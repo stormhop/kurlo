@@ -28,7 +28,7 @@ func workspaceTreeForTest(t *testing.T, root string) map[string]string {
 		if err != nil {
 			return err
 		}
-		files[rel] = string(data)
+		files[filepath.ToSlash(rel)] = string(data)
 		return nil
 	})
 	if err != nil {

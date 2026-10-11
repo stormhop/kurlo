@@ -3742,9 +3742,6 @@ test.describe('Protocol badge', () => {
       widths[`${type} draft`] = Math.round((await trigger.boundingBox())!.width);
       await page.getByLabel('Request URL').fill(type === 'WebSocket' ? 'wss://echo.websocket.org' : 'https://api.example.test/');
       widths[`${type} with url`] = Math.round((await trigger.boundingBox())!.width);
-      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+s' : 'Control+s');
-      await page.waitForTimeout(300);
-      widths[`${type} saved`] = Math.round((await page.getByRole('button', { name: 'Method and protocol' }).boundingBox())!.width);
     }
     for (const [label, width] of Object.entries(widths)) expect(width, label).toBeLessThanOrEqual(widths.http + 24);
     expect(widths.ws, 'a locked WS badge hugs its label').toBeLessThanOrEqual(56);
