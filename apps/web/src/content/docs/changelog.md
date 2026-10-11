@@ -7,6 +7,28 @@ tableOfContents:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## 2.2.6
+
+### Added
+
+- **The cookie sync extension comes with the app.** In Cookies → Sync cookies, pick your browser and Kurlo puts the extension in a folder with the steps to load it, at the same version as the app. Releases also attach it as a zip. See [Cookies](/docs/guides/cookies/).
+- **`kurlo mcp` lists the variables a request was missing** in `unresolvedVariables`. See [MCP server](/docs/guides/mcp-server/).
+
+### Changed
+
+- **Updates moved into About**, with the update state, one action, automatic install and release notes in one place.
+- **Large workspaces open, search and save much faster**: 10,000 requests appear in about a second instead of 24, and importing them saves in seconds instead of minutes on macOS.
+- **Workspace files no longer carry `createdAt` and `updatedAt`**, so reloading no longer changes cookie timestamps in Git.
+
+### Fixed
+
+- **No more changes you never made after opening a workspace, switching branches or pulling.**
+- **An interrupted save can no longer lock the workspace or lose a new secret.**
+- **Bruno, OpenCollection and Insomnia exports keep `{{variables}}` and scripts.**
+- **Save to file keeps binary responses intact.**
+- **Cancelling and resending, or switching environments mid-request, no longer mixes up results.**
+- **Search covers Starred requests**, and the **GraphQL explorer** shows arguments and every field of the schema.
+
 ## 2.2.5
 
 ### Added

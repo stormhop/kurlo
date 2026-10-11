@@ -5,6 +5,61 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [2.2.6] - 2026-10-11
+
+### Added
+
+- **The cookie sync extension comes with the app.** The Sync Cookies tab has a **Browser extension** section: pick Chrome, Edge, Brave or Firefox, and Kurlo puts the extension in a folder it opens for you, with the three steps to load it. No more cloning the repository. The extension carries the same version as Kurlo, and Kurlo refreshes the folder when it updates, so the browser picks up the new version the next time it starts or when you press Reload. A connected extension that is older than Kurlo is flagged in the tab. Each release also attaches the extension as `kurlo-cookie-sync-<version>-chromium.zip` and `-firefox.zip`.
+- **`kurlo mcp` says which variables a request was missing.** When a request uses a `{{variable}}` that no environment, call override or script has set, `run_request` and `send_request` list it in `unresolvedVariables`, so an assistant that gets a `401` knows to run the login request first instead of guessing.
+
+### Changed
+
+- **Updates moved into About.** The Updates tab is gone. About shows the version, the update state with the one action that fits it (check, install, restart or try again), the automatic install switch and the notes of a new release, all in one place.
+- **Large workspaces open and search fast.** With 10,000 requests the sidebar took about 24 seconds to appear and as long to search; it now takes about a second and a tenth of a second. A workspace with a long request history starts about twice as fast.
+- **Saving many files at once is much faster on macOS.** Importing a collection of 10,000 requests took over two minutes to save; it now takes about four seconds. Kurlo flushes each file normally and makes one full flush to the disk at the end of the save instead of one per file.
+- **Workspace files no longer carry `createdAt` and `updatedAt`.** Nothing read them, and cookie timestamps changed on every reload, which showed up as changes in Git. Files that still have them keep them until the item really changes.
+- **A smaller Send button**, and a protocol badge such as `WS` or `GraphQL` that is as wide as its label once the protocol can no longer change.
+
+- **Folders decide where a collection, request or environment belongs.** Changing a workspace or collection ID by hand, or in a pulled commit, no longer locks the workspace with one error for every file inside it. Kurlo follows the folder, keeps everything where it was, and rewrites the copied `workspaceId`, `collectionId` and `requestId` fields on the next save. Order entries for deleted files are skipped instead of reported.
+- **One problem, one entry.** A copied collection or workspace folder is reported once, on the copy, and the original stays usable. The Git screen lists each file by name with its folder and a plain explanation, and only the problems that really pause saving remain: duplicate or missing IDs, a deleted parent file with files left inside its folder, and broken response examples.
+- **A response example is one file.** The response body is now stored inside the example's YAML, as a readable block for JSON, XML and HTML, instead of in a separate `.body.json` or `.body.txt` file. Bodies saved the old way still load and move into the YAML on the next save.
+- **History loads older commits as you scroll.** Reaching the end of the list fetches the next 60 commits without pausing the other Git buttons, so a repository with thousands of commits scrolls through without pressing **Load more**.
+- **Diffs read like the file.** The Git screen no longer shows Git's own header lines (`diff --git`, `index`, `---`/`+++`), numbers each line by its place in the file instead of its place in the diff, and names each file when a commit touches several.
+- **Edit YAML is a real editor.** It has syntax colours, line numbers and the same red underline as the JSON editor. Kurlo checks the file as you type with the parser that loads the workspace, so the editor and the Git screen always agree, and common YAML mistakes are explained in plain words instead of parser messages. ⌘S saves.
+- **Changes lists only Kurlo files.** Other changes in the same repository are counted below the list instead of being shown as files Kurlo can neither commit nor discard.
+- **A clearer branch picker.** Each branch is one line with its upstream beside it, the current branch is marked with a check, and a remote branch that already has a local branch is no longer listed twice: renaming or deleting it on the remote is in that local branch's ⋯ menu.
+- **Files are named after what they hold.** A folder or file now always follows the name of the workspace, collection, request or environment inside it, so a pull request reads `collections/EF/requests/Obshchiy.yml` instead of `collections/Requests/requests/New-Request-3.yml`. Renaming in the app, editing `name` in the YAML, or pulling someone else's rename moves the file on the next save, and Git shows it as a rename. Cyrillic names are transliterated (`Общий` → `Obshchiy`) instead of becoming `item.yml`, names that differ only in case get separate files, which macOS and Windows need, and requests that share a name keep their numbered files when reordered. Opening or pulling never moves files by itself, and nothing moves while a file in the workspace is broken.
+- **Changes and History share one panel.** The Git screen has two columns: a Changes | History switch on the left and the diff on the right. Picking a commit shows its message and diff there. History no longer needs its own column, its loaded-commit count or its refresh button: it refreshes after every Git action and whenever you come back to Kurlo with the Git screen open.
+- **No more "Clean" label.** The toolbar showed "Clean" or "N changed" next to the branch, the same count the Changes tab and the status bar already show. It now shows only a merge or rebase in progress, the one state that needs attention there.
+- **Git output opens in its own window.** It moved from a collapsed strip under the history to **Show Git output** in the ⋯ menu, and a failed command offers **Show output** next to its error.
+
+### Fixed
+
+- **Opening a workspace, switching branches or pulling showed changes you never made.** Kurlo rewrote request files to add a `settingsOverrides` block it had worked out from the request's own settings, and rewrote cookies with a new timestamp. A file whose content has not changed is now left exactly as it is.
+- **A save interrupted while renaming or moving a request could lock the workspace** with two files claiming the same ID. Kurlo now keeps a short journal of the files a save writes and, after a crash, removes the leftover copy when it opens the workspace.
+- **A save interrupted at the wrong moment could lose a newly entered secret.** The token was already replaced by a placeholder in the YAML but not yet stored in the encrypted local file. Kurlo now stores new secrets first.
+- **Deleting a collection, cut short, could lock the workspace.** Its `collection.yml` was removed before the requests inside it. Kurlo now removes the files inside a folder first.
+- **Exporting to Bruno or OpenCollection turned `{{token}}` into `{}`.** A value that starts with `{{` was written without quotes, which YAML reads as an object. Such values are now quoted.
+- **Exporting to or importing from Insomnia dropped the pre-request and test scripts.** They now travel as Insomnia's `preRequestScript` and `afterResponseScript`.
+- **Save to file wrote broken images, PDFs and archives.** A binary response body was passed through the window as text and lost bytes on the way. It now stays in Kurlo's backend, is saved byte for byte, and no longer turns a 100 MB download into half a gigabyte of window memory.
+- **Send, Cancel, Send could end with no response and no spinner.** When the cancelled call answered late, it cleared the progress and showed "Request canceled" over the new call. A cancelled or superseded call no longer touches the screen.
+- **Values a script set went to the wrong environment** when you switched environments while the request was running. They now go to the environment the request was sent with.
+- **Search ignored the Starred section.** It stayed open with every starred request and pushed the results out of view.
+- **The GraphQL explorer squeezed each field's arguments into a thin line**, and a schema with a default such as `filter: Input = {}` lost every field after it.
+- **The Git sign-in hint said Kurlo does not store tokens.** Kurlo asks for a personal access token or an SSH key when a repository needs one and keeps the token encrypted; the hint now says so.
+
+- **Response bodies saved as `.json`, `.xml`, `.html`, `.csv` or `.js` files never reached Git.** The Git screen only committed YAML, so a teammate who pulled the example got an error about a missing body file. The body now lives in the YAML itself.
+- **A broken file in a workspace you were not looking at went unnoticed.** After a pull broke `workspace.yml`, Kurlo switched to another workspace and the Git screen showed only that workspace's problems. It now lists every broken file in the folder and names the workspace each one locks.
+- **A request deleted in the app came back after a reload** when any other file in the same workspace could not be read. Kurlo now keeps only the unreadable file, or the folder of an unreadable `collection.yml` or `workspace.yml`, and cleans up the rest as usual.
+- **Changing a workspace ID back left stray changes.** Kurlo had rewritten the references inside the folder for the new ID, and after the ID was restored they stayed changed until the next edit. Kurlo now corrects references, and the order in `kurlo.yml`, as soon as it loads the folder, touching only those lines and keeping comments.
+- **`name: 404` or `method: 42` in a request file stopped the workspace from loading.** Unquoted numbers and other wrong value types in hand-edited YAML are now read as text where text is expected, and a value of the wrong shape falls back to its default.
+- **A file written by a newer Kurlo was read as if it were the current format.** It is now reported and left untouched.
+- **A save cut short, by a crash or a power loss, could leave the workspace locked.** Kurlo now writes each parent file before the files inside it, so an interrupted save always leaves a folder that loads.
+
+- **The workspace JSON Schema rejected the files Kurlo writes.** It required fields Kurlo leaves out, such as `filesystemName`, a default `method` or an empty `auth`, missed the `cookies` of a workspace, and lacked newer values such as the `mcp` request type, `inherit` auth and the `password` and `device_code` grants. Every file Kurlo writes is now checked against it in the test suite. It also moved to JSON Schema draft-07, which IntelliJ-based IDEs and the YAML language server read fully.
+
+- **Two first saves at the same moment could refuse each other** with "kurlo.yml is missing but workspace files remain", for example the app and `kurlo run` writing a new folder together. Kurlo now checks again before reporting it.
+
 ## [2.2.5] - 2026-10-06
 
 ### Added
@@ -572,7 +627,8 @@ this repository.
 - Configurable keyboard shortcuts throughout, global search (`⌘K`), quick send (`⌘Enter`), and tab switching (`⌘1`–`⌘9`).
 - Settings search and full keyboard navigation, theme previews, and onboarding empty states.
 
-[Unreleased]: https://github.com/stormhop/kurlo/compare/v2.2.5...HEAD
+[Unreleased]: https://github.com/stormhop/kurlo/compare/v2.2.6...HEAD
+[2.2.6]: https://github.com/stormhop/kurlo/compare/v2.2.5...v2.2.6
 [2.2.5]: https://github.com/stormhop/kurlo/compare/v2.2.4...v2.2.5
 [2.2.4]: https://github.com/stormhop/kurlo/compare/v2.2.3...v2.2.4
 [2.2.3]: https://github.com/stormhop/kurlo/compare/v2.2.2...v2.2.3
