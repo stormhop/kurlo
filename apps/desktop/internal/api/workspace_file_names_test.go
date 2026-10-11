@@ -73,7 +73,7 @@ func TestRenamingInTheAppMovesFilesAndFolders(t *testing.T) {
 		"workspaces/Platezhi/collections/EF/requests/Obshchiy.yml",
 		"workspaces/Platezhi/collections/EF/examples/Obshchiy/created.yml",
 	} {
-		if _, ok := tree[filepath.FromSlash(path)]; !ok {
+		if _, ok := tree[path]; !ok {
 			t.Errorf("missing %s after rename; files: %v", path, keysOf(tree))
 		}
 	}

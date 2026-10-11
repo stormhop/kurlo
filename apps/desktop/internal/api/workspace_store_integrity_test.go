@@ -160,7 +160,7 @@ func TestWorkspaceIntegrityAllowsConsistentExternalChanges(t *testing.T) {
 				t.Fatal(err)
 			}
 			before := workspaceTreeForTest(t, root)
-			if _, moved := before[filepath.Join("workspaces", "Renamed", "workspace.yml")]; change == "name" && !moved {
+			if _, moved := before["workspaces/Renamed/workspace.yml"]; change == "name" && !moved {
 				t.Fatalf("a renamed workspace must move to its new folder: %v", keysOf(before))
 			}
 			loaded, _, err = loadKurloStorePayloadWithDiagnostics(local, root)
