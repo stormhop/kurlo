@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -102,6 +103,8 @@ function defaultSettings() {
     disableCookieJar: false,
     maxRedirects: 10,
     timeoutMs: 30000,
+    scriptTimeoutMs: 0,
+    allowSendRequest: true,
     proxyUrl: '',
     browserEmulation: false,
     browserOrigin: '',
@@ -143,11 +146,43 @@ function methodFor(type, index) {
   return ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'][index % 5];
 }
 
+function makeExamples(id, index) {
+  if (index % 25 !== 0) return [];
+  return [{
+    id: `${id}-example-ok`,
+    requestId: id,
+    name: 'OK',
+    filesystemName: 'ok',
+    source: 'captured',
+    snapshot: { method: 'GET', url: `https://api.example.test/v1/resources/${index}` },
+    response: {
+      statusCode: 200,
+      status: '200 OK',
+      bodyMediaType: 'application/json',
+      body: JSON.stringify({ id, ok: true }, null, 2),
+      headers: [{ key: 'Content-Type', value: 'application/json', enabled: true }],
+    },
+    match: { pathTemplate: `/v1/resources/${index}` },
+  }];
+}
+
+function requestSettings(index, collection) {
+  if (index % 13 !== 0) return { settings: { ...collection.defaults.settings }, settingsOverrides: {} };
+  return { settings: { ...collection.defaults.settings, timeoutMs: 5000 + index }, settingsOverrides: { timeoutMs: true } };
+}
+
+function requestName(method, index) {
+  const serial = String(index).padStart(5, '0');
+  if (index % 9 === 4) return `${method} Заказ ${serial} 🚀`;
+  if (index % 9 === 7) return `${method} 注文 ${serial}`;
+  return `${method} Fixture ${serial}`;
+}
+
 function makeRequest(index, collection) {
   const type = requestTypeFor(index);
   const method = methodFor(type, index);
   const id = `req-${String(index).padStart(5, '0')}`;
-  const name = `${method} Fixture ${String(index).padStart(5, '0')}`;
+  const name = requestName(method, index);
   const isGraphQL = type === 'graphql';
   const isGrpc = type === 'grpc';
   const isRealtime = type === 'ws' || type === 'socketio';
@@ -192,8 +227,8 @@ function makeRequest(index, collection) {
     preRequestScriptJs: 'pm.variables.set("fixtureRequestId", pm.request.url)',
     testScriptJs: 'pm.test("status under 500", () => pm.expect(pm.response.code).to.be.below(500))',
     requestNotes: `Generated performance fixture request ${index}.`,
-    settings: defaultSettings(),
-    settingsOverrides: {},
+    ...requestSettings(index, collection),
+    examples: makeExamples(id, index),
     sioEvents: type === 'socketio' ? [row(5, 'message', '', { description: 'fixture event' })] : [],
     sioEventName: type === 'socketio' ? 'message' : '',
     sioArgs: type === 'socketio' ? [{ id: '1', content: '{"ok":true}', bodyType: 'json', encoding: 'base64' }] : [{ id: '1', content: '', bodyType: 'text', encoding: 'base64' }],
@@ -204,57 +239,11 @@ function makeRequest(index, collection) {
     grpcProtoFilePath: '',
     grpcProtoFileName: '',
     grpcProtoImportPaths: [],
-    createdAt: baseTime + index,
-    updatedAt: baseTime + index,
   };
-}
-
-function yamlScalar(value, indent = 0) {
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  const text = String(value ?? '');
-  if (text.includes('\n')) {
-    const pad = ' '.repeat(indent + 2);
-    return `|-\n${text.split('\n').map(line => `${pad}${line}`).join('\n')}`;
-  }
-  if (!text) return '""';
-  if (/^[A-Za-z0-9_./:@{}$ -]+$/.test(text) && !/^(true|false|null|~)$/i.test(text) && !/^\d/.test(text) && !text.includes(': ')) return text;
-  return JSON.stringify(text);
-}
-
-function yamlValue(value, indent = 0) {
-  const pad = ' '.repeat(indent);
-  if (Array.isArray(value)) {
-    if (!value.length) return '[]';
-    return value.map(item => {
-      if (item && typeof item === 'object' && !Array.isArray(item)) {
-        return `${pad}- ${yamlMap(item, indent + 2).trimStart()}`;
-      }
-      return `${pad}- ${yamlScalar(item, indent)}`;
-    }).join('\n');
-  }
-  if (value && typeof value === 'object') return `\n${yamlMap(value, indent + 2)}`;
-  return yamlScalar(value, indent);
-}
-
-function yamlMap(value, indent = 0) {
-  const pad = ' '.repeat(indent);
-  const lines = [];
-  for (const [key, raw] of Object.entries(value)) {
-    if (raw === undefined || raw === null) continue;
-    if (Array.isArray(raw)) lines.push(raw.length ? `${pad}${key}:\n${yamlValue(raw, indent + 2)}` : `${pad}${key}: []`);
-    else if (raw && typeof raw === 'object') lines.push(`${pad}${key}:\n${yamlMap(raw, indent + 2)}`);
-    else lines.push(`${pad}${key}: ${yamlScalar(raw, indent)}`);
-  }
-  return `${lines.join('\n')}\n`;
 }
 
 function writeJSON(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
-}
-
-function writeYAML(path, value) {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, yamlMap(value));
 }
 
 function makeHugeResponse(targetBytes) {
@@ -280,7 +269,7 @@ function makeHugeResponse(targetBytes) {
 }
 
 const options = readArgs(process.argv.slice(2));
-const baseTime = Date.UTC(2026, 0, 1, 0, 0, 0);
+const historyNow = Date.now();
 
 rmSync(options.out, { recursive: true, force: true });
 mkdirSync(options.out, { recursive: true });
@@ -307,10 +296,10 @@ const collections = Array.from({ length: options.collections }, (_, index) => ({
     testScript: '',
     preRequestScriptJs: '',
     testScriptJs: '',
-    settings: defaultSettings(),
+    settings: index === 0
+      ? { ...defaultSettings(), browserEmulation: true, browserEnforceCORS: true, browserOrigin: 'https://app.example.com', browserWithCredentials: true }
+      : defaultSettings(),
   },
-  createdAt: baseTime + index,
-  updatedAt: baseTime + index,
 }));
 
 const requests = Array.from({ length: options.requests }, (_, index) => makeRequest(index, collections[index % collections.length]));
@@ -333,7 +322,7 @@ const history = Array.from({ length: options.history }, (_, index) => {
     statusCode: index % 23 === 0 ? 500 : index % 7 === 0 ? 204 : 200,
     status: index % 23 === 0 ? '500 Internal Server Error' : index % 7 === 0 ? '204 No Content' : '200 OK',
     duration: 20 + (index % 1800),
-    createdAt: baseTime - index * 60000,
+    createdAt: historyNow - index * 60000,
   };
 });
 const cookies = Array.from({ length: Math.min(1000, Math.max(20, Math.floor(options.requests / 10))) }, (_, index) => ({
@@ -347,8 +336,6 @@ const cookies = Array.from({ length: Math.min(1000, Math.max(20, Math.floor(opti
   httpOnly: index % 5 === 0,
   sameSite: index % 3 === 0 ? 'lax' : '',
   hostOnly: index % 2 === 0,
-  createdAt: baseTime + index,
-  updatedAt: baseTime + index,
 }));
 
 writeJSON(join(options.out, 'request-store-large.json'), {
@@ -363,41 +350,24 @@ writeJSON(join(options.out, 'request-store-large.json'), {
   environments,
   requests,
   history,
-  cookies,
+  workspaceCookies: { [workspace.id]: cookies },
 });
 
 writeFileSync(join(options.out, 'huge-response.json'), makeHugeResponse(options.responseMb * 1024 * 1024));
 
 const yamlRoot = join(options.out, 'kurlo-yaml-large');
-writeYAML(join(yamlRoot, 'kurlo.yml'), {
-  version: 1,
-  format: 'kurlo.workspace.yaml.v1',
-  workspaceOrder: [workspace.id],
+const build = spawnSync('go', ['test', './internal/api', '-run', '^TestPerfFixtureWorkspace$', '-count=1', '-v'], {
+  cwd: join(root, 'apps', 'desktop'),
+  env: { ...process.env, KURLO_PERF_STORE: join(options.out, 'request-store-large.json'), KURLO_PERF_WORKSPACE: yamlRoot },
+  encoding: 'utf8',
 });
-writeYAML(join(yamlRoot, 'workspaces', workspace.filesystemName, 'workspace.yml'), {
-  version: 1,
-  workspace,
-  collectionOrder: collections.map(collection => collection.id),
-});
-for (const collection of collections) {
-  const collectionDir = join(yamlRoot, 'workspaces', workspace.filesystemName, 'collections', collection.filesystemName);
-  writeYAML(join(collectionDir, 'collection.yml'), {
-    version: 1,
-    collection,
-    requestOrder: requests.filter(request => request.collectionId === collection.id).map(request => request.id),
-  });
-  for (const request of requests.filter(candidate => candidate.collectionId === collection.id)) {
-    writeYAML(join(collectionDir, 'requests', `${request.filesystemName}.yml`), {
-      version: 1,
-      request,
-    });
-  }
+const report = `${build.stdout ?? ''}${build.stderr ?? ''}`;
+for (const line of report.split('\n')) {
+  if (line.includes('perf fixture:')) console.log(line.trim().replace(/^.*perf fixture:\s*/, ''));
 }
-for (const env of environments) {
-  writeYAML(join(yamlRoot, 'workspaces', workspace.filesystemName, 'environments', `${env.filesystemName}.yml`), {
-    version: 1,
-    environment: env,
-  });
+if (build.status !== 0) {
+  console.error(report);
+  throw new Error('Building the YAML workspace with the Kurlo writer failed');
 }
 
 writeJSON(join(options.out, 'manifest.json'), {
@@ -413,6 +383,7 @@ writeJSON(join(options.out, 'manifest.json'), {
     collections: collections.length,
     folderPaths: options.folders,
     requests: requests.length,
+    examples: requests.reduce((total, request) => total + request.examples.length, 0),
     history: history.length,
     environments: environments.length,
     cookies: cookies.length,

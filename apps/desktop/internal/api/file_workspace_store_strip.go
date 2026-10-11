@@ -165,6 +165,7 @@ var socketIORequestSettingFieldSet = stringSet(socketIORequestSettingFields)
 var grpcRequestSettingFieldSet = stringSet(grpcRequestSettingFields)
 
 func stripRequestForFilesystem(request map[string]any) {
+	stripTimestamps(request)
 	requestType := stringValue(request, "requestType")
 	stripBodyFieldsForType(request, requestType)
 	stripRealtimeFieldsForType(request, requestType)
@@ -350,11 +351,13 @@ func stringSet(values []string) map[string]bool {
 }
 
 func stripWorkspaceForFilesystem(workspace map[string]any) {
+	stripTimestamps(workspace)
 	delete(workspace, "theme")
 	stripEmptyAndDefaults(workspace, nil)
 }
 
 func stripCollectionForFilesystem(collection map[string]any) {
+	stripTimestamps(collection)
 	stripCollectionDefaultsForFilesystem(collection)
 	stripEmptyAndDefaults(collection, collectionFieldDefaults)
 }
@@ -375,6 +378,7 @@ func stripCollectionDefaultsForFilesystem(collection map[string]any) {
 }
 
 func stripEnvironmentForFilesystem(environment map[string]any) {
+	stripTimestamps(environment)
 	stripNonSecretRowIDs(environment["values"])
 	stripEmptyAndDefaults(environment, nil)
 }
@@ -544,4 +548,9 @@ func valuesEqual(a, b any) bool {
 		}
 	}
 	return false
+}
+
+func stripTimestamps(item map[string]any) {
+	delete(item, "createdAt")
+	delete(item, "updatedAt")
 }

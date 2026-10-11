@@ -127,6 +127,7 @@ type RequestStateHost = {
   requestTab: RequestTab;
   requestType: RequestType;
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   response: HttpResponse | null;
   responseBodyPage: number;
   responseSearchIndex: number;
@@ -217,7 +218,7 @@ export const requestStateFeature = {
   },
 
   snapshotActiveRequest(this: RequestStateHost, options: { forPersistence?: boolean } = {}): SavedRequest {
-    const existing = this.requests.find(r => r.id === this.activeRequestId);
+    const existing = this.requestsById.get(this.activeRequestId);
     const collectionId = existing?.isDraft ? '' : existing?.collectionId || this.activeCollectionId();
     const normalizedType = this.normalizeRequestTypeValue(this.requestType, this.url);
     const isGraphQL = normalizedType === 'graphql';
@@ -383,7 +384,7 @@ export const requestStateFeature = {
     this.requestExamples = (req.examples ?? []).map(cloneRequestExample);
     this.selectedExampleId = this.requestExamples[0]?.id ?? '';
     this.applyRequestSettings(req.settings);
-    this.requestSettingsOverrides = normalizeRequestSettingsOverrides(req.settingsOverrides, req.settings);
+    this.requestSettingsOverrides = normalizeRequestSettingsOverrides(req.settingsOverrides, req.settings, this.collections.find(collection => collection.id === req.collectionId)?.defaults?.settings);
     this.response = this.requestType !== 'grpc' ? (this.responses.get(req.id) ?? null) : null;
     this.responseTab = this.requestType !== 'grpc' ? (this.responseTabs.get(req.id) ?? 'body') : 'body';
     this.responseBodyPage = 0;

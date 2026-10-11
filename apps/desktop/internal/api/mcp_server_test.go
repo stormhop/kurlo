@@ -367,11 +367,17 @@ func TestMCPServerRunsRequestsAndCarriesScriptVariables(t *testing.T) {
 	if chain.TestsTotal != 1 || chain.TestsPassed != 0 {
 		t.Fatalf("before the login-style request ran, Chain's test should fail: %+v", chain)
 	}
+	if strings.Join(chain.Unresolved, ",") != "chained" {
+		t.Fatalf("Chain should report chained as unresolved before a script sets it: %v", chain.Unresolved)
+	}
 
 	var ok mcpRequestOutcome
 	h.tool("run_request", map[string]any{"request": "Smoke/Ok"}, &ok)
 	if ok.Status != 200 || ok.TestsPassed != 1 || ok.TestsTotal != 1 {
 		t.Fatalf("Ok = %+v", ok)
+	}
+	if len(ok.Unresolved) > 0 {
+		t.Errorf("collection variables are known, nothing is unresolved: %v", ok.Unresolved)
 	}
 	if !strings.Contains(ok.Body, `"query":"v=v1"`) {
 		t.Errorf("collection variables should resolve in the URL; body = %s", ok.Body)
@@ -383,9 +389,13 @@ func TestMCPServerRunsRequestsAndCarriesScriptVariables(t *testing.T) {
 		t.Errorf("headers/timings missing: %+v", ok)
 	}
 
+	chain = mcpRequestOutcome{}
 	h.tool("run_request", map[string]any{"request": "req-fail"}, &chain)
 	if chain.TestsPassed != 1 || !strings.Contains(chain.URL, "chained=yes") {
 		t.Fatalf("a value a script set should carry into the next call: %+v", chain)
+	}
+	if len(chain.Unresolved) > 0 {
+		t.Fatalf("once a script set chained it is no longer unresolved: %v", chain.Unresolved)
 	}
 
 	h.tool("run_request", map[string]any{"request": "Chain", "variables": map[string]any{"chained": "override"}}, &chain)

@@ -16,23 +16,25 @@ Nothing is read until three things line up:
 
 Cookies flow one way: browser → Kurlo.
 
-## Install (Chrome, Edge, Brave)
+## Install
 
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. **Load unpacked** → pick this `apps/extension` folder.
-3. Open the extension, press **Connect**, and approve the request in Kurlo.
-4. Press **Grant domain access** and accept the browser's permission prompt.
+The extension ships with Kurlo. In Kurlo, open **Cookies → Sync cookies → Browser extension**
+and pick your browser: Kurlo writes the extension, with its own version in the manifest, to a
+folder in its data directory and opens it.
 
-## Install (Firefox)
+- **Chrome, Edge, Brave:** `chrome://extensions` → **Developer mode** → **Load unpacked** →
+  pick that folder.
+- **Firefox:** `about:debugging#/runtime/this-firefox` → **Load Temporary Add-on** → pick
+  `manifest.json` in that folder. Kurlo writes the Firefox event-page manifest there for you.
 
-Firefox wants an event page rather than a service worker:
+Kurlo rewrites the folder on start-up after an update, so the browser picks up the new
+version when it restarts or when you press **Reload**. Releases also attach
+`kurlo-cookie-sync-<version>-chromium.zip` and `-firefox.zip`
+(`scripts/package-browser-extension.py`).
 
-```bash
-cp apps/extension/manifest.firefox.json apps/extension/manifest.json
-```
-
-Then load it from `about:debugging` → **This Firefox** → **Load Temporary Add-on** and pick
-`manifest.json`. (Keep a copy of the Chromium manifest if you switch back.)
+For development, load this folder itself unpacked (Chromium), or copy
+`manifest.firefox.json` over `manifest.json` in a scratch copy for Firefox. `embed.go` is
+how the app bundles these files; browsers ignore it.
 
 ## How it talks to Kurlo
 

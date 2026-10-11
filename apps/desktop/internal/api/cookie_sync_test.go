@@ -101,7 +101,7 @@ func (h *cookieSyncHarness) do(t *testing.T, req *http.Request) (int, map[string
 
 func (h *cookieSyncHarness) dial(t *testing.T, token string) *websocket.Conn {
 	t.Helper()
-	url := fmt.Sprintf("ws://127.0.0.1:%d/ws?token=%s&browser=Chrome", h.port, token)
+	url := fmt.Sprintf("ws://127.0.0.1:%d/ws?token=%s&browser=Chrome&version=1.4.0", h.port, token)
 	headers := http.Header{}
 	headers.Set("Origin", "chrome-extension://kurlotestextension")
 	conn, _, err := websocket.DefaultDialer.Dial(url, headers)

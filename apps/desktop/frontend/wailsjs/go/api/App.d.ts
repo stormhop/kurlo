@@ -21,6 +21,8 @@ export function CancelRequest(arg1:string):Promise<void>;
 
 export function CheckForUpdate():Promise<model.UpdateCheckResult>;
 
+export function CheckWorkspaceYAML(arg1:string,arg2:string):Promise<api.WorkspaceYAMLCheckResult>;
+
 export function ClearCookies(arg1:string):Promise<Array<model.Cookie>>;
 
 export function ClearHistoryResponses():Promise<string>;
@@ -143,6 +145,8 @@ export function GitTokenInfo(arg1:string):Promise<api.GitTokenInfoResult>;
 
 export function GrpcDiscover(arg1:model.GrpcRequest):Promise<model.GrpcServiceDefinition>;
 
+export function InstallBrowserExtension(arg1:string):Promise<api.BrowserExtensionResult>;
+
 export function ListCookies(arg1:string):Promise<Array<model.Cookie>>;
 
 export function LoadHistoryResponse(arg1:string):Promise<api.HistoryResponseResult>;
@@ -196,6 +200,8 @@ export function SaveHistoryResponse(arg1:string,arg2:string):Promise<api.History
 export function SaveRequestStore(arg1:string):Promise<boolean>;
 
 export function SaveRequestStoreWithError(arg1:string):Promise<api.SaveRequestStoreResult>;
+
+export function SaveResponseBody(arg1:string,arg2:string):Promise<api.SaveResponseBodyResult>;
 
 export function SaveWorkspaceSecrets(arg1:Record<string, string>):Promise<api.WorkspaceOpenResult>;
 

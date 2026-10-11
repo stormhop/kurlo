@@ -626,6 +626,29 @@
   color: var(--text-3);
 }
 
+.cookie-sync-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--text-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+}
+
+.cookie-sync-steps code,
+.cookie-sync-path {
+  font-family: var(--font-mono);
+  color: var(--text);
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.cookie-sync-outdated {
+  border-color: color-mix(in srgb, var(--s4xx) 45%, var(--border));
+}
+
 .cookie-sync-hint em {
   font-style: normal;
   font-weight: var(--weight-semibold);

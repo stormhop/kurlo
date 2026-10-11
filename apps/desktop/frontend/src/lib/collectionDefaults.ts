@@ -1,6 +1,6 @@
 import { DEFAULT_REQUEST_SETTINGS } from './constants';
 import type { AuthState, Collection, CollectionDefaults, KVRow, RequestSettings, RequestSettingsOverrides, SavedRequest } from './types/models';
-import { authStateHasData, cloneRowsForStore, emptyAuthState, rowHasContent } from './utils';
+import { authStateHasData, cloneRowsForStore, emptyAuthState, rowHasContent, sanitizeLike } from './utils';
 
 type RequestSettingKey = keyof RequestSettings;
 
@@ -57,16 +57,17 @@ export function emptyCollectionDefaults(): CollectionDefaults {
   };
 }
 
-export function normalizeCollectionDefaults(input?: Partial<CollectionDefaults>): CollectionDefaults {
+export function normalizeCollectionDefaults(raw?: Partial<CollectionDefaults>): CollectionDefaults {
+  const input = sanitizeLike(raw, emptyCollectionDefaults());
   return {
-    headers: cloneRowsForStore(input?.headers ?? []),
-    variables: cloneRowsForStore(input?.variables ?? []),
-    auth: { ...emptyAuthState(), ...(input?.auth ?? {}) },
-    preRequestScript: input?.preRequestScript ?? '',
-    testScript: input?.testScript ?? '',
-    preRequestScriptJs: input?.preRequestScriptJs ?? '',
-    testScriptJs: input?.testScriptJs ?? '',
-    settings: { ...DEFAULT_REQUEST_SETTINGS, ...(input?.settings ?? {}) },
+    headers: cloneRowsForStore(input.headers ?? []),
+    variables: cloneRowsForStore(input.variables ?? []),
+    auth: { ...emptyAuthState(), ...sanitizeLike(input.auth, emptyAuthState()) },
+    preRequestScript: input.preRequestScript ?? '',
+    testScript: input.testScript ?? '',
+    preRequestScriptJs: input.preRequestScriptJs ?? '',
+    testScriptJs: input.testScriptJs ?? '',
+    settings: { ...DEFAULT_REQUEST_SETTINGS, ...sanitizeLike(input.settings, DEFAULT_REQUEST_SETTINGS) },
   };
 }
 
@@ -150,10 +151,12 @@ export function mergeCollectionAuth(defaultAuth: AuthState, requestAuth: AuthSta
   return emptyAuthState();
 }
 
-export function requestSettingsOverridesFromSettings(settings: RequestSettings): RequestSettingsOverrides {
+export function requestSettingsOverridesFromSettings(settings: RequestSettings, inherited?: Partial<RequestSettings>): RequestSettingsOverrides {
   const overrides: RequestSettingsOverrides = {};
   for (const key of REQUEST_SETTING_KEYS) {
-    if (settings[key] !== DEFAULT_REQUEST_SETTINGS[key]) overrides[key] = true;
+    if (settings[key] === DEFAULT_REQUEST_SETTINGS[key]) continue;
+    if (inherited && Object.prototype.hasOwnProperty.call(inherited, key) && settings[key] === inherited[key]) continue;
+    overrides[key] = true;
   }
   return overrides;
 }
@@ -161,8 +164,9 @@ export function requestSettingsOverridesFromSettings(settings: RequestSettings):
 export function normalizeRequestSettingsOverrides(
   overrides: RequestSettingsOverrides | undefined,
   settings: RequestSettings,
+  inherited?: Partial<RequestSettings>,
 ): RequestSettingsOverrides {
-  if (!overrides) return requestSettingsOverridesFromSettings(settings);
+  if (!overrides) return requestSettingsOverridesFromSettings(settings, inherited);
   const normalized: RequestSettingsOverrides = {};
   for (const key of REQUEST_SETTING_KEYS) {
     if (overrides[key]) normalized[key] = true;

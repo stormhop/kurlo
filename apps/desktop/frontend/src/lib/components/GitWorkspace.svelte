@@ -1,5 +1,8 @@
 <script lang="ts">
   import { uiScale } from '../uiScale';
+  import { tabListKeyboard } from '../a11y';
+  import { gitDiffRows, type GitDiffRow } from '../gitDiffRows';
+  import { kurloChangedFiles, otherChangedFileCount } from '../gitFiles';
   import GitIcon from './GitIcon.svelte';
   import type { GitBranchEntry, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, WorkspaceDiagnostic } from '../backend';
   import { gitConflictHunks, parseGitConflictBlocks, replaceAllGitConflictHunks, replaceGitConflictHunk, type ConflictSide, type GitConflictBlock } from '../gitConflicts';
@@ -22,8 +25,8 @@
     workspaceDiagnostics = [],
     onEditWorkspaceDiagnostic = () => {},
     workspaceDiagnosticKey = (diagnostic: WorkspaceDiagnostic) => diagnostic.path,
-    workspaceDiagnosticTitle = () => 'Workspace YAML',
     workspaceDiagnosticLocation = (diagnostic: WorkspaceDiagnostic) => diagnostic.path,
+    workspaceDiagnosticScopeLabel = () => '',
     onRefresh,
     onUseLocal,
     onUseAppStorage = () => {},
@@ -48,8 +51,8 @@
     onRenameBranch,
     onCommit,
     onViewOutgoing,
-    onRefreshLog,
     onLoadMoreLog,
+    logLoadingMore = false,
     onSelectCommit,
     onPush,
     onForcePush,
@@ -75,8 +78,8 @@
     workspaceDiagnostics?: WorkspaceDiagnostic[];
     onEditWorkspaceDiagnostic?: (diagnostic: WorkspaceDiagnostic) => void;
     workspaceDiagnosticKey?: (diagnostic: WorkspaceDiagnostic) => string;
-    workspaceDiagnosticTitle?: (diagnostic: WorkspaceDiagnostic) => string;
     workspaceDiagnosticLocation?: (diagnostic: WorkspaceDiagnostic) => string;
+    workspaceDiagnosticScopeLabel?: (diagnostic: WorkspaceDiagnostic) => string;
     onRefresh: () => void | Promise<void>;
     onUseLocal: () => void | Promise<void>;
     onUseAppStorage?: () => void | Promise<void>;
@@ -101,8 +104,8 @@
     onRenameBranch: (branchName: string, remote?: boolean) => void | Promise<void>;
     onCommit: (paths?: string[]) => void | Promise<void>;
     onViewOutgoing: () => void | Promise<void>;
-    onRefreshLog: () => void | Promise<void>;
     onLoadMoreLog: () => void | Promise<void>;
+    logLoadingMore?: boolean;
     onSelectCommit: (commit: string) => void | Promise<void>;
     onPush: () => void | Promise<void>;
     onForcePush: () => void | Promise<void>;
@@ -113,15 +116,17 @@
   } = $props();
 
   const FILE_ROW_HEIGHT = 30;
-  const COMMIT_ROW_HEIGHT = 46;
+  const COMMIT_ROW_HEIGHT = 56;
   const VIRTUAL_OVERSCAN = 8;
   const YAML_PAGE_SIZE = 6;
 
   type BranchRow = {
     key: string;
     label: string;
-    detail: string;
-    action: string;
+    prefix: string;
+    meta: string;
+    metaWarn: boolean;
+    hint: string;
     current: boolean;
     disabled: boolean;
     deleteDisabled: boolean;
@@ -143,7 +148,7 @@
   let selectedFilePaths = $state<string[]>([]);
   let conflictDraft = $state('');
   let conflictDraftKey = $state('');
-  let expandedPanel = $state<'diff' | 'conflict' | ''>('');
+  let expandedPanel = $state<'diff' | 'conflict' | 'output' | ''>('');
   let currentConflictIndex = $state(0);
   let conflictRawMode = $state(false);
   let conflictResultEditor = $state<HTMLTextAreaElement | null>(null);
@@ -159,14 +164,16 @@
   let remoteBranchesCollapsed = $state(false);
   let commitScrollTop = $state(0);
   let commitListHeight = $state(320);
+  let sideTab = $state<'changes' | 'history'>('changes');
   let yamlDiagnosticTotal = $derived(workspaceDiagnostics.length);
   let visibleYamlDiagnostics = $derived(workspaceDiagnostics.slice(0, yamlVisibleCount));
   let yamlHiddenCount = $derived(Math.max(0, yamlDiagnosticTotal - yamlVisibleCount));
   let yamlNextPage = $derived(Math.min(YAML_PAGE_SIZE, yamlHiddenCount));
-  let changeCount = $derived(status.files?.length ?? 0);
-  let changedFiles = $derived(status.files ?? []);
+  let changedFiles = $derived(kurloChangedFiles(status));
+  let changeCount = $derived(changedFiles.length);
+  let otherChangeCount = $derived(otherChangedFileCount(status));
   let conflictedFiles = $derived((status.files ?? []).filter(file => file.status === 'conflicted'));
-  let changedFilePaths = $derived((status.files ?? []).map(file => file.path));
+  let changedFilePaths = $derived(changedFiles.map(file => file.path));
   let selectedFileSet = $derived(new Set(selectedFilePaths));
   let selectedFileCount = $derived(selectedFilePaths.length);
   let selectedFileLabel = $derived(`${selectedFileCount} selected`);
@@ -219,16 +226,12 @@
     ...(remoteBranchRows.length ? [{ kind: 'section' as const, key: 'section:remote', label: 'Remote', section: 'remote' as const, count: visibleRemoteBranchRows.length, total: remoteBranchRows.length, collapsed: remoteBranchesCollapsed }] : []),
     ...(!remoteBranchesCollapsed ? visibleRemoteBranchRows.map(row => ({ kind: 'branch' as const, key: row.key, row })) : []),
   ] satisfies BranchListItem[]);
-  let branchCountLabel = $derived(normalizedBranchFilter
-    ? `${visibleLocalBranchRows.length}/${localBranchRows.length} local · ${visibleRemoteBranchRows.length}/${remoteBranchRows.length} remote`
-    : `${localBranchRows.length} local · ${remoteBranchRows.length} remote`);
   let commitRows = $derived(commits.commits ?? []);
-  let commitCountLabel = $derived(`${commitRows.length}${commits.hasMore ? '+' : ''}`);
+  let selectedCommitInfo = $derived(commitRows.find(commit => commit.hash === selectedCommit));
   let fileWindow = $derived(virtualWindow(changedFiles.length, FILE_ROW_HEIGHT * $uiScale, fileScrollTop, fileListHeight));
   let commitWindow = $derived(virtualWindow(commitRows.length, COMMIT_ROW_HEIGHT * $uiScale, commitScrollTop, commitListHeight));
   let virtualChangedFiles = $derived(changedFiles.slice(fileWindow.start, fileWindow.end));
   let virtualCommitRows = $derived(commitRows.slice(commitWindow.start, commitWindow.end));
-  let diffLines = $derived(diff.diff ? diff.diff.split('\n') : []);
   let conflictOursLines = $derived(conflict.oursContent ? conflict.oursContent.split('\n') : []);
   let conflictTheirsLines = $derived(conflict.theirsContent ? conflict.theirsContent.split('\n') : []);
   let conflictBlocks = $derived(parseGitConflictBlocks(conflictDraft));
@@ -240,25 +243,21 @@
   let conflictProgressLabel = $derived(conflictHunks.length
     ? `${conflictHunks.length} unresolved hunk${conflictHunks.length === 1 ? '' : 's'}`
     : 'No inline markers');
-  let visibleDiffLines = $derived(diffLines.filter(line => !isDiffHeaderLine(line)));
-  let stagedDiffLines = $derived(diff.stagedDiff ? diff.stagedDiff.split('\n').filter(line => !isDiffHeaderLine(line)) : []);
-  let unstagedDiffLines = $derived(diff.unstagedDiff ? diff.unstagedDiff.split('\n').filter(line => !isDiffHeaderLine(line)) : []);
+  let visibleDiffRows = $derived(diff.diff ? gitDiffRows(diff.diff) : []);
+  let stagedDiffRows = $derived(diff.stagedDiff ? gitDiffRows(diff.stagedDiff) : []);
+  let unstagedDiffRows = $derived(diff.unstagedDiff ? gitDiffRows(diff.unstagedDiff) : []);
   let selectedChangedFile = $derived(status.files?.find(file => file.path === selectedPath));
   let selectedFileIsConflict = $derived(selectedChangedFile?.status === 'conflicted');
   let selectedConflictPathMatches = $derived(sameGitPath(conflict.path, selectedPath));
   let conflictLoaded = $derived(Boolean(selectedFileIsConflict && selectedConflictPathMatches && (conflict.ok || conflict.error)));
   let conflictReady = $derived(Boolean(selectedFileIsConflict && selectedConflictPathMatches && conflict.ok));
   let markerlessConflict = $derived(Boolean(conflictReady && !conflict.binary && !hasInlineConflictMarkers));
-  let hasSplitDiff = $derived(Boolean(selectedChangedFile && (stagedDiffLines.length || unstagedDiffLines.length)));
+  let hasSplitDiff = $derived(Boolean(selectedChangedFile && (stagedDiffRows.length || unstagedDiffRows.length)));
   let canContinueOperation = $derived(Boolean(status.operation && conflictedFiles.length === 0 && !loading));
   let stashCount = $derived(status.stashes?.length ?? 0);
   let canStash = $derived(Boolean(canRepoAction && !status.operation && changedFiles.length > 0));
   let canPopStash = $derived(Boolean(canRepoAction && !status.operation && stashCount > 0));
-  let statusTitle = $derived(status.operation
-    ? `${status.operation} in progress`
-    : (status.clean
-      ? 'Clean: no uncommitted Kurlo workspace file changes'
-      : `${changeCount} Kurlo workspace file change${changeCount === 1 ? '' : 's'} not committed yet`));
+  let statusTitle = $derived(`Git ${status.operation} in progress. Resolve the conflicted files, then continue or abort it.`);
 
 
   let canDiscardAction = $derived(status.isRepo && !loading);
@@ -438,31 +437,17 @@
     };
   }
 
+  function loadMoreCommitsNearEnd(event: Event) {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement) || !commits.hasMore || logLoadingMore) return;
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - COMMIT_ROW_HEIGHT * $uiScale * VIRTUAL_OVERSCAN) void onLoadMoreLog();
+  }
+
   function updateVirtualScroll(event: Event, setScrollTop: (value: number) => void, setHeight: (value: number) => void) {
     const target = event.currentTarget;
     if (!(target instanceof HTMLElement)) return;
     setScrollTop(target.scrollTop);
     setHeight(target.clientHeight);
-  }
-
-  function diffLineKind(line: string) {
-    if (line.startsWith('@@')) return 'hunk';
-    if (line.startsWith('+')) return 'added';
-    if (line.startsWith('-')) return 'removed';
-    return 'context';
-  }
-
-  function isDiffHeaderLine(line: string) {
-    return line.startsWith('index ')
-      || line.startsWith('old mode ')
-      || line.startsWith('new mode ')
-      || line.startsWith('new file mode ')
-      || line.startsWith('deleted file mode ')
-      || line.startsWith('similarity index ')
-      || line.startsWith('rename from ')
-      || line.startsWith('rename to ')
-      || line.startsWith('--- ')
-      || line.startsWith('+++ ');
   }
 
   function pathName(path: string) {
@@ -631,8 +616,12 @@
       return {
         key: `local:${branch.name}`,
         label: branch.name,
-        detail: branch.upstream ? `Tracks ${branch.upstream}${upstreamGone ? ' (gone)' : ''}` : 'Local only',
-        action: branch.current ? 'Current' : 'Checkout',
+        prefix: '',
+        meta: branch.upstream ? `${branch.upstream}${upstreamGone ? ' · gone' : ''}` : 'local only',
+        metaWarn: upstreamGone,
+        hint: branch.current
+          ? `${branch.name} is the current branch`
+          : `Switch to ${branch.name}${branch.upstream ? ` (tracks ${branch.upstream})` : ''}`,
         current: branch.current,
         disabled: loading || branch.current || workspaceRecoveryMode,
         deleteDisabled: loading || branch.current || workspaceRecoveryMode,
@@ -643,42 +632,57 @@
           : (branch.upstream ? `${branch.upstream} is gone` : `${branch.name} has no upstream`),
         remote: false,
         startPoint: branch.current ? '' : branch.name,
-        remoteDeleteStartPoint: '',
+        remoteDeleteStartPoint: canPullBranch ? branch.upstream : '',
         searchText: `${branch.name} ${branch.upstream} local ${upstreamGone ? 'gone' : ''}`.toLowerCase(),
         onOpen: () => onCheckoutBranch(branch.name),
       };
-    }).sort((left, right) => left.label.localeCompare(right.label));
+    }).sort((left, right) => Number(right.current) - Number(left.current) || left.label.localeCompare(right.label));
   }
 
   function buildRemoteBranchRows(): BranchRow[] {
-    return remoteBranches.map(branch => {
-      const localBranch = localBranchForRemote(branch);
-      const localCurrent = Boolean(localBranch?.current);
-      const pullBranchName = localBranch?.name ?? '';
-      return {
-        key: `remote:${branch.fullName}`,
-        label: branch.name,
-        detail: localBranch
-          ? `${branch.fullName} · tracked by ${localBranch.name}${localCurrent ? ' · current upstream' : ''}`
-          : `${branch.fullName} · remote only`,
-        action: localBranch ? (localCurrent ? 'Upstream' : 'Checkout') : 'Track',
-        current: false,
-        disabled: loading || workspaceRecoveryMode || localCurrent,
-        deleteDisabled: loading || workspaceRecoveryMode,
-        pullBranchName,
-        pullDisabled: loading || workspaceRecoveryMode || !pullBranchName,
-        pullTitle: pullBranchName
-          ? `Pull ${branch.fullName} into ${pullBranchName}`
-          : `Create a local tracking branch before pulling ${branch.fullName}`,
-        remote: true,
-        startPoint: branch.fullName,
-        remoteDeleteStartPoint: branch.fullName,
-        searchText: `${branch.fullName} ${branch.remote} remote ${localBranch?.name ?? ''}`.toLowerCase(),
-        onOpen: () => localBranch ? onCheckoutBranch(localBranch.name) : openRemoteBranch(branch),
-      };
-    }).sort((left, right) => left.label.localeCompare(right.label));
+    return remoteBranches.filter(branch => !localBranchForRemote(branch)).map(branch => ({
+      key: `remote:${branch.fullName}`,
+      label: branch.name,
+      prefix: `${branch.remote}/`,
+      meta: 'remote only',
+      metaWarn: false,
+      hint: `Create a local branch that tracks ${branch.fullName} and switch to it`,
+      current: false,
+      disabled: loading || workspaceRecoveryMode,
+      deleteDisabled: loading || workspaceRecoveryMode,
+      pullBranchName: '',
+      pullDisabled: true,
+      pullTitle: `Create a local tracking branch before pulling ${branch.fullName}`,
+      remote: true,
+      startPoint: branch.fullName,
+      remoteDeleteStartPoint: branch.fullName,
+      searchText: `${branch.fullName} ${branch.remote} remote`.toLowerCase(),
+      onOpen: () => openRemoteBranch(branch),
+    })).sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  function remoteNameOf(startPoint: string) {
+    return startPoint.slice(0, startPoint.indexOf('/')) || 'remote';
   }
 </script>
+
+{#snippet diffRowList(rows: GitDiffRow[])}
+  {#each rows as row, index (index)}
+    {#if row.kind === 'file'}
+      <div class="git-diff-file">{row.text}</div>
+    {:else if row.kind === 'hunk'}
+      <div class="git-diff-line hunk"><span class="git-diff-line-no">⋯</span><span class="git-diff-sign"></span><code>{row.text}</code></div>
+    {:else if row.kind === 'note'}
+      <div class="git-diff-line note"><span class="git-diff-line-no"></span><span class="git-diff-sign"></span><code>{row.text}</code></div>
+    {:else}
+      <div class="git-diff-line" class:added={row.kind === 'added'} class:removed={row.kind === 'removed'}>
+        <span class="git-diff-line-no">{row.line}</span>
+        <span class="git-diff-sign" aria-hidden="true">{row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ''}</span>
+        <code>{row.text || ' '}</code>
+      </div>
+    {/if}
+  {/each}
+{/snippet}
 
 <section class="git-workspace">
   <div class="git-toolbar" class:standalone={!status.isRepo}>
@@ -755,36 +759,30 @@
                       </button>
                     {:else}
                       {@const branch = item.row}
-                    <div
-                      class="git-branch-row"
-                      class:current={branch.current}
-                      aria-current={branch.current ? 'true' : undefined}
-                    >
+                    <div class="git-branch-row" class:current={branch.current} aria-current={branch.current ? 'true' : undefined}>
                       <button
                         class="git-branch-row-main"
                         type="button"
                         disabled={branch.disabled}
                         onclick={() => runAndClosePicker(branch.onOpen)}
+                        title={branch.hint}
                       >
-                        <span>
-                          <strong>{branch.label}</strong>
-                          <small>{branch.detail}</small>
-                        </span>
-                        <em>{branch.action}</em>
+                        <span class="git-branch-mark" aria-hidden="true"><GitIcon name={branch.current ? 'check' : 'branch'} /></span>
+                        <strong>{#if branch.prefix}<span class="git-branch-prefix">{branch.prefix}</span>{/if}{branch.label}</strong>
+                        <small class:warn={branch.metaWarn}>{branch.meta}</small>
                       </button>
-                      <div class="git-branch-row-actions">
-                        <button
-                          class="btn btn-ghost btn-icon btn-sm git-branch-row-menu-btn"
-                          type="button"
-                          disabled={loading || workspaceRecoveryMode}
-                          onclick={(event) => toggleBranchActionMenu(event, branch.key)}
-                          aria-haspopup="menu"
-                          aria-expanded={branchActionMenuKey === branch.key}
-                          title={`Branch actions for ${branch.label}`}
-                        >
-                          <span class="git-more-dots">⋯</span>
-                        </button>
-                      </div>
+                      <button
+                        class="btn btn-ghost btn-icon btn-sm git-branch-row-menu-btn"
+                        type="button"
+                        disabled={loading || workspaceRecoveryMode}
+                        onclick={(event) => toggleBranchActionMenu(event, branch.key)}
+                        aria-haspopup="menu"
+                        aria-expanded={branchActionMenuKey === branch.key}
+                        aria-label={`Actions for ${branch.prefix}${branch.label}`}
+                        title={`Actions for ${branch.prefix}${branch.label}`}
+                      >
+                        <span class="git-more-dots">⋯</span>
+                      </button>
                     </div>
                     {/if}
                   {/each}
@@ -803,17 +801,19 @@
                     <GitIcon name="branch-plus" />
                     Create from here
                   </button>
-                  <button
-                    class="menu-item git-more-item"
-                    type="button"
-                    onclick={() => { const r = activeBranchActionRow; if (r) runBranchAction(() => onPullBranch(r.pullBranchName)); }}
-                    disabled={row.pullDisabled}
-                    title={row.pullTitle}
-                    role="menuitem"
-                  >
-                    <GitIcon name="pull" />
-                    Pull
-                  </button>
+                  {#if !row.remote}
+                    <button
+                      class="menu-item git-more-item"
+                      type="button"
+                      onclick={() => { const r = activeBranchActionRow; if (r) runBranchAction(() => onPullBranch(r.pullBranchName)); }}
+                      disabled={row.pullDisabled}
+                      title={row.pullTitle}
+                      role="menuitem"
+                    >
+                      <GitIcon name="pull" />
+                      Pull
+                    </button>
+                  {/if}
                   <div class="git-more-sep"></div>
                   {#if !row.remote}
                     <button
@@ -825,7 +825,7 @@
                       role="menuitem"
                     >
                       <GitIcon name="branch" />
-                      Rename (local)
+                      Rename
                     </button>
                   {/if}
                   {#if row.remoteDeleteStartPoint}
@@ -838,7 +838,7 @@
                       role="menuitem"
                     >
                       <GitIcon name="branch" />
-                      Rename (remote)
+                      Rename on {remoteNameOf(row.remoteDeleteStartPoint)}
                     </button>
                   {/if}
                   <div class="git-more-sep"></div>
@@ -865,27 +865,17 @@
                       role="menuitem"
                     >
                       <GitIcon name="trash" />
-                      Delete
+                      Delete from {remoteNameOf(row.remoteDeleteStartPoint)}
                     </button>
                   {/if}
                 </div>
               {/if}
-              <div class="git-branch-popover-foot">
-                <small>{branchCountLabel}</small>
-                <button class="btn btn-ghost btn-sm git-action-btn" type="button" onclick={closeBranchPicker}>Close</button>
-              </div>
             </div>
           {/if}
         </div>
-        <span class="git-status-pill" class:dirty={!status.clean} class:operation={Boolean(status.operation)} title={statusTitle}>
-          {#if status.operation}
-            {status.operation}
-          {:else if changeCount}
-            {changeCount} changed
-          {:else}
-            Clean
-          {/if}
-        </span>
+        {#if status.operation}
+          <span class="git-status-pill operation" title={statusTitle}>{status.operation} in progress</span>
+        {/if}
         {#if status.upstream}
           <span
             class="git-upstream"
@@ -956,7 +946,8 @@
             onclick={() => (moreMenuOpen = !moreMenuOpen)}
             aria-haspopup="menu"
             aria-expanded={moreMenuOpen}
-            title="More git actions"
+            aria-label="More Git actions"
+            title="More Git actions"
           >
             <span class="git-more-dots">⋯</span>
           </button>
@@ -969,6 +960,10 @@
               <button class="menu-item git-more-item" type="button" onclick={() => runAndCloseMore(onViewOutgoing)} disabled={!canRepoAction} role="menuitem">
                 <GitIcon name="eye" />
                 View outgoing
+              </button>
+              <button class="menu-item git-more-item" type="button" onclick={() => { moreMenuOpen = false; expandedPanel = 'output'; }} disabled={!output} role="menuitem" title={output ? 'Show what Git printed for the last command' : 'No Git output yet'}>
+                <GitIcon name="history" />
+                Show Git output
               </button>
               <div class="git-more-sep"></div>
               <button class="menu-item git-more-item" type="button" onclick={() => runAndCloseMore(() => onPull('merge'))} disabled={!canPullWithHistoryStrategy} role="menuitem">
@@ -1041,32 +1036,42 @@
 
   <div class="git-content">
     {#if workspaceDiagnostics.length}
-      <div class="git-yaml-card" class:blocking={workspaceBlocked} role="group" aria-label="Workspace YAML errors">
-        <div class="git-provider-copy">
-          <span>{workspaceBlocked ? 'Workspace locked' : 'YAML errors'}</span>
-          <strong>{workspaceDiagnostics.length} YAML {workspaceDiagnostics.length === 1 ? 'error' : 'errors'} {workspaceBlocked ? 'blocking this workspace' : 'in this workspace'}</strong>
-          <small>
+      <div class="git-yaml-card" class:blocking={workspaceBlocked} role="group" aria-label="Workspace issues">
+        <div class="git-yaml-head">
+          <strong>
             {#if workspaceBlocked}
-              Editing, commits and pulls stay paused until the YAML is valid. Fix each file below, or pull a fixed commit.
+              Editing is paused: {workspaceDiagnostics.length} workspace {workspaceDiagnostics.length === 1 ? 'file needs' : 'files need'} fixing
             {:else}
-              These files failed to load. Fix each one below — affected collections, requests and environments stay unavailable until their YAML is valid.
+              {workspaceDiagnostics.length} workspace {workspaceDiagnostics.length === 1 ? 'file' : 'files'} could not be loaded
             {/if}
-          </small>
+          </strong>
+          <p>
+            {#if workspaceBlocked}
+              Saving and commits stay off until these files are fixed. Edit them here, or pull a commit that fixes them.
+            {:else}
+              What these files describe stays hidden until their YAML is fixed. Everything else works as usual.
+            {/if}
+          </p>
         </div>
         <div class="git-yaml-list">
           {#each visibleYamlDiagnostics as diagnostic (workspaceDiagnosticKey(diagnostic))}
-            <div class="git-yaml-row">
-              <span class="git-yaml-badge" aria-hidden="true">!</span>
+            {@const location = workspaceDiagnosticLocation(diagnostic)}
+            {@const scopeLabel = workspaceDiagnosticScopeLabel(diagnostic)}
+            <div class="git-yaml-row" class:blocking={diagnostic.blocking}>
+              <span class="git-yaml-dot" aria-hidden="true"></span>
               <div class="git-yaml-copy">
-                <strong>{workspaceDiagnosticTitle(diagnostic)}</strong>
-                <em title={workspaceDiagnosticLocation(diagnostic)}>{workspaceDiagnosticLocation(diagnostic)}</em>
+                <div class="git-yaml-file" title={location}>
+                  <strong>{pathName(location)}</strong>
+                  {#if pathFolder(diagnostic.path)}<em>{pathFolder(diagnostic.path)}</em>{/if}
+                </div>
                 <span>{diagnostic.message}</span>
+                {#if scopeLabel}<small class="git-yaml-scope">{scopeLabel}</small>{/if}
               </div>
               <button
-                class="btn btn-primary btn-sm git-action-btn git-yaml-edit"
+                class="btn btn-secondary btn-sm git-action-btn git-yaml-edit"
                 type="button"
                 onclick={() => onEditWorkspaceDiagnostic(diagnostic)}
-                title={`Edit ${diagnostic.path} to fix this error`}
+                aria-label={`Edit ${diagnostic.path}`}
               >
                 <GitIcon name="edit" />
                 Edit YAML
@@ -1096,10 +1101,15 @@
         {/if}
       </div>
     {:else if workspaceBlocked}
-      <div class="git-banner warning">Workspace YAML is invalid. Editing is locked until this workspace can be loaded again; fetch or pull a fixed commit here.</div>
+      <div class="git-banner warning">Workspace files are invalid. Editing is paused until this workspace loads again; pull a commit that fixes them.</div>
     {/if}
     {#if error || status.error}
-      <div class="git-banner error">{error || status.error}</div>
+      <div class="git-banner error git-banner-row">
+        <span>{error || status.error}</span>
+        {#if output}
+          <button class="btn btn-ghost btn-sm git-action-btn" type="button" onclick={() => (expandedPanel = 'output')}>Show output</button>
+        {/if}
+      </div>
     {/if}
 
     {#if status.operation || conflictedFiles.length}
@@ -1221,21 +1231,86 @@
       <div class="git-layout">
       <div class="git-files">
         <div class="git-panel-head">
-          <span class="git-panel-title">Changes {#if changeCount}<em class="git-panel-count">{changeCount}</em>{/if}</span>
-          <div class="git-panel-actions">
-            {#if changeCount && !selectedFileCount}
+          <div class="segmented git-side-tabs" role="tablist" aria-label="Changes and history" use:tabListKeyboard>
+            <button class="segmented-item" role="tab" type="button" class:active={sideTab === 'changes'} aria-selected={sideTab === 'changes'} tabindex={sideTab === 'changes' ? 0 : -1} onclick={() => (sideTab = 'changes')}>
+              Changes{#if changeCount}<span class="subtab-count">{changeCount}</span>{/if}
+            </button>
+            <button class="segmented-item" role="tab" type="button" class:active={sideTab === 'history'} aria-selected={sideTab === 'history'} tabindex={sideTab === 'history' ? 0 : -1} onclick={() => (sideTab = 'history')}>
+              History
+            </button>
+          </div>
+        </div>
+        {#if sideTab === 'history'}
+          {#if commits.error}
+            <div class="git-empty error">{commits.error}</div>
+          {:else if commitRows.length}
+            <div
+              class="git-commit-list virtual"
+              onscroll={(event) => { updateVirtualScroll(event, value => (commitScrollTop = value), value => (commitListHeight = value)); loadMoreCommitsNearEnd(event); }}
+            >
+              <div class="git-list-spacer" style={`height: ${commitWindow.before}px`}></div>
+              {#each virtualCommitRows as commit (commit.hash)}
+                <button
+                  class="git-commit-row"
+                  class:active={selectedCommit === commit.hash}
+                  type="button"
+                  onclick={() => onSelectCommit(commit.hash)}
+                  title={`View changes in ${commit.hash}`}
+                >
+                  <span>
+                    <strong>{commit.message || '(no message)'}</strong>
+                    <small>{commit.shortHash} · {commit.author} · {commitDateLabel(commit.date)}</small>
+                  </span>
+                </button>
+              {/each}
+              <div class="git-list-spacer" style={`height: ${commitWindow.after}px`}></div>
+            </div>
+            {#if commits.hasMore}
+              <div class="git-list-footer">
+                <button class="btn btn-secondary btn-sm git-action-btn" class:loading={logLoadingMore} type="button" onclick={onLoadMoreLog} disabled={logLoadingMore} aria-busy={logLoadingMore} title="Load older commits">
+                  <GitIcon name="download" busy={logLoadingMore} />
+                  {logLoadingMore ? 'Loading older commits' : 'Load more'}
+                </button>
+              </div>
+            {/if}
+          {:else}
+            <div class="empty-state git-empty">No commits yet</div>
+          {/if}
+        {:else}
+          {#if selectedFileCount}
+            <div class="git-selection-bar">
+              <small>{selectedFileLabel}</small>
               <button
                 class="btn btn-primary btn-sm git-action-btn"
-                class:loading={isBusy('commit')}
+                class:loading={isBusy('commit-selected')}
                 type="button"
-                onclick={() => onCommit()}
-                disabled={!canRepoAction}
-                aria-busy={isBusy('commit')}
-                title="Commit all changed Kurlo workspace files"
+                onclick={commitSelectedFiles}
+                disabled={!canOperateOnSelectedFiles}
+                aria-busy={isBusy('commit-selected')}
+                title="Commit selected Kurlo workspace files"
               >
-                <GitIcon name="commit" busy={isBusy('commit')} />
-                Commit all
+                <GitIcon name="commit" busy={isBusy('commit-selected')} />
+                Commit
               </button>
+              <button
+                class="btn btn-secondary btn-danger btn-icon btn-sm git-action-btn"
+                class:loading={isBusy('discard-selected')}
+                type="button"
+                onclick={discardSelectedFiles}
+                disabled={!canDiscardSelectedFiles}
+                aria-busy={isBusy('discard-selected')}
+                title="Discard selected Kurlo workspace file changes"
+                aria-label="Discard selected"
+              >
+                <GitIcon name="trash" busy={isBusy('discard-selected')} />
+              </button>
+              <button class="btn btn-ghost btn-icon btn-sm git-action-btn" type="button" onclick={clearFileSelection} disabled={loading} title="Clear file selection" aria-label="Clear selection">
+                <GitIcon name="x" />
+              </button>
+            </div>
+          {:else if changeCount}
+            <div class="git-selection-bar">
+              <small>{changeCount} changed {changeCount === 1 ? 'file' : 'files'}</small>
               <button class="btn btn-ghost btn-icon btn-sm git-action-btn" type="button" onclick={toggleAllFileSelection} disabled={loading} title="Select all changed files" aria-label="Select all">
                 <GitIcon name="check-square" />
               </button>
@@ -1251,81 +1326,67 @@
               >
                 <GitIcon name="trash" busy={isBusy('discard-all')} />
               </button>
-            {/if}
-          </div>
-        </div>
-        {#if selectedFileCount}
-          <div class="git-selection-bar">
-            <small>{selectedFileLabel}</small>
-            <button
-              class="btn btn-primary btn-sm git-action-btn"
-              class:loading={isBusy('commit-selected')}
-              type="button"
-              onclick={commitSelectedFiles}
-              disabled={!canOperateOnSelectedFiles}
-              aria-busy={isBusy('commit-selected')}
-              title="Commit selected Kurlo workspace files"
+              <button
+                class="btn btn-primary btn-sm git-action-btn"
+                class:loading={isBusy('commit')}
+                type="button"
+                onclick={() => onCommit()}
+                disabled={!canRepoAction}
+                aria-busy={isBusy('commit')}
+                title="Commit all changed Kurlo workspace files"
+              >
+                <GitIcon name="commit" busy={isBusy('commit')} />
+                Commit all
+              </button>
+            </div>
+          {/if}
+          {#if !changeCount}
+            <div class="empty-state git-empty"><span class="empty-state-title">No changed files</span></div>
+            {#if otherChangeCount}<p class="git-other-changes">{otherChangeCount} other {otherChangeCount === 1 ? 'change' : 'changes'} in this repository {otherChangeCount === 1 ? "isn't a Kurlo file" : "aren't Kurlo files"}. Commit {otherChangeCount === 1 ? 'it' : 'them'} with your usual Git tool.</p>{/if}
+          {:else}
+            <div
+              class="git-file-list virtual"
+              role="list"
+              onscroll={(event) => updateVirtualScroll(event, value => (fileScrollTop = value), value => (fileListHeight = value))}
             >
-              <GitIcon name="commit" busy={isBusy('commit-selected')} />
-              Commit
-            </button>
-            <button
-              class="btn btn-secondary btn-danger btn-icon btn-sm git-action-btn"
-              class:loading={isBusy('discard-selected')}
-              type="button"
-              onclick={discardSelectedFiles}
-              disabled={!canDiscardSelectedFiles}
-              aria-busy={isBusy('discard-selected')}
-              title="Discard selected Kurlo workspace file changes"
-              aria-label="Discard selected"
-            >
-              <GitIcon name="trash" busy={isBusy('discard-selected')} />
-            </button>
-            <button class="btn btn-ghost btn-icon btn-sm git-action-btn" type="button" onclick={clearFileSelection} disabled={loading} title="Clear file selection" aria-label="Clear selection">
-              <GitIcon name="x" />
-            </button>
-          </div>
-        {/if}
-        {#if !changeCount}
-          <div class="empty-state git-empty"><span class="empty-state-title">No changed files</span></div>
-        {:else}
-          <div
-            class="git-file-list virtual"
-            role="list"
-            onscroll={(event) => updateVirtualScroll(event, value => (fileScrollTop = value), value => (fileListHeight = value))}
-          >
-            <div class="git-list-spacer" style={`height: ${fileWindow.before}px`}></div>
-            {#each virtualChangedFiles as file (file.path)}
-              <div class="git-file-row" class:active={selectedPath === file.path} class:selected={selectedFileSet.has(file.path)} role="listitem">
-                <input
-                  class="git-file-check check"
-                  type="checkbox"
-                  checked={selectedFileSet.has(file.path)}
-                  aria-label={`Select ${file.path}`}
-                  onchange={(event) => setFileSelection(file.path, event.currentTarget.checked)}
-                  disabled={!canDiscardAction}
-                />
-                <button class="git-file-open" type="button" onclick={() => openFile(file)}>
-                  <span
-                    class:added={file.status === 'added' || file.status === 'untracked'}
-                    class:removed={file.status === 'deleted'}
-                    class:modified={file.status === 'modified' || file.status === 'changed' || file.status === 'renamed'}
-                    class:conflict={file.status === 'conflicted'}
-                    title={file.status}
-                  >{fileStatusLabel(file.status)}</span>
-                  <strong title={file.path}>{pathName(file.path)}<small>{pathFolder(file.path)}</small></strong>
-                  <span class="sr-only">{file.status}</span>
-                </button>
-              </div>
-            {/each}
-            <div class="git-list-spacer" style={`height: ${fileWindow.after}px`}></div>
-          </div>
+              <div class="git-list-spacer" style={`height: ${fileWindow.before}px`}></div>
+              {#each virtualChangedFiles as file (file.path)}
+                <div class="git-file-row" class:active={selectedPath === file.path} class:selected={selectedFileSet.has(file.path)} role="listitem">
+                  <input
+                    class="git-file-check check"
+                    type="checkbox"
+                    checked={selectedFileSet.has(file.path)}
+                    aria-label={`Select ${file.path}`}
+                    onchange={(event) => setFileSelection(file.path, event.currentTarget.checked)}
+                    disabled={!canDiscardAction}
+                  />
+                  <button class="git-file-open" type="button" onclick={() => openFile(file)}>
+                    <span
+                      class:added={file.status === 'added' || file.status === 'untracked'}
+                      class:removed={file.status === 'deleted'}
+                      class:modified={file.status === 'modified' || file.status === 'changed' || file.status === 'renamed'}
+                      class:conflict={file.status === 'conflicted'}
+                      title={file.status}
+                    >{fileStatusLabel(file.status)}</span>
+                    <strong title={file.path}>{pathName(file.path)}<small>{pathFolder(file.path)}</small></strong>
+                    <span class="sr-only">{file.status}</span>
+                  </button>
+                </div>
+              {/each}
+              <div class="git-list-spacer" style={`height: ${fileWindow.after}px`}></div>
+            </div>
+            {#if otherChangeCount}<p class="git-other-changes">{otherChangeCount} other {otherChangeCount === 1 ? 'change' : 'changes'} in this repository {otherChangeCount === 1 ? "isn't a Kurlo file" : "aren't Kurlo files"}. Commit {otherChangeCount === 1 ? 'it' : 'them'} with your usual Git tool.</p>{/if}
+          {/if}
         {/if}
       </div>
 
       <div class="git-diff">
         <div class="git-panel-head">
-          <span class="git-panel-title" title={diffTitle}>{selectedCommit ? diffTitle : pathName(diffTitle)}{#if !selectedCommit && pathFolder(diffTitle)}<small>{pathFolder(diffTitle)}</small>{/if}</span>
+          {#if selectedCommit}
+            <span class="git-panel-title" title={selectedCommitInfo?.message || diffTitle}>{selectedCommitInfo?.message || diffTitle}{#if selectedCommitInfo}<small>{selectedCommitInfo.shortHash} · {selectedCommitInfo.author}</small>{/if}</span>
+          {:else}
+            <span class="git-panel-title" title={diffTitle}>{pathName(diffTitle)}{#if pathFolder(diffTitle)}<small>{pathFolder(diffTitle)}</small>{/if}</span>
+          {/if}
           <div class="git-panel-actions">
             {#if diff.truncated}<small>truncated</small>{/if}
             <button
@@ -1409,115 +1470,52 @@
           <div class="empty-state git-empty">Binary file</div>
         {:else if diff.diff && hasSplitDiff}
           <div class="git-diff-code" role="region" aria-label="Git diff">
-            {#if stagedDiffLines.length}
+            {#if stagedDiffRows.length}
               <div class="git-diff-section-label">Staged</div>
-              {#each stagedDiffLines as line, index (index)}
-                {@const kind = diffLineKind(line)}
-                <div class="git-diff-line" class:added={kind === 'added'} class:removed={kind === 'removed'} class:hunk={kind === 'hunk'}>
-                  <span class="git-diff-line-no">{index + 1}</span>
-                  <code>{line || ' '}</code>
-                </div>
-              {/each}
+              {@render diffRowList(stagedDiffRows)}
             {/if}
-            {#if unstagedDiffLines.length}
+            {#if unstagedDiffRows.length}
               <div class="git-diff-section-label">Unstaged</div>
-              {#each unstagedDiffLines as line, index (index)}
-                {@const kind = diffLineKind(line)}
-                <div class="git-diff-line" class:added={kind === 'added'} class:removed={kind === 'removed'} class:hunk={kind === 'hunk'}>
-                  <span class="git-diff-line-no">{index + 1}</span>
-                  <code>{line || ' '}</code>
-                </div>
-              {/each}
+              {@render diffRowList(unstagedDiffRows)}
             {/if}
           </div>
         {:else if diff.diff}
           <div class="git-diff-code" role="region" aria-label="Git diff">
-            {#each visibleDiffLines as line, index (index)}
-              {@const kind = diffLineKind(line)}
-              <div class="git-diff-line" class:added={kind === 'added'} class:removed={kind === 'removed'} class:hunk={kind === 'hunk'}>
-                <span class="git-diff-line-no">{index + 1}</span>
-                <code>{line || ' '}</code>
-              </div>
-            {/each}
+            {@render diffRowList(visibleDiffRows)}
           </div>
         {:else}
-          <div class="empty-state git-empty">{selectedPath ? 'No text diff' : 'Select a file'}</div>
+          <div class="empty-state git-empty">{selectedPath ? 'No text diff' : sideTab === 'history' ? 'Select a commit' : 'Select a file'}</div>
         {/if}
       </div>
 
-      <div class="git-history">
-        <div class="git-panel-head">
-          <span class="git-panel-title">History</span>
-          <div class="git-panel-actions">
-            <small>{commitCountLabel}</small>
-            <button class="btn btn-ghost btn-icon btn-sm git-action-btn" class:loading={isBusy('log')} type="button" onclick={onRefreshLog} disabled={loading} aria-busy={isBusy('log')} title="Refresh commit history" aria-label="Refresh commit history">
-              <GitIcon name="refresh" busy={isBusy('log')} />
-            </button>
-          </div>
-        </div>
-        {#if commits.error}
-          <div class="git-empty error">{commits.error}</div>
-        {:else if commitRows.length}
-          <div
-            class="git-commit-list virtual"
-            onscroll={(event) => updateVirtualScroll(event, value => (commitScrollTop = value), value => (commitListHeight = value))}
-          >
-            <div class="git-list-spacer" style={`height: ${commitWindow.before}px`}></div>
-            {#each virtualCommitRows as commit (commit.hash)}
-              <button
-                class="git-commit-row"
-                class:active={selectedCommit === commit.hash}
-                type="button"
-                onclick={() => onSelectCommit(commit.hash)}
-                title={`View changes in ${commit.hash}`}
-              >
-                <span>
-                  <strong>{commit.message || '(no message)'}</strong>
-                  <small>{commit.shortHash} · {commit.author} · {commitDateLabel(commit.date)}</small>
-                </span>
-              </button>
-            {/each}
-            <div class="git-list-spacer" style={`height: ${commitWindow.after}px`}></div>
-          </div>
-          {#if commits.hasMore}
-            <div class="git-list-footer">
-              <button class="btn btn-secondary btn-sm git-action-btn" class:loading={isBusy('log-more')} type="button" onclick={onLoadMoreLog} disabled={loading} aria-busy={isBusy('log-more')} title="Load more commits">
-                <GitIcon name="download" busy={isBusy('log-more')} />
-                Load more
-              </button>
-            </div>
-          {/if}
-        {:else}
-          <div class="empty-state git-empty">No commits yet</div>
-        {/if}
-      </div>
     </div>
   {/if}
 
-    {#if output}
-      <details class="git-output">
-        <summary>Git output</summary>
-        <pre>{output}</pre>
-      </details>
-    {/if}
   </div>
 
   {#if expandedPanel}
     <div class="dialog-backdrop git-review-backdrop" role="presentation" onmousedown={(event) => event.target === event.currentTarget && closeExpandedPanel()}>
-      <div class="modal git-review-modal" class:conflict={expandedPanel === 'conflict'} role="dialog" aria-modal="true" aria-labelledby="git-review-title" tabindex="-1" onkeydown={(event) => event.key === 'Escape' && closeExpandedPanel()}>
+      <div class="modal git-review-modal" class:conflict={expandedPanel === 'conflict'} class:output={expandedPanel === 'output'} role="dialog" aria-modal="true" aria-labelledby="git-review-title" tabindex="-1" onkeydown={(event) => event.key === 'Escape' && closeExpandedPanel()}>
         <div class="modal-head dialog-head git-review-head">
           <div>
             {#if expandedPanel === 'diff'}
-              <h2 class="modal-title" id="git-review-title">{selectedCommit ? diffTitle : pathName(diffTitle)}</h2>
+              <h2 class="modal-title" id="git-review-title">{selectedCommit ? (selectedCommitInfo?.message || diffTitle) : pathName(diffTitle)}</h2>
               <p>{selectedCommit ? 'Commit diff' : (pathFolder(diffTitle) || 'Review workspace changes')}</p>
+            {:else if expandedPanel === 'output'}
+              <h2 class="modal-title" id="git-review-title">Git output</h2>
+              <p>What Git printed for the last command</p>
             {:else}
               <h2 id="git-review-title">Resolve conflict{selectedPath ? ` · ${pathName(selectedPath)}` : ''}</h2>
               <p>{selectedPath ? (pathFolder(selectedPath) || selectedPath) : 'Choose a conflicted Kurlo file'}</p>
             {/if}
           </div>
-          <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={closeExpandedPanel} aria-label="Close review">×</button>
+          <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={closeExpandedPanel} aria-label={expandedPanel === 'output' ? 'Close Git output' : 'Close review'}>×</button>
         </div>
-        {#if expandedPanel === 'diff'}
+        {#if expandedPanel === 'output'}
+          <div class="git-review-body">
+            <pre class="git-output-log" aria-label="Git output">{output || 'No output'}</pre>
+          </div>
+        {:else if expandedPanel === 'diff'}
           <div class="git-review-body">
             {#if diffLoading}
               <div class="empty-state git-empty">Loading diff...</div>
@@ -1527,39 +1525,21 @@
               <div class="empty-state git-empty">Binary file</div>
             {:else if diff.diff && hasSplitDiff}
               <div class="git-diff-code expanded" role="region" aria-label="Expanded Git diff">
-                {#if stagedDiffLines.length}
+                {#if stagedDiffRows.length}
                   <div class="git-diff-section-label">Staged</div>
-                  {#each stagedDiffLines as line, index (index)}
-                    {@const kind = diffLineKind(line)}
-                    <div class="git-diff-line" class:added={kind === 'added'} class:removed={kind === 'removed'} class:hunk={kind === 'hunk'}>
-                      <span class="git-diff-line-no">{index + 1}</span>
-                      <code>{line || ' '}</code>
-                    </div>
-                  {/each}
+                  {@render diffRowList(stagedDiffRows)}
                 {/if}
-                {#if unstagedDiffLines.length}
+                {#if unstagedDiffRows.length}
                   <div class="git-diff-section-label">Unstaged</div>
-                  {#each unstagedDiffLines as line, index (index)}
-                    {@const kind = diffLineKind(line)}
-                    <div class="git-diff-line" class:added={kind === 'added'} class:removed={kind === 'removed'} class:hunk={kind === 'hunk'}>
-                      <span class="git-diff-line-no">{index + 1}</span>
-                      <code>{line || ' '}</code>
-                    </div>
-                  {/each}
+                  {@render diffRowList(unstagedDiffRows)}
                 {/if}
               </div>
             {:else if diff.diff}
               <div class="git-diff-code expanded" role="region" aria-label="Expanded Git diff">
-                {#each visibleDiffLines as line, index (index)}
-                  {@const kind = diffLineKind(line)}
-                  <div class="git-diff-line" class:added={kind === 'added'} class:removed={kind === 'removed'} class:hunk={kind === 'hunk'}>
-                    <span class="git-diff-line-no">{index + 1}</span>
-                    <code>{line || ' '}</code>
-                  </div>
-                {/each}
+                {@render diffRowList(visibleDiffRows)}
               </div>
             {:else}
-              <div class="empty-state git-empty">{selectedPath ? 'No text diff' : 'Select a file'}</div>
+              <div class="empty-state git-empty">{selectedPath ? 'No text diff' : sideTab === 'history' ? 'Select a commit' : 'Select a file'}</div>
             {/if}
           </div>
         {:else if expandedPanel === 'conflict'}

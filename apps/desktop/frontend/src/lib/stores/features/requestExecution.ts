@@ -13,6 +13,13 @@ import { newRequestId } from '../../utils';
 import type { RunnableHttpOptions } from './requestSerialization';
 
 const REQUEST_CANCELED_ERROR = 'Request canceled';
+const sendGenerations = new Map<string, number>();
+
+function nextSendGeneration(requestId: string) {
+  const generation = (sendGenerations.get(requestId) ?? 0) + 1;
+  sendGenerations.set(requestId, generation);
+  return generation;
+}
 
 function downloadFilenameFromUrl(url: string): string {
   const path = url.split('#')[0].split('?')[0].replace(/\/+$/, '');
@@ -55,6 +62,8 @@ type RequestExecutionHost = {
   sendMcpCall: () => Promise<void>;
   isEventStreamResponse: (response: HttpResponse | null) => boolean;
   markRequestLoading: (requestId: string, loading: boolean) => void;
+  activeEnvironmentId: string;
+  applyEnvironmentChangesFromResponse: (resp: HttpResponse, environmentId: string) => Promise<void>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   promoteActiveRequestToSSE: () => void;
   recordRequestHistory: (httpResponse: HttpResponse, requestSnapshot?: SavedRequest) => Promise<void>;
@@ -149,23 +158,27 @@ export const requestExecutionFeature = {
         return;
       }
     }
-    await this.ensureValidOAuth2Token();
-    const requestSnapshot = this.snapshotActiveRequest();
-    const envValues = this.activeEnvironmentValues();
-    const secretValues = this.activeSecretEnvironmentValues();
-    const secretKeys = this.activeSecretEnvironmentKeys();
-    const headerError = this.headerValidationErrorForRequest(requestSnapshot, envValues);
-    if (headerError) {
-      this.requestError = headerError;
-      this.setActiveResponse(null);
-      this.requestTab = 'headers';
-      return;
-    }
     const requestId = this.activeRequestId || newRequestId();
-    this.clearTransientSSESession(requestId);
+    const generation = nextSendGeneration(requestId);
+    const isCurrent = () => sendGenerations.get(requestId) === generation;
     this.markRequestLoading(requestId, true);
     this.requestError = '';
     try {
+      await this.ensureValidOAuth2Token();
+      if (!isCurrent()) return;
+      const requestSnapshot = this.snapshotActiveRequest();
+      const sentEnvironmentId = this.activeEnvironmentId;
+      const envValues = this.activeEnvironmentValues();
+      const secretValues = this.activeSecretEnvironmentValues();
+      const secretKeys = this.activeSecretEnvironmentKeys();
+      const headerError = this.headerValidationErrorForRequest(requestSnapshot, envValues);
+      if (headerError) {
+        this.requestError = headerError;
+        this.setActiveResponse(null);
+        this.requestTab = 'headers';
+        return;
+      }
+      this.clearTransientSSESession(requestId);
       await this.persistActiveRequestNow();
       try { await this.syncBackendEnvironment(); } catch {  }
       try { await this.syncBackendGlobals(); } catch {}
@@ -179,8 +192,9 @@ export const requestExecutionFeature = {
       } else {
         resp = await sendHttpRequest(serialized);
       }
-      try { await this.syncActiveEnvironmentFromBackend(); } catch {}
+      try { await this.applyEnvironmentChangesFromResponse(resp, sentEnvironmentId); } catch {}
       try { await this.syncGlobalsFromBackend(); } catch {}
+      if (!isCurrent()) return;
       if (requestSnapshot.method === 'GET' && this.isEventStreamResponse(resp)) {
         if (this.requestIsActive(requestId)) {
           this.setActiveResponse(null, requestId);
@@ -212,10 +226,10 @@ export const requestExecutionFeature = {
       }
       await this.recordRequestHistory(resp, requestSnapshot);
     } catch (e) {
-      if (this.requestIsActive(requestId)) this.requestError = String(e);
+      if (isCurrent() && this.requestIsActive(requestId)) this.requestError = String(e);
     }
     finally {
-      this.markRequestLoading(requestId, false);
+      if (isCurrent()) this.markRequestLoading(requestId, false);
       if (!this.disableCookieJar) void this.refreshCookieJar(true, true);
     }
   },
@@ -223,6 +237,7 @@ export const requestExecutionFeature = {
   async cancelActiveRequest(this: RequestExecutionHost) {
     const requestId = this.activeRequestId;
     if (!requestId || !this.inFlightRequestIds.has(requestId)) return;
+    nextSendGeneration(requestId);
     await cancelHttpRequest(requestId);
     this.markRequestLoading(requestId, false);
     if (this.requestIsActive(requestId)) {

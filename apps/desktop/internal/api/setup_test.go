@@ -8,6 +8,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if len(os.Args) >= 2 && os.Args[1] == "git-credential" {
+		os.Exit(RunGitCredentialHelper(os.Args[2:]))
+	}
 	if err := os.Setenv(requestStoreDisableKeychain, "1"); err != nil {
 		panic(err)
 	}

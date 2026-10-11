@@ -38,6 +38,10 @@ export function CheckForUpdate() {
   return window['go']['api']['App']['CheckForUpdate']();
 }
 
+export function CheckWorkspaceYAML(arg1, arg2) {
+  return window['go']['api']['App']['CheckWorkspaceYAML'](arg1, arg2);
+}
+
 export function ClearCookies(arg1) {
   return window['go']['api']['App']['ClearCookies'](arg1);
 }
@@ -282,6 +286,10 @@ export function GrpcDiscover(arg1) {
   return window['go']['api']['App']['GrpcDiscover'](arg1);
 }
 
+export function InstallBrowserExtension(arg1) {
+  return window['go']['api']['App']['InstallBrowserExtension'](arg1);
+}
+
 export function ListCookies(arg1) {
   return window['go']['api']['App']['ListCookies'](arg1);
 }
@@ -388,6 +396,10 @@ export function SaveRequestStore(arg1) {
 
 export function SaveRequestStoreWithError(arg1) {
   return window['go']['api']['App']['SaveRequestStoreWithError'](arg1);
+}
+
+export function SaveResponseBody(arg1, arg2) {
+  return window['go']['api']['App']['SaveResponseBody'](arg1, arg2);
 }
 
 export function SaveWorkspaceSecrets(arg1) {

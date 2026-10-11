@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	goruntime "runtime"
 	"sort"
@@ -201,7 +202,7 @@ func loadKurloStorePayloadWithDiagnostics(localStorePath, workspaceRoot string) 
 	if workspaceRootUnavailable(workspaceRoot) {
 		return "", nil, fmt.Errorf("%s", missingWorkspaceRootMessage())
 	}
-	if !hasYAMLWorkspaceStore(workspaceRoot) {
+	if !hasYAMLWorkspaceStore(workspaceRoot) && !workspaceChildrenRemain(workspaceRoot, fileStoreWorkspacesDir) {
 		if localStoreAuthFailed {
 			return "", nil, localErr
 		}
@@ -211,8 +212,11 @@ func loadKurloStorePayloadWithDiagnostics(localStorePath, workspaceRoot string) 
 	if localStore == nil {
 		localStore = map[string]any{}
 	}
+	if err := recoverInterruptedSaveLocked(workspaceRoot); err != nil {
+		return "", nil, err
+	}
 	secrets := stringMap(localStore["secrets"])
-	workspaces, collections, requests, environments, workspaceCookies, diagnostics, err := loadFilesystemWorkspaceStoreWithDiagnostics(workspaceRoot, secrets)
+	workspaces, collections, requests, environments, workspaceCookies, diagnostics, err := loadFilesystemWorkspaceStoreRepairing(workspaceRoot, secrets)
 	if err != nil {
 		return "", diagnostics, err
 	}
@@ -261,6 +265,14 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 		return err
 	}
 
+	if err := validateWorkspaceStorePayload(store); err != nil {
+		return err
+	}
+	disk, err := inspectWorkspaceStoreOnDisk(workspaceRoot)
+	if err != nil {
+		return err
+	}
+
 	existingSecrets := map[string]string{}
 	existingSharedHash := ""
 	existingStorageMode := inferWorkspaceStorageMode(workspaceRoot)
@@ -283,7 +295,7 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 	requests := mapSlice(store["requests"])
 	environments := mapSlice(store["environments"])
 	workspaceCookies := workspaceCookiesFromStore(store["workspaceCookies"])
-	ensureStoreFilesystemNames(workspaces, collections, requests, environments)
+	ensureStoreFilesystemNames(workspaces, collections, requests, environments, disk, len(preserveDirs) > 0)
 
 	sanitizedRequests := sanitizeRequestsForFilesystem(requests, existingSecrets, secrets)
 	sanitizedEnvironments := sanitizeEnvironmentsForFilesystem(environments, existingSecrets, secrets)
@@ -299,6 +311,14 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 	sharedChanged := !filesystemStoreExists || existingSharedHash != sharedHash
 
 	if sharedChanged {
+		if staged, changed := secretsAhead(existingSecrets, secrets); changed {
+			if err := os.MkdirAll(workspaceRoot, 0755); err != nil {
+				return err
+			}
+			if err := saveLocalKurloStore(localStorePath, buildLocalKurloStore(store, workspaceRoot, staged, existingSharedHash, existingStorageMode)); err != nil {
+				return err
+			}
+		}
 		if err := writeFilesystemWorkspaceStore(workspaceRoot, sanitizedWorkspaces, sanitizedCollections, sanitizedRequests, sanitizedEnvironments, sanitizedWorkspaceCookies, preserveDirs); err != nil {
 			return err
 		}
@@ -306,6 +326,18 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 
 	localStore := buildLocalKurloStore(store, workspaceRoot, secrets, sharedHash, existingStorageMode)
 	return saveLocalKurloStore(localStorePath, localStore)
+}
+
+func secretsAhead(existing, next map[string]string) (map[string]string, bool) {
+	merged := cloneStringMap(existing)
+	changed := false
+	for key, value := range next {
+		if current, ok := merged[key]; !ok || current != value {
+			merged[key] = value
+			changed = true
+		}
+	}
+	return merged, changed
 }
 
 func buildLocalKurloStore(store map[string]any, workspaceRoot string, secrets map[string]string, sharedHash string, storageMode string) map[string]any {
@@ -372,9 +404,16 @@ func writeFilesystemWorkspaceStore(root string, workspaces, collections, request
 }
 
 func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, environments []map[string]any, workspaceCookies map[string][]map[string]any, preserveDirs []string) error {
+	yamlStoreWriteMu.Lock()
+	defer yamlStoreWriteMu.Unlock()
 	if err := os.MkdirAll(root, 0755); err != nil {
 		return err
 	}
+	if err := recoverInterruptedSave(root); err != nil {
+		return err
+	}
+	journal := &saveJournal{root: root}
+	defer journal.close()
 	if err := ensureManagedWorkspaceDirIfExists(root, fileStoreWorkspacesDir); err != nil {
 		return err
 	}
@@ -386,6 +425,18 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 
 	rootIndexPath := filepath.Join(root, fileStoreRootIndex)
 	desiredFiles[rootIndexPath] = struct{}{}
+
+	workspaceOrder := idsFor(workspaces)
+	if len(preserveDirs) > 0 {
+		workspaceOrder = mergePreservedWorkspaceOrder(root, workspaceOrder)
+	}
+	if err := writeJournaledYAMLFile(rootIndexPath, filesystemStoreRootFile{
+		Version:        fileStoreVersion,
+		Format:         workspaceStoreFormat,
+		WorkspaceOrder: workspaceOrder,
+	}, journal); err != nil {
+		return err
+	}
 
 	for _, workspace := range workspaces {
 		workspaceID := stringValue(workspace, "id")
@@ -401,6 +452,15 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 		}
 		workspacePath := filepath.Join(workspaceDir, fileStoreRootFileName)
 		desiredFiles[workspacePath] = struct{}{}
+		delete(workspace, filesystemNameField)
+		if err := writeJournaledYAMLFile(workspacePath, filesystemWorkspaceFile{
+			Version:         fileStoreVersion,
+			Workspace:       workspace,
+			CollectionOrder: idsFor(collectionsByWorkspace[workspaceID]),
+			Cookies:         workspaceCookies[workspaceID],
+		}, journal); err != nil {
+			return err
+		}
 
 		workspaceCollections := collectionsByWorkspace[workspaceID]
 		collectionDirs := filesystemSegmentsForItems(workspaceCollections)
@@ -418,6 +478,15 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 				return err
 			}
 			collectionPath := filepath.Join(collectionDir, fileStoreCollection)
+			delete(collection, filesystemNameField)
+			if err := writeJournaledYAMLFile(collectionPath, filesystemCollectionFile{
+				Version:      fileStoreVersion,
+				Collection:   collection,
+				RequestOrder: idsFor(requestsByCollection[collectionID]),
+			}, journal); err != nil {
+				return err
+			}
+			desiredFiles[collectionPath] = struct{}{}
 			requestFiles := filesystemSegmentsForItems(requestsByCollection[collectionID])
 			for _, request := range requestsByCollection[collectionID] {
 				requestID := stringValue(request, "id")
@@ -425,24 +494,17 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 					return fmt.Errorf("request is missing id")
 				}
 				requestPath := filepath.Join(requestsDir, requestFiles[requestID]+fileStoreYAMLExt)
-				if err := writeRequestExamples(collectionDir, requestFiles[requestID], requestExampleMaps(request), desiredFiles); err != nil {
-					return err
-				}
+				examples := requestExampleMaps(request)
 				delete(request, filesystemNameField)
-				if err := writeYAMLFile(requestPath, filesystemRequestFile{Version: fileStoreVersion, Request: request}); err != nil {
+				dropInferableSettingsOverrides(request, collection)
+				if err := writeCanonicalYAMLFile(requestPath, filesystemRequestFile{Version: fileStoreVersion, Request: request}, journal, canonicalRequestFile(collection)); err != nil {
 					return err
 				}
 				desiredFiles[requestPath] = struct{}{}
+				if err := writeRequestExamples(collectionDir, requestFiles[requestID], examples, desiredFiles, journal); err != nil {
+					return err
+				}
 			}
-			delete(collection, filesystemNameField)
-			if err := writeYAMLFile(collectionPath, filesystemCollectionFile{
-				Version:      fileStoreVersion,
-				Collection:   collection,
-				RequestOrder: idsFor(requestsByCollection[collectionID]),
-			}); err != nil {
-				return err
-			}
-			desiredFiles[collectionPath] = struct{}{}
 		}
 
 		workspaceEnvironments := environmentsByWorkspace[workspaceID]
@@ -459,37 +521,19 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 				}
 				envPath := filepath.Join(envDir, environmentFiles[environmentID]+fileStoreYAMLExt)
 				delete(environment, filesystemNameField)
-				if err := writeYAMLFile(envPath, filesystemEnvironmentFile{Version: fileStoreVersion, Environment: environment}); err != nil {
+				if err := writeJournaledYAMLFile(envPath, filesystemEnvironmentFile{Version: fileStoreVersion, Environment: environment}, journal); err != nil {
 					return err
 				}
 				desiredFiles[envPath] = struct{}{}
 			}
 		}
 
-		delete(workspace, filesystemNameField)
-		if err := writeYAMLFile(workspacePath, filesystemWorkspaceFile{
-			Version:         fileStoreVersion,
-			Workspace:       workspace,
-			CollectionOrder: idsFor(collectionsByWorkspace[workspaceID]),
-			Cookies:         workspaceCookies[workspaceID],
-		}); err != nil {
-			return err
-		}
-	}
-
-	workspaceOrder := idsFor(workspaces)
-	if len(preserveDirs) > 0 {
-		workspaceOrder = mergePreservedWorkspaceOrder(root, workspaceOrder)
-	}
-	if err := writeYAMLFile(rootIndexPath, filesystemStoreRootFile{
-		Version:        fileStoreVersion,
-		Format:         workspaceStoreFormat,
-		WorkspaceOrder: workspaceOrder,
-	}); err != nil {
-		return err
 	}
 
 	if err := pruneYAMLWorkspaceStore(root, desiredFiles, preserveDirs); err != nil {
+		return err
+	}
+	if err := journal.finish(); err != nil {
 		return err
 	}
 	return ensureWorkspaceGitignore(root)
@@ -527,6 +571,7 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		}
 		return err
 	}
+	var stale []string
 	if err := filepath.WalkDir(managedRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -550,11 +595,30 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		if !isExampleBody && !isKurloManagedYAMLFile(path) {
 			return nil
 		}
-		return os.Remove(path)
+		stale = append(stale, path)
+		return nil
 	}); err != nil {
 		return err
 	}
+	sort.SliceStable(stale, func(i, j int) bool {
+		return pruneRank(stale[i]) < pruneRank(stale[j])
+	})
+	for _, path := range stale {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
 	return removeEmptyDirs(managedRoot)
+}
+
+func pruneRank(path string) int {
+	switch filepath.Base(path) {
+	case fileStoreRootFileName:
+		return 2
+	case fileStoreCollection:
+		return 1
+	}
+	return 0
 }
 
 func pathInsideAnyDir(path string, dirs []string) bool {
@@ -585,12 +649,17 @@ func diagnosticPreserveDirs(root string, diagnostics []WorkspaceDiagnostic) []st
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(root, path)
 		}
-		dir := workspaceDirForPath(root, path)
-		if dir == "" || seen[dir] {
+		if workspaceDirForPath(root, path) == "" {
 			continue
 		}
-		seen[dir] = true
-		dirs = append(dirs, dir)
+		if base := filepath.Base(path); base == fileStoreRootFileName || base == fileStoreCollection {
+			path = filepath.Dir(path)
+		}
+		if seen[path] {
+			continue
+		}
+		seen[path] = true
+		dirs = append(dirs, path)
 	}
 	return dirs
 }
@@ -797,10 +866,27 @@ func loadFilesystemWorkspaceStoreWithDiagnostics(root string, secrets map[string
 	return loadYAMLWorkspaceStoreWithDiagnostics(root, secrets)
 }
 
+func loadFilesystemWorkspaceStoreRepairing(root string, secrets map[string]string) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, error) {
+	workspaces, collections, requests, environments, cookies, diagnostics, fixes, err := loadYAMLWorkspaceStoreWithFixes(root, secrets)
+	if err != nil || len(fixes) == 0 || workspaceIntegrityError(diagnostics) != nil {
+		return workspaces, collections, requests, environments, cookies, diagnostics, err
+	}
+	if applyWorkspaceReferenceFixes(fixes) != nil {
+		return workspaces, collections, requests, environments, cookies, diagnostics, nil
+	}
+	workspaces, collections, requests, environments, cookies, diagnostics, _, err = loadYAMLWorkspaceStoreWithFixes(root, secrets)
+	return workspaces, collections, requests, environments, cookies, diagnostics, err
+}
+
 func loadYAMLWorkspaceStoreWithDiagnostics(root string, secrets map[string]string) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, error) {
+	workspaces, collections, requests, environments, cookies, diagnostics, _, err := loadYAMLWorkspaceStoreWithFixes(root, secrets)
+	return workspaces, collections, requests, environments, cookies, diagnostics, err
+}
+
+func loadYAMLWorkspaceStoreWithFixes(root string, secrets map[string]string) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, []workspaceReferenceFix, error) {
 	workspaceEntries, invalidWorkspaceFolders, diagnostics, err := readYAMLWorkspaceEntriesWithDiagnostics(root, secrets)
 	if err != nil {
-		return nil, nil, nil, nil, nil, diagnostics, err
+		return nil, nil, nil, nil, nil, diagnostics, nil, err
 	}
 	workspaces := make([]map[string]any, 0, len(workspaceEntries))
 	collections := make([]map[string]any, 0)
@@ -808,13 +894,15 @@ func loadYAMLWorkspaceStoreWithDiagnostics(root string, secrets map[string]strin
 	environments := make([]map[string]any, 0)
 	workspaceCookies := map[string][]map[string]any{}
 
+	validator := newWorkspaceIntegrityValidator(root)
 	for _, workspaceEntry := range workspaceEntries {
+		validator.item("workspace", filepath.Join(workspaceEntry.path, fileStoreRootFileName), workspaceEntry.workspace)
 		workspaceID := stringValue(workspaceEntry.workspace, "id")
 		workspaces = append(workspaces, workspaceEntry.workspace)
 		if workspaceID != "" && len(workspaceEntry.cookies) > 0 {
 			workspaceCookies[workspaceID] = workspaceEntry.cookies
 		}
-		childCollections, childRequests, childEnvironments, childDiagnostics := collectWorkspaceFolderChildren(workspaceEntry.path, root, workspaceID, workspaceEntry.collectionOrder, secrets)
+		childCollections, childRequests, childEnvironments, childDiagnostics := collectWorkspaceFolderChildren(workspaceEntry.path, root, workspaceID, workspaceEntry.collectionOrder, secrets, validator)
 		collections = append(collections, childCollections...)
 		requests = append(requests, childRequests...)
 		environments = append(environments, childEnvironments...)
@@ -822,15 +910,32 @@ func loadYAMLWorkspaceStoreWithDiagnostics(root string, secrets map[string]strin
 	}
 
 	for _, folder := range invalidWorkspaceFolders {
-		_, _, _, childDiagnostics := collectWorkspaceFolderChildren(folder.path, root, folder.workspaceID, nil, secrets)
+		_, _, _, childDiagnostics := collectWorkspaceFolderChildren(folder.path, root, folder.workspaceID, nil, secrets, nil)
 		diagnostics = append(diagnostics, childDiagnostics...)
 	}
+	if len(invalidWorkspaceFolders) == 0 {
+		var rootFile filesystemStoreRootFile
+		rootIndexPath := filepath.Join(root, fileStoreRootIndex)
+		if readYAMLFile(rootIndexPath, &rootFile) == nil {
+			validator.order(rootIndexPath, "workspaceOrder", rootFile.WorkspaceOrder, workspaces)
+		}
+	}
 
+	diagnostics = append(diagnostics, validator.diagnostics...)
+	workspaces = validator.usableItems("workspace", workspaces)
+	collections = validator.usableItems("collection", collections)
+	requests = validator.usableItems("request", requests)
+	environments = validator.usableItems("environment", environments)
+	for _, request := range requests {
+		if examples, exists := request["examples"]; exists {
+			request["examples"] = validator.usableItems("example", mapSlice(examples))
+		}
+	}
 	hydrateRequestCollectionNames(requests, collections)
-	return workspaces, collections, requests, environments, workspaceCookies, diagnostics, nil
+	return workspaces, collections, requests, environments, workspaceCookies, diagnostics, validator.fixes, nil
 }
 
-func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, collectionOrder []string, secrets map[string]string) ([]map[string]any, []map[string]any, []map[string]any, []WorkspaceDiagnostic) {
+func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, collectionOrder []string, secrets map[string]string, validator *workspaceIntegrityValidator) ([]map[string]any, []map[string]any, []map[string]any, []WorkspaceDiagnostic) {
 	collections := make([]map[string]any, 0)
 	requests := make([]map[string]any, 0)
 	environments := make([]map[string]any, 0)
@@ -838,21 +943,30 @@ func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, col
 
 	collectionEntries, invalidCollectionFolders, collectionDiagnostics := readYAMLCollectionEntriesWithDiagnostics(filepath.Join(workspacePath, fileStoreCollectionsDir), collectionOrder, root, workspaceID, secrets)
 	diagnostics = append(diagnostics, collectionDiagnostics...)
-	seenCollections := map[string]bool{}
 	for _, collectionEntry := range collectionEntries {
+		collectionPath := filepath.Join(collectionEntry.path, fileStoreCollection)
+		validator.item("collection", collectionPath, collectionEntry.collection)
+		validator.reference(collectionPath, "collection", collectionEntry.collection, "workspaceId", workspaceID)
 		collectionID := stringValue(collectionEntry.collection, "id")
-		seenCollections[collectionID] = true
 		collections = append(collections, collectionEntry.collection)
 		requestEntries, requestDiagnostics := readYAMLRequestEntriesWithDiagnostics(filepath.Join(collectionEntry.path, fileStoreRequestsDir), collectionEntry.requestOrder, secrets, root, workspaceID, collectionID)
 		diagnostics = append(diagnostics, requestDiagnostics...)
-		seenRequests := map[string]bool{}
+		if len(requestDiagnostics) == 0 {
+			validator.orphanExamples(collectionEntry.path, requestEntries)
+			requestItems := make([]map[string]any, 0, len(requestEntries))
+			for _, requestEntry := range requestEntries {
+				requestItems = append(requestItems, requestEntry.request)
+			}
+			validator.order(collectionPath, "requestOrder", collectionEntry.requestOrder, requestItems)
+		}
 		for _, requestEntry := range requestEntries {
+			validator.item("request", requestEntry.path, requestEntry.request)
+			validator.reference(requestEntry.path, "request", requestEntry.request, "collectionId", collectionID)
 			requestID := stringValue(requestEntry.request, "id")
-			seenRequests[requestID] = true
 			examples, exampleDiagnostics := readRequestExamples(
 				collectionEntry.path,
 				stringValue(requestEntry.request, filesystemNameField),
-				root, workspaceID, collectionID, requestID,
+				root, workspaceID, collectionID, requestID, validator,
 			)
 			diagnostics = append(diagnostics, exampleDiagnostics...)
 			if len(examples) > 0 {
@@ -860,24 +974,10 @@ func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, col
 			}
 			requests = append(requests, requestEntry.request)
 		}
-		hasRequestLoadErrors := len(requestDiagnostics) > 0
-		for _, requestID := range collectionEntry.requestOrder {
-			if requestID == "" || seenRequests[requestID] {
-				continue
-			}
-			if hasRequestLoadErrors {
+	}
 
-				continue
-			}
-			diagnostics = append(diagnostics, workspaceDiagnostic{
-				scope:        "collection",
-				path:         filepath.Join(collectionEntry.path, fileStoreCollection),
-				root:         root,
-				message:      fmt.Sprintf("requestOrder references missing request %q", requestID),
-				workspaceID:  workspaceID,
-				collectionID: collectionID,
-			}.toDiagnostic())
-		}
+	if len(collectionDiagnostics) == 0 {
+		validator.order(filepath.Join(workspacePath, fileStoreRootFileName), "collectionOrder", collectionOrder, collections)
 	}
 
 	for _, folder := range invalidCollectionFolders {
@@ -885,26 +985,11 @@ func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, col
 		diagnostics = append(diagnostics, requestDiagnostics...)
 	}
 
-	hasCollectionLoadErrors := len(collectionDiagnostics) > 0
-	for _, collectionID := range collectionOrder {
-		if collectionID == "" || seenCollections[collectionID] {
-			continue
-		}
-		if hasCollectionLoadErrors {
-
-			continue
-		}
-		diagnostics = append(diagnostics, workspaceDiagnostic{
-			scope:       "workspace",
-			path:        filepath.Join(workspacePath, fileStoreRootFileName),
-			root:        root,
-			message:     fmt.Sprintf("collectionOrder references missing collection %q", collectionID),
-			workspaceID: workspaceID,
-		}.toDiagnostic())
-	}
 	environmentEntries, environmentDiagnostics := readYAMLEnvironmentEntriesWithDiagnostics(filepath.Join(workspacePath, fileStoreEnvironmentsDir), secrets, root, workspaceID)
 	diagnostics = append(diagnostics, environmentDiagnostics...)
 	for _, environmentEntry := range environmentEntries {
+		validator.item("environment", environmentEntry.path, environmentEntry.environment)
+		validator.reference(environmentEntry.path, "environment", environmentEntry.environment, "workspaceId", workspaceID)
 		environments = append(environments, environmentEntry.environment)
 	}
 	return collections, requests, environments, diagnostics
@@ -928,6 +1013,9 @@ func (d workspaceDiagnostic) toDiagnostic() WorkspaceDiagnostic {
 		message = workspaceDiagnosticErrorMessage(d.path, d.err)
 	}
 	line, column := workspaceDiagnosticLineColumn(message)
+	if line > 0 {
+		message = friendlyYAMLMessage(message)
+	}
 	return WorkspaceDiagnostic{
 		Scope:        d.scope,
 		Severity:     "error",
@@ -959,6 +1047,12 @@ func readYAMLWorkspaceEntriesWithDiagnostics(root string, secrets map[string]str
 		diagnostics = append(diagnostics, workspaceDiagnostic{scope: "workspace", path: rootIndexPath, root: root, err: err, blocking: true}.toDiagnostic())
 		return nil, nil, diagnostics, workspaceDiagnosticsError(diagnostics)
 	}
+	if rootIndexMissingWithChildren(root) {
+		diagnostics = append(diagnostics, workspaceDiagnostic{
+			scope: workspaceIntegrityScope, path: rootIndexPath, root: root, blocking: true,
+			message: "kurlo.yml is missing but workspace files remain. Restore kurlo.yml before saving.",
+		}.toDiagnostic())
+	}
 	orderIndex := indexByID(rootFile.WorkspaceOrder)
 	var workspaces []workspaceFileEntry
 	var invalidFolders []invalidWorkspaceFolder
@@ -975,6 +1069,12 @@ func readYAMLWorkspaceEntriesWithDiagnostics(root string, secrets map[string]str
 		var doc filesystemWorkspaceFile
 		if err := readYAMLFile(filePath, &doc); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
+				if workspaceChildrenRemain(path, fileStoreCollectionsDir, fileStoreEnvironmentsDir) {
+					diagnostics = append(diagnostics, workspaceDiagnostic{
+						scope: workspaceIntegrityScope, path: filePath, root: root, blocking: true,
+						message: "workspace.yml is missing but its child files remain. Restore the workspace file before saving.",
+					}.toDiagnostic())
+				}
 				continue
 			}
 			workspaceID := invalidDiagnosticID("workspace", filePath)
@@ -1040,6 +1140,12 @@ func readYAMLCollectionEntriesWithDiagnostics(root string, order []string, works
 		var doc filesystemCollectionFile
 		if err := readYAMLFile(filePath, &doc); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
+				if workspaceChildrenRemain(path, fileStoreRequestsDir, fileStoreExamplesDir) {
+					diagnostics = append(diagnostics, workspaceDiagnostic{
+						scope: workspaceIntegrityScope, path: filePath, root: workspaceRoot, blocking: true,
+						message: "collection.yml is missing but its child files remain. Restore the collection file before saving.",
+					}.toDiagnostic())
+				}
 				continue
 			}
 			collectionID := invalidDiagnosticID("collection", filePath)
@@ -1251,7 +1357,7 @@ func workspaceDiagnosticsError(diagnostics []WorkspaceDiagnostic) error {
 	if len(diagnostics) == 1 {
 		return fmt.Errorf("%s: %s", location, first.Message)
 	}
-	return fmt.Errorf("%s: %s (+%d more workspace YAML errors)", location, first.Message, len(diagnostics)-1)
+	return fmt.Errorf("%s: %s (+%d more workspace issues)", location, first.Message, len(diagnostics)-1)
 }
 
 func sanitizeRequestsForFilesystem(requests []map[string]any, existingSecrets, secrets map[string]string) []map[string]any {
@@ -1448,6 +1554,7 @@ func sanitizeWorkspaceCookiesForFilesystem(workspaceCookies map[string][]map[str
 		nextCookies := make([]map[string]any, 0, len(cookies))
 		for _, cookie := range cookies {
 			next := cloneMap(cookie)
+			stripTimestamps(next)
 			sanitizeWorkspaceCookieSecret(next, workspaceID, existingSecrets, secrets)
 			nextCookies = append(nextCookies, next)
 		}
@@ -1592,7 +1699,22 @@ func mergeWorkspaceCookieSecrets(cookies []map[string]any, secrets map[string]st
 	}
 }
 
+var beforeYAMLWrite func(path string) error
+
 func writeYAMLFile(path string, value any) error {
+	return writeJournaledYAMLFile(path, value, nil)
+}
+
+func writeJournaledYAMLFile(path string, value any, journal *saveJournal) error {
+	return writeCanonicalYAMLFile(path, value, journal, nil)
+}
+
+func writeCanonicalYAMLFile(path string, value any, journal *saveJournal, canonical func(any) any) error {
+	if beforeYAMLWrite != nil {
+		if err := beforeYAMLWrite(path); err != nil {
+			return err
+		}
+	}
 	data, err := yaml.Marshal(value)
 	if err != nil {
 		return err
@@ -1607,8 +1729,11 @@ func writeYAMLFile(path string, value any) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	if existing, err := os.ReadFile(path); err == nil && string(existing) == string(data) {
+	if existing, err := os.ReadFile(path); err == nil && (string(existing) == string(data) || yamlSameIgnoringTimestamps(existing, data, canonical)) {
 		return nil
+	}
+	if err := journal.record(path); err != nil {
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return err
@@ -1632,7 +1757,7 @@ func writeYAMLFile(path string, value any) error {
 		_ = tmp.Close()
 		return err
 	}
-	if err := tmp.Sync(); err != nil {
+	if err := journal.flush(tmp); err != nil {
 		_ = tmp.Close()
 		return err
 	}
@@ -1643,10 +1768,95 @@ func writeYAMLFile(path string, value any) error {
 		return err
 	}
 	cleanup = false
-	if err := syncDir(filepath.Dir(path)); err != nil {
-		return err
+	return journal.syncDir(filepath.Dir(path))
+}
+
+func sameJSONValue(left, right any) bool {
+	leftJSON, leftErr := json.Marshal(left)
+	rightJSON, rightErr := json.Marshal(right)
+	return leftErr == nil && rightErr == nil && string(leftJSON) == string(rightJSON)
+}
+
+func dropInferableSettingsOverrides(request, collection map[string]any) {
+	overrides, ok := request["settingsOverrides"].(map[string]any)
+	if !ok {
+		return
 	}
-	return nil
+	settings, _ := request["settings"].(map[string]any)
+	inherited, _ := nestedMap(collection, "defaults")["settings"].(map[string]any)
+	inferred := map[string]bool{}
+	for key, value := range settings {
+		if inheritedValue, ok := inherited[key]; ok && sameJSONValue(inheritedValue, value) {
+			continue
+		}
+		inferred[key] = true
+	}
+	explicit := map[string]bool{}
+	for key, value := range overrides {
+		if boolValue(value) {
+			explicit[key] = true
+		}
+	}
+	if reflect.DeepEqual(explicit, inferred) {
+		delete(request, "settingsOverrides")
+	}
+}
+
+func yamlSameIgnoringTimestamps(existing, next []byte, canonical func(any) any) bool {
+	var left, right any
+	if yaml.Unmarshal(existing, &left) != nil || yaml.Unmarshal(next, &right) != nil {
+		return false
+	}
+	if canonical != nil {
+		left = canonical(left)
+	}
+	return reflect.DeepEqual(withoutTimestamps(left), withoutTimestamps(right))
+}
+
+func canonicalRequestFile(collection map[string]any) func(any) any {
+	return func(doc any) any {
+		file, ok := doc.(map[string]any)
+		if !ok {
+			return doc
+		}
+		if request, ok := file["request"].(map[string]any); ok {
+			dropInferableSettingsOverrides(request, collection)
+		}
+		return file
+	}
+}
+
+func withoutTimestamps(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, item := range typed {
+			if key == "createdAt" || key == "updatedAt" {
+				continue
+			}
+			out[key] = withoutTimestamps(item)
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for index, item := range typed {
+			out[index] = withoutTimestamps(item)
+		}
+		return out
+	}
+	return value
+}
+
+func yamlFileFormatVersion(out any) int {
+	value := reflect.ValueOf(out)
+	if value.Kind() != reflect.Pointer || value.Elem().Kind() != reflect.Struct {
+		return 0
+	}
+	field := value.Elem().FieldByName("Version")
+	if !field.IsValid() || field.Kind() != reflect.Int {
+		return 0
+	}
+	return int(field.Int())
 }
 
 func readYAMLFile(path string, out any) error {
@@ -1663,6 +1873,9 @@ func readYAMLFile(path string, out any) error {
 	}
 	if err := yaml.Unmarshal(data, out); err != nil {
 		return fmt.Errorf("read %s: %w", path, err)
+	}
+	if version := yamlFileFormatVersion(out); version > fileStoreVersion {
+		return fmt.Errorf("read %s: written by a newer Kurlo (file format version %d, this version reads %d). Update Kurlo to open it", path, version, fileStoreVersion)
 	}
 	return nil
 }
@@ -1768,19 +1981,6 @@ func idsFor(items []map[string]any) []string {
 		}
 	}
 	return ids
-}
-
-func ensureStoreFilesystemNames(workspaces, collections, requests, environments []map[string]any) {
-	filesystemSegmentsForItems(workspaces)
-	for _, workspaceCollections := range groupByString(collections, "workspaceId") {
-		filesystemSegmentsForItems(workspaceCollections)
-	}
-	for _, collectionRequests := range groupByString(requests, "collectionId") {
-		filesystemSegmentsForItems(collectionRequests)
-	}
-	for _, workspaceEnvironments := range groupByString(environments, "workspaceId") {
-		filesystemSegmentsForItems(workspaceEnvironments)
-	}
 }
 
 func filesystemSegmentsForItems(items []map[string]any) map[string]string {

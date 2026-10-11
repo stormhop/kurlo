@@ -1,3 +1,4 @@
+import { kurloChangedFiles } from '../../gitFiles';
 import {
   gitStatus, gitDiff, gitOutgoingChanges, gitCommitLogPage, gitCommitDiff, gitConflictFile,
   gitResolveConflictFile, gitContinueOperation, gitAbortOperation, gitStashWorkspace, gitStashPopWorkspace,
@@ -6,7 +7,7 @@ import {
   gitDeleteBranch, gitRenameBranch, gitStageWorkspaceFiles, gitCommitWorkspace, gitCommitWorkspaceFiles,
   gitPushWorkspace, gitForcePushWorkspace, gitDiscardWorkspaceFile, gitDiscardWorkspaceFiles,
   gitDiscardWorkspaceChanges, gitStoreToken, gitSetSshKey, gitCloneWorkspaceWithAuth, gitSshUrlFor,
-  gitRemoteUrl, gitSetRemoteUrl, openWorkspaceRoot, openDirectoryDialog,
+  gitRemoteUrl, gitSetRemoteUrl, openWorkspaceRoot, openDirectoryDialog
 } from '../../backend';
 import { EMPTY_GIT_STATUS } from '../../wire';
 import type {
@@ -19,7 +20,7 @@ import type { DialogOption } from '../../types/dialog';
 import type { TopView } from '../ui';
 
 export const GIT_LOG_PAGE_SIZE = 60;
-const GIT_REMOTE_HELP = 'Private repositories work through your system Git credentials. SSH URLs are recommended, for example git@gitlab.com:team/project.git. Kurlo does not store Git tokens.';
+const GIT_REMOTE_HELP = 'For a private repository Kurlo asks for a personal access token or an SSH key when it needs one. The token is kept encrypted on this device. SSH URLs look like git@gitlab.com:team/project.git.';
 
 export { EMPTY_GIT_STATUS };
 
@@ -149,6 +150,7 @@ type GitHost = {
   gitSelectedCommit: string;
   gitSelectedPath: string;
   gitLoading: boolean;
+  gitLogLoadingMore: boolean;
   gitDiffLoading: boolean;
   gitAction: string;
   gitMessage: string;
@@ -268,45 +270,33 @@ export const gitFeature = {
       if (this.gitSelectedPath === path) this.gitDiffLoading = false;
     }
   },
-  async refreshGitLog(this: GitHost) {
-    if (!this.gitStatus.isRepo) {
-      this.gitLog = { ...EMPTY_GIT_LOG };
-      return;
-    }
-    this.gitLoading = true;
-    this.gitAction = 'log';
+  async refreshGitQuietly(this: GitHost) {
+    if (this.gitLoading || !this.gitStatus.isRepo) return;
+    await this.refreshGitStatusAfterPersist();
+    if (this.gitLoading || !this.gitStatus.isRepo) return;
     try {
-      this.gitLog = normalizeGitLog(await gitCommitLogPage(GIT_LOG_PAGE_SIZE, 0));
-      if (this.gitLog.error) this.gitError = this.gitLog.error;
-    } catch (error) {
-      this.gitError = error instanceof Error ? error.message : String(error);
-    } finally {
-      this.gitLoading = false;
-      if (this.gitAction === 'log') this.gitAction = '';
+      const page = normalizeGitLog(await gitCommitLogPage(GIT_LOG_PAGE_SIZE, 0));
+      if (!page.error && page.commits[0]?.hash !== this.gitLog.commits[0]?.hash) this.gitLog = page;
+    } catch {
     }
   },
   async loadMoreGitLog(this: GitHost) {
-    if (!this.gitStatus.isRepo || this.gitLoading || !this.gitLog.hasMore) return;
-    this.gitLoading = true;
-    this.gitAction = 'log-more';
-    this.gitError = '';
+    if (!this.gitStatus.isRepo || this.gitLogLoadingMore || !this.gitLog.hasMore) return;
+    this.gitLogLoadingMore = true;
+    const startLog = this.gitLog;
     try {
-      const offset = this.gitLog.commits.length;
-      const page = normalizeGitLog(await gitCommitLogPage(GIT_LOG_PAGE_SIZE, offset));
-      const seen = new Set(this.gitLog.commits.map(commit => commit.hash));
+      const page = normalizeGitLog(await gitCommitLogPage(GIT_LOG_PAGE_SIZE, startLog.commits.length));
+      if (this.gitLog !== startLog) return;
+      const seen = new Set(startLog.commits.map(commit => commit.hash));
       this.gitLog = {
         ...page,
-        commits: [
-          ...this.gitLog.commits,
-          ...page.commits.filter(commit => !seen.has(commit.hash)),
-        ],
+        commits: [...startLog.commits, ...page.commits.filter(commit => !seen.has(commit.hash))],
       };
-      if (this.gitLog.error) this.gitError = this.gitLog.error;
+      if (page.error) this.gitError = page.error;
     } catch (error) {
       this.gitError = error instanceof Error ? error.message : String(error);
     } finally {
-      this.gitLoading = false;
-      if (this.gitAction === 'log-more') this.gitAction = '';
+      this.gitLogLoadingMore = false;
     }
   },
   async selectGitCommit(this: GitHost, commit: string) {
@@ -442,7 +432,7 @@ export const gitFeature = {
     if (!directoryName) return;
     const initMode = await this.openSelectDialog('Kurlo workspace setup', 'If the cloned repository does not already contain Kurlo workspace files, choose what Kurlo should create:', [
       { value: 'empty', label: 'Create empty workspace', description: `Create a workspace named "${directoryName}" with a default collection.` },
-      { value: 'copy', label: 'Copy current workspace', description: 'Copy the current local workspaces, collections, requests, and environments.' },
+      { value: 'copy', label: 'Copy current workspaces', description: 'Copy all workspaces in the current folder, including their collections, requests, and environments.' },
     ], 'Clone', 'Cancel');
     if (!initMode) return;
     const parentDir = await openDirectoryDialog(`Choose parent folder for ${directoryName}`, await this.defaultWorkspaceParentForDialogs());
@@ -609,7 +599,7 @@ export const gitFeature = {
       const result = await gitPullWorkspace(normalizedStrategy);
       if (!result.ok) {
         if ((result.diagnostics ?? []).length) {
-          await this.applyWorkspaceOpenResult(result, result.error || 'Workspace YAML needs repair');
+          await this.applyWorkspaceOpenResult(result, result.error || 'Workspace files or references need repair');
           if (this.gitStatus.isRepo) {
             this.gitBranches = normalizeGitBranches(await gitListBranches());
             this.gitLog = normalizeGitLog(await gitCommitLogPage(GIT_LOG_PAGE_SIZE, 0));
@@ -1175,8 +1165,8 @@ export const gitFeature = {
   },
   async discardGitWorkspaceChanges(this: GitHost) {
     this.closeFloatingMenus();
-    if (!this.gitStatus.isRepo || !this.gitStatus.files.length) return;
-    const count = this.gitStatus.files.length;
+    if (!this.gitStatus.isRepo || !kurloChangedFiles(this.gitStatus).length) return;
+    const count = kurloChangedFiles(this.gitStatus).length;
     const confirmed = await this.openConfirmDialog(
       'Discard Kurlo changes',
       `Discard local Kurlo workspace changes and reload from the current commit? This affects Kurlo-managed files only and cannot be undone.`

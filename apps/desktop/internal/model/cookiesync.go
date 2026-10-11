@@ -16,23 +16,24 @@ type CookieSyncPairRequest struct {
 }
 
 type CookieSyncStatus struct {
-	Enabled       bool                  `json:"enabled"`
-	Running       bool                  `json:"running"`
-	Port          int                   `json:"port"`
-	URL           string                `json:"url"`
-	PairingCode   string                `json:"pairingCode"`
-	Domains       []string              `json:"domains"`
-	Paired        bool                  `json:"paired"`
-	Connected     bool                  `json:"connected"`
-	Browser       string                `json:"browser"`
-	Unreadable    []string              `json:"unreadable"`
-	LastContactAt int64                 `json:"lastContactAt"`
-	LastSyncAt    int64                 `json:"lastSyncAt"`
-	LastSyncCount int                   `json:"lastSyncCount"`
-	SyncedTotal   int                   `json:"syncedTotal"`
-	Pending       CookieSyncPairRequest `json:"pending"`
-	Log           []CookieSyncLog       `json:"log"`
-	Error         string                `json:"error,omitempty"`
+	Enabled          bool                  `json:"enabled"`
+	Running          bool                  `json:"running"`
+	Port             int                   `json:"port"`
+	URL              string                `json:"url"`
+	PairingCode      string                `json:"pairingCode"`
+	Domains          []string              `json:"domains"`
+	Paired           bool                  `json:"paired"`
+	Connected        bool                  `json:"connected"`
+	Browser          string                `json:"browser"`
+	ExtensionVersion string                `json:"extensionVersion,omitempty"`
+	Unreadable       []string              `json:"unreadable"`
+	LastContactAt    int64                 `json:"lastContactAt"`
+	LastSyncAt       int64                 `json:"lastSyncAt"`
+	LastSyncCount    int                   `json:"lastSyncCount"`
+	SyncedTotal      int                   `json:"syncedTotal"`
+	Pending          CookieSyncPairRequest `json:"pending"`
+	Log              []CookieSyncLog       `json:"log"`
+	Error            string                `json:"error,omitempty"`
 }
 
 type CookieSyncLog struct {

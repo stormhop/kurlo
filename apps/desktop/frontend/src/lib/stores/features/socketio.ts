@@ -19,6 +19,7 @@ type SocketIOHost = {
   activeRequestId: string;
   url: string;
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   requestError: string;
   requestTab: RequestTab;
   sioEventName: string;
@@ -111,7 +112,7 @@ export const socketioFeature = {
   _sioHistorySnapshot(this: SocketIOHost, sessionId: string): SavedRequest | null {
     const base = sessionId === this.activeRequestId
       ? this.snapshotActiveRequest()
-      : this.requests.find(r => r.id === sessionId);
+      : this.requestsById.get(sessionId);
     if (!base) return null;
     return this.normalizeSavedRequestCtx({
       ...base,

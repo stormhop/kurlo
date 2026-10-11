@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -300,7 +301,8 @@ func (s *mcpServer) instructions() string {
 		"run_collection to run a collection or folder with its test scripts, or send_request for a one-off HTTP call that can use the environment's {{variables}}. " +
 		"Values that scripts set with pm.environment.set or pm.collectionVariables.set are kept for later calls in this session, so a login request can hand its token to the requests after it. " +
 		"To find out whether a browser would let a web page make a call, pass browserOrigin to run_request or send_request: Kurlo then sends it the way a browser on that origin would, runs the CORS preflight, and reports the CORS error the browser would raise. " +
-		"Secret environment values are used when sending but never shown."
+		"Secret environment values are used when sending but never shown. " +
+		"When a request uses a {{variable}} that no environment, override or script has set, the result lists it in unresolvedVariables: set it with the variables argument or run the request that sets it first."
 	if s.opts.env != "" {
 		text += " Calls that do not name an environment use " + s.opts.env + "."
 	}
@@ -994,6 +996,43 @@ type mcpRequestOutcome struct {
 	Skipped          bool            `json:"skipped,omitempty"`
 	SkipReason       string          `json:"skipReason,omitempty"`
 	VariablesChanged []string        `json:"variablesChanged,omitempty"`
+	Unresolved       []string        `json:"unresolvedVariables,omitempty"`
+}
+
+var mcpVariableRe = regexp.MustCompile(`\{\{\s*([^{}$\s][^{}]*?)\s*\}\}`)
+
+func mcpUnresolvedVariables(req cliSavedRequest, run *mcpRunContext) []string {
+	known := map[string]bool{}
+	for _, source := range []map[string]string{run.values, run.sm.GetEnvironment(), run.sm.GetVariables()} {
+		for key := range source {
+			known[key] = true
+		}
+	}
+	texts := []string{req.URL, req.BodyContent}
+	for _, rows := range [][]cliKV{req.Params, req.Headers, req.FormRows} {
+		for _, row := range rows {
+			if row.Enabled {
+				texts = append(texts, row.Key, row.Value)
+			}
+		}
+	}
+	if auth, err := json.Marshal(req.Auth); err == nil {
+		texts = append(texts, string(auth))
+	}
+	seen := map[string]bool{}
+	var missing []string
+	for _, text := range texts {
+		for _, match := range mcpVariableRe.FindAllStringSubmatch(text, -1) {
+			name := strings.TrimSpace(match[1])
+			if strings.HasPrefix(name, "kurloSecret:") || known[name] || seen[name] {
+				continue
+			}
+			seen[name] = true
+			missing = append(missing, name)
+		}
+	}
+	sort.Strings(missing)
+	return missing
 }
 
 func (o mcpRequestOutcome) toolFailed() bool { return o.Error != "" && o.Status == 0 }
@@ -1093,6 +1132,7 @@ func (s *mcpServer) toolRunRequest(ctx context.Context, arguments json.RawMessag
 	}
 	result, resp := s.execute(ctx, run, req)
 	outcome := mcpOutcome(mcpRequestPath(req), run, result, resp, mcpBodyLimit(args.MaxBodyBytes))
+	outcome.Unresolved = mcpUnresolvedVariables(req, run)
 	outcome.VariablesChanged = s.remember(run)
 	return outcome, nil
 }
@@ -1146,6 +1186,7 @@ func (s *mcpServer) toolSendRequest(ctx context.Context, arguments json.RawMessa
 	}
 	result, resp := s.execute(ctx, run, req)
 	outcome := mcpOutcome(req.Method+" "+req.URL, run, result, resp, mcpBodyLimit(args.MaxBodyBytes))
+	outcome.Unresolved = mcpUnresolvedVariables(req, run)
 	outcome.VariablesChanged = s.remember(run)
 	return outcome, nil
 }

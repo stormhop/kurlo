@@ -65,8 +65,8 @@ The full pipeline in [`ci.yml`](.github/workflows/ci.yml) runs:
 | End-to-end | `npm run frontend:e2e` (Playwright) |
 
 `make test-extension` is not in that list: it drives the real Cookie Sync extension in a
-headless Chromium against a Go-hosted bridge, and it is run locally when `apps/extension`
-or `internal/api/cookie_sync.go` changes. See [`apps/extension/README.md`](apps/extension/README.md).
+headless Chromium against a Go-hosted bridge, and it is run locally when `apps/desktop/extension`
+or `internal/api/cookie_sync.go` changes. See [`apps/desktop/extension/README.md`](apps/desktop/extension/README.md).
 
 Two of these surprise people:
 

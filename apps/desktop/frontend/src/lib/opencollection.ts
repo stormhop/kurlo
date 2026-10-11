@@ -988,7 +988,7 @@ function yamlScalar(value: unknown, indent: number): string {
     return `|-\n${text.split('\n').map(line => `${pad}${line}`).join('\n')}`;
   }
   if (!text) return '""';
-  if (/^[A-Za-z0-9_./:@{}$ -]+$/.test(text) && !/^(true|false|null|~)$/i.test(text) && !/^\d/.test(text) && !text.includes(': ')) return text;
+  if (/^[A-Za-z_./$][A-Za-z0-9_./:@{}$ -]*$/.test(text) && !/^(true|false|null|~)$/i.test(text) && !/ $/.test(text) && !text.includes(': ')) return text;
   return JSON.stringify(text);
 }
 

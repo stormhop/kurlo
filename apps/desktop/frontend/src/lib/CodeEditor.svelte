@@ -15,7 +15,7 @@
   import { variableDisplayValue } from './variables';
   import { DYNAMIC_VARIABLES } from './dynamicVariables';
 
-  type Lang = 'json' | 'javascript' | 'html' | 'xml' | 'graphql' | 'text';
+  type Lang = 'json' | 'javascript' | 'html' | 'xml' | 'graphql' | 'yaml' | 'text';
 
   let {
     value = $bindable(''),
@@ -30,6 +30,7 @@
     ariaLabel = '',
     variableSuggestions = [],
     onformat,
+    validate,
   }: {
     value?: string;
     language?: Lang;
@@ -43,6 +44,7 @@
     ariaLabel?: string;
     variableSuggestions?: VariableSuggestion[];
     onformat?: () => void;
+    validate?: (text: string) => Promise<{ line: number; message: string } | null>;
   } = $props();
 
   let container: HTMLDivElement;
@@ -223,8 +225,24 @@
     },
   });
 
+  const yamlLanguage = StreamLanguage.define({
+    token(stream) {
+      if (stream.sol() && stream.match(/^\s*-(?=\s|$)/)) return 'punctuation';
+      if (stream.eatSpace()) return null;
+      if (stream.match(/#.*/)) return 'lineComment';
+      if (stream.match(/(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^\s:#][^:#]*?)(?=:(?:\s|$))/)) return 'propertyName';
+      if (stream.match(/:(?=\s|$)/)) return 'punctuation';
+      if (stream.match(/"(?:[^"\\]|\\.)*"?|'(?:[^']|'')*'?/)) return 'string';
+      if (stream.match(/[|>][-+0-9]*\s*$/)) return 'punctuation';
+      if (stream.match(/(?:true|false|null|~)(?=\s*(?:#|$))/)) return 'atom';
+      if (stream.match(/-?\d+(?:\.\d+)?(?:e[-+]?\d+)?(?=\s*(?:#|$))/i)) return 'number';
+      stream.skipToEnd();
+      return 'string';
+    },
+  });
+
   function immediateLangExtension(lang: Lang): Extension {
-    return languageExtensions[lang] ?? (lang === 'graphql' ? graphQLLanguage : []);
+    return languageExtensions[lang] ?? (lang === 'graphql' ? graphQLLanguage : lang === 'yaml' ? yamlLanguage : []);
   }
 
   async function loadLangExtension(lang: Lang): Promise<Extension> {
@@ -247,6 +265,9 @@
         break;
       case 'graphql':
         extension = graphQLLanguage;
+        break;
+      case 'yaml':
+        extension = yamlLanguage;
         break;
       default:
         extension = [];
@@ -423,9 +444,17 @@
     return null;
   }
 
-  function kurloDiagnostics(view: EditorView): Diagnostic[] {
+  async function kurloDiagnostics(view: EditorView): Promise<Diagnostic[]> {
     const docLen = view.state.doc.length;
-    const issue = computeIssue(view.state.doc.toString());
+    const text = view.state.doc.toString();
+    let issue = computeIssue(text);
+    if (!issue && validate) {
+      const found = await validate(text);
+      if (found) {
+        const lineNumber = Math.min(Math.max(found.line, 1), view.state.doc.lines);
+        issue = { position: view.state.doc.line(lineNumber).from, message: found.message, source: 'YAML' };
+      }
+    }
     if (!issue) return [];
     const pos = Math.min(Math.max(issue.position, 0), docLen);
     const line = view.state.doc.lineAt(pos);

@@ -12,6 +12,7 @@ type WorkspaceHost = {
   openRequestIds: string[];
   requestHistory: RequestHistoryEntry[];
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   topView: string;
   workspaceMenuOpen: boolean;
   workspaces: Workspace[];
@@ -44,7 +45,7 @@ export const workspaceFeature = {
     return this.collections.find(collection => collection.id === collectionId)?.workspaceId ?? this.activeWorkspaceId;
   },
   activeCollectionId(this: WorkspaceHost) {
-    const current = this.requests.find(request => request.id === this.activeRequestId);
+    const current = this.requestsById.get(this.activeRequestId);
     if (current?.isDraft) return this.defaultCollectionForWorkspace()?.id || '';
     const collection = this.collections.find(candidate => candidate.id === current?.collectionId);
     if (this.topView === 'request' && collection?.workspaceId === this.activeWorkspaceId) return collection.id;

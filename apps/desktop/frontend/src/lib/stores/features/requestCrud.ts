@@ -8,6 +8,7 @@ import {
   parseGraphQLPayload,
 } from '../../graphql';
 import { makeCollection } from '../../normalizers';
+import { requestMatchesSidebarQuery } from './collections';
 import { defaultBodyContentFor, requestBodyDefaultsFor } from '../../requestBodyDefaults';
 import type { DialogOption } from '../../types/dialog';
 import type {
@@ -29,6 +30,7 @@ import { newRequestId, requestTabLabel } from '../../utils';
 import type { TopView } from '../ui';
 
 type RequestCrudHost = {
+  unsavedRequestSnapshots: Map<string, SavedRequest>;
   activeRequest: SavedRequest | undefined;
   activeRequestId: string;
   activeWorkspaceId: string;
@@ -64,6 +66,7 @@ type RequestCrudHost = {
   requestTab: RequestTab;
   requestType: RequestType;
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   responseTabs: Map<string, ResponseTab>;
   savedRequestSnapshots: Map<string, SavedRequest>;
   sidebarSearch: string;
@@ -129,20 +132,20 @@ type RequestCrudHost = {
 export const requestCrudFeature = {
   get openRequests(): SavedRequest[] {
     const host = this as unknown as RequestCrudHost;
-    return host.openRequestIds.map(id => host.requests.find(r => r.id === id)).filter((r): r is SavedRequest => Boolean(r));
+    return host.openRequestIds.map(id => host.requestsById.get(id)).filter((r): r is SavedRequest => Boolean(r));
   },
 
   get openRequestsForTabs(): SavedRequest[] {
     const host = this as unknown as RequestCrudHost;
     host.dirtyRequestIdList;
     return host.openRequestIds
-      .map(id => host.requestForEditing(id) ?? host.requests.find(r => r.id === id))
+      .map(id => host.requestForEditing(id) ?? host.requestsById.get(id))
       .filter((r): r is SavedRequest => Boolean(r));
   },
 
   get activeRequest(): SavedRequest | undefined {
     const host = this as unknown as RequestCrudHost;
-    return host.requests.find(r => r.id === host.activeRequestId);
+    return host.requestsById.get(host.activeRequestId);
   },
 
   get activeRequestIsDirty(): boolean {
@@ -166,12 +169,15 @@ export const requestCrudFeature = {
     const host = this as unknown as RequestCrudHost;
     host.dirtyRequestIdList;
     const collectionIds = new Set(host.collections.filter(collection => collection.workspaceId === host.activeWorkspaceId).map(collection => collection.id));
-    return host.requestsForDisplay().filter(request => !request.isDraft && request.isPinned && collectionIds.has(request.collectionId));
+    const query = host.sidebarSearch.trim().toLowerCase();
+    return host.requestsForDisplay().filter(request => !request.isDraft && request.isPinned && collectionIds.has(request.collectionId) && requestMatchesSidebarQuery(request, query));
   },
 
   requestsForDisplay(this: RequestCrudHost): SavedRequest[] {
     this.dirtyRequestIdList;
-    return this.requests.map(request => this.requestForEditing(request.id) ?? request);
+    const unsaved = this.unsavedRequestSnapshots;
+    if (!unsaved.size) return this.requests.slice();
+    return this.requests.map(request => unsaved.get(request.id) ?? request);
   },
 
   isRequestType(this: RequestCrudHost, value: unknown): value is RequestType {
@@ -380,7 +386,7 @@ export const requestCrudFeature = {
 
   async saveDraftToCollection(this: RequestCrudHost, draftId: string, cancelLabel = 'Discard') {
     if (!this.guardWorkspaceWritable('Saving drafts')) return false;
-    const draft = this.requests.find(r => r.id === draftId);
+    const draft = this.requestsById.get(draftId);
     const wsCols = this.collections.filter(c => c.workspaceId === (this.activeWorkspaceId || this.workspaces[0]?.id));
     if (!wsCols.length) {
       const wsId = this.activeWorkspaceId || this.workspaces[0]?.id;
@@ -393,7 +399,7 @@ export const requestCrudFeature = {
     if (!selectedId) return selectedId;
     this.requests = this.requests.map(r => r.id === draftId ? { ...r, isDraft: false, collectionId: selectedId, collection: this.collectionNameById(selectedId) } : r);
     this.draftRequestIds = new Set([...this.draftRequestIds].filter(id => id !== draftId));
-    const saved = this.requests.find(r => r.id === draftId);
+    const saved = this.requestsById.get(draftId);
     if (saved) this.savedRequestSnapshots.set(draftId, this.savedRequestSnapshot(saved));
     await this.persistRequestStore();
     return true;
@@ -405,7 +411,7 @@ export const requestCrudFeature = {
     this.openRequestIds = this.openRequestIds.filter(oid => oid !== id);
     if (id === this.activeRequestId) {
       const fallbackId = this.openRequestIds.at(-1) ?? '';
-      const next = fallbackId ? this.requests.find(r => r.id === fallbackId) : undefined;
+      const next = fallbackId ? this.requestsById.get(fallbackId) : undefined;
       if (next) {
         this.activeWorkspaceId = this.workspaceIdForCollection(next.collectionId);
         this.applySavedRequest(next);
@@ -418,7 +424,7 @@ export const requestCrudFeature = {
   },
 
   openDraftRequests(this: RequestCrudHost) {
-    return this.openRequestIds.map(id => this.requests.find(r => r.id === id)).filter((r): r is SavedRequest => Boolean(r?.isDraft));
+    return this.openRequestIds.map(id => this.requestsById.get(id)).filter((r): r is SavedRequest => Boolean(r?.isDraft));
   },
 
   hasUnsavedDrafts(this: RequestCrudHost) {
@@ -459,7 +465,7 @@ export const requestCrudFeature = {
         }
       }
       for (const draftId of this.openDraftRequests().map(req => req.id)) {
-        const draft = this.requests.find(r => r.id === draftId);
+        const draft = this.requestsById.get(draftId);
         if (!draft?.isDraft) continue;
         this.openRequestIds = [...new Set([...this.openRequestIds, draftId])];
         this.applySavedRequest(draft);
@@ -544,7 +550,7 @@ export const requestCrudFeature = {
       this.draftRequestIds = new Set([...this.draftRequestIds].filter(did => did !== id));
     } else if (isDraft) {
       if (id === this.activeRequestId) await this.persistActiveRequestNow();
-      const req = this.requests.find(r => r.id === id);
+      const req = this.requestsById.get(id);
       const hasContent = Boolean(req && this.requestHasContent(req));
       if (hasContent) {
         const saved = await this.saveDraftToCollection(id);
@@ -694,7 +700,7 @@ export const requestCrudFeature = {
     if (!this.guardWorkspaceWritable('Duplicating requests')) return;
     const req = id === this.activeRequestId
       ? this.snapshotActiveRequest({ forPersistence: true })
-      : this.requestForEditing(id) ?? this.requests.find(r => r.id === id);
+      : this.requestForEditing(id) ?? this.requestsById.get(id);
     if (!req) return;
     const copy = this.normalizeSavedRequestCtx({ ...req, id: newRequestId(), filesystemName: undefined, name: `${requestTabLabel(req)} Copy`, nameAuto: false });
     this.requests = [...this.requests, copy];
@@ -708,7 +714,7 @@ export const requestCrudFeature = {
 
   async deleteRequest(this: RequestCrudHost, id: string) {
     if (!this.guardWorkspaceWritable('Deleting requests')) return;
-    const req = this.requests.find(r => r.id === id);
+    const req = this.requestsById.get(id);
     if (!req) return;
     this.openRequestMenuId = '';
     const confirmed = await this.openConfirmDialog('Delete request', `Delete "${requestTabLabel(req)}" from local storage?`);
@@ -745,7 +751,7 @@ export const requestCrudFeature = {
 
   async toggleRequestPinned(this: RequestCrudHost, id: string) {
     if (!this.guardWorkspaceWritable('Updating requests')) return;
-    const req = this.requests.find(r => r.id === id);
+    const req = this.requestsById.get(id);
     if (!req || req.isDraft) return;
     this.requests = this.requests.map(r => r.id === id ? { ...r, isPinned: !r.isPinned } : r);
     this.openRequestMenuId = '';

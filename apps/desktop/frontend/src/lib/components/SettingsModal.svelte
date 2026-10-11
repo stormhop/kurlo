@@ -75,9 +75,8 @@
     { id: 'theme', label: 'Theme', keywords: 'theme appearance dark light system color scheme' },
     { id: 'proxy', label: 'Proxy', keywords: 'proxy http https socks5 system bypass network hostname port credentials' },
     { id: 'shortcuts', label: 'Shortcuts', keywords: 'shortcuts keybindings keyboard hotkeys' },
-    { id: 'updates', label: 'Updates', keywords: 'updates version release notes upgrade' },
     { id: 'support', label: 'Support', keywords: 'support report issues bug github questions telegram help' },
-    { id: 'about', label: 'About', keywords: 'about version platform runtime auto update install' },
+    { id: 'about', label: 'About', keywords: 'updates check upgrade release notes about version platform runtime auto update install' },
   ];
 
   let {
@@ -231,7 +230,7 @@
   }
 
   $effect(() => {
-    if ((settingsTab === 'updates' || settingsTab === 'about') && !currentVersion) {
+    if (settingsTab === 'about' && !currentVersion) {
       void getAppInfo().then(info => { rememberCurrentVersion(info.version, info.packaged); });
     }
     if (settingsTab === 'about' && !aboutInfo) {
@@ -445,12 +444,6 @@
                   <rect x="6.25" y="8" width="3" height="1.5" rx="0.3" fill="currentColor"/>
                   <rect x="10" y="8" width="1.5" height="1.5" rx="0.3" fill="currentColor"/>
                 </svg>
-              {:else if item.id === 'updates'}
-                <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-                  <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.3"/>
-                  <path d="M7.5 4.5v6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-                  <path d="M4.5 8l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
               {:else if item.id === 'support'}
                 <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 15 15" fill="none" aria-hidden="true">
                   <path d="M2.2 6.8c0-2.8 2.2-4.8 5.3-4.8s5.3 2 5.3 4.8-2.2 4.8-5.3 4.8c-.7 0-1.4-.1-2-.3l-2.4 1 .7-2.1c-1-.9-1.6-2-1.6-3.4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
@@ -663,77 +656,6 @@
         </div>
       {/if}
 
-      {#if settingsTab === 'updates'}
-        <div class="settings-body updates-tab" id="settings-panel-updates" role="tabpanel">
-          <div class="updates-summary">
-            <div class="updates-summary-copy">
-              <strong>Kurlo {currentVersion || '…'}</strong>
-              {#if isDevBuild}
-                <span>Development build</span>
-              {:else if updateState === 'idle'}
-                <span>Kurlo checks for updates in the background.</span>
-              {:else if updateState === 'checking'}
-                <span class="updates-inline"><span class="updates-spinner" aria-hidden="true"></span>Checking for updates…</span>
-              {:else if updateState === 'up-to-date'}
-                <span class="updates-inline">
-                  <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 15 15" fill="none" aria-hidden="true" class="updates-ok-icon">
-                    <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" stroke-width="1.3"/>
-                    <path d="M4.5 7.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  You're on the latest version
-                </span>
-              {:else if updateState === 'available' && updateInfo}
-                <span>Version <b>{updateInfo.version}</b> is available{updateInfo.publishedAt ? ` · ${formatDate(updateInfo.publishedAt)}` : ''}</span>
-              {:else if updateState === 'installing'}
-                <span class="updates-inline"><span class="updates-spinner" aria-hidden="true"></span>Downloading and installing…</span>
-              {:else if updateState === 'ready'}
-                <span class="updates-inline">
-                  <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 15 15" fill="none" aria-hidden="true" class="updates-ok-icon">
-                    <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" stroke-width="1.3"/>
-                    <path d="M4.5 7.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  Update installed — restart to apply
-                </span>
-              {:else if updateState === 'error'}
-                <span class="updates-error-text">{updateError}</span>
-              {/if}
-            </div>
-            {#if !isDevBuild}
-              {#if updateState === 'idle'}
-                <button class="btn btn-secondary" type="button" onclick={handleCheck}>Check for updates</button>
-              {:else if updateState === 'up-to-date'}
-                <button class="btn btn-secondary" type="button" onclick={handleCheck}>Check again</button>
-              {:else if updateState === 'available' && updateInfo && manualUpdateURL}
-                <button class="btn btn-primary" type="button" onclick={handleDownload}>Download update</button>
-              {:else if updateState === 'available' && updateInfo}
-                <button class="btn btn-primary" type="button" onclick={handleInstall}>Install update</button>
-              {:else if updateState === 'ready'}
-                <button class="btn btn-primary" type="button" onclick={handleRestart}>Restart now</button>
-              {:else if updateState === 'error'}
-                <button class="btn btn-secondary" type="button" onclick={handleCheck}>Try again</button>
-              {/if}
-            {/if}
-          </div>
-
-          {#if isDevBuild}
-            <p class="updates-dev-notice">
-              Updates aren't available when Kurlo runs from a local <code>make dev</code> or <code>go run</code> build. Install a release build from the <a href="https://github.com/stormhop/kurlo/releases/latest" onclick={(e) => { e.preventDefault(); openExternalURL('https://github.com/stormhop/kurlo/releases/latest'); }}>releases page</a> to receive them.
-            </p>
-          {:else if updateState === 'available' && updateInfo}
-            {#if manualUpdateURL}
-              <p class="updates-dev-notice">
-                Kurlo is installed from the Windows app package, which Windows keeps read-only, so it can't update itself. Download the new <code>.msix</code> package and open it to upgrade Kurlo in place.
-              </p>
-            {/if}
-            {#if cleanReleaseNotes(updateInfo.releaseNotes)}
-              <div class="updates-notes">
-                <p class="settings-section-label">What's new in {updateInfo.version}</p>
-                <ReleaseNotes body={cleanReleaseNotes(updateInfo.releaseNotes)} />
-              </div>
-            {/if}
-          {/if}
-        </div>
-      {/if}
       {#if settingsTab === 'general'}
         <div class="settings-body general-tab" id="settings-panel-general" role="tabpanel">
           {#if matchesQuery('Saving', 'autosave', 'manual save')}
@@ -1095,6 +1017,80 @@
           </div>
 
           <div class="about-list">
+            <div class="about-item about-update-row" aria-live="polite">
+              <span class="about-item-copy">
+                {#if isDevBuild}
+                  <strong>Development build</strong>
+                  <span>Updates come with release builds.</span>
+                {:else if updateState === 'checking'}
+                  <strong>Checking for updates…</strong>
+                  <span>This takes a few seconds.</span>
+                {:else if updateState === 'up-to-date'}
+                  <strong class="updates-inline">
+                    <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 15 15" fill="none" aria-hidden="true" class="updates-ok-icon">
+                      <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" stroke-width="1.3"/>
+                      <path d="M4.5 7.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    You're up to date
+                  </strong>
+                  <span>Kurlo {currentVersion} is the latest version.</span>
+                {:else if updateState === 'available' && updateInfo}
+                  <strong>Kurlo {updateInfo.version} is available</strong>
+                  <span>{updateInfo.publishedAt ? `Released ${formatDate(updateInfo.publishedAt)}` : 'A new version is ready to install.'}</span>
+                {:else if updateState === 'installing'}
+                  <strong>Installing update…</strong>
+                  <span>Downloading{updateInfo ? ` Kurlo ${updateInfo.version}` : ''} in the background.</span>
+                {:else if updateState === 'ready'}
+                  <strong class="updates-inline">
+                    <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 15 15" fill="none" aria-hidden="true" class="updates-ok-icon">
+                      <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" stroke-width="1.3"/>
+                      <path d="M4.5 7.5l2 2 4-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    Update installed
+                  </strong>
+                  <span>Restart Kurlo to apply it.</span>
+                {:else if updateState === 'error'}
+                  <strong>Couldn't update</strong>
+                  <span class="updates-error-text">{updateError}</span>
+                {:else}
+                  <strong>Updates</strong>
+                  <span>Kurlo also checks in the background.</span>
+                {/if}
+              </span>
+              {#if !isDevBuild}
+                {#if updateState === 'idle'}
+                  <button class="btn btn-secondary" type="button" onclick={handleCheck}>Check for updates</button>
+                {:else if updateState === 'up-to-date'}
+                  <button class="btn btn-secondary" type="button" onclick={handleCheck}>Check again</button>
+                {:else if updateState === 'available' && updateInfo && manualUpdateURL}
+                  <button class="btn btn-primary" type="button" onclick={handleDownload}>Download</button>
+                {:else if updateState === 'available' && updateInfo}
+                  <button class="btn btn-primary" type="button" onclick={handleInstall}>Install</button>
+                {:else if updateState === 'ready'}
+                  <button class="btn btn-primary" type="button" onclick={handleRestart}>Restart now</button>
+                {:else if updateState === 'error'}
+                  <button class="btn btn-secondary" type="button" onclick={handleCheck}>Try again</button>
+                {:else}
+                  <span class="updates-spinner" aria-hidden="true"></span>
+                {/if}
+              {/if}
+            </div>
+            <div class="about-item">
+              <span class="about-item-copy">
+                <strong>Install updates automatically</strong>
+                <span>{packagedInstall ? 'Not available for the Windows app package.' : 'New builds install in the background, then Kurlo asks for a restart.'}</span>
+              </span>
+              <label class="switch-control" aria-label="Install updates automatically">
+                <input
+                  type="checkbox"
+                  checked={autoUpdateInstall && !packagedInstall}
+                  disabled={isDevBuild || packagedInstall || updateState === 'installing'}
+                  onchange={handleAutoUpdateToggle}
+                />
+                <span class="switch-track"></span>
+                <span class="switch-state">{autoUpdateInstall && !packagedInstall ? 'ON' : 'OFF'}</span>
+              </label>
+            </div>
             {#if whatsNewAvailable}
               <button class="about-item about-item-link" type="button" onclick={onShowWhatsNew}>
                 <span class="about-item-copy">
@@ -1106,33 +1102,21 @@
                 </svg>
               </button>
             {/if}
-            <div class="about-item">
-              <span class="about-item-copy">
-                <strong>Automatically install updates</strong>
-                <span>Kurlo checks in the background, installs the new build, then asks for a restart.</span>
-              </span>
-              <label class="switch-control" aria-label="Automatically install updates">
-                <input
-                  type="checkbox"
-                  checked={autoUpdateInstall && !packagedInstall}
-                  disabled={isDevBuild || packagedInstall || updateState === 'installing'}
-                  onchange={handleAutoUpdateToggle}
-                />
-                <span class="switch-track"></span>
-                <span class="switch-state">{autoUpdateInstall && !packagedInstall ? 'ON' : 'OFF'}</span>
-              </label>
-            </div>
           </div>
           {#if isDevBuild}
-            <p class="about-update-note">Auto-updates are available in release builds.</p>
-          {:else if packagedInstall}
-            <p class="about-update-note">Kurlo is installed from the Windows app package, so it can't install updates itself. When a new version is out, download it from Updates.</p>
-          {:else if autoUpdateInstall && updateState === 'installing'}
-            <p class="about-update-note">Downloading and installing the update…</p>
-          {:else if autoUpdateInstall && updateState === 'ready'}
-            <p class="about-update-note">Update installed. Restart Kurlo from Updates to apply it.</p>
-          {:else if autoUpdateInstall}
-            <p class="about-update-note">Auto-update is on. New releases install after the background check finds them.</p>
+            <p class="about-update-note">
+              Local <code>make dev</code> or <code>go run</code> builds don't update. Install a release from the <a href="https://github.com/stormhop/kurlo/releases/latest" onclick={(e) => { e.preventDefault(); openExternalURL('https://github.com/stormhop/kurlo/releases/latest'); }}>releases page</a>.
+            </p>
+          {:else if updateState === 'available' && updateInfo}
+            {#if manualUpdateURL}
+              <p class="about-update-note">Windows keeps the app package read-only, so Kurlo can't update itself. Download the new <code>.msix</code> and open it to upgrade in place.</p>
+            {/if}
+            {#if cleanReleaseNotes(updateInfo.releaseNotes)}
+              <div class="updates-notes">
+                <p class="settings-section-label">What's new in {updateInfo.version}</p>
+                <ReleaseNotes body={cleanReleaseNotes(updateInfo.releaseNotes)} />
+              </div>
+            {/if}
           {/if}
         </div>
       {/if}
@@ -1141,83 +1125,15 @@
 </div>
 
 <style>
-  .updates-tab {
-    padding-top: var(--space-5);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-  }
-
-  .updates-summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-4);
-    padding-bottom: var(--space-4);
-    border-bottom: 1px solid var(--border-subtle);
-  }
-
-  .updates-summary-copy {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    min-width: 0;
-  }
-
-  .updates-summary-copy strong {
-    color: var(--text);
-    font-size: var(--text-title);
-    font-weight: var(--weight-semibold);
-  }
-
-  .updates-summary-copy > span {
-    color: var(--text-3);
-    font-size: var(--text-body);
-    line-height: var(--leading-normal);
-  }
-
-  .updates-summary-copy b {
-    color: var(--text);
-    font-weight: var(--weight-semibold);
-  }
-
-  .updates-summary .btn {
-    flex: 0 0 auto;
-  }
-
   .updates-inline {
     display: inline-flex;
     align-items: center;
     gap: var(--space-2);
   }
 
-  .updates-dev-notice {
-    margin: 0;
-    color: var(--text-3);
-    font-size: var(--text-body);
-    line-height: var(--leading-relaxed);
-  }
 
-  .updates-dev-notice code {
-    padding: 1px var(--space-1-5);
-    border-radius: var(--radius-sm);
-    background: var(--hover);
-    color: var(--text-2);
-    font-family: var(--font-mono);
-    font-size: var(--text-caption);
-  }
 
-  .updates-dev-notice a {
-    color: var(--text-2);
-    text-decoration: underline;
-    text-decoration-color: var(--border);
-    text-underline-offset: 0.125rem;
-  }
 
-  .updates-dev-notice a:hover {
-    color: var(--text);
-    text-decoration-color: currentColor;
-  }
 
   .updates-ok-icon {
     color: var(--s2xx);
@@ -1254,7 +1170,7 @@
     margin-bottom: 0;
   }
 
-  .updates-summary-copy > .updates-error-text {
+  .about-item-copy .updates-error-text {
     color: var(--delete);
   }
 
@@ -1768,8 +1684,26 @@
     color: var(--text-3);
   }
 
-  .about-item .switch-control {
+  .about-item .switch-control,
+  .about-item .btn,
+  .about-item .updates-spinner {
     flex-shrink: 0;
+  }
+
+  .about-update-row {
+    min-height: 3.5rem;
+  }
+
+  .about-item-copy .updates-inline {
+    display: inline-flex;
+  }
+
+  .about-update-note code {
+    font-family: var(--font-mono);
+  }
+
+  .about-update-note a {
+    color: var(--accent);
   }
 
   .about-update-note {

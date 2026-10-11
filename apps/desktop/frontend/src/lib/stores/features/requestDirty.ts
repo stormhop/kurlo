@@ -14,6 +14,7 @@ type RequestDirtyHost = {
   dirtyRequestIds: Set<string>;
   draftRequestIds: Set<string>;
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   savedRequestSnapshots: Map<string, SavedRequest>;
   unsavedRequestSnapshots: Map<string, SavedRequest>;
   removeDirtyRequest: (id: string) => void;
@@ -42,7 +43,7 @@ export const requestDirtyFeature = {
   },
 
   requestDiffersFromStored(this: RequestDirtyHost, req: SavedRequest) {
-    const stored = this.savedRequestSnapshots.get(req.id) ?? this.requests.find(request => request.id === req.id);
+    const stored = this.savedRequestSnapshots.get(req.id) ?? this.requestsById.get(req.id);
     if (!stored) return this.requestHasContent(req);
     return requestDiffersFromSavedSnapshot(req, stored);
   },

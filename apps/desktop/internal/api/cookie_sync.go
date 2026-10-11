@@ -89,32 +89,33 @@ func (s *cookieSyncSession) closeWith(code int, reason string) {
 }
 
 type cookieSyncServer struct {
-	mu            sync.RWMutex
-	server        *http.Server
-	listener      net.Listener
-	jars          *cookieJarRegistry
-	emit          func(model.CookieSyncStatus)
-	upgrader      websocket.Upgrader
-	running       bool
-	enabled       bool
-	port          int
-	token         string
-	domains       []string
-	workspaceID   string
-	sessions      map[string]*cookieSyncSession
-	pending       *cookieSyncPairing
-	cooldownUntil time.Time
-	paired        bool
-	browser       string
-	lastContactAt time.Time
-	lastSyncAt    time.Time
-	lastSyncCount int
-	syncedTotal   int
-	unreadable    []string
-	log           []model.CookieSyncLog
-	seq           atomic.Uint64
-	startErr      string
-	hydrated      bool
+	mu               sync.RWMutex
+	server           *http.Server
+	listener         net.Listener
+	jars             *cookieJarRegistry
+	emit             func(model.CookieSyncStatus)
+	upgrader         websocket.Upgrader
+	running          bool
+	enabled          bool
+	port             int
+	token            string
+	domains          []string
+	workspaceID      string
+	sessions         map[string]*cookieSyncSession
+	pending          *cookieSyncPairing
+	cooldownUntil    time.Time
+	paired           bool
+	browser          string
+	extensionVersion string
+	lastContactAt    time.Time
+	lastSyncAt       time.Time
+	lastSyncCount    int
+	syncedTotal      int
+	unreadable       []string
+	log              []model.CookieSyncLog
+	seq              atomic.Uint64
+	startErr         string
+	hydrated         bool
 }
 
 func newCookieSyncServer(jars *cookieJarRegistry) *cookieSyncServer {
@@ -238,18 +239,19 @@ func (s *cookieSyncServer) status() model.CookieSyncStatus {
 
 func (s *cookieSyncServer) statusLocked() model.CookieSyncStatus {
 	status := model.CookieSyncStatus{
-		Enabled:       s.enabled,
-		Running:       s.running,
-		Port:          s.port,
-		Domains:       append([]string{}, s.domains...),
-		Paired:        s.paired,
-		Connected:     len(s.sessions) > 0,
-		Browser:       s.browser,
-		Unreadable:    append([]string{}, s.unreadable...),
-		LastSyncCount: s.lastSyncCount,
-		SyncedTotal:   s.syncedTotal,
-		Log:           append([]model.CookieSyncLog{}, s.log...),
-		Error:         s.startErr,
+		Enabled:          s.enabled,
+		Running:          s.running,
+		Port:             s.port,
+		Domains:          append([]string{}, s.domains...),
+		Paired:           s.paired,
+		Connected:        len(s.sessions) > 0,
+		Browser:          s.browser,
+		ExtensionVersion: s.extensionVersion,
+		Unreadable:       append([]string{}, s.unreadable...),
+		LastSyncCount:    s.lastSyncCount,
+		SyncedTotal:      s.syncedTotal,
+		Log:              append([]model.CookieSyncLog{}, s.log...),
+		Error:            s.startErr,
 	}
 	if s.running {
 		status.URL = fmt.Sprintf("http://127.0.0.1:%d", s.port)
@@ -359,6 +361,7 @@ func (s *cookieSyncServer) stopServer() {
 	s.running = false
 	s.emit = nil
 	s.browser = ""
+	s.extensionVersion = ""
 	s.lastContactAt = time.Time{}
 	s.mu.Unlock()
 
@@ -424,6 +427,7 @@ func (s *cookieSyncServer) revokePairing() model.CookieSyncStatus {
 	s.token = newCookieSyncToken()
 	s.paired = false
 	s.browser = ""
+	s.extensionVersion = ""
 	s.pending = nil
 	s.lastContactAt = time.Time{}
 	s.unreadable = nil
@@ -664,6 +668,7 @@ func (s *cookieSyncServer) handleSocket(w http.ResponseWriter, r *http.Request) 
 	if browser == "" {
 		browser = "A browser"
 	}
+	extensionVersion := sanitizeCookieSyncLabel(r.URL.Query().Get("version"))
 	session := &cookieSyncSession{
 		id:      fmt.Sprintf("cookie-sync-session-%d", s.seq.Add(1)),
 		browser: browser,
@@ -674,6 +679,7 @@ func (s *cookieSyncServer) handleSocket(w http.ResponseWriter, r *http.Request) 
 	s.sessions[session.id] = session
 	s.paired = true
 	s.browser = browser
+	s.extensionVersion = extensionVersion
 	s.lastContactAt = time.Now()
 	domains := append([]string{}, s.domains...)
 	s.mu.Unlock()
@@ -706,6 +712,7 @@ func (s *cookieSyncServer) handleSocket(w http.ResponseWriter, r *http.Request) 
 	delete(s.sessions, session.id)
 	if len(s.sessions) == 0 {
 		s.browser = ""
+		s.extensionVersion = ""
 		s.unreadable = nil
 	}
 	s.mu.Unlock()

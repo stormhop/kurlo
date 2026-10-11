@@ -37,6 +37,14 @@ export async function logFilePath(): Promise<string> {
   return app.LogFilePath();
 }
 
+export type BrowserExtensionResult = { path: string; version: string; browser: string; error?: string };
+
+export async function installBrowserExtension(browser: 'chromium' | 'firefox'): Promise<BrowserExtensionResult> {
+  const app = window.go?.api?.App;
+  if (!app?.InstallBrowserExtension) return { path: '', version: '', browser, error: 'The extension can be set up from the desktop app.' };
+  return app.InstallBrowserExtension(browser);
+}
+
 export async function openLogFolder(): Promise<string> {
   const app = window.go?.api?.App;
   if (!app?.OpenLogFolder) return 'The log folder is only available in the desktop app.';
@@ -209,6 +217,10 @@ export async function readWorkspaceYAMLFile(path: string): Promise<WorkspaceYAML
   return (await window.go?.api?.App?.ReadWorkspaceYAMLFile?.(path)) ?? { ok: false, path, content: '', error: 'Wails bridge not available' };
 }
 
+export async function checkWorkspaceYAML(path: string, content: string): Promise<{ ok: boolean; line: number; message: string }> {
+  return (await window.go?.api?.App?.CheckWorkspaceYAML?.(path, content)) ?? { ok: true, line: 0, message: '' };
+}
+
 export async function writeWorkspaceYAMLFile(path: string, content: string): Promise<WorkspaceOpenResult> {
   return (await window.go?.api?.App?.WriteWorkspaceYAMLFile?.(path, content)) ?? EMPTY_WORKSPACE_OPEN_RESULT;
 }
@@ -269,6 +281,12 @@ export async function openDirectoryDialog(title: string, defaultDirectory = ''):
 
 export async function readTextFile(path: string): Promise<string> {
   return (await window.go?.api?.App?.ReadTextFile?.(path)) ?? '';
+}
+
+export async function saveResponseBody(requestId: string, defaultName: string): Promise<{ savedPath: string; error?: string }> {
+  const app = window.go?.api?.App;
+  if (!app?.SaveResponseBody) return { savedPath: '', error: 'Saving binary responses is only available in the desktop app.' };
+  return app.SaveResponseBody(requestId, defaultName);
 }
 
 export async function saveFileDialog(name: string, content: string): Promise<string> {

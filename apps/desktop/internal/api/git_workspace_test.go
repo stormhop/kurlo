@@ -2552,7 +2552,7 @@ func TestFriendlyGitErrorAddsPrivateRepositoryHints(t *testing.T) {
 		t.Fatalf("expected SSH auth hint, got %q", message)
 	}
 	message = friendlyGitError("clone", "fatal: could not read Username for 'https://gitlab.com': terminal prompts disabled", nil)
-	if !strings.Contains(message, "credential helper") || !strings.Contains(message, "Kurlo does not store Git tokens") {
+	if !strings.Contains(message, "credential helper") || !strings.Contains(message, "personal access token") || strings.Contains(message, "does not store") {
 		t.Fatalf("expected HTTPS auth hint, got %q", message)
 	}
 }
@@ -2705,4 +2705,137 @@ func readFileForTest(t *testing.T, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(data)
+}
+
+func TestNormalizeGitDiffPathsKeepsSidePrefixes(t *testing.T) {
+	diff := "diff --git a/Users/me/repo/workspaces/x.txt b/Users/me/repo/workspaces/x.txt\n--- /dev/null\n+++ b/Users/me/repo/workspaces/x.txt\n@@ -0,0 +1 @@\n+a/Users/me/repo/kept"
+	got := normalizeGitDiffPaths("/Users/me/repo", diff)
+	want := "diff --git a/workspaces/x.txt b/workspaces/x.txt\n--- /dev/null\n+++ b/workspaces/x.txt\n@@ -0,0 +1 @@\n+a/Users/me/repo/kept"
+	if got != want {
+		t.Fatalf("got:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestGitStatusMarksWhichChangesKurloCanHandle(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	repo := t.TempDir()
+	root := filepath.Join(repo, "api")
+	writeKurloWorkspaceFiles(t, root)
+	runGitForTest(t, repo, "init")
+	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt"} {
+		if err := os.WriteFile(filepath.Join(repo, filepath.FromSlash(path)), []byte("x\n"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	managed := map[string]bool{}
+	for _, file := range gitStatusForWorkspace(root).Files {
+		managed[file.Path] = file.Managed
+	}
+	if !managed["api/kurlo.yml"] || !managed["api/workspaces/Main/workspace.yml"] {
+		t.Fatalf("Kurlo files must be managed: %#v", managed)
+	}
+	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt"} {
+		if value, listed := managed[path]; !listed || value {
+			t.Fatalf("%s must be listed as not managed: %#v", path, managed)
+		}
+	}
+}
+
+func setupBranchRepoForTest(t *testing.T) string {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	dir := t.TempDir()
+	remote := filepath.Join(t.TempDir(), "origin.git")
+	if err := os.MkdirAll(remote, 0755); err != nil {
+		t.Fatal(err)
+	}
+	initBareRemoteForTest(t, remote)
+	writeKurloWorkspaceFiles(t, dir)
+	if result := gitInitWorkspaceForRoot(dir); !result.Ok {
+		t.Fatalf("init failed: %s", result.Error)
+	}
+	configureGitUserForTest(t, dir)
+	if result := gitAddRemoteForRoot(dir, "origin", remote); !result.Ok {
+		t.Fatalf("add remote failed: %s", result.Error)
+	}
+	if result := gitCommitWorkspaceForRoot(dir, "Initial"); !result.Ok {
+		t.Fatalf("commit failed: %s", result.Error)
+	}
+	if result := gitPushWorkspaceForRoot(dir, "origin"); !result.Ok {
+		t.Fatalf("push failed: %s", result.Error)
+	}
+	return dir
+}
+
+func TestGitRenameBranchLocallyAndOnTheRemote(t *testing.T) {
+	dir := setupBranchRepoForTest(t)
+	if result := gitCreateBranchForRoot(dir, "feature", "main"); !result.Ok {
+		t.Fatalf("create failed: %s", result.Error)
+	}
+	if result := gitPushWorkspaceForRoot(dir, "origin"); !result.Ok {
+		t.Fatalf("push failed: %s", result.Error)
+	}
+	if result := gitRenameBranchForRoot(dir, "feature", "feature-renamed", false); !result.Ok {
+		t.Fatalf("local rename failed: %s", result.Error)
+	}
+	if localGitBranchExists(dir, "feature") || !localGitBranchExists(dir, "feature-renamed") {
+		t.Fatal("local branch was not renamed")
+	}
+	if result := gitRenameBranchForRoot(dir, "main", "feature-renamed", false); result.Ok {
+		t.Fatal("renaming onto an existing branch must fail")
+	}
+	if result := gitRenameBranchForRoot(dir, "origin/feature", "feature-renamed", true); !result.Ok {
+		t.Fatalf("remote rename failed: %s\n%s", result.Error, result.Output)
+	}
+	if strings.TrimSpace(runGitOutputForTest(t, dir, "ls-remote", "origin", "refs/heads/feature")) != "" {
+		t.Fatal("old remote branch still exists")
+	}
+	if strings.TrimSpace(runGitOutputForTest(t, dir, "ls-remote", "origin", "refs/heads/feature-renamed")) == "" {
+		t.Fatal("new remote branch is missing")
+	}
+	upstream := strings.TrimSpace(runGitOutputForTest(t, dir, "rev-parse", "--abbrev-ref", "feature-renamed@{upstream}"))
+	if upstream != "origin/feature-renamed" {
+		t.Fatalf("local branch must follow the renamed remote, got %q", upstream)
+	}
+	if result := gitRenameBranchForRoot(dir, "origin/missing", "x", true); result.Ok {
+		t.Fatal("renaming an unknown remote branch must fail")
+	}
+}
+
+func TestGitCheckoutLoadsTheOtherBranchesWorkspace(t *testing.T) {
+	withRequestStoreTestKey(t)
+	useTempConfigDir(t, t.TempDir())
+	dir := setupBranchRepoForTest(t)
+	app := NewApp()
+	if result := app.openWorkspaceRoot(dir); !result.Ok {
+		t.Fatalf("open failed: %s", result.Error)
+	}
+	if result := gitCreateBranchForRoot(dir, "renamed-workspace", "main"); !result.Ok {
+		t.Fatalf("create failed: %s", result.Error)
+	}
+	replaceWorkspaceTextForTest(t, dir, "workspaces/Main/workspace.yml", "name: Main", "name: Renamed on branch")
+	if result := gitCommitWorkspaceForRoot(dir, "Rename workspace"); !result.Ok {
+		t.Fatalf("commit failed: %s", result.Error)
+	}
+	for _, step := range []struct{ branch, want string }{{"main", "Main"}, {"renamed-workspace", "Renamed on branch"}, {"main", "Main"}} {
+		branch := step.branch
+		result := app.GitCheckoutBranch(branch)
+		if !result.Ok {
+			t.Fatalf("checkout %s failed: %s", branch, result.Error)
+		}
+		store, err := decodeJSONMap(result.Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := stringValue(mapSlice(store["workspaces"])[0], "name"); got != step.want {
+			t.Fatalf("checkout %s loaded workspace %q, want %q", branch, got, step.want)
+		}
+		if status := gitStatusForWorkspace(dir); !status.Clean {
+			t.Fatalf("checkout %s left changes: %#v", branch, status.Files)
+		}
+	}
 }

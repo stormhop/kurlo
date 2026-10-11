@@ -196,9 +196,12 @@ type HttpResponse struct {
 
 	BodyIsBinary    bool   `json:"bodyIsBinary,omitempty"`
 	BodySniffedType string `json:"bodySniffedType,omitempty"`
+	BodyOmitted     bool   `json:"bodyOmitted,omitempty"`
 
 	CollectionVariableUpdates  map[string]string `json:"collectionVariableUpdates,omitempty"`
 	CollectionVariablesRemoved []string          `json:"collectionVariablesRemoved,omitempty"`
+	EnvironmentUpdates         map[string]string `json:"environmentUpdates,omitempty"`
+	EnvironmentRemoved         []string          `json:"environmentRemoved,omitempty"`
 }
 
 type SentRequest struct {

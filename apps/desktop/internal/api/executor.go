@@ -68,6 +68,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		}
 		req = resolved
 	}
+	var envDelta environmentDelta
 	scope := beginScriptScope(sm, req.CollectionVariables)
 	ctx := scope.ctx
 	populateScriptRequestContext(ctx, req)
@@ -85,9 +86,10 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 				values := overlayScriptVariables(template.TemplateValues, ctx, changed)
 				resolved, err := resolveHTTPRequestTemplates(template, values)
 				if err != nil {
-					scope.commit(sm)
+					envDelta.merge(scope.commit(sm))
 					resp := model.HttpResponse{Error: err.Error(), PreRequestResult: preResult}
 					resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult)
+					envDelta.apply(&resp)
 					return resp
 				}
 				resolved.SecretEnvironmentValues = append(resolved.SecretEnvironmentValues, revealedSecretValues(changed, template.SecretEnvironmentKeys, values)...)
@@ -101,13 +103,14 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		mergeScriptHeaders(ctx, &req)
 		mergeScriptParams(ctx, &req)
 		mergeScriptBody(ctx, &req)
-		scope.commit(sm)
+		envDelta.merge(scope.commit(sm))
 		if preResult.Error != "" {
 			resp := model.HttpResponse{
 				Error:            "pre-request script failed: " + preResult.Error,
 				PreRequestResult: preResult,
 			}
 			resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult)
+			envDelta.apply(&resp)
 			return resp
 		}
 		if preResult.SkippedRequest {
@@ -117,6 +120,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 				PreRequestResult: preResult,
 			}
 			resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult)
+			envDelta.apply(&resp)
 			return resp
 		}
 	}
@@ -133,10 +137,11 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		testCtx.Send = newScriptSender(requestCtx, req.AllowSendRequest, req)
 		resp.TestResult = script.RunTests(req.ScriptEngine, req.TestScript, testCtx)
 		resp.TestResult = redactScriptResult(resp.TestResult, req.SecretEnvironmentValues)
-		testScope.commit(sm)
+		envDelta.merge(testScope.commit(sm))
 	}
 
 	resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult, resp.TestResult)
+	envDelta.apply(&resp)
 
 	return resp
 }
@@ -192,8 +197,57 @@ func beginScriptScope(sm *state.Manager, collectionVariables map[string]string) 
 	}
 }
 
-func (s *scriptStateScope) commit(sm *state.Manager) {
+func (s *scriptStateScope) commit(sm *state.Manager) environmentDelta {
 	sm.Merge(s.beforeVars, s.ctx.Variables, s.beforeEnv, s.ctx.Environment)
+	var delta environmentDelta
+	delta.add(s.beforeEnv, s.ctx.Environment)
+	return delta
+}
+
+type environmentDelta struct {
+	updates map[string]string
+	removed map[string]bool
+}
+
+func (d *environmentDelta) add(before, after map[string]string) {
+	for key, value := range after {
+		if prev, ok := before[key]; ok && prev == value {
+			continue
+		}
+		if d.updates == nil {
+			d.updates = map[string]string{}
+		}
+		d.updates[key] = value
+		delete(d.removed, key)
+	}
+	for key := range before {
+		if _, ok := after[key]; ok {
+			continue
+		}
+		if d.removed == nil {
+			d.removed = map[string]bool{}
+		}
+		d.removed[key] = true
+		delete(d.updates, key)
+	}
+}
+
+func (d *environmentDelta) merge(other environmentDelta) {
+	for key, value := range other.updates {
+		d.add(map[string]string{}, map[string]string{key: value})
+	}
+	for key := range other.removed {
+		d.add(map[string]string{key: ""}, map[string]string{})
+	}
+}
+
+func (d environmentDelta) apply(resp *model.HttpResponse) {
+	resp.EnvironmentUpdates = d.updates
+	resp.EnvironmentRemoved = nil
+	for key := range d.removed {
+		resp.EnvironmentRemoved = append(resp.EnvironmentRemoved, key)
+	}
+	sort.Strings(resp.EnvironmentRemoved)
 }
 
 func redactScriptResult(result model.ScriptResult, secrets []string) model.ScriptResult {
@@ -496,7 +550,7 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 		}
 	}
 	if !streamedToSink {
-		bodyBytes, truncated, readErr = readResponseBodyWithLimit(httpResp.Body, maxResponseBodySize)
+		bodyBytes, truncated, readErr = readResponseBodyWithLimitHint(httpResp.Body, maxResponseBodySize, httpResp.ContentLength)
 		bodySize = int64(len(bodyBytes))
 		if readErr == nil && !truncated {
 			if decoded, ok := decodeResponseBody(bodyBytes, httpResp); ok {
@@ -540,6 +594,19 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 		}
 	}
 	return withTrace(resp)
+}
+
+func readResponseBodyWithLimitHint(body io.Reader, maxSize int64, sizeHint int64) ([]byte, bool, error) {
+	if sizeHint <= 0 || sizeHint > maxSize {
+		return readResponseBodyWithLimit(body, maxSize)
+	}
+	buffer := bytes.NewBuffer(make([]byte, 0, sizeHint+bytes.MinRead))
+	_, readErr := buffer.ReadFrom(io.LimitReader(body, maxSize+1))
+	bodyBytes := buffer.Bytes()
+	if int64(len(bodyBytes)) <= maxSize {
+		return bodyBytes, false, readErr
+	}
+	return bodyBytes[:int(maxSize)], true, readErr
 }
 
 func readResponseBodyWithLimit(body io.Reader, maxSize int64) ([]byte, bool, error) {

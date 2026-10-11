@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { kurloChangedFiles } from './lib/gitFiles';
   import { onMount, untrack } from 'svelte';
   import { getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
   import type { MockRequestLog, OAuth2DevicePrompt, UpdateInfo } from './lib/backend';
@@ -297,6 +298,7 @@
       ) {
         focusedBeforeWindowBlur.focus({ preventScroll: true });
       }
+      if (vm.topView === 'git') void vm.refreshGitQuietly();
     };
     const media = window.matchMedia('(prefers-color-scheme: dark)');
     const onThemeChange = () => {
@@ -391,7 +393,7 @@
     ready={updateReady}
     installing={autoUpdateInstalling}
     onDismiss={() => (updateInfo = null)}
-    onOpen={() => { vm.openSettings('updates'); }}
+    onOpen={() => { vm.openSettings('about'); }}
     onDownload={downloadPackagedUpdate}
     onRestart={restartForInstalledUpdate}
   />
@@ -438,7 +440,7 @@
     bind:sidebarHidden={vm.sidebarHidden}
     topView={vm.topView}
     mockRunning={vm.mockServer.running}
-    gitChangeCount={vm.gitStatus.files?.length ?? 0}
+    gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
     cookieCount={vm.cookies.length}
     settingsShortcut={shortcutComboLabel(vm.shortcutCombo('settings'), vm.appRuntime)}
     workspaceBlocked={vm.workspaceBlocked}
@@ -548,7 +550,7 @@
       gitTabOpen={vm.gitWorkspaceOpen}
       mockTabOpen={vm.mockServerTabOpen}
       mockRunning={vm.mockServer.running}
-      gitChangeCount={vm.gitStatus.files?.length ?? 0}
+      gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
       autosave={vm.autosave}
       appRuntime={vm.appRuntime}
       workspaceBlocked={vm.workspaceBlocked}
@@ -618,10 +620,10 @@
         error={vm.gitError}
         output={vm.gitOutput}
         workspaceBlocked={vm.workspaceBlocked}
-        workspaceDiagnostics={vm.activeWorkspaceDiagnostics}
+        workspaceDiagnostics={vm.workspaceDiagnostics}
+        workspaceDiagnosticScopeLabel={vm.workspaceDiagnosticScopeLabel}
         onEditWorkspaceDiagnostic={vm.openWorkspaceYAMLEditor}
         workspaceDiagnosticKey={vm.workspaceDiagnosticKey}
-        workspaceDiagnosticTitle={vm.workspaceDiagnosticTitle}
         workspaceDiagnosticLocation={vm.workspaceDiagnosticLocation}
         onRefresh={vm.refreshGitStatus}
         onUseLocal={vm.useLocalWorkspace}
@@ -647,8 +649,8 @@
         onRenameBranch={vm.renameGitBranch}
         onCommit={vm.commitGitWorkspace}
         onViewOutgoing={vm.viewGitOutgoingChanges}
-        onRefreshLog={vm.refreshGitLog}
         onLoadMoreLog={vm.loadMoreGitLog}
+        logLoadingMore={vm.gitLogLoadingMore}
         onSelectCommit={vm.selectGitCommit}
         onPush={vm.pushGitWorkspace}
         onForcePush={vm.forcePushGitWorkspace}

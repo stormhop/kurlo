@@ -28,6 +28,7 @@ type DataBackupHost = {
   shortcutOverrides: Record<string, string>;
   proxyConfig: ProxyConfig;
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   activeRequestId: string;
   openRequestIds: string[];
   dirtyRequestIds: Set<string>;
@@ -119,7 +120,7 @@ export const dataBackupFeature = {
       this.saveShortcutSettings();
     }
     if (this.isRecord(preferences.requestSettings)) {
-      const activeRequest = this.requests.find(request => request.id === this.activeRequestId);
+      const activeRequest = this.requestsById.get(this.activeRequestId);
       this.applyRequestSettings(preferences.requestSettings as Partial<RequestSettings>);
       this.saveRequestSettings();
       if (activeRequest) this.applySavedRequest(activeRequest);

@@ -16,10 +16,10 @@ const derived = [
   { path: join(root, 'apps', 'web', 'src', 'assets', 'logo.png'), size: 128 },
   { path: join(root, 'apps', 'web', 'public', 'favicon-32.png'), size: 32 },
   { path: join(root, 'apps', 'web', 'public', 'apple-touch-icon.png'), size: 180 },
-  { path: join(root, 'apps', 'extension', 'icons', 'icon-16.png'), size: 16 },
-  { path: join(root, 'apps', 'extension', 'icons', 'icon-32.png'), size: 32 },
-  { path: join(root, 'apps', 'extension', 'icons', 'icon-48.png'), size: 48 },
-  { path: join(root, 'apps', 'extension', 'icons', 'icon-128.png'), size: 128 },
+  { path: join(root, 'apps', 'desktop', 'extension', 'icons', 'icon-16.png'), size: 16 },
+  { path: join(root, 'apps', 'desktop', 'extension', 'icons', 'icon-32.png'), size: 32 },
+  { path: join(root, 'apps', 'desktop', 'extension', 'icons', 'icon-48.png'), size: 48 },
+  { path: join(root, 'apps', 'desktop', 'extension', 'icons', 'icon-128.png'), size: 128 },
 ];
 
 for (const { path, size } of derived) {

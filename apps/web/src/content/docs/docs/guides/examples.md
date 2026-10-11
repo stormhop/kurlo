@@ -31,7 +31,7 @@ A body with nothing to redact is stored byte for byte. Kurlo does not reformat i
 
 ## Where examples live
 
-In a [Git-backed workspace](/docs/guides/git-workspaces/), each example is one file under `collections/<collection>/examples/<request>/`, with the response body kept in a sibling file named for its media type:
+In a [Git-backed workspace](/docs/guides/git-workspaces/), each example is one YAML file under `collections/<collection>/examples/<request>/`, with the response body inside it:
 
 ```
 collections/
@@ -39,10 +39,9 @@ collections/
     examples/
       list-pets/
         two-pets.yml
-        two-pets.json
 ```
 
-The body is a separate file on purpose. Embedded in YAML it would be a block scalar no reviewer can read; as its own `.json` it diffs line by line.
+A multi-line body is written as a YAML block, so a JSON body still diffs line by line, and one file per example means a commit can never carry an example without its body.
 
 See the [Kurlo YAML format](/docs/reference/kurlo-yaml-format/) for the field-by-field reference.
 

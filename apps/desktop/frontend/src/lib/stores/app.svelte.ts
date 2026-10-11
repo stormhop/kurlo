@@ -680,7 +680,7 @@ class AppVM {
   declare refreshGitStatusAfterPersist: typeof gitFeature.refreshGitStatusAfterPersist;
   declare refreshGitStatus: typeof gitFeature.refreshGitStatus;
   declare selectGitFile: typeof gitFeature.selectGitFile;
-  declare refreshGitLog: typeof gitFeature.refreshGitLog;
+  declare refreshGitQuietly: typeof gitFeature.refreshGitQuietly;
   declare loadMoreGitLog: typeof gitFeature.loadMoreGitLog;
   declare selectGitCommit: typeof gitFeature.selectGitCommit;
   declare loadGitConflictFile: typeof gitFeature.loadGitConflictFile;
@@ -855,6 +855,7 @@ class AppVM {
   declare syncBackendEnvironment: typeof environmentFeature.syncBackendEnvironment;
   declare mergeActiveEnvironmentValues: typeof environmentFeature.mergeActiveEnvironmentValues;
   declare syncActiveEnvironmentFromBackend: typeof environmentFeature.syncActiveEnvironmentFromBackend;
+  declare applyEnvironmentChangesFromResponse: typeof environmentFeature.applyEnvironmentChangesFromResponse;
 
   declare globalSearchResults: typeof uiShellFeature.globalSearchResults;
   declare codePanelAvailable: typeof uiShellFeature.codePanelAvailable;
@@ -886,12 +887,11 @@ class AppVM {
   declare workspaceBlocked: typeof workspaceDiagnosticsFeature.workspaceBlocked;
   declare workspaceGlobalBlockingDiagnostics: typeof workspaceDiagnosticsFeature.workspaceGlobalBlockingDiagnostics;
   declare workspaceBlockingDiagnostics: typeof workspaceDiagnosticsFeature.workspaceBlockingDiagnostics;
-  declare activeWorkspaceDiagnostics: typeof workspaceDiagnosticsFeature.activeWorkspaceDiagnostics;
+  declare workspaceDiagnosticScopeLabel: typeof workspaceDiagnosticsFeature.workspaceDiagnosticScopeLabel;
   declare workspaceDiagnosticKey: typeof workspaceDiagnosticsFeature.workspaceDiagnosticKey;
   declare workspaceDiagnosticLocation: typeof workspaceDiagnosticsFeature.workspaceDiagnosticLocation;
   declare workspaceDiagnosticTitle: typeof workspaceDiagnosticsFeature.workspaceDiagnosticTitle;
   declare workspaceDiagnosticSummary: typeof workspaceDiagnosticsFeature.workspaceDiagnosticSummary;
-  declare isWorkspaceReferenceDiagnostic: typeof workspaceDiagnosticsFeature.isWorkspaceReferenceDiagnostic;
   declare workspaceDiagnosticIsGlobal: typeof workspaceDiagnosticsFeature.workspaceDiagnosticIsGlobal;
   declare workspaceDiagnosticTargetsWorkspace: typeof workspaceDiagnosticsFeature.workspaceDiagnosticTargetsWorkspace;
   declare workspaceBlockingDiagnosticsFor: typeof workspaceDiagnosticsFeature.workspaceBlockingDiagnosticsFor;
@@ -1125,6 +1125,7 @@ class AppVM {
 
   topView = $state<TopView>('request');
   requests = $state<SavedRequest[]>([]);
+  requestsById = $derived(new Map(this.requests.map(request => [request.id, request])));
   workspaces = $state<Workspace[]>([]);
   collections = $state<Collection[]>([]);
   environments = $state<Environment[]>([]);
@@ -1234,6 +1235,7 @@ class AppVM {
   gitSelectedCommit = $state('');
   gitSelectedPath = $state('');
   gitLoading = $state(false);
+  gitLogLoadingMore = $state(false);
   gitDiffLoading = $state(false);
   gitAction = $state('');
   gitMessage = $state('');
@@ -1400,7 +1402,7 @@ class AppVM {
   }
 
   async copyRequestCurl(id: string) {
-    const req = this.requests.find(r => r.id === id); if (!req) return;
+    const req = this.requestsById.get(id); if (!req) return;
     if (this.savedRequestIsRealtime(req)) { this.openRequestMenuId = ''; return; }
     const { toCurl } = await import('../curl');
     const values = this.environmentValuesForRequest(req, this.redactedActiveEnvironmentValues());
@@ -1437,8 +1439,6 @@ class AppVM {
     lWs = [...lWs, ...this.invalidWorkspacesFromDiagnostics(lWs)];
     if (!lWs.length) lWs = [makeWorkspace(DEFAULT_WORKSPACE)];
     if (!lWsId || !lWs.some(w => w.id === lWsId)) lWsId = lWs.find(workspace => !workspace.isInvalid)?.id ?? lWs[0].id;
-    lCols = lCols.map(c => lWs.some(w => w.id === c.workspaceId) ? c : { ...c, workspaceId: lWsId });
-    lEnvs = lEnvs.map(e => lWs.some(w => w.id === e.workspaceId) ? e : { ...e, workspaceId: lWsId });
     if (!lCols.length && !this.workspaceDiagnostics.length && !lWs.find(workspace => workspace.id === lWsId)?.isInvalid) lCols = [makeCollection(lWsId, DEFAULT_COLLECTION)];
     if (lEnvId && !lEnvs.some(e => e.id === lEnvId && e.workspaceId === lWsId)) lEnvId = '';
     this.workspaces = lWs; this.collections = lCols; this.environments = lEnvs;
@@ -1513,8 +1513,6 @@ class AppVM {
       if (this.workspaceDiagnostics.length) {
         this.focusedWorkspaceDiagnosticKey = this.workspaceDiagnosticKey(this.workspaceDiagnostics[0]);
         if (this.topView !== 'git') this.openGitTab(false);
-        this.collectionImportToast = `Workspace YAML has ${this.workspaceDiagnostics.length} error${this.workspaceDiagnostics.length === 1 ? '' : 's'}.`;
-        setTimeout(() => (this.collectionImportToast = ''), 5000);
       }
       return false;
     }
@@ -1538,8 +1536,9 @@ class AppVM {
       this.gitLog = { ...EMPTY_GIT_LOG };
     }
     this.openMissingSecretsWizard(result.missingSecrets ?? []);
-    if ((result.diagnostics ?? []).length) {
-      this.collectionImportToast = `Workspace YAML has ${result.diagnostics?.length ?? 0} error${(result.diagnostics?.length ?? 0) === 1 ? '' : 's'}. Affected workspace files stay locked until fixed.`;
+    const issueCount = result.diagnostics?.length ?? 0;
+    if (issueCount && this.topView !== 'git') {
+      this.collectionImportToast = `${issueCount} workspace ${issueCount === 1 ? 'file needs' : 'files need'} attention. Open Git to see ${issueCount === 1 ? 'it' : 'them'}.`;
       setTimeout(() => (this.collectionImportToast = ''), 6000);
     }
     this.showGitToast(successMessage);
@@ -1667,7 +1666,7 @@ class AppVM {
     if (!directoryName) return;
     const initMode = await this.openSelectDialog('Folder workspace setup', 'Choose what Kurlo should write into the new folder:', [
       { value: 'empty', label: 'Create empty workspace', description: `Create a clean workspace named "${directoryName}".` },
-      { value: 'copy', label: 'Copy current workspace', description: 'Copy current workspaces, collections, requests, and environments.' },
+      { value: 'copy', label: 'Copy current workspaces', description: 'Copy all workspaces in the current folder, including their collections, requests, and environments.' },
     ], 'Create', 'Cancel');
     if (!initMode) return;
     const parentDir = await openDirectoryDialog(`Choose parent folder for ${directoryName}`, await this.defaultWorkspaceParentForDialogs());

@@ -36,6 +36,7 @@ type App struct {
 	sio            *socketIOManager
 	mock           *mockServer
 	cookieSync     *cookieSyncServer
+	binaryBodies   *binaryResponseCache
 }
 
 type SaveRequestStoreResult struct {
@@ -53,6 +54,7 @@ func NewApp() *App {
 	return &App{
 		quit:           newQuitGate(),
 		requestCancels: make(map[string]requestCancel),
+		binaryBodies:   newBinaryResponseCache(),
 		state:          state.New(),
 		cookieJars:     jars,
 		preflightCache: newPreflightCache(),
@@ -67,6 +69,7 @@ func NewApp() *App {
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 	repairStaleBundleInBackground(ctx)
+	go refreshInstalledBrowserExtensions()
 }
 
 func (a *App) DiagnosticsReport() string {
@@ -430,7 +433,7 @@ func (a *App) SendRequest(req model.HttpRequest) model.HttpResponse {
 		cancel()
 		a.unregisterRequestCancel(req.RequestID, seq)
 	}()
-	return sendRequest(ctx, req, a.state, a.cookieJars, a.preflightCache)
+	return a.keepBinaryBodyOutOfTheWindow(req.RequestID, sendRequest(ctx, req, a.state, a.cookieJars, a.preflightCache))
 }
 
 type DownloadResult struct {

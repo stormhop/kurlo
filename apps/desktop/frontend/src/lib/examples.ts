@@ -12,7 +12,7 @@ import type {
   RequestExampleSource,
   SavedRequest,
 } from './types/models';
-import { cloneRowsForStore, newEntityId, restoreRows } from './utils';
+import { cloneRowsForStore, newEntityId, rowHasContent } from './utils';
 import { emptyHttpResponse } from './wire';
 
 const EXAMPLE_SOURCES: RequestExampleSource[] = ['captured', 'manual', 'openapi', 'postman'];
@@ -26,7 +26,18 @@ function finite(value: unknown, fallback = 0): number {
 }
 
 function storedRows(input: KVRow[] | undefined): KVRow[] {
-  return restoreRows(input ?? []).slice(0, -1);
+  return (input ?? []).filter(rowHasContent).map(row => ({
+    ...mkRow(),
+    ...(typeof row.id === 'number' && Number.isFinite(row.id) ? { id: row.id } : {}),
+    enabled: row.enabled ?? true,
+    key: row.key ?? '',
+    value: row.value ?? '',
+    description: row.description ?? '',
+    isFile: row.isFile ?? false,
+    fileName: row.fileName ?? '',
+    contentType: row.contentType ?? '',
+    secret: row.secret ?? false,
+  }));
 }
 
 function headerValue(headers: KVRow[], name: string): string {

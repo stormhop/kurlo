@@ -41,8 +41,52 @@ export function rowHasContent(row: KVRow) {
   return Boolean(row.key || row.value || row.description || row.isFile);
 }
 
-export function cloneRowsForStore(rows: KVRow[]) {
+function valueKind(value: unknown): string {
+  return Array.isArray(value) ? 'array' : value === null ? 'null' : typeof value;
+}
+
+export function sanitizeLike<T extends object>(value: unknown, template: T): Partial<T> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const clean: Record<string, unknown> = { ...(value as Record<string, unknown>) };
+  for (const [key, expected] of Object.entries(template)) {
+    if (!(key in clean) || expected === undefined || expected === null) continue;
+    const actual = clean[key];
+    if (valueKind(actual) === valueKind(expected)) continue;
+    if (typeof expected === 'string' && (typeof actual === 'number' || typeof actual === 'boolean')) clean[key] = String(actual);
+    else if (typeof expected === 'number' && typeof actual === 'string' && actual.trim() !== '' && Number.isFinite(Number(actual))) clean[key] = Number(actual);
+    else delete clean[key];
+  }
+  return clean as Partial<T>;
+}
+
+function rowText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  return typeof value === 'number' || typeof value === 'boolean' ? String(value) : '';
+}
+
+export function sanitizeRows(rows: unknown): KVRow[] {
+  if (!Array.isArray(rows)) return [];
   return rows
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === 'object' && !Array.isArray(row))
+    .map(row => {
+      const clean: Record<string, unknown> = {
+        ...row,
+        enabled: typeof row.enabled === 'boolean' ? row.enabled : true,
+        key: rowText(row.key),
+        value: rowText(row.value),
+        description: rowText(row.description),
+        fileName: rowText(row.fileName),
+        contentType: rowText(row.contentType),
+        isFile: row.isFile === true,
+        secret: row.secret === true,
+      };
+      if (typeof row.id !== 'number' || !Number.isFinite(row.id)) delete clean.id;
+      return clean as unknown as KVRow;
+    });
+}
+
+export function cloneRowsForStore(rows: KVRow[]) {
+  return sanitizeRows(rows)
     .filter(rowHasContent)
     .map(row => ({
       id: row.id,
@@ -58,7 +102,7 @@ export function cloneRowsForStore(rows: KVRow[]) {
 }
 
 export function restoreRows(rows: KVRow[] | undefined): KVRow[] {
-  const restored = (rows ?? [])
+  const restored = sanitizeRows(rows)
     .filter(rowHasContent)
     .map(row => ({
       ...mkRow(),

@@ -90,25 +90,22 @@ func TestExamplesRoundTripThroughWorkspace(t *testing.T) {
 	}
 
 	exampleDir := exampleDirFor(workspaceRoot)
-	bodyPath := filepath.Join(exampleDir, "created.body.json")
-	body, err := os.ReadFile(bodyPath)
+	entries, err := os.ReadDir(exampleDir)
 	if err != nil {
-		t.Fatalf("read body file: %v", err)
+		t.Fatalf("read example dir: %v", err)
 	}
-	if string(body) != "{\n  \"id\": \"ord_1\"\n}" {
-		t.Errorf("body file = %q, want the response body verbatim", body)
+	if len(entries) != 1 || entries[0].Name() != "created.yml" {
+		t.Fatalf("an example is one YAML file, got %v", entries)
 	}
-
-	yamlPath := filepath.Join(exampleDir, "created.yml")
-	rawYAML, err := os.ReadFile(yamlPath)
+	rawYAML, err := os.ReadFile(filepath.Join(exampleDir, "created.yml"))
 	if err != nil {
 		t.Fatalf("read example yaml: %v", err)
 	}
-	if strings.Contains(string(rawYAML), "ord_1") {
-		t.Errorf("the body must live in its own file, not inside the YAML:\n%s", rawYAML)
+	if !strings.Contains(string(rawYAML), "body: |-\n            {\n              \"id\": \"ord_1\"") {
+		t.Errorf("the body must be a readable block inside the YAML:\n%s", rawYAML)
 	}
-	if !strings.Contains(string(rawYAML), "bodyFile: created.body.json") {
-		t.Errorf("example YAML should point at the body file, got:\n%s", rawYAML)
+	if strings.Contains(string(rawYAML), "bodyFile") {
+		t.Errorf("no body file pointer expected:\n%s", rawYAML)
 	}
 
 	requestYAML, err := os.ReadFile(filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Core", "requests", "Create-order.yml"))
@@ -138,35 +135,75 @@ func TestExamplesRoundTripThroughWorkspace(t *testing.T) {
 		t.Fatal("example came back with no response")
 	}
 	if got := response["body"]; got != "{\n  \"id\": \"ord_1\"\n}" {
-		t.Errorf("body = %q, want it restored from the body file", got)
+		t.Errorf("body = %q, want the saved body", got)
 	}
 	if _, ok := response["bodyFile"]; ok {
 		t.Error("bodyFile is an on-disk detail and must not reach the frontend")
 	}
 }
 
-func TestExamplesAreRemovedWithTheirBodyFile(t *testing.T) {
+func writeLegacyExampleBodyForTest(t *testing.T, root, bodyFile, body string) {
+	t.Helper()
+	yamlPath := filepath.Join(exampleDirFor(root), "created.yml")
+	raw, err := os.ReadFile(yamlPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(string(raw), "        body: |-")
+	end := strings.Index(string(raw), "        bodyMediaType:")
+	if start < 0 || end < start {
+		t.Fatalf("test premise: inline body not found:\n%s", raw)
+	}
+	legacy := string(raw[:start]) + "        bodyFile: " + bodyFile + "\n" + string(raw[end:])
+	if err := os.WriteFile(yamlPath, []byte(legacy), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if body != "" {
+		if err := os.WriteFile(filepath.Join(exampleDirFor(root), bodyFile), []byte(body), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestLegacyExampleBodyFileIsInlinedOnNextSave(t *testing.T) {
 	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
-
 	if err := saveKurloStorePayload(localPath, workspaceRoot, exampleStorePayload(t, createdExample)); err != nil {
-		t.Fatalf("save with example: %v", err)
+		t.Fatalf("save: %v", err)
 	}
-	bodyPath := filepath.Join(exampleDirFor(workspaceRoot), "created.body.json")
-	if _, err := os.Stat(bodyPath); err != nil {
-		t.Fatalf("body file should exist after the first save: %v", err)
-	}
+	writeLegacyExampleBodyForTest(t, workspaceRoot, "created.body.txt", "legacy body\n")
 
-	if err := saveKurloStorePayload(localPath, workspaceRoot, exampleStorePayload(t, `[]`)); err != nil {
-		t.Fatalf("save without example: %v", err)
+	payload, diagnostics, err := loadKurloStorePayloadWithDiagnostics(localPath, workspaceRoot)
+	if err != nil || len(diagnostics) != 0 {
+		t.Fatalf("legacy body must load: %v %#v", err, diagnostics)
 	}
-	if _, err := os.Stat(bodyPath); !os.IsNotExist(err) {
-		t.Errorf("body file should be gone once its example is deleted, stat err = %v", err)
+	response, _ := requestExamplesFromPayload(t, payload)[0]["response"].(map[string]any)
+	if response["body"] != "legacy body\n" {
+		t.Fatalf("legacy body not read: %#v", response)
 	}
-	if _, err := os.Stat(filepath.Join(exampleDirFor(workspaceRoot), "created.yml")); !os.IsNotExist(err) {
-		t.Errorf("example YAML should be gone too, stat err = %v", err)
+	store, err := decodeJSONMap(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mapSlice(store["requests"])[0]["url"] = "https://api.example.test/orders/v2"
+	edited, err := json.Marshal(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveKurloStorePayload(localPath, workspaceRoot, string(edited)); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(exampleDirFor(workspaceRoot), "created.body.txt")); !os.IsNotExist(err) {
+		t.Fatalf("legacy body file must be removed after the body moves into the YAML: %v", err)
+	}
+	rawYAML, err := os.ReadFile(filepath.Join(exampleDirFor(workspaceRoot), "created.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(rawYAML), "legacy body") || strings.Contains(string(rawYAML), "bodyFile") {
+		t.Fatalf("body was not inlined:\n%s", rawYAML)
 	}
 }
 
@@ -191,24 +228,6 @@ func TestWorkspaceWithoutExamplesLoadsUnchanged(t *testing.T) {
 	}
 }
 
-func TestExampleBodyExtensionFollowsMediaType(t *testing.T) {
-	for _, tc := range []struct{ mediaType, want string }{
-		{"application/json", ".json"},
-		{"application/json; charset=utf-8", ".json"},
-		{"application/problem+json", ".json"},
-		{"text/xml", ".xml"},
-		{"application/soap+xml", ".xml"},
-		{"text/html", ".html"},
-		{"text/plain", ".txt"},
-		{"", ".txt"},
-		{"application/octet-stream", ".txt"},
-	} {
-		if got := exampleBodyExtension(tc.mediaType); got != tc.want {
-			t.Errorf("exampleBodyExtension(%q) = %q, want %q", tc.mediaType, got, tc.want)
-		}
-	}
-}
-
 func TestExampleBodyFileEscapingIsRefused(t *testing.T) {
 	withRequestStoreTestKey(t)
 	dir := t.TempDir()
@@ -222,18 +241,7 @@ func TestExampleBodyFileEscapingIsRefused(t *testing.T) {
 	if err := os.WriteFile(secret, []byte("do not read me"), 0600); err != nil {
 		t.Fatalf("write bait: %v", err)
 	}
-	yamlPath := filepath.Join(exampleDirFor(workspaceRoot), "created.yml")
-	rawYAML, err := os.ReadFile(yamlPath)
-	if err != nil {
-		t.Fatalf("read example: %v", err)
-	}
-	tampered := strings.Replace(string(rawYAML), "bodyFile: created.body.json", "bodyFile: ../../../../../secret.txt", 1)
-	if tampered == string(rawYAML) {
-		t.Fatal("test premise: bodyFile line not found")
-	}
-	if err := os.WriteFile(yamlPath, []byte(tampered), 0644); err != nil {
-		t.Fatalf("write tampered example: %v", err)
-	}
+	writeLegacyExampleBodyForTest(t, workspaceRoot, "../../../../../secret.txt", "")
 
 	payload, diagnostics, err := loadKurloStorePayloadWithDiagnostics(localPath, workspaceRoot)
 	if err != nil {
@@ -262,7 +270,7 @@ func TestExampleNamesAreMadeUniqueOnDisk(t *testing.T) {
 	}
 
 	exampleDir := exampleDirFor(workspaceRoot)
-	for _, name := range []string{"created.yml", "created.body.json", "created-1.yml", "created-1.body.json"} {
+	for _, name := range []string{"created.yml", "created-1.yml"} {
 		if _, err := os.Stat(filepath.Join(exampleDir, name)); err != nil {
 			t.Errorf("expected %s on disk: %v", name, err)
 		}

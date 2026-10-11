@@ -52,6 +52,8 @@ type EnvironmentHost = {
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   guardWorkspaceWritable: (action?: string) => boolean;
   persistRequestStore: () => Promise<boolean>;
+  syncActiveEnvironmentFromBackend: () => Promise<void>;
+  syncBackendEnvironment: () => Promise<void>;
   environmentValuesFor: (environmentId: string) => Record<string, string>;
   activeEnvironmentValues: () => Record<string, string>;
   environmentVariableSuggestions: (environmentId?: string) => VariableSuggestion[];
@@ -356,6 +358,27 @@ export const environmentFeature = {
     this.environments = this.environments.map(candidate => candidate.id === environment.id ? { ...candidate, values: nextValues } : candidate);
     await this.persistRequestStore();
     return true;
+  },
+  async applyEnvironmentChangesFromResponse(this: EnvironmentHost, resp: { environmentUpdates?: Record<string, string>; environmentRemoved?: string[] }, environmentId: string) {
+    if (environmentId === this.activeEnvironmentId) {
+      await this.syncActiveEnvironmentFromBackend();
+      return;
+    }
+    const updates = resp.environmentUpdates ?? {};
+    const removed = new Set(resp.environmentRemoved ?? []);
+    const environment = this.environments.find(candidate => candidate.id === environmentId);
+    if (environment && (Object.keys(updates).length || removed.size) && this.guardWorkspaceWritable('Environment sync')) {
+      const values: Record<string, string> = {};
+      for (const row of environment.values) {
+        const key = row.key.trim();
+        if (key && row.enabled && !removed.has(key)) values[key] = row.value;
+      }
+      Object.assign(values, updates);
+      const nextValues = mergeEnvironmentRowsWithValues(environment.values, values);
+      this.environments = this.environments.map(candidate => candidate.id === environment.id ? { ...candidate, values: nextValues } : candidate);
+      await this.persistRequestStore();
+    }
+    await this.syncBackendEnvironment();
   },
   async syncActiveEnvironmentFromBackend(this: EnvironmentHost) {
     await this.mergeActiveEnvironmentValues(await getEnvironment());

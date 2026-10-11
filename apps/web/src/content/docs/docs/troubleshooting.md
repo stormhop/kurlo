@@ -101,9 +101,9 @@ This error means the auto-updater couldn't find a binary for your platform in th
 
 ### Updates aren't available in development builds
 
-If you're running a `make dev` / `go run` build, Settings → Updates says *Development build* and explains why, instead of offering a check. This is intentional — there's no released version newer than your local source tree. Install a release build to receive updates.
+If you're running a `make dev` / `go run` build, Settings → About says *Development build* and explains why, instead of offering a check. This is intentional — there's no released version newer than your local source tree. Install a release build to receive updates.
 
-![Settings → Updates in a development build](../../../assets/screenshots/settings-updates-dev.png)
+![Settings → About in a development build](../../../assets/screenshots/settings-updates-dev.png)
 
 ### "The downloaded update could not be verified"
 
@@ -119,7 +119,7 @@ Kurlo updates an AppImage by replacing the `.AppImage` file it was started from,
 
 ### Update applied but Kurlo didn't restart
 
-Click *Restart now* in Settings → Updates. If that doesn't work, quit Kurlo manually and reopen it — the new binary is already in place.
+Click *Restart now* in Settings → About. If that doesn't work, quit Kurlo manually and reopen it — the new binary is already in place.
 
 ## Data and storage
 
@@ -158,7 +158,7 @@ Disk full, or Kurlo's data directory is no longer writable (permissions changed,
 
 ## UI quirks
 
-### Settings → Updates says "DEV BUILD" but I downloaded a release
+### Settings → About says "DEV BUILD" but I downloaded a release
 
 Your build has `appVersion=dev` baked in — the release ldflags didn't apply. If you built it yourself, run `make build` from a tagged commit. If you downloaded it from GitHub releases, file an issue.
 

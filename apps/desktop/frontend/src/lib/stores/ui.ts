@@ -1,5 +1,5 @@
 export type TopView = 'overview' | 'request' | 'environment' | 'globals' | 'git' | 'runner' | 'collection' | 'mock' | 'history';
-export type SettingsTab = 'general' | 'theme' | 'proxy' | 'shortcuts' | 'updates' | 'support' | 'about';
+export type SettingsTab = 'general' | 'theme' | 'proxy' | 'shortcuts' | 'support' | 'about';
 export type SnippetLanguage =
   | 'curl'
   | 'go'

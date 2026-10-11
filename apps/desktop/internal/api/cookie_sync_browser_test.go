@@ -84,7 +84,7 @@ func TestCookieSyncWithARealBrowserExtension(t *testing.T) {
 	cmd.Dir = filepath.Join(root, "apps", "desktop", "frontend")
 	cmd.Env = append(os.Environ(),
 		"KURLO_BRIDGE_PORT="+strconv.Itoa(harness.port),
-		"KURLO_EXTENSION_DIR="+filepath.Join(root, "apps", "extension"),
+		"KURLO_EXTENSION_DIR="+filepath.Join(root, "apps", "desktop", "extension"),
 		"KURLO_COOKIE_DOMAIN=kurlo.test",
 	)
 	stdout, err := cmd.StdoutPipe()
@@ -172,6 +172,9 @@ func TestCookieSyncWithARealBrowserExtension(t *testing.T) {
 	waitUntil("the extension to open its socket", 30*time.Second, func(status model.CookieSyncStatus, _ []model.Cookie) bool {
 		return status.Connected && status.Browser != ""
 	})
+	if version := harness.server.status().ExtensionVersion; version == "" {
+		t.Fatal("the extension should report its manifest version when it connects")
+	}
 
 	waitForEvent("cookie-added", 30*time.Second)
 	waitUntil("the browser cookie to reach the jar", 30*time.Second, func(_ model.CookieSyncStatus, cookies []model.Cookie) bool {

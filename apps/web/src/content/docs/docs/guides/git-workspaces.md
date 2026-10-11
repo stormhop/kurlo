@@ -104,7 +104,26 @@ This is intentionally conservative: Kurlo would rather pause than silently overw
 
 Diagnostics appear when YAML exists but is incomplete, invalid, or references something Kurlo cannot load cleanly. A diagnostic does not always mean data is lost; often it means a third-party edit missed a required field.
 
-Use diagnostics to jump to the affected workspace, collection, request, or environment. After fixing the item in Kurlo or editing the YAML, refresh the Git workspace status.
+The Git screen lists problems from every workspace in the folder, not only the open one, and names the workspace each problem locks. A file Kurlo cannot read is never rewritten or deleted while it is broken; the rest of the workspace saves as usual.
+
+Use diagnostics to jump to the affected workspace, collection, request, or environment. After you fix a file with **Edit YAML**, the workspace reloads by itself.
+
+## Changes made outside Kurlo
+
+A folder or file is always named after the workspace, collection, request, or environment it holds, so paths in Git read like the names in the app. When a name changes, in the app, by editing the YAML, or in a pulled commit, Kurlo moves the file on its next save and Git shows a rename under Changes; commit it like any other change. Opening or pulling never moves files by itself. An object's ID never changes with its name.
+
+Folders decide what belongs where. A collection belongs to the workspace folder it sits in, a request to its collection folder, and an environment to its workspace folder. The `workspaceId`, `collectionId`, and `requestId` fields in child files are copies of that. If they disagree with the folder, Kurlo follows the folder and corrects the field as soon as it loads the folder, changing only that line. Changing an ID in `workspace.yml` or `collection.yml` therefore needs no other edits: commit the corrected files Kurlo shows under Changes together with your change. Moving a folder moves everything inside it.
+
+Order lists such as `workspaceOrder`, `collectionOrder`, and `requestOrder` only set the order. An entry for a file that no longer exists is skipped. When exactly one ID in a list changed, Kurlo replaces the old entry with the new one so the order stays the same.
+
+Some changes leave Kurlo unable to tell which file is right, and these pause saving:
+
+- Two objects of the same kind share an ID, usually because a folder was copied. Kurlo reports the copy once and keeps showing the original.
+- An object has no ID.
+- `kurlo.yml`, `workspace.yml`, or `collection.yml` was deleted but files inside its folder remain.
+- A response example has no matching request file.
+
+When this happens, the Git screen lists one entry per problem and pauses editing and commits for the open workspace folder. Fix the listed file with **Edit YAML**, or pull a commit that fixes it. Kurlo does not guess a replacement.
 
 ## Safety rules
 

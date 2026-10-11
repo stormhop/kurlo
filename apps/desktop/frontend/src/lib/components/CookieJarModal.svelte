@@ -1,5 +1,7 @@
 <script lang="ts">
   import { openExternalURL } from '../externalLinks';
+  import { getAppInfo, installBrowserExtension } from '../backend';
+  import type { BrowserExtensionResult } from '../backend';
   import { tabListKeyboard, trapFocus } from '../a11y';
   import type { CookieJarEntry, CookieSyncStatus } from '../backend';
   import {
@@ -145,6 +147,50 @@
     if (!value) return;
     await onAddSyncDomain(value);
     syncDomainInput = '';
+  }
+
+  let appVersion = $state('');
+  let extensionSetup = $state<BrowserExtensionResult | null>(null);
+  let extensionBusy = $state(false);
+  let extensionPageCopied = $state(false);
+
+  $effect(() => {
+    if (tab === 'sync' && !appVersion) void getAppInfo().then(info => { appVersion = info.version; });
+  });
+
+  function versionParts(version: string): number[] {
+    return (version.replace(/^v/, '').match(/^\d+(\.\d+)*/)?.[0] ?? '').split('.').filter(Boolean).map(Number);
+  }
+
+  function versionOlder(left: string, right: string): boolean {
+    const a = versionParts(left);
+    const b = versionParts(right);
+    if (!a.length || !b.length) return false;
+    for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+      const diff = (a[index] ?? 0) - (b[index] ?? 0);
+      if (diff) return diff < 0;
+    }
+    return false;
+  }
+
+  let extensionOutdated = $derived(Boolean(sync.connected && sync.extensionVersion && appVersion && versionOlder(sync.extensionVersion, appVersion)));
+  let extensionPage = $derived(extensionSetup?.browser === 'firefox' ? 'about:debugging#/runtime/this-firefox' : 'chrome://extensions');
+
+  async function setUpExtension(browser: 'chromium' | 'firefox') {
+    extensionBusy = true;
+    try {
+      extensionSetup = await installBrowserExtension(browser);
+    } finally {
+      extensionBusy = false;
+    }
+  }
+
+  async function copyExtensionPage() {
+    try {
+      await navigator.clipboard.writeText(extensionPage);
+      extensionPageCopied = true;
+      setTimeout(() => (extensionPageCopied = false), 1600);
+    } catch {}
   }
 
   function openSyncGuide() {
@@ -368,6 +414,50 @@
               <button class="btn btn-secondary btn-lg" type="button" onclick={onDenySync} disabled={syncBusy}>Deny</button>
               <button class="btn btn-primary btn-lg" type="button" onclick={onApproveSync} disabled={syncBusy}>Allow</button>
             </div>
+          </section>
+        {/if}
+
+        {#if extensionOutdated}
+          <section class="cookie-sync-approval cookie-sync-outdated" role="status">
+            <div class="cookie-sync-approval-copy">
+              <strong>The extension is older than Kurlo</strong>
+              <span>{sync.browser || 'The browser'} runs extension {sync.extensionVersion}, Kurlo is {appVersion}. Refresh its files, then press Reload on Kurlo Cookie Sync in the browser's extensions page.</span>
+            </div>
+            <div class="cookie-sync-approval-actions">
+              <button class="btn btn-secondary btn-lg" type="button" onclick={() => setUpExtension(sync.browser?.toLowerCase().includes('firefox') ? 'firefox' : 'chromium')} disabled={extensionBusy}>Refresh files</button>
+            </div>
+          </section>
+        {/if}
+
+        {#if !sync.paired || extensionSetup}
+          <section class="cookie-sync-block cookie-sync-extension">
+            <h3>Browser extension</h3>
+            {#if extensionSetup && !extensionSetup.error}
+              <ol class="cookie-sync-steps">
+                <li>
+                  Open <code>{extensionPage}</code> in the browser
+                  <button class="btn-link cookie-sync-link" type="button" onclick={copyExtensionPage}>{extensionPageCopied ? 'Copied' : 'Copy'}</button>
+                </li>
+                {#if extensionSetup.browser === 'firefox'}
+                  <li>Press <strong>Load Temporary Add-on</strong> and pick <code>manifest.json</code> in the folder Kurlo just opened.</li>
+                {:else}
+                  <li>Turn on <strong>Developer mode</strong>, press <strong>Load unpacked</strong> and pick the folder Kurlo just opened.</li>
+                {/if}
+                <li>Open the extension and press <strong>Connect</strong>.</li>
+              </ol>
+              <p class="cookie-sync-hint">
+                Version {extensionSetup.version} in <code class="cookie-sync-path">{extensionSetup.path}</code>. Kurlo keeps this folder in step with the app, so after an update the browser picks up the new version the next time it starts, or when you press Reload.
+              </p>
+            {:else}
+              {#if extensionSetup?.error}
+                <div class="cookie-error">{extensionSetup.error}</div>
+              {/if}
+              <p class="cookie-sync-hint">Kurlo ships the extension. Pick your browser and it puts the files in a folder you can load.</p>
+              <div class="cookie-sync-row">
+                <button class="btn btn-secondary btn-lg" type="button" onclick={() => setUpExtension('chromium')} disabled={extensionBusy}>Chrome, Edge, Brave</button>
+                <button class="btn btn-secondary btn-lg" type="button" onclick={() => setUpExtension('firefox')} disabled={extensionBusy}>Firefox</button>
+              </div>
+            {/if}
           </section>
         {/if}
 

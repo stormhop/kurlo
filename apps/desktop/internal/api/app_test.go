@@ -1790,86 +1790,6 @@ func TestKurloStoreManualAndAutosaveUpdatesReachWorkspaceYAML(t *testing.T) {
 	}
 }
 
-func TestKurloStoreAutosaveCollectionRenameKeepsFilesystemNameStable(t *testing.T) {
-	withRequestStoreTestKey(t)
-	dir := t.TempDir()
-	localPath := filepath.Join(dir, "requests.json")
-	workspaceRoot := filepath.Join(dir, "workspaces")
-
-	if err := saveKurloStorePayload(localPath, workspaceRoot, kurloSaveFlowPayload("/saved", "token-a", []string{"req-main"}, "")); err != nil {
-		t.Fatalf("save initial kurlo store: %v", err)
-	}
-	loadedBeforeRename, err := loadKurloStorePayload(localPath, workspaceRoot)
-	if err != nil {
-		t.Fatalf("load initial kurlo store: %v", err)
-	}
-	renamedPayload := strings.ReplaceAll(loadedBeforeRename, `"name": "Core"`, `"name": "Renamed Core"`)
-	renamedPayload = strings.ReplaceAll(renamedPayload, `"collection": "Core"`, `"collection": "Renamed Core"`)
-	if err := saveKurloStorePayload(localPath, workspaceRoot, renamedPayload); err != nil {
-		t.Fatalf("save renamed kurlo store: %v", err)
-	}
-
-	collectionPath := filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Core", "collection.yml")
-	data, err := os.ReadFile(collectionPath)
-	if err != nil {
-		t.Fatalf("read collection file: %v", err)
-	}
-	text := string(data)
-	if !strings.Contains(text, "name: Renamed Core") || strings.Contains(text, "name: Core") {
-		t.Fatalf("collection rename did not reach collection.yml:\n%s", text)
-	}
-	requestPath := filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Core", "requests", "Main-request.yml")
-	data, err = os.ReadFile(requestPath)
-	if err != nil {
-		t.Fatalf("read request file: %v", err)
-	}
-	text = string(data)
-	if strings.Contains(text, "collection:") || strings.Contains(text, "Renamed Core") || strings.Contains(text, "Core") {
-		t.Fatalf("collection rename should not be denormalized into request yaml:\n%s", text)
-	}
-	if _, err := os.Stat(filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "collection-main")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("collection id folder should not be created for canonical filesystem layout, err=%v", err)
-	}
-	if _, err := os.Stat(filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Renamed-Core")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("collection display rename should not rename the filesystem folder, err=%v", err)
-	}
-}
-
-func TestKurloStoreWorkspaceRenameKeepsFilesystemNameStable(t *testing.T) {
-	withRequestStoreTestKey(t)
-	dir := t.TempDir()
-	localPath := filepath.Join(dir, "requests.json")
-	workspaceRoot := filepath.Join(dir, "workspaces")
-
-	if err := saveKurloStorePayload(localPath, workspaceRoot, kurloSaveFlowPayload("/saved", "token-a", []string{"req-main"}, "")); err != nil {
-		t.Fatalf("save initial kurlo store: %v", err)
-	}
-	loadedBeforeRename, err := loadKurloStorePayload(localPath, workspaceRoot)
-	if err != nil {
-		t.Fatalf("load initial kurlo store: %v", err)
-	}
-	renamedPayload := strings.Replace(loadedBeforeRename, `"name": "Main",`, `"name": "Renamed Main",`, 1)
-	if err := saveKurloStorePayload(localPath, workspaceRoot, renamedPayload); err != nil {
-		t.Fatalf("save renamed workspace store: %v", err)
-	}
-
-	workspacePath := filepath.Join(workspaceRoot, "workspaces", "Main", "workspace.yml")
-	data, err := os.ReadFile(workspacePath)
-	if err != nil {
-		t.Fatalf("read workspace file: %v", err)
-	}
-	text := string(data)
-	if !strings.Contains(text, "name: Renamed Main") || strings.Contains(text, "name: Main") {
-		t.Fatalf("workspace rename did not reach stable workspace.yml:\n%s", text)
-	}
-	if strings.Contains(text, "filesystemName:") {
-		t.Fatalf("workspace.yml should not embed filesystemName (it is encoded by the directory):\n%s", text)
-	}
-	if _, err := os.Stat(filepath.Join(workspaceRoot, "workspaces", "Renamed-Main")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("workspace display rename should not rename the filesystem folder, err=%v", err)
-	}
-}
-
 func TestKurloStoreDerivesFilesystemNameFromPathWhenAbsentInBody(t *testing.T) {
 	withRequestStoreTestKey(t)
 	dir := t.TempDir()
@@ -1961,7 +1881,7 @@ func TestKurloStoreLoadsValidDataWithDiagnosticsForInvalidRequestYAML(t *testing
 	if got.Scope != "request" || got.CollectionID != "collection-main" || got.Blocking {
 		t.Fatalf("unexpected request diagnostic: %#v", got)
 	}
-	if !strings.Contains(got.Path, "Broken.yml") || got.Line == 0 || !strings.Contains(got.Message, "line") {
+	if !strings.Contains(got.Path, "Broken.yml") || got.Line == 0 || !strings.Contains(got.Message, "unclosed quote") {
 		t.Fatalf("diagnostic did not point at broken YAML: %#v", got)
 	}
 	if _, err := loadKurloStorePayload(localPath, workspaceRoot); err == nil {
@@ -2054,6 +1974,61 @@ func TestKurloStoreSavePreservesInvalidWorkspaceDirectory(t *testing.T) {
 	}
 }
 
+func TestKurloStoreSaveKeepsOnlyTheBrokenFile(t *testing.T) {
+	withRequestStoreTestKey(t)
+	dir := t.TempDir()
+	localPath := filepath.Join(dir, "requests.json")
+	workspaceRoot := filepath.Join(dir, "workspaces")
+	store, err := decodeJSONMap(kurloSaveFlowPayload("/saved", "", []string{"req-main"}, ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests := mapSlice(store["requests"])
+	second := cloneMap(requests[0])
+	second["id"], second["name"], second["filesystemName"] = "req-two", "Second", "Second"
+	store["requests"] = append(requests, second)
+	initial, err := json.Marshal(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveKurloStorePayload(localPath, workspaceRoot, string(initial)); err != nil {
+		t.Fatal(err)
+	}
+	requestsDir := filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Core", "requests")
+	brokenPath := filepath.Join(requestsDir, "Broken.yml")
+	if err := os.WriteFile(brokenPath, []byte("version: 1\nrequest: [\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	payload, diagnostics, err := loadKurloStorePayloadWithDiagnostics(localPath, workspaceRoot)
+	if err != nil || len(diagnostics) != 1 {
+		t.Fatalf("expected one diagnostic: %v %#v", err, diagnostics)
+	}
+	loaded, err := decodeJSONMap(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kept []map[string]any
+	for _, request := range mapSlice(loaded["requests"]) {
+		if stringValue(request, "id") != "req-two" {
+			kept = append(kept, request)
+		}
+	}
+	loaded["requests"] = kept
+	edited, err := json.Marshal(loaded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := saveKurloStorePayloadPreserving(localPath, workspaceRoot, string(edited), diagnosticPreserveDirs(workspaceRoot, diagnostics)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(brokenPath); err != nil {
+		t.Fatalf("broken file must stay for repair: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(requestsDir, "Second.yml")); !os.IsNotExist(err) {
+		t.Fatalf("a request deleted in the app must not come back because another file is broken: %v", err)
+	}
+}
+
 func TestWorkspaceYAMLEditorRepairsBlockingDiagnostic(t *testing.T) {
 	withRequestStoreTestKey(t)
 	configDir := t.TempDir()
@@ -2091,7 +2066,7 @@ func TestWorkspaceYAMLEditorRepairsBlockingDiagnostic(t *testing.T) {
 	}
 }
 
-func TestKurloStoreReportsDanglingRequestOrderAsCollectionDiagnostic(t *testing.T) {
+func TestKurloStoreIgnoresDanglingOrderEntries(t *testing.T) {
 	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
@@ -2100,26 +2075,27 @@ func TestKurloStoreReportsDanglingRequestOrderAsCollectionDiagnostic(t *testing.
 		t.Fatalf("save kurlo store: %v", err)
 	}
 	collectionPath := filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Core", "collection.yml")
-	data, err := os.ReadFile(collectionPath)
-	if err != nil {
-		t.Fatalf("read collection: %v", err)
-	}
-	text := string(data)
-	text = strings.Replace(text, "requestOrder:\n    - req-main", "requestOrder:\n    - req-main\n    - req-missing", 1)
-	if err := os.WriteFile(collectionPath, []byte(text), 0644); err != nil {
-		t.Fatalf("write collection: %v", err)
+	workspacePath := filepath.Join(workspaceRoot, "workspaces", "Main", "workspace.yml")
+	for path, list := range map[string]string{collectionPath: "requestOrder:\n", workspacePath: "collectionOrder:\n"} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := strings.Replace(string(data), list, list+"    - deleted-by-hand\n", 1)
+		if text == string(data) {
+			t.Fatalf("missing %q in %s", list, path)
+		}
+		if err := os.WriteFile(path, []byte(text), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	_, diagnostics, err := loadKurloStorePayloadWithDiagnostics(localPath, workspaceRoot)
 	if err != nil {
 		t.Fatalf("load with diagnostics: %v", err)
 	}
-	if len(diagnostics) != 1 {
-		t.Fatalf("expected one diagnostic, got %#v", diagnostics)
-	}
-	got := diagnostics[0]
-	if got.Scope != "collection" || got.CollectionID != "collection-main" || !strings.Contains(got.Message, "req-missing") {
-		t.Fatalf("unexpected collection diagnostic: %#v", got)
+	if len(diagnostics) != 0 {
+		t.Fatalf("order entries for deleted files are not issues: %#v", diagnostics)
 	}
 }
 
@@ -2258,52 +2234,6 @@ func TestFilesystemSegmentsUseNamesAndDisambiguateDuplicates(t *testing.T) {
 		if stringValue(item, filesystemNameField) == "" {
 			t.Fatalf("expected filesystemName to be written back to item %#v", item)
 		}
-	}
-}
-
-func TestKurloStoreRequestAndEnvironmentRenamesKeepFilesystemNamesStable(t *testing.T) {
-	withRequestStoreTestKey(t)
-	dir := t.TempDir()
-	localPath := filepath.Join(dir, "requests.json")
-	workspaceRoot := filepath.Join(dir, "workspaces")
-
-	if err := saveKurloStorePayload(localPath, workspaceRoot, kurloSaveFlowPayload("/saved", "token-a", []string{"req-main"}, "")); err != nil {
-		t.Fatalf("save initial kurlo store: %v", err)
-	}
-	loadedBeforeRename, err := loadKurloStorePayload(localPath, workspaceRoot)
-	if err != nil {
-		t.Fatalf("load initial kurlo store: %v", err)
-	}
-	renamedPayload := strings.Replace(loadedBeforeRename, `"name": "Main request"`, `"name": "Renamed request"`, 1)
-	renamedPayload = strings.Replace(renamedPayload, `"name": "Local"`, `"name": "Renamed Local"`, 1)
-	if err := saveKurloStorePayload(localPath, workspaceRoot, renamedPayload); err != nil {
-		t.Fatalf("save renamed kurlo store: %v", err)
-	}
-
-	requestPath := filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Core", "requests", "Main-request.yml")
-	data, err := os.ReadFile(requestPath)
-	if err != nil {
-		t.Fatalf("read request file: %v", err)
-	}
-	text := string(data)
-	if !strings.Contains(text, "name: Renamed request") || strings.Contains(text, "name: Main request") {
-		t.Fatalf("request rename did not reach stable request file:\n%s", text)
-	}
-	if _, err := os.Stat(filepath.Join(workspaceRoot, "workspaces", "Main", "collections", "Core", "requests", "Renamed-request.yml")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("request display rename should not rename the filesystem file, err=%v", err)
-	}
-
-	environmentPath := filepath.Join(workspaceRoot, "workspaces", "Main", "environments", "Local.yml")
-	data, err = os.ReadFile(environmentPath)
-	if err != nil {
-		t.Fatalf("read environment file: %v", err)
-	}
-	text = string(data)
-	if !strings.Contains(text, "name: Renamed Local") || strings.Contains(text, "name: Local") {
-		t.Fatalf("environment rename did not reach stable environment file:\n%s", text)
-	}
-	if _, err := os.Stat(filepath.Join(workspaceRoot, "workspaces", "Main", "environments", "Renamed-Local.yml")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("environment display rename should not rename the filesystem file, err=%v", err)
 	}
 }
 

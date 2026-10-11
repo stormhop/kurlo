@@ -389,6 +389,9 @@ jobs:
           )
           python3 scripts/make-latest-json.py "${args[@]}"
 
+      - name: Package the browser extension
+        run: python3 scripts/package-browser-extension.py --version "${GITHUB_REF_NAME#v}" --out release
+
       - name: Generate checksums
         run: |
           cd release

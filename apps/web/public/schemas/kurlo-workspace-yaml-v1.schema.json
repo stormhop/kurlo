@@ -1,18 +1,18 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kurlo.dev/schemas/kurlo-workspace-yaml-v1.schema.json",
   "title": "Kurlo Workspace YAML v1",
   "description": "Public contract for Kurlo workspace YAML files stored with path layout yaml-filesystem-names.v1.",
   "type": "object",
   "oneOf": [
-    { "$ref": "#/$defs/rootFile" },
-    { "$ref": "#/$defs/workspaceFile" },
-    { "$ref": "#/$defs/collectionFile" },
-    { "$ref": "#/$defs/requestFile" },
-    { "$ref": "#/$defs/environmentFile" },
-    { "$ref": "#/$defs/exampleFile" }
+    { "$ref": "#/definitions/rootFile" },
+    { "$ref": "#/definitions/workspaceFile" },
+    { "$ref": "#/definitions/collectionFile" },
+    { "$ref": "#/definitions/requestFile" },
+    { "$ref": "#/definitions/environmentFile" },
+    { "$ref": "#/definitions/exampleFile" }
   ],
-  "$defs": {
+  "definitions": {
     "fileVersion": {
       "type": "integer",
       "const": 1
@@ -32,14 +32,9 @@
       "type": "integer",
       "minimum": 0
     },
-    "timestamp": {
-      "type": "number",
-      "minimum": 0
-    },
     "kvRow": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "enabled", "key", "value"],
       "properties": {
         "id": {
           "oneOf": [
@@ -62,11 +57,10 @@
     "auth": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["type"],
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["none", "bearer", "basic", "apikey", "oauth2", "aws", "digest"]
+          "enum": ["inherit", "none", "bearer", "basic", "apikey", "oauth2", "aws", "digest"]
         },
         "bearerToken": { "type": "string" },
         "basicUser": { "type": "string" },
@@ -74,7 +68,7 @@
         "apiKeyName": { "type": "string" },
         "apiKeyValue": { "type": "string" },
         "apiKeyIn": { "type": "string", "enum": ["header", "query"] },
-        "oauth2GrantType": { "type": "string", "enum": ["client_credentials", "authorization_code"] },
+        "oauth2GrantType": { "type": "string", "enum": ["client_credentials", "authorization_code", "password", "device_code"] },
         "oauth2AuthURL": { "type": "string" },
         "oauth2TokenURL": { "type": "string" },
         "oauth2ClientID": { "type": "string" },
@@ -131,9 +125,8 @@
     "sioArg": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "content", "bodyType", "encoding"],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
+        "id": { "$ref": "#/definitions/id" },
         "content": { "type": "string" },
         "bodyType": { "type": "string", "enum": ["text", "json", "html", "xml", "binary"] },
         "encoding": { "type": "string", "enum": ["base64", "hex"] }
@@ -142,25 +135,23 @@
     "workspace": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "name", "filesystemName"],
+      "required": ["id"],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
+        "id": { "$ref": "#/definitions/id" },
         "name": { "type": "string" },
-        "filesystemName": { "$ref": "#/$defs/filesystemName" },
-        "description": { "type": "string" },
-        "createdAt": { "$ref": "#/$defs/timestamp" },
-        "updatedAt": { "$ref": "#/$defs/timestamp" }
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "description": { "type": "string" }
       }
     },
     "collection": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "workspaceId", "name", "filesystemName"],
+      "required": ["id"],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "workspaceId": { "$ref": "#/$defs/id" },
+        "id": { "$ref": "#/definitions/id" },
+        "workspaceId": { "$ref": "#/definitions/id" },
         "name": { "type": "string" },
-        "filesystemName": { "$ref": "#/$defs/filesystemName" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "description": { "type": "string" },
         "collapsed": { "type": "boolean" },
         "folderPaths": {
@@ -171,9 +162,7 @@
             "items": { "type": "string" }
           }
         },
-        "defaults": { "$ref": "#/$defs/collectionDefaults" },
-        "createdAt": { "$ref": "#/$defs/timestamp" },
-        "updatedAt": { "$ref": "#/$defs/timestamp" }
+        "defaults": { "$ref": "#/definitions/collectionDefaults" }
       }
     },
     "collectionDefaults": {
@@ -182,49 +171,49 @@
       "properties": {
         "headers": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
+          "items": { "$ref": "#/definitions/kvRow" }
         },
         "variables": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
+          "items": { "$ref": "#/definitions/kvRow" }
         },
-        "auth": { "$ref": "#/$defs/auth" },
+        "auth": { "$ref": "#/definitions/auth" },
         "preRequestScript": { "type": "string" },
         "testScript": { "type": "string" },
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },
-        "settings": { "$ref": "#/$defs/requestSettings" }
+        "settings": { "$ref": "#/definitions/requestSettings" }
       }
     },
     "request": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "name", "filesystemName", "collectionId", "method", "url", "auth", "settings"],
+      "required": ["id"],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
+        "id": { "$ref": "#/definitions/id" },
         "name": { "type": "string" },
-        "filesystemName": { "$ref": "#/$defs/filesystemName" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "nameAuto": { "type": "boolean" },
-        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc"] },
+        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "mcp"] },
         "isDraft": { "type": "boolean" },
         "isPinned": { "type": "boolean" },
-        "collectionId": { "$ref": "#/$defs/id" },
+        "collectionId": { "$ref": "#/definitions/id" },
         "folderPath": {
           "type": "array",
           "items": { "type": "string" }
         },
         "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "SSE"] },
         "url": { "type": "string" },
-        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "metadata", "body", "schema", "service", "events", "scripts", "settings"] },
+        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples"] },
         "params": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
+          "items": { "$ref": "#/definitions/kvRow" }
         },
         "headers": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
+          "items": { "$ref": "#/definitions/kvRow" }
         },
-        "auth": { "$ref": "#/$defs/auth" },
+        "auth": { "$ref": "#/definitions/auth" },
         "bodyType": { "type": "string", "enum": ["none", "json", "text", "xml", "html", "form", "urlencoded", "binary", "graphql"] },
         "rawBodyType": { "type": "string", "enum": ["text", "json", "html", "xml"] },
         "bodyContent": { "type": "string" },
@@ -232,7 +221,7 @@
         "bodyFileName": { "type": "string" },
         "formRows": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
+          "items": { "$ref": "#/definitions/kvRow" }
         },
         "graphqlSchema": { "type": "string" },
         "preRequestScript": { "type": "string" },
@@ -240,25 +229,25 @@
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },
         "requestNotes": { "type": "string" },
-        "settings": { "$ref": "#/$defs/requestSettings" },
+        "settings": { "$ref": "#/definitions/requestSettings" },
         "settingsOverrides": {
           "type": "object",
           "additionalProperties": { "type": "boolean" }
         },
         "sioEvents": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
+          "items": { "$ref": "#/definitions/kvRow" }
         },
         "sioEventName": { "type": "string" },
         "sioArgs": {
           "type": "array",
-          "items": { "$ref": "#/$defs/sioArg" }
+          "items": { "$ref": "#/definitions/sioArg" }
         },
         "sioAck": { "type": "boolean" },
         "grpcMethod": { "type": "string" },
         "grpcMetadata": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
+          "items": { "$ref": "#/definitions/kvRow" }
         },
         "grpcUseReflection": { "type": "boolean" },
         "grpcProtoFilePath": { "type": "string" },
@@ -266,26 +255,22 @@
         "grpcProtoImportPaths": {
           "type": "array",
           "items": { "type": "string" }
-        },
-        "createdAt": { "$ref": "#/$defs/timestamp" },
-        "updatedAt": { "$ref": "#/$defs/timestamp" }
+        }
       }
     },
     "environment": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "workspaceId", "name", "filesystemName", "values"],
+      "required": ["id"],
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
-        "workspaceId": { "$ref": "#/$defs/id" },
+        "id": { "$ref": "#/definitions/id" },
+        "workspaceId": { "$ref": "#/definitions/id" },
         "name": { "type": "string" },
-        "filesystemName": { "$ref": "#/$defs/filesystemName" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "values": {
           "type": "array",
-          "items": { "$ref": "#/$defs/kvRow" }
-        },
-        "createdAt": { "$ref": "#/$defs/timestamp" },
-        "updatedAt": { "$ref": "#/$defs/timestamp" }
+          "items": { "$ref": "#/definitions/kvRow" }
+        }
       }
     },
     "rootFile": {
@@ -293,11 +278,11 @@
       "additionalProperties": false,
       "required": ["version", "format", "workspaceOrder"],
       "properties": {
-        "version": { "$ref": "#/$defs/fileVersion" },
+        "version": { "$ref": "#/definitions/fileVersion" },
         "format": { "type": "string", "const": "kurlo.workspace.yaml.v1" },
         "workspaceOrder": {
           "type": "array",
-          "items": { "$ref": "#/$defs/id" }
+          "items": { "$ref": "#/definitions/id" }
         }
       }
     },
@@ -306,11 +291,26 @@
       "additionalProperties": false,
       "required": ["version", "workspace"],
       "properties": {
-        "version": { "$ref": "#/$defs/fileVersion" },
-        "workspace": { "$ref": "#/$defs/workspace" },
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "workspace": { "$ref": "#/definitions/workspace" },
         "collectionOrder": {
           "type": "array",
-          "items": { "$ref": "#/$defs/id" }
+          "items": { "$ref": "#/definitions/id" }
+        },
+        "cookies": {
+          "type": "array",
+          "description": "Cookies kept for this workspace. Values that are secrets are stored as {{kurloSecret:...}} placeholders.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "value": { "type": "string" },
+              "domain": { "type": "string" },
+              "path": { "type": "string" }
+            }
+          }
         }
       }
     },
@@ -319,11 +319,11 @@
       "additionalProperties": false,
       "required": ["version", "collection"],
       "properties": {
-        "version": { "$ref": "#/$defs/fileVersion" },
-        "collection": { "$ref": "#/$defs/collection" },
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "collection": { "$ref": "#/definitions/collection" },
         "requestOrder": {
           "type": "array",
-          "items": { "$ref": "#/$defs/id" }
+          "items": { "$ref": "#/definitions/id" }
         }
       }
     },
@@ -332,9 +332,9 @@
       "additionalProperties": false,
       "required": ["version", "request"],
       "properties": {
-        "version": { "$ref": "#/$defs/fileVersion" },
-        "order": { "$ref": "#/$defs/order" },
-        "request": { "$ref": "#/$defs/request" }
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "request": { "$ref": "#/definitions/request" }
       }
     },
     "environmentFile": {
@@ -342,29 +342,28 @@
       "additionalProperties": false,
       "required": ["version", "environment"],
       "properties": {
-        "version": { "$ref": "#/$defs/fileVersion" },
-        "order": { "$ref": "#/$defs/order" },
-        "environment": { "$ref": "#/$defs/environment" }
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "environment": { "$ref": "#/definitions/environment" }
       }
     },
     "example": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "name", "response"],
-      "description": "A saved response paired with the request snapshot that produced it. Stored under collections/<collection>/examples/<request filesystemName>/, one file per example, with the response body in a sibling file.",
+      "required": ["id"],
+      "description": "A saved response paired with the request snapshot that produced it. Stored under collections/<collection>/examples/<request filesystemName>/, one file per example, with the response body inside it.",
       "properties": {
-        "id": { "$ref": "#/$defs/id" },
+        "id": { "$ref": "#/definitions/id" },
         "requestId": {
-          "$ref": "#/$defs/id",
+          "$ref": "#/definitions/id",
           "description": "The request this example belongs to. The directory name locates it; this re-links it when the request file is renamed."
         },
         "name": { "type": "string" },
-        "filesystemName": { "$ref": "#/$defs/filesystemName" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "source": {
           "type": "string",
           "enum": ["captured", "manual", "openapi", "postman"]
         },
-        "createdAt": { "$ref": "#/$defs/timestamp" },
         "notes": { "type": "string" },
         "snapshot": {
           "type": "object",
@@ -373,8 +372,8 @@
           "properties": {
             "method": { "type": "string" },
             "url": { "type": "string" },
-            "params": { "type": "array", "items": { "$ref": "#/$defs/kvRow" } },
-            "headers": { "type": "array", "items": { "$ref": "#/$defs/kvRow" } },
+            "params": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } },
+            "headers": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } },
             "bodyType": { "type": "string" },
             "bodyContent": { "type": "string" }
           }
@@ -386,11 +385,12 @@
           "properties": {
             "statusCode": { "type": "integer" },
             "status": { "type": "string" },
-            "headers": { "type": "array", "items": { "$ref": "#/$defs/kvRow" } },
+            "headers": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } },
             "bodyMediaType": { "type": "string" },
+            "body": { "type": "string", "description": "The response body, stored byte for byte." },
             "bodyFile": {
               "type": "string",
-              "description": "Plain file name, in the same directory as this file. A path separator is refused on load.",
+              "description": "Older layout: plain file name of the body, in the same directory as this file. Read on load and replaced by body on the next save. A path separator is refused.",
               "pattern": "^[^/\\\\]+$"
             },
             "durationMs": { "type": "number", "minimum": 0 }
@@ -415,9 +415,9 @@
       "additionalProperties": false,
       "required": ["version", "example"],
       "properties": {
-        "version": { "$ref": "#/$defs/fileVersion" },
-        "order": { "$ref": "#/$defs/order" },
-        "example": { "$ref": "#/$defs/example" }
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "example": { "$ref": "#/definitions/example" }
       }
     }
   },

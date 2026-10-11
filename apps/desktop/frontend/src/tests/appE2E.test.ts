@@ -187,6 +187,7 @@ class TestApp {
   environments: Environment[] = [];
   globalVariables: KVRow[] = [];
   requests: SavedRequest[] = [];
+  get requestsById() { return new Map(this.requests.map(request => [request.id, request])); }
   requestHistory: RequestHistoryEntry[] = [];
   workspaceCookies: Record<string, CookieJarEntry[]> = {};
   cookies: CookieJarEntry[] = [];

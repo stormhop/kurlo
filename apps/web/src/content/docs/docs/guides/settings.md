@@ -87,18 +87,11 @@ The current command list and default bindings are documented in [Keyboard shortc
 
 ## Updates
 
-Release builds can:
+Updates live in the **About** tab, under the version. The first row shows the current state and one action: **Check for updates**, **Install**, **Restart now**, or **Try again** after an error. When a new release is found, its notes appear below the list.
 
-1. Check for an update.
-2. Show release notes.
-3. Download and install the selected build.
-4. Restart Kurlo to apply it.
+When the background check finds a release, a notice in the lower-right corner says so; **View** opens the **About** tab.
 
-When the background check finds a release, a notice in the lower-right corner says so; **View** opens this tab, where the new version's notes are shown and **Install update** downloads it.
-
-Development builds created with `make dev` or `go run` do not use the release updater.
-
-The **About** tab also has **Automatically install updates**. When enabled, Kurlo performs the background check, installs a discovered release, and asks you to restart. The setting is disabled in development builds.
+**Install updates automatically** installs a discovered release in the background, then asks you to restart. Development builds created with `make dev` or `go run` do not use the release updater, so both controls are off there.
 
 ## What's new
 

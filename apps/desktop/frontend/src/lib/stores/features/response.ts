@@ -1,4 +1,4 @@
-import { openFileDialog, readTextFile, saveFileDialog } from '../../backend';
+import { openFileDialog, readTextFile, saveFileDialog, saveResponseBody } from '../../backend';
 import { emptyHttpResponse } from '../../wire';
 import type { HttpResponse, ScriptResult } from '../../backend';
 import { countMatchesAsync, shouldVirtualizeResponseBody } from '../../response-render';
@@ -389,6 +389,15 @@ export const responseFeature = {
 
   async saveResponseFile(this: ResponseHost) {
     if (!this.response) return;
+    if (this.response.bodyIsBinary) {
+      const result = await saveResponseBody(this.activeRequestId, 'response');
+      if (result.error) this.requestError = result.error;
+      if (result.savedPath) {
+        this.savedResponse = true;
+        setTimeout(() => (this.savedResponse = false), 1600);
+      }
+      return;
+    }
     const ext = this.isJsonResponse() ? 'json' : this.isHtmlResponse() ? 'html' : 'txt';
     const path = await saveFileDialog(`response.${ext}`, this.response.body);
     if (path) {

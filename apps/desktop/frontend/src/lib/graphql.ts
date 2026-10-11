@@ -359,6 +359,23 @@ function parseSDLArgs(source: string): GraphQLExplorerArg[] {
   return args;
 }
 
+function matchingBraceIndex(source: string, start: number): number {
+  let depth = 1;
+  let quote = '';
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index];
+    if (quote) {
+      if (char === '\\') index += 1;
+      else if (char === quote) quote = '';
+      continue;
+    }
+    if (char === '"') quote = char;
+    else if (char === '{') depth += 1;
+    else if (char === '}' && --depth === 0) return index;
+  }
+  return source.length;
+}
+
 function parseSDLSchema(source: string): { queryType: string; types: TypeMap } | null {
   const clean = stripDescriptionBlocks(source)
     .replace(/#[^\n]*/g, '')
@@ -371,12 +388,15 @@ function parseSDLSchema(source: string): { queryType: string; types: TypeMap } |
   for (const scalar of clean.matchAll(/\bscalar\s+([_A-Za-z][_0-9A-Za-z]*)/g)) scalarTypes.add(scalar[1]);
   const enumTypes = new Set<string>();
   for (const enumMatch of clean.matchAll(/\benum\s+([_A-Za-z][_0-9A-Za-z]*)\s*\{/g)) enumTypes.add(enumMatch[1]);
-  const typeRe = /\b(type|interface)\s+([_A-Za-z][_0-9A-Za-z]*)[^{]*\{([\s\S]*?)\}/g;
+  const typeRe = /\b(type|interface)\s+([_A-Za-z][_0-9A-Za-z]*)[^{]*\{/g;
   let match: RegExpExecArray | null;
   while ((match = typeRe.exec(clean))) {
     const kind = match[1] === 'interface' ? 'INTERFACE' : 'OBJECT';
     const name = match[2];
-    const body = match[3];
+    const bodyStart = typeRe.lastIndex;
+    const bodyEnd = matchingBraceIndex(clean, bodyStart);
+    const body = clean.slice(bodyStart, bodyEnd);
+    typeRe.lastIndex = bodyEnd + 1;
     const fields: TypeField[] = [];
     const fieldRe = /(?:^|\n)\s*([_A-Za-z][_0-9A-Za-z]*)\s*(\([^)]*\))?\s*:\s*([^@\n]+)/g;
     let fieldMatch: RegExpExecArray | null;

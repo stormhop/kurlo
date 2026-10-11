@@ -272,6 +272,38 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       }
     }
 
+    async function slowResponse(req, sequence) {
+      const url = new URL(req.url);
+      for (const param of req.params || []) {
+        if (param.enabled !== false && param.key) url.searchParams.append(param.key, param.value);
+      }
+      const delays = (url.searchParams.get('ms') || '300').split(',').map(Number);
+      const delay = delays[(sequence - 1) % delays.length];
+      state.pendingCancels = state.pendingCancels || {};
+      const cancelled = await new Promise(resolve => {
+        const timer = setTimeout(() => resolve(false), delay);
+        const cancelLag = Number(url.searchParams.get('cancelLag') || 0);
+        state.pendingCancels[req.requestId] = () => { clearTimeout(timer); setTimeout(() => resolve(true), cancelLag); };
+      });
+      const empty = { logs: [], tests: [] };
+      if (cancelled) {
+        return { statusCode: 0, status: '', body: '', headers: [], duration: 0, size: 0, timings: {}, preRequestResult: empty, testResult: empty, connection: {}, error: 'Request canceled' };
+      }
+      const environmentUpdates = {};
+      for (const pair of url.searchParams.getAll('setenv')) {
+        const [key, value] = pair.split(':');
+        environmentUpdates[key] = value;
+        state.environment = { ...state.environment, [key]: value };
+      }
+      const body = JSON.stringify({ sequence, host: url.host });
+      return {
+        statusCode: 200, status: '200 OK', body,
+        headers: [{ key: 'Content-Type', value: 'application/json', enabled: true }],
+        duration: delay, size: body.length, timings: {}, preRequestResult: empty, testResult: empty, connection: {},
+        ...(Object.keys(environmentUpdates).length ? { environmentUpdates } : {}),
+      };
+    }
+
     function materializeTemplates(req) {
       if (!req.resolveTemplates) return req;
       const values = req.templateValues || {};
@@ -314,6 +346,22 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
 
     function jsonResponse(req) {
       const isGraphQL = req.bodyType === 'graphql' || req.url.includes('/graphql');
+      if (req.url.includes('/huge-response')) {
+        const line = '{"id":1234567,"name":"Заказ 🚀","note":"lorem ipsum dolor sit amet"},\n';
+        const body = line.repeat(Math.ceil(104857600 / line.length)).slice(0, 104857600);
+        return {
+          statusCode: 200, status: '200 OK', body,
+          headers: [{ key: 'Content-Type', value: 'text/plain', enabled: true }],
+          duration: 900, size: body.length, timings: {}, preRequestResult: { logs: [], tests: [] }, testResult: { logs: [], tests: [] }, connection: {},
+        };
+      }
+      if (req.url.includes('/binary-response')) {
+        return {
+          statusCode: 200, status: '200 OK', body: '', bodyOmitted: true, bodyIsBinary: true, bodySniffedType: 'application/zip',
+          headers: [{ key: 'Content-Type', value: 'application/octet-stream', enabled: true }],
+          duration: 12, size: 104857600, timings: {}, preRequestResult: { logs: [], tests: [] }, testResult: { logs: [], tests: [] }, connection: {},
+        };
+      }
       if (req.url.includes('/large-response')) {
         const bodyText = largeResponseBody || JSON.stringify({
           Status: 0,
@@ -392,7 +440,10 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
     const app = {
       AppInfo: async () => ({ name: 'Kurlo', version: 'dev', runtime, goVersion: 'e2e' }),
       LoadWorkspaceDiagnostics: async () => [],
-      LoadRequestStore: async () => JSON.stringify(state.store),
+      LoadRequestStore: async () => {
+        if (state.perfStoreUrl) return await (await fetch(state.perfStoreUrl)).text();
+        return JSON.stringify(state.store);
+      },
       AckQuit: async () => {
         state.calls.push('AckQuit');
       },
@@ -441,7 +492,12 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       SendRequest: async (sent) => {
         const req = materializeTemplates(sent);
         state.sentRequests.push(clone(req));
+        if (req.url.includes('/slow')) return slowResponse(req, state.sentRequests.length);
         return jsonResponse(req);
+      },
+      SaveResponseBody: async (requestId, defaultName) => {
+        state.calls.push(`SaveResponseBody:${requestId}:${defaultName}`);
+        return { savedPath: '/tmp/response.zip' };
       },
       SendRequestToFile: async (req, defaultName) => {
         const response = await app.SendRequest(req);
@@ -653,6 +709,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       },
       CancelRequest: async (requestId) => {
         state.calls.push(`cancel:${requestId}`);
+        state.pendingCancels?.[requestId]?.();
       },
       SaveFileDialog: async (name, content) => {
         const path = `/tmp/kurlo-e2e-${state.savedFiles.length + 1}-${name}`;
@@ -735,6 +792,10 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         return { cookies: next, error: '' };
       },
       CookieSyncStatus: async () => clone(state.cookieSync),
+      InstallBrowserExtension: async (browser) => {
+        state.calls.push(`InstallBrowserExtension:${browser}`);
+        return { browser, version: '2.5.0', path: `/Users/e2e/Library/Application Support/Kurlo/browser-extension/${browser}` };
+      },
       StartCookieSync: async (config, workspaceId) => {
         state.cookieSyncWorkspace = workspaceId;
         state.cookieSync = {
@@ -1784,7 +1845,7 @@ test.describe('Kurlo desktop browser E2E', () => {
       } catch (err) { console.log('docs screenshot settings-general/search skipped:', err); }
       try { await page.getByRole('tab', { name: 'Theme', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-theme'); } catch (err) { console.log('docs screenshot settings-theme skipped:', err); }
       try { await page.getByRole('tab', { name: 'Shortcuts', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-shortcuts'); } catch (err) { console.log('docs screenshot settings-shortcuts skipped:', err); }
-      try { await page.getByRole('tab', { name: 'Updates', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-updates-dev'); } catch (err) { console.log('docs screenshot settings-updates-dev skipped:', err); }
+      try { await page.getByRole('tab', { name: 'About', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-updates-dev'); } catch (err) { console.log('docs screenshot settings-updates-dev skipped:', err); }
       try { await page.getByRole('tab', { name: 'About', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-about'); } catch (err) { console.log('docs screenshot settings-about skipped:', err); }
     }
     await page.getByRole('tab', { name: 'Proxy', exact: true }).click();
@@ -2378,6 +2439,239 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(calls[commitIndex]).toBe('GitCommitWorkspace:Update the login request');
     expect(saveIndex).toBeGreaterThan(-1);
     expect(saveIndex).toBeLessThan(commitIndex);
+  });
+
+  for (const layout of [{ width: 1500, scale: 1 }, { width: 1000, scale: 1.25 }]) {
+    test(`Git panel keeps workspace issues, history and output readable at ${layout.width}px and ${layout.scale} scale`, async ({ page }) => {
+      await page.setViewportSize({ width: layout.width, height: 780 });
+      await installKurloBridge(page);
+      await page.addInitScript(scale => localStorage.setItem('kurlo.uiScale.v1', String(scale)), layout.scale);
+      await page.goto('/');
+      await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
+      await setGitStatus(page, {
+        isRepo: true, root: '/workspace', workspaceRoot: '/workspace',
+        branch: 'main', head: 'a1b2c3d', upstream: 'origin/main', remotes: ['origin'],
+        clean: false,
+        files: [{ path: 'workspaces/Main/collections/API/examples/Login/403.body.txt', index: '?', worktree: '?', status: 'untracked' }],
+      });
+      await page.evaluate(() => {
+        const app = window.go.api.App;
+        app.LoadWorkspaceDiagnostics = async () => [
+          {
+            scope: 'store', severity: 'error', blocking: true, path: 'workspaces/Main/collections/HB-copy/collection.yml',
+            message: 'This collection has the same id "collection-fb71d1c7-ca15-45e0-bb05-e127ac36fa75" as workspaces/Main/collections/HB/collection.yml, so the folder looks like a copy. Give the copy and everything inside it new ids, or remove it.',
+          },
+          {
+            scope: 'store', severity: 'error', blocking: true, path: 'workspaces/Main/collections/API/collection.yml',
+            message: 'collection.yml is missing but its child files remain. Restore the collection file before saving.',
+          },
+        ];
+        app.GitCommitLogPage = async (limit, offset) => ({
+          git: await app.GitStatus(), limit, offset, hasMore: false, error: '', output: '',
+          commits: Array.from({ length: 12 }, (_, index) => ({
+            hash: `commit-${index}`, shortHash: `hash-${index}`, author: 'Workspace author',
+            date: '2026-10-06', message: index ? 'Update workspace files' : 'Restore original workspace ID',
+          })),
+        });
+        app.GitPullWorkspaceWithStrategy = async () => ({
+          ok: true, root: '/workspace', payload: JSON.stringify(window.__kurloE2E.store),
+          git: await app.GitStatus(), diagnostics: await app.LoadWorkspaceDiagnostics(),
+          missingSecrets: [], error: '',
+          output: 'Updating 2e346da..55a5b55\nFast-forward\nworkspaces/Main/workspace.yml | 2 +-\n1 file changed, 1 insertion(+), 1 deletion(-)',
+        });
+      });
+      await openGitPanel(page);
+      await page.getByRole('button', { name: 'Pull', exact: true }).click();
+      await expect(page.locator('.git-yaml-card')).toContainText('2 workspace files need fixing');
+      await expect(page.locator('.git-yaml-row')).toHaveCount(2);
+      await expect(page.locator('.git-yaml-row').first()).toContainText('collections/HB-copy');
+      await expect(page.getByRole('button', { name: 'Commit all', exact: true })).toBeDisabled();
+      expect(await page.locator('.git-layout').evaluate(grid => getComputedStyle(grid).borderTopWidth)).toBe('1px');
+      await page.getByRole('tab', { name: 'History' }).click();
+
+      await expect.poll(() => page.locator('.git-workspace').evaluate(panel => {
+        const card = panel.querySelector<HTMLElement>('.git-yaml-card')!;
+        const grid = panel.querySelector<HTMLElement>('.git-layout')!;
+        const toolbar = panel.querySelector<HTMLElement>('.git-toolbar')!;
+        const content = panel.querySelector<HTMLElement>('.git-content')!;
+        const rows = [...panel.querySelectorAll<HTMLElement>('.git-commit-row')];
+        const diagnostics = [...panel.querySelectorAll<HTMLElement>('.git-yaml-row')];
+        return grid.getBoundingClientRect().top >= card.getBoundingClientRect().bottom - 1
+          && toolbar.scrollWidth <= toolbar.clientWidth + 1
+          && content.scrollWidth <= content.clientWidth + 1
+          && rows.length > 1
+          && rows.every(row => row.querySelector('span')!.getBoundingClientRect().bottom <= row.getBoundingClientRect().bottom + 1)
+          && rows.slice(1).every((row, index) => row.getBoundingClientRect().top >= rows[index].getBoundingClientRect().bottom - 1)
+          && diagnostics.every(row => {
+            const edit = row.querySelector('button')!.getBoundingClientRect();
+            const bounds = row.getBoundingClientRect();
+            return row.scrollWidth <= row.clientWidth + 1 && edit.right <= bounds.right && edit.bottom <= bounds.bottom;
+          });
+      })).toBe(true);
+
+      await page.getByRole('tab', { name: /Changes/ }).click();
+      await expect(page.locator('.git-commit-list')).toHaveCount(0);
+      await expect(page.locator('.git-file-row')).toHaveCount(1);
+      await page.getByRole('tab', { name: 'History' }).click();
+      await expect(page.locator('.git-commit-list')).toBeVisible();
+      await expect(page.locator('.git-output-log')).toHaveCount(0);
+      await page.getByRole('button', { name: 'More Git actions' }).click();
+      await page.getByRole('menuitem', { name: 'Show Git output' }).click();
+      const outputDialog = page.getByRole('dialog');
+      await expect(outputDialog.getByRole('heading', { name: 'Git output' })).toBeVisible();
+      await expect(outputDialog.locator('.git-output-log')).toContainText('Fast-forward');
+      await outputDialog.getByRole('button', { name: 'Close Git output' }).click();
+      await expect(page.locator('.git-output-log')).toHaveCount(0);
+    });
+  }
+
+  test('Git branch picker lists each branch once and keeps remote actions on the tracking branch', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 820 });
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
+    await setGitStatus(page, {
+      isRepo: true, root: '/workspace', workspaceRoot: '/workspace',
+      branch: 'main', head: 'a1b2c3d', upstream: 'origin/main', remotes: ['origin'], clean: true, files: [],
+    });
+    await setGitBranches(page, {
+      ok: true, git: {}, current: 'main', error: '', output: '',
+      localBranches: [
+        { name: 'main', fullName: 'main', remote: '', current: true, upstream: 'origin/main' },
+        { name: 'feature', fullName: 'feature', remote: '', current: false, upstream: 'origin/feature' },
+        { name: 'stale', fullName: 'stale', remote: '', current: false, upstream: 'origin/stale' },
+      ],
+      remoteBranches: [
+        { name: 'main', fullName: 'origin/main', remote: 'origin', current: false, upstream: '' },
+        { name: 'feature', fullName: 'origin/feature', remote: 'origin', current: false, upstream: '' },
+        { name: 'release', fullName: 'origin/release', remote: 'origin', current: false, upstream: '' },
+      ],
+    });
+    await openGitPanel(page);
+    await page.locator('.git-branch-chip').click();
+    const picker = page.getByRole('dialog', { name: 'Switch branch' });
+    const rows = picker.locator('.git-branch-row');
+    await expect(rows).toHaveCount(4);
+    await expect(rows.first()).toHaveAttribute('aria-current', 'true');
+    await expect(rows.first()).toContainText('origin/main');
+    await expect(picker.locator('.git-branch-row', { hasText: 'stale' })).toContainText('gone');
+    await expect(picker.locator('.git-branch-row', { hasText: 'release' })).toContainText('remote only');
+    await expect(picker.locator('.git-branch-popover-foot')).toHaveCount(0);
+
+    await picker.getByRole('button', { name: 'Actions for feature' }).click();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem', { name: 'Delete from origin' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Rename on origin' })).toBeVisible();
+    await picker.getByRole('button', { name: 'Actions for feature' }).click();
+    await expect(menu).toHaveCount(0);
+
+    await picker.getByLabel('Filter branches').fill('rele');
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText('origin/release');
+  });
+
+  test('Git changes and history share the left panel and a commit opens in the diff', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 820 });
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
+    await setGitStatus(page, {
+      isRepo: true, root: '/workspace', workspaceRoot: '/workspace',
+      branch: 'main', head: 'a1b2c3d', upstream: 'origin/main', remotes: ['origin'], clean: false,
+      files: [{ path: 'kurlo.yml', index: ' ', worktree: 'M', status: 'modified', managed: true }],
+    });
+    await page.evaluate(() => {
+      const app = window.go.api.App;
+      app.GitCommitLogPage = async (limit, offset) => ({
+        git: await app.GitStatus(), limit, offset, hasMore: false, error: '', output: '',
+        commits: [{ hash: 'abc1234def', shortHash: 'abc1234', author: 'Evgeny', date: '2026-10-06', message: 'Restore original workspace ID' }],
+      });
+      app.GitCommitDiff = async (hash) => ({ path: hash, diff: '@@ -1 +1 @@\n-old\n+new', stagedDiff: '', unstagedDiff: '', binary: false, truncated: false, error: '' });
+    });
+    await openGitPanel(page);
+    await expect(page.locator('.git-layout > *')).toHaveCount(2);
+    await expect(page.getByText('Clean', { exact: true })).toHaveCount(0);
+    const changes = page.getByRole('tab', { name: /Changes/ });
+    await expect(changes).toHaveAttribute('aria-selected', 'true');
+    await expect(changes).toContainText('1');
+    await page.getByRole('tab', { name: 'History' }).click();
+    await expect(page.locator('.git-history')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Refresh commit history' })).toHaveCount(0);
+    await page.locator('.git-commit-row').first().click();
+    await expect(page.locator('.git-diff .git-panel-title')).toContainText('Restore original workspace ID');
+    await expect(page.locator('.git-diff .git-panel-title')).toContainText('abc1234 · Evgeny');
+  });
+
+  test('Git panel shows a pulled syntax error in a workspace that is not open', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
+    await setGitStatus(page, {
+      isRepo: true, root: '/workspace', workspaceRoot: '/workspace',
+      branch: 'main', head: 'a665a49', upstream: 'origin/main', remotes: ['origin'], clean: true, files: [],
+    });
+    await page.evaluate(() => {
+      const app = window.go.api.App;
+      app.LoadWorkspaceDiagnostics = async () => [{
+        scope: 'workspace', severity: 'error', blocking: true, path: 'workspaces/My-Workspace/workspace.yml',
+        line: 5, message: "line 5: could not find expected ':'",
+      }];
+      app.GitPullWorkspaceWithStrategy = async () => ({
+        ok: true, root: '/workspace', payload: JSON.stringify(window.__kurloE2E.store),
+        git: await app.GitStatus(), diagnostics: await app.LoadWorkspaceDiagnostics(),
+        missingSecrets: [], error: '', output: '',
+      });
+    });
+    await openGitPanel(page);
+    await page.getByRole('button', { name: 'Pull', exact: true }).click();
+    const row = page.locator('.git-yaml-row');
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText('workspace.yml:5');
+    await expect(row).toContainText('Workspace “My Workspace” stays locked until this is fixed');
+    await expect(page.locator('.git-yaml-card')).toContainText('1 workspace file could not be loaded');
+  });
+
+  test('Git history loads older commits while scrolling a 5000-commit repository', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
+    await setGitStatus(page, {
+      isRepo: true, root: '/workspace', workspaceRoot: '/workspace',
+      branch: 'main', head: 'c0', upstream: 'origin/main', remotes: ['origin'], clean: true, files: [],
+    });
+    await page.evaluate(() => {
+      const app = window.go.api.App;
+      const total = 5000;
+      const calls: number[] = [];
+      (window as unknown as { __logCalls: number[] }).__logCalls = calls;
+      app.GitCommitLogPage = async (limit: number, offset: number) => {
+        calls.push(offset);
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const end = Math.min(total, offset + limit);
+        return {
+          git: await app.GitStatus(), limit, offset, hasMore: end < total, error: '', output: '',
+          commits: Array.from({ length: end - offset }, (_, index) => ({
+            hash: `c${offset + index}`, shortHash: `c${offset + index}`, author: 'Author',
+            date: '2026-10-06', message: `Commit ${offset + index}`,
+          })),
+        };
+      };
+    });
+    await openGitPanel(page);
+    await page.getByRole('tab', { name: 'History' }).click();
+    const list = page.locator('.git-commit-list');
+    await expect(list.locator('.git-commit-row').first()).toContainText('Commit 0');
+    const loadedOffsets = () => page.evaluate(() => (window as unknown as { __logCalls: number[] }).__logCalls.filter(offset => offset > 0));
+
+    await list.evaluate(element => element.scrollTo(0, element.scrollHeight));
+    await expect(page.getByRole('button', { name: 'Loading older commits' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Fetch', exact: true })).toBeEnabled();
+    await expect.poll(loadedOffsets).toEqual([60]);
+    await expect(page.getByRole('button', { name: 'Load more' })).toBeVisible();
+
+    await list.evaluate(element => element.scrollTo(0, element.scrollHeight));
+    await expect.poll(loadedOffsets).toEqual([60, 120]);
+    expect(await list.locator('.git-commit-row').count()).toBeLessThan(60);
   });
 
   test('recovers a missing workspace folder by switching back to app storage', async ({ page }) => {
@@ -3301,22 +3595,474 @@ test.describe('Windows app package updates', () => {
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls)).toContain(`open:${msixUrl}`);
 
     await page.getByLabel('Settings', { exact: true }).click();
-    await page.getByRole('tab', { name: 'Updates', exact: true }).click();
-    const updates = page.locator('#settings-panel-updates');
-    await expect(updates).toContainText('Version 2.1.0 is available');
-    await expect(updates).toContainText('Windows app package');
-    await expect(updates).toContainText('Packaged installs update cleanly');
-    await expect(updates.getByRole('button', { name: 'Install update' })).toHaveCount(0);
-    await updates.getByRole('button', { name: 'Download update' }).click();
+    await page.getByRole('tab', { name: 'About', exact: true }).click();
+    const about = page.locator('#settings-panel-about');
+    await expect(about).toContainText('Kurlo 2.1.0 is available');
+    await expect(about).toContainText('.msix');
+    await expect(about).toContainText('Packaged installs update cleanly');
+    await expect(about.getByRole('button', { name: 'Install', exact: true })).toHaveCount(0);
+    await about.getByRole('button', { name: 'Download', exact: true }).click();
     await expect.poll(async () => (await page.evaluate(() => window.__kurloE2E.calls)).filter((call: string) => call === `open:${msixUrl}`).length).toBe(2);
 
-    await page.getByRole('tab', { name: 'About', exact: true }).click();
-    const autoInstall = page.getByLabel('Automatically install updates').locator('input');
+    const autoInstall = page.getByLabel('Install updates automatically').locator('input');
     await expect(autoInstall).toBeDisabled();
     await expect(autoInstall).not.toBeChecked();
-    await expect(page.locator('#settings-panel-about')).toContainText('installed from the Windows app package');
+    await expect(about).toContainText('Not available for the Windows app package');
 
     const calls = await page.evaluate(() => window.__kurloE2E.calls);
     expect(calls).not.toContain('ApplyUpdate');
+  });
+});
+
+test.describe('Binary responses', () => {
+  test('keeps a binary body out of the window and saves it from Go', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/binary-response');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+    await expect(page.getByText('This response is binary')).toBeVisible();
+    await expect(page.getByText('Response body is empty')).toHaveCount(0);
+    await expect(page.getByText('application/zip, 100.00 MB.', { exact: false })).toBeVisible();
+    await page.locator('.response-binary-actions').getByRole('button', { name: 'Save to file' }).click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.calls as string[]).filter(call => call.startsWith('SaveResponseBody:')))).toHaveLength(1);
+    const calls = await page.evaluate(() => window.__kurloE2E.calls as string[]);
+    expect(calls.some(call => call === 'SaveFileDialog')).toBe(false);
+  });
+});
+
+test.describe('Huge responses', () => {
+  test('pages a 100 MB text response without freezing the window', async ({ page }) => {
+    test.setTimeout(120_000);
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(String(error)));
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/huge-response');
+    const started = Date.now();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByText('200 OK')).toBeVisible({ timeout: 60_000 });
+    const viewer = page.getByRole('textbox', { name: 'Response body', exact: true });
+    await expect(viewer.locator('.response-line').first()).toBeVisible({ timeout: 60_000 });
+    const shownMs = Date.now() - started;
+
+    await expect(page.getByText('Large response preview')).toBeVisible();
+    expect(await viewer.locator('.response-line').count()).toBeLessThan(200);
+
+    const pageStarted = Date.now();
+    await page.getByLabel('Next response page').click();
+    await expect(page.locator('.response-page-count')).toHaveText(/^2\//);
+    await expect(viewer.locator('.response-line').first()).toBeVisible();
+    const nextPageMs = Date.now() - pageStarted;
+
+    const probe = await page.evaluate(() => {
+      const started = performance.now();
+      return new Promise<number>(resolve => setTimeout(() => resolve(performance.now() - started), 0));
+    });
+
+    console.log(`huge response: shown ${shownMs}ms, next page ${nextPageMs}ms, event loop delay ${Math.round(probe)}ms`);
+    expect(pageErrors).toEqual([]);
+    expect(shownMs).toBeLessThan(15_000);
+    expect(nextPageMs).toBeLessThan(2_000);
+  });
+});
+
+test.describe('Cookie sync extension', () => {
+  test('sets the extension up from the app and flags an outdated one', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      (window as any).go.api.App.AppInfo = async () => ({ name: 'Kurlo', version: '2.5.0', runtime: 'darwin/e2e', goVersion: 'e2e' });
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+    const modal = page.getByRole('dialog', { name: 'Cookies' });
+    await modal.getByRole('tab', { name: /Sync cookies/i }).click();
+
+    await modal.getByRole('button', { name: 'Chrome, Edge, Brave' }).click();
+    await expect(modal.getByText('chrome://extensions')).toBeVisible();
+    await expect(modal.getByText(/Load unpacked/)).toBeVisible();
+    await expect(modal.locator('.cookie-sync-path')).toHaveText(/browser-extension\/chromium$/);
+    await expect(modal.getByText(/Version 2\.5\.0/)).toBeVisible();
+    expect(await page.evaluate(() => (window.__kurloE2E.calls as string[]).filter(call => call.startsWith('InstallBrowserExtension')))).toEqual(['InstallBrowserExtension:chromium']);
+
+    await page.evaluate(() => {
+      const state = window.__kurloE2E as any;
+      state.cookieSync = { ...state.cookieSync, enabled: true, running: true, paired: true, connected: true, browser: 'Chrome', extensionVersion: '1.0.0' };
+      state.emit('cookies:synced', state.cookieSync);
+    });
+    await expect(modal.getByText('The extension is older than Kurlo')).toBeVisible();
+    await expect(modal.getByText(/runs extension 1\.0\.0, Kurlo is 2\.5\.0/)).toBeVisible();
+    await modal.getByRole('button', { name: 'Refresh files' }).click();
+    expect(await page.evaluate(() => (window.__kurloE2E.calls as string[]).filter(call => call.startsWith('InstallBrowserExtension')))).toHaveLength(2);
+
+    await page.evaluate(() => {
+      const state = window.__kurloE2E as any;
+      state.cookieSync = { ...state.cookieSync, extensionVersion: '2.5.0' };
+      state.emit('cookies:synced', state.cookieSync);
+    });
+    await expect(modal.getByText('The extension is older than Kurlo')).toHaveCount(0);
+  });
+});
+
+test.describe('Protocol badge', () => {
+  test('stays as narrow as its label after the request is created', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const request = (id: string, requestType: string, url: string, method = 'GET') => ({ id, name: id, collectionId: 'collection-ef', collection: 'EF', folderPath: [], requestType, method, url });
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.collections = [{ id: 'collection-ef', workspaceId: 'workspace-e2e', name: 'EF', filesystemName: 'EF' }];
+      store.requests = [
+        request('http', 'http', 'https://api.example.test/'),
+        request('ws', 'ws', 'wss://echo.websocket.org'),
+        request('gql', 'graphql', 'https://countries.trevorblades.com/', 'POST'),
+        request('sio', 'socketio', 'https://api.example.test/'),
+      ];
+      store.activeId = 'http';
+      store.openIds = ['http', 'ws', 'gql', 'sio'];
+    });
+    await page.goto('/');
+    const widths: Record<string, number> = {};
+    for (const id of ['http', 'ws', 'gql', 'sio']) {
+      await page.getByRole('tab', { name: new RegExp(`\\b${id}$`) }).first().click();
+      const trigger = page.getByRole('button', { name: 'Method and protocol' });
+      await expect(trigger).toBeVisible();
+      widths[id] = Math.round((await trigger.boundingBox())!.width);
+    }
+    await page.getByRole('tab', { name: /\bws$/ }).first().click();
+    for (const type of ['WebSocket', 'Socket.IO', 'GraphQL']) {
+      await page.getByLabel('New unsaved request').click();
+      await chooseRequestType(page, type);
+      const trigger = page.getByRole('button', { name: 'Method and protocol' });
+      widths[`${type} draft`] = Math.round((await trigger.boundingBox())!.width);
+      await page.getByLabel('Request URL').fill(type === 'WebSocket' ? 'wss://echo.websocket.org' : 'https://api.example.test/');
+      widths[`${type} with url`] = Math.round((await trigger.boundingBox())!.width);
+      await page.keyboard.press(process.platform === 'darwin' ? 'Meta+s' : 'Control+s');
+      await page.waitForTimeout(300);
+      widths[`${type} saved`] = Math.round((await page.getByRole('button', { name: 'Method and protocol' }).boundingBox())!.width);
+    }
+    for (const [label, width] of Object.entries(widths)) expect(width, label).toBeLessThanOrEqual(widths.http + 24);
+    expect(widths.ws, 'a locked WS badge hugs its label').toBeLessThanOrEqual(56);
+  });
+});
+
+test.describe('GraphQL explorer', () => {
+  test('keeps every field row whole when the schema does not fit', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const fields = [
+        'continent(code: ID!): Continent',
+        'continents(filter: ContinentFilterInput = {}): [Continent!]!',
+        'countries(filter: CountryFilterInput = {}): [Country!]!',
+        'country(code: ID!): Country',
+        'language(code: ID!): Language',
+        'languages(filter: LanguageFilterInput = {}): [Language!]!',
+        ...Array.from({ length: 14 }, (_, index) => `extra${index}(id: ID!, first: Int = 10, after: String): [Country!]!`),
+      ];
+      const schema = `type Query {\n  ${fields.join('\n  ')}\n}\ntype Continent { code: ID! }\ntype Country { code: ID! }\ntype Language { code: ID! }`;
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.collections = [{ id: 'collection-ef', workspaceId: 'workspace-e2e', name: 'EF', filesystemName: 'EF' }];
+      store.requests = [{
+        id: 'req-countries', name: 'New Request', collectionId: 'collection-ef', collection: 'EF', folderPath: [],
+        requestType: 'graphql', method: 'POST', url: 'https://countries.trevorblades.com/', requestTab: 'query',
+        bodyType: 'graphql', bodyContent: JSON.stringify({ query: 'query {\n  continents {\n    code\n  }\n}', variables: {} }),
+        graphqlSchema: schema,
+      }];
+      store.activeId = 'req-countries';
+      store.openIds = ['req-countries'];
+    });
+    await page.setViewportSize({ width: 1100, height: 640 });
+    await page.goto('/');
+
+    const rows = page.locator('.graphql-explorer-field');
+    await expect(rows.first()).toBeVisible();
+    expect(await rows.count()).toBe(20);
+    const layout = await rows.evaluateAll(buttons => buttons.map(button => {
+      const box = button.getBoundingClientRect();
+      const args = button.querySelector('.graphql-field-args')?.getBoundingClientRect();
+      return { top: box.top, bottom: box.bottom, argsBottom: args?.bottom ?? box.top };
+    }));
+    for (let index = 0; index < layout.length; index += 1) {
+      expect(layout[index].argsBottom, `arguments of row ${index} stay inside it`).toBeLessThanOrEqual(layout[index].bottom + 0.5);
+      if (index) expect(layout[index].top, `row ${index} starts below row ${index - 1}`).toBeGreaterThanOrEqual(layout[index - 1].bottom - 0.5);
+    }
+    const clipped = await page.locator('.graphql-field-args, .graphql-field-name, .graphql-field-type').evaluateAll(elements => elements
+      .filter(element => element.scrollHeight > element.clientHeight + 1)
+      .map(element => `${element.className}: ${element.clientHeight}px of ${element.scrollHeight}px, line-height ${getComputedStyle(element).lineHeight}`));
+    expect(clipped, 'text lines are not cut vertically').toEqual([]);
+    const list = page.locator('.graphql-explorer-list');
+    expect(await list.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+  });
+});
+
+test.describe('Send races', () => {
+  async function openRequest(page: Page, url: string) {
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill(url);
+  }
+
+  test('twenty rapid Send clicks settle on the last send', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await openRequest(page, 'https://api.kurlo.test/slow?ms=600&cancelLag=200');
+
+    const send = page.locator('.send-split .btn-send');
+    for (let click = 0; click < 21; click += 1) await send.click({ delay: 0 });
+
+    await expect(send).toHaveText(/^Send/, { timeout: 10_000 });
+    const sent = await page.evaluate(() => (window.__kurloE2E.sentRequests as unknown[]).length);
+    expect(sent).toBe(11);
+    const viewer = page.getByRole('textbox', { name: 'Response body', exact: true });
+    await expect(viewer).toContainText(`"sequence": ${sent}`);
+    await page.waitForTimeout(600);
+    await expect(viewer).toContainText(`"sequence": ${sent}`);
+    await expect(page.getByText('Request canceled')).toHaveCount(0);
+    await expect(send).toHaveText(/^Send/);
+  });
+
+  test('Send, Cancel, Send keeps the spinner until the second answer', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await openRequest(page, 'https://api.kurlo.test/slow?ms=1500&cancelLag=500');
+
+    const send = page.locator('.send-split .btn-send');
+    await send.click();
+    await expect(send).toHaveText(/Cancel/);
+    await send.click();
+    await expect(send).toHaveText(/^Send/);
+    await send.click();
+    await expect(send).toHaveText(/Cancel/);
+    await page.waitForTimeout(300);
+    await expect(send).toHaveText(/Cancel/);
+    await expect(page.getByText('Request canceled')).toHaveCount(0);
+    const viewer = page.getByRole('textbox', { name: 'Response body', exact: true });
+    await expect(viewer).toContainText('"sequence": 2', { timeout: 5_000 });
+    await expect(send).toHaveText(/^Send/);
+  });
+
+  test('switching environment mid-request keeps script changes in the environment the request used', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const row = (key: string, value: string) => ({ id: `${key}-${value}`, key, value, enabled: true, description: '' });
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.environments = [
+        { id: 'env-a', workspaceId: 'workspace-e2e', name: 'Alpha', values: [row('host', 'a.kurlo.test')] },
+        { id: 'env-b', workspaceId: 'workspace-e2e', name: 'Beta', values: [row('host', 'b.kurlo.test'), row('only-b', 'yes')] },
+      ];
+      store.activeEnvironmentId = 'env-a';
+    });
+    await page.goto('/');
+    await openRequest(page, 'https://{{host}}/slow?ms=800&setenv=token:from-alpha');
+
+    await page.locator('.send-split .btn-send').click();
+    await page.locator('.environment-select').click();
+    await page.getByRole('button', { name: 'Beta' }).click();
+    await expect(page.locator('.environment-select')).toContainText('Beta');
+
+    await expect(page.getByRole('textbox', { name: 'Response body', exact: true })).toContainText('a.kurlo.test', { timeout: 5_000 });
+    await expect.poll(async () => page.evaluate(() => {
+      const stores = window.__kurloE2E.savedStores as Array<{ environments?: Array<{ id: string; values: Array<{ key: string; value: string }> }> }>;
+      const last = stores[stores.length - 1];
+      const values = (id: string) => Object.fromEntries((last?.environments?.find(env => env.id === id)?.values ?? []).filter(row => row.key).map(row => [row.key, row.value]));
+      return { alpha: values('env-a'), beta: values('env-b') };
+    })).toEqual({
+      alpha: { host: 'a.kurlo.test', token: 'from-alpha' },
+      beta: { host: 'b.kurlo.test', 'only-b': 'yes' },
+    });
+    expect(await page.evaluate(() => window.__kurloE2E.environment)).toEqual({ host: 'b.kurlo.test', 'only-b': 'yes' });
+  });
+
+  test('deleting a request while it is in flight does not bring it back', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.collections = [{ id: 'collection-race', workspaceId: 'workspace-e2e', name: 'Race', filesystemName: 'Race' }];
+      store.requests = [{ id: 'req-doomed', name: 'Doomed', collectionId: 'collection-race', collection: 'Race', folderPath: [], method: 'GET', url: 'https://api.kurlo.test/slow?ms=800' }];
+      store.activeId = 'req-doomed';
+      store.openIds = ['req-doomed'];
+    });
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(String(error)));
+    await page.goto('/');
+    await expect(page.getByLabel('Request URL')).toHaveValue('https://api.kurlo.test/slow?ms=800');
+
+    await page.locator('.send-split .btn-send').click();
+    const row = page.locator('.sidebar').getByText('Doomed', { exact: true }).first();
+    await row.hover();
+    await page.getByLabel('Request menu').first().click();
+    await page.locator('.request-menu').getByRole('button', { name: 'Delete' }).click();
+    const confirm = page.getByRole('dialog').getByRole('button', { name: /Delete/ });
+    if (await confirm.count()) await confirm.click();
+
+    await page.waitForTimeout(1_200);
+    const stored = await page.evaluate(() => {
+      const stores = window.__kurloE2E.savedStores as Array<{ requests: Array<{ id: string }> }>;
+      return stores[stores.length - 1]?.requests.map(request => request.id) ?? [];
+    });
+    expect(stored).not.toContain('req-doomed');
+    await expect(page.getByText('Doomed', { exact: true })).toHaveCount(0);
+    expect(pageErrors).toEqual([]);
+  });
+});
+
+test.describe('Scale', () => {
+  test('stays responsive with ten thousand requests, 200-deep folders and unicode names', async ({ page }) => {
+    test.setTimeout(180_000);
+    await installKurloBridge(page);
+    await page.addInitScript((total) => {
+      const deep = Array.from({ length: 200 }, (_, index) => `Уровень ${index} 📁`);
+      const requests = Array.from({ length: total }, (_, index) => ({
+        id: `big-${index}`,
+        name: index % 4 === 1 ? `Заказ №${index} 🚀 注文` : index % 4 === 2 ? `request-${index}` : 'New Request',
+        collectionId: 'collection-big',
+        collection: 'Big',
+        folderPath: index % 10 === 0 ? deep : [`Папка ${index % 50}`],
+        method: 'GET',
+        url: `https://api.example.test/items/${index}`,
+      }));
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.collections = [{ id: 'collection-big', workspaceId: 'workspace-e2e', name: 'Big', filesystemName: 'Big' }];
+      store.requests = requests;
+    }, Number(process.env.SCALE_N ?? 10_000));
+
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(String(error)));
+    const started = Date.now();
+    await page.goto('/');
+    await expect(collectionRow(page, 'Big')).toBeVisible({ timeout: 60_000 });
+    const firstPaint = Date.now() - started;
+
+    const searchStarted = Date.now();
+    await page.getByRole('textbox', { name: 'Filter requests' }).fill('Заказ №9997');
+    await expect(page.getByText('Заказ №9997 🚀 注文').first()).toBeVisible({ timeout: 30_000 });
+    const searchMs = Date.now() - searchStarted;
+
+    await page.getByText('Заказ №9997 🚀 注文').first().click();
+    const url = page.getByPlaceholder('Enter request URL or paste cURL…');
+    await expect(url).toHaveValue('https://api.example.test/items/9997');
+
+    const savesBefore = await page.evaluate(() => (window.__kurloE2E.savedStores as unknown[]).length);
+    const editStarted = Date.now();
+    await url.fill('https://api.example.test/edited');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.savedStores as unknown[]).length), { timeout: 30_000 }).toBeGreaterThan(savesBefore);
+    const saveMs = Date.now() - editStarted;
+
+    const saved = await page.evaluate(() => {
+      const stores = window.__kurloE2E.savedStores as Array<{ requests: Array<{ id: string; url: string; folderPath: string[] }> }>;
+      const last = stores[stores.length - 1];
+      return { count: last.requests.length, edited: last.requests.find(r => r.id === 'big-9997')?.url, depth: last.requests.find(r => r.id === 'big-0')?.folderPath.length };
+    });
+
+    console.log(`scale: first paint ${firstPaint}ms, search ${searchMs}ms, save ${saveMs}ms`);
+    expect(saved).toEqual({ count: 10_000, edited: 'https://api.example.test/edited', depth: 200 });
+    expect(pageErrors).toEqual([]);
+    expect(firstPaint).toBeLessThan(5_000);
+    expect(searchMs).toBeLessThan(2_000);
+    expect(saveMs).toBeLessThan(5_000);
+  });
+});
+
+
+test.describe('Perf fixtures', () => {
+  const fixtures = process.env.KURLO_PERF_FIXTURES ?? '';
+  test.skip(!fixtures, 'set KURLO_PERF_FIXTURES to the generated perf/fixtures folder');
+
+  test('stays responsive on the generated perf fixtures', async ({ page }) => {
+    test.setTimeout(240_000);
+    const { readFile } = await import('node:fs/promises');
+    const storeBody = await readFile(`${fixtures}/request-store-large.json`, 'utf8');
+    const hugeBody = await readFile(`${fixtures}/huge-response.json`, 'utf8');
+    await page.route('**/__perf/store.json', route => route.fulfill({ body: storeBody, contentType: 'application/json' }));
+    await page.route('**/__perf/huge.json', route => route.fulfill({ body: hugeBody, contentType: 'application/json' }));
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      (window.__kurloE2E as Record<string, unknown>).perfStoreUrl = '/__perf/store.json';
+    });
+    const pageErrors: string[] = [];
+    page.on('pageerror', error => pageErrors.push(String(error)));
+
+    const timings: Record<string, number> = {};
+    const time = async (label: string, step: () => Promise<void>) => {
+      const started = Date.now();
+      await step();
+      timings[label] = Date.now() - started;
+    };
+
+    const cdp = process.env.KURLO_PERF_PROFILE ? await page.context().newCDPSession(page) : null;
+    if (cdp) {
+      await cdp.send('Profiler.enable');
+      await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
+      await cdp.send('Profiler.start');
+    }
+    await time('first paint', async () => {
+      await page.goto('/');
+      await expect(page.getByRole('button', { name: /^Starred \d+/ })).toBeVisible({ timeout: 120_000 });
+    });
+    if (cdp) {
+      const { profile } = await cdp.send('Profiler.stop');
+      (await import('node:fs')).writeFileSync(process.env.KURLO_PERF_PROFILE!, JSON.stringify(profile));
+    }
+    await time('sidebar search', async () => {
+      await page.getByRole('textbox', { name: 'Filter requests' }).fill('Заказ 04999');
+      await expect(page.getByText(/Заказ 04999/).first()).toBeVisible({ timeout: 30_000 });
+    });
+    await time('open request', async () => {
+      await page.getByText(/Заказ 04999/).first().click();
+      await expect(page.getByLabel('Request URL')).toHaveValue(/resources\/4999/, { timeout: 30_000 });
+    });
+    await page.getByRole('textbox', { name: 'Filter requests' }).fill('');
+    await time('history view', async () => {
+      await page.getByLabel('History', { exact: true }).first().click();
+      await expect(page.locator('.sidebar').getByText(/200|204|500/).first()).toBeVisible({ timeout: 30_000 });
+    });
+    await time('huge response', async () => {
+      await page.evaluate(async () => {
+        const body = await (await fetch('/__perf/huge.json')).text();
+        (window.__kurloE2E as Record<string, unknown>).hugeBody = body;
+      });
+    });
+
+    console.log(`perf fixtures: ${Object.entries(timings).map(([label, ms]) => `${label} ${ms}ms`).join(', ')}`);
+    expect(pageErrors).toEqual([]);
+    expect(timings['first paint']).toBeLessThan(10_000);
+    expect(timings['sidebar search']).toBeLessThan(3_000);
+    expect(timings['open request']).toBeLessThan(3_000);
+  });
+});
+
+test.describe('Real workspace round trip', () => {
+  const input = process.env.KURLO_ROUNDTRIP_IN ?? '';
+  const output = process.env.KURLO_ROUNDTRIP_OUT ?? '';
+  test.skip(!input || !output, 'driven by the Go Git flow test');
+
+  test('real workspace round trip', async ({ page }) => {
+    const { readFile, writeFile } = await import('node:fs/promises');
+    const body = await readFile(input, 'utf8');
+    await page.route('**/__roundtrip/store.json', route => route.fulfill({ body, contentType: 'application/json' }));
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      (window.__kurloE2E as Record<string, unknown>).perfStoreUrl = '/__roundtrip/store.json';
+    });
+    await page.goto('/');
+    const toggle = page.getByRole('button', { name: /^(Collapse|Expand) collection$/ }).first();
+    await expect(toggle).toBeVisible();
+    const before = await page.evaluate(() => (window.__kurloE2E.savedStores as unknown[]).length);
+    await toggle.click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.savedStores as unknown[]).length)).toBeGreaterThan(before);
+    const afterFirst = await page.evaluate(() => (window.__kurloE2E.savedStores as unknown[]).length);
+    await page.getByRole('button', { name: /^(Collapse|Expand) collection$/ }).first().click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.savedStores as unknown[]).length)).toBeGreaterThan(afterFirst);
+    const saved = await page.evaluate(() => {
+      const stores = window.__kurloE2E.savedStores as unknown[];
+      return JSON.stringify(stores[stores.length - 1]);
+    });
+    await writeFile(output, saved);
   });
 });

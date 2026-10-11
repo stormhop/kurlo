@@ -246,7 +246,7 @@
         {/each}
         {#if response.error}
           <div class="response-error" role="textbox" aria-readonly="true" tabindex="0">{response.error}</div>
-      {:else if !response.body}
+      {:else if !response.body && !response.bodyIsBinary}
         <div class="response-placeholder response-empty-state" role="status">
           <span class="response-placeholder-text">Response body is empty</span>
         </div>

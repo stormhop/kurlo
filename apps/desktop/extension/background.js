@@ -280,7 +280,7 @@ async function connect() {
       return;
     }
 
-    const url = `ws://127.0.0.1:${port}/ws?token=${encodeURIComponent(state.token)}&browser=${encodeURIComponent(browserLabel())}`;
+    const url = `ws://127.0.0.1:${port}/ws?token=${encodeURIComponent(state.token)}&browser=${encodeURIComponent(browserLabel())}&version=${encodeURIComponent(api.runtime.getManifest().version)}`;
     socket = new WebSocket(url);
 
     socketOpened = false;

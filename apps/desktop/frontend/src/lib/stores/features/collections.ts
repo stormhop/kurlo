@@ -68,6 +68,15 @@ function updateRequestCount(folder: FolderGroup): number {
   return folder.requestCount;
 }
 
+export function requestMatchesSidebarQuery(request: SavedRequest, query: string): boolean {
+  if (!query) return true;
+  return requestTabLabel(request).toLowerCase().includes(query)
+    || request.url.toLowerCase().includes(query)
+    || (request.grpcMethod ?? '').toLowerCase().includes(query)
+    || (request.grpcProtoFileName ?? '').toLowerCase().includes(query)
+    || (request.folderPath ?? []).join(' / ').toLowerCase().includes(query);
+}
+
 export const collectionFeature = {
   async toggleCollectionCollapsed(this: CollectionHost, collectionId: string) {
     this.collections = this.collections.map(collection => collection.id === collectionId ? { ...collection, collapsed: !collection.collapsed } : collection);
@@ -246,13 +255,7 @@ export const collectionFeature = {
       collection = collectionDiagnostics.length ? { ...collection, workspaceDiagnostics: collectionDiagnostics } : collection;
       const groupRequests = requests.filter(request => {
         if (request.isDraft || request.collectionId !== collection.id) return false;
-        if (!query) return true;
-        const label = requestTabLabel(request);
-        return label.toLowerCase().includes(query)
-          || request.url.toLowerCase().includes(query)
-          || (request.grpcMethod ?? '').toLowerCase().includes(query)
-          || (request.grpcProtoFileName ?? '').toLowerCase().includes(query)
-          || (request.folderPath ?? []).join(' / ').toLowerCase().includes(query);
+        return requestMatchesSidebarQuery(request, query);
       }).map(request => {
         const requestDiagnostics = this.diagnosticsForRequest(request.id);
         return requestDiagnostics.length ? { ...request, workspaceDiagnostics: requestDiagnostics } : request;

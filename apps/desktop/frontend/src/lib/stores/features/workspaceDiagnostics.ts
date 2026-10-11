@@ -15,6 +15,7 @@ type WorkspaceDiagnosticsHost = {
   gitLoading: boolean;
   requestStoreLoaded: boolean;
   topView: TopView;
+  workspaces: Workspace[];
   workspaceBlocked: boolean;
   workspaceBlockingDiagnostics: WorkspaceDiagnostic[];
   workspaceDiagnostics: WorkspaceDiagnostic[];
@@ -34,7 +35,6 @@ type WorkspaceDiagnosticsHost = {
   hasUnsavedDrafts: () => boolean;
   hasUnsavedRequestChanges: () => boolean;
   handleExternalWorkspaceChange: (reason: string) => Promise<void>;
-  isWorkspaceReferenceDiagnostic: (diagnostic: WorkspaceDiagnostic) => boolean;
   loadRequestWorkspace: (rawOverride?: string, diagnosticsOverride?: WorkspaceDiagnostic[]) => Promise<void>;
   markExternalWorkspaceChangePending: (reason: string) => void;
   openGitTab: (refresh?: boolean) => void;
@@ -85,10 +85,11 @@ export const workspaceDiagnosticsFeature = {
     return host.workspaceBlockingDiagnosticsFor(host.activeWorkspaceId);
   },
 
-  get activeWorkspaceDiagnostics(): WorkspaceDiagnostic[] {
-    const host = this as unknown as WorkspaceDiagnosticsHost;
-    const workspaceId = host.activeWorkspaceId;
-    return host.workspaceDiagnostics.filter(diagnostic => host.workspaceDiagnosticIsGlobal(diagnostic) || host.workspaceDiagnosticTargetsWorkspace(diagnostic, workspaceId));
+  workspaceDiagnosticScopeLabel(this: WorkspaceDiagnosticsHost, diagnostic: WorkspaceDiagnostic): string {
+    if (this.workspaceDiagnosticIsGlobal(diagnostic) || this.workspaceDiagnosticTargetsWorkspace(diagnostic, this.activeWorkspaceId)) return '';
+    const id = invalidWorkspaceIdForDiagnostic(diagnostic);
+    const name = this.workspaces.find(workspace => workspace.id === id)?.name || invalidWorkspaceNameForDiagnostic(diagnostic);
+    return diagnostic.blocking ? `Workspace “${name}” stays locked until this is fixed` : `In workspace “${name}”`;
   },
 
   workspaceDiagnosticKey(this: WorkspaceDiagnosticsHost, diagnostic: WorkspaceDiagnostic): string {
@@ -101,6 +102,7 @@ export const workspaceDiagnosticsFeature = {
   },
 
   workspaceDiagnosticTitle(this: WorkspaceDiagnosticsHost, diagnostic: WorkspaceDiagnostic): string {
+    if (diagnostic.scope === 'store') return 'Workspace files';
     if (diagnostic.scope === 'workspace') return diagnostic.blocking ? 'Workspace blocked' : 'Workspace YAML';
     if (diagnostic.scope === 'collection') return 'Collection YAML';
     if (diagnostic.scope === 'request') return 'Request YAML';
@@ -111,12 +113,8 @@ export const workspaceDiagnosticsFeature = {
     return `${this.workspaceDiagnosticTitle(diagnostic)}: ${this.workspaceDiagnosticLocation(diagnostic)} — ${diagnostic.message}`;
   },
 
-  isWorkspaceReferenceDiagnostic(this: WorkspaceDiagnosticsHost, diagnostic: WorkspaceDiagnostic): boolean {
-    return /^(collectionOrder|requestOrder) references /.test(diagnostic.message ?? '');
-  },
-
   workspaceDiagnosticIsGlobal(this: WorkspaceDiagnosticsHost, diagnostic: WorkspaceDiagnostic): boolean {
-    return !diagnostic.workspaceId && !workspacePathSegment(diagnostic.path);
+    return diagnostic.scope === 'store' || (!diagnostic.workspaceId && !workspacePathSegment(diagnostic.path));
   },
 
   workspaceDiagnosticTargetsWorkspace(this: WorkspaceDiagnosticsHost, diagnostic: WorkspaceDiagnostic, workspaceId: string): boolean {
@@ -142,14 +140,14 @@ export const workspaceDiagnosticsFeature = {
 
   workspaceBlockSummary(this: WorkspaceDiagnosticsHost): string {
     const diagnostic = this.workspaceBlockingDiagnostics[0] ?? this.workspaceDiagnostics[0];
-    if (!diagnostic) return 'Workspace YAML is invalid.';
+    if (!diagnostic) return 'Workspace files or references are invalid.';
     return this.workspaceDiagnosticSummary(diagnostic);
   },
 
   showWorkspaceBlockedToast(this: WorkspaceDiagnosticsHost, action = 'Workspace editing', workspaceId = this.activeWorkspaceId) {
     const diagnostics = this.workspaceBlockingDiagnosticsFor(workspaceId);
     const count = diagnostics.length || this.workspaceDiagnostics.length;
-    this.collectionImportToast = `${action} is paused until ${count} blocking workspace YAML error${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} fixed.`;
+    this.collectionImportToast = `${action} is paused until ${count} blocking workspace issue${count === 1 ? '' : 's'} ${count === 1 ? 'is' : 'are'} fixed.`;
     const diagnostic = diagnostics[0] ?? this.workspaceDiagnostics[0];
     if (diagnostic) this.focusedWorkspaceDiagnosticKey = this.workspaceDiagnosticKey(diagnostic);
     if (this.topView !== 'git') this.openGitTab(false);
@@ -175,7 +173,7 @@ export const workspaceDiagnosticsFeature = {
       return false;
     }
     if (!this.workspaceBlocked) return true;
-    this.gitError = `${action} is paused because workspace YAML is invalid. ${this.workspaceBlockSummary()}`;
+    this.gitError = `${action} is paused because workspace files or references are invalid. ${this.workspaceBlockSummary()}`;
     this.showWorkspaceBlockedToast(action);
     return false;
   },
@@ -239,7 +237,7 @@ export const workspaceDiagnosticsFeature = {
       const result = await writeWorkspaceYAMLFile(this.yamlEditorPath, this.yamlEditorContent);
       await this.applyWorkspaceOpenResult(result, 'Saved YAML');
       const ownError = this.workspaceDiagnostics.find(
-        diagnostic => diagnostic.path === this.yamlEditorPath && !this.isWorkspaceReferenceDiagnostic(diagnostic),
+        diagnostic => diagnostic.path === this.yamlEditorPath,
       );
       if (ownError) {
         this.yamlEditorDiagnostic = ownError;
@@ -252,8 +250,8 @@ export const workspaceDiagnosticsFeature = {
       this.closeWorkspaceYAMLEditor();
       const remaining = this.workspaceDiagnostics.length;
       this.collectionImportToast = remaining
-        ? `Saved. ${remaining} YAML error${remaining === 1 ? '' : 's'} left — fix the rest in the Git tab.`
-        : 'YAML saved and workspace diagnostics refreshed.';
+        ? `Saved. ${remaining} workspace ${remaining === 1 ? 'file still needs' : 'files still need'} fixing.`
+        : 'Saved. The workspace loads cleanly again.';
       setTimeout(() => (this.collectionImportToast = ''), 3600);
     } catch (error) {
       this.yamlEditorError = error instanceof Error ? error.message : String(error);
@@ -266,7 +264,8 @@ export const workspaceDiagnosticsFeature = {
     const existingIds = new Set(existingWorkspaces.map(workspace => workspace.id));
     const invalidWorkspaces: Workspace[] = [];
     for (const diagnostic of diagnostics) {
-      if (!diagnostic.blocking || diagnostic.scope !== 'workspace' || this.workspaceDiagnosticIsGlobal(diagnostic)) continue;
+      const workspaceFile = diagnostic.scope === 'store' && diagnostic.path.endsWith('/workspace.yml');
+      if (!diagnostic.blocking || (!workspaceFile && (diagnostic.scope !== 'workspace' || this.workspaceDiagnosticIsGlobal(diagnostic)))) continue;
       const id = invalidWorkspaceIdForDiagnostic(diagnostic);
       if (!id || existingIds.has(id)) continue;
       existingIds.add(id);

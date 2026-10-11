@@ -1,5 +1,23 @@
 export namespace api {
 	
+	export class BrowserExtensionResult {
+	    path: string;
+	    version: string;
+	    browser: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BrowserExtensionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.version = source["version"];
+	        this.browser = source["browser"];
+	        this.error = source["error"];
+	    }
+	}
 	export class CollectionTextFile {
 	    path: string;
 	    content: string;
@@ -151,6 +169,7 @@ export namespace api {
 	    index: string;
 	    worktree: string;
 	    status: string;
+	    managed: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new GitFileStatus(source);
@@ -162,6 +181,7 @@ export namespace api {
 	        this.index = source["index"];
 	        this.worktree = source["worktree"];
 	        this.status = source["status"];
+	        this.managed = source["managed"];
 	    }
 	}
 	export class GitWorkspaceStatus {
@@ -538,6 +558,20 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class SaveResponseBodyResult {
+	    savedPath: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SaveResponseBodyResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.savedPath = source["savedPath"];
+	        this.error = source["error"];
+	    }
+	}
 	export class WorkspaceDiagnostic {
 	    scope: string;
 	    severity: string;
@@ -633,6 +667,22 @@ export namespace api {
 		}
 	}
 	
+	export class WorkspaceYAMLCheckResult {
+	    ok: boolean;
+	    line: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceYAMLCheckResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.line = source["line"];
+	        this.message = source["message"];
+	    }
+	}
 	export class WorkspaceYAMLFileResult {
 	    ok: boolean;
 	    path: string;
@@ -918,6 +968,7 @@ export namespace model {
 	    paired: boolean;
 	    connected: boolean;
 	    browser: string;
+	    extensionVersion?: string;
 	    unreadable: string[];
 	    lastContactAt: number;
 	    lastSyncAt: number;
@@ -942,6 +993,7 @@ export namespace model {
 	        this.paired = source["paired"];
 	        this.connected = source["connected"];
 	        this.browser = source["browser"];
+	        this.extensionVersion = source["extensionVersion"];
 	        this.unreadable = source["unreadable"];
 	        this.lastContactAt = source["lastContactAt"];
 	        this.lastSyncAt = source["lastSyncAt"];
@@ -1544,8 +1596,11 @@ export namespace model {
 	    previewMediaType?: string;
 	    bodyIsBinary?: boolean;
 	    bodySniffedType?: string;
+	    bodyOmitted?: boolean;
 	    collectionVariableUpdates?: Record<string, string>;
 	    collectionVariablesRemoved?: string[];
+	    environmentUpdates?: Record<string, string>;
+	    environmentRemoved?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new HttpResponse(source);
@@ -1574,8 +1629,11 @@ export namespace model {
 	        this.previewMediaType = source["previewMediaType"];
 	        this.bodyIsBinary = source["bodyIsBinary"];
 	        this.bodySniffedType = source["bodySniffedType"];
+	        this.bodyOmitted = source["bodyOmitted"];
 	        this.collectionVariableUpdates = source["collectionVariableUpdates"];
 	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
+	        this.environmentUpdates = source["environmentUpdates"];
+	        this.environmentRemoved = source["environmentRemoved"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

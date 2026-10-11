@@ -22,7 +22,8 @@ export function folderPathStartsWith(path: string[] | undefined, prefix: string[
 export function normalizeCollectionFolderPaths(paths: string[][] | undefined): string[][] {
   const seen = new Set<string>();
   const out: string[][] = [];
-  for (const path of paths ?? []) {
+  for (const path of Array.isArray(paths) ? paths : []) {
+    if (!Array.isArray(path)) continue;
     const normalized = normalizeFolderPath(path);
     if (!normalized.length) continue;
     const key = folderPathKey(normalized);

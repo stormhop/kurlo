@@ -44,6 +44,7 @@ type GitFileStatus struct {
 	Index    string `json:"index"`
 	Worktree string `json:"worktree"`
 	Status   string `json:"status"`
+	Managed  bool   `json:"managed"`
 }
 
 type GitWorkspaceStatus struct {
@@ -1076,6 +1077,7 @@ func gitStatusForWorkspace(workspaceRoot string) GitWorkspaceStatus {
 			Index:    index,
 			Worktree: worktree,
 			Status:   gitStatusLabel(index, worktree),
+			Managed:  isDiscardableKurloGitPath(workspaceRoot, status.Root, path),
 		})
 	}
 	status.Clean = len(status.Files) == 0
@@ -1440,6 +1442,9 @@ func gitCommitWorkspaceForRoot(root, message string) GitOperationResult {
 	if status.Operation != "" {
 		return GitOperationResult{Ok: false, Git: status, Error: "Finish, continue, or abort the current Git " + status.Operation + " before creating a normal commit."}
 	}
+	if err := validateWorkspaceStoreOnDisk(root); err != nil {
+		return GitOperationResult{Ok: false, Git: status, Error: err.Error()}
+	}
 	message = strings.TrimSpace(message)
 	if message == "" {
 		return GitOperationResult{Ok: false, Git: status, Error: "Commit message is required."}
@@ -1485,6 +1490,9 @@ func gitCommitWorkspaceFilesForRoot(root string, paths []string, message string)
 	}
 	if status.Operation != "" {
 		return GitOperationResult{Ok: false, Git: status, Error: "Finish, continue, or abort the current Git " + status.Operation + " before creating a normal commit."}
+	}
+	if err := validateWorkspaceStoreOnDisk(root); err != nil {
+		return GitOperationResult{Ok: false, Git: status, Error: err.Error()}
 	}
 	message = strings.TrimSpace(message)
 	if message == "" {
@@ -3275,7 +3283,7 @@ func normalizeGitLogOffset(offset int) int {
 }
 
 func normalizeGitDiffPaths(repoRoot, diff string) string {
-	prefix := filepath.ToSlash(repoRoot) + "/"
+	prefix := strings.TrimPrefix(filepath.ToSlash(repoRoot), "/") + "/"
 	lines := strings.Split(diff, "\n")
 	for i, line := range lines {
 		if strings.HasPrefix(line, "diff ") || strings.HasPrefix(line, "--- ") || strings.HasPrefix(line, "+++ ") {
@@ -3401,9 +3409,9 @@ func appendGitAuthHint(message string) string {
 	case strings.Contains(lower, "permission denied (publickey)"):
 		return message + "\n\nAuthentication hint: for private repositories, add your SSH public key to GitHub/GitLab/Bitbucket and make sure ssh-agent has the private key loaded with ssh-add."
 	case strings.Contains(lower, "could not read username") || strings.Contains(lower, "terminal prompts disabled"):
-		return message + "\n\nAuthentication hint: HTTPS private repositories need a Git credential helper or personal access token stored in your system Git credentials. Kurlo does not store Git tokens; SSH remote URLs are recommended."
+		return message + "\n\nAuthentication hint: this HTTPS repository needs credentials. Kurlo asks for a personal access token and keeps it encrypted on this device, or you can pick an SSH key instead. A system Git credential helper also works."
 	case strings.Contains(lower, "authentication failed"):
-		return message + "\n\nAuthentication hint: use an SSH remote URL or configure your system Git credential helper with a personal access token."
+		return message + "\n\nAuthentication hint: the token or password was rejected. Enter a new personal access token when Kurlo asks, or pick an SSH key instead."
 	case strings.Contains(lower, "repository not found"):
 		return message + "\n\nAuthentication hint: the repository may be private or the remote URL may be wrong. Verify access in your Git provider and prefer the SSH clone URL for private repositories."
 	default:

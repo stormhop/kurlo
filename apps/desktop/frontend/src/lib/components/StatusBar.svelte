@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { kurloChangedFiles } from '../gitFiles';
   import { vm } from '../stores/app.svelte';
   import { openExternalURL } from '../externalLinks';
   import type { GitWorkspaceStatus } from '../backend';
@@ -80,7 +81,7 @@
     return /\[\s*gone\s*\]/.test(value || '');
   }
 
-  let changeCount = $derived(gitStatus.files?.length ?? 0);
+  let changeCount = $derived(kurloChangedFiles(gitStatus).length);
   let branchLabel = $derived(branchNameOnly(gitStatus.branch) || (gitStatus.isRepo ? 'HEAD' : 'Local'));
   let upstreamLabel = $derived(gitStatus.upstream || upstreamFromRawBranch(gitStatus.branch));
   let upstreamGone = $derived(Boolean(gitStatus.upstreamGone || rawBranchHasGoneUpstream(gitStatus.branch)));

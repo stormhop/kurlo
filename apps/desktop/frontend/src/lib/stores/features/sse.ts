@@ -21,6 +21,7 @@ type SSEHost = {
   method: Method;
   requestType: RequestType;
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   requestError: string;
   requestTab: RequestTab;
   currentSSESession: SSESession | undefined;
@@ -149,7 +150,7 @@ export const sseFeature = {
   _sseHistorySnapshot(this: SSEHost, sessionId: string): SavedRequest | null {
     const base = sessionId === this.activeRequestId
       ? this.snapshotActiveRequest()
-      : this.requests.find(request => request.id === sessionId);
+      : this.requestsById.get(sessionId);
     if (!base) return null;
     return this.normalizeSavedRequestCtx({
       ...base,

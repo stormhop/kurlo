@@ -31,7 +31,45 @@ import {
     normalizeRawBodyTypeForUi,
     requestTitleFrom,
     restoreRows,
+    sanitizeLike,
 } from './utils';
+
+type FieldTypes = { strings?: string[]; booleans?: string[]; arrays?: string[]; objects?: string[] };
+
+function sanitizeFields<T>(input: Partial<T> | null | undefined, fields: FieldTypes): Partial<T> {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+    const clean: Record<string, unknown> = { ...(input as Record<string, unknown>) };
+    for (const key of fields.strings ?? []) {
+        const value = clean[key];
+        if (typeof value === 'number' || typeof value === 'boolean') clean[key] = String(value);
+        else if (value !== undefined && typeof value !== 'string') delete clean[key];
+    }
+    for (const key of fields.booleans ?? []) {
+        if (clean[key] !== undefined && typeof clean[key] !== 'boolean') delete clean[key];
+    }
+    for (const key of fields.arrays ?? []) {
+        if (clean[key] !== undefined && !Array.isArray(clean[key])) delete clean[key];
+    }
+    for (const key of fields.objects ?? []) {
+        const value = clean[key];
+        if (value !== undefined && (!value || typeof value !== 'object' || Array.isArray(value))) delete clean[key];
+    }
+    return clean as Partial<T>;
+}
+
+const ENTITY_STRINGS = ['id', 'name', 'filesystemName', 'description', 'workspaceId'];
+
+const REQUEST_FIELDS: FieldTypes = {
+    strings: [
+        ...ENTITY_STRINGS, 'collectionId', 'collection', 'method', 'url', 'requestTab', 'requestType', 'bodyType', 'rawBodyType',
+        'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema', 'preRequestScript', 'testScript',
+        'preRequestScriptJs', 'testScriptJs', 'requestNotes', 'sioEventName', 'grpcMethod', 'grpcProtoFilePath',
+        'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
+    ],
+    booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection'],
+    arrays: ['folderPath', 'params', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'grpcMetadata', 'grpcProtoImportPaths', 'examples'],
+    objects: ['auth', 'settings', 'settingsOverrides'],
+};
 
 function normalizeRequestType(input: Partial<SavedRequest>): RequestType {
     if (input.requestType === 'mcp') return 'mcp';
@@ -43,7 +81,8 @@ function normalizeRequestType(input: Partial<SavedRequest>): RequestType {
 }
 
 export function normalizeSioArgs(input: Partial<SIOArg>[] | undefined): SIOArg[] {
-    const source = input && input.length > 0 ? input : defaultSocketIOArgs();
+    const valid = Array.isArray(input) ? input.filter(arg => Boolean(arg) && typeof arg === 'object' && !Array.isArray(arg)) : [];
+    const source = valid.length > 0 ? valid : defaultSocketIOArgs();
     const seen = new Set<string>();
     return source.map((arg, index) => {
         const fallbackId = String(index + 1);
@@ -102,7 +141,8 @@ export function makeEnvironment(workspaceId: string, name = 'Local'): Environmen
     return {id, workspaceId, name, filesystemName: filesystemNameFromName(name, id), values: [mkRow()]};
 }
 
-export function normalizeWorkspace(input: Partial<Workspace>): Workspace {
+export function normalizeWorkspace(raw: Partial<Workspace>): Workspace {
+    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS });
     const id = input.id || newEntityId('workspace');
     const name = input.name || DEFAULT_WORKSPACE;
     return {
@@ -113,7 +153,8 @@ export function normalizeWorkspace(input: Partial<Workspace>): Workspace {
     };
 }
 
-export function normalizeCollection(input: Partial<Collection>, workspaceId: string): Collection {
+export function normalizeCollection(raw: Partial<Collection>, workspaceId: string): Collection {
+    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['collapsed'], arrays: ['folderPaths'], objects: ['defaults'] });
     const id = input.id || newEntityId('collection');
     const name = input.name || DEFAULT_COLLECTION;
     return {
@@ -128,7 +169,8 @@ export function normalizeCollection(input: Partial<Collection>, workspaceId: str
     };
 }
 
-export function normalizeEnvironment(input: Partial<Environment>, workspaceId: string): Environment {
+export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: string): Environment {
+    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, arrays: ['values'] });
     const id = input.id || newEntityId('environment');
     const name = input.name || 'Local';
     return {
@@ -141,10 +183,11 @@ export function normalizeEnvironment(input: Partial<Environment>, workspaceId: s
 }
 
 export function normalizeSavedRequest(
-    input: Partial<SavedRequest>,
+    raw: Partial<SavedRequest>,
     collections: Collection[],
     defaultWorkspaceId: string,
 ): SavedRequest {
+    const input = sanitizeFields(raw, REQUEST_FIELDS);
     const isDraft = input.isDraft ?? false;
     const collectionId = isDraft ? '' : input.collectionId
         || collections.find(c => c.name === input.collection)?.id
@@ -184,14 +227,15 @@ export function normalizeSavedRequest(
         }
     }
     const id = input.id || newRequestId();
-    const settings = {...DEFAULT_REQUEST_SETTINGS, ...(input.settings ?? {})};
+    const settings = {...DEFAULT_REQUEST_SETTINGS, ...sanitizeLike(input.settings, DEFAULT_REQUEST_SETTINGS)};
     if (
         typeof input.grpcUseReflection === 'boolean'
         && !Object.prototype.hasOwnProperty.call(input.settings ?? {}, 'grpcUseReflection')
     ) {
         settings.grpcUseReflection = input.grpcUseReflection;
     }
-    const settingsOverrides = normalizeRequestSettingsOverrides(input.settingsOverrides as RequestSettingsOverrides | undefined, settings);
+    const inheritedSettings = collections.find(c => c.id === collectionId)?.defaults?.settings;
+    const settingsOverrides = normalizeRequestSettingsOverrides(input.settingsOverrides as RequestSettingsOverrides | undefined, settings, inheritedSettings);
     const normalizedExamples = normalizeRequestExamples(input.examples, id);
     return {
         id,
@@ -209,7 +253,7 @@ export function normalizeSavedRequest(
         requestTab: requestTab as RequestTab,
         params: cloneRowsForStore(input.params ?? []),
         headers: cloneRowsForStore(input.headers ?? []),
-        auth: {...emptyAuthState(), ...(input.auth ?? {})},
+        auth: {...emptyAuthState(), ...sanitizeLike(input.auth, emptyAuthState())},
         bodyType: isGraphQL || isGrpc ? bodyDefaults.bodyType : normalizeBodyTypeForUi(input.bodyType ?? bodyDefaults.bodyType),
         rawBodyType: isGraphQL || isGrpc ? bodyDefaults.rawBodyType : normalizeRawBodyTypeForUi(input.rawBodyType ?? bodyDefaults.rawBodyType),
         bodyContent: isGraphQL || isGrpc ? (input.bodyContent || bodyDefaults.bodyContent) : input.bodyContent ?? bodyDefaults.bodyContent,

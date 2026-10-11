@@ -44,6 +44,7 @@ type AuthHost = {
   oauth2DevicePrompt: OAuth2DevicePrompt | null;
   requestType: RequestType;
   requests: SavedRequest[];
+  requestsById: Map<string, SavedRequest>;
   collections: import('../../types/models').Collection[];
   savedRequestSnapshots: Map<string, SavedRequest>;
   requestWithCollectionDefaults: (req: SavedRequest) => SavedRequest;
@@ -138,7 +139,7 @@ export const authFeature = {
   },
 
   authForPersistence(this: AuthHost, auth: SavedRequest['auth'] = this.currentAuthState()): SavedRequest['auth'] {
-    const stored = this.savedRequestSnapshots.get(this.activeRequestId)?.auth ?? this.requests.find(request => request.id === this.activeRequestId)?.auth;
+    const stored = this.savedRequestSnapshots.get(this.activeRequestId)?.auth ?? this.requestsById.get(this.activeRequestId)?.auth;
     return resolveAuthForPersistence(auth, stored);
   },
 

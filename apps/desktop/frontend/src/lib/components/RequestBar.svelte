@@ -486,7 +486,7 @@
             aria-expanded={sendMenuOpen}
             onclick={() => (sendMenuOpen = !sendMenuOpen)}
           >
-            <svg width="0.625rem" height="0.4375rem" viewBox="0 0 10 7" fill="none" aria-hidden="true">
+            <svg width="0.5rem" height="0.3125rem" viewBox="0 0 10 7" fill="none" aria-hidden="true">
               <path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </button>

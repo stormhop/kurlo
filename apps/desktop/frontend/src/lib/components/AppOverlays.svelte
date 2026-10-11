@@ -8,6 +8,7 @@
   import AppDialog from './AppDialog.svelte';
   import GitAuthModal from './GitAuthModal.svelte';
   import MissingSecretsModal from './MissingSecretsModal.svelte';
+  import WorkspaceYAMLEditor from './WorkspaceYAMLEditor.svelte';
 
   type Props = {
     startupUpdateInfo: UpdateInfo | null;
@@ -169,36 +170,7 @@
 {/if}
 
 {#if vm.yamlEditorOpen}
-  <div class="modal-overlay" role="presentation">
-    <div class="modal yaml-editor-modal" role="dialog" aria-modal="true" aria-labelledby="yaml-editor-title" tabindex="-1">
-      <div class="modal-head modal-header">
-        <div>
-          <span class="modal-title" id="yaml-editor-title">Edit YAML</span>
-          <small>{vm.yamlEditorPath}</small>
-        </div>
-        <button class="btn btn-ghost btn-icon modal-close" type="button" onclick={vm.closeWorkspaceYAMLEditor} aria-label="Close">&times;</button>
-      </div>
-      {#if vm.yamlEditorLoading}
-        <div class="yaml-editor-loading">Loading YAML&hellip;</div>
-      {:else}
-        <textarea
-          class="modal-textarea yaml-editor-textarea"
-          bind:value={vm.yamlEditorContent}
-          spellcheck="false"
-          disabled={vm.yamlEditorSaving}
-        ></textarea>
-      {/if}
-      {#if vm.yamlEditorError}
-        <div class="modal-error">{vm.yamlEditorError}</div>
-      {/if}
-      <div class="modal-foot modal-footer">
-        <button class="btn btn-secondary btn-lg" type="button" onclick={vm.closeWorkspaceYAMLEditor} disabled={vm.yamlEditorSaving}>Cancel</button>
-        <button class="btn btn-primary btn-lg" type="button" onclick={vm.saveWorkspaceYAMLEditor} disabled={vm.yamlEditorLoading || vm.yamlEditorSaving}>
-          {vm.yamlEditorSaving ? 'Saving\u2026' : 'Save YAML'}
-        </button>
-      </div>
-    </div>
-  </div>
+  <WorkspaceYAMLEditor />
 {/if}
 
 {#if vm.appDialog}
