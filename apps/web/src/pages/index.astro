@@ -71,6 +71,19 @@ const extras = [
 
 const agentClients = [
   {
+    id: 'install',
+    label: 'Every client',
+    code: [
+      '<span class="d">$</span> npx -y @kurlo/cli mcp install --env Staging',
+      'Claude Code  added   user config',
+      'Cursor       added   ~/.cursor/mcp.json',
+      'Codex        added   ~/.codex/config.toml',
+      '',
+      '<span class="d"># or for the whole team, in the repository</span>',
+      '<span class="d">$</span> npx -y @kurlo/cli mcp install --project',
+    ].join('\n'),
+  },
+  {
     id: 'claude-code',
     label: 'Claude Code',
     code: '<span class="d">$</span> claude mcp add kurlo -- npx -y @kurlo/cli mcp --env Staging',
@@ -106,9 +119,9 @@ const agentClients = [
 
 const agentTicks = [
   'Runs saved requests with their collection auth, scripts and tests',
-  'A login request run once hands its token to every call after it',
-  'Reads the workspace on each call, so your last edit is what runs',
-  'The same engine as kurlo run in CI',
+  'Adds and changes requests and tests as plain YAML, never secrets',
+  'Reads the last request you sent from the app, so you debug together',
+  'Environments you protect stay out of its reach',
 ];
 
 type Mark = 'yes' | 'part' | 'no';
@@ -405,7 +418,7 @@ const ldJson = JSON.stringify({
       <div class="wrap">
         <div class="head">
           <h2 id="agents-title">Your AI agent can run your requests.</h2>
-          <p>Kurlo is also an MCP server. Connect Claude Code, Codex, Cursor or any MCP client, and the agent can list your collections, send saved requests and run their tests. Your tokens reach the API; the model only ever sees <code>[secret]</code>.</p>
+          <p>Kurlo is also an MCP server. Connect Claude Code, Codex, Cursor or any MCP client, and the agent can send your saved requests, run their tests and keep them up to date. Your tokens reach the API; the model only ever sees <code>[secret]</code>.</p>
         </div>
         <div class="agents">
           <div>
@@ -417,8 +430,7 @@ const ldJson = JSON.stringify({
             {agentClients.map((client, i) => (
               <pre class="cli agent-cli" role="tabpanel" id={`agent-panel-${client.id}`} aria-labelledby={`agent-${client.id}`} hidden={i !== 0} set:html={client.code} />
             ))}
-            <p class="agent-note">npx fetches the server from npm, with or without the app installed. To keep it around, install it once:</p>
-            <pre class="cli agent-install"><span class="d">$</span> npm install -g @kurlo/cli</pre>
+            <p class="agent-note">npx fetches Kurlo from npm, with or without the app installed. When the app is installed, clients start the server from it.</p>
             <ul class="ticks">{agentTicks.map(item => <li><span>{withCode(item).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</span></li>)}</ul>
             <a class="tour-link" href={href('docs/guides/mcp-server/')}>Connect an assistant →</a>
           </div>

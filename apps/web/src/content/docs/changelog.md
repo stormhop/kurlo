@@ -7,6 +7,24 @@ tableOfContents:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **AI agents can keep your collections up to date.** `kurlo mcp` can create collections, add and change saved requests with their `pm.*` tests, save responses as examples and set environment variables, writing the same YAML the app does. Secrets are never written. See [Writing to the workspace](/docs/guides/mcp-server/#writing-to-the-workspace).
+- **Your agent sees what you just sent.** `list_history` and `get_history_entry` read the requests you send from the app, with responses, tests and logs, secrets masked. See [What you just sent from the app](/docs/guides/mcp-server/#what-you-just-sent-from-the-app).
+- **`kurlo mcp install`** adds Kurlo to Claude Code, Claude Desktop, Codex, Cursor, VS Code, Windsurf and Gemini CLI in one command, or to a repository's shared config with `--project`. See [Connect an assistant](/docs/guides/mcp-server/#connect-an-assistant).
+- **Protected environments** that AI agents cannot send requests with or change. See [Environments](/docs/guides/environments/#protecting-an-environment-from-ai-agents).
+- **Docs for language models**: [llms.txt](/llms.txt) and [llms-full.txt](/llms-full.txt).
+
+### Changed
+
+- **A token that is only a `{{variable}}`** stays in the shared YAML instead of moving to the encrypted local file, so a cloned workspace works with your own environment.
+
+### Fixed
+
+- **Files changed outside Kurlo are no longer overwritten.** The app reloads changes made by `kurlo mcp`, an editor or `git pull` within a second, and a save that races with one keeps both.
+
 ## 2.2.6
 
 ### Added

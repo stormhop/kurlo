@@ -254,7 +254,6 @@ body.landing {
 .agents { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: clamp(2rem, 1rem + 4vw, 4.5rem); align-items: start; }
 .agent-cli { margin-top: 1rem; }
 .agent-note { margin-top: 1rem; font-size: var(--t-small); color: var(--ink-3); }
-.cli.agent-install { margin-top: 0.5rem; }
 .agent { min-width: 0; overflow: hidden; border: 1px solid var(--con-line); border-radius: var(--radius); background: var(--con-bg); color: var(--con-ink); }
 .agent-log { display: grid; gap: 1rem; margin: 0; padding: 1.125rem 1rem; list-style: none; }
 .agent-say { display: grid; grid-template-columns: 3.25rem minmax(0, 1fr); gap: 0.5rem; font-size: 0.9375rem; line-height: 1.55; }

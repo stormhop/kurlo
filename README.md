@@ -92,30 +92,13 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 - Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets
 - **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure
 
-**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, read how a request is defined, run saved requests and whole collections with their auth, scripts and tests, and send one-off calls with your `{{variables}}`. A login request run once hands its token to every call after it. The workspace is re-read on every call, so your last edit in the app is what runs. Secret environment values are sent to the API but masked as `[secret]` in everything the model sees. `npx` fetches the server from npm, so it works with or without the app installed:
+**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved requests and whole collections with their auth, scripts and tests, and send one-off calls with your `{{variables}}`. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
 
 ```bash
-# Claude Code
-claude mcp add kurlo -- npx -y @kurlo/cli mcp --env Staging
-
-# Codex (CLI, IDE extension and desktop app share one config)
-codex mcp add kurlo -- npx -y @kurlo/cli mcp --env Staging
+npx -y @kurlo/cli mcp install --env Staging
 ```
 
-Cursor, Claude Desktop and other clients with a JSON config (`.cursor/mcp.json`, `claude_desktop_config.json`, …):
-
-```json
-{
-  "mcpServers": {
-    "kurlo": {
-      "command": "npx",
-      "args": ["-y", "@kurlo/cli", "mcp", "--env", "Staging"]
-    }
-  }
-}
-```
-
-Without Node.js, point the client at the desktop app instead: `/Applications/Kurlo.app/Contents/MacOS/kurlo mcp` on macOS, or the installed `kurlo` executable on Linux and Windows. Tools, flags and serving a Git-backed workspace are covered in the [MCP server guide](https://kurlo.dev/docs/guides/mcp-server/).
+Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json` instead, so the whole team gets the server by cloning. Manual setup, the tools and the flags are covered in the [MCP server guide](https://kurlo.dev/docs/guides/mcp-server/).
 
 **Response examples** — save any response as a named example on its request: the status, headers and body it came back with, alongside the request that produced it. Secrets are redacted on capture, a clean body is stored byte for byte, and examples ride along through Postman, OpenCollection, HAR and OpenAPI imports and exports. A response can be diffed against an example instead of against the previous send.
 
