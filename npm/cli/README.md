@@ -21,6 +21,14 @@ Node installed with Homebrew, Volta or nvm keeps global packages in your home fo
 
 ## Connect an AI agent
 
+Add Kurlo to every AI client on your machine (Claude Code, Claude Desktop, Codex, Cursor, VS Code, Windsurf, Gemini CLI):
+
+```bash
+npx -y @kurlo/cli mcp install --env Staging
+```
+
+Add `--project` to write the repository's shared `.mcp.json` and `.cursor/mcp.json` instead, `--dry-run` to see the changes first, and run `kurlo mcp uninstall` to take Kurlo out again. To set it up by hand instead:
+
 Claude Code:
 
 ```bash
@@ -46,7 +54,7 @@ Cursor, Claude Desktop and other clients with a JSON config:
 }
 ```
 
-The agent can list your requests and environments, run a saved request or a whole collection with its tests, and send one-off calls that use your `{{variables}}`. Secret values are sent to your API and masked as `[secret]` in everything the model sees.
+The agent can list your requests and environments, run a saved request or a whole collection with its tests, and send one-off calls that use your `{{variables}}`. It can also add and change saved requests with their tests, save responses as examples and set environment variables, so the collection stays in step with your code. Secret values are sent to your API and masked as `[secret]` in everything the model sees, and never written to the workspace. Mark an environment protected in the app to keep agents away from it.
 
 With no workspace argument, `kurlo mcp` serves the workspace the desktop app has open. Pass the folder that contains `kurlo.yml` to serve a Git-backed workspace instead:
 

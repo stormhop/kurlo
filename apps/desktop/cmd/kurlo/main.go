@@ -13,6 +13,7 @@ const usage = `Kurlo command-line tools
 Usage:
   kurlo run [workspace] [flags]   Run a workspace's requests and test scripts
   kurlo mcp [workspace] [flags]   Serve a workspace to AI agents over MCP
+  kurlo mcp install [client...]   Add Kurlo to Claude Code, Cursor, Codex and other AI clients
   kurlo version                   Print the version
 
 Run "kurlo run --help" or "kurlo mcp --help" for the flags.

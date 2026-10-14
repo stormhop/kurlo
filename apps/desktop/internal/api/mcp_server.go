@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -83,6 +84,9 @@ type mcpServerError struct {
 func (e *mcpServerError) Error() string { return e.message }
 
 func RunMCPServer(args []string) int {
+	if len(args) > 0 && (args[0] == "install" || args[0] == "uninstall") {
+		return RunMCPInstall(args[1:], args[0] == "uninstall")
+	}
 	opts, err := parseMCPServerArgs(args, os.Stderr)
 	if err != nil {
 		if err == flag.ErrHelp {
@@ -115,7 +119,7 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 	fs.BoolVar(&opts.readOnly, "read-only", false, "only offer the tools that read and run; never change the workspace files")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: kurlo mcp [workspace] [flags]")
-		fmt.Fprint(stderr, "\nServe a Kurlo workspace to AI assistants as a Model Context Protocol server over stdio.\nWithout a workspace argument it serves the workspace the app has open.\n\n")
+		fmt.Fprint(stderr, "\nServe a Kurlo workspace to AI assistants as a Model Context Protocol server over stdio.\nWithout a workspace argument it serves the workspace the app has open.\nA relative workspace path is resolved against CLAUDE_PROJECT_DIR when it is set.\n\nTo add Kurlo to Claude Code, Cursor, Codex and other clients: kurlo mcp install --help\n\n")
 		fs.PrintDefaults()
 	}
 
@@ -131,6 +135,11 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 		positional = fs.Arg(0)
 	}
 
+	if positional != "" && !filepath.IsAbs(positional) {
+		if projectDir := os.Getenv("CLAUDE_PROJECT_DIR"); projectDir != "" {
+			positional = filepath.Join(projectDir, positional)
+		}
+	}
 	appRoot := fileWorkspaceStorePath()
 	opts.workspace = positional
 	if opts.workspace == "" {

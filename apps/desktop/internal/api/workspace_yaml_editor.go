@@ -145,6 +145,10 @@ func rejectSymlinkParents(root string, path string) error {
 }
 
 func writeTextFileAtomic(path string, data []byte) error {
+	return writeFileAtomicMode(path, data, 0644)
+}
+
+func writeFileAtomicMode(path string, data []byte, mode os.FileMode) error {
 	if existing, err := os.ReadFile(path); err == nil && string(existing) == string(data) {
 		return nil
 	}
@@ -163,7 +167,7 @@ func writeTextFileAtomic(path string, data []byte) error {
 		_ = tmp.Close()
 		return err
 	}
-	if err := tmp.Chmod(0644); err != nil {
+	if err := tmp.Chmod(mode); err != nil {
 		_ = tmp.Close()
 		return err
 	}
