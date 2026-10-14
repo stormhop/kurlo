@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -190,7 +191,7 @@ func TestMCPInstallEditsClaudeJSONWhenThereIsNoClaudeCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Mode().Perm() != 0o600 {
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
 		t.Fatalf("a private config must stay private, mode is %v", info.Mode().Perm())
 	}
 	if out, _ := runInstallForTest(t, host, nil, true); !strings.Contains(out, "removed") || readTestFile(t, path) != original {
