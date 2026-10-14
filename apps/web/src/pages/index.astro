@@ -445,6 +445,66 @@ const ldJson = JSON.stringify({
       </div>
     </section>
 
+    <section class="section" id="agent-writes" aria-labelledby="agent-writes-title">
+      <div class="wrap">
+        <div class="head">
+          <h2 id="agent-writes-title">Your agent keeps the collection up to date.</h2>
+          <p>The agent that writes an endpoint can add its request, tests and example to your workspace, and the open app shows them as the files change. It all lands in Git next to the code, with tokens left as <code>&#123;&#123;variables&#125;&#125;</code>.</p>
+        </div>
+        <figure class="demo" data-demo aria-label="An AI agent adds a Refund order request with tests to the Shop API collection through kurlo mcp, runs it, saves the response as an example, and the request appears in the open Kurlo window">
+          <div class="agent demo-chat">
+            <div class="script-head"><span>Agent session</span><span>kurlo mcp · Local</span></div>
+            <ol class="agent-log">
+              <li class="agent-say" data-at="1"><span class="who">you</span><p>Add the refund endpoint I just wrote to Kurlo, with a test.</p></li>
+              <li class="agent-call" data-at="2">
+                <div><span class="tool">save_request</span> <span class="dim">Shop API/Orders/Refund order</span></div>
+                <div data-at="3"><b class="ok">✓</b> created <span class="dim">requests/Refund-order.yml</span></div>
+              </li>
+              <li class="agent-call" data-at="4">
+                <div><span class="tool">run_request</span> <span class="dim">Refund order</span></div>
+                <div data-at="5"><b class="ok">✓</b> POST /orders/42/refund <span class="dim">→</span> 201 <span class="dim">· 84 ms · [2/2]</span></div>
+              </li>
+              <li class="agent-call" data-at="6">
+                <div><span class="tool">save_example</span> <span class="dim">Refunded</span></div>
+                <div><b class="ok">✓</b> 201 kept for the mock server</div>
+              </li>
+              <li class="agent-say" data-at="7"><span class="who">agent</span><p>Done. <em>Refund order</em> is in Orders with two passing tests, and its 201 response is saved as an example.</p></li>
+            </ol>
+          </div>
+          <div class="demo-app" aria-hidden="true">
+            <div class="demo-bar"><span></span><span></span><span></span><b>Kurlo</b></div>
+            <div class="demo-body">
+              <div class="demo-side">
+                <div class="demo-col">Shop API</div>
+                <div class="demo-folder">Orders</div>
+                <div class="demo-row"><span class="m-get">GET</span>List orders</div>
+                <div class="demo-row"><span class="m-post">POST</span>Create order</div>
+                <div class="demo-row demo-new" data-at="3"><span class="m-post">POST</span>Refund order</div>
+                <div class="demo-folder">Payments</div>
+              </div>
+              <div class="demo-main">
+                <div class="demo-url" data-at="3"><span class="m-post">POST</span>&#123;&#123;baseUrl&#125;&#125;/orders/&#123;&#123;orderId&#125;&#125;/refund</div>
+                <div class="demo-status" data-at="5"><b>201 Created</b><span>84 ms</span><span>312 B</span></div>
+                <ul class="demo-tests" data-at="5">
+                  <li><b>✓</b> status is 201</li>
+                  <li><b>✓</b> refund amount matches the order</li>
+                </ul>
+                <div class="demo-chip" data-at="6">Examples · Refunded 201</div>
+                <div class="demo-git" data-at="7">
+                  <span class="dim">Git · 3 changes</span>
+                  <span><b>A</b> collections/Shop-API/requests/Refund-order.yml</span>
+                  <span><b>A</b> collections/Shop-API/examples/Refund-order/Refunded.yml</span>
+                  <span><b class="mod">M</b> collections/Shop-API/collection.yml</span>
+                </div>
+              </div>
+            </div>
+            <div class="demo-toast" data-at="3" data-flash>Workspace refreshed (files changed outside Kurlo)</div>
+          </div>
+        </figure>
+        <a class="tour-link demo-link" href={href('docs/guides/mcp-server/#writing-to-the-workspace')}>What an agent can change →</a>
+      </div>
+    </section>
+
     <section class="section" id="tour" aria-labelledby="tour-title">
       <div class="wrap">
         <div class="head">
@@ -682,6 +742,30 @@ const ldJson = JSON.stringify({
       const mark = () => nav && nav.classList.toggle('nav-scrolled', scrollY > 8);
       mark();
       addEventListener('scroll', mark, { passive: true });
+
+      const demo = document.querySelector('[data-demo]');
+      if (demo) {
+        const steps = [...demo.querySelectorAll('[data-at]')];
+        const show = stage => steps.forEach(step => step.classList.toggle('on', Number(step.dataset.at) <= stage));
+        const still = matchMedia('(prefers-reduced-motion: reduce)');
+        const times = [400, 1500, 2600, 4200, 5300, 6800, 8300];
+        let timers = [];
+        const stop = () => { timers.forEach(clearTimeout); timers = []; };
+        const play = () => {
+          stop();
+          if (still.matches) { demo.classList.remove('demo-anim'); show(times.length); return; }
+          demo.classList.add('demo-anim');
+          show(0);
+          times.forEach((at, i) => timers.push(setTimeout(() => show(i + 1), at)));
+          timers.push(setTimeout(play, 14500));
+        };
+        if ('IntersectionObserver' in window) {
+          new IntersectionObserver(entries => entries.forEach(entry => (entry.isIntersecting ? play() : stop())), { threshold: 0.35 }).observe(demo);
+        } else {
+          show(times.length);
+        }
+        still.addEventListener?.('change', play);
+      }
 
       document.querySelectorAll('[role="tablist"]').forEach(list => {
         const tabs = [...list.querySelectorAll('[role="tab"]')];
