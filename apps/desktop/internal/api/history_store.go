@@ -68,6 +68,10 @@ func (a *App) SaveHistoryResponse(id string, payload string) HistoryResponseResu
 }
 
 func (a *App) LoadHistoryResponse(id string) HistoryResponseResult {
+	return readHistoryResponse(id)
+}
+
+func readHistoryResponse(id string) HistoryResponseResult {
 	path, err := historyResponsePath(id)
 	if err != nil {
 		return HistoryResponseResult{Error: err.Error()}

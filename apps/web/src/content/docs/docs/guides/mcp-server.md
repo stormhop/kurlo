@@ -102,6 +102,8 @@ The workspace is read again on every call, so a request you edit in the app is w
 | `run_request` | Sends one saved HTTP or GraphQL request with its collection defaults, auth and scripts. Returns the status, headers, body, timings, test results and script logs. |
 | `run_collection` | Runs a collection or folder in order with its test scripts and returns pass/fail per request. Realtime requests are skipped, as in `kurlo run`. When the call carries a `progressToken`, the server reports progress after every request. |
 | `send_request` | Sends an unsaved HTTP request. `{{variables}}` in the URL, headers and body are resolved from the environment. |
+| `list_history` | Lists the requests you recently sent from the Kurlo app, newest first, with status, timing and the saved request each came from. Can be searched, or narrowed to failures. |
+| `get_history_entry` | Shows one request you sent from the app and the response you got: status, headers, body, error, test results and script logs. Without an entry it shows the last one. |
 | `create_collection` | Creates an empty collection. |
 | `save_request` | Creates a saved HTTP or GraphQL request, or changes one. See [Writing to the workspace](#writing-to-the-workspace). |
 | `delete_request` | Deletes a saved request and its examples. |
@@ -111,6 +113,12 @@ The workspace is read again on every call, so a request you edit in the app is w
 A request can be named by its id, its full path, or just its name when that name is unique. When a name matches more than one request, the tool lists the matches with their ids so the assistant can pick one.
 
 Every run accepts an `environment` and a `variables` object of overrides for that call. `run_request` and `send_request` return up to 64 KB of the response body by default. An assistant can ask for up to 1 MB with `maxBodyBytes`. Binary bodies are described but not included.
+
+## What you just sent from the app
+
+The assistant can read the requests you send from the Kurlo app, so you can debug together without copying anything: send a request, then ask "why did my last request fail?" `get_history_entry` with no arguments returns the last request sent from the app with its response, test results and script logs, and `list_history` finds older ones, such as every request that failed today.
+
+These tools read the [history](/docs/guides/history/) that Kurlo keeps on this machine, for every workspace, including requests you never saved. Secrets are masked as everywhere else: values Kurlo stores as secrets, auth credentials and the values of headers like `Authorization` and `Cookie` come back as `[secret]`. Both tools only read, so they are also there with `--read-only`.
 
 ## Writing to the workspace
 
@@ -178,6 +186,10 @@ Environment variables marked secret are used when requests are sent, but they ar
 | `--insecure`, `-k` | Turn off TLS certificate verification for every request. |
 | `--allow-send-request` | Let scripts call `pm.sendRequest`. Off by default, as in `kurlo run`. |
 | `--read-only` | Offer only the tools that read and run; never change workspace files. |
+
+## Docs for agents
+
+The whole Kurlo documentation is available in plain text for language models: [llms.txt](https://kurlo.dev/llms.txt) lists the pages, and [llms-full.txt](https://kurlo.dev/llms-full.txt) has all of them in one file.
 
 ## Protocol
 

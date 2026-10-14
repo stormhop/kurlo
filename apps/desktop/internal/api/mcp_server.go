@@ -315,6 +315,7 @@ func (s *mcpServer) instructions() string {
 		"Values that scripts set with pm.environment.set or pm.collectionVariables.set are kept for later calls in this session, so a login request can hand its token to the requests after it. " +
 		"To find out whether a browser would let a web page make a call, pass browserOrigin to run_request or send_request: Kurlo then sends it the way a browser on that origin would, runs the CORS preflight, and reports the CORS error the browser would raise. " +
 		"Secret environment values are used when sending but never shown. " +
+		"When the user mentions a request they sent or a response they saw in Kurlo, call get_history_entry: with no arguments it returns the last request sent from the app and its response; list_history finds older ones. " +
 		"Environments marked protected in Kurlo cannot be used or changed here; ask the user to run those requests in the app. " +
 		"When a request uses a {{variable}} that no environment, override or script has set, the result lists it in unresolvedVariables: set it with the variables argument or run the request that sets it first."
 	if !s.opts.readOnly {
@@ -465,6 +466,7 @@ func mcpServerTools(readOnly bool) []map[string]any {
 			"annotations": network,
 		},
 	}
+	tools = append(tools, mcpServerHistoryTools()...)
 	if readOnly {
 		return tools
 	}
@@ -504,6 +506,10 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolRunCollection
 	case "send_request":
 		run = s.toolSendRequest
+	case "list_history":
+		run = s.toolListHistory
+	case "get_history_entry":
+		run = s.toolGetHistoryEntry
 	case "create_collection":
 		run = s.toolCreateCollection
 	case "save_request":
