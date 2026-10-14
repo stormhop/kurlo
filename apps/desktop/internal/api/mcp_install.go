@@ -271,14 +271,16 @@ func mcpInstallLaunch(opts mcpInstallOptions, host *mcpInstallHost) (mcpLaunch, 
 		args = append(args, "--read-only")
 	}
 	command := strings.TrimSpace(opts.command)
+	if command != "" && command != "npx" && !opts.project {
+		if abs, err := filepath.Abs(command); err == nil {
+			command = abs
+		}
+	}
 	if command == "" && !opts.project {
 		command = mcpSelfExecutable(host)
 	}
 	if command == "" || command == "npx" {
 		return mcpLaunch{command: "npx", args: append([]string{"-y", mcpNpmPackage}, args...)}, nil
-	}
-	if abs, err := filepath.Abs(command); err == nil && !opts.project {
-		command = abs
 	}
 	return mcpLaunch{command: command, args: args}, nil
 }
