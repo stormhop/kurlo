@@ -68,6 +68,7 @@ func NewApp() *App {
 
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	go a.watchWorkspaceDisk(ctx)
 	repairStaleBundleInBackground(ctx)
 	go refreshInstalledBrowserExtensions()
 }
@@ -144,6 +145,9 @@ func (a *App) MenuZoom(action string) {
 func (a *App) emitWorkspaceChanged(reason string) {
 	if a.ctx == nil {
 		return
+	}
+	if root := workspaceDisk.trackedRoot(); root != "" {
+		workspaceDisk.markAnnounced(root)
 	}
 	runtime.EventsEmit(a.ctx, "kurlo:workspace-changed", reason)
 }
@@ -240,7 +244,14 @@ func (a *App) SaveFileDialog(defaultName string, content string) string {
 func (a *App) LoadRequestStore() string {
 	gitOperationMu.RLock()
 	defer gitOperationMu.RUnlock()
-	payload, _, err := loadKurloStorePayloadWithDiagnostics(requestStorePath(), fileWorkspaceStorePath())
+	root := fileWorkspaceStorePath()
+	if unlock, err := lockWorkspaceWrites(root); err == nil {
+		defer unlock()
+	}
+	payload, _, err := loadKurloStorePayloadWithDiagnostics(requestStorePath(), root)
+	if hasYAMLWorkspaceStore(root) {
+		workspaceDisk.remember(root)
+	}
 	if err != nil {
 		return ""
 	}
@@ -272,6 +283,30 @@ func (a *App) SaveRequestStoreWithError(payload string) SaveRequestStoreResult {
 
 func (a *App) saveRequestStorePayload(payload string) error {
 	root := fileWorkspaceStorePath()
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	before, external, err := workspaceDisk.externalChanges(root)
+	if err != nil {
+		return err
+	}
+	if err := a.writeRequestStorePayload(root, payload); err != nil {
+		return err
+	}
+	workspaceDisk.remember(root)
+	if len(external) == 0 {
+		return nil
+	}
+	if err := reapplyExternalChanges(root, before, external); err != nil {
+		return err
+	}
+	a.emitWorkspaceChanged(workspaceExternalChangeNote)
+	return nil
+}
+
+func (a *App) writeRequestStorePayload(root, payload string) error {
 	localStoreAuthFailed := false
 	if _, _, err := loadLocalRequestStore(requestStorePath()); err != nil && isRequestStoreAuthenticationError(err) {
 		localStoreAuthFailed = true

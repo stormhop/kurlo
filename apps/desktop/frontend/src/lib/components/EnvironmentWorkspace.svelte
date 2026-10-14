@@ -10,6 +10,7 @@
     environmentSaveState,
     createEnvironment,
     renameEnvironment,
+    setEnvironmentProtected = () => {},
     useEnvironment,
     deleteEnvironment,
     saveEnvironment,
@@ -34,6 +35,7 @@
     environmentSaveState: 'idle' | 'dirty' | 'saving' | 'saved';
     createEnvironment: () => void;
     renameEnvironment: (environmentId: string) => void;
+    setEnvironmentProtected?: (environmentId: string, isProtected: boolean) => void;
     useEnvironment: (environmentId: string) => void;
     deleteEnvironment: (environmentId: string) => void;
     saveEnvironment: () => void;
@@ -154,7 +156,12 @@
   {:else if activeEnvironment}
     <div class="environment-workspace-head">
       <div class="environment-title">
-        <h1>{activeEnvironment.name}</h1>
+        <h1>
+          {activeEnvironment.name}
+          {#if activeEnvironment.protected}
+            <span class="env-protected" title="AI agents connected through kurlo mcp cannot send requests with this environment or change it"><MenuIcon name="lock" />Protected</span>
+          {/if}
+        </h1>
         <p>
           {variableCount} {variableCount === 1 ? 'variable' : 'variables'} · use them in requests as {'{{variableName}}'}
           {#if environmentSaveState !== 'idle'}
@@ -177,6 +184,7 @@
           {#if moreMenuOpen}
             <div class="menu request-menu env-more-menu" role="menu">
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => renameEnvironment(activeEnvironment.id))}><MenuIcon name="rename" />Rename</button>
+              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.protected)} title="AI agents connected through kurlo mcp cannot send requests with a protected environment or change it" onclick={() => runMenuAction(() => setEnvironmentProtected(activeEnvironment.id, !activeEnvironment.protected))}><MenuIcon name="lock" />{activeEnvironment.protected ? 'Unprotect from AI agents' : 'Protect from AI agents'}</button>
               <div class="menu-separator" role="separator"></div>
               <button class="menu-item" type="button" role="menuitem" title="Import variables from a .env file" onclick={() => runMenuAction(() => importEnvFromFile(activeEnvironment.id))}><MenuIcon name="import" />Import .env</button>
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => exportEnvironment(activeEnvironment.id))}><MenuIcon name="export" />Export…</button>

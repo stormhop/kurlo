@@ -136,9 +136,10 @@ type cliCollection struct {
 }
 
 type cliEnvironment struct {
-	ID     string  `json:"id"`
-	Name   string  `json:"name"`
-	Values []cliKV `json:"values"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Protected bool    `json:"protected"`
+	Values    []cliKV `json:"values"`
 }
 
 func decodeMaps[T any](maps []map[string]any) ([]T, error) {

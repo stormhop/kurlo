@@ -5,6 +5,21 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **AI agents can keep your collections up to date.** `kurlo mcp` has five new tools: `create_collection`, `save_request` (create a request or change only the fields named, with headers, body, GraphQL query, auth and JavaScript `pm.*` scripts), `delete_request`, `save_example` (keep the response of the last run, or a described one, as an example) and `set_variable`. They write the same YAML files the app does, through the same code, so an agent that adds an endpoint can add its request and tests to the workspace in the same commit. Secrets are never written: a token or password must be a `{{variable}}` reference, and secret headers or variables can only be changed in the app. Start the server with `--read-only` to offer only the tools that read and run.
+- **Protected environments.** Mark an environment **Protect from AI agents** in its ⋯ menu and `kurlo mcp` refuses to send requests with it or change its variables, so an assistant cannot reach production by picking the wrong environment. The mark is saved in the environment's file as `protected: true` and shared through Git.
+
+### Changed
+
+- **A token that only names a variable is stored as written.** A bearer token, password or API key of exactly `{{token}}` holds no secret, so it now stays in the request's YAML instead of moving to the encrypted local file. Someone who clones the workspace gets a request that works with their own environment instead of an empty placeholder.
+
+### Fixed
+
+- **Kurlo no longer overwrites files changed outside it.** With the app open, a request added by `kurlo mcp`, by an editor or by `git pull` in a terminal was deleted by the next save, because the app wrote back the workspace it had in memory. Kurlo now notices such changes within a second and reloads, and a save that races with one keeps both: the app writes its own edits and puts back every file it did not change itself. When both changed the same file, the app's version wins. The app and `kurlo mcp` also take turns writing, so neither sees the other's half-written save.
+
 ## [2.2.6] - 2026-10-11
 
 ### Added

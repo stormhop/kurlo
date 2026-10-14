@@ -45,17 +45,19 @@ type mcpServerOptions struct {
 	insecure         bool
 	allowSendRequest bool
 	loadAppSecrets   bool
+	readOnly         bool
 }
 
 type mcpServer struct {
-	opts    mcpServerOptions
-	out     io.Writer
-	writeMu sync.Mutex
-	runMu   sync.Mutex
-	jars    *cookieJarRegistry
-	cache   *preflightCache
-	tokens  *oauth2TokenCache
-	session map[string]*mcpSessionScope
+	opts     mcpServerOptions
+	out      io.Writer
+	writeMu  sync.Mutex
+	runMu    sync.Mutex
+	jars     *cookieJarRegistry
+	cache    *preflightCache
+	tokens   *oauth2TokenCache
+	session  map[string]*mcpSessionScope
+	lastRuns map[string]mcpLastRun
 
 	pendingMu sync.Mutex
 	pending   map[string]context.CancelFunc
@@ -110,6 +112,7 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 	fs.BoolVar(&opts.insecure, "insecure", false, "disable TLS certificate verification for every request")
 	fs.BoolVar(&opts.insecure, "k", false, "alias for --insecure")
 	fs.BoolVar(&opts.allowSendRequest, "allow-send-request", false, "allow pm.sendRequest to make HTTP calls from scripts")
+	fs.BoolVar(&opts.readOnly, "read-only", false, "only offer the tools that read and run; never change the workspace files")
 	fs.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: kurlo mcp [workspace] [flags]")
 		fmt.Fprint(stderr, "\nServe a Kurlo workspace to AI assistants as a Model Context Protocol server over stdio.\nWithout a workspace argument it serves the workspace the app has open.\n\n")
@@ -139,13 +142,14 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 
 func newMCPServer(opts mcpServerOptions, out io.Writer) *mcpServer {
 	return &mcpServer{
-		opts:    opts,
-		out:     out,
-		jars:    newCookieJarRegistry(),
-		cache:   newPreflightCache(),
-		tokens:  newOAuth2TokenCache(),
-		session: map[string]*mcpSessionScope{},
-		pending: map[string]context.CancelFunc{},
+		opts:     opts,
+		out:      out,
+		jars:     newCookieJarRegistry(),
+		cache:    newPreflightCache(),
+		tokens:   newOAuth2TokenCache(),
+		session:  map[string]*mcpSessionScope{},
+		lastRuns: map[string]mcpLastRun{},
+		pending:  map[string]context.CancelFunc{},
 	}
 }
 
@@ -194,7 +198,7 @@ func (s *mcpServer) handle(line []byte) {
 	case mcpMethodDiscover:
 		s.writeResult(msg.ID, s.discoverResult())
 	case mcpMethodToolsList:
-		result := map[string]any{"tools": mcpServerTools()}
+		result := map[string]any{"tools": mcpServerTools(s.opts.readOnly)}
 		if mcpServerStateless(msg.Params) {
 			result["resultType"] = "complete"
 		}
@@ -302,7 +306,14 @@ func (s *mcpServer) instructions() string {
 		"Values that scripts set with pm.environment.set or pm.collectionVariables.set are kept for later calls in this session, so a login request can hand its token to the requests after it. " +
 		"To find out whether a browser would let a web page make a call, pass browserOrigin to run_request or send_request: Kurlo then sends it the way a browser on that origin would, runs the CORS preflight, and reports the CORS error the browser would raise. " +
 		"Secret environment values are used when sending but never shown. " +
+		"Environments marked protected in Kurlo cannot be used or changed here; ask the user to run those requests in the app. " +
 		"When a request uses a {{variable}} that no environment, override or script has set, the result lists it in unresolvedVariables: set it with the variables argument or run the request that sets it first."
+	if !s.opts.readOnly {
+		text += " The workspace is plain YAML files, usually in Git, and you can keep it up to date as you work: create_collection and save_request add or change saved requests, with JavaScript pm.* test scripts, " +
+			"save_example keeps a response as an example that the mock server and response diffs use, delete_request removes one, and set_variable sets a non-secret environment variable. " +
+			"Never write a secret into a request: reference it as a {{variable}} and ask the user to add the value in Kurlo as a secret. " +
+			"Kurlo, if it is open, picks the changes up by itself."
+	}
 	if s.opts.env != "" {
 		text += " Calls that do not name an environment use " + s.opts.env + "."
 	}
@@ -338,7 +349,7 @@ func (s *mcpServer) discoverResult() map[string]any {
 	}
 }
 
-func mcpServerTools() []map[string]any {
+func mcpServerTools(readOnly bool) []map[string]any {
 	environment := map[string]any{"type": "string", "description": "Environment name. Defaults to the one the server was started with."}
 	variables := map[string]any{
 		"type":                 "object",
@@ -348,10 +359,10 @@ func mcpServerTools() []map[string]any {
 	maxBody := map[string]any{"type": "integer", "description": "Most bytes of the response body to return (default 65536, max 1048576)."}
 	browserOrigin := map[string]any{"type": "string", "description": "Send the call the way a browser on this page origin would, for example https://app.example.com: browser headers, the CORS preflight when one is needed, and the CORS error a browser would raise. Omit it and a saved request uses its own browser settings, if any."}
 	browserCredentials := map[string]any{"type": "boolean", "description": "With browserOrigin, make it a credentialed request (fetch credentials: include), which a wildcard Access-Control-Allow-Origin does not satisfy."}
-	readOnly := map[string]any{"readOnlyHint": true, "openWorldHint": false}
+	readOnlyTool := map[string]any{"readOnlyHint": true, "openWorldHint": false}
 	network := map[string]any{"readOnlyHint": false, "openWorldHint": true}
 
-	return []map[string]any{
+	tools := []map[string]any{
 		{
 			"name":        "list_requests",
 			"title":       "List saved requests",
@@ -363,7 +374,7 @@ func mcpServerTools() []map[string]any {
 					"query":      map[string]any{"type": "string", "description": "Only list requests whose path, method or URL contains every word of this text, ignoring case. For example: \"post orders\"."},
 				},
 			},
-			"annotations": readOnly,
+			"annotations": readOnlyTool,
 		},
 		{
 			"name":        "get_request",
@@ -376,14 +387,14 @@ func mcpServerTools() []map[string]any {
 				},
 				"required": []string{"request"},
 			},
-			"annotations": readOnly,
+			"annotations": readOnlyTool,
 		},
 		{
 			"name":        "list_environments",
 			"title":       "List environments",
 			"description": "List the workspace's environments and their variables. Secret values are hidden.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
-			"annotations": readOnly,
+			"annotations": readOnlyTool,
 		},
 		{
 			"name":        "run_request",
@@ -445,6 +456,10 @@ func mcpServerTools() []map[string]any {
 			"annotations": network,
 		},
 	}
+	if readOnly {
+		return tools
+	}
+	return append(tools, mcpServerWriteTools()...)
 }
 
 func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[string]any, error) {
@@ -480,8 +495,21 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolRunCollection
 	case "send_request":
 		run = s.toolSendRequest
+	case "create_collection":
+		run = s.toolCreateCollection
+	case "save_request":
+		run = s.toolSaveRequest
+	case "delete_request":
+		run = s.toolDeleteRequest
+	case "save_example":
+		run = s.toolSaveExample
+	case "set_variable":
+		run = s.toolSetVariable
 	default:
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "unknown tool: " + call.Name}
+	}
+	if s.opts.readOnly && mcpWriteToolNames[call.Name] {
+		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: call.Name + " is not available: this server was started with --read-only"}
 	}
 
 	s.runMu.Lock()
@@ -731,7 +759,9 @@ func mcpEnabledRows(rows []cliKV) []mcpKeyValue {
 	for _, row := range rows {
 		if row.Enabled && strings.TrimSpace(row.Key) != "" {
 			value := row.Value
-			if row.IsFile {
+			if row.Secret {
+				value = "<secret>"
+			} else if row.IsFile {
 				value = "<file " + defaultString(row.FileName, row.Value) + ">"
 			}
 			out = append(out, mcpKeyValue{Key: row.Key, Value: value})
@@ -857,12 +887,13 @@ func (s *mcpServer) toolListEnvironments(_ context.Context, _ json.RawMessage) (
 	}
 	type environment struct {
 		Name             string     `json:"name"`
+		Protected        bool       `json:"protected,omitempty"`
 		Variables        []variable `json:"variables"`
 		SessionVariables []string   `json:"sessionVariables,omitempty"`
 	}
 	environments := make([]environment, 0, len(ws.environments))
 	for _, env := range ws.environments {
-		entry := environment{Name: env.Name, Variables: []variable{}}
+		entry := environment{Name: env.Name, Protected: env.Protected, Variables: []variable{}}
 		for _, row := range env.Values {
 			if !row.Enabled || strings.TrimSpace(row.Key) == "" {
 				continue
@@ -892,6 +923,9 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 	envName = strings.TrimSpace(envName)
 	if envName == "" {
 		envName = s.opts.env
+	}
+	if env, ok := findEnvironment(ws.environments, envName); ok && env.Protected {
+		return nil, fmt.Errorf("environment %s is protected: Kurlo does not send requests with it for AI agents; ask the user to run this in the app, or use another environment", env.Name)
 	}
 	values, secrets, err := resolveCLIValues(cliOptions{env: envName}, ws.collections, ws.environments, nil)
 	if err != nil {
@@ -1131,6 +1165,7 @@ func (s *mcpServer) toolRunRequest(ctx context.Context, arguments json.RawMessag
 		return nil, err
 	}
 	result, resp := s.execute(ctx, run, req)
+	s.lastRuns[req.ID] = mcpLastRun{request: req, response: resp, secrets: run.secrets}
 	outcome := mcpOutcome(mcpRequestPath(req), run, result, resp, mcpBodyLimit(args.MaxBodyBytes))
 	outcome.Unresolved = mcpUnresolvedVariables(req, run)
 	outcome.VariablesChanged = s.remember(run)

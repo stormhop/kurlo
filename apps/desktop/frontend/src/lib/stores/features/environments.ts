@@ -208,6 +208,15 @@ export const environmentFeature = {
     this.environments = this.environments.map(candidate => candidate.id === environmentId ? { ...candidate, name } : candidate);
     await this.persistRequestStore();
   },
+  async setEnvironmentProtected(this: EnvironmentHost, environmentId: string, isProtected: boolean) {
+    if (!this.guardWorkspaceWritable('Environment changes')) return;
+    this.environments = this.environments.map(candidate => {
+      if (candidate.id !== environmentId) return candidate;
+      const { protected: _previous, ...rest } = candidate;
+      return isProtected ? { ...rest, protected: true } : rest;
+    });
+    await this.persistRequestStore();
+  },
   async deleteEnvironment(this: EnvironmentHost, environmentId: string) {
     if (!this.guardWorkspaceWritable('Deleting environments')) return;
     const environment = this.environments.find(candidate => candidate.id === environmentId);

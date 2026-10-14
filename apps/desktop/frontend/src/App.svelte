@@ -680,6 +680,7 @@
         environmentSaveState={vm.environmentSaveState}
         createEnvironment={vm.createEnvironment}
         renameEnvironment={vm.renameEnvironment}
+        setEnvironmentProtected={vm.setEnvironmentProtected}
         useEnvironment={vm.useEnvironment}
         deleteEnvironment={vm.deleteEnvironment}
         saveEnvironment={vm.saveEnvironment}

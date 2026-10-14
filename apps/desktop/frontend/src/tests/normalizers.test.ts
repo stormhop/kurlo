@@ -209,4 +209,10 @@ describe('normalizeHistoryEntry', () => {
     expect(entry).not.toBeNull();
     expect(entry && 'sourceRequestId' in entry).toBe(false);
   });
+
+  it('keeps the protected mark on an environment and drops it when false', () => {
+    expect(normalizeEnvironment({ id: 'environment-prod', name: 'Prod', protected: true }, 'workspace-1').protected).toBe(true);
+    expect('protected' in normalizeEnvironment({ id: 'environment-local', name: 'Local', protected: false }, 'workspace-1')).toBe(false);
+    expect('protected' in normalizeEnvironment({ id: 'environment-dev', name: 'Dev' }, 'workspace-1')).toBe(false);
+  });
 });

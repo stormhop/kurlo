@@ -1374,7 +1374,7 @@ func sanitizeRequestsForFilesystem(requests []map[string]any, existingSecrets, s
 					if existingValue, exists := existingSecrets[placeholderKey]; exists {
 						secrets[placeholderKey] = existingValue
 					}
-				} else if value != "" {
+				} else if secretFieldNeedsVault(value) {
 					secrets[key] = value
 					auth[field] = kurloSecretPlaceholder(key)
 				}
@@ -1388,7 +1388,7 @@ func sanitizeRequestsForFilesystem(requests []map[string]any, existingSecrets, s
 					if existingValue, exists := existingSecrets[placeholderKey]; exists {
 						secrets[placeholderKey] = existingValue
 					}
-				} else if value != "" {
+				} else if secretFieldNeedsVault(value) {
 					secrets[key] = value
 					settings[field] = kurloSecretPlaceholder(key)
 				}
@@ -1417,7 +1417,7 @@ func sanitizeCollectionSecrets(collection map[string]any, existingSecrets, secre
 				if existingValue, exists := existingSecrets[placeholderKey]; exists {
 					secrets[placeholderKey] = existingValue
 				}
-			} else if value != "" {
+			} else if secretFieldNeedsVault(value) {
 				secrets[key] = value
 				auth[field] = kurloSecretPlaceholder(key)
 			}
@@ -1431,7 +1431,7 @@ func sanitizeCollectionSecrets(collection map[string]any, existingSecrets, secre
 				if existingValue, exists := existingSecrets[placeholderKey]; exists {
 					secrets[placeholderKey] = existingValue
 				}
-			} else if value != "" {
+			} else if secretFieldNeedsVault(value) {
 				secrets[key] = value
 				settings[field] = kurloSecretPlaceholder(key)
 			}
@@ -2242,4 +2242,10 @@ func truncateUTF8(value string, max int) string {
 func shortHash(value string) string {
 	hash := sha1.Sum([]byte(value))
 	return hex.EncodeToString(hash[:])[:10]
+}
+
+var pureVariableReferenceRe = regexp.MustCompile(`^\{\{\s*[^{}\s]+\s*\}\}$`)
+
+func secretFieldNeedsVault(value string) bool {
+	return value != "" && !pureVariableReferenceRe.MatchString(value)
 }

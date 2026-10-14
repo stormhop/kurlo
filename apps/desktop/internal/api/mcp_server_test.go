@@ -246,7 +246,7 @@ func TestMCPServerHandshakeAndToolList(t *testing.T) {
 			t.Errorf("%s inputSchema type = %v", tool.Name, tool.InputSchema["type"])
 		}
 	}
-	if got := strings.Join(names, ","); got != "list_requests,get_request,list_environments,run_request,run_collection,send_request" {
+	if got := strings.Join(names, ","); got != "list_requests,get_request,list_environments,run_request,run_collection,send_request,create_collection,save_request,delete_request,save_example,set_variable" {
 		t.Errorf("tools = %s", got)
 	}
 	if list.ResultType != "" {

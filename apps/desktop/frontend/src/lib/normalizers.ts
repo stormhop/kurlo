@@ -170,7 +170,7 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
 }
 
 export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: string): Environment {
-    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, arrays: ['values'] });
+    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['protected'], arrays: ['values'] });
     const id = input.id || newEntityId('environment');
     const name = input.name || 'Local';
     return {
@@ -179,6 +179,7 @@ export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: str
         name,
         filesystemName: filesystemNameFromName(input.filesystemName || name, id),
         values: restoreRows(input.values),
+        ...(input.protected ? { protected: true } : {}),
     };
 }
 

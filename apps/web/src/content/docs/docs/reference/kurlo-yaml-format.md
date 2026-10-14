@@ -207,7 +207,7 @@ request:
 | `settings` | Request transport settings. Unknown settings must be preserved by third-party tools. |
 | `settingsOverrides` | Per-request override markers for inherited collection defaults. |
 
-Secret-bearing auth fields (`bearerToken`, `basicPass`, `apiKeyValue`, `oauth2Secret`, `oauth2Token`, `oauth2RefreshToken`, `awsAccessKey`, and `awsSecretKey`) are replaced with `{{kurloSecret:...}}` placeholders in shared Git/YAML workspaces. Their plaintext values stay in Kurlo's encrypted local profile.
+Secret-bearing auth fields (`bearerToken`, `basicPass`, `apiKeyValue`, `oauth2Secret`, `oauth2Token`, `oauth2RefreshToken`, `awsAccessKey`, and `awsSecretKey`) are replaced with `{{kurloSecret:...}}` placeholders in shared Git/YAML workspaces. Their plaintext values stay in Kurlo's encrypted local profile A value that is only a variable reference, such as `{{apiToken}}`, holds no secret and is written as is.
 
 ## Example file
 
@@ -288,6 +288,8 @@ environment:
       description: ""
       secret: true
 ```
+
+`protected: true` on the environment marks it as one that AI agents connected through [`kurlo mcp`](/docs/guides/mcp-server/#protected-environments) may not send requests with or change. It is left out when false.
 
 ## Secrets
 

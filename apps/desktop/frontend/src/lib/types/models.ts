@@ -181,6 +181,7 @@ export type Collection = {
 };
 export type Environment = {
   id: string; workspaceId: string; name: string; filesystemName: string; values: KVRow[];
+  protected?: boolean;
 };
 export type ScriptEngine = 'js' | 'tengo';
 export type RequestSettings = {

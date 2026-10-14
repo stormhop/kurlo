@@ -267,6 +267,7 @@
         "workspaceId": { "$ref": "#/definitions/id" },
         "name": { "type": "string" },
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "protected": { "type": "boolean" },
         "values": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
