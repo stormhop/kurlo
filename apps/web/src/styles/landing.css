@@ -327,7 +327,7 @@ body.landing {
 .compare th, .compare td { padding: 1rem 1.125rem; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .compare tbody tr:last-child th, .compare tbody tr:last-child td { border-bottom: 0; }
 .compare thead th { padding-block: 1.125rem; font-weight: 600; }
-.compare thead td:first-child, .compare tbody th { position: sticky; left: 0; background: var(--surface); }
+.compare thead td:first-child, .compare tbody th { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: inset -1px 0 0 var(--line); }
 .compare tbody th { width: 15%; font-weight: 500; color: var(--ink-2); }
 .compare td { width: 21.25%; color: var(--ink-2); }
 .compare .col-kurlo { background: var(--accent-soft); color: var(--ink); }
