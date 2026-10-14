@@ -3560,6 +3560,47 @@ test.describe('README screenshot', () => {
   });
 });
 
+test.describe('Update release notes', () => {
+  test('long notes scroll under the update status instead of squeezing it away', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const app = (window as any).go.api.App;
+      const item = (n: number) => `- **Change ${n}.** ${'A long sentence about what changed and why it matters to you. '.repeat(6)}`;
+      app.AppInfo = async () => ({ name: 'Kurlo', version: '2.2.6', runtime: 'darwin/e2e', goVersion: 'e2e', packaged: false });
+      app.CheckForUpdate = async () => ({
+        info: {
+          version: '2.3.0',
+          releaseNotes: ['### Added', ...Array.from({ length: 8 }, (_, i) => item(i)), '### Fixed', item(9)].join('\n'),
+          publishedAt: '2026-10-14T10:00:00Z',
+          downloadUrl: 'https://github.com/stormhop/kurlo/releases/download/v2.3.0/kurlo-darwin-universal.app.zip',
+          assetName: 'kurlo-darwin-universal.app.zip',
+          sha256: 'abc123',
+          signatureUrl: '',
+          manualInstallUrl: '',
+        },
+        error: '',
+      });
+    });
+    await page.goto('/');
+
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'About', exact: true }).click();
+    const about = page.locator('#settings-panel-about');
+    await expect(about).toContainText('Kurlo 2.3.0 is available');
+    await expect(about).toContainText('Change 9');
+
+    const row = about.locator('.about-update-row');
+    const box = await row.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThan(40);
+    const list = await about.locator('.about-list').boundingBox();
+    expect(list?.height ?? 0).toBeGreaterThan(box?.height ?? 0);
+    await about.getByRole('button', { name: 'Install', exact: true }).click({ trial: true });
+
+    const scrolls = await about.evaluate(element => element.scrollHeight > element.clientHeight);
+    expect(scrolls).toBe(true);
+  });
+});
+
 test.describe('Windows app package updates', () => {
   test('offers the MSIX download instead of replacing a packaged install', async ({ page }) => {
     const msixUrl = 'https://github.com/stormhop/kurlo/releases/download/v2.1.0/kurlo-2.1.0-windows-amd64.msix';

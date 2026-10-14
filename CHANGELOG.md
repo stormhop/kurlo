@@ -5,6 +5,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Long release notes hid the update button.** When a new version had long notes, Settings → About squeezed the "is available" line and its **Install** button down to a thin grey bar. The status and button now stay put, and the notes scroll below them.
+
 ## [2.3.0] - 2026-10-14
 
 ### Added

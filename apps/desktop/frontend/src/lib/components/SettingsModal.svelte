@@ -1164,6 +1164,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2-5);
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 26.25rem;
+    margin-top: var(--space-5);
   }
 
   .updates-notes .settings-section-label {
@@ -1587,6 +1591,10 @@
     flex-direction: column;
     align-items: center;
     padding-top: var(--space-10);
+  }
+
+  .about-tab > * {
+    flex-shrink: 0;
   }
 
   .about-hero {

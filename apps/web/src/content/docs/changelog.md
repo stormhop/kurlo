@@ -7,6 +7,12 @@ tableOfContents:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Fixed
+
+- **Long release notes no longer hide the update button** in Settings → About.
+
 ## 2.3.0
 
 ### Added
