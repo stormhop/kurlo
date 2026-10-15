@@ -5,6 +5,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Claude Code saw no Kurlo tools.** Claude Code talks to `kurlo mcp` with the 2026-07-28 revision of MCP, which requires every tool list to say how long it may be cached. Kurlo left that out, so Claude Code rejected the whole list and showed the server as connected with no tools. The list and the server description now carry the caching fields, and the server's instructions are short enough that Claude Code no longer cuts them off.
+
 ## [2.3.1] - 2026-10-14
 
 ### Fixed

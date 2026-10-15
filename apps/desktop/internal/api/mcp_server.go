@@ -30,6 +30,7 @@ const (
 	mcpServerDefaultBodyLimit = 64 * 1024
 	mcpServerMaxBodyLimit     = 1024 * 1024
 	mcpServerExampleBodyLimit = 8 * 1024
+	mcpServerListTTLMs        = 60 * 60 * 1000
 )
 
 const (
@@ -210,6 +211,8 @@ func (s *mcpServer) handle(line []byte) {
 		result := map[string]any{"tools": mcpServerTools(s.opts.readOnly)}
 		if mcpServerStateless(msg.Params) {
 			result["resultType"] = "complete"
+			result["ttlMs"] = mcpServerListTTLMs
+			result["cacheScope"] = "public"
 		}
 		s.writeResult(msg.ID, result)
 	case mcpMethodToolsCall:
@@ -309,25 +312,21 @@ func (s *mcpServer) serverInfo() map[string]any {
 }
 
 func (s *mcpServer) instructions() string {
-	text := "Kurlo is an API client. This server exposes the saved requests, collections and environments of the Kurlo workspace at " + s.opts.workspace + ". " +
-		"Call list_requests to see what is saved and list_environments to see the environments, then run_request to send one saved request and read its response, " +
-		"run_collection to run a collection or folder with its test scripts, or send_request for a one-off HTTP call that can use the environment's {{variables}}. " +
-		"Values that scripts set with pm.environment.set or pm.collectionVariables.set are kept for later calls in this session, so a login request can hand its token to the requests after it. " +
-		"To find out whether a browser would let a web page make a call, pass browserOrigin to run_request or send_request: Kurlo then sends it the way a browser on that origin would, runs the CORS preflight, and reports the CORS error the browser would raise. " +
-		"Secret environment values are used when sending but never shown. " +
-		"When the user mentions a request they sent or a response they saw in Kurlo, call get_history_entry: with no arguments it returns the last request sent from the app and its response; list_history finds older ones. " +
-		"Environments marked protected in Kurlo cannot be used or changed here; ask the user to run those requests in the app. " +
-		"When a request uses a {{variable}} that no environment, override or script has set, the result lists it in unresolvedVariables: set it with the variables argument or run the request that sets it first."
+	lines := []string{
+		"Kurlo is an API client. These tools work on the Kurlo workspace at " + s.opts.workspace + ": its saved requests, collections and environments.",
+		"- list_requests, get_request and list_environments show what is saved. run_request sends a saved request with its auth, scripts and tests, run_collection runs a collection or folder, and send_request sends a one-off call that can use {{variables}}.",
+		"- When the user mentions a request they just sent or a response they saw in Kurlo, call get_history_entry: with no arguments it returns the last request sent from the app. list_history finds older ones.",
+		"- Values scripts set carry over to later calls, so run a login request first. unresolvedVariables names the {{variables}} nothing set.",
+		"- browserOrigin on run_request or send_request checks CORS the way a browser on that origin would.",
+		"- Secrets are sent but shown as [secret]. Protected environments cannot be used here: ask the user to run those requests in Kurlo.",
+	}
 	if !s.opts.readOnly {
-		text += " The workspace is plain YAML files, usually in Git, and you can keep it up to date as you work: create_collection and save_request add or change saved requests, with JavaScript pm.* test scripts, " +
-			"save_example keeps a response as an example that the mock server and response diffs use, delete_request removes one, and set_variable sets a non-secret environment variable. " +
-			"Never write a secret into a request: reference it as a {{variable}} and ask the user to add the value in Kurlo as a secret. " +
-			"Kurlo, if it is open, picks the changes up by itself."
+		lines = append(lines, "- create_collection, save_request, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")
 	}
 	if s.opts.env != "" {
-		text += " Calls that do not name an environment use " + s.opts.env + "."
+		lines = append(lines, "- Calls that do not name an environment use "+s.opts.env+".")
 	}
-	return text
+	return strings.Join(lines, "\n")
 }
 
 func (s *mcpServer) initializeResult(params json.RawMessage) map[string]any {
@@ -355,6 +354,8 @@ func (s *mcpServer) discoverResult() map[string]any {
 		"supportedVersions": []string{model.McpDefaultProtocolVersion},
 		"capabilities":      map[string]any{"tools": map[string]any{}},
 		"instructions":      s.instructions(),
+		"ttlMs":             mcpServerListTTLMs,
+		"cacheScope":        "private",
 		"_meta":             map[string]any{mcpMetaServerInfo: s.serverInfo()},
 	}
 }

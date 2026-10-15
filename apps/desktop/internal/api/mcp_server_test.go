@@ -278,9 +278,21 @@ func TestMCPServerSpeaksTheStatelessRevision(t *testing.T) {
 		t.Errorf("serverInfo missing from _meta: %s", resp.Result)
 	}
 
+	var cache struct {
+		TTLMs      *int   `json:"ttlMs"`
+		CacheScope string `json:"cacheScope"`
+	}
+	if err := json.Unmarshal(resp.Result, &cache); err != nil || cache.TTLMs == nil || *cache.TTLMs < 0 || cache.CacheScope != "private" {
+		t.Errorf("server/discover under 2026-07-28 must carry ttlMs and cacheScope: %s", resp.Result)
+	}
+
 	resp = h.request("tools/list", meta)
 	if !strings.Contains(string(resp.Result), `"resultType":"complete"`) {
 		t.Errorf("tools/list under 2026-07-28 should carry resultType: %s", resp.Result)
+	}
+	cache.TTLMs, cache.CacheScope = nil, ""
+	if err := json.Unmarshal(resp.Result, &cache); err != nil || cache.TTLMs == nil || *cache.TTLMs < 0 || cache.CacheScope != "public" {
+		t.Errorf("tools/list under 2026-07-28 must carry ttlMs and cacheScope, or Claude Code drops every tool: %s", resp.Result)
 	}
 	resp = h.request("tools/call", map[string]any{"name": "list_environments", "arguments": map[string]any{}, "_meta": meta["_meta"]})
 	if !strings.Contains(string(resp.Result), `"resultType":"complete"`) {

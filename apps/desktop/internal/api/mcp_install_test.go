@@ -338,8 +338,9 @@ func TestMCPServerResolvesARelativeWorkspaceAgainstTheClaudeProject(t *testing.T
 }
 
 func TestMCPServerInstructionsFitClaudeCodeLimit(t *testing.T) {
-	server := newMCPServer(mcpServerOptions{workspace: "/ws", env: "Local"}, io.Discard)
-	if n := len(server.instructions()); n > 4096 {
-		t.Fatalf("instructions are %d characters; Claude Code cuts them at 4096", n)
+	workspace := "/Users/someone/Library/Application Support/Kurlo/workspaces/" + strings.Repeat("a", 60)
+	server := newMCPServer(mcpServerOptions{workspace: workspace, env: "Staging-Europe"}, io.Discard)
+	if n := len(server.instructions()); n > 2048 {
+		t.Fatalf("instructions are %d characters; Claude Code cuts them at 2048", n)
 	}
 }

@@ -7,6 +7,12 @@ tableOfContents:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Fixed
+
+- **Claude Code now sees Kurlo's tools.** `kurlo mcp` was shown as connected with no tools, because Claude Code's newer MCP revision rejected its tool list.
+
 ## 2.3.1
 
 ### Fixed
