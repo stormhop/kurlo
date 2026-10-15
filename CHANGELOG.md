@@ -7,6 +7,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Kurlo is listed in the MCP Registry.** `kurlo mcp` is published to the official MCP Registry as `dev.kurlo/kurlo`, so MCP clients and server directories that read the registry can find it and install it from `@kurlo/cli`.
+
 ### Fixed
 
 - **Saved responses in History disappeared after a restart.** Kurlo keeps the response of each request you send, but forgot which history entries had one when it started again, so their responses could no longer be opened from History and `get_history_entry` in `kurlo mcp` returned no body. The link to the stored response, its size and content type now survive a restart.

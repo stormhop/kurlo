@@ -1,6 +1,7 @@
 {
   "name": "@kurlo/cli",
   "version": "0.0.0",
+  "mcpName": "dev.kurlo/kurlo",
   "description": "Kurlo's command line: run API collections in CI and serve them to AI agents over MCP.",
   "keywords": [
     "api",

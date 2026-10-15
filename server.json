@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.kurlo/kurlo",
+  "title": "Kurlo",
+  "description": "Run, write and test the API requests saved in a Kurlo workspace, the open source API client.",
+  "websiteUrl": "https://kurlo.dev/docs/guides/mcp-server/",
+  "repository": {
+    "url": "https://github.com/stormhop/kurlo",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://kurlo.dev/apple-touch-icon.png",
+      "mimeType": "image/png",
+      "sizes": ["180x180"]
+    }
+  ],
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@kurlo/cli",
+      "version": "0.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        },
+        {
+          "type": "positional",
+          "valueHint": "workspace",
+          "description": "Path to a Kurlo YAML workspace. Leave it empty to serve the workspace the Kurlo app has open.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}

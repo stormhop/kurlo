@@ -1,0 +1,96 @@
+name: MCP Registry
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
+      wait-minutes:
+        type: number
+        default: 0
+    secrets:
+      MCP_REGISTRY_PRIVATE_KEY:
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to publish, for example 2.4.0. Defaults to the latest @kurlo/cli on npm.
+        type: string
+        required: false
+      wait-minutes:
+        description: How long to wait for @kurlo/cli at that version to appear on npm.
+        type: number
+        default: 0
+
+permissions:
+  contents: read
+
+env:
+  MCP_PUBLISHER_VERSION: v1.8.1
+
+jobs:
+  publish:
+    name: Publish to the MCP Registry
+    runs-on: ubuntu-24.04
+    timeout-minutes: 200
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          version="${INPUT_VERSION#v}"
+          if [ -z "$version" ]; then
+            version="$(npm view @kurlo/cli version --registry=https://registry.npmjs.org)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for @kurlo/cli on npm
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          WAIT_MINUTES: ${{ inputs.wait-minutes }}
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + ${WAIT_MINUTES:-0} * 60 ))
+          while true; do
+            name="$(npm view "@kurlo/cli@$VERSION" mcpName --registry=https://registry.npmjs.org 2>/dev/null || true)"
+            if [ "$name" = "dev.kurlo/kurlo" ]; then
+              echo "@kurlo/cli@$VERSION is on npm"
+              break
+            fi
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "::error::@kurlo/cli@$VERSION with mcpName dev.kurlo/kurlo is not on npm yet. Approve the staged packages, then run this workflow again."
+              exit 1
+            fi
+            sleep 60
+          done
+
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+
+      - name: Set the version in server.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          jq --arg v "$VERSION" '.version = $v | .packages[].version = $v' server.json > server.json.tmp
+          mv server.json.tmp server.json
+          cat server.json
+
+      - name: Publish
+        env:
+          MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          ./mcp-publisher login http --domain kurlo.dev --private-key "$MCP_REGISTRY_PRIVATE_KEY"
+          ./mcp-publisher publish

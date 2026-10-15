@@ -517,3 +517,12 @@ jobs:
             stage "$dir"
           done
 
+  mcp-registry:
+    name: Publish to the MCP Registry
+    needs: npm
+    uses: ./.github/workflows/mcp-registry.yml
+    with:
+      version: ${{ github.ref_name }}
+      wait-minutes: 180
+    secrets:
+      MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
