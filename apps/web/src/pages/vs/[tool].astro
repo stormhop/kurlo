@@ -1,0 +1,103 @@
+---
+import LandingLayout from '../../components/LandingLayout.astro';
+import logo from '../../assets/logo.png';
+import { CHECKED_ON, competitors, type Competitor } from '../../lib/competitors';
+import { structuredData } from '../../../site.schema.mjs';
+
+export function getStaticPaths() {
+  return competitors.map(competitor => ({ params: { tool: competitor.slug }, props: { competitor } }));
+}
+
+const { competitor } = Astro.props as { competitor: Competitor };
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const site = Astro.site ? new URL(base, Astro.site).toString() : base;
+const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
+const pageUrl = new URL(`vs/${competitor.slug}/`, site).href;
+
+const codeTerms = /(pm\.test|pm\.expect|pm\.sendRequest|pm\.\*|bru\.\*|kurlo mcp|tests\[\]|postman\.setEnvironmentVariable|\{\{variables\}\})/g;
+const withCode = (text: string) => text.split(codeTerms).map((part, i) => (i % 2 ? { code: part } : { text: part }));
+
+const ldJson = structuredData({
+  siteRoot: site,
+  description: competitor.description,
+  page: { url: pageUrl, name: competitor.title, description: competitor.description },
+});
+---
+
+<LandingLayout title={competitor.title} description={competitor.description} canonical={pageUrl} ldJson={ldJson} links={[{ label: 'Compare', href: '#compare' }, { label: 'Why switch', href: '#why' }, { label: 'Migrate', href: '#migrate' }, { label: 'MCP', href: href('mcp/') }, { label: 'Docs', href: href('docs/getting-started/installation/') }]}>
+  <section class="hero vs-hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <h1 id="hero-title">Kurlo vs {competitor.name}</h1>
+      <p class="lead">{withCode(competitor.lead).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</p>
+      <div class="cta">
+        <a class="btn btn-primary" href={href('download/')}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Download Kurlo</span>
+        </a>
+        <a class="btn btn-quiet" href="#migrate">Move from {competitor.name}</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="compare" aria-labelledby="compare-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="compare-title">Side by side</h2>
+      </div>
+      <div class="table-scroll vs-table" tabindex="0" role="region" aria-label={`Comparison of Kurlo and ${competitor.name}`}>
+        <table class="compare vs-compare">
+          <thead>
+            <tr>
+              <td></td>
+              <th scope="col" class="col-kurlo"><span><img src={logo.src} alt="" width="20" height="20" />Kurlo</span></th>
+              <th scope="col">{competitor.name}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {competitor.rows.map(row => (
+              <tr>
+                <th scope="row">{row.label}</th>
+                {[row.kurlo, row.other].map((cell, i) => (
+                  <td class={i === 0 ? 'col-kurlo' : undefined}>
+                    <span class={cell.mark}><span>{withCode(cell.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</span></span>
+                    {cell.note && <span class="note">{cell.note}</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="compare-foot">Checked against {competitor.sources.map((source, i) => (<>{i > 0 && ', '}<a href={source.url}>{source.label}</a></>))} and the vendor’s documentation on {CHECKED_ON}. Prices are per user per month on annual billing. If something here is out of date, <a href="https://github.com/stormhop/kurlo/issues">open an issue</a>.</p>
+    </div>
+  </section>
+
+  <section class="section" id="why" aria-labelledby="why-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="why-title">Why people move from {competitor.name}</h2>
+      </div>
+      <dl class="spec">
+        {competitor.reasons.map(item => (
+          <div>
+            <dt>{item.title}</dt>
+            <dd>{withCode(item.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </section>
+
+  <section class="section" id="migrate" aria-labelledby="migrate-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="migrate-title">Moving from {competitor.name}</h2>
+        <p>{competitor.migrate.intro} <a href={href(competitor.migrate.link)}>Migration guide</a></p>
+      </div>
+      <ol class="vs-steps">
+        {competitor.migrate.steps.map(step => <li>{step}</li>)}
+      </ol>
+      <p class="vs-carries"><b>What comes across:</b> {withCode(competitor.migrate.carries).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</p>
+    </div>
+  </section>
+</LandingLayout>

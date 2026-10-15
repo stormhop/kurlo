@@ -1,0 +1,31 @@
+---
+import type { ImageMetadata } from 'astro';
+import { getImage } from 'astro:assets';
+
+interface Props {
+  light: ImageMetadata;
+  dark: ImageMetadata;
+  alt: string;
+}
+
+const { light, dark, alt } = Astro.props;
+const widths = [800, 1200, 1800, 2400];
+const sizes = '(max-width: 1200px) 100vw, 1152px';
+const lightImage = await getImage({ src: light, widths, sizes });
+const darkImage = await getImage({ src: dark, widths, sizes });
+---
+
+<picture data-themed-shot>
+  <source media="(prefers-color-scheme: dark)" srcset={darkImage.srcSet.attribute} sizes={sizes} data-dark />
+  <img src={lightImage.src} srcset={lightImage.srcSet.attribute} sizes={sizes} alt={alt} width={light.width} height={light.height} loading="eager" fetchpriority="high" decoding="async" />
+</picture>
+<script is:inline>
+  (() => {
+    const shot = document.currentScript.previousElementSibling;
+    const source = shot && shot.querySelector('source[data-dark]');
+    if (!source) return;
+    const theme = document.documentElement.dataset.theme;
+    const system = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (theme !== system) source.media = theme === 'dark' ? 'all' : 'not all';
+  })();
+</script>

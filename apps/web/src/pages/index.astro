@@ -1,19 +1,17 @@
 ---
-import '@fontsource-variable/geist';
-import '@fontsource-variable/geist-mono';
-import '../styles/landing.css';
-import { Image } from 'astro:assets';
-import logo from '../assets/logo.png';
+import LandingLayout from '../components/LandingLayout.astro';
+import ThemedShot from '../components/ThemedShot.astro';
 import requestEditor from '../assets/screenshots/request-editor.png';
+import requestEditorDark from '../assets/screenshots/request-editor-dark.png';
+import { structuredData } from '../../site.schema.mjs';
+import { competitors } from '../lib/competitors';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 const site = Astro.site ? new URL(base, Astro.site).toString() : base;
 const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
 
-const title = 'Kurlo — the API client your AI agent can use';
-const description = 'A free, open-source desktop API client for HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE and MCP. Requests are YAML files in your repo, and your AI agent can run and edit them. No account, no cloud, no telemetry.';
-const releases = 'https://github.com/stormhop/kurlo/releases/latest';
-const github = 'https://github.com/stormhop/kurlo';
+const title = 'Kurlo — free, open-source API client and Postman alternative';
+const description = 'A free, open-source desktop API client and Postman alternative for HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE and MCP. Requests are YAML files in your repo, and your AI agent can run and edit them. No account, no cloud, no telemetry.';
 
 const facts = ['Free and MIT licensed', 'No account', 'No telemetry', 'macOS, Windows, Linux'];
 
@@ -38,102 +36,6 @@ const features = [
   { title: 'History', text: 'Every send with its response, kept for 14 days and reopenable in the editor.', link: 'docs/guides/history/' },
 ];
 
-type Mark = 'yes' | 'part' | 'no';
-type Cell = { mark: Mark; text: string; note?: string };
-const tools = ['Kurlo', 'Postman', 'Insomnia', 'Bruno'];
-const comparison: { label: string; cells: Cell[] }[] = [
-  {
-    label: 'Price',
-    cells: [
-      { mark: 'yes', text: 'Free, every feature' },
-      { mark: 'part', text: 'Free for 1 user', note: 'Team plan $19 per user a month' },
-      { mark: 'part', text: 'Free up to 3 Git Sync users', note: 'Pro $12 per user a month' },
-      { mark: 'part', text: 'Free: 2 workspaces, 5 OpenAPI syncs a month', note: 'Pro $6, Ultimate $11 per user a month' },
-    ],
-  },
-  {
-    label: 'Account',
-    cells: [
-      { mark: 'yes', text: 'Not needed' },
-      { mark: 'part', text: 'Required for collections', note: 'Signed out, it only sends one-off requests' },
-      { mark: 'part', text: 'Required beyond Scratch Pad' },
-      { mark: 'yes', text: 'Not needed' },
-    ],
-  },
-  {
-    label: 'Where collections live',
-    cells: [
-      { mark: 'yes', text: 'Your disk and your Git repo' },
-      { mark: 'part', text: 'Postman’s cloud', note: 'Local vault for secrets' },
-      { mark: 'part', text: 'Cloud, local or Git' },
-      { mark: 'yes', text: 'Your disk and your Git repo' },
-    ],
-  },
-  {
-    label: 'Team sharing',
-    cells: [
-      { mark: 'yes', text: 'Any Git host, no seat limit' },
-      { mark: 'part', text: 'Cloud workspaces', note: 'Paid for teams' },
-      { mark: 'part', text: 'Git Sync', note: 'Free up to 3 users' },
-      { mark: 'part', text: 'Git', note: 'Private Git providers need Pro' },
-    ],
-  },
-  {
-    label: 'Source code',
-    cells: [
-      { mark: 'yes', text: 'MIT' },
-      { mark: 'no', text: 'Closed' },
-      { mark: 'yes', text: 'Apache-2.0' },
-      { mark: 'yes', text: 'MIT core', note: 'Paid editions on top' },
-    ],
-  },
-  {
-    label: 'Built on',
-    cells: [
-      { mark: 'yes', text: 'Native Go with the system WebView' },
-      { mark: 'part', text: 'Electron' },
-      { mark: 'part', text: 'Electron' },
-      { mark: 'part', text: 'Electron' },
-    ],
-  },
-  {
-    label: 'Postman scripts',
-    cells: [
-      { mark: 'yes', text: 'Run as written in pm.*' },
-      { mark: 'yes', text: 'Native' },
-      { mark: 'part', text: 'Compatibility layer' },
-      { mark: 'part', text: 'Converted to bru.* on import', note: 'Complex scripts need rewriting' },
-    ],
-  },
-  {
-    label: 'Mock server',
-    cells: [
-      { mark: 'yes', text: 'Local, no request cap', note: 'Works offline, no account' },
-      { mark: 'part', text: 'Cloud-hosted', note: 'Unlimited since March 2026, needs an account' },
-      { mark: 'part', text: '1,000 mock requests a month on free' },
-      { mark: 'yes', text: 'Local' },
-    ],
-  },
-  {
-    label: 'Browser CORS and CSP checks',
-    cells: [
-      { mark: 'yes', text: 'Built in' },
-      { mark: 'no', text: 'No' },
-      { mark: 'no', text: 'No' },
-      { mark: 'no', text: 'No' },
-    ],
-  },
-  {
-    label: 'Sync cookies from your browser',
-    cells: [
-      { mark: 'yes', text: 'Extension for Chromium and Firefox' },
-      { mark: 'yes', text: 'Interceptor extension' },
-      { mark: 'no', text: 'No' },
-      { mark: 'no', text: 'No' },
-    ],
-  },
-];
-
 const codeTerms = /(pm\.sendRequest|kurlo run|kurlo mcp|pm\.\*|bru\.\*)/g;
 const withCode = (text: string) => text.split(codeTerms).map((part, i) => (i % 2 ? { code: part } : { text: part }));
 
@@ -150,85 +52,21 @@ const scriptSnippet = [
   '})',
 ].join('\n');
 
-const ldJson = JSON.stringify({
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'Kurlo',
+const ldJson = structuredData({
+  siteRoot: site,
   description,
-  applicationCategory: 'DeveloperApplication',
-  operatingSystem: 'macOS, Windows, Linux',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  url: site,
-  downloadUrl: releases,
-  sameAs: [github],
+  screenshot: new URL(requestEditor.src, site).href,
+  page: { url: site, name: title, description },
 });
 ---
 
-<!doctype html>
-<html lang="en" data-theme="light">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={site} />
-  <link rel="icon" href={href('favicon-32.png')} type="image/png" />
-  <link rel="apple-touch-icon" href={href('apple-touch-icon.png')} />
-  <link rel="sitemap" href={href('sitemap-index.xml')} />
-  <meta property="og:type" content="website" />
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
-  <meta property="og:url" content={site} />
-  <meta property="og:image" content={`${site}og.png`} />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content={`${site}og.png`} />
-  <meta name="color-scheme" content="light dark" />
-  <script is:inline>
-    (() => {
-      let stored = null;
-      try { stored = localStorage.getItem('starlight-theme'); } catch {}
-      const theme = stored === 'light' || stored === 'dark'
-        ? stored
-        : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.dataset.theme = theme;
-    })();
-  </script>
-  <script is:inline type="application/ld+json" set:html={ldJson} />
-</head>
-<body class="landing">
-  <a class="skip" href="#main">Skip to content</a>
-
-  <header class="nav" data-nav>
-    <div class="wrap nav-row">
-      <a class="brand" href={base} aria-label="Kurlo home">
-        <img src={logo.src} alt="" width="28" height="28" />
-        <span>Kurlo</span>
-      </a>
-      <nav class="nav-links" aria-label="Site">
-        <a href="#agents">AI agents</a>
-        <a href="#features">Features</a>
-        <a href="#compare">Compare</a>
-        <a href={href('docs/getting-started/installation/')}>Docs</a>
-      </nav>
-      <div class="nav-actions">
-        <a class="gh" href={github}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.29-1.69-1.29-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
-          <span>GitHub</span>
-        </a>
-        <a class="btn btn-primary btn-sm" href={href('download/')}>Download</a>
-      </div>
-    </div>
-  </header>
-
-  <main id="main">
+<LandingLayout title={title} description={description} canonical={site} ldJson={ldJson} links={[{ label: 'AI agents', href: '#agents' }, { label: 'MCP', href: href('mcp/') }, { label: 'Features', href: '#features' }, { label: 'Compare', href: '#compare' }, { label: 'Docs', href: href('docs/getting-started/installation/') }]}>
     <section class="hero" aria-labelledby="hero-title">
       <div class="wrap">
         <div class="hero-grid">
           <div class="hero-copy">
-            <h1 id="hero-title">Your AI agent writes the API requests. You see them in Kurlo.</h1>
-            <p class="lead">Kurlo is a free, open-source API client for HTTP, GraphQL, gRPC, WebSocket and more. Collections are plain YAML in your repo, so your team reviews them in Git and your agent keeps them up to date.</p>
+            <h1 id="hero-title">The open-source API client your AI agent can use.</h1>
+            <p class="lead">Kurlo speaks HTTP, GraphQL, gRPC, WebSocket and more, costs nothing and needs no account. Collections are plain YAML in your repo, so your team reviews them in Git and your agent keeps them up to date.</p>
             <div class="cta">
               <a class="btn btn-primary" href={href('download/')} data-os-download>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -301,7 +139,7 @@ const ldJson = JSON.stringify({
           </figure>
         </div>
         <figure class="shot hero-shot">
-          <Image src={requestEditor} alt="Kurlo with a POST request to a login endpoint, its JSON body, and a 200 OK response with one passing test" widths={[800, 1200, 1800, 2400]} sizes="(max-width: 1200px) 100vw, 1152px" loading="eager" fetchpriority="high" />
+          <ThemedShot light={requestEditor} dark={requestEditorDark} alt="Kurlo with a POST request to a login endpoint, its JSON body, and a 200 OK response with one passing test" />
         </figure>
       </div>
     </section>
@@ -310,7 +148,7 @@ const ldJson = JSON.stringify({
       <div class="wrap">
         <div class="head">
           <h2 id="agents-title">What your agent can do</h2>
-          <p>Kurlo is also an MCP server. One command connects it to Claude Code, Codex, Cursor, VS Code, Windsurf, Gemini CLI or Claude Desktop, and your agent works with the same collection you see in the app. <a href={href('docs/guides/mcp-server/')}>Setup and the full tool list</a></p>
+          <p>Kurlo is also an MCP server. One command connects it to Claude Code, Codex, Cursor, VS Code, Windsurf, Gemini CLI or Claude Desktop, and your agent works with the same collection you see in the app. <a href={href('docs/guides/mcp-server/')}>Setup and the full tool list</a>, or <a href={href('mcp/')}>test your own MCP server in Kurlo</a></p>
         </div>
         <dl class="spec">
           {agentAbilities.map(item => (
@@ -366,74 +204,22 @@ const ldJson = JSON.stringify({
           <h2 id="compare-title">Next to Postman, Insomnia and Bruno</h2>
           <p>All four send requests well. They differ in what you pay, where your data lives and what you need an account for.</p>
         </div>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison of Kurlo, Postman, Insomnia and Bruno">
-          <table class="compare">
-            <thead>
-              <tr>
-                <td></td>
-                {tools.map((tool, i) => (
-                  <th scope="col" class={i === 0 ? 'col-kurlo' : undefined}>
-                    {i === 0 ? <span><img src={logo.src} alt="" width="20" height="20" />{tool}</span> : tool}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {comparison.map(row => (
-                <tr>
-                  <th scope="row">{row.label}</th>
-                  {row.cells.map((cell, i) => (
-                    <td class={i === 0 ? 'col-kurlo' : undefined}>
-                      <span class={cell.mark}><span>{withCode(cell.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</span></span>
-                      {cell.note && <span class="note">{cell.note}</span>}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p class="compare-foot">Checked against each vendor’s public pricing page and documentation on 5 October 2026. Prices are per user per month on annual billing. If something here is out of date, <a href={`${github}/issues`}>open an issue</a>.</p>
-      </div>
-    </section>
-
-    <section class="section" id="download" aria-labelledby="download-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="download-title">Download</h2>
-          <p>Open the app and send: there is no sign-up in between. Updates are signed and install themselves. Questions are answered in the <a href={href('docs/faq/')}>FAQ</a>.</p>
-        </div>
-        <div class="platforms">
-          <a class="platform" href={releases} data-platform="mac">
-            <span class="platform-name">macOS <span class="platform-here">Your system</span></span>
-            <span class="platform-meta">Universal .dmg</span>
-          </a>
-          <a class="platform" href={releases} data-platform="windows">
-            <span class="platform-name">Windows <span class="platform-here">Your system</span></span>
-            <span class="platform-meta">x64 and Arm64, no admin</span>
-          </a>
-          <a class="platform" href={releases} data-platform="linux">
-            <span class="platform-name">Linux <span class="platform-here">Your system</span></span>
-            <span class="platform-meta">x64 .AppImage</span>
-          </a>
+        <div class="vs-cards">
+          {competitors.map(competitor => (
+            <a class="vs-card" href={href(`vs/${competitor.slug}/`)}>
+              <span class="vs-card-title">Kurlo vs {competitor.name}</span>
+              <span class="vs-card-summary">{competitor.summary}</span>
+              <ul>
+                {competitor.highlights.map(item => <li><span>{withCode(item).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</span></li>)}
+              </ul>
+              <span class="vs-card-more">Full comparison</span>
+            </a>
+          ))}
         </div>
       </div>
     </section>
-  </main>
 
-  <footer class="foot">
-    <div class="wrap foot-row">
-      <span>© 2026 Kurlo · MIT licensed</span>
-      <nav aria-label="Footer">
-        <a href={href('docs/getting-started/installation/')}>Docs</a>
-        <a href={href('download/')}>Download</a>
-        <a href={href('changelog/')}>Changelog</a>
-        <a href={href('privacy/')}>Privacy</a>
-        <a href={github}>GitHub</a>
-      </nav>
-    </div>
-  </footer>
-
+  <Fragment slot="scripts">
   <script is:inline>
     (() => {
       const ua = navigator.userAgent || '';
@@ -447,13 +233,7 @@ const ldJson = JSON.stringify({
         document.documentElement.dataset.kurloOs = os;
         const label = document.querySelector('[data-os-label]');
         if (label) label.textContent = `Download for ${names[os]}`;
-        document.querySelector(`.platform[data-platform="${os}"]`)?.classList.add('platform-current');
       }
-
-      const nav = document.querySelector('[data-nav]');
-      const mark = () => nav && nav.classList.toggle('nav-scrolled', scrollY > 8);
-      mark();
-      addEventListener('scroll', mark, { passive: true });
 
       const copy = document.querySelector('[data-cmd-copy]');
       const cmd = document.querySelector('[data-cmd]');
@@ -524,5 +304,5 @@ const ldJson = JSON.stringify({
       }
     }
   </script>
-</body>
-</html>
+  </Fragment>
+</LandingLayout>

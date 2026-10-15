@@ -1,0 +1,179 @@
+---
+import LandingLayout from '../components/LandingLayout.astro';
+import ThemedShot from '../components/ThemedShot.astro';
+import requestMcp from '../assets/screenshots/request-mcp.png';
+import requestMcpDark from '../assets/screenshots/request-mcp-dark.png';
+import { structuredData } from '../../site.schema.mjs';
+
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const site = Astro.site ? new URL(base, Astro.site).toString() : base;
+const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
+const pageUrl = new URL('mcp/', site).href;
+
+const title = 'MCP client for testing MCP servers — Kurlo';
+const description = 'Kurlo is a free desktop MCP client: discover a server’s tools, call them with arguments from their schema, and read the raw JSON-RPC exchange. It is also an MCP server that lets your AI agent run and write your API requests.';
+
+const clientAbilities = [
+  { title: 'Discover', text: 'Press Discover and Kurlo shows the server’s name, version, tools, resources and prompts. It only asks for the capabilities the server declares.' },
+  { title: 'Call tools', text: 'tools/call, resources/read and prompts/get. Picking a tool fills the Arguments editor from its input schema, and arguments that are not a JSON object are stopped before they are sent.' },
+  { title: 'Raw exchange', text: 'The JSON-RPC envelope exactly as it arrived, frame by frame when the server streams its answer. This is the view that makes a failing tool call readable.' },
+  { title: 'Notifications', text: 'The progress and log notifications a streamed answer carried before its result.' },
+  { title: 'Spec checks', text: 'A tool whose structuredContent does not match its own outputSchema is flagged, and a tool whose x-mcp-header annotations the specification forbids is named with the reason instead of quietly hidden.' },
+  { title: 'Old and new servers', text: 'Kurlo tries the stateless 2026-07-28 revision first. Servers on 2025-11-25, 2025-06-18 or 2025-03-26 get a session with initialize and Mcp-Session-Id, and the panel names the revision.' },
+  { title: 'Saved like any request', text: 'An MCP call lives in your collection as YAML in Git, with environment variables, pm.* pre-request and test scripts, auth, proxy and client certificates.' },
+];
+
+const agentTools = [
+  { title: 'Read', text: 'list_requests, get_request, list_environments, and list_history with get_history_entry for the requests you just sent from the app.' },
+  { title: 'Run', text: 'run_request and run_collection with their auth, scripts and tests, and send_request for a one-off call with your environment’s variables.' },
+  { title: 'Write', text: 'create_collection, save_request, delete_request, save_example and set_variable change the same YAML files the app writes.' },
+  { title: 'Guardrails', text: 'Secrets reach your API but come back to the model as [secret]. Environments marked protected are refused, and --read-only leaves out every write tool.' },
+];
+
+const faq = [
+  { q: 'What is an MCP client?', a: 'A program that talks to Model Context Protocol servers. AI agents such as Claude Code or Cursor are MCP clients that call tools on their own. Kurlo is one you drive by hand, so you can see each call and its answer before an agent depends on them.' },
+  { q: 'How do I test an MCP server I am building?', a: 'Run it on a local port, put its endpoint in a new MCP request, press Discover and call each tool. Save the calls in a collection and add pm.test checks, and the same calls tell you when a change breaks a tool.' },
+  { q: 'Does it work with servers made with the official SDKs or FastMCP?', a: 'Yes. Those servers mostly speak the session-based revisions, and Kurlo opens the session for them.' },
+  { q: 'Is it free?', a: 'Yes. Kurlo is MIT licensed, with no account, no paid plan and no telemetry.' },
+];
+
+const codeTerms = /(tools\/call|resources\/read|prompts\/get|subscriptions\/listen|structuredContent|outputSchema|x-mcp-header|Mcp-Session-Id|initialize|pm\.\*|pm\.test|npx some-server|--read-only|\[secret\]|list_requests|get_request|list_environments|list_history|get_history_entry|run_request|run_collection|send_request|create_collection|save_request|delete_request|save_example|set_variable)/g;
+const withCode = (text: string) => text.split(codeTerms).map((part, i) => (i % 2 ? { code: part } : { text: part }));
+
+const callSnippet = [
+  '<span class="c">// POST {{baseUrl}}/mcp</span>',
+  '{',
+  '  <span class="s">"jsonrpc"</span>: <span class="s">"2.0"</span>,',
+  '  <span class="s">"method"</span>: <span class="f">"tools/call"</span>,',
+  '  <span class="s">"params"</span>: {',
+  '    <span class="s">"name"</span>: <span class="s">"search_orders"</span>,',
+  '    <span class="s">"arguments"</span>: { <span class="s">"status"</span>: <span class="s">"refunded"</span>, <span class="s">"limit"</span>: 5 }',
+  '  }',
+  '}',
+].join('\n');
+
+const ldJson = structuredData({
+  siteRoot: site,
+  description,
+  screenshot: new URL(requestMcp.src, site).href,
+  page: { url: pageUrl, name: title, description },
+});
+---
+
+<LandingLayout title={title} description={description} canonical={pageUrl} ldJson={ldJson} links={[{ label: 'Test a server', href: '#client' }, { label: 'For agents', href: '#agents' }, { label: 'FAQ', href: '#faq' }, { label: 'Docs', href: href('docs/guides/request-types/#mcp') }]}>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap">
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <h1 id="hero-title">Call an MCP server’s tools yourself, before an agent does.</h1>
+            <p class="lead">Kurlo opens an MCP server like any other API. Discover what it offers, call a tool with arguments taken from its schema, and read the exact JSON-RPC that came back. Every call is a saved request you can replay, test and commit.</p>
+            <div class="cta">
+              <a class="btn btn-primary" href={href('download/')}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Download Kurlo</span>
+              </a>
+              <a class="btn btn-quiet" href={href('docs/guides/request-types/#mcp')}>Read the guide</a>
+            </div>
+            <p class="facts">Free and MIT licensed · No account · MCP 2025-03-26 to 2026-07-28 · macOS, Windows, Linux</p>
+          </div>
+          <figure class="script" aria-label="A tools/call request to an MCP server and the result Kurlo shows">
+            <div class="script-head"><span>Search orders · MCP</span><span>shop-mcp 1.4.0 · MCP 2025-06-18</span></div>
+            <pre set:html={callSnippet} />
+            <div class="script-out">
+              <div><b>✓</b> result · 5 content blocks <span>· 112 ms</span></div>
+              <div><b>✓</b> structuredContent matches outputSchema</div>
+              <div><b>✓</b> pm.test("returns refunded orders only")</div>
+            </div>
+          </figure>
+        </div>
+        <figure class="shot hero-shot">
+          <ThemedShot light={requestMcp} dark={requestMcpDark} alt="Kurlo with an MCP request: a discovered server with its tools, a chosen tool with its arguments, and the tool's result" />
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="client" aria-labelledby="client-title">
+      <div class="wrap">
+        <div class="head">
+          <h2 id="client-title">Test an MCP server</h2>
+          <p>Point Kurlo at the server’s endpoint. Everything below works the same for a server you are writing on localhost and for a hosted one. <a href={href('docs/guides/request-types/#mcp')}>How MCP requests work</a></p>
+        </div>
+        <dl class="spec">
+          {clientAbilities.map(item => (
+            <div>
+              <dt>{item.title}</dt>
+              <dd>{withCode(item.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+
+    <section class="section" id="agents" aria-labelledby="agents-title">
+      <div class="wrap">
+        <div class="head">
+          <h2 id="agents-title">Kurlo is an MCP server too</h2>
+          <p><code>kurlo mcp</code> gives Claude Code, Codex, Cursor, VS Code, Windsurf, Gemini CLI or Claude Desktop your saved API requests. The agent runs them with their auth and tests, and adds new ones to the collection you see in the app. It ships as <a href="https://www.npmjs.com/package/@kurlo/cli"><code>@kurlo/cli</code> on npm</a> and is listed in the official MCP Registry as <code>dev.kurlo/kurlo</code>. <a href={href('docs/guides/mcp-server/')}>Setup and the full tool list</a></p>
+        </div>
+        <div class="cmd mcp-cmd">
+          <span class="cmd-prompt" aria-hidden="true">$</span>
+          <code data-cmd>npx -y @kurlo/cli mcp install</code>
+          <button class="cmd-copy" type="button" data-cmd-copy aria-label="Copy the install command">
+            <svg class="cmd-icon-copy" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="1.8"/></svg>
+            <svg class="cmd-icon-done" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <dl class="spec">
+          {agentTools.map(item => (
+            <div>
+              <dt>{item.title}</dt>
+              <dd>{withCode(item.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="wrap">
+        <div class="head">
+          <h2 id="faq-title">Questions</h2>
+        </div>
+        <dl class="spec">
+          {faq.map(item => (
+            <div>
+              <dt>{item.q}</dt>
+              <dd>{withCode(item.a).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+
+  <Fragment slot="scripts">
+  <script is:inline>
+    (() => {
+      const copy = document.querySelector('[data-cmd-copy]');
+      const cmd = document.querySelector('[data-cmd]');
+      if (copy && cmd) {
+        let reset;
+        copy.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(cmd.textContent);
+            copy.dataset.copied = '';
+            copy.setAttribute('aria-label', 'Copied');
+          } catch {
+            const range = document.createRange();
+            range.selectNodeContents(cmd);
+            const selection = getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          clearTimeout(reset);
+          reset = setTimeout(() => { delete copy.dataset.copied; copy.setAttribute('aria-label', 'Copy the install command'); }, 1600);
+        });
+      }
+    })();
+  </script>
+  </Fragment>
+</LandingLayout>

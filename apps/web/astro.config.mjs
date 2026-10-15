@@ -1,4 +1,7 @@
 
+import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 import sitemap from '@astrojs/sitemap';
@@ -6,7 +9,6 @@ import { unified } from '@astrojs/markdown-remark';
 
 
 import {
-  GITHUB_RELEASES,
   GITHUB_SOURCE,
   SITE_BASE,
   SITE_BASE_PATH,
@@ -15,10 +17,33 @@ import {
   SITE_URL,
 } from './site.config.mjs';
 import { DOCS_SIDEBAR } from './docs.sidebar.mjs';
+import { structuredData } from './site.schema.mjs';
 
 const SITE = SITE_URL;
 const BASE = SITE_BASE;
 const BASE_NORMALIZED = SITE_BASE_PATH;
+
+function sourcesFor(pathname) {
+  const route = pathname.slice(BASE_NORMALIZED.length).replace(/^\/+|\/+$/g, '');
+  if (route === '') return ['src/pages/index.astro'];
+  if (route.startsWith('vs/')) return ['src/pages/vs/[tool].astro', 'src/lib/competitors.ts'];
+  const candidates = [
+    `src/pages/${route}.astro`,
+    ...['md', 'mdx'].flatMap(ext => [`src/content/docs/${route}.${ext}`, `src/content/docs/${route}/index.${ext}`]),
+  ];
+  return candidates.filter(file => existsSync(file)).slice(0, 1);
+}
+
+function lastModified(pathname) {
+  const files = sourcesFor(pathname);
+  if (!files.length) return undefined;
+  try {
+    const date = execFileSync('git', ['log', '-1', '--format=%cI', '--', ...files], { encoding: 'utf8' }).trim();
+    return date || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function rehypeBasePaths() {
   if (!BASE_NORMALIZED) return () => tree => tree;
@@ -163,24 +188,19 @@ export default defineConfig({
         {
           tag: 'script',
           attrs: { type: 'application/ld+json' },
-          content: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'SoftwareApplication',
-            name: SITE_NAME,
-            description: SITE_TAGLINE,
-            applicationCategory: 'DeveloperApplication',
-            operatingSystem: 'macOS, Windows, Linux',
-            offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-            url: `${SITE}${BASE_NORMALIZED}/`,
-            downloadUrl: GITHUB_RELEASES,
-            sameAs: [GITHUB_SOURCE, GITHUB_RELEASES],
-          }),
+          content: structuredData({ siteRoot: `${SITE}${BASE_NORMALIZED}/`, description: SITE_TAGLINE }),
         },
       ],
       sidebar: DOCS_SIDEBAR,
       lastUpdated: true,
       pagefind: true,
     }),
-    sitemap({ filter: page => !page.endsWith('/pricing/') }),
+    sitemap({
+      filter: page => !page.endsWith('/pricing/'),
+      serialize: item => {
+        const lastmod = lastModified(new URL(item.url).pathname);
+        return lastmod ? { ...item, lastmod } : item;
+      },
+    }),
   ],
 });
