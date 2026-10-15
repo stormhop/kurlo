@@ -302,5 +302,9 @@ export function normalizeHistoryEntry(
         status: input.status || '',
         duration: finiteNumber(input.duration),
         createdAt,
+        ...(input.responseStored === true ? { responseStored: true } : {}),
+        ...(input.responseSize !== undefined ? { responseSize: finiteNumber(input.responseSize) } : {}),
+        ...(typeof input.responseContentType === 'string' && input.responseContentType ? { responseContentType: input.responseContentType } : {}),
+        ...(input.responseTruncated === true ? { responseTruncated: true } : {}),
     };
 }

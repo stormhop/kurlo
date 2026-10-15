@@ -210,6 +210,20 @@ describe('normalizeHistoryEntry', () => {
     expect(entry && 'sourceRequestId' in entry).toBe(false);
   });
 
+  it('keeps the link to the stored response across a reload', () => {
+    const entry = normalizeHistoryEntry({
+      id: 'history-3', request, statusCode: 200, createdAt: 1,
+      responseStored: true, responseSize: 429, responseContentType: 'application/json', responseTruncated: true,
+    }, [collection], 'workspace-1');
+    expect(entry).toMatchObject({ responseStored: true, responseSize: 429, responseContentType: 'application/json', responseTruncated: true });
+  });
+
+  it('leaves entries without a stored response unmarked', () => {
+    const entry = normalizeHistoryEntry({ id: 'history-4', request, statusCode: 200, createdAt: 1, responseStored: false }, [collection], 'workspace-1');
+    expect(entry && 'responseStored' in entry).toBe(false);
+    expect(entry && 'responseTruncated' in entry).toBe(false);
+  });
+
   it('keeps the protected mark on an environment and drops it when false', () => {
     expect(normalizeEnvironment({ id: 'environment-prod', name: 'Prod', protected: true }, 'workspace-1').protected).toBe(true);
     expect('protected' in normalizeEnvironment({ id: 'environment-local', name: 'Local', protected: false }, 'workspace-1')).toBe(false);
