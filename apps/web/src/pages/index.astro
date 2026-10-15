@@ -5,123 +5,37 @@ import '../styles/landing.css';
 import { Image } from 'astro:assets';
 import logo from '../assets/logo.png';
 import requestEditor from '../assets/screenshots/request-editor.png';
-import requestMcp from '../assets/screenshots/request-mcp.png';
-import runnerResults from '../assets/screenshots/collection-runner-results.png';
-import mockServer from '../assets/landing/mock-server.png';
-import gitWorkspace from '../assets/landing/git-workspace.png';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 const site = Astro.site ? new URL(base, Astro.site).toString() : base;
 const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
 
-const title = 'Kurlo — the API client with no pricing page';
-const description = 'A free, open-source desktop API client for HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE and MCP. No account, no seats, no cloud, no telemetry. Imports Postman, Insomnia and Bruno.';
+const title = 'Kurlo — the API client your AI agent can use';
+const description = 'A free, open-source desktop API client for HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE and MCP. Requests are YAML files in your repo, and your AI agent can run and edit them. No account, no cloud, no telemetry.';
 const releases = 'https://github.com/stormhop/kurlo/releases/latest';
 const github = 'https://github.com/stormhop/kurlo';
 
-const protocols = ['HTTP/1.1 & 2', 'GraphQL', 'gRPC', 'WebSocket', 'Socket.IO', 'SSE', 'MCP'];
-const imports = ['Postman', 'Insomnia', 'Bruno', 'OpenAPI', 'HAR', 'cURL'];
-const heroMeta = ['MIT licensed', 'No telemetry', 'macOS, Windows, Linux'];
+const facts = ['Free and MIT licensed', 'No account', 'No telemetry', 'macOS, Windows, Linux'];
 
-const migrations = [
-  {
-    id: 'postman',
-    label: 'Postman',
-    steps: [
-      { title: 'Export the collection.', text: 'Right-click it in Postman, choose Export, then Collection v2.1. Export environments from the Environments list.' },
-      { title: 'Drop the files on Kurlo’s sidebar.', text: 'The format is detected for you. The folder tree, auth, scripts and examples are kept.' },
-      { title: 'Pick the environment and send.', text: 'Your tests run as they did in Postman. Export back to v2.1 any time a teammate still needs it.' },
-    ],
-  },
-  {
-    id: 'insomnia',
-    label: 'Insomnia',
-    steps: [
-      { title: 'Export your data.', text: 'In Insomnia, open Preferences, then Data, then Export Data as Insomnia v4 JSON.' },
-      { title: 'Drop the file on Kurlo’s sidebar.', text: 'Each workspace becomes a collection, request groups become folders, and environments come along.' },
-      { title: 'Check template tags.', text: 'Plain variables carry over. Custom Nunjucks tags such as timestamps move into a pre-request script.' },
-    ],
-  },
-  {
-    id: 'bruno',
-    label: 'Bruno',
-    steps: [
-      { title: 'Use the YAML format.', text: 'Bruno 4.1 and later convert a .bru collection to OpenCollection YAML in one click.' },
-      { title: 'Import the collection folder.', text: 'Choose Bruno / OpenCollection in Kurlo’s import dialog. Empty folders and saved responses are kept.' },
-      { title: 'Keep using Git.', text: 'Kurlo workspaces are YAML in a repository too, so your review flow stays the same.' },
-    ],
-  },
+const agentAbilities = [
+  { title: 'Run your requests', text: 'Saved requests and whole collections, with their auth, scripts and tests, in the environment you choose.' },
+  { title: 'Write requests and tests', text: 'As it writes an endpoint, it adds the request with pm.* tests to your collection, as YAML that lands in the same commit.' },
+  { title: 'Read what you just sent', text: 'Ask why your last request failed, and it reads the request and response from the app. Nothing to copy.' },
+  { title: 'Keep examples', text: 'It saves real responses as examples, which the mock server serves and responses are compared against.' },
+  { title: 'Keep secrets out', text: 'Tokens reach your API but never the model, and nothing it writes contains a secret. Environments you protect, such as production, are off limits.' },
 ];
 
-const checks = [
-  { title: 'CORS preflight', text: 'Sent when the method or headers need it. Allowed methods, headers and Max-Age are checked.' },
-  { title: 'Credentials', text: 'Cookies are held back cross-origin unless you include them, and a wildcard origin then fails.' },
-  { title: 'CSP connect-src', text: 'Paste the page’s policy. A blocked URL fails before Kurlo connects, and every redirect is checked again.' },
-  { title: 'Origin and Sec-Fetch', text: 'A browser User-Agent, Origin and Sec-Fetch headers, worked out from scheme, host and port.' },
-];
-
-const extras = [
-  { title: 'Your browser’s cookies', text: 'Pair the extension for Chrome, Edge, Brave or Firefox and send with the session you’re already signed into.', link: 'docs/guides/cookies/' },
-  { title: 'Every environment side by side', text: 'A matrix of variables across environments. The token missing from staging is one glance away.', link: 'docs/guides/environments/' },
-  { title: 'Auth set once per collection', text: 'Headers, auth, scripts and settings defined on a collection apply to every request inside it.', link: 'docs/guides/collection-defaults/' },
-  { title: 'Keyboard first', text: 'A command palette and rebindable shortcuts that follow the physical key on any layout.', link: 'docs/reference/keyboard-shortcuts/' },
-  { title: 'History you can reopen', text: 'Every send with its response, kept for 14 days. Open an old one back in the editor.', link: 'docs/guides/history/' },
-  { title: 'Large responses stay fast', text: 'Bodies over 10 MB are paged instead of freezing the window. Images, HTML and PDFs preview inline.', link: 'docs/guides/response-viewer/' },
-];
-
-const agentClients = [
-  {
-    id: 'install',
-    label: 'Every client',
-    code: [
-      '<span class="d">$</span> npx -y @kurlo/cli mcp install --env Staging',
-      'Claude Code  added   user config',
-      'Cursor       added   ~/.cursor/mcp.json',
-      'Codex        added   ~/.codex/config.toml',
-      '',
-      '<span class="d"># or for the whole team, in the repository</span>',
-      '<span class="d">$</span> npx -y @kurlo/cli mcp install --project',
-    ].join('\n'),
-  },
-  {
-    id: 'claude-code',
-    label: 'Claude Code',
-    code: '<span class="d">$</span> claude mcp add kurlo -- npx -y @kurlo/cli mcp --env Staging',
-  },
-  {
-    id: 'codex',
-    label: 'Codex',
-    code: [
-      '<span class="d">$</span> codex mcp add kurlo -- npx -y @kurlo/cli mcp --env Staging',
-      '',
-      '<span class="d"># or in ~/.codex/config.toml</span>',
-      '[mcp_servers.kurlo]',
-      'command = "npx"',
-      'args = ["-y", "@kurlo/cli", "mcp", "--env", "Staging"]',
-    ].join('\n'),
-  },
-  {
-    id: 'mcp-json',
-    label: 'Cursor and other clients',
-    code: [
-      '<span class="d">// .cursor/mcp.json or claude_desktop_config.json</span>',
-      '{',
-      '  "mcpServers": {',
-      '    "kurlo": {',
-      '      "command": "npx",',
-      '      "args": ["-y", "@kurlo/cli", "mcp", "--env", "Staging"]',
-      '    }',
-      '  }',
-      '}',
-    ].join('\n'),
-  },
-];
-
-const agentTicks = [
-  'Runs saved requests with their collection auth, scripts and tests',
-  'Adds and changes requests and tests as plain YAML, never secrets',
-  'Reads the last request you sent from the app, so you debug together',
-  'Environments you protect stay out of its reach',
+const features = [
+  { title: 'Every protocol', text: 'HTTP/1.1 and 2, GraphQL with schema explorer, gRPC, WebSocket, Socket.IO, SSE, and MCP servers you can call by hand.', link: 'docs/guides/request-types/' },
+  { title: 'Git workspaces', text: 'Requests are readable YAML in your repository, reviewed in pull requests. Secrets stay on your machine as placeholders.', link: 'docs/guides/git-workspaces/' },
+  { title: 'Postman scripts', text: 'Pre-request and test scripts in JavaScript with the pm.* API, including pm.sendRequest, chai and CryptoJS.', link: 'docs/guides/scripting/' },
+  { title: 'Mock server', text: 'Serve a collection’s saved examples on localhost while the real endpoint is still being built. No request quota.', link: 'docs/guides/mock-server/' },
+  { title: 'Runner and CI', text: 'Run a collection with data files in the app, or the same requests and tests in CI with kurlo run.', link: 'docs/guides/cli-runner/' },
+  { title: 'Browser checks', text: 'Send a request the way a page on another origin would, and see the CORS or CSP error before your users do.', link: 'docs/guides/browser-security/' },
+  { title: 'Environments', text: 'Every variable across every environment in one table, so the value missing from staging is easy to spot.', link: 'docs/guides/environments/' },
+  { title: 'Auth', text: 'OAuth 2.0 with all four grants, PKCE and refresh, AWS SigV4, Digest, API keys and client certificates.', link: 'docs/guides/authentication/' },
+  { title: 'Browser cookies', text: 'An extension for Chrome, Edge, Brave and Firefox sends the session you are already signed into.', link: 'docs/guides/cookies/' },
+  { title: 'History', text: 'Every send with its response, kept for 14 days and reopenable in the editor.', link: 'docs/guides/history/' },
 ];
 
 type Mark = 'yes' | 'part' | 'no';
@@ -220,23 +134,8 @@ const comparison: { label: string; cells: Cell[] }[] = [
   },
 ];
 
-const faq = [
-  { q: 'Is it really free?', a: 'Yes. There is no paid plan, no locked feature and no seat limit. The code is MIT-licensed, so you can read it or build it yourself.' },
-  { q: 'Do I need an account?', a: 'No. Open the app and send. There is no Kurlo server to sign in to.' },
-  { q: 'Where is my data?', a: 'On your disk, encrypted with AES-256-GCM. The key lives in macOS Keychain, Windows DPAPI or libsecret on Linux.' },
-  { q: 'Does Kurlo send anything home?', a: 'No analytics and no crash reports. The network carries your requests, OAuth, Git and the update check. Nothing else.' },
-  { q: 'How does my team share collections?', a: 'Put the workspace in a Git repository. Requests are YAML you review in pull requests; secrets stay on each machine.' },
-  { q: 'Will my Postman scripts work?', a: 'Most run unchanged, including pm.sendRequest, CryptoJS and require for lodash, ajv, chai and uuid. setTimeout, async and await, and postman.setNextRequest aren’t supported yet.' },
-  { q: 'Can I run tests in CI?', a: 'npx @kurlo/cli run ./workspace --env CI runs the same requests and scripts, writes JUnit or JSON, and exits non-zero on a failed test. No desktop app needed on the runner.' },
-  { q: 'macOS says the app can’t be opened.', a: 'Builds aren’t notarized by Apple yet. Right-click Kurlo.app, choose Open, and confirm once. Every update is checked against a SHA-256 hash and a minisign signature before it installs.' },
-  { q: 'Is it maintained?', a: 'New versions ship often, and every change is listed in the public changelog. Updates install from inside the app.' },
-  { q: 'Which platforms?', a: 'macOS on Apple silicon and Intel, Windows 10 and 11 on x64 and Arm64, and Linux x64 as an AppImage.' },
-];
-
-const codeTerms = /(pm\.sendRequest|CryptoJS|require|setTimeout|postman\.setNextRequest|npx @kurlo\/cli run \.\/workspace --env CI|kurlo run|kurlo mcp|pm\.\*|bru\.\*)/g;
+const codeTerms = /(pm\.sendRequest|kurlo run|kurlo mcp|pm\.\*|bru\.\*)/g;
 const withCode = (text: string) => text.split(codeTerms).map((part, i) => (i % 2 ? { code: part } : { text: part }));
-
-const pricingBody = '<span>content-type</span>: text/plain\n\nEvery feature is in the free app.\nThere is nothing to upgrade to.';
 
 const scriptSnippet = [
   '<span class="c">// unchanged from the Postman export</span>',
@@ -308,11 +207,9 @@ const ldJson = JSON.stringify({
         <span>Kurlo</span>
       </a>
       <nav class="nav-links" aria-label="Site">
-        <a href="#tour">Features</a>
         <a href="#agents">AI agents</a>
-        <a href="#browser">Browser checks</a>
+        <a href="#features">Features</a>
         <a href="#compare">Compare</a>
-        <a href="#faq">FAQ</a>
         <a href={href('docs/getting-started/installation/')}>Docs</a>
       </nav>
       <div class="nav-actions">
@@ -329,314 +226,127 @@ const ldJson = JSON.stringify({
     <section class="hero" aria-labelledby="hero-title">
       <div class="wrap">
         <div class="hero-grid">
-          <div>
-            <h1 id="hero-title">The API client with <span>no pricing page.</span></h1>
-            <p class="lead">Kurlo is a free, open-source desktop app for HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE and MCP. No account, no seats, no cloud. Your collections are files on your disk, and Git is how your team shares them.</p>
+          <div class="hero-copy">
+            <h1 id="hero-title">Your AI agent writes the API requests. You see them in Kurlo.</h1>
+            <p class="lead">Kurlo is a free, open-source API client for HTTP, GraphQL, gRPC, WebSocket and more. Collections are plain YAML in your repo, so your team reviews them in Git and your agent keeps them up to date.</p>
             <div class="hero-actions">
               <a class="btn btn-primary" href={href('download/')} data-os-download>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span data-os-label>Download Kurlo</span>
               </a>
-              <a class="btn btn-quiet" href="#switch">Bring my Postman collection</a>
+              <a class="btn btn-quiet" href="#agents">How it works</a>
             </div>
-            <a class="hero-agents" href="#agents">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M7.5 7.5l-2-2m13 13-2-2m0-9 2-2m-13 13 2-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
-              <span>Works with Claude Code, Codex, Cursor and any MCP client&nbsp;→</span>
-            </a>
-            <ul class="hero-meta">
-              {heroMeta.map(item => (
-                <li>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  {item}
-                </li>
-              ))}
-            </ul>
+            <div class="hero-install">
+              <pre class="cli"><span class="d">$</span> npx -y @kurlo/cli mcp install</pre>
+              <p>Connects Claude Code, Codex, Cursor and other AI clients.</p>
+            </div>
+            <p class="facts">{facts.join(' · ')}</p>
           </div>
-          <figure class="probe" aria-label="A request to kurlo.dev/pricing returns 404 Not Found">
-            <div class="probe-head"><span class="probe-method">GET</span><span class="probe-url">https://kurlo.dev/pricing</span></div>
-            <div class="probe-status"><b>404 Not Found</b><span>38 ms</span><span>66 B</span></div>
-            <pre set:html={pricingBody} />
-            <div class="probe-foot">✓ pm.test("no paywall") <span>· 1/1 passed</span></div>
+        <figure class="demo demo-stack" data-demo aria-label="An AI agent adds a Refund order request with tests to the Shop API collection through kurlo mcp, runs it, saves the response as an example, and the request appears in the open Kurlo window">
+            <div class="agent demo-chat">
+              <div class="script-head"><span>Agent session</span><span>kurlo mcp · Local</span></div>
+              <ol class="agent-log">
+                <li class="agent-say" data-at="1"><span class="who">you</span><p>Add the refund endpoint I just wrote to Kurlo, with a test.</p></li>
+                <li class="agent-call" data-at="2">
+                  <div><span class="tool">save_request</span> <span class="dim">Shop API/Orders/Refund order</span></div>
+                  <div data-at="3"><b class="ok">✓</b> created <span class="dim">requests/Refund-order.yml</span></div>
+                </li>
+                <li class="agent-call" data-at="4">
+                  <div><span class="tool">run_request</span> <span class="dim">Refund order</span></div>
+                  <div data-at="5"><b class="ok">✓</b> POST /orders/42/refund <span class="dim">→</span> 201 <span class="dim">· 84 ms · [2/2]</span></div>
+                </li>
+                <li class="agent-call" data-at="6">
+                  <div><span class="tool">save_example</span> <span class="dim">Refunded</span></div>
+                  <div><b class="ok">✓</b> 201 kept for the mock server</div>
+                </li>
+                <li class="agent-say" data-at="7"><span class="who">agent</span><p>Done. <em>Refund order</em> is in Orders with two passing tests, and its 201 response is saved as an example.</p></li>
+              </ol>
+            </div>
+            <div class="demo-app" aria-hidden="true">
+              <div class="demo-bar"><span></span><span></span><span></span><b>Kurlo</b></div>
+              <div class="demo-body">
+                <div class="demo-side">
+                  <div class="demo-col">Shop API</div>
+                  <div class="demo-folder">Orders</div>
+                  <div class="demo-row"><span class="m-get">GET</span>List orders</div>
+                  <div class="demo-row"><span class="m-post">POST</span>Create order</div>
+                  <div class="demo-row demo-new" data-at="3"><span class="m-post">POST</span>Refund order</div>
+                  <div class="demo-folder">Payments</div>
+                </div>
+                <div class="demo-main">
+                  <div class="demo-url" data-at="3"><span class="m-post">POST</span>&#123;&#123;baseUrl&#125;&#125;/orders/&#123;&#123;orderId&#125;&#125;/refund</div>
+                  <div class="demo-status" data-at="5"><b>201 Created</b><span>84 ms</span><span>312 B</span></div>
+                  <ul class="demo-tests" data-at="5">
+                    <li><b>✓</b> status is 201</li>
+                    <li><b>✓</b> refund amount matches the order</li>
+                  </ul>
+                  <div class="demo-chip" data-at="6">Examples · Refunded 201</div>
+                  <div class="demo-git" data-at="7">
+                    <span class="dim">Git · 3 changes</span>
+                    <span><b>A</b> collections/Shop-API/requests/Refund-order.yml</span>
+                    <span><b>A</b> collections/Shop-API/examples/Refund-order/Refunded.yml</span>
+                    <span><b class="mod">M</b> collections/Shop-API/collection.yml</span>
+                  </div>
+                </div>
+              </div>
+              <div class="demo-toast" data-at="3" data-flash>Workspace refreshed (files changed outside Kurlo)</div>
+            </div>
           </figure>
         </div>
-
         <figure class="shot hero-shot">
           <Image src={requestEditor} alt="Kurlo with a POST request to a login endpoint, its JSON body, and a 200 OK response with one passing test" widths={[800, 1200, 1800, 2400]} sizes="(max-width: 1200px) 100vw, 1152px" loading="eager" fetchpriority="high" />
         </figure>
-      </div>
-
-      <div class="formats" aria-label="Protocols and import formats">
-        <div class="wrap">
-          <div class="formats-row">
-            <span class="formats-label">Speaks</span>
-            <ul>{protocols.map(item => <li>{item}</li>)}</ul>
-          </div>
-          <div class="formats-row">
-            <span class="formats-label">Imports from</span>
-            <ul>{imports.map(item => <li>{item}</li>)}</ul>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section" id="switch" aria-labelledby="switch-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="switch-title">Switching takes one import, not a weekend.</h2>
-          <p>Folders, auth, environments and saved responses come across. Postman test scripts keep running as <code>pm.*</code>, so you don’t rewrite them in a new dialect.</p>
-        </div>
-        <div class="switch">
-          <div>
-            <div class="tabs" role="tablist" aria-label="Coming from">
-              {migrations.map((source, i) => (
-                <button class="tab" type="button" role="tab" id={`from-${source.id}`} aria-controls={`steps-${source.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>{source.label}</button>
-              ))}
-            </div>
-            {migrations.map((source, i) => (
-              <ol class="steps" role="tabpanel" id={`steps-${source.id}`} aria-labelledby={`from-${source.id}`} hidden={i !== 0}>
-                {source.steps.map(step => (
-                  <li><div><b>{step.title}</b><p>{step.text}</p></div></li>
-                ))}
-              </ol>
-            ))}
-            <p class="switch-note">The import never touches your original files. <a href={href('docs/getting-started/migrating/')}>Full migration guide →</a></p>
-          </div>
-
-          <figure class="script" aria-label="A Postman test script running unchanged in Kurlo">
-            <div class="script-head"><span>Login user · Tests</span><span>imported from Postman</span></div>
-            <pre set:html={scriptSnippet} />
-            <div class="script-out">
-              <div><b>✓</b> status is 200 <span>· 0.4 ms</span></div>
-              <div><b>✓</b> returns a session <span>· 0.6 ms</span></div>
-            </div>
-          </figure>
-        </div>
       </div>
     </section>
 
     <section class="section" id="agents" aria-labelledby="agents-title">
       <div class="wrap">
         <div class="head">
-          <h2 id="agents-title">Your AI agent can run your requests.</h2>
-          <p>Kurlo is also an MCP server. Connect Claude Code, Codex, Cursor or any MCP client, and the agent can send your saved requests, run their tests and keep them up to date. Your tokens reach the API; the model only ever sees <code>[secret]</code>.</p>
+          <h2 id="agents-title">What your agent can do</h2>
+          <p>Kurlo is also an MCP server. One command connects it to Claude Code, Codex, Cursor, VS Code, Windsurf, Gemini CLI or Claude Desktop, and your agent works with the same collection you see in the app. <a href={href('docs/guides/mcp-server/')}>Setup and the full tool list</a></p>
         </div>
-        <div class="agents">
-          <div>
-            <div class="tabs" role="tablist" aria-label="MCP client">
-              {agentClients.map((client, i) => (
-                <button class="tab" type="button" role="tab" id={`agent-${client.id}`} aria-controls={`agent-panel-${client.id}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>{client.label}</button>
-              ))}
+        <dl class="spec">
+          {agentAbilities.map(item => (
+            <div>
+              <dt>{item.title}</dt>
+              <dd>{withCode(item.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
             </div>
-            {agentClients.map((client, i) => (
-              <pre class="cli agent-cli" role="tabpanel" id={`agent-panel-${client.id}`} aria-labelledby={`agent-${client.id}`} hidden={i !== 0} set:html={client.code} />
-            ))}
-            <p class="agent-note">npx fetches Kurlo from npm, with or without the app installed. When the app is installed, clients start the server from it.</p>
-            <ul class="ticks">{agentTicks.map(item => <li><span>{withCode(item).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</span></li>)}</ul>
-            <a class="tour-link" href={href('docs/guides/mcp-server/')}>Connect an assistant →</a>
-          </div>
-
-          <figure class="agent" aria-label="An AI agent runs the Checkout collection through kurlo mcp, finds the failing payment request and explains why">
-            <div class="script-head"><span>Agent session</span><span>kurlo mcp · Staging</span></div>
-            <ol class="agent-log">
-              <li class="agent-say"><span class="who">you</span><p>Check that checkout still works on staging.</p></li>
-              <li class="agent-call">
-                <div><span class="tool">run_collection</span> <span class="dim">Checkout</span></div>
-                <div><b class="ok">✓</b> POST /cart <span class="dim">→</span> 201 <span class="dim">[2/2]</span></div>
-                <div><b class="ok">✓</b> POST /orders <span class="dim">→</span> 201 <span class="dim">[3/3]</span></div>
-                <div><b class="err">✗</b> POST /payments <span class="dim">→</span> <span class="err">422</span> <span class="dim">[0/1]</span></div>
-              </li>
-              <li class="agent-call">
-                <div><span class="tool">get_request</span> <span class="dim">Checkout/Create payment</span></div>
-                <div class="dim">"amount": "&#123;&#123;total&#125;&#125;", "currency": "EUR"</div>
-              </li>
-              <li class="agent-say"><span class="who">agent</span><p>Payments fails: the body sends <em>amount</em> as a string, and the API now wants a number. Remove the quotes around <em>&#123;&#123;total&#125;&#125;</em>?</p></li>
-            </ol>
-            <div class="agent-foot">Authorization: Bearer <span>[secret]</span> <span class="dim">· the token is sent, never shown to the model</span></div>
-          </figure>
-        </div>
+          ))}
+        </dl>
       </div>
     </section>
 
-    <section class="section" id="agent-writes" aria-labelledby="agent-writes-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="agent-writes-title">Your agent keeps the collection up to date.</h2>
-          <p>The agent that writes an endpoint can add its request, tests and example to your workspace, and the open app shows them as the files change. It all lands in Git next to the code, with tokens left as <code>&#123;&#123;variables&#125;&#125;</code>.</p>
-        </div>
-        <figure class="demo" data-demo aria-label="An AI agent adds a Refund order request with tests to the Shop API collection through kurlo mcp, runs it, saves the response as an example, and the request appears in the open Kurlo window">
-          <div class="agent demo-chat">
-            <div class="script-head"><span>Agent session</span><span>kurlo mcp · Local</span></div>
-            <ol class="agent-log">
-              <li class="agent-say" data-at="1"><span class="who">you</span><p>Add the refund endpoint I just wrote to Kurlo, with a test.</p></li>
-              <li class="agent-call" data-at="2">
-                <div><span class="tool">save_request</span> <span class="dim">Shop API/Orders/Refund order</span></div>
-                <div data-at="3"><b class="ok">✓</b> created <span class="dim">requests/Refund-order.yml</span></div>
-              </li>
-              <li class="agent-call" data-at="4">
-                <div><span class="tool">run_request</span> <span class="dim">Refund order</span></div>
-                <div data-at="5"><b class="ok">✓</b> POST /orders/42/refund <span class="dim">→</span> 201 <span class="dim">· 84 ms · [2/2]</span></div>
-              </li>
-              <li class="agent-call" data-at="6">
-                <div><span class="tool">save_example</span> <span class="dim">Refunded</span></div>
-                <div><b class="ok">✓</b> 201 kept for the mock server</div>
-              </li>
-              <li class="agent-say" data-at="7"><span class="who">agent</span><p>Done. <em>Refund order</em> is in Orders with two passing tests, and its 201 response is saved as an example.</p></li>
-            </ol>
+    <section class="section" id="switch" aria-labelledby="switch-title">
+      <div class="wrap switch">
+        <div>
+          <div class="head head-tight">
+            <h2 id="switch-title">Coming from Postman</h2>
+            <p>Export the collection as v2.1 and drop the file on Kurlo’s sidebar. Folders, auth, environments and saved responses come across, and test scripts keep running as <code>pm.*</code>, so there is nothing to rewrite.</p>
           </div>
-          <div class="demo-app" aria-hidden="true">
-            <div class="demo-bar"><span></span><span></span><span></span><b>Kurlo</b></div>
-            <div class="demo-body">
-              <div class="demo-side">
-                <div class="demo-col">Shop API</div>
-                <div class="demo-folder">Orders</div>
-                <div class="demo-row"><span class="m-get">GET</span>List orders</div>
-                <div class="demo-row"><span class="m-post">POST</span>Create order</div>
-                <div class="demo-row demo-new" data-at="3"><span class="m-post">POST</span>Refund order</div>
-                <div class="demo-folder">Payments</div>
-              </div>
-              <div class="demo-main">
-                <div class="demo-url" data-at="3"><span class="m-post">POST</span>&#123;&#123;baseUrl&#125;&#125;/orders/&#123;&#123;orderId&#125;&#125;/refund</div>
-                <div class="demo-status" data-at="5"><b>201 Created</b><span>84 ms</span><span>312 B</span></div>
-                <ul class="demo-tests" data-at="5">
-                  <li><b>✓</b> status is 201</li>
-                  <li><b>✓</b> refund amount matches the order</li>
-                </ul>
-                <div class="demo-chip" data-at="6">Examples · Refunded 201</div>
-                <div class="demo-git" data-at="7">
-                  <span class="dim">Git · 3 changes</span>
-                  <span><b>A</b> collections/Shop-API/requests/Refund-order.yml</span>
-                  <span><b>A</b> collections/Shop-API/examples/Refund-order/Refunded.yml</span>
-                  <span><b class="mod">M</b> collections/Shop-API/collection.yml</span>
-                </div>
-              </div>
-            </div>
-            <div class="demo-toast" data-at="3" data-flash>Workspace refreshed (files changed outside Kurlo)</div>
+          <p class="switch-note">Insomnia, Bruno, OpenAPI, HAR and cURL import the same way, and the original files are never touched. <a href={href('docs/getting-started/migrating/')}>Migration guide</a></p>
+        </div>
+        <figure class="script" aria-label="A Postman test script running unchanged in Kurlo">
+          <div class="script-head"><span>Login user · Tests</span><span>imported from Postman</span></div>
+          <pre set:html={scriptSnippet} />
+          <div class="script-out">
+            <div><b>✓</b> status is 200 <span>· 0.4 ms</span></div>
+            <div><b>✓</b> returns a session <span>· 0.6 ms</span></div>
           </div>
         </figure>
-        <a class="tour-link demo-link" href={href('docs/guides/mcp-server/#writing-to-the-workspace')}>What an agent can change →</a>
       </div>
     </section>
 
-    <section class="section" id="tour" aria-labelledby="tour-title">
+    <section class="section" id="features" aria-labelledby="features-title">
       <div class="wrap">
         <div class="head">
-          <h2 id="tour-title">The paid-tier features are just features here.</h2>
-          <p>Data-driven runs, CI reports, private Git remotes and unmetered mocks sit behind paid plans elsewhere. In Kurlo they ship in the same free download.</p>
+          <h2 id="features-title">What’s in it</h2>
+          <p>Everything ships in the same free download. Nothing needs a plan, a login or a Kurlo server.</p>
         </div>
-
-        <div class="tabs tour-tabs" role="tablist" aria-label="Feature tour">
-          <button class="tab" type="button" role="tab" id="tour-tab-protocols" aria-controls="tour-protocols" aria-selected="true" tabindex="0">Every protocol</button>
-          <button class="tab" type="button" role="tab" id="tour-tab-mock" aria-controls="tour-mock" aria-selected="false" tabindex="-1">Mock server</button>
-          <button class="tab" type="button" role="tab" id="tour-tab-runner" aria-controls="tour-runner" aria-selected="false" tabindex="-1">Runner and CI</button>
-          <button class="tab" type="button" role="tab" id="tour-tab-git" aria-controls="tour-git" aria-selected="false" tabindex="-1">Git workspaces</button>
-        </div>
-
-        <div class="tour" role="tabpanel" id="tour-protocols" aria-labelledby="tour-tab-protocols">
-          <div class="tour-copy">
-            <h3>One window for REST, streams and AI tools.</h3>
-            <p>Send HTTP, GraphQL and gRPC, hold open WebSocket, Socket.IO and SSE connections, and call MCP servers by hand: Kurlo lists their tools and fills the arguments from the schema.</p>
-            <ul class="ticks">
-              <li>OAuth 2.0 with all four grants, PKCE and automatic refresh</li>
-              <li>AWS SigV4, Digest, API keys and client certificates</li>
-              <li>Diff a response against the last one or a saved example</li>
-              <li>Copy as code in 14 languages, with secrets left as placeholders</li>
-            </ul>
-            <a class="tour-link" href={href('docs/guides/request-types/')}>Request types →</a>
-          </div>
-          <figure class="shot"><Image src={requestMcp} alt="An MCP request in Kurlo listing a server’s tools with arguments filled from the tool schema" widths={[700, 1100, 1600]} sizes="(max-width: 900px) 100vw, 760px" /></figure>
-        </div>
-
-        <div class="tour" role="tabpanel" id="tour-mock" aria-labelledby="tour-tab-mock" hidden>
-          <div class="tour-copy">
-            <h3>Build the frontend before the endpoint exists.</h3>
-            <p>Save real responses as examples and serve the collection on localhost. Path templates like <code>/orders/:id</code> and recorded query values decide which example answers.</p>
-            <ul class="ticks">
-              <li>No request quota and no cloud account</li>
-              <li>A live log of every call, including the ones nothing matched</li>
-              <li>Edit an example and the running mock reloads</li>
-              <li>Optionally replay the original response times</li>
-            </ul>
-            <a class="tour-link" href={href('docs/guides/mock-server/')}>How the mock matches requests →</a>
-          </div>
-          <figure class="shot"><Image src={mockServer} alt="Kurlo’s mock server running on port 3100 with a route for GET /orders/:id and a request log" widths={[700, 1100, 1600]} sizes="(max-width: 900px) 100vw, 760px" /></figure>
-        </div>
-
-        <div class="tour" role="tabpanel" id="tour-runner" aria-labelledby="tour-tab-runner" hidden>
-          <div class="tour-copy">
-            <h3>The same tests on your laptop and in CI.</h3>
-            <p>Run a collection in order or in parallel, feed it a CSV or JSON data file, and keep an HTML report. The desktop binary is also the CLI.</p>
-            <pre class="cli"><span class="d">$</span> kurlo run ./api --env CI --data users.csv --reporters cli,junit
-<span class="ok">✓</span> POST /login   <span class="d">→</span> 200  <span class="d">88ms</span>  [2/2]
-<span class="ok">✓</span> GET  /me      <span class="d">→</span> 200  <span class="d">41ms</span>  [3/3]
-<span class="d">2 passed · 0 failed · exit 0</span></pre>
-            <a class="tour-link" href={href('docs/guides/cli-runner/')}>Run Kurlo in CI →</a>
-          </div>
-          <figure class="shot"><Image src={runnerResults} alt="Collection runner results for Smoke API with two of two requests passed" widths={[700, 1100, 1600]} sizes="(max-width: 900px) 100vw, 760px" /></figure>
-        </div>
-
-        <div class="tour" role="tabpanel" id="tour-git" aria-labelledby="tour-tab-git" hidden>
-          <div class="tour-copy">
-            <h3>Requests reviewed like code.</h3>
-            <p>Keep a workspace as readable YAML next to the service it calls. Commit, pull and switch branches from the app. Tokens never land in the diff.</p>
-            <ul class="ticks">
-              <li>GitHub, GitLab or your own server, public or private</li>
-              <li>Secrets stay on your machine as placeholders</li>
-              <li>A conflict helper when two people edit one request</li>
-              <li>A JSON Schema for the format, so CI can lint it</li>
-            </ul>
-            <a class="tour-link" href={href('docs/guides/git-workspaces/')}>Git workspaces →</a>
-          </div>
-          <figure class="shot"><Image src={gitWorkspace} alt="A Git-backed workspace in Kurlo showing changed files ready to commit" widths={[700, 1100, 1600]} sizes="(max-width: 900px) 100vw, 760px" /></figure>
-        </div>
-      </div>
-    </section>
-
-    <section class="band" id="browser" aria-labelledby="browser-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="browser-title">200 OK in your API client. Blocked in Chrome.</h2>
-          <p>API clients skip the checks a browser makes, so CORS and CSP bugs show up only after the frontend ships. Give Kurlo your page’s origin and it sends the request the way Chrome would, then tells you in one line why the browser would refuse it.</p>
-        </div>
-        <div class="consoles">
-          <article class="console">
-            <header><span>A typical API client</span><code>no origin</code></header>
-            <ol class="console-body">
-              <li><span class="get">GET</span> https://api.example.com/me</li>
-              <li><span class="ok">200 OK</span> <span class="dim">· 142 ms · 1.2 KB</span></li>
-              <li class="dim">{'{ "id": 42, "email": "ada@example.com" }'}</li>
-            </ol>
-            <footer>Looks fine. Ships on Friday.</footer>
-          </article>
-          <article class="console console-kurlo">
-            <header><span>Kurlo, browser emulation on</span><code>origin https://app.example.com · credentials</code></header>
-            <ol class="console-body">
-              <li><span class="opt">OPTIONS</span> /me <span class="ok">→ 204</span> <span class="dim">preflight passed</span></li>
-              <li><span class="get">GET</span> /me <span class="ok">→ 200</span></li>
-              <li class="error">CORS error: the response allows origin *, but a credentialed request needs the exact origin https://app.example.com</li>
-            </ol>
-            <footer>What your users would see, found before they see it.</footer>
-          </article>
-        </div>
-        <ul class="checks">
-          {checks.map(check => (
-            <li><h3>{check.title}</h3><p>{check.text}</p></li>
-          ))}
-        </ul>
-        <a class="band-link" href={href('docs/guides/browser-security/')}>How browser emulation works →</a>
-      </div>
-    </section>
-
-    <section class="section" aria-labelledby="extras-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="extras-title">The small things you’ll use every day.</h2>
-          <p>None of these needs a plan, a login or a connection to a Kurlo server.</p>
-        </div>
-        <dl class="also">
-          {extras.map(extra => (
+        <dl class="spec">
+          {features.map(feature => (
             <div>
-              <dt><a href={href(extra.link)}>{extra.title}</a></dt>
-              <dd>{withCode(extra.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
+              <dt><a href={href(feature.link)}>{feature.title}</a></dt>
+              <dd>{withCode(feature.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
             </div>
           ))}
         </dl>
@@ -646,8 +356,8 @@ const ldJson = JSON.stringify({
     <section class="section" id="compare" aria-labelledby="compare-title">
       <div class="wrap">
         <div class="head">
-          <h2 id="compare-title">Kurlo next to Postman, Insomnia and Bruno.</h2>
-          <p>All four send requests well. The differences are in what you pay, where your data lives and what you need an account for.</p>
+          <h2 id="compare-title">Next to Postman, Insomnia and Bruno</h2>
+          <p>All four send requests well. They differ in what you pay, where your data lives and what you need an account for.</p>
         </div>
         <div class="table-scroll" tabindex="0" role="region" aria-label="Comparison of Kurlo, Postman, Insomnia and Bruno">
           <table class="compare">
@@ -676,32 +386,15 @@ const ldJson = JSON.stringify({
             </tbody>
           </table>
         </div>
-        <p class="compare-foot">Checked against each vendor’s public pricing page and documentation on 5 October 2026. Prices are per user per month on annual billing. If something here has gone out of date, <a href={`${github}/issues`}>open an issue</a> and we’ll fix it.</p>
+        <p class="compare-foot">Checked against each vendor’s public pricing page and documentation on 5 October 2026. Prices are per user per month on annual billing. If something here is out of date, <a href={`${github}/issues`}>open an issue</a>.</p>
       </div>
     </section>
 
-    <section class="section" id="faq" aria-labelledby="faq-title">
+    <section class="section" id="download" aria-labelledby="download-title">
       <div class="wrap">
         <div class="head">
-          <h2 id="faq-title">Questions people ask before switching.</h2>
-          <p>Not answered here? Ask in <a href={`${github}/discussions`}>GitHub Discussions</a> or read the <a href={href('docs/faq/')}>full FAQ</a>.</p>
-        </div>
-        <dl class="faq">
-          {faq.map(item => (
-            <div>
-              <dt>{item.q}</dt>
-              <dd>{withCode(item.a).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
-
-    <section class="cta" aria-labelledby="cta-title">
-      <div class="wrap cta-grid">
-        <div>
-          <h2 id="cta-title">Send your first request in a minute.</h2>
-          <p>No sign-up screen between the download and the Send button. Signed updates install themselves.</p>
+          <h2 id="download-title">Download</h2>
+          <p>Open the app and send: there is no sign-up in between. Updates are signed and install themselves. Questions are answered in the <a href={href('docs/faq/')}>FAQ</a>.</p>
         </div>
         <div class="platforms">
           <a class="platform" href={releases} data-platform="mac">
@@ -778,29 +471,6 @@ const ldJson = JSON.stringify({
         }
         still.addEventListener?.('change', play);
       }
-
-      document.querySelectorAll('[role="tablist"]').forEach(list => {
-        const tabs = [...list.querySelectorAll('[role="tab"]')];
-        const select = (tab, focus) => {
-          tabs.forEach(item => {
-            const on = item === tab;
-            item.setAttribute('aria-selected', String(on));
-            item.tabIndex = on ? 0 : -1;
-            const panel = document.getElementById(item.getAttribute('aria-controls'));
-            if (panel) panel.hidden = !on;
-          });
-          if (focus) tab.focus();
-        };
-        tabs.forEach((tab, i) => {
-          tab.addEventListener('click', () => select(tab, false));
-          tab.addEventListener('keydown', event => {
-            const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-            if (event.key === 'Home') { event.preventDefault(); select(tabs[0], true); }
-            else if (event.key === 'End') { event.preventDefault(); select(tabs[tabs.length - 1], true); }
-            else if (step) { event.preventDefault(); select(tabs[(i + step + tabs.length) % tabs.length], true); }
-          });
-        });
-      });
     })();
   </script>
 
