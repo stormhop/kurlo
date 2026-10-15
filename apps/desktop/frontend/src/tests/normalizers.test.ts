@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyCollectionDefaults } from '../lib/collectionDefaults';
 import { parseGraphQLPayload } from '../lib/graphql';
-import { filesystemNameFromName, normalizeCollection, normalizeEnvironment, normalizeHistoryEntry, normalizeSavedRequest, normalizeSioArgs, normalizeWorkspace } from '../lib/normalizers';
+import { filesystemNameFromName, normalizeCollection, normalizeEnvironment, normalizeHistoryEntry, normalizeSavedRequest, normalizeSioArgs, normalizeWorkspace, withStoredHistoryResponses } from '../lib/normalizers';
 import { REQUEST_BODY_DEFAULTS } from '../lib/requestBodyDefaults';
 import type { Collection } from '../lib/types/models';
 
@@ -222,6 +222,14 @@ describe('normalizeHistoryEntry', () => {
     const entry = normalizeHistoryEntry({ id: 'history-4', request, statusCode: 200, createdAt: 1, responseStored: false }, [collection], 'workspace-1');
     expect(entry && 'responseStored' in entry).toBe(false);
     expect(entry && 'responseTruncated' in entry).toBe(false);
+  });
+
+  it('marks entries whose response is still on disk after their mark was lost', () => {
+    const lost = normalizeHistoryEntry({ id: 'history-5', request, statusCode: 200, createdAt: 1 }, [collection], 'workspace-1')!;
+    const gone = normalizeHistoryEntry({ id: 'history-6', request, statusCode: 200, createdAt: 1 }, [collection], 'workspace-1')!;
+    const [restored, missing] = withStoredHistoryResponses([lost, gone], ['history-5']);
+    expect(restored.responseStored).toBe(true);
+    expect('responseStored' in missing).toBe(false);
   });
 
   it('keeps the protected mark on an environment and drops it when false', () => {

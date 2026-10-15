@@ -287,6 +287,11 @@ export function normalizeSavedRequest(
     };
 }
 
+export function withStoredHistoryResponses(entries: RequestHistoryEntry[], storedIds: Iterable<string>): RequestHistoryEntry[] {
+    const stored = new Set(storedIds);
+    return entries.map(entry => !entry.responseStored && stored.has(entry.id) ? { ...entry, responseStored: true } : entry);
+}
+
 export function normalizeHistoryEntry(
     input: Partial<RequestHistoryEntry>,
     collections: Collection[],

@@ -120,6 +120,18 @@ func TestMCPServerReadsWhatTheAppSent(t *testing.T) {
 	if result.IsError || !strings.Contains(result.Content[0].Text, "did not keep") {
 		t.Fatalf("an entry without a stored response: %+v", result)
 	}
+
+	if result := app.SaveHistoryResponse("history-old", `{"statusCode":200,"status":"200 OK","body":"healthy"}`); !result.Stored {
+		t.Fatalf("store response: %+v", result)
+	}
+	h.tool("list_history", map[string]any{"query": "health"}, &list)
+	if list.Count != 1 || !list.Entries[0].ResponseStored {
+		t.Fatalf("an entry whose mark was lost should still show its stored response: %+v", list)
+	}
+	result = h.tool("get_history_entry", map[string]any{"entry": "history-old"}, nil)
+	if result.IsError || !strings.Contains(result.Content[0].Text, "healthy") {
+		t.Fatalf("an entry whose mark was lost should return its stored response: %+v", result)
+	}
 	if result := h.tool("get_history_entry", map[string]any{"entry": "nope"}, nil); !result.IsError {
 		t.Fatal("an unknown entry should be an error")
 	}

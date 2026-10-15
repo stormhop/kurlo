@@ -90,6 +90,31 @@ func readHistoryResponse(id string) HistoryResponseResult {
 	return HistoryResponseResult{Stored: true, Payload: string(payload)}
 }
 
+func (a *App) StoredHistoryResponseIDs() []string {
+	ids := make([]string, 0)
+	for id := range storedHistoryResponseIDs() {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func storedHistoryResponseIDs() map[string]bool {
+	stored := map[string]bool{}
+	entries, err := os.ReadDir(historyResponseDir())
+	if err != nil {
+		return stored
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		stored[strings.TrimSuffix(name, ".json")] = true
+	}
+	return stored
+}
+
 func (a *App) PruneHistoryResponses(keepIDs []string) string {
 	historyStoreMu.Lock()
 	defer historyStoreMu.Unlock()

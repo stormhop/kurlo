@@ -1,5 +1,5 @@
 import {
-  loadRequestStore, loadWorkspaceDiagnostics,
+  loadRequestStore, loadWorkspaceDiagnostics, storedHistoryResponseIds,
   openDirectoryDialog, saveFileDialog, defaultWorkspaceLocation, setDefaultWorkspaceLocation,
   gitStatus, gitCommitLogPage, gitListBranches,
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
@@ -18,7 +18,7 @@ import { DEFAULT_RUNNER_CONCURRENCY } from '../concurrency';
 import {
   makeWorkspace, makeCollection,
   normalizeWorkspace, normalizeCollection, normalizeEnvironment,
-  normalizeSavedRequest, normalizeHistoryEntry,
+  normalizeSavedRequest, normalizeHistoryEntry, withStoredHistoryResponses,
 } from '../normalizers';
 import { defaultSocketIOArgs, requestBodyDefaultsFor } from '../requestBodyDefaults';
 import {
@@ -1469,6 +1469,7 @@ class AppVM {
       lActiveId = draft.id;
       lOpenIds = [draft.id];
     }
+    if (lHistory.some(entry => !entry.responseStored)) lHistory = withStoredHistoryResponses(lHistory, await storedHistoryResponseIds());
     this.requests = lReqs; this.requestHistory = this.pruneHistory(lHistory);
     this.collectionLastRuns = lCollectionRuns;
     this.draftRequestIds = new Set(lReqs.filter(r => r.isDraft).map(r => r.id));

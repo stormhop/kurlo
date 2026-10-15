@@ -13,7 +13,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
-- **Saved responses in History disappeared after a restart.** Kurlo keeps the response of each request you send, but forgot which history entries had one when it started again, so their responses could no longer be opened from History and `get_history_entry` in `kurlo mcp` returned no body. The link to the stored response, its size and content type now survive a restart.
+- **Saved responses in History disappeared after a restart.** Kurlo keeps the response of each request you send, but forgot which history entries had one when it started again, so their responses could no longer be opened from History and `get_history_entry` in `kurlo mcp` returned no body. The link to the stored response, its size and content type now survive a restart, and the responses of entries that lost the link are found again.
 
 - **Claude Code saw no Kurlo tools.** Claude Code talks to `kurlo mcp` with the 2026-07-28 revision of MCP, which requires every tool list to say how long it may be cached. Kurlo left that out, so Claude Code rejected the whole list and showed the server as connected with no tools. The list and the server description now carry the caching fields, and the server's instructions are short enough that Claude Code no longer cuts them off.
 

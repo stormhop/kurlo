@@ -245,6 +245,8 @@ export function StopCookieSync():Promise<model.CookieSyncStatus>;
 
 export function StopMockServer():Promise<model.MockServerStatus>;
 
+export function StoredHistoryResponseIDs():Promise<Array<string>>;
+
 export function UpsertCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 
 export function UseLocalWorkspaceStore():Promise<api.WorkspaceOpenResult>;

@@ -573,6 +573,10 @@ export async function pruneHistoryResponses(keepIds: string[]): Promise<string> 
   return (await window.go?.api?.App?.PruneHistoryResponses?.(keepIds)) ?? '';
 }
 
+export async function storedHistoryResponseIds(): Promise<string[]> {
+  return (await window.go?.api?.App?.StoredHistoryResponseIDs?.()) ?? [];
+}
+
 export async function clearHistoryResponses(): Promise<string> {
   return (await window.go?.api?.App?.ClearHistoryResponses?.()) ?? '';
 }

@@ -71,6 +71,10 @@ func loadMCPAppHistory() (mcpAppHistory, error) {
 		}
 	}
 	sort.SliceStable(history.entries, func(i, j int) bool { return history.entries[i].CreatedAt > history.entries[j].CreatedAt })
+	stored := storedHistoryResponseIDs()
+	for i := range history.entries {
+		history.entries[i].ResponseStored = stored[history.entries[i].ID]
+	}
 	for _, value := range stringMap(store["secrets"]) {
 		history.secrets = append(history.secrets, value)
 	}

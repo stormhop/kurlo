@@ -486,6 +486,10 @@ export function StopMockServer() {
   return window['go']['api']['App']['StopMockServer']();
 }
 
+export function StoredHistoryResponseIDs() {
+  return window['go']['api']['App']['StoredHistoryResponseIDs']();
+}
+
 export function UpsertCookie(arg1, arg2) {
   return window['go']['api']['App']['UpsertCookie'](arg1, arg2);
 }
