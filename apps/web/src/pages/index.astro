@@ -229,20 +229,25 @@ const ldJson = JSON.stringify({
           <div class="hero-copy">
             <h1 id="hero-title">Your AI agent writes the API requests. You see them in Kurlo.</h1>
             <p class="lead">Kurlo is a free, open-source API client for HTTP, GraphQL, gRPC, WebSocket and more. Collections are plain YAML in your repo, so your team reviews them in Git and your agent keeps them up to date.</p>
-            <div class="hero-actions">
+            <div class="cta">
               <a class="btn btn-primary" href={href('download/')} data-os-download>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span data-os-label>Download Kurlo</span>
               </a>
               <a class="btn btn-quiet" href="#agents">How it works</a>
+              <div class="cmd">
+                <span class="cmd-prompt" aria-hidden="true">$</span>
+                <code data-cmd>npx -y @kurlo/cli mcp install</code>
+                <button class="cmd-copy" type="button" data-cmd-copy aria-label="Copy the install command">
+                  <svg class="cmd-icon-copy" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="1.8"/></svg>
+                  <svg class="cmd-icon-done" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
             </div>
-            <div class="hero-install">
-              <pre class="cli"><span class="d">$</span> npx -y @kurlo/cli mcp install</pre>
-              <p>Connects Claude Code, Codex, Cursor and other AI clients.</p>
-            </div>
+            <p class="cta-note">Connects Kurlo to Claude Code, Codex, Cursor and other AI clients.</p>
             <p class="facts">{facts.join(' · ')}</p>
           </div>
-        <figure class="demo demo-stack" data-demo aria-label="An AI agent adds a Refund order request with tests to the Shop API collection through kurlo mcp, runs it, saves the response as an example, and the request appears in the open Kurlo window">
+          <figure class="demo demo-stack" data-demo aria-label="An AI agent adds a Refund order request with tests to the Shop API collection through kurlo mcp, runs it, saves the response as an example, and the request appears in the open Kurlo window">
             <div class="agent demo-chat">
               <div class="script-head"><span>Agent session</span><span>kurlo mcp · Local</span></div>
               <ol class="agent-log">
@@ -259,7 +264,7 @@ const ldJson = JSON.stringify({
                   <div><span class="tool">save_example</span> <span class="dim">Refunded</span></div>
                   <div><b class="ok">✓</b> 201 kept for the mock server</div>
                 </li>
-                <li class="agent-say" data-at="7"><span class="who">agent</span><p>Done. <em>Refund order</em> is in Orders with two passing tests, and its 201 response is saved as an example.</p></li>
+                <li class="agent-say" data-at="7"><span class="who">agent</span><p>Done. <em>Refund order</em> is in Orders and both tests pass.</p></li>
               </ol>
             </div>
             <div class="demo-app" aria-hidden="true">
@@ -275,17 +280,19 @@ const ldJson = JSON.stringify({
                 </div>
                 <div class="demo-main">
                   <div class="demo-url" data-at="3"><span class="m-post">POST</span>&#123;&#123;baseUrl&#125;&#125;/orders/&#123;&#123;orderId&#125;&#125;/refund</div>
-                  <div class="demo-status" data-at="5"><b>201 Created</b><span>84 ms</span><span>312 B</span></div>
+                  <div class="demo-meta">
+                    <div class="demo-status" data-at="5"><b>201 Created</b><span>84 ms</span></div>
+                    <div class="demo-chip" data-at="6">Example · Refunded</div>
+                  </div>
                   <ul class="demo-tests" data-at="5">
                     <li><b>✓</b> status is 201</li>
                     <li><b>✓</b> refund amount matches the order</li>
                   </ul>
-                  <div class="demo-chip" data-at="6">Examples · Refunded 201</div>
                   <div class="demo-git" data-at="7">
-                    <span class="dim">Git · 3 changes</span>
-                    <span><b>A</b> collections/Shop-API/requests/Refund-order.yml</span>
-                    <span><b>A</b> collections/Shop-API/examples/Refund-order/Refunded.yml</span>
-                    <span><b class="mod">M</b> collections/Shop-API/collection.yml</span>
+                    <span class="dim">Git · Shop-API · 3 changes</span>
+                    <span><b>A</b> requests/Refund-order.yml</span>
+                    <span><b>A</b> examples/Refund-order/Refunded.yml</span>
+                    <span><b class="mod">M</b> collection.yml</span>
                   </div>
                 </div>
               </div>
@@ -447,6 +454,27 @@ const ldJson = JSON.stringify({
       const mark = () => nav && nav.classList.toggle('nav-scrolled', scrollY > 8);
       mark();
       addEventListener('scroll', mark, { passive: true });
+
+      const copy = document.querySelector('[data-cmd-copy]');
+      const cmd = document.querySelector('[data-cmd]');
+      if (copy && cmd) {
+        let reset;
+        copy.addEventListener('click', async () => {
+          try {
+            await navigator.clipboard.writeText(cmd.textContent);
+            copy.dataset.copied = '';
+            copy.setAttribute('aria-label', 'Copied');
+          } catch {
+            const range = document.createRange();
+            range.selectNodeContents(cmd);
+            const selection = getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
+          clearTimeout(reset);
+          reset = setTimeout(() => { delete copy.dataset.copied; copy.setAttribute('aria-label', 'Copy the install command'); }, 1600);
+        });
+      }
 
       const demo = document.querySelector('[data-demo]');
       if (demo) {
