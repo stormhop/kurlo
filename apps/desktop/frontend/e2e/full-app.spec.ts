@@ -32,6 +32,7 @@ const readmeScreenshotPath = process.env.KURLO_README_SCREENSHOT ?? '';
 
 const DOCS_VIEWPORT = { width: 1200, height: 780 };
 const DOCS_CROP_PADDING = 26;
+const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp']);
 
 async function docsDialogClip(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-modal="true"]').first();
@@ -86,6 +87,15 @@ async function captureDocsScreenshot(page: Page, name: string, cropTo?: Locator)
     animations: 'disabled',
     ...(clip ? { clip } : {}),
   });
+  if (!DOCS_DARK_VARIANTS.has(name)) return;
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.screenshot({
+    path: join(docsScreenshotDir, `${name}-dark.png`),
+    animations: 'disabled',
+    ...(clip ? { clip } : {}),
+  });
+  await page.emulateMedia({ colorScheme: 'light' });
 }
 
 async function tourPause(page: Page, label: string) {
