@@ -1760,6 +1760,7 @@ export namespace model {
 	    serverName?: string;
 	    serverVersion?: string;
 	    instructions?: string;
+	    protocolVersion?: string;
 	    supportedVersions: string[];
 	    capabilities: string[];
 	    resultType?: string;
@@ -1792,6 +1793,7 @@ export namespace model {
 	        this.serverName = source["serverName"];
 	        this.serverVersion = source["serverVersion"];
 	        this.instructions = source["instructions"];
+	        this.protocolVersion = source["protocolVersion"];
 	        this.supportedVersions = source["supportedVersions"];
 	        this.capabilities = source["capabilities"];
 	        this.resultType = source["resultType"];

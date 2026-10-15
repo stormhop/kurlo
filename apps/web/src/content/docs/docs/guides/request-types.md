@@ -110,6 +110,8 @@ gRPC supports pre-request/test scripts, environment variables, collection defaul
 
 An MCP request calls a [Model Context Protocol](https://modelcontextprotocol.io) server — the servers agents talk to — without an agent in the loop. Kurlo speaks protocol revision **2026-07-28**, which is stateless: every call is a single HTTP POST to the server's endpoint, so an MCP call is an ordinary saved request that can be replayed, diffed, scripted and committed.
 
+Most servers in use today were built for the earlier revisions **2025-11-25**, **2025-06-18** and **2025-03-26**, which need a session. Kurlo finds that out by itself: when a server does not answer the stateless call, Kurlo sends `initialize` and `notifications/initialized`, keeps the `Mcp-Session-Id` the server hands out, and sends that call and the later ones to the same endpoint in the session. The panel then shows the revision next to the server's name, for example *MCP 2025-06-18*. If the server forgets the session, Kurlo opens a new one and sends the call again. The handshake carries the request's URL, headers and auth, but not its scripts, which run once around the call itself. To pin a revision, set `mcpProtocolVersion` on the request in its YAML file.
+
 Put the server's endpoint in the URL bar, then press **Discover**. Kurlo calls `server/discover` and follows it with `tools/list`, `resources/list` and `prompts/list` for the capabilities the server actually declares, so a server with no prompts is never asked for any. The panel then names the server, its version and what it holds.
 
 Choose a method and, for `tools/call`, `resources/read` or `prompts/get`, the tool, resource or prompt to address. Picking a tool seeds the **Arguments** editor from the tool's own input schema, and the arguments are checked for being a JSON object before anything is sent.
@@ -130,7 +132,7 @@ What Kurlo checks on your behalf:
 
 Auth, proxy, client certificates, redirects and the response cap are the ordinary HTTP ones — an MCP call is an HTTP request, and it carries the same settings.
 
-Not in this release: the **stdio** transport, so servers launched as a local command (`npx some-server`) cannot be reached yet; the protocol revisions before `2026-07-28`; `subscriptions/listen`; and sampling, which Kurlo declines because it has no model and is not going to acquire one.
+Not in this release: the **stdio** transport, so servers launched as a local command (`npx some-server`) cannot be reached yet; the old HTTP+SSE transport of revision `2024-11-05`; `subscriptions/listen`; and sampling, which Kurlo declines because it has no model and is not going to acquire one.
 
 ## Import and export notes
 

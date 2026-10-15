@@ -14,6 +14,13 @@ export const MCP_METHODS = [
   'prompts/get',
 ] as const;
 
+export const MCP_STATELESS_PROTOCOL_VERSION = '2026-07-28';
+
+export function mcpSessionProtocolVersion(response: McpResponse | null | undefined): string {
+  const version = response?.protocolVersion ?? '';
+  return version && version !== MCP_STATELESS_PROTOCOL_VERSION ? version : '';
+}
+
 const NAMED_METHODS = new Set<string>(['tools/call', 'resources/read', 'prompts/get']);
 
 export function mcpMethodNeedsName(method: string) {

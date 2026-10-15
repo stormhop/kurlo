@@ -476,17 +476,24 @@ func mcpApplyHeaders(existing []model.KeyValue, protocol []model.KeyValue) ([]mo
 	return kept, warnings
 }
 
-func mcpPrepareRequest(req model.HttpRequest, id int) (model.HttpRequest, []string, error) {
-	endpoint := strings.TrimSpace(req.URL)
-	if endpoint == "" {
-		return req, nil, fmt.Errorf("this request has no MCP endpoint")
+func mcpValidateCall(req model.HttpRequest) (model.HttpRequest, error) {
+	if strings.TrimSpace(req.URL) == "" {
+		return req, fmt.Errorf("this request has no MCP endpoint")
 	}
 	req.McpMethod = strings.TrimSpace(req.McpMethod)
 	if req.McpMethod == "" {
-		return req, nil, fmt.Errorf("choose a method to send")
+		return req, fmt.Errorf("choose a method to send")
 	}
 	if !mcpMethodIsKnown(req.McpMethod) {
-		return req, nil, fmt.Errorf("%q is not a method Kurlo knows how to send", req.McpMethod)
+		return req, fmt.Errorf("%q is not a method Kurlo knows how to send", req.McpMethod)
+	}
+	return req, nil
+}
+
+func mcpPrepareRequest(req model.HttpRequest, id int) (model.HttpRequest, []string, error) {
+	req, err := mcpValidateCall(req)
+	if err != nil {
+		return req, nil, err
 	}
 	if req.McpMethod == mcpMethodToolsCall {
 		if reason := McpToolRejection(req.McpInputSchema); reason != "" {
@@ -783,6 +790,10 @@ func mcpApplyResult(out *model.McpResponse, req model.HttpRequest, raw json.RawM
 			out.ServerVersion = mcpStringField(info, "version")
 		}
 	}
+	if info, ok := result["serverInfo"].(map[string]any); ok && out.ServerName == "" {
+		out.ServerName = mcpStringField(info, "name")
+		out.ServerVersion = mcpStringField(info, "version")
+	}
 
 	if flag, ok := result["isError"].(bool); ok {
 		out.IsError = flag
@@ -855,11 +866,6 @@ func requestReadsEventStream(req model.HttpRequest) bool {
 }
 
 func (a *App) SendMcpRequest(req model.HttpRequest) model.McpResponse {
-	prepared, warnings, err := mcpPrepareRequest(req, 1)
-	if err != nil {
-		return model.NormalizeMcpResponse(model.McpResponse{Error: err.Error()})
-	}
-
 	baseCtx := context.Background()
 	if a.ctx != nil {
 		baseCtx = a.ctx
@@ -871,8 +877,20 @@ func (a *App) SendMcpRequest(req model.HttpRequest) model.McpResponse {
 		a.unregisterRequestCancel(req.RequestID, seq)
 	}()
 
-	httpResponse := sendRequest(ctx, prepared, a.state, a.cookieJars, a.preflightCache)
-	return model.NormalizeMcpResponse(mcpResponseFrom(prepared, httpResponse, warnings))
+	transport := func(prepared model.HttpRequest) model.HttpResponse {
+		return sendRequest(ctx, prepared, a.state, a.cookieJars, a.preflightCache)
+	}
+	return model.NormalizeMcpResponse(a.mcpSessions.send(req, transport))
+}
+
+func mcpSendStateless(req model.HttpRequest, transport mcpTransport) model.McpResponse {
+	prepared, warnings, err := mcpPrepareRequest(req, 1)
+	if err != nil {
+		return model.McpResponse{Error: err.Error()}
+	}
+	out := mcpResponseFrom(prepared, transport(prepared), warnings)
+	out.ProtocolVersion = mcpProtocolVersion(req)
+	return out
 }
 
 func mcpResponseFrom(req model.HttpRequest, httpResponse model.HttpResponse, warnings []string) model.McpResponse {

@@ -48,6 +48,7 @@ type McpResponse struct {
 	ServerName        string   `json:"serverName,omitempty"`
 	ServerVersion     string   `json:"serverVersion,omitempty"`
 	Instructions      string   `json:"instructions,omitempty"`
+	ProtocolVersion   string   `json:"protocolVersion,omitempty"`
 	SupportedVersions []string `json:"supportedVersions"`
 	Capabilities      []string `json:"capabilities"`
 

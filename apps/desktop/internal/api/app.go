@@ -37,6 +37,7 @@ type App struct {
 	mock           *mockServer
 	cookieSync     *cookieSyncServer
 	binaryBodies   *binaryResponseCache
+	mcpSessions    *mcpSessionRegistry
 }
 
 type SaveRequestStoreResult struct {
@@ -55,6 +56,7 @@ func NewApp() *App {
 		quit:           newQuitGate(),
 		requestCancels: make(map[string]requestCancel),
 		binaryBodies:   newBinaryResponseCache(),
+		mcpSessions:    newMCPSessionRegistry(),
 		state:          state.New(),
 		cookieJars:     jars,
 		preflightCache: newPreflightCache(),

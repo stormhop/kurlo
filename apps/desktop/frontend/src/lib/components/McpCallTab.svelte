@@ -7,6 +7,7 @@
     mcpMethodNeedsName,
     mcpMethodTakesArguments,
     mcpNameLabelFor,
+    mcpSessionProtocolVersion,
   } from '../stores/features/mcp';
 
   const METHOD_OPTIONS = MCP_METHODS.map(method => ({ value: method, label: method }));
@@ -58,9 +59,12 @@
     (needsName ? selectedTool?.description : '') || catalog?.instructions || '',
   );
 
+  const sessionProtocol = $derived(mcpSessionProtocolVersion(catalog));
+
   const summaryTitle = $derived([
     catalog?.serverName,
     catalog?.serverVersion,
+    sessionProtocol && `MCP ${sessionProtocol}`,
     counts.join(' · '),
     detail,
   ].filter(Boolean).join(' · '));
@@ -126,6 +130,7 @@
     <p class="mcp-server" title={summaryTitle}>
       <span class="mcp-server-name">{catalog.serverName || 'This server'}</span>
       {#if catalog.serverVersion}<span class="mcp-server-version">{catalog.serverVersion}</span>{/if}
+      {#if sessionProtocol}<span class="mcp-server-meta" title="This server predates stateless MCP, so Kurlo talks to it in a session">· MCP {sessionProtocol}</span>{/if}
       {#if counts.length}<span class="mcp-server-meta">· {counts.join(' · ')}</span>{/if}
       {#if detail}<span class="mcp-server-detail">— {detail}</span>{/if}
     </p>

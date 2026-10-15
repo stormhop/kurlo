@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **MCP requests reach the servers built before stateless MCP.** Kurlo spoke only the stateless 2026-07-28 revision, so most MCP servers in use today could not be opened at all. When a server does not answer the stateless call, Kurlo now opens a session the way revisions 2025-11-25, 2025-06-18 and 2025-03-26 expect (`initialize`, `notifications/initialized`, `Mcp-Session-Id`), sends every later call in it, and opens a new one if the server forgets it. The panel names the revision the server speaks.
 - **Kurlo is listed in the MCP Registry.** `kurlo mcp` is published to the official MCP Registry as `dev.kurlo/kurlo`, so MCP clients and server directories that read the registry can find it and install it from `@kurlo/cli`.
 
 ### Fixed

@@ -553,10 +553,21 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
           notifications: [], rpcErrorCode: 0, rpcErrorMessage: '', rpcErrorData: '',
           warnings: [], error: '',
         };
+        if (req.mcpMethod === 'server/discover' && req.url.includes('legacy')) {
+          return {
+            ...base,
+            serverName: 'E2E Legacy', serverVersion: '0.9.0',
+            protocolVersion: '2025-06-18',
+            supportedVersions: ['2025-06-18'],
+            capabilities: ['tools'],
+            warnings: ['This server speaks MCP 2025-06-18, so Kurlo opened a session with initialize and sends later calls in it.'],
+          };
+        }
         if (req.mcpMethod === 'server/discover') {
           return {
             ...base,
             serverName: 'E2E Weather', serverVersion: '2.1.0',
+            protocolVersion: '2026-07-28',
             supportedVersions: ['2026-07-28'],
             capabilities: ['tools'],
             instructions: 'Weather utilities for the end-to-end run.',
@@ -3195,6 +3206,27 @@ test.describe('Kurlo desktop browser E2E', () => {
 
     const sent = await page.evaluate(() => window.__kurloE2E.sentMcpRequests.map(r => r.mcpMethod));
     expect(sent).toEqual(['server/discover', 'tools/list', 'tools/call']);
+  });
+
+  test('names the MCP revision of a server that needs a session', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'MCP Request');
+    await page.getByLabel('Request URL').fill('https://legacy.kurlo.test/mcp');
+    await page.getByLabel('Request URL').press('Tab');
+    await page.locator('.mcp-discover').click();
+
+    await expect(page.locator('.mcp-server')).toContainText('E2E Legacy');
+    await expect(page.locator('.mcp-server')).toContainText('MCP 2025-06-18');
+    if (process.env.KURLO_E2E_SHOT) await page.locator('.mcp-call').screenshot({ path: process.env.KURLO_E2E_SHOT });
+
+    await page.getByLabel('Request URL').fill('https://mcp.kurlo.test/mcp');
+    await page.getByLabel('Request URL').press('Tab');
+    await page.locator('.mcp-discover').click();
+    await expect(page.locator('.mcp-server')).toContainText('E2E Weather');
+    await expect(page.locator('.mcp-server')).not.toContainText('MCP 2026');
   });
 
   test('reloads a running mock after an example changes with the panel closed', async ({ page }) => {

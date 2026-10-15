@@ -10,6 +10,7 @@ import type { McpResponse } from '../lib/backend';
 import { emptyHttpResponse } from '../lib/wire';
 import {
   MCP_METHODS,
+  mcpSessionProtocolVersion,
   mcpArgumentTemplate,
   mcpFailureMessage,
   mcpFeature,
@@ -222,6 +223,15 @@ describe('mcp argument template', () => {
     expect(mcpArgumentTemplate('')).toBe('');
     expect(mcpArgumentTemplate('not json')).toBe('');
     expect(mcpArgumentTemplate('{"type":"object"}')).toBe('');
+  });
+});
+
+describe('mcp protocol version', () => {
+  it('names the revision only for a server that needs a session', () => {
+    expect(mcpSessionProtocolVersion({ protocolVersion: '2025-06-18' } as McpResponse)).toBe('2025-06-18');
+    expect(mcpSessionProtocolVersion({ protocolVersion: '2026-07-28' } as McpResponse)).toBe('');
+    expect(mcpSessionProtocolVersion({} as McpResponse)).toBe('');
+    expect(mcpSessionProtocolVersion(null)).toBe('');
   });
 });
 
