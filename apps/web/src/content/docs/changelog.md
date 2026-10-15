@@ -9,8 +9,14 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ## Unreleased
 
+### Added
+
+- **MCP requests reach servers built before stateless MCP.** Kurlo opens a session with servers that speak revisions 2025-11-25, 2025-06-18 or 2025-03-26 and names the revision in the panel. See [MCP](/docs/guides/request-types/#mcp).
+- **`kurlo mcp` is in the official MCP Registry** as `dev.kurlo/kurlo`.
+
 ### Fixed
 
+- **Saved responses in History survive a restart** again, including those of entries that lost the link before this release.
 - **Claude Code now sees Kurlo's tools.** `kurlo mcp` was shown as connected with no tools, because Claude Code's newer MCP revision rejected its tool list.
 
 ## 2.3.1
