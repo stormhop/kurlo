@@ -293,7 +293,7 @@ async function connect() {
     };
 
     socket.onmessage = async (event) => {
-      let message = null;
+      let message;
       try {
         message = JSON.parse(event.data);
       } catch {

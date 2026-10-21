@@ -43,7 +43,7 @@
   }
 
   async function checkWhatsNew(version: string) {
-    let lastSeen: string | null = null;
+    let lastSeen: string | null;
     try {
       lastSeen = localStorage.getItem(LAST_SEEN_VERSION_KEY);
     } catch {

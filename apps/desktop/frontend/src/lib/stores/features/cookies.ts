@@ -128,7 +128,7 @@ export const cookieFeature = {
     this.cookieJarError = '';
   },
   async importCookieHeaderForUrl(this: CookieHost, requestUrl: string, cookieHeader: string) {
-    let hostname = '';
+    let hostname: string;
     try {
       hostname = new URL(this.normalizeRequestUrlForSend(this.resolveTemplate(requestUrl.trim()))).hostname;
     } catch {

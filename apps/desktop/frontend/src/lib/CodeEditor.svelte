@@ -352,7 +352,7 @@
     for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo += 1) {
       const line = view.state.doc.line(lineNo);
       const trimmed = line.text.trimStart();
-      let commented = false;
+      let commented: boolean;
 
       if (language === 'html' || language === 'xml') {
         const HTML_OPEN = '<' + '!--';

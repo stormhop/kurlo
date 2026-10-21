@@ -177,7 +177,7 @@ export function parseGraphQLVariables(source: string): Record<string, unknown> {
 }
 
 export function serializeGraphQLPayload(payload: GraphQLPayload): string {
-  let variables: unknown = payload.variables.trim() ? payload.variables : {};
+  let variables: unknown;
   try {
     variables = parseGraphQLVariables(payload.variables);
   } catch {

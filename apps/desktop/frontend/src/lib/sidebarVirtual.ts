@@ -15,7 +15,7 @@ export function virtualizeRows<T extends VirtualRow>(
   const heightOf = (row: T) => measured?.get(row.key) ?? row.height * scale;
   const visible: T[] = [];
   let before = 0;
-  let after = 0;
+  let after: number;
   let offset = 0;
   let firstVisible = true;
 

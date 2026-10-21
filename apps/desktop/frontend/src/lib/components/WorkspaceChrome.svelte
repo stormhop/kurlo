@@ -15,6 +15,7 @@
     workspaceMenuOpen = $bindable(false),
     topView = $bindable<TopView>('request'),
     environmentMenuOpen = $bindable(false),
+    // eslint-disable-next-line no-useless-assignment
     sidebarView = $bindable<SidebarView>('collections'),
     codePanelOpen = $bindable(false),
     codePanelAvailable = true,

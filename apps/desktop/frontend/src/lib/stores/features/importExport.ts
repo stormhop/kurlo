@@ -454,7 +454,7 @@ export const importExportFeature = {
     const includeSecrets = await this.chooseCollectionSecretExportMode(exportableReqs, `${label} export`);
     if (includeSecrets === null) return;
     const name = `${safeFileName(col.name)}.${format === 'swagger2' ? 'swagger' : 'openapi'}.json`;
-    let content = '';
+    let content: string;
     try {
       const { buildOpenApiExport } = await import('../../openapi');
       const payload = buildOpenApiExport(format, col.name, col.description ?? '', exportableReqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets);

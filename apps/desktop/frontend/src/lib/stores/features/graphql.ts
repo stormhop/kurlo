@@ -106,7 +106,7 @@ export const graphqlFeature = {
 
   graphQLPayloadHasContent(this: GraphQLHost, source: string) {
     const payload = parseGraphQLPayload(source);
-    let variablesHaveContent = false;
+    let variablesHaveContent: boolean;
     try {
       variablesHaveContent = Object.keys(parseGraphQLVariables(payload.variables)).length > 0;
     } catch {

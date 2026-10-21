@@ -32,7 +32,7 @@ function decodeJsonObject(value: string, label: string) {
   try {
     parsed = JSON.parse(decodeBase64Url(value));
   } catch (error) {
-    throw new Error(`Invalid ${label}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`Invalid ${label}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`Invalid ${label}: expected a JSON object`);

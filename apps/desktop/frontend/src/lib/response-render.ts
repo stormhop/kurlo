@@ -153,7 +153,7 @@ function renderHtmlTag(token: string, offset: number, marks: SearchMarks) {
   while ((match = partRE.exec(token)) !== null) {
     if (match.index > last) html += markSegment(token.slice(last, match.index), offset + last, marks);
     const part = match[0];
-    let className = '';
+    let className: string;
 
     if (/^\s+$/.test(part)) {
       html += markSegment(part, offset + match.index, marks);
