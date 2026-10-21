@@ -10,6 +10,18 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **Prompts for AI assistants:** `sync_collection`, `cover_endpoint` and `debug_last_failure` in `kurlo mcp`. See [Prompts](/docs/guides/mcp-server/#prompts).
+- **`generate_tests`** writes status, `Content-Type` and JSON schema tests from a real or described response, and saves it as an example. See [Tests from a response](/docs/guides/mcp-server/#tests-from-a-response).
+- **`diagnose_last_failure`** explains why the last failed request from the app failed. See [When a request fails](/docs/guides/mcp-server/#when-a-request-fails).
+
+### Changed
+
+- **A JSON body can be passed as an object** to `save_request`, `save_example` and `generate_tests`.
+
 ## 2.3.2
 
 ### Added

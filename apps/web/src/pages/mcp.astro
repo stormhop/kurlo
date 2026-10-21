@@ -24,9 +24,10 @@ const clientAbilities = [
 ];
 
 const agentTools = [
-  { title: 'Read', text: 'list_requests, get_request, list_environments, and list_history with get_history_entry for the requests you just sent from the app.' },
+  { title: 'Read', text: 'list_requests, get_request, list_environments, and list_history with get_history_entry for the requests you just sent from the app. diagnose_last_failure says why one failed.' },
   { title: 'Run', text: 'run_request and run_collection with their auth, scripts and tests, and send_request for a one-off call with your environment’s variables.' },
-  { title: 'Write', text: 'create_collection, save_request, delete_request, save_example and set_variable change the same YAML files the app writes.' },
+  { title: 'Write', text: 'create_collection, save_request, delete_request, save_example and set_variable change the same YAML files the app writes. generate_tests turns a response into status and JSON schema tests.' },
+  { title: 'Prompts', text: 'sync_collection adds a request with tests for every route in your code the collection lacks, cover_endpoint does it for one, and debug_last_failure explains your last failed request.' },
   { title: 'Guardrails', text: 'Secrets reach your API but come back to the model as [secret]. Environments marked protected are refused, and --read-only leaves out every write tool.' },
 ];
 
@@ -37,7 +38,7 @@ const faq = [
   { q: 'Is it free?', a: 'Yes. Kurlo is MIT licensed, with no account, no paid plan and no telemetry.' },
 ];
 
-const codeTerms = /(tools\/call|resources\/read|prompts\/get|subscriptions\/listen|structuredContent|outputSchema|x-mcp-header|Mcp-Session-Id|initialize|pm\.\*|pm\.test|npx some-server|--read-only|\[secret\]|list_requests|get_request|list_environments|list_history|get_history_entry|run_request|run_collection|send_request|create_collection|save_request|delete_request|save_example|set_variable)/g;
+const codeTerms = /(tools\/call|resources\/read|prompts\/get|subscriptions\/listen|structuredContent|outputSchema|x-mcp-header|Mcp-Session-Id|initialize|pm\.\*|pm\.test|npx some-server|--read-only|\[secret\]|list_requests|get_request|list_environments|list_history|get_history_entry|run_request|run_collection|send_request|create_collection|save_request|delete_request|save_example|set_variable|generate_tests|diagnose_last_failure|sync_collection|cover_endpoint|debug_last_failure)/g;
 const withCode = (text: string) => text.split(codeTerms).map((part, i) => (i % 2 ? { code: part } : { text: part }));
 
 const callSnippet = [

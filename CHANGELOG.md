@@ -5,6 +5,18 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Ready-made prompts for AI assistants.** `kurlo mcp` now offers three MCP prompts, which Claude Code, Cursor and other clients show as commands: `sync_collection` finds the HTTP routes in your project's code and adds a saved request with tests for each one the collection lacks, `cover_endpoint` does the same for one endpoint such as `POST /orders`, and `debug_last_failure` explains why your last request failed. They tell the assistant to look for the server's address in the project and ask you before setting it, never to point an environment at production, and to delete nothing. With `--read-only` only `debug_last_failure` is offered.
+- **`generate_tests` writes a request's tests from its response.** It sends the request and writes `pm.test` checks for the status, the `Content-Type` and a JSON schema of the body: the field types and which fields are required, never their values, so the tests do not break on the next order number and no data from the response ends up in your files. The response is saved as an example too, so the mock server serves it. For an API that is not running anywhere yet, `from: example` takes the status and body, or a schema, that the code returns, and the tests are ready for when the server is up. Tests the request already has are kept, and a 4xx or 5xx response is refused unless the call says that error is what it means to test.
+- **`diagnose_last_failure` says why a request failed.** It takes the most recent request sent from the app that got no response, a 4xx or 5xx status or failing tests, and returns the error, the failed tests, the `{{variables}}` nothing sets in the active environment, how the response differs from the saved example (missing fields, changed types, another status), and hints for the likely cause: a server that is not running, a host that does not resolve, a token nothing has set yet, a method typed into the URL field, a pre-request script that threw.
+
+### Changed
+
+- **A JSON body can be passed as an object.** `save_request`, `save_example` and `generate_tests` took the body only as a string, so an assistant that sent `{"sku": "a"}` as JSON got an error. They now take either and store an object as formatted JSON.
+
 ## [2.3.2] - 2026-10-15
 
 ### Added

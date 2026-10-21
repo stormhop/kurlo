@@ -5,7 +5,7 @@ description: Let Claude, Codex, Cursor and other AI assistants run your saved Ku
 
 `kurlo mcp` serves a Kurlo workspace to AI assistants as a [Model Context Protocol](https://modelcontextprotocol.io) server. Once it is connected, an assistant can see your collections and environments, run a saved request and read the response, run a collection's tests, or send a one-off call that uses your environment's variables. It does this with the same engine as the app and [`kurlo run`](/docs/guides/cli-runner/).
 
-It can also write to the workspace: add and change saved requests with their tests, save responses as examples and set environment variables. An agent that adds an endpoint to your service can add the request for it in the same commit, and Kurlo, if it is open, shows the change within a second.
+It can also write to the workspace: add and change saved requests with their tests, write tests from a response, save responses as examples and set environment variables. An agent that adds an endpoint to your service can add the request for it in the same commit, and Kurlo, if it is open, shows the change within a second.
 
 The assistant starts `kurlo mcp` itself and talks to it over stdin and stdout. The server comes from the [`@kurlo/cli`](https://www.npmjs.com/package/@kurlo/cli) npm package, which `npx` downloads on first use, so the commands below work with or without the desktop app installed.
 
@@ -104,15 +104,56 @@ The workspace is read again on every call, so a request you edit in the app is w
 | `send_request` | Sends an unsaved HTTP request. `{{variables}}` in the URL, headers and body are resolved from the environment. |
 | `list_history` | Lists the requests you recently sent from the Kurlo app, newest first, with status, timing and the saved request each came from. Can be searched, or narrowed to failures. |
 | `get_history_entry` | Shows one request you sent from the app and the response you got: status, headers, body, error, test results and script logs. Without an entry it shows the last one. |
+| `diagnose_last_failure` | Explains why a request sent from the app failed. See [When a request fails](#when-a-request-fails). |
 | `create_collection` | Creates an empty collection. |
 | `save_request` | Creates a saved HTTP or GraphQL request, or changes one. See [Writing to the workspace](#writing-to-the-workspace). |
 | `delete_request` | Deletes a saved request and its examples. |
 | `save_example` | Saves a response as an [example](/docs/guides/examples/) of a request: the response of the last `run_request` of that request, or one the assistant describes with `status` and `body`. |
 | `set_variable` | Sets a non-secret variable in an environment, and creates the environment if there is none with that name. |
+| `generate_tests` | Writes a request's status, `Content-Type` and JSON schema tests from a real or described response. See [Tests from a response](#tests-from-a-response). |
 
 A request can be named by its id, its full path, or just its name when that name is unique. When a name matches more than one request, the tool lists the matches with their ids so the assistant can pick one.
 
 Every run accepts an `environment` and a `variables` object of overrides for that call. `run_request` and `send_request` return up to 64 KB of the response body by default. An assistant can ask for up to 1 MB with `maxBodyBytes`. Binary bodies are described but not included.
+
+## Prompts
+
+The server also offers three [prompts](https://modelcontextprotocol.io/specification/2026-07-28/server/prompts): ready-made instructions that clients show as commands. In Claude Code they are `/mcp__kurlo__sync_collection` and so on.
+
+| Prompt | Arguments | What the assistant does |
+|--------|-----------|-------------------------|
+| `sync_collection` | `collection`, `source` | Finds the HTTP routes in your project's code (Express, FastAPI, Flask, Go routers, Spring, Rails, ASP.NET and others), matches them with the saved requests, and adds a request with tests for each route that has none. It deletes nothing: saved requests that match no route are listed for you to decide. |
+| `cover_endpoint` | `endpoint` (required), `collection` | Does the same for one endpoint, such as `POST /orders`, and also saves its main error responses as examples. |
+| `debug_last_failure` | `entry` | Calls `diagnose_last_failure`, explains the cause and proposes a fix, which it applies only after you agree. |
+
+Requests are saved with `{{baseUrl}}` in the URL, so the address lives in an environment, not in each request. When no environment sets it, the prompts tell the assistant to look for it in the project (`.env`, `docker-compose.yml`, launch settings, the README) and to ask you before calling `set_variable`, and never to point an environment at production. With `--read-only` only `debug_last_failure` is offered.
+
+## Tests from a response
+
+`generate_tests` writes a saved request's tests for it. With `from: run`, the default, it sends the request and writes three `pm.test` checks from the response:
+
+- the status, such as `pm.response.to.have.status(200)`;
+- the `Content-Type`;
+- a JSON schema of the body, checked with `pm.response.to.have.jsonSchema`: the type of every field and which fields are required. Values are left out, so the tests do not break when the next order has another id, and nothing from the response is written into the request's file.
+
+The response is also saved as an [example](/docs/guides/examples/), named after its status, so the [mock server](/docs/guides/mock-server/) serves it. Run `generate_tests` again later and an example of the same name is refreshed rather than added twice.
+
+Sending the request has its effects: a `POST` creates what it creates. A response with a 4xx or 5xx status is refused, since the tests would assert a failure, unless the call passes `allowErrorStatus: true` to test that error on purpose.
+
+When the API is not running anywhere yet, `from: example` takes what the code returns instead: a `status` and a `body`, or a `schema` built from the response type. The tests and the example are written the same way, and the tests pass once the server is up. A schema that does not accept its own body is refused.
+
+Tests the request already has are kept and the new ones are added after them. A test with the same name, such as `status is 200`, is not added twice. When the request's tests already expect another status, an error response such as a `422` is saved as an example only, so the script never asserts two statuses. `replace: true` replaces the whole test script.
+
+## When a request fails
+
+`diagnose_last_failure` takes the most recent request sent from the app that got no response, a 4xx or 5xx status, or failing tests, or the history entry you name, and returns:
+
+- the status, the error and the failed tests;
+- `unresolvedVariables`: the `{{variables}}` the request uses that nothing sets in the environment active in the app;
+- `example`: how the response differs from the request's saved example, with missing fields, fields that changed type and a different status;
+- `hints`: the likely cause in plain words, such as a server that is not running, a host that does not resolve, a `401` because the login request has not set `{{token}}` yet, a method typed into the URL field, or a pre-request script that threw.
+
+It only reads, so it is there with `--read-only` too.
 
 ## What you just sent from the app
 
@@ -193,7 +234,7 @@ The whole Kurlo documentation is available in plain text for language models: [l
 
 ## Protocol
 
-The server speaks MCP over stdio with newline-delimited JSON-RPC. It supports the `initialize` handshake of the 2024-11-05 through 2025-11-25 revisions, and the stateless 2026-07-28 revision's `server/discover`. It offers tools only, with no resources or prompts. Tool results carry the JSON as text and as `structuredContent`. A call can be cancelled with `notifications/cancelled`.
+The server speaks MCP over stdio with newline-delimited JSON-RPC. It supports the `initialize` handshake of the 2024-11-05 through 2025-11-25 revisions, and the stateless 2026-07-28 revision's `server/discover`. It offers tools and prompts, and no resources. Tool results carry the JSON as text and as `structuredContent`. A call can be cancelled with `notifications/cancelled`.
 
 To try the server by hand, pipe JSON-RPC into it:
 
