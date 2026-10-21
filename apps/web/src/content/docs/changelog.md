@@ -10,7 +10,7 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
-## Unreleased
+## 2.4.0
 
 ### Added
 
