@@ -2,6 +2,8 @@ module github.com/stormhop/kurlo/apps/desktop
 
 go 1.26.0
 
+toolchain go1.26.10
+
 require (
 	aead.dev/minisign v0.3.0
 	github.com/Masterminds/semver/v3 v3.5.0

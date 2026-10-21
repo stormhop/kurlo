@@ -76,7 +76,7 @@ jobs:
       - name: Check generated Wails bindings are current
         working-directory: apps/desktop
         run: |
-          go run github.com/wailsapp/wails/v2/cmd/wails@v2.13.0 generate module
+          go run github.com/wailsapp/wails/v2/cmd/wails@v2.16.0 generate module
           if ! git -c core.fileMode=false diff --quiet -- frontend/wailsjs; then
             echo "::error::wailsjs bindings are out of date. Run 'make bindings' and commit the result:"
             git -c core.fileMode=false diff --stat -- frontend/wailsjs
