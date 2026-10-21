@@ -246,7 +246,7 @@ func TestMCPServerHandshakeAndToolList(t *testing.T) {
 			t.Errorf("%s inputSchema type = %v", tool.Name, tool.InputSchema["type"])
 		}
 	}
-	if got := strings.Join(names, ","); got != "list_requests,get_request,list_environments,run_request,run_collection,send_request,list_history,get_history_entry,create_collection,save_request,delete_request,save_example,set_variable" {
+	if got := strings.Join(names, ","); got != "list_requests,get_request,list_environments,run_request,run_collection,send_request,list_history,get_history_entry,diagnose_last_failure,create_collection,save_request,delete_request,save_example,set_variable,generate_tests" {
 		t.Errorf("tools = %s", got)
 	}
 	if list.ResultType != "" {
@@ -556,5 +556,71 @@ func TestParseMCPServerArgs(t *testing.T) {
 	}
 	if opts.workspace != fileWorkspaceStorePath() || !opts.loadAppSecrets {
 		t.Errorf("with no workspace it should serve the app's own, with its secrets: %+v", opts)
+	}
+}
+
+func TestMCPServerOffersPrompts(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	server := echoServer(t)
+	root := writeYAMLWorkspace(t, server.URL)
+	names := func(h *mcpHarness) []string {
+		resp := h.request("prompts/list", map[string]any{})
+		var list struct {
+			Prompts []struct {
+				Name string `json:"name"`
+			} `json:"prompts"`
+		}
+		if err := json.Unmarshal(resp.Result, &list); err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, prompt := range list.Prompts {
+			out = append(out, prompt.Name)
+		}
+		return out
+	}
+
+	h := startMCPHarness(t, mcpServerOptions{workspace: root, env: "Local"})
+	resp := h.request("initialize", map[string]any{"protocolVersion": "2025-11-25", "capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "t", "version": "1"}})
+	if !strings.Contains(string(resp.Result), `"prompts":{}`) {
+		t.Fatalf("initialize should announce prompts: %s", resp.Result)
+	}
+	if got := strings.Join(names(h), ","); got != "sync_collection,cover_endpoint,debug_last_failure" {
+		t.Fatalf("prompts = %s", got)
+	}
+
+	resp = h.request("prompts/get", map[string]any{"name": "cover_endpoint", "arguments": map[string]any{"endpoint": "POST /orders", "collection": "Shop"}})
+	var got struct {
+		Messages []struct {
+			Role    string `json:"role"`
+			Content struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"messages"`
+	}
+	if err := json.Unmarshal(resp.Result, &got); err != nil || len(got.Messages) != 1 {
+		t.Fatalf("prompts/get = %s (%v)", resp.Result, err)
+	}
+	text := got.Messages[0].Content.Text
+	for _, want := range []string{"POST /orders", "collection Shop", "generate_tests", "from: example", "never point an environment at production"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("cover_endpoint prompt is missing %q:\n%s", want, text)
+		}
+	}
+
+	if resp := h.request("prompts/get", map[string]any{"name": "cover_endpoint", "arguments": map[string]any{}}); resp.Error == nil || resp.Error.Code != mcpRPCInvalidParams {
+		t.Fatalf("a missing required argument should be invalid params: %+v", resp)
+	}
+	if resp := h.request("prompts/get", map[string]any{"name": "nope"}); resp.Error == nil || resp.Error.Code != mcpRPCInvalidParams {
+		t.Fatalf("an unknown prompt should be invalid params: %+v", resp)
+	}
+
+	readOnly := startMCPHarness(t, mcpServerOptions{workspace: root, env: "Local", readOnly: true})
+	if got := strings.Join(names(readOnly), ","); got != "debug_last_failure" {
+		t.Fatalf("a read-only server should only offer prompts that change nothing: %s", got)
+	}
+	if resp := readOnly.request("prompts/get", map[string]any{"name": "sync_collection"}); resp.Error == nil {
+		t.Fatal("a read-only server should not render a prompt that writes")
 	}
 }

@@ -48,8 +48,9 @@ type mcpHistorySummary struct {
 }
 
 type mcpAppHistory struct {
-	entries []mcpStoredHistoryEntry
-	secrets []string
+	entries             []mcpStoredHistoryEntry
+	secrets             []string
+	activeEnvironmentID string
 }
 
 func loadMCPAppHistory() (mcpAppHistory, error) {
@@ -70,6 +71,7 @@ func loadMCPAppHistory() (mcpAppHistory, error) {
 			return history, fmt.Errorf("could not read Kurlo's history: %v", err)
 		}
 	}
+	history.activeEnvironmentID = stringValue(store, "activeEnvironmentId")
 	sort.SliceStable(history.entries, func(i, j int) bool { return history.entries[i].CreatedAt > history.entries[j].CreatedAt })
 	stored := storedHistoryResponseIDs()
 	for i := range history.entries {

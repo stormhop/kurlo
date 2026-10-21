@@ -57,6 +57,46 @@ func (s *mcpSpecSchema) check(definition, label string, raw json.RawMessage) {
 		s.t.Errorf("%s %s does not match the spec's %s:\n%v\n%s", s.revision, label, definition, err, excerpt)
 	}
 }
+func checkMCPPromptsConform(t *testing.T, h *mcpHarness, spec *mcpSpecSchema, meta map[string]any) {
+	t.Helper()
+	params := func(extra map[string]any) map[string]any {
+		out := map[string]any{}
+		for key, value := range extra {
+			out[key] = value
+		}
+		if meta != nil {
+			out["_meta"] = meta
+		}
+		return out
+	}
+	resp := h.request("prompts/list", params(nil))
+	spec.check("ListPromptsResult", "prompts/list", resp.Result)
+	var list struct {
+		Prompts []struct {
+			Name      string `json:"name"`
+			Arguments []struct {
+				Name     string `json:"name"`
+				Required bool   `json:"required"`
+			} `json:"arguments"`
+		} `json:"prompts"`
+	}
+	if err := json.Unmarshal(resp.Result, &list); err != nil || len(list.Prompts) == 0 {
+		t.Fatalf("prompts/list = %s (%v)", resp.Result, err)
+	}
+	for _, prompt := range list.Prompts {
+		arguments := map[string]any{}
+		for _, arg := range prompt.Arguments {
+			if arg.Required {
+				arguments[arg.Name] = "GET /orders/{id}"
+			}
+		}
+		resp := h.request("prompts/get", params(map[string]any{"name": prompt.Name, "arguments": arguments}))
+		if resp.Error != nil {
+			t.Fatalf("prompts/get %s: rpc error %+v", prompt.Name, resp.Error)
+		}
+		spec.check("GetPromptResult", "prompts/get "+prompt.Name, resp.Result)
+	}
+}
 
 func mcpConformanceCalls(serverURL string) []struct {
 	label     string
@@ -78,6 +118,9 @@ func mcpConformanceCalls(serverURL string) []struct {
 		{"get_history_entry on no history", "get_history_entry", map[string]any{}},
 		{"run_request on a missing request", "run_request", map[string]any{"request": "Nope"}},
 		{"save_request", "save_request", map[string]any{"collection": "Smoke", "name": "Spec check", "url": "{{baseUrl}}/spec"}},
+		{"generate_tests", "generate_tests", map[string]any{"request": "Smoke/Spec check"}},
+		{"generate_tests from an example", "generate_tests", map[string]any{"request": "Smoke/Spec check", "from": "example", "status": 201, "body": `{"id":1}`}},
+		{"diagnose_last_failure on no history", "diagnose_last_failure", map[string]any{}},
 		{"delete_request", "delete_request", map[string]any{"request": "Smoke/Spec check"}},
 	}
 }
@@ -100,6 +143,7 @@ func TestMCPServerAnswersMatchEveryHandshakeRevisionSchema(t *testing.T) {
 
 			resp = h.request("tools/list", map[string]any{})
 			spec.check("ListToolsResult", "tools/list", resp.Result)
+			checkMCPPromptsConform(t, h, spec, nil)
 
 			for _, call := range mcpConformanceCalls(server.URL) {
 				resp := h.request("tools/call", map[string]any{"name": call.name, "arguments": call.arguments})
@@ -128,6 +172,7 @@ func TestMCPServerAnswersMatchTheStatelessRevisionSchema(t *testing.T) {
 
 	resp = h.request("tools/list", map[string]any{"_meta": meta})
 	spec.check("ListToolsResult", "tools/list", resp.Result)
+	checkMCPPromptsConform(t, h, spec, meta)
 
 	for _, call := range mcpConformanceCalls(server.URL) {
 		resp := h.request("tools/call", map[string]any{"name": call.name, "arguments": call.arguments, "_meta": meta})

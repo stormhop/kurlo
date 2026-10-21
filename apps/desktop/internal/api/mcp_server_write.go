@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -22,6 +23,7 @@ var mcpWriteToolNames = map[string]bool{
 	"delete_request":    true,
 	"save_example":      true,
 	"set_variable":      true,
+	"generate_tests":    true,
 }
 
 type mcpStore struct {
@@ -434,7 +436,7 @@ type mcpSaveRequestArgs struct {
 	URL              *string         `json:"url"`
 	Params           *[]mcpRowArg    `json:"params"`
 	Headers          *[]mcpRowArg    `json:"headers"`
-	Body             *string         `json:"body"`
+	Body             *mcpTextArg     `json:"body"`
 	BodyType         *string         `json:"bodyType"`
 	Form             *[]mcpRowArg    `json:"form"`
 	Query            *string         `json:"query"`
@@ -602,9 +604,9 @@ func mcpApplyBody(request map[string]any, args mcpSaveRequestArgs) error {
 	}
 	switch {
 	case bodyType != "":
-	case args.Body != nil && strings.TrimSpace(*args.Body) == "":
+	case args.Body != nil && strings.TrimSpace(string(*args.Body)) == "":
 		bodyType = "none"
-	case args.Body != nil && json.Valid([]byte(*args.Body)):
+	case args.Body != nil && json.Valid([]byte(string(*args.Body))):
 		bodyType = "json"
 	case args.Body != nil:
 		bodyType = "text"
@@ -612,7 +614,7 @@ func mcpApplyBody(request map[string]any, args mcpSaveRequestArgs) error {
 		bodyType = "urlencoded"
 	}
 	if args.Body != nil {
-		request["bodyContent"] = *args.Body
+		request["bodyContent"] = string(*args.Body)
 	}
 	if bodyType == "" {
 		return nil
@@ -730,7 +732,7 @@ func (s *mcpServer) toolSaveExample(_ context.Context, arguments json.RawMessage
 		Name        string         `json:"name"`
 		Notes       string         `json:"notes"`
 		Status      int            `json:"status"`
-		Body        *string        `json:"body"`
+		Body        *mcpTextArg    `json:"body"`
 		Headers     map[string]any `json:"headers"`
 		ContentType string         `json:"contentType"`
 	}
@@ -755,52 +757,57 @@ func (s *mcpServer) toolSaveExample(_ context.Context, arguments json.RawMessage
 			response = mcpExampleResponse(last.response, last.secrets)
 			source = "captured"
 		} else {
-			response = mcpManualExampleResponse(args.Status, args.Body, args.Headers, args.ContentType)
+			response = mcpManualExampleResponse(args.Status, args.Body.ptr(), args.Headers, args.ContentType)
 		}
-		name := strings.TrimSpace(args.Name)
-		if name == "" {
-			name = defaultString(stringValue(response, "status"), fmt.Sprint(response["statusCode"]))
-		}
-		example := map[string]any{
-			"id":        "example-" + uuid.NewString(),
-			"requestId": stringValue(request, "id"),
-			"name":      name,
-			"source":    source,
-			"createdAt": time.Now().UnixMilli(),
-			"snapshot": map[string]any{
-				"method":      defaultString(stringValue(request, "method"), "GET"),
-				"url":         stringValue(request, "url"),
-				"params":      mcpPublicRows(request["params"]),
-				"headers":     mcpPublicRows(request["headers"]),
-				"bodyType":    defaultString(stringValue(request, "bodyType"), "none"),
-				"bodyContent": stringValue(request, "bodyContent"),
-			},
-			"response": response,
-			"match":    map[string]any{"pathTemplate": mcpPathTemplate(stringValue(request, "url"))},
-		}
-		if notes := strings.TrimSpace(args.Notes); notes != "" {
-			example["notes"] = notes
-		}
-		var examples []any
-		switch typed := request["examples"].(type) {
-		case []any:
-			examples = typed
-		case []map[string]any:
-			for _, item := range typed {
-				examples = append(examples, item)
-			}
-		}
-		request["examples"] = append(examples, example)
+		example := mcpAddExample(request, response, args.Name, args.Notes, source)
 		return func() any {
 			return map[string]any{
 				"request": st.requestPath(request),
-				"example": name,
+				"example": example["name"],
 				"id":      stringValue(example, "id"),
 				"status":  response["statusCode"],
 				"source":  source,
 			}
 		}, nil
 	})
+}
+
+func mcpAddExample(request, response map[string]any, name, notes, source string) map[string]any {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = defaultString(stringValue(response, "status"), fmt.Sprint(response["statusCode"]))
+	}
+	example := map[string]any{
+		"id":        "example-" + uuid.NewString(),
+		"requestId": stringValue(request, "id"),
+		"name":      name,
+		"source":    source,
+		"createdAt": time.Now().UnixMilli(),
+		"snapshot": map[string]any{
+			"method":      defaultString(stringValue(request, "method"), "GET"),
+			"url":         stringValue(request, "url"),
+			"params":      mcpPublicRows(request["params"]),
+			"headers":     mcpPublicRows(request["headers"]),
+			"bodyType":    defaultString(stringValue(request, "bodyType"), "none"),
+			"bodyContent": stringValue(request, "bodyContent"),
+		},
+		"response": response,
+		"match":    map[string]any{"pathTemplate": mcpPathTemplate(stringValue(request, "url"))},
+	}
+	if notes = strings.TrimSpace(notes); notes != "" {
+		example["notes"] = notes
+	}
+	var examples []any
+	switch typed := request["examples"].(type) {
+	case []any:
+		examples = typed
+	case []map[string]any:
+		for _, item := range typed {
+			examples = append(examples, item)
+		}
+	}
+	request["examples"] = append(examples, example)
+	return example
 }
 
 func mcpPublicRows(value any) []any {
@@ -883,6 +890,30 @@ func mcpManualExampleResponse(status int, body *string, headerArgs map[string]an
 		"body":          text,
 		"bodyMediaType": mcpMediaType(contentType),
 	}
+}
+
+type mcpTextArg string
+
+func (t *mcpTextArg) UnmarshalJSON(data []byte) error {
+	var text string
+	if err := json.Unmarshal(data, &text); err == nil {
+		*t = mcpTextArg(text)
+		return nil
+	}
+	var buf bytes.Buffer
+	if err := json.Indent(&buf, data, "", "  "); err != nil {
+		return err
+	}
+	*t = mcpTextArg(buf.String())
+	return nil
+}
+
+func (t *mcpTextArg) ptr() *string {
+	if t == nil {
+		return nil
+	}
+	text := string(*t)
+	return &text
 }
 
 func mcpMediaType(contentType string) string {

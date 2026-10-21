@@ -217,6 +217,20 @@ func (s *mcpServer) handle(line []byte) {
 		s.writeResult(msg.ID, result)
 	case mcpMethodToolsCall:
 		s.startToolCall(msg)
+	case mcpMethodPromptsList:
+		s.writeResult(msg.ID, s.listPrompts(msg.Params))
+	case mcpMethodPromptsGet:
+		result, err := s.getPrompt(msg.Params)
+		if err != nil {
+			var rpcErr *mcpServerError
+			if errors.As(err, &rpcErr) {
+				s.writeError(msg.ID, rpcErr.code, rpcErr.message)
+				return
+			}
+			s.writeError(msg.ID, mcpRPCInvalidParams, err.Error())
+			return
+		}
+		s.writeResult(msg.ID, result)
 	default:
 		s.writeError(msg.ID, mcpRPCMethodNotFound, "method not found: "+msg.Method)
 	}
@@ -315,13 +329,13 @@ func (s *mcpServer) instructions() string {
 	lines := []string{
 		"Kurlo is an API client. These tools work on the Kurlo workspace at " + s.opts.workspace + ": its saved requests, collections and environments.",
 		"- list_requests, get_request and list_environments show what is saved. run_request sends a saved request with its auth, scripts and tests, run_collection runs a collection or folder, and send_request sends a one-off call that can use {{variables}}.",
-		"- When the user mentions a request they just sent or a response they saw in Kurlo, call get_history_entry: with no arguments it returns the last request sent from the app. list_history finds older ones.",
+		"- When the user mentions a request they just sent or a response they saw in Kurlo, call get_history_entry: with no arguments it returns the last request sent from the app. list_history finds older ones. When one failed, diagnose_last_failure says why.",
 		"- Values scripts set carry over to later calls, so run a login request first. unresolvedVariables names the {{variables}} nothing set.",
 		"- browserOrigin on run_request or send_request checks CORS the way a browser on that origin would.",
 		"- Secrets are sent but shown as [secret]. Protected environments cannot be used here: ask the user to run those requests in Kurlo.",
 	}
 	if !s.opts.readOnly {
-		lines = append(lines, "- create_collection, save_request, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")
+		lines = append(lines, "- create_collection, save_request, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*, or let generate_tests write them from a response. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")
 	}
 	if s.opts.env != "" {
 		lines = append(lines, "- Calls that do not name an environment use "+s.opts.env+".")
@@ -342,7 +356,7 @@ func (s *mcpServer) initializeResult(params json.RawMessage) map[string]any {
 	}
 	return map[string]any{
 		"protocolVersion": version,
-		"capabilities":    map[string]any{"tools": map[string]any{}},
+		"capabilities":    mcpServerCapabilities(),
 		"serverInfo":      s.serverInfo(),
 		"instructions":    s.instructions(),
 	}
@@ -352,12 +366,16 @@ func (s *mcpServer) discoverResult() map[string]any {
 	return map[string]any{
 		"resultType":        "complete",
 		"supportedVersions": []string{model.McpDefaultProtocolVersion},
-		"capabilities":      map[string]any{"tools": map[string]any{}},
+		"capabilities":      mcpServerCapabilities(),
 		"instructions":      s.instructions(),
 		"ttlMs":             mcpServerListTTLMs,
 		"cacheScope":        "private",
 		"_meta":             map[string]any{mcpMetaServerInfo: s.serverInfo()},
 	}
+}
+
+func mcpServerCapabilities() map[string]any {
+	return map[string]any{"tools": map[string]any{}, "prompts": map[string]any{}}
 }
 
 func mcpServerTools(readOnly bool) []map[string]any {
@@ -467,11 +485,11 @@ func mcpServerTools(readOnly bool) []map[string]any {
 			"annotations": network,
 		},
 	}
-	tools = append(tools, mcpServerHistoryTools()...)
+	tools = append(append(tools, mcpServerHistoryTools()...), mcpDiagnoseTool())
 	if readOnly {
 		return tools
 	}
-	return append(tools, mcpServerWriteTools()...)
+	return append(append(tools, mcpServerWriteTools()...), mcpGenerateTestsTool())
 }
 
 func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[string]any, error) {
@@ -511,6 +529,8 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolListHistory
 	case "get_history_entry":
 		run = s.toolGetHistoryEntry
+	case "diagnose_last_failure":
+		run = s.toolDiagnoseLastFailure
 	case "create_collection":
 		run = s.toolCreateCollection
 	case "save_request":
@@ -521,6 +541,8 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolSaveExample
 	case "set_variable":
 		run = s.toolSetVariable
+	case "generate_tests":
+		run = s.toolGenerateTests
 	default:
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "unknown tool: " + call.Name}
 	}
