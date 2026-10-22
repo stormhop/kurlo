@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **A way to star Kurlo on GitHub.** Settings › Support has a link to the repository, and after your twentieth successful request a small "Star on GitHub" appears once in the status bar. It goes away for good when you click it or close it. The count stays on your machine; Kurlo still sends nothing anywhere.
 - **`.keys` in test scripts.** `pm.expect(order).to.have.all.keys("id", "status", "total")`, `.to.have.any.keys(...)`, `.keys([...])` and `.key(name)` work as they do in Chai. A script that used them stopped with an error before.
 
 ### Fixed

@@ -29,6 +29,24 @@
   color: var(--text);
 }
 
+.star-prompt {
+  display: inline-flex;
+  align-items: center;
+}
+
+.star-prompt-btn {
+  gap: var(--space-1);
+  color: var(--text-2);
+}
+
+.star-prompt-btn svg {
+  color: var(--accent);
+}
+
+.star-prompt-close {
+  color: var(--text-3);
+}
+
 .status-bar {
   display: flex;
   align-items: center;

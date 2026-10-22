@@ -66,6 +66,7 @@ type RequestExecutionHost = {
   applyEnvironmentChangesFromResponse: (resp: HttpResponse, environmentId: string) => Promise<void>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   promoteActiveRequestToSSE: () => void;
+  noteSuccessfulSend: () => void;
   recordRequestHistory: (httpResponse: HttpResponse, requestSnapshot?: SavedRequest) => Promise<void>;
   refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean) => Promise<void>;
   requestIsActive: (requestId: string) => boolean;
@@ -225,6 +226,7 @@ export const requestExecutionFeature = {
         setTimeout(() => (this.savedResponse = false), 1600);
       }
       await this.recordRequestHistory(resp, requestSnapshot);
+      if (resp.statusCode && !resp.error) this.noteSuccessfulSend();
     } catch (e) {
       if (isCurrent() && this.requestIsActive(requestId)) this.requestError = String(e);
     }

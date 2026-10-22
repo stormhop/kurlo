@@ -2,6 +2,7 @@
   import { kurloChangedFiles } from '../gitFiles';
   import { vm } from '../stores/app.svelte';
   import { openExternalURL } from '../externalLinks';
+  import { KURLO_REPO_URL } from '../starPrompt';
   import type { GitWorkspaceStatus } from '../backend';
   import type { TopView } from '../stores/ui';
   import { shortcutComboLabel } from '../stores/features/preferences';
@@ -58,6 +59,11 @@
   let themeVariantList = $derived(resolvedAppTheme === 'light' ? LIGHT_THEME_VARIANTS : DARK_THEME_VARIANTS);
   let activeVariantId = $derived(resolvedAppTheme === 'light' ? appTheme.light : appTheme.dark);
   let toggleSidebarShortcut = $derived(shortcutComboLabel(vm.shortcutCombo('toggle-left-sidebar'), appRuntime));
+
+  function starKurlo() {
+    openExternalURL(KURLO_REPO_URL);
+    vm.closeStarPrompt();
+  }
 
   function branchNameOnly(value: string) {
     const branch = (value || '').trim();
@@ -121,6 +127,21 @@
     </button>
   </div>
   <div class="status-bar-right">
+    {#if vm.starPromptVisible}
+      <span class="star-prompt">
+        <button class="btn btn-ghost btn-xs star-prompt-btn" type="button" onclick={starKurlo} title="Kurlo is free and open source; a star helps other people find it">
+          <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 1.6l1.95 3.95 4.35.63-3.15 3.07.74 4.33L8 11.53l-3.89 2.05.74-4.33L1.7 6.18l4.35-.63L8 1.6z" fill="currentColor"/>
+          </svg>
+          <span>Star on GitHub</span>
+        </button>
+        <button class="btn btn-ghost btn-icon btn-xs star-prompt-close" type="button" onclick={() => vm.closeStarPrompt()} title="Don't show again" aria-label="Hide the GitHub star prompt">
+          <svg width="0.5625rem" height="0.5625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </span>
+    {/if}
     <button
       class="btn btn-ghost btn-icon btn-xs layout-btn github-link-btn"
       type="button"

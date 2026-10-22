@@ -60,6 +60,7 @@ import { requestBodyFeature } from './features/requestBody';
 import { requestCrudFeature } from './features/requestCrud';
 import { requestDirtyFeature } from './features/requestDirty';
 import { requestExecutionFeature } from './features/requestExecution';
+import { finishStarPrompt, loadStarPromptState, recordSuccessfulSend, starPromptDue } from '../starPrompt';
 import { requestHeadersFeature } from './features/requestHeaders';
 import { requestPersistenceFeature } from './features/requestPersistence';
 import { requestSerializationFeature } from './features/requestSerialization';
@@ -1125,6 +1126,7 @@ class AppVM {
   settingsSaved = $state(false);
 
   topView = $state<TopView>('request');
+  starPromptVisible = $state(starPromptDue(loadStarPromptState()));
   requests = $state<SavedRequest[]>([]);
   requestsById = $derived(new Map(this.requests.map(request => [request.id, request])));
   workspaces = $state<Workspace[]>([]);
@@ -1342,6 +1344,15 @@ class AppVM {
   get variableSuggestions(): VariableSuggestion[] { return this.requestVariableSuggestions(); }
   get cookieJarDefaultDomain() { return this.activeRequestCookieDomain(); }
   get loading(): boolean { return Boolean(this.activeRequestId && this.inFlightRequestIds.has(this.activeRequestId)); }
+
+  noteSuccessfulSend() {
+    if (starPromptDue(recordSuccessfulSend())) this.starPromptVisible = true;
+  }
+
+  closeStarPrompt() {
+    finishStarPrompt();
+    this.starPromptVisible = false;
+  }
 
   scheduleWorkspacePersist() {
     if (this.workspaceBlocked) return;

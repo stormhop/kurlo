@@ -1,6 +1,8 @@
 <script lang="ts">
   import Keycaps from './Keycaps.svelte';
   import { openExternalURL } from '../externalLinks';
+  import { KURLO_REPO_URL } from '../starPrompt';
+  import { vm } from '../stores/app.svelte';
   import { untrack } from 'svelte';
   import { tabListKeyboard, trapFocus } from '../a11y';
   import type { SettingsTab } from '../stores/ui';
@@ -932,6 +934,21 @@
           <p class="support-intro">Send bugs or questions to the public tracker.</p>
 
           <div class="support-actions">
+            <button class="support-link-card" type="button" onclick={() => { openExternalURL(KURLO_REPO_URL); vm.closeStarPrompt(); }}>
+              <span class="support-link-icon" aria-hidden="true">
+                <svg width="1.0625rem" height="1.0625rem" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 1.9l1.85 3.75 4.15.6-3 2.92.71 4.13L8 11.35l-3.71 1.95.71-4.13-3-2.92 4.15-.6L8 1.9z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span class="support-link-copy">
+                <span class="support-link-title">Star Kurlo on GitHub</span>
+                <span class="support-link-meta">Free and open source; a star helps other people find it</span>
+              </span>
+              <svg width="0.6875rem" height="0.6875rem" viewBox="0 0 10 10" fill="none" aria-hidden="true" class="support-link-arrow">
+                <path d="M2 8L8 2M8 2H4M8 2v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+
             <button class="support-link-card" type="button" onclick={() => openExternalURL('https://github.com/stormhop/kurlo/issues')}>
               <span class="support-link-icon" aria-hidden="true">
                 <svg width="1.0625rem" height="1.0625rem" viewBox="0 0 18 18" fill="none">

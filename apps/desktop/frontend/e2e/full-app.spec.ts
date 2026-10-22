@@ -3793,6 +3793,48 @@ test.describe('Cookie sync extension', () => {
   });
 });
 
+test.describe('GitHub star prompt', () => {
+  test('shows once after the twentieth send and stays away when closed', async ({ page }) => {
+    const shots = process.env.KURLO_STAR_SHOTS ?? '';
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.starPrompt.v1', JSON.stringify({ sends: 19, done: false })));
+    await page.goto('/');
+    const prompt = page.getByRole('button', { name: 'Star on GitHub' });
+    await expect(prompt).toHaveCount(0);
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/users');
+    await page.getByRole('button', { name: /^Send( |$)/ }).first().click();
+    await expect(prompt).toBeVisible();
+    if (shots) await page.locator('.status-bar').screenshot({ path: `${shots}/status-light.png` });
+    await page.getByRole('button', { name: 'Hide the GitHub star prompt' }).click();
+    await expect(prompt).toHaveCount(0);
+    expect(JSON.parse(await page.evaluate(() => localStorage.getItem('kurlo.starPrompt.v1') ?? '{}'))).toEqual({ sends: 20, done: true });
+    await page.getByRole('button', { name: /^Send( |$)/ }).first().click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(2);
+    await page.waitForTimeout(300);
+    await expect(prompt).toHaveCount(0);
+  });
+
+  test('opens the repository from the status bar and from Support', async ({ page }) => {
+    const shots = process.env.KURLO_STAR_SHOTS ?? '';
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.starPrompt.v1', JSON.stringify({ sends: 20, done: false })));
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Star on GitHub' })).toBeVisible();
+    if (shots) await page.locator('.status-bar').screenshot({ path: `${shots}/status-dark.png` });
+    await page.getByRole('button', { name: 'Star on GitHub' }).click();
+    await expect(page.getByRole('button', { name: 'Star on GitHub' })).toHaveCount(0);
+    expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call === 'open:https://github.com/stormhop/kurlo'))).toHaveLength(1);
+    await page.locator('.version-pill').click();
+    await page.getByRole('tab', { name: 'Support' }).click();
+    const card = page.getByRole('button', { name: /Star Kurlo on GitHub/ });
+    await expect(card).toBeVisible();
+    if (shots) await page.locator('#settings-panel-support').screenshot({ path: `${shots}/support-dark.png` });
+    await card.click();
+    expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call === 'open:https://github.com/stormhop/kurlo'))).toHaveLength(2);
+  });
+});
+
 test.describe('External workspace changes', () => {
   test('keep the open request on the tab the user is looking at', async ({ page }) => {
     await installKurloBridge(page);
