@@ -3793,6 +3793,31 @@ test.describe('Cookie sync extension', () => {
   });
 });
 
+test.describe('External workspace changes', () => {
+  test('keep the open request on the tab the user is looking at', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.collections = [{ id: 'collection-ext', workspaceId: 'workspace-e2e', name: 'Orders', filesystemName: 'Orders' }];
+      store.requests = [{ id: 'req-ext', name: 'Create order', collectionId: 'collection-ext', collection: 'Orders', folderPath: [], requestType: 'http', method: 'POST', url: 'https://api.example.test/orders', testScriptJs: 'pm.test("first", () => {})' }];
+      store.activeId = 'req-ext';
+      store.openIds = ['req-ext'];
+    });
+    await page.goto('/');
+    await chooseRequestSection(page, 'Scripts');
+    await page.getByRole('tab', { name: /^Tests/ }).click();
+    await expect(page.getByTestId('test-script-editor')).toContainText('first');
+    await page.evaluate(() => {
+      const store = window.__kurloE2E.store as { requests: Array<Record<string, unknown>> };
+      store.requests[0].testScriptJs = 'pm.test("added by an agent", () => {})';
+      window.__kurloE2E.emit('kurlo:workspace-changed', 'Create-order.yml changed');
+    });
+    await expect(page.getByTestId('test-script-editor')).toContainText('added by an agent');
+    await expect(page.locator('.request-editor-tabs-shell').getByRole('tab', { name: 'Scripts' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: /^Tests/ })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
 test.describe('Protocol badge', () => {
   test('stays as narrow as its label after the request is created', async ({ page }) => {
     await installKurloBridge(page);

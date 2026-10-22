@@ -1,10 +1,11 @@
 import { readWorkspaceYAMLFile, writeWorkspaceYAMLFile } from '../../backend';
 import type { WorkspaceDiagnostic, WorkspaceOpenResult } from '../../backend';
 import { filesystemNameFromName } from '../../normalizers';
-import type { Workspace } from '../../types/models';
+import type { RequestTab, RequestType, ResponseTab, ScriptTab, Workspace } from '../../types/models';
 import type { TopView } from '../ui';
 
 type WorkspaceDiagnosticsHost = {
+  activeRequestId: string;
   activeWorkspaceId: string;
   collectionImportToast: string;
   externalWorkspaceChangePending: boolean;
@@ -14,6 +15,10 @@ type WorkspaceDiagnosticsHost = {
   gitError: string;
   gitLoading: boolean;
   requestStoreLoaded: boolean;
+  requestTab: RequestTab;
+  requestType: RequestType;
+  responseTab: ResponseTab;
+  scriptTab: ScriptTab;
   topView: TopView;
   workspaces: Workspace[];
   workspaceBlocked: boolean;
@@ -326,8 +331,14 @@ export const workspaceDiagnosticsFeature = {
   },
 
   async reloadWorkspaceAfterExternalChange(this: WorkspaceDiagnosticsHost, reason: string) {
+    const view = { id: this.activeRequestId, requestType: this.requestType, requestTab: this.requestTab, scriptTab: this.scriptTab, responseTab: this.responseTab };
     this.requestStoreLoaded = false;
     await this.loadRequestWorkspace();
+    if (view.id && this.activeRequestId === view.id && this.requestType === view.requestType) {
+      this.requestTab = view.requestTab;
+      this.scriptTab = view.scriptTab;
+      this.responseTab = view.responseTab;
+    }
     const friendly = reason ? ` (${reason})` : '';
     if (this.workspaceDiagnostics.length) {
       this.collectionImportToast = `Workspace refreshed${friendly}; ${this.workspaceDiagnostics.length} YAML error${this.workspaceDiagnostics.length === 1 ? '' : 's'} found.`;
