@@ -1,21 +1,24 @@
 ---
 import Search from '@astrojs/starlight/components/Search.astro';
-import SiteTitle from '@astrojs/starlight/components/SiteTitle.astro';
 import ThemeSelect from '@astrojs/starlight/components/ThemeSelect.astro';
+import logo from '../assets/logo.png';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 const path = Astro.url.pathname.slice(base.length - 1);
 const links = [
   { label: 'Docs', href: `${base}docs/`, active: path.startsWith('/docs/') },
   { label: 'MCP', href: `${base}mcp/`, active: false },
-  { label: 'Download', href: `${base}download/`, active: path.startsWith('/download/') },
   { label: 'Changelog', href: `${base}changelog/`, active: path.startsWith('/changelog/') },
+  { label: 'GitHub', href: 'https://github.com/stormhop/kurlo', active: false },
 ];
 ---
 
 <div class="kurlo-header">
   <div class="kurlo-header-title">
-    <SiteTitle />
+    <a class="kurlo-brand" href={base} aria-label="Kurlo home">
+      <img src={logo.src} alt="" width="30" height="30" />
+      <span>kurlo</span>
+    </a>
   </div>
   <div class="kurlo-header-search print:hidden">
     <Search />
@@ -26,10 +29,8 @@ const links = [
         <a href={link.href} aria-current={link.active ? 'page' : undefined}>{link.label}</a>
       ))}
     </nav>
-    <a class="kurlo-header-github" href="https://github.com/stormhop/kurlo" aria-label="Kurlo on GitHub">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.2 4.2 0 0 0-.1-3.2s-1.1-.3-3.5 1.3a12 12 0 0 0-6.2 0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2 0 0 0-.1 3.2A4.6 4.6 0 0 0 4 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </a>
     <ThemeSelect />
+    <a class="kurlo-header-cta" href={`${base}download/`} aria-current={path.startsWith('/download/') ? 'page' : undefined}>Download</a>
   </div>
 </div>
 
@@ -47,6 +48,19 @@ const links = [
     padding: 0.25rem;
     margin: -0.25rem;
   }
+  .kurlo-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--sl-color-white);
+    text-decoration: none;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  .kurlo-brand img {
+    border-radius: 8px;
+  }
   .kurlo-header-search {
     display: flex;
     flex: 1 1 auto;
@@ -54,41 +68,40 @@ const links = [
   }
   .kurlo-header-end {
     align-items: center;
-    gap: 1.25rem;
+    gap: 1.5rem;
   }
   .kurlo-header-nav {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 1.5rem;
+  }
+  .kurlo-header-nav a,
+  .kurlo-header-cta {
+    font-family: var(--sl-font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    text-decoration: none;
   }
   .kurlo-header-nav a {
-    padding: 0.4rem 0.7rem;
-    border-radius: 8px;
-    font-size: 0.875rem;
-    font-weight: 500;
     color: var(--sl-color-gray-2);
-    text-decoration: none;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: color 0.15s ease;
   }
-  .kurlo-header-nav a:hover {
-    color: var(--sl-color-white);
-    background: var(--kurlo-surface);
-  }
+  .kurlo-header-nav a:hover,
   .kurlo-header-nav a[aria-current='page'] {
     color: var(--sl-color-white);
   }
-  .kurlo-header-github {
-    display: grid;
-    place-items: center;
-    width: 2.1rem;
-    height: 2.1rem;
-    border-radius: 8px;
-    color: var(--sl-color-gray-2);
-    transition: color 0.15s ease, background 0.15s ease;
+  .kurlo-header-cta {
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    background: var(--sl-color-white);
+    color: var(--sl-color-black);
+    font-weight: 700;
+    transition: opacity 0.15s ease;
   }
-  .kurlo-header-github:hover {
-    color: var(--sl-color-white);
-    background: var(--kurlo-surface);
+  .kurlo-header-cta:hover {
+    opacity: 0.88;
   }
   @media (min-width: 50rem) {
     .kurlo-header-title {

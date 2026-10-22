@@ -24,47 +24,51 @@
   --sl-color-accent: #5865f2;
   --sl-color-accent-high: #c3c8ff;
 
-  --sl-color-white: #f4f4f6;
-  --sl-color-gray-1: #ececef;
-  --sl-color-gray-2: #b4b4bc;
-  --sl-color-gray-3: #8e8e97;
-  --sl-color-gray-4: #5a5a63;
-  --sl-color-gray-5: #2d2d32;
-  --sl-color-gray-6: #19191c;
-  --sl-color-black: #111113;
+  --sl-color-white: #eeece6;
+  --sl-color-gray-1: #e2e0da;
+  --sl-color-gray-2: #aeaebb;
+  --sl-color-gray-3: #8a8b99;
+  --sl-color-gray-4: #5a5b68;
+  --sl-color-gray-5: #2b2c38;
+  --sl-color-gray-6: #171821;
+  --sl-color-black: #0e0f15;
 
-  --sl-color-bg-nav: #0e0e10;
-  --sl-color-bg-sidebar: #0e0e10;
-  --sl-color-hairline: #222226;
-  --sl-color-hairline-shade: #222226;
+  --sl-color-bg-nav: #0e0f15;
+  --sl-color-bg-sidebar: #0e0f15;
+  --sl-color-hairline: #22232d;
+  --sl-color-hairline-shade: #22232d;
 
-  --kurlo-code-bg: #141417;
-  --kurlo-code-bar: #19191c;
+  --kurlo-code-bg: #14151d;
+  --kurlo-code-bar: #1c1d27;
+  --kurlo-code-line: #2b2c38;
+  --kurlo-inline-code-bg: #171821;
   --kurlo-shot-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03), 0 24px 50px -30px rgba(0, 0, 0, 0.85);
 }
 
 :root[data-theme='light'] {
   --sl-color-accent-low: #e6e8ff;
   --sl-color-accent: #4f5be8;
-  --sl-color-accent-high: #2c35a8;
+  --sl-color-accent-high: #3f4bd6;
 
-  --sl-color-white: #16161a;
-  --sl-color-gray-1: #26262c;
-  --sl-color-gray-2: #4a4a55;
-  --sl-color-gray-3: #6b6b74;
-  --sl-color-gray-4: #a0a0aa;
-  --sl-color-gray-5: #dcdce3;
-  --sl-color-gray-6: #f0f0f3;
-  --sl-color-gray-7: #f7f7f9;
-  --sl-color-black: #ffffff;
+  --sl-color-white: #15161c;
+  --sl-color-gray-1: #25262d;
+  --sl-color-gray-2: #4a4b56;
+  --sl-color-gray-3: #6d6e78;
+  --sl-color-gray-4: #a3a19a;
+  --sl-color-gray-5: #dcd8cd;
+  --sl-color-gray-6: #ece9e1;
+  --sl-color-gray-7: #f4f2ec;
+  --sl-color-black: #f8f6f1;
 
-  --sl-color-bg-nav: #fbfbfc;
-  --sl-color-bg-sidebar: #fbfbfc;
-  --sl-color-hairline: #e7e7ec;
-  --sl-color-hairline-shade: #e7e7ec;
+  --sl-color-bg-nav: #f3f0e9;
+  --sl-color-bg-sidebar: #f3f0e9;
+  --sl-color-hairline: #e4e0d5;
+  --sl-color-hairline-shade: #e4e0d5;
 
-  --kurlo-code-bg: #f7f7f9;
-  --kurlo-code-bar: #f0f0f3;
+  --kurlo-code-bg: #14151d;
+  --kurlo-code-bar: #1c1d27;
+  --kurlo-code-line: #2b2c38;
+  --kurlo-inline-code-bg: #ece9e1;
   --kurlo-shot-shadow: 0 1px 2px rgba(22, 22, 26, 0.05), 0 24px 50px -34px rgba(22, 22, 26, 0.35);
 }
 
@@ -275,7 +279,7 @@ starlight-theme-select select {
   padding: 0.12em 0.4em;
   border: 1px solid var(--sl-color-hairline);
   border-radius: 6px;
-  background: var(--kurlo-code-bg);
+  background: var(--kurlo-inline-code-bg);
   font-size: 0.86em;
   color: var(--sl-color-white);
   overflow-wrap: anywhere;

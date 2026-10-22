@@ -1,0 +1,69 @@
+---
+import '@fontsource/anton';
+import Scene from './Scene.astro';
+
+interface Props {
+  description?: string;
+}
+
+const { description } = Astro.props;
+---
+
+<div class="kurlo-docs-hero not-content">
+  <Scene variant="dusk" eager />
+  <div class="kurlo-docs-hero-copy">
+    <p class="kurlo-docs-hero-label">Documentation</p>
+    <h1 id="_top">Learn Kurlo.</h1>
+    {description && <p class="kurlo-docs-hero-lead">{description}</p>}
+  </div>
+</div>
+
+<style>
+  .kurlo-docs-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    min-height: clamp(15rem, 34vw, 21rem);
+    margin-top: 0.5rem;
+    border-radius: 16px;
+    color: #f7f3ea;
+  }
+  .kurlo-docs-hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: linear-gradient(90deg, rgba(14, 12, 44, 0.55) 0%, rgba(14, 12, 44, 0.25) 45%, rgba(14, 12, 44, 0) 75%);
+  }
+  .kurlo-docs-hero-copy {
+    padding: clamp(1.25rem, 4vw, 2.25rem);
+  }
+  .kurlo-docs-hero-label {
+    margin: 0 0 0.75rem;
+    font-family: var(--sl-font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    opacity: 0.85;
+  }
+  h1 {
+    margin: 0;
+    font-family: 'Anton', Impact, sans-serif;
+    font-weight: 400;
+    font-size: clamp(3rem, 2rem + 4vw, 5rem);
+    line-height: 0.9;
+    letter-spacing: 0.005em;
+    text-transform: uppercase;
+    color: #f7f3ea;
+    text-shadow: 0 4px 30px rgba(20, 18, 60, 0.3);
+  }
+  .kurlo-docs-hero-lead {
+    max-width: 30rem;
+    margin: 0.9rem 0 0;
+    font-size: 1.0625rem;
+    line-height: 1.5;
+    text-shadow: 0 1px 2px rgba(16, 14, 50, 0.55), 0 2px 18px rgba(16, 14, 50, 0.5);
+  }
+</style>

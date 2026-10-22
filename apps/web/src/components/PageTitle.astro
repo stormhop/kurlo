@@ -1,9 +1,19 @@
 ---
-const { title, description } = Astro.locals.starlightRoute.entry.data;
+import DocsHero from './DocsHero.astro';
+
+const route = Astro.locals.starlightRoute;
+const { title, description } = route.entry.data;
+const hub = route.id === 'docs';
 ---
 
-<h1 id="_top">{title}</h1>
-{description && <p class="kurlo-page-lead">{description}</p>}
+{hub ? (
+  <DocsHero description={description} />
+) : (
+  <>
+    <h1 id="_top">{title}</h1>
+    {description && <p class="kurlo-page-lead">{description}</p>}
+  </>
+)}
 
 <style>
   h1 {
