@@ -274,6 +274,8 @@ JavaScript also supports Chai-style aliases for the common Postman patterns:
 | `.to.equal(v)` | Strict equality |
 | `.to.include(v)` | Substring or array membership |
 | `.to.have.property(k)` | Object has property |
+| `.to.have.all.keys(...k)` | Object has exactly these keys; `.keys` alone means the same |
+| `.to.have.any.keys(...k)` | Object has at least one of these keys |
 | `.to.be.above(n)` | `value > n` |
 | `.to.be.below(n)` | `value < n` |
 | `pm.response.to.have.status(code)` | Response status code check |

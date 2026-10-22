@@ -5,6 +5,17 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`.keys` in test scripts.** `pm.expect(order).to.have.all.keys("id", "status", "total")`, `.to.have.any.keys(...)`, `.keys([...])` and `.key(name)` work as they do in Chai. A script that used them stopped with an error before.
+
+### Fixed
+
+- **A request body could be lost when the YAML named an unknown body type.** A request file with `bodyType: raw`, as Postman and Bruno call it, or another value Kurlo does not know, was read as having no body: `kurlo run` and `kurlo mcp` sent the request empty, and the next save from the app deleted the body from the file. `raw` is now read as the type in `rawBodyType`, and any other unknown type that has a body is read as text.
+- **A change made outside Kurlo moved the open request to Params.** When an assistant, an editor or `git pull` changed the workspace on disk, Kurlo reloaded it and showed the open request on the tab saved in its file, usually Params, so you lost the Scripts or Body tab you were looking at. The request and response tabs now stay where they were.
+
 ## [2.4.0] - 2026-10-22
 
 ### Added

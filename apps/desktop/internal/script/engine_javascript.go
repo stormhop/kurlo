@@ -534,6 +534,8 @@ var __kurloAPI = (function (host) {
   }
   Object.defineProperty(Assertion.prototype, 'not', { get: function () { this._neg = !this._neg; return this; }, configurable: true });
   Object.defineProperty(Assertion.prototype, 'deep', { get: function () { this._deep = true; return this; }, configurable: true });
+  Object.defineProperty(Assertion.prototype, 'all', { get: function () { this._any = false; return this; }, configurable: true });
+  Object.defineProperty(Assertion.prototype, 'any', { get: function () { this._any = true; return this; }, configurable: true });
 
   function getAssert(name, fn) {
     Object.defineProperty(Assertion.prototype, name, { get: function () { return fn.call(this); }, configurable: true });
@@ -591,6 +593,22 @@ var __kurloAPI = (function (host) {
     return check(this, len === n, 'expected length ' + fmt(len) + ' to equal ' + fmt(n), 'expected length ' + fmt(len) + ' to not equal ' + fmt(n));
   };
   Assertion.prototype.length = Assertion.prototype.lengthOf;
+  Assertion.prototype.keys = function (first) {
+    var expected = Array.isArray(first) ? first.slice() : (first && typeof first === 'object' ? Object.keys(first) : Array.prototype.slice.call(arguments));
+    var o = this._obj;
+    var actual = o !== null && o !== undefined && typeof o === 'object' ? Object.keys(o) : [];
+    var present = function (key) { return actual.indexOf(String(key)) !== -1; };
+    var pass, wording;
+    if (this._any) {
+      pass = expected.some(present);
+      wording = 'any of keys ';
+    } else {
+      pass = expected.every(present) && actual.length === expected.length;
+      wording = 'all keys ';
+    }
+    return check(this, expected.length > 0 && pass, 'expected ' + fmt(o) + ' to have ' + wording + fmt(expected), 'expected ' + fmt(o) + ' to not have ' + wording + fmt(expected));
+  };
+  Assertion.prototype.key = Assertion.prototype.keys;
   Assertion.prototype.above = function (n) { return check(this, num(this) > n, 'expected ' + fmt(this._obj) + ' to be above ' + fmt(n), 'expected ' + fmt(this._obj) + ' to not be above ' + fmt(n)); };
   Assertion.prototype.gt = Assertion.prototype.above;
   Assertion.prototype.greaterThan = Assertion.prototype.above;

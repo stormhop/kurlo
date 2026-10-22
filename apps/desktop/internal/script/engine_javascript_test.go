@@ -233,6 +233,36 @@ pm.test("oneOf", () => pm.expect("b").to.be.oneOf(["a", "b", "c"]));
 	}
 }
 
+func TestJSChaiKeys(t *testing.T) {
+	ctx := NewContext(nil, nil)
+	res := jsTests(`
+const order = {id: "ord_1", status: "confirmed", total: 228};
+pm.test("all keys", () => pm.expect(order).to.have.all.keys("id", "status", "total"));
+pm.test("keys array", () => pm.expect(order).to.have.keys(["total", "id", "status"]));
+pm.test("any keys", () => pm.expect(order).to.have.any.keys("missing", "id"));
+pm.test("key", () => pm.expect({id: 1}).to.have.key("id"));
+pm.test("not all keys", () => pm.expect(order).to.not.have.all.keys("id", "status"));
+pm.test("extra key fails", () => pm.expect(order).to.have.all.keys("id", "status"));
+pm.test("no key fails", () => pm.expect(order).to.have.any.keys("missing"));
+`, ctx)
+	if res.Error != "" {
+		t.Fatalf("unexpected error: %s", res.Error)
+	}
+	if len(res.Tests) != 7 {
+		t.Fatalf("expected 7 tests, got %d", len(res.Tests))
+	}
+	for _, tr := range res.Tests[:5] {
+		if !tr.Passed {
+			t.Fatalf("%s failed: %s", tr.Name, tr.Error)
+		}
+	}
+	for _, tr := range res.Tests[5:] {
+		if tr.Passed {
+			t.Fatalf("%s passed but should fail", tr.Name)
+		}
+	}
+}
+
 func TestJSLogging(t *testing.T) {
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
