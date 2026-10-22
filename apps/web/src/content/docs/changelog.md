@@ -10,6 +10,18 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **Star Kurlo on GitHub** from Settings › Support. After your twentieth successful request a "Star on GitHub" link also appears once in the status bar; the count stays on your machine.
+- **`.keys` in test scripts:** `.to.have.all.keys`, `.to.have.any.keys`, `.keys` and `.key`, as in Chai. See [Scripting API](/docs/reference/scripting-api/).
+
+### Fixed
+
+- **A request body is no longer lost** when a request file names a body type Kurlo does not know, such as `raw`: it is read as the type in `rawBodyType`, or as text.
+- **Changes made outside Kurlo keep the open request on its tab.** An assistant, an editor or `git pull` changing the workspace no longer moves you to Params.
+
 ## 2.4.0
 
 ### Added
