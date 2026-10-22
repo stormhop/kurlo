@@ -1,0 +1,16 @@
+---
+interface Props {
+  label?: string;
+  tag?: string;
+  keepLabel?: boolean;
+}
+
+const { label = 'Download', tag = 'All platforms', keepLabel = false } = Astro.props;
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+---
+
+<a class="k-btn k-btn-solid" href={`${base}download/`} data-os-download>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <b data-os-label={keepLabel ? 'keep' : ''}>{label}</b>
+  <span class="k-tag" data-os-tag>{tag}</span>
+</a>

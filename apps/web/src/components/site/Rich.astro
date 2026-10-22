@@ -1,0 +1,12 @@
+---
+import { codeParts } from '../../lib/inline';
+
+interface Props {
+  text: string;
+  terms: RegExp;
+}
+
+const { text, terms } = Astro.props;
+---
+
+{codeParts(text, terms).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}

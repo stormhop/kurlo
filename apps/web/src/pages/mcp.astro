@@ -1,9 +1,11 @@
 ---
-import LandingLayout from '../components/LandingLayout.astro';
-import ThemedShot from '../components/ThemedShot.astro';
-import AgentDemo from '../components/AgentDemo.astro';
+import SiteLayout from '../components/SiteLayout.astro';
+import Scene from '../components/Scene.astro';
+import DownloadButton from '../components/site/DownloadButton.astro';
+import InstallButton from '../components/site/InstallButton.astro';
+import EndCta from '../components/site/EndCta.astro';
+import Rich from '../components/site/Rich.astro';
 import requestMcp from '../assets/screenshots/request-mcp.png';
-import requestMcpDark from '../assets/screenshots/request-mcp-dark.png';
 import { structuredData } from '../../site.schema.mjs';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
@@ -13,6 +15,8 @@ const pageUrl = new URL('mcp/', site).href;
 
 const title = 'MCP client for testing MCP servers — Kurlo';
 const description = 'Kurlo is a free desktop MCP client: discover a server’s tools, call them with arguments from their schema, and read the raw JSON-RPC exchange. It is also an MCP server that lets your AI agent run and write your API requests.';
+
+const terms = /(tools\/call|resources\/read|prompts\/get|subscriptions\/listen|structuredContent|outputSchema|x-mcp-header|Mcp-Session-Id|initialize|pm\.\*|pm\.test|npx some-server|--read-only|\[secret\]|list_requests|get_request|list_environments|list_history|get_history_entry|run_request|run_collection|send_request|create_collection|save_request|delete_request|save_example|set_variable|generate_tests|diagnose_last_failure|sync_collection|cover_endpoint|debug_last_failure|kurlo mcp|@kurlo\/cli|dev\.kurlo\/kurlo)/g;
 
 const clientAbilities = [
   { title: 'Discover', text: 'Press Discover and Kurlo shows the server’s name, version, tools, resources and prompts. It only asks for the capabilities the server declares.' },
@@ -32,27 +36,27 @@ const agentTools = [
   { title: 'Guardrails', text: 'Secrets reach your API but come back to the model as [secret]. Environments marked protected are refused, and --read-only leaves out every write tool.' },
 ];
 
+const clients = ['Claude Code', 'Codex', 'Cursor', 'VS Code', 'Windsurf', 'Gemini CLI', 'Claude Desktop'];
+
+const revisions = [
+  { part: '2026-07-28', details: 'Stateless. Tried first.', status: 'Yes', tone: 'yes' },
+  { part: '2025-11-25', details: 'Session with initialize and Mcp-Session-Id.', status: 'Yes', tone: 'yes' },
+  { part: '2025-06-18', details: 'Session with initialize and Mcp-Session-Id.', status: 'Yes', tone: 'yes' },
+  { part: '2025-03-26', details: 'Session with initialize and Mcp-Session-Id.', status: 'Yes', tone: 'yes' },
+  { part: 'Streamed answers', details: 'Frame by frame, with progress and log notifications.', status: 'Yes', tone: 'yes' },
+  { part: 'stdio', details: 'Servers started as a local command, such as npx some-server.', status: 'Not yet', tone: 'later' },
+  { part: '2024-11-05', details: 'The old HTTP+SSE transport.', status: 'Not yet', tone: 'later' },
+  { part: 'Subscriptions', details: 'subscriptions/listen.', status: 'Not yet', tone: 'later' },
+  { part: 'Sampling', details: 'Declined. Kurlo has no model and is not going to grow one.', status: 'No', tone: 'no' },
+];
+
 const faq = [
   { q: 'What is an MCP client?', a: 'A program that talks to Model Context Protocol servers. AI agents such as Claude Code or Cursor are MCP clients that call tools on their own. Kurlo is one you drive by hand, so you can see each call and its answer before an agent depends on them.' },
   { q: 'How do I test an MCP server I am building?', a: 'Run it on a local port, put its endpoint in a new MCP request, press Discover and call each tool. Save the calls in a collection and add pm.test checks, and the same calls tell you when a change breaks a tool.' },
   { q: 'Does it work with servers made with the official SDKs or FastMCP?', a: 'Yes. Those servers mostly speak the session-based revisions, and Kurlo opens the session for them.' },
+  { q: 'How do I give my agent my API requests?', a: 'Run npx -y @kurlo/cli mcp install once. It adds kurlo mcp to the AI clients it finds, and the agent works with the same collection you see in the app.' },
   { q: 'Is it free?', a: 'Yes. Kurlo is MIT licensed, with no account, no paid plan and no telemetry.' },
 ];
-
-const codeTerms = /(tools\/call|resources\/read|prompts\/get|subscriptions\/listen|structuredContent|outputSchema|x-mcp-header|Mcp-Session-Id|initialize|pm\.\*|pm\.test|npx some-server|--read-only|\[secret\]|list_requests|get_request|list_environments|list_history|get_history_entry|run_request|run_collection|send_request|create_collection|save_request|delete_request|save_example|set_variable|generate_tests|diagnose_last_failure|sync_collection|cover_endpoint|debug_last_failure)/g;
-const withCode = (text: string) => text.split(codeTerms).map((part, i) => (i % 2 ? { code: part } : { text: part }));
-
-const callSnippet = [
-  '<span class="c">// POST {{baseUrl}}/mcp</span>',
-  '{',
-  '  <span class="s">"jsonrpc"</span>: <span class="s">"2.0"</span>,',
-  '  <span class="s">"method"</span>: <span class="f">"tools/call"</span>,',
-  '  <span class="s">"params"</span>: {',
-  '    <span class="s">"name"</span>: <span class="s">"search_orders"</span>,',
-  '    <span class="s">"arguments"</span>: { <span class="s">"status"</span>: <span class="s">"refunded"</span>, <span class="s">"limit"</span>: 5 }',
-  '  }',
-  '}',
-].join('\n');
 
 const ldJson = structuredData({
   siteRoot: site,
@@ -62,121 +66,260 @@ const ldJson = structuredData({
 });
 ---
 
-<LandingLayout title={title} description={description} canonical={pageUrl} ldJson={ldJson} links={[{ label: 'Test a server', href: '#client' }, { label: 'For agents', href: '#agents' }, { label: 'FAQ', href: '#faq' }, { label: 'Docs', href: href('docs/guides/request-types/#mcp') }]}>
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="wrap">
-        <div class="hero-grid">
-          <div class="hero-copy">
-            <h1 id="hero-title">Call an MCP server’s tools yourself, before an agent does.</h1>
-            <p class="lead">Kurlo opens an MCP server like any other API. Discover what it offers, call a tool with arguments taken from its schema, and read the exact JSON-RPC that came back. Every call is a saved request you can replay, test and commit.</p>
-            <div class="cta">
-              <a class="btn btn-primary" href={href('download/')}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <span>Download Kurlo</span>
-              </a>
-              <a class="btn btn-quiet" href={href('docs/guides/request-types/#mcp')}>Read the guide</a>
-            </div>
-            <p class="facts">Free and MIT licensed · No account · MCP 2025-03-26 to 2026-07-28 · macOS, Windows, Linux</p>
+<SiteLayout title={title} description={description} canonical={pageUrl} ldJson={ldJson} links={[{ label: 'Test a server', href: '#client' }, { label: 'For agents', href: '#agents' }, { label: 'Support', href: '#support' }, { label: 'FAQ', href: '#faq' }]}>
+  <section class="k-hero" data-hero data-replies="tools/call · 112 ms|tools/list · 3 tools|resources/read · 38 ms|prompts/get · 21 ms|initialize · 2025-06-18" aria-labelledby="hero-title">
+    <Scene variant="dawn" bird />
+    <p class="k-hint" data-hint aria-hidden="true">Click the sky <svg width="38" height="22" viewBox="0 0 38 22" fill="none"><path d="M2 4c10 0 22 2 32 14m0 0-1-8m1 8-8-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></p>
+    <div class="k-hero-copy">
+      <p class="k-label k-label-hero">MCP client and MCP server</p>
+      <h1 id="hero-title"><span>Call it</span><span>first.</span></h1>
+      <p class="k-lead">Call an MCP server’s tools yourself, before an agent does. Discover what it offers, call a tool with arguments from its schema, and read the exact JSON-RPC that came back.</p>
+      <div class="k-cta">
+        <DownloadButton />
+        <InstallButton />
+        <a class="k-source" href={href('docs/guides/request-types/#mcp')}>Read the guide</a>
+      </div>
+    </div>
+    <p class="k-counter" data-counter hidden>Calls <b data-count>0</b></p>
+  </section>
+
+  <section class="k-live" id="client" aria-labelledby="live-title">
+    <div class="k-live-head">
+      <h2 id="live-title" data-live-title>Not a screenshot.</h2>
+      <p class="k-kicker" data-live-kicker>Pick a tool, hit Call</p>
+    </div>
+    <div class="k-app" data-mcp>
+      <div class="k-app-bar"><i></i><i></i><i></i><span>Kurlo — Shop MCP</span></div>
+      <div class="k-app-body">
+        <aside class="k-app-side" aria-label="Server">
+          <div class="k-server">
+            <b>shop-mcp 1.4.0</b>
+            <span><span class="ok">●</span> MCP 2025-06-18 · session</span>
           </div>
-          <figure class="script" aria-label="A tools/call request to an MCP server and the result Kurlo shows">
-            <div class="script-head"><span>Search orders · MCP</span><span>shop-mcp 1.4.0 · MCP 2025-06-18</span></div>
-            <pre set:html={callSnippet} />
-            <div class="script-out">
-              <div><b>✓</b> result · 5 content blocks <span>· 112 ms</span></div>
-              <div><b>✓</b> structuredContent matches outputSchema</div>
-              <div><b>✓</b> pm.test("returns refunded orders only")</div>
+          <div class="k-app-folder">Tools</div>
+          <div class="k-mcp-tools" role="listbox" aria-label="Tools" data-tools></div>
+        </aside>
+        <div class="k-app-main">
+          <div class="k-app-url">
+            <span class="k-method m-mcp">MCP</span>
+            <span class="k-url"><span class="v">&#123;&#123;baseUrl&#125;&#125;</span>/mcp</span>
+            <button class="k-send" type="button" data-call><span>Call</span><kbd>⌘↵</kbd></button>
+          </div>
+          <div class="k-app-req">
+            <div class="k-app-tabs"><span class="on">Arguments</span><span>Headers</span><span>Auth</span><span>Scripts</span></div>
+            <label class="k-sr" for="mcp-args">Tool arguments as JSON</label>
+            <textarea class="k-args" id="mcp-args" spellcheck="false" data-args></textarea>
+          </div>
+          <div class="k-app-res">
+            <div class="k-app-res-head">
+              <div class="k-app-tabs" role="tablist" aria-label="Result">
+                <button type="button" role="tab" class="on" data-view="result" aria-selected="true">Result</button>
+                <button type="button" role="tab" data-view="raw" aria-selected="false">Raw</button>
+                <button type="button" role="tab" data-view="notes" aria-selected="false">Notifications</button>
+              </div>
+              <div class="k-app-stat" data-stat aria-live="polite"></div>
             </div>
-          </figure>
+            <div class="k-app-res-body" data-out>
+              <p class="k-empty">Pick a tool and hit Call</p>
+            </div>
+          </div>
         </div>
-        <figure class="shot hero-shot">
-          <ThemedShot light={requestMcp} dark={requestMcpDark} alt="Kurlo with an MCP request: a discovered server with its tools, a chosen tool with its arguments, and the tool's result" />
-        </figure>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <section class="section" id="client" aria-labelledby="client-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="client-title">Test an MCP server</h2>
-          <p>Point Kurlo at the server’s endpoint. Everything below works the same for a server you are writing on localhost and for a hosted one. <a href={href('docs/guides/request-types/#mcp')}>How MCP requests work</a></p>
+  <section class="k-wrap" aria-labelledby="client-title">
+    <p class="k-label">Test an MCP server</p>
+    <h2 class="k-display" id="client-title">Every call, readable.</h2>
+    <p class="k-sub">Point Kurlo at the server’s endpoint. Everything below works the same for a server you are writing on localhost and for a hosted one.</p>
+    <div class="k-reasons">
+      {clientAbilities.map((item, i) => (
+        <div>
+          <p class="k-no"><span class="k-dot" aria-hidden="true"></span>No. {String(i + 1).padStart(2, '0')}</p>
+          <h3>{item.title}</h3>
+          <p><Rich text={item.text} terms={terms} /></p>
         </div>
-        <dl class="spec">
-          {clientAbilities.map(item => (
-            <div>
-              <dt>{item.title}</dt>
-              <dd>{withCode(item.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
+      ))}
+    </div>
+  </section>
 
-    <section class="section" id="agents" aria-labelledby="agents-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="agents-title">Kurlo is an MCP server too</h2>
-          <p><code>kurlo mcp</code> gives Claude Code, Codex, Cursor, VS Code, Windsurf, Gemini CLI or Claude Desktop your saved API requests. The agent runs them with their auth and tests, and adds new ones to the collection you see in the app. It ships as <a href="https://www.npmjs.com/package/@kurlo/cli"><code>@kurlo/cli</code> on npm</a> and is listed in the official MCP Registry as <code>dev.kurlo/kurlo</code>. <a href={href('docs/guides/mcp-server/')}>Setup and the full tool list</a></p>
+  <section class="k-wrap" id="agents" aria-labelledby="agents-title">
+    <p class="k-label">And the other way round</p>
+    <h2 class="k-display" id="agents-title">Kurlo is a server too.</h2>
+    <p class="k-sub">kurlo mcp gives your agent your saved API requests. It runs them with their auth and tests and adds new ones to the collection you see in the app. It ships as <a href="https://www.npmjs.com/package/@kurlo/cli"><code>@kurlo/cli</code> on npm</a> and is listed in the official MCP Registry as <code>dev.kurlo/kurlo</code>.</p>
+    <div class="k-install"><InstallButton tag="Copy" /></div>
+    <ul class="k-chips" aria-label="Works with">
+      {clients.map(client => <li>{client}</li>)}
+    </ul>
+    <figure class="k-video k-video-wide" style="margin-top: 3rem">
+      <video src={href('media/agent-demo.mp4')} poster={href('media/agent-demo.jpg')} width="1600" height="1214" autoplay muted loop playsinline preload="metadata" data-motion aria-label="Claude Code adds tests to a Kurlo collection over MCP, finds that an order total ignores quantity, fixes the server and runs the collection again while the tests appear in Kurlo"></video>
+    </figure>
+    <p class="k-caption">A real run, sped up 4×. Claude Code gets one prompt, writes the tests over <code>kurlo mcp</code>, finds that the order total ignores quantity and fixes the server. The tests appear in Kurlo as they are saved.</p>
+    <div class="k-tool-groups">
+      {agentTools.map(item => (
+        <div>
+          <h3>{item.title}</h3>
+          <p><Rich text={item.text} terms={terms} /></p>
         </div>
-        <div class="cmd mcp-cmd">
-          <span class="cmd-prompt" aria-hidden="true">$</span>
-          <code data-cmd>npx -y @kurlo/cli mcp install</code>
-          <button class="cmd-copy" type="button" data-cmd-copy aria-label="Copy the install command">
-            <svg class="cmd-icon-copy" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3" stroke="currentColor" stroke-width="1.8"/></svg>
-            <svg class="cmd-icon-done" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
-        <AgentDemo />
-        <dl class="spec">
-          {agentTools.map(item => (
-            <div>
-              <dt>{item.title}</dt>
-              <dd>{withCode(item.text).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
+      ))}
+    </div>
+    <p class="k-fine"><a href={href('docs/guides/mcp-server/')}>Setup and the full tool list</a></p>
+  </section>
 
-    <section class="section" id="faq" aria-labelledby="faq-title">
-      <div class="wrap">
-        <div class="head">
-          <h2 id="faq-title">Questions</h2>
-        </div>
-        <dl class="spec">
-          {faq.map(item => (
-            <div>
-              <dt>{item.q}</dt>
-              <dd>{withCode(item.a).map(part => ('code' in part ? <code>{part.code}</code> : part.text))}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
+  <section class="k-parts" id="support" aria-labelledby="support-title">
+    <p class="k-label">Protocol support</p>
+    <h2 class="k-display" id="support-title">What it speaks.</h2>
+    <p class="k-sub">Every revision a server is likely to run today, and the parts that are still missing.</p>
+    <table class="k-table">
+      <thead><tr><th>Part</th><th>Details</th><th>Status</th></tr></thead>
+      <tbody>
+        {revisions.map(p => (
+          <tr>
+            <th>{p.part}</th>
+            <td><Rich text={p.details} terms={terms} /></td>
+            <td><span class={`k-status k-s-${p.tone}`}>{p.status}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="k-faq" id="faq" aria-labelledby="faq-title">
+    <p class="k-label">FAQ</p>
+    <h2 class="k-display" id="faq-title">Fair questions.</h2>
+    <div class="k-faq-list">
+      {faq.map(item => (
+        <details>
+          <summary>{item.q}</summary>
+          <p><Rich text={item.a} terms={terms} /></p>
+        </details>
+      ))}
+    </div>
+  </section>
+
+  <EndCta label="MCP client and server · Free" title="Call it." lead="Test the server you are building, then hand your agent the requests that prove it works." />
 
   <Fragment slot="scripts">
-  <script is:inline>
-    (() => {
-      const copy = document.querySelector('[data-cmd-copy]');
-      const cmd = document.querySelector('[data-cmd]');
-      if (copy && cmd) {
-        let reset;
-        copy.addEventListener('click', async () => {
-          try {
-            await navigator.clipboard.writeText(cmd.textContent);
-            copy.dataset.copied = '';
-            copy.setAttribute('aria-label', 'Copied');
-          } catch {
-            const range = document.createRange();
-            range.selectNodeContents(cmd);
-            const selection = getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
+    <script is:inline>
+      (() => {
+        const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (still) document.querySelectorAll('video[data-motion]').forEach(video => { video.removeAttribute('autoplay'); video.pause(); video.controls = true; });
+
+        const tools = [
+          { name: 'search_orders', about: 'Find orders by status', args: { status: 'refunded', limit: 2 }, ms: 112,
+            result: (a) => ({ content: [{ type: 'text', text: `${Math.min(a.limit ?? 2, 2)} orders with status ${a.status ?? 'any'}` }], structuredContent: { orders: [{ id: 42, total: 19, status: a.status ?? 'refunded' }, { id: 38, total: 54.5, status: a.status ?? 'refunded' }].slice(0, Math.max(1, Math.min(a.limit ?? 2, 2))) } }),
+            notes: [['notifications/progress', '1 of 2 shards'], ['notifications/progress', '2 of 2 shards'], ['notifications/message', 'info · cache hit on orders index']], check: null },
+          { name: 'get_order', about: 'One order with its items', args: { id: 42 }, ms: 64,
+            result: (a) => ({ content: [{ type: 'text', text: `Order ${a.id ?? 42}` }], structuredContent: { id: a.id ?? 42, total: '19.00', items: 1 } }),
+            notes: [], check: 'structuredContent does not match outputSchema: total must be number, got string' },
+          { name: 'refund_order', about: 'Refund a paid order', args: { id: 42, reason: 'damaged' }, ms: 91,
+            result: (a) => ({ content: [{ type: 'text', text: `Refunded order ${a.id ?? 42}` }], structuredContent: { orderId: a.id ?? 42, refunded: 19, status: 'refunded' } }),
+            notes: [['notifications/message', 'info · refund queued with the payment provider']], check: null },
+        ];
+
+        const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const json = value => esc(JSON.stringify(value, null, 2))
+          .replace(/(&quot;[^&]*?&quot;)(\s*:)/g, '<span class="k">$1</span>$2')
+          .replace(/: (&quot;[^&]*?&quot;)/g, ': <span class="s">$1</span>')
+          .replace(/: (-?\d+(?:\.\d+)?|null|true|false)/g, ': <span class="n">$1</span>');
+
+        const app = document.querySelector('[data-mcp]');
+        const list = app.querySelector('[data-tools]');
+        const args = app.querySelector('[data-args]');
+        const call = app.querySelector('[data-call]');
+        const stat = app.querySelector('[data-stat]');
+        const out = app.querySelector('[data-out]');
+        const views = [...app.querySelectorAll('[data-view]')];
+        const title = document.querySelector('[data-live-title]');
+        const kicker = document.querySelector('[data-live-kicker]');
+        let current = 0;
+        let view = 'result';
+        let last = null;
+        let id = 0;
+
+        const render = () => {
+          if (!last) {
+            stat.innerHTML = '';
+            out.innerHTML = '<p class="k-empty">Pick a tool and hit Call</p>';
+            return;
           }
-          clearTimeout(reset);
-          reset = setTimeout(() => { delete copy.dataset.copied; copy.setAttribute('aria-label', 'Copy the install command'); }, 1600);
+          if (last.error) {
+            stat.innerHTML = '<b class="bad">Not sent</b>';
+            out.innerHTML = `<p class="k-arg-error" style="padding:0.8rem 0">${esc(last.error)}</p>`;
+            return;
+          }
+          stat.innerHTML = `<b class="ok">result</b><span>${last.ms} ms</span><span>${last.response.result.content.length} block</span>`;
+          if (view === 'result') {
+            const check = last.check
+              ? `<ul class="k-tests"><li class="bad"><b>!</b>Spec check<span>${esc(last.check)}</span></li></ul>`
+              : '<ul class="k-tests"><li class="ok"><b>✓</b>structuredContent matches outputSchema</li></ul>';
+            out.innerHTML = `${check}<pre class="k-code">${json(last.response.result.structuredContent)}</pre>`;
+          } else if (view === 'raw') {
+            out.innerHTML = `<pre class="k-code"><span class="n">→</span> ${json(last.request)}\n\n<span class="n">←</span> ${json(last.response)}</pre>`;
+          } else {
+            out.innerHTML = last.notes.length
+              ? `<ul class="k-notes">${last.notes.map(([m, t]) => `<li><b>${esc(m)}</b> ${esc(t)}</li>`).join('')}</ul>`
+              : '<p class="k-empty">No notifications before the result</p>';
+          }
+        };
+        const select = i => {
+          current = i;
+          [...list.children].forEach((row, j) => { row.classList.toggle('on', j === i); row.setAttribute('aria-selected', j === i ? 'true' : 'false'); });
+          args.value = JSON.stringify(tools[i].args, null, 2);
+          last = null;
+          render();
+        };
+        tools.forEach((tool, i) => {
+          const row = document.createElement('button');
+          row.type = 'button';
+          row.setAttribute('role', 'option');
+          row.innerHTML = `<b>${tool.name}</b><span>${esc(tool.about)}</span>`;
+          row.addEventListener('click', () => select(i));
+          list.appendChild(row);
         });
-      }
-    })();
-  </script>
+        views.forEach(button => button.addEventListener('click', () => {
+          view = button.dataset.view;
+          views.forEach(b => { b.classList.toggle('on', b === button); b.setAttribute('aria-selected', b === button ? 'true' : 'false'); });
+          render();
+        }));
+        const fire = () => {
+          if (call.disabled) return;
+          const tool = tools[current];
+          let parsed;
+          try { parsed = JSON.parse(args.value); } catch { parsed = undefined; }
+          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            last = { error: 'Arguments must be a JSON object. Nothing was sent.' };
+            render();
+            return;
+          }
+          call.disabled = true;
+          call.classList.add('busy');
+          stat.innerHTML = '<span>Calling…</span>';
+          setTimeout(() => {
+            id += 1;
+            last = {
+              ms: tool.ms,
+              check: tool.check,
+              notes: tool.notes,
+              request: { jsonrpc: '2.0', id, method: 'tools/call', params: { name: tool.name, arguments: parsed } },
+              response: { jsonrpc: '2.0', id, result: tool.result(parsed) },
+            };
+            call.disabled = false;
+            call.classList.remove('busy');
+            render();
+            out.classList.remove('flash');
+            void out.offsetWidth;
+            out.classList.add('flash');
+            title.textContent = 'Told you.';
+            kicker.textContent = tool.check ? 'Kurlo caught that one' : 'Now try get_order';
+          }, still ? 0 : 260 + tool.ms * 3);
+        };
+        call.addEventListener('click', fire);
+        app.addEventListener('keydown', event => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); fire(); }
+        });
+        select(0);
+      })();
+    </script>
   </Fragment>
-</LandingLayout>
+</SiteLayout>

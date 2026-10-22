@@ -1,0 +1,279 @@
+---
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
+import '@fontsource/anton';
+import '../styles/site.css';
+import logo from '../assets/logo.png';
+import { GITHUB_SOURCE } from '../../site.constants.mjs';
+
+interface Props {
+  title: string;
+  description: string;
+  canonical?: string;
+  ldJson?: string;
+  noindex?: boolean;
+  overlay?: boolean;
+  links?: { label: string; href: string }[];
+}
+
+const { title, description, canonical, ldJson, noindex = false, overlay = true, links = [] } = Astro.props;
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const site = Astro.site ? new URL(base, Astro.site).toString() : base;
+const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
+---
+
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  {noindex && <meta name="robots" content="noindex" />}
+  {canonical && <link rel="canonical" href={canonical} />}
+  <link rel="icon" href={href('favicon-32.png')} type="image/png" />
+  <link rel="apple-touch-icon" href={href('apple-touch-icon.png')} />
+  <link rel="sitemap" href={href('sitemap-index.xml')} />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Kurlo" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  {canonical && <meta property="og:url" content={canonical} />}
+  <meta property="og:image" content={`${site}og.png`} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content={`${site}og.png`} />
+  <meta name="theme-color" content="#262a6b" />
+  <meta name="color-scheme" content="light dark" />
+  <script is:inline>
+    (() => {
+      let stored = null;
+      try { stored = localStorage.getItem('starlight-theme'); } catch {}
+      const theme = stored === 'light' || stored === 'dark'
+        ? stored
+        : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.dataset.theme = theme;
+    })();
+  </script>
+  {ldJson && <script is:inline type="application/ld+json" set:html={ldJson} />}
+</head>
+<body class="k">
+  <a class="k-skip" href="#main">Skip to content</a>
+
+  <header class:list={['k-nav', { 'k-nav-solid': !overlay }]} data-nav data-overlay={overlay ? '' : undefined}>
+    <a class="k-brand" href={base} aria-label="Kurlo home">
+      <img src={logo.src} alt="" width="30" height="30" />
+      <span>kurlo</span>
+    </a>
+    <nav class="k-links" aria-label="Site">
+      {links.map(link => <a href={link.href}>{link.label}</a>)}
+      <a href={href('docs/getting-started/installation/')}>Docs</a>
+      <a href={GITHUB_SOURCE}>GitHub</a>
+    </nav>
+    <a class="k-nav-cta" href={href('download/')}>Download</a>
+  </header>
+
+  <main id="main">
+    <slot />
+  </main>
+
+  <footer class="k-foot">
+    <p class="k-foot-line">The bird always comes back.</p>
+    <div class="k-foot-cols">
+      <nav aria-label="Product">
+        <b>Kurlo</b>
+        <a href={href('download/')}>Download</a>
+        <a href={href('mcp/')}>MCP</a>
+        <a href={href('changelog/')}>Changelog</a>
+        <a href={href('privacy/')}>Privacy</a>
+      </nav>
+      <nav aria-label="Compare">
+        <b>Compare</b>
+        <a href={href('vs/postman/')}>vs Postman</a>
+        <a href={href('vs/insomnia/')}>vs Insomnia</a>
+        <a href={href('vs/bruno/')}>vs Bruno</a>
+      </nav>
+      <nav aria-label="Learn">
+        <b>Learn</b>
+        <a href={href('docs/getting-started/installation/')}>Docs</a>
+        <a href={href('docs/getting-started/migrating/')}>Migrating</a>
+        <a href={href('docs/guides/mcp-server/')}>MCP server</a>
+        <a href={href('docs/guides/cli-runner/')}>CLI runner</a>
+      </nav>
+      <nav aria-label="Source">
+        <b>Source</b>
+        <a href={GITHUB_SOURCE}>GitHub</a>
+        <a href={`${GITHUB_SOURCE}/issues`}>Issues</a>
+        <a href="https://www.npmjs.com/package/@kurlo/cli">npm</a>
+      </nav>
+    </div>
+    <span class="k-foot-legal">© 2026 Kurlo · MIT licensed · No account, no cloud, no telemetry</span>
+  </footer>
+
+  <script is:inline>
+    (() => {
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const nav = document.querySelector('[data-nav]');
+      const hero = document.querySelector('[data-hero]');
+      if (nav && nav.hasAttribute('data-overlay') && hero) {
+        const mark = () => nav.classList.toggle('k-nav-solid', scrollY > hero.offsetHeight - 80);
+        mark();
+        addEventListener('scroll', mark, { passive: true });
+      } else if (nav) {
+        nav.classList.add('k-nav-solid');
+      }
+
+      document.querySelectorAll('[data-copy]').forEach(button => {
+        const tag = button.querySelector('[data-copy-tag]');
+        const label = tag ? tag.textContent : '';
+        let reset;
+        button.addEventListener('click', async event => {
+          event.stopPropagation();
+          let ok = true;
+          try { await navigator.clipboard.writeText(button.dataset.copy); } catch { ok = false; }
+          if (tag) tag.textContent = ok ? 'Copied' : 'Select it';
+          clearTimeout(reset);
+          reset = setTimeout(() => { if (tag) tag.textContent = label; }, 1600);
+        });
+      });
+
+      document.querySelectorAll('[data-tabs]').forEach(group => {
+        const tabs = [...group.querySelectorAll('[data-tab]')];
+        const panels = [...group.querySelectorAll('[data-panel]')];
+        const select = (tab, focus) => {
+          tabs.forEach(item => {
+            const on = item === tab;
+            item.classList.toggle('on', on);
+            item.setAttribute('aria-selected', String(on));
+            item.tabIndex = on ? 0 : -1;
+          });
+          panels.forEach(panel => { panel.hidden = panel.dataset.panel !== tab.dataset.tab; });
+          if (focus) tab.focus();
+        };
+        tabs.forEach((tab, i) => {
+          tab.addEventListener('click', () => select(tab, false));
+          tab.addEventListener('keydown', event => {
+            const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+            if (step) { event.preventDefault(); select(tabs[(i + step + tabs.length) % tabs.length], true); }
+          });
+        });
+      });
+
+      const ua = navigator.userAgent || '';
+      const platform = (navigator.userAgentData && navigator.userAgentData.platform) || '';
+      const os = /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows'
+        : (/mac/i.test(platform) || /Macintosh/i.test(ua)) && !/iPhone|iPad/i.test(ua) ? 'mac'
+        : (/linux/i.test(platform) || /Linux|X11/i.test(ua)) && !/Android/i.test(ua) ? 'linux'
+        : '';
+      if (os) {
+        document.documentElement.dataset.kurloOs = os;
+        const names = { mac: 'Mac', windows: 'Windows', linux: 'Linux' };
+        const kinds = { mac: 'Universal', windows: 'x64', linux: 'AppImage' };
+        document.querySelectorAll('[data-os-download]').forEach(button => {
+          const label = button.querySelector('[data-os-label]');
+          const tag = button.querySelector('[data-os-tag]');
+          if (label && label.dataset.osLabel !== 'keep') label.textContent = `Download for ${names[os]}`;
+          if (tag) tag.textContent = kinds[os];
+        });
+      }
+
+      document.querySelectorAll('[data-hero]').forEach(section => {
+        const scene = section.querySelector('[data-scene]');
+        const bird = section.querySelector('[data-bird]');
+        if (!scene || !bird) return;
+        const flip = bird.querySelector('[data-bird-flip]');
+        const hint = section.querySelector('[data-hint]');
+        const counter = section.querySelector('[data-counter]');
+        const count = section.querySelector('[data-count]');
+        const replies = (section.dataset.replies || '201 Created · 84 ms|200 OK · 42 ms|204 No Content · 31 ms|200 OK · 18 ms|202 Accepted · 57 ms').split('|');
+        let pos = { x: 1080, y: 330 };
+        let flight = 0;
+        let delivered = 0;
+        const place = (x, y, dir) => {
+          bird.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+          if (dir) flip.setAttribute('transform', dir < 0 ? 'scale(-1 1)' : '');
+        };
+        const home = () => {
+          const ctm = scene.getScreenCTM();
+          if (!ctm) return;
+          const rect = scene.getBoundingClientRect();
+          const narrow = rect.width < 720;
+          const point = new DOMPoint(rect.left + rect.width * (narrow ? 0.78 : 0.7), rect.top + rect.height * (narrow ? 0.19 : 0.32)).matrixTransform(ctm.inverse());
+          pos = { x: point.x, y: point.y };
+          place(pos.x, pos.y);
+        };
+        home();
+        if (hint && matchMedia('(pointer: coarse)').matches) hint.firstChild.textContent = 'Tap the sky ';
+        const drop = (x, y) => {
+          delivered += 1;
+          if (count) count.textContent = delivered;
+          if (counter) counter.hidden = false;
+          const rect = scene.getBoundingClientRect();
+          const ctm = scene.getScreenCTM();
+          const tag = document.createElement('span');
+          tag.className = 'k-reply';
+          tag.textContent = replies[(delivered - 1) % replies.length];
+          tag.style.left = `${ctm.a * x + ctm.e - rect.left}px`;
+          tag.style.top = `${ctm.d * y + ctm.f - rect.top + 46}px`;
+          section.appendChild(tag);
+          setTimeout(() => tag.remove(), 2600);
+        };
+        section.addEventListener('click', event => {
+          if (event.target.closest('a, button, h1, p, code')) return;
+          const ctm = scene.getScreenCTM();
+          if (!ctm) return;
+          const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(ctm.inverse());
+          const target = { x: point.x, y: Math.min(point.y, 720) };
+          if (hint) hint.classList.add('k-hint-gone');
+          cancelAnimationFrame(flight);
+          const from = { ...pos };
+          const dir = Math.sign(target.x - from.x) || 1;
+          const dist = Math.hypot(target.x - from.x, target.y - from.y);
+          const duration = still ? 0 : Math.min(1600, 400 + dist * 1.1);
+          const start = performance.now();
+          bird.classList.add('flying');
+          const step = now => {
+            const t = duration ? Math.min(1, (now - start) / duration) : 1;
+            const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+            const arc = Math.sin(Math.PI * t) * Math.min(120, dist * 0.25);
+            pos = { x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e - arc };
+            place(pos.x, pos.y, dir);
+            if (t < 1) { flight = requestAnimationFrame(step); return; }
+            bird.classList.remove('flying');
+            drop(pos.x, pos.y);
+          };
+          flight = requestAnimationFrame(step);
+        });
+      });
+    })();
+  </script>
+  <script>
+    import { findAsset, formatSize, latestRelease } from '../scripts/latest-release';
+    const SUFFIXES: Record<string, string> = {
+      mac: '-darwin-universal.dmg',
+      windows: '-windows-amd64-installer.exe',
+      linux: '-linux-amd64.AppImage',
+    };
+    const KINDS: Record<string, string> = { mac: 'Universal', windows: 'x64', linux: 'AppImage' };
+    const os = document.documentElement.dataset.kurloOs ?? '';
+    const suffix = SUFFIXES[os];
+    const buttons = document.querySelectorAll<HTMLAnchorElement>('[data-os-download]');
+    if (buttons.length && suffix) {
+      const release = await latestRelease();
+      const asset = release && findAsset(release, suffix);
+      if (asset) {
+        buttons.forEach(button => {
+          button.href = asset.browser_download_url;
+          button.setAttribute('download', '');
+          const tag = button.querySelector('[data-os-tag]');
+          const size = formatSize(asset.size);
+          if (tag && size) tag.textContent = `${KINDS[os]} · ${size}`;
+        });
+      }
+    }
+  </script>
+  <slot name="scripts" />
+</body>
+</html>

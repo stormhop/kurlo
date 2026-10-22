@@ -1,0 +1,19 @@
+export const BIRD_BODY =
+  'M 232 624 L 318 566 C 318 470 410 406 515 413 C 545 380 575 340 600 320 C 625 303 655 298 680 308 C 710 322 725 350 725 386 L 786 409 L 725 426 C 718 460 700 480 674 504 C 670 552 648 600 600 633 C 562 657 515 665 475 664 C 430 664 385 655 352 624 Z';
+
+export const BIRD_WING =
+  'M 384 544 C 420 500 470 483 510 484 C 550 485 580 500 600 519 C 570 560 520 582 475 582 C 435 582 405 565 384 544 Z';
+
+export const BIRD_STRIPE = 'M 574 417 C 590 450 615 470 650 475 C 665 477 675 474 683 471';
+
+export const BIRD_EYE = { cx: 660, cy: 366, r: 19 };
+
+export const BIRD_LEGS = [
+  { x: 450, y: 640, width: 24, height: 95 },
+  { x: 516, y: 640, width: 24, height: 95 },
+];
+
+export const BIRD_CENTER = { x: 509, y: 520 };
+
+export const BIRD_BLUE = '#5865f2';
+export const BIRD_LIGHT = '#a5abff';

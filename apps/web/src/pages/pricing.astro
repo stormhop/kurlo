@@ -1,12 +1,9 @@
 ---
-import '@fontsource-variable/geist';
-import '@fontsource-variable/geist-mono';
-import '../styles/landing.css';
-import logo from '../assets/logo.png';
+import SiteLayout from '../components/SiteLayout.astro';
+import Scene from '../components/Scene.astro';
+import DownloadButton from '../components/site/DownloadButton.astro';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
-const github = 'https://github.com/stormhop/kurlo';
 
 const title = 'There is no pricing page — Kurlo';
 const description = 'Kurlo has no paid plan. Every feature is in the free, open-source app.';
@@ -21,153 +18,54 @@ const headers = [
 const tests = ['no paywall', 'no seat limit', 'no account required'];
 ---
 
-<!doctype html>
-<html lang="en" data-theme="light">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <meta name="robots" content="noindex" />
-  <link rel="icon" href={href('favicon-32.png')} type="image/png" />
-  <link rel="apple-touch-icon" href={href('apple-touch-icon.png')} />
-  <meta name="color-scheme" content="light dark" />
-  <script is:inline>
-    (() => {
-      let stored = null;
-      try { stored = localStorage.getItem('starlight-theme'); } catch {}
-      const theme = stored === 'light' || stored === 'dark'
-        ? stored
-        : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.dataset.theme = theme;
-    })();
-  </script>
-</head>
-<body class="landing">
-  <header class="nav">
-    <div class="wrap nav-row">
-      <a class="brand" href={base} aria-label="Kurlo home">
-        <img src={logo.src} alt="" width="28" height="28" />
-        <span>Kurlo</span>
-      </a>
-      <div class="nav-actions">
-        <a class="gh" href={github}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.33-1.29-1.69-1.29-1.69-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.71 1.26 3.37.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.69 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>
-          <span>GitHub</span>
-        </a>
-        <a class="btn btn-primary btn-sm" href={href('download/')}>Download</a>
-      </div>
-    </div>
-  </header>
-
-  <main id="main" class="miss">
-    <div class="wrap miss-grid">
-      <div class="miss-copy">
-        <h1>There is no pricing page.</h1>
-        <p class="lead">Every feature is in the free app, so there is nothing to sell you. No seats, no trial, no plan to outgrow. The code is MIT-licensed on GitHub.</p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href={href('download/')}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5M5 19h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Download Kurlo
-          </a>
-          <a class="btn btn-quiet" href={`${base}#compare`}>Compare with Postman and Bruno</a>
+<SiteLayout title={title} description={description} noindex>
+  <section class="k-hero" data-hero data-replies="404 Not Found · 38 ms|404 Not Found · 12 ms|still 404 · 9 ms" aria-labelledby="hero-title">
+    <Scene variant="night" eager />
+    <div class="k-hero-copy k-miss">
+      <div>
+        <p class="k-label k-label-hero">GET /pricing → 404</p>
+        <h1 id="hero-title" class="k-h1-long"><span>No</span><span>pricing.</span></h1>
+        <p class="k-lead">Every feature is in the free app, so there is nothing to sell you. No seats, no trial, no plan to outgrow. The code is MIT licensed on GitHub.</p>
+        <div class="k-cta">
+          <DownloadButton />
+          <button class="k-btn k-btn-glass" type="button" data-copy={curl} aria-label={`Copy ${curl}`}>
+            <span class="k-dollar" aria-hidden="true">$</span>
+            <code>{curl}</code>
+            <span class="k-tag" data-copy-tag>Copy</span>
+          </button>
+          <a class="k-source" href={`${base}#compare`}>Compare with Postman and Bruno</a>
         </div>
-        <div class="miss-curl">
-          <p>Ask the same question from a terminal:</p>
-          <div class="miss-curl-row">
-            <code data-curl>{curl}</code>
-            <button class="miss-copy-btn" type="button" data-copy>Copy</button>
+      </div>
+      <div class="k-app" data-tabs aria-label="Kurlo showing GET https://kurlo.dev/pricing answered with 404 Not Found">
+        <div class="k-app-bar"><i></i><i></i><i></i><span>Kurlo</span></div>
+        <div class="k-app-body">
+          <div class="k-app-main">
+            <div class="k-app-url">
+              <span class="k-method m-get">GET</span>
+              <span class="k-url">https://kurlo.dev/pricing</span>
+              <span class="k-send" aria-hidden="true"><span>Send</span></span>
+            </div>
+            <div class="k-app-res">
+              <div class="k-app-res-head">
+                <div class="k-app-tabs" role="tablist" aria-label="Response">
+                  <button type="button" role="tab" class="on" aria-selected="true" tabindex="0" data-tab="body">Body</button>
+                  <button type="button" role="tab" aria-selected="false" tabindex="-1" data-tab="headers">Headers</button>
+                  <button type="button" role="tab" aria-selected="false" tabindex="-1" data-tab="tests">Tests <span class="ok">{tests.length}/{tests.length}</span></button>
+                </div>
+                <div class="k-app-stat"><b class="bad">404 Not Found</b><span>38 ms</span><span>66 B</span></div>
+              </div>
+              <div class="k-app-res-body">
+                <pre class="k-code" role="tabpanel" data-panel="body">Every feature is in the free app.
+There is nothing to upgrade to.</pre>
+                <pre class="k-code" role="tabpanel" data-panel="headers" hidden>{headers.map(([name, value]) => <><span class="k">{name}</span>: {value}{'\n'}</>)}</pre>
+                <ul class="k-tests" role="tabpanel" data-panel="tests" hidden>
+                  {tests.map(test => <li class="ok"><b>✓</b>pm.test("{test}")</li>)}
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-
-      <figure class="miss-window" aria-label="Kurlo showing GET https://kurlo.dev/pricing answered with 404 Not Found">
-        <div class="miss-bar">
-          <div class="miss-url"><b>GET</b><span>https://kurlo.dev/pricing</span></div>
-          <span class="miss-send">Send</span>
-        </div>
-        <div class="miss-status">
-          <span class="miss-dot" aria-hidden="true"></span>
-          <b>404 Not Found</b>
-          <span>38 ms</span>
-          <span>66 B</span>
-          <span class="miss-pass">3/3 tests</span>
-        </div>
-        <div class="miss-tabs" role="tablist" aria-label="Response">
-          <button class="miss-tab" type="button" role="tab" id="miss-tab-body" aria-controls="miss-body" aria-selected="true" tabindex="0">Body</button>
-          <button class="miss-tab" type="button" role="tab" id="miss-tab-headers" aria-controls="miss-headers" aria-selected="false" tabindex="-1">Headers <span>{headers.length}</span></button>
-          <button class="miss-tab" type="button" role="tab" id="miss-tab-tests" aria-controls="miss-tests" aria-selected="false" tabindex="-1">Tests <span class="miss-pass">{tests.length}/{tests.length}</span></button>
-        </div>
-        <ol class="miss-panel miss-code" role="tabpanel" id="miss-body" aria-labelledby="miss-tab-body">
-          <li>Every feature is in the free app.</li>
-          <li>There is nothing to upgrade to.</li>
-        </ol>
-        <dl class="miss-panel miss-headers" role="tabpanel" id="miss-headers" aria-labelledby="miss-tab-headers" hidden>
-          {headers.map(([name, value]) => (
-            <div><dt>{name}</dt><dd>{value}</dd></div>
-          ))}
-        </dl>
-        <ul class="miss-panel miss-tests" role="tabpanel" id="miss-tests" aria-labelledby="miss-tab-tests" hidden>
-          {tests.map(test => (
-            <li><b>✓</b> pm.test("{test}")</li>
-          ))}
-        </ul>
-      </figure>
     </div>
-  </main>
-
-  <footer class="foot">
-    <div class="wrap foot-row">
-      <span>© 2026 Kurlo · MIT licensed</span>
-      <nav aria-label="Footer">
-        <a href={href('docs/getting-started/installation/')}>Docs</a>
-        <a href={href('download/')}>Download</a>
-        <a href={href('changelog/')}>Changelog</a>
-        <a href={github}>GitHub</a>
-      </nav>
-    </div>
-  </footer>
-
-  <script is:inline>
-    (() => {
-      const button = document.querySelector('[data-copy]');
-      const code = document.querySelector('[data-curl]');
-      if (button && code) {
-        button.addEventListener('click', async () => {
-          try {
-            await navigator.clipboard.writeText(code.textContent);
-            button.textContent = 'Copied';
-          } catch {
-            const range = document.createRange();
-            range.selectNodeContents(code);
-            const selection = getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
-            button.textContent = 'Selected';
-          }
-          setTimeout(() => { button.textContent = 'Copy'; }, 1600);
-        });
-      }
-
-      const tabs = [...document.querySelectorAll('.miss-tab')];
-      const select = (tab, focus) => {
-        tabs.forEach(item => {
-          const on = item === tab;
-          item.setAttribute('aria-selected', String(on));
-          item.tabIndex = on ? 0 : -1;
-          const panel = document.getElementById(item.getAttribute('aria-controls'));
-          if (panel) panel.hidden = !on;
-        });
-        if (focus) tab.focus();
-      };
-      tabs.forEach((tab, i) => {
-        tab.addEventListener('click', () => select(tab, false));
-        tab.addEventListener('keydown', event => {
-          const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
-          if (step) { event.preventDefault(); select(tabs[(i + step + tabs.length) % tabs.length], true); }
-        });
-      });
-    })();
-  </script>
-</body>
-</html>
+  </section>
+</SiteLayout>

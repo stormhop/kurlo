@@ -1,0 +1,71 @@
+---
+import { getImage } from 'astro:assets';
+import dusk from '../assets/scenes/dusk.webp';
+import dawn from '../assets/scenes/dawn.webp';
+import night from '../assets/scenes/night.webp';
+import { BIRD_BLUE, BIRD_BODY, BIRD_CENTER, BIRD_EYE, BIRD_LEGS, BIRD_LIGHT, BIRD_STRIPE, BIRD_WING } from '../lib/bird';
+
+interface Props {
+  variant: 'dusk' | 'dawn' | 'night';
+  bird?: boolean;
+  eager?: boolean;
+}
+
+const { variant, bird = false, eager = bird } = Astro.props;
+const source = { dusk, dawn, night }[variant];
+const widths = [960, 1600, 2560];
+const images = await Promise.all(widths.map(width => getImage({ src: source, width, format: 'webp', quality: 84 })));
+const srcset = images.map((image, i) => `${image.src} ${widths[i]}w`).join(', ');
+
+const wire = { x0: -40, y0: 520, cx: 800, cy: 660, x1: 1640, y1: 470 };
+const t = 0.6;
+const perch = {
+  x: (1 - t) ** 2 * wire.x0 + 2 * (1 - t) * t * wire.cx + t ** 2 * wire.x1,
+  y: (1 - t) ** 2 * wire.y0 + 2 * (1 - t) * t * wire.cy + t ** 2 * wire.y1,
+};
+const shift = `translate(${-BIRD_CENTER.x} ${-BIRD_CENTER.y})`;
+const id = `${variant}-bird`;
+---
+
+<div class={`scene scene-${variant}`} aria-hidden="true">
+  <img src={images[1].src} srcset={srcset} sizes="max(100vw, 160svh)" alt="" width="2560" height="1600" decoding="async" loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} />
+  <svg class="scene-overlay" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" data-scene>
+    <defs>
+      <g id={id}>
+        <g transform={shift}>
+          <path d={BIRD_BODY} fill="none" stroke="#f7f3ea" stroke-width="30" stroke-linejoin="round" />
+          {BIRD_LEGS.map(leg => <rect x={leg.x} y={leg.y} width={leg.width} height={leg.height} rx="12" fill={BIRD_BLUE} stroke="#f7f3ea" stroke-width="18" paint-order="stroke" />)}
+          <path d={BIRD_BODY} fill={BIRD_BLUE} />
+          <path d={BIRD_STRIPE} stroke={BIRD_LIGHT} stroke-width="34" stroke-linecap="round" fill="none" />
+          <circle cx={BIRD_EYE.cx} cy={BIRD_EYE.cy} r={BIRD_EYE.r} fill="#ffffff" />
+        </g>
+      </g>
+    </defs>
+
+    {variant === 'night' && (
+      <g transform={`translate(${perch.x.toFixed(1)} ${(perch.y - 0.15 * (735 - BIRD_CENTER.y)).toFixed(1)}) scale(0.15)`}>
+        <use href={`#${id}`} />
+        <g transform={shift}><path d={BIRD_WING} fill={BIRD_LIGHT} /></g>
+      </g>
+    )}
+
+    {bird && (
+      <g class="bird" data-bird transform="translate(1080 330)">
+        <g data-bird-flip>
+          <g class="bird-bob">
+            <g transform="scale(0.23)">
+              <g transform={shift}>
+                <g transform="translate(495 752) rotate(-5)">
+                  <rect x="-62" y="0" width="124" height="82" rx="6" fill="#f7f3ea" stroke="#d9cfb8" stroke-width="4" />
+                  <path d="M -62 2 L 0 44 L 62 2" fill="none" stroke="#b9ad93" stroke-width="6" stroke-linejoin="round" />
+                </g>
+              </g>
+              <use href={`#${id}`} />
+              <g transform={shift}><path class="wing" d={BIRD_WING} fill={BIRD_LIGHT} /></g>
+            </g>
+          </g>
+        </g>
+      </g>
+    )}
+  </svg>
+</div>

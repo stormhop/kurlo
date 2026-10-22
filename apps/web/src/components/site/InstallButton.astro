@@ -1,0 +1,14 @@
+---
+interface Props {
+  tag?: string;
+}
+
+const { tag = 'For your agent' } = Astro.props;
+const command = 'npx -y @kurlo/cli mcp install';
+---
+
+<button class="k-btn k-btn-glass" type="button" data-copy={command} aria-label={`Copy ${command}`}>
+  <span class="k-dollar" aria-hidden="true">$</span>
+  <code>{command}</code>
+  <span class="k-tag" data-copy-tag>{tag}</span>
+</button>

@@ -1,0 +1,32 @@
+---
+import Scene from '../Scene.astro';
+import DownloadButton from './DownloadButton.astro';
+import { SOFTWARE_VERSION } from '../../../site.schema.mjs';
+
+interface Props {
+  label?: string;
+  title?: string;
+  lead?: string;
+}
+
+const {
+  label = 'Free · MIT · No account',
+  title = 'Ship it.',
+  lead = 'One download. Your collections stay in your repo, your secrets stay on your machine.',
+} = Astro.props;
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+---
+
+<section class="k-end" aria-labelledby="end-title">
+  <Scene variant="night" />
+  <div class="k-end-copy">
+    <p class="k-label">{label}</p>
+    <h2 class="k-display" id="end-title">{title}</h2>
+    <p class="k-lead">{lead}</p>
+    <div class="k-cta">
+      <DownloadButton label={SOFTWARE_VERSION ? `Download ${SOFTWARE_VERSION}` : 'Download'} keepLabel />
+      <a class="k-source" href={`${base}changelog/`}>What’s new{SOFTWARE_VERSION ? ` in ${SOFTWARE_VERSION}` : ''}</a>
+    </div>
+    <p class="k-req">macOS 12+ · Windows 10+ · Ubuntu 22.04+ · x64 and Arm64</p>
+  </div>
+</section>
