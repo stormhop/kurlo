@@ -5,9 +5,9 @@
 **The open-source Postman alternative your AI agent can drive.**<br>
 No account, no paid plan, no telemetry. Collections live as YAML in your Git repo.
 
-[![Latest release](https://img.shields.io/github/v/release/stormhop/kurlo?sort=semver)](https://github.com/stormhop/kurlo/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/stormhop/kurlo)](https://github.com/stormhop/kurlo/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/stormhop/kurlo?style=flat)](https://github.com/stormhop/kurlo/stargazers)
-[![CI](https://github.com/stormhop/kurlo/actions/workflows/ci.yml/badge.svg)](https://github.com/stormhop/kurlo/actions/workflows/ci.yml)
+[![CI](https://github.com/stormhop/kurlo/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/stormhop/kurlo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/stormhop/kurlo/releases/latest)
 
