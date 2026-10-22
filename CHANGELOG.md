@@ -5,7 +5,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
-## [Unreleased]
+## [2.4.1] - 2026-10-22
 
 ### Added
 
@@ -688,7 +688,8 @@ this repository.
 - Configurable keyboard shortcuts throughout, global search (`⌘K`), quick send (`⌘Enter`), and tab switching (`⌘1`–`⌘9`).
 - Settings search and full keyboard navigation, theme previews, and onboarding empty states.
 
-[Unreleased]: https://github.com/stormhop/kurlo/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/stormhop/kurlo/compare/v2.4.1...HEAD
+[2.4.1]: https://github.com/stormhop/kurlo/compare/v2.4.0...v2.4.1
 [2.4.0]: https://github.com/stormhop/kurlo/compare/v2.3.2...v2.4.0
 [2.3.2]: https://github.com/stormhop/kurlo/compare/v2.3.1...v2.3.2
 [2.3.1]: https://github.com/stormhop/kurlo/compare/v2.3.0...v2.3.1
