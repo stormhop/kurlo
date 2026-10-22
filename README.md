@@ -2,18 +2,42 @@
 
 # Kurlo
 
-**A fast, local-first desktop API client. No accounts, no cloud sync, no telemetry — just you and your APIs.**
+**The open-source Postman alternative your AI agent can drive.**<br>
+No account, no paid plan, no telemetry. Collections live as YAML in your Git repo.
 
-[![CI](https://github.com/stormhop/kurlo/actions/workflows/ci.yml/badge.svg)](https://github.com/stormhop/kurlo/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/stormhop/kurlo?sort=semver)](https://github.com/stormhop/kurlo/releases/latest)
+[![GitHub stars](https://img.shields.io/github/stars/stormhop/kurlo?style=flat)](https://github.com/stormhop/kurlo/stargazers)
+[![CI](https://github.com/stormhop/kurlo/actions/workflows/ci.yml/badge.svg)](https://github.com/stormhop/kurlo/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/stormhop/kurlo/releases/latest)
 
-Built with Go, Svelte 5, and Wails.
+**[Download](https://github.com/stormhop/kurlo/releases/latest)** · [Website](https://kurlo.dev/) · [Docs](https://kurlo.dev/docs/getting-started/installation/) · [MCP server](https://kurlo.dev/mcp/) · [Compare](https://kurlo.dev/vs/postman/)
 
 </div>
 
 ![Kurlo screenshot](.github/assets/screenshot.png)
+
+## Why Kurlo
+
+- **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request as the API change.
+- **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
+- **Your AI agent can use it.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
+- **See what the browser will do.** Send a request with a browser's CORS and CSP rules and get the error before your users do. Postman, Insomnia and Bruno do not do this.
+- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 22 MB and the Linux one is 11 MB.
+
+| | Kurlo | Postman | Insomnia | Bruno |
+|---|---|---|---|---|
+| Free plan | ✅ Every feature, any team size | 1 user | Up to 3 Git Sync users | Private Git hosts need Pro |
+| Account needed | ✅ No | For collections | Beyond Scratch Pad | No |
+| Collections in your Git repo | ✅ | Native Git in the desktop app | ✅ | ✅ |
+| Postman `pm.*` scripts | ✅ Run as written | Native | Compatibility layer | Converted to `bru.*` |
+| Mock server | ✅ Local, no cap | Cloud, needs an account | 1,000 requests/mo free | ✅ Local |
+| MCP | ✅ Client and server | Client | Client | Community servers |
+| Browser CORS and CSP checks | ✅ | — | — | — |
+
+Checked against vendor pricing pages on 15 October 2026. Details and sources: [vs Postman](https://kurlo.dev/vs/postman/), [vs Insomnia](https://kurlo.dev/vs/insomnia/), [vs Bruno](https://kurlo.dev/vs/bruno/).
+
+If Kurlo saves you time, a ⭐ helps other people find it.
 
 ---
 
@@ -24,7 +48,7 @@ Grab the latest build from the [releases page](https://github.com/stormhop/kurlo
 | Platform | Installer |
 |----------|-----------|
 | macOS (Apple Silicon + Intel) | `.dmg` |
-| Windows 10/11 (x64) | `.exe` (NSIS installer), `.msix` |
+| Windows 10/11 (x64, arm64) | `.exe` (NSIS installer), `.msix` |
 | Linux (x64) | `.AppImage` |
 
 Every release ships SHA256 checksums and minisign signatures, and the in-app updater refuses any binary that fails either check.
