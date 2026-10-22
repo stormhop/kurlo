@@ -21,7 +21,7 @@ Kurlo publishes a build for each platform on the [releases page](https://github.
 
 </Steps>
 
-Current builds are not Apple-notarized. On the first launch, right-click **Kurlo.app** and choose **Open**, or use *System Settings → Privacy & Security → Open Anyway*. See the [troubleshooting guide](/docs/troubleshooting/#macos-kurlo-cant-be-opened-because-apple-cannot-check-it-for-malicious-software).
+Current builds are not Apple-notarized, so macOS blocks the first launch. Click **Done**, then open *System Settings → Privacy & Security* and click **Open Anyway** next to Kurlo. Or run `xattr -dr com.apple.quarantine /Applications/Kurlo.app` once. See the [troubleshooting guide](/docs/troubleshooting/#macos-kurlo-not-opened-or-apple-could-not-verify-kurlo).
 
 ## Windows
 

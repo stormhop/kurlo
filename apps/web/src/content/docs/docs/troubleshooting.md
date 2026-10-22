@@ -7,17 +7,22 @@ This page collects the issues people run into most often. If your situation isn'
 
 ## Installation
 
-### macOS: "Kurlo can't be opened because Apple cannot check it for malicious software"
+### macOS: "Kurlo Not Opened" or "Apple could not verify Kurlo"
 
-Current Kurlo DMGs are not Apple-notarized, so Gatekeeper can block the first launch. You have three options:
+Current Kurlo DMGs are not Apple-notarized, so Gatekeeper blocks the first launch. On macOS 15 Sequoia and later the dialog only offers **Done** and **Move to Trash**, and right-click → **Open** no longer works. Pick one of these:
 
-1. **One-time bypass.** Right-click `Kurlo.app` in Finder → **Open**, then **Open** again in the dialog. From then on macOS remembers your choice.
-2. **System Settings.** Try to open Kurlo once (you'll see the error), then open *System Settings → Privacy & Security*. Scroll down — there's a "Kurlo was blocked" entry with an **Open Anyway** button.
-3. **Terminal.** `xattr -dr com.apple.quarantine /Applications/Kurlo.app`.
+1. **System Settings.** Click **Done**, open *System Settings → Privacy & Security* and scroll down to *Security*. Next to "Kurlo was blocked to protect your Mac" click **Open Anyway**, confirm with your password, then click **Open Anyway** once more. From then on Kurlo opens normally.
+2. **Terminal.** Remove the quarantine flag and launch as usual:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Kurlo.app
+   ```
+
+On macOS 12–14 you can also right-click `Kurlo.app` in Finder → **Open**, then **Open** again in the dialog.
 
 ### macOS: "Kurlo is damaged and can't be opened"
 
-This is the second-tier Gatekeeper error after the previous one was bypassed too aggressively. Run:
+macOS shows this for quarantined apps that are not notarized, most often when the download came through a browser that re-tags files or through a package manager. The app is not broken. Run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/Kurlo.app
