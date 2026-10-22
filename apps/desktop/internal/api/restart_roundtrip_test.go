@@ -55,7 +55,7 @@ func newRoundtripRequest(id, collectionID, collectionName, name string, folder [
 	request["folderPath"] = folder
 	request["method"] = "POST"
 	request["params"] = []any{map[string]any{"id": "p-" + id, "key": "q", "value": "1", "enabled": true}}
-	request["bodyType"] = "raw"
+	request["bodyType"] = "text"
 	request["bodyContent"] = `{"hello":"world"}`
 	request["preRequestScript"] = "pm.variables.set('x', 1)"
 	request["testScript"] = "pm.test('ok', () => {})"
@@ -78,7 +78,7 @@ func restartOps() []storeOp {
 		{"edit request body and url", func(s map[string]any) {
 			r := storeItem(s, "requests", "req-main")
 			r["url"] = "https://api.example.test/v2/{{path}}?a=1&b=2"
-			r["bodyType"] = "raw"
+			r["bodyType"] = "text"
 			r["bodyContent"] = "line one\nline two\n\ttabbed"
 		}},
 		{"add collection and move request into it", func(s map[string]any) {

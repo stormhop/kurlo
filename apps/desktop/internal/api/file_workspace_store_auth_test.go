@@ -190,3 +190,53 @@ func numberValue(value any) float64 {
 	}
 	return 0
 }
+
+func TestUnknownBodyTypeKeepsTheBodyOnLoad(t *testing.T) {
+	root := t.TempDir()
+	workspaces := []map[string]any{{"id": "w1", "name": "WS"}}
+	collections := []map[string]any{{"id": "c1", "workspaceId": "w1", "name": "Col"}}
+	requests := []map[string]any{
+		{"id": "r1", "workspaceId": "w1", "collectionId": "c1", "name": "Raw", "method": "POST", "url": "https://example.com", "requestType": "http"},
+		{"id": "r2", "workspaceId": "w1", "collectionId": "c1", "name": "Plain", "method": "POST", "url": "https://example.com", "requestType": "http"},
+		{"id": "r3", "workspaceId": "w1", "collectionId": "c1", "name": "Empty", "method": "POST", "url": "https://example.com", "requestType": "http"},
+	}
+	secrets := map[string]string{}
+	if err := writeYAMLWorkspaceStore(root, workspaces, collections, sanitizeRequestsForFilesystem(requests, map[string]string{}, secrets), nil, nil, nil); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	bodies := map[string]string{
+		"Raw":   "    bodyType: raw\n    rawBodyType: json\n    bodyContent: '{\"a\":1}'\n",
+		"Plain": "    bodyType: plain\n    bodyContent: hello\n",
+		"Empty": "    bodyType: plain\n",
+	}
+	for name, extra := range bodies {
+		matches, _ := filepath.Glob(filepath.Join(root, "workspaces", "*", "collections", "*", "requests", name+".yml"))
+		if len(matches) != 1 {
+			t.Fatalf("request file for %s: %v", name, matches)
+		}
+		data, err := os.ReadFile(matches[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(matches[0], append(data, extra...), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, _, loaded, _, _, _, err := loadYAMLWorkspaceStoreWithDiagnostics(root, secrets)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	byID := map[string]map[string]any{}
+	for _, request := range loaded {
+		byID[stringValue(request, "id")] = request
+	}
+	if got := stringValue(byID["r1"], "bodyType"); got != "json" || stringValue(byID["r1"], "bodyContent") != `{"a":1}` {
+		t.Errorf("raw body loaded as %q with %q", got, stringValue(byID["r1"], "bodyContent"))
+	}
+	if got := stringValue(byID["r2"], "bodyType"); got != "text" || stringValue(byID["r2"], "bodyContent") != "hello" {
+		t.Errorf("unknown body type with content loaded as %q", got)
+	}
+	if got := stringValue(byID["r3"], "bodyType"); got != "plain" {
+		t.Errorf("unknown body type without content changed to %q", got)
+	}
+}

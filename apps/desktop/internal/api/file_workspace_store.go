@@ -1226,6 +1226,7 @@ func readYAMLRequestEntriesWithDiagnostics(root string, order []string, secrets 
 			return nil
 		}
 		mergeRequestSecrets(request, secrets)
+		normalizeLoadedBodyType(request)
 		sortOrder := doc.Order
 		if ordered, ok := orderIndex[requestID]; ok {
 			sortOrder = ordered
@@ -1243,6 +1244,27 @@ func readYAMLRequestEntriesWithDiagnostics(root string, order []string, secrets 
 		return requests[i].order < requests[j].order
 	})
 	return requests, diagnostics
+}
+
+var loadedBodyTypes = map[string]bool{"none": true, "json": true, "text": true, "xml": true, "html": true, "form": true, "urlencoded": true, "binary": true, "graphql": true}
+
+var loadedRawBodyTypes = map[string]bool{"json": true, "text": true, "xml": true, "html": true}
+
+func normalizeLoadedBodyType(request map[string]any) {
+	bodyType, ok := request["bodyType"].(string)
+	if !ok || bodyType == "" || loadedBodyTypes[bodyType] {
+		return
+	}
+	if bodyType == "raw" {
+		if rawType := stringValue(request, "rawBodyType"); loadedRawBodyTypes[rawType] {
+			request["bodyType"] = rawType
+			return
+		}
+	}
+	if stringValue(request, "bodyContent") == "" {
+		return
+	}
+	request["bodyType"] = "text"
 }
 
 func readYAMLEnvironmentEntriesWithDiagnostics(root string, secrets map[string]string, workspaceRoot string, workspaceID string) ([]environmentFileEntry, []WorkspaceDiagnostic) {
