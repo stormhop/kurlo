@@ -15,7 +15,7 @@ No account, no paid plan, no telemetry. Collections live as YAML in your Git rep
 
 </div>
 
-![Kurlo screenshot](.github/assets/screenshot.png)
+![Claude Code adds tests to a Kurlo collection over MCP, finds a pricing bug and fixes it, while the tests appear in Kurlo](.github/assets/demo.gif)
 
 ## Why Kurlo
 
