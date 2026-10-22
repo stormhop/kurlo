@@ -1,6 +1,7 @@
 ---
 import LandingLayout from '../components/LandingLayout.astro';
 import ThemedShot from '../components/ThemedShot.astro';
+import AgentDemo from '../components/AgentDemo.astro';
 import requestEditor from '../assets/screenshots/request-editor.png';
 import requestEditorDark from '../assets/screenshots/request-editor-dark.png';
 import { structuredData } from '../../site.schema.mjs';
@@ -150,6 +151,7 @@ const ldJson = structuredData({
           <h2 id="agents-title">What your agent can do</h2>
           <p>Kurlo is also an MCP server. One command connects it to Claude Code, Codex, Cursor, VS Code, Windsurf, Gemini CLI or Claude Desktop, and your agent works with the same collection you see in the app. <a href={href('docs/guides/mcp-server/')}>Setup and the full tool list</a>, or <a href={href('mcp/')}>test your own MCP server in Kurlo</a></p>
         </div>
+        <AgentDemo />
         <dl class="spec">
           {agentAbilities.map(item => (
             <div>

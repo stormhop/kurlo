@@ -182,6 +182,9 @@ body.landing {
 .facts { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: var(--t-small); color: var(--ink-3); }
 .shot { margin: 0; overflow: hidden; border: 1px solid var(--line-2); border-radius: 12px; background: var(--surface); box-shadow: var(--shot-shadow); }
 .hero-shot { margin-top: clamp(2.5rem, 2rem + 2vw, 3.5rem); }
+.agent-demo { margin: 0 0 clamp(2rem, 1.5rem + 1.5vw, 2.75rem); max-width: 58rem; }
+.agent-demo video { display: block; width: 100%; height: auto; }
+.agent-demo figcaption { margin-top: 0.75rem; color: var(--ink-2); font-size: 0.875rem; max-width: 44rem; }
 
 .section { padding-block: clamp(3.5rem, 2.5rem + 3vw, 5.5rem); scroll-margin-top: 3.75rem; }
 .section + .section { border-top: 1px solid var(--line); }
