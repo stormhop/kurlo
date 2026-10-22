@@ -1831,6 +1831,19 @@ code {
   text-shadow: 0 1px 10px rgba(20, 18, 60, 0.35);
 }
 
+.k-places a {
+  color: var(--con-ink);
+  text-decoration: none;
+}
+
+.k-places a:hover {
+  color: var(--con-key);
+}
+
+.k-places b {
+  color: var(--con-dim);
+}
+
 @media (max-width: 960px) {
   .k-links {
     display: none;

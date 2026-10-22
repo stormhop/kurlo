@@ -194,6 +194,7 @@ export default defineConfig({
       sidebar: DOCS_SIDEBAR,
       lastUpdated: true,
       pagefind: true,
+      disable404Route: true,
     }),
     sitemap({
       filter: page => !page.endsWith('/pricing/'),
