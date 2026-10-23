@@ -39,7 +39,7 @@ type WorkspaceHost = {
 
 export const workspaceFeature = {
   defaultCollectionForWorkspace(this: WorkspaceHost, workspaceId = this.activeWorkspaceId) {
-    return this.collections.find(collection => collection.workspaceId === workspaceId) ?? this.collections[0];
+    return this.collections.find(collection => collection.workspaceId === workspaceId);
   },
   workspaceIdForCollection(this: WorkspaceHost, collectionId: string) {
     return this.collections.find(collection => collection.id === collectionId)?.workspaceId ?? this.activeWorkspaceId;
@@ -49,7 +49,7 @@ export const workspaceFeature = {
     if (current?.isDraft) return this.defaultCollectionForWorkspace()?.id || '';
     const collection = this.collections.find(candidate => candidate.id === current?.collectionId);
     if (this.topView === 'request' && collection?.workspaceId === this.activeWorkspaceId) return collection.id;
-    return this.defaultCollectionForWorkspace()?.id || current?.collectionId || '';
+    return this.defaultCollectionForWorkspace()?.id || '';
   },
   collectionNameById(this: WorkspaceHost, id: string) {
     return this.collections.find(collection => collection.id === id)?.name ?? DEFAULT_COLLECTION;

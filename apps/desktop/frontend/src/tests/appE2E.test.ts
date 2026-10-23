@@ -726,6 +726,30 @@ describe('full application e2e smoke', () => {
     vi.mocked(backend.sendHttpRequest).mockReset();
   });
 
+  it('creates a new request inside an empty workspace instead of jumping to another one', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+
+    app.prompts.push('API');
+    await app.createCollection();
+    const first = app.activeWorkspaceId;
+    await app.createNewRequest(app.collections[0].id);
+    const firstRequestId = app.activeRequestId;
+
+    const empty = makeWorkspace('Workspace 2');
+    app.workspaces = [...app.workspaces, empty];
+    app.activeWorkspaceId = empty.id;
+    app.topView = 'overview';
+
+    await app.createNewRequest();
+
+    expect(app.activeWorkspaceId).toBe(empty.id);
+    const created = app.requests.find(req => req.id === app.activeRequestId)!;
+    expect(created.id).not.toBe(firstRequestId);
+    expect(app.collections.find(col => col.id === created.collectionId)?.workspaceId).toBe(empty.id);
+    expect(app.collections.filter(col => col.workspaceId === first)).toHaveLength(1);
+  });
+
   it('duplicates the current editor state for the active request', async () => {
     backend.state.savedStores = [];
     const app = new TestApp() as TestApp & Record<string, any>;
