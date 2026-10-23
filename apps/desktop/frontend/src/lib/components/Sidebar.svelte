@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KurloBird from './KurloBird.svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import SidebarRequestRow from './SidebarRequestRow.svelte';
@@ -773,6 +774,7 @@
           </div>
         {:else}
         <div class="empty-state history-empty">
+          <KurloBird size="2.75rem" />
           <span class="empty-state-title">No request history yet.</span>
           <small class="empty-state-text">Sent requests will be stored here for 14 days.</small>
         </div>
@@ -820,6 +822,7 @@
         </div>
       {:else}
         <div class="empty-state history-empty">
+          <KurloBird size="2.75rem" />
           <span class="empty-state-title">No environments yet.</span>
           <small class="empty-state-text">Create one and use values as {'{{baseUrl}}'} in requests.</small>
           <button class="btn btn-secondary" type="button" onclick={createEnvironment} disabled={workspaceBlocked}>Create environment</button>

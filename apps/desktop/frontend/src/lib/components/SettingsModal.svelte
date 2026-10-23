@@ -21,7 +21,7 @@
   import { cleanReleaseNotes } from '../releaseNotes';
   import ReleaseNotes from './ReleaseNotes.svelte';
   import ThemePreview from './ThemePreview.svelte';
-  import kurloMark from '../assets/kurlo-mark.png';
+  import AboutNight from './AboutNight.svelte';
   import { friendlyUpdateError } from '../updateErrors';
   import { shortcutComboLabel } from '../stores/features/preferences';
 
@@ -1024,7 +1024,7 @@
       {#if settingsTab === 'about'}
         <div class="settings-body about-tab" id="settings-panel-about" role="tabpanel">
           <div class="about-hero">
-            <img class="about-icon" src={kurloMark} alt="" width="64" height="64" draggable="false" />
+            <AboutNight />
             <h3 class="about-name">Kurlo</h3>
             {#if aboutInfo}
               <p class="about-meta">Version {aboutInfo.version} · {aboutInfo.platform}</p>
@@ -1607,7 +1607,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: var(--space-10);
+    padding-top: var(--space-6);
   }
 
   .about-tab > * {
@@ -1618,16 +1618,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
+    max-width: 26.25rem;
     margin-bottom: var(--space-6);
-  }
-
-  .about-icon {
-    width: 4rem;
-    height: 4rem;
-    margin-bottom: var(--space-3);
-    border-radius: 0.9375rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 6px 18px rgba(0, 0, 0, 0.22);
-    -webkit-user-drag: none;
   }
 
   .about-name {

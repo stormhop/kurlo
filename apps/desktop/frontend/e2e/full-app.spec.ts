@@ -3641,6 +3641,23 @@ test.describe('Update release notes', () => {
     const scrolls = await about.evaluate(element => element.scrollHeight > element.clientHeight);
     expect(scrolls).toBe(true);
   });
+
+  test('About shows the bird perched on the wire in the night scene', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'About', exact: true }).click();
+    const scene = page.locator('#settings-panel-about .about-night');
+    await expect(scene).toBeVisible();
+    await expect.poll(() => scene.locator('img').evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
+
+    const sceneBox = await scene.boundingBox();
+    const birdBox = await scene.locator('.about-night-bird').boundingBox();
+    expect(birdBox && sceneBox && birdBox.x > sceneBox.x && birdBox.x + birdBox.width < sceneBox.x + sceneBox.width).toBe(true);
+    expect(birdBox && sceneBox && birdBox.y > sceneBox.y && birdBox.y + birdBox.height < sceneBox.y + sceneBox.height).toBe(true);
+    await expect(page.locator('#settings-panel-about')).toContainText('Kurlo');
+  });
 });
 
 test.describe('Windows app package updates', () => {
@@ -3971,6 +3988,30 @@ test.describe('Send races', () => {
     await expect(viewer).toContainText(`"sequence": ${sent}`);
     await expect(page.getByText('Request canceled')).toHaveCount(0);
     await expect(send).toHaveText(/^Send/);
+  });
+
+  test('the bird waits in an empty response and while a request is out, and the status lands', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await openRequest(page, 'https://api.kurlo.test/slow?ms=1600');
+
+    await expect(page.locator('.response-empty-state .kurlo-bird-perched')).toBeVisible();
+
+    await page.locator('.send-split .btn-send').click();
+    await expect(page.locator('.response-loading-state .kurlo-bird-flying')).toBeVisible();
+    await expect(page.locator('.response-waiting-time')).toHaveText(/^1\.\d s$/);
+
+    const badge = page.locator('.response-status-bar .status-badge');
+    await expect(badge).toHaveText(/200 OK/);
+    await expect(badge).toHaveClass(/status-arrived/);
+    await expect(badge).not.toHaveClass(/status-arrived/);
+    await expect(page.locator('.response-loading-state')).toHaveCount(0);
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/slow?ms=400');
+    await page.locator('.send-split .btn-send').click();
+    await expect(page.locator('.send-split .btn-send')).toHaveText(/^Send/);
+    await expect(badge).not.toHaveClass(/status-arrived/);
   });
 
   test('Send, Cancel, Send keeps the spinner until the second answer', async ({ page }) => {

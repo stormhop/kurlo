@@ -400,6 +400,40 @@
   padding-top: var(--space-0-5);
 }
 
+.response-waiting-bird {
+  opacity: 0;
+  animation: response-waiting-in var(--dur-base) ease-out 0.3s forwards;
+}
+
+.response-waiting-time {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes response-waiting-in {
+  from { opacity: 0; transform: translateY(0.375rem); }
+  to { opacity: 1; transform: none; }
+}
+
+.status-badge.status-arrived {
+  display: inline-block;
+  animation: status-arrived 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+@keyframes status-arrived {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .response-waiting-bird {
+    opacity: 1;
+    animation: none;
+  }
+  .status-badge.status-arrived {
+    animation: none;
+  }
+}
+
 .response-area.loading > :not(.response-loading-progress) {
   opacity: 0.46;
   filter: grayscale(0.82);

@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { vm } from '../stores/app.svelte';
   import Keycaps from './Keycaps.svelte';
   import { tabListKeyboard } from '../a11y';
   import type { ResponseRenderMode } from '../response-render';
   import type { HttpResponse } from '../backend';
   import ResponseBodyViewer from './ResponseBodyViewer.svelte';
+  import KurloBird from './KurloBird.svelte';
   import ResponseTimeTooltip from './ResponseTimeTooltip.svelte';
   import ResponseTimelinePanel from './ResponseTimelinePanel.svelte';
   import ResponseDiffPanel from './ResponseDiffPanel.svelte';
@@ -111,6 +113,31 @@
     if (responseSearchOpen) setTimeout(() => responseSearchInput?.focus(), 0);
   });
 
+  let waitingSince = $state(0);
+  let waitingNow = $state(0);
+  let waitingSeconds = $derived(Math.max(0, (waitingNow - waitingSince) / 1000));
+
+  $effect(() => {
+    if (!loading || response) return;
+    waitingSince = performance.now();
+    waitingNow = waitingSince;
+    const timer = setInterval(() => { waitingNow = performance.now(); }, 100);
+    return () => clearInterval(timer);
+  });
+
+  let responseArrived = $state(false);
+  let wasLoading = untrack(() => loading);
+
+  $effect(() => {
+    const isLoading = loading;
+    const arrived = wasLoading && !isLoading && untrack(() => Boolean(response) && !requestError);
+    wasLoading = isLoading;
+    if (!arrived) return;
+    responseArrived = true;
+    const timer = setTimeout(() => { responseArrived = false; }, 700);
+    return () => clearTimeout(timer);
+  });
+
 </script>
 
 <div class="response-area" class:loading={loading && Boolean(response)} aria-busy={loading}>
@@ -120,7 +147,9 @@
 
   {#if loading && !response}
     <div class="response-placeholder response-loading-state" role="status">
+      <span class="response-waiting-bird"><KurloBird mode="flying" envelope size="3.25rem" /></span>
       <span class="response-placeholder-text">Sending request…</span>
+      {#if waitingSeconds >= 1}<span class="response-placeholder-hint response-waiting-time">{waitingSeconds.toFixed(1)} s</span>{/if}
     </div>
 
   {:else if requestError}
@@ -140,7 +169,7 @@
   {:else if response}
     <div class="response-status-bar">
       <div class="status-left">
-        <span class="status-badge {statusClass(response.statusCode)}">
+        <span class="status-badge {statusClass(response.statusCode)}" class:status-arrived={responseArrived}>
           {response.statusCode} {response.status.replace(String(response.statusCode), '').trim()}
         </span>
         <ResponseTimeTooltip timings={response.timings} total={response.duration} />
@@ -386,10 +415,7 @@
 
   {:else}
     <div class="response-placeholder response-empty-state" role="status">
-      <svg width="2rem" height="2rem" viewBox="0 0 32 32" fill="none" opacity="0.35">
-        <circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="1.5"/>
-        <path d="M12 16h8M16 12l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <KurloBird size="3rem" />
       <span class="response-placeholder-text">Send a request to see the response</span>
       {#if vm.shortcutCombo('send-request')}<span class="response-placeholder-hint"><Keycaps combo={vm.shortcutCombo('send-request')} runtime={appRuntime} /> to send</span>{/if}
       <button class="btn btn-secondary response-load-file" type="button" onclick={loadResponseFromFile}>
