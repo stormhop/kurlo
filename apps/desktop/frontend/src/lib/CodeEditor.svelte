@@ -26,6 +26,7 @@
     maxHeight = '18.75rem',
     fillHeight = false,
     compact = false,
+    prose = false,
     testId = '',
     ariaLabel = '',
     variableSuggestions = [],
@@ -40,6 +41,7 @@
     maxHeight?: string;
     fillHeight?: boolean;
     compact?: boolean;
+    prose?: boolean;
     testId?: string;
     ariaLabel?: string;
     variableSuggestions?: VariableSuggestion[];
@@ -63,8 +65,8 @@
     '&': {
       backgroundColor: 'transparent',
       color: 'var(--text)',
-      fontSize: 'var(--text-code)',
-      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
+      fontSize: prose ? 'var(--text-body)' : 'var(--text-code)',
+      fontFamily: prose ? 'var(--font-ui)' : 'var(--font-mono, ui-monospace, monospace)',
       height: fillHeight ? '100%' : 'auto',
     },
     '.cm-content': {
@@ -561,14 +563,11 @@
 
   function buildExtensions(lang: Lang) {
     return [
-      lineNumbers(),
-      foldGutter(),
-      highlightActiveLineGutter(),
-      highlightActiveLine(),
+      ...(prose
+        ? [EditorView.lineWrapping]
+        : [lineNumbers(), foldGutter(), highlightActiveLineGutter(), highlightActiveLine(), bracketMatching(), closeBrackets()]),
       history(),
       indentOnInput(),
-      bracketMatching(),
-      closeBrackets(),
       autocompletion({ override: [variableCompletionSource] }),
       commentDecorationPlugin,
       kurloLinter,
