@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -341,9 +342,37 @@ func (m *sseManager) runStreamAttempt(
 		Timestamp:  openedAt.UnixMilli(),
 	})
 
-	const sseMaxLineSize = 1 * 1024 * 1024
-	const sseMaxEventDataSize = 16 * 1024 * 1024
-	scanner := bufio.NewScanner(resp.Body)
+	parsed := parseSSEStream(sseCtx, resp.Body, result.lastEventID, onEvent)
+	result.lastEventID = parsed.lastEventID
+	if parsed.retry >= 0 {
+		result.retry = parsed.retry
+	}
+
+	if sseCtx.Err() != nil {
+		return closed("Disconnected", false)
+	}
+
+	if scanErr := parsed.err; scanErr != nil {
+		if errors.Is(scanErr, bufio.ErrTooLong) {
+			return fail(fmt.Sprintf("SSE line exceeds %d bytes — stream is malformed", sseMaxLineSize), false)
+		}
+		return fail(fmt.Sprintf("Stream error: %s", scanErr), status2xx)
+	}
+	return closed("Connection closed by server", status2xx)
+}
+
+type sseParseResult struct {
+	lastEventID string
+	retry       time.Duration
+	err         error
+}
+
+const sseMaxLineSize = 1 * 1024 * 1024
+const sseMaxEventDataSize = 16 * 1024 * 1024
+
+func parseSSEStream(ctx context.Context, r io.Reader, lastEventID string, onEvent func(model.SSEEvent)) sseParseResult {
+	out := sseParseResult{lastEventID: lastEventID, retry: -1}
+	scanner := bufio.NewScanner(r)
 	scanner.Buffer(make([]byte, 0, 64*1024), sseMaxLineSize)
 	scanner.Split(newSSELineSplitter())
 
@@ -353,7 +382,7 @@ func (m *sseManager) runStreamAttempt(
 	firstLine := true
 
 	for scanner.Scan() {
-		if sseCtx.Err() != nil {
+		if ctx.Err() != nil {
 			break
 		}
 
@@ -366,7 +395,7 @@ func (m *sseManager) runStreamAttempt(
 		if line == "" {
 			if hasData || currentEvent != "" {
 				ev := model.SSEEvent{
-					ID:        result.lastEventID,
+					ID:        out.lastEventID,
 					Event:     currentEvent,
 					Data:      dataLines,
 					Timestamp: time.Now().UnixMilli(),
@@ -395,11 +424,11 @@ func (m *sseManager) runStreamAttempt(
 		switch field {
 		case "id":
 			if !strings.ContainsRune(value, '\x00') {
-				result.lastEventID = value
+				out.lastEventID = value
 			}
 		case "retry":
 			if ms, convErr := strconv.Atoi(strings.TrimSpace(value)); convErr == nil && ms >= 0 {
-				result.retry = time.Duration(ms) * time.Millisecond
+				out.retry = time.Duration(ms) * time.Millisecond
 			}
 		case "event":
 			currentEvent = value
@@ -436,17 +465,8 @@ func (m *sseManager) runStreamAttempt(
 		}
 	}
 
-	if sseCtx.Err() != nil {
-		return closed("Disconnected", false)
-	}
-
-	if scanErr := scanner.Err(); scanErr != nil {
-		if errors.Is(scanErr, bufio.ErrTooLong) {
-			return fail(fmt.Sprintf("SSE line exceeds %d bytes — stream is malformed", sseMaxLineSize), false)
-		}
-		return fail(fmt.Sprintf("Stream error: %s", scanErr), status2xx)
-	}
-	return closed("Connection closed by server", status2xx)
+	out.err = scanner.Err()
+	return out
 }
 
 func newSSELineSplitter() bufio.SplitFunc {

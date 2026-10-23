@@ -203,6 +203,8 @@ type HttpResponse struct {
 	CollectionVariablesRemoved []string          `json:"collectionVariablesRemoved,omitempty"`
 	EnvironmentUpdates         map[string]string `json:"environmentUpdates,omitempty"`
 	EnvironmentRemoved         []string          `json:"environmentRemoved,omitempty"`
+
+	Llm string `json:"llm,omitempty"`
 }
 
 type SentRequest struct {

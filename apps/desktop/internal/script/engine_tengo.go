@@ -332,6 +332,20 @@ func buildResponse(resp *model.HttpResponse) *tengo.Map {
 			},
 		},
 
+		"llm": &tengo.UserFunction{
+			Name: "llm",
+			Value: func(args ...tengo.Object) (tengo.Object, error) {
+				if resp.Llm == "" {
+					return tengo.UndefinedValue, fmt.Errorf("response.llm() is only available on AI requests")
+				}
+				var parsed interface{}
+				if err := json.Unmarshal([]byte(resp.Llm), &parsed); err != nil {
+					return tengo.UndefinedValue, err
+				}
+				return goToTengo(parsed), nil
+			},
+		},
+
 		"headers": &tengo.Map{Value: map[string]tengo.Object{
 			"get": &tengo.UserFunction{
 				Name: "get",

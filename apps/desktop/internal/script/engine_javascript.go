@@ -470,6 +470,7 @@ func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool) map[string]in
 		host["resTime"] = func() int64 { return resp.Duration }
 		host["resSize"] = func() int64 { return resp.Size }
 		host["resBody"] = func() string { return resp.Body }
+		host["resLLM"] = func() string { return resp.Llm }
 		host["resHeadersJSON"] = func() string {
 			headers := map[string]string{}
 			for _, h := range resp.Headers {
@@ -935,6 +936,11 @@ var __kurloAPI = (function (host) {
       text: function () { return host.resBody(); },
       body: function () { return host.resBody(); },
       json: function () { return JSON.parse(host.resBody()); },
+      llm: function () {
+        var raw = host.resLLM();
+        if (!raw) { throw new Error('pm.response.llm() is only available on AI requests'); }
+        return JSON.parse(raw);
+      },
       headers: { get: function (k) { return host.resHeaderGet(String(k)); } }
     };
     Object.defineProperty(resp, 'code', { get: function () { return host.resCode(); }, configurable: true });
