@@ -9,7 +9,7 @@ const title = 'Page not found — Kurlo';
 const description = 'This page does not exist. The Kurlo docs, download and home page are one click away.';
 const places = [
   { label: 'Home', path: '' },
-  { label: 'Docs', path: 'docs/getting-started/installation/' },
+  { label: 'Docs', path: 'docs/' },
   { label: 'Download', path: 'download/' },
   { label: 'MCP', path: 'mcp/' },
   { label: 'Changelog', path: 'changelog/' },
@@ -30,7 +30,7 @@ const places = [
             <b>Back home</b>
             <span class="k-tag">200 OK</span>
           </a>
-          <a class="k-source" href={href('docs/getting-started/installation/')}>Search the docs</a>
+          <a class="k-source" href={href('docs/')}>Search the docs</a>
         </div>
       </div>
       <div class="k-app" data-tabs aria-label="Kurlo showing the missing page answered with 404 Not Found">

@@ -68,7 +68,7 @@ const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
     </a>
     <nav class="k-links" aria-label="Site">
       {links.map(link => <a href={link.href}>{link.label}</a>)}
-      <a href={href('docs/getting-started/installation/')}>Docs</a>
+      <a href={href('docs/')}>Docs</a>
       <a href={GITHUB_SOURCE}>GitHub</a>
     </nav>
     <a class="k-nav-cta" href={href('download/')}>Download</a>
@@ -96,7 +96,7 @@ const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
       </nav>
       <nav aria-label="Learn">
         <b>Learn</b>
-        <a href={href('docs/getting-started/installation/')}>Docs</a>
+        <a href={href('docs/')}>Docs</a>
         <a href={href('docs/getting-started/migrating/')}>Migrating</a>
         <a href={href('docs/guides/mcp-server/')}>MCP server</a>
         <a href={href('docs/guides/cli-runner/')}>CLI runner</a>
