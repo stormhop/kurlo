@@ -12,16 +12,17 @@ export type AiPreset = {
   provider: 'openai' | 'anthropic';
   url: string;
   auth: { type: AuthType; variable?: string };
+  modelExample: string;
 };
 
 export const AI_PRESETS: AiPreset[] = [
-  { id: 'openai', label: 'OpenAI', provider: 'openai', url: 'https://api.openai.com/v1', auth: { type: 'bearer', variable: 'openaiApiKey' } },
-  { id: 'anthropic', label: 'Anthropic', provider: 'anthropic', url: 'https://api.anthropic.com/v1', auth: { type: 'apikey', variable: 'anthropicApiKey' } },
-  { id: 'openrouter', label: 'OpenRouter', provider: 'openai', url: 'https://openrouter.ai/api/v1', auth: { type: 'bearer', variable: 'openrouterApiKey' } },
-  { id: 'groq', label: 'Groq', provider: 'openai', url: 'https://api.groq.com/openai/v1', auth: { type: 'bearer', variable: 'groqApiKey' } },
-  { id: 'ollama', label: 'Ollama', provider: 'openai', url: 'http://localhost:11434/v1', auth: { type: 'none' } },
-  { id: 'lmstudio', label: 'LM Studio', provider: 'openai', url: 'http://localhost:1234/v1', auth: { type: 'none' } },
-  { id: 'custom', label: 'OpenAI-compatible URL', provider: 'openai', url: '', auth: { type: 'bearer', variable: 'apiKey' } },
+  { id: 'openai', label: 'OpenAI', provider: 'openai', url: 'https://api.openai.com/v1', auth: { type: 'bearer', variable: 'openaiApiKey' }, modelExample: 'gpt-4o-mini' },
+  { id: 'anthropic', label: 'Anthropic', provider: 'anthropic', url: 'https://api.anthropic.com/v1', auth: { type: 'apikey', variable: 'anthropicApiKey' }, modelExample: 'claude-sonnet-5-5' },
+  { id: 'openrouter', label: 'OpenRouter', provider: 'openai', url: 'https://openrouter.ai/api/v1', auth: { type: 'bearer', variable: 'openrouterApiKey' }, modelExample: 'openai/gpt-4o-mini' },
+  { id: 'groq', label: 'Groq', provider: 'openai', url: 'https://api.groq.com/openai/v1', auth: { type: 'bearer', variable: 'groqApiKey' }, modelExample: 'llama-3.3-70b-versatile' },
+  { id: 'ollama', label: 'Ollama', provider: 'openai', url: 'http://localhost:11434/v1', auth: { type: 'none' }, modelExample: 'llama3.2' },
+  { id: 'lmstudio', label: 'LM Studio', provider: 'openai', url: 'http://localhost:1234/v1', auth: { type: 'none' }, modelExample: 'qwen2.5-7b-instruct' },
+  { id: 'custom', label: 'Custom URL', provider: 'openai', url: '', auth: { type: 'bearer', variable: 'apiKey' }, modelExample: 'the model name your server expects' },
 ];
 
 export const AI_DEFAULT_PRESET = AI_PRESETS[0];
@@ -140,12 +141,13 @@ function optionalNumber(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-export function aiSettingsError(req: Pick<SavedRequest, 'aiTemperature' | 'aiTopP' | 'aiMaxTokens' | 'aiMaxSteps'>): string {
+export function aiSettingsError(req: Pick<SavedRequest, 'aiTemperature' | 'aiTopP' | 'aiMaxTokens' | 'aiMaxSteps' | 'aiIdleTimeoutSec'>): string {
   const checks: [string, string | undefined, (n: number) => boolean][] = [
     ['Temperature', req.aiTemperature, n => n >= 0 && n <= 2],
     ['Top P', req.aiTopP, n => n >= 0 && n <= 1],
     ['Max tokens', req.aiMaxTokens, n => Number.isInteger(n) && n > 0],
     ['Step limit', req.aiMaxSteps, n => Number.isInteger(n) && n > 0 && n <= 50],
+    ['Stop after silence', req.aiIdleTimeoutSec, n => Number.isInteger(n) && n > 0],
   ];
   for (const [label, raw, valid] of checks) {
     const text = (raw ?? '').trim();
@@ -265,6 +267,11 @@ export const aiFeature = {
     if (this.aiProvider === 'anthropic' && !headers.some(h => h.key.toLowerCase() === 'anthropic-version')) {
       headers.push({ key: 'anthropic-version', value: '2023-06-01', enabled: true, isFile: false, fileName: '', contentType: '' });
     }
+    const keyProblem = aiUnresolvedKey(runnable);
+    if (keyProblem) {
+      this.aiModelsError = keyProblem;
+      return;
+    }
     const resolvedBase = runnable.url.replace(/\/+$/, '').replace(/\/(chat\/completions|messages)$/, '');
     this.aiModelsLoading = true;
     this.aiModelsError = '';
@@ -282,7 +289,10 @@ export const aiFeature = {
       });
       if (response.error) throw new Error(response.error);
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw new Error(`${response.status || response.statusCode}: ${aiResponseErrorMessage(response.body) || 'the provider refused the model list'}`);
+        const detail = aiResponseErrorMessage(response.body) || 'the provider refused the model list';
+        throw new Error(response.statusCode === 401 || response.statusCode === 403
+          ? `The provider did not accept the API key (${response.statusCode}): ${detail}`
+          : `${response.status || response.statusCode}: ${detail}`);
       }
       const models = parseModelList(response.body);
       if (!models.length) throw new Error('The provider returned no models.');
@@ -328,7 +338,7 @@ export const aiFeature = {
     const settingsError = aiSettingsError(snapshot);
     if (settingsError) {
       this.requestError = settingsError;
-      this.requestTab = 'body';
+      this.requestTab = 'settings';
       return;
     }
 
@@ -349,6 +359,8 @@ export const aiFeature = {
       const runnable = this.savedRequestToRunnableAiRequest(
         snapshot, messages, envValues, this.activeSecretEnvironmentValues(), this.activeSecretEnvironmentKeys(), requestId,
       );
+      const keyProblem = aiUnresolvedKey(runnable.http);
+      if (keyProblem) throw new Error(keyProblem);
       const response = await sendAiRequest(runnable);
       try { await this.applyEnvironmentChangesFromResponse(response.http, environmentId); } catch {  }
       try { await this.syncActiveEnvironmentFromBackend(); } catch {  }
@@ -415,6 +427,13 @@ export const aiFeature = {
     });
   },
 };
+
+export function aiUnresolvedKey(req: Pick<HttpRequest, 'auth'>): string {
+  const value = req.auth?.type === 'bearer' ? req.auth.token : req.auth?.type === 'apikey' ? req.auth.keyValue : '';
+  const match = /\{\{\s*([^{}\s]+)\s*\}\}/.exec(value ?? '');
+  if (!match) return '';
+  return `The API key comes from {{${match[1]}}}, which the active environment does not set. Add ${match[1]} to an environment (mark it secret), or put the key in the Auth tab.`;
+}
 
 function aiModelsKey(url: string, provider: string) {
   return `${provider}|${url.trim().replace(/\/+$/, '').toLowerCase()}`;

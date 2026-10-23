@@ -307,6 +307,7 @@ export const requestSerializationFeature = {
         maxTokens: aiOptionalNumber(resolved.aiMaxTokens) ?? 0,
         stream: resolved.aiStream ?? true,
         thinking: resolved.aiProvider === 'anthropic' ? (resolved.aiThinking ?? '') : '',
+        idleTimeoutSec: aiOptionalNumber(resolved.aiIdleTimeoutSec) ?? 0,
       },
       toolServers,
       maxSteps: aiOptionalNumber(resolved.aiMaxSteps) ?? 0,

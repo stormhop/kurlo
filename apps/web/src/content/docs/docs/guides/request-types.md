@@ -22,7 +22,7 @@ The picker holds both decisions: the HTTP methods on top, the other protocols be
 | Socket.IO | Socket.IO servers with namespaces/events | Params, Auth, Headers, Events, Message, Settings | Events, handshake, logs | No |
 | gRPC | Protobuf RPCs with metadata/reflection/proto files | Metadata, Body, Service, Scripts, Settings | Messages, metadata, trailers, scripts | Yes |
 | MCP | Model Context Protocol servers — list their tools and call one by hand | Arguments, Auth, Headers, Scripts, Settings | Result, raw exchange, notifications | Yes |
-| AI | Prompts to OpenAI, Anthropic and OpenAI-compatible models, with MCP tools | Prompt, Auth, Headers, Tools, Scripts, Settings | Conversation, raw stream, tests | No |
+| AI | Prompts to OpenAI, Anthropic and OpenAI-compatible models, with MCP tools | Prompt, Auth, Headers, Tools, Scripts, Settings (model) | Conversation, raw stream, tests | No |
 
 Realtime requests are intentionally skipped by the Collection Runner because they are long-lived sessions. gRPC is runnable because each invocation produces a bounded response. AI requests are skipped too for now: a model answer is not repeatable the way an HTTP response is, and a run could spend real money.
 
@@ -149,9 +149,9 @@ Not in this release: the **stdio** transport, so servers launched as a local com
 
 ## AI
 
-An AI request sends a prompt to a language model and shows the answer as a conversation. Pick the provider and the model in the box next to the URL: **OpenAI**, **Anthropic**, **OpenRouter**, **Groq**, **Ollama**, **LM Studio**, or **OpenAI-compatible URL** for anything else that speaks the Chat Completions API, such as vLLM or your own gateway. The provider fills in the base URL and the auth: a bearer token from `{{openaiApiKey}}`, `{{openrouterApiKey}}` or `{{groqApiKey}}`, `x-api-key` from `{{anthropicApiKey}}`, and no auth for the local servers. Set the key in an environment, mark it secret, and it never lands in the YAML. **Load models** asks the provider's `/models` endpoint for the list; you can also type any model ID.
+An AI request sends a prompt to a language model and shows the answer as a conversation. Pick the provider and the model in the box next to the URL: **OpenAI**, **Anthropic**, **OpenRouter**, **Groq**, **Ollama**, **LM Studio**, or **Custom URL** for anything else that speaks the OpenAI Chat Completions API, such as vLLM or your own gateway. The provider fills in the base URL and the auth: a bearer token from `{{openaiApiKey}}`, `{{openrouterApiKey}}` or `{{groqApiKey}}`, `x-api-key` from `{{anthropicApiKey}}`, and no auth for the local servers. Set the key in an environment, mark it secret, and it never lands in the YAML; if the variable is not set, Kurlo says so before sending. The model is the name the provider knows it by, such as `gpt-4o-mini` or `llama3.2`: when you open the box, Kurlo reads the provider's `/models` list so you can pick one, and you can always type a name instead.
 
-The **Prompt** tab holds the system prompt, the prompt and the model parameters: temperature, max tokens, top P and streaming, plus thinking for Anthropic models. `{{variables}}` work in all of them.
+The **Prompt** tab holds the system prompt and the prompt; `{{variables}}` work in both. **Settings** holds the model parameters (temperature, max tokens, top P, streaming, thinking for Anthropic models), how long to wait for a silent provider, and the SSL and proxy settings a local model or a company proxy may need. Auth and Headers are the usual ones: the provider presets fill Auth in, and Headers is there for gateways that want extra ones, such as OpenRouter's `HTTP-Referer`.
 
 ![AI request with a streamed answer, a tool call and its result](../../../../assets/screenshots/request-ai.png)
 
@@ -182,7 +182,7 @@ The **Tools** tab lists the MCP requests saved in the workspace. Tick one and th
 
 ### Good to know
 
-- The **Timeout** setting means silence for an AI request: the stream is stopped when no data has arrived for that long (two minutes when it is not set), so a long answer that keeps streaming is never cut off.
+- **Stop after silence** in Settings is the only timeout: the stream is stopped when no data has arrived for that long (five minutes when it is not set), so a long answer that keeps streaming is never cut off.
 - Anthropic thinking blocks, with their signatures, are sent back unchanged in later steps, as the API requires during tool use.
 - For OpenAI-compatible streams Kurlo asks for usage with `stream_options`. A server that ignores it shows no token counts.
 - Not in this release: the OpenAI Responses API, Gemini's own API, images and files in the prompt, prices, and running AI requests with `kurlo run` or `kurlo mcp`.

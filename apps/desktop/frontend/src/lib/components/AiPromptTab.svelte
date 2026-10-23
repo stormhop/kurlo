@@ -1,21 +1,8 @@
 <script lang="ts">
   import CodeEditor from '../CodeEditor.svelte';
-  import Select from './Select.svelte';
   import { vm } from '../stores/app.svelte';
-  import { aiSettingsError } from '../stores/features/ai';
-
-  const THINKING_OPTIONS = [
-    { value: '', label: 'Model default' },
-    { value: 'summarized', label: 'Show summarized' },
-  ];
 
   let systemOpen = $state(Boolean(vm.aiSystem.trim()));
-  const settingsError = $derived(aiSettingsError({
-    aiTemperature: vm.aiTemperature,
-    aiTopP: vm.aiTopP,
-    aiMaxTokens: vm.aiMaxTokens,
-    aiMaxSteps: vm.aiMaxSteps,
-  }));
 </script>
 
 <div class="ai-prompt">
@@ -56,37 +43,6 @@
       />
     </div>
   </div>
-
-  <div class="ai-params" role="group" aria-label="Model parameters">
-    <label class="ai-param">
-      <span>Temperature</span>
-      <input class="field field-md field-mono" inputmode="decimal" placeholder="default" bind:value={vm.aiTemperature} />
-    </label>
-    <label class="ai-param">
-      <span>Max tokens</span>
-      <input class="field field-md field-mono" inputmode="numeric" placeholder={vm.aiProvider === 'anthropic' ? '8192' : 'default'} bind:value={vm.aiMaxTokens} />
-    </label>
-    <label class="ai-param">
-      <span>Top P</span>
-      <input class="field field-md field-mono" inputmode="decimal" placeholder="default" bind:value={vm.aiTopP} />
-    </label>
-    {#if vm.aiProvider === 'anthropic'}
-      <div class="ai-param ai-param-wide">
-        <span>Thinking</span>
-        <Select value={vm.aiThinking} options={THINKING_OPTIONS} ariaLabel="Thinking" onChange={value => (vm.aiThinking = value)} />
-      </div>
-    {/if}
-    <label class="ai-param ai-param-switch">
-      <span>Stream</span>
-      <span class="switch-control">
-        <input type="checkbox" bind:checked={vm.aiStream} />
-        <span class="switch-track"></span>
-      </span>
-    </label>
-  </div>
-  {#if settingsError}
-    <p class="ai-error" role="alert">{settingsError}</p>
-  {/if}
 </div>
 
 <style>
@@ -153,37 +109,6 @@
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-  }
-  .ai-params {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: var(--space-3);
-    flex: 0 0 auto;
-  }
-  .ai-param {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
-    width: 6.5rem;
-    color: var(--text-2);
-    font-size: var(--text-caption);
-  }
-  .ai-param-wide {
-    width: 10rem;
-  }
-  .ai-param-switch {
-    width: auto;
-  }
-  .ai-param-switch .switch-control {
-    height: var(--control-md);
-    display: inline-flex;
-    align-items: center;
-  }
-  .ai-error {
-    margin: 0;
-    color: var(--danger);
-    font-size: var(--text-label);
   }
   @media (prefers-reduced-motion: reduce) {
     .ai-section-toggle svg {

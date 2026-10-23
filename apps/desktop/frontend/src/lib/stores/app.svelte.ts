@@ -1134,6 +1134,7 @@ class AppVM {
   aiTopP = $state('');
   aiMaxTokens = $state('');
   aiMaxSteps = $state('');
+  aiIdleTimeoutSec = $state('');
   aiThinking = $state('');
   aiStream = $state(true);
   aiToolRequestIds = $state<string[]>([]);

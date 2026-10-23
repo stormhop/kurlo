@@ -249,7 +249,7 @@ func stripRealtimeFieldsForType(request map[string]any, requestType string) {
 
 var aiRequestFields = []string{
 	"aiProvider", "aiModel", "aiSystem", "aiPrompt", "aiTemperature", "aiTopP",
-	"aiMaxTokens", "aiMaxSteps", "aiThinking", "aiStream", "aiToolRequestIds",
+	"aiMaxTokens", "aiMaxSteps", "aiIdleTimeoutSec", "aiThinking", "aiStream", "aiToolRequestIds",
 }
 
 func stripMethodForType(request map[string]any, requestType string) {

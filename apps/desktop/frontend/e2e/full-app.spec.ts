@@ -505,6 +505,9 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         const req = materializeTemplates(sent);
         state.sentRequests.push(clone(req));
         if (req.url.includes('/slow')) return slowResponse(req, state.sentRequests.length);
+        if (req.url.endsWith(':11434/v1/models')) {
+          return { ...jsonResponse(req), body: '{"object":"list","data":[{"id":"llama3.2"},{"id":"qwen2.5:7b"}]}' };
+        }
         return jsonResponse(req);
       },
       SaveResponseBody: async (requestId, defaultName) => {
@@ -3239,9 +3242,13 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.getByLabel('Provider base URL')).toHaveValue('https://api.openai.com/v1');
 
     await page.getByLabel('Provider and model').click();
-    await page.locator('#ai-model-input').fill('gpt-test');
-    await page.locator('#ai-model-input').press('Enter');
-    await expect(page.getByLabel('Provider and model')).toContainText('gpt-test');
+    await page.getByRole('radio', { name: 'Ollama' }).click();
+    await expect(page.getByRole('radio', { name: 'Ollama' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByLabel('Provider base URL')).toHaveValue('http://localhost:11434/v1');
+    await expect(page.getByRole('option', { name: 'qwen2.5:7b' })).toBeVisible();
+    await page.getByRole('option', { name: 'llama3.2' }).click();
+    await expect(page.getByLabel('Provider and model')).toContainText('Ollama');
+    await expect(page.getByLabel('Provider and model')).toContainText('llama3.2');
 
     await fillCodeEditor(page, 'ai-prompt-editor', 'Do I need an umbrella in Lisbon tomorrow?');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -3256,9 +3263,9 @@ test.describe('Kurlo desktop browser E2E', () => {
 
     const sent = await page.evaluate(() => window.__kurloE2E.sentAiRequests);
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({ provider: 'openai', model: 'gpt-test' });
+    expect(sent[0]).toMatchObject({ provider: 'openai', model: 'llama3.2' });
     expect(sent[0].messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: 'Do I need an umbrella in Lisbon tomorrow?' }] }]);
-    expect((sent[0].http as Record<string, unknown>).auth).toMatchObject({ type: 'bearer' });
+    expect((sent[0].http as Record<string, unknown>).auth).toMatchObject({ type: 'none' });
 
     await page.getByRole('tab', { name: /Tests/ }).click();
     await expect(page.locator('.test-row.fail')).toContainText('answers fast');

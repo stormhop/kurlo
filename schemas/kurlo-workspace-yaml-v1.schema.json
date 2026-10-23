@@ -264,6 +264,7 @@
         "aiTopP": { "type": "string" },
         "aiMaxTokens": { "type": "string" },
         "aiMaxSteps": { "type": "string" },
+        "aiIdleTimeoutSec": { "type": "string" },
         "aiThinking": { "type": "string", "enum": ["", "summarized"] },
         "aiStream": { "type": "boolean" },
         "aiToolRequestIds": {

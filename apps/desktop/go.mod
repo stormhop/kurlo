@@ -18,7 +18,7 @@ require (
 	github.com/klauspost/compress v1.20.3
 	github.com/minio/selfupdate v0.6.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	github.com/wailsapp/wails/v2 v2.16.0
+	github.com/wailsapp/wails/v2 v2.13.0
 	golang.org/x/net v0.61.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0

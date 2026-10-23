@@ -83,6 +83,10 @@
 .request-bar.request-bar-grpc {
   grid-template-columns: minmax(11.25rem, 0.44fr) minmax(13.75rem, 0.56fr) max-content;
 }
+.request-bar.request-bar-ai {
+  grid-template-columns: minmax(12.5rem, 0.55fr) minmax(12.5rem, 0.45fr) max-content;
+}
+.request-bar.request-bar-ai .btn-send,
 .request-bar.request-bar-grpc .btn-send {
   justify-self: end;
   width: auto;

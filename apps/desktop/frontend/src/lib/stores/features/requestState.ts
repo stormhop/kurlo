@@ -91,6 +91,7 @@ type RequestStateHost = {
   aiTopP: string;
   aiMaxTokens: string;
   aiMaxSteps: string;
+  aiIdleTimeoutSec: string;
   aiThinking: string;
   aiStream: boolean;
   aiToolRequestIds: string[];
@@ -200,7 +201,7 @@ export const requestStateFeature = {
       mcpMethod: this.mcpMethod, mcpName: this.mcpName,
       mcpArguments: this.mcpArguments, mcpProtocolVersion: this.mcpProtocolVersion,
       aiProvider: this.aiProvider, aiModel: this.aiModel, aiSystem: this.aiSystem, aiPrompt: this.aiPrompt,
-      aiTemperature: this.aiTemperature, aiTopP: this.aiTopP, aiMaxTokens: this.aiMaxTokens, aiMaxSteps: this.aiMaxSteps,
+      aiTemperature: this.aiTemperature, aiTopP: this.aiTopP, aiMaxTokens: this.aiMaxTokens, aiMaxSteps: this.aiMaxSteps, aiIdleTimeoutSec: this.aiIdleTimeoutSec,
       aiThinking: this.aiThinking, aiStream: this.aiStream, aiToolRequestIds: this.aiToolRequestIds,
       graphqlOperationName: this.graphqlOperationName,
       examples: this.requestExamples.map(
@@ -233,7 +234,7 @@ export const requestStateFeature = {
     const settings = this.currentRequestSettings();
     const id = newRequestId();
     const aiAuth = aiDefaultAuthFor();
-    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, isPinned: false, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
+    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, isPinned: false, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
   },
 
   snapshotActiveRequest(this: RequestStateHost, options: { forPersistence?: boolean } = {}): SavedRequest {
@@ -283,6 +284,7 @@ export const requestStateFeature = {
       aiTopP: this.aiTopP,
       aiMaxTokens: this.aiMaxTokens,
       aiMaxSteps: this.aiMaxSteps,
+      aiIdleTimeoutSec: this.aiIdleTimeoutSec,
       aiThinking: this.aiThinking,
       aiStream: this.aiStream,
       aiToolRequestIds: [...(this.aiToolRequestIds ?? [])],
@@ -387,6 +389,7 @@ export const requestStateFeature = {
     this.aiTopP = req.aiTopP ?? '';
     this.aiMaxTokens = req.aiMaxTokens ?? '';
     this.aiMaxSteps = req.aiMaxSteps ?? '';
+    this.aiIdleTimeoutSec = req.aiIdleTimeoutSec ?? '';
     this.aiThinking = req.aiThinking ?? '';
     this.aiStream = req.aiStream ?? true;
     this.aiToolRequestIds = [...(req.aiToolRequestIds ?? [])];

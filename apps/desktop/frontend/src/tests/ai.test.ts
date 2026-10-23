@@ -14,6 +14,7 @@ import {
   aiFeature,
   aiPresetFor,
   aiSettingsError,
+  aiUnresolvedKey,
   applyAiDeltas,
   parseModelList,
   type AiTurn,
@@ -96,11 +97,19 @@ describe('ai presets', () => {
     expect(parseModelList('not json')).toEqual([]);
   });
 
+  it('names the variable when the API key is not set', () => {
+    expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{openaiApiKey}}' } } as never)).toContain('openaiApiKey');
+    expect(aiUnresolvedKey({ auth: { type: 'apikey', keyValue: '{{ anthropicApiKey }}' } } as never)).toContain('anthropicApiKey');
+    expect(aiUnresolvedKey({ auth: { type: 'bearer', token: 'sk-real' } } as never)).toBe('');
+    expect(aiUnresolvedKey({ auth: { type: 'none' } } as never)).toBe('');
+  });
+
   it('validates model parameters', () => {
     expect(aiSettingsError({ aiTemperature: '0.7', aiMaxTokens: '512' })).toBe('');
     expect(aiSettingsError({ aiTemperature: '3' })).toContain('Temperature');
     expect(aiSettingsError({ aiMaxTokens: '1.5' })).toContain('Max tokens');
     expect(aiSettingsError({ aiMaxSteps: '99' })).toContain('Step limit');
+    expect(aiSettingsError({ aiIdleTimeoutSec: '0' })).toContain('silence');
   });
 });
 

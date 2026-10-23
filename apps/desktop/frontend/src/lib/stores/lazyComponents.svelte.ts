@@ -39,6 +39,7 @@ class AppLazyComponents {
   McpResponsePanelComponent = $state<LazyComponent | null>(null);
   AiPromptTabComponent = $state<LazyComponent | null>(null);
   AiToolsTabComponent = $state<LazyComponent | null>(null);
+  AiSettingsTabComponent = $state<LazyComponent | null>(null);
   AiConversationPanelComponent = $state<LazyComponent | null>(null);
   GrpcServiceDefinitionTabComponent = $state<LazyComponent | null>(null);
   GrpcSettingsTabComponent = $state<LazyComponent | null>(null);
@@ -135,6 +136,10 @@ class AppLazyComponents {
 
   async loadAiToolsTab() {
     if (!this.AiToolsTabComponent) this.AiToolsTabComponent = (await import('../components/AiToolsTab.svelte')).default as LazyComponent;
+  }
+
+  async loadAiSettingsTab() {
+    if (!this.AiSettingsTabComponent) this.AiSettingsTabComponent = (await import('../components/AiSettingsTab.svelte')).default as LazyComponent;
   }
 
   async loadAiConversationPanel() {
@@ -249,6 +254,7 @@ class AppLazyComponents {
       void this.loadAiConversationPanel();
       if (state.requestTab === 'body') void this.loadAiPromptTab();
       if (state.requestTab === 'tools') void this.loadAiToolsTab();
+      if (state.requestTab === 'settings') void this.loadAiSettingsTab();
     }
     if (state.requestType === 'grpc') {
       void this.loadGrpcResponsePanel();

@@ -266,6 +266,7 @@ export type SavedRequest = {
   aiTopP?: string;
   aiMaxTokens?: string;
   aiMaxSteps?: string;
+  aiIdleTimeoutSec?: string;
   aiThinking?: string;
   aiStream?: boolean;
   aiToolRequestIds?: string[];

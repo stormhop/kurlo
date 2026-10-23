@@ -928,6 +928,8 @@
               {#if lazy.SocketIOSettingsTabComponent}<lazy.SocketIOSettingsTabComponent />{/if}
             {:else if vm.requestType === 'grpc'}
               {#if lazy.GrpcSettingsTabComponent}<lazy.GrpcSettingsTabComponent />{/if}
+            {:else if vm.requestType === 'ai'}
+              {#if lazy.AiSettingsTabComponent}<lazy.AiSettingsTabComponent />{/if}
             {:else if lazy.RequestSettingsTabComponent}
               <lazy.RequestSettingsTabComponent />
             {/if}

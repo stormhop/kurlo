@@ -17,7 +17,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const aiDefaultIdleTimeout = 120 * time.Second
+const aiDefaultIdleTimeout = 300 * time.Second
 
 const aiMaxSteps = 50
 
@@ -190,9 +190,6 @@ func (r *aiRunner) idleTimeout() time.Duration {
 	if seconds := r.req.Settings.IdleTimeoutSec; seconds > 0 {
 		return time.Duration(seconds) * time.Second
 	}
-	if r.req.HTTP.TimeoutMs > 0 {
-		return time.Duration(r.req.HTTP.TimeoutMs) * time.Millisecond
-	}
 	return aiDefaultIdleTimeout
 }
 
@@ -310,7 +307,7 @@ func (r *aiRunner) runStep(index int, conversation []model.AiMessage, tools []ai
 
 	switch {
 	case timedOut:
-		step.Error = fmt.Sprintf("No data from the model for %s. The stream was stopped; raise the idle timeout in Settings if the model needs longer.", idle)
+		step.Error = fmt.Sprintf("No data from the model for %s. The stream was stopped; raise the silence limit in Settings if the model needs longer.", idle)
 	case r.ctx.Err() != nil:
 		step.Error = "Cancelled"
 	case resp.Error != "":

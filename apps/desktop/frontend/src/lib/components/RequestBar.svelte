@@ -262,7 +262,7 @@
     {/if}
   </div>
 
-  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-grpc={requestType === 'grpc' || requestType === 'ai'}>
+  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
     <div class="url-field">
       <div class="method-wrap" onfocusout={closeMethodMenuOnFocusOut}>
         <button
@@ -332,7 +332,7 @@
         bind:value={url}
         multiline
         suggestions={variableSuggestions}
-        placeholder={requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Provider base URL, e.g. https://api.openai.com/v1' : 'Enter request URL or paste cURL…'}
+        placeholder={requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Base URL' : 'Enter request URL or paste cURL…'}
         ariaLabel={requestType === 'grpc' ? 'gRPC target' : requestType === 'ai' ? 'Provider base URL' : 'Request URL'}
         oninput={onUrlInput}
         onpaste={(event) => { onUrlPaste(event); keepHostVisible(); }}

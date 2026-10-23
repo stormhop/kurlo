@@ -200,7 +200,7 @@ request:
 | `grpcMethod`, `grpcUseReflection`, `grpcProtoFilePath`, `grpcProtoFileName`, `grpcProtoImportPaths` | gRPC method and service-definition source metadata. |
 | `aiProvider` | `openai` (Chat Completions, also for OpenAI-compatible servers) or `anthropic` (Messages). `url` is the provider's base URL. |
 | `aiModel`, `aiSystem`, `aiPrompt` | Model ID, system prompt and prompt; all accept `{{variables}}`. |
-| `aiTemperature`, `aiTopP`, `aiMaxTokens`, `aiMaxSteps` | Strings; empty means the provider's default (8 steps for `aiMaxSteps`). |
+| `aiTemperature`, `aiTopP`, `aiMaxTokens`, `aiMaxSteps`, `aiIdleTimeoutSec` | Strings; empty means the default: the provider's, 8 steps for `aiMaxSteps`, 300 seconds of silence for `aiIdleTimeoutSec`. |
 | `aiThinking` | Empty, or `summarized` to show an Anthropic model's thinking. |
 | `aiStream` | `false` to wait for the whole answer; omitted when `true`. |
 | `aiToolRequestIds` | IDs of saved MCP requests whose tools the model may call. |
