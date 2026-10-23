@@ -963,7 +963,7 @@ describe('importing a spec from a URL', () => {
     expect(app.collections[0].name).toBe('Petstore API');
     expect(app.requests.map((req: SavedRequest) => `${req.method} ${req.url}`).sort()).toEqual([
       'GET {{baseUrl}}/pets',
-      'GET {{baseUrl}}/pets/{{petId}}',
+      'GET {{baseUrl}}/pets/:petId',
       'POST {{baseUrl}}/pets',
     ]);
     expect(app.requests.every((req: SavedRequest) => req.collectionId === app.collections[0].id)).toBe(true);
@@ -1256,6 +1256,26 @@ describe('request templates reach the backend unresolved', () => {
     const req = app.savedRequestToRunnableHttpRequest(app.snapshotActiveRequest(), { host: 'https://env.test' }, [], []);
     expect(req.url).toBe('https://env.test/collection/from-globals');
     expect(req.resolveTemplates).toBeUndefined();
+  });
+
+  it('keeps path variables in step with the URL, saves them and resolves them for sending', async () => {
+    const app = await appWithRequest('{{host}}/users/:id/posts/:post');
+    app.syncParamsFromUrl();
+    expect(app.pathParams.map(r => r.key)).toEqual(['id', 'post']);
+    app.pathParams[0].value = '{{userId}}';
+    app.pathParams[1].value = '9';
+    app.url = '{{host}}/users/:id';
+    app.syncParamsFromUrl();
+    expect(app.pathParams.map(r => [r.key, r.value])).toEqual([['id', '{{userId}}']]);
+    await app.saveActiveRequest();
+    const saved = app.requests.find(r => r.id === app.activeRequestId)!;
+    expect(saved.pathParams?.map(r => [r.key, r.value])).toEqual([['id', '{{userId}}']]);
+    app.pathParams = [];
+    app.applySavedRequest(saved);
+    expect(app.pathParams.map(r => [r.key, r.value])).toEqual([['id', '{{userId}}']]);
+    const req = app.savedRequestToRunnableHttpRequest(app.snapshotActiveRequest(), { host: 'https://env.test', userId: 'u-1' }, [], []);
+    expect(req.url).toBe('https://env.test/users/:id');
+    expect(req.pathParams).toEqual([{ key: 'id', value: 'u-1', enabled: true, isFile: false, fileName: '', contentType: '' }]);
   });
 
   it('defers templates with the merged values, iteration data and GraphQL parts', async () => {

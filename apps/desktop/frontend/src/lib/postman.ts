@@ -10,6 +10,7 @@ import { filesystemNameFromName } from './normalizers';
 import { emptyCollectionDefaults } from './collectionDefaults';
 import { mediaTypeOf, normalizeRequestExample } from './examples';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
+import { applyPathParams, pathParamsFromUrl } from './pathParams';
 
 const KURLO_EXTENSION_KEY = 'x-kurlo';
 const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp']);
@@ -201,27 +202,15 @@ function postmanAuthConfig(authValue: unknown, inheritedAuth?: unknown): SavedRe
   return config;
 }
 
-function applyPostmanPathVariables(url: string, variables: unknown): string {
-  const rows = asArray(variables).filter(isRecord);
-  if (!rows.length) return url;
-  let out = url;
-  for (const row of rows) {
-    const key = asText(row.key);
-    const value = asText(row.value);
-    if (!key || !value) continue;
-    out = out.replace(new RegExp(`(^|/):${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=/|$)`, 'g'), `$1${value}`);
-  }
-  return out;
-}
-
 function postmanUrlToKurlo(urlValue: unknown) {
-  if (typeof urlValue === 'string') return { url: stripUrlQueryAndFragment(urlValue), params: queryParamsFromUrl(urlValue) };
-  if (!isRecord(urlValue)) return { url: '', params: [] as KVRow[] };
+  if (typeof urlValue === 'string') return { url: stripUrlQueryAndFragment(urlValue), params: queryParamsFromUrl(urlValue), pathParams: [] as KVRow[] };
+  if (!isRecord(urlValue)) return { url: '', params: [] as KVRow[], pathParams: [] as KVRow[] };
   const declaredParams = postmanKvRows(urlValue.query);
+  const pathParams = postmanKvRows(urlValue.variable);
   const raw = asText(urlValue.raw);
   if (raw) {
     const params = declaredParams.length ? declaredParams : queryParamsFromUrl(raw);
-    return { url: applyPostmanPathVariables(stripUrlQueryAndFragment(raw), urlValue.variable), params };
+    return { url: stripUrlQueryAndFragment(raw), params, pathParams };
   }
   const protocol = asText(urlValue.protocol);
   const host = Array.isArray(urlValue.host) ? urlValue.host.map(asText).join('.') : asText(urlValue.host);
@@ -230,8 +219,9 @@ function postmanUrlToKurlo(urlValue: unknown) {
   const prefix = protocol ? `${protocol}://` : '';
   const hostWithPort = port ? `${host}:${port}` : host;
   return {
-    url: applyPostmanPathVariables(`${prefix}${hostWithPort}${path ? `/${path}` : ''}`, urlValue.variable),
+    url: `${prefix}${hostWithPort}${path ? `/${path}` : ''}`,
     params: declaredParams,
+    pathParams,
   };
 }
 
@@ -342,7 +332,7 @@ function postmanExamplesFromItem(item: Record<string, unknown>, requestId: strin
         source: 'postman',
         snapshot: {
           method: (asText(original.method).toUpperCase() || 'GET') as Method,
-          url: originalUrl.url,
+          url: applyPathParams(originalUrl.url, originalUrl.pathParams),
           params: originalUrl.params,
           headers: postmanKvRows(original.header),
           bodyType: originalBody.bodyType,
@@ -408,13 +398,15 @@ export function postmanRequestsFromItems(
     const scripts = mergeScripts(inheritedScripts, postmanScriptsFromEvents(item.event, req.event));
     const id = newRequestId();
     const examples = postmanExamplesFromItem(item, id);
+    const url = asText(kurlo.url) || socketIO?.url || urlData.url;
+    const pathParams = requestType === 'http' || requestType === 'graphql' ? pathParamsFromUrl(url, urlData.pathParams) : [];
     return [{
       id, name, filesystemName: filesystemNameFromName(name, id), collectionId, collection: collectionName, folderPath: path,
       requestType,
       method: (requestType === 'graphql' || requestType === 'grpc' ? 'POST' : asText(req.method).toUpperCase() || 'GET') as Method,
-      url: asText(kurlo.url) || socketIO?.url || urlData.url,
+      url,
       requestTab: kurloTab || (requestType === 'grpc' ? 'body' : requestType === 'socketio' ? 'events' : requestType === 'ws' ? 'body' : requestType === 'graphql' ? 'query' : 'params'),
-      params, headers: postmanKvRows(req.header),
+      params, ...(pathParams.length ? { pathParams } : {}), headers: postmanKvRows(req.header),
       auth: req.auth === undefined && childAuth === undefined ? inheritAuthState() : postmanAuthConfig(req.auth, childAuth),
       bodyType: requestType === 'grpc' && body.bodyType === 'none' ? 'json' : body.bodyType,
       rawBodyType: body.rawBodyType,
@@ -538,6 +530,7 @@ function requestUrlWithParams(req: SavedRequest, includeSecrets = false) {
 function postmanUrlFromKurlo(req: SavedRequest, includeSecrets = false) {
   const raw = requestUrlWithParams(req, includeSecrets);
   const query = req.params.filter(r => r.enabled && r.key).map(row => postmanKv(row, includeSecrets));
+  const variable = (req.pathParams ?? []).filter(r => r.key).map(row => postmanKv(row, includeSecrets));
   try {
     const parsed = new URL(raw);
     return {
@@ -546,8 +539,9 @@ function postmanUrlFromKurlo(req: SavedRequest, includeSecrets = false) {
       ...(parsed.port ? { port: parsed.port } : {}),
       path: parsed.pathname.split('/').filter(Boolean),
       ...(query.length ? { query } : {}),
+      ...(variable.length ? { variable } : {}),
     };
-  } catch { return { raw, ...(query.length ? { query } : {}) }; }
+  } catch { return { raw, ...(query.length ? { query } : {}), ...(variable.length ? { variable } : {}) }; }
 }
 
 function postmanAuthPair(key: string, value: string, type = 'string', includeSecrets = false, redactionKey = key) {

@@ -10,6 +10,12 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **Path variables:** a `:name` segment in the URL gets its own row under Path variables in the Params tab, and its value goes into the URL when the request is sent. See [Path variables](/docs/guides/request-types/#path-variables).
+
 ## 2.4.1
 
 ### Added

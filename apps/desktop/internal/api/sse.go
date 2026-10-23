@@ -209,6 +209,7 @@ func (m *sseManager) runStreamAttempt(
 		return result
 	}
 
+	req.URL = applyPathParams(req.URL, req.PathParams)
 	rawInput := strings.TrimSpace(req.URL)
 	if isBarePortLikeURL(rawInput) {
 		return fail(invalidBarePortURLMessage("http"), false)

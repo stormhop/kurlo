@@ -42,3 +42,39 @@
   {/each}
 </div>
 {/if}
+{#if vm.pathParams.length && (vm.requestType === 'http' || vm.requestType === 'graphql')}
+<section class="path-vars" aria-label="Path variables">
+  <div class="request-section-bar">
+    <span class="request-section-title">Path variables</span>
+    <span class="request-section-meta">{vm.pathParams.filter(r => r.value).length} of {vm.pathParams.length} set</span>
+  </div>
+  <div class="kv-table headers-kv-table" style="--kw: {rem(vm.kvKeyW)}; --vw: {rem(vm.kvValW)}">
+    <div class="kv-head">
+      <span></span>
+      <span class="kv-head-cell">Key</span>
+      <span class="kv-head-cell">Value</span>
+      <span class="kv-head-cell">Description</span>
+      <span></span>
+    </div>
+    {#each vm.pathParams as row (row.id)}
+      <div class="kv-row" data-testid="path-var-row">
+        <span></span>
+        <input class="field field-bare kv-input path-var-key" value={row.key} readonly tabindex="-1" aria-label="Path variable name" />
+        <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" />
+        <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+        <span></span>
+      </div>
+    {/each}
+  </div>
+</section>
+{/if}
+
+<style>
+  .path-vars {
+    margin-top: var(--space-4);
+  }
+  .path-var-key {
+    color: var(--text-2);
+    cursor: default;
+  }
+</style>

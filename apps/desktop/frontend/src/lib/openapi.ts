@@ -6,6 +6,7 @@ import { parseYaml } from './yaml';
 import { safeExportRow, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
 import { filesystemNameFromName } from './normalizers';
 import { normalizeRequestExample } from './examples';
+import { applyPathParams, pathParamsFromUrl } from './pathParams';
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'] as const;
 const JSON_TYPES = ['application/json', 'application/*+json'];
@@ -309,7 +310,13 @@ function serverUrls(spec: Record<string, unknown>): string[] {
 
 
 function joinUrl(base: string, path: string) {
-  const templatedPath = path.replace(/\{([^}]+)\}/g, '{{$1}}');
+  const templatedPath = path
+    .split('/')
+    .map(segment => {
+      const whole = segment.match(/^\{([^{}]+)\}$/);
+      return whole ? `:${whole[1]}` : segment.replace(/\{([^}]+)\}/g, '{{$1}}');
+    })
+    .join('/');
   if (!base) return templatedPath;
   return `${base.replace(/\/+$/, '')}/${templatedPath.replace(/^\/+/, '')}`;
 }
@@ -522,11 +529,7 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
       const parameters = parametersFor(pathItem, operation, spec);
       const params = parameterRows(parameters, 'query', spec);
       const headers = parameterRows(parameters, 'header', spec);
-      for (const pathParam of parameterRows(parameters, 'path', spec)) {
-        if (!variables.has(pathParam.key)) {
-          variables.set(pathParam.key, { ...pathParam, enabled: true });
-        }
-      }
+      const pathRows = parameterRows(parameters, 'path', spec);
       const consumes = [...asArray(operation.consumes).map(asText), ...globalConsumes];
       const body = spec.swagger
         ? swaggerBody(parameters, consumes, spec)
@@ -537,8 +540,15 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
       const id = newRequestId();
       const ownServer = operationServerUrl(operation) || operationServerUrl(pathItem);
       const url = joinUrl(ownServer || (servers.length ? `{{${OPENAPI_BASE_URL_VARIABLE}}}` : ''), path);
+      const pathParams = pathParamsFromUrl(url, pathRows.map(r => ({ ...r, enabled: true })));
+      const pathNames = new Set(pathParams.map(r => r.key));
+      for (const pathParam of pathRows) {
+        if (!pathNames.has(pathParam.key) && !variables.has(pathParam.key)) {
+          variables.set(pathParam.key, { ...pathParam, enabled: true });
+        }
+      }
       const examples = openApiExamplesFromResponses(operation, spec, id, {
-        method: methodUpper, url, params, headers, bodyType: body.bodyType, bodyContent: body.bodyContent,
+        method: methodUpper, url: applyPathParams(url, pathParams), params, headers, bodyType: body.bodyType, bodyContent: body.bodyContent,
       });
       requests.push({
         id,
@@ -551,6 +561,7 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
         url,
         requestTab: body.bodyType !== 'none' ? 'body' : params.length ? 'params' : headers.length ? 'headers' : 'docs',
         params,
+        ...(pathParams.length ? { pathParams } : {}),
         headers,
         auth: operationAuth(operation, spec, schemes, variables, Boolean(collectionAuth)),
         bodyType: body.bodyType,
@@ -818,8 +829,17 @@ function openApiParameter(row: KVRow, location: 'query' | 'header', required = f
   return parameter;
 }
 
-function openApiPathParameter(name: string) {
-  return { name, in: 'path', required: true, schema: { type: 'string' } };
+function pathRowFor(req: SavedRequest, name: string): KVRow | undefined {
+  return (req.pathParams ?? []).find(row => row.key && openApiParamName(row.key) === name);
+}
+
+function openApiPathParameter(req: SavedRequest, name: string, includeSecrets = false) {
+  const parameter: Record<string, unknown> = { name, in: 'path', required: true, schema: { type: 'string' } };
+  const source = pathRowFor(req, name);
+  const safeValue = source ? safeExportValue(source.key, source.value, includeSecrets, source.secret === true) : '';
+  if (source?.description) parameter.description = source.description;
+  if (source?.value && safeValue) parameter.example = safeValue;
+  return parameter;
 }
 
 function swaggerParameter(row: KVRow, location: 'query' | 'header', required = false, includeSecrets = false) {
@@ -837,8 +857,13 @@ function swaggerParameter(row: KVRow, location: 'query' | 'header', required = f
   return parameter;
 }
 
-function swaggerPathParameter(name: string) {
-  return { name, in: 'path', required: true, type: 'string' };
+function swaggerPathParameter(req: SavedRequest, name: string, includeSecrets = false) {
+  const parameter: Record<string, unknown> = { name, in: 'path', required: true, type: 'string' };
+  const source = pathRowFor(req, name);
+  const safeValue = source ? safeExportValue(source.key, source.value, includeSecrets, source.secret === true) : '';
+  if (source?.description) parameter.description = source.description;
+  if (source?.value && safeValue) parameter.default = safeValue;
+  return parameter;
 }
 
 function operationId(req: SavedRequest, path: string, used: Set<string>) {
@@ -1008,7 +1033,7 @@ function openApiOperation(
   const body = requestBodyExport(req, stripFn, includeSecrets);
   const tags = tagForRequest(req);
   const parameters: Record<string, unknown>[] = [
-    ...pathParameterNames(path).map(openApiPathParameter),
+    ...pathParameterNames(path).map(name => openApiPathParameter(req, name, includeSecrets)),
     ...queryRows.map(row => openApiParameter(row, 'query', false, includeSecrets)),
     ...enabledRows(req.headers)
       .filter(row => row.key.trim().toLowerCase() !== 'content-type')
@@ -1053,7 +1078,7 @@ function swaggerOperation(
   const body = requestBodyExport(req, stripFn, includeSecrets);
   const tags = tagForRequest(req);
   const parameters: Record<string, unknown>[] = [
-    ...pathParameterNames(path).map(swaggerPathParameter),
+    ...pathParameterNames(path).map(name => swaggerPathParameter(req, name, includeSecrets)),
     ...queryRows.map(row => swaggerParameter(row, 'query', false, includeSecrets)),
     ...enabledRows(req.headers)
       .filter(row => row.key.trim().toLowerCase() !== 'content-type')

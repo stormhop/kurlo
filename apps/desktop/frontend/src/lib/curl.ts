@@ -1,4 +1,5 @@
 import { methodConventionallyHasNoBody, RAW_BODY_CONTENT_TYPES } from './constants';
+import { applyPathParams } from './pathParams';
 
 function splitCurlFormValue(raw: string): { value: string; contentType: string } {
   const match = /;type=([^;]+)$/i.exec(raw);
@@ -26,6 +27,7 @@ type CurlRequest = {
   method: string;
   url: string;
   params: CurlRow[];
+  pathParams?: CurlRow[];
   headers: CurlRow[];
   auth: CurlAuth;
   bodyType: string;
@@ -45,7 +47,7 @@ export function toCurl(req: CurlRequest): string {
     parts.push(`-X ${req.method}`);
   }
 
-  let urlStr = req.url;
+  let urlStr = applyPathParams(req.url, req.pathParams);
   const activeParams = req.params.filter(p => p.enabled && p.key);
   if (req.auth.type === 'apikey' && req.auth.keyIn === 'query' && req.auth.keyName) {
     activeParams.push({ key: req.auth.keyName, value: req.auth.keyValue ?? '', enabled: true });

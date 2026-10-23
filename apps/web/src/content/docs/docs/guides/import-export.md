@@ -12,7 +12,7 @@ Kurlo supports both one-off interchange formats and full Kurlo backups. Imports 
 | Postman Collection v2.1 | Collections, nested folders, requests, auth, bodies, GraphQL, scripts, collection variables, and request documentation. Environment and globals exports import through the same picker. |
 | Insomnia v4 JSON | Workspaces, folders, requests, auth, bodies, and environments. |
 | Bruno/OpenCollection | Collections, explicit empty folders, requests, GraphQL, and supported metadata. |
-| OpenAPI/Swagger | From a file or a URL. HTTP/SSE requests generated from operations, plus the collection defaults that make them sendable: the server becomes a `{{baseUrl}}` variable, path parameters become collection variables seeded from the spec's examples, and declared security schemes become the request's auth. |
+| OpenAPI/Swagger | From a file or a URL. HTTP/SSE requests generated from operations, plus the collection defaults that make them sendable: the server becomes a `{{baseUrl}}` variable, path parameters become the request's path variables seeded from the spec's examples, and declared security schemes become the request's auth. |
 | HAR | Captured HTTP requests. |
 | `.http` / `.rest` | JetBrains HTTP Client and VS Code REST Client files: requests, names, headers, bodies, and file variables. |
 | cURL | A single request pasted into the URL bar, including the flags that map onto a request setting — `-k`, `--max-time`, `--proxy` — and a form part's `;type=`. |
@@ -32,7 +32,7 @@ Kurlo reads Postman Collection v2.1 — the JSON export, not the cloud-sync form
 What carries over:
 
 - Folder hierarchy — including folders that hold no requests — request names, methods, URLs.
-- Headers, query params, body (JSON, form-data, raw, urlencoded).
+- Headers, query params, path variables (`:id` and its value), body (JSON, form-data, raw, urlencoded).
 - Pre-request and test scripts. JavaScript scripts map to Kurlo's sandboxed JavaScript fields; legacy Tengo fields remain available for existing requests.
 - Request descriptions, which become the request's **Docs** tab.
 - Collection-level variables, auth, and scripts, which become the collection's [defaults](/docs/guides/collection-defaults/). A request that declared no auth of its own is set to **Inherit auth**, so the collection's auth applies exactly as it did in Postman.
@@ -57,7 +57,7 @@ Pick **OpenAPI / Swagger** and choose a JSON or YAML spec. Kurlo builds one requ
 The point is a collection you can send straight away, so three things land on the collection rather than being baked into each request:
 
 - **The server** becomes a `baseUrl` collection variable, and every request URL starts with `{{baseUrl}}`. Retargeting the whole import at staging is one edit. When the spec declares more than one server, the others are recorded in the variable's description.
-- **Path parameters** become collection variables, seeded with the `example` or `default` from the spec. Without them a path like `/users/{userId}` would import as `{{userId}}` with nothing behind it, and every request would refuse to send.
+- **Path parameters** become [path variables](/docs/guides/request-types/#path-variables): `/users/{userId}` imports as `/users/:userId`, with the value seeded from the spec's `example` or `default` in the request's **Params** tab. A parameter that is only part of a segment, such as `/files/{name}.json`, cannot be a path variable and becomes a collection variable instead.
 - **Security schemes** become auth. A scheme declared for the whole document lands on the collection and each request is set to **Inherit auth**; an operation with its own `security` carries that instead, and `security: []` means the operation is public. HTTP basic, digest and bearer, API keys (with the name and location the spec gives), and OAuth 2.0 (with its token and authorization URLs and scopes) are mapped. The credentials themselves are not in a spec, so each one points at a collection variable — `{{bearerToken}}`, `{{apiKey}}`, `{{oauth2ClientSecret}}` — giving you one place to fill in.
 
 `openIdConnect` is left as **No auth**: its endpoints can only be discovered by fetching the provider's configuration, which the importer does not do.

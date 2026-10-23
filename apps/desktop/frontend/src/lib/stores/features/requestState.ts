@@ -7,6 +7,7 @@ import {
 } from '../../graphql';
 import { cloneRequestExample } from '../../examples';
 import { filesystemNameFromName, normalizeSavedRequest, normalizeSioArgs } from '../../normalizers';
+import { pathParamsFromUrl } from '../../pathParams';
 import {
   defaultBodyContentFor,
   defaultSocketIOArgs,
@@ -113,6 +114,7 @@ type RequestStateHost = {
   oauth2AssertionKeyID: string;
   oauth2AssertionAudience: string;
   params: KVRow[];
+  pathParams: KVRow[];
   preRequestScript: string;
   preRequestScriptJs: string;
   rawBodyType: RawBodyType;
@@ -172,7 +174,7 @@ export const requestStateFeature = {
     return JSON.stringify({
       id: this.activeRequestId, requestType: this.requestType,
       requestNameAuto: this.requestNameAuto, method: this.method,
-      params: this.params, reqHeaders: this.reqHeaders,
+      params: this.params, pathParams: this.pathParams, reqHeaders: this.reqHeaders,
 	      auth: this.currentAuthState(),
 	      bodyType: this.bodyType, rawBodyType: this.rawBodyType,
 	      bodyFilePath: this.bodyFilePath, bodyFileName: this.bodyFileName, formRows: this.formRows,
@@ -214,7 +216,7 @@ export const requestStateFeature = {
     const bodyDefaults = requestBodyDefaultsFor(normalizedType);
     const settings = this.currentRequestSettings();
     const id = newRequestId();
-    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, isPinned: false, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp ? 'POST' : 'GET', url: '', requestTab: isMcp || isGrpc ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], headers: [], auth: resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
+    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, isPinned: false, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp ? 'POST' : 'GET', url: '', requestTab: isMcp || isGrpc ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
   },
 
   snapshotActiveRequest(this: RequestStateHost, options: { forPersistence?: boolean } = {}): SavedRequest {
@@ -236,7 +238,7 @@ export const requestStateFeature = {
       collectionId,
       collection: collectionId ? this.collectionNameById(collectionId) : '',
       folderPath: [...(existing?.folderPath ?? [])], method: isGraphQL || isGrpc ? 'POST' : this.method, url: this.url,
-      requestTab: this.requestTab, params: cloneRowsForStore(this.params), headers: cloneRowsForStore(this.reqHeaders),
+      requestTab: this.requestTab, params: cloneRowsForStore(this.params), pathParams: cloneRowsForStore(this.pathParams), headers: cloneRowsForStore(this.reqHeaders),
       auth: options.forPersistence ? this.authForPersistence(auth) : auth,
       bodyType: isGraphQL ? 'graphql' : this.bodyType, rawBodyType: isGraphQL ? 'json' : this.rawBodyType, bodyContent: isGraphQL ? this.graphQLBodyContentForStore() : this.bodyContent,
       bodyFilePath: this.bodyFilePath, bodyFileName: this.bodyFileName,
@@ -280,7 +282,7 @@ export const requestStateFeature = {
     const requestType = this.normalizeRequestTypeValue(req.requestType, req.url);
     const hasBodyContent = req.bodyContent.trim() || req.bodyFilePath || req.bodyFileName || req.formRows.some(rowHasContent);
     const hasSharedContent =
-      req.params.some(rowHasContent) || req.headers.some(rowHasContent) ||
+      req.params.some(rowHasContent) || (req.pathParams ?? []).some(r => r.value.trim()) || req.headers.some(rowHasContent) ||
       this.authStateHasData(req.auth, req.auth.type) || req.preRequestScript.trim() || req.testScript.trim() ||
       req.requestNotes.trim();
     if (requestType === 'ws') {
@@ -345,7 +347,7 @@ export const requestStateFeature = {
     this.grpcProtoFilePath = req.grpcProtoFilePath ?? '';
     this.grpcProtoFileName = req.grpcProtoFileName ?? '';
     this.grpcProtoImportPaths = [...(req.grpcProtoImportPaths ?? [])];
-    this.params = restoreRows(req.params); this.reqHeaders = restoreRows(req.headers); this.formRows = restoreRows(req.formRows);
+    this.params = restoreRows(req.params); this.pathParams = pathParamsFromUrl(req.url, restoreRows(req.pathParams)); this.reqHeaders = restoreRows(req.headers); this.formRows = restoreRows(req.formRows);
     this.authType = req.auth.type; this.bearerToken = req.auth.bearerToken; this.basicUser = req.auth.basicUser; this.basicPass = req.auth.basicPass;
     this.apiKeyName = req.auth.apiKeyName; this.apiKeyValue = req.auth.apiKeyValue; this.apiKeyIn = req.auth.apiKeyIn;
     this.oauth2TokenURL = req.auth.oauth2TokenURL; this.oauth2ClientID = req.auth.oauth2ClientID; this.oauth2Secret = req.auth.oauth2Secret;

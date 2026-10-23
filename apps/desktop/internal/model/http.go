@@ -95,6 +95,7 @@ type HttpRequest struct {
 	Method           string     `json:"method"`
 	URL              string     `json:"url"`
 	Params           []KeyValue `json:"params"`
+	PathParams       []KeyValue `json:"pathParams"`
 	Headers          []KeyValue `json:"headers"`
 	Auth             AuthConfig `json:"auth"`
 	BodyType         string     `json:"bodyType"`

@@ -67,7 +67,7 @@ const REQUEST_FIELDS: FieldTypes = {
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
     ],
     booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection'],
-    arrays: ['folderPath', 'params', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'grpcMetadata', 'grpcProtoImportPaths', 'examples'],
+    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'grpcMetadata', 'grpcProtoImportPaths', 'examples'],
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
 
@@ -253,6 +253,7 @@ export function normalizeSavedRequest(
         url: input.url || '',
         requestTab: requestTab as RequestTab,
         params: cloneRowsForStore(input.params ?? []),
+        pathParams: cloneRowsForStore(input.pathParams ?? []),
         headers: cloneRowsForStore(input.headers ?? []),
         auth: {...emptyAuthState(), ...sanitizeLike(input.auth, emptyAuthState())},
         bodyType: isGraphQL || isGrpc ? bodyDefaults.bodyType : normalizeBodyTypeForUi(input.bodyType ?? bodyDefaults.bodyType),

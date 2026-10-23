@@ -248,6 +248,30 @@ func buildRequest(ctx *Context) *tengo.Map {
 			},
 		}},
 
+		"pathVariables": &tengo.Map{Value: map[string]tengo.Object{
+			"get": &tengo.UserFunction{
+				Name: "get",
+				Value: func(args ...tengo.Object) (tengo.Object, error) {
+					if len(args) < 1 {
+						return tengo.UndefinedValue, nil
+					}
+					if v, ok := ctx.RequestPathParams[tengoString(args[0])]; ok {
+						return &tengo.String{Value: v}, nil
+					}
+					return tengo.UndefinedValue, nil
+				},
+			},
+			"set": &tengo.UserFunction{
+				Name: "set",
+				Value: func(args ...tengo.Object) (tengo.Object, error) {
+					if len(args) >= 2 {
+						ctx.SetRequestPathParam(tengoString(args[0]), tengoString(args[1]))
+					}
+					return tengo.UndefinedValue, nil
+				},
+			},
+		}},
+
 		"params": &tengo.Map{Value: map[string]tengo.Object{
 			"get": &tengo.UserFunction{
 				Name: "get",

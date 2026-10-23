@@ -67,7 +67,7 @@ var authActiveFields = map[string][]string{
 
 var authTypesWithoutFields = map[string]bool{"inherit": true}
 
-var requestRowFieldsForStrip = []string{"params", "headers", "formRows", "sioEvents", "grpcMetadata"}
+var requestRowFieldsForStrip = []string{"params", "pathParams", "headers", "formRows", "sioEvents", "grpcMetadata"}
 
 var requestSettingFields = []string{
 	"sseDisableReconnect",

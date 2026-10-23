@@ -977,6 +977,7 @@ class AppVM {
   requestSettingsOverrides = $state<RequestSettingsOverrides>({});
 
   params = $state<KVRow[]>([mkRow()]);
+  pathParams = $state<KVRow[]>([]);
   reqHeaders = $state<KVRow[]>([mkRow()]);
   formRows = $state<KVRow[]>([mkRow()]);
   bulkEditTables = $state<{ params: boolean; headers: boolean; form: boolean }>({ params: false, headers: false, form: false });

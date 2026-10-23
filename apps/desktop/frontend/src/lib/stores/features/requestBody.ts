@@ -8,6 +8,7 @@ import {
 } from '../../graphql';
 import { stripJsonComments } from '../../jsonEditing';
 import { paramsFromUrl, urlWithParams } from '../../queryParams';
+import { pathParamsFromUrl } from '../../pathParams';
 import { DEFAULT_GRPC_MESSAGE, requestBodyDefaultsFor } from '../../requestBodyDefaults';
 import type { BodyMode, BodyType, KVRow, Method, RawBodyType, RequestTab, RequestType, SavedRequest } from '../../types/models';
 import {
@@ -45,6 +46,7 @@ type RequestBodyHost = {
   graphqlVariables: string;
   method: Method;
   params: KVRow[];
+  pathParams: KVRow[];
   oauth2Token: string;
   enableSSLVerification: boolean;
   timeoutMs: number;
@@ -281,6 +283,7 @@ export const requestBodyFeature = {
     this.requestType = 'http';
     this.url = parsed.url;
     this.params = paramsFromUrl(this.url, this.params);
+    this.pathParams = pathParamsFromUrl(this.url, this.pathParams);
     if (parsed.method) this.method = parsed.method as Method;
     if (parsed.followRedirects !== undefined) this.followRedirects = parsed.followRedirects;
     this.reqHeaders = parsed.headers?.length ? [...parsed.headers.map(h => ({ ...mkRow(), enabled: true, key: h.key, value: h.value })), mkRow()] : [mkRow()];
@@ -338,6 +341,7 @@ export const requestBodyFeature = {
   syncParamsFromUrl(this: RequestBodyHost) {
     if (this.requestType === 'grpc') return;
     this.params = paramsFromUrl(this.url, this.params);
+    this.pathParams = pathParamsFromUrl(this.url, this.pathParams);
   },
 
   async onUrlPaste(this: RequestBodyHost, e: ClipboardEvent) {

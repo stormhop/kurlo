@@ -30,12 +30,24 @@ Realtime requests are intentionally skipped by the Collection Runner because the
 HTTP is the default mode. It supports:
 
 - Methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, and `SSE`.
-- Query params and headers as editable rows.
+- Query params, path variables, and headers as editable rows.
 - Auth, body, scripts, request notes, and per-request settings.
 - JSON, text, XML, HTML, form-data, urlencoded, GraphQL-shaped body, and binary-file bodies.
 - cURL import from the URL bar.
 
 Use HTTP for normal REST APIs. Use the `SSE` method only when the endpoint keeps an event stream open.
+
+### Path variables
+
+A path segment that starts with a colon is a path variable: type `{{baseUrl}}/users/:userId/posts/:postId` and the **Params** tab lists `userId` and `postId` under **Path variables**, below the query params. Fill in the values there, and Kurlo puts them into the URL when it sends the request, so `/users/:userId` goes out as `/users/42`. The URL field keeps showing `:userId`.
+
+- The rows follow the URL. Adding `:name` to the path adds a row, and removing it from the path removes the row. Renaming a variable means editing the URL.
+- Only a whole segment counts. `/users/:id` has a variable, while `/v1:beta` and `http://localhost:8080` do not, and the query string and fragment are left alone.
+- A value can use `{{variables}}`, such as `{{userId}}` from the environment.
+- Characters that would change the URL's structure, such as `/`, `?`, `#` and spaces, are percent-encoded. Sequences that are already encoded, like `%2F`, are kept as they are.
+- A variable with an empty value stays in the URL as `:name`.
+- Pre-request scripts see the URL with `:name` in it, as Postman's do, and can read and change the values with [`pm.request.pathVariables`](/docs/reference/scripting-api/).
+- Path variables apply to HTTP, GraphQL, and SSE requests. Copy as cURL and generated code put the values into the URL. The mock server treats `:name` as "any value" when it matches requests against saved examples.
 
 ## GraphQL
 

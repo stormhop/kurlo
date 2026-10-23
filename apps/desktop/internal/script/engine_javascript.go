@@ -319,6 +319,23 @@ func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool) map[string]in
 			ctx.UnsetRequestParam(limitJSHostString(k))
 		},
 
+		"reqPathVarGet": func(k string) goja.Value {
+			if v, ok := ctx.RequestPathParams[k]; ok {
+				return vm.ToValue(v)
+			}
+			return undef
+		},
+		"reqPathVarSet": func(k, v string) {
+			ctx.SetRequestPathParam(limitJSHostString(k), limitJSHostString(v))
+		},
+		"reqPathVarAll": func() string {
+			encoded, err := json.Marshal(ctx.RequestPathParams)
+			if err != nil {
+				return "{}"
+			}
+			return string(encoded)
+		},
+
 		"recordTest": func(name string, passed bool, errMsg string) {
 			if len(ctx.Tests) >= jsMaxTestEntries {
 				return
@@ -727,6 +744,12 @@ var __kurloAPI = (function (host) {
         get: function (k) { return host.reqParamGet(String(k)); },
         set: function (k, v) { host.reqParamSet(String(k), valStr(v)); },
         unset: function (k) { host.reqParamUnset(String(k)); }
+      },
+      pathVariables: {
+        get: function (k) { return host.reqPathVarGet(String(k)); },
+        set: function (k, v) { host.reqPathVarSet(String(k), valStr(v)); },
+        has: function (k) { return host.reqPathVarGet(String(k)) !== undefined; },
+        toObject: function () { try { return JSON.parse(host.reqPathVarAll()) || {}; } catch (e) { return {}; } }
       }
     },
     test: function (name, fn) {

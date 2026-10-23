@@ -102,6 +102,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		}
 		mergeScriptHeaders(ctx, &req)
 		mergeScriptParams(ctx, &req)
+		mergeScriptPathParams(ctx, &req)
 		mergeScriptBody(ctx, &req)
 		envDelta.merge(scope.commit(sm))
 		if preResult.Error != "" {
@@ -309,6 +310,11 @@ func populateScriptRequestContext(ctx *script.Context, req model.HttpRequest) {
 			ctx.RequestParams[p.Key] = p.Value
 		}
 	}
+	for _, p := range req.PathParams {
+		if p.Enabled && p.Key != "" {
+			ctx.RequestPathParams[p.Key] = p.Value
+		}
+	}
 }
 
 func populateScriptCookies(ctx *script.Context, req model.HttpRequest, jars *cookieJarRegistry) {
@@ -342,6 +348,7 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 		}
 	}
 
+	req.URL = applyPathParams(req.URL, req.PathParams)
 	rawURL := strings.TrimSpace(req.URL)
 	if isBarePortLikeURL(rawURL) {
 		return earlyError(invalidBarePortURLMessage("http"))
@@ -1387,6 +1394,13 @@ func mergeScriptParams(ctx *script.Context, req *model.HttpRequest) {
 	sameKey := func(a, b string) bool { return a == b }
 	for _, key := range writtenKeys(ctx.RequestParams, ctx.TouchedParams, func(s string) string { return s }) {
 		req.Params = upsertRow(req.Params, key, ctx.RequestParams[key], sameKey)
+	}
+}
+
+func mergeScriptPathParams(ctx *script.Context, req *model.HttpRequest) {
+	sameKey := func(a, b string) bool { return a == b }
+	for _, key := range writtenKeys(ctx.RequestPathParams, ctx.TouchedPathParams, func(s string) string { return s }) {
+		req.PathParams = upsertRow(req.PathParams, key, ctx.RequestPathParams[key], sameKey)
 	}
 }
 

@@ -5,6 +5,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Path variables.** A URL like `{{baseUrl}}/users/:userId` now gets a **Path variables** section in the Params tab, below the query params, where you set the value of `userId`. Kurlo puts the value into the URL when it sends the request. Values can use `{{variables}}`, scripts can read and change them with `pm.request.pathVariables`, and they come across when you import from or export to Postman, Insomnia, Bruno and OpenAPI.
+
 ## [2.4.1] - 2026-10-22
 
 ### Added

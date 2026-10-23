@@ -157,7 +157,7 @@ export function emptyConnectionInfo(): ConnectionInfo {
 export function emptyHttpRequest(): HttpRequest {
   return {
     requestId: '', workspaceId: '', method: '', url: '',
-    params: [], headers: [], auth: emptyAuthConfig(),
+    params: [], pathParams: [], headers: [], auth: emptyAuthConfig(),
     bodyType: '', body: '', bodyFilePath: '', formData: [],
     preRequestScript: '', testScript: '', scriptEngine: '',
     followRedirects: false, timeoutMs: 0, name: '',

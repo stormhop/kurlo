@@ -238,7 +238,7 @@ export type SavedRequest = {
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;
   folderPath: string[]; method: Method; url: string; requestTab: RequestTab;
-  params: KVRow[]; headers: KVRow[];
+  params: KVRow[]; pathParams?: KVRow[]; headers: KVRow[];
   auth: AuthState;
   bodyType: BodyType; rawBodyType: RawBodyType; bodyContent: string;
   bodyFilePath: string; bodyFileName: string; formRows: KVRow[];

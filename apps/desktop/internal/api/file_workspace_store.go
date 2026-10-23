@@ -60,6 +60,7 @@ var requestSettingSecretFields = []string{
 
 var requestSecretRowFields = []string{
 	"params",
+	"pathParams",
 	"headers",
 	"formRows",
 }

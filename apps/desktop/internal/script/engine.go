@@ -76,6 +76,10 @@ type Context struct {
 	RequestMethod  string
 	RequestHeaders map[string]string
 	RequestParams  map[string]string
+
+	RequestPathParams map[string]string
+	TouchedPathParams map[string]struct{}
+
 	RemovedHeaders map[string]struct{}
 	RemovedParams  map[string]struct{}
 
@@ -126,6 +130,8 @@ func NewContext(vars, env map[string]string) *Context {
 		RemovedParams:       make(map[string]struct{}),
 		TouchedHeaders:      make(map[string]struct{}),
 		TouchedParams:       make(map[string]struct{}),
+		RequestPathParams:   make(map[string]string),
+		TouchedPathParams:   make(map[string]struct{}),
 	}
 }
 
@@ -154,6 +160,11 @@ func (c *Context) SetRequestParam(key, value string) {
 	c.RequestParams[key] = value
 	c.TouchedParams[key] = struct{}{}
 	delete(c.RemovedParams, key)
+}
+
+func (c *Context) SetRequestPathParam(key, value string) {
+	c.RequestPathParams[key] = value
+	c.TouchedPathParams[key] = struct{}{}
 }
 
 func (c *Context) UnsetRequestParam(key string) {

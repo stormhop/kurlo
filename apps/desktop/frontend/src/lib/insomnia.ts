@@ -7,6 +7,7 @@ import { filterSocketIOTransportParams, graphQLBodyContentFromJsonText, isWebSoc
 import { filesystemNameFromName } from './normalizers';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
 import { safeExportRow, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
+import { pathParamsFromUrl } from './pathParams';
 
 const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp']);
 const KURLO_REQUEST_TABS = new Set<RequestTab>(['docs', 'params', 'query', 'auth', 'headers', 'metadata', 'body', 'schema', 'service', 'events', 'scripts', 'settings']);
@@ -226,6 +227,8 @@ export function insomniaRequestsFromResources(payload: unknown, collectionId: st
     const grpcMethod = asText(kurlo.grpcMethod ?? kurlo.fullMethod ?? resource.protoMethodName ?? resource.grpcMethod);
     const grpcMetadata = insomniaRows(kurlo.grpcMetadata ?? kurlo.metadata ?? resource.metadata);
     const kurloTab = kurloRequestTab(kurlo.requestTab);
+    const requestUrl = asText(kurlo.url) || socketIO?.url || url;
+    const pathParams = requestType === 'http' || requestType === 'graphql' ? pathParamsFromUrl(requestUrl, insomniaRows(resource.pathParameters)) : [];
     return {
       id,
       name,
@@ -235,9 +238,10 @@ export function insomniaRequestsFromResources(payload: unknown, collectionId: st
       folderPath: folderPathFor(resource, byId),
       requestType,
       method: (requestType === 'graphql' || requestType === 'grpc' ? 'POST' : asText(resource.method).toUpperCase() || 'GET') as Method,
-      url: asText(kurlo.url) || socketIO?.url || url,
+      url: requestUrl,
       requestTab: kurloTab || (requestType === 'grpc' ? 'body' : requestType === 'socketio' ? 'events' : requestType === 'ws' ? 'body' : requestType === 'graphql' ? 'query' : body.bodyType !== 'none' ? 'body' : headers.length ? 'headers' : params.length ? 'params' : 'docs'),
       params,
+      ...(pathParams.length ? { pathParams } : {}),
       headers,
       auth: authConfig(resource),
       bodyType: requestType === 'grpc' && body.bodyType === 'none' ? 'json' : body.bodyType,
@@ -412,6 +416,7 @@ function requestResource(req: SavedRequest, parentId: string, stripFn: (source: 
     method: req.requestType === 'graphql' || req.requestType === 'grpc' ? 'POST' : req.method,
     url: safeExportUrl(req.url, includeSecrets),
     parameters: req.params.filter(row => row.key || row.value).map(row => insomniaRow(row, includeSecrets)),
+    ...((req.pathParams ?? []).some(row => row.key) ? { pathParameters: (req.pathParams ?? []).filter(row => row.key).map(row => insomniaRow(row, includeSecrets)) } : {}),
     headers: req.headers.filter(row => row.key || row.value).map(row => insomniaRow(row, includeSecrets)),
     authentication: insomniaAuth(req.auth, includeSecrets),
     body: insomniaBody(req, stripFn, includeSecrets),

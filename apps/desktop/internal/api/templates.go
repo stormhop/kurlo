@@ -94,6 +94,7 @@ func resolveHTTPRequestTemplates(req model.HttpRequest, values map[string]string
 	out := req
 	out.URL = resolve(req.URL)
 	out.Params = resolveTemplateRows(req.Params, values)
+	out.PathParams = resolveTemplateRows(req.PathParams, values)
 	out.Headers = resolveTemplateRows(req.Headers, values)
 	out.FormData = resolveTemplateRows(req.FormData, values)
 	out.Auth = resolveAuthTemplates(req.Auth, values)

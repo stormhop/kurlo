@@ -171,7 +171,8 @@ The write tools change the same YAML files the app writes, through the same code
 |-------|---------|
 | `name` | Defaults to the method and path, such as `POST /orders`. |
 | `type` | `http` (the default) or `graphql`. |
-| `method`, `url` | `url` may use `{{variables}}`, such as `{{baseUrl}}/orders`. |
+| `method`, `url` | `url` may use `{{variables}}`, such as `{{baseUrl}}/orders`, and `:name` path variables, such as `/orders/:orderId`. |
+| `pathVariables` | Values for the URL's `:name` segments, such as `[{"key": "orderId", "value": "{{orderId}}"}]`. Replaces the whole list. `get_request` returns them under the same name. |
 | `body`, `bodyType` | A JSON body is stored as JSON and anything else as text, unless `bodyType` says `xml`, `html`, `urlencoded`, `form` or `none`. |
 | `query`, `variables` | The query and variables of a GraphQL request. |
 | `auth` | `inherit` (the default, the collection's auth), `none`, `bearer` with `token`, `basic` with `username` and `password`, or `apikey` with `key`, `value` and `in`. |

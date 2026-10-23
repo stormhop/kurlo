@@ -102,6 +102,7 @@ type cliSavedRequest struct {
 	URL                string          `json:"url"`
 	IsDraft            bool            `json:"isDraft"`
 	Params             []cliKV         `json:"params"`
+	PathParams         []cliKV         `json:"pathParams"`
 	Headers            []cliKV         `json:"headers"`
 	Auth               cliAuth         `json:"auth"`
 	BodyType           string          `json:"bodyType"`
@@ -208,6 +209,12 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 			params = append(params, model.KeyValue{Key: p.Key, Value: p.Value, Enabled: true})
 		}
 	}
+	pathParams := make([]model.KeyValue, 0, len(req.PathParams))
+	for _, p := range req.PathParams {
+		if p.Enabled && strings.TrimSpace(p.Key) != "" {
+			pathParams = append(pathParams, model.KeyValue{Key: strings.TrimSpace(p.Key), Value: p.Value, Enabled: true})
+		}
+	}
 	headers := make([]model.KeyValue, 0, len(req.Headers))
 	for _, h := range req.Headers {
 		if h.Enabled && strings.TrimSpace(h.Key) != "" {
@@ -241,11 +248,12 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 	}
 
 	return model.HttpRequest{
-		RequestID: req.ID,
-		Method:    method,
-		URL:       strings.TrimSpace(req.URL),
-		Params:    params,
-		Headers:   headers,
+		RequestID:  req.ID,
+		Method:     method,
+		URL:        strings.TrimSpace(req.URL),
+		Params:     params,
+		PathParams: pathParams,
+		Headers:    headers,
 		Auth: model.AuthConfig{
 			Type:                      req.Auth.Type,
 			Token:                     token,

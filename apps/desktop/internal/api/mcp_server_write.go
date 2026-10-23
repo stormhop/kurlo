@@ -435,6 +435,7 @@ type mcpSaveRequestArgs struct {
 	Method           *string         `json:"method"`
 	URL              *string         `json:"url"`
 	Params           *[]mcpRowArg    `json:"params"`
+	PathVariables    *[]mcpRowArg    `json:"pathVariables"`
 	Headers          *[]mcpRowArg    `json:"headers"`
 	Body             *mcpTextArg     `json:"body"`
 	BodyType         *string         `json:"bodyType"`
@@ -555,7 +556,7 @@ func mcpApplyRequestArgs(request map[string]any, args mcpSaveRequestArgs) error 
 	for _, rows := range []struct {
 		field string
 		args  *[]mcpRowArg
-	}{{"params", args.Params}, {"headers", args.Headers}} {
+	}{{"params", args.Params}, {"pathParams", args.PathVariables}, {"headers", args.Headers}} {
 		if rows.args == nil {
 			continue
 		}
@@ -1105,20 +1106,21 @@ func mcpServerWriteTools() []map[string]any {
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"request":    str("Id or path (Collection/Folder/Name) of the request to change. Omit to create one."),
-					"collection": str("Collection to create the request in, or to move it to. Optional when there is only one."),
-					"folder":     str("Folder path inside the collection, slash-separated, for example Users/Admin. An empty string moves the request to the top."),
-					"name":       str("Request name. Defaults to the method and path."),
-					"type":       map[string]any{"type": "string", "enum": []string{"http", "graphql"}, "description": "Defaults to http."},
-					"method":     str("HTTP method (default GET). Ignored for GraphQL, which is always POST."),
-					"url":        str("URL; may use {{variables}}. Required for a new request."),
-					"params":     rows("Query parameters. Replaces the existing list."),
-					"headers":    rows("Request headers. Replaces the existing list."),
-					"body":       str("Request body. JSON is stored as a JSON body, anything else as text, unless bodyType says otherwise."),
-					"bodyType":   map[string]any{"type": "string", "enum": []string{"none", "json", "text", "xml", "html", "urlencoded", "form"}},
-					"form":       rows("Form fields for a urlencoded or form (multipart) body. Replaces the existing list."),
-					"query":      str("GraphQL query or mutation."),
-					"variables":  map[string]any{"type": "object", "description": "GraphQL variables."},
+					"request":       str("Id or path (Collection/Folder/Name) of the request to change. Omit to create one."),
+					"collection":    str("Collection to create the request in, or to move it to. Optional when there is only one."),
+					"folder":        str("Folder path inside the collection, slash-separated, for example Users/Admin. An empty string moves the request to the top."),
+					"name":          str("Request name. Defaults to the method and path."),
+					"type":          map[string]any{"type": "string", "enum": []string{"http", "graphql"}, "description": "Defaults to http."},
+					"method":        str("HTTP method (default GET). Ignored for GraphQL, which is always POST."),
+					"url":           str("URL; may use {{variables}}. Required for a new request."),
+					"params":        rows("Query parameters. Replaces the existing list."),
+					"pathVariables": rows("Values for :name segments in the URL path, such as id for /users/:id. Replaces the existing list."),
+					"headers":       rows("Request headers. Replaces the existing list."),
+					"body":          str("Request body. JSON is stored as a JSON body, anything else as text, unless bodyType says otherwise."),
+					"bodyType":      map[string]any{"type": "string", "enum": []string{"none", "json", "text", "xml", "html", "urlencoded", "form"}},
+					"form":          rows("Form fields for a urlencoded or form (multipart) body. Replaces the existing list."),
+					"query":         str("GraphQL query or mutation."),
+					"variables":     map[string]any{"type": "object", "description": "GraphQL variables."},
 					"auth": map[string]any{
 						"type":        "object",
 						"description": "Authentication. Secret parts (token, password, value) must be {{variable}} references. Defaults to inherit, which uses the collection's auth.",

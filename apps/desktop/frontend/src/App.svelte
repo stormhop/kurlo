@@ -850,7 +850,7 @@
           bind:requestTab={vm.requestTab}
           requestType={vm.requestType}
           method={vm.method}
-          paramsCount={activeCount(vm.params)}
+          paramsCount={activeCount(vm.params) + vm.pathParams.filter(r => r.value).length}
           authConfigured={vm.authHasConfig()}
           headerCount={vm.requestHeaderCount}
           bodyHasContent={vm.bodyHasContent()}

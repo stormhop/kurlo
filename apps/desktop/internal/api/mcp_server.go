@@ -835,6 +835,9 @@ func (s *mcpServer) toolGetRequest(_ context.Context, arguments json.RawMessage)
 		"auth":     map[string]any{"type": defaultString(req.Auth.Type, "none")},
 		"runnable": cliRunnable(req),
 	}
+	if rows := mcpEnabledRows(req.PathParams); len(rows) > 0 {
+		detail["pathVariables"] = rows
+	}
 	if req.BodyContent != "" {
 		detail["body"] = req.BodyContent
 	}

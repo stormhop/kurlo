@@ -1336,6 +1336,7 @@ export namespace model {
 	    method: string;
 	    url: string;
 	    params: KeyValue[];
+	    pathParams: KeyValue[];
 	    headers: KeyValue[];
 	    auth: AuthConfig;
 	    bodyType: string;
@@ -1411,6 +1412,7 @@ export namespace model {
 	        this.method = source["method"];
 	        this.url = source["url"];
 	        this.params = this.convertValues(source["params"], KeyValue);
+	        this.pathParams = this.convertValues(source["pathParams"], KeyValue);
 	        this.headers = this.convertValues(source["headers"], KeyValue);
 	        this.auth = this.convertValues(source["auth"], AuthConfig);
 	        this.bodyType = source["bodyType"];

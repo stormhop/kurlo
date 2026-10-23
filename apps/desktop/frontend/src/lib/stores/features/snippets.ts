@@ -5,6 +5,7 @@ import type { Collection, RenderedSnippetLine, SavedRequest } from '../../types/
 import { clipboardCopy } from '../../utils';
 import { variableTemplate } from '../../variables';
 import type { SnippetLanguage } from '../ui';
+import { applyPathParams } from '../../pathParams';
 
 type SnippetsHost = {
   copiedSnippet: boolean;
@@ -85,7 +86,7 @@ export const snippetsFeature = {
     const req = this.buildRequest(values, []);
     return {
       method: req.method,
-      url: req.url,
+      url: applyPathParams(req.url, req.pathParams),
       params: req.params,
       headers: req.headers,
       auth: {

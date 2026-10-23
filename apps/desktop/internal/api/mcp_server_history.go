@@ -266,6 +266,9 @@ func (s *mcpServer) toolGetHistoryEntry(_ context.Context, arguments json.RawMes
 	if req.BodyContent != "" {
 		request["body"] = redactSecrets(req.BodyContent, secrets)
 	}
+	if rows := mcpHistoryRows(req.PathParams, secrets, nil); len(rows) > 0 {
+		request["pathVariables"] = rows
+	}
 	if rows := mcpHistoryRows(req.FormRows, secrets, nil); len(rows) > 0 {
 		request["form"] = rows
 	}

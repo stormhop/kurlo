@@ -734,12 +734,13 @@ paths:
     expect(requests[0]).toMatchObject({
       method: 'GET',
       folderPath: ['Pets'],
-      url: '{{baseUrl}}/pets/{{petId}}',
+      url: '{{baseUrl}}/pets/:petId',
     });
+    expect(requests[0].pathParams).toEqual([expect.objectContaining({ key: 'petId', enabled: true })]);
     expect(defaults.variables).toContainEqual(
       expect.objectContaining({ key: 'baseUrl', value: 'https://api.example.test/v1' }),
     );
-    expect(defaults.variables).toContainEqual(expect.objectContaining({ key: 'petId' }));
+    expect(defaults.variables).not.toContainEqual(expect.objectContaining({ key: 'petId' }));
     expect(requests[0].params[0]).toMatchObject({ key: 'verbose', value: 'true' });
     expect(requests[1]).toMatchObject({ method: 'POST', bodyType: 'json' });
     expect(JSON.parse(requests[1].bodyContent)).toEqual({ name: 'Fluffy', age: 3 });
@@ -2162,7 +2163,7 @@ describe('examples through OpenCollection and Postman settings', () => {
     });
   });
 
-  it('substitutes Postman path variable values into the URL', () => {
+  it('keeps Postman path variables as path variables', () => {
     const requests = postmanRequestsFromItems([{
       name: 'Get user',
       request: {
@@ -2171,7 +2172,11 @@ describe('examples through OpenCollection and Postman settings', () => {
       },
     }], 'col-1', 'API');
 
-    expect(requests[0].url).toBe('https://api.example.com/users/42/posts/:postId');
+    expect(requests[0].url).toBe('https://api.example.com/users/:userId/posts/:postId');
+    expect(requests[0].pathParams?.map(({ key, value }) => ({ key, value }))).toEqual([
+      { key: 'userId', value: '42' },
+      { key: 'postId', value: '' },
+    ]);
   });
 
   it('builds a URL from Postman host/path parts with its path variables', () => {
@@ -2183,7 +2188,8 @@ describe('examples through OpenCollection and Postman settings', () => {
       },
     }], 'col-1', 'API');
 
-    expect(requests[0].url).toBe('https://api.example.com/users/7');
+    expect(requests[0].url).toBe('https://api.example.com/users/:userId');
+    expect(requests[0].pathParams?.map(({ key, value }) => ({ key, value }))).toEqual([{ key: 'userId', value: '7' }]);
   });
 });
 

@@ -7,6 +7,7 @@ import { asArray, asText, authStateHasData, emptyAuthState, inheritAuthState, is
 import { filesystemNameFromName } from './normalizers';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
 import { parseYaml } from './yaml';
+import { pathParamsFromUrl } from './pathParams';
 
 export type CollectionTextFile = {
   path: string;
@@ -139,13 +140,25 @@ function sioArgsFromOpenCollection(value: unknown): SIOArg[] {
   }).filter((item): item is SIOArg => Boolean(item));
 }
 
-function paramsFromOpenCollection(value: unknown) {
-  if (Array.isArray(value)) return rowsFromOpenCollectionList(value, 'query');
-  if (!isRecord(value)) return [];
-  return [
-    ...rowsFromOpenCollectionList(value.query, 'query'),
-    ...rowsFromOpenCollectionList(value.path, 'path'),
-  ];
+function paramsFromOpenCollection(value: unknown): { query: KVRow[]; path: KVRow[] } {
+  if (Array.isArray(value)) {
+    const isPath = (item: unknown) => isRecord(item) && asText(item.type) === 'path';
+    return {
+      query: rowsFromOpenCollectionList(value.filter(item => !isPath(item)), 'query'),
+      path: rowsFromOpenCollectionList(value.filter(isPath), 'path'),
+    };
+  }
+  if (!isRecord(value)) return { query: [], path: [] };
+  return {
+    query: rowsFromOpenCollectionList(value.query, 'query'),
+    path: rowsFromOpenCollectionList(value.path, 'path'),
+  };
+}
+
+function importedPathParams(requestType: RequestType, url: string, rows: KVRow[]) {
+  if (requestType !== 'http' && requestType !== 'graphql') return {};
+  const pathParams = pathParamsFromUrl(url, rows);
+  return pathParams.length ? { pathParams } : {};
 }
 
 function rowsFromBruBlock(block = '') {
@@ -619,6 +632,7 @@ function requestFromOpenCollectionFile(file: CollectionTextFile, collectionId: s
         ? isRecord(parsed.websocket) ? parsed.websocket : isRecord(parsed.ws) ? parsed.ws : {}
         : isRecord(parsed.http) ? parsed.http : {};
   if (!isRecord(section) || !Object.keys(section).length) return null;
+  const sectionParams = paramsFromOpenCollection(section.params);
   const method = asText(section.method || (requestType === 'grpc' || requestType === 'graphql' ? 'POST' : 'GET')).toUpperCase();
   const body = requestType === 'grpc'
     ? { bodyType: 'json' as BodyType, rawBodyType: 'json' as RawBodyType, bodyContent: asText(section.message ?? section.body ?? DEFAULT_GRPC_MESSAGE) || DEFAULT_GRPC_MESSAGE, formRows: [] as KVRow[] }
@@ -644,7 +658,8 @@ function requestFromOpenCollectionFile(file: CollectionTextFile, collectionId: s
     method: requestType === 'grpc' ? 'POST' : HTTP_METHODS.has(method as Method) ? method as Method : 'GET',
     url: asText(section.url ?? section.target),
     requestTab,
-    params: requestType === 'grpc' ? [] : paramsFromOpenCollection(section.params).filter(row => row.key || row.value),
+    params: requestType === 'grpc' ? [] : sectionParams.query,
+    ...importedPathParams(requestType, asText(section.url ?? section.target), sectionParams.path),
     headers: requestType === 'grpc' ? [] : rowsFromOpenCollectionList(section.headers).filter(row => row.key || row.value),
     auth: openCollectionAuth(section.auth),
     ...body,
@@ -855,7 +870,8 @@ function requestFromBruFile(file: CollectionTextFile, collectionId: string, coll
     method: requestType === 'grpc' ? 'POST' : HTTP_METHODS.has(method as Method) ? method as Method : 'GET',
     url: methodConfig.url || methodConfig.target || '',
     requestTab: requestType === 'grpc' ? 'body' : requestType === 'socketio' ? 'events' : requestType === 'ws' ? 'body' : requestType === 'graphql' ? 'query' : 'params',
-    params: requestType === 'grpc' ? [] : rowsFromBruBlock(byName.get('query') || byName.get('params')),
+    params: requestType === 'grpc' ? [] : rowsFromBruBlock(byName.get('params:query') || byName.get('query') || byName.get('params')),
+    ...importedPathParams(requestType, methodConfig.url || methodConfig.target || '', rowsFromBruBlock(byName.get('params:path'))),
     headers: requestType === 'grpc' ? [] : rowsFromBruBlock(byName.get('headers')),
     auth,
     requestType,
@@ -1033,9 +1049,13 @@ function requestToOpenCollection(req: SavedRequest, seq: number, stripFn: (sourc
     req.testScript ? { type: 'tests', code: req.testScript } : undefined,
   ].filter(Boolean);
   const requestType = req.requestType ?? (req.bodyType === 'graphql' ? 'graphql' : 'http');
+  const exportParams = [
+    ...req.params.filter(row => row.key || row.value).map(row => rowToOpenCollection(row, 'query', includeSecrets)),
+    ...(req.pathParams ?? []).filter(row => row.key).map(row => rowToOpenCollection(row, 'path', includeSecrets)),
+  ];
   const common = {
     url: safeExportUrl(req.url, includeSecrets),
-    ...(req.params.some(row => row.key || row.value) ? { params: req.params.filter(row => row.key || row.value).map(row => rowToOpenCollection(row, 'query', includeSecrets)) } : {}),
+    ...(exportParams.length ? { params: exportParams } : {}),
     ...(req.headers.some(row => row.key || row.value) ? { headers: req.headers.filter(row => row.key || row.value).map(row => rowToOpenCollection(row, undefined, includeSecrets)) } : {}),
     auth: authToOpenCollection(req.auth, includeSecrets),
   };
