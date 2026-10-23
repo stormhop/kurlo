@@ -1,5 +1,6 @@
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
-import type { GrpcRequest, HttpRequest } from '../../backend';
+import type { AiMessage, AiRequest, GrpcRequest, HttpRequest } from '../../backend';
+import { aiOptionalNumber } from './ai';
 import {
   collectionSecretVariableKeys,
   collectionSecretVariableValues,
@@ -61,6 +62,14 @@ type RequestSerializationHost = {
   scriptFieldsForSend: (req: SavedRequest) => { preRequestScript: string; testScript: string; scriptEngine: ScriptEngine };
   secretEnvironmentKeysForRequest: (req: Pick<SavedRequest, 'collectionId'>, secretKeys?: string[]) => string[];
   secretEnvironmentValuesForRequest: (req: Pick<SavedRequest, 'collectionId'>, secretValues?: string[]) => string[];
+  requestsById: Map<string, SavedRequest>;
+  savedRequestToRunnableMcpRequest: (
+    req: SavedRequest,
+    envValues?: Record<string, string>,
+    secretEnvironmentValues?: string[],
+    secretEnvironmentKeys?: string[],
+    requestId?: string,
+  ) => HttpRequest;
 };
 
 export const requestSerializationFeature = {
@@ -251,6 +260,56 @@ export const requestSerializationFeature = {
       mcpRequestState: '',
       mcpInputSchema: overrides.inputSchema ?? '',
       mcpOutputSchema: overrides.outputSchema ?? '',
+    };
+  },
+
+  savedRequestToRunnableAiRequest(
+    this: RequestSerializationHost,
+    req: SavedRequest,
+    messages: AiMessage[],
+    envValues = this.activeEnvironmentValues(),
+    secretEnvironmentValues = this.activeSecretEnvironmentValues(),
+    secretEnvironmentKeys = this.activeSecretEnvironmentKeys(),
+    requestId = req.id,
+  ): AiRequest {
+    const base = this.savedRequestToRunnableHttpRequest(req, envValues, secretEnvironmentValues, secretEnvironmentKeys, requestId);
+    const resolved = this.requestWithCollectionDefaults(req);
+    const values = this.environmentValuesForRequest(req, envValues);
+    const resolve = (value: string) => this.resolveTemplate(value, values);
+    const toolServers = (resolved.aiToolRequestIds ?? [])
+      .map(id => this.requestsById.get(id))
+      .filter((server): server is SavedRequest => Boolean(server) && server!.requestType === 'mcp')
+      .map(server => ({
+        name: server.name,
+        request: this.savedRequestToRunnableMcpRequest(server, envValues, secretEnvironmentValues, secretEnvironmentKeys, `${requestId}-tool-${server.id}`),
+      }));
+    const temperature = aiOptionalNumber(resolved.aiTemperature);
+    const topP = aiOptionalNumber(resolved.aiTopP);
+    return {
+      http: {
+        ...base,
+        method: 'POST',
+        url: resolve((resolved.url ?? '').trim()),
+        bodyType: 'none',
+        body: '',
+        formData: [],
+        bodyFilePath: '',
+      },
+      provider: resolved.aiProvider || 'openai',
+      model: resolve((resolved.aiModel ?? '').trim()),
+      system: resolve(resolved.aiSystem ?? ''),
+      messages: messages.map(message => message.role === 'user'
+        ? { ...message, blocks: message.blocks.map(block => block.type === 'text' ? { ...block, text: resolve(block.text ?? '') } : block) }
+        : message),
+      settings: {
+        ...(temperature !== undefined ? { temperature } : {}),
+        ...(topP !== undefined ? { topP } : {}),
+        maxTokens: aiOptionalNumber(resolved.aiMaxTokens) ?? 0,
+        stream: resolved.aiStream ?? true,
+        thinking: resolved.aiProvider === 'anthropic' ? (resolved.aiThinking ?? '') : '',
+      },
+      toolServers,
+      maxSteps: aiOptionalNumber(resolved.aiMaxSteps) ?? 0,
     };
   },
 

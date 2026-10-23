@@ -54,6 +54,7 @@ import { folderFeature } from './features/folders';
 import { graphqlFeature } from './features/graphql';
 import { grpcFeature } from './features/grpc';
 import { mcpFeature } from './features/mcp';
+import { aiFeature, type AiTurn } from './features/ai';
 import { importExportFeature } from './features/importExport';
 import { examplesFeature } from './features/examples';
 import { requestBodyFeature } from './features/requestBody';
@@ -432,6 +433,18 @@ class AppVM {
   declare mcpArgumentsError: typeof mcpFeature.mcpArgumentsError;
   declare discoverMcpServer: typeof mcpFeature.discoverMcpServer;
   declare sendMcpCall: typeof mcpFeature.sendMcpCall;
+  declare aiTurns: typeof aiFeature.aiTurns;
+  declare setAiTurns: typeof aiFeature.setAiTurns;
+  declare updateAiTurn: typeof aiFeature.updateAiTurn;
+  declare clearAiConversation: typeof aiFeature.clearAiConversation;
+  declare selectAiPreset: typeof aiFeature.selectAiPreset;
+  declare aiCurrentPreset: typeof aiFeature.aiCurrentPreset;
+  declare aiModelOptions: typeof aiFeature.aiModelOptions;
+  declare loadAiModels: typeof aiFeature.loadAiModels;
+  declare aiToolServerOptions: typeof aiFeature.aiToolServerOptions;
+  declare toggleAiToolServer: typeof aiFeature.toggleAiToolServer;
+  declare sendAiPrompt: typeof aiFeature.sendAiPrompt;
+  declare initAiListeners: typeof aiFeature.initAiListeners;
 
   declare activePreRequestScript: typeof scriptsFeature.activePreRequestScript;
   declare activeTestScript: typeof scriptsFeature.activeTestScript;
@@ -546,6 +559,7 @@ class AppVM {
   declare savedRequestToRunnableHttpRequest: typeof requestSerializationFeature.savedRequestToRunnableHttpRequest;
   declare savedRequestToRunnableGrpcRequest: typeof requestSerializationFeature.savedRequestToRunnableGrpcRequest;
   declare savedRequestToRunnableMcpRequest: typeof requestSerializationFeature.savedRequestToRunnableMcpRequest;
+  declare savedRequestToRunnableAiRequest: typeof requestSerializationFeature.savedRequestToRunnableAiRequest;
   declare normalizeRequestUrlForSend: typeof requestSerializationFeature.normalizeRequestUrlForSend;
   declare normalizeWebSocketUrlForSend: typeof requestSerializationFeature.normalizeWebSocketUrlForSend;
 
@@ -1066,6 +1080,10 @@ class AppVM {
   mcpCatalogLoading = $state(false);
   mcpCatalogError = $state('');
   mcpCatalogOperationToken = 0;
+  aiConversations = $state<Map<string, AiTurn[]>>(new Map());
+  aiModels = $state<Map<string, string[]>>(new Map());
+  aiModelsLoading = $state(false);
+  aiModelsError = $state('');
   _responseSearchCountToken = 0;
   _responseSearchCountTimer: number | undefined = undefined;
   _responseSearchCountKey = '';
@@ -1108,6 +1126,17 @@ class AppVM {
   mcpName = $state('');
   mcpArguments = $state('');
   mcpProtocolVersion = $state('');
+  aiProvider = $state('');
+  aiModel = $state('');
+  aiSystem = $state('');
+  aiPrompt = $state('');
+  aiTemperature = $state('');
+  aiTopP = $state('');
+  aiMaxTokens = $state('');
+  aiMaxSteps = $state('');
+  aiThinking = $state('');
+  aiStream = $state(true);
+  aiToolRequestIds = $state<string[]>([]);
   grpcMetadata = $state<KVRow[]>([mkRow()]);
   grpcUseReflection = $state(true);
   grpcProtoFilePath = $state('');
@@ -1823,6 +1852,7 @@ applyFeatures(
   graphqlFeature,
   grpcFeature,
   mcpFeature,
+  aiFeature,
   scriptsFeature,
   examplesFeature,
   requestBodyFeature,

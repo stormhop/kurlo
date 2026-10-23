@@ -194,7 +194,7 @@
         "name": { "type": "string" },
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "nameAuto": { "type": "boolean" },
-        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "mcp"] },
+        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "mcp", "ai"] },
         "isDraft": { "type": "boolean" },
         "isPinned": { "type": "boolean" },
         "collectionId": { "$ref": "#/definitions/id" },
@@ -204,7 +204,7 @@
         },
         "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "SSE"] },
         "url": { "type": "string" },
-        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples"] },
+        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
         "params": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
@@ -255,6 +255,20 @@
         "grpcProtoImportPaths": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "aiProvider": { "type": "string", "enum": ["openai", "anthropic"] },
+        "aiModel": { "type": "string" },
+        "aiSystem": { "type": "string" },
+        "aiPrompt": { "type": "string" },
+        "aiTemperature": { "type": "string" },
+        "aiTopP": { "type": "string" },
+        "aiMaxTokens": { "type": "string" },
+        "aiMaxSteps": { "type": "string" },
+        "aiThinking": { "type": "string", "enum": ["", "summarized"] },
+        "aiStream": { "type": "boolean" },
+        "aiToolRequestIds": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/id" }
         }
       }
     },

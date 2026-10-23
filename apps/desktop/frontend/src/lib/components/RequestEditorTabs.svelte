@@ -3,7 +3,7 @@
   import { tabListKeyboard } from '../a11y';
   import type { RequestType } from '../types/models';
 
-  type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'metadata' | 'body' | 'schema' | 'service' | 'scripts' | 'settings' | 'events' | 'examples';
+  type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'metadata' | 'body' | 'schema' | 'service' | 'scripts' | 'settings' | 'events' | 'examples' | 'tools';
   type BadgeKind = 'default' | 'on';
   type TabItem = {
     id: RequestTab;
@@ -27,6 +27,8 @@
     metadataCount = 0,
     grpcMethodSelected = false,
     mcpArgumentsHaveContent = false,
+    aiPromptHasContent = false,
+    aiToolCount = 0,
     exampleCount = 0,
   }: {
     requestTab: RequestTab;
@@ -42,6 +44,8 @@
     metadataCount?: number;
     grpcMethodSelected?: boolean;
     mcpArgumentsHaveContent?: boolean;
+    aiPromptHasContent?: boolean;
+    aiToolCount?: number;
     exampleCount?: number;
   } = $props();
 
@@ -84,6 +88,18 @@
         scripts,
         settings,
         examples,
+      ];
+    }
+
+    if (requestType === 'ai') {
+      return [
+        docs,
+        { id: 'body', label: 'Prompt', badge: aiPromptHasContent ? 'On' : undefined, badgeKind: 'on' },
+        auth,
+        headers,
+        { id: 'tools', label: 'Tools', badge: aiToolCount > 0 ? String(aiToolCount) : undefined },
+        scripts,
+        settings,
       ];
     }
 

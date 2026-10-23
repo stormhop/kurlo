@@ -706,24 +706,134 @@ export namespace api {
 
 export namespace model {
 	
-	export class AppInfo {
-	    name: string;
-	    version: string;
-	    runtime: string;
-	    goVersion: string;
-	    packaged: boolean;
+	export class AiBlock {
+	    type: string;
+	    text?: string;
+	    id?: string;
+	    name?: string;
+	    input?: string;
+	    server?: string;
+	    isError?: boolean;
+	    signature?: string;
+	    data?: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AppInfo(source);
+	        return new AiBlock(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.text = source["text"];
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.input = source["input"];
+	        this.server = source["server"];
+	        this.isError = source["isError"];
+	        this.signature = source["signature"];
+	        this.data = source["data"];
+	    }
+	}
+	export class AiMessage {
+	    role: string;
+	    blocks: AiBlock[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AiMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.role = source["role"];
+	        this.blocks = this.convertValues(source["blocks"], AiBlock);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiToolServer {
+	    name: string;
+	    request: HttpRequest;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiToolServer(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
-	        this.version = source["version"];
-	        this.runtime = source["runtime"];
-	        this.goVersion = source["goVersion"];
-	        this.packaged = source["packaged"];
+	        this.request = this.convertValues(source["request"], HttpRequest);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiSettings {
+	    temperature?: number;
+	    topP?: number;
+	    maxTokens?: number;
+	    stream: boolean;
+	    thinking?: string;
+	    idleTimeoutSec?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.temperature = source["temperature"];
+	        this.topP = source["topP"];
+	        this.maxTokens = source["maxTokens"];
+	        this.stream = source["stream"];
+	        this.thinking = source["thinking"];
+	        this.idleTimeoutSec = source["idleTimeoutSec"];
+	    }
+	}
+	export class GraphQLPayload {
+	    query: string;
+	    variables: string;
+	    operationName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GraphQLPayload(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.query = source["query"];
+	        this.variables = source["variables"];
+	        this.operationName = source["operationName"];
 	    }
 	}
 	export class AuthConfig {
@@ -798,6 +908,272 @@ export namespace model {
 	        this.awsService = source["awsService"];
 	    }
 	}
+	export class KeyValue {
+	    key: string;
+	    value: string;
+	    enabled: boolean;
+	    isFile: boolean;
+	    fileName: string;
+	    contentType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new KeyValue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.value = source["value"];
+	        this.enabled = source["enabled"];
+	        this.isFile = source["isFile"];
+	        this.fileName = source["fileName"];
+	        this.contentType = source["contentType"];
+	    }
+	}
+	export class HttpRequest {
+	    requestId: string;
+	    workspaceId: string;
+	    method: string;
+	    url: string;
+	    params: KeyValue[];
+	    pathParams: KeyValue[];
+	    headers: KeyValue[];
+	    auth: AuthConfig;
+	    bodyType: string;
+	    body: string;
+	    bodyFilePath: string;
+	    formData: KeyValue[];
+	    preRequestScript: string;
+	    testScript: string;
+	    scriptEngine: string;
+	    followRedirects: boolean;
+	    timeoutMs: number;
+	    name: string;
+	    scriptTimeoutMs: number;
+	    allowSendRequest: boolean;
+	    iteration?: number;
+	    iterationCount?: number;
+	    httpVersion: string;
+	    enableSSLVerification: boolean;
+	    followOriginalMethod: boolean;
+	    followAuthorizationHeader: boolean;
+	    removeRefererHeader: boolean;
+	    encodeUrlAutomatically: boolean;
+	    disableCookieJar: boolean;
+	    maxRedirects: number;
+	    secretEnvironmentKeys: string[];
+	    secretEnvironmentValues: string[];
+	    collectionVariables: Record<string, string>;
+	    iterationData?: Record<string, string>;
+	    resolveTemplates?: boolean;
+	    templateValues?: Record<string, string>;
+	    graphql?: GraphQLPayload;
+	    proxyUrl: string;
+	    proxyMode: string;
+	    proxyBypass: string;
+	    clientCertPath: string;
+	    clientKeyPath: string;
+	    clientKeyPassword: string;
+	    browserEmulation: boolean;
+	    browserOrigin: string;
+	    browserWithCredentials: boolean;
+	    browserEnforceCORS: boolean;
+	    browserEnforceCSP: boolean;
+	    browserCSP: string;
+	    wsHandshakeTimeoutMs: number;
+	    wsReconnectAttempts: number;
+	    wsReconnectIntervalMs: number;
+	    wsMaxMessageSizeMb: number;
+	    wsKeepAliveIntervalMs: number;
+	    sioClientVersion: string;
+	    sioPath: string;
+	    sioNamespace: string;
+	    sioListenEvents: string[];
+	    sseDisableReconnect: boolean;
+	    sseReconnectIntervalMs: number;
+	    mcpProtocolVersion: string;
+	    mcpMethod: string;
+	    mcpName: string;
+	    mcpArguments: string;
+	    mcpCursor: string;
+	    mcpInputResponses: string;
+	    mcpRequestState: string;
+	    mcpInputSchema: string;
+	    mcpOutputSchema: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HttpRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requestId = source["requestId"];
+	        this.workspaceId = source["workspaceId"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.params = this.convertValues(source["params"], KeyValue);
+	        this.pathParams = this.convertValues(source["pathParams"], KeyValue);
+	        this.headers = this.convertValues(source["headers"], KeyValue);
+	        this.auth = this.convertValues(source["auth"], AuthConfig);
+	        this.bodyType = source["bodyType"];
+	        this.body = source["body"];
+	        this.bodyFilePath = source["bodyFilePath"];
+	        this.formData = this.convertValues(source["formData"], KeyValue);
+	        this.preRequestScript = source["preRequestScript"];
+	        this.testScript = source["testScript"];
+	        this.scriptEngine = source["scriptEngine"];
+	        this.followRedirects = source["followRedirects"];
+	        this.timeoutMs = source["timeoutMs"];
+	        this.name = source["name"];
+	        this.scriptTimeoutMs = source["scriptTimeoutMs"];
+	        this.allowSendRequest = source["allowSendRequest"];
+	        this.iteration = source["iteration"];
+	        this.iterationCount = source["iterationCount"];
+	        this.httpVersion = source["httpVersion"];
+	        this.enableSSLVerification = source["enableSSLVerification"];
+	        this.followOriginalMethod = source["followOriginalMethod"];
+	        this.followAuthorizationHeader = source["followAuthorizationHeader"];
+	        this.removeRefererHeader = source["removeRefererHeader"];
+	        this.encodeUrlAutomatically = source["encodeUrlAutomatically"];
+	        this.disableCookieJar = source["disableCookieJar"];
+	        this.maxRedirects = source["maxRedirects"];
+	        this.secretEnvironmentKeys = source["secretEnvironmentKeys"];
+	        this.secretEnvironmentValues = source["secretEnvironmentValues"];
+	        this.collectionVariables = source["collectionVariables"];
+	        this.iterationData = source["iterationData"];
+	        this.resolveTemplates = source["resolveTemplates"];
+	        this.templateValues = source["templateValues"];
+	        this.graphql = this.convertValues(source["graphql"], GraphQLPayload);
+	        this.proxyUrl = source["proxyUrl"];
+	        this.proxyMode = source["proxyMode"];
+	        this.proxyBypass = source["proxyBypass"];
+	        this.clientCertPath = source["clientCertPath"];
+	        this.clientKeyPath = source["clientKeyPath"];
+	        this.clientKeyPassword = source["clientKeyPassword"];
+	        this.browserEmulation = source["browserEmulation"];
+	        this.browserOrigin = source["browserOrigin"];
+	        this.browserWithCredentials = source["browserWithCredentials"];
+	        this.browserEnforceCORS = source["browserEnforceCORS"];
+	        this.browserEnforceCSP = source["browserEnforceCSP"];
+	        this.browserCSP = source["browserCSP"];
+	        this.wsHandshakeTimeoutMs = source["wsHandshakeTimeoutMs"];
+	        this.wsReconnectAttempts = source["wsReconnectAttempts"];
+	        this.wsReconnectIntervalMs = source["wsReconnectIntervalMs"];
+	        this.wsMaxMessageSizeMb = source["wsMaxMessageSizeMb"];
+	        this.wsKeepAliveIntervalMs = source["wsKeepAliveIntervalMs"];
+	        this.sioClientVersion = source["sioClientVersion"];
+	        this.sioPath = source["sioPath"];
+	        this.sioNamespace = source["sioNamespace"];
+	        this.sioListenEvents = source["sioListenEvents"];
+	        this.sseDisableReconnect = source["sseDisableReconnect"];
+	        this.sseReconnectIntervalMs = source["sseReconnectIntervalMs"];
+	        this.mcpProtocolVersion = source["mcpProtocolVersion"];
+	        this.mcpMethod = source["mcpMethod"];
+	        this.mcpName = source["mcpName"];
+	        this.mcpArguments = source["mcpArguments"];
+	        this.mcpCursor = source["mcpCursor"];
+	        this.mcpInputResponses = source["mcpInputResponses"];
+	        this.mcpRequestState = source["mcpRequestState"];
+	        this.mcpInputSchema = source["mcpInputSchema"];
+	        this.mcpOutputSchema = source["mcpOutputSchema"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiRequest {
+	    http: HttpRequest;
+	    provider: string;
+	    model: string;
+	    system: string;
+	    messages: AiMessage[];
+	    settings: AiSettings;
+	    toolServers: AiToolServer[];
+	    maxSteps: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.http = this.convertValues(source["http"], HttpRequest);
+	        this.provider = source["provider"];
+	        this.model = source["model"];
+	        this.system = source["system"];
+	        this.messages = this.convertValues(source["messages"], AiMessage);
+	        this.settings = this.convertValues(source["settings"], AiSettings);
+	        this.toolServers = this.convertValues(source["toolServers"], AiToolServer);
+	        this.maxSteps = source["maxSteps"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiToolInfo {
+	    name: string;
+	    originalName: string;
+	    server: string;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiToolInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.originalName = source["originalName"];
+	        this.server = source["server"];
+	        this.description = source["description"];
+	    }
+	}
+	export class TimelineEvent {
+	    label: string;
+	    atMs: number;
+	    detail?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TimelineEvent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.atMs = source["atMs"];
+	        this.detail = source["detail"];
+	    }
+	}
 	export class ConnectionInfo {
 	    reused: boolean;
 	    wasIdle: boolean;
@@ -828,6 +1204,359 @@ export namespace model {
 	        this.addresses = source["addresses"];
 	    }
 	}
+	export class SentRequest {
+	    method: string;
+	    url: string;
+	    proto: string;
+	    headers: KeyValue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SentRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.proto = source["proto"];
+	        this.headers = this.convertValues(source["headers"], KeyValue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class TestResult {
+	    name: string;
+	    passed: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.passed = source["passed"];
+	        this.error = source["error"];
+	    }
+	}
+	export class ScriptResult {
+	    tests: TestResult[];
+	    logs?: string[];
+	    error?: string;
+	    skippedRequest?: boolean;
+	    collectionVariables?: Record<string, string>;
+	    collectionVariablesRemoved?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ScriptResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tests = this.convertValues(source["tests"], TestResult);
+	        this.logs = source["logs"];
+	        this.error = source["error"];
+	        this.skippedRequest = source["skippedRequest"];
+	        this.collectionVariables = source["collectionVariables"];
+	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ResponseTime {
+	    total: number;
+	    prepare: number;
+	    socketInitialization: number;
+	    dnsLookup: number;
+	    tcpHandshake: number;
+	    tlsHandshake: number;
+	    waitingTTFB: number;
+	    download: number;
+	    process: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResponseTime(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total = source["total"];
+	        this.prepare = source["prepare"];
+	        this.socketInitialization = source["socketInitialization"];
+	        this.dnsLookup = source["dnsLookup"];
+	        this.tcpHandshake = source["tcpHandshake"];
+	        this.tlsHandshake = source["tlsHandshake"];
+	        this.waitingTTFB = source["waitingTTFB"];
+	        this.download = source["download"];
+	        this.process = source["process"];
+	    }
+	}
+	export class HttpResponse {
+	    statusCode: number;
+	    status: string;
+	    headers: KeyValue[];
+	    body: string;
+	    duration: number;
+	    timings: ResponseTime;
+	    size: number;
+	    error?: string;
+	    preRequestResult: ScriptResult;
+	    testResult: ScriptResult;
+	    sentRequests?: SentRequest[];
+	    connection: ConnectionInfo;
+	    timeline?: TimelineEvent[];
+	    skipped?: boolean;
+	    skipReason?: string;
+	    warnings?: string[];
+	    browserHiddenHeaders?: string[];
+	    previewImageBase64?: string;
+	    previewMediaType?: string;
+	    bodyIsBinary?: boolean;
+	    bodySniffedType?: string;
+	    bodyOmitted?: boolean;
+	    collectionVariableUpdates?: Record<string, string>;
+	    collectionVariablesRemoved?: string[];
+	    environmentUpdates?: Record<string, string>;
+	    environmentRemoved?: string[];
+	    llm?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new HttpResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.statusCode = source["statusCode"];
+	        this.status = source["status"];
+	        this.headers = this.convertValues(source["headers"], KeyValue);
+	        this.body = source["body"];
+	        this.duration = source["duration"];
+	        this.timings = this.convertValues(source["timings"], ResponseTime);
+	        this.size = source["size"];
+	        this.error = source["error"];
+	        this.preRequestResult = this.convertValues(source["preRequestResult"], ScriptResult);
+	        this.testResult = this.convertValues(source["testResult"], ScriptResult);
+	        this.sentRequests = this.convertValues(source["sentRequests"], SentRequest);
+	        this.connection = this.convertValues(source["connection"], ConnectionInfo);
+	        this.timeline = this.convertValues(source["timeline"], TimelineEvent);
+	        this.skipped = source["skipped"];
+	        this.skipReason = source["skipReason"];
+	        this.warnings = source["warnings"];
+	        this.browserHiddenHeaders = source["browserHiddenHeaders"];
+	        this.previewImageBase64 = source["previewImageBase64"];
+	        this.previewMediaType = source["previewMediaType"];
+	        this.bodyIsBinary = source["bodyIsBinary"];
+	        this.bodySniffedType = source["bodySniffedType"];
+	        this.bodyOmitted = source["bodyOmitted"];
+	        this.collectionVariableUpdates = source["collectionVariableUpdates"];
+	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
+	        this.environmentUpdates = source["environmentUpdates"];
+	        this.environmentRemoved = source["environmentRemoved"];
+	        this.llm = source["llm"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiUsage {
+	    input: number;
+	    output: number;
+	    cacheRead: number;
+	    cacheWrite: number;
+	    reasoning: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.input = source["input"];
+	        this.output = source["output"];
+	        this.cacheRead = source["cacheRead"];
+	        this.cacheWrite = source["cacheWrite"];
+	        this.reasoning = source["reasoning"];
+	    }
+	}
+	export class AiStep {
+	    index: number;
+	    blocks: AiBlock[];
+	    toolResults: AiBlock[];
+	    stopReason: string;
+	    rawStopReason: string;
+	    model: string;
+	    usage: AiUsage;
+	    hasUsage: boolean;
+	    firstTokenMs: number;
+	    durationMs: number;
+	    error?: string;
+	    http: HttpResponse;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
+	        this.blocks = this.convertValues(source["blocks"], AiBlock);
+	        this.toolResults = this.convertValues(source["toolResults"], AiBlock);
+	        this.stopReason = source["stopReason"];
+	        this.rawStopReason = source["rawStopReason"];
+	        this.model = source["model"];
+	        this.usage = this.convertValues(source["usage"], AiUsage);
+	        this.hasUsage = source["hasUsage"];
+	        this.firstTokenMs = source["firstTokenMs"];
+	        this.durationMs = source["durationMs"];
+	        this.error = source["error"];
+	        this.http = this.convertValues(source["http"], HttpResponse);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiResponse {
+	    steps: AiStep[];
+	    messages: AiMessage[];
+	    text: string;
+	    stopReason: string;
+	    usage: AiUsage;
+	    hasUsage: boolean;
+	    firstTokenMs: number;
+	    durationMs: number;
+	    tools: AiToolInfo[];
+	    warnings: string[];
+	    error?: string;
+	    http: HttpResponse;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.steps = this.convertValues(source["steps"], AiStep);
+	        this.messages = this.convertValues(source["messages"], AiMessage);
+	        this.text = source["text"];
+	        this.stopReason = source["stopReason"];
+	        this.usage = this.convertValues(source["usage"], AiUsage);
+	        this.hasUsage = source["hasUsage"];
+	        this.firstTokenMs = source["firstTokenMs"];
+	        this.durationMs = source["durationMs"];
+	        this.tools = this.convertValues(source["tools"], AiToolInfo);
+	        this.warnings = source["warnings"];
+	        this.error = source["error"];
+	        this.http = this.convertValues(source["http"], HttpResponse);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
+	export class AppInfo {
+	    name: string;
+	    version: string;
+	    runtime: string;
+	    goVersion: string;
+	    packaged: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.runtime = source["runtime"];
+	        this.goVersion = source["goVersion"];
+	        this.packaged = source["packaged"];
+	    }
+	}
+	
+	
 	export class Cookie {
 	    name: string;
 	    value: string;
@@ -1022,22 +1751,7 @@ export namespace model {
 		    return a;
 		}
 	}
-	export class GraphQLPayload {
-	    query: string;
-	    variables: string;
-	    operationName: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new GraphQLPayload(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.query = source["query"];
-	        this.variables = source["variables"];
-	        this.operationName = source["operationName"];
-	    }
-	}
 	export class GrpcMessage {
 	    index: number;
 	    direction?: string;
@@ -1082,28 +1796,6 @@ export namespace model {
 	        this.exampleMessage = source["exampleMessage"];
 	        this.clientStreaming = source["clientStreaming"];
 	        this.serverStreaming = source["serverStreaming"];
-	    }
-	}
-	export class KeyValue {
-	    key: string;
-	    value: string;
-	    enabled: boolean;
-	    isFile: boolean;
-	    fileName: string;
-	    contentType: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new KeyValue(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.key = source["key"];
-	        this.value = source["value"];
-	        this.enabled = source["enabled"];
-	        this.isFile = source["isFile"];
-	        this.fileName = source["fileName"];
-	        this.contentType = source["contentType"];
 	    }
 	}
 	export class GrpcRequest {
@@ -1162,62 +1854,6 @@ export namespace model {
 	        this.secretEnvironmentKeys = source["secretEnvironmentKeys"];
 	        this.secretEnvironmentValues = source["secretEnvironmentValues"];
 	        this.collectionVariables = source["collectionVariables"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class TestResult {
-	    name: string;
-	    passed: boolean;
-	    error?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new TestResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.passed = source["passed"];
-	        this.error = source["error"];
-	    }
-	}
-	export class ScriptResult {
-	    tests: TestResult[];
-	    logs?: string[];
-	    error?: string;
-	    skippedRequest?: boolean;
-	    collectionVariables?: Record<string, string>;
-	    collectionVariablesRemoved?: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ScriptResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.tests = this.convertValues(source["tests"], TestResult);
-	        this.logs = source["logs"];
-	        this.error = source["error"];
-	        this.skippedRequest = source["skippedRequest"];
-	        this.collectionVariables = source["collectionVariables"];
-	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1330,332 +1966,8 @@ export namespace model {
 		    return a;
 		}
 	}
-	export class HttpRequest {
-	    requestId: string;
-	    workspaceId: string;
-	    method: string;
-	    url: string;
-	    params: KeyValue[];
-	    pathParams: KeyValue[];
-	    headers: KeyValue[];
-	    auth: AuthConfig;
-	    bodyType: string;
-	    body: string;
-	    bodyFilePath: string;
-	    formData: KeyValue[];
-	    preRequestScript: string;
-	    testScript: string;
-	    scriptEngine: string;
-	    followRedirects: boolean;
-	    timeoutMs: number;
-	    name: string;
-	    scriptTimeoutMs: number;
-	    allowSendRequest: boolean;
-	    iteration?: number;
-	    iterationCount?: number;
-	    httpVersion: string;
-	    enableSSLVerification: boolean;
-	    followOriginalMethod: boolean;
-	    followAuthorizationHeader: boolean;
-	    removeRefererHeader: boolean;
-	    encodeUrlAutomatically: boolean;
-	    disableCookieJar: boolean;
-	    maxRedirects: number;
-	    secretEnvironmentKeys: string[];
-	    secretEnvironmentValues: string[];
-	    collectionVariables: Record<string, string>;
-	    iterationData?: Record<string, string>;
-	    resolveTemplates?: boolean;
-	    templateValues?: Record<string, string>;
-	    graphql?: GraphQLPayload;
-	    proxyUrl: string;
-	    proxyMode: string;
-	    proxyBypass: string;
-	    clientCertPath: string;
-	    clientKeyPath: string;
-	    clientKeyPassword: string;
-	    browserEmulation: boolean;
-	    browserOrigin: string;
-	    browserWithCredentials: boolean;
-	    browserEnforceCORS: boolean;
-	    browserEnforceCSP: boolean;
-	    browserCSP: string;
-	    wsHandshakeTimeoutMs: number;
-	    wsReconnectAttempts: number;
-	    wsReconnectIntervalMs: number;
-	    wsMaxMessageSizeMb: number;
-	    wsKeepAliveIntervalMs: number;
-	    sioClientVersion: string;
-	    sioPath: string;
-	    sioNamespace: string;
-	    sioListenEvents: string[];
-	    sseDisableReconnect: boolean;
-	    sseReconnectIntervalMs: number;
-	    mcpProtocolVersion: string;
-	    mcpMethod: string;
-	    mcpName: string;
-	    mcpArguments: string;
-	    mcpCursor: string;
-	    mcpInputResponses: string;
-	    mcpRequestState: string;
-	    mcpInputSchema: string;
-	    mcpOutputSchema: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new HttpRequest(source);
-	    }
 	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.requestId = source["requestId"];
-	        this.workspaceId = source["workspaceId"];
-	        this.method = source["method"];
-	        this.url = source["url"];
-	        this.params = this.convertValues(source["params"], KeyValue);
-	        this.pathParams = this.convertValues(source["pathParams"], KeyValue);
-	        this.headers = this.convertValues(source["headers"], KeyValue);
-	        this.auth = this.convertValues(source["auth"], AuthConfig);
-	        this.bodyType = source["bodyType"];
-	        this.body = source["body"];
-	        this.bodyFilePath = source["bodyFilePath"];
-	        this.formData = this.convertValues(source["formData"], KeyValue);
-	        this.preRequestScript = source["preRequestScript"];
-	        this.testScript = source["testScript"];
-	        this.scriptEngine = source["scriptEngine"];
-	        this.followRedirects = source["followRedirects"];
-	        this.timeoutMs = source["timeoutMs"];
-	        this.name = source["name"];
-	        this.scriptTimeoutMs = source["scriptTimeoutMs"];
-	        this.allowSendRequest = source["allowSendRequest"];
-	        this.iteration = source["iteration"];
-	        this.iterationCount = source["iterationCount"];
-	        this.httpVersion = source["httpVersion"];
-	        this.enableSSLVerification = source["enableSSLVerification"];
-	        this.followOriginalMethod = source["followOriginalMethod"];
-	        this.followAuthorizationHeader = source["followAuthorizationHeader"];
-	        this.removeRefererHeader = source["removeRefererHeader"];
-	        this.encodeUrlAutomatically = source["encodeUrlAutomatically"];
-	        this.disableCookieJar = source["disableCookieJar"];
-	        this.maxRedirects = source["maxRedirects"];
-	        this.secretEnvironmentKeys = source["secretEnvironmentKeys"];
-	        this.secretEnvironmentValues = source["secretEnvironmentValues"];
-	        this.collectionVariables = source["collectionVariables"];
-	        this.iterationData = source["iterationData"];
-	        this.resolveTemplates = source["resolveTemplates"];
-	        this.templateValues = source["templateValues"];
-	        this.graphql = this.convertValues(source["graphql"], GraphQLPayload);
-	        this.proxyUrl = source["proxyUrl"];
-	        this.proxyMode = source["proxyMode"];
-	        this.proxyBypass = source["proxyBypass"];
-	        this.clientCertPath = source["clientCertPath"];
-	        this.clientKeyPath = source["clientKeyPath"];
-	        this.clientKeyPassword = source["clientKeyPassword"];
-	        this.browserEmulation = source["browserEmulation"];
-	        this.browserOrigin = source["browserOrigin"];
-	        this.browserWithCredentials = source["browserWithCredentials"];
-	        this.browserEnforceCORS = source["browserEnforceCORS"];
-	        this.browserEnforceCSP = source["browserEnforceCSP"];
-	        this.browserCSP = source["browserCSP"];
-	        this.wsHandshakeTimeoutMs = source["wsHandshakeTimeoutMs"];
-	        this.wsReconnectAttempts = source["wsReconnectAttempts"];
-	        this.wsReconnectIntervalMs = source["wsReconnectIntervalMs"];
-	        this.wsMaxMessageSizeMb = source["wsMaxMessageSizeMb"];
-	        this.wsKeepAliveIntervalMs = source["wsKeepAliveIntervalMs"];
-	        this.sioClientVersion = source["sioClientVersion"];
-	        this.sioPath = source["sioPath"];
-	        this.sioNamespace = source["sioNamespace"];
-	        this.sioListenEvents = source["sioListenEvents"];
-	        this.sseDisableReconnect = source["sseDisableReconnect"];
-	        this.sseReconnectIntervalMs = source["sseReconnectIntervalMs"];
-	        this.mcpProtocolVersion = source["mcpProtocolVersion"];
-	        this.mcpMethod = source["mcpMethod"];
-	        this.mcpName = source["mcpName"];
-	        this.mcpArguments = source["mcpArguments"];
-	        this.mcpCursor = source["mcpCursor"];
-	        this.mcpInputResponses = source["mcpInputResponses"];
-	        this.mcpRequestState = source["mcpRequestState"];
-	        this.mcpInputSchema = source["mcpInputSchema"];
-	        this.mcpOutputSchema = source["mcpOutputSchema"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class TimelineEvent {
-	    label: string;
-	    atMs: number;
-	    detail?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new TimelineEvent(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.label = source["label"];
-	        this.atMs = source["atMs"];
-	        this.detail = source["detail"];
-	    }
-	}
-	export class SentRequest {
-	    method: string;
-	    url: string;
-	    proto: string;
-	    headers: KeyValue[];
-	
-	    static createFrom(source: any = {}) {
-	        return new SentRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.method = source["method"];
-	        this.url = source["url"];
-	        this.proto = source["proto"];
-	        this.headers = this.convertValues(source["headers"], KeyValue);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ResponseTime {
-	    total: number;
-	    prepare: number;
-	    socketInitialization: number;
-	    dnsLookup: number;
-	    tcpHandshake: number;
-	    tlsHandshake: number;
-	    waitingTTFB: number;
-	    download: number;
-	    process: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new ResponseTime(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.total = source["total"];
-	        this.prepare = source["prepare"];
-	        this.socketInitialization = source["socketInitialization"];
-	        this.dnsLookup = source["dnsLookup"];
-	        this.tcpHandshake = source["tcpHandshake"];
-	        this.tlsHandshake = source["tlsHandshake"];
-	        this.waitingTTFB = source["waitingTTFB"];
-	        this.download = source["download"];
-	        this.process = source["process"];
-	    }
-	}
-	export class HttpResponse {
-	    statusCode: number;
-	    status: string;
-	    headers: KeyValue[];
-	    body: string;
-	    duration: number;
-	    timings: ResponseTime;
-	    size: number;
-	    error?: string;
-	    preRequestResult: ScriptResult;
-	    testResult: ScriptResult;
-	    sentRequests?: SentRequest[];
-	    connection: ConnectionInfo;
-	    timeline?: TimelineEvent[];
-	    skipped?: boolean;
-	    skipReason?: string;
-	    warnings?: string[];
-	    browserHiddenHeaders?: string[];
-	    previewImageBase64?: string;
-	    previewMediaType?: string;
-	    bodyIsBinary?: boolean;
-	    bodySniffedType?: string;
-	    bodyOmitted?: boolean;
-	    collectionVariableUpdates?: Record<string, string>;
-	    collectionVariablesRemoved?: string[];
-	    environmentUpdates?: Record<string, string>;
-	    environmentRemoved?: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new HttpResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.statusCode = source["statusCode"];
-	        this.status = source["status"];
-	        this.headers = this.convertValues(source["headers"], KeyValue);
-	        this.body = source["body"];
-	        this.duration = source["duration"];
-	        this.timings = this.convertValues(source["timings"], ResponseTime);
-	        this.size = source["size"];
-	        this.error = source["error"];
-	        this.preRequestResult = this.convertValues(source["preRequestResult"], ScriptResult);
-	        this.testResult = this.convertValues(source["testResult"], ScriptResult);
-	        this.sentRequests = this.convertValues(source["sentRequests"], SentRequest);
-	        this.connection = this.convertValues(source["connection"], ConnectionInfo);
-	        this.timeline = this.convertValues(source["timeline"], TimelineEvent);
-	        this.skipped = source["skipped"];
-	        this.skipReason = source["skipReason"];
-	        this.warnings = source["warnings"];
-	        this.browserHiddenHeaders = source["browserHiddenHeaders"];
-	        this.previewImageBase64 = source["previewImageBase64"];
-	        this.previewMediaType = source["previewMediaType"];
-	        this.bodyIsBinary = source["bodyIsBinary"];
-	        this.bodySniffedType = source["bodySniffedType"];
-	        this.bodyOmitted = source["bodyOmitted"];
-	        this.collectionVariableUpdates = source["collectionVariableUpdates"];
-	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
-	        this.environmentUpdates = source["environmentUpdates"];
-	        this.environmentRemoved = source["environmentRemoved"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	
 	export class McpContent {
 	    type: string;

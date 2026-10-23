@@ -406,6 +406,10 @@ export function SaveWorkspaceSecrets(arg1) {
   return window['go']['api']['App']['SaveWorkspaceSecrets'](arg1);
 }
 
+export function SendAiRequest(arg1) {
+  return window['go']['api']['App']['SendAiRequest'](arg1);
+}
+
 export function SendGrpcRequest(arg1) {
   return window['go']['api']['App']['SendGrpcRequest'](arg1);
 }

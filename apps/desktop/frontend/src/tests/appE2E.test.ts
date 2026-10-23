@@ -205,6 +205,7 @@ class TestApp {
   responseTabs = new Map<string, ResponseTab>();
   grpcResponses = new Map<string, GrpcResponse>();
   grpcResponseTabs = new Map<string, GrpcResponseTab>();
+  aiConversations = new Map<string, unknown[]>();
   sseSessions = new Map();
   webSocketSessions = new Map();
   socketIOSessions = new Map();

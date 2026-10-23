@@ -65,14 +65,16 @@ const REQUEST_FIELDS: FieldTypes = {
         'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema', 'preRequestScript', 'testScript',
         'preRequestScriptJs', 'testScriptJs', 'requestNotes', 'sioEventName', 'grpcMethod', 'grpcProtoFilePath',
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
+        'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiThinking',
     ],
-    booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection'],
-    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'grpcMetadata', 'grpcProtoImportPaths', 'examples'],
+    booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection', 'aiStream'],
+    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
 
 function normalizeRequestType(input: Partial<SavedRequest>): RequestType {
     if (input.requestType === 'mcp') return 'mcp';
+    if (input.requestType === 'ai') return 'ai';
     if (input.requestType === 'grpc') return 'grpc';
     if (input.requestType === 'socketio') return 'socketio';
     if (input.requestType === 'ws') return 'ws';
@@ -201,12 +203,17 @@ export function normalizeSavedRequest(
     const isGraphQL = normalizedRequestType === 'graphql';
     const isGrpc = normalizedRequestType === 'grpc';
     const isMcp = normalizedRequestType === 'mcp';
+    const isAi = normalizedRequestType === 'ai';
     const bodyDefaults = requestBodyDefaultsFor(normalizedRequestType);
-    const rawRequestTab = input.requestTab || (isMcp ? 'body' : isGrpc ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params');
+    const rawRequestTab = input.requestTab || (isMcp || isAi ? 'body' : isGrpc ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params');
     const requestTab = isGraphQL && !['docs', 'query', 'auth', 'headers', 'schema', 'scripts'].includes(rawRequestTab)
         ? 'query'
         : isMcp && !['docs', 'body', 'auth', 'headers', 'scripts', 'settings', 'examples'].includes(rawRequestTab)
         ? 'body'
+        : isAi && !['docs', 'body', 'auth', 'headers', 'tools', 'scripts', 'settings'].includes(rawRequestTab)
+        ? 'body'
+        : !isAi && rawRequestTab === 'tools'
+        ? 'params'
         : isGrpc && !['docs', 'body', 'auth', 'metadata', 'service', 'scripts', 'settings'].includes(rawRequestTab)
         ? 'body'
         : isRealtime && ['scripts', 'query', 'schema'].includes(rawRequestTab)
@@ -214,13 +221,13 @@ export function normalizeSavedRequest(
         : (input.method ?? '').toUpperCase() === 'SSE' && ['scripts', 'query', 'schema'].includes(rawRequestTab)
         ? 'params'
         : rawRequestTab;
-    const realtimeLabel = normalizedRequestType === 'mcp' ? 'MCP' : normalizedRequestType === 'grpc' ? 'gRPC' : normalizedRequestType === 'socketio' ? 'Socket.IO' : normalizedRequestType === 'ws' ? 'WS' : normalizedRequestType === 'graphql' ? 'GraphQL' : '';
+    const realtimeLabel = normalizedRequestType === 'ai' ? 'AI' : normalizedRequestType === 'mcp' ? 'MCP' : normalizedRequestType === 'grpc' ? 'gRPC' : normalizedRequestType === 'socketio' ? 'Socket.IO' : normalizedRequestType === 'ws' ? 'WS' : normalizedRequestType === 'graphql' ? 'GraphQL' : '';
     const rawName = input.name || requestTitleFrom(realtimeLabel || (input.method || 'GET'), input.url || '');
     let folderPath = Array.isArray(input.folderPath) ? input.folderPath.map(asText).filter(Boolean) : [];
     let normalizedName = rawName;
     if (!folderPath.length && rawName.includes(' / ')) {
         const parts = rawName.split(' / ').map(p => p.trim()).filter(Boolean);
-        const looksLikeAutoTitle = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|GRAPHQL|GQL|WS|WEBSOCKET|SIO|SOCKET\.IO|GRPC|MCP|SSE)\b/i.test(parts[0] ?? '')
+        const looksLikeAutoTitle = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|GRAPHQL|GQL|WS|WEBSOCKET|SIO|SOCKET\.IO|GRPC|MCP|AI|SSE)\b/i.test(parts[0] ?? '')
             || (parts[0] ?? '').includes('/');
         if (parts.length > 1 && !looksLikeAutoTitle) {
             folderPath = parts.slice(0, -1);
@@ -249,7 +256,7 @@ export function normalizeSavedRequest(
         collectionId,
         collection: isDraft ? '' : input.collection || collectionName,
         folderPath,
-        method: (isGraphQL || isGrpc ? 'POST' : input.method || 'GET') as Method,
+        method: (isGraphQL || isGrpc || isAi ? 'POST' : input.method || 'GET') as Method,
         url: input.url || '',
         requestTab: requestTab as RequestTab,
         params: cloneRowsForStore(input.params ?? []),
@@ -284,6 +291,17 @@ export function normalizeSavedRequest(
         mcpName: input.mcpName || '',
         mcpArguments: input.mcpArguments || '',
         mcpProtocolVersion: input.mcpProtocolVersion || '',
+        aiProvider: input.aiProvider || (isAi ? 'openai' : ''),
+        aiModel: input.aiModel || '',
+        aiSystem: input.aiSystem || '',
+        aiPrompt: input.aiPrompt || '',
+        aiTemperature: input.aiTemperature || '',
+        aiTopP: input.aiTopP || '',
+        aiMaxTokens: input.aiMaxTokens || '',
+        aiMaxSteps: input.aiMaxSteps || '',
+        aiThinking: input.aiThinking || '',
+        aiStream: input.aiStream ?? true,
+        aiToolRequestIds: Array.isArray(input.aiToolRequestIds) ? input.aiToolRequestIds.map(asText).filter(Boolean) : [],
         ...(normalizedExamples ? { examples: normalizedExamples } : {}),
     };
 }

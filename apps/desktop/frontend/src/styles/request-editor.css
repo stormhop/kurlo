@@ -346,6 +346,7 @@
 .method-graphql,
 .method-grpc,
 .method-mcp { color: color-mix(in srgb, var(--accent) 62%, var(--text)); }
+.method-ai { color: var(--syn-flag); }
 
 .url-input {
   height: var(--control-xl);

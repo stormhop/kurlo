@@ -60,6 +60,7 @@ type RequestExecutionHost = {
   headerValidationErrorForRequest: (req: SavedRequest, envValues?: Record<string, string>) => string;
   invokeGrpc: () => Promise<void>;
   sendMcpCall: () => Promise<void>;
+  sendAiPrompt: (followUp?: string) => Promise<void>;
   isEventStreamResponse: (response: HttpResponse | null) => boolean;
   markRequestLoading: (requestId: string, loading: boolean) => void;
   activeEnvironmentId: string;
@@ -125,6 +126,10 @@ export const requestExecutionFeature = {
     }
     if (this.requestType === 'mcp') {
       await this.sendMcpCall();
+      return;
+    }
+    if (this.requestType === 'ai') {
+      await this.sendAiPrompt();
       return;
     }
     if (this.requestType === 'http' && (this.method === 'SSE' || this.sseSessionIsActive())) {

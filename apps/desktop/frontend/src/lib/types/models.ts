@@ -2,7 +2,7 @@ import type { CookieJarEntry, KeyValue, ResponseTimings, ScriptResult } from '..
 
 export type { CookieJarEntry, KeyValue, ResponseTimings, ScriptResult };
 
-export type RequestType = 'http' | 'graphql' | 'ws' | 'socketio' | 'grpc' | 'mcp';
+export type RequestType = 'http' | 'graphql' | 'ws' | 'socketio' | 'grpc' | 'mcp' | 'ai';
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'SSE';
 
 export type SSEStatus = 'idle' | 'connecting' | 'reconnecting' | 'connected' | 'error';
@@ -118,7 +118,7 @@ export type BodyType = 'none' | 'json' | 'text' | 'xml' | 'html' | 'form' | 'url
 export type BodyMode = 'none' | 'form' | 'urlencoded' | 'raw' | 'binary' | 'graphql';
 export type RawBodyType = 'text' | 'json' | 'html' | 'xml';
 export type HttpVersion = 'auto' | '1.1' | '2';
-export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'metadata' | 'body' | 'schema' | 'service' | 'events' | 'scripts' | 'settings' | 'examples';
+export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'metadata' | 'body' | 'schema' | 'service' | 'events' | 'scripts' | 'settings' | 'examples' | 'tools';
 export type ScriptTab = 'pre-request' | 'tests';
 export type ResponseTab = 'body' | 'preview' | 'headers' | 'test-results' | 'timeline' | 'diff';
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
@@ -258,6 +258,17 @@ export type SavedRequest = {
   mcpName?: string;
   mcpArguments?: string;
   mcpProtocolVersion?: string;
+  aiProvider?: string;
+  aiModel?: string;
+  aiSystem?: string;
+  aiPrompt?: string;
+  aiTemperature?: string;
+  aiTopP?: string;
+  aiMaxTokens?: string;
+  aiMaxSteps?: string;
+  aiThinking?: string;
+  aiStream?: boolean;
+  aiToolRequestIds?: string[];
   examples?: RequestExample[];
 };
 

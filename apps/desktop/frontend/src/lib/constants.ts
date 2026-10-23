@@ -1,6 +1,6 @@
 import type { Method, RequestType, RawBodyType, ShortcutDefinition, AuthType, RequestSettings, KVRow, ProxyConfig } from './types/models';
 
-export const REQUEST_TYPES: RequestType[] = ['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp'];
+export const REQUEST_TYPES: RequestType[] = ['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'ai'];
 
 export const BROWSER_LIKE_USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 export const METHODS: Method[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS', 'SSE'];

@@ -205,6 +205,8 @@ export function SaveResponseBody(arg1:string,arg2:string):Promise<api.SaveRespon
 
 export function SaveWorkspaceSecrets(arg1:Record<string, string>):Promise<api.WorkspaceOpenResult>;
 
+export function SendAiRequest(arg1:model.AiRequest):Promise<model.AiResponse>;
+
 export function SendGrpcRequest(arg1:model.GrpcRequest):Promise<model.GrpcResponse>;
 
 export function SendMcpRequest(arg1:model.HttpRequest):Promise<model.McpResponse>;

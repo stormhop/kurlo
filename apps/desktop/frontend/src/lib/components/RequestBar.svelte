@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import VariableInput from './VariableInput.svelte';
+  import AiModelPicker from './AiModelPicker.svelte';
   import type { VariableSuggestion } from '../variables';
   import type { GrpcMethodInfo, RequestType, SSEStatus, WebSocketStatus, SocketIOStatus } from '../types/models';
 
@@ -87,6 +88,7 @@
   let isSSE = $derived(method === 'SSE');
   let isGraphQL = $derived(requestType === 'graphql');
   let isGRPC = $derived(requestType === 'grpc');
+  let isAI = $derived(requestType === 'ai');
   let sseConnected = $derived(sseStatus === 'connected');
   let sseConnecting = $derived(sseStatus === 'connecting');
   let showSSEControls = $derived(isSSE || sseConnected || sseConnecting);
@@ -167,6 +169,7 @@
     socketio: 'Socket.IO',
     grpc: 'gRPC',
     mcp: 'MCP',
+    ai: 'AI',
   };
   let protocolTypes = $derived(requestTypes.filter(type => type !== 'http'));
   let isHTTP = $derived(requestType === 'http');
@@ -259,7 +262,7 @@
     {/if}
   </div>
 
-  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-grpc={requestType === 'grpc'}>
+  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-grpc={requestType === 'grpc' || requestType === 'ai'}>
     <div class="url-field">
       <div class="method-wrap" onfocusout={closeMethodMenuOnFocusOut}>
         <button
@@ -316,7 +319,7 @@
                   </button>
                 {/each}
               {:else}
-                <p class="method-menu-note">The protocol is fixed once a saved request has a URL. Create a new request to use GraphQL, WebSocket, Socket.IO, gRPC or MCP.</p>
+                <p class="method-menu-note">The protocol is fixed once a saved request has a URL. Create a new request to use GraphQL, WebSocket, Socket.IO, gRPC, MCP or AI.</p>
               {/if}
             </div>
           </div>
@@ -329,13 +332,17 @@
         bind:value={url}
         multiline
         suggestions={variableSuggestions}
-        placeholder={requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : 'Enter request URL or paste cURL…'}
-        ariaLabel={requestType === 'grpc' ? 'gRPC target' : 'Request URL'}
+        placeholder={requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Provider base URL, e.g. https://api.openai.com/v1' : 'Enter request URL or paste cURL…'}
+        ariaLabel={requestType === 'grpc' ? 'gRPC target' : requestType === 'ai' ? 'Provider base URL' : 'Request URL'}
         oninput={onUrlInput}
         onpaste={(event) => { onUrlPaste(event); keepHostVisible(); }}
         onenter={sendFromUrl}
       />
     </div>
+
+    {#if isAI}
+      <AiModelPicker />
+    {/if}
 
     {#if isGRPC}
       <div class="grpc-method-wrap" onfocusout={closeGrpcMethodMenuOnFocusOut}>
@@ -421,6 +428,19 @@
         {#if loading}<span class="spinner"></span>Cancel
         {:else}
           Invoke
+        {/if}
+      </button>
+    {:else if isAI}
+      <button
+        class="btn-send"
+        class:btn-send-cancel={loading}
+        onclick={onSend}
+        type="button"
+        title={!loading && sendShortcut ? `Send (${sendShortcut})` : undefined}
+      >
+        {#if loading}<span class="spinner"></span>Stop
+        {:else}
+          Send{#if sendShortcut && sendShortcutInline}<kbd class="btn-send-kbd">{sendShortcut}</kbd>{/if}
         {/if}
       </button>
     {:else if isSIO}

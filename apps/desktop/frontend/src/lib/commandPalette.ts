@@ -63,6 +63,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     { id: 'create-request-socketio', group: 'Create', label: 'New Socket.IO request', keywords: 'sio realtime socket', run: () => ctx.createRequest('socketio') },
     { id: 'create-request-grpc', group: 'Create', label: 'New gRPC request', keywords: 'protobuf rpc', run: () => ctx.createRequest('grpc') },
     { id: 'create-request-mcp', group: 'Create', label: 'New MCP request', keywords: 'model context protocol tools', run: () => ctx.createRequest('mcp') },
+    { id: 'create-request-ai', group: 'Create', label: 'New AI request', keywords: 'llm openai anthropic claude gpt chat model prompt', run: () => ctx.createRequest('ai') },
     { id: 'create-collection', group: 'Create', label: 'New collection', run: ctx.createCollection },
     { id: 'create-environment', group: 'Create', label: 'New environment', keywords: 'variables', run: ctx.createEnvironment },
     { id: 'import-collection', group: 'Create', label: 'Import collection…', keywords: 'postman insomnia bruno openapi har curl opencollection', run: ctx.importCollection },

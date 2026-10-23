@@ -9,6 +9,7 @@ type KurloE2EState = {
   sseConnects: Array<Record<string, unknown>>;
   grpcDiscoveries: Array<Record<string, unknown>>;
   sentMcpRequests: Array<Record<string, unknown>>;
+  sentAiRequests: Array<Record<string, unknown>>;
   sentGrpcRequests: Array<Record<string, unknown>>;
   webSocketConnects: Array<Record<string, unknown>>;
   webSocketMessages: Array<Record<string, unknown>>;
@@ -32,7 +33,7 @@ const readmeScreenshotPath = process.env.KURLO_README_SCREENSHOT ?? '';
 
 const DOCS_VIEWPORT = { width: 1200, height: 780 };
 const DOCS_CROP_PADDING = 26;
-const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp']);
+const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai']);
 
 async function docsDialogClip(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-modal="true"]').first();
@@ -198,6 +199,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       sseConnects: [],
       grpcDiscoveries: [],
       sentMcpRequests: [],
+      sentAiRequests: [],
       sentGrpcRequests: [],
       webSocketConnects: [],
       webSocketMessages: [],
@@ -549,6 +551,48 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       },
       SSEDisconnect: async (sessionId) => {
         emit('sse:close', { sessionId, message: 'SSE disconnected by E2E', timestamp: Date.now() });
+      },
+      SendAiRequest: async (req) => {
+        state.sentAiRequests.push(clone(req));
+        const sessionId = req.http.requestId;
+        const usage = (input, output) => ({ input, output, cacheRead: 0, cacheWrite: 0, reasoning: 0 });
+        const firstBlocks = [
+          { type: 'text', text: 'Let me check the forecast for Lisbon.' },
+          { type: 'tool_use', id: 'call_1', name: 'get_weather', input: '{"city":"Lisbon","date":"2026-10-24"}' },
+        ];
+        const toolResult = { type: 'tool_result', id: 'call_1', name: 'get_weather', server: 'Weather', text: '{"rain":0.72,"high_c":19}' };
+        const secondBlocks = [{ type: 'text', text: 'Bring an umbrella: there is a 72% chance of rain after noon, with a high of 19 °C.' }];
+        const stepHttp = (body) => ({ ...jsonResponse(req.http), headers: [{ key: 'Content-Type', value: 'text/event-stream', enabled: true }], body });
+        const firstStep = { index: 0, blocks: firstBlocks, toolResults: [toolResult], stopReason: 'tool_use', rawStopReason: 'tool_calls', model: req.model, usage: usage(1180, 64), hasUsage: true, firstTokenMs: 412, durationMs: 1650, http: stepHttp('data: {"choices":[{"delta":{"content":"Let me"}}]}\n\ndata: [DONE]\n') };
+        const secondStep = { index: 1, blocks: secondBlocks, toolResults: [], stopReason: 'end_turn', rawStopReason: 'stop', model: req.model, usage: usage(1290, 38), hasUsage: true, firstTokenMs: 380, durationMs: 1200, http: stepHttp('data: {"choices":[{"delta":{"content":"Bring"}}]}\n\ndata: [DONE]\n') };
+        emit('ai:deltas', { sessionId, deltas: [
+          { sessionId, step: 0, index: 0, type: 'text', text: 'Let me check ' },
+          { sessionId, step: 0, index: 0, type: 'text', text: 'the forecast for Lisbon.' },
+          { sessionId, step: 0, index: 1, type: 'tool_use', id: 'call_1', name: 'get_weather' },
+          { sessionId, step: 0, index: 1, type: 'tool_use', input: '{"city":"Lis' },
+        ] });
+        await new Promise(resolve => setTimeout(resolve, 60));
+        return {
+          steps: [firstStep, secondStep],
+          messages: [
+            { role: 'assistant', blocks: firstBlocks },
+            { role: 'tool', blocks: [toolResult] },
+            { role: 'assistant', blocks: secondBlocks },
+          ],
+          text: secondBlocks[0].text,
+          stopReason: 'end_turn',
+          usage: usage(2470, 102),
+          hasUsage: true,
+          firstTokenMs: 412,
+          durationMs: 2850,
+          tools: [{ name: 'get_weather', originalName: 'get_weather', server: 'Weather', description: '' }],
+          warnings: [],
+          error: '',
+          http: {
+            ...stepHttp(''),
+            testResult: { tests: [{ name: 'calls the weather tool', passed: true, error: '' }, { name: 'answers fast', passed: false, error: 'expected 1650 to be below 800' }], logs: [], error: '' },
+          },
+        };
       },
       SendMcpRequest: async (req) => {
         state.sentMcpRequests.push(clone(req));
@@ -3183,6 +3227,48 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('StartMockServer')))).toEqual([
       'StartMockServer:Orders API:1',
     ]);
+  });
+
+  test('sends an AI request, streams the answer and shows the tool call', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await expect(page.getByLabel('Provider base URL')).toHaveValue('https://api.openai.com/v1');
+
+    await page.getByLabel('Provider and model').click();
+    await page.locator('#ai-model-input').fill('gpt-test');
+    await page.locator('#ai-model-input').press('Enter');
+    await expect(page.getByLabel('Provider and model')).toContainText('gpt-test');
+
+    await fillCodeEditor(page, 'ai-prompt-editor', 'Do I need an umbrella in Lisbon tomorrow?');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+    await expect(page.locator('.ai-text').last()).toContainText('Bring an umbrella');
+    await expect(page.locator('.ai-tool-name')).toContainText('get_weather');
+    await expect(page.locator('.ai-tool-server')).toContainText('Weather');
+    await expect(page.locator('.ai-tool-result')).toContainText('"rain":0.72');
+    await expect(page.locator('.ai-metrics')).toContainText('TTFT');
+    await expect(page.locator('.ai-stop')).toContainText('end_turn');
+    await captureDocsScreenshot(page, 'request-ai');
+
+    const sent = await page.evaluate(() => window.__kurloE2E.sentAiRequests);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ provider: 'openai', model: 'gpt-test' });
+    expect(sent[0].messages).toEqual([{ role: 'user', blocks: [{ type: 'text', text: 'Do I need an umbrella in Lisbon tomorrow?' }] }]);
+    expect((sent[0].http as Record<string, unknown>).auth).toMatchObject({ type: 'bearer' });
+
+    await page.getByRole('tab', { name: /Tests/ }).click();
+    await expect(page.locator('.test-row.fail')).toContainText('answers fast');
+
+    await page.getByRole('tab', { name: 'Chat' }).click();
+    await page.getByLabel('Reply').fill('And on Saturday?');
+    await page.getByRole('button', { name: 'Reply', exact: true }).click();
+    await expect(page.locator('.ai-user')).toHaveCount(2);
+    const followUp = await page.evaluate(() => window.__kurloE2E.sentAiRequests[1]);
+    expect((followUp.messages as Array<{ role: string }>).map(m => m.role)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user']);
   });
 
   test('discovers an MCP server, calls a tool, and keeps the raw exchange', async ({ page }) => {

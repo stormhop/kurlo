@@ -322,6 +322,7 @@
       vm.loadScriptEngine();
       void vm.loadDefaultWorkspaceLocation();
       vm.initSSEListeners();
+      vm.initAiListeners();
       vm.initGrpcListeners();
       vm.initWebSocketListeners();
       vm.initSocketIOListeners();
@@ -860,10 +861,12 @@
           metadataCount={activeCount(vm.grpcMetadata)}
           grpcMethodSelected={Boolean(vm.grpcMethod)}
           mcpArgumentsHaveContent={Boolean(vm.mcpArguments.trim())}
+          aiPromptHasContent={Boolean(vm.aiPrompt.trim())}
+          aiToolCount={vm.aiToolRequestIds.length}
           exampleCount={vm.requestExamples.length}
         />
 
-        {#if vm.requestTab === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp'}
+        {#if vm.requestTab === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
           <BodyModeSelector
             bind:rawTypeMenuOpen={vm.rawTypeMenuOpen}
             rawBodyType={vm.rawBodyType}
@@ -879,7 +882,7 @@
           />
         {/if}
 
-        <div class="tab-content" class:body-editor-mode={(vm.requestTab === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (vm.requestTab === 'query' || vm.requestTab === 'schema'))}>
+        <div class="tab-content" class:body-editor-mode={(vm.requestTab === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || vm.requestType === 'ai' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (vm.requestTab === 'query' || vm.requestTab === 'schema'))}>
           {#if vm.requestTab === 'docs'}
             {#if lazy.DocsTabComponent}<lazy.DocsTabComponent />{/if}
           {:else if vm.requestTab === 'query'}
@@ -901,9 +904,13 @@
               {#if lazy.GrpcMessageTabComponent}<lazy.GrpcMessageTabComponent />{/if}
             {:else if vm.requestType === 'mcp'}
               {#if lazy.McpCallTabComponent}<lazy.McpCallTabComponent />{/if}
+            {:else if vm.requestType === 'ai'}
+              {#if lazy.AiPromptTabComponent}<lazy.AiPromptTabComponent />{/if}
             {:else if lazy.BodyTabComponent}
               <lazy.BodyTabComponent />
             {/if}
+          {:else if vm.requestTab === 'tools'}
+            {#if lazy.AiToolsTabComponent}<lazy.AiToolsTabComponent />{/if}
           {:else if vm.requestTab === 'events'}
             {#if lazy.SocketIOEventsTabComponent}<lazy.SocketIOEventsTabComponent />{/if}
           {:else if vm.requestTab === 'schema'}
@@ -1000,6 +1007,10 @@
       {:else if vm.requestType === 'mcp'}
         {#if lazy.McpResponsePanelComponent}
           <lazy.McpResponsePanelComponent />
+        {/if}
+      {:else if vm.requestType === 'ai'}
+        {#if lazy.AiConversationPanelComponent}
+          <lazy.AiConversationPanelComponent />
         {/if}
       {:else if lazy.ResponsePanelComponent}
         <lazy.ResponsePanelComponent

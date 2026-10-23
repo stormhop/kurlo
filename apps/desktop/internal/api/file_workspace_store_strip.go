@@ -6,6 +6,7 @@ var savedRequestFieldDefaults = map[string]any{
 	"nameAuto":          false,
 	"sioAck":            false,
 	"grpcUseReflection": true,
+	"aiStream":          true,
 }
 
 var savedRequestSettingDefaults = map[string]any{
@@ -236,15 +237,25 @@ func stripRealtimeFieldsForType(request map[string]any, requestType string) {
 		delete(request, "mcpArguments")
 		delete(request, "mcpProtocolVersion")
 	}
+	if requestType != "ai" {
+		for _, field := range aiRequestFields {
+			delete(request, field)
+		}
+	}
 	if requestType != "graphql" {
 		delete(request, "graphqlSchema")
 	}
 }
 
+var aiRequestFields = []string{
+	"aiProvider", "aiModel", "aiSystem", "aiPrompt", "aiTemperature", "aiTopP",
+	"aiMaxTokens", "aiMaxSteps", "aiThinking", "aiStream", "aiToolRequestIds",
+}
+
 func stripMethodForType(request map[string]any, requestType string) {
 	method := stringValue(request, "method")
 	switch requestType {
-	case "ws", "socketio", "grpc", "mcp":
+	case "ws", "socketio", "grpc", "mcp", "ai":
 		delete(request, "method")
 	case "graphql":
 		if method == "POST" {
@@ -261,7 +272,7 @@ func stripRequestTabForType(request map[string]any, requestType string) {
 	tab := stringValue(request, "requestTab")
 	defaultTab := "params"
 	switch requestType {
-	case "ws", "socketio", "grpc", "mcp":
+	case "ws", "socketio", "grpc", "mcp", "ai":
 		defaultTab = "body"
 	case "graphql":
 		defaultTab = "query"
@@ -310,7 +321,7 @@ func stripRequestSettingsForType(request map[string]any, requestType string) {
 
 func requestSettingFieldsForType(requestType string) map[string]bool {
 	switch requestType {
-	case "", "http", "graphql", "mcp":
+	case "", "http", "graphql", "mcp", "ai":
 		return httpRequestSettingFieldSet
 	case "ws":
 		return webSocketRequestSettingFieldSet

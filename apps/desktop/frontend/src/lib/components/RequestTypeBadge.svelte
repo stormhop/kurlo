@@ -27,6 +27,7 @@
     socketio: 'SIO',
     grpc: 'gRPC',
     mcp: 'MCP',
+    ai: 'AI',
   };
 
   function input() {

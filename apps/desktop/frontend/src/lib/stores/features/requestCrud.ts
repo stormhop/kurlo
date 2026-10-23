@@ -9,6 +9,7 @@ import {
 } from '../../graphql';
 import { makeCollection } from '../../normalizers';
 import { requestMatchesSidebarQuery } from './collections';
+import { AI_DEFAULT_PRESET, aiDefaultAuthFor, type AiTurn } from './ai';
 import { defaultBodyContentFor, requestBodyDefaultsFor } from '../../requestBodyDefaults';
 import type { DialogOption } from '../../types/dialog';
 import type {
@@ -111,6 +112,11 @@ type RequestCrudHost = {
   requestHasContent: (req: SavedRequest) => boolean;
   requestTypeEditable: boolean;
   mcpMethod: string;
+  aiProvider: string;
+  bearerToken: string;
+  apiKeyName: string;
+  apiKeyValue: string;
+  aiConversations: Map<string, AiTurn[]>;
   requestsForDisplay: () => SavedRequest[];
   savedRequestIsRealtime: (req: Pick<SavedRequest, 'requestType' | 'url'>) => boolean;
   savedRequestSnapshot: (req: SavedRequest) => SavedRequest;
@@ -181,11 +187,12 @@ export const requestCrudFeature = {
   },
 
   isRequestType(this: RequestCrudHost, value: unknown): value is RequestType {
-    return value === 'http' || value === 'graphql' || value === 'ws' || value === 'socketio' || value === 'grpc' || value === 'mcp';
+    return value === 'http' || value === 'graphql' || value === 'ws' || value === 'socketio' || value === 'grpc' || value === 'mcp' || value === 'ai';
   },
 
   normalizeRequestTypeValue(this: RequestCrudHost, value: unknown, url = ''): RequestType {
     if (value === 'mcp') return 'mcp';
+    if (value === 'ai') return 'ai';
     if (value === 'grpc') return 'grpc';
     if (value === 'socketio') return 'socketio';
     if (value === 'ws') return 'ws';
@@ -205,7 +212,7 @@ export const requestCrudFeature = {
 
   savedRequestIsRunnerSkipped(this: RequestCrudHost, req: Pick<SavedRequest, 'requestType' | 'url' | 'method'>) {
     const type = this.normalizeRequestTypeValue(req.requestType, req.url);
-    return this.savedRequestIsRealtime(req) || (type === 'http' && req.method === 'SSE');
+    return this.savedRequestIsRealtime(req) || type === 'ai' || (type === 'http' && req.method === 'SSE');
   },
 
   savedRequestIsGraphQL(this: RequestCrudHost, req: Pick<SavedRequest, 'requestType' | 'url' | 'bodyType'>) {
@@ -321,6 +328,22 @@ export const requestCrudFeature = {
       this.rawBodyType = 'json';
       this.bodyContent = '';
       if (!this.mcpMethod) this.mcpMethod = 'tools/list';
+    } else if (this.requestType === 'ai') {
+      if (this.method === 'SSE') void this.sseDisconnect();
+      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'socketio') void this.socketIODisconnect();
+      this.method = 'POST';
+      this.requestTab = ['docs', 'body', 'auth', 'headers', 'tools', 'scripts', 'settings'].includes(this.requestTab) ? this.requestTab : 'body';
+      this.bodyType = 'none';
+      this.rawBodyType = 'json';
+      this.bodyContent = '';
+      if (!this.aiProvider) this.aiProvider = AI_DEFAULT_PRESET.provider;
+      if (!/^https?:\/\//i.test(this.url.trim())) this.url = AI_DEFAULT_PRESET.url;
+      if (this.authType === 'inherit' || this.authType === 'none') {
+        const auth = aiDefaultAuthFor();
+        this.authType = auth.type;
+        this.bearerToken = auth.bearerToken;
+      }
     } else {
       if (previousType === 'ws') void this.webSocketDisconnect();
       if (previousType === 'socketio') void this.socketIODisconnect();
@@ -331,7 +354,7 @@ export const requestCrudFeature = {
         this.rawBodyType = 'json';
         if (this.requestTab === 'query' || this.requestTab === 'schema') this.requestTab = 'body';
       } else if (this.requestTab === 'body' && this.bodyType !== 'none') this.requestTab = 'params';
-      if (this.requestTab === 'events' || this.requestTab === 'query' || this.requestTab === 'schema') this.requestTab = 'params';
+      if (this.requestTab === 'events' || this.requestTab === 'query' || this.requestTab === 'schema' || this.requestTab === 'tools') this.requestTab = 'params';
     }
     if (this.requestType !== 'graphql') {
       this.graphqlQuery = DEFAULT_GRAPHQL_QUERY;
@@ -732,6 +755,7 @@ export const requestCrudFeature = {
     this.responseTabs = new Map([...this.responseTabs].filter(([requestId]) => requestId !== id));
     this.grpcResponses = new Map([...this.grpcResponses].filter(([requestId]) => requestId !== id));
     this.grpcResponseTabs = new Map([...this.grpcResponseTabs].filter(([requestId]) => requestId !== id));
+    this.aiConversations = new Map([...this.aiConversations].filter(([requestId]) => requestId !== id));
     if (id === this.activeRequestId) {
       const next = this.requests.find(r => this.openRequestIds.includes(r.id)) ?? this.requests[0];
       if (next) {
