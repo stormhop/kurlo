@@ -90,6 +90,7 @@ In Tengo the same surface is `pm.request.body`, `pm.request.body_type` (Kurlo's 
 | `pm.response.body()` | Raw body as string |
 | `pm.response.json()` | Body parsed as JSON (map/array) |
 | `pm.response.headers.get(name)` | Get response header (case-insensitive) |
+| `pm.response.llm()` | AI requests only: the answer as `{ text, thinking, toolCalls, stopReason, model, usage, timing, steps, error }`, the same for every provider. `toolCalls` items have `id`, `name`, `input` and `server`; `usage` has `input`, `output`, `cacheRead`, `cacheWrite` and `reasoning`; `timing` has `firstToken` and `total` in milliseconds. |
 
 ## Variable scopes
 

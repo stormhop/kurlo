@@ -1,11 +1,11 @@
 ---
 title: Request types
-description: HTTP, GraphQL, SSE, WebSocket, Socket.IO, gRPC, and MCP requests in Kurlo.
+description: HTTP, GraphQL, SSE, WebSocket, Socket.IO, gRPC, MCP, and AI requests in Kurlo.
 ---
 
 Kurlo has separate request modes for protocols that behave differently on the wire. Each mode changes the editor tabs, send/connect controls, response panel, and export behavior to match.
 
-A new request always starts as HTTP — the `+` in the tab bar, `Cmd/Ctrl N`, and **Add request** in the sidebar open it straight away, with no dialog. To use another protocol, pick it from the menu at the start of the address bar, or run **New GraphQL request**, **New WebSocket request**, **New Socket.IO request**, **New gRPC request**, or **New MCP request** from the command palette.
+A new request always starts as HTTP — the `+` in the tab bar, `Cmd/Ctrl N`, and **Add request** in the sidebar open it straight away, with no dialog. To use another protocol, pick it from the menu at the start of the address bar, or run **New GraphQL request**, **New WebSocket request**, **New Socket.IO request**, **New gRPC request**, **New MCP request**, or **New AI request** from the command palette.
 
 ![Method and protocol picker in the address bar](../../../../assets/screenshots/request-protocol-picker.png)
 
@@ -22,8 +22,9 @@ The picker holds both decisions: the HTTP methods on top, the other protocols be
 | Socket.IO | Socket.IO servers with namespaces/events | Params, Auth, Headers, Events, Message, Settings | Events, handshake, logs | No |
 | gRPC | Protobuf RPCs with metadata/reflection/proto files | Metadata, Body, Service, Scripts, Settings | Messages, metadata, trailers, scripts | Yes |
 | MCP | Model Context Protocol servers — list their tools and call one by hand | Arguments, Auth, Headers, Scripts, Settings | Result, raw exchange, notifications | Yes |
+| AI | Prompts to OpenAI, Anthropic and OpenAI-compatible models, with MCP tools | Prompt, Auth, Headers, Tools, Scripts, Settings | Conversation, raw stream, tests | No |
 
-Realtime requests are intentionally skipped by the Collection Runner because they are long-lived sessions. gRPC is runnable because each invocation produces a bounded response.
+Realtime requests are intentionally skipped by the Collection Runner because they are long-lived sessions. gRPC is runnable because each invocation produces a bounded response. AI requests are skipped too for now: a model answer is not repeatable the way an HTTP response is, and a run could spend real money.
 
 ## HTTP
 
@@ -145,6 +146,46 @@ What Kurlo checks on your behalf:
 Auth, proxy, client certificates, redirects and the response cap are the ordinary HTTP ones — an MCP call is an HTTP request, and it carries the same settings.
 
 Not in this release: the **stdio** transport, so servers launched as a local command (`npx some-server`) cannot be reached yet; the old HTTP+SSE transport of revision `2024-11-05`; `subscriptions/listen`; and sampling, which Kurlo declines because it has no model and is not going to acquire one.
+
+## AI
+
+An AI request sends a prompt to a language model and shows the answer as a conversation. Pick the provider and the model in the box next to the URL: **OpenAI**, **Anthropic**, **OpenRouter**, **Groq**, **Ollama**, **LM Studio**, or **OpenAI-compatible URL** for anything else that speaks the Chat Completions API, such as vLLM or your own gateway. The provider fills in the base URL and the auth: a bearer token from `{{openaiApiKey}}`, `{{openrouterApiKey}}` or `{{groqApiKey}}`, `x-api-key` from `{{anthropicApiKey}}`, and no auth for the local servers. Set the key in an environment, mark it secret, and it never lands in the YAML. **Load models** asks the provider's `/models` endpoint for the list; you can also type any model ID.
+
+The **Prompt** tab holds the system prompt, the prompt and the model parameters: temperature, max tokens, top P and streaming, plus thinking for Anthropic models. `{{variables}}` work in all of them.
+
+![AI request with a streamed answer, a tool call and its result](../../../../assets/screenshots/request-ai.png)
+
+**Send** starts a new conversation with the saved prompt, so the request behaves the same every time you open it. The answer streams in as it is written:
+
+- **Text** builds up word by word, and **thinking** sits in a collapsed block above it when the model shares it.
+- **Tool calls** are cards with the tool's name, the server it came from, its call ID and its arguments, which grow while the model writes them. The result, or the tool's error, appears under the call.
+- The status line shows the **time to the first token**, the **speed** in tokens per second and the **tokens** in and out, with cache reads; hover it for the breakdown per type.
+- The **stop reason** is shown under the answer. An answer cut off by the token limit says so and offers to raise the limit and send again, and an error in the middle of a stream, which arrives with HTTP 200, is shown where the stream stopped, below the part that did arrive.
+
+Type into **Reply** to continue the conversation: Kurlo sends the earlier messages, the tool calls and their results along with it. **New conversation** clears it. The conversation lives only while the request is open; each send is in History.
+
+**Raw** shows each model call's stream exactly as it arrived, and **Tests** the results of the request's test scripts, which run once after the last step. `pm.response.llm()` gives them the answer in one shape for every provider, so a test reads the same for OpenAI and Anthropic:
+
+```javascript
+const llm = pm.response.llm();
+pm.test("asks for the weather", () => {
+  pm.expect(llm.toolCalls[0].name).to.equal("get_weather");
+  pm.expect(llm.toolCalls[0].input.city).to.equal("Lisbon");
+});
+pm.test("stays short", () => pm.expect(llm.usage.output).to.be.below(300));
+pm.test("answers fast", () => pm.expect(llm.timing.firstToken).to.be.below(800));
+```
+
+### Tools from MCP servers
+
+The **Tools** tab lists the MCP requests saved in the workspace. Tick one and the model gets that server's tools. When it calls one, Kurlo runs the call with the MCP request's URL, auth and headers, sends the result back and asks the model again, until it answers without calling a tool or the **step limit** is reached (8 by default, 50 at most). Each step is visible in the conversation, and a tool that fails is reported to the model as an error so it can recover. Tool names the providers do not accept, such as `files.read`, are renamed to `files_read`, and two servers with a tool of the same name get the server's name in front.
+
+### Good to know
+
+- The **Timeout** setting means silence for an AI request: the stream is stopped when no data has arrived for that long (two minutes when it is not set), so a long answer that keeps streaming is never cut off.
+- Anthropic thinking blocks, with their signatures, are sent back unchanged in later steps, as the API requires during tool use.
+- For OpenAI-compatible streams Kurlo asks for usage with `stream_options`. A server that ignores it shows no token counts.
+- Not in this release: the OpenAI Responses API, Gemini's own API, images and files in the prompt, prices, and running AI requests with `kurlo run` or `kurlo mcp`.
 
 ## Import and export notes
 

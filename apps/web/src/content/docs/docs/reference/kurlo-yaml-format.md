@@ -193,11 +193,17 @@ request:
 
 | Field | Contract |
 |-------|----------|
-| `requestType` | `http`, `graphql`, `ws`, `socketio`, or `grpc` |
+| `requestType` | `http`, `graphql`, `ws`, `socketio`, `grpc`, `mcp`, or `ai` |
 | `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, or `SSE` |
 | `folderPath` | Display names only. Request files are stored flat; `folderPath` is the UI source of truth. |
 | `params`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. |
 | `grpcMethod`, `grpcUseReflection`, `grpcProtoFilePath`, `grpcProtoFileName`, `grpcProtoImportPaths` | gRPC method and service-definition source metadata. |
+| `aiProvider` | `openai` (Chat Completions, also for OpenAI-compatible servers) or `anthropic` (Messages). `url` is the provider's base URL. |
+| `aiModel`, `aiSystem`, `aiPrompt` | Model ID, system prompt and prompt; all accept `{{variables}}`. |
+| `aiTemperature`, `aiTopP`, `aiMaxTokens`, `aiMaxSteps` | Strings; empty means the provider's default (8 steps for `aiMaxSteps`). |
+| `aiThinking` | Empty, or `summarized` to show an Anthropic model's thinking. |
+| `aiStream` | `false` to wait for the whole answer; omitted when `true`. |
+| `aiToolRequestIds` | IDs of saved MCP requests whose tools the model may call. |
 | `bodyType` | `none`, `json`, `text`, `xml`, `html`, `form`, `urlencoded`, `binary`, or `graphql`. |
 | `rawBodyType` | `text`, `json`, `html`, or `xml`. |
 | `preRequestScript`, `testScript` | Legacy Tengo scripts. |
