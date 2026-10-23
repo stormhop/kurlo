@@ -1959,6 +1959,24 @@ code {
   }
 }
 
+@media (hover: none) and (pointer: coarse) {
+  body.k::before {
+    display: none;
+  }
+
+  .k-nav-solid {
+    background: var(--paper);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .k-btn-glass {
+    background: rgba(20, 20, 50, 0.6);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bird .wing,
   .bird .bird-bob,
