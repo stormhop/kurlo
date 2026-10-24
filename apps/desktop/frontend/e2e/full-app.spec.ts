@@ -3301,6 +3301,48 @@ test.describe('Kurlo desktop browser E2E', () => {
   });
 
 
+  test('switches the response beside the request from the status bar', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 780 });
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await expect(page.locator('.request-split')).not.toHaveClass(/split-right/);
+    await page.getByRole('button', { name: 'Show the response beside the request' }).click();
+    await expect(page.locator('.request-split')).toHaveClass(/split-right/);
+    const divider = await page.getByRole('button', { name: 'Resize panels' }).boundingBox();
+    const editor = await page.locator('.request-editor').boundingBox();
+    const response = await page.locator('.request-split > :last-child').boundingBox();
+    expect(divider!.width).toBeLessThanOrEqual(1.5);
+    expect(Math.abs(editor!.x + editor!.width - divider!.x)).toBeLessThan(1);
+    expect(Math.abs(response!.x - (divider!.x + divider!.width))).toBeLessThan(1);
+    const before = editor!.width;
+    await page.mouse.move(divider!.x + 3, divider!.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(divider!.x + 83, divider!.y + 200, { steps: 6 });
+    await page.mouse.up();
+    expect((await page.locator('.request-editor').boundingBox())!.width).toBeGreaterThan(before + 40);
+    await captureDocsScreenshot(page, 'split-divider');
+    await page.getByRole('button', { name: 'Show the response below the request' }).click();
+    await expect(page.locator('.request-split')).not.toHaveClass(/split-right/);
+  });
+
+
+  test('shows HTTP methods and other protocols side by side in the method menu', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await page.getByLabel('Method and protocol').click();
+    const groups = page.locator('.method-menu-group');
+    await expect(groups).toHaveCount(2);
+    const [http, other] = [await groups.first().boundingBox(), await groups.last().boundingBox()];
+    expect(other!.x).toBeGreaterThan(http!.x + http!.width - 2);
+    expect(Math.abs(other!.y - http!.y)).toBeLessThan(2);
+    await captureDocsScreenshot(page, 'method-menu', page.locator('.method-menu'));
+    await page.getByRole('option', { name: 'AI', exact: true }).click();
+    await expect(page.getByLabel('Provider base URL')).toBeVisible();
+  });
+
+
   test('discovers an MCP server, calls a tool, and keeps the raw exchange', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);

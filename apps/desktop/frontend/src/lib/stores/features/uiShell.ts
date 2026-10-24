@@ -22,8 +22,34 @@ const ACTIVITY_RAIL_WIDTH = 52;
 export type ResponseLayout = 'right' | 'below';
 export const RESPONSE_LAYOUT_KEY = 'kurlo.responseLayout.v1';
 export const RESPONSE_RIGHT_MIN_WIDTH = 1000;
+export const RESPONSE_RIGHT_CHOSEN_MIN_WIDTH = 760;
 const SPLIT_MIN_RATIO = 0.28;
 const SPLIT_MAX_RATIO = 0.72;
+const SPLIT_EDITOR_MIN_REM = 24;
+const SPLIT_RESPONSE_MIN_REM = 22;
+
+export function splitRatioBounds(widthPx: number, remPx: number): [number, number] {
+  if (widthPx <= 0) return [SPLIT_MIN_RATIO, SPLIT_MAX_RATIO];
+  const min = Math.max(SPLIT_MIN_RATIO, (SPLIT_EDITOR_MIN_REM * remPx) / widthPx);
+  const max = Math.min(SPLIT_MAX_RATIO, 1 - (SPLIT_RESPONSE_MIN_REM * remPx) / widthPx);
+  return max >= min ? [min, max] : [min, min];
+}
+
+function rootRemPx(): number {
+  return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+}
+
+export function readResponseLayoutChosen(): boolean {
+  try {
+    return localStorage.getItem(RESPONSE_LAYOUT_KEY) === 'right';
+  } catch {
+    return false;
+  }
+}
+
+export function responseRightMinWidth(chosen: boolean): number {
+  return chosen ? RESPONSE_RIGHT_CHOSEN_MIN_WIDTH : RESPONSE_RIGHT_MIN_WIDTH;
+}
 
 export function readResponseLayout(): ResponseLayout {
   try {
@@ -71,6 +97,7 @@ type UiShellHost = {
   panelResizeStartY: number;
   panelResizing: boolean;
   responseLayout: ResponseLayout;
+  responseLayoutChosen: boolean;
   requestSplitRatio: number;
   splitResizing: boolean;
   splitResizeStartX: number;
@@ -236,11 +263,14 @@ export const uiShellFeature = {
   onSplitDividerKeydown(this: UiShellHost, e: KeyboardEvent) {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();
-    this.requestSplitRatio = clamp(this.requestSplitRatio + (e.key === 'ArrowRight' ? 0.02 : -0.02), SPLIT_MIN_RATIO, SPLIT_MAX_RATIO);
+    const container = (e.currentTarget as HTMLElement | null)?.parentElement;
+    const [min, max] = splitRatioBounds(container?.clientWidth ?? 0, rootRemPx());
+    this.requestSplitRatio = clamp(this.requestSplitRatio + (e.key === 'ArrowRight' ? 0.02 : -0.02), min, max);
   },
 
   setResponseLayout(this: UiShellHost, layout: ResponseLayout) {
     this.responseLayout = layout;
+    this.responseLayoutChosen = layout === 'right';
     try {
       localStorage.setItem(RESPONSE_LAYOUT_KEY, layout);
     } catch {}
@@ -292,7 +322,8 @@ export const uiShellFeature = {
     if (this.panelResizing) this.requestPanelHeight = clamp(this.panelResizeStartH + toLogicalPx(e.clientY - this.panelResizeStartY), 120, toLogicalPx(window.innerHeight) - 220);
     if (this.splitResizing && this.splitResizeWidth > 0) {
       const delta = (e.clientX - this.splitResizeStartX) / this.splitResizeWidth;
-      this.requestSplitRatio = clamp(this.splitResizeStartRatio + delta, SPLIT_MIN_RATIO, SPLIT_MAX_RATIO);
+      const [min, max] = splitRatioBounds(this.splitResizeWidth, rootRemPx());
+      this.requestSplitRatio = clamp(this.splitResizeStartRatio + delta, min, max);
     }
     if (this.codePanelResizing) {
       const sidebarWidth = this.sidebarHidden ? 0 : this.sidebarWidth;

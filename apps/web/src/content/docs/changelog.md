@@ -15,6 +15,16 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Added
 
 - **Markdown docs for every request:** Edit with a live preview, and a Preview that adds a reference built from the request's URL, params, headers and body. See [Docs](/docs/guides/workspaces/#docs).
+- **Response layout button** in the status bar, to put the response beside or below the request.
+
+### Changed
+
+- **Shorter method menu:** HTTP methods and the other protocols side by side.
+
+### Fixed
+
+- The provider and model box closes when you click it again.
+- With the response beside the request, neither side can be dragged too narrow, and settings rows stack on a narrow panel.
 
 ## 2.4.2
 

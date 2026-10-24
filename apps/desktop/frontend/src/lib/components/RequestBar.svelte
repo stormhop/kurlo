@@ -145,22 +145,22 @@
   function closeMethodMenuOnFocusOut(event: FocusEvent) {
     const current = event.currentTarget;
     const next = event.relatedTarget;
-    if (!(current instanceof HTMLElement)) return;
-    if (!(next instanceof Node) || !current.contains(next)) methodMenuOpen = false;
+    if (!(current instanceof HTMLElement) || !(next instanceof Node)) return;
+    if (!current.contains(next)) methodMenuOpen = false;
   }
 
   function closeGrpcMethodMenuOnFocusOut(event: FocusEvent) {
     const current = event.currentTarget;
     const next = event.relatedTarget;
-    if (!(current instanceof HTMLElement)) return;
-    if (!(next instanceof Node) || !current.contains(next)) grpcMethodMenuOpen = false;
+    if (!(current instanceof HTMLElement) || !(next instanceof Node)) return;
+    if (!current.contains(next)) grpcMethodMenuOpen = false;
   }
 
   function closeSendMenuOnFocusOut(event: FocusEvent) {
     const current = event.currentTarget;
     const next = event.relatedTarget;
-    if (!(current instanceof HTMLElement)) return;
-    if (!(next instanceof Node) || !current.contains(next)) sendMenuOpen = false;
+    if (!(current instanceof HTMLElement) || !(next instanceof Node)) return;
+    if (!current.contains(next)) sendMenuOpen = false;
   }
 
   const PROTOCOL_NAMES: Partial<Record<RequestType, string>> = {

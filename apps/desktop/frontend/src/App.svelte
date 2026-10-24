@@ -16,7 +16,7 @@
   import RequestEditorTabs from './lib/components/RequestEditorTabs.svelte';
   import ActivityRail from './lib/components/ActivityRail.svelte';
   import { shortcutComboLabel, usesMacShortcutGlyphs } from './lib/stores/features/preferences';
-  import { RESPONSE_RIGHT_MIN_WIDTH } from './lib/stores/features/uiShell';
+  import { responseRightMinWidth } from './lib/stores/features/uiShell';
   import { rem, uiScale } from './lib/uiScale';
   import Sidebar from './lib/components/Sidebar.svelte';
   import StatusBar from './lib/components/StatusBar.svelte';
@@ -94,7 +94,7 @@
   let historyDetailBody = $derived(vm.historyDetailResponse ? vm.formatResponseBody(vm.historyDetailResponse) : '');
   let historyDetailMode = $derived<ResponseRenderMode>(!vm.historyDetailResponse ? 'text' : vm.isJsonResponse(vm.historyDetailResponse) ? 'json' : vm.isHtmlResponse(vm.historyDetailResponse) ? 'html' : 'text');
   let historyDetailVirtualized = $derived(historyDetailBody ? shouldVirtualizeResponseBody(historyDetailBody, historyDetailMode) : false);
-  let responseOnRight = $derived(vm.responseLayout === 'right' && requestSplitWidth / $uiScale >= RESPONSE_RIGHT_MIN_WIDTH);
+  let responseOnRight = $derived(vm.responseLayout === 'right' && requestSplitWidth / $uiScale >= responseRightMinWidth(vm.responseLayoutChosen));
 
   function setRuntimePlatform(runtime: string) {
     const platform = runtime.split('/')[0] || 'browser';
@@ -1066,6 +1066,7 @@
     sidebarHidden={vm.sidebarHidden}
     codePanelOpen={vm.codePanelOpen}
     codePanelAvailable={codePanelAvailable}
+    {responseOnRight}
     topView={vm.topView}
     gitStatus={vm.gitStatus}
     appVersion={vm.appVersion}

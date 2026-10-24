@@ -19,6 +19,7 @@
     sidebarHidden,
     codePanelOpen,
     codePanelAvailable = true,
+    responseOnRight = false,
     topView,
     gitStatus,
     appVersion = '',
@@ -35,6 +36,7 @@
     sidebarHidden: boolean;
     codePanelOpen: boolean;
     codePanelAvailable?: boolean;
+    responseOnRight?: boolean;
     topView: TopView;
     gitStatus: GitWorkspaceStatus;
     appVersion?: string;
@@ -235,6 +237,24 @@
         <line x1="5" y1="1" x2="5" y2="13" stroke="currentColor" stroke-width="1.2"/>
       </svg>
     </button>
+    {#if topView === 'request'}
+      <button
+        class="btn btn-ghost btn-icon btn-xs layout-btn response-layout-btn"
+        type="button"
+        onclick={() => vm.setResponseLayout(responseOnRight ? 'below' : 'right')}
+        title={responseOnRight ? 'Show the response below the request' : 'Show the response beside the request'}
+        aria-label={responseOnRight ? 'Show the response below the request' : 'Show the response beside the request'}
+      >
+        <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.2"/>
+          {#if responseOnRight}
+            <line x1="7" y1="1" x2="7" y2="13" stroke="currentColor" stroke-width="1.2"/>
+          {:else}
+            <line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.2"/>
+          {/if}
+        </svg>
+      </button>
+    {/if}
     {#if codePanelAvailable}
       <button
         class="btn btn-ghost btn-icon btn-xs layout-btn"

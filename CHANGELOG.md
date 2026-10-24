@@ -12,7 +12,18 @@ All notable changes to Kurlo are documented here. This project follows
 - **AI requests.** A new request type sends a prompt to a language model: OpenAI, Anthropic, OpenRouter, Groq, Ollama, LM Studio, or any server with an OpenAI-compatible API. Choose the provider and the model next to the URL (**Load models** reads the provider's list), and write a system prompt and a prompt with `{{variables}}`. The answer streams into a conversation that shows the model's thinking, each tool call with its arguments and result, the stop reason, the time to the first token, the speed and the tokens in and out. **Reply** continues the conversation, **Raw** shows each stream as it arrived, and an answer cut off by the token limit or an error in the middle of a stream is called out where it happened. API keys come from `{{openaiApiKey}}`, `{{anthropicApiKey}}` and the like, so they stay out of the YAML.
 - **MCP servers as tools for the model.** The **Tools** tab of an AI request lists the MCP requests in the workspace. Tick one, and when the model calls one of its tools Kurlo runs the call with that request's URL, auth and headers and gives the result back, step by step, until the model answers or the step limit is reached.
 - **Markdown docs for every request.** The **Docs** tab has **Edit** with a live preview and **Preview**, which renders headings, lists, tables, code, links and images and adds a reference built from the request: the method and URL, the auth type, and the path variables, query params, headers and body with each row's description.
+- **A status bar button for the response layout.** It puts the response beside or below the request; before, this was only in the command palette. Choosing the side-by-side layout yourself keeps it on editors down to 760 px wide.
 - **`pm.response.llm()` in tests.** Test scripts of an AI request get the answer in one shape for every provider: the text, the tool calls with their parsed input, the stop reason, the tokens and the timings. Tests run once, after the last step.
+
+### Changed
+
+- **The method menu is shorter.** HTTP methods and the other protocols sit side by side.
+
+### Fixed
+
+- Clicking the provider and model box while it was open closed it and opened it again at once in the app; it now closes. The gRPC method picker had the same problem.
+- With the response beside the request, the request side could be dragged so narrow that settings fields were cut off. Both sides now keep a minimum width, and settings rows stack when the panel is narrow.
+- With the response beside the request, the lines of the response panel stopped short of the divider. The divider is now a single line with a wider grab area.
 
 ## [2.4.2] - 2026-10-23
 

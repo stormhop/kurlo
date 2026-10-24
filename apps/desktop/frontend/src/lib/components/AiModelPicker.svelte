@@ -10,6 +10,7 @@
   let open = $state(false);
   let modelInput = $state<HTMLInputElement>();
   let triggerEl = $state<HTMLButtonElement>();
+  let wrapEl = $state<HTMLDivElement>();
 
   const preset = $derived(vm.aiCurrentPreset());
   const models = $derived(vm.aiModelOptions());
@@ -38,8 +39,15 @@
   function closeOnFocusOut(event: FocusEvent) {
     const current = event.currentTarget;
     const next = event.relatedTarget;
-    if (!(current instanceof HTMLElement)) return;
-    if (!(next instanceof Node) || !current.contains(next)) open = false;
+    if (!(current instanceof HTMLElement) || !(next instanceof Node)) return;
+    if (!current.contains(next)) open = false;
+  }
+
+  function closeOnOutsidePointerDown(event: PointerEvent) {
+    if (!open) return;
+    const target = event.target;
+    if (target instanceof Node && wrapEl?.contains(target)) return;
+    open = false;
   }
 
   async function choosePreset(id: AiPresetId) {
@@ -65,7 +73,9 @@
   }
 </script>
 
-<div class="grpc-method-wrap ai-model-wrap" onfocusout={closeOnFocusOut}>
+<svelte:document onpointerdowncapture={closeOnOutsidePointerDown} />
+
+<div class="grpc-method-wrap ai-model-wrap" bind:this={wrapEl} onfocusout={closeOnFocusOut}>
   <button
     class="field field-xl select-trigger grpc-method-trigger"
     class:open

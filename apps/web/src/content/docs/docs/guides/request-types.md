@@ -38,6 +38,8 @@ HTTP is the default mode. It supports:
 
 Use HTTP for normal REST APIs. Use the `SSE` method only when the endpoint keeps an event stream open.
 
+The method menu lists the HTTP methods on the left and the other protocols on the right.
+
 ### Path variables
 
 A path segment that starts with a colon is a path variable: type `{{baseUrl}}/users/:userId/posts/:postId` and the **Params** tab lists `userId` and `postId` under **Path variables**, below the query params. Fill in the values there, and Kurlo puts them into the URL when it sends the request, so `/users/:userId` goes out as `/users/42`. The URL field keeps showing `:userId`.

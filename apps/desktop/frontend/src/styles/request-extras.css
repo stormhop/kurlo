@@ -175,6 +175,7 @@
 }
 
 .settings-list {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   padding: 0 0 var(--space-4);
@@ -183,7 +184,7 @@
 
 .postman-setting {
   display: grid;
-  grid-template-columns: minmax(12.5rem, 1fr) 13.75rem;
+  grid-template-columns: minmax(0, 1fr) minmax(8rem, 13.75rem);
   gap: var(--space-6);
   align-items: center;
   min-height: 3.625rem;
@@ -195,6 +196,16 @@
 
 .postman-setting > .switch-control {
   justify-self: end;
+}
+
+@container (max-width: 30rem) {
+  .postman-setting {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+  .postman-setting > .switch-control {
+    justify-self: start;
+  }
 }
 
 .postman-setting-tall {
@@ -1092,7 +1103,7 @@ input::-webkit-calendar-picker-indicator { opacity: 0; }
 
 .request-split.split-right > .request-editor {
   flex: 0 0 auto;
-  width: calc(var(--request-split, 0.5) * 100%);
+  width: clamp(24rem, calc(var(--request-split, 0.5) * 100%), calc(100% - 22rem));
   min-width: 0;
   height: auto;
 }
@@ -1104,11 +1115,21 @@ input::-webkit-calendar-picker-indicator { opacity: 0; }
 }
 
 .panel-divider.panel-divider-vertical {
-  width: 0.4375rem;
+  z-index: 2;
+  width: 1px;
   height: auto;
   border-top: none;
-  border-left: 1px solid var(--border-subtle);
+  background: var(--border-subtle);
   cursor: col-resize;
+}
+
+.panel-divider.panel-divider-vertical::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -0.25rem;
+  right: -0.25rem;
 }
 
 .panel-divider.panel-divider-vertical::after {

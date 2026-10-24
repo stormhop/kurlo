@@ -83,7 +83,7 @@ import { normalizeCollectionRuns, type CollectionRunRecord } from '../collection
 import { menuFeature } from './features/menus';
 import { preferencesFeature } from './features/preferences';
 import { DEFAULT_STARTUP_VIEW, startupNeedsDraftRequest, startupTopView, type StartupView } from '../startupView';
-import { readResponseLayout, uiShellFeature, type ResponseLayout } from './features/uiShell';
+import { readResponseLayout, readResponseLayoutChosen, uiShellFeature, type ResponseLayout } from './features/uiShell';
 import { workspaceFeature } from './features/workspace';
 import { workspaceDiagnosticsFeature } from './features/workspaceDiagnostics';
 
@@ -1318,6 +1318,7 @@ class AppVM {
   sidebarWidth = $state(SIDEBAR_DEFAULT_WIDTH);
   requestPanelHeight = $state(280);
   responseLayout = $state<ResponseLayout>(readResponseLayout());
+  responseLayoutChosen = $state(readResponseLayoutChosen());
   requestSplitRatio = $state(0.5);
   splitResizing = $state(false);
   splitResizeStartX = 0;

@@ -152,6 +152,8 @@ Press `Cmd/Ctrl K` — or click the search field in the title bar — to open th
 - **Create** — a new request, collection or environment, or an import.
 - **Go to** — collections, environments, history, globals, the collection runner, the mock server, Git, cookies, settings and proxy settings.
 - **View** — show or hide the sidebar and the code snippet panel, put the response beside or below the request, switch between light, dark and system theme.
+
+The response layout also has a button in the status bar, next to the sidebar toggle. Kurlo puts the response beside the request on its own when the editor is at least 1000 px wide; once you choose the side-by-side layout yourself, it keeps it down to 760 px. Dragging the divider stops before either side gets too narrow to use.
 - **Help** — what's new, reporting an issue, about Kurlo.
 
 Start the query with `>` to list commands only. `↑` and `↓` move through the list, `Enter` runs the selection, `Esc` closes the palette. A command bound to a shortcut shows it, including one you reassigned in *Settings → Shortcuts*.

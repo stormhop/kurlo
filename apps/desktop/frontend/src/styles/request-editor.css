@@ -181,20 +181,22 @@
   left: -1px;
   z-index: 120;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: stretch;
   gap: var(--space-1);
   width: max-content;
-  min-width: 11.5rem;
-  max-width: 16.25rem;
+  max-width: min(26rem, calc(100vw - 2rem));
 }
 
 .method-menu-group {
   display: flex;
   flex-direction: column;
+  min-width: 9.5rem;
+  max-width: 13rem;
 }
 .method-menu-group + .method-menu-group {
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--border-subtle);
+  padding-left: var(--space-1);
+  border-left: 1px solid var(--border-subtle);
 }
 
 .method-menu-label {
