@@ -33,7 +33,7 @@ const readmeScreenshotPath = process.env.KURLO_README_SCREENSHOT ?? '';
 
 const DOCS_VIEWPORT = { width: 1200, height: 780 };
 const DOCS_CROP_PADDING = 26;
-const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai', 'ai-model-list-error']);
+const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai', 'ai-model-list-error', 'ai-chat-error']);
 
 async function docsDialogClip(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-modal="true"]').first();
@@ -560,6 +560,15 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       },
       SendAiRequest: async (req) => {
         state.sentAiRequests.push(clone(req));
+        const lastText = req.messages.at(-1)?.blocks?.[0]?.text ?? '';
+        if (lastText === 'Spend my credits') {
+          const error = "402 Payment Required: This request requires more credits, or fewer max_tokens. You requested up to 65536 tokens, but can only afford 3284. To increase, visit https://openrouter.ai/workspaces/default/keys/0c1ef0c6f3d2c23cb6911e6e4f8a9b0c1d2e3f40 and adjust the key's total limit";
+          return {
+            steps: [], messages: [], text: '', stopReason: '', hasUsage: false, firstTokenMs: 0, durationMs: 0, tools: [], warnings: [], error,
+            usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 },
+            http: { ...jsonResponse(req.http), statusCode: 402, status: '402 Payment Required', body: '' },
+          };
+        }
         const sessionId = req.http.requestId;
         const usage = (input, output) => ({ input, output, cacheRead: 0, cacheWrite: 0, reasoning: 0 });
         const firstBlocks = [
@@ -3452,6 +3461,32 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.keyboard.insertText('s'.repeat(50_005));
     await expect(page.locator('.ai-counter-full')).toHaveText('50,000 / 50,000');
     await expect(page.getByRole('textbox', { name: 'Reply' })).toHaveCount(0);
+  });
+
+  test('shows a provider error inside the chat, with its status, link and a hint', async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 760 });
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.responseLayout.v1', 'right'));
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await page.getByRole('button', { name: 'Provider and model' }).click();
+    await page.getByRole('radio', { name: 'Ollama' }).click();
+    await page.getByRole('option', { name: 'llama3.2' }).click();
+    await fillCodeEditor(page, 'ai-prompt-editor', 'Spend my credits');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    const card = page.locator('.ai-error-card');
+    await expect(card.locator('.ai-error-title')).toHaveText('The provider returned an error');
+    await expect(card.locator('.ai-error-status')).toHaveText('402 Payment Required');
+    await expect(card.locator('.ai-error-message')).toContainText('This request requires more credits');
+    await expect(card.locator('.ai-error-message a')).toHaveAttribute('href', /^https:\/\/openrouter\.ai\/workspaces\/default\/keys\//);
+    await expect(card.locator('.ai-error-hint')).toHaveText('Add credits at the provider, or lower Max tokens in Settings.');
+    const chat = page.locator('.ai-chat');
+    expect(await chat.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+    const [cardBox, chatBox] = [await card.boundingBox(), await chat.boundingBox()];
+    expect(cardBox!.x).toBeGreaterThanOrEqual(chatBox!.x);
+    expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(chatBox!.x + chatBox!.width + 0.5);
+    await captureDocsScreenshot(page, 'ai-chat-error');
   });
 
   test('explains why the model list could not be loaded', async ({ page }) => {

@@ -4,7 +4,7 @@
   import { tabListKeyboard } from '../a11y';
   import Markdown from './Markdown.svelte';
   import { vm } from '../stores/app.svelte';
-  import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiTurnUsage, type AiStepView, type AiTurn } from '../stores/features/ai';
+  import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiErrorView, aiTurnUsage, type AiStepView, type AiTurn } from '../stores/features/ai';
   import { formatSize, statusClass } from '../utils';
   import type { AiBlock } from '../backend';
 
@@ -145,6 +145,25 @@
   }
 </script>
 
+{#snippet errorCard(text: string, note: string)}
+  {@const view = aiErrorView(text)}
+  <div class="ai-error-card" role="alert">
+    <svg class="ai-error-icon" width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.25" stroke="currentColor" stroke-width="1.3"/>
+      <path d="M8 4.75v3.75M8 10.75v.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    </svg>
+    <div class="ai-error-body">
+      <div class="ai-error-head">
+        <strong class="ai-error-title">{view.title}</strong>
+        {#if view.status}<span class="ai-error-status">{view.status}</span>{/if}
+      </div>
+      {#if view.message}<div class="ai-error-message"><Markdown source={view.message} compact /></div>{/if}
+      {#if view.hint}<span class="ai-error-hint">{view.hint}</span>{/if}
+      {#if note}<span class="ai-error-hint">{note}</span>{/if}
+    </div>
+  </div>
+{/snippet}
+
 {#snippet rawBody(label: string, key: string, text: string)}
   {@const full = rawExpanded.has(key) || text.length <= RAW_PREVIEW_CHARS}
   <div class="ai-raw-label">{label}</div>
@@ -266,10 +285,7 @@
                 <div class="ai-waiting"><span class="ai-caret"></span></div>
               {/if}
               {#if step.error}
-                <div class="ai-error-card" role="alert">
-                  <strong>{step.error}</strong>
-                  {#if step.blocks.length}<span>The answer above is what arrived before the error.</span>{/if}
-                </div>
+                {@render errorCard(step.error, step.blocks.length ? 'The answer above is what arrived before the error.' : '')}
               {/if}
             {/each}
 
@@ -278,7 +294,7 @@
             {/if}
 
             {#if turn.status === 'error' && turn.error && !turn.steps.some(step => step.error)}
-              <div class="ai-error-card" role="alert"><strong>{turn.error}</strong></div>
+              {@render errorCard(turn.error, '')}
             {/if}
 
             {#if turn.response?.warnings?.length}
@@ -470,13 +486,15 @@
   .ai-chat {
     flex: 1 1 auto;
     min-height: 0;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: var(--space-4);
   }
   .ai-turn {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
+    min-width: 0;
     padding-bottom: var(--space-6);
   }
   .ai-turn + .ai-turn {
@@ -614,9 +632,10 @@
     min-height: var(--control-sm);
   }
   .ai-error-card {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-1);
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-2);
+    min-width: 0;
     padding: var(--space-2-5) var(--space-3);
     border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
     border-radius: var(--radius-lg);
@@ -625,13 +644,48 @@
     font-size: var(--text-label);
     user-select: text;
   }
-  .ai-error-card strong {
+  .ai-error-icon {
+    margin-top: var(--space-0-5);
     color: var(--danger);
+  }
+  .ai-error-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .ai-error-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1-5) var(--space-2);
+  }
+  .ai-error-title {
+    color: var(--text);
+    font-weight: var(--weight-semibold);
+  }
+  .ai-error-status {
+    padding: 0 var(--space-1-5);
+    border-radius: var(--radius-xs);
+    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    color: var(--text);
     font-family: var(--font-mono);
+    font-size: var(--text-caption);
     font-weight: var(--weight-medium);
   }
-  .ai-error-card span {
+  .ai-error-message {
+    min-width: 0;
     color: var(--text-2);
+    overflow-wrap: anywhere;
+  }
+  .ai-error-message :global(.md) {
+    color: inherit;
+    font-size: var(--text-label);
+  }
+  .ai-error-hint {
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
   }
   .ai-note {
     display: flex;

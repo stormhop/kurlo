@@ -35,6 +35,7 @@ All notable changes to Kurlo are documented here. This project follows
 - With the response beside the request, the lines of the response panel stopped short of the divider. The divider is now a single line with a wider grab area.
 - On a narrow response panel the AI status line cut off the status code. Metrics now give way first, and **New chat** becomes an icon.
 - A base URL with a query string, such as an Azure OpenAI URL ending in `?api-version=…`, got the API path after the query string, so the request went to a wrong address.
+- A long provider error in the AI chat, such as a link in a "402 Payment Required" answer, ran past the right edge of the panel. The error now wraps inside the chat and shows the status apart from the provider's message, its links as links, and a hint at what to do, such as adding credits or lowering Max tokens.
 - **New MCP request** on the Tools tab of an AI request added an empty request to the collection that stayed there when you closed it without saving. It now opens a draft.
 
 ## [2.4.2] - 2026-10-23

@@ -14,6 +14,7 @@ import {
   AI_SYSTEM_MAX_CHARS,
   aiPromptLengthError,
   aiModelsProblem,
+  aiErrorView,
   aiEndpointParts,
   aiModelsURL,
   aiComposerSends,
@@ -136,6 +137,18 @@ describe('ai presets', () => {
     expect(aiModelsURL('https://api.deepseek.com/v1/chat/completions', 'openai')).toBe('https://api.deepseek.com/v1/models');
     expect(aiModelsURL('https://api.anthropic.com/v1/messages', 'anthropic')).toBe('https://api.anthropic.com/v1/models');
     expect(aiModelsURL('https://x.test/v1?api-version=1', 'openai')).toBe('https://x.test/v1/models?api-version=1');
+  });
+
+  it('splits a provider error into a status, the message and a hint', () => {
+    expect(aiErrorView('402 Payment Required: This request requires more credits.')).toEqual({
+      title: 'The provider returned an error',
+      status: '402 Payment Required',
+      message: 'This request requires more credits.',
+      hint: 'Add credits at the provider, or lower Max tokens in Settings.',
+    });
+    expect(aiErrorView('502 Bad Gateway')).toMatchObject({ status: '502 Bad Gateway', message: '', hint: 'The provider had a problem on its side. Try again in a moment.' });
+    expect(aiErrorView('418: teapot')).toMatchObject({ status: '418', message: 'teapot', hint: '' });
+    expect(aiErrorView('No data from the model for 5m0s. The stream was stopped.')).toEqual({ title: 'The request failed', status: '', message: 'No data from the model for 5m0s. The stream was stopped.', hint: '' });
   });
 
   it('explains why the model list could not be loaded', () => {

@@ -31,6 +31,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - With the response beside the request, neither side can be dragged too narrow, and settings rows stack on a narrow panel.
 - The AI prompt field no longer scrolls its text under the border in a short window.
 - An invalid AI setting is explained right below its field, and a narrow response panel keeps the status code visible.
+- Provider errors in the AI chat wrap inside the panel and come with their status and a hint.
 - **New MCP request** on an AI request's Tools tab opens a draft instead of leaving an empty request in the collection.
 
 ## 2.4.2

@@ -479,6 +479,27 @@ export function aiComposerSends(event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 
   return !event.isComposing && event.keyCode !== 229;
 }
 
+export type AiErrorView = { title: string; status: string; message: string; hint: string };
+
+const AI_STATUS_HINTS: Record<number, string> = {
+  400: 'Check the model name and the settings the provider accepts.',
+  401: 'Check the API key in the Auth tab or in the environment.',
+  402: 'Add credits at the provider, or lower Max tokens in Settings.',
+  403: 'Check that the API key may use this model.',
+  404: 'Check the base URL and the model name.',
+  413: 'Shorten the prompt or the conversation.',
+  429: 'The provider is limiting requests. Wait a moment and send again.',
+};
+
+export function aiErrorView(text: string): AiErrorView {
+  const value = text.trim();
+  const match = /^(\d{3})((?: [^:\n]+)?)(?::\s*([\s\S]*))?$/.exec(value);
+  if (!match) return { title: 'The request failed', status: '', message: value, hint: '' };
+  const code = Number(match[1]);
+  const hint = AI_STATUS_HINTS[code] ?? (code >= 500 ? 'The provider had a problem on its side. Try again in a moment.' : '');
+  return { title: 'The provider returned an error', status: `${match[1]}${match[2]}`, message: (match[3] ?? '').trim(), hint };
+}
+
 export type AiEndpointParts = { base: string; suffix: string; query: string };
 
 export function aiEndpointParts(url: string, provider: string): AiEndpointParts {
