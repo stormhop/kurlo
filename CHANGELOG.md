@@ -27,6 +27,7 @@ All notable changes to Kurlo are documented here. This project follows
 - Long AI answers no longer parse their Markdown again on every streamed chunk.
 - The response layout button in the status bar did nothing when the editor was too narrow for the side-by-side layout; it is now disabled and says why.
 - With Tengo as the script engine, a Postman, Insomnia or Bruno import put the collection's JavaScript into the Tengo fields, so every imported script failed on the first send. Imported scripts now always go to the JavaScript fields, and exports to those formats take the JavaScript scripts instead of the active engine's.
+- The shortcut list in Settings could be scrolled sideways, which cut off the start of every name, and the keys of different shortcuts did not line up. The list no longer scrolls sideways, and single-character keys share one width, so the keys form columns.
 - Git status and diffs could fail for a moment while a commit, pull, merge or rebase was running. A saved Git token that cannot be read is now reported as such instead of ending in a plain 401.
 
 ## [2.5.0] - 2026-10-24

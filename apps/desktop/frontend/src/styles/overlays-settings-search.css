@@ -992,7 +992,9 @@
 
 .shortcut-list {
   min-height: 0;
-  overflow: auto;
+  margin-inline: calc(var(--space-2) * -1);
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .shortcut-group + .shortcut-group {
@@ -1485,6 +1487,7 @@
 
 .shortcut-group h3 {
   margin-bottom: var(--space-1-5);
+  padding-inline: var(--space-2);
   color: var(--text-2);
   font-size: var(--text-label);
   font-weight: var(--weight-medium);
@@ -1492,7 +1495,6 @@
 
 .shortcut-row {
   min-height: 2.125rem;
-  margin: 0 calc(var(--space-2) * -1);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-md);
   color: var(--text);

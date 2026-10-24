@@ -2316,6 +2316,35 @@ test.describe('Kurlo desktop browser E2E', () => {
     }
   });
 
+  test('lays out the shortcut settings without sideways scrolling and with aligned keycaps', async ({ page }) => {
+    await installKurloBridge(page, '', 'darwin/e2e');
+    await page.goto('/');
+    await page.getByRole('button', { name: /^Settings/ }).click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await settings.getByRole('tab', { name: 'Shortcuts', exact: true }).click();
+    const list = settings.locator('.shortcut-list');
+    await expect(list.locator('.shortcut-row').first()).toBeVisible();
+    const layout = await list.evaluate(el => {
+      const textLeft = (node: Element) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return range.getBoundingClientRect().left;
+      };
+      const body = el.closest('.settings-body') as HTMLElement;
+      const glyphs = [...el.querySelectorAll('.keycaps-md .keycap-glyph')].map(cap => Math.round(cap.getBoundingClientRect().width));
+      const lastCaps = [...el.querySelectorAll('.shortcut-row .keycaps')].map(caps => Math.round(caps.lastElementChild!.getBoundingClientRect().right));
+      return {
+        listScrolls: el.scrollWidth > el.clientWidth + 1,
+        bodyScrolls: body.scrollWidth > body.clientWidth + 1,
+        glyphWidths: new Set(glyphs).size,
+        rightEdges: new Set(lastCaps).size,
+        headingAligned: Math.round(textLeft(el.querySelector('.shortcut-group h3')!)) === Math.round(textLeft(el.querySelector('.shortcut-row > span')!)),
+      };
+    });
+    expect(layout).toEqual({ listScrolls: false, bodyScrolls: false, glyphWidths: 1, rightEdges: 1, headingAligned: true });
+    await list.screenshot({ path: test.info().outputPath('shortcuts.png') });
+  });
+
   test('sends a WebSocket message with the send shortcut and stays connected', async ({ page }) => {
     await installKurloBridge(page, '', 'windows/e2e');
     await page.goto('/');

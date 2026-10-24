@@ -71,6 +71,8 @@
   }
 
   .keycaps-md .keycap-glyph {
+    width: 1.75rem;
+    padding: 0;
     font-size: 0.84375rem;
   }
 
