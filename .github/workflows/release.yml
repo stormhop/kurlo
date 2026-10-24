@@ -456,7 +456,7 @@ jobs:
           git push
 
   npm:
-    name: Stage npm packages
+    name: Publish npm packages
     needs: publish
     runs-on: ubuntu-24.04
     permissions:
@@ -484,23 +484,23 @@ jobs:
       - name: Build packages
         run: node scripts/build-npm-packages.mjs --version "${GITHUB_REF_NAME#v}"
 
-      - name: Stage packages
+      - name: Publish packages
         shell: bash
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           tag=latest
           case "$version" in *-*) tag=next ;; esac
-          stage() {
+          publish() {
             local dir="$1" out attempt
             for attempt in 1 2 3; do
-              if out="$(npm stage publish "./$dir" --access public --tag "$tag" 2>&1)"; then
+              if out="$(npm publish "./$dir" --access public --tag "$tag" 2>&1)"; then
                 echo "$out"
                 return 0
               fi
               echo "$out"
-              if grep -q "Cannot stage previously published version" <<<"$out"; then
-                echo "already staged; skipping"
+              if grep -qi "cannot publish over the previously published versions" <<<"$out"; then
+                echo "already published; skipping"
                 return 0
               fi
               grep -qE "E5[0-9]{2}" <<<"$out" || return 1
@@ -514,7 +514,7 @@ jobs:
               echo "$name@$version is already on npm"
               continue
             fi
-            stage "$dir"
+            publish "$dir"
           done
 
   mcp-registry:
@@ -523,6 +523,6 @@ jobs:
     uses: ./.github/workflows/mcp-registry.yml
     with:
       version: ${{ github.ref_name }}
-      wait-minutes: 180
+      wait-minutes: 20
     secrets:
       MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}

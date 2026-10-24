@@ -67,7 +67,7 @@ jobs:
               break
             fi
             if [ "$(date +%s)" -ge "$deadline" ]; then
-              echo "::error::@kurlo/cli@$VERSION with mcpName dev.kurlo/kurlo is not on npm yet. Approve the staged packages, then run this workflow again."
+              echo "::error::@kurlo/cli@$VERSION with mcpName dev.kurlo/kurlo is not on npm yet. Check the npm job of the release, then run this workflow again."
               exit 1
             fi
             sleep 60
