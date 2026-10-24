@@ -199,6 +199,8 @@ export function SaveHistoryResponse(arg1:string,arg2:string):Promise<api.History
 
 export function SaveRequestStore(arg1:string):Promise<boolean>;
 
+export function SaveRequestStoreView(arg1:string):Promise<api.SaveRequestStoreResult>;
+
 export function SaveRequestStoreWithError(arg1:string):Promise<api.SaveRequestStoreResult>;
 
 export function SaveResponseBody(arg1:string,arg2:string):Promise<api.SaveResponseBodyResult>;

@@ -80,7 +80,87 @@ func cacheRequestStoreKey(key []byte) {
 	requestStoreKeyCache = append([]byte(nil), key...)
 }
 
+type requestStorePlaintext struct {
+	size         int64
+	modTime      time.Time
+	key          string
+	payload      string
+	storage      map[string]any
+	storageKnown bool
+}
+
+var (
+	requestStorePlaintextMu    sync.Mutex
+	requestStorePlaintextCache = map[string]requestStorePlaintext{}
+)
+
+func cachedRequestStorePlaintext(path string) (string, bool) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", false
+	}
+	key, err := requestStoreKeyLoader()
+	if err != nil {
+		return "", false
+	}
+	requestStorePlaintextMu.Lock()
+	defer requestStorePlaintextMu.Unlock()
+	entry, ok := requestStorePlaintextCache[filepath.Clean(path)]
+	if !ok || entry.size != info.Size() || !entry.modTime.Equal(info.ModTime()) || entry.key != string(key) {
+		return "", false
+	}
+	return entry.payload, true
+}
+
+func rememberRequestStorePlaintext(path string, payload string) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+	key, err := requestStoreKeyLoader()
+	if err != nil {
+		return
+	}
+	requestStorePlaintextMu.Lock()
+	defer requestStorePlaintextMu.Unlock()
+	requestStorePlaintextCache = map[string]requestStorePlaintext{
+		filepath.Clean(path): {size: info.Size(), modTime: info.ModTime(), key: string(key), payload: payload},
+	}
+}
+
+func loadLocalRequestStoreStorage(path string) (map[string]any, error) {
+	payload, err := loadRequestStorePayload(path)
+	if err != nil {
+		return nil, err
+	}
+	key := filepath.Clean(path)
+	requestStorePlaintextMu.Lock()
+	entry, ok := requestStorePlaintextCache[key]
+	if ok && entry.storageKnown && entry.payload == payload {
+		requestStorePlaintextMu.Unlock()
+		return cloneMap(entry.storage), nil
+	}
+	requestStorePlaintextMu.Unlock()
+	var head struct {
+		Storage map[string]any `json:"storage"`
+	}
+	if err := json.Unmarshal([]byte(payload), &head); err != nil {
+		return nil, err
+	}
+	requestStorePlaintextMu.Lock()
+	if entry, ok := requestStorePlaintextCache[key]; ok && entry.payload == payload {
+		entry.storage = cloneMap(head.Storage)
+		entry.storageKnown = true
+		requestStorePlaintextCache[key] = entry
+	}
+	requestStorePlaintextMu.Unlock()
+	return head.Storage, nil
+}
+
 func loadRequestStorePayload(path string) (string, error) {
+	if payload, ok := cachedRequestStorePlaintext(path); ok {
+		return payload, nil
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -92,6 +172,7 @@ func loadRequestStorePayload(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	rememberRequestStorePlaintext(path, string(plaintext))
 	return string(plaintext), nil
 }
 
@@ -139,7 +220,11 @@ func saveRequestStorePayload(path string, payload string) error {
 	if err := os.Chmod(path, 0600); err != nil {
 		return err
 	}
-	return syncDir(dir)
+	if err := syncDir(dir); err != nil {
+		return err
+	}
+	rememberRequestStorePlaintext(path, payload)
+	return nil
 }
 
 func isEncryptedRequestStore(data []byte) bool {

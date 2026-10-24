@@ -247,6 +247,15 @@ export async function saveRequestStore(payload: string): Promise<SaveRequestStor
   return { ok, error: ok ? '' : 'request store save failed' };
 }
 
+export type RequestStoreView = { activeId: string; activeWorkspaceId: string; openIds: string[] };
+
+export async function saveRequestStoreView(view: RequestStoreView): Promise<SaveRequestStoreResult | null> {
+  const app = window.go?.api?.App;
+  if (!app?.SaveRequestStoreView) return null;
+  const result = await app.SaveRequestStoreView(JSON.stringify(view));
+  return { ok: Boolean(result?.ok), error: result?.error ?? '' };
+}
+
 export async function ackQuit(): Promise<void> {
   await window.go?.api?.App?.AckQuit?.();
 }

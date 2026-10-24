@@ -196,36 +196,49 @@ func loadKurloStorePayload(localStorePath, workspaceRoot string) (string, error)
 }
 
 func loadKurloStorePayloadWithDiagnostics(localStorePath, workspaceRoot string) (string, []WorkspaceDiagnostic, error) {
+	localStore, diagnostics, err := loadKurloStoreWithDiagnostics(localStorePath, workspaceRoot)
+	if err != nil {
+		return "", diagnostics, err
+	}
+	payload, err := json.MarshalIndent(localStore, "", "  ")
+	if err != nil {
+		return "", diagnostics, err
+	}
+	return string(payload), diagnostics, nil
+}
+
+func loadKurloStoreWithDiagnostics(localStorePath, workspaceRoot string) (map[string]any, []WorkspaceDiagnostic, error) {
 	localStore, _, localErr := loadLocalRequestStore(localStorePath)
 	localStoreAuthFailed := false
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
 		if !isRequestStoreAuthenticationError(localErr) {
-			return "", nil, localErr
+			return nil, nil, localErr
 		}
 		localStoreAuthFailed = true
 		localStore = nil
 	}
 
 	if workspaceRootUnavailable(workspaceRoot) {
-		return "", nil, fmt.Errorf("%s", missingWorkspaceRootMessage())
+		return nil, nil, fmt.Errorf("%s", missingWorkspaceRootMessage())
 	}
 	if !hasYAMLWorkspaceStore(workspaceRoot) && !workspaceChildrenRemain(workspaceRoot, fileStoreWorkspacesDir) {
 		if localStoreAuthFailed {
-			return "", nil, localErr
+			return nil, nil, localErr
 		}
-		return "", nil, fmt.Errorf("workspace does not contain a Kurlo YAML workspace")
+		return nil, nil, fmt.Errorf("workspace does not contain a Kurlo YAML workspace")
 	}
 
 	if localStore == nil {
 		localStore = map[string]any{}
 	}
+	applyRequestStoreView(localStorePath, localStore)
 	if err := recoverInterruptedSaveLocked(workspaceRoot); err != nil {
-		return "", nil, err
+		return nil, nil, err
 	}
 	secrets := stringMap(localStore["secrets"])
 	workspaces, collections, requests, environments, workspaceCookies, diagnostics, err := loadFilesystemWorkspaceStoreRepairing(workspaceRoot, secrets)
 	if err != nil {
-		return "", diagnostics, err
+		return nil, diagnostics, err
 	}
 
 	localStore["version"] = localStoreVersion
@@ -255,11 +268,7 @@ func loadKurloStorePayloadWithDiagnostics(localStorePath, workspaceRoot string) 
 		localStore["openIds"] = []string{stringValue(requests[0], "id")}
 	}
 
-	payload, err := json.MarshalIndent(localStore, "", "  ")
-	if err != nil {
-		return "", diagnostics, err
-	}
-	return string(payload), diagnostics, nil
+	return localStore, diagnostics, nil
 }
 
 func saveKurloStorePayload(localStorePath, workspaceRoot, payload string) error {
@@ -348,7 +357,14 @@ func secretsAhead(existing, next map[string]string) (map[string]string, bool) {
 }
 
 func buildLocalKurloStore(store map[string]any, workspaceRoot string, secrets map[string]string, sharedHash string, storageMode string) map[string]any {
-	localStore := cloneMap(store)
+	localStore := make(map[string]any, len(store)+2)
+	for key, value := range store {
+		switch key {
+		case "workspaces", "collections", "requests", "environments", "cookies", "workspaceCookies":
+		default:
+			localStore[key] = value
+		}
+	}
 	localStore["version"] = localStoreVersion
 	if storageMode != workspaceStorageModeGit && storageMode != workspaceStorageModeLocal {
 		storageMode = inferWorkspaceStorageMode(workspaceRoot)
@@ -362,21 +378,70 @@ func buildLocalKurloStore(store map[string]any, workspaceRoot string, secrets ma
 	}
 	localStore["storage"] = storage
 	localStore["secrets"] = cloneStringMap(secrets)
-	delete(localStore, "workspaces")
-	delete(localStore, "collections")
-	delete(localStore, "requests")
-	delete(localStore, "environments")
-	delete(localStore, "cookies")
-	delete(localStore, "workspaceCookies")
 	return localStore
 }
 
 func saveLocalKurloStore(path string, store map[string]any) error {
-	payload, err := json.MarshalIndent(store, "", "  ")
+	payload, err := json.Marshal(store)
 	if err != nil {
 		return err
 	}
-	return saveRequestStorePayload(path, string(payload))
+	if err := saveRequestStorePayload(path, string(payload)); err != nil {
+		return err
+	}
+	return clearRequestStoreView(path)
+}
+
+type requestStoreView struct {
+	ActiveID          string   `json:"activeId"`
+	ActiveWorkspaceID string   `json:"activeWorkspaceId"`
+	OpenIDs           []string `json:"openIds"`
+}
+
+func requestStoreViewPath(localStorePath string) string {
+	return filepath.Join(filepath.Dir(localStorePath), "request-view.json")
+}
+
+func saveRequestStoreView(localStorePath, payload string) error {
+	var view requestStoreView
+	if err := json.Unmarshal([]byte(payload), &view); err != nil {
+		return err
+	}
+	if view.OpenIDs == nil {
+		view.OpenIDs = []string{}
+	}
+	data, err := json.Marshal(view)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(localStorePath), 0755); err != nil {
+		return err
+	}
+	return writeFileAtomic(requestStoreViewPath(localStorePath), data)
+}
+
+func applyRequestStoreView(localStorePath string, store map[string]any) {
+	data, err := os.ReadFile(requestStoreViewPath(localStorePath))
+	if err != nil {
+		return
+	}
+	var view requestStoreView
+	if err := json.Unmarshal(data, &view); err != nil {
+		return
+	}
+	if view.OpenIDs == nil {
+		view.OpenIDs = []string{}
+	}
+	store["activeId"] = view.ActiveID
+	store["activeWorkspaceId"] = view.ActiveWorkspaceID
+	store["openIds"] = view.OpenIDs
+}
+
+func clearRequestStoreView(localStorePath string) error {
+	if err := os.Remove(requestStoreViewPath(localStorePath)); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func loadLocalRequestStore(path string) (map[string]any, string, error) {

@@ -1,4 +1,4 @@
-import { loadRequestStore, saveRequestStore } from '../../backend';
+import { loadRequestStore, saveRequestStore, saveRequestStoreView } from '../../backend';
 import { normalizeSavedRequest } from '../../normalizers';
 import type {
   Collection,
@@ -53,6 +53,7 @@ type RequestPersistenceHost = {
   guardWorkspaceWritable: (action?: string) => boolean;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: PersistRequestStore;
+  persistRequestStoreView: (activeId?: string, openIds?: string[], workspaceId?: string) => Promise<boolean>;
   persistWorkspaceNow: () => Promise<void>;
   pruneHistory: (history: RequestHistoryEntry[]) => RequestHistoryEntry[];
   recordSavedRequestSnapshots: (requestsForStore: SavedRequest[]) => void;
@@ -195,7 +196,7 @@ export const requestPersistenceFeature = {
     }
     const storeRequests = this.requestsForStore(nextRequests);
     const payload = this.requestStorePayload(storeRequests, activeId, nextOpenIds, nextWorkspaces, nextCollections, workspaceId, nextHistory, nextEnvironments, nextActiveEnvId);
-    const serialized = JSON.stringify(payload, null, 2);
+    const serialized = JSON.stringify(payload);
     const persistEpoch = this.requestStorePersistEpoch;
     const persistJob = this.requestStorePersistQueue.then(async () => {
       if (persistEpoch !== this.requestStorePersistEpoch) return false;
@@ -222,6 +223,37 @@ export const requestPersistenceFeature = {
       setTimeout(() => (this.collectionImportToast = ''), 5000);
       return false;
     }
+  },
+
+  async persistRequestStoreView(
+    this: RequestPersistenceHost,
+    activeId = this.activeRequestId,
+    nextOpenIds = this.openRequestIds,
+    workspaceId = this.activeWorkspaceId,
+  ) {
+    const storeWorkspaceIds = new Set(this.workspaces.filter(workspace => !workspace.isInvalid).map(workspace => workspace.id));
+    const storeCollectionIds = new Set(this.collections.filter(collection => !collection.isInvalid && storeWorkspaceIds.has(collection.workspaceId)).map(collection => collection.id));
+    const storeRequestIds = new Set(this.requests.filter(request => !request.isInvalid && storeCollectionIds.has(request.collectionId)).map(request => request.id));
+    const view = {
+      activeId: storeRequestIds.has(activeId) ? activeId : '',
+      activeWorkspaceId: storeWorkspaceIds.has(workspaceId) ? workspaceId : this.workspaces.find(workspace => storeWorkspaceIds.has(workspace.id))?.id ?? '',
+      openIds: nextOpenIds.filter(id => storeRequestIds.has(id)),
+    };
+    const persistEpoch = this.requestStorePersistEpoch;
+    const viewJob = this.requestStorePersistQueue.then(async () => {
+      if (persistEpoch !== this.requestStorePersistEpoch) return false;
+      return await saveRequestStoreView(view);
+    });
+    this.requestStorePersistQueue = viewJob.catch(() => undefined);
+    let saved: Awaited<typeof viewJob>;
+    try {
+      saved = await viewJob;
+    } catch {
+      saved = { ok: false, error: '' };
+    }
+    if (saved === null) return await this.persistRequestStore(this.requests, activeId, nextOpenIds);
+    if (saved === false) return false;
+    return saved.ok || await this.persistRequestStore(this.requests, activeId, nextOpenIds);
   },
 
   scheduleRequestStorePersist(this: RequestPersistenceHost, delay = 160) {

@@ -21,6 +21,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- Opening a request or closing a tab in a large workspace no longer saves the whole workspace, and saving a change reads the local store once. See [Performance fixtures](/docs/reference/performance-fixtures/).
 - Secret gRPC metadata and Socket.IO event rows, and secret rows without an id, are kept out of the YAML.
 - `kurlo run` skips SSE, MCP and AI requests, and the Collection Runner skips MCP requests instead of sending them as empty HTTP requests.
 - AI requests: thinking with temperature or top P on Anthropic, a stream cut before a signature, `pause_turn`, empty event streams, and OpenAI-compatible servers that refuse `stream_options` or a token-limit field or send tool calls without an id.

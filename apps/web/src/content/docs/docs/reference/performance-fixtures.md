@@ -41,7 +41,7 @@ cd apps/desktop/frontend
 KURLO_PERF_FIXTURES=$PWD/../../../perf/fixtures npx playwright test -g "perf fixtures"
 ```
 
-It prints first paint, sidebar search, opening a request, the history view and loading the huge response, and fails when first paint takes over 10 s or search or opening a request takes over 3 s.
+It prints first paint, sidebar search, opening a request, the history view and loading the huge response, and fails when first paint takes over 10 s, search over 500 ms or opening a request over 400 ms. On an Apple M-series machine with the default set, opening a request takes about 130 ms and saving the open tabs about 10 ms.
 
 ## Outputs
 

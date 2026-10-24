@@ -598,6 +598,7 @@ class AppVM {
   declare flushPendingPersist: typeof requestPersistenceFeature.flushPendingPersist;
   declare requestStorePayload: typeof requestPersistenceFeature.requestStorePayload;
   declare persistRequestStore: typeof requestPersistenceFeature.persistRequestStore;
+  declare persistRequestStoreView: typeof requestPersistenceFeature.persistRequestStoreView;
   declare scheduleRequestStorePersist: typeof requestPersistenceFeature.scheduleRequestStorePersist;
   declare persistActiveRequestNow: typeof requestPersistenceFeature.persistActiveRequestNow;
   declare saveActiveRequest: typeof requestPersistenceFeature.saveActiveRequest;

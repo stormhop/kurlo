@@ -16,6 +16,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Large workspaces switch requests without waiting on a save.** Opening a request or closing a tab wrote the whole workspace and its history again: with 5,000 requests that froze the UI for about a second and kept the disk busy for about five. It now saves only the open tabs and the active request, in a small file next to the local store, and a request opens in about 130 ms. Saving a change to a request is faster too: the encrypted local store is read once per save instead of up to four times, and requests that did not change are no longer copied again after each save.
 - A gRPC metadata row or a Socket.IO event marked `secret: true` was written to the YAML in plain text. Its value now goes to the encrypted local store like any other secret row, and so does a secret row without an `id`, as an import or a hand-edited file can leave it.
 - `kurlo run` sent an SSE request as an HTTP request with the method `SSE`. It now skips SSE, MCP and AI requests, as the docs say.
 - The Collection Runner sent an MCP request as an empty HTTP request and showed the answer as the result of the call. MCP requests are now skipped, like AI requests.

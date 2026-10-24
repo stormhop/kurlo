@@ -17,11 +17,11 @@ func fileWorkspaceStorePath() string {
 }
 
 func fileWorkspaceStorageMode() string {
-	store, _, err := loadLocalRequestStore(requestStorePath())
+	storage, err := loadLocalRequestStoreStorage(requestStorePath())
 	if err != nil {
 		return inferWorkspaceStorageMode(fileWorkspaceStorePath())
 	}
-	mode := stringValue(localStoreStorage(store), "mode")
+	mode := stringValue(storage, "mode")
 	if mode == workspaceStorageModeGit || mode == workspaceStorageModeLocal {
 		return mode
 	}
@@ -33,11 +33,11 @@ func defaultFileWorkspaceStorePath() string {
 }
 
 func configuredFileWorkspaceStorePath() string {
-	store, _, err := loadLocalRequestStore(requestStorePath())
+	storage, err := loadLocalRequestStoreStorage(requestStorePath())
 	if err != nil {
 		return ""
 	}
-	return stringValue(localStoreStorage(store), "root")
+	return stringValue(storage, "root")
 }
 
 func persistedWorkspaceRoot(root string) string {

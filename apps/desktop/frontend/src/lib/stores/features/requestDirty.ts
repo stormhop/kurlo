@@ -25,6 +25,8 @@ type RequestDirtyHost = {
   syncManualRequestSnapshotState: (next: ManualRequestSnapshotState) => void;
 };
 
+const snapshotSources = new WeakMap<SavedRequest, SavedRequest>();
+
 export const requestDirtyFeature = {
   savedRequestSnapshot(this: RequestDirtyHost, req: SavedRequest): SavedRequest {
     return cloneSavedRequestSnapshot(req);
@@ -102,7 +104,12 @@ export const requestDirtyFeature = {
     const currentIds = new Set(this.requests.filter(req => !req.isDraft).map(req => req.id));
     const next = new Map(this.savedRequestSnapshots);
     for (const req of requestsForStore) {
-      if (!req.isDraft) next.set(req.id, this.savedRequestSnapshot(req));
+      if (req.isDraft) continue;
+      const known = snapshotSources.get(req);
+      if (known && next.get(req.id) === known) continue;
+      const snapshot = this.savedRequestSnapshot(req);
+      snapshotSources.set(req, snapshot);
+      next.set(req.id, snapshot);
     }
     for (const id of next.keys()) {
       if (!currentIds.has(id)) next.delete(id);

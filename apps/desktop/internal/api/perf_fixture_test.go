@@ -87,4 +87,14 @@ func TestPerfFixtureWorkspace(t *testing.T) {
 		t.Fatal("saving the loaded workspace rewrote files: the fixture does not match the current format")
 	}
 	t.Logf("perf fixture: %d files, 0 diagnostics, resave is a no-op", len(before))
+
+	start = time.Now()
+	if err := saveRequestStoreView(local, `{"activeId":"","activeWorkspaceId":"","openIds":[]}`); err != nil {
+		t.Fatalf("save view: %v", err)
+	}
+	viewTook := time.Since(start)
+	t.Logf("perf fixture: saved the open tabs in %v", viewTook.Round(time.Microsecond))
+	if viewTook > 50*time.Millisecond {
+		t.Fatalf("saving the open tabs took %v, want under 50ms", viewTook)
+	}
 }

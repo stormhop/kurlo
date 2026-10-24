@@ -5,6 +5,7 @@ import { join } from 'node:path';
 type KurloE2EState = {
   store: Record<string, unknown>;
   savedStores: Record<string, unknown>[];
+  savedViews: Array<{ activeId: string; activeWorkspaceId: string; openIds: string[] }>;
   sentRequests: Array<Record<string, unknown>>;
   sseConnects: Array<Record<string, unknown>>;
   grpcDiscoveries: Array<Record<string, unknown>>;
@@ -195,6 +196,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
     const state = {
       store: initialStore,
       savedStores: [],
+      savedViews: [],
       sentRequests: [],
       sseConnects: [],
       grpcDiscoveries: [],
@@ -477,6 +479,14 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         state.store = parseStore(payload);
         state.savedStores.push(clone(state.store));
         return true;
+      },
+      SaveRequestStoreView: async (payload) => {
+        state.calls.push('SaveRequestStoreView');
+        if (state.failSaves) return { ok: false, error: 'Workspace folder no longer exists.' };
+        const view = JSON.parse(payload) as { activeId: string; activeWorkspaceId: string; openIds: string[] };
+        state.store = { ...state.store, activeId: view.activeId, activeWorkspaceId: view.activeWorkspaceId, openIds: view.openIds };
+        state.savedViews.push(view);
+        return { ok: true, error: '' };
       },
       SaveHistoryResponse: async (id, payload) => {
         state.historyResponses[id] = payload;
@@ -4490,6 +4500,39 @@ test.describe('Protocol badge', () => {
   });
 });
 
+test.describe('Request tabs', () => {
+  test('switching and closing tabs saves only the view, not the whole store', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const request = (id: string) => ({ id, name: id, collectionId: 'collection-tabs', collection: 'Tabs', folderPath: [], requestType: 'http', method: 'GET', url: `https://api.example.test/${id}` });
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.collections = [{ id: 'collection-tabs', workspaceId: 'workspace-e2e', name: 'Tabs', filesystemName: 'Tabs' }];
+      store.requests = [request('alpha'), request('beta'), request('gamma')];
+      store.activeId = 'alpha';
+      store.openIds = ['alpha', 'beta'];
+    });
+    await page.goto('/');
+    await expect(page.getByLabel('Request URL')).toHaveValue(/alpha$/);
+    await page.evaluate(() => { window.__kurloE2E.calls.length = 0; });
+
+    await page.getByRole('tab', { name: /\bbeta$/ }).first().click();
+    await expect(page.getByLabel('Request URL')).toHaveValue(/beta$/);
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedViews.at(-1))).toEqual({ activeId: 'beta', activeWorkspaceId: 'workspace-e2e', openIds: ['alpha', 'beta'] });
+
+    await page.getByText('gamma', { exact: true }).first().click();
+    await expect(page.getByLabel('Request URL')).toHaveValue(/gamma$/);
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedViews.at(-1))).toEqual({ activeId: 'gamma', activeWorkspaceId: 'workspace-e2e', openIds: ['alpha', 'beta', 'gamma'] });
+
+    await page.getByRole('button', { name: 'Close tab' }).nth(2).click();
+    await expect(page.getByLabel('Request URL')).toHaveValue(/beta$/);
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedViews.at(-1))).toEqual({ activeId: 'beta', activeWorkspaceId: 'workspace-e2e', openIds: ['alpha', 'beta'] });
+
+    const calls = await page.evaluate(() => window.__kurloE2E.calls);
+    expect(calls.filter(call => call === 'SaveRequestStore')).toEqual([]);
+    expect(await page.evaluate(() => (window.__kurloE2E.store as { activeId: string }).activeId)).toBe('beta');
+  });
+});
+
 test.describe('GraphQL explorer', () => {
   test('keeps every field row whole when the schema does not fit', async ({ page }) => {
     await installKurloBridge(page);
@@ -4795,8 +4838,8 @@ test.describe('Perf fixtures', () => {
     console.log(`perf fixtures: ${Object.entries(timings).map(([label, ms]) => `${label} ${ms}ms`).join(', ')}`);
     expect(pageErrors).toEqual([]);
     expect(timings['first paint']).toBeLessThan(10_000);
-    expect(timings['sidebar search']).toBeLessThan(3_000);
-    expect(timings['open request']).toBeLessThan(3_000);
+    expect(timings['sidebar search']).toBeLessThan(500);
+    expect(timings['open request']).toBeLessThan(400);
   });
 });
 

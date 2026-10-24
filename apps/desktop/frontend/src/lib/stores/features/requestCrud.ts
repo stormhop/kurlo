@@ -108,6 +108,7 @@ type RequestCrudHost = {
   openWorkspaceDiagnostic: (diagnostics?: SavedRequest['workspaceDiagnostics']) => void;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: (requests?: SavedRequest[], activeId?: string, openIds?: string[]) => Promise<boolean>;
+  persistRequestStoreView: (activeId?: string, openIds?: string[], workspaceId?: string) => Promise<boolean>;
   removeDirtyRequest: (id: string) => void;
   requestForEditing: (id: string) => SavedRequest | undefined;
   requestHasContent: (req: SavedRequest) => boolean;
@@ -536,7 +537,7 @@ export const requestCrudFeature = {
     this.activeWorkspaceId = this.workspaceIdForCollection(next.collectionId);
     this.applySavedRequest(next);
     this.topView = 'request';
-    await this.persistRequestStore(this.requests, id, this.openRequestIds);
+    await this.persistRequestStoreView(id, this.openRequestIds);
   },
 
   async closeRequestTab(this: RequestCrudHost, id: string, force = false) {
@@ -610,7 +611,8 @@ export const requestCrudFeature = {
         this.topView = 'overview';
       }
     }
-    await this.persistRequestStore(this.requests, this.activeRequestId, nextOpenIds);
+    if (isDraft) await this.persistRequestStore(this.requests, this.activeRequestId, nextOpenIds);
+    else await this.persistRequestStoreView(this.activeRequestId, nextOpenIds);
   },
 
   async closeRequestTabs(this: RequestCrudHost, ids: string[]) {

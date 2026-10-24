@@ -283,6 +283,15 @@ func (a *App) SaveRequestStoreWithError(payload string) SaveRequestStoreResult {
 	return SaveRequestStoreResult{Ok: true}
 }
 
+func (a *App) SaveRequestStoreView(payload string) SaveRequestStoreResult {
+	gitOperationMu.Lock()
+	defer gitOperationMu.Unlock()
+	if err := saveRequestStoreView(requestStorePath(), payload); err != nil {
+		return SaveRequestStoreResult{Ok: false, Error: err.Error()}
+	}
+	return SaveRequestStoreResult{Ok: true}
+}
+
 func (a *App) saveRequestStorePayload(payload string) error {
 	root := fileWorkspaceStorePath()
 	unlock, err := lockWorkspaceWrites(root)
@@ -310,7 +319,7 @@ func (a *App) saveRequestStorePayload(payload string) error {
 
 func (a *App) writeRequestStorePayload(root, payload string) error {
 	localStoreAuthFailed := false
-	if _, _, err := loadLocalRequestStore(requestStorePath()); err != nil && isRequestStoreAuthenticationError(err) {
+	if _, err := loadRequestStorePayload(requestStorePath()); err != nil && isRequestStoreAuthenticationError(err) {
 		localStoreAuthFailed = true
 	}
 	if hasYAMLWorkspaceStore(root) {
@@ -320,7 +329,7 @@ func (a *App) writeRequestStorePayload(root, payload string) error {
 			}
 			return saveKurloStorePayloadPreserving(requestStorePath(), root, payload, nil)
 		}
-		_, diagnostics, err := loadKurloStorePayloadWithDiagnostics(requestStorePath(), root)
+		_, diagnostics, err := loadKurloStoreWithDiagnostics(requestStorePath(), root)
 		if err != nil {
 			if isRequestStoreAuthenticationError(err) {
 				if _, backupErr := backupRequestStoreForRecovery(requestStorePath()); backupErr != nil {
