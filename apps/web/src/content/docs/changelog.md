@@ -27,6 +27,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - AI requests: thinking with temperature or top P on Anthropic, a stream cut before a signature, `pause_turn`, empty event streams, and OpenAI-compatible servers that refuse `stream_options` or a token-limit field or send tool calls without an id.
 - With Tengo selected, scripts from a Postman, Insomnia or Bruno import go to the JavaScript fields instead of failing in Tengo, and exports to those formats take the JavaScript scripts. See [Import and export](/docs/guides/import-export/).
 - The shortcut list in Settings no longer scrolls sideways, and its keys line up in columns.
+- Merge conflicts in the diff3 style no longer put the base text into **Ours**.
 - Git status and diffs no longer race a running commit, pull or rebase, and an unreadable saved token is reported.
 
 ## 2.5.0

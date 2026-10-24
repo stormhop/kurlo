@@ -7,6 +7,7 @@ export type GitConflictHunk = {
   marker: string;
   ours: string[];
   theirs: string[];
+  base: string[];
   raw: string[];
 };
 
@@ -16,6 +17,10 @@ export type GitConflictBlock =
 
 function isConflictStart(line: string) {
   return line.startsWith('<<<<<<<');
+}
+
+function isConflictBaseMarker(line: string) {
+  return line.startsWith('|||||||');
 }
 
 function isConflictSeparator(line: string) {
@@ -53,9 +58,14 @@ export function parseGitConflictBlocks(content: string): GitConflictBlock[] {
     }
 
     const start = lineIndex;
+    let baseMarker = -1;
     let separator = -1;
     let end = -1;
     for (let scan = start + 1; scan < lines.length; scan += 1) {
+      if (baseMarker < 0 && separator < 0 && isConflictBaseMarker(lines[scan])) {
+        baseMarker = scan;
+        continue;
+      }
       if (separator < 0 && isConflictSeparator(lines[scan])) {
         separator = scan;
         continue;
@@ -79,8 +89,9 @@ export function parseGitConflictBlocks(content: string): GitConflictBlock[] {
       startLine: start + 1,
       endLine: end + 1,
       marker: line.replace(/^<<<<<<<\s*/, '').trim() || 'HEAD',
-      ours: lines.slice(start + 1, separator),
+      ours: lines.slice(start + 1, baseMarker >= 0 ? baseMarker : separator),
       theirs: lines.slice(separator + 1, end),
+      base: baseMarker >= 0 ? lines.slice(baseMarker + 1, separator) : [],
       raw: lines.slice(start, end + 1),
     });
     hunkIndex += 1;

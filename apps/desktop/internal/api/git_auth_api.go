@@ -78,6 +78,8 @@ func (a *App) GitSshUrlFor(remoteURL string) string {
 }
 
 func (a *App) GitRemoteUrl(remoteName string) string {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	status := gitStatusForWorkspace(fileWorkspaceStorePath())
 	if !status.IsRepo || status.Root == "" {
 		return ""
@@ -86,6 +88,8 @@ func (a *App) GitRemoteUrl(remoteName string) string {
 }
 
 func (a *App) GitSetRemoteUrl(remoteName, remoteURL string) GitOperationResult {
+	gitOperationMu.Lock()
+	defer gitOperationMu.Unlock()
 	status := gitStatusForWorkspace(fileWorkspaceStorePath())
 	if !status.IsRepo || status.Root == "" {
 		return GitOperationResult{Ok: false, Git: status, Error: "Not a Git repository."}

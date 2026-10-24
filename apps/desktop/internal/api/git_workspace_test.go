@@ -2839,3 +2839,54 @@ func TestGitCheckoutLoadsTheOtherBranchesWorkspace(t *testing.T) {
 		}
 	}
 }
+
+func TestSwapGitConflictMarkerSidesKeepsDiff3BaseOutOfSides(t *testing.T) {
+	content := strings.Join([]string{
+		"version: 1",
+		"<<<<<<< HEAD",
+		"description: upstream",
+		"||||||| merged common ancestors",
+		"description: base",
+		"=======",
+		"description: local",
+		">>>>>>> abc1234 (local commit)",
+		"name: Workspace",
+	}, "\n")
+
+	swapped := swapGitConflictMarkerSides(content)
+	if strings.Contains(swapped, "|||||||") {
+		t.Fatalf("swapped content kept the diff3 base marker:\n%s", swapped)
+	}
+	lines := strings.Split(swapped, "\n")
+	if !strings.HasPrefix(lines[1], "<<<<<<< local") {
+		t.Fatalf("first side should be semantic ours after swap, got %q", lines[1])
+	}
+	ours := swapped[strings.Index(swapped, "<<<<<<< local"):strings.Index(swapped, "=======")]
+	if !strings.Contains(ours, "description: local") {
+		t.Fatalf("semantic ours content missing after swap:\n%s", swapped)
+	}
+	if strings.Contains(ours, "description: base") {
+		t.Fatalf("base content leaked into the ours side:\n%s", swapped)
+	}
+	if !strings.Contains(swapped, "description: upstream") {
+		t.Fatalf("semantic theirs content missing after swap:\n%s", swapped)
+	}
+	if !strings.HasSuffix(strings.TrimSpace(swapped), "name: Workspace") {
+		t.Fatalf("text after the conflict hunk was lost:\n%s", swapped)
+	}
+
+	plain := "<<<<<<< HEAD\none\n=======\ntwo\n>>>>>>> branch\n"
+	swappedPlain := swapGitConflictMarkerSides(plain)
+	if swappedPlain != "<<<<<<< local\ntwo\n=======\none\n>>>>>>> remote\n" {
+		t.Fatalf("plain conflict swap changed shape: %q", swappedPlain)
+	}
+}
+
+func TestContainsGitConflictMarkersDetectsDiff3Base(t *testing.T) {
+	if !containsGitConflictMarkers("ok\n<<<<<<< HEAD\nx\n||||||| base\ny\n=======\nz\n>>>>>>> other\n") {
+		t.Fatal("diff3 conflict markers were not detected")
+	}
+	if containsGitConflictMarkers("ok:\n  - a\n  - b\n") {
+		t.Fatal("plain YAML was flagged as containing conflict markers")
+	}
+}

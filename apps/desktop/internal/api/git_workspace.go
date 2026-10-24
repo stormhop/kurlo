@@ -2139,9 +2139,14 @@ func swapGitConflictMarkerSides(content string) string {
 			continue
 		}
 		start := lineIndex
+		baseMarker := -1
 		separator := -1
 		end := -1
 		for scan := start + 1; scan < len(lines); scan++ {
+			if baseMarker < 0 && separator < 0 && strings.HasPrefix(lines[scan], "|||||||") {
+				baseMarker = scan
+				continue
+			}
 			if separator < 0 && strings.HasPrefix(lines[scan], "=======") {
 				separator = scan
 				continue
@@ -2155,10 +2160,14 @@ func swapGitConflictMarkerSides(content string) string {
 			result = append(result, line)
 			continue
 		}
+		first := lines[start+1 : separator]
+		if baseMarker >= 0 {
+			first = lines[start+1 : baseMarker]
+		}
 		result = append(result, "<<<<<<< local")
 		result = append(result, lines[separator+1:end]...)
 		result = append(result, "=======")
-		result = append(result, lines[start+1:separator]...)
+		result = append(result, first...)
 		result = append(result, ">>>>>>> remote")
 		lineIndex = end
 	}
@@ -2200,7 +2209,7 @@ func gitConflictStageAvailable(repoRoot, relPath string, stage int) bool {
 
 func containsGitConflictMarkers(content string) bool {
 	for _, line := range strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n") {
-		if strings.HasPrefix(line, "<<<<<<< ") || strings.HasPrefix(line, "=======") || strings.HasPrefix(line, ">>>>>>> ") {
+		if strings.HasPrefix(line, "<<<<<<< ") || strings.HasPrefix(line, "=======") || strings.HasPrefix(line, ">>>>>>> ") || strings.HasPrefix(line, "|||||||") {
 			return true
 		}
 	}

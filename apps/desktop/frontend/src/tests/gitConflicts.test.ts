@@ -39,3 +39,38 @@ describe('git conflict helpers', () => {
     expect(resolved.match(/description: "123321"/g)).toHaveLength(2);
   });
 });
+
+const diff3Sample = [
+  'version: 1',
+  '<<<<<<< HEAD',
+  '    description: local',
+  '||||||| merged common ancestors',
+  '    description: base',
+  '=======',
+  '    description: remote',
+  '>>>>>>> feature',
+  '    name: Workspace',
+].join('\n');
+
+describe('git conflict helpers with diff3 style', () => {
+  it('keeps the diff3 base section out of both sides', () => {
+    const hunks = gitConflictHunks(diff3Sample);
+    expect(hunks).toHaveLength(1);
+    expect(hunks[0].ours).toEqual(['    description: local']);
+    expect(hunks[0].theirs).toEqual(['    description: remote']);
+    expect(hunks[0].base).toEqual(['    description: base']);
+    expect(JSON.stringify(hunks[0].ours)).not.toContain('|||||||');
+    expect(JSON.stringify(hunks[0].ours)).not.toContain('description: base');
+  });
+
+  it('resolving a side drops the base section and its marker', () => {
+    for (const side of ['ours', 'theirs'] as const) {
+      const resolved = replaceAllGitConflictHunks(diff3Sample, side);
+      expect(resolved).not.toContain('|||||||');
+      expect(resolved).not.toContain('description: base');
+      expect(resolved).not.toContain('=======');
+    }
+    expect(replaceAllGitConflictHunks(diff3Sample, 'ours')).toContain('description: local');
+    expect(replaceAllGitConflictHunks(diff3Sample, 'theirs')).toContain('description: remote');
+  });
+});
