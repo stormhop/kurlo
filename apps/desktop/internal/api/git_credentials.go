@@ -116,21 +116,26 @@ func saveGitCredentials(creds map[string]gitCredential) error {
 }
 
 func gitCredentialLookup(host string) (gitCredential, bool) {
+	cred, ok, _ := gitCredentialLookupErr(host)
+	return cred, ok
+}
+
+func gitCredentialLookupErr(host string) (gitCredential, bool, error) {
 	host = normalizeGitHost(host)
 	if host == "" {
-		return gitCredential{}, false
+		return gitCredential{}, false, nil
 	}
 	gitCredentialsMu.Lock()
 	defer gitCredentialsMu.Unlock()
 	creds, err := loadGitCredentials()
 	if err != nil {
-		return gitCredential{}, false
+		return gitCredential{}, false, err
 	}
 	cred, ok := creds[host]
 	if !ok || strings.TrimSpace(cred.Token) == "" {
-		return gitCredential{}, false
+		return gitCredential{}, false, nil
 	}
-	return cred, true
+	return cred, true, nil
 }
 
 func gitCredentialSet(host, username, token string) error {
@@ -288,7 +293,11 @@ func RunGitCredentialHelper(args []string) int {
 	host := fields["host"]
 	switch action {
 	case "get":
-		cred, ok := gitCredentialLookup(host)
+		cred, ok, err := gitCredentialLookupErr(host)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "kurlo: the saved Git token for %s could not be read (%v); save the token again in Kurlo\n", host, err)
+			return 0
+		}
 		if !ok {
 
 			return 0

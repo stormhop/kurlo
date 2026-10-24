@@ -3,7 +3,7 @@ import { emptyAuthConfig } from '../../wire';
 import type { AuthConfig, OAuth2DevicePrompt, OAuth2TokenResponse } from '../../backend';
 import { AUTH_OPTIONS } from '../../constants';
 import type { AuthType, OAuth2ClientAuth, OAuth2GrantType, RequestType, SavedRequest } from '../../types/models';
-import { authForPersistence as resolveAuthForPersistence, authStateHasData as authHasPersistableData } from '../../utils';
+import { authForPersistence as resolveAuthForPersistence, authStateHasData as authHasPersistableData, oauth1AuthFields, type OAuth1Fields } from '../../utils';
 
 type AuthHost = {
   activeRequestId: string;
@@ -17,6 +17,7 @@ type AuthHost = {
   awsSecretKey: string;
   awsSessionToken: string;
   awsService: string;
+  oauth1: OAuth1Fields;
   basicPass: string;
   basicUser: string;
   bearerToken: string;
@@ -107,6 +108,7 @@ export const authFeature = {
       awsSessionToken: this.awsSessionToken,
       awsRegion: this.awsRegion,
       awsService: this.awsService,
+      ...oauth1AuthFields(this.oauth1),
     };
   },
 
@@ -131,6 +133,7 @@ export const authFeature = {
       return Boolean(this.oauth2TokenURL && this.oauth2ClientID);
     }
     if (this.authType === 'aws') return Boolean(this.awsAccessKey && this.awsSecretKey && this.awsRegion && this.awsService);
+    if (this.authType === 'oauth1') return Boolean(this.oauth1.consumerKey);
     return false;
   },
 

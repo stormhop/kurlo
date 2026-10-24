@@ -32,7 +32,15 @@ type aiRunner struct {
 	send     func(ctx context.Context, req model.HttpRequest, sink responseBodySinkFactory) model.HttpResponse
 	mcp      func(req model.HttpRequest) model.McpResponse
 	now      func() time.Time
+
+	bodyFixes map[string]bool
 }
+
+const (
+	aiFixDropStreamOptions = "drop-stream-options"
+	aiFixCompletionTokens  = "max-completion-tokens"
+	aiFixPlainMaxTokens    = "max-tokens"
+)
 
 func (a *App) SendAiRequest(req model.AiRequest) model.AiResponse {
 	baseCtx := context.Background()
@@ -157,6 +165,12 @@ func (r *aiRunner) run() model.AiResponse {
 			out.Error = step.Error
 			break
 		}
+		if step.StopReason == model.AiStopPauseTurn && len(step.Blocks) > 0 {
+			if index == maxSteps-1 {
+				out.Warnings = append(out.Warnings, fmt.Sprintf("Stopped after %d steps: the model paused its turn and had not finished. Raise the step limit to let it finish.", maxSteps))
+			}
+			continue
+		}
 		if step.StopReason != model.AiStopToolUse || len(tools) == 0 {
 			break
 		}
@@ -188,6 +202,9 @@ func (r *aiRunner) run() model.AiResponse {
 func (r *aiRunner) stepRequest(index int, conversation []model.AiMessage, tools []aiTool) (model.HttpRequest, error) {
 	body, headers, err := r.provider.build(r.req, conversation, tools)
 	if err != nil {
+		return model.HttpRequest{}, err
+	}
+	if body, err = r.applyBodyFixes(body); err != nil {
 		return model.HttpRequest{}, err
 	}
 	prepared := r.req.HTTP
@@ -227,6 +244,67 @@ func (s *aiStreamSink) Write(p []byte) (int, error) {
 }
 
 func (r *aiRunner) runStep(index int, conversation []model.AiMessage, tools []aiTool) model.AiStep {
+	step := r.attemptStep(index, conversation, tools)
+	if fix := r.bodyFixFor(step); fix != "" {
+		if r.bodyFixes == nil {
+			r.bodyFixes = map[string]bool{}
+		}
+		r.bodyFixes[fix] = true
+		step = r.attemptStep(index, conversation, tools)
+	}
+	step = model.NormalizeAiStep(step)
+	r.publish("ai:step", model.AiStepEvent{SessionID: r.sessionID(), TurnID: r.req.TurnID, Step: aiStepEventCopy(step)})
+	return step
+}
+
+func (r *aiRunner) bodyFixFor(step model.AiStep) string {
+	if _, ok := r.provider.(openAIProvider); !ok || step.HTTP.StatusCode < 400 || step.HTTP.StatusCode >= 500 {
+		return ""
+	}
+	message := strings.ToLower(step.Error + " " + step.HTTP.Body)
+	var body map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(step.RequestBody), &body)
+	_, hasStreamOptions := body["stream_options"]
+	_, hasMaxTokens := body["max_tokens"]
+	_, hasCompletionTokens := body["max_completion_tokens"]
+	switch {
+	case hasStreamOptions && strings.Contains(message, "stream_options") && !r.bodyFixes[aiFixDropStreamOptions]:
+		return aiFixDropStreamOptions
+	case hasMaxTokens && strings.Contains(message, "max_completion_tokens") && !r.bodyFixes[aiFixCompletionTokens]:
+		return aiFixCompletionTokens
+	case hasCompletionTokens && strings.Contains(message, "max_completion_tokens") && !r.bodyFixes[aiFixPlainMaxTokens]:
+		return aiFixPlainMaxTokens
+	}
+	return ""
+}
+
+func (r *aiRunner) applyBodyFixes(body []byte) ([]byte, error) {
+	if len(r.bodyFixes) == 0 {
+		return body, nil
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return body, nil
+	}
+	if r.bodyFixes[aiFixDropStreamOptions] {
+		delete(fields, "stream_options")
+	}
+	if r.bodyFixes[aiFixCompletionTokens] {
+		if value, ok := fields["max_tokens"]; ok {
+			delete(fields, "max_tokens")
+			fields["max_completion_tokens"] = value
+		}
+	}
+	if r.bodyFixes[aiFixPlainMaxTokens] {
+		if value, ok := fields["max_completion_tokens"]; ok {
+			delete(fields, "max_completion_tokens")
+			fields["max_tokens"] = value
+		}
+	}
+	return json.Marshal(fields)
+}
+
+func (r *aiRunner) attemptStep(index int, conversation []model.AiMessage, tools []aiTool) model.AiStep {
 	step := model.AiStep{Index: index}
 	prepared, err := r.stepRequest(index, conversation, tools)
 	if err != nil {
@@ -257,10 +335,10 @@ func (r *aiRunner) runStep(index int, conversation []model.AiMessage, tools []ai
 	var firstMu sync.Mutex
 	batcher := newEventBatcher[model.AiDeltaEvent](64, 50*time.Millisecond,
 		func(ev model.AiDeltaEvent) {
-			r.publish("ai:deltas", model.AiDeltaBatch{SessionID: r.sessionID(), Deltas: []model.AiDeltaEvent{ev}})
+			r.publish("ai:deltas", model.AiDeltaBatch{SessionID: r.sessionID(), TurnID: r.req.TurnID, Deltas: []model.AiDeltaEvent{ev}})
 		},
 		func(events []model.AiDeltaEvent) {
-			r.publish("ai:deltas", model.AiDeltaBatch{SessionID: r.sessionID(), Deltas: events})
+			r.publish("ai:deltas", model.AiDeltaBatch{SessionID: r.sessionID(), TurnID: r.req.TurnID, Deltas: events})
 		})
 	emit := func(delta model.AiDeltaEvent) {
 		firstMu.Lock()
@@ -275,6 +353,8 @@ func (r *aiRunner) runStep(index int, conversation []model.AiMessage, tools []ai
 
 	var sink *aiStreamSink
 	streamed := false
+	var events int
+	var eventsMu sync.Mutex
 	sinkFactory := func(headers []model.KeyValue) *responseBodySink {
 		touch()
 		if !headerContainsEventStream(headers) {
@@ -286,6 +366,11 @@ func (r *aiRunner) runStep(index int, conversation []model.AiMessage, tools []ai
 		go func() {
 			defer close(sink.done)
 			parseSSEStream(stepCtx, reader, "", func(ev model.SSEEvent) {
+				if strings.TrimSpace(ev.Data) != "" {
+					eventsMu.Lock()
+					events++
+					eventsMu.Unlock()
+				}
 				decoder.event(ev, emit)
 			})
 			_, _ = io.Copy(io.Discard, reader)
@@ -345,10 +430,10 @@ func (r *aiRunner) runStep(index int, conversation []model.AiMessage, tools []ai
 		}
 	case result.err != "":
 		step.Error = result.err
+	case streamed && events == 0 && len(step.Blocks) == 0:
+		step.Error = "The provider answered with Content-Type: text/event-stream but sent no events, so there is no answer. Check the base URL, or turn Stream off in Settings."
 	}
 	step.HTTP.Error = ""
-	step = model.NormalizeAiStep(step)
-	r.publish("ai:step", model.AiStepEvent{SessionID: r.sessionID(), Step: aiStepEventCopy(step)})
 	return step
 }
 
@@ -441,7 +526,7 @@ func (r *aiRunner) callTools(stepIndex int, blocks []model.AiBlock, tools []aiTo
 			result.Text, result.IsError = r.callTool(tool, block.Input)
 		}
 		results = append(results, result)
-		r.publish("ai:tool", model.AiToolResultEvent{SessionID: r.sessionID(), Step: stepIndex, Block: result})
+		r.publish("ai:tool", model.AiToolResultEvent{SessionID: r.sessionID(), TurnID: r.req.TurnID, Step: stepIndex, Block: result})
 	}
 	return results
 }

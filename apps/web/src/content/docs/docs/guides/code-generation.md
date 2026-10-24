@@ -27,6 +27,7 @@ Snippets are generated from the currently open HTTP, GraphQL or AI request:
 - URL params, enabled headers, and supported bodies are represented.
 - Bearer, API key, Basic, and OAuth 2.0 auth are emitted in every language. Basic becomes an `Authorization: Basic …` header; an OAuth 2.0 request carries the access token Kurlo currently holds, and the snippet says so, because that token expires.
 - cURL goes further where curl itself can: `-u` for Basic, `--digest` for Digest, and `--aws-sigv4` with the access key for AWS Signature v4, so the copied command signs itself rather than carrying a signature that is already stale.
+- OAuth 1.0 is signed per request over a fresh timestamp and nonce, so a snippet cannot carry a signature that still works. It leaves the header out and says to use an OAuth 1.0 signing library.
 
 ## AI requests
 

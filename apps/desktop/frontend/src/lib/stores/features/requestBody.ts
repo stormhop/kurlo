@@ -26,6 +26,7 @@ type RequestBodyHost = {
   authType: SavedRequest['auth']['type'];
   awsAccessKey: string;
   awsSecretKey: string;
+  oauth1: import('../../utils').OAuth1Fields;
   basicPass: string;
   basicUser: string;
   bearerToken: string;
@@ -295,6 +296,7 @@ export const requestBodyFeature = {
     this.oauth2Token = '';
     this.awsAccessKey = '';
     this.awsSecretKey = '';
+    this.oauth1 = { ...this.oauth1, consumerSecret: '', token: '', tokenSecret: '', privateKey: '' };
     this.resetBodyState();
     if (parsed.username) {
       this.authType = 'basic';

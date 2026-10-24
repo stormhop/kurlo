@@ -7,6 +7,7 @@
   import { appLazyComponents as lazy } from '../stores/lazyComponents.svelte';
   import AppDialog from './AppDialog.svelte';
   import GitAuthModal from './GitAuthModal.svelte';
+  import FindReplaceModal from './FindReplaceModal.svelte';
   import MissingSecretsModal from './MissingSecretsModal.svelte';
   import WorkspaceYAMLEditor from './WorkspaceYAMLEditor.svelte';
 
@@ -60,11 +61,28 @@
     createEnvironment: () => vm.createEnvironment(),
     importCollection: vm.openPostmanImport,
     copyCurl: () => vm.copyRequestCurl(vm.activeRequestId),
+    findReplaceInCollection: vm.activeRequest && !vm.activeRequest.isDraft
+      ? () => { if (vm.activeRequest) void vm.openFindReplace(vm.activeRequest.collectionId, vm.activeRequest.folderPath ?? []); }
+      : undefined,
     setResponseLayout: (layout) => vm.setResponseLayout(layout),
     setThemeMode: (mode) => vm.setThemeMode(mode),
     showWhatsNew: onShowWhatsNew,
   }) : []);
 </script>
+
+{#if vm.findReplaceScope}
+  <FindReplaceModal
+    scopeLabel={vm.findReplaceScopeLabel()}
+    requests={vm.findReplaceRequests()}
+    unsavedIds={vm.findReplaceUnsavedIds()}
+    undo={vm.findReplaceUndo}
+    requestLabel={requestTabLabel}
+    onApply={vm.applyFindReplace}
+    onUndo={vm.undoFindReplace}
+    onOpenRequest={(id: string) => { vm.closeFindReplace(); vm.switchRequest(id); }}
+    onClose={vm.closeFindReplace}
+  />
+{/if}
 
 {#if vm.missingSecrets.length}
   <MissingSecretsModal

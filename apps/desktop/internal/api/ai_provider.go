@@ -129,6 +129,9 @@ func (b *aiBlockBuilder) finish() []model.AiBlock {
 		if block.Type == model.AiBlockToolUse && strings.TrimSpace(block.Input) == "" {
 			block.Input = "{}"
 		}
+		if block.Type == model.AiBlockToolUse && strings.TrimSpace(block.ID) == "" {
+			block.ID = "call_" + strconv.Itoa(len(out))
+		}
 		out = append(out, block)
 	}
 	return out

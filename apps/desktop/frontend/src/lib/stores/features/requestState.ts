@@ -43,8 +43,10 @@ import {
   emptyAuthState,
   inheritAuthState,
   newRequestId,
+  oauth1FieldsFromAuth,
   restoreRows,
   rowHasContent,
+  type OAuth1Fields,
 } from '../../utils';
 
 type RequestStateHost = {
@@ -60,6 +62,7 @@ type RequestStateHost = {
   awsSecretKey: string;
   awsSessionToken: string;
   awsService: string;
+  oauth1: OAuth1Fields;
   basicPass: string;
   basicUser: string;
   bearerToken: string;
@@ -411,6 +414,7 @@ export const requestStateFeature = {
     this.oauth2AssertionAlgorithm = req.auth.oauth2AssertionAlgorithm ?? ''; this.oauth2AssertionPrivateKey = req.auth.oauth2AssertionPrivateKey ?? '';
     this.oauth2AssertionKeyID = req.auth.oauth2AssertionKeyID ?? ''; this.oauth2AssertionAudience = req.auth.oauth2AssertionAudience ?? '';
     this.awsAccessKey = req.auth.awsAccessKey; this.awsSecretKey = req.auth.awsSecretKey; this.awsSessionToken = req.auth.awsSessionToken ?? ''; this.awsRegion = req.auth.awsRegion; this.awsService = req.auth.awsService;
+    this.oauth1 = oauth1FieldsFromAuth(req.auth);
     if (this.requestType === 'grpc' && !['none', 'apikey', 'basic', 'bearer', 'oauth2'].includes(this.authType)) this.authType = 'none';
     if (this.requestType === 'grpc') this.apiKeyIn = 'header';
     if (this.requestType === 'graphql') {

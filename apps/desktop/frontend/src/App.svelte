@@ -95,6 +95,7 @@
   let historyDetailMode = $derived<ResponseRenderMode>(!vm.historyDetailResponse ? 'text' : vm.isJsonResponse(vm.historyDetailResponse) ? 'json' : vm.isHtmlResponse(vm.historyDetailResponse) ? 'html' : 'text');
   let historyDetailVirtualized = $derived(historyDetailBody ? shouldVirtualizeResponseBody(historyDetailBody, historyDetailMode) : false);
   let responseOnRight = $derived(vm.responseLayout === 'right' && requestSplitWidth / $uiScale >= responseRightMinWidth(vm.responseLayoutChosen));
+  let responseRightTooNarrow = $derived(!responseOnRight && requestSplitWidth > 0 && requestSplitWidth / $uiScale < responseRightMinWidth(true));
 
   function setRuntimePlatform(runtime: string) {
     const platform = runtime.split('/')[0] || 'browser';
@@ -491,6 +492,7 @@
     createRequestInFolder={vm.createRequestInFolder}
     createSubfolder={vm.createSubfolder}
     renameFolder={vm.renameFolder}
+    openFindReplace={vm.openFindReplace}
     deleteFolder={vm.deleteFolder}
     createFolderInCollection={vm.createFolderInCollection}
     runFolder={vm.runFolder}
@@ -1067,6 +1069,7 @@
     codePanelOpen={vm.codePanelOpen}
     codePanelAvailable={codePanelAvailable}
     {responseOnRight}
+    {responseRightTooNarrow}
     topView={vm.topView}
     gitStatus={vm.gitStatus}
     appVersion={vm.appVersion}

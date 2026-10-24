@@ -122,7 +122,7 @@ export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'met
 export type ScriptTab = 'pre-request' | 'tests';
 export type ResponseTab = 'body' | 'preview' | 'headers' | 'test-results' | 'timeline' | 'diff';
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
-export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'oauth2' | 'aws' | 'digest';
+export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'oauth2' | 'oauth1' | 'aws' | 'digest';
 export type SidebarView = 'collections' | 'environments' | 'history';
 export type ShortcutId =
   | 'close-tab' | 'force-close-tab' | 'next-tab' | 'previous-tab'
@@ -147,6 +147,8 @@ export type Workspace = {
 };
 export type OAuth2GrantType = 'client_credentials' | 'authorization_code' | 'password' | 'device_code';
 export type OAuth2ClientAuth = 'basic' | 'body' | 'client_secret_jwt' | 'private_key_jwt';
+export type OAuth1SignatureMethod = 'HMAC-SHA1' | 'HMAC-SHA256' | 'HMAC-SHA512' | 'RSA-SHA1' | 'RSA-SHA256' | 'RSA-SHA512' | 'PLAINTEXT';
+export type OAuth1AddTo = 'header' | 'query' | 'body';
 export type AuthState = {
   type: AuthType; bearerToken: string; basicUser: string; basicPass: string;
   apiKeyName: string; apiKeyValue: string; apiKeyIn: 'header' | 'query';
@@ -160,6 +162,11 @@ export type AuthState = {
   oauth2AssertionAlgorithm?: string; oauth2AssertionPrivateKey?: string;
   oauth2AssertionKeyID?: string; oauth2AssertionAudience?: string;
   awsAccessKey: string; awsSecretKey: string; awsSessionToken?: string; awsRegion: string; awsService: string;
+  oauth1ConsumerKey?: string; oauth1ConsumerSecret?: string; oauth1Token?: string; oauth1TokenSecret?: string;
+  oauth1SignatureMethod?: OAuth1SignatureMethod; oauth1PrivateKey?: string;
+  oauth1Realm?: string; oauth1Callback?: string; oauth1Verifier?: string;
+  oauth1Timestamp?: string; oauth1Nonce?: string; oauth1Version?: string;
+  oauth1AddTo?: OAuth1AddTo; oauth1IncludeBodyHash?: boolean; oauth1AddEmptyParams?: boolean;
 };
 export type CollectionDefaults = {
   headers: KVRow[];

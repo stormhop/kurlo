@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 env:
-  WAILS_VERSION: v2.13.0
+  WAILS_VERSION: v2.16.0
   GO_MODULE: github.com/stormhop/kurlo/apps/desktop/internal/api
   UPDATE_REPOSITORY: stormhop/kurlo
   UPDATE_PUBLIC_KEY: ${{ vars.UPDATE_PUBLIC_KEY }}

@@ -63,6 +63,7 @@ type AiRequest struct {
 	Settings    AiSettings     `json:"settings"`
 	ToolServers []AiToolServer `json:"toolServers"`
 	MaxSteps    int            `json:"maxSteps"`
+	TurnID      string         `json:"turnId,omitempty"`
 }
 
 type AiUsage struct {
@@ -134,16 +135,19 @@ type AiDeltaEvent struct {
 
 type AiDeltaBatch struct {
 	SessionID string         `json:"sessionId"`
+	TurnID    string         `json:"turnId,omitempty"`
 	Deltas    []AiDeltaEvent `json:"deltas"`
 }
 
 type AiStepEvent struct {
 	SessionID string `json:"sessionId"`
+	TurnID    string `json:"turnId,omitempty"`
 	Step      AiStep `json:"step"`
 }
 
 type AiToolResultEvent struct {
 	SessionID string  `json:"sessionId"`
+	TurnID    string  `json:"turnId,omitempty"`
 	Step      int     `json:"step"`
 	Block     AiBlock `json:"block"`
 }

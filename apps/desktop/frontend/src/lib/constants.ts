@@ -123,9 +123,13 @@ export const AUTH_OPTIONS: { value: AuthType; label: string }[] = [
   { value: 'basic', label: 'Basic auth' },
   { value: 'digest', label: 'Digest auth' },
   { value: 'apikey', label: 'API key' },
+  { value: 'oauth1', label: 'OAuth 1.0' },
   { value: 'oauth2', label: 'OAuth 2.0' },
   { value: 'aws', label: 'AWS Signature v4' },
 ];
+
+export const OAUTH1_SIGNATURE_OPTIONS = (['HMAC-SHA1', 'HMAC-SHA256', 'HMAC-SHA512', 'RSA-SHA1', 'RSA-SHA256', 'RSA-SHA512', 'PLAINTEXT'] as const)
+  .map(value => ({ value, label: value }));
 
 export const COLLECTION_AUTH_OPTIONS = AUTH_OPTIONS
   .filter(option => option.value !== 'inherit')

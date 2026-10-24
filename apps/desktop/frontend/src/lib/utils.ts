@@ -1,4 +1,4 @@
-import type { KVRow, BodyType, AuthType, RawBodyType, RequestType, SavedRequest } from './types/models';
+import type { KVRow, BodyType, AuthType, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
 import { mkRow } from './constants';
 import { clipboardSet } from './backend';
 
@@ -324,6 +324,49 @@ export function emptyAuthState() {
     oauth2Username: '', oauth2Password: '', oauth2ClientAuth: 'basic' as const,
     oauth2AssertionAlgorithm: '', oauth2AssertionPrivateKey: '', oauth2AssertionKeyID: '', oauth2AssertionAudience: '',
     awsAccessKey: '', awsSecretKey: '', awsSessionToken: '', awsRegion: 'us-east-1', awsService: 'execute-api',
+    ...oauth1AuthFields(oauth1FieldsFromAuth({})),
+  };
+}
+
+export type OAuth1Fields = {
+  consumerKey: string; consumerSecret: string; token: string; tokenSecret: string;
+  signatureMethod: OAuth1SignatureMethod; privateKey: string;
+  realm: string; callback: string; verifier: string;
+  timestamp: string; nonce: string; version: string;
+  addTo: OAuth1AddTo; includeBodyHash: boolean; addEmptyParams: boolean;
+};
+
+export function oauth1FieldsFromAuth(auth: Partial<SavedRequest['auth']>): OAuth1Fields {
+  return {
+    consumerKey: auth.oauth1ConsumerKey ?? '', consumerSecret: auth.oauth1ConsumerSecret ?? '',
+    token: auth.oauth1Token ?? '', tokenSecret: auth.oauth1TokenSecret ?? '',
+    signatureMethod: auth.oauth1SignatureMethod ?? 'HMAC-SHA1', privateKey: auth.oauth1PrivateKey ?? '',
+    realm: auth.oauth1Realm ?? '', callback: auth.oauth1Callback ?? '', verifier: auth.oauth1Verifier ?? '',
+    timestamp: auth.oauth1Timestamp ?? '', nonce: auth.oauth1Nonce ?? '', version: auth.oauth1Version ?? '1.0',
+    addTo: auth.oauth1AddTo ?? 'header', includeBodyHash: auth.oauth1IncludeBodyHash ?? false, addEmptyParams: auth.oauth1AddEmptyParams ?? false,
+  };
+}
+
+export function oauth1AuthFields(fields: OAuth1Fields): Partial<SavedRequest['auth']> {
+  return {
+    oauth1ConsumerKey: fields.consumerKey, oauth1ConsumerSecret: fields.consumerSecret,
+    oauth1Token: fields.token, oauth1TokenSecret: fields.tokenSecret,
+    oauth1SignatureMethod: fields.signatureMethod, oauth1PrivateKey: fields.privateKey,
+    oauth1Realm: fields.realm, oauth1Callback: fields.callback, oauth1Verifier: fields.verifier,
+    oauth1Timestamp: fields.timestamp, oauth1Nonce: fields.nonce, oauth1Version: fields.version,
+    oauth1AddTo: fields.addTo, oauth1IncludeBodyHash: fields.includeBodyHash, oauth1AddEmptyParams: fields.addEmptyParams,
+  };
+}
+
+export function oauth1ConfigFields(auth: SavedRequest['auth'], resolve: (value: string) => string) {
+  const fields = oauth1FieldsFromAuth(auth);
+  return {
+    oauth1ConsumerKey: resolve(fields.consumerKey), oauth1ConsumerSecret: resolve(fields.consumerSecret),
+    oauth1Token: resolve(fields.token), oauth1TokenSecret: resolve(fields.tokenSecret),
+    oauth1SignatureMethod: fields.signatureMethod, oauth1PrivateKey: resolve(fields.privateKey),
+    oauth1Realm: resolve(fields.realm), oauth1Callback: resolve(fields.callback), oauth1Verifier: resolve(fields.verifier),
+    oauth1Timestamp: resolve(fields.timestamp), oauth1Nonce: resolve(fields.nonce), oauth1Version: resolve(fields.version),
+    oauth1AddTo: fields.addTo, oauth1IncludeBodyHash: fields.includeBodyHash, oauth1AddEmptyParams: fields.addEmptyParams,
   };
 }
 
@@ -343,6 +386,10 @@ export function authStateHasData(auth: SavedRequest['auth'], type: AuthType = au
       auth.oauth2RefreshToken ?? '', auth.oauth2Audience ?? '',
       auth.oauth2Username ?? '', auth.oauth2Password ?? '', auth.oauth2AssertionPrivateKey ?? '',
     );
+  }
+  if (type === 'oauth1') {
+    const fields = oauth1FieldsFromAuth(auth);
+    return has(fields.consumerKey, fields.consumerSecret, fields.token, fields.tokenSecret, fields.privateKey, fields.realm, fields.callback, fields.verifier);
   }
   if (type === 'aws') {
     return has(auth.awsAccessKey, auth.awsSecretKey, auth.awsSessionToken ?? '') || auth.awsRegion.trim() !== 'us-east-1' || auth.awsService.trim() !== 'execute-api';

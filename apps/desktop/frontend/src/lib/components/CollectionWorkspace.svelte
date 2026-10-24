@@ -1,11 +1,11 @@
 <script lang="ts">
   import { tabListKeyboard } from '../a11y';
-  import { COLLECTION_AUTH_OPTIONS } from '../constants';
+  import { COLLECTION_AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
   import { HEADER_PICKER_NAMES, getHeaderValues } from '../headers';
   import { collectionSettingsFingerprint, emptyCollectionDefaults, normalizeCollectionDefaults } from '../collectionDefaults';
   import { activeCount, cloneRowsForStore, guardTrailing, removeRow, restoreRows, scriptLineCount } from '../utils';
   import { openFileDialog } from '../backend';
-  import type { AuthState, Collection, CollectionDefaults, KVRow, RequestSettings, ScriptEngine } from '../types/models';
+  import type { AuthState, Collection, CollectionDefaults, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
   import type { VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
   import Select from './Select.svelte';
@@ -375,6 +375,32 @@
                 <input id="collection-oauth-secret" class="field field-input" bind:value={auth.oauth2Secret} type="password" />
                 <label class="field-label" for="collection-oauth-scope">Scope</label>
                 <input id="collection-oauth-scope" class="field field-input" bind:value={auth.oauth2Scope} spellcheck="false" />
+              {:else if auth.type === 'oauth1'}
+                <div class="auth-grid-2">
+                  <div>
+                    <span class="field-label">Signature method</span>
+                    <Select value={auth.oauth1SignatureMethod ?? 'HMAC-SHA1'} options={OAUTH1_SIGNATURE_OPTIONS} className="auth-field-select" ariaLabel="Signature method" onChange={value => (auth.oauth1SignatureMethod = value as OAuth1SignatureMethod)} />
+                  </div>
+                  <div>
+                    <span class="field-label">Add parameters to</span>
+                    <div class="segmented radio-group" role="radiogroup">
+                      {#each [['header', 'Header'], ['query', 'Query'], ['body', 'Body']] as [value, label] (value)}
+                        <label class="segmented-item radio-label"><input type="radio" checked={(auth.oauth1AddTo ?? 'header') === value} onchange={() => (auth.oauth1AddTo = value as OAuth1AddTo)} /> {label}</label>
+                      {/each}
+                    </div>
+                  </div>
+                  <div><label class="field-label" for="collection-oauth1-key">Consumer key</label><input id="collection-oauth1-key" class="field field-input field-mono" bind:value={auth.oauth1ConsumerKey} spellcheck="false" /></div>
+                  {#if (auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
+                    <div class="auth-grid-span"><label class="field-label" for="collection-oauth1-private-key">Private key (PEM)</label><textarea id="collection-oauth1-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.oauth1PrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
+                  {:else}
+                    <div><label class="field-label" for="collection-oauth1-secret">Consumer secret</label><input id="collection-oauth1-secret" class="field field-input field-mono" bind:value={auth.oauth1ConsumerSecret} type="password" /></div>
+                  {/if}
+                  <div><label class="field-label" for="collection-oauth1-token">Access token</label><input id="collection-oauth1-token" class="field field-input field-mono" bind:value={auth.oauth1Token} type="password" /></div>
+                  {#if !(auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
+                    <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><input id="collection-oauth1-token-secret" class="field field-input field-mono" bind:value={auth.oauth1TokenSecret} type="password" /></div>
+                  {/if}
+                  <div><label class="field-label" for="collection-oauth1-realm">Realm</label><input id="collection-oauth1-realm" class="field field-input" bind:value={auth.oauth1Realm} spellcheck="false" /></div>
+                </div>
               {:else if auth.type === 'aws'}
                 <div class="auth-grid-2">
                   <div><label class="field-label" for="collection-aws-key">Access key ID</label><input id="collection-aws-key" class="field field-input field-mono" bind:value={auth.awsAccessKey} spellcheck="false" /></div>

@@ -230,6 +230,21 @@ export function emptyAuthConfig(): AuthConfig {
     awsSessionToken: '',
     awsRegion: '',
     awsService: '',
+    oauth1ConsumerKey: '',
+    oauth1ConsumerSecret: '',
+    oauth1Token: '',
+    oauth1TokenSecret: '',
+    oauth1SignatureMethod: '',
+    oauth1PrivateKey: '',
+    oauth1Realm: '',
+    oauth1Callback: '',
+    oauth1Verifier: '',
+    oauth1Timestamp: '',
+    oauth1Nonce: '',
+    oauth1Version: '',
+    oauth1AddTo: '',
+    oauth1IncludeBodyHash: false,
+    oauth1AddEmptyParams: false,
   };
 }
 

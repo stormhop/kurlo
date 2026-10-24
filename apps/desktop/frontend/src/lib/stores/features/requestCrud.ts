@@ -212,7 +212,7 @@ export const requestCrudFeature = {
 
   savedRequestIsRunnerSkipped(this: RequestCrudHost, req: Pick<SavedRequest, 'requestType' | 'url' | 'method'>) {
     const type = this.normalizeRequestTypeValue(req.requestType, req.url);
-    return this.savedRequestIsRealtime(req) || type === 'ai' || (type === 'http' && req.method === 'SSE');
+    return this.savedRequestIsRealtime(req) || type === 'ai' || type === 'mcp' || (type === 'http' && req.method === 'SSE');
   },
 
   savedRequestIsGraphQL(this: RequestCrudHost, req: Pick<SavedRequest, 'requestType' | 'url' | 'bodyType'>) {

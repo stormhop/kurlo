@@ -60,6 +60,9 @@ export function snippetAuthNotes(req: SnippetRequest): string[] {
   if (req.auth.type === 'digest') {
     return [`Digest auth: this request answers the server's challenge with the credentials for "${req.auth.username ?? ''}". Use your HTTP library's digest support — a fixed Authorization header will not work.`];
   }
+  if (req.auth.type === 'oauth1') {
+    return ['OAuth 1.0: the signature covers the timestamp and a fresh nonce, so it is computed per request. Use an OAuth 1.0 signing library here.'];
+  }
   if (req.auth.type === 'aws') {
     return ['AWS Signature v4: the signature is computed per request from your access key. Use an AWS SDK or a signing helper here.'];
   }

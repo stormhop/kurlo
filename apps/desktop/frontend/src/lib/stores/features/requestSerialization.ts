@@ -12,6 +12,7 @@ import { stripJsonComments } from '../../jsonEditing';
 import { resolveProxy, type ResolvedProxy } from '../../proxy';
 import { flattenUrlParams } from '../../queryParams';
 import { DEFAULT_GRPC_MESSAGE } from '../../requestBodyDefaults';
+import { oauth1ConfigFields } from '../../utils';
 import type {
   Collection,
   BodyType,
@@ -183,6 +184,7 @@ export const requestSerializationFeature = {
         awsSessionToken: resolveValue(req.auth.awsSessionToken ?? ''),
         awsRegion: resolveValue(req.auth.awsRegion),
         awsService: resolveValue(req.auth.awsService),
+        ...oauth1ConfigFields(req.auth, resolveValue),
       },
       bodyType: isGraphQL ? 'graphql' : outBodyType,
       body: outBody,

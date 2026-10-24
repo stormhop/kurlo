@@ -37,6 +37,7 @@ export type PaletteContext = {
   createEnvironment: () => unknown;
   importCollection: () => unknown;
   copyCurl: () => unknown;
+  findReplaceInCollection?: () => unknown;
   setResponseLayout: (layout: ResponseLayout) => unknown;
   setThemeMode: (mode: AppThemeMode) => unknown;
   showWhatsNew: () => unknown;
@@ -83,6 +84,9 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     );
     if (ctx.canCopyCurl) {
       commands.push({ id: 'request-curl', group: 'Request', label: 'Copy as cURL', keywords: 'clipboard command line', run: ctx.copyCurl });
+    }
+    if (ctx.findReplaceInCollection) {
+      commands.push({ id: 'request-find-replace', group: 'Request', label: 'Find and replace in collection…', keywords: 'search rename rewrite bulk edit url host', run: ctx.findReplaceInCollection });
     }
     commands.push({ id: 'request-close', group: 'Request', label: 'Close tab', shortcut: 'close-tab', run: () => ctx.runShortcut('close-tab') });
   }

@@ -36,6 +36,7 @@ For environments, switch the sidebar to *Environments* view and use its import f
 | Request name, method, URL, params, headers, body (raw / form-data / urlencoded / binary / GraphQL) | All preserved verbatim |
 | Authentication: Basic, Bearer, API Key, Digest, OAuth 2.0 | Imported into Kurlo's Auth tab. Kurlo supports inherited auth at the collection level; folder-level auth is flattened to the closest representable collection/request configuration. |
 | AWS Signature v4 | Preserved with region / service / access keys |
+| OAuth 1.0 | Preserved: keys, secrets, signature method, realm, callback, verifier and the header/query choice |
 | Pre-request and test scripts | Imported into Kurlo's sandboxed script fields — see compatibility notes below |
 | Environments (variables) | One Kurlo environment per Postman environment |
 | `{{variable}}` syntax everywhere | Preserved literally — Kurlo resolves them the same way |

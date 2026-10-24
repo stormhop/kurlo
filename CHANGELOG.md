@@ -5,6 +5,29 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **OAuth 1.0 auth.** The Auth tab signs requests with OAuth 1.0a: consumer key and secret, access token and token secret, `HMAC-SHA1`, `HMAC-SHA256`, `HMAC-SHA512`, `RSA-SHA1`, `RSA-SHA256`, `RSA-SHA512` or `PLAINTEXT`, and the parameters in the `Authorization` header, the query or a form body. The timestamp and the nonce are new on every send; **Advanced** has the realm, callback, verifier, version and the body hash. The secrets stay in the encrypted local store, with placeholders in the YAML, and Postman and Insomnia imports and exports carry the settings. `kurlo run` and `kurlo mcp` sign the same way.
+- **Find and replace in a collection or a folder.** It searches the URL, params, headers, form fields, body, scripts, docs and the auth fields that hold no secret, with match case, whole word and regular expressions. Each match is previewed with its request, field and line, and is replaced one at a time, per request or all at once, with **Undo**.
+
+### Fixed
+
+- A gRPC metadata row or a Socket.IO event marked `secret: true` was written to the YAML in plain text. Its value now goes to the encrypted local store like any other secret row, and so does a secret row without an `id`, as an import or a hand-edited file can leave it.
+- `kurlo run` sent an SSE request as an HTTP request with the method `SSE`. It now skips SSE, MCP and AI requests, as the docs say.
+- The Collection Runner sent an MCP request as an empty HTTP request and showed the answer as the result of the call. MCP requests are now skipped, like AI requests.
+- An Anthropic request with thinking on and a temperature, or a top P under 0.95, failed with a 400. Those settings are now left out while the model thinks.
+- When an Anthropic stream broke before a thinking block was complete, the next reply failed with a 400. The tool calls of that turn are now left out of the history.
+- An Anthropic answer that stopped with `pause_turn` ended there; Kurlo now sends the turn back so the model carries on, within the step limit.
+- A provider that answered `200` with `Content-Type: text/event-stream` and no events gave an empty answer without an error; it now says so.
+- An OpenAI-compatible server that refuses `stream_options`, `max_tokens` or `max_completion_tokens` is asked once more without it, and a tool call that arrives without an id gets one, so the next step does not fail.
+- A late stream event of a cancelled AI send could land in the next send.
+- An API key in a header such as `x-auth-token` or `anthropic-api-key` was not recognized, and Kurlo warned that the key was missing.
+- Long AI answers no longer parse their Markdown again on every streamed chunk.
+- The response layout button in the status bar did nothing when the editor was too narrow for the side-by-side layout; it is now disabled and says why.
+- Git status and diffs could fail for a moment while a commit, pull, merge or rebase was running. A saved Git token that cannot be read is now reported as such instead of ending in a plain 401.
+
 ## [2.5.0] - 2026-10-24
 
 ### Added

@@ -1,11 +1,34 @@
 <script lang="ts">
   import { openExternalURL } from '../externalLinks';
   import { parseMarkdown, type MdBlock, type MdInline } from '../markdown';
+  import { untrack } from 'svelte';
   import { clipboardCopy } from '../utils';
 
-  let { source, remoteImages = false, compact = false }: { source: string; remoteImages?: boolean; compact?: boolean } = $props();
+  const LIVE_PARSE_MS = 120;
 
-  const blocks = $derived(parseMarkdown(source));
+  let { source, remoteImages = false, compact = false, live = false }: { source: string; remoteImages?: boolean; compact?: boolean; live?: boolean } = $props();
+
+  let liveSource = $state(untrack(() => source));
+  let lastParse = 0;
+  $effect(() => {
+    const next = source;
+    if (!live) {
+      liveSource = next;
+      return;
+    }
+    const wait = LIVE_PARSE_MS - (Date.now() - lastParse);
+    if (wait <= 0) {
+      lastParse = Date.now();
+      liveSource = next;
+      return;
+    }
+    const timer = setTimeout(() => {
+      lastParse = Date.now();
+      liveSource = next;
+    }, wait);
+    return () => clearTimeout(timer);
+  });
+  const blocks = $derived(parseMarkdown(live ? liveSource : source));
   let copiedIndex = $state('');
 
   function openLink(event: MouseEvent, href: string) {

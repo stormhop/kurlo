@@ -227,3 +227,19 @@ func TestGitClearTokenReportsStoreFailure(t *testing.T) {
 		t.Fatalf("expected token clear failure, got %+v", result)
 	}
 }
+
+func TestGitCredentialLookupReportsAnUnreadableStore(t *testing.T) {
+	withIsolatedStore(t)
+	if err := gitCredentialSet("https://gitlab.com/g/r.git", "oauth2", "glpat-xxx"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if err := os.WriteFile(gitCredentialsPath(), []byte("not an encrypted store"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := gitCredentialLookupErr("gitlab.com"); ok || err == nil {
+		t.Fatalf("ok=%v err=%v, want the read error", ok, err)
+	}
+	if _, ok := gitCredentialLookup("gitlab.com"); ok {
+		t.Fatal("an unreadable store has no token")
+	}
+}

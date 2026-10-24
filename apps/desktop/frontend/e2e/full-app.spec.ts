@@ -33,7 +33,7 @@ const readmeScreenshotPath = process.env.KURLO_README_SCREENSHOT ?? '';
 
 const DOCS_VIEWPORT = { width: 1200, height: 780 };
 const DOCS_CROP_PADDING = 26;
-const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai', 'ai-model-list-error', 'ai-chat-error']);
+const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai']);
 
 async function docsDialogClip(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-modal="true"]').first();
@@ -1496,6 +1496,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     if (docsScreenshotDir) {
       try {
         await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+        await expect(page.locator('.cookie-modal')).toBeVisible();
         await captureDocsScreenshot(page, 'cookie-jar-empty');
         await page.getByLabel('Close cookie jar').click();
       } catch (err) { console.log('docs screenshot cookie-jar-empty skipped:', err); }
@@ -1919,10 +1920,7 @@ test.describe('Kurlo desktop browser E2E', () => {
       try {
         await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
         await captureDocsScreenshot(page, 'settings-general');
-        await page.getByLabel('Search settings').fill('autosave');
-        await captureDocsScreenshot(page, 'settings-search-filter');
-        await page.getByLabel('Search settings').fill('');
-      } catch (err) { console.log('docs screenshot settings-general/search skipped:', err); }
+      } catch (err) { console.log('docs screenshot settings-general skipped:', err); }
       try { await page.getByRole('tab', { name: 'Theme', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-theme'); } catch (err) { console.log('docs screenshot settings-theme skipped:', err); }
       try { await page.getByRole('tab', { name: 'Shortcuts', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-shortcuts'); } catch (err) { console.log('docs screenshot settings-shortcuts skipped:', err); }
       try { await page.getByRole('tab', { name: 'About', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-updates-dev'); } catch (err) { console.log('docs screenshot settings-updates-dev skipped:', err); }
@@ -3260,7 +3258,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(endpoint).toContainText('POST https://api.deepseek.com/v1/chat/completions');
     await page.getByLabel('Provider base URL').fill('https://api.deepseek.com/v1');
     await expect(endpoint.locator('.ai-endpoint-suffix')).toHaveText('/chat/completions');
-    await captureDocsScreenshot(page, 'ai-endpoint', page.locator('.request-composer'));
     await page.getByLabel('Provider base URL').fill('https://api.openai.com/v1');
 
     await page.getByLabel('Provider and model').click();
@@ -3340,7 +3337,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     const [topP, topPMessage] = [await page.locator('#ai-top-p').boundingBox(), await topPError.boundingBox()];
     expect(topPMessage!.y).toBeGreaterThanOrEqual(topP!.y + topP!.height - 1);
     expect(Math.abs((topPMessage!.x + topPMessage!.width) - (topP!.x + topP!.width))).toBeLessThan(2);
-    await captureDocsScreenshot(page, 'ai-settings-error-wide');
     await page.locator('#ai-top-p').fill('');
     await page.getByRole('tab', { name: /Prompt/ }).click();
 
@@ -3364,7 +3360,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     const line = await page.getByTestId('ai-prompt-editor').locator('.cm-line').first().boundingBox();
     expect(line!.y).toBeGreaterThanOrEqual(frame!.y + 6);
     expect(line!.y + line!.height).toBeLessThanOrEqual(frame!.y + frame!.height);
-    await captureDocsScreenshot(page, 'ai-narrow-prompt');
 
     const divider = page.getByRole('button', { name: 'Resize panels' });
     const box = await divider.boundingBox();
@@ -3383,7 +3378,6 @@ test.describe('Kurlo desktop browser E2E', () => {
       return rect.right <= panel.right + 0.5 && rect.width > 40;
     }));
     expect(fits).toBe(true);
-    await captureDocsScreenshot(page, 'ai-narrow-settings');
 
     await page.locator('#ai-temperature').fill('2132312231');
     const error = page.locator('#ai-temperature-error');
@@ -3393,7 +3387,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(message!.y).toBeGreaterThanOrEqual(field!.y + field!.height - 1);
     expect(message!.y - (field!.y + field!.height)).toBeLessThan(16);
     expect(field!.width).toBeLessThanOrEqual(8 * 16 + 1);
-    await captureDocsScreenshot(page, 'ai-settings-error');
     await page.locator('#ai-temperature').fill('');
     await expect(error).toHaveCount(0);
 
@@ -3411,7 +3404,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     const [replyBox, sendBox] = [await page.getByRole('textbox', { name: 'Reply' }).boundingBox(), await page.getByRole('button', { name: 'Send reply' }).boundingBox()];
     expect(Math.abs(replyBox!.height - sendBox!.height)).toBeLessThan(1.5);
     expect(Math.abs((replyBox!.y + replyBox!.height) - (sendBox!.y + sendBox!.height))).toBeLessThan(1.5);
-    await captureDocsScreenshot(page, 'ai-narrow-status');
   });
 
   test('grows the AI prompt field with its text up to the free height', async ({ page }) => {
@@ -3437,7 +3429,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect((await page.getByLabel('System prompt').boundingBox())!.height).toBeGreaterThan(40);
     const scroller = page.getByTestId('ai-prompt-editor').locator('.cm-scroller');
     expect(await scroller.evaluate(el => el.scrollHeight > el.clientHeight + 20)).toBe(true);
-    await captureDocsScreenshot(page, 'ai-prompt-grown');
   });
 
   test('stops the AI prompt and system prompt at their length limits', async ({ page }) => {
@@ -3454,7 +3445,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.keyboard.press('Backspace');
     await expect(page.locator('.ai-counter')).toHaveText('199,999 / 200,000');
     await expect(page.locator('.ai-counter-full')).toHaveCount(0);
-    await captureDocsScreenshot(page, 'ai-prompt-limit');
 
     const system = page.getByLabel('System prompt').locator('.cm-content');
     await system.click();
@@ -3486,7 +3476,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     const [cardBox, chatBox] = [await card.boundingBox(), await chat.boundingBox()];
     expect(cardBox!.x).toBeGreaterThanOrEqual(chatBox!.x);
     expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(chatBox!.x + chatBox!.width + 0.5);
-    await captureDocsScreenshot(page, 'ai-chat-error');
   });
 
   test('keeps the status code and New chat on the AI status line when the model name is long', async ({ page }) => {
@@ -3518,7 +3507,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     });
     expect(layout).toEqual({ badgeFits: true, newChatFits: true, modelTruncated: true, modelBeforeMetrics: true, metricsFit: true });
     await bar.screenshot({ path: test.info().outputPath('status.png') });
-    await captureDocsScreenshot(page, 'ai-long-model-status');
   });
 
   test('keeps the token visibility button clear of the token text', async ({ page }) => {
@@ -3555,7 +3543,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(problem.locator('.ai-model-problem-detail')).toHaveText('404 Not FoundGET https://no-models.kurlo.test/v1/models');
     await expect(problem).not.toContainText('secret');
     await expect(problem.locator('.ai-model-problem-hint')).toContainText('type the model name');
-    await captureDocsScreenshot(page, 'ai-model-list-error', page.getByRole('dialog', { name: 'Provider and model' }));
     const before = await page.evaluate(() => window.__kurloE2E.sentRequests.length);
     await problem.getByRole('button', { name: 'Try again' }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(before + 1);
@@ -3592,7 +3579,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(docs.locator('.docs-preview h2')).toHaveText('List users');
     await expect(docs.locator('.docs-preview strong')).toHaveText('active');
     await expect(docs.locator('.docs-preview table td').first()).toHaveText('id');
-    await captureDocsScreenshot(page, 'request-docs-edit');
     await docs.getByRole('radio', { name: 'Preview' }).click();
     await expect(docs.locator('textarea')).toHaveCount(0);
     await expect(docs.locator('.docs-ref-url')).toHaveText('https://api.kurlo.test/users?page=2');
@@ -3621,7 +3607,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.mouse.move(divider!.x + 83, divider!.y + 200, { steps: 6 });
     await page.mouse.up();
     expect((await page.locator('.request-editor').boundingBox())!.width).toBeGreaterThan(before + 40);
-    await captureDocsScreenshot(page, 'split-divider');
     await page.getByRole('button', { name: 'Show the response below the request' }).click();
     await expect(page.locator('.request-split')).not.toHaveClass(/split-right/);
   });
@@ -3636,7 +3621,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     const [http, other] = [await groups.first().boundingBox(), await groups.last().boundingBox()];
     expect(other!.x).toBeGreaterThan(http!.x + http!.width - 2);
     expect(Math.abs(other!.y - http!.y)).toBeLessThan(2);
-    await captureDocsScreenshot(page, 'method-menu', page.locator('.method-menu'));
     await page.getByRole('option', { name: 'AI', exact: true }).click();
     await expect(page.getByLabel('Provider base URL')).toBeVisible();
   });

@@ -50,6 +50,22 @@ type cliAuth struct {
 	AWSSessionToken string `json:"awsSessionToken"`
 	AWSRegion       string `json:"awsRegion"`
 	AWSService      string `json:"awsService"`
+
+	OAuth1ConsumerKey     string `json:"oauth1ConsumerKey"`
+	OAuth1ConsumerSecret  string `json:"oauth1ConsumerSecret"`
+	OAuth1Token           string `json:"oauth1Token"`
+	OAuth1TokenSecret     string `json:"oauth1TokenSecret"`
+	OAuth1SignatureMethod string `json:"oauth1SignatureMethod"`
+	OAuth1PrivateKey      string `json:"oauth1PrivateKey"`
+	OAuth1Realm           string `json:"oauth1Realm"`
+	OAuth1Callback        string `json:"oauth1Callback"`
+	OAuth1Verifier        string `json:"oauth1Verifier"`
+	OAuth1Timestamp       string `json:"oauth1Timestamp"`
+	OAuth1Nonce           string `json:"oauth1Nonce"`
+	OAuth1Version         string `json:"oauth1Version"`
+	OAuth1AddTo           string `json:"oauth1AddTo"`
+	OAuth1IncludeBodyHash bool   `json:"oauth1IncludeBodyHash"`
+	OAuth1AddEmptyParams  bool   `json:"oauth1AddEmptyParams"`
 }
 
 type cliSettings struct {
@@ -179,7 +195,7 @@ func enabledRowValues(rows []cliKV) map[string]string {
 func cliRunnable(req cliSavedRequest) bool {
 	switch strings.ToLower(strings.TrimSpace(req.RequestType)) {
 	case "", "http", "graphql":
-		return !req.IsDraft
+		return !req.IsDraft && !strings.EqualFold(strings.TrimSpace(req.Method), "SSE")
 	default:
 		return false
 	}
@@ -283,6 +299,21 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 			AWSSessionToken:           req.Auth.AWSSessionToken,
 			AWSRegion:                 req.Auth.AWSRegion,
 			AWSService:                req.Auth.AWSService,
+			OAuth1ConsumerKey:         req.Auth.OAuth1ConsumerKey,
+			OAuth1ConsumerSecret:      req.Auth.OAuth1ConsumerSecret,
+			OAuth1Token:               req.Auth.OAuth1Token,
+			OAuth1TokenSecret:         req.Auth.OAuth1TokenSecret,
+			OAuth1SignatureMethod:     req.Auth.OAuth1SignatureMethod,
+			OAuth1PrivateKey:          req.Auth.OAuth1PrivateKey,
+			OAuth1Realm:               req.Auth.OAuth1Realm,
+			OAuth1Callback:            req.Auth.OAuth1Callback,
+			OAuth1Verifier:            req.Auth.OAuth1Verifier,
+			OAuth1Timestamp:           req.Auth.OAuth1Timestamp,
+			OAuth1Nonce:               req.Auth.OAuth1Nonce,
+			OAuth1Version:             req.Auth.OAuth1Version,
+			OAuth1AddTo:               req.Auth.OAuth1AddTo,
+			OAuth1IncludeBodyHash:     req.Auth.OAuth1IncludeBodyHash,
+			OAuth1AddEmptyParams:      req.Auth.OAuth1AddEmptyParams,
 		},
 		BodyType:                bodyType,
 		Body:                    body,

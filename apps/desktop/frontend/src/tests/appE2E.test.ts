@@ -9,6 +9,7 @@ import type { CollectionRunRecord } from '../lib/collectionRuns';
 import { DEFAULT_RUNNER_CONCURRENCY } from '../lib/concurrency';
 import { emptyCollectionDefaults } from '../lib/collectionDefaults';
 import { makeWorkspace, normalizeSavedRequest } from '../lib/normalizers';
+import { oauth1FieldsFromAuth } from '../lib/utils';
 import type {
   BodyType,
   Collection,
@@ -282,6 +283,7 @@ class TestApp {
   awsSecretKey = '';
   awsRegion = '';
   awsService = '';
+  oauth1 = oauth1FieldsFromAuth({});
   bodyType: BodyType = 'none';
   rawBodyType: RawBodyType = 'json';
   bodyContent = '';

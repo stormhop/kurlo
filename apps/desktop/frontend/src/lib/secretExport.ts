@@ -164,7 +164,11 @@ function requestHasExportSecrets(req: SavedRequest) {
     || hasRawSecret('refreshToken', auth.oauth2RefreshToken ?? '')
     || hasRawSecret('accessToken', auth.bearerToken)
     || hasRawSecret('clientSecret', auth.oauth2Secret)
-    || hasRawSecret('awsSecretKey', auth.awsSecretKey);
+    || hasRawSecret('awsSecretKey', auth.awsSecretKey)
+    || hasRawSecret('consumerSecret', auth.oauth1ConsumerSecret ?? '')
+    || hasRawSecret('token', auth.oauth1Token ?? '')
+    || hasRawSecret('tokenSecret', auth.oauth1TokenSecret ?? '')
+    || hasRawSecret('privateKey', auth.oauth1PrivateKey ?? '');
   return authHasSecrets
     || req.params.some(row => hasRawSecret(row.key, row.value, row.secret))
     || req.headers.some(row => hasRawSecret(row.key, row.value, row.secret))

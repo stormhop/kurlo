@@ -60,7 +60,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["inherit", "none", "bearer", "basic", "apikey", "oauth2", "aws", "digest"]
+          "enum": ["inherit", "none", "bearer", "basic", "apikey", "oauth1", "oauth2", "aws", "digest"]
         },
         "bearerToken": { "type": "string" },
         "basicUser": { "type": "string" },
@@ -81,7 +81,22 @@
         "awsAccessKey": { "type": "string" },
         "awsSecretKey": { "type": "string" },
         "awsRegion": { "type": "string" },
-        "awsService": { "type": "string" }
+        "awsService": { "type": "string" },
+        "oauth1ConsumerKey": { "type": "string" },
+        "oauth1ConsumerSecret": { "type": "string" },
+        "oauth1Token": { "type": "string" },
+        "oauth1TokenSecret": { "type": "string" },
+        "oauth1SignatureMethod": { "type": "string", "enum": ["HMAC-SHA1", "HMAC-SHA256", "HMAC-SHA512", "RSA-SHA1", "RSA-SHA256", "RSA-SHA512", "PLAINTEXT"] },
+        "oauth1PrivateKey": { "type": "string" },
+        "oauth1Realm": { "type": "string" },
+        "oauth1Callback": { "type": "string" },
+        "oauth1Verifier": { "type": "string" },
+        "oauth1Timestamp": { "type": "string" },
+        "oauth1Nonce": { "type": "string" },
+        "oauth1Version": { "type": "string" },
+        "oauth1AddTo": { "type": "string", "enum": ["header", "query", "body"] },
+        "oauth1IncludeBodyHash": { "type": "boolean" },
+        "oauth1AddEmptyParams": { "type": "boolean" }
       }
     },
     "requestSettings": {
@@ -209,6 +224,10 @@
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
         },
+        "pathParams": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
         "headers": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
@@ -256,6 +275,10 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "mcpMethod": { "type": "string" },
+        "mcpName": { "type": "string" },
+        "mcpArguments": { "type": "string" },
+        "mcpProtocolVersion": { "type": "string" },
         "aiProvider": { "type": "string", "enum": ["openai", "anthropic"] },
         "aiModel": { "type": "string" },
         "aiSystem": { "type": "string", "maxLength": 50000 },

@@ -868,6 +868,21 @@ export namespace model {
 	    awsSessionToken: string;
 	    awsRegion: string;
 	    awsService: string;
+	    oauth1ConsumerKey: string;
+	    oauth1ConsumerSecret: string;
+	    oauth1Token: string;
+	    oauth1TokenSecret: string;
+	    oauth1SignatureMethod: string;
+	    oauth1PrivateKey: string;
+	    oauth1Realm: string;
+	    oauth1Callback: string;
+	    oauth1Verifier: string;
+	    oauth1Timestamp: string;
+	    oauth1Nonce: string;
+	    oauth1Version: string;
+	    oauth1AddTo: string;
+	    oauth1IncludeBodyHash: boolean;
+	    oauth1AddEmptyParams: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AuthConfig(source);
@@ -906,6 +921,21 @@ export namespace model {
 	        this.awsSessionToken = source["awsSessionToken"];
 	        this.awsRegion = source["awsRegion"];
 	        this.awsService = source["awsService"];
+	        this.oauth1ConsumerKey = source["oauth1ConsumerKey"];
+	        this.oauth1ConsumerSecret = source["oauth1ConsumerSecret"];
+	        this.oauth1Token = source["oauth1Token"];
+	        this.oauth1TokenSecret = source["oauth1TokenSecret"];
+	        this.oauth1SignatureMethod = source["oauth1SignatureMethod"];
+	        this.oauth1PrivateKey = source["oauth1PrivateKey"];
+	        this.oauth1Realm = source["oauth1Realm"];
+	        this.oauth1Callback = source["oauth1Callback"];
+	        this.oauth1Verifier = source["oauth1Verifier"];
+	        this.oauth1Timestamp = source["oauth1Timestamp"];
+	        this.oauth1Nonce = source["oauth1Nonce"];
+	        this.oauth1Version = source["oauth1Version"];
+	        this.oauth1AddTo = source["oauth1AddTo"];
+	        this.oauth1IncludeBodyHash = source["oauth1IncludeBodyHash"];
+	        this.oauth1AddEmptyParams = source["oauth1AddEmptyParams"];
 	    }
 	}
 	export class KeyValue {
@@ -1105,6 +1135,7 @@ export namespace model {
 	    settings: AiSettings;
 	    toolServers: AiToolServer[];
 	    maxSteps: number;
+	    turnId?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AiRequest(source);
@@ -1120,6 +1151,7 @@ export namespace model {
 	        this.settings = this.convertValues(source["settings"], AiSettings);
 	        this.toolServers = this.convertValues(source["toolServers"], AiToolServer);
 	        this.maxSteps = source["maxSteps"];
+	        this.turnId = source["turnId"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

@@ -89,6 +89,7 @@
     createRequestInFolder,
     createSubfolder,
     renameFolder,
+    openFindReplace,
     deleteFolder,
     createFolderInCollection,
     runFolder,
@@ -153,6 +154,7 @@
     createRequestInFolder: (collectionId: string, folderPath: string[]) => void;
     createSubfolder: (collectionId: string, parentPath: string[]) => void;
     renameFolder: (collectionId: string, folderPath: string[]) => void;
+    openFindReplace: (collectionId: string, folderPath?: string[]) => void;
     deleteFolder: (collectionId: string, folderPath: string[]) => void;
     createFolderInCollection: (collectionId: string) => void;
     runFolder: (collectionId: string, folderPath: string[]) => void;
@@ -622,6 +624,7 @@
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item" type="button" onclick={() => openCollectionSettings(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="settings" />Settings</button>
                     <button class="menu-item" type="button" onclick={() => renameCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
+                    <button class="menu-item" type="button" onclick={() => openFindReplace(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
                     <button class="menu-item" type="button" onclick={() => exportCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="export" />Export…</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item danger" type="button" onclick={() => deleteCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete collection</button>
@@ -668,6 +671,7 @@
                     ><MenuIcon name="folder" />Add subfolder</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item" type="button" onclick={() => runFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="play" />Run folder</button>
+                    <button class="menu-item" type="button" onclick={() => openFindReplace(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
                     <button class="menu-item" type="button" onclick={() => renameFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item danger" type="button" onclick={() => deleteFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete folder</button>

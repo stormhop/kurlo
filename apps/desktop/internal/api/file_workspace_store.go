@@ -52,6 +52,10 @@ var requestAuthSecretFields = []string{
 	"awsAccessKey",
 	"awsSecretKey",
 	"awsSessionToken",
+	"oauth1ConsumerSecret",
+	"oauth1Token",
+	"oauth1TokenSecret",
+	"oauth1PrivateKey",
 }
 
 var requestSettingSecretFields = []string{
@@ -63,6 +67,8 @@ var requestSecretRowFields = []string{
 	"pathParams",
 	"headers",
 	"formRows",
+	"sioEvents",
+	"grpcMetadata",
 }
 
 var collectionSecretRowFields = []string{
@@ -1469,15 +1475,12 @@ func sanitizeCollectionSecretRows(defaults map[string]any, collectionID string, 
 		if !ok {
 			continue
 		}
-		for _, rawRow := range rows {
+		for index, rawRow := range rows {
 			row, ok := rawRow.(map[string]any)
 			if !ok || !boolValue(row["secret"]) {
 				continue
 			}
-			rowID := rowIDValue(row)
-			if rowID == "" {
-				continue
-			}
+			rowID := secretRowID(row, index)
 			value := stringFromAny(row["value"])
 			key := collectionRowSecretKey(collectionID, field, rowID)
 			if placeholderKey, ok := kurloSecretKeyFromPlaceholder(value); ok {
@@ -1512,15 +1515,12 @@ func sanitizeRequestSecretRows(request map[string]any, requestID string, existin
 		if !ok {
 			continue
 		}
-		for _, rawRow := range rows {
+		for index, rawRow := range rows {
 			row, ok := rawRow.(map[string]any)
 			if !ok || !boolValue(row["secret"]) {
 				continue
 			}
-			rowID := rowIDValue(row)
-			if rowID == "" {
-				continue
-			}
+			rowID := secretRowID(row, index)
 			value := stringFromAny(row["value"])
 			key := requestRowSecretKey(requestID, field, rowID)
 			if placeholderKey, ok := kurloSecretKeyFromPlaceholder(value); ok {
@@ -1541,15 +1541,12 @@ func sanitizeEnvironmentsForFilesystem(environments []map[string]any, existingSe
 		next := cloneMap(environment)
 		envID := stringValue(next, "id")
 		if rows, ok := next["values"].([]any); ok && envID != "" {
-			for _, rawRow := range rows {
+			for index, rawRow := range rows {
 				row, ok := rawRow.(map[string]any)
 				if !ok || !boolValue(row["secret"]) {
 					continue
 				}
-				rowID := rowIDValue(row)
-				if rowID == "" {
-					continue
-				}
+				rowID := secretRowID(row, index)
 				value := stringFromAny(row["value"])
 				key := environmentSecretKey(envID, rowID)
 				if placeholderKey, ok := kurloSecretKeyFromPlaceholder(value); ok {
@@ -2145,6 +2142,13 @@ func rowIDValue(row map[string]any) string {
 	default:
 		return ""
 	}
+}
+
+func secretRowID(row map[string]any, index int) string {
+	if id := rowIDValue(row); id != "" {
+		return id
+	}
+	return fmt.Sprintf("index-%d", index)
 }
 
 func requestSecretKey(requestID, field string) string {

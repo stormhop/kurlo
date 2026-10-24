@@ -127,6 +127,10 @@ describe('ai presets', () => {
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: 'sk-real' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'none' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key: 'Authorization', value: 'Bearer sk-x', enabled: true }] } as never)).toBe('');
+    for (const key of ['x-auth-token', 'anthropic-api-key', 'x-goog-api-key', 'X-Api-Key']) {
+      expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key, value: 'sk-x', enabled: true }] } as never)).toBe('');
+    }
+    expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key: 'Accept', value: 'json', enabled: true }] } as never)).toContain('apiKey');
   });
 
   it('builds the request a code snippet shows from the prompt, the model and the settings', () => {

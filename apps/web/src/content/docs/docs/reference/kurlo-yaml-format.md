@@ -196,7 +196,10 @@ request:
 | `requestType` | `http`, `graphql`, `ws`, `socketio`, `grpc`, `mcp`, or `ai` |
 | `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, or `SSE` |
 | `folderPath` | Display names only. Request files are stored flat; `folderPath` is the UI source of truth. |
-| `params`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. |
+| `params`, `pathParams`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. A row with `secret: true` keeps its value in the encrypted local store, with a `{{kurloSecret:...}}` placeholder in the file. |
+| `pathParams` | Values of the `:name` path variables in `url`. The names come from the URL; a row whose name the URL no longer has is dropped. |
+| `mcpMethod`, `mcpName`, `mcpArguments` | The MCP call: the method (`tools/list`, `tools/call` and the like), the tool, resource or prompt name, and the arguments as JSON text. |
+| `mcpProtocolVersion` | Pins an MCP protocol revision, such as `2025-06-18`. Empty lets Kurlo find the one the server speaks. |
 | `grpcMethod`, `grpcUseReflection`, `grpcProtoFilePath`, `grpcProtoFileName`, `grpcProtoImportPaths` | gRPC method and service-definition source metadata. |
 | `aiProvider` | `openai` (Chat Completions, also for OpenAI-compatible servers) or `anthropic` (Messages). `url` is the provider's base URL. |
 | `aiModel`, `aiSystem`, `aiPrompt` | Model ID, system prompt (up to 50,000 characters) and prompt (up to 200,000); all accept `{{variables}}`. |
@@ -208,12 +211,13 @@ request:
 | `rawBodyType` | `text`, `json`, `html`, or `xml`. |
 | `preRequestScript`, `testScript` | Legacy Tengo scripts. |
 | `preRequestScriptJs`, `testScriptJs` | JavaScript pre-request/test scripts. |
-| `auth.type` | `none`, `bearer`, `basic`, `apikey`, `oauth2`, `aws`, or `digest`. |
+| `auth.type` | `inherit`, `none`, `bearer`, `basic`, `apikey`, `oauth1`, `oauth2`, `aws`, or `digest`. |
+| `auth.oauth1ConsumerKey`, `auth.oauth1SignatureMethod`, `auth.oauth1AddTo`, `auth.oauth1Realm`, `auth.oauth1Callback`, `auth.oauth1Verifier`, `auth.oauth1Version`, `auth.oauth1Timestamp`, `auth.oauth1Nonce`, `auth.oauth1IncludeBodyHash`, `auth.oauth1AddEmptyParams` | OAuth 1.0 settings. `oauth1SignatureMethod` is `HMAC-SHA1` (default), `HMAC-SHA256`, `HMAC-SHA512`, `RSA-SHA1`, `RSA-SHA256`, `RSA-SHA512` or `PLAINTEXT`; `oauth1AddTo` is `header` (default), `query` or `body`. An empty timestamp or nonce is generated on every send. |
 | `auth.oauth2GrantType`, `auth.oauth2AuthURL`, `auth.oauth2TokenURL`, `auth.oauth2ClientID`, `auth.oauth2Scope`, `auth.oauth2TokenExpiry`, `auth.oauth2UsePKCE` | OAuth 2.0 grant metadata. `oauth2GrantType` is `client_credentials` or `authorization_code`; Authorization Code can use PKCE. |
 | `settings` | Request transport settings. Unknown settings must be preserved by third-party tools. |
 | `settingsOverrides` | Per-request override markers for inherited collection defaults. |
 
-Secret-bearing auth fields (`bearerToken`, `basicPass`, `apiKeyValue`, `oauth2Secret`, `oauth2Token`, `oauth2RefreshToken`, `awsAccessKey`, and `awsSecretKey`) are replaced with `{{kurloSecret:...}}` placeholders in shared Git/YAML workspaces. Their plaintext values stay in Kurlo's encrypted local profile A value that is only a variable reference, such as `{{apiToken}}`, holds no secret and is written as is.
+Secret-bearing auth fields (`bearerToken`, `basicPass`, `apiKeyValue`, `oauth2Secret`, `oauth2Token`, `oauth2RefreshToken`, `awsAccessKey`, `awsSecretKey`, `oauth1ConsumerSecret`, `oauth1Token`, `oauth1TokenSecret`, and `oauth1PrivateKey`) are replaced with `{{kurloSecret:...}}` placeholders in shared Git/YAML workspaces. Their plaintext values stay in Kurlo's encrypted local profile A value that is only a variable reference, such as `{{apiToken}}`, holds no secret and is written as is.
 
 ## Example file
 

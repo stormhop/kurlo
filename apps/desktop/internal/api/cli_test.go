@@ -62,6 +62,9 @@ func TestSelectCLIRequestsFiltersRealtimeDraftsAndCollection(t *testing.T) {
 		{Name: "graphql", RequestType: "graphql", Collection: "Smoke"},
 		{Name: "ws", RequestType: "ws", Collection: "Smoke"},
 		{Name: "grpc", RequestType: "grpc", Collection: "Smoke"},
+		{Name: "sse", RequestType: "http", Method: "SSE", Collection: "Smoke"},
+		{Name: "mcp", RequestType: "mcp", Collection: "Smoke"},
+		{Name: "ai", RequestType: "ai", Collection: "Smoke"},
 		{Name: "draft", RequestType: "http", Collection: "Smoke", IsDraft: true},
 		{Name: "other", RequestType: "http", Collection: "Other"},
 	}
@@ -338,5 +341,21 @@ func TestRunCLIHandlesAHugeIterationCount(t *testing.T) {
 	code := runCLI(cliOptions{workspace: root, env: "Local", reporters: []string{"cli"}, iterations: math.MaxInt, failFast: true, stdout: &out, stderr: &out})
 	if code != 1 {
 		t.Fatalf("expected the run to stop at the first failure with exit 1, got %d. output:\n%s", code, out.String())
+	}
+}
+
+func TestBuildHTTPRequestCarriesOAuth1Settings(t *testing.T) {
+	req := cliSavedRequest{Method: "GET", URL: "https://api.example.test", RequestType: "http"}
+	req.Auth.Type = "oauth1"
+	req.Auth.OAuth1ConsumerKey = "key"
+	req.Auth.OAuth1ConsumerSecret = "secret"
+	req.Auth.OAuth1SignatureMethod = "HMAC-SHA256"
+	req.Auth.OAuth1AddTo = "query"
+	req.Auth.OAuth1IncludeBodyHash = true
+	built := buildHTTPRequest(req, map[string]string{}, nil, 0)
+	auth := built.Auth
+	if auth.Type != "oauth1" || auth.OAuth1ConsumerKey != "key" || auth.OAuth1ConsumerSecret != "secret" ||
+		auth.OAuth1SignatureMethod != "HMAC-SHA256" || auth.OAuth1AddTo != "query" || !auth.OAuth1IncludeBodyHash {
+		t.Fatalf("oauth1 settings were not carried over: %+v", auth)
 	}
 }

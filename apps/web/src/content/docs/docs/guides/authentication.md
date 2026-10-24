@@ -1,6 +1,6 @@
 ---
 title: Authentication
-description: Configure Bearer, Basic, Digest, API Key, OAuth 2.0, and AWS Signature v4 auth.
+description: Configure Bearer, Basic, Digest, API Key, OAuth 1.0, OAuth 2.0, and AWS Signature v4 auth.
 ---
 
 Auth is configured per request on the **Auth** tab. Collections can also define default auth; requests set to **Inherit auth** use the collection default, while requests with an explicit auth type override it.
@@ -53,6 +53,16 @@ For both assertion methods the audience defaults to the token URL, which is what
 **Audience** sends an `audience` parameter alongside the token request. It is not part of RFC 6749 but Auth0 requires it and several other providers accept it.
 
 The acquired `access_token` is injected as `Authorization: Bearer ...` on send. If the provider returns a refresh token, Kurlo exposes **Refresh token** and automatically refreshes an expired access token before sending a request.
+
+## OAuth 1.0
+
+Sign each request with OAuth 1.0a ([RFC 5849](https://www.rfc-editor.org/rfc/rfc5849)), the scheme of older APIs such as Twitter/X v1.1, Trello, Flickr or Jira Server.
+
+- **Consumer key** and **consumer secret**, plus the **access token** and **token secret** when you act for a user. Use `{{variables}}` for the secrets.
+- **Signature method**: `HMAC-SHA1` (the default), `HMAC-SHA256`, `HMAC-SHA512`, `RSA-SHA1`, `RSA-SHA256`, `RSA-SHA512` or `PLAINTEXT`. The RSA methods take a PEM private key instead of the two secrets.
+- **Add parameters to**: the `Authorization: OAuth …` header (the default), the query string, or the body. The body works only with a form-urlencoded body, or with no body, which then becomes one.
+
+Kurlo generates a fresh **timestamp** and **nonce** on every send and signs the method, the URL and its query, and the fields of a form-urlencoded body. **Advanced** holds the realm, the callback URL and the verifier of the three-legged flow, the version, fixed timestamp and nonce values for debugging a signature, **Include body hash** (`oauth_body_hash` for bodies that are not form-urlencoded) and **Sign empty parameters**.
 
 ## AWS Signature v4
 

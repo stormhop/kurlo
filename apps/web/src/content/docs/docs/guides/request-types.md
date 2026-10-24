@@ -9,7 +9,7 @@ A new request always starts as HTTP — the `+` in the tab bar, `Cmd/Ctrl N`, an
 
 ![Method and protocol picker in the address bar](../../../../assets/screenshots/request-protocol-picker.png)
 
-The picker holds both decisions: the HTTP methods on top, the other protocols below. A draft can switch protocol at any time — pick `POST` on a GraphQL draft and it becomes an HTTP request. A saved request can switch until it has a URL; after that its protocol is fixed, the picker still changes an HTTP request's method, and a request of any other type shows its protocol without a menu.
+The picker holds both decisions: the HTTP methods on the left, the other protocols on the right. A draft can switch protocol at any time — pick `POST` on a GraphQL draft and it becomes an HTTP request. A saved request can switch until it has a URL; after that its protocol is fixed, the picker still changes an HTTP request's method, and a request of any other type shows its protocol without a menu.
 
 ## At a glance
 
@@ -21,10 +21,10 @@ The picker holds both decisions: the HTTP methods on top, the other protocols be
 | WebSocket | Raw `ws://` / `wss://` sessions | Params, Auth, Headers, Message, Settings | Frames, handshake, logs | No |
 | Socket.IO | Socket.IO servers with namespaces/events | Params, Auth, Headers, Events, Message, Settings | Events, handshake, logs | No |
 | gRPC | Protobuf RPCs with metadata/reflection/proto files | Metadata, Body, Service, Scripts, Settings | Messages, metadata, trailers, scripts | Yes |
-| MCP | Model Context Protocol servers — list their tools and call one by hand | Arguments, Auth, Headers, Scripts, Settings | Result, raw exchange, notifications | Yes |
+| MCP | Model Context Protocol servers — list their tools and call one by hand | Arguments, Auth, Headers, Scripts, Settings | Result, raw exchange, notifications | No |
 | AI | Prompts to OpenAI, Anthropic and OpenAI-compatible models, with MCP tools | Prompt, Auth, Headers, Tools, Scripts, Settings (model) | Conversation, raw stream, tests | No |
 
-Realtime requests are intentionally skipped by the Collection Runner because they are long-lived sessions. gRPC is runnable because each invocation produces a bounded response. AI requests are skipped too for now: a model answer is not repeatable the way an HTTP response is, and a run could spend real money.
+Realtime requests are intentionally skipped by the Collection Runner because they are long-lived sessions. gRPC is runnable because each invocation produces a bounded response. AI requests are skipped too for now: a model answer is not repeatable the way an HTTP response is, and a run could spend real money. MCP requests are skipped as well: the runner does not speak JSON-RPC to an MCP server yet.
 
 ## HTTP
 
@@ -163,6 +163,8 @@ The **Prompt** tab holds the system prompt and the prompt; `{{variables}}` work 
 - **Tool calls** are cards with the tool's name, the server it came from, its call ID and its arguments, which grow while the model writes them. The result, or the tool's error, appears under the call.
 - The status line shows the **time to the first token**, the **speed** in tokens per second and the **tokens** in and out, with cache reads; hover it for the breakdown per type.
 - The **stop reason** is shown under the answer. An answer cut off by the token limit says so and offers to raise the limit and send again, and an error in the middle of a stream, which arrives with HTTP 200, is shown where the stream stopped, below the part that did arrive.
+
+![AI chat with a Markdown answer, its stop reason and the reply field](../../../../assets/screenshots/request-ai-chat.png)
 
 Answers are rendered as Markdown: headings, lists, tables, code blocks with a **Copy** button, and links, which open in your browser. Images the model puts in its answer as a `data:` URL are shown; remote images stay links, so an answer cannot make Kurlo fetch a URL on its own.
 

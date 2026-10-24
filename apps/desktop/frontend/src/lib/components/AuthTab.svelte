@@ -1,6 +1,6 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
-  import { AUTH_OPTIONS } from '../constants';
+  import { AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
   import Select from './Select.svelte';
   import { decodeJwt, formatJwtClaimValue, formatJwtNumericDate, jwtClaimRows, jwtHeaderRows, jwtTokenState } from '../jwt';
 
@@ -29,6 +29,8 @@
     { value: 'client_secret_jwt', label: 'Client secret JWT (HS256)' },
     { value: 'private_key_jwt', label: 'Private key JWT (RS256 / ES256)' },
   ];
+
+  let oauth1UsesRsa = $derived(vm.oauth1.signatureMethod.startsWith('RSA-'));
 
   let oauth2ActionLabel = $derived.by(() => {
     switch (vm.oauth2GrantType) {
@@ -208,7 +210,7 @@
         <input id="oauth2-secret" class="field field-input" bind:value={vm.oauth2Secret} type="password" />
       {/if}
       {#if vm.oauth2ClientAuth === 'private_key_jwt'}
-        <label class="field-label" for="oauth2-private-key">Private key (PEM)<span class="field-label-hint"> — accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
+        <label class="field-label" for="oauth2-private-key">Private key (PEM) <span class="field-label-hint">— accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
         <textarea id="oauth2-private-key" class="field field-input field-mono oauth2-key-input" bind:value={vm.oauth2AssertionPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea>
         <div class="auth-grid-2">
           <div>
@@ -254,6 +256,81 @@
         <input class="field field-input field-mono" type="password" readonly value={vm.oauth2Token} onclick={selectInputText} />
         {#if oauth2ExpiryLabel}<span class="oauth2-expiry-hint">{oauth2ExpiryLabel}</span>{/if}
       {/if}
+
+    {:else if vm.authType === 'oauth1'}
+      <div class="auth-grid-2">
+        <div>
+          <span class="field-label">Signature method</span>
+          <Select bind:value={vm.oauth1.signatureMethod} options={OAUTH1_SIGNATURE_OPTIONS} className="auth-field-select" ariaLabel="Signature method" />
+        </div>
+        <div>
+          <span class="field-label">Add parameters to</span>
+          <div class="segmented radio-group" role="radiogroup" aria-label="Add OAuth 1.0 parameters to">
+            <label class="segmented-item radio-label"><input type="radio" bind:group={vm.oauth1.addTo} value="header" /> Header</label>
+            <label class="segmented-item radio-label"><input type="radio" bind:group={vm.oauth1.addTo} value="query" /> Query</label>
+            <label class="segmented-item radio-label"><input type="radio" bind:group={vm.oauth1.addTo} value="body" /> Body</label>
+          </div>
+        </div>
+        <div>
+          <label class="field-label" for="oauth1-consumer-key">Consumer key</label>
+          <input id="oauth1-consumer-key" class="field field-input field-mono" bind:value={vm.oauth1.consumerKey} spellcheck="false" />
+        </div>
+        {#if !oauth1UsesRsa}
+          <div>
+            <label class="field-label" for="oauth1-consumer-secret">Consumer secret</label>
+            <input id="oauth1-consumer-secret" class="field field-input field-mono" bind:value={vm.oauth1.consumerSecret} type="password" />
+          </div>
+        {/if}
+        {#if oauth1UsesRsa}
+          <div class="auth-grid-span">
+            <label class="field-label" for="oauth1-private-key">Private key (PEM) <span class="field-label-hint">— accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
+            <textarea id="oauth1-private-key" class="field field-input field-mono oauth2-key-input" bind:value={vm.oauth1.privateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea>
+          </div>
+        {/if}
+        <div>
+          <label class="field-label" for="oauth1-token">Access token <span class="field-label-hint">(optional)</span></label>
+          <input id="oauth1-token" class="field field-input field-mono" bind:value={vm.oauth1.token} type="password" />
+        </div>
+        {#if !oauth1UsesRsa}
+          <div>
+            <label class="field-label" for="oauth1-token-secret">Token secret <span class="field-label-hint">(optional)</span></label>
+            <input id="oauth1-token-secret" class="field field-input field-mono" bind:value={vm.oauth1.tokenSecret} type="password" />
+          </div>
+        {/if}
+      </div>
+      <details class="oauth1-advanced">
+        <summary class="field-label">Advanced</summary>
+        <div class="auth-grid-2">
+          <div>
+            <label class="field-label" for="oauth1-realm">Realm</label>
+            <input id="oauth1-realm" class="field field-input" bind:value={vm.oauth1.realm} spellcheck="false" />
+          </div>
+          <div>
+            <label class="field-label" for="oauth1-callback">Callback URL</label>
+            <input id="oauth1-callback" class="field field-input" bind:value={vm.oauth1.callback} placeholder="https://example.com/callback" spellcheck="false" />
+          </div>
+          <div>
+            <label class="field-label" for="oauth1-verifier">Verifier</label>
+            <input id="oauth1-verifier" class="field field-input field-mono" bind:value={vm.oauth1.verifier} spellcheck="false" />
+          </div>
+          <div>
+            <label class="field-label" for="oauth1-version">Version</label>
+            <input id="oauth1-version" class="field field-input field-mono" bind:value={vm.oauth1.version} placeholder="1.0" spellcheck="false" />
+          </div>
+          <div>
+            <label class="field-label" for="oauth1-timestamp">Timestamp</label>
+            <input id="oauth1-timestamp" class="field field-input field-mono" bind:value={vm.oauth1.timestamp} placeholder="Generated on send" spellcheck="false" />
+          </div>
+          <div>
+            <label class="field-label" for="oauth1-nonce">Nonce</label>
+            <input id="oauth1-nonce" class="field field-input field-mono" bind:value={vm.oauth1.nonce} placeholder="Generated on send" spellcheck="false" />
+          </div>
+        </div>
+        <div class="oauth1-checks">
+          <label class="check-label"><input class="check" type="checkbox" bind:checked={vm.oauth1.includeBodyHash} /> Include body hash <span class="field-label-hint">(oauth_body_hash)</span></label>
+          <label class="check-label"><input class="check" type="checkbox" bind:checked={vm.oauth1.addEmptyParams} /> Sign empty parameters</label>
+        </div>
+      </details>
 
     {:else if vm.authType === 'aws'}
       <div class="auth-grid-2">

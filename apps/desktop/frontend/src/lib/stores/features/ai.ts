@@ -407,7 +407,7 @@ export const aiFeature = {
       );
       const keyProblem = aiUnresolvedKey(runnable.http);
       if (keyProblem) throw new Error(keyProblem);
-      const response = await sendAiRequest(runnable);
+      const response = await sendAiRequest({ ...runnable, turnId: turn.id });
       try { await this.applyEnvironmentChangesFromResponse(response.http, environmentId); } catch {  }
       try { await this.syncActiveEnvironmentFromBackend(); } catch {  }
       const status: AiTurnStatus = response.error === 'Cancelled' ? 'cancelled' : response.error ? 'error' : 'done';
@@ -443,16 +443,18 @@ export const aiFeature = {
   initAiListeners(this: AiHost) {
     const runtime = window.runtime;
     if (!runtime?.EventsOn) return;
-    runtime.EventsOn('ai:deltas', (payload: { sessionId: string; deltas: AiDelta[] }) => {
+    runtime.EventsOn('ai:deltas', (payload: { sessionId: string; turnId?: string; deltas: AiDelta[] }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
       if (!turn || turn.status !== 'streaming' || !payload.deltas?.length) return;
+      if (payload.turnId && payload.turnId !== turn.id) return;
       this.updateAiTurn(payload.sessionId, turn.id, current => applyAiDeltas(current, payload.deltas));
     });
-    runtime.EventsOn('ai:step', (payload: { sessionId: string; step: AiStep }) => {
+    runtime.EventsOn('ai:step', (payload: { sessionId: string; turnId?: string; step: AiStep }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
       if (!turn || turn.status !== 'streaming') return;
+      if (payload.turnId && payload.turnId !== turn.id) return;
       this.updateAiTurn(payload.sessionId, turn.id, current => {
         const steps = current.steps.slice();
         while (steps.length <= payload.step.index) steps.push(emptyStepView(steps.length));
@@ -460,10 +462,11 @@ export const aiFeature = {
         return { ...current, steps };
       });
     });
-    runtime.EventsOn('ai:tool', (payload: { sessionId: string; step: number; block: AiBlock }) => {
+    runtime.EventsOn('ai:tool', (payload: { sessionId: string; turnId?: string; step: number; block: AiBlock }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
       if (!turn || turn.status !== 'streaming') return;
+      if (payload.turnId && payload.turnId !== turn.id) return;
       this.updateAiTurn(payload.sessionId, turn.id, current => {
         const steps = current.steps.slice();
         while (steps.length <= payload.step) steps.push(emptyStepView(steps.length));
@@ -609,8 +612,10 @@ export function aiModelsProblem(outcome:
   }
 }
 
+const AI_KEY_HEADER = /^(?:proxy-)?authorization$|api[-_]?key|auth[-_]?token|(?:^|-)(?:key|token)$/i;
+
 export function aiUnresolvedKey(req: Pick<HttpRequest, 'auth' | 'headers'>): string {
-  const keyHeader = (req.headers ?? []).some(h => h.enabled !== false && /^(authorization|x-api-key|api-key)$/i.test(h.key.trim()) && h.value.trim() && !h.value.includes('{{'));
+  const keyHeader = (req.headers ?? []).some(h => h.enabled !== false && AI_KEY_HEADER.test(h.key.trim()) && h.value.trim() && !h.value.includes('{{'));
   if (keyHeader) return '';
   const value = req.auth?.type === 'bearer' ? req.auth.token : req.auth?.type === 'apikey' ? req.auth.keyValue : '';
   const match = /\{\{\s*([^{}\s]+)\s*\}\}/.exec(value ?? '');

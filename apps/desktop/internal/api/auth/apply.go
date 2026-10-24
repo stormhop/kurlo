@@ -27,6 +27,8 @@ func Apply(req *http.Request, cfg model.AuthConfig) error {
 		}
 	case "aws":
 		return Sign(req, cfg)
+	case "oauth1":
+		return SignOAuth1(req, cfg)
 	default:
 		return fmt.Errorf("unsupported auth type %q", cfg.Type)
 	}

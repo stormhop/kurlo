@@ -6,6 +6,7 @@
   import type { GitWorkspaceStatus } from '../backend';
   import type { TopView } from '../stores/ui';
   import { shortcutComboLabel } from '../stores/features/preferences';
+  import { RESPONSE_RIGHT_CHOSEN_MIN_WIDTH } from '../stores/features/uiShell';
   import {
     DARK_THEME_VARIANTS,
     LIGHT_THEME_VARIANTS,
@@ -20,6 +21,7 @@
     codePanelOpen,
     codePanelAvailable = true,
     responseOnRight = false,
+    responseRightTooNarrow = false,
     topView,
     gitStatus,
     appVersion = '',
@@ -37,6 +39,7 @@
     codePanelOpen: boolean;
     codePanelAvailable?: boolean;
     responseOnRight?: boolean;
+    responseRightTooNarrow?: boolean;
     topView: TopView;
     gitStatus: GitWorkspaceStatus;
     appVersion?: string;
@@ -242,7 +245,8 @@
         class="btn btn-ghost btn-icon btn-xs layout-btn response-layout-btn"
         type="button"
         onclick={() => vm.setResponseLayout(responseOnRight ? 'below' : 'right')}
-        title={responseOnRight ? 'Show the response below the request' : 'Show the response beside the request'}
+        disabled={responseRightTooNarrow}
+        title={responseOnRight ? 'Show the response below the request' : responseRightTooNarrow ? `The editor is too narrow to show the response beside the request (it needs ${RESPONSE_RIGHT_CHOSEN_MIN_WIDTH} px)` : 'Show the response beside the request'}
         aria-label={responseOnRight ? 'Show the response below the request' : 'Show the response beside the request'}
       >
         <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">

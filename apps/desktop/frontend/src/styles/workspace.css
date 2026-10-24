@@ -5357,3 +5357,170 @@
   font-size: var(--text-label);
   text-align: center;
 }
+
+.find-replace-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(52rem, 100%);
+  height: min(42rem, calc(100vh - 2.75rem));
+  color: var(--text);
+  overflow: hidden;
+}
+
+.find-replace-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.find-replace-scope {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: var(--text-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-replace-form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.find-replace-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.find-replace-row .btn-primary {
+  min-width: 8.5rem;
+}
+
+.find-replace-toggles {
+  display: flex;
+  gap: var(--space-0-5);
+  min-width: 8.5rem;
+}
+
+.find-replace-toggle {
+  min-width: 2rem;
+  font-family: var(--font-mono);
+}
+
+.find-replace-toggle.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.find-replace-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  color: var(--text-3);
+  font-size: var(--text-label);
+}
+
+.find-replace-error {
+  color: color-mix(in srgb, var(--delete) 78%, var(--text));
+}
+
+.find-replace-skipped {
+  color: color-mix(in srgb, var(--s4xx) 70%, var(--text));
+}
+
+.find-replace-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1-5) var(--space-2-5);
+  border: 1px solid color-mix(in srgb, var(--s2xx) 30%, var(--border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--s2xx) 6%, var(--surface));
+  font-size: var(--text-label);
+}
+
+.find-replace-results {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+
+.find-replace-group + .find-replace-group {
+  margin-top: var(--space-3);
+}
+
+.find-replace-group-head {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) auto auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.find-replace-request {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-replace-count {
+  color: var(--text-3);
+  font-size: var(--text-caption);
+}
+
+.find-replace-match {
+  display: grid;
+  grid-template-columns: minmax(0, 10rem) minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-1) 0 var(--space-1) var(--space-2);
+}
+
+.find-replace-match:hover {
+  background: var(--hover);
+}
+
+.find-replace-field {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.find-replace-context {
+  overflow: hidden;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.find-replace-context mark {
+  border-radius: var(--radius-xs);
+  color: var(--text);
+  background: color-mix(in srgb, var(--s4xx) 32%, transparent);
+}
+
+.find-replace-context mark.replaced {
+  text-decoration: line-through;
+  background: color-mix(in srgb, var(--delete) 22%, transparent);
+}
+
+.find-replace-context ins {
+  border-radius: var(--radius-xs);
+  color: var(--text);
+  background: color-mix(in srgb, var(--s2xx) 24%, transparent);
+  text-decoration: none;
+}

@@ -86,6 +86,17 @@ func resolveAuthTemplates(cfg model.AuthConfig, values map[string]string) model.
 	cfg.AWSSessionToken = resolve(cfg.AWSSessionToken)
 	cfg.AWSRegion = resolve(cfg.AWSRegion)
 	cfg.AWSService = resolve(cfg.AWSService)
+	cfg.OAuth1ConsumerKey = resolve(cfg.OAuth1ConsumerKey)
+	cfg.OAuth1ConsumerSecret = resolve(cfg.OAuth1ConsumerSecret)
+	cfg.OAuth1Token = resolve(cfg.OAuth1Token)
+	cfg.OAuth1TokenSecret = resolve(cfg.OAuth1TokenSecret)
+	cfg.OAuth1PrivateKey = resolve(cfg.OAuth1PrivateKey)
+	cfg.OAuth1Realm = resolve(cfg.OAuth1Realm)
+	cfg.OAuth1Callback = resolve(cfg.OAuth1Callback)
+	cfg.OAuth1Verifier = resolve(cfg.OAuth1Verifier)
+	cfg.OAuth1Timestamp = resolve(cfg.OAuth1Timestamp)
+	cfg.OAuth1Nonce = resolve(cfg.OAuth1Nonce)
+	cfg.OAuth1Version = resolve(cfg.OAuth1Version)
 	return cfg
 }
 

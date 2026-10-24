@@ -64,6 +64,12 @@ var authActiveFields = map[string][]string{
 		"oauth2AssertionKeyID", "oauth2AssertionAudience",
 	},
 	"aws": {"awsAccessKey", "awsSecretKey", "awsSessionToken", "awsRegion", "awsService"},
+	"oauth1": {
+		"oauth1ConsumerKey", "oauth1ConsumerSecret", "oauth1Token", "oauth1TokenSecret",
+		"oauth1SignatureMethod", "oauth1PrivateKey", "oauth1Realm", "oauth1Callback",
+		"oauth1Verifier", "oauth1Timestamp", "oauth1Nonce", "oauth1Version", "oauth1AddTo",
+		"oauth1IncludeBodyHash", "oauth1AddEmptyParams",
+	},
 }
 
 var authTypesWithoutFields = map[string]bool{"inherit": true}

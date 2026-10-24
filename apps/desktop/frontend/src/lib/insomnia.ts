@@ -1,4 +1,4 @@
-import type { AuthType, BodyType, KVRow, Method, RawBodyType, RequestSettings, RequestTab, RequestType, SavedRequest, SIOArg } from './types/models';
+import type { AuthType, BodyType, KVRow, Method, OAuth1SignatureMethod, RawBodyType, RequestSettings, RequestTab, RequestType, SavedRequest, SIOArg } from './types/models';
 import { DEFAULT_REQUEST_SETTINGS, mkRow } from './constants';
 import { asArray, asText, isRecord, newRequestId } from './utils';
 import { emptyAuthState } from './utils';
@@ -72,7 +72,7 @@ function folderPathFor(resource: Record<string, unknown>, byId: Map<string, Reco
 
 function authConfig(resource: Record<string, unknown>): SavedRequest['auth'] {
   const auth = isRecord(resource.authentication) ? resource.authentication : isRecord(resource.auth) ? resource.auth : {};
-  const config = emptyAuthState();
+  const config: SavedRequest['auth'] = emptyAuthState();
   const type = asText(auth.type).toLowerCase();
   if (!type || type === 'none') return config;
   if (type === 'bearer' || type === 'bearer-token') {
@@ -95,6 +95,21 @@ function authConfig(resource: Record<string, unknown>): SavedRequest['auth'] {
     config.oauth2Secret = asText(auth.clientSecret);
     config.oauth2Scope = asText(auth.scope);
     config.oauth2TokenURL = asText(auth.accessTokenUrl || auth.tokenUrl);
+  } else if (type === 'oauth1') {
+    const method = asText(auth.signatureMethod).toUpperCase();
+    config.type = 'oauth1';
+    config.oauth1ConsumerKey = asText(auth.consumerKey);
+    config.oauth1ConsumerSecret = asText(auth.consumerSecret);
+    config.oauth1Token = asText(auth.tokenKey || auth.token);
+    config.oauth1TokenSecret = asText(auth.tokenSecret);
+    config.oauth1SignatureMethod = (['HMAC-SHA1', 'HMAC-SHA256', 'HMAC-SHA512', 'RSA-SHA1', 'RSA-SHA256', 'RSA-SHA512', 'PLAINTEXT'].includes(method) ? method : 'HMAC-SHA1') as OAuth1SignatureMethod;
+    config.oauth1PrivateKey = asText(auth.privateKey);
+    config.oauth1Realm = asText(auth.realm);
+    config.oauth1Callback = asText(auth.callback);
+    config.oauth1Verifier = asText(auth.verifier);
+    config.oauth1Timestamp = asText(auth.timestamp);
+    config.oauth1Nonce = asText(auth.nonce);
+    config.oauth1Version = asText(auth.version) || '1.0';
   } else if (type === 'aws' || type === 'awsv4' || type === 'iam') {
     config.type = 'aws';
     config.awsAccessKey = asText(auth.accessKeyId || auth.accessKey);
@@ -291,6 +306,21 @@ function insomniaAuth(auth: SavedRequest['auth'], includeSecrets = false) {
       clientSecret: safeExportValue('clientSecret', auth.oauth2Secret, includeSecrets),
       scope: auth.oauth2Scope,
       accessTokenUrl: auth.oauth2TokenURL,
+    };
+  }
+  if (auth.type === 'oauth1') {
+    return {
+      type: 'oauth1',
+      consumerKey: auth.oauth1ConsumerKey ?? '',
+      consumerSecret: safeExportValue('consumerSecret', auth.oauth1ConsumerSecret ?? '', includeSecrets),
+      tokenKey: safeExportValue('token', auth.oauth1Token ?? '', includeSecrets),
+      tokenSecret: safeExportValue('tokenSecret', auth.oauth1TokenSecret ?? '', includeSecrets),
+      signatureMethod: auth.oauth1SignatureMethod ?? 'HMAC-SHA1',
+      privateKey: safeExportValue('privateKey', auth.oauth1PrivateKey ?? '', includeSecrets),
+      realm: auth.oauth1Realm ?? '',
+      callback: auth.oauth1Callback ?? '',
+      verifier: auth.oauth1Verifier ?? '',
+      version: auth.oauth1Version ?? '1.0',
     };
   }
   if (auth.type === 'aws') {

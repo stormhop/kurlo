@@ -261,7 +261,7 @@
                 {:else if block.type === 'redacted_thinking'}
                   <div class="ai-thinking"><span class="ai-thinking-toggle">Thinking (redacted by the provider)</span></div>
                 {:else if block.type === 'text' && block.text}
-                  <div class="ai-text"><Markdown source={block.text} compact /></div>
+                  <div class="ai-text"><Markdown source={block.text} compact live={turn.status === 'streaming' && !step.done} /></div>
                 {:else if block.type === 'tool_use'}
                   {@const result = toolResultFor(step, block)}
                   <div class="ai-tool" class:ai-tool-error={result?.isError}>

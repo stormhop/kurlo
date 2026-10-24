@@ -213,6 +213,8 @@ func (a *App) openDirectoryDialog(title, defaultDirectory string) string {
 }
 
 func (a *App) GitStatus() GitWorkspaceStatus {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	root := fileWorkspaceStorePath()
 	if fileWorkspaceStorageMode() == workspaceStorageModeLocal {
 		return localWorkspaceGitStatus(root)
@@ -221,26 +223,38 @@ func (a *App) GitStatus() GitWorkspaceStatus {
 }
 
 func (a *App) GitDiff(path string) GitDiffResult {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	return gitDiffForWorkspace(fileWorkspaceStorePath(), path)
 }
 
 func (a *App) GitOutgoingChanges() GitDiffResult {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	return gitOutgoingChangesForWorkspace(fileWorkspaceStorePath())
 }
 
 func (a *App) GitCommitLog(limit int) GitLogResult {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	return gitCommitLogForRoot(fileWorkspaceStorePath(), limit)
 }
 
 func (a *App) GitCommitLogPage(limit, offset int) GitLogResult {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	return gitCommitLogPageForRoot(fileWorkspaceStorePath(), limit, offset)
 }
 
 func (a *App) GitCommitDiff(commit string) GitDiffResult {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	return gitCommitDiffForRoot(fileWorkspaceStorePath(), commit)
 }
 
 func (a *App) GitConflictFile(path string) GitConflictFileResult {
+	gitOperationMu.RLock()
+	defer gitOperationMu.RUnlock()
 	return gitConflictFileForRoot(fileWorkspaceStorePath(), path)
 }
 

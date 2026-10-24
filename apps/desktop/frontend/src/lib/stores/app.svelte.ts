@@ -27,6 +27,7 @@ import {
 } from '../constants';
 import {
   safeFileName, downloadTextFile, clipboardCopy, restoreRows, requestSupportsCurl,
+  oauth1FieldsFromAuth, type OAuth1Fields,
 } from '../utils';
 import type {
   Method, BodyType, RawBodyType, HttpVersion, RequestTab, ScriptTab, ResponseTab, GrpcResponseTab,
@@ -51,6 +52,7 @@ import { dataBackupFeature } from './features/dataBackup';
 import { gitFeature, GIT_LOG_PAGE_SIZE, EMPTY_GIT_STATUS, EMPTY_GIT_DIFF, EMPTY_GIT_BRANCHES, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG, normalizeGitStatus, normalizeGitBranches, normalizeGitLog } from './features/git';
 import type { GitAuthChoice, GitAuthRequest } from './features/git';
 import { folderFeature } from './features/folders';
+import { findReplaceFeature, type FindReplaceScope, type FindReplaceUndo } from './features/findReplace';
 import { graphqlFeature } from './features/graphql';
 import { grpcFeature } from './features/grpc';
 import { mcpFeature } from './features/mcp';
@@ -381,6 +383,14 @@ class AppVM {
   declare createFolderInCollection: typeof folderFeature.createFolderInCollection;
   declare renameFolder: typeof folderFeature.renameFolder;
   declare deleteFolder: typeof folderFeature.deleteFolder;
+
+  declare openFindReplace: typeof findReplaceFeature.openFindReplace;
+  declare closeFindReplace: typeof findReplaceFeature.closeFindReplace;
+  declare findReplaceScopeLabel: typeof findReplaceFeature.findReplaceScopeLabel;
+  declare findReplaceRequests: typeof findReplaceFeature.findReplaceRequests;
+  declare findReplaceUnsavedIds: typeof findReplaceFeature.findReplaceUnsavedIds;
+  declare applyFindReplace: typeof findReplaceFeature.applyFindReplace;
+  declare undoFindReplace: typeof findReplaceFeature.undoFindReplace;
 
   declare currentGraphQLPayload: typeof graphqlFeature.currentGraphQLPayload;
   declare graphQLBodyContentForStore: typeof graphqlFeature.graphQLBodyContentForStore;
@@ -1029,6 +1039,7 @@ class AppVM {
   awsSessionToken = $state('');
   awsRegion = $state('us-east-1');
   awsService = $state('execute-api');
+  oauth1 = $state<OAuth1Fields>(oauth1FieldsFromAuth({}));
 
   bodyType = $state<BodyType>(INITIAL_BODY_DEFAULTS.bodyType);
   rawBodyType = $state<RawBodyType>(INITIAL_BODY_DEFAULTS.rawBodyType);
@@ -1208,6 +1219,8 @@ class AppVM {
   shortcutCaptureMessage = $state('');
   lastClosedRequestIds = $state<string[]>([]);
   draftRequestIds = $state<Set<string>>(new Set());
+  findReplaceScope = $state<FindReplaceScope | null>(null);
+  findReplaceUndo = $state<FindReplaceUndo | null>(null);
   copiedRequestItem = $state<SavedRequest | null>(null);
   sidebarHidden = $state(false);
   globalSearchOpen = $state(false);
@@ -1851,6 +1864,7 @@ applyFeatures(
   collectionDefaultsFeature,
   collectionFeature,
   folderFeature,
+  findReplaceFeature,
   graphqlFeature,
   grpcFeature,
   mcpFeature,

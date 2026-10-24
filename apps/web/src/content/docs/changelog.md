@@ -10,6 +10,20 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **OAuth 1.0 auth:** HMAC, RSA and PLAINTEXT signatures, in the header, the query or a form body, with the secrets kept out of the YAML. See [Authentication](/docs/guides/authentication/#oauth-10).
+- **Find and replace** across a collection or a folder, with a preview of every match and **Undo**. See [Find and replace](/docs/guides/workspaces/#find-and-replace).
+
+### Fixed
+
+- Secret gRPC metadata and Socket.IO event rows, and secret rows without an id, are kept out of the YAML.
+- `kurlo run` skips SSE, MCP and AI requests, and the Collection Runner skips MCP requests instead of sending them as empty HTTP requests.
+- AI requests: thinking with temperature or top P on Anthropic, a stream cut before a signature, `pause_turn`, empty event streams, and OpenAI-compatible servers that refuse `stream_options` or a token-limit field or send tool calls without an id.
+- Git status and diffs no longer race a running commit, pull or rebase, and an unreadable saved token is reported.
+
 ## 2.5.0
 
 ### Added

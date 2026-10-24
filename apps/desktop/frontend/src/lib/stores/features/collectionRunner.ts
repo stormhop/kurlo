@@ -438,7 +438,7 @@ export const collectionRunnerFeature = {
     const runnableRequests = requests.filter(request => !this.savedRequestIsRunnerSkipped(request));
     const skippedRealtimeRequests = requests.filter(request => this.savedRequestIsRunnerSkipped(request));
     if (!runnableRequests.length) {
-      this.collectionImportToast = 'No runnable requests to run. Realtime requests are skipped.';
+      this.collectionImportToast = 'No runnable requests to run. Realtime, MCP and AI requests are skipped.';
       setTimeout(() => (this.collectionImportToast = ''), 3200);
       return;
     }

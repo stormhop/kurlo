@@ -11,6 +11,8 @@ const anthropicAPIVersion = "2023-06-01"
 
 const anthropicDefaultMaxTokens = 8192
 
+const anthropicThinkingMinTopP = 0.95
+
 type anthropicProvider struct{}
 
 func (anthropicProvider) endpoint(base string) string {
@@ -38,13 +40,14 @@ func (anthropicProvider) build(req model.AiRequest, messages []model.AiMessage, 
 	if strings.TrimSpace(req.System) != "" {
 		body["system"] = req.System
 	}
-	if req.Settings.Temperature != nil {
+	thinking := req.Settings.Thinking == "summarized"
+	if req.Settings.Temperature != nil && !thinking {
 		body["temperature"] = *req.Settings.Temperature
 	}
-	if req.Settings.TopP != nil {
+	if req.Settings.TopP != nil && (!thinking || *req.Settings.TopP >= anthropicThinkingMinTopP) {
 		body["top_p"] = *req.Settings.TopP
 	}
-	if req.Settings.Thinking == "summarized" {
+	if thinking {
 		body["thinking"] = map[string]any{"type": "adaptive", "display": "summarized"}
 	}
 	if len(tools) > 0 {
@@ -71,13 +74,22 @@ func (anthropicProvider) build(req model.AiRequest, messages []model.AiMessage, 
 
 func anthropicMessages(messages []model.AiMessage) []anthropicMessage {
 	out := []anthropicMessage{}
+	dropped := map[string]bool{}
 	for _, message := range messages {
 		role := "user"
 		if message.Role == "assistant" {
 			role = "assistant"
 		}
+		broken := role == "assistant" && anthropicHasUnsignedThinking(message.Blocks)
 		content := []anthropicContent{}
 		for _, block := range message.Blocks {
+			if broken && block.Type == model.AiBlockToolUse {
+				dropped[block.ID] = true
+				continue
+			}
+			if block.Type == model.AiBlockToolResult && dropped[block.ID] {
+				continue
+			}
 			if item := anthropicContentFor(role, block); item != nil {
 				content = append(content, item)
 			}
@@ -92,6 +104,15 @@ func anthropicMessages(messages []model.AiMessage) []anthropicMessage {
 		out = append(out, anthropicMessage{Role: role, Content: content})
 	}
 	return out
+}
+
+func anthropicHasUnsignedThinking(blocks []model.AiBlock) bool {
+	for _, block := range blocks {
+		if block.Type == model.AiBlockThinking && block.Signature == "" {
+			return true
+		}
+	}
+	return false
 }
 
 func anthropicContentFor(role string, block model.AiBlock) anthropicContent {

@@ -263,3 +263,94 @@ func assertMapMissingKeys(t *testing.T, item map[string]any, keys []string) {
 		}
 	}
 }
+
+func TestSanitizeRequestsForFilesystemKeepsSecretRowsOutOfTheYAML(t *testing.T) {
+	secrets := map[string]string{}
+	requests := []map[string]any{
+		{
+			"id":          "req-sio",
+			"requestType": "socketio",
+			"sioEvents":   []any{map[string]any{"id": "ev-1", "key": "auth", "value": "sio-secret", "enabled": true, "secret": true}},
+		},
+		{
+			"id":           "req-grpc",
+			"requestType":  "grpc",
+			"grpcMetadata": []any{map[string]any{"id": "md-1", "key": "authorization", "value": "grpc-secret", "enabled": true, "secret": true}},
+		},
+		{
+			"id":          "req-no-id",
+			"requestType": "http",
+			"method":      "GET",
+			"headers": []any{
+				map[string]any{"key": "Accept", "value": "*/*", "enabled": true},
+				map[string]any{"key": "X-Token", "value": "imported-secret", "enabled": true, "secret": true},
+			},
+		},
+	}
+
+	sanitized := sanitizeRequestsForFilesystem(requests, map[string]string{}, secrets)
+
+	for _, tt := range []struct {
+		index int
+		field string
+		row   int
+		key   string
+		value string
+	}{
+		{0, "sioEvents", 0, "request.req-sio.sioEvents.row.ev-1.value", "sio-secret"},
+		{1, "grpcMetadata", 0, "request.req-grpc.grpcMetadata.row.md-1.value", "grpc-secret"},
+		{2, "headers", 1, "request.req-no-id.headers.row.index-1.value", "imported-secret"},
+	} {
+		rows, ok := sanitized[tt.index][tt.field].([]any)
+		if !ok || len(rows) <= tt.row {
+			t.Fatalf("%s rows missing: %#v", tt.field, sanitized[tt.index][tt.field])
+		}
+		row := rows[tt.row].(map[string]any)
+		if got, want := row["value"], kurloSecretPlaceholder(tt.key); got != want {
+			t.Fatalf("%s value = %q, want %q", tt.field, got, want)
+		}
+		if got := secrets[tt.key]; got != tt.value {
+			t.Fatalf("stored %s secret = %q, want %q", tt.field, got, tt.value)
+		}
+	}
+}
+
+func TestSanitizeRequestsForFilesystemKeepsOAuth1SecretsOutOfTheYAML(t *testing.T) {
+	secrets := map[string]string{}
+	requests := []map[string]any{{
+		"id":          "req-oauth1",
+		"requestType": "http",
+		"method":      "GET",
+		"auth": map[string]any{
+			"type":                  "oauth1",
+			"oauth1ConsumerKey":     "consumer-key",
+			"oauth1ConsumerSecret":  "consumer-secret",
+			"oauth1Token":           "access-token",
+			"oauth1TokenSecret":     "token-secret",
+			"oauth1PrivateKey":      "-----BEGIN PRIVATE KEY-----",
+			"oauth1SignatureMethod": "HMAC-SHA256",
+			"oauth1AddTo":           "query",
+			"awsSecretKey":          "left-over",
+		},
+	}}
+
+	sanitized := sanitizeRequestsForFilesystem(requests, map[string]string{}, secrets)
+	auth := sanitized[0]["auth"].(map[string]any)
+	for _, field := range []string{"oauth1ConsumerSecret", "oauth1Token", "oauth1TokenSecret", "oauth1PrivateKey"} {
+		key := "request.req-oauth1.auth." + field
+		if got, want := auth[field], kurloSecretPlaceholder(key); got != want {
+			t.Fatalf("%s = %q, want %q", field, got, want)
+		}
+		if secrets[key] == "" {
+			t.Fatalf("%s was not stored in the local secrets", field)
+		}
+	}
+	for field, want := range map[string]string{"oauth1ConsumerKey": "consumer-key", "oauth1SignatureMethod": "HMAC-SHA256", "oauth1AddTo": "query"} {
+		if auth[field] != want {
+			t.Fatalf("%s = %v, want %q", field, auth[field], want)
+		}
+	}
+	if _, ok := auth["awsSecretKey"]; ok {
+		t.Fatalf("fields of another auth type must be stripped: %#v", auth)
+	}
+}

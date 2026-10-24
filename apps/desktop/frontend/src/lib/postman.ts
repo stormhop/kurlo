@@ -1,4 +1,4 @@
-import type { KVRow, SavedRequest, CollectionDefaults, Environment, AuthType, BodyType, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SIOArg } from './types/models';
+import type { KVRow, SavedRequest, CollectionDefaults, Environment, AuthType, BodyType, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SIOArg } from './types/models';
 import { DEFAULT_REQUEST_SETTINGS } from './constants';
 import { isRecord, asArray, asText, newRequestId } from './utils';
 import { mkRow } from './constants';
@@ -142,6 +142,14 @@ function postmanAuthParam(auth: Record<string, unknown>, bucket: string, key: st
   return isRecord(entry) ? asText(entry.value) : '';
 }
 
+function postmanAuthBool(auth: Record<string, unknown>, bucket: string, key: string) {
+  const entry = asArray(auth[bucket]).find(item => isRecord(item) && item.key === key);
+  if (!isRecord(entry)) return undefined;
+  return entry.value === true || asText(entry.value).toLowerCase() === 'true';
+}
+
+const OAUTH1_SIGNATURE_METHODS = new Set<string>(['HMAC-SHA1', 'HMAC-SHA256', 'HMAC-SHA512', 'RSA-SHA1', 'RSA-SHA256', 'RSA-SHA512', 'PLAINTEXT']);
+
 function postmanGrantType(value: string): { grant: OAuth2GrantType; pkce: boolean } | null {
   switch (value.toLowerCase()) {
     case 'authorization_code': return { grant: 'authorization_code', pkce: false };
@@ -191,6 +199,25 @@ function postmanAuthConfig(authValue: unknown, inheritedAuth?: unknown): SavedRe
       config.oauth2GrantType = grant.grant;
       config.oauth2UsePKCE = grant.pkce;
     }
+  } else if (type === 'oauth1') {
+    const param = (key: string) => postmanAuthParam(auth, 'oauth1', key);
+    const method = param('signatureMethod').toUpperCase();
+    config.type = 'oauth1';
+    config.oauth1ConsumerKey = param('consumerKey');
+    config.oauth1ConsumerSecret = param('consumerSecret');
+    config.oauth1Token = param('token');
+    config.oauth1TokenSecret = param('tokenSecret');
+    config.oauth1SignatureMethod = (OAUTH1_SIGNATURE_METHODS.has(method) ? method : 'HMAC-SHA1') as OAuth1SignatureMethod;
+    config.oauth1PrivateKey = param('privateKey');
+    config.oauth1Realm = param('realm');
+    config.oauth1Callback = param('callback');
+    config.oauth1Verifier = param('verifier');
+    config.oauth1Timestamp = param('timestamp');
+    config.oauth1Nonce = param('nonce');
+    config.oauth1Version = param('version') || '1.0';
+    config.oauth1AddTo = postmanAuthBool(auth, 'oauth1', 'addParamsToHeader') === false ? 'query' : 'header';
+    config.oauth1IncludeBodyHash = postmanAuthBool(auth, 'oauth1', 'includeBodyHash') ?? false;
+    config.oauth1AddEmptyParams = postmanAuthBool(auth, 'oauth1', 'addEmptyParamsToSign') ?? false;
   } else if (type === 'awsv4') {
     config.type = 'aws';
     config.awsAccessKey = postmanAuthParam(auth, 'awsv4', 'accessKey');
@@ -558,6 +585,23 @@ function postmanAuthFromKurlo(auth: SavedRequest['auth'], includeSecrets = false
   }
   if (auth.type === 'oauth2') {
     return { type: 'oauth2', oauth2: [postmanAuthPair('accessToken', auth.oauth2Token || auth.bearerToken, 'string', includeSecrets), postmanAuthPair('clientId', auth.oauth2ClientID, 'string', includeSecrets), postmanAuthPair('clientSecret', auth.oauth2Secret, 'string', includeSecrets), postmanAuthPair('scope', auth.oauth2Scope, 'string', true), postmanAuthPair('tokenUrl', auth.oauth2TokenURL, 'string', true)].filter(i => i.value) };
+  }
+  if (auth.type === 'oauth1') {
+    const secret = (key: string, value: string | undefined) => postmanAuthPair(key, value ?? '', 'string', includeSecrets);
+    const plain = (key: string, value: string | undefined) => postmanAuthPair(key, value ?? '', 'string', true);
+    const pairs: Array<{ key: string; value: string | boolean; type: string }> = [
+      plain('consumerKey', auth.oauth1ConsumerKey), secret('consumerSecret', auth.oauth1ConsumerSecret),
+      secret('token', auth.oauth1Token), secret('tokenSecret', auth.oauth1TokenSecret),
+      plain('signatureMethod', auth.oauth1SignatureMethod || 'HMAC-SHA1'), secret('privateKey', auth.oauth1PrivateKey),
+      plain('realm', auth.oauth1Realm), plain('callback', auth.oauth1Callback), plain('verifier', auth.oauth1Verifier),
+      plain('timestamp', auth.oauth1Timestamp), plain('nonce', auth.oauth1Nonce), plain('version', auth.oauth1Version || '1.0'),
+    ].filter(pair => pair.value);
+    pairs.push(
+      { key: 'addParamsToHeader', value: (auth.oauth1AddTo ?? 'header') === 'header', type: 'boolean' },
+      { key: 'includeBodyHash', value: auth.oauth1IncludeBodyHash ?? false, type: 'boolean' },
+      { key: 'addEmptyParamsToSign', value: auth.oauth1AddEmptyParams ?? false, type: 'boolean' },
+    );
+    return { type: 'oauth1', oauth1: pairs };
   }
   if (auth.type === 'aws') {
     return { type: 'awsv4', awsv4: [postmanAuthPair('accessKey', auth.awsAccessKey, 'string', includeSecrets), postmanAuthPair('secretKey', auth.awsSecretKey, 'string', includeSecrets), postmanAuthPair('region', auth.awsRegion, 'string', true), postmanAuthPair('service', auth.awsService, 'string', true)] };

@@ -48,6 +48,22 @@ type AuthConfig struct {
 	AWSSessionToken string `json:"awsSessionToken"`
 	AWSRegion       string `json:"awsRegion"`
 	AWSService      string `json:"awsService"`
+
+	OAuth1ConsumerKey     string `json:"oauth1ConsumerKey"`
+	OAuth1ConsumerSecret  string `json:"oauth1ConsumerSecret"`
+	OAuth1Token           string `json:"oauth1Token"`
+	OAuth1TokenSecret     string `json:"oauth1TokenSecret"`
+	OAuth1SignatureMethod string `json:"oauth1SignatureMethod"`
+	OAuth1PrivateKey      string `json:"oauth1PrivateKey"`
+	OAuth1Realm           string `json:"oauth1Realm"`
+	OAuth1Callback        string `json:"oauth1Callback"`
+	OAuth1Verifier        string `json:"oauth1Verifier"`
+	OAuth1Timestamp       string `json:"oauth1Timestamp"`
+	OAuth1Nonce           string `json:"oauth1Nonce"`
+	OAuth1Version         string `json:"oauth1Version"`
+	OAuth1AddTo           string `json:"oauth1AddTo"`
+	OAuth1IncludeBodyHash bool   `json:"oauth1IncludeBodyHash"`
+	OAuth1AddEmptyParams  bool   `json:"oauth1AddEmptyParams"`
 }
 
 type OAuth2TokenResponse struct {
