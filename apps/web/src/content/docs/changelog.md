@@ -14,6 +14,9 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **AI requests:** send a prompt to OpenAI, Anthropic, OpenRouter, Groq, Ollama, LM Studio or any OpenAI-compatible API, and follow the streamed answer with its thinking, tool calls, stop reason, timings and tokens. **Reply** continues the chat. See [AI requests](/docs/guides/request-types/#ai).
+- **MCP servers as tools for the model:** tick MCP requests on the Tools tab, and Kurlo runs the model's tool calls with their URL, auth and headers. See [Tools from MCP servers](/docs/guides/request-types/#tools-from-mcp-servers).
+- **`pm.response.llm()` in tests:** the answer of an AI request in one shape for every provider. See [Scripting API](/docs/reference/scripting-api/).
 - **Markdown docs for every request:** Edit with a live preview, and a Preview that adds a reference built from the request's URL, params, headers and body. See [Docs](/docs/guides/workspaces/#docs).
 - **Response layout button** in the status bar, to put the response beside or below the request.
 
@@ -23,6 +26,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Full request address under the base URL** of an AI request, with the added API path highlighted. See [AI requests](/docs/guides/request-types/#ai).
 - **Clearer model list errors:** what went wrong, the status and address, and what to try next.
 - **Length limits for AI prompts:** 200,000 characters for the prompt and chat messages, 50,000 for the system prompt, with a counter near the limit.
+- **The AI prompt field fits its text** and grows as you write, up to the free height of the tab.
 - **Shorter method menu:** HTTP methods and the other protocols side by side.
 
 ### Fixed
@@ -32,6 +36,9 @@ This page summarizes the notable-change log maintained in the source repository.
 - The AI prompt field no longer scrolls its text under the border in a short window.
 - An invalid AI setting is explained right below its field, and a narrow response panel keeps the status code visible.
 - Provider errors in the AI chat wrap inside the panel and come with their status and a hint.
+- A base URL with a query string, such as an Azure OpenAI `?api-version=…` URL, gets the API path before the query string.
+- The AI chat's send button is visible in light themes while the message is empty.
+- With the response beside the request, the response panel's lines reach the divider, which is now a single line with a wider grab area.
 - **New MCP request** on an AI request's Tools tab opens a draft instead of leaving an empty request in the collection.
 - The code snippet of an AI request now posts the prompt, model and settings to the full API address. See [Code generation](/docs/guides/code-generation/#ai-requests).
 - A long model name no longer pushes the metrics and **New chat** off the AI status line.
