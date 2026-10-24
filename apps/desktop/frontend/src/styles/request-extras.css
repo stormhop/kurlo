@@ -853,6 +853,7 @@
 
 .bearer-token-input-wrap .field-input {
   width: 100%;
+  padding-right: calc(var(--control-xs) + var(--space-2));
 }
 
 .token-visibility-btn {

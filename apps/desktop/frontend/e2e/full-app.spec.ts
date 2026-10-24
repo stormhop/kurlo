@@ -3489,6 +3489,54 @@ test.describe('Kurlo desktop browser E2E', () => {
     await captureDocsScreenshot(page, 'ai-chat-error');
   });
 
+  test('keeps the status code and New chat on the AI status line when the model name is long', async ({ page }) => {
+    await page.setViewportSize({ width: 1500, height: 820 });
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.responseLayout.v1', 'right'));
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await page.getByRole('button', { name: 'Provider and model' }).click();
+    await page.getByRole('radio', { name: 'Ollama' }).click();
+    await page.getByLabel('Model', { exact: true }).fill('openai/gpt-4o-mini-2024-07-18-extended-preview-with-a-very-long-name');
+    await page.keyboard.press('Enter');
+    await fillCodeEditor(page, 'ai-prompt-editor', 'Do I need an umbrella in Lisbon tomorrow?');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    const bar = page.locator('.ai-panel .response-status-bar');
+    await expect(bar.locator('.status-badge')).toContainText('200');
+    const layout = await bar.evaluate(el => {
+      const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
+      const box = (selector: string) => el.querySelector(selector)!.getBoundingClientRect();
+      const model = el.querySelector('.ai-model-name') as HTMLElement;
+      return {
+        badgeFits: box('.status-badge').right <= right + 0.5,
+        newChatFits: box('.ai-new-chat').right <= right + 0.5,
+        modelTruncated: model.scrollWidth > model.clientWidth,
+        modelBeforeMetrics: box('.ai-model-name').right <= box('.ai-metrics').left,
+        metricsFit: (el.querySelector('.ai-metrics') as HTMLElement).scrollWidth <= (el.querySelector('.ai-metrics') as HTMLElement).clientWidth,
+      };
+    });
+    expect(layout).toEqual({ badgeFits: true, newChatFits: true, modelTruncated: true, modelBeforeMetrics: true, metricsFit: true });
+    await bar.screenshot({ path: test.info().outputPath('status.png') });
+    await captureDocsScreenshot(page, 'ai-long-model-status');
+  });
+
+  test('keeps the token visibility button clear of the token text', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await page.getByRole('tab', { name: /Auth/ }).click();
+    await page.getByLabel('Auth type').click();
+    await page.locator('.auth-select-menu').getByRole('button', { name: 'Bearer Token' }).click();
+    const input = page.locator('#bearer-token');
+    await input.fill('x'.repeat(200));
+    const [field, button] = await Promise.all([input.evaluate(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.right - parseFloat(getComputedStyle(el).paddingRight);
+    }), page.getByRole('button', { name: 'Show token' }).boundingBox()]);
+    expect(field).toBeLessThanOrEqual(button!.x + 0.5);
+  });
+
   test('explains why the model list could not be loaded', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);

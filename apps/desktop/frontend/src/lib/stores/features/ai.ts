@@ -521,6 +521,51 @@ export function aiModelsURL(url: string, provider: string): string {
   return `${root}/models${query}`;
 }
 
+const ANTHROPIC_API_VERSION = '2023-06-01';
+const ANTHROPIC_DEFAULT_MAX_TOKENS = 8192;
+
+function aiUsesCompletionTokens(url: string): boolean {
+  try {
+    return new URL(url.trim()).hostname.toLowerCase() === 'api.openai.com';
+  } catch {
+    return false;
+  }
+}
+
+export function aiHttpPreview(ai: AiRequest): { url: string; headers: HttpRequest['headers']; body: string } {
+  const { base, suffix, query } = aiEndpointParts(ai.http.url, ai.provider);
+  const text = (ai.messages ?? []).filter(message => message.role === 'user')
+    .flatMap(message => message.blocks.filter(block => block.type === 'text' && block.text).map(block => block.text ?? ''))
+    .join('\n\n');
+  const settings = ai.settings ?? { maxTokens: 0, stream: true, thinking: '', idleTimeoutSec: 0 };
+  const maxTokens = settings.maxTokens ?? 0;
+  const body: Record<string, unknown> = { model: ai.model };
+  const headers = [...(ai.http.headers ?? [])];
+  if (ai.provider === 'anthropic') {
+    body.messages = text ? [{ role: 'user', content: [{ type: 'text', text }] }] : [];
+    body.stream = settings.stream;
+    body.max_tokens = maxTokens > 0 ? maxTokens : ANTHROPIC_DEFAULT_MAX_TOKENS;
+    if (ai.system.trim()) body.system = ai.system;
+    if (settings.temperature !== undefined) body.temperature = settings.temperature;
+    if (settings.topP !== undefined) body.top_p = settings.topP;
+    if (settings.thinking === 'summarized') body.thinking = { type: 'adaptive', display: 'summarized' };
+    if (!headers.some(h => h.enabled && h.key.toLowerCase() === 'anthropic-version')) {
+      headers.push({ key: 'anthropic-version', value: ANTHROPIC_API_VERSION, enabled: true, isFile: false, fileName: '', contentType: '' });
+    }
+  } else {
+    const messages: { role: string; content: string }[] = [];
+    if (ai.system.trim()) messages.push({ role: 'system', content: ai.system });
+    if (text) messages.push({ role: 'user', content: text });
+    body.messages = messages;
+    body.stream = settings.stream;
+    if (settings.stream) body.stream_options = { include_usage: true };
+    if (maxTokens > 0) body[aiUsesCompletionTokens(ai.http.url) ? 'max_completion_tokens' : 'max_tokens'] = maxTokens;
+    if (settings.temperature !== undefined) body.temperature = settings.temperature;
+    if (settings.topP !== undefined) body.top_p = settings.topP;
+  }
+  return { url: `${base}${suffix}${query}`, headers, body: JSON.stringify(body, null, 2) };
+}
+
 export type AiModelsProblem = { title: string; status: string; detail: string; hint: string };
 
 function displayURL(url: string): string {

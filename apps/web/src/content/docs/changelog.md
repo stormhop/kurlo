@@ -33,6 +33,9 @@ This page summarizes the notable-change log maintained in the source repository.
 - An invalid AI setting is explained right below its field, and a narrow response panel keeps the status code visible.
 - Provider errors in the AI chat wrap inside the panel and come with their status and a hint.
 - **New MCP request** on an AI request's Tools tab opens a draft instead of leaving an empty request in the collection.
+- The code snippet of an AI request now posts the prompt, model and settings to the full API address. See [Code generation](/docs/guides/code-generation/#ai-requests).
+- A long model name no longer pushes the metrics and **New chat** off the AI status line.
+- A long bearer token no longer runs under the show/hide button in the Auth tab.
 
 ## 2.4.2
 

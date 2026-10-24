@@ -198,6 +198,7 @@
     {/if}
   {:else}
     <div class="response-status-bar">
+      <div class="ai-status-row">
       <div class="status-left">
         {#if streaming}
           <span class="ai-live"><span class="ai-live-dot"></span>{lastStep && lastStep.done && lastStep.stopReason === 'tool_use' ? 'Running tools…' : 'Streaming…'}</span>
@@ -208,7 +209,7 @@
         {:else if last?.status === 'error'}
           <span class="status-badge status-5xx">Error</span>
         {/if}
-        {#if lastStep?.model}<span class="status-meta ai-model-name">{lastStep.model}</span>{/if}
+        {#if lastStep?.model}<span class="status-meta ai-model-name" title={lastStep.model}>{lastStep.model}</span>{/if}
       </div>
       <div class="status-right">
         {#if firstTokenMs || hasUsage}
@@ -227,6 +228,7 @@
           </svg>
           <span class="ai-new-chat-label">New chat</span>
         </button>
+      </div>
       </div>
       <div class="tab-bar response-mini-tabs" role="tablist" use:tabListKeyboard>
         <button class="tab" role="tab" type="button" class:active={tab === 'chat'} aria-selected={tab === 'chat'} aria-controls="ai-panel-chat" tabindex={tab === 'chat' ? 0 : -1} onclick={() => (tab = 'chat')}>Chat</button>
@@ -406,16 +408,24 @@
     flex-direction: column;
     min-height: 0;
   }
+  .ai-status-row {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    height: 100%;
+    overflow: hidden;
+  }
   .ai-panel .status-left {
-    flex: 0 1 auto;
+    display: contents;
   }
   .ai-panel .status-left :global(.status-badge) {
     flex-shrink: 0;
   }
-  .ai-panel .response-status-bar {
-    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  }
   .ai-model-name {
+    flex: 0 10000 auto;
     font-family: var(--font-mono);
     min-width: 0;
     overflow: hidden;
@@ -445,6 +455,8 @@
     cursor: default;
   }
   .ai-panel .status-right {
+    flex: 0 1 auto;
+    margin-left: auto;
     display: flex;
     align-items: center;
     justify-content: flex-end;

@@ -37,6 +37,9 @@ All notable changes to Kurlo are documented here. This project follows
 - A base URL with a query string, such as an Azure OpenAI URL ending in `?api-version=…`, got the API path after the query string, so the request went to a wrong address.
 - A long provider error in the AI chat, such as a link in a "402 Payment Required" answer, ran past the right edge of the panel. The error now wraps inside the chat and shows the status apart from the provider's message, its links as links, and a hint at what to do, such as adding credits or lowering Max tokens.
 - **New MCP request** on the Tools tab of an AI request added an empty request to the collection that stayed there when you closed it without saving. It now opens a draft.
+- The code snippet of an AI request sent an empty request to the base URL: it had no prompt, no model and no body, so running it did nothing useful in any language. The snippet now posts to the full address, such as `…/v1/chat/completions` or `…/v1/messages`, with the JSON body Kurlo sends: the model, the system prompt and the prompt, and the settings you set, plus `anthropic-version` for Anthropic.
+- A long model name, such as `gpt-4o-mini-2024-07-18`, pushed the metrics and **New chat** off the AI status line. The name is now cut with an ellipsis (hover shows it in full), and the status, the metrics and **New chat** stay in place.
+- A long bearer token ran under the show/hide button in the Auth tab. The text now stops before the button.
 
 ## [2.4.2] - 2026-10-23
 

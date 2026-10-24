@@ -7,9 +7,12 @@ vi.mock('../lib/backend', async () => {
 
 import * as backend from '../lib/backend';
 import type { AiResponse } from '../lib/backend';
-import { emptyHttpResponse } from '../lib/wire';
+import { emptyHttpRequest, emptyHttpResponse } from '../lib/wire';
+import { buildSnippet } from '../lib/snippets';
+import { toCurl } from '../lib/curl';
 import {
   AI_PRESETS,
+  aiHttpPreview,
   AI_PROMPT_MAX_CHARS,
   AI_SYSTEM_MAX_CHARS,
   aiPromptLengthError,
@@ -124,6 +127,44 @@ describe('ai presets', () => {
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: 'sk-real' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'none' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key: 'Authorization', value: 'Bearer sk-x', enabled: true }] } as never)).toBe('');
+  });
+
+  it('builds the request a code snippet shows from the prompt, the model and the settings', () => {
+    const http = { ...emptyHttpRequest(), url: 'https://openrouter.ai/api/v1' };
+    const user = [{ role: 'user', blocks: [{ type: 'text', text: 'Say hi' }] }];
+    const openai = aiHttpPreview({
+      http, provider: 'openai', model: 'openai/gpt-4o-mini', system: 'Be brief', messages: user,
+      settings: { maxTokens: 50, temperature: 0.2, stream: true, thinking: '', idleTimeoutSec: 0 }, toolServers: [], maxSteps: 0,
+    } as never);
+    expect(openai.url).toBe('https://openrouter.ai/api/v1/chat/completions');
+    expect(JSON.parse(openai.body)).toEqual({
+      model: 'openai/gpt-4o-mini',
+      messages: [{ role: 'system', content: 'Be brief' }, { role: 'user', content: 'Say hi' }],
+      stream: true, stream_options: { include_usage: true }, max_tokens: 50, temperature: 0.2,
+    });
+    expect(JSON.parse(aiHttpPreview({
+      http: { ...http, url: 'https://api.openai.com/v1' }, provider: 'openai', model: 'gpt-5', system: '', messages: user,
+      settings: { maxTokens: 10, stream: false, thinking: '', idleTimeoutSec: 0 }, toolServers: [], maxSteps: 0,
+    } as never).body)).toEqual({ model: 'gpt-5', messages: [{ role: 'user', content: 'Say hi' }], stream: false, max_completion_tokens: 10 });
+
+    const anthropic = aiHttpPreview({
+      http: { ...http, url: 'https://api.anthropic.com/v1' }, provider: 'anthropic', model: 'claude-x', system: 'Be brief', messages: user,
+      settings: { maxTokens: 0, stream: true, thinking: 'summarized', idleTimeoutSec: 0 }, toolServers: [], maxSteps: 0,
+    } as never);
+    expect(anthropic.url).toBe('https://api.anthropic.com/v1/messages');
+    expect(anthropic.headers).toContainEqual(expect.objectContaining({ key: 'anthropic-version', value: '2023-06-01' }));
+    expect(JSON.parse(anthropic.body)).toEqual({
+      model: 'claude-x', messages: [{ role: 'user', content: [{ type: 'text', text: 'Say hi' }] }], stream: true, max_tokens: 8192,
+      system: 'Be brief', thinking: { type: 'adaptive', display: 'summarized' },
+    });
+
+    const curl = buildSnippet('curl', {
+      method: 'POST', url: openai.url, params: [], headers: openai.headers, formData: [], bodyType: 'json', body: openai.body,
+      auth: { type: 'bearer', token: '{{openrouterApiKey}}', keyName: '', keyValue: '', keyIn: 'header' },
+    }, toCurl);
+    expect(curl).toContain('https://openrouter.ai/api/v1/chat/completions');
+    expect(curl).toContain('Say hi');
+    expect(curl).toContain('Content-Type: application/json');
   });
 
   it('shows which address a base URL turns into, the same way the backend builds it', () => {
