@@ -88,24 +88,20 @@ describe('routeImportedScripts', () => {
     testScriptJs: '',
   } as unknown as SavedRequest;
 
-  it('moves imported scripts into the JS fields when the active engine is js', () => {
-    const out = routeImportedScripts(imported, 'js');
+  it('moves imported scripts into the JS fields, whatever engine is active', () => {
+    const out = routeImportedScripts(imported);
     expect(out.preRequestScriptJs).toBe('console.log("pre")');
     expect(out.testScriptJs).toBe('pm.test("ok", () => pm.expect(1).to.eql(1))');
     expect(out.preRequestScript).toBe('');
     expect(out.testScript).toBe('');
     expect(out.id).toBe('r1');
-  });
-
-  it('leaves scripts in the base fields when the active engine is tengo', () => {
-    const out = routeImportedScripts(imported, 'tengo');
-    expect(out).toBe(imported);
-    expect(out.preRequestScript).toBe('console.log("pre")');
+    expect(scriptFieldsForSend('tengo', out)).toEqual({ preRequestScript: '', testScript: '', scriptEngine: 'tengo' });
+    expect(scriptFieldsForSend('js', out).preRequestScript).toBe('console.log("pre")');
   });
 
   it('is a no-op when there are no scripts to route', () => {
     const empty = { id: 'r2', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '' } as unknown as SavedRequest;
-    expect(routeImportedScripts(empty, 'js')).toBe(empty);
+    expect(routeImportedScripts(empty)).toBe(empty);
   });
 });
 

@@ -22,6 +22,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - Secret gRPC metadata and Socket.IO event rows, and secret rows without an id, are kept out of the YAML.
 - `kurlo run` skips SSE, MCP and AI requests, and the Collection Runner skips MCP requests instead of sending them as empty HTTP requests.
 - AI requests: thinking with temperature or top P on Anthropic, a stream cut before a signature, `pause_turn`, empty event streams, and OpenAI-compatible servers that refuse `stream_options` or a token-limit field or send tool calls without an id.
+- With Tengo selected, scripts from a Postman, Insomnia or Bruno import go to the JavaScript fields instead of failing in Tengo, and exports to those formats take the JavaScript scripts. See [Import and export](/docs/guides/import-export/).
 - Git status and diffs no longer race a running commit, pull or rebase, and an unreadable saved token is reported.
 
 ## 2.5.0

@@ -2919,6 +2919,43 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(requests.find(entry => entry.name === 'List invoices')?.testScriptJs ?? '').toContain('pm.test');
   });
 
+  test('keeps Postman scripts as JavaScript when Tengo is the script engine', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.scriptEngine.v1', 'tengo'));
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Collections' }).click();
+    await page.getByLabel('Import collection').first().click();
+    const sourceDialog = page.getByRole('dialog', { name: 'Import collection' });
+    await sourceDialog.getByText('Postman collection').click();
+    await sourceDialog.getByRole('button', { name: 'Import', exact: true }).click();
+    await expect(sourceDialog).toBeHidden();
+    const collection = {
+      info: { name: 'Tengo user API', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+      event: [{ listen: 'prerequest', script: { exec: ['pm.variables.set("trace", "1")'] } }],
+      item: [{
+        name: 'Ping',
+        request: { method: 'GET', url: { raw: 'https://api.billing.test/ping' } },
+        event: [{ listen: 'test', script: { exec: ['pm.test("ok", () => pm.response.to.have.status(200))'] } }],
+      }],
+    };
+    await page.setInputFiles('input[type="file"]', {
+      name: 'tengo.postman_collection.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(collection)),
+    });
+    await expect(page.getByRole('button', { name: 'GET Ping' })).toBeVisible();
+    const store = await page.evaluate(() => window.__kurloE2E.store as {
+      collections: Array<{ name: string; defaults?: { preRequestScript?: string; preRequestScriptJs?: string } }>;
+      requests: Array<{ name: string; testScript?: string; testScriptJs?: string }>;
+    });
+    const ping = store.requests.find(entry => entry.name === 'Ping')!;
+    expect(ping.testScriptJs).toContain('pm.test');
+    expect(ping.testScript ?? '').toBe('');
+    const defaults = store.collections.find(entry => entry.name === 'Tengo user API')?.defaults;
+    expect(defaults?.preRequestScriptJs ?? '').toContain('pm.variables.set');
+    expect(defaults?.preRequestScript ?? '').toBe('');
+  });
+
   test('keeps the header actions anchored when the runner replaces the request view', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');

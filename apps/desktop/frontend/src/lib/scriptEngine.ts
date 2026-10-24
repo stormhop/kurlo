@@ -15,8 +15,7 @@ export function scriptFieldsForSend(
     : { preRequestScript: req.preRequestScript ?? '', testScript: req.testScript ?? '', scriptEngine: 'tengo' };
 }
 
-export function routeImportedScripts<T extends RequestScripts>(item: T, engine: ScriptEngine): T {
-  if (engine !== 'js') return item;
+export function routeImportedScripts<T extends RequestScripts>(item: T): T {
   const pre = item.preRequestScriptJs || item.preRequestScript || '';
   const test = item.testScriptJs || item.testScript || '';
   if (!pre && !test) return item;

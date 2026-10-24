@@ -33,7 +33,7 @@ What carries over:
 
 - Folder hierarchy — including folders that hold no requests — request names, methods, URLs.
 - Headers, query params, path variables (`:id` and its value), body (JSON, form-data, raw, urlencoded).
-- Pre-request and test scripts. JavaScript scripts map to Kurlo's sandboxed JavaScript fields; legacy Tengo fields remain available for existing requests.
+- Pre-request and test scripts. They always go to Kurlo's JavaScript fields, even when Tengo is the selected [script engine](/docs/guides/settings/#script-engine): switch to JavaScript to run them.
 - Request descriptions, which become the request's **Docs** tab.
 - Collection-level variables, auth, and scripts, which become the collection's [defaults](/docs/guides/collection-defaults/). A request that declared no auth of its own is set to **Inherit auth**, so the collection's auth applies exactly as it did in Postman.
 - The whole OAuth 2.0 configuration, not just a stored access token: grant type, authorization and token URLs, client id and secret, scope, audience, and refresh token.
