@@ -10,6 +10,12 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **Markdown docs for every request:** Edit with a live preview, and a Preview that adds a reference built from the request's URL, params, headers and body. See [Docs](/docs/guides/workspaces/#docs).
+
 ## 2.4.2
 
 ### Added

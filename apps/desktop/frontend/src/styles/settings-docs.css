@@ -115,33 +115,6 @@
   transition: background var(--dur-base) ease;
 }
 
-.docs-tab {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-3) var(--space-4);
-}
-
-.docs-textarea {
-  flex: 1;
-  resize: none;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: var(--text);
-  font-family: var(--font-ui);
-  font-size: var(--text-code);
-  line-height: var(--leading-relaxed);
-  caret-color: var(--accent);
-  padding: 0;
-  width: 100%;
-  min-height: 0;
-}
-.docs-textarea::placeholder {
-  color: var(--text-3);
-}
-
 .examples-tab {
   display: flex;
   flex-direction: column;

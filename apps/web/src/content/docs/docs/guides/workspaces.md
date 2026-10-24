@@ -110,6 +110,10 @@ A request is the leaf of the tree. Each request has its own URL, method, headers
 - Workspace overview → *Start* → **New request**
 - Drafts: **+** after the open tabs, then pick the request type. Drafts live in a special "scratch" area until you save them to a collection.
 
+### Docs
+
+The **Docs** tab of a request is written in Markdown: headings, **bold**, `code`, lists, task lists, tables, quotes, links and images. **Edit** shows the text on the left and a live preview on the right; **Preview** shows the rendered page, followed by a reference Kurlo builds from the request itself: the method and URL, the auth type, and the enabled path variables, query params, headers and body, with the description you gave each row. Links open in your browser, and secret values are masked. A request without docs opens in **Edit**; `Esc` goes back to the preview.
+
 ### The request `⋯` menu
 
 Right-click (or click the `⋯` button on hover) on any request to reveal:

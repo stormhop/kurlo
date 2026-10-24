@@ -3278,6 +3278,29 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect((followUp.messages as Array<{ role: string }>).map(m => m.role)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user']);
   });
 
+  test('writes request docs in Markdown with a live preview and an automatic reference', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/users?page=2');
+    await page.getByRole('tab', { name: 'Docs' }).click();
+    const docs = page.locator('.docs-tab');
+    await expect(docs.getByRole('radio', { name: 'Edit' })).toHaveAttribute('aria-checked', 'true');
+    await docs.getByLabel('Docs', { exact: true }).fill('# List users\n\nReturns **active** users.\n\n| Field | Type |\n|---|---|\n| id | `string` |\n\n[API guide](https://kurlo.dev/docs)');
+    await expect(docs.locator('.docs-preview h2')).toHaveText('List users');
+    await expect(docs.locator('.docs-preview strong')).toHaveText('active');
+    await expect(docs.locator('.docs-preview table td').first()).toHaveText('id');
+    await captureDocsScreenshot(page, 'request-docs-edit');
+    await docs.getByRole('radio', { name: 'Preview' }).click();
+    await expect(docs.locator('textarea')).toHaveCount(0);
+    await expect(docs.locator('.docs-ref-url')).toHaveText('https://api.kurlo.test/users?page=2');
+    await expect(docs.locator('.docs-ref-row').first()).toContainText('page');
+    await expect(docs.locator('.md-link')).toHaveAttribute('href', 'https://kurlo.dev/docs');
+    await captureDocsScreenshot(page, 'request-docs');
+  });
+
+
   test('discovers an MCP server, calls a tool, and keeps the raw exchange', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);
