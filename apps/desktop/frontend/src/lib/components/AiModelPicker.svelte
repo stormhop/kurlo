@@ -1,5 +1,7 @@
 <script module lang="ts">
-  const autoLoaded = new Set<string>();
+  import { SvelteSet } from 'svelte/reactivity';
+
+  const autoLoaded = new SvelteSet<string>();
 </script>
 
 <script lang="ts">

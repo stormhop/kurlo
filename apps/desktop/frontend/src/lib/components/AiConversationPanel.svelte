@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { tabListKeyboard } from '../a11y';
   import Markdown from './Markdown.svelte';
   import { vm } from '../stores/app.svelte';
@@ -13,9 +14,9 @@
   let reply = $state('');
   let scroller = $state<HTMLDivElement>();
   let stickToBottom = $state(true);
-  let openThinking = $state<Set<string>>(new Set());
-  let rawOpen = $state<Set<string>>(new Set());
-  let rawExpanded = $state<Set<string>>(new Set());
+  const openThinking = new SvelteSet<string>();
+  const rawOpen = new SvelteSet<string>();
+  const rawExpanded = new SvelteSet<string>();
   const RAW_PREVIEW_CHARS = 20000;
   const NO_AUTOCORRECT: Record<string, string> = { autocorrect: 'off' };
 
@@ -88,14 +89,12 @@
 
   function toggleRawStep(index: number) {
     const key = `${turnKey}:${index}`;
-    const next = new Set(rawOpen);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    rawOpen = next;
+    if (rawOpen.has(key)) rawOpen.delete(key);
+    else rawOpen.add(key);
   }
 
   function expandRaw(key: string) {
-    rawExpanded = new Set([...rawExpanded, key]);
+    rawExpanded.add(key);
   }
 
   function toolResultFor(step: AiStepView, block: AiBlock) {
@@ -111,10 +110,8 @@
   }
 
   function toggleThinking(key: string) {
-    const next = new Set(openThinking);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    openThinking = next;
+    if (openThinking.has(key)) openThinking.delete(key);
+    else openThinking.add(key);
   }
 
   function stopLabel(reason: string) {

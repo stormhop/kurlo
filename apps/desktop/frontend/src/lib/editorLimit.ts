@@ -1,11 +1,12 @@
 import { EditorSelection, EditorState, Transaction, type ChangeSpec, type Extension, type TransactionSpec } from '@codemirror/state';
 
-export function limitTransaction(tr: Transaction, max: number): Transaction | TransactionSpec {
+export function limitTransaction(tr: Transaction, max: number): Transaction | TransactionSpec | readonly TransactionSpec[] {
   if (!tr.docChanged || tr.newDoc.length <= max || !tr.annotation(Transaction.userEvent)) return tr;
   let room = max - tr.startState.doc.length;
   tr.changes.iterChangedRanges((fromA, toA) => {
     room += toA - fromA;
   });
+  if (room <= 0 && tr.newDoc.length >= tr.startState.doc.length) return [];
   const changes: ChangeSpec[] = [];
   let cursor = -1;
   let shift = 0;
