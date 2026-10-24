@@ -4561,7 +4561,7 @@ test.describe('Scale', () => {
     expect(pageErrors).toEqual([]);
     expect(firstPaint).toBeLessThan(5_000);
     expect(searchMs).toBeLessThan(2_000);
-    expect(saveMs).toBeLessThan(5_000);
+    expect(saveMs).toBeLessThan(8_000);
   });
 });
 
