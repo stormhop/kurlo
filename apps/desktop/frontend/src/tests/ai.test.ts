@@ -13,6 +13,7 @@ import {
   AI_PROMPT_MAX_CHARS,
   AI_SYSTEM_MAX_CHARS,
   aiPromptLengthError,
+  aiModelsProblem,
   aiComposerSends,
   aiConversationHistory,
   aiFeature,
@@ -120,6 +121,25 @@ describe('ai presets', () => {
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: 'sk-real' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'none' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key: 'Authorization', value: 'Bearer sk-x', enabled: true }] } as never)).toBe('');
+  });
+
+  it('explains why the model list could not be loaded', () => {
+    const url = 'https://api.example.test/v1/models?key=secret';
+    expect(aiModelsProblem({ kind: 'status', url, statusCode: 404, status: '404 Not Found', body: '{"error":{"message":"Not Found"}}' })).toEqual({
+      title: 'This server has no model list',
+      status: '404 Not Found',
+      detail: 'GET https://api.example.test/v1/models',
+      hint: 'Check the base URL, or type the model name: some servers do not list their models.',
+    });
+    expect(aiModelsProblem({ kind: 'status', url, statusCode: 401, status: '401 Unauthorized', body: '{"error":{"message":"Incorrect API key"}}' }))
+      .toMatchObject({ title: 'The API key was not accepted', status: '401 Unauthorized', detail: 'GET https://api.example.test/v1/models\nIncorrect API key' });
+    expect(aiModelsProblem({ kind: 'status', url, statusCode: 500, status: '500 Internal Server Error', body: '' }))
+      .toMatchObject({ title: 'The provider refused the model list', detail: 'GET https://api.example.test/v1/models' });
+    expect(aiModelsProblem({ kind: 'network', url, error: 'connection refused' }))
+      .toMatchObject({ title: 'Could not reach the provider', status: '', detail: 'GET https://api.example.test/v1/models\nconnection refused' });
+    expect(aiModelsProblem({ kind: 'empty', url }).title).toBe('The provider listed no models');
+    expect(aiModelsProblem({ kind: 'no-url' }).title).toBe('Enter the base URL first');
+    expect(JSON.stringify(aiModelsProblem({ kind: 'network', url, error: 'x' }))).not.toContain('secret');
   });
 
   it('validates model parameters', () => {

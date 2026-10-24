@@ -33,7 +33,7 @@ const readmeScreenshotPath = process.env.KURLO_README_SCREENSHOT ?? '';
 
 const DOCS_VIEWPORT = { width: 1200, height: 780 };
 const DOCS_CROP_PADDING = 26;
-const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai']);
+const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai', 'ai-model-list-error']);
 
 async function docsDialogClip(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-modal="true"]').first();
@@ -507,6 +507,9 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         if (req.url.includes('/slow')) return slowResponse(req, state.sentRequests.length);
         if (req.url.endsWith(':11434/v1/models')) {
           return { ...jsonResponse(req), body: '{"object":"list","data":[{"id":"llama3.2"},{"id":"qwen2.5:7b"}]}' };
+        }
+        if (req.url.includes('no-models.kurlo.test')) {
+          return { ...jsonResponse(req), statusCode: 404, status: '404 Not Found', body: '{"error":{"message":"Not Found"}}' };
         }
         return jsonResponse(req);
       },
@@ -3439,6 +3442,33 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.keyboard.insertText('s'.repeat(50_005));
     await expect(page.locator('.ai-counter-full')).toHaveText('50,000 / 50,000');
     await expect(page.getByRole('textbox', { name: 'Reply' })).toHaveCount(0);
+  });
+
+  test('explains why the model list could not be loaded', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await page.getByRole('button', { name: 'Provider and model' }).click();
+    await page.getByRole('radio', { name: 'Ollama' }).click();
+    await page.keyboard.press('Escape');
+    await page.getByLabel('Provider base URL').fill('https://no-models.kurlo.test/v1?key=secret');
+    await page.getByRole('button', { name: 'Provider and model' }).click();
+    const problem = page.locator('.ai-model-problem');
+    await expect(problem).toBeVisible();
+    await expect(problem.locator('.ai-model-problem-title')).toHaveText('This server has no model list');
+    await expect(problem.locator('.ai-model-problem-status')).toHaveText('404 Not Found');
+    await expect(problem.locator('.ai-model-problem-detail')).toHaveText('404 Not FoundGET https://no-models.kurlo.test/v1/models');
+    await expect(problem).not.toContainText('secret');
+    await expect(problem.locator('.ai-model-problem-hint')).toContainText('type the model name');
+    await captureDocsScreenshot(page, 'ai-model-list-error', page.getByRole('dialog', { name: 'Provider and model' }));
+    const before = await page.evaluate(() => window.__kurloE2E.sentRequests.length);
+    await problem.getByRole('button', { name: 'Try again' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(before + 1);
+    await page.getByLabel('Model', { exact: true }).fill('my-model');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: 'Provider and model' })).toContainText('my-model');
   });
 
   test('opens a new MCP server from the AI tools tab as a draft that is dropped when closed unsaved', async ({ page }) => {

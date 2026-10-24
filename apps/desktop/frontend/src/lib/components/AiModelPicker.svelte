@@ -31,7 +31,7 @@
   async function toggle() {
     open = !open;
     if (open) {
-      vm.aiModelsError = '';
+      vm.aiModelsError = null;
       autoLoadModels();
       await tick();
       modelInput?.focus();
@@ -54,7 +54,7 @@
 
   async function choosePreset(id: AiPresetId) {
     vm.selectAiPreset(id);
-    vm.aiModelsError = '';
+    vm.aiModelsError = null;
     autoLoadModels();
     await tick();
     modelInput?.focus();
@@ -126,8 +126,20 @@
       {#if vm.aiModelsLoading}
         <div class="grpc-method-empty"><span class="spinner spinner-inline"></span> Loading the provider's models…</div>
       {:else if vm.aiModelsError}
-        <p class="ai-model-error" role="alert">{vm.aiModelsError}</p>
-        <button class="btn btn-ghost btn-sm ai-model-retry" type="button" onclick={() => vm.loadAiModels()}>Try again</button>
+        <div class="ai-model-problem" role="alert">
+          <svg class="ai-model-problem-icon" width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 1.75l6.5 11.5h-13L8 1.75z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            <path d="M8 6.25v3.25M8 11.5v.25" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <div class="ai-model-problem-body">
+            <strong class="ai-model-problem-title">{vm.aiModelsError.title}</strong>
+            {#if vm.aiModelsError.status || vm.aiModelsError.detail}
+              <span class="ai-model-problem-detail">{#if vm.aiModelsError.status}<span class="ai-model-problem-status">{vm.aiModelsError.status}</span>{/if}{vm.aiModelsError.detail}</span>
+            {/if}
+            {#if vm.aiModelsError.hint}<span class="ai-model-problem-hint">{vm.aiModelsError.hint}</span>{/if}
+          </div>
+          <button class="btn btn-secondary btn-xs ai-model-problem-retry" type="button" onclick={() => vm.loadAiModels()}>Try again</button>
+        </div>
       {:else if visibleModels.length}
         <div class="grpc-method-options ai-model-options" role="listbox" aria-label="Models">
           {#each visibleModels as model (model)}
@@ -201,13 +213,62 @@
   .ai-model-options :global(.grpc-method-option) {
     min-height: var(--control-lg);
   }
-  .ai-model-error {
-    margin: 0;
-    color: var(--danger);
-    font-size: var(--text-label);
-    line-height: var(--leading-normal);
-  }
   .ai-model-retry {
     justify-self: start;
+  }
+  .ai-model-problem {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+    padding: var(--space-2-5) var(--space-3);
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+  }
+  .ai-model-problem-icon {
+    margin-top: var(--space-0-5);
+    color: var(--warning);
+  }
+  .ai-model-problem-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+  .ai-model-problem-title {
+    color: var(--text);
+    font-size: var(--text-label);
+    font-weight: var(--weight-semibold);
+    line-height: var(--leading-normal);
+  }
+  .ai-model-problem-detail {
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .ai-model-problem-detail {
+    white-space: pre-line;
+  }
+  .ai-model-problem-status {
+    display: inline-block;
+    margin-right: var(--space-1-5);
+    padding: 0 var(--space-1-5);
+    border-radius: var(--radius-xs);
+    background: color-mix(in srgb, var(--warning) 16%, transparent);
+    color: var(--text);
+    font-weight: var(--weight-medium);
+  }
+  .ai-model-problem-hint {
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
+  }
+  .ai-model-problem-retry {
+    align-self: start;
   }
 </style>

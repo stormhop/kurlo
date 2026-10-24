@@ -211,7 +211,7 @@ type AiHost = {
   aiConversations: Map<string, AiTurn[]>;
   aiModels: Map<string, string[]>;
   aiModelsLoading: boolean;
-  aiModelsError: string;
+  aiModelsError: AiModelsProblem | null;
   requests: SavedRequest[];
   inFlightRequestIds: Set<string>;
   guardWorkspaceWritable: (action?: string) => boolean;
@@ -287,7 +287,7 @@ export const aiFeature = {
     if (this.aiModelsLoading) return;
     const base = this.url.trim().replace(/\/+$/, '');
     if (!base) {
-      this.aiModelsError = 'Enter the base URL first.';
+      this.aiModelsError = aiModelsProblem({ kind: 'no-url' });
       return;
     }
     const key = aiModelsKey(this.url, this.aiProvider);
@@ -303,17 +303,17 @@ export const aiFeature = {
     }
     const keyProblem = aiUnresolvedKey(runnable);
     if (keyProblem) {
-      this.aiModelsError = keyProblem;
+      this.aiModelsError = aiModelsProblem({ kind: 'no-key', message: keyProblem });
       return;
     }
-    const resolvedBase = runnable.url.replace(/\/+$/, '').replace(/\/(chat\/completions|messages)$/, '');
     this.aiModelsLoading = true;
-    this.aiModelsError = '';
+    this.aiModelsError = null;
+    const url = `${runnable.url.replace(/\/+$/, '').replace(/\/(chat\/completions|messages)$/, '')}/models`;
     try {
       const response = await sendHttpRequest({
         ...runnable,
         method: 'GET',
-        url: `${resolvedBase}/models`,
+        url,
         headers,
         bodyType: 'none',
         body: '',
@@ -321,20 +321,24 @@ export const aiFeature = {
         preRequestScript: '',
         testScript: '',
       });
-      if (response.error) throw new Error(response.error);
+      if (response.error) {
+        this.aiModelsError = aiModelsProblem({ kind: 'network', url, error: response.error });
+        return;
+      }
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        const detail = aiResponseErrorMessage(response.body) || 'the provider refused the model list';
-        throw new Error(response.statusCode === 401 || response.statusCode === 403
-          ? `The provider did not accept the API key (${response.statusCode}): ${detail}`
-          : `${response.status || response.statusCode}: ${detail}`);
+        this.aiModelsError = aiModelsProblem({ kind: 'status', url, statusCode: response.statusCode, status: response.status, body: response.body });
+        return;
       }
       const models = parseModelList(response.body);
-      if (!models.length) throw new Error('The provider returned no models.');
+      if (!models.length) {
+        this.aiModelsError = aiModelsProblem({ kind: 'empty', url });
+        return;
+      }
       const next = new Map(this.aiModels);
       next.set(key, models);
       this.aiModels = next;
     } catch (error) {
-      this.aiModelsError = error instanceof Error ? error.message : String(error);
+      this.aiModelsError = aiModelsProblem({ kind: 'network', url, error: error instanceof Error ? error.message : String(error) });
     } finally {
       this.aiModelsLoading = false;
     }
@@ -473,6 +477,49 @@ export const aiFeature = {
 export function aiComposerSends(event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'isComposing'> & { keyCode?: number }): boolean {
   if (event.key !== 'Enter' || event.shiftKey || event.altKey) return false;
   return !event.isComposing && event.keyCode !== 229;
+}
+
+export type AiModelsProblem = { title: string; status: string; detail: string; hint: string };
+
+function displayURL(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return url.split('?')[0];
+  }
+}
+
+export function aiModelsProblem(outcome:
+  | { kind: 'no-url' }
+  | { kind: 'no-key'; message: string }
+  | { kind: 'network'; url: string; error: string }
+  | { kind: 'status'; url: string; statusCode: number; status: string; body: string }
+  | { kind: 'empty'; url: string },
+): AiModelsProblem {
+  switch (outcome.kind) {
+    case 'no-url':
+      return { title: 'Enter the base URL first', status: '', detail: '', hint: 'Kurlo reads the model list from the base URL.' };
+    case 'no-key':
+      return { title: 'The API key is not set', status: '', detail: outcome.message, hint: '' };
+    case 'network':
+      return { title: 'Could not reach the provider', status: '', detail: `GET ${displayURL(outcome.url)}\n${outcome.error}`, hint: 'Check the base URL and that the server is running. You can still type the model name.' };
+    case 'empty':
+      return { title: 'The provider listed no models', status: '', detail: `GET ${displayURL(outcome.url)}`, hint: 'Type the model name instead.' };
+    case 'status': {
+      const status = outcome.status || String(outcome.statusCode);
+      const message = aiResponseErrorMessage(outcome.body).trim();
+      const repeatsStatus = !message || status.toLowerCase().replace(/^\d+\s*/, '') === message.toLowerCase();
+      const detail = `GET ${displayURL(outcome.url)}${repeatsStatus ? '' : `\n${message}`}`;
+      if (outcome.statusCode === 401 || outcome.statusCode === 403) {
+        return { title: 'The API key was not accepted', status, detail, hint: 'Check the key in the Auth tab or in the environment.' };
+      }
+      if (outcome.statusCode === 404) {
+        return { title: 'This server has no model list', status, detail, hint: 'Check the base URL, or type the model name: some servers do not list their models.' };
+      }
+      return { title: 'The provider refused the model list', status, detail, hint: 'You can still type the model name.' };
+    }
+  }
 }
 
 export function aiUnresolvedKey(req: Pick<HttpRequest, 'auth' | 'headers'>): string {

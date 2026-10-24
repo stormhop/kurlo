@@ -54,7 +54,7 @@ import { folderFeature } from './features/folders';
 import { graphqlFeature } from './features/graphql';
 import { grpcFeature } from './features/grpc';
 import { mcpFeature } from './features/mcp';
-import { aiFeature, type AiTurn } from './features/ai';
+import { aiFeature, type AiModelsProblem, type AiTurn } from './features/ai';
 import { importExportFeature } from './features/importExport';
 import { examplesFeature } from './features/examples';
 import { requestBodyFeature } from './features/requestBody';
@@ -1083,7 +1083,7 @@ class AppVM {
   aiConversations = $state<Map<string, AiTurn[]>>(new Map());
   aiModels = $state<Map<string, string[]>>(new Map());
   aiModelsLoading = $state(false);
-  aiModelsError = $state('');
+  aiModelsError = $state<AiModelsProblem | null>(null);
   _responseSearchCountToken = 0;
   _responseSearchCountTimer: number | undefined = undefined;
   _responseSearchCountKey = '';
