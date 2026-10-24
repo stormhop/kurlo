@@ -1428,6 +1428,9 @@ export namespace model {
 	}
 	export class AiStep {
 	    index: number;
+	    method: string;
+	    url: string;
+	    requestBody: string;
 	    blocks: AiBlock[];
 	    toolResults: AiBlock[];
 	    stopReason: string;
@@ -1447,6 +1450,9 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.index = source["index"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.requestBody = source["requestBody"];
 	        this.blocks = this.convertValues(source["blocks"], AiBlock);
 	        this.toolResults = this.convertValues(source["toolResults"], AiBlock);
 	        this.stopReason = source["stopReason"];

@@ -155,6 +155,9 @@ func TestAiOpenAIStreamAssemblesTextAndUsage(t *testing.T) {
 	if server.paths[0] != "/v1/chat/completions" {
 		t.Fatalf("path %q", server.paths[0])
 	}
+	if out.Steps[0].URL != server.URL+"/v1/chat/completions" || out.Steps[0].Method != "POST" || !strings.Contains(out.Steps[0].RequestBody, `"model":"test-model"`) {
+		t.Fatalf("step request %s %s %s", out.Steps[0].Method, out.Steps[0].URL, out.Steps[0].RequestBody)
+	}
 	body := server.body(0)
 	if body["max_tokens"] != float64(256) || body["stream"] != true {
 		t.Fatalf("body %v", body)
@@ -178,6 +181,20 @@ func TestAiOpenAIStreamAssemblesTextAndUsage(t *testing.T) {
 	}
 	if !strings.Contains(out.HTTP.Body, "[DONE]") {
 		t.Fatalf("raw stream not kept: %q", out.HTTP.Body)
+	}
+}
+
+func TestAiEndpointKeepsAFullPath(t *testing.T) {
+	cases := map[string]string{
+		"https://api.deepseek.com/v1":                  "https://api.deepseek.com/v1/chat/completions",
+		"https://api.deepseek.com/v1/":                 "https://api.deepseek.com/v1/chat/completions",
+		"https://api.deepseek.com/v1/chat/completions": "https://api.deepseek.com/v1/chat/completions",
+		"https://api.deepseek.com":                     "https://api.deepseek.com/chat/completions",
+	}
+	for in, want := range cases {
+		if got := (openAIProvider{}).endpoint(in); got != want {
+			t.Fatalf("%s -> %s, want %s", in, got, want)
+		}
 	}
 }
 
@@ -550,5 +567,29 @@ func TestAiTestScriptsRunOnceAfterAllSteps(t *testing.T) {
 	out = finishAiTests(context.Background(), req, out, state.New(), newCookieJarRegistry())
 	if len(out.HTTP.TestResult.Tests) != 1 {
 		t.Fatalf("tests %+v", out.HTTP.TestResult)
+	}
+}
+
+func TestAiRefusesPromptsOverTheLengthLimit(t *testing.T) {
+	long := strings.Repeat("я", model.AiMaxPromptChars+1)
+	req := aiTestRequest(model.AiProviderOpenAI, "http://127.0.0.1:1/v1")
+	req.Messages[0].Blocks[0].Text = long
+	runner, _ := newTestAiRunner(req, nil)
+	if out := runner.run(); !strings.Contains(out.Error, "message is longer than 200000") || len(out.Steps) != 0 {
+		t.Fatalf("prompt: %q, %d steps", out.Error, len(out.Steps))
+	}
+
+	req = aiTestRequest(model.AiProviderOpenAI, "http://127.0.0.1:1/v1")
+	req.System = strings.Repeat("s", model.AiMaxSystemChars+1)
+	runner, _ = newTestAiRunner(req, nil)
+	if out := runner.run(); !strings.Contains(out.Error, "system prompt is longer than 50000") {
+		t.Fatalf("system: %q", out.Error)
+	}
+
+	if aiLengthError(model.AiRequest{System: strings.Repeat("я", model.AiMaxSystemChars), Messages: []model.AiMessage{
+		{Role: "user", Blocks: []model.AiBlock{{Type: model.AiBlockText, Text: strings.Repeat("я", model.AiMaxPromptChars)}}},
+		{Role: "assistant", Blocks: []model.AiBlock{{Type: model.AiBlockText, Text: long}}},
+	}}) != "" {
+		t.Fatal("text at the limit and long answers are allowed")
 	}
 }

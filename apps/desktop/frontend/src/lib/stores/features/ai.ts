@@ -112,6 +112,19 @@ export function aiTurnMessages(turn: AiTurn): AiMessage[] {
   return out.concat(turn.response?.messages ?? []);
 }
 
+export function compactAiTurn(turn: AiTurn): AiTurn {
+  const response = turn.response;
+  if (!response) return turn;
+  return {
+    ...turn,
+    response: {
+      ...response,
+      steps: (response.steps ?? []).map(step => ({ ...step, requestBody: '', http: step.http ? { ...step.http, body: '' } : step.http })),
+      http: response.http ? { ...response.http, body: '' } : response.http,
+    } as AiResponse,
+  };
+}
+
 export function aiConversationHistory(turns: AiTurn[]): AiMessage[] {
   const out: AiMessage[] = [];
   for (const turn of turns) {
@@ -141,19 +154,40 @@ function optionalNumber(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-export function aiSettingsError(req: Pick<SavedRequest, 'aiTemperature' | 'aiTopP' | 'aiMaxTokens' | 'aiMaxSteps' | 'aiIdleTimeoutSec'>): string {
-  const checks: [string, string | undefined, (n: number) => boolean][] = [
-    ['Temperature', req.aiTemperature, n => n >= 0 && n <= 2],
-    ['Top P', req.aiTopP, n => n >= 0 && n <= 1],
-    ['Max tokens', req.aiMaxTokens, n => Number.isInteger(n) && n > 0],
-    ['Step limit', req.aiMaxSteps, n => Number.isInteger(n) && n > 0 && n <= 50],
-    ['Stop after silence', req.aiIdleTimeoutSec, n => Number.isInteger(n) && n > 0],
-  ];
-  for (const [label, raw, valid] of checks) {
-    const text = (raw ?? '').trim();
+export const AI_PROMPT_MAX_CHARS = 200_000;
+export const AI_SYSTEM_MAX_CHARS = 50_000;
+
+export function aiPromptLengthError(req: Pick<SavedRequest, 'aiSystem' | 'aiPrompt'>, promptLabel = 'prompt'): string {
+  if ((req.aiSystem ?? '').length > AI_SYSTEM_MAX_CHARS) return `The system prompt is longer than ${AI_SYSTEM_MAX_CHARS.toLocaleString('en-US')} characters. Shorten it before sending.`;
+  if ((req.aiPrompt ?? '').length > AI_PROMPT_MAX_CHARS) return `The ${promptLabel} is longer than ${AI_PROMPT_MAX_CHARS.toLocaleString('en-US')} characters. Shorten it before sending.`;
+  return '';
+}
+
+export type AiSettingField = 'aiTemperature' | 'aiTopP' | 'aiMaxTokens' | 'aiMaxSteps' | 'aiIdleTimeoutSec';
+
+const AI_SETTING_CHECKS: [AiSettingField, string, string, (n: number) => boolean][] = [
+  ['aiTemperature', 'Temperature', 'Use a number from 0 to 2.', n => n >= 0 && n <= 2],
+  ['aiTopP', 'Top P', 'Use a number from 0 to 1.', n => n >= 0 && n <= 1],
+  ['aiMaxTokens', 'Max tokens', 'Use a whole number above 0.', n => Number.isInteger(n) && n > 0],
+  ['aiMaxSteps', 'Step limit', 'Use a whole number from 1 to 50.', n => Number.isInteger(n) && n > 0 && n <= 50],
+  ['aiIdleTimeoutSec', 'Stop after silence', 'Use a whole number of seconds above 0.', n => Number.isInteger(n) && n > 0],
+];
+
+export function aiSettingErrors(req: Pick<SavedRequest, AiSettingField>): Partial<Record<AiSettingField, string>> {
+  const errors: Partial<Record<AiSettingField, string>> = {};
+  for (const [field, , hint, valid] of AI_SETTING_CHECKS) {
+    const text = (req[field] ?? '').trim();
     if (!text) continue;
     const parsed = Number(text);
-    if (!Number.isFinite(parsed) || !valid(parsed)) return `${label} has an invalid value: ${text}`;
+    if (!Number.isFinite(parsed) || !valid(parsed)) errors[field] = hint;
+  }
+  return errors;
+}
+
+export function aiSettingsError(req: Pick<SavedRequest, AiSettingField>): string {
+  const errors = aiSettingErrors(req);
+  for (const [field, label, hint] of AI_SETTING_CHECKS) {
+    if (errors[field]) return `${label}: ${(req[field] ?? '').trim()} is not valid. ${hint}`;
   }
   return '';
 }
@@ -236,7 +270,7 @@ export const aiFeature = {
     const previous = aiPresetFor(this.url, this.aiProvider);
     const authUntouched = authLooksLikePreset(this, previous);
     this.aiProvider = preset.provider;
-    if (preset.url || id !== 'custom') this.url = preset.url;
+    this.url = preset.url;
     if (authUntouched) applyPresetAuth(this, preset);
     if (previous.id !== preset.id) this.aiModel = '';
   },
@@ -331,6 +365,14 @@ export const aiFeature = {
       if (followUp === undefined) this.requestTab = 'body';
       return;
     }
+    const lengthError = followUp === undefined
+      ? aiPromptLengthError(snapshot)
+      : aiPromptLengthError({ aiSystem: snapshot.aiSystem, aiPrompt: prompt }, 'message');
+    if (lengthError) {
+      this.requestError = lengthError;
+      if (followUp === undefined) this.requestTab = 'body';
+      return;
+    }
     if (!(snapshot.aiModel ?? '').trim()) {
       this.requestError = 'Choose a model before sending.';
       return;
@@ -345,7 +387,7 @@ export const aiFeature = {
     const envValues = this.activeEnvironmentValues();
     const history = followUp === undefined ? [] : aiConversationHistory(this.aiTurns(requestId));
     const turn: AiTurn = { id: newRequestId(), prompt, startedAt: Date.now(), status: 'streaming', steps: [], response: null, error: '' };
-    const previousTurns = followUp === undefined ? [] : this.aiTurns(requestId);
+    const previousTurns = followUp === undefined ? [] : this.aiTurns(requestId).map(compactAiTurn);
     this.setAiTurns(requestId, [...previousTurns, turn]);
     const messages: AiMessage[] = [...history, { role: 'user', blocks: [{ type: 'text', text: prompt }] }];
 
@@ -428,7 +470,14 @@ export const aiFeature = {
   },
 };
 
-export function aiUnresolvedKey(req: Pick<HttpRequest, 'auth'>): string {
+export function aiComposerSends(event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'isComposing'> & { keyCode?: number }): boolean {
+  if (event.key !== 'Enter' || event.shiftKey || event.altKey) return false;
+  return !event.isComposing && event.keyCode !== 229;
+}
+
+export function aiUnresolvedKey(req: Pick<HttpRequest, 'auth' | 'headers'>): string {
+  const keyHeader = (req.headers ?? []).some(h => h.enabled !== false && /^(authorization|x-api-key|api-key)$/i.test(h.key.trim()) && h.value.trim() && !h.value.includes('{{'));
+  if (keyHeader) return '';
   const value = req.auth?.type === 'bearer' ? req.auth.token : req.auth?.type === 'apikey' ? req.auth.keyValue : '';
   const match = /\{\{\s*([^{}\s]+)\s*\}\}/.exec(value ?? '');
   if (!match) return '';

@@ -10,12 +10,18 @@ import type { AiResponse } from '../lib/backend';
 import { emptyHttpResponse } from '../lib/wire';
 import {
   AI_PRESETS,
+  AI_PROMPT_MAX_CHARS,
+  AI_SYSTEM_MAX_CHARS,
+  aiPromptLengthError,
+  aiComposerSends,
   aiConversationHistory,
   aiFeature,
   aiPresetFor,
+  aiSettingErrors,
   aiSettingsError,
   aiUnresolvedKey,
   applyAiDeltas,
+  compactAiTurn,
   parseModelList,
   type AiTurn,
 } from '../lib/stores/features/ai';
@@ -91,6 +97,17 @@ describe('ai presets', () => {
     expect(host.url).toBe('https://openrouter.ai/api/v1');
   });
 
+  it('clears the URL when Custom URL is chosen so the preset changes', () => {
+    const host = {
+      url: 'https://api.groq.com/openai/v1', aiProvider: 'openai', aiModel: 'x',
+      authType: 'bearer', bearerToken: '{{groqApiKey}}', apiKeyName: '', apiKeyValue: '', apiKeyIn: 'header',
+    };
+    aiFeature.selectAiPreset.call(host as never, 'custom');
+    expect(host.url).toBe('');
+    expect(aiPresetFor(host.url, host.aiProvider).id).toBe('custom');
+    expect(host.bearerToken).toBe('{{apiKey}}');
+  });
+
   it('reads model lists from OpenAI, Anthropic and Ollama style answers', () => {
     expect(parseModelList('{"data":[{"id":"b"},{"id":"a"},{"id":"a"}]}')).toEqual(['a', 'b']);
     expect(parseModelList('{"models":[{"name":"llama3"}]}')).toEqual(['llama3']);
@@ -102,6 +119,7 @@ describe('ai presets', () => {
     expect(aiUnresolvedKey({ auth: { type: 'apikey', keyValue: '{{ anthropicApiKey }}' } } as never)).toContain('anthropicApiKey');
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: 'sk-real' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'none' } } as never)).toBe('');
+    expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key: 'Authorization', value: 'Bearer sk-x', enabled: true }] } as never)).toBe('');
   });
 
   it('validates model parameters', () => {
@@ -110,6 +128,11 @@ describe('ai presets', () => {
     expect(aiSettingsError({ aiMaxTokens: '1.5' })).toContain('Max tokens');
     expect(aiSettingsError({ aiMaxSteps: '99' })).toContain('Step limit');
     expect(aiSettingsError({ aiIdleTimeoutSec: '0' })).toContain('silence');
+    expect(aiSettingErrors({ aiTemperature: '2132312231', aiTopP: '0.5', aiMaxTokens: 'abc' })).toEqual({
+      aiTemperature: 'Use a number from 0 to 2.',
+      aiMaxTokens: 'Use a whole number above 0.',
+    });
+    expect(aiSettingsError({ aiTemperature: '9' })).toBe('Temperature: 9 is not valid. Use a number from 0 to 2.');
   });
 });
 
@@ -209,6 +232,50 @@ describe('sending an AI request', () => {
     const call = vi.mocked(backend.sendAiRequest).mock.calls.at(-1)?.[0];
     expect(call?.messages.map(m => `${m.role}:${m.blocks[0].text}`)).toEqual(['user:Hello', 'assistant:Hi', 'user:And again?']);
     expect((host.aiConversations as Map<string, AiTurn[]>).get('req-1')).toHaveLength(2);
+  });
+
+  it('keeps only the history of earlier turns, not their raw request and response bodies', async () => {
+    const big = 'x'.repeat(50000);
+    const earlier = turn({
+      id: 'a', prompt: 'Hello', status: 'done',
+      response: aiResponse({
+        messages: [{ role: 'assistant', blocks: [{ type: 'text', text: 'Hi' }] }],
+        http: { ...emptyHttpResponse(), statusCode: 200, body: big },
+        steps: [{ index: 0, method: 'POST', url: 'https://x', requestBody: big, blocks: [{ type: 'text', text: 'Hi' }], toolResults: [], stopReason: 'end_turn', rawStopReason: 'end_turn', model: 'm', usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, reasoning: 0 }, hasUsage: true, firstTokenMs: 1, durationMs: 2, http: { ...emptyHttpResponse(), statusCode: 200, body: big } }],
+      }),
+    });
+    vi.mocked(backend.sendAiRequest).mockResolvedValueOnce(aiResponse({ text: 'Sure' }));
+    const host = sendHost({ aiConversations: new Map([['req-1', [earlier]]]) });
+    await (host.sendAiPrompt as (text?: string) => Promise<void>)('More?');
+    const [kept] = (host.aiConversations as Map<string, AiTurn[]>).get('req-1') ?? [];
+    expect(kept.response?.steps[0].requestBody).toBe('');
+    expect(kept.response?.steps[0].http.body).toBe('');
+    expect(kept.response?.http.body).toBe('');
+    expect(kept.response?.messages[0].blocks[0].text).toBe('Hi');
+    expect(compactAiTurn(turn({ id: 'b', prompt: 'p', status: 'error', response: null }))).toMatchObject({ id: 'b', response: null });
+  });
+
+  it('refuses prompts, replies and system prompts over the length limit', async () => {
+    expect(aiPromptLengthError({ aiSystem: 's'.repeat(AI_SYSTEM_MAX_CHARS), aiPrompt: 'p'.repeat(AI_PROMPT_MAX_CHARS) })).toBe('');
+    expect(aiPromptLengthError({ aiSystem: 's'.repeat(AI_SYSTEM_MAX_CHARS + 1), aiPrompt: '' })).toContain('system prompt is longer than 50,000');
+    vi.mocked(backend.sendAiRequest).mockClear();
+    const host = sendHost({ snapshotActiveRequest: () => ({ id: 'req-1', aiPrompt: 'p'.repeat(AI_PROMPT_MAX_CHARS + 1), aiModel: 'm' }) });
+    await (host.sendAiPrompt as () => Promise<void>)();
+    expect(host.requestError).toContain('prompt is longer than 200,000');
+    const reply = sendHost();
+    await (reply.sendAiPrompt as (text?: string) => Promise<void>)('r'.repeat(AI_PROMPT_MAX_CHARS + 1));
+    expect(reply.requestError).toContain('message is longer than 200,000');
+    expect(backend.sendAiRequest).not.toHaveBeenCalled();
+  });
+
+  it('sends a reply on Enter and keeps Shift+Enter for a new line', () => {
+    const key = (init: Partial<KeyboardEvent>) => ({ key: 'Enter', shiftKey: false, altKey: false, isComposing: false, ...init });
+    expect(aiComposerSends(key({}))).toBe(true);
+    expect(aiComposerSends(key({ shiftKey: true }))).toBe(false);
+    expect(aiComposerSends(key({ altKey: true }))).toBe(false);
+    expect(aiComposerSends(key({ isComposing: true }))).toBe(false);
+    expect(aiComposerSends({ ...key({}), keyCode: 229 })).toBe(false);
+    expect(aiComposerSends(key({ key: 'a' }))).toBe(false);
   });
 
   it('refuses to send without a prompt or a model', async () => {

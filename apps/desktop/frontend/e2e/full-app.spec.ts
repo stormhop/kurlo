@@ -564,7 +564,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
           { type: 'tool_use', id: 'call_1', name: 'get_weather', input: '{"city":"Lisbon","date":"2026-10-24"}' },
         ];
         const toolResult = { type: 'tool_result', id: 'call_1', name: 'get_weather', server: 'Weather', text: '{"rain":0.72,"high_c":19}' };
-        const secondBlocks = [{ type: 'text', text: 'Bring an umbrella: there is a 72% chance of rain after noon, with a high of 19 °C.' }];
+        const secondBlocks = [{ type: 'text', text: 'Bring an umbrella: there is a **72%** chance of rain after noon.\n\n- High: `19 °C`\n- Wind: light, from the west' }];
         const stepHttp = (body) => ({ ...jsonResponse(req.http), headers: [{ key: 'Content-Type', value: 'text/event-stream', enabled: true }], body });
         const firstStep = { index: 0, blocks: firstBlocks, toolResults: [toolResult], stopReason: 'tool_use', rawStopReason: 'tool_calls', model: req.model, usage: usage(1180, 64), hasUsage: true, firstTokenMs: 412, durationMs: 1650, http: stepHttp('data: {"choices":[{"delta":{"content":"Let me"}}]}\n\ndata: [DONE]\n') };
         const secondStep = { index: 1, blocks: secondBlocks, toolResults: [], stopReason: 'end_turn', rawStopReason: 'stop', model: req.model, usage: usage(1290, 38), hasUsage: true, firstTokenMs: 380, durationMs: 1200, http: stepHttp('data: {"choices":[{"delta":{"content":"Bring"}}]}\n\ndata: [DONE]\n') };
@@ -3249,11 +3249,20 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.getByRole('option', { name: 'llama3.2' }).click();
     await expect(page.getByLabel('Provider and model')).toContainText('Ollama');
     await expect(page.getByLabel('Provider and model')).toContainText('llama3.2');
+    const picker = page.getByRole('button', { name: 'Provider and model' });
+    await picker.click();
+    await expect(page.getByRole('dialog', { name: 'Provider and model' })).toBeVisible();
+    await expect(page.getByLabel('Model', { exact: true })).toBeFocused();
+    await picker.click();
+    await expect(page.getByRole('dialog', { name: 'Provider and model' })).toHaveCount(0);
 
     await fillCodeEditor(page, 'ai-prompt-editor', 'Do I need an umbrella in Lisbon tomorrow?');
     await page.getByRole('button', { name: 'Send', exact: true }).click();
 
     await expect(page.locator('.ai-text').last()).toContainText('Bring an umbrella');
+    await expect(page.locator('.ai-text').last().locator('strong')).toHaveText('72%');
+    await expect(page.locator('.ai-text').last().locator('li')).toHaveCount(2);
+    await expect(page.locator('.ai-text').last()).not.toContainText('**');
     await expect(page.locator('.ai-tool-name')).toContainText('get_weather');
     await expect(page.locator('.ai-tool-server')).toContainText('Weather');
     await expect(page.locator('.ai-tool-result')).toContainText('"rain":0.72');
@@ -3270,12 +3279,181 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.getByRole('tab', { name: /Tests/ }).click();
     await expect(page.locator('.test-row.fail')).toContainText('answers fast');
 
+    await page.getByRole('tab', { name: 'Raw' }).click();
+    const rawSteps = page.locator('.ai-raw-step');
+    await expect(rawSteps).toHaveCount(2);
+    await expect(rawSteps.first().locator('.ai-raw-head')).toHaveAttribute('aria-expanded', 'false');
+    await expect(rawSteps.last().locator('.ai-raw-head')).toHaveAttribute('aria-expanded', 'true');
+    await expect(rawSteps.last().locator('.ai-raw-body')).toContainText('Bring');
+    await rawSteps.first().locator('.ai-raw-head').click();
+    await expect(rawSteps.first().locator('.ai-raw-body')).toContainText('Let me');
+
     await page.getByRole('tab', { name: 'Chat' }).click();
-    await page.getByLabel('Reply').fill('And on Saturday?');
-    await page.getByRole('button', { name: 'Reply', exact: true }).click();
+    const panel = page.locator('.ai-panel');
+    const chatBox = await page.locator('.ai-chat').boundingBox();
+    const turnBox = await page.locator('.ai-turn').first().boundingBox();
+    expect(turnBox!.width).toBeGreaterThan(chatBox!.width - 80);
+
+    const reply = page.getByRole('textbox', { name: 'Reply' });
+    await reply.click();
+    await page.keyboard.type('And on');
+    await page.keyboard.press('Shift+Enter');
+    await page.keyboard.type('Saturday?');
+    await expect(reply).toHaveValue('And on\nSaturday?');
+    expect(await page.evaluate(() => window.__kurloE2E.sentAiRequests.length)).toBe(1);
+    await expect(reply).toHaveAttribute('spellcheck', 'false');
+    await expect(reply).toHaveAttribute('autocomplete', 'off');
+    await page.keyboard.press('Enter');
     await expect(page.locator('.ai-user')).toHaveCount(2);
+    await expect(reply).toHaveValue('');
     const followUp = await page.evaluate(() => window.__kurloE2E.sentAiRequests[1]);
     expect((followUp.messages as Array<{ role: string }>).map(m => m.role)).toEqual(['user', 'assistant', 'tool', 'assistant', 'user']);
+    expect((followUp.messages as Array<{ blocks: Array<{ text: string }> }>).at(-1)?.blocks[0].text).toBe('And on\nSaturday?');
+    await captureDocsScreenshot(page, 'request-ai-chat');
+
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await page.locator('#ai-top-p').fill('5');
+    const topPError = page.locator('#ai-top-p-error');
+    await expect(topPError).toHaveText('Use a number from 0 to 1.');
+    const [topP, topPMessage] = [await page.locator('#ai-top-p').boundingBox(), await topPError.boundingBox()];
+    expect(topPMessage!.y).toBeGreaterThanOrEqual(topP!.y + topP!.height - 1);
+    expect(Math.abs((topPMessage!.x + topPMessage!.width) - (topP!.x + topP!.width))).toBeLessThan(2);
+    await captureDocsScreenshot(page, 'ai-settings-error-wide');
+    await page.locator('#ai-top-p').fill('');
+    await page.getByRole('tab', { name: /Prompt/ }).click();
+
+    await panel.getByRole('button', { name: 'New chat' }).click();
+    await expect(page.locator('.ai-user')).toHaveCount(0);
+    await expect(panel).toContainText('Send the prompt to start a conversation.');
+  });
+
+  test('keeps the AI prompt and settings inside a narrow request panel', async ({ page }) => {
+    await page.setViewportSize({ width: 1180, height: 470 });
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.responseLayout.v1', 'right'));
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await fillCodeEditor(page, 'ai-prompt-editor', 'привет братик');
+    await page.getByTestId('ai-prompt-editor').locator('.cm-content').click();
+    const scroller = page.getByTestId('ai-prompt-editor').locator('.cm-scroller');
+    await expect.poll(() => scroller.evaluate(el => el.scrollTop)).toBe(0);
+    const frame = await page.locator('.ai-editor-prompt').boundingBox();
+    const line = await page.getByTestId('ai-prompt-editor').locator('.cm-line').first().boundingBox();
+    expect(line!.y).toBeGreaterThanOrEqual(frame!.y + 6);
+    expect(line!.y + line!.height).toBeLessThanOrEqual(frame!.y + frame!.height);
+    await captureDocsScreenshot(page, 'ai-narrow-prompt');
+
+    const divider = page.getByRole('button', { name: 'Resize panels' });
+    const box = await divider.boundingBox();
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + 40);
+    await page.mouse.down();
+    await page.mouse.move(0, box!.y + 40, { steps: 8 });
+    await page.mouse.up();
+    const editor = await page.locator('.request-editor').boundingBox();
+    expect(editor!.width).toBeGreaterThanOrEqual(24 * 16 - 1);
+
+    await page.getByRole('button', { name: 'Request section' }).click();
+    await page.getByRole('option', { name: 'Settings' }).click();
+    const fits = await page.locator('.request-editor .postman-setting input.setting-number').evaluateAll(inputs => inputs.every(input => {
+      const rect = input.getBoundingClientRect();
+      const panel = input.closest('.request-editor')!.getBoundingClientRect();
+      return rect.right <= panel.right + 0.5 && rect.width > 40;
+    }));
+    expect(fits).toBe(true);
+    await captureDocsScreenshot(page, 'ai-narrow-settings');
+
+    await page.locator('#ai-temperature').fill('2132312231');
+    const error = page.locator('#ai-temperature-error');
+    await expect(error).toHaveText('Use a number from 0 to 2.');
+    await expect(page.locator('#ai-temperature')).toHaveAttribute('aria-invalid', 'true');
+    const [field, message] = [await page.locator('#ai-temperature').boundingBox(), await error.boundingBox()];
+    expect(message!.y).toBeGreaterThanOrEqual(field!.y + field!.height - 1);
+    expect(message!.y - (field!.y + field!.height)).toBeLessThan(16);
+    expect(field!.width).toBeLessThanOrEqual(8 * 16 + 1);
+    await captureDocsScreenshot(page, 'ai-settings-error');
+    await page.locator('#ai-temperature').fill('');
+    await expect(error).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Provider and model' }).click();
+    await page.getByRole('radio', { name: 'Ollama' }).click();
+    await page.getByRole('option', { name: 'llama3.2' }).click();
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    const badge = page.locator('.ai-panel .status-badge');
+    await expect(badge).toContainText('200');
+    expect(await badge.evaluate(el => el.scrollWidth <= el.clientWidth + 1 && el.getBoundingClientRect().right <= el.closest('.response-status-bar')!.getBoundingClientRect().right)).toBe(true);
+    const newChat = page.locator('.ai-panel').getByRole('button', { name: 'New chat' });
+    await expect(newChat).toBeVisible();
+    const statusFits = await page.locator('.ai-panel .response-status-bar').evaluate(bar => [...bar.querySelectorAll('.status-left, .status-right')].every(part => part.getBoundingClientRect().right <= bar.getBoundingClientRect().right + 0.5));
+    expect(statusFits).toBe(true);
+    const [replyBox, sendBox] = [await page.getByRole('textbox', { name: 'Reply' }).boundingBox(), await page.getByRole('button', { name: 'Send reply' }).boundingBox()];
+    expect(Math.abs(replyBox!.height - sendBox!.height)).toBeLessThan(1.5);
+    expect(Math.abs((replyBox!.y + replyBox!.height) - (sendBox!.y + sendBox!.height))).toBeLessThan(1.5);
+    await captureDocsScreenshot(page, 'ai-narrow-status');
+  });
+
+  test('grows the AI prompt field with its text up to the free height', async ({ page }) => {
+    await page.setViewportSize({ width: 1500, height: 900 });
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.responseLayout.v1', 'right'));
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    const field = page.locator('.ai-editor-prompt');
+    const root = page.locator('.ai-prompt');
+    const empty = (await field.boundingBox())!.height;
+    const free = (await root.boundingBox())!.height;
+    expect(empty).toBeLessThan(free * 0.75);
+    expect(empty).toBeGreaterThan(9 * 16 - 2);
+    await fillCodeEditor(page, 'ai-prompt-editor', Array.from({ length: 8 }, (_, index) => `line ${index + 1}`).join('\n'));
+    const grown = (await field.boundingBox())!.height;
+    expect(grown).toBeGreaterThan(empty + 20);
+    await fillCodeEditor(page, 'ai-prompt-editor', Array.from({ length: 80 }, (_, index) => `line ${index + 1}`).join('\n'));
+    const rootBox = (await root.boundingBox())!;
+    const fieldBox = (await field.boundingBox())!;
+    expect(fieldBox.y + fieldBox.height).toBeLessThanOrEqual(rootBox.y + rootBox.height + 1);
+    expect((await page.getByLabel('System prompt').boundingBox())!.height).toBeGreaterThan(40);
+    const scroller = page.getByTestId('ai-prompt-editor').locator('.cm-scroller');
+    expect(await scroller.evaluate(el => el.scrollHeight > el.clientHeight + 20)).toBe(true);
+    await captureDocsScreenshot(page, 'ai-prompt-grown');
+  });
+
+  test('stops the AI prompt and system prompt at their length limits', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    const prompt = page.getByTestId('ai-prompt-editor').locator('.cm-content');
+    await prompt.click();
+    await page.keyboard.insertText('x'.repeat(200_010));
+    await expect(page.locator('.ai-counter-full')).toHaveText('200,000 / 200,000');
+    await page.keyboard.type('more');
+    await expect(page.locator('.ai-counter-full')).toHaveText('200,000 / 200,000');
+    await page.keyboard.press('Backspace');
+    await expect(page.locator('.ai-counter')).toHaveText('199,999 / 200,000');
+    await expect(page.locator('.ai-counter-full')).toHaveCount(0);
+    await captureDocsScreenshot(page, 'ai-prompt-limit');
+
+    const system = page.getByLabel('System prompt').locator('.cm-content');
+    await system.click();
+    await page.keyboard.insertText('s'.repeat(50_005));
+    await expect(page.locator('.ai-counter-full')).toHaveText('50,000 / 50,000');
+    await expect(page.getByRole('textbox', { name: 'Reply' })).toHaveCount(0);
+  });
+
+  test('opens a new MCP server from the AI tools tab as a draft that is dropped when closed unsaved', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await page.getByRole('tab', { name: /Tools/ }).click();
+    const before = await page.evaluate(() => window.__kurloE2E.store.requests.length);
+    await page.getByRole('button', { name: 'New MCP request' }).click();
+    await expect(page.getByLabel('Method and protocol')).toContainText('MCP');
+    await page.locator('.saved-request-tab.active').getByRole('button', { name: 'Close tab' }).click();
+    await expect(page.getByLabel('Method and protocol')).toContainText('AI');
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.filter((request: { requestType?: string; isDraft?: boolean }) => request.requestType === 'mcp' && !request.isDraft).length)).toBe(0);
+    expect(await page.evaluate(() => window.__kurloE2E.store.requests.length)).toBeLessThanOrEqual(before);
   });
 
   test('writes request docs in Markdown with a live preview and an automatic reference', async ({ page }) => {
@@ -3299,7 +3477,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(docs.locator('.md-link')).toHaveAttribute('href', 'https://kurlo.dev/docs');
     await captureDocsScreenshot(page, 'request-docs');
   });
-
 
   test('switches the response beside the request from the status bar', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 780 });
@@ -3326,7 +3503,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.locator('.request-split')).not.toHaveClass(/split-right/);
   });
 
-
   test('shows HTTP methods and other protocols side by side in the method menu', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');
@@ -3341,7 +3517,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.getByRole('option', { name: 'AI', exact: true }).click();
     await expect(page.getByLabel('Provider base URL')).toBeVisible();
   });
-
 
   test('discovers an MCP server, calls a tool, and keeps the raw exchange', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);

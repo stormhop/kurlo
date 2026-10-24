@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { tabListKeyboard } from '../a11y';
+  import Markdown from './Markdown.svelte';
   import { vm } from '../stores/app.svelte';
-  import { aiTurnUsage, type AiStepView, type AiTurn } from '../stores/features/ai';
-  import { statusClass } from '../utils';
+  import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiTurnUsage, type AiStepView, type AiTurn } from '../stores/features/ai';
+  import { formatSize, statusClass } from '../utils';
   import type { AiBlock } from '../backend';
 
   type AiTab = 'chat' | 'raw' | 'tests';
@@ -13,6 +14,10 @@
   let scroller = $state<HTMLDivElement>();
   let stickToBottom = $state(true);
   let openThinking = $state<Set<string>>(new Set());
+  let rawOpen = $state<Set<string>>(new Set());
+  let rawExpanded = $state<Set<string>>(new Set());
+  const RAW_PREVIEW_CHARS = 20000;
+  const NO_AUTOCORRECT: Record<string, string> = { autocorrect: 'off' };
 
   const turns = $derived(vm.aiConversations.get(vm.activeRequestId) ?? []);
   const last = $derived(turns.at(-1) ?? null);
@@ -32,6 +37,7 @@
   const testTotal = $derived(tests?.tests?.length ?? 0);
   const testPassed = $derived(tests?.tests?.filter(test => test.passed).length ?? 0);
   const rawSteps = $derived(last?.response?.steps ?? []);
+  const turnKey = $derived(last?.id ?? '');
   const metricsTitle = $derived.by(() => {
     if (!usage) return '';
     const lines = [
@@ -76,6 +82,22 @@
     }
   }
 
+  function rawStepOpen(index: number) {
+    return rawOpen.has(`${turnKey}:${index}`) !== (index === rawSteps.length - 1);
+  }
+
+  function toggleRawStep(index: number) {
+    const key = `${turnKey}:${index}`;
+    const next = new Set(rawOpen);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    rawOpen = next;
+  }
+
+  function expandRaw(key: string) {
+    rawExpanded = new Set([...rawExpanded, key]);
+  }
+
   function toolResultFor(step: AiStepView, block: AiBlock) {
     return step.toolResults.find(result => result.id === block.id);
   }
@@ -113,10 +135,9 @@
   }
 
   function onReplyKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-      event.preventDefault();
-      void sendReply();
-    }
+    if (!aiComposerSends(event)) return;
+    event.preventDefault();
+    void sendReply();
   }
 
   async function raiseMaxTokens() {
@@ -126,6 +147,18 @@
     await vm.sendAiPrompt();
   }
 </script>
+
+{#snippet rawBody(label: string, key: string, text: string)}
+  {@const full = rawExpanded.has(key) || text.length <= RAW_PREVIEW_CHARS}
+  <div class="ai-raw-label">{label}</div>
+  <pre class="ai-raw-body">{full ? text : text.slice(0, RAW_PREVIEW_CHARS)}</pre>
+  {#if !full}
+    <div class="ai-raw-more">
+      <span>Showing {formatSize(RAW_PREVIEW_CHARS)} of {formatSize(text.length)}</span>
+      <button class="btn btn-ghost btn-sm" type="button" onclick={() => expandRaw(key)}>Show all</button>
+    </div>
+  {/if}
+{/snippet}
 
 <div class="response-area ai-panel">
   {#if !turns.length}
@@ -164,14 +197,20 @@
       <div class="status-right">
         {#if firstTokenMs || hasUsage}
           <span class="ai-metrics" title={metricsTitle}>
-            {#if firstTokenMs}<span><span class="ai-metric-key">TTFT</span> {formatMs(firstTokenMs)}</span>{/if}
-            {#if tokensPerSecond}<span><span class="ai-metric-key">speed</span> {tokensPerSecond} tok/s</span>{/if}
+            {#if firstTokenMs}<span class="ai-metric-ttft"><span class="ai-metric-key">TTFT</span> {formatMs(firstTokenMs)}</span>{/if}
+            {#if tokensPerSecond}<span class="ai-metric-extra"><span class="ai-metric-key">speed</span> {tokensPerSecond} tok/s</span>{/if}
             {#if hasUsage && usage}
               <span><span class="ai-metric-key">in</span> {(usage.input + usage.cacheRead + usage.cacheWrite).toLocaleString()} <span class="ai-metric-key">out</span> {usage.output.toLocaleString()}</span>
-              {#if usage.cacheRead}<span><span class="ai-metric-key">cache</span> {usage.cacheRead.toLocaleString()}</span>{/if}
+              {#if usage.cacheRead}<span class="ai-metric-extra"><span class="ai-metric-key">cache</span> {usage.cacheRead.toLocaleString()}</span>{/if}
             {/if}
           </span>
         {/if}
+        <button class="btn btn-secondary btn-sm ai-new-chat" type="button" onclick={() => vm.clearAiConversation()} disabled={streaming} aria-label="New chat" title="Clear the chat. Send starts again from the Prompt tab.">
+          <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <span class="ai-new-chat-label">New chat</span>
+        </button>
       </div>
       <div class="tab-bar response-mini-tabs" role="tablist" use:tabListKeyboard>
         <button class="tab" role="tab" type="button" class:active={tab === 'chat'} aria-selected={tab === 'chat'} aria-controls="ai-panel-chat" tabindex={tab === 'chat' ? 0 : -1} onclick={() => (tab = 'chat')}>Chat</button>
@@ -204,7 +243,7 @@
                 {:else if block.type === 'redacted_thinking'}
                   <div class="ai-thinking"><span class="ai-thinking-toggle">Thinking (redacted by the provider)</span></div>
                 {:else if block.type === 'text' && block.text}
-                  <div class="ai-text">{block.text}</div>
+                  <div class="ai-text"><Markdown source={block.text} compact /></div>
                 {:else if block.type === 'tool_use'}
                   {@const result = toolResultFor(step, block)}
                   <div class="ai-tool" class:ai-tool-error={result?.isError}>
@@ -274,22 +313,43 @@
         <textarea
           class="field field-area ai-reply"
           rows="1"
-          placeholder={streaming ? 'Waiting for the answer…' : 'Reply to continue the conversation'}
+          placeholder="Message"
           aria-label="Reply"
+          autocomplete="off"
+          autocapitalize="off"
+          spellcheck="false"
+          {...NO_AUTOCORRECT}
+          maxlength={AI_PROMPT_MAX_CHARS}
           bind:value={reply}
           onkeydown={onReplyKeydown}
           disabled={streaming}
         ></textarea>
-        <button class="btn btn-primary btn-lg" type="button" onclick={sendReply} disabled={streaming || !reply.trim()}>Reply</button>
-        <button class="btn btn-ghost btn-lg" type="button" onclick={() => vm.clearAiConversation()} disabled={streaming}>New conversation</button>
+        <button class="btn btn-primary btn-icon btn-lg ai-send" type="button" onclick={sendReply} disabled={streaming || !reply.trim()} aria-label="Send reply" title="Send (Enter)">
+          <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M7 12V2M2.5 6.5L7 2l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
     {:else if tab === 'raw'}
       <div class="ai-raw" id="ai-panel-raw" role="tabpanel">
         {#if rawSteps.length}
-          {#each rawSteps as step (step.index)}
+          {#each rawSteps as step, stepIndex (step.index)}
+            {@const open = rawStepOpen(stepIndex)}
             <div class="ai-raw-step">
-              <div class="ai-raw-head">Step {step.index + 1}{#if step.http.statusCode} · {step.http.status}{/if}</div>
-              <pre class="ai-raw-body">{step.http.body || '(empty body)'}</pre>
+              <button class="btn btn-ghost btn-sm ai-raw-head" type="button" aria-expanded={open} onclick={() => toggleRawStep(stepIndex)}>
+                <svg class:open width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                  <path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Step {step.index + 1}{#if step.http.statusCode} · {step.http.status}{/if}
+                <span class="ai-raw-size">{formatSize((step.requestBody?.length ?? 0) + (step.http.body?.length ?? 0))}</span>
+              </button>
+              {#if open}
+                {#if step.url}<div class="ai-raw-url"><span class="ai-raw-method">{step.method}</span> {step.url}</div>{/if}
+                {#if step.requestBody}
+                  {@render rawBody('Request body', `${turnKey}:${step.index}:req`, prettyJSON(step.requestBody))}
+                {/if}
+                {@render rawBody('Response', `${turnKey}:${step.index}:res`, step.http.body || '(empty body)')}
+              {/if}
             </div>
           {/each}
         {:else}
@@ -328,9 +388,26 @@
 
 <style>
   .ai-panel {
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     min-height: 0;
+  }
+  .ai-panel .status-left {
+    flex: 0 1 auto;
+  }
+  .ai-panel .status-left :global(.status-badge) {
+    flex-shrink: 0;
+  }
+  .ai-panel .response-status-bar {
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  }
+  .ai-model-name {
+    font-family: var(--font-mono);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .ai-live {
     display: inline-flex;
@@ -346,17 +423,46 @@
     background: var(--accent);
     animation: ai-pulse 1.2s ease-in-out infinite;
   }
-  .ai-model-name {
-    font-family: var(--font-mono);
-  }
   .ai-metrics {
     display: inline-flex;
-    flex-wrap: wrap;
     gap: var(--space-3);
     color: var(--text-2);
     font-family: var(--font-mono);
     font-size: var(--text-caption);
     cursor: default;
+  }
+  .ai-panel .status-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    min-width: 0;
+    overflow: hidden;
+  }
+  .ai-metrics {
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  @container (max-width: 40rem) {
+    .ai-metric-extra {
+      display: none;
+    }
+  }
+  @container (max-width: 32rem) {
+    .ai-model-name,
+    .ai-new-chat-label {
+      display: none;
+    }
+  }
+  @container (max-width: 24rem) {
+    .ai-metrics {
+      display: none;
+    }
+  }
+  .ai-new-chat {
+    flex: 0 0 auto;
   }
   .ai-metric-key {
     color: var(--text-3);
@@ -374,7 +480,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    max-width: 48rem;
     padding-bottom: var(--space-6);
   }
   .ai-turn + .ai-turn {
@@ -396,12 +501,7 @@
     user-select: text;
   }
   .ai-text {
-    color: var(--text);
-    font-size: var(--text-body);
-    line-height: var(--leading-relaxed);
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    user-select: text;
+    min-width: 0;
   }
   .ai-thinking-toggle {
     display: inline-flex;
@@ -575,14 +675,28 @@
   }
   .ai-composer {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
     gap: var(--space-2);
     padding: var(--space-2-5) var(--space-4);
     border-top: 1px solid var(--border);
   }
+  .ai-composer {
+    --ai-composer-h: calc(var(--text-body) * var(--leading-normal) + var(--space-2) * 2 + 0.125rem);
+  }
+  .ai-send {
+    width: var(--ai-composer-h);
+    height: var(--ai-composer-h);
+  }
+  .ai-send:disabled {
+    border-color: var(--border);
+    background: var(--elevated);
+    color: var(--text-3);
+    opacity: 1;
+  }
   .ai-reply {
-    min-height: var(--control-lg);
+    min-height: var(--ai-composer-h);
+    font-size: var(--text-body);
     max-height: 8rem;
     resize: none;
     field-sizing: content;
@@ -597,13 +711,59 @@
     margin-top: var(--space-4);
   }
   .ai-raw-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    width: 100%;
+    justify-content: flex-start;
     margin-bottom: var(--space-1-5);
     color: var(--text-2);
     font-size: var(--text-label);
     font-weight: var(--weight-medium);
   }
+  .ai-raw-head svg {
+    color: var(--text-3);
+    transition: transform var(--dur-fast);
+  }
+  .ai-raw-head svg.open {
+    transform: rotate(90deg);
+  }
+  .ai-raw-size {
+    margin-left: auto;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-regular);
+  }
+  .ai-raw-more {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+    color: var(--text-3);
+    font-size: var(--text-caption);
+  }
+  .ai-raw-url {
+    margin-bottom: var(--space-2);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: var(--text-code);
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .ai-raw-method {
+    color: var(--post);
+    font-weight: var(--weight-medium);
+  }
+  .ai-raw-label {
+    margin: var(--space-2) 0 var(--space-1);
+    color: var(--text-3);
+    font-size: var(--text-caption);
+  }
   .ai-raw-body {
     margin: 0;
+    max-height: 32rem;
+    overflow: auto;
     padding: var(--space-2-5) var(--space-3);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
@@ -627,7 +787,8 @@
     .ai-live-dot {
       animation: none;
     }
-    .ai-thinking-toggle svg {
+    .ai-thinking-toggle svg,
+    .ai-raw-head svg {
       transition: none;
     }
   }

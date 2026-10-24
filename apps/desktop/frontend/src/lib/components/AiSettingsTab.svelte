@@ -1,14 +1,14 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
   import Select from './Select.svelte';
-  import { aiSettingsError } from '../stores/features/ai';
+  import { aiSettingErrors } from '../stores/features/ai';
 
   const THINKING_OPTIONS = [
     { value: '', label: 'Model default' },
     { value: 'summarized', label: 'Show summarized' },
   ];
 
-  const settingsError = $derived(aiSettingsError({
+  const errors = $derived(aiSettingErrors({
     aiTemperature: vm.aiTemperature,
     aiTopP: vm.aiTopP,
     aiMaxTokens: vm.aiMaxTokens,
@@ -25,13 +25,16 @@
     </div>
   </div>
 
-  <div class="settings-list">
+  <div class="settings-list ai-settings-list">
     <label class="postman-setting">
       <span class="setting-copy">
         <strong>Temperature</strong>
         <span>How random the answer is, from 0 to 2. Lower is more predictable, which helps tests.</span>
       </span>
-      <input class="field setting-number" inputmode="decimal" placeholder="default" bind:value={vm.aiTemperature} />
+      <span class="ai-setting-control">
+        <input id="ai-temperature" class="field ai-number" class:ai-invalid={errors.aiTemperature} inputmode="decimal" placeholder="default" aria-invalid={Boolean(errors.aiTemperature)} aria-describedby={errors.aiTemperature ? 'ai-temperature-error' : undefined} bind:value={vm.aiTemperature} />
+        {#if errors.aiTemperature}<span id="ai-temperature-error" class="ai-field-error" role="alert">{errors.aiTemperature}</span>{/if}
+      </span>
     </label>
 
     <label class="postman-setting">
@@ -39,7 +42,10 @@
         <strong>Max tokens</strong>
         <span>The longest answer the model may write. {vm.aiProvider === 'anthropic' ? 'Anthropic requires a limit; Kurlo sends 8192 when this is empty.' : 'Reasoning models count their thinking against it too.'}</span>
       </span>
-      <input class="field setting-number" inputmode="numeric" placeholder={vm.aiProvider === 'anthropic' ? '8192' : 'default'} bind:value={vm.aiMaxTokens} />
+      <span class="ai-setting-control">
+        <input id="ai-max-tokens" class="field ai-number" class:ai-invalid={errors.aiMaxTokens} inputmode="numeric" placeholder={vm.aiProvider === 'anthropic' ? '8192' : 'default'} aria-invalid={Boolean(errors.aiMaxTokens)} aria-describedby={errors.aiMaxTokens ? 'ai-max-tokens-error' : undefined} bind:value={vm.aiMaxTokens} />
+        {#if errors.aiMaxTokens}<span id="ai-max-tokens-error" class="ai-field-error" role="alert">{errors.aiMaxTokens}</span>{/if}
+      </span>
     </label>
 
     <label class="postman-setting">
@@ -47,7 +53,10 @@
         <strong>Top P</strong>
         <span>Sample only from the most likely words, from 0 to 1. Change this or temperature, not both.</span>
       </span>
-      <input class="field setting-number" inputmode="decimal" placeholder="default" bind:value={vm.aiTopP} />
+      <span class="ai-setting-control">
+        <input id="ai-top-p" class="field ai-number" class:ai-invalid={errors.aiTopP} inputmode="decimal" placeholder="default" aria-invalid={Boolean(errors.aiTopP)} aria-describedby={errors.aiTopP ? 'ai-top-p-error' : undefined} bind:value={vm.aiTopP} />
+        {#if errors.aiTopP}<span id="ai-top-p-error" class="ai-field-error" role="alert">{errors.aiTopP}</span>{/if}
+      </span>
     </label>
 
     {#if vm.aiProvider === 'anthropic'}
@@ -77,16 +86,15 @@
         <strong>Stop after silence</strong>
         <span>Give up when the provider sends nothing for this long. A long answer that keeps streaming is never cut off.</span>
       </span>
-      <span class="setting-inline-number">
-        <input class="field setting-number" inputmode="numeric" placeholder="300" bind:value={vm.aiIdleTimeoutSec} />
-        <span>s</span>
+      <span class="ai-setting-control">
+        <span class="ai-number-unit">
+          <input id="ai-idle-timeout" class="field ai-number" class:ai-invalid={errors.aiIdleTimeoutSec} inputmode="numeric" placeholder="300" aria-invalid={Boolean(errors.aiIdleTimeoutSec)} aria-describedby={errors.aiIdleTimeoutSec ? 'ai-idle-timeout-error' : undefined} bind:value={vm.aiIdleTimeoutSec} />
+          <span>s</span>
+        </span>
+        {#if errors.aiIdleTimeoutSec}<span id="ai-idle-timeout-error" class="ai-field-error" role="alert">{errors.aiIdleTimeoutSec}</span>{/if}
       </span>
     </label>
   </div>
-
-  {#if settingsError}
-    <p class="ai-settings-error" role="alert">{settingsError}</p>
-  {/if}
 
   <div class="settings-header ai-settings-network">
     <div>
@@ -119,12 +127,52 @@
 </div>
 
 <style>
-  .ai-settings-error {
-    margin: 0;
-    color: var(--danger);
+  .ai-settings-list :global(.postman-setting) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ai-setting-control {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: var(--space-1);
+    justify-self: end;
+  }
+  .ai-number {
+    width: 8rem;
+    font-family: var(--font-mono);
+  }
+  .ai-number-unit {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-3);
     font-size: var(--text-label);
+  }
+  .ai-invalid,
+  .ai-invalid:focus {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+  }
+  .ai-field-error {
+    max-width: 14rem;
+    color: var(--danger);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
+    text-align: right;
   }
   .ai-settings-network {
     margin-top: var(--space-6);
+  }
+  @container (max-width: 30rem) {
+    .ai-settings-list :global(.postman-setting) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .ai-setting-control {
+      align-items: flex-start;
+      justify-self: start;
+    }
+    .ai-field-error {
+      text-align: left;
+    }
   }
 </style>

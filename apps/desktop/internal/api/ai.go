@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
@@ -66,6 +67,23 @@ func (a *App) SendAiRequest(req model.AiRequest) model.AiResponse {
 	return model.NormalizeAiResponse(out)
 }
 
+func aiLengthError(req model.AiRequest) string {
+	if utf8.RuneCountInString(req.System) > model.AiMaxSystemChars {
+		return fmt.Sprintf("The system prompt is longer than %d characters. Shorten it before sending.", model.AiMaxSystemChars)
+	}
+	for _, message := range req.Messages {
+		if message.Role != "user" {
+			continue
+		}
+		for _, block := range message.Blocks {
+			if block.Type == model.AiBlockText && utf8.RuneCountInString(block.Text) > model.AiMaxPromptChars {
+				return fmt.Sprintf("A message is longer than %d characters. Shorten it before sending.", model.AiMaxPromptChars)
+			}
+		}
+	}
+	return ""
+}
+
 func (a *App) aiEventEmitter() aiEmitter {
 	if a.ctx == nil {
 		return nil
@@ -94,6 +112,10 @@ func (r *aiRunner) run() model.AiResponse {
 	}
 	if strings.TrimSpace(r.req.HTTP.URL) == "" {
 		out.Error = "Enter the provider's base URL before sending."
+		return out
+	}
+	if message := aiLengthError(r.req); message != "" {
+		out.Error = message
 		return out
 	}
 
@@ -211,6 +233,9 @@ func (r *aiRunner) runStep(index int, conversation []model.AiMessage, tools []ai
 		step.Error = err.Error()
 		return step
 	}
+	step.Method = prepared.Method
+	step.URL = prepared.URL
+	step.RequestBody = prepared.Body
 
 	stepCtx, cancel := context.WithCancel(r.ctx)
 	defer cancel()

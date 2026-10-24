@@ -19,12 +19,17 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Changed
 
+- **AI conversations read like a chat:** Markdown answers, the full width of the panel, `Enter` to send, and a lighter Raw view for long conversations. See [AI requests](/docs/guides/request-types/#ai).
+- **Length limits for AI prompts:** 200,000 characters for the prompt and chat messages, 50,000 for the system prompt, with a counter near the limit.
 - **Shorter method menu:** HTTP methods and the other protocols side by side.
 
 ### Fixed
 
 - The provider and model box closes when you click it again.
 - With the response beside the request, neither side can be dragged too narrow, and settings rows stack on a narrow panel.
+- The AI prompt field no longer scrolls its text under the border in a short window.
+- An invalid AI setting is explained right below its field, and a narrow response panel keeps the status code visible.
+- **New MCP request** on an AI request's Tools tab opens a draft instead of leaving an empty request in the collection.
 
 ## 2.4.2
 

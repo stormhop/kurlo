@@ -1,8 +1,10 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
+  import { aiSettingErrors } from '../stores/features/ai';
 
   const servers = $derived(vm.aiToolServerOptions());
   const selected = $derived(new Set(vm.aiToolRequestIds));
+  const stepError = $derived(aiSettingErrors({ aiMaxSteps: vm.aiMaxSteps }).aiMaxSteps ?? '');
   const missing = $derived(vm.aiToolRequestIds.filter(id => !servers.some(server => server.id === id)));
 </script>
 
@@ -28,7 +30,7 @@
     <div class="empty-state">
       <p class="empty-state-title">No MCP servers yet</p>
       <p class="empty-state-text">Save an MCP request with the server's URL and auth, then pick it here.</p>
-      <button class="btn btn-secondary" type="button" onclick={() => vm.createNewRequest(undefined, 'mcp')}>New MCP request</button>
+      <button class="btn btn-secondary" type="button" onclick={() => vm.createDraftRequest('mcp')}>New MCP request</button>
     </div>
   {/if}
 
@@ -38,8 +40,9 @@
 
   <label class="ai-tools-steps">
     <span>Step limit</span>
-    <input class="field field-md field-mono" inputmode="numeric" placeholder="8" bind:value={vm.aiMaxSteps} />
+    <input class="field field-md field-mono" class:ai-invalid={stepError} inputmode="numeric" placeholder="8" aria-invalid={Boolean(stepError)} bind:value={vm.aiMaxSteps} />
     <span class="ai-tools-hint">Model calls in one send, counting each round of tool calls.</span>
+    {#if stepError}<span class="ai-field-error" role="alert">{stepError}</span>{/if}
   </label>
 </div>
 
@@ -113,6 +116,16 @@
     gap: var(--space-2);
     color: var(--text-2);
     font-size: var(--text-label);
+  }
+  .ai-invalid,
+  .ai-invalid:focus {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
+  }
+  .ai-field-error {
+    grid-column: 2 / -1;
+    color: var(--danger);
+    font-size: var(--text-caption);
   }
   .ai-tools-hint {
     color: var(--text-3);

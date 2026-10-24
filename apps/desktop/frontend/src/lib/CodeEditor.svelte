@@ -14,6 +14,7 @@
   import type { VariableSuggestion } from './variables';
   import { variableDisplayValue } from './variables';
   import { DYNAMIC_VARIABLES } from './dynamicVariables';
+  import { maxLength as maxLengthFilter } from './editorLimit';
 
   type Lang = 'json' | 'javascript' | 'html' | 'xml' | 'graphql' | 'yaml' | 'text';
 
@@ -30,6 +31,7 @@
     testId = '',
     ariaLabel = '',
     variableSuggestions = [],
+    maxLength = 0,
     onformat,
     validate,
   }: {
@@ -45,6 +47,7 @@
     testId?: string;
     ariaLabel?: string;
     variableSuggestions?: VariableSuggestion[];
+    maxLength?: number;
     onformat?: () => void;
     validate?: (text: string) => Promise<{ line: number; message: string } | null>;
   } = $props();
@@ -72,7 +75,7 @@
     '.cm-content': {
       padding: compact ? 'var(--space-2) 0' : 'var(--space-2-5) 0',
       caretColor: 'var(--accent)',
-      minHeight: minHeight,
+      minHeight: fillHeight ? '100%' : minHeight,
     },
     '.cm-line': {
       padding: '0 var(--space-3)',
@@ -587,6 +590,7 @@
       kurloTheme(),
       kurloHighlight,
       EditorState.readOnly.of(readonly),
+      ...(maxLength > 0 ? [maxLengthFilter(maxLength)] : []),
       EditorView.updateListener.of(update => {
         if (update.docChanged && !internalChange) {
           internalChange = true;

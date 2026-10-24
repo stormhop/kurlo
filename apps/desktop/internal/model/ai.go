@@ -19,6 +19,8 @@ const (
 	AiStopPauseTurn     = "pause_turn"
 
 	AiDefaultMaxSteps = 8
+	AiMaxPromptChars  = 200000
+	AiMaxSystemChars  = 50000
 )
 
 type AiSettings struct {
@@ -81,6 +83,9 @@ func (u *AiUsage) Add(other AiUsage) {
 
 type AiStep struct {
 	Index         int          `json:"index"`
+	Method        string       `json:"method"`
+	URL           string       `json:"url"`
+	RequestBody   string       `json:"requestBody"`
 	Blocks        []AiBlock    `json:"blocks"`
 	ToolResults   []AiBlock    `json:"toolResults"`
 	StopReason    string       `json:"stopReason"`

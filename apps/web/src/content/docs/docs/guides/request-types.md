@@ -153,7 +153,7 @@ Not in this release: the **stdio** transport, so servers launched as a local com
 
 An AI request sends a prompt to a language model and shows the answer as a conversation. Pick the provider and the model in the box next to the URL: **OpenAI**, **Anthropic**, **OpenRouter**, **Groq**, **Ollama**, **LM Studio**, or **Custom URL** for anything else that speaks the OpenAI Chat Completions API, such as vLLM or your own gateway. The provider fills in the base URL and the auth: a bearer token from `{{openaiApiKey}}`, `{{openrouterApiKey}}` or `{{groqApiKey}}`, `x-api-key` from `{{anthropicApiKey}}`, and no auth for the local servers. Set the key in an environment, mark it secret, and it never lands in the YAML; if the variable is not set, Kurlo says so before sending. The model is the name the provider knows it by, such as `gpt-4o-mini` or `llama3.2`: when you open the box, Kurlo reads the provider's `/models` list so you can pick one, and you can always type a name instead.
 
-The **Prompt** tab holds the system prompt and the prompt; `{{variables}}` work in both. **Settings** holds the model parameters (temperature, max tokens, top P, streaming, thinking for Anthropic models), how long to wait for a silent provider, and the SSL and proxy settings a local model or a company proxy may need. Auth and Headers are the usual ones: the provider presets fill Auth in, and Headers is there for gateways that want extra ones, such as OpenRouter's `HTTP-Referer`.
+The **Prompt** tab holds the system prompt and the prompt; `{{variables}}` work in both. The prompt field grows with its text and scrolls once it fills the tab. The prompt and every chat message take up to 200,000 characters (about 50,000 tokens) and the system prompt up to 50,000; a counter shows up next to the label as you get close. **Settings** holds the model parameters (temperature, max tokens, top P, streaming, thinking for Anthropic models), how long to wait for a silent provider, and the SSL and proxy settings a local model or a company proxy may need. Auth and Headers are the usual ones: the provider presets fill Auth in, and Headers is there for gateways that want extra ones, such as OpenRouter's `HTTP-Referer`.
 
 ![AI request with a streamed answer, a tool call and its result](../../../../assets/screenshots/request-ai.png)
 
@@ -164,9 +164,11 @@ The **Prompt** tab holds the system prompt and the prompt; `{{variables}}` work 
 - The status line shows the **time to the first token**, the **speed** in tokens per second and the **tokens** in and out, with cache reads; hover it for the breakdown per type.
 - The **stop reason** is shown under the answer. An answer cut off by the token limit says so and offers to raise the limit and send again, and an error in the middle of a stream, which arrives with HTTP 200, is shown where the stream stopped, below the part that did arrive.
 
-Type into **Reply** to continue the conversation: Kurlo sends the earlier messages, the tool calls and their results along with it. **New conversation** clears it. The conversation lives only while the request is open; each send is in History.
+Answers are rendered as Markdown: headings, lists, tables, code blocks with a **Copy** button, and links, which open in your browser. Images the model puts in its answer as a `data:` URL are shown; remote images stay links, so an answer cannot make Kurlo fetch a URL on its own.
 
-**Raw** shows each model call's stream exactly as it arrived, and **Tests** the results of the request's test scripts, which run once after the last step. `pm.response.llm()` gives them the answer in one shape for every provider, so a test reads the same for OpenAI and Anthropic:
+To continue the conversation, type in the field under the answer and press `Enter`; `Shift+Enter` starts a new line. Kurlo sends the earlier messages, the tool calls and their results along with it. The system prompt and the settings apply to every message; the **Prompt** is only the first one. **New chat** in the status line clears the conversation, and **Send** starts a new one from the prompt. The conversation lives only while the request is open; each send is in History.
+
+**Raw** shows, for each model call, the URL, the request body Kurlo sent and the stream exactly as it arrived. Steps are folded except the last one, and a body over 20,000 characters shows its start with **Show all**, so a long conversation stays quick to open. Raw keeps the bodies of the latest send only. **Tests** shows the results of the request's test scripts, which run once after the last step. `pm.response.llm()` gives them the answer in one shape for every provider, so a test reads the same for OpenAI and Anthropic:
 
 ```javascript
 const llm = pm.response.llm();
@@ -180,7 +182,7 @@ pm.test("answers fast", () => pm.expect(llm.timing.firstToken).to.be.below(800))
 
 ### Tools from MCP servers
 
-The **Tools** tab lists the MCP requests saved in the workspace. Tick one and the model gets that server's tools. When it calls one, Kurlo runs the call with the MCP request's URL, auth and headers, sends the result back and asks the model again, until it answers without calling a tool or the **step limit** is reached (8 by default, 50 at most). Each step is visible in the conversation, and a tool that fails is reported to the model as an error so it can recover. Tool names the providers do not accept, such as `files.read`, are renamed to `files_read`, and two servers with a tool of the same name get the server's name in front.
+The **Tools** tab lists the MCP requests saved in the workspace. Tick one and the model gets that server's tools. When it calls one, Kurlo runs the call with the MCP request's URL, auth and headers, sends the result back and asks the model again, until it answers without calling a tool or the **step limit** is reached (8 by default, 50 at most). Each step is visible in the conversation, and a tool that fails is reported to the model as an error so it can recover. With no MCP requests in the workspace yet, **New MCP request** opens one as a draft: save it to a collection to offer it to the model, or close it and nothing is left behind. Tool names the providers do not accept, such as `files.read`, are renamed to `files_read`, and two servers with a tool of the same name get the server's name in front.
 
 ### Good to know
 
