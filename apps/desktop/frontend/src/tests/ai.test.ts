@@ -14,6 +14,8 @@ import {
   AI_SYSTEM_MAX_CHARS,
   aiPromptLengthError,
   aiModelsProblem,
+  aiEndpointParts,
+  aiModelsURL,
   aiComposerSends,
   aiConversationHistory,
   aiFeature,
@@ -121,6 +123,19 @@ describe('ai presets', () => {
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: 'sk-real' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'none' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key: 'Authorization', value: 'Bearer sk-x', enabled: true }] } as never)).toBe('');
+  });
+
+  it('shows which address a base URL turns into, the same way the backend builds it', () => {
+    expect(aiEndpointParts('https://api.deepseek.com/v1', 'openai')).toEqual({ base: 'https://api.deepseek.com/v1', suffix: '/chat/completions', query: '' });
+    expect(aiEndpointParts(' https://api.deepseek.com/v1/ ', 'openai').base).toBe('https://api.deepseek.com/v1');
+    expect(aiEndpointParts('https://api.deepseek.com/v1/chat/completions', 'openai')).toEqual({ base: 'https://api.deepseek.com/v1/chat/completions', suffix: '', query: '' });
+    expect(aiEndpointParts('https://api.anthropic.com/v1', 'anthropic').suffix).toBe('/messages');
+    expect(aiEndpointParts('https://x.openai.azure.com/openai/deployments/gpt?api-version=2024-10-21', 'openai'))
+      .toEqual({ base: 'https://x.openai.azure.com/openai/deployments/gpt', suffix: '/chat/completions', query: '?api-version=2024-10-21' });
+    expect(aiModelsURL('https://api.deepseek.com/v1', 'openai')).toBe('https://api.deepseek.com/v1/models');
+    expect(aiModelsURL('https://api.deepseek.com/v1/chat/completions', 'openai')).toBe('https://api.deepseek.com/v1/models');
+    expect(aiModelsURL('https://api.anthropic.com/v1/messages', 'anthropic')).toBe('https://api.anthropic.com/v1/models');
+    expect(aiModelsURL('https://x.test/v1?api-version=1', 'openai')).toBe('https://x.test/v1/models?api-version=1');
   });
 
   it('explains why the model list could not be loaded', () => {

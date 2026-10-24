@@ -3243,6 +3243,16 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.getByLabel('New unsaved request').click();
     await chooseRequestType(page, 'AI Request');
     await expect(page.getByLabel('Provider base URL')).toHaveValue('https://api.openai.com/v1');
+    const endpoint = page.locator('.ai-endpoint');
+    await expect(endpoint).toContainText('POST https://api.openai.com/v1/chat/completions');
+    await expect(endpoint.locator('.ai-endpoint-suffix')).toHaveText('/chat/completions');
+    await page.getByLabel('Provider base URL').fill('https://api.deepseek.com/v1/chat/completions');
+    await expect(endpoint.locator('.ai-endpoint-suffix')).toHaveCount(0);
+    await expect(endpoint).toContainText('POST https://api.deepseek.com/v1/chat/completions');
+    await page.getByLabel('Provider base URL').fill('https://api.deepseek.com/v1');
+    await expect(endpoint.locator('.ai-endpoint-suffix')).toHaveText('/chat/completions');
+    await captureDocsScreenshot(page, 'ai-endpoint', page.locator('.request-composer'));
+    await page.getByLabel('Provider base URL').fill('https://api.openai.com/v1');
 
     await page.getByLabel('Provider and model').click();
     await page.getByRole('radio', { name: 'Ollama' }).click();

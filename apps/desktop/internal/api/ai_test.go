@@ -186,10 +186,12 @@ func TestAiOpenAIStreamAssemblesTextAndUsage(t *testing.T) {
 
 func TestAiEndpointKeepsAFullPath(t *testing.T) {
 	cases := map[string]string{
-		"https://api.deepseek.com/v1":                  "https://api.deepseek.com/v1/chat/completions",
-		"https://api.deepseek.com/v1/":                 "https://api.deepseek.com/v1/chat/completions",
-		"https://api.deepseek.com/v1/chat/completions": "https://api.deepseek.com/v1/chat/completions",
-		"https://api.deepseek.com":                     "https://api.deepseek.com/chat/completions",
+		"https://api.deepseek.com/v1":                                              "https://api.deepseek.com/v1/chat/completions",
+		"https://api.deepseek.com/v1/":                                             "https://api.deepseek.com/v1/chat/completions",
+		"https://api.deepseek.com/v1/chat/completions":                             "https://api.deepseek.com/v1/chat/completions",
+		"https://api.deepseek.com":                                                 "https://api.deepseek.com/chat/completions",
+		"https://x.openai.azure.com/openai/deployments/gpt?api-version=2024-10-21": "https://x.openai.azure.com/openai/deployments/gpt/chat/completions?api-version=2024-10-21",
+		"https://x.test/v1/chat/completions/?api-version=1":                        "https://x.test/v1/chat/completions?api-version=1",
 	}
 	for in, want := range cases {
 		if got := (openAIProvider{}).endpoint(in); got != want {

@@ -20,6 +20,7 @@ All notable changes to Kurlo are documented here. This project follows
 - **The AI conversation reads like a chat.** Answers are rendered as Markdown, the conversation uses the whole width of the panel, and the message field sends on `Enter` (`Shift+Enter` for a new line) without the system's spelling suggestions. **New chat** moved to the status line, and the Prompt tab says which text goes with every message and which only starts the chat.
 - **Raw stays quick in long conversations.** Each step shows its URL and request body, steps are folded except the last, long bodies show their first 20,000 characters with **Show all**, and earlier sends no longer keep their raw bodies in memory.
 - **The prompt field fits its text.** It starts at about six lines and grows as you write, up to the free height of the tab, instead of filling the whole tab.
+- **The full address under the base URL.** An AI request shows where it sends the prompt, such as `POST https://api.deepseek.com/v1/chat/completions`, with the path Kurlo adds highlighted, so it is clear that the field takes the base URL.
 - **Clearer errors when the model list does not load.** The provider and model box says what went wrong in a short title, shows the status and the address Kurlo asked (without its query string, where keys can hide), and suggests what to do next, such as checking the base URL or typing the model name.
 - **Length limits for prompts.** The prompt and each chat message take up to 200,000 characters, the system prompt up to 50,000. A paste that does not fit is cut at the limit, a counter appears next to the label as you get close, and a longer prompt from an edited YAML file is refused when you send.
 - **The method menu is shorter.** HTTP methods and the other protocols sit side by side.
@@ -33,6 +34,7 @@ All notable changes to Kurlo are documented here. This project follows
 - The send button of the AI chat was nearly invisible in light themes while the message was empty.
 - With the response beside the request, the lines of the response panel stopped short of the divider. The divider is now a single line with a wider grab area.
 - On a narrow response panel the AI status line cut off the status code. Metrics now give way first, and **New chat** becomes an icon.
+- A base URL with a query string, such as an Azure OpenAI URL ending in `?api-version=…`, got the API path after the query string, so the request went to a wrong address.
 - **New MCP request** on the Tools tab of an AI request added an empty request to the collection that stayed there when you closed it without saving. It now opens a draft.
 
 ## [2.4.2] - 2026-10-23

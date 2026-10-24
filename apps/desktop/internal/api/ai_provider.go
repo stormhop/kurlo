@@ -48,11 +48,16 @@ func aiProviderFor(name string) aiProvider {
 }
 
 func aiEndpoint(base, suffix string) string {
-	trimmed := strings.TrimRight(strings.TrimSpace(base), "/")
-	if strings.HasSuffix(trimmed, suffix) {
-		return trimmed
+	trimmed := strings.TrimSpace(base)
+	query := ""
+	if index := strings.IndexByte(trimmed, '?'); index >= 0 {
+		trimmed, query = trimmed[:index], trimmed[index:]
 	}
-	return trimmed + suffix
+	trimmed = strings.TrimRight(trimmed, "/")
+	if !strings.HasSuffix(trimmed, suffix) {
+		trimmed += suffix
+	}
+	return trimmed + query
 }
 
 func aiErrorMessage(body []byte) string {

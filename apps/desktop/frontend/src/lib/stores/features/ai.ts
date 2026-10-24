@@ -308,7 +308,7 @@ export const aiFeature = {
     }
     this.aiModelsLoading = true;
     this.aiModelsError = null;
-    const url = `${runnable.url.replace(/\/+$/, '').replace(/\/(chat\/completions|messages)$/, '')}/models`;
+    const url = aiModelsURL(runnable.url, this.aiProvider);
     try {
       const response = await sendHttpRequest({
         ...runnable,
@@ -477,6 +477,27 @@ export const aiFeature = {
 export function aiComposerSends(event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'altKey' | 'isComposing'> & { keyCode?: number }): boolean {
   if (event.key !== 'Enter' || event.shiftKey || event.altKey) return false;
   return !event.isComposing && event.keyCode !== 229;
+}
+
+export type AiEndpointParts = { base: string; suffix: string; query: string };
+
+export function aiEndpointParts(url: string, provider: string): AiEndpointParts {
+  const suffix = provider === 'anthropic' ? '/messages' : '/chat/completions';
+  let base = url.trim();
+  let query = '';
+  const index = base.indexOf('?');
+  if (index >= 0) {
+    query = base.slice(index);
+    base = base.slice(0, index);
+  }
+  base = base.replace(/\/+$/, '');
+  return base.endsWith(suffix) ? { base, suffix: '', query } : { base, suffix, query };
+}
+
+export function aiModelsURL(url: string, provider: string): string {
+  const { base, suffix, query } = aiEndpointParts(url, provider);
+  const root = suffix ? base : base.slice(0, base.length - (provider === 'anthropic' ? '/messages' : '/chat/completions').length);
+  return `${root}/models${query}`;
 }
 
 export type AiModelsProblem = { title: string; status: string; detail: string; hint: string };

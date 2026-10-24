@@ -20,6 +20,7 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Changed
 
 - **AI conversations read like a chat:** Markdown answers, the full width of the panel, `Enter` to send, and a lighter Raw view for long conversations. See [AI requests](/docs/guides/request-types/#ai).
+- **Full request address under the base URL** of an AI request, with the added API path highlighted. See [AI requests](/docs/guides/request-types/#ai).
 - **Clearer model list errors:** what went wrong, the status and address, and what to try next.
 - **Length limits for AI prompts:** 200,000 characters for the prompt and chat messages, 50,000 for the system prompt, with a counter near the limit.
 - **Shorter method menu:** HTTP methods and the other protocols side by side.

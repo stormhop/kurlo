@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import VariableInput from './VariableInput.svelte';
   import AiModelPicker from './AiModelPicker.svelte';
+  import { vm } from '../stores/app.svelte';
+  import { aiEndpointParts } from '../stores/features/ai';
   import type { VariableSuggestion } from '../variables';
   import type { GrpcMethodInfo, RequestType, SSEStatus, WebSocketStatus, SocketIOStatus } from '../types/models';
 
@@ -173,6 +175,7 @@
   };
   let protocolTypes = $derived(requestTypes.filter(type => type !== 'http'));
   let isHTTP = $derived(requestType === 'http');
+  let aiEndpoint = $derived(aiEndpointParts(url, vm.aiProvider));
   let pickerInteractive = $derived(isHTTP || requestTypeEditable);
   let pickerLabel = $derived(isHTTP ? method : requestTypeLabel(requestType));
 
@@ -529,4 +532,10 @@
       </div>
     {/if}
   </div>
+  {#if isAI && aiEndpoint.base}
+    <p class="ai-endpoint" title="Kurlo adds the API path to the base URL">
+      <span class="ai-endpoint-label">Sends to</span>
+      <span class="ai-endpoint-url"><span class="ai-endpoint-method">POST</span> {aiEndpoint.base}{#if aiEndpoint.suffix}<mark class="ai-endpoint-suffix">{aiEndpoint.suffix}</mark>{/if}{aiEndpoint.query}</span>
+    </p>
+  {/if}
 </div>
