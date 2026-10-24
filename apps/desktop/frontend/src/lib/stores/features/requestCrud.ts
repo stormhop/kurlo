@@ -86,6 +86,7 @@ type RequestCrudHost = {
   closeHistoryDetail: () => void;
   closeActiveRequestTab: (force?: boolean) => Promise<void>;
   closeRequestTab: (id: string, force?: boolean) => Promise<void>;
+  closeRequestTabs: (ids: string[]) => Promise<void>;
   collectionNameById: (collectionId: string) => string;
   currentRequestName: () => string;
   defaultCollectionForWorkspace: (workspaceId?: string) => Collection | undefined;
@@ -610,6 +611,23 @@ export const requestCrudFeature = {
       }
     }
     await this.persistRequestStore(this.requests, this.activeRequestId, nextOpenIds);
+  },
+
+  async closeRequestTabs(this: RequestCrudHost, ids: string[]) {
+    for (const id of ids) {
+      if (!this.openRequestIds.includes(id)) continue;
+      await this.closeRequestTab(id);
+      if (this.openRequestIds.includes(id)) return;
+    }
+  },
+
+  async closeOtherRequestTabs(this: RequestCrudHost) {
+    if (!this.activeRequestId) return;
+    await this.closeRequestTabs(this.openRequestIds.filter(id => id !== this.activeRequestId));
+  },
+
+  async closeAllRequestTabs(this: RequestCrudHost) {
+    await this.closeRequestTabs([...this.openRequestIds]);
   },
 
   async closeActiveRequestTab(this: RequestCrudHost, force = false) {

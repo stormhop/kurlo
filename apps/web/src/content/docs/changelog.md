@@ -17,6 +17,8 @@ This page summarizes the notable-change log maintained in the source repository.
 - **OAuth 1.0 auth:** HMAC, RSA and PLAINTEXT signatures, in the header, the query or a form body, with the secrets kept out of the YAML. See [Authentication](/docs/guides/authentication/#oauth-10).
 - **Find and replace** across a collection or a folder, with a preview of every match and **Undo**. See [Find and replace](/docs/guides/workspaces/#find-and-replace).
 
+- **Thirteen more keyboard shortcuts:** cancel a request, copy as cURL, find and replace, response layout, sidebar views, environment picker, new collection, import, collection runner, and closing other or all tabs. See [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
+
 ### Fixed
 
 - Secret gRPC metadata and Socket.IO event rows, and secret rows without an id, are kept out of the YAML.

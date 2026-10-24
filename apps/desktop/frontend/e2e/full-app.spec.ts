@@ -2316,6 +2316,75 @@ test.describe('Kurlo desktop browser E2E', () => {
     }
   });
 
+  test('runs the request, view, create and tab shortcuts', async ({ page }) => {
+    await installKurloBridge(page, '', 'windows/e2e');
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    const url = page.getByLabel('Request URL');
+    await url.fill('https://api.kurlo.test/slow?ms=4000');
+    const send = page.locator('.send-split .btn-send');
+    await url.press('Control+Enter');
+    await expect(send).toHaveText(/Cancel/);
+    await url.press('Escape');
+    await expect(send).toHaveText(/^Send/);
+    await expect(page.getByText('Request canceled')).toBeVisible();
+
+    await url.fill('https://api.kurlo.test/users');
+    await url.press('Control+Shift+C');
+    await expect(page.locator('.curl-toast')).toHaveText('Copied as cURL');
+
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('Control+Alt+2');
+    await expect(page.locator('.sidebar')).toContainText(/Environments/);
+    await page.keyboard.press('Control+Alt+3');
+    await expect(page.locator('.sidebar')).toContainText(/History/);
+    await page.keyboard.press('Control+Alt+1');
+
+    const layout = () => page.evaluate(() => localStorage.getItem('kurlo.responseLayout.v1'));
+    const before = await layout();
+    await page.keyboard.press('Control+Alt+V');
+    await expect.poll(layout).not.toBe(before);
+
+    await page.keyboard.press('Control+Alt+E');
+    await expect(page.locator('.environment-menu')).toBeVisible();
+    await expect(page.locator('.environment-menu .menu-item').first()).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.environment-menu')).toHaveCount(0);
+
+    await page.keyboard.press('Control+O');
+    await expect(page.getByRole('dialog', { name: 'Import collection' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Import collection' })).toHaveCount(0);
+
+    await page.keyboard.press('Control+Shift+N');
+    const prompt = page.getByRole('dialog', { name: 'New collection' });
+    await expect(prompt).toBeVisible();
+    await prompt.getByRole('textbox').fill('Shortcut collection');
+    await prompt.getByRole('textbox').press('Enter');
+    await expect(collectionRow(page, 'Shortcut collection')).toBeVisible();
+
+    await page.keyboard.press('Control+Shift+R');
+    await expect(page.getByRole('button', { name: 'Collection runner', exact: true })).toHaveClass(/active/);
+
+    const closeButtons = page.locator('.saved-request-tab').getByRole('button', { name: 'Close tab', exact: true });
+    await page.getByLabel('New unsaved request').click();
+    await page.getByLabel('New unsaved request').click();
+    const opened = await closeButtons.count();
+    expect(opened).toBeGreaterThanOrEqual(3);
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('Control+Alt+Shift+W');
+    const saveDraft = page.getByRole('dialog', { name: 'Save request' });
+    await expect(saveDraft).toBeVisible();
+    await saveDraft.getByRole('button', { name: 'Discard' }).click();
+    await expect(closeButtons).toHaveCount(1);
+    await page.getByLabel('New unsaved request').click();
+    await expect(closeButtons).toHaveCount(2);
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('Control+Shift+W');
+    await expect(closeButtons).toHaveCount(0);
+  });
+
   test('lays out the shortcut settings without sideways scrolling and with aligned keycaps', async ({ page }) => {
     await installKurloBridge(page, '', 'darwin/e2e');
     await page.goto('/');

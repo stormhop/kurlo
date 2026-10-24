@@ -9,6 +9,7 @@ import {
   shortcutPlatform,
 } from '../lib/stores/features/preferences';
 import type { ShortcutId } from '../lib/types/models';
+import { SHORTCUT_DEFINITIONS } from '../lib/constants';
 
 function shortcutHost(appRuntime: string, shortcutOverrides: Record<string, string> = {}) {
   return {
@@ -112,5 +113,43 @@ describe('platform shortcut defaults', () => {
     expect(preferencesFeature.shortcutCombo.call(linux, 'search')).toBe('');
     const ctrlEnter = { key: 'Enter', code: 'Enter', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false } as KeyboardEvent;
     expect(preferencesFeature.shortcutForEvent.call(linux, ctrlEnter)).toBeNull();
+  });
+});
+
+describe('default shortcut set', () => {
+  const reserved: Record<string, string[]> = {
+    'darwin/arm64': ['Shift+Meta+3', 'Shift+Meta+4', 'Shift+Meta+5', 'Meta+H', 'Alt+Meta+H', 'Meta+M', 'Meta+Q', 'Meta+Space', 'Ctrl+Meta+F', 'Ctrl+Meta+Q'],
+    'windows/amd64': ['Ctrl+Alt+Delete', 'Alt+F4', 'Ctrl+Shift+Escape'],
+    'linux/amd64': ['Ctrl+Alt+T', 'Ctrl+Alt+L', 'Ctrl+Alt+Delete', 'Ctrl+Alt+ArrowUp', 'Ctrl+Alt+ArrowDown'],
+  };
+
+  for (const [runtime, systemCombos] of Object.entries(reserved)) {
+    it(`gives every action its own combination on ${runtime.split('/')[0]} and leaves system ones alone`, () => {
+      const combos = SHORTCUT_DEFINITIONS.map(definition => platformShortcutCombo(definition.defaultCombo, runtime));
+      expect(new Set(combos).size).toBe(combos.length);
+      expect(combos.filter(combo => systemCombos.includes(combo))).toEqual([]);
+    });
+  }
+
+  it('matches the new defaults from real key events, including Option and Shift on a Mac', () => {
+    const host = { ...shortcutHost('darwin/arm64'), shortcutForEvent: preferencesFeature.shortcutForEvent };
+    const press = (key: string, code: string, mods: Partial<Record<'metaKey' | 'altKey' | 'shiftKey' | 'ctrlKey', boolean>>) => host.shortcutForEvent({ key, code, metaKey: false, altKey: false, shiftKey: false, ctrlKey: false, ...mods } as KeyboardEvent);
+    expect(press('√', 'KeyV', { metaKey: true, altKey: true })).toBe('toggle-response-layout');
+    expect(press('¡', 'Digit1', { metaKey: true, altKey: true })).toBe('go-collections');
+    expect(press('™', 'Digit2', { metaKey: true, altKey: true })).toBe('go-environments');
+    expect(press('£', 'Digit3', { metaKey: true, altKey: true })).toBe('go-history');
+    expect(press('Dead', 'KeyE', { metaKey: true, altKey: true })).toBe('choose-environment');
+    expect(press('C', 'KeyC', { metaKey: true, shiftKey: true })).toBe('copy-curl');
+    expect(press('F', 'KeyF', { metaKey: true, shiftKey: true })).toBe('find-replace');
+    expect(press('N', 'KeyN', { metaKey: true, shiftKey: true })).toBe('new-collection');
+    expect(press('R', 'KeyR', { metaKey: true, shiftKey: true })).toBe('collection-runner');
+    expect(press('o', 'KeyO', { metaKey: true })).toBe('import-collection');
+    expect(press('W', 'KeyW', { metaKey: true, shiftKey: true })).toBe('close-all-tabs');
+    expect(press('„', 'KeyW', { metaKey: true, shiftKey: true, altKey: true })).toBe('close-other-tabs');
+    expect(press('Escape', 'Escape', {})).toBe('cancel-request');
+
+    const windows = { ...shortcutHost('windows/amd64'), shortcutForEvent: preferencesFeature.shortcutForEvent };
+    expect(windows.shortcutForEvent({ key: '1', code: 'Digit1', ctrlKey: true, altKey: true, shiftKey: false, metaKey: false } as KeyboardEvent)).toBe('go-collections');
+    expect(windows.shortcutForEvent({ key: 'o', code: 'KeyO', ctrlKey: true, altKey: false, shiftKey: false, metaKey: false } as KeyboardEvent)).toBe('import-collection');
   });
 });

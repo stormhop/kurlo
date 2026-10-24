@@ -528,6 +528,9 @@ class AppVM {
   declare switchRequest: typeof requestCrudFeature.switchRequest;
   declare closeRequestTab: typeof requestCrudFeature.closeRequestTab;
   declare closeActiveRequestTab: typeof requestCrudFeature.closeActiveRequestTab;
+  declare closeRequestTabs: typeof requestCrudFeature.closeRequestTabs;
+  declare closeOtherRequestTabs: typeof requestCrudFeature.closeOtherRequestTabs;
+  declare closeAllRequestTabs: typeof requestCrudFeature.closeAllRequestTabs;
   declare closeActiveTab: typeof requestCrudFeature.closeActiveTab;
   declare switchOpenTabByOffset: typeof requestCrudFeature.switchOpenTabByOffset;
   declare switchOpenTabAt: typeof requestCrudFeature.switchOpenTabAt;
@@ -908,6 +911,9 @@ class AppVM {
   declare isKeyboardWidgetTarget: typeof uiShellFeature.isKeyboardWidgetTarget;
   declare isShortcutAllowedInEditable: typeof uiShellFeature.isShortcutAllowedInEditable;
   declare runShortcut: typeof uiShellFeature.runShortcut;
+  declare showSidebarView: typeof uiShellFeature.showSidebarView;
+  declare openEnvironmentPicker: typeof uiShellFeature.openEnvironmentPicker;
+  declare copyActiveRequestCurl: typeof uiShellFeature.copyActiveRequestCurl;
   declare onKeydown: typeof uiShellFeature.onKeydown;
 
   declare workspaceBlocked: typeof workspaceDiagnosticsFeature.workspaceBlocked;

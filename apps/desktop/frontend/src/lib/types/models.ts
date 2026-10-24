@@ -132,7 +132,10 @@ export type ShortcutId =
   | 'next-item' | 'previous-item' | 'expand-item' | 'collapse-item' | 'expand-all' | 'collapse-all'
   | 'settings' | 'shortcut-help' | 'search' | 'toggle-left-sidebar' | 'toggle-right-sidebar'
   | 'zoom-in' | 'zoom-out' | 'zoom-reset'
-  | 'save-request';
+  | 'save-request' | 'cancel-request' | 'copy-curl' | 'find-replace'
+  | 'close-other-tabs' | 'close-all-tabs'
+  | 'go-collections' | 'go-environments' | 'go-history' | 'choose-environment'
+  | 'new-collection' | 'import-collection' | 'collection-runner' | 'toggle-response-layout';
 
 export type ShortcutDefinition = { id: ShortcutId; group: string; label: string; defaultCombo: string };
 export type KVRow = { id: number; enabled: boolean; key: string; value: string; description: string; isFile?: boolean; fileName?: string; contentType?: string; secret?: boolean };

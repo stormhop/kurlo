@@ -1,6 +1,7 @@
 import type { HttpResponse } from '../../backend';
 import type { AppDialogState } from '../../types/dialog';
-import type { RequestType, SavedRequest, ShortcutId } from '../../types/models';
+import type { RequestType, SavedRequest, ShortcutId, SidebarView } from '../../types/models';
+import { requestSupportsCurl } from '../../utils';
 import {
   clamp,
   requestBadgeLabel,
@@ -121,6 +122,20 @@ type UiShellHost = {
   topView: TopView;
   workspaceBlocked: boolean;
   closeActiveTab: (force?: boolean) => Promise<unknown>;
+  closeOtherRequestTabs: () => Promise<unknown>;
+  closeAllRequestTabs: () => Promise<unknown>;
+  activeRequest: SavedRequest | undefined;
+  inFlightRequestIds: Set<string>;
+  environmentMenuOpen: boolean;
+  sidebarView: SidebarView;
+  collectionImportToast: string;
+  cancelActiveRequest: () => Promise<unknown>;
+  copyRequestCurl: (id: string) => Promise<unknown>;
+  openFindReplace: (collectionId: string, folderPath?: string[]) => Promise<unknown>;
+  createCollection: () => Promise<unknown>;
+  openPostmanImport: () => Promise<unknown>;
+  openCollectionRunner: (collectionId?: string) => unknown;
+  setResponseLayout: (layout: ResponseLayout) => void;
   closeFloatingMenus: () => void;
   closeGlobalSearch: () => void;
   closeSettings: () => void;
@@ -148,6 +163,9 @@ type UiShellHost = {
   reopenLastClosedTab: () => Promise<unknown>;
   runActiveRequest: () => Promise<unknown>;
   runShortcut: (id: ShortcutId) => Promise<unknown>;
+  showSidebarView: (view: SidebarView) => void;
+  openEnvironmentPicker: () => void;
+  copyActiveRequestCurl: () => Promise<unknown>;
   saveActiveRequest: () => Promise<unknown>;
   saveEnvironment: () => Promise<unknown>;
   setShortcut: (id: ShortcutId, combo: string) => void;
@@ -406,11 +424,11 @@ export const uiShellFeature = {
   },
 
   isShortcutAllowedInEditable(this: UiShellHost, id: ShortcutId) {
-    return ['close-tab', 'force-close-tab', 'send-request', 'save-request', 'request-url', 'search', 'settings', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset'].includes(id);
+    return ['close-tab', 'force-close-tab', 'send-request', 'save-request', 'request-url', 'search', 'settings', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset', 'cancel-request', 'copy-curl', 'find-replace'].includes(id);
   },
 
   async runShortcut(this: UiShellHost, id: ShortcutId) {
-    if (this.workspaceBlocked && !['close-tab', 'force-close-tab', 'settings', 'shortcut-help', 'toggle-left-sidebar', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset'].includes(id)) {
+    if (this.workspaceBlocked && !['close-tab', 'force-close-tab', 'settings', 'shortcut-help', 'toggle-left-sidebar', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset', 'toggle-response-layout'].includes(id)) {
       this.showWorkspaceBlockedToast('Workspace shortcuts');
       return;
     }
@@ -448,6 +466,41 @@ export const uiShellFeature = {
     else if (id === 'zoom-in') this.zoomIn();
     else if (id === 'zoom-out') this.zoomOut();
     else if (id === 'zoom-reset') this.resetZoom();
+    else if (id === 'cancel-request') await this.cancelActiveRequest();
+    else if (id === 'copy-curl') await this.copyActiveRequestCurl();
+    else if (id === 'find-replace' && this.activeRequest && !this.activeRequest.isDraft) await this.openFindReplace(this.activeRequest.collectionId, this.activeRequest.folderPath ?? []);
+    else if (id === 'close-other-tabs') await this.closeOtherRequestTabs();
+    else if (id === 'close-all-tabs') await this.closeAllRequestTabs();
+    else if (id === 'go-collections') this.showSidebarView('collections');
+    else if (id === 'go-environments') this.showSidebarView('environments');
+    else if (id === 'go-history') this.showSidebarView('history');
+    else if (id === 'choose-environment') this.openEnvironmentPicker();
+    else if (id === 'new-collection') await this.createCollection();
+    else if (id === 'import-collection') await this.openPostmanImport();
+    else if (id === 'collection-runner') this.openCollectionRunner(this.activeRequest?.collectionId ?? '');
+    else if (id === 'toggle-response-layout') this.setResponseLayout(this.responseLayout === 'right' ? 'below' : 'right');
+  },
+
+  showSidebarView(this: UiShellHost, view: SidebarView) {
+    this.sidebarView = view;
+    this.sidebarHidden = false;
+  },
+
+  openEnvironmentPicker(this: UiShellHost) {
+    this.closeFloatingMenus();
+    this.environmentMenuOpen = true;
+    setTimeout(() => {
+      const items = document.querySelectorAll<HTMLElement>('.environment-menu .menu-item');
+      (document.querySelector<HTMLElement>('.environment-menu .menu-item.active') ?? items[0])?.focus();
+    }, 0);
+  },
+
+  async copyActiveRequestCurl(this: UiShellHost) {
+    const request = this.activeRequest;
+    if (!request || !requestSupportsCurl(request)) return;
+    await this.copyRequestCurl(request.id);
+    this.collectionImportToast = 'Copied as cURL';
+    setTimeout(() => { if (this.collectionImportToast === 'Copied as cURL') this.collectionImportToast = ''; }, 1800);
   },
 
   async onKeydown(this: UiShellHost, e: KeyboardEvent) {
@@ -483,6 +536,11 @@ export const uiShellFeature = {
       return;
     }
     const shortcutId = this.shortcutForEvent(e);
+    if (shortcutId === 'cancel-request' && (e.defaultPrevented || !this.inFlightRequestIds.has(this.activeRequestId))) {
+      if (e.key === 'Escape' && this.rawTypeMenuOpen) this.rawTypeMenuOpen = false;
+      if (e.key === 'Escape') this.closeFloatingMenus();
+      return;
+    }
     if (shortcutId) {
       if (this.isEditableTarget(e.target) && !this.isShortcutAllowedInEditable(shortcutId)) return;
       if (!e.metaKey && !e.ctrlKey && !e.altKey && this.isKeyboardWidgetTarget(e.target)) return;

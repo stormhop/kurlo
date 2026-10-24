@@ -47,11 +47,11 @@ const GROUP_ORDER: PaletteGroup[] = ['Request', 'Create', 'Go to', 'View', 'Help
 
 export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
   const commands: PaletteCommand[] = [
-    { id: 'go-collections', group: 'Go to', label: 'Collections', keywords: 'sidebar requests tree', run: () => ctx.showSidebarView('collections') },
-    { id: 'go-environments', group: 'Go to', label: 'Environments', keywords: 'variables env matrix', run: () => ctx.showSidebarView('environments') },
-    { id: 'go-history', group: 'Go to', label: 'History', keywords: 'recent sent', run: () => ctx.showSidebarView('history') },
+    { id: 'go-collections', group: 'Go to', label: 'Collections', keywords: 'sidebar requests tree', shortcut: 'go-collections', run: () => ctx.showSidebarView('collections') },
+    { id: 'go-environments', group: 'Go to', label: 'Environments', keywords: 'variables env matrix', shortcut: 'go-environments', run: () => ctx.showSidebarView('environments') },
+    { id: 'go-history', group: 'Go to', label: 'History', keywords: 'recent sent', shortcut: 'go-history', run: () => ctx.showSidebarView('history') },
     { id: 'go-globals', group: 'Go to', label: 'Globals', keywords: 'global variables', run: ctx.openGlobals },
-    { id: 'go-runner', group: 'Go to', label: 'Collection runner', keywords: 'run tests iterations', run: ctx.openCollectionRunner },
+    { id: 'go-runner', group: 'Go to', label: 'Collection runner', keywords: 'run tests iterations', shortcut: 'collection-runner', run: ctx.openCollectionRunner },
     { id: 'go-mock', group: 'Go to', label: 'Mock server', keywords: 'examples serve', run: ctx.openMockServer },
     { id: 'go-git', group: 'Go to', label: 'Git', keywords: 'commit branch pull push changes', run: ctx.openGit },
     { id: 'go-cookies', group: 'Go to', label: 'Cookies', keywords: 'cookie jar sync', run: ctx.openCookies },
@@ -65,9 +65,9 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     { id: 'create-request-grpc', group: 'Create', label: 'New gRPC request', keywords: 'protobuf rpc', run: () => ctx.createRequest('grpc') },
     { id: 'create-request-mcp', group: 'Create', label: 'New MCP request', keywords: 'model context protocol tools', run: () => ctx.createRequest('mcp') },
     { id: 'create-request-ai', group: 'Create', label: 'New AI request', keywords: 'llm openai anthropic claude gpt chat model prompt', run: () => ctx.createRequest('ai') },
-    { id: 'create-collection', group: 'Create', label: 'New collection', run: ctx.createCollection },
+    { id: 'create-collection', group: 'Create', label: 'New collection', shortcut: 'new-collection', run: ctx.createCollection },
     { id: 'create-environment', group: 'Create', label: 'New environment', keywords: 'variables', run: ctx.createEnvironment },
-    { id: 'import-collection', group: 'Create', label: 'Import collection…', keywords: 'postman insomnia bruno openapi har curl opencollection', run: ctx.importCollection },
+    { id: 'import-collection', group: 'Create', label: 'Import collection…', keywords: 'postman insomnia bruno openapi har curl opencollection', shortcut: 'import-collection', run: ctx.importCollection },
   ];
 
   if (ctx.hasActiveRequest) {
@@ -83,10 +83,10 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
       { id: 'request-rename', group: 'Request', label: 'Rename request', shortcut: 'rename-item', run: () => ctx.runShortcut('rename-item') },
     );
     if (ctx.canCopyCurl) {
-      commands.push({ id: 'request-curl', group: 'Request', label: 'Copy as cURL', keywords: 'clipboard command line', run: ctx.copyCurl });
+      commands.push({ id: 'request-curl', group: 'Request', label: 'Copy as cURL', keywords: 'clipboard command line', shortcut: 'copy-curl', run: ctx.copyCurl });
     }
     if (ctx.findReplaceInCollection) {
-      commands.push({ id: 'request-find-replace', group: 'Request', label: 'Find and replace in collection…', keywords: 'search rename rewrite bulk edit url host', run: ctx.findReplaceInCollection });
+      commands.push({ id: 'request-find-replace', group: 'Request', label: 'Find and replace in collection…', keywords: 'search rename rewrite bulk edit url host', shortcut: 'find-replace', run: ctx.findReplaceInCollection });
     }
     commands.push({ id: 'request-close', group: 'Request', label: 'Close tab', shortcut: 'close-tab', run: () => ctx.runShortcut('close-tab') });
   }
@@ -116,8 +116,8 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     { id: 'view-zoom-reset', group: 'View', label: 'Reset zoom', keywords: 'interface size scale actual default 100', shortcut: 'zoom-reset', run: () => ctx.runShortcut('zoom-reset') },
   );
   commands.push(ctx.responseLayout === 'right'
-    ? { id: 'view-response-below', group: 'View', label: 'Show response below the request', keywords: 'layout split vertical bottom', run: () => ctx.setResponseLayout('below') }
-    : { id: 'view-response-right', group: 'View', label: 'Show response beside the request', keywords: 'layout split horizontal right side', run: () => ctx.setResponseLayout('right') });
+    ? { id: 'view-response-below', group: 'View', label: 'Show response below the request', keywords: 'layout split vertical bottom', shortcut: 'toggle-response-layout', run: () => ctx.setResponseLayout('below') }
+    : { id: 'view-response-right', group: 'View', label: 'Show response beside the request', keywords: 'layout split horizontal right side', shortcut: 'toggle-response-layout', run: () => ctx.setResponseLayout('right') });
 
   const themes: { mode: AppThemeMode; label: string }[] = [
     { mode: 'light', label: 'Use light theme' },
