@@ -214,7 +214,7 @@ export const requestStateFeature = {
   },
 
   markRequestLoading(this: RequestStateHost, requestId: string, loading: boolean) {
-    if (!requestId) return;
+    if (!requestId || this.inFlightRequestIds.has(requestId) === loading) return;
     const next = new Set(this.inFlightRequestIds);
     if (loading) next.add(requestId);
     else next.delete(requestId);

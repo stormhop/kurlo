@@ -5,6 +5,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- The status of a response stopped popping in after the first send: once a response arrived, the badge kept its arrival animation class, so later answers came in without it.
+
 ## [2.5.1] - 2026-10-25
 
 ### Added
