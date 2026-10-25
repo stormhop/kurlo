@@ -41,7 +41,7 @@
 
   let request = $derived(entry.request);
   let sentAt = $derived(new Date(entry.createdAt));
-  let sentLabel = $derived(sentAt.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }));
+  let sentLabel = $derived(sentAt.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short', hourCycle: 'h23' }));
   let requestHeaders = $derived(enabledRows(request.headers));
   let formRows = $derived(enabledRows(request.formRows));
   let authLabel = $derived(AUTH_OPTIONS.find(option => option.value === request.auth?.type)?.label ?? '');

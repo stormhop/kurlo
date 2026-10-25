@@ -291,7 +291,7 @@
       {/if}
       {#if status === 'connected'}
         <span class="sse-summary-dot"></span>
-        <span>{events.length.toLocaleString()} {events.length === 1 ? 'event' : 'events'}</span>
+        <span>{events.length.toLocaleString('en-US')} {events.length === 1 ? 'event' : 'events'}</span>
         <span class="sse-summary-dot"></span>
         <span>{formatSize(streamSize)}</span>
         <span class="sse-summary-dot"></span>
@@ -305,7 +305,7 @@
         <span class="sse-summary-dot"></span>
         <span class="sse-status-error" title={error}>{friendlySSEError(error)}</span>
       {:else}
-        <span>{events.length.toLocaleString()} {events.length === 1 ? 'event' : 'events'}</span>
+        <span>{events.length.toLocaleString('en-US')} {events.length === 1 ? 'event' : 'events'}</span>
         <span class="sse-summary-dot"></span>
         <span>{formatSize(streamSize)}</span>
       {/if}
@@ -313,7 +313,7 @@
 
     <div class="tab-bar response-tabs sse-tabs" role="tablist" use:tabListKeyboard>
       <button class="tab" role="tab" class:active={sseTab === 'messages'} aria-selected={sseTab === 'messages'} tabindex={sseTab === 'messages' ? 0 : -1} onclick={() => (sseTab = 'messages')} type="button">
-        Messages<span class="badge">{events.length.toLocaleString()}</span>
+        Messages<span class="badge">{events.length.toLocaleString('en-US')}</span>
       </button>
       <button class="tab" role="tab" class:active={sseTab === 'headers'} aria-selected={sseTab === 'headers'} tabindex={sseTab === 'headers' ? 0 : -1} onclick={() => (sseTab = 'headers')} type="button">
         Headers{#if headers.length}<span class="badge">{headers.length}</span>{/if}
@@ -458,9 +458,9 @@
         {#if hiddenEventCount > 0}
           <div class="sse-pagination-row">
             <button class="btn btn-secondary btn-sm" type="button" onclick={() => (visibleEventCount = Math.min(filteredEvents.length, visibleEventCount + REALTIME_PAGE_SIZE))}>
-              Load {Math.min(REALTIME_PAGE_SIZE, hiddenEventCount).toLocaleString()} older
+              Load {Math.min(REALTIME_PAGE_SIZE, hiddenEventCount).toLocaleString('en-US')} older
             </button>
-            <span>Showing {visibleReversedEvents.length.toLocaleString()} of {filteredEvents.length.toLocaleString()}</span>
+            <span>Showing {visibleReversedEvents.length.toLocaleString('en-US')} of {filteredEvents.length.toLocaleString('en-US')}</span>
           </div>
         {/if}
       {/if}

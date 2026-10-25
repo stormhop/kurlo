@@ -86,7 +86,7 @@ export function formatJwtClaimValue(value: unknown) {
 
 export function formatJwtNumericDate(key: string, value: unknown) {
   if (!NUMERIC_DATE_CLAIMS.has(key) || typeof value !== 'number' || !Number.isFinite(value)) return '';
-  return new Date(value * 1000).toLocaleString();
+  return new Date(value * 1000).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' });
 }
 
 export function jwtTokenState(payload: JwtObject, nowSeconds = Math.floor(Date.now() / 1000)): JwtTokenState {

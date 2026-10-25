@@ -85,7 +85,7 @@
   }
 
   function formatTime(timestamp: number) {
-    return new Date(timestamp).toLocaleTimeString([], { hour12: false });
+    return new Date(timestamp).toLocaleTimeString('en-GB', { hour12: false });
   }
 
   function portValue(event: Event) {

@@ -104,7 +104,7 @@
     const days = Math.round(hours / 24);
     if (days === 1) return 'Yesterday';
     if (days < 7) return `${days} days ago`;
-    return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
   function inputValue(event: Event): string {

@@ -523,9 +523,9 @@
       {#if hiddenMessageCount > 0}
         <div class="sse-pagination-row">
           <button class="btn btn-secondary btn-sm" type="button" onclick={() => (visibleMessageCount = Math.min(filteredMessages.length, visibleMessageCount + REALTIME_PAGE_SIZE))}>
-            Load {Math.min(REALTIME_PAGE_SIZE, hiddenMessageCount).toLocaleString()} older
+            Load {Math.min(REALTIME_PAGE_SIZE, hiddenMessageCount).toLocaleString('en-US')} older
           </button>
-          <span>Showing {visibleReversedMessages.length.toLocaleString()} of {filteredMessages.length.toLocaleString()}</span>
+          <span>Showing {visibleReversedMessages.length.toLocaleString('en-US')} of {filteredMessages.length.toLocaleString('en-US')}</span>
         </div>
       {/if}
     {/if}

@@ -4872,3 +4872,22 @@ test.describe('Real workspace round trip', () => {
     await writeFile(output, saved);
   });
 });
+
+test.describe('UI locale', () => {
+  test.use({ locale: 'ru-RU' });
+
+  test('shows English dates on a system in another language', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      localStorage.setItem('kurlo:last-seen-version', '2.0.2');
+      const app = (window as any).go.api.App;
+      app.AppInfo = async () => ({ name: 'Kurlo', version: '2.0.3', runtime: 'browser/e2e', goVersion: 'e2e' });
+    });
+    await page.goto('/');
+
+    const whatsNew = page.getByRole('dialog', { name: /What's new in Kurlo/ });
+    await expect(whatsNew).toBeVisible();
+    await expect(whatsNew).not.toContainText(/октябр|сентябр|ноябр|г\./);
+    await expect(whatsNew).toContainText(/(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}/);
+  });
+});

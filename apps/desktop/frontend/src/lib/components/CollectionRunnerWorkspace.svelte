@@ -260,7 +260,7 @@
     {#if hasResults}
       <section class="runner-results-panel" aria-label="Run results">
         {#if lastRunAt && !running}
-          <p class="runner-last-run" title={new Date(lastRunAt).toLocaleString()}>Last run {relativeTime(lastRunAt)}</p>
+          <p class="runner-last-run" title={new Date(lastRunAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' })}>Last run {relativeTime(lastRunAt)}</p>
         {/if}
         <div class="runner-results-summary">
           <div class="runner-stat">

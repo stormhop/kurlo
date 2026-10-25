@@ -44,12 +44,12 @@
     const lines = [
       `First token: ${formatMs(firstTokenMs)}`,
       `Total: ${formatMs(durationMs)}`,
-      `Input: ${usage.input.toLocaleString()}`,
-      `Output: ${usage.output.toLocaleString()}`,
+      `Input: ${usage.input.toLocaleString('en-US')}`,
+      `Output: ${usage.output.toLocaleString('en-US')}`,
     ];
-    if (usage.cacheRead) lines.push(`Cache read: ${usage.cacheRead.toLocaleString()}`);
-    if (usage.cacheWrite) lines.push(`Cache write: ${usage.cacheWrite.toLocaleString()}`);
-    if (usage.reasoning) lines.push(`Reasoning: ${usage.reasoning.toLocaleString()}`);
+    if (usage.cacheRead) lines.push(`Cache read: ${usage.cacheRead.toLocaleString('en-US')}`);
+    if (usage.cacheWrite) lines.push(`Cache write: ${usage.cacheWrite.toLocaleString('en-US')}`);
+    if (usage.reasoning) lines.push(`Reasoning: ${usage.reasoning.toLocaleString('en-US')}`);
     if (last && last.steps.length > 1) lines.push(`Steps: ${last.steps.length}`);
     return lines.join('\n');
   });
@@ -217,8 +217,8 @@
             {#if firstTokenMs}<span class="ai-metric-ttft"><span class="ai-metric-key">TTFT</span> {formatMs(firstTokenMs)}</span>{/if}
             {#if tokensPerSecond}<span class="ai-metric-extra"><span class="ai-metric-key">speed</span> {tokensPerSecond} tok/s</span>{/if}
             {#if hasUsage && usage}
-              <span><span class="ai-metric-key">in</span> {(usage.input + usage.cacheRead + usage.cacheWrite).toLocaleString()} <span class="ai-metric-key">out</span> {usage.output.toLocaleString()}</span>
-              {#if usage.cacheRead}<span class="ai-metric-extra"><span class="ai-metric-key">cache</span> {usage.cacheRead.toLocaleString()}</span>{/if}
+              <span><span class="ai-metric-key">in</span> {(usage.input + usage.cacheRead + usage.cacheWrite).toLocaleString('en-US')} <span class="ai-metric-key">out</span> {usage.output.toLocaleString('en-US')}</span>
+              {#if usage.cacheRead}<span class="ai-metric-extra"><span class="ai-metric-key">cache</span> {usage.cacheRead.toLocaleString('en-US')}</span>{/if}
             {/if}
           </span>
         {/if}

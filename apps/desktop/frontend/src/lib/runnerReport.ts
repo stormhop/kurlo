@@ -56,7 +56,7 @@ function runStatus(summary: CollectionRunnerReportSummary): string {
 function formatDate(value: Date | string): string {
   const date = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString();
+  return date.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' });
 }
 
 function dataPreview(row: RunnerDataRow | undefined): string {

@@ -16,7 +16,7 @@
     if (!value) return '';
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   }
 
   let releaseURL = $derived(`https://github.com/stormhop/kurlo/releases/tag/v${section.version}`);

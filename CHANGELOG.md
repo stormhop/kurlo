@@ -10,6 +10,7 @@ All notable changes to Kurlo are documented here. This project follows
 ### Fixed
 
 - The status of a response stopped popping in after the first send: once a response arrived, the badge kept its arrival animation class, so later answers came in without it.
+- Dates, times and numbers followed the system language, so an English interface showed dates such as `25 октября 2026 г.` on a Russian system. They are now always in English, with times on a 24-hour clock: What's new, update notes, history, Git, the collection runner and its report, cookies, JWT claims and the token counts of AI requests.
 
 ## [2.5.1] - 2026-10-25
 

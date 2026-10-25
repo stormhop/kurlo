@@ -15,6 +15,7 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Fixed
 
 - The response status pops in again on every send, not only the first.
+- Dates and numbers are shown in English whatever the system language is, with times on a 24-hour clock.
 
 ## 2.5.1
 

@@ -106,5 +106,5 @@ export function relativeTime(timestamp: number, now = Date.now()): string {
   if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
   const days = Math.round(hours / 24);
   if (days < 7) return days === 1 ? 'yesterday' : `${days} days ago`;
-  return new Date(timestamp).toLocaleDateString([], { month: 'short', day: 'numeric', year: new Date(timestamp).getFullYear() === new Date(now).getFullYear() ? undefined : 'numeric' });
+  return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: new Date(timestamp).getFullYear() === new Date(now).getFullYear() ? undefined : 'numeric' });
 }
