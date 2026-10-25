@@ -65,6 +65,8 @@ func workspaceYAMLSection(path string) string {
 		return "environment"
 	case strings.Contains(clean, "/"+fileStoreExamplesDir+"/"):
 		return "example"
+	case strings.Contains(clean, "/"+fileStoreLoadTestsDir+"/"):
+		return "loadTest"
 	}
 	return ""
 }
@@ -114,6 +116,8 @@ func checkWorkspaceYAML(path, content string) WorkspaceYAMLCheckResult {
 		target = &filesystemEnvironmentFile{}
 	case "example":
 		target = &filesystemExampleFile{}
+	case "loadTest":
+		target = &filesystemLoadTestFile{}
 	}
 	if err := top.Decode(target); err != nil {
 		return yamlErrorFailure(err)

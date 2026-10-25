@@ -1,4 +1,5 @@
 import type { CookieJarEntry, KeyValue, ResponseTimings, ScriptResult } from '../backend';
+import type { LoadTest } from '../wire';
 
 export type { CookieJarEntry, KeyValue, ResponseTimings, ScriptResult };
 
@@ -186,6 +187,7 @@ export type Collection = {
   collapsed: boolean;
   folderPaths?: string[][];
   defaults: CollectionDefaults;
+  loadTests?: LoadTest[];
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;
 };

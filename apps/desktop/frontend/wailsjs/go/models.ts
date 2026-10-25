@@ -2011,6 +2011,287 @@ export namespace model {
 	
 	
 	
+	export class LoadCheck {
+	    type: string;
+	    path?: string;
+	    value?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.path = source["path"];
+	        this.value = source["value"];
+	    }
+	}
+	export class LoadDataSource {
+	    path: string;
+	    mode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadDataSource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.mode = source["mode"];
+	    }
+	}
+	export class LoadStage {
+	    durationMs: number;
+	    target: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadStage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.durationMs = source["durationMs"];
+	        this.target = source["target"];
+	    }
+	}
+	export class LoadExecutor {
+	    type: string;
+	    vus?: number;
+	    durationMs?: number;
+	    stages?: LoadStage[];
+	    rate?: number;
+	    timeUnitMs?: number;
+	    preAllocatedVUs?: number;
+	    maxVUs?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadExecutor(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.vus = source["vus"];
+	        this.durationMs = source["durationMs"];
+	        this.stages = this.convertValues(source["stages"], LoadStage);
+	        this.rate = source["rate"];
+	        this.timeUnitMs = source["timeUnitMs"];
+	        this.preAllocatedVUs = source["preAllocatedVUs"];
+	        this.maxVUs = source["maxVUs"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LoadExtract {
+	    var: string;
+	    from: string;
+	    path: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadExtract(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.var = source["var"];
+	        this.from = source["from"];
+	        this.path = source["path"];
+	    }
+	}
+	export class LoadStep {
+	    id: string;
+	    requestId: string;
+	    name?: string;
+	    once?: boolean;
+	    extract?: LoadExtract[];
+	    checks?: LoadCheck[];
+	    thinkTimeMs?: number;
+	    thinkJitterMs?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.requestId = source["requestId"];
+	        this.name = source["name"];
+	        this.once = source["once"];
+	        this.extract = this.convertValues(source["extract"], LoadExtract);
+	        this.checks = this.convertValues(source["checks"], LoadCheck);
+	        this.thinkTimeMs = source["thinkTimeMs"];
+	        this.thinkJitterMs = source["thinkJitterMs"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LoadScenario {
+	    id: string;
+	    name: string;
+	    executor: LoadExecutor;
+	    steps: LoadStep[];
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadScenario(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.executor = this.convertValues(source["executor"], LoadExecutor);
+	        this.steps = this.convertValues(source["steps"], LoadStep);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LoadSettings {
+	    environment?: string;
+	    insecure?: boolean;
+	    timeoutMs?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.environment = source["environment"];
+	        this.insecure = source["insecure"];
+	        this.timeoutMs = source["timeoutMs"];
+	    }
+	}
+	
+	
+	export class LoadThreshold {
+	    metric: string;
+	    stat: string;
+	    op: string;
+	    value: number;
+	    step?: string;
+	    abortOnFail?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadThreshold(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.metric = source["metric"];
+	        this.stat = source["stat"];
+	        this.op = source["op"];
+	        this.value = source["value"];
+	        this.step = source["step"];
+	        this.abortOnFail = source["abortOnFail"];
+	    }
+	}
+	export class LoadTest {
+	    id: string;
+	    name: string;
+	    filesystemName?: string;
+	    scenarios: LoadScenario[];
+	    thresholds?: LoadThreshold[];
+	    data?: LoadDataSource;
+	    settings: LoadSettings;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadTest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.filesystemName = source["filesystemName"];
+	        this.scenarios = this.convertValues(source["scenarios"], LoadScenario);
+	        this.thresholds = this.convertValues(source["thresholds"], LoadThreshold);
+	        this.data = this.convertValues(source["data"], LoadDataSource);
+	        this.settings = this.convertValues(source["settings"], LoadSettings);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LoadTestRequest {
+	    id: string;
+	    requestType: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadTestRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.requestType = source["requestType"];
+	    }
+	}
+	
 	export class McpContent {
 	    type: string;
 	    text?: string;

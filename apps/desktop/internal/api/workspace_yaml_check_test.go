@@ -21,6 +21,9 @@ func TestCheckWorkspaceYAMLPointsAtTheProblemLine(t *testing.T) {
 		{"numeric id", "workspaces/Main/collections/Core/requests/Get.yml", "version: 1\nrequest:\n    name: Get\n    id: 123\n", 4, false},
 		{"empty id", "workspaces/Main/environments/Local.yml", "version: 1\nenvironment:\n    id: ''\n", 3, false},
 		{"root index", "kurlo.yml", "version: 1\nworkspaceOrder:\n    - a\n", 0, true},
+		{"valid load test", "workspaces/Main/collections/Core/loadtests/Smoke.yml", "version: 1\norder: 2\nloadTest:\n    id: lt-a\n    name: Smoke\n", 0, true},
+		{"load test without block", "workspaces/Main/collections/Core/loadtests/Smoke.yml", "version: 1\nrequest:\n    id: lt-a\n", 1, false},
+		{"load test without id", "workspaces/Main/collections/Core/loadtests/Smoke.yml", "version: 1\nloadTest:\n    name: Smoke\n", 2, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			result := checkWorkspaceYAML(tc.path, tc.content)

@@ -255,6 +255,8 @@ export function UpsertCookie(arg1:string,arg2:model.Cookie):Promise<model.Cookie
 
 export function UseLocalWorkspaceStore():Promise<api.WorkspaceOpenResult>;
 
+export function ValidateLoadTest(arg1:model.LoadTest,arg2:Array<model.LoadTestRequest>):Promise<Array<string>>;
+
 export function WebSocketConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
 
 export function WebSocketDisconnect(arg1:string):Promise<void>;

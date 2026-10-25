@@ -550,6 +550,7 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 				return err
 			}
 			collectionPath := filepath.Join(collectionDir, fileStoreCollection)
+			loadTests := collectionLoadTestMaps(collection)
 			delete(collection, filesystemNameField)
 			if err := writeJournaledYAMLFile(collectionPath, filesystemCollectionFile{
 				Version:      fileStoreVersion,
@@ -559,6 +560,9 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 				return err
 			}
 			desiredFiles[collectionPath] = struct{}{}
+			if err := writeCollectionLoadTests(collectionDir, loadTests, desiredFiles, journal); err != nil {
+				return err
+			}
 			requestFiles := filesystemSegmentsForItems(requestsByCollection[collectionID])
 			for _, request := range requestsByCollection[collectionID] {
 				requestID := stringValue(request, "id")
@@ -761,7 +765,7 @@ func isKurloManagedYAMLFile(path string) bool {
 	if _, hasVersion := doc["version"]; !hasVersion {
 		return false
 	}
-	for _, key := range []string{"workspace", "collection", "request", "environment", "example"} {
+	for _, key := range []string{"workspace", "collection", "request", "environment", "example", "loadTest"} {
 		if _, ok := doc[key]; ok {
 			return true
 		}
@@ -1003,6 +1007,11 @@ func loadYAMLWorkspaceStoreWithFixes(root string, secrets map[string]string) ([]
 			request["examples"] = validator.usableItems("example", mapSlice(examples))
 		}
 	}
+	for _, collection := range collections {
+		if loadTests, exists := collection["loadTests"]; exists {
+			collection["loadTests"] = validator.usableItems("load test", mapSlice(loadTests))
+		}
+	}
 	hydrateRequestCollectionNames(requests, collections)
 	return workspaces, collections, requests, environments, workspaceCookies, diagnostics, validator.fixes, nil
 }
@@ -1020,6 +1029,12 @@ func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, col
 		validator.item("collection", collectionPath, collectionEntry.collection)
 		validator.reference(collectionPath, "collection", collectionEntry.collection, "workspaceId", workspaceID)
 		collectionID := stringValue(collectionEntry.collection, "id")
+		delete(collectionEntry.collection, "loadTests")
+		loadTests, loadTestDiagnostics := readCollectionLoadTests(collectionEntry.path, root, workspaceID, collectionID, validator)
+		diagnostics = append(diagnostics, loadTestDiagnostics...)
+		if len(loadTests) > 0 {
+			collectionEntry.collection["loadTests"] = loadTests
+		}
 		collections = append(collections, collectionEntry.collection)
 		requestEntries, requestDiagnostics := readYAMLRequestEntriesWithDiagnostics(filepath.Join(collectionEntry.path, fileStoreRequestsDir), collectionEntry.requestOrder, secrets, root, workspaceID, collectionID)
 		diagnostics = append(diagnostics, requestDiagnostics...)
@@ -1212,7 +1227,7 @@ func readYAMLCollectionEntriesWithDiagnostics(root string, order []string, works
 		var doc filesystemCollectionFile
 		if err := readYAMLFile(filePath, &doc); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				if workspaceChildrenRemain(path, fileStoreRequestsDir, fileStoreExamplesDir) {
+				if workspaceChildrenRemain(path, fileStoreRequestsDir, fileStoreExamplesDir, fileStoreLoadTestsDir) {
 					diagnostics = append(diagnostics, workspaceDiagnostic{
 						scope: workspaceIntegrityScope, path: filePath, root: workspaceRoot, blocking: true,
 						message: "collection.yml is missing but its child files remain. Restore the collection file before saving.",

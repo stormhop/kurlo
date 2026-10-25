@@ -109,6 +109,11 @@ func richWorkspacePayloadForTest(t *testing.T) string {
 		"settings":         map[string]any{"timeoutMs": 10000},
 		"preRequestScript": "console.log(1)",
 	}
+	var loadTest map[string]any
+	if err := json.Unmarshal([]byte(checkoutLoadTest), &loadTest); err != nil {
+		t.Fatal(err)
+	}
+	collection["loadTests"] = []any{loadTest}
 	environment := mapSlice(store["environments"])[0]
 	environment["values"] = []any{row(8, "host", "localhost"), map[string]any{"id": 9, "enabled": true, "key": "token", "value": "secret", "secret": true}}
 	payload, err := json.Marshal(store)
@@ -161,7 +166,7 @@ func TestEveryFileKurloWritesMatchesThePublishedSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []string{"root", "workspace", "collection", "request", "environment", "example"} {
+	for _, kind := range []string{"root", "workspace", "collection", "request", "environment", "example", "loadTest"} {
 		if checked[kind] == 0 {
 			t.Errorf("no %s file was checked: %v", kind, checked)
 		}

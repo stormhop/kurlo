@@ -18,6 +18,7 @@ import {
 } from './constants';
 import { emptyCollectionDefaults, normalizeCollectionDefaults, normalizeRequestSettingsOverrides } from './collectionDefaults';
 import { normalizeRequestExamples } from './examples';
+import { normalizeLoadTests } from './loadTests';
 import { normalizeCollectionFolderPaths } from './collections';
 import { defaultSocketIOArgs, requestBodyDefaultsFor } from './requestBodyDefaults';
 import {
@@ -156,9 +157,10 @@ export function normalizeWorkspace(raw: Partial<Workspace>): Workspace {
 }
 
 export function normalizeCollection(raw: Partial<Collection>, workspaceId: string): Collection {
-    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['collapsed'], arrays: ['folderPaths'], objects: ['defaults'] });
+    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['collapsed'], arrays: ['folderPaths', 'loadTests'], objects: ['defaults'] });
     const id = input.id || newEntityId('collection');
     const name = input.name || DEFAULT_COLLECTION;
+    const loadTests = normalizeLoadTests(input.loadTests);
     return {
         id,
         workspaceId: input.workspaceId || workspaceId,
@@ -168,6 +170,7 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
         collapsed: input.collapsed ?? false,
         folderPaths: normalizeCollectionFolderPaths(input.folderPaths),
         defaults: normalizeCollectionDefaults(input.defaults),
+        ...(loadTests ? { loadTests } : {}),
     };
 }
 

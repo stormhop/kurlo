@@ -10,7 +10,8 @@
     { "$ref": "#/definitions/collectionFile" },
     { "$ref": "#/definitions/requestFile" },
     { "$ref": "#/definitions/environmentFile" },
-    { "$ref": "#/definitions/exampleFile" }
+    { "$ref": "#/definitions/exampleFile" },
+    { "$ref": "#/definitions/loadTestFile" }
   ],
   "definitions": {
     "fileVersion": {
@@ -457,6 +458,150 @@
         "version": { "$ref": "#/definitions/fileVersion" },
         "order": { "$ref": "#/definitions/order" },
         "example": { "$ref": "#/definitions/example" }
+      }
+    },
+    "loadTestDuration": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Milliseconds."
+    },
+    "loadExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "description": "How load is applied. constant-vus and ramping-vus loop a number of virtual users through the flow; constant-arrival-rate and ramping-arrival-rate start iterations at a fixed rate however slow the server gets.",
+      "properties": {
+        "type": { "type": "string", "enum": ["constant-vus", "ramping-vus", "constant-arrival-rate", "ramping-arrival-rate"] },
+        "vus": { "type": "integer", "minimum": 0 },
+        "durationMs": { "$ref": "#/definitions/loadTestDuration" },
+        "stages": {
+          "type": "array",
+          "description": "ramping-vus: target is virtual users. ramping-arrival-rate: target is iterations per time unit.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["durationMs", "target"],
+            "properties": {
+              "durationMs": { "$ref": "#/definitions/loadTestDuration" },
+              "target": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "rate": { "type": "integer", "minimum": 0, "description": "Iterations started per time unit." },
+        "timeUnitMs": { "$ref": "#/definitions/loadTestDuration", "description": "Defaults to 1000." },
+        "preAllocatedVUs": { "type": "integer", "minimum": 0 },
+        "maxVUs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "loadStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "requestId"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "requestId": { "$ref": "#/definitions/id", "description": "An HTTP or GraphQL request in the same collection." },
+        "name": { "type": "string", "description": "Name used to tag the step in results." },
+        "once": { "type": "boolean", "description": "Run once per virtual user, for example to log in." },
+        "extract": {
+          "type": "array",
+          "description": "Values saved from the response for later steps, used as {{var}}.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["var", "from", "path"],
+            "properties": {
+              "var": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+              "from": { "type": "string", "enum": ["json", "header", "regex"] },
+              "path": { "type": "string", "description": "json: a path such as $.items[0].id. header: the header name. regex: a pattern with one ( ) group." }
+            }
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["status", "jsonExists", "bodyContains"] },
+              "path": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        },
+        "thinkTimeMs": { "$ref": "#/definitions/loadTestDuration", "description": "Wait after the step." },
+        "thinkJitterMs": { "$ref": "#/definitions/loadTestDuration", "description": "Random extra wait added to thinkTimeMs." }
+      }
+    },
+    "loadTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "description": "A load test built from requests in this collection. Stored under collections/<collection>/loadtests/, one file per load test.",
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "name": { "type": "string" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "scenarios": {
+          "type": "array",
+          "description": "The flow the virtual users run. Kurlo uses exactly one.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "executor"],
+            "properties": {
+              "id": { "$ref": "#/definitions/id" },
+              "name": { "type": "string" },
+              "executor": { "$ref": "#/definitions/loadExecutor" },
+              "steps": { "type": "array", "items": { "$ref": "#/definitions/loadStep" } }
+            }
+          }
+        },
+        "thresholds": {
+          "type": "array",
+          "description": "Pass criteria. The run fails when any of them is not met.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric", "stat", "op", "value"],
+            "properties": {
+              "metric": { "type": "string", "enum": ["http_req_duration", "http_req_failed", "checks"] },
+              "stat": { "type": "string", "enum": ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "rate"] },
+              "op": { "type": "string", "enum": ["<", "<=", ">", ">="] },
+              "value": { "type": "number", "minimum": 0, "description": "Milliseconds for http_req_duration, a fraction from 0 to 1 for rate." },
+              "step": { "$ref": "#/definitions/id", "description": "Limit the threshold to one step, by its id." },
+              "abortOnFail": { "type": "boolean", "description": "Stop the test as soon as the threshold fails." }
+            }
+          }
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "mode"],
+          "properties": {
+            "path": { "type": "string", "description": "CSV or JSON file, relative to the workspace folder." },
+            "mode": { "type": "string", "enum": ["per-vu", "per-iteration", "random"] }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "environment": { "type": "string", "description": "Environment used when the test runs." },
+            "insecure": { "type": "boolean", "description": "Skip TLS certificate checks." },
+            "timeoutMs": { "$ref": "#/definitions/loadTestDuration", "description": "Request timeout." }
+          }
+        }
+      }
+    },
+    "loadTestFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "loadTest"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "loadTest": { "$ref": "#/definitions/loadTest" }
       }
     }
   },

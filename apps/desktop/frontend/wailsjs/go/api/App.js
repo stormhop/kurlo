@@ -506,6 +506,10 @@ export function UseLocalWorkspaceStore() {
   return window['go']['api']['App']['UseLocalWorkspaceStore']();
 }
 
+export function ValidateLoadTest(arg1, arg2) {
+  return window['go']['api']['App']['ValidateLoadTest'](arg1, arg2);
+}
+
 export function WebSocketConnect(arg1, arg2) {
   return window['go']['api']['App']['WebSocketConnect'](arg1, arg2);
 }
