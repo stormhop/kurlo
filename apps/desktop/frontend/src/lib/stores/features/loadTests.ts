@@ -1,10 +1,10 @@
-import { validateLoadTest } from '../../backend';
+import { exportLoadTestK6, validateLoadTest } from '../../backend';
 import { loadTestFingerprint, normalizeLoadTest } from '../../loadTests';
 import { presetExecutor } from '../../loadPresets';
 import { filesystemNameFromName } from '../../normalizers';
-import type { Collection, PersistRequestStore, SavedRequest, SidebarView } from '../../types/models';
+import type { Collection, Environment, KVRow, PersistRequestStore, SavedRequest, SidebarView } from '../../types/models';
 import { newEntityId, requestTabLabel } from '../../utils';
-import type { LoadStep, LoadTest } from '../../wire';
+import type { K6ExportResult, LoadStep, LoadTest } from '../../wire';
 import type { TopView } from '../ui';
 
 export type LoadTestTab = 'flow' | 'load' | 'data';
@@ -14,9 +14,12 @@ const LOAD_TEST_REQUEST_TYPES = new Set(['', 'http', 'graphql']);
 type LoadTestHost = {
   activeLoadTestId: string;
   activeLoadTestCollectionId: string;
+  activeEnvironmentId: string;
   activeRequestId: string;
   activeWorkspaceId: string;
   collections: Collection[];
+  environments: Environment[];
+  globalVariables: KVRow[];
   loadTestSaveState: 'idle' | 'saving' | 'saved';
   loadTestSavedTimer: ReturnType<typeof setTimeout> | null;
   loadTestTab: LoadTestTab;
@@ -87,6 +90,29 @@ export const loadTestFeature = {
       .filter(request => !request.isDraft && !request.isInvalid && request.collectionId === collectionId)
       .map(request => ({ id: request.id, requestType: request.requestType ?? '' }));
     return validateLoadTest(normalizeLoadTest(JSON.parse(JSON.stringify(test))), targets);
+  },
+
+  loadTestEnvironment(this: LoadTestHost, collection: Collection, test: LoadTest): Environment | undefined {
+    const environments = this.environments.filter(environment => environment.workspaceId === collection.workspaceId);
+    const name = test.settings.environment;
+    if (name) return environments.find(environment => environment.name === name);
+    return environments.find(environment => environment.id === this.activeEnvironmentId);
+  },
+
+  async exportLoadTestK6(this: LoadTestHost & { loadTestEnvironment: (collection: Collection, test: LoadTest) => Environment | undefined }, collectionId: string, test: LoadTest, inlineSecrets: boolean): Promise<K6ExportResult> {
+    const collection = this.collections.find(candidate => candidate.id === collectionId);
+    if (!collection) return { script: '', fileName: '', warnings: [], error: 'The collection of this load test is gone.' };
+    const requestIds = new Set((test.scenarios[0]?.steps ?? []).map(step => step.requestId));
+    const environment = this.loadTestEnvironment(collection, test);
+    const { loadTests: _loadTests, ...collectionWithoutTests } = collection;
+    const payload = {
+      loadTest: test,
+      collection: collectionWithoutTests,
+      requests: this.requests.filter(request => requestIds.has(request.id) && request.collectionId === collectionId),
+      environment: environment ? { name: environment.name, values: environment.values } : null,
+      globals: this.globalVariables,
+    };
+    return exportLoadTestK6(JSON.stringify(payload), inlineSecrets);
   },
 
   async openLoadTest(this: LoadTestHost, collectionId: string, loadTestId: string) {

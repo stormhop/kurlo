@@ -80,3 +80,16 @@ type LoadTestRequest struct {
 	ID          string `json:"id"`
 	RequestType string `json:"requestType"`
 }
+
+type K6ExportWarning struct {
+	Level   string `json:"level"`
+	Step    int    `json:"step,omitempty"`
+	Message string `json:"message"`
+}
+
+type K6ExportResult struct {
+	Script   string            `json:"script"`
+	FileName string            `json:"fileName"`
+	Warnings []K6ExportWarning `json:"warnings"`
+	Error    string            `json:"error,omitempty"`
+}

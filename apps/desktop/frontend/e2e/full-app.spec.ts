@@ -954,6 +954,18 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         };
         return clone(state.cookieSync);
       },
+      ExportLoadTestK6: async (payload: string, inlineSecrets: boolean) => {
+        const parsed = JSON.parse(payload) as { loadTest: { name: string }; requests: Array<{ name: string }> };
+        state.calls.push(`ExportLoadTestK6:${parsed.loadTest.name}:${parsed.requests.map(request => request.name).join(',')}:${inlineSecrets}`);
+        return {
+          script: `import http from 'k6/http';\n\nexport default function () {\n  http.get('https://shop.kurlo.test/login');\n}\n`,
+          fileName: 'login-load-test.k6.js',
+          warnings: [
+            { level: 'warn', step: 2, message: 'The pre-request and test scripts of List orders are not exported. Add checks to the step instead.' },
+            { level: 'info', message: 'password is secret and is not written into the script. Pass it when running: k6 run -e password=…' },
+          ],
+        };
+      },
       StartMockServer: async (config) => {
         state.calls.push(`StartMockServer:${config.collectionName}:${config.routes.length}`);
         state.mockServer = {
@@ -3447,6 +3459,23 @@ test.describe('Kurlo desktop browser E2E', () => {
         ],
       }],
     });
+
+    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export to k6' });
+    await expect(exportDialog).toBeVisible();
+    await expect(exportDialog.locator('.k6-export-warnings li')).toHaveCount(1);
+    await expect(exportDialog.locator('.k6-export-warnings')).toContainText('List orders are not exported');
+    await expect(exportDialog.locator('.k6-export-command')).toHaveText('password=… k6 run login-load-test.k6.js');
+    await exportDialog.getByRole('radio', { name: 'Write into the script' }).click();
+    await expect(exportDialog).toContainText('Do not commit or share it');
+    await exportDialog.getByRole('button', { name: 'Save script…' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedFiles.map(file => file.name))).toEqual(['login-load-test.k6.js']);
+    expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('ExportLoadTestK6')))).toEqual([
+      'ExportLoadTestK6:Login load test:Login,List orders:false',
+      'ExportLoadTestK6:Login load test:Login,List orders:true',
+    ]);
+    await exportDialog.press('Escape');
+    await expect(exportDialog).toBeHidden();
 
     const sidebarRow = page.locator('.collection-request-wrap').filter({ hasText: 'Login load test' });
     await expect(sidebarRow).toHaveClass(/active/);

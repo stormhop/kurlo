@@ -49,6 +49,8 @@ export function DenyCookieSyncPairing(arg1:string):Promise<model.CookieSyncStatu
 
 export function DiagnosticsReport():Promise<string>;
 
+export function ExportLoadTestK6(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
+
 export function FetchOAuth2Token(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
 export function GetEnvironment():Promise<Record<string, string>>;

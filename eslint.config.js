@@ -13,6 +13,7 @@ export default [
       '**/.astro/**',
       'apps/desktop/build/**',
       'apps/desktop/frontend/wailsjs/**',
+      'apps/desktop/internal/loadtest/testdata/**',
       'perf/fixtures/**',
       'release/**',
     ],

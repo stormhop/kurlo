@@ -443,3 +443,97 @@
 .loadtest-field > .app-select {
   align-self: flex-start;
 }
+
+.k6-export {
+  width: min(72rem, 100%);
+  height: min(46rem, calc(100vh - var(--space-10)));
+}
+
+.k6-export-title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.k6-export-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
+  min-height: 0;
+}
+
+.k6-export-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4);
+  overflow: auto;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.k6-export-side .segmented {
+  align-self: flex-start;
+}
+
+.k6-export-command {
+  padding: var(--space-2) var(--space-2-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.k6-export-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+}
+
+.k6-export-warnings li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.k6-export-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-label);
+}
+
+.k6-export-code {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-3);
+  overflow: hidden;
+}
+
+.k6-export-file {
+  flex: 1;
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 60rem) {
+  .k6-export-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .k6-export-side {
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+}

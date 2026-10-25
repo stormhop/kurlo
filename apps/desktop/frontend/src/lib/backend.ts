@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, LoadTest, LoadTestRequest,
+  McpResponse, AiRequest, AiResponse, LoadTest, LoadTestRequest, K6ExportResult,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -596,6 +596,14 @@ export async function storedHistoryResponseIds(): Promise<string[]> {
 
 export async function clearHistoryResponses(): Promise<string> {
   return (await window.go?.api?.App?.ClearHistoryResponses?.()) ?? '';
+}
+
+export async function exportLoadTestK6(payload: string, inlineSecrets: boolean): Promise<K6ExportResult> {
+  const app = window.go?.api?.App;
+  if (!app?.ExportLoadTestK6) {
+    return { script: '', fileName: '', warnings: [], error: 'Exporting to k6 is only available in the desktop app.' };
+  }
+  return app.ExportLoadTestK6(payload, inlineSecrets);
 }
 
 export async function validateLoadTest(test: LoadTest, requests: LoadTestRequest[]): Promise<string[]> {

@@ -3,7 +3,8 @@
   import { loadTestFingerprint, normalizeLoadTest } from '../loadTests';
   import type { LoadTestTab } from '../stores/features/loadTests';
   import type { Collection, Environment, SavedRequest } from '../types/models';
-  import type { LoadTest } from '../wire';
+  import type { K6ExportResult, LoadTest } from '../wire';
+  import K6ExportModal from './K6ExportModal.svelte';
   import LoadDataTab from './LoadDataTab.svelte';
   import LoadFlowEditor from './LoadFlowEditor.svelte';
   import LoadProfileEditor from './LoadProfileEditor.svelte';
@@ -26,6 +27,9 @@
     onOpenRequest,
     onDuplicate,
     onDelete,
+    onExport,
+    onSaveScript,
+    onCopy,
   }: {
     collection: Collection | undefined;
     loadTest: LoadTest | undefined;
@@ -40,6 +44,9 @@
     onOpenRequest: (requestId: string) => void;
     onDuplicate: (collectionId: string, loadTestId: string) => void;
     onDelete: (collectionId: string, loadTestId: string) => void;
+    onExport: (collectionId: string, draft: LoadTest, inlineSecrets: boolean) => Promise<K6ExportResult>;
+    onSaveScript: (fileName: string, script: string) => Promise<boolean>;
+    onCopy: (text: string) => void;
   } = $props();
 
   let draft = $state<LoadTest>({ id: '', name: '', scenarios: [], settings: {} });
@@ -48,6 +55,7 @@
   let externalUpdate = $state(false);
   let savingInFlight = $state(false);
   let problems = $state<string[]>([]);
+  let exportOpen = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   const saved = $derived(saveState === 'saved');
@@ -167,6 +175,7 @@
           disabled={workspaceBlocked}
           onChange={setEnvironment}
         />
+        <button class="btn btn-secondary" type="button" onclick={() => (exportOpen = true)}>Export k6 script</button>
         <button class="btn btn-ghost" type="button" onclick={() => onDuplicate(collection.id, loadTest.id)} disabled={workspaceBlocked}>Duplicate</button>
         <button class="btn btn-ghost btn-danger" type="button" onclick={() => onDelete(collection.id, loadTest.id)} disabled={workspaceBlocked}>Delete</button>
         {#if !autosave}
@@ -201,6 +210,16 @@
         <LoadDataTab bind:draft disabled={workspaceBlocked} />
       {/if}
     </div>
+    {#if exportOpen}
+      {@const snapshot = $state.snapshot(draft) as LoadTest}
+      <K6ExportModal
+        loadTest={snapshot}
+        onExport={(inlineSecrets) => onExport(collection.id, snapshot, inlineSecrets)}
+        onSave={onSaveScript}
+        {onCopy}
+        onClose={() => (exportOpen = false)}
+      />
+    {/if}
   {:else}
     <div class="empty-state">
       <p class="empty-state-title">This load test is gone</p>

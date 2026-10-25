@@ -2010,6 +2010,59 @@ export namespace model {
 	}
 	
 	
+	export class K6ExportWarning {
+	    level: string;
+	    step?: number;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new K6ExportWarning(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.level = source["level"];
+	        this.step = source["step"];
+	        this.message = source["message"];
+	    }
+	}
+	export class K6ExportResult {
+	    script: string;
+	    fileName: string;
+	    warnings: K6ExportWarning[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new K6ExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.script = source["script"];
+	        this.fileName = source["fileName"];
+	        this.warnings = this.convertValues(source["warnings"], K6ExportWarning);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	
 	export class LoadCheck {
 	    type: string;

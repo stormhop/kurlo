@@ -1228,6 +1228,8 @@ class AppVM {
   declare duplicateLoadTest: typeof loadTestFeature.duplicateLoadTest;
   declare deleteLoadTest: typeof loadTestFeature.deleteLoadTest;
   declare saveLoadTest: typeof loadTestFeature.saveLoadTest;
+  declare loadTestEnvironment: typeof loadTestFeature.loadTestEnvironment;
+  declare exportLoadTestK6: typeof loadTestFeature.exportLoadTestK6;
   sidebarView = $state<SidebarView>('collections');
   requestHistory = $state<RequestHistoryEntry[]>([]);
   historyHeaderMenuOpen = $state(false);

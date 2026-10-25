@@ -767,6 +767,9 @@
         onOpenRequest={(requestId: string) => void vm.switchRequest(requestId)}
         onDuplicate={vm.duplicateLoadTest}
         onDelete={vm.deleteLoadTest}
+        onExport={vm.exportLoadTestK6}
+        onSaveScript={(fileName: string, script: string) => vm.saveTextFile(fileName, script)}
+        onCopy={(text: string) => void clipboardSet(text)}
       />
       {/if}
     {:else if vm.topView === 'history' && vm.historyDetailEntry}

@@ -94,6 +94,10 @@ export function DiagnosticsReport() {
   return window['go']['api']['App']['DiagnosticsReport']();
 }
 
+export function ExportLoadTestK6(arg1, arg2) {
+  return window['go']['api']['App']['ExportLoadTestK6'](arg1, arg2);
+}
+
 export function FetchOAuth2Token(arg1) {
   return window['go']['api']['App']['FetchOAuth2Token'](arg1);
 }
