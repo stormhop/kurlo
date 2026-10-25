@@ -3387,6 +3387,75 @@ test.describe('Kurlo desktop browser E2E', () => {
     ]);
   });
 
+  test('builds a load test from collection requests and saves it to the workspace', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Shop API');
+    for (const [name, url] of [['Login', 'https://shop.kurlo.test/login'], ['List orders', 'https://shop.kurlo.test/orders']]) {
+      await collectionRow(page, 'Shop API').getByLabel('Collection menu').click();
+      await collectionRow(page, 'Shop API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+      await chooseRequestType(page, 'HTTP Request');
+      await page.getByLabel('Request name').fill(name);
+      await page.getByLabel('Request name').press('Enter');
+      await page.getByLabel('Request URL').fill(url);
+      await page.locator('.save-btn:not(.revert-btn)').first().click();
+      await expect(page.locator('.save-btn:not(.revert-btn)').first()).toBeDisabled();
+    }
+
+    const loginRow = page.locator('.collection-request-wrap').filter({ hasText: 'Login' }).first();
+    await loginRow.hover();
+    await loginRow.getByLabel('Request menu').click();
+    await loginRow.getByRole('button', { name: 'Load test this request' }).click();
+
+    const editor = page.locator('section[aria-label="Load test"]');
+    await expect(editor).toBeVisible();
+    await expect(editor.getByLabel('Load test name')).toHaveValue('Login load test');
+    await expect(editor.getByRole('option')).toHaveCount(1);
+
+    await editor.getByRole('option').first().click();
+    await editor.getByRole('radio', { name: 'Once per user' }).click();
+    await editor.getByRole('button', { name: '+ Save a value' }).click();
+    await editor.getByLabel('Variable name').fill('token');
+    await editor.getByRole('textbox', { name: 'Path' }).fill('$.access_token');
+
+    await editor.getByRole('button', { name: '+ Add request from collection' }).click();
+    await editor.getByRole('menuitem', { name: /List orders/ }).click();
+    await expect(editor.getByRole('option')).toHaveCount(2);
+    await editor.getByLabel('Wait', { exact: true }).fill('1s');
+    await editor.getByLabel('Wait', { exact: true }).press('Enter');
+    await expect(editor.getByRole('option').nth(1)).toContainText('wait 1s');
+
+    await editor.getByRole('tab', { name: /Load & thresholds/ }).click();
+    await editor.getByRole('button', { name: /^Load normal traffic/ }).click();
+    await expect(editor.locator('.loadtest-preview')).toContainText('Peak 50 users · 13m total');
+    await editor.getByRole('radio', { name: 'Iterations per second' }).click();
+    await expect(editor.locator('.loadtest-preview')).toContainText('iterations/s');
+
+    await editor.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => {
+      const store = window.__kurloE2E.store as { collections?: Array<{ name: string; loadTests?: unknown[] }> };
+      return store.collections?.find(candidate => candidate.name === 'Shop API')?.loadTests?.[0] ?? null;
+    })).toMatchObject({
+      name: 'Login load test',
+      scenarios: [{
+        executor: { type: 'ramping-arrival-rate' },
+        steps: [
+          { once: true, extract: [{ var: 'token', from: 'json', path: '$.access_token' }] },
+          { thinkTimeMs: 1000 },
+        ],
+      }],
+    });
+
+    const sidebarRow = page.locator('.collection-request-wrap').filter({ hasText: 'Login load test' });
+    await expect(sidebarRow).toHaveClass(/active/);
+    await sidebarRow.getByLabel('Load test menu').click();
+    await sidebarRow.getByRole('button', { name: 'Duplicate' }).click();
+    await expect(editor.getByLabel('Load test name')).toHaveValue('Login load test copy');
+    await expect(page.locator('.collection-request-wrap').filter({ hasText: 'load test' })).toHaveCount(2);
+  });
+
   test('sends an AI request, streams the answer and shows the tool call', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);

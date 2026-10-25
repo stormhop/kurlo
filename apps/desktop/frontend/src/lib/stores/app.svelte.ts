@@ -83,6 +83,7 @@ import { globalsFeature, withTrailingRow as withTrailingGlobalRow } from './feat
 import { historyFeature } from './features/history';
 import { normalizeCollectionRuns, type CollectionRunRecord } from '../collectionRuns';
 import { menuFeature } from './features/menus';
+import { loadTestFeature, type LoadTestTab } from './features/loadTests';
 import { preferencesFeature } from './features/preferences';
 import { DEFAULT_STARTUP_VIEW, startupNeedsDraftRequest, startupTopView, type StartupView } from '../startupView';
 import { readResponseLayout, readResponseLayoutChosen, uiShellFeature, type ResponseLayout } from './features/uiShell';
@@ -754,6 +755,7 @@ class AppVM {
 
   declare closeFloatingMenus: typeof menuFeature.closeFloatingMenus;
   declare toggleRequestMenu: typeof menuFeature.toggleRequestMenu;
+  declare toggleLoadTestMenu: typeof menuFeature.toggleLoadTestMenu;
   declare toggleCollectionMenu: typeof menuFeature.toggleCollectionMenu;
   declare toggleFolderMenu: typeof menuFeature.toggleFolderMenu;
   declare toggleHistoryHeaderMenu: typeof menuFeature.toggleHistoryHeaderMenu;
@@ -1208,6 +1210,24 @@ class AppVM {
   collectionSettingsTab = $state<'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy'>('overview');
   collectionSettingsSaveState = $state<'idle' | 'saving' | 'saved'>('idle');
   openFolderMenuKey = $state('');
+  openLoadTestMenuId = $state('');
+  activeLoadTestId = $state('');
+  activeLoadTestCollectionId = $state('');
+  loadTestTab = $state<LoadTestTab>('flow');
+  loadTestSaveState = $state<'idle' | 'saving' | 'saved'>('idle');
+  loadTestSavedTimer: ReturnType<typeof setTimeout> | null = null;
+  declare loadTestRequestOptions: typeof loadTestFeature.loadTestRequestOptions;
+  declare loadTestRequestLabel: typeof loadTestFeature.loadTestRequestLabel;
+  declare activeLoadTest: typeof loadTestFeature.activeLoadTest;
+  declare validateLoadTestDraft: typeof loadTestFeature.validateLoadTestDraft;
+  declare openLoadTest: typeof loadTestFeature.openLoadTest;
+  declare closeLoadTestTab: typeof loadTestFeature.closeLoadTestTab;
+  declare updateCollectionLoadTests: typeof loadTestFeature.updateCollectionLoadTests;
+  declare createLoadTest: typeof loadTestFeature.createLoadTest;
+  declare createLoadTestFromRequest: typeof loadTestFeature.createLoadTestFromRequest;
+  declare duplicateLoadTest: typeof loadTestFeature.duplicateLoadTest;
+  declare deleteLoadTest: typeof loadTestFeature.deleteLoadTest;
+  declare saveLoadTest: typeof loadTestFeature.saveLoadTest;
   sidebarView = $state<SidebarView>('collections');
   requestHistory = $state<RequestHistoryEntry[]>([]);
   historyHeaderMenuOpen = $state(false);
@@ -1862,6 +1882,7 @@ function applyFeatures(target: object, ...features: object[]) {
 
 applyFeatures(
   AppVM.prototype,
+  loadTestFeature,
   cookieFeature,
   cookieSyncFeature,
   sseFeature,

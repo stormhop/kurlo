@@ -7,6 +7,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Load tests.** A collection can hold load tests: a flow of its HTTP and GraphQL requests, the load to put on it and the criteria for passing. Make one from a request's menu with **Load test this request**, or from a collection's menu with **New load test**. A step can run once per virtual user, for example to log in, save a value from the response as a variable for later steps, check the status or the body, and wait before the next step. The load starts from a preset (smoke, load, stress, spike, soak), as virtual users or iterations per second, constant or in stages, with a preview of its shape; pass criteria cover response time, failed requests and passed checks, for the whole flow or one step. Each load test is a YAML file in the collection's `loadtests/` folder, so it is reviewed and shared through Git like the requests. Running a test comes in a later release.
+
 ### Fixed
 
 - The status of a response stopped popping in after the first send: once a response arrived, the badge kept its arrival animation class, so later answers came in without it.

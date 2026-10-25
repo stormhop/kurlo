@@ -2,6 +2,7 @@ type MenuHost = {
   openRequestMenuId: string;
   openCollectionMenuId: string;
   openFolderMenuKey: string;
+  openLoadTestMenuId: string;
   historyHeaderMenuOpen: boolean;
   openHistoryMenuId: string;
   snippetMenuOpen: boolean;
@@ -17,6 +18,7 @@ function closeMenus(host: MenuHost) {
   host.openRequestMenuId = '';
   host.openCollectionMenuId = '';
   host.openFolderMenuKey = '';
+  host.openLoadTestMenuId = '';
   host.historyHeaderMenuOpen = false;
   host.openHistoryMenuId = '';
   host.snippetMenuOpen = false;
@@ -48,6 +50,10 @@ export const menuFeature = {
   toggleFolderMenu(this: MenuHost, key: string, event: MouseEvent) {
     const open = this.openFolderMenuKey === key ? '' : key;
     toggleMenu(this, event, () => (this.openFolderMenuKey = open));
+  },
+  toggleLoadTestMenu(this: MenuHost, id: string, event: MouseEvent) {
+    const open = this.openLoadTestMenuId === id ? '' : id;
+    toggleMenu(this, event, () => (this.openLoadTestMenuId = open));
   },
   toggleHistoryHeaderMenu(this: MenuHost, event: MouseEvent) {
     const open = !this.historyHeaderMenuOpen;

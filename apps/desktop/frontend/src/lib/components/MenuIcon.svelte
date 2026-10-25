@@ -1,5 +1,5 @@
 <script lang="ts">
-  type MenuIconName = 'request' | 'folder' | 'settings' | 'rename' | 'export' | 'import' | 'trash' | 'duplicate' | 'star' | 'copy' | 'play' | 'open' | 'example' | 'collection' | 'collection-add' | 'lock' | 'replace';
+  type MenuIconName = 'request' | 'folder' | 'settings' | 'rename' | 'export' | 'import' | 'trash' | 'duplicate' | 'star' | 'copy' | 'play' | 'open' | 'example' | 'collection' | 'collection-add' | 'lock' | 'replace' | 'load';
 
   let { name }: { name: MenuIconName } = $props();
 </script>
@@ -37,6 +37,8 @@
     <path d="M5 4.5L2 8l3 3.5M11 4.5L14 8l-3 3.5M9.2 3l-2.4 10"/>
   {:else if name === 'play'}
     <path d="M5 3.2v9.6L12.5 8z"/>
+  {:else if name === 'load'}
+    <path d="M2.5 13.5h11"/><path d="M3.5 11l3-3.5 2.5 2 3.5-5"/><path d="M10.5 4.5h2v2"/>
   {:else if name === 'lock'}
     <rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/>
   {/if}

@@ -484,6 +484,14 @@
     renameRequest={vm.renameRequest}
     duplicateRequest={vm.duplicateRequest}
     copyRequestCurl={vm.copyRequestCurl}
+    activeLoadTestId={vm.activeLoadTestId}
+    openLoadTestMenuId={vm.openLoadTestMenuId}
+    createLoadTest={(collectionId: string) => void vm.createLoadTest(collectionId)}
+    createLoadTestFromRequest={(requestId: string) => void vm.createLoadTestFromRequest(requestId)}
+    openLoadTest={(collectionId: string, loadTestId: string) => void vm.openLoadTest(collectionId, loadTestId)}
+    toggleLoadTestMenu={vm.toggleLoadTestMenu}
+    duplicateLoadTest={(collectionId: string, loadTestId: string) => void vm.duplicateLoadTest(collectionId, loadTestId)}
+    deleteLoadTest={(collectionId: string, loadTestId: string) => void vm.deleteLoadTest(collectionId, loadTestId)}
     toggleRequestPinned={vm.toggleRequestPinned}
     deleteRequest={vm.deleteRequest}
     toggleFolderCollapsed={vm.toggleFolderCollapsed}
@@ -740,6 +748,25 @@
         onClearLog={vm.clearMockServerLog}
         onCopy={(text: string) => void clipboardSet(text)}
         onOpenExample={(exampleId: string) => void vm.openMockRouteExample(exampleId)}
+      />
+      {/if}
+    {:else if vm.topView === 'loadtest'}
+      {#if lazy.LoadTestWorkspaceComponent}
+      {@const active = vm.activeLoadTest()}
+      <lazy.LoadTestWorkspaceComponent
+        collection={active?.collection}
+        loadTest={active?.loadTest}
+        requests={active ? vm.loadTestRequestOptions(active.collection.id) : []}
+        environments={vm.environments.filter(environment => environment.workspaceId === vm.activeWorkspaceId)}
+        bind:loadTestTab={vm.loadTestTab}
+        autosave={vm.autosave}
+        saveState={vm.loadTestSaveState}
+        workspaceBlocked={vm.workspaceBlocked}
+        onSave={vm.saveLoadTest}
+        onValidate={vm.validateLoadTestDraft}
+        onOpenRequest={(requestId: string) => void vm.switchRequest(requestId)}
+        onDuplicate={vm.duplicateLoadTest}
+        onDelete={vm.deleteLoadTest}
       />
       {/if}
     {:else if vm.topView === 'history' && vm.historyDetailEntry}

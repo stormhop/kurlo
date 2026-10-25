@@ -1,0 +1,148 @@
+import { describe, expect, it, vi } from 'vitest';
+import { loadTestFeature, uniqueLoadTestName } from '../lib/stores/features/loadTests';
+import { loadTestFingerprint } from '../lib/loadTests';
+import { makeCollection, normalizeCollection, normalizeSavedRequest } from '../lib/normalizers';
+import type { Collection, SavedRequest } from '../lib/types/models';
+import type { LoadTest } from '../lib/wire';
+
+function makeHost(requestType: SavedRequest['requestType'] = 'http') {
+  const collection = makeCollection('ws-1', 'Shop API');
+  const login = normalizeSavedRequest({ id: 'req-login', name: 'Login', collectionId: collection.id, requestType, method: 'POST', url: 'https://shop.test/login' }, [collection], 'ws-1');
+  const orders = normalizeSavedRequest({ id: 'req-orders', name: 'List orders', collectionId: collection.id, requestType: 'http', method: 'GET', url: 'https://shop.test/orders' }, [collection], 'ws-1');
+  const socket = normalizeSavedRequest({ id: 'req-socket', name: 'Live', collectionId: collection.id, requestType: 'ws', method: 'GET', url: 'wss://shop.test/live' }, [collection], 'ws-1');
+  const saved: Collection[][] = [];
+  const host = {
+    ...loadTestFeature,
+    activeLoadTestId: '',
+    activeLoadTestCollectionId: '',
+    activeRequestId: 'req-login',
+    activeWorkspaceId: 'ws-1',
+    collections: [collection] as Collection[],
+    loadTestSaveState: 'idle' as 'idle' | 'saving' | 'saved',
+    loadTestSavedTimer: null as ReturnType<typeof setTimeout> | null,
+    loadTestTab: 'load' as 'flow' | 'load' | 'data',
+    requests: [login, orders, socket],
+    sidebarView: 'history' as 'collections' | 'environments' | 'history',
+    topView: 'request' as string,
+    closeFloatingMenus: vi.fn(),
+    guardWorkspaceWritable: () => true,
+    openAlertDialog: vi.fn().mockResolvedValue(undefined),
+    openConfirmDialog: vi.fn().mockResolvedValue(true),
+    persistActiveRequestNow: vi.fn().mockResolvedValue(undefined),
+    persistRequestStore: vi.fn(async function (this: { collections: Collection[] }) {
+      saved.push(JSON.parse(JSON.stringify(host.collections)));
+      return true;
+    }),
+  };
+  return { host, collection, saved };
+}
+
+function testsOf(host: { collections: Collection[] }): LoadTest[] {
+  return host.collections[0].loadTests ?? [];
+}
+
+describe('load test store', () => {
+  it('creates a smoke test from a request and opens it', async () => {
+    const { host, saved } = makeHost();
+    await host.createLoadTestFromRequest('req-login');
+    const [test] = testsOf(host);
+    expect(test.name).toBe('Login load test');
+    expect(test.scenarios[0].executor).toEqual({ type: 'constant-vus', vus: 2, durationMs: 60000 });
+    expect(test.scenarios[0].steps.map(step => step.requestId)).toEqual(['req-login']);
+    expect(host.topView).toBe('loadtest');
+    expect(host.activeLoadTestId).toBe(test.id);
+    expect(host.loadTestTab).toBe('flow');
+    expect(host.sidebarView).toBe('collections');
+    expect(saved.at(-1)?.[0].loadTests?.[0].id).toBe(test.id);
+  });
+
+  it('refuses requests that a load test cannot run', async () => {
+    const { host } = makeHost();
+    await host.createLoadTestFromRequest('req-socket');
+    expect(testsOf(host)).toEqual([]);
+    expect(host.openAlertDialog).toHaveBeenCalled();
+  });
+
+  it('gives new tests unique names in the collection', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id);
+    await host.createLoadTest(collection.id);
+    expect(testsOf(host).map(test => test.name)).toEqual(['New load test', 'New load test 2']);
+    expect(uniqueLoadTestName('Smoke', [{ id: 'a', name: 'smoke', scenarios: [], settings: {} }])).toBe('Smoke 2');
+  });
+
+  it('only offers HTTP and GraphQL requests of the collection as steps', () => {
+    const { host, collection } = makeHost();
+    expect(host.loadTestRequestOptions(collection.id).map(request => request.id)).toEqual(['req-login', 'req-orders']);
+  });
+
+  it('duplicates a test right after the original with fresh ids', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id, ['req-login']);
+    await host.createLoadTest(collection.id);
+    const original = testsOf(host)[0];
+    await host.duplicateLoadTest(collection.id, original.id);
+    const tests = testsOf(host);
+    expect(tests.map(test => test.name)).toEqual(['Login load test', 'Login load test copy', 'New load test']);
+    expect(tests[1].id).not.toBe(original.id);
+    expect(tests[1].scenarios).toEqual(original.scenarios);
+    expect(host.activeLoadTestId).toBe(tests[1].id);
+  });
+
+  it('deletes a test after confirmation and leaves the editor', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id);
+    const [test] = testsOf(host);
+    await host.deleteLoadTest(collection.id, test.id);
+    expect(host.collections[0].loadTests).toBeUndefined();
+    expect(host.topView).toBe('request');
+    expect(host.activeLoadTestId).toBe('');
+  });
+
+  it('keeps the test when deletion is cancelled', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id);
+    host.openConfirmDialog.mockResolvedValueOnce(false);
+    await host.deleteLoadTest(collection.id, testsOf(host)[0].id);
+    expect(testsOf(host)).toHaveLength(1);
+  });
+
+  it('saves edits, renames the file and survives a reload', async () => {
+    const { host, collection, saved } = makeHost();
+    await host.createLoadTest(collection.id, ['req-login']);
+    const [test] = testsOf(host);
+    const draft: LoadTest = {
+      ...test,
+      name: '  Checkout flow ',
+      scenarios: [{ ...test.scenarios[0], steps: [{ ...test.scenarios[0].steps[0], once: true, extract: [{ var: 'token', from: 'json', path: '$.access_token' }] }] }],
+    };
+    expect(await host.saveLoadTest(collection.id, draft, loadTestFingerprint(test))).toBe(true);
+    const [after] = testsOf(host);
+    expect(after.name).toBe('Checkout flow');
+    expect(after.filesystemName).toBe('Checkout-flow');
+    expect(after.scenarios[0].steps[0]).toMatchObject({ once: true, extract: [{ var: 'token', from: 'json', path: '$.access_token' }] });
+    expect(host.loadTestSaveState).toBe('saved');
+    const reloaded = normalizeCollection(saved.at(-1)![0], 'ws-1');
+    expect(reloaded.loadTests).toEqual([after]);
+  });
+
+  it('refuses to overwrite a test that changed elsewhere', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id);
+    const [test] = testsOf(host);
+    const stale = loadTestFingerprint(test);
+    await host.saveLoadTest(collection.id, { ...test, name: 'Edited in YAML' }, stale);
+    expect(await host.saveLoadTest(collection.id, { ...test, name: 'Edited here' }, stale)).toBe(false);
+    expect(testsOf(host)[0].name).toBe('Edited in YAML');
+    expect(host.openAlertDialog).toHaveBeenCalled();
+  });
+
+  it('closes the editor back to the open request', () => {
+    const { host } = makeHost();
+    host.topView = 'loadtest';
+    host.activeLoadTestId = 'lt';
+    host.closeLoadTestTab();
+    expect(host.topView).toBe('request');
+    expect(host.activeLoadTestId).toBe('');
+  });
+});

@@ -18,6 +18,7 @@
     renameRequest,
     duplicateRequest,
     copyRequestCurl,
+    createLoadTestFromRequest,
     toggleRequestPinned,
     deleteRequest,
     openWorkspaceDiagnostic,
@@ -35,6 +36,7 @@
     renameRequest: (id: string, name?: string) => void | Promise<void>;
     duplicateRequest: (id: string) => void;
     copyRequestCurl: (id: string) => void;
+    createLoadTestFromRequest?: (id: string) => void;
     toggleRequestPinned: (id: string) => void;
     deleteRequest: (id: string) => void;
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
@@ -147,6 +149,7 @@
       <button class="menu-item" type="button" onclick={() => duplicateRequest(req.id)} disabled={disabled}><MenuIcon name="duplicate" />Duplicate</button>
       {#if !req.isDraft}<button class="menu-item" type="button" onclick={() => toggleRequestPinned(req.id)} disabled={disabled}><MenuIcon name="star" />{req.isPinned ? 'Unstar' : 'Star'}</button>{/if}
       {#if requestSupportsCurl(req)}<button class="menu-item" type="button" onclick={() => copyRequestCurl(req.id)} disabled={disabled}><MenuIcon name="copy" />Copy as cURL</button>{/if}
+      {#if createLoadTestFromRequest && !req.isDraft && req.collectionId && (!req.requestType || req.requestType === 'http' || req.requestType === 'graphql')}<button class="menu-item" type="button" onclick={() => createLoadTestFromRequest(req.id)} disabled={disabled}><MenuIcon name="load" />Load test this request</button>{/if}
       <div class="menu-separator" role="separator"></div>
       <button class="menu-item danger" type="button" onclick={() => deleteRequest(req.id)} disabled={disabled}><MenuIcon name="trash" />Delete</button>
     </div>

@@ -141,3 +141,7 @@ export function normalizeLoadTests(raw: unknown): LoadTest[] | undefined {
   });
   return loadTests.length ? loadTests : undefined;
 }
+
+export function loadTestFingerprint(test: LoadTest): string {
+  return JSON.stringify(normalizeLoadTest(JSON.parse(JSON.stringify(test))));
+}

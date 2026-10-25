@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse,
+  McpResponse, AiRequest, AiResponse, LoadTest, LoadTestRequest,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -596,6 +596,10 @@ export async function storedHistoryResponseIds(): Promise<string[]> {
 
 export async function clearHistoryResponses(): Promise<string> {
   return (await window.go?.api?.App?.ClearHistoryResponses?.()) ?? '';
+}
+
+export async function validateLoadTest(test: LoadTest, requests: LoadTestRequest[]): Promise<string[]> {
+  return (await window.go?.api?.App?.ValidateLoadTest?.(test, requests)) ?? [];
 }
 
 export async function startMockServer(config: MockServerConfig): Promise<MockServerStatus> {

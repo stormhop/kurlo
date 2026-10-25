@@ -19,6 +19,7 @@
     WorkspaceDiagnostic,
   } from '../types/models';
   import type { TopView } from '../stores/ui';
+  import type { LoadTest } from '../wire';
 
   type DropPlacement = 'before' | 'after';
   type CollectionSidebarRow =
@@ -27,6 +28,7 @@
     | { type: 'request'; key: string; height: number; req: SavedRequest; depth: number; menuKey: string }
     | { type: 'collection'; key: string; height: number; group: CollectionGroup }
     | { type: 'collection-empty'; key: string; height: number; collectionId: string; depth: number }
+    | { type: 'loadtest'; key: string; height: number; collectionId: string; loadTest: LoadTest; depth: number }
     | { type: 'folder'; key: string; height: number; folder: FolderGroup; collectionId: string; depth: number }
     | { type: 'folder-empty'; key: string; height: number; folder: FolderGroup; collectionId: string; depth: number };
   type HistorySidebarRow =
@@ -39,6 +41,7 @@
   const ROW_HEIGHT = 30;
   const REQUEST_ROW_HEIGHT = 28;
   const COLLECTION_ROW_HEIGHT = 28;
+  const LOADTEST_ROW_HEIGHT = 28;
   const FOLDER_ROW_HEIGHT = 30;
   const PINNED_HEAD_HEIGHT = 24;
   const EMPTY_ROW_HEIGHT = 58;
@@ -114,6 +117,14 @@
     openEnvironment,
     environmentValueCount,
     openWorkspaceDiagnostic,
+    activeLoadTestId = '',
+    openLoadTestMenuId = '',
+    createLoadTest,
+    createLoadTestFromRequest,
+    openLoadTest,
+    toggleLoadTestMenu,
+    duplicateLoadTest,
+    deleteLoadTest,
     workspaceBlocked = false,
   }: {
     sidebarView: SidebarView;
@@ -179,6 +190,14 @@
     openEnvironment: (environmentId: string) => void;
     environmentValueCount: (environment: Environment) => number;
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
+    activeLoadTestId?: string;
+    openLoadTestMenuId?: string;
+    createLoadTest: (collectionId: string) => void;
+    createLoadTestFromRequest: (requestId: string) => void;
+    openLoadTest: (collectionId: string, loadTestId: string) => void;
+    toggleLoadTestMenu: (id: string, event: MouseEvent) => void;
+    duplicateLoadTest: (collectionId: string, loadTestId: string) => void;
+    deleteLoadTest: (collectionId: string, loadTestId: string) => void;
     workspaceBlocked?: boolean;
   } = $props();
 
@@ -324,6 +343,11 @@
       }
       for (const folder of group.folders) addFolderRows(rows, group.collection.id, folder, COLLECTION_CHILD_DEPTH, hasSearch);
       for (const req of group.rootRequests) rows.push({ type: 'request', key: `request:${req.id}`, height: REQUEST_ROW_HEIGHT, req, depth: COLLECTION_CHILD_DEPTH, menuKey: `request:${req.id}` });
+      const query = sidebarSearch.trim().toLowerCase();
+      for (const loadTest of group.collection.loadTests ?? []) {
+        if (query && !loadTest.name.toLowerCase().includes(query)) continue;
+        rows.push({ type: 'loadtest', key: `loadtest:${loadTest.id}`, height: LOADTEST_ROW_HEIGHT, collectionId: group.collection.id, loadTest, depth: COLLECTION_CHILD_DEPTH });
+      }
     }
     return rows;
   }
@@ -543,6 +567,7 @@
               {renameRequest}
               {duplicateRequest}
               {copyRequestCurl}
+              {createLoadTestFromRequest}
               {toggleRequestPinned}
               {deleteRequest}
               {openWorkspaceDiagnostic}
@@ -621,6 +646,7 @@
                   <div class="menu request-menu collection-menu">
                     <button class="menu-item" type="button" onclick={() => createNewRequest(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="request" />Add request</button>
                     <button class="menu-item" type="button" onclick={() => createFolderInCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="folder" />Add folder</button>
+                    <button class="menu-item" type="button" onclick={() => createLoadTest(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="load" />New load test</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item" type="button" onclick={() => openCollectionSettings(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="settings" />Settings</button>
                     <button class="menu-item" type="button" onclick={() => renameCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
@@ -631,6 +657,34 @@
                   </div>
                 {/if}
               </div>
+            </div>
+          {:else if row.type === 'loadtest'}
+            <div
+              class="collection-request-wrap"
+              class:in-folder={true}
+              class:active={row.loadTest.id === activeLoadTestId && topView === 'loadtest'}
+              style={`--tree-depth: ${row.depth}`}
+            >
+              <button
+                class="collection-request"
+                type="button"
+                title={row.loadTest.name}
+                onclick={() => openLoadTest(row.collectionId, row.loadTest.id)}
+                oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleLoadTestMenu(row.loadTest.id, event); }}
+                disabled={workspaceBlocked}
+              >
+                <span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>
+                <span class="collection-title">{row.loadTest.name}</span>
+              </button>
+              <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleLoadTestMenu(row.loadTest.id, event)} aria-label="Load test menu" disabled={workspaceBlocked}>•••</button>
+              {#if openLoadTestMenuId === row.loadTest.id}
+                <div class="menu request-menu">
+                  <button class="menu-item" type="button" onclick={() => openLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="open" />Open</button>
+                  <button class="menu-item" type="button" onclick={() => duplicateLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="duplicate" />Duplicate</button>
+                  <div class="menu-separator" role="separator"></div>
+                  <button class="menu-item danger" type="button" onclick={() => deleteLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete</button>
+                </div>
+              {/if}
             </div>
           {:else if row.type === 'collection-empty'}
             <div class="collection-empty" role="status" style={`--tree-depth: ${row.depth}`}>
