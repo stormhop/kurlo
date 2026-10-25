@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, LoadTest, LoadTestRequest, K6ExportResult,
+  McpResponse, AiRequest, AiResponse, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -601,9 +601,59 @@ export async function clearHistoryResponses(): Promise<string> {
 export async function exportLoadTestK6(payload: string, inlineSecrets: boolean): Promise<K6ExportResult> {
   const app = window.go?.api?.App;
   if (!app?.ExportLoadTestK6) {
-    return { script: '', fileName: '', warnings: [], error: 'Exporting to k6 is only available in the desktop app.' };
+    return { script: '', fileName: '', warnings: [], steps: [], error: 'Exporting to k6 is only available in the desktop app.' };
   }
   return app.ExportLoadTestK6(payload, inlineSecrets);
+}
+
+const EMPTY_LOAD_RUN_STATE: LoadRunState = {
+  running: false, stopping: false, loadTestId: '', collectionId: '', startedAt: 0, plannedMs: 0, dashboardUrl: '', k6Version: '',
+  progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 },
+};
+
+export function emptyLoadRunState(): LoadRunState {
+  return { ...EMPTY_LOAD_RUN_STATE, progress: { ...EMPTY_LOAD_RUN_STATE.progress } };
+}
+
+export async function k6Info(path: string): Promise<K6Info> {
+  const app = window.go?.api?.App;
+  if (!app?.K6Info) return { found: false, path: '', version: '', error: 'k6 runs only in the desktop app.' };
+  return app.K6Info(path);
+}
+
+export async function startLoadRun(payload: string, k6Path: string): Promise<LoadRunState> {
+  const app = window.go?.api?.App;
+  if (!app?.StartLoadRun) return { ...emptyLoadRunState(), error: 'k6 runs only in the desktop app.' };
+  return app.StartLoadRun(payload, k6Path);
+}
+
+export async function stopLoadRun(): Promise<LoadRunState> {
+  return (await window.go?.api?.App?.StopLoadRun?.()) ?? emptyLoadRunState();
+}
+
+export async function loadRunStatus(): Promise<LoadRunState> {
+  return (await window.go?.api?.App?.LoadRunStatus?.()) ?? emptyLoadRunState();
+}
+
+export async function loadRunLog(): Promise<string[]> {
+  return (await window.go?.api?.App?.LoadRunLog?.()) ?? [];
+}
+
+export async function lastLoadRun(loadTestId: string): Promise<LoadRunResult | null> {
+  const result = await window.go?.api?.App?.LastLoadRun?.(loadTestId);
+  return result?.loadTestId ? result : null;
+}
+
+export async function loadRunSummaryJSON(loadTestId: string): Promise<string> {
+  return (await window.go?.api?.App?.LoadRunSummaryJSON?.(loadTestId)) ?? '';
+}
+
+export async function openLoadRunReport(loadTestId: string): Promise<string> {
+  return (await window.go?.api?.App?.OpenLoadRunReport?.(loadTestId)) ?? 'Reports open only in the desktop app.';
+}
+
+export async function loadTestTargets(payload: string): Promise<string[]> {
+  return (await window.go?.api?.App?.LoadTestTargets?.(payload)) ?? [];
 }
 
 export async function validateLoadTest(test: LoadTest, requests: LoadTestRequest[]): Promise<string[]> {

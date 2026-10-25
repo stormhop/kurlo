@@ -149,11 +149,23 @@ export function GrpcDiscover(arg1:model.GrpcRequest):Promise<model.GrpcServiceDe
 
 export function InstallBrowserExtension(arg1:string):Promise<api.BrowserExtensionResult>;
 
+export function K6Info(arg1:string):Promise<model.K6Info>;
+
+export function LastLoadRun(arg1:string):Promise<model.LoadRunResult>;
+
 export function ListCookies(arg1:string):Promise<Array<model.Cookie>>;
 
 export function LoadHistoryResponse(arg1:string):Promise<api.HistoryResponseResult>;
 
 export function LoadRequestStore():Promise<string>;
+
+export function LoadRunLog():Promise<Array<string>>;
+
+export function LoadRunStatus():Promise<model.LoadRunState>;
+
+export function LoadRunSummaryJSON(arg1:string):Promise<string>;
+
+export function LoadTestTargets(arg1:string):Promise<Array<string>>;
 
 export function LoadWorkspaceDiagnostics():Promise<Array<api.WorkspaceDiagnostic>>;
 
@@ -170,6 +182,8 @@ export function OpenDirectoryDialog(arg1:string):Promise<string>;
 export function OpenDirectoryDialogWithDefault(arg1:string,arg2:string):Promise<string>;
 
 export function OpenFileDialog(arg1:string):Promise<string>;
+
+export function OpenLoadRunReport(arg1:string):Promise<string>;
 
 export function OpenLogFolder():Promise<string>;
 
@@ -245,9 +259,13 @@ export function SocketIOEmit(arg1:string,arg2:model.SocketIOEmitMessage):Promise
 
 export function StartCookieSync(arg1:model.CookieSyncConfig,arg2:string):Promise<model.CookieSyncStatus>;
 
+export function StartLoadRun(arg1:string,arg2:string):Promise<model.LoadRunState>;
+
 export function StartMockServer(arg1:model.MockServerConfig):Promise<model.MockServerStatus>;
 
 export function StopCookieSync():Promise<model.CookieSyncStatus>;
+
+export function StopLoadRun():Promise<model.LoadRunState>;
 
 export function StopMockServer():Promise<model.MockServerStatus>;
 

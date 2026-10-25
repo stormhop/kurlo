@@ -2010,6 +2010,20 @@ export namespace model {
 	}
 	
 	
+	export class K6ExportStep {
+	    stepId: string;
+	    tag: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new K6ExportStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stepId = source["stepId"];
+	        this.tag = source["tag"];
+	    }
+	}
 	export class K6ExportWarning {
 	    level: string;
 	    step?: number;
@@ -2030,6 +2044,7 @@ export namespace model {
 	    script: string;
 	    fileName: string;
 	    warnings: K6ExportWarning[];
+	    steps: K6ExportStep[];
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -2041,6 +2056,7 @@ export namespace model {
 	        this.script = source["script"];
 	        this.fileName = source["fileName"];
 	        this.warnings = this.convertValues(source["warnings"], K6ExportWarning);
+	        this.steps = this.convertValues(source["steps"], K6ExportStep);
 	        this.error = source["error"];
 	    }
 	
@@ -2063,6 +2079,25 @@ export namespace model {
 		}
 	}
 	
+	
+	export class K6Info {
+	    found: boolean;
+	    path: string;
+	    version: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new K6Info(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.found = source["found"];
+	        this.path = source["path"];
+	        this.version = source["version"];
+	        this.error = source["error"];
+	    }
+	}
 	
 	export class LoadCheck {
 	    type: string;
@@ -2168,6 +2203,225 @@ export namespace model {
 	        this.path = source["path"];
 	    }
 	}
+	export class LoadRunProgress {
+	    elapsedMs: number;
+	    vus: number;
+	    maxVUs: number;
+	    iterations: number;
+	    interrupted: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadRunProgress(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.elapsedMs = source["elapsedMs"];
+	        this.vus = source["vus"];
+	        this.maxVUs = source["maxVUs"];
+	        this.iterations = source["iterations"];
+	        this.interrupted = source["interrupted"];
+	    }
+	}
+	export class LoadRunStep {
+	    stepId: string;
+	    tag: string;
+	    requests: number;
+	    med: number;
+	    p95: number;
+	    p99: number;
+	    failedRate: number;
+	    checksRate: number;
+	    checksPassed: number;
+	    checksFailed: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadRunStep(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stepId = source["stepId"];
+	        this.tag = source["tag"];
+	        this.requests = source["requests"];
+	        this.med = source["med"];
+	        this.p95 = source["p95"];
+	        this.p99 = source["p99"];
+	        this.failedRate = source["failedRate"];
+	        this.checksRate = source["checksRate"];
+	        this.checksPassed = source["checksPassed"];
+	        this.checksFailed = source["checksFailed"];
+	    }
+	}
+	export class LoadRunTotals {
+	    requests: number;
+	    rps: number;
+	    avg: number;
+	    med: number;
+	    p95: number;
+	    p99: number;
+	    max: number;
+	    failedRate: number;
+	    failedCount: number;
+	    checksPassed: number;
+	    checksFailed: number;
+	    iterations: number;
+	    interrupted: number;
+	    maxVUs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadRunTotals(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requests = source["requests"];
+	        this.rps = source["rps"];
+	        this.avg = source["avg"];
+	        this.med = source["med"];
+	        this.p95 = source["p95"];
+	        this.p99 = source["p99"];
+	        this.max = source["max"];
+	        this.failedRate = source["failedRate"];
+	        this.failedCount = source["failedCount"];
+	        this.checksPassed = source["checksPassed"];
+	        this.checksFailed = source["checksFailed"];
+	        this.iterations = source["iterations"];
+	        this.interrupted = source["interrupted"];
+	        this.maxVUs = source["maxVUs"];
+	    }
+	}
+	export class LoadRunThreshold {
+	    metric: string;
+	    stepId?: string;
+	    expression: string;
+	    ok: boolean;
+	    actual: number;
+	    hasActual: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadRunThreshold(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.metric = source["metric"];
+	        this.stepId = source["stepId"];
+	        this.expression = source["expression"];
+	        this.ok = source["ok"];
+	        this.actual = source["actual"];
+	        this.hasActual = source["hasActual"];
+	    }
+	}
+	export class LoadRunResult {
+	    loadTestId: string;
+	    collectionId: string;
+	    loadTestName: string;
+	    environment: string;
+	    k6Version: string;
+	    status: string;
+	    exitCode: number;
+	    startedAt: number;
+	    finishedAt: number;
+	    error?: string;
+	    thresholds: LoadRunThreshold[];
+	    totals: LoadRunTotals;
+	    steps: LoadRunStep[];
+	    hasReport: boolean;
+	    hasSummary: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadRunResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.loadTestId = source["loadTestId"];
+	        this.collectionId = source["collectionId"];
+	        this.loadTestName = source["loadTestName"];
+	        this.environment = source["environment"];
+	        this.k6Version = source["k6Version"];
+	        this.status = source["status"];
+	        this.exitCode = source["exitCode"];
+	        this.startedAt = source["startedAt"];
+	        this.finishedAt = source["finishedAt"];
+	        this.error = source["error"];
+	        this.thresholds = this.convertValues(source["thresholds"], LoadRunThreshold);
+	        this.totals = this.convertValues(source["totals"], LoadRunTotals);
+	        this.steps = this.convertValues(source["steps"], LoadRunStep);
+	        this.hasReport = source["hasReport"];
+	        this.hasSummary = source["hasSummary"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class LoadRunState {
+	    running: boolean;
+	    stopping: boolean;
+	    loadTestId: string;
+	    collectionId: string;
+	    startedAt: number;
+	    plannedMs: number;
+	    dashboardUrl: string;
+	    k6Version: string;
+	    progress: LoadRunProgress;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadRunState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.stopping = source["stopping"];
+	        this.loadTestId = source["loadTestId"];
+	        this.collectionId = source["collectionId"];
+	        this.startedAt = source["startedAt"];
+	        this.plannedMs = source["plannedMs"];
+	        this.dashboardUrl = source["dashboardUrl"];
+	        this.k6Version = source["k6Version"];
+	        this.progress = this.convertValues(source["progress"], LoadRunProgress);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
 	export class LoadStep {
 	    id: string;
 	    requestId: string;

@@ -3,8 +3,9 @@ import {
   openDirectoryDialog, saveFileDialog, defaultWorkspaceLocation, setDefaultWorkspaceLocation,
   gitStatus, gitCommitLogPage, gitListBranches,
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
+  emptyLoadRunState,
 } from '../backend';
-import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef } from '../backend';
+import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState } from '../backend';
 import { EMPTY_COOKIE_SYNC_STATUS, EMPTY_MOCK_SERVER_STATUS } from '../wire';
 import { DEFAULT_MOCK_PORT } from '../mockRoutes';
 import type { SSEEventEntry, SSESession, WebSocketMessageEntry, WebSocketSession, SocketIOMessageEntry, SocketIOSession, SocketIOClientVersion } from '../types/models';
@@ -84,6 +85,7 @@ import { historyFeature } from './features/history';
 import { normalizeCollectionRuns, type CollectionRunRecord } from '../collectionRuns';
 import { menuFeature } from './features/menus';
 import { loadTestFeature, type LoadTestTab } from './features/loadTests';
+import { loadRunFeature } from './features/loadRuns';
 import { preferencesFeature } from './features/preferences';
 import { DEFAULT_STARTUP_VIEW, startupNeedsDraftRequest, startupTopView, type StartupView } from '../startupView';
 import { readResponseLayout, readResponseLayoutChosen, uiShellFeature, type ResponseLayout } from './features/uiShell';
@@ -1230,6 +1232,23 @@ class AppVM {
   declare saveLoadTest: typeof loadTestFeature.saveLoadTest;
   declare loadTestEnvironment: typeof loadTestFeature.loadTestEnvironment;
   declare exportLoadTestK6: typeof loadTestFeature.exportLoadTestK6;
+  declare loadTestPayload: typeof loadTestFeature.loadTestPayload;
+  k6Path = $state('');
+  k6Info = $state<K6Info | null>(null);
+  k6MissingOpen = $state(false);
+  loadRun = $state<LoadRunState>(emptyLoadRunState());
+  loadRunLogLines = $state<string[]>([]);
+  loadRunLogTestId = $state('');
+  loadRunResults = $state<Record<string, LoadRunResult>>({});
+  declare initLoadRunListeners: typeof loadRunFeature.initLoadRunListeners;
+  declare checkK6: typeof loadRunFeature.checkK6;
+  declare chooseK6Binary: typeof loadRunFeature.chooseK6Binary;
+  declare loadLastLoadRun: typeof loadRunFeature.loadLastLoadRun;
+  declare confirmLoadTargets: typeof loadRunFeature.confirmLoadTargets;
+  declare runLoadTest: typeof loadRunFeature.runLoadTest;
+  declare stopLoadTest: typeof loadRunFeature.stopLoadTest;
+  declare openLoadTestReport: typeof loadRunFeature.openLoadTestReport;
+  declare saveLoadTestSummary: typeof loadRunFeature.saveLoadTestSummary;
   sidebarView = $state<SidebarView>('collections');
   requestHistory = $state<RequestHistoryEntry[]>([]);
   historyHeaderMenuOpen = $state(false);
@@ -1885,6 +1904,7 @@ function applyFeatures(target: object, ...features: object[]) {
 applyFeatures(
   AppVM.prototype,
   loadTestFeature,
+  loadRunFeature,
   cookieFeature,
   cookieSyncFeature,
   sseFeature,

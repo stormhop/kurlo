@@ -38,6 +38,7 @@ type App struct {
 	cookieSync     *cookieSyncServer
 	binaryBodies   *binaryResponseCache
 	mcpSessions    *mcpSessionRegistry
+	loadRuns       loadRunManager
 }
 
 type SaveRequestStoreResult struct {
@@ -108,6 +109,7 @@ func (a *App) Shutdown(_ context.Context) {
 	if a.mock != nil {
 		a.mock.stop()
 	}
+	a.stopLoadRunForShutdown()
 	if a.cookieSync != nil {
 		a.cookieSync.stopServer()
 	}

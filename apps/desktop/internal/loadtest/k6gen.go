@@ -55,6 +55,7 @@ type generator struct {
 	needs     map[string]bool
 	tokens    []model.AuthConfig
 	stepTags  map[string]string
+	stepOrder []model.K6ExportStep
 	insecure  bool
 }
 
@@ -95,7 +96,19 @@ func GenerateK6(plan Plan, options Options) model.K6ExportResult {
 		Script:   g.out.String(),
 		FileName: fileName(plan.Test.Name),
 		Warnings: g.warnings,
+		Steps:    g.stepOrder,
 	}
+}
+
+func ThresholdKey(threshold model.LoadThreshold, tag string) string {
+	if tag == "" {
+		return threshold.Metric
+	}
+	return threshold.Metric + "{step:" + tag + "}"
+}
+
+func ThresholdExpression(threshold model.LoadThreshold) string {
+	return threshold.Stat + threshold.Op + strconv.FormatFloat(threshold.Value, 'f', -1, 64)
 }
 
 func (g *generator) steps() []model.LoadStep {
@@ -280,6 +293,7 @@ func (g *generator) defaultFunction(steps []model.LoadStep) string {
 		}
 		tag := g.stepTag(step, request, used)
 		g.stepTags[step.ID] = tag
+		g.stepOrder = append(g.stepOrder, model.K6ExportStep{StepID: step.ID, Tag: tag})
 		g.writeStep(number, step, request, tag)
 	}
 	body := g.out.String()
@@ -639,19 +653,18 @@ func (g *generator) scenario() []string {
 
 func (g *generator) thresholds() []string {
 	byKey := map[string][]string{}
-	stepIDs := map[string]bool{}
 	for _, threshold := range g.plan.Test.Thresholds {
-		key := threshold.Metric
+		tag := ""
 		if threshold.Step != "" {
-			tag, ok := g.stepTags[threshold.Step]
+			found, ok := g.stepTags[threshold.Step]
 			if !ok {
 				g.warn(0, "A threshold applies to a step that is not exported, so it is left out.")
 				continue
 			}
-			key += "{step:" + tag + "}"
-			stepIDs[threshold.Step] = true
+			tag = found
 		}
-		expression := threshold.Stat + threshold.Op + strconv.FormatFloat(threshold.Value, 'f', -1, 64)
+		key := ThresholdKey(threshold, tag)
+		expression := ThresholdExpression(threshold)
 		if threshold.AbortOnFail {
 			byKey[key] = append(byKey[key], "{ threshold: "+jsString(expression)+", abortOnFail: true }")
 		} else {
@@ -659,7 +672,7 @@ func (g *generator) thresholds() []string {
 		}
 	}
 	for _, tag := range g.stepTags {
-		for _, metric := range []string{"http_req_duration", "http_req_failed", "checks"} {
+		for _, metric := range []string{"http_req_duration", "http_req_failed", "http_reqs", "checks"} {
 			key := metric + "{step:" + tag + "}"
 			if _, ok := byKey[key]; !ok {
 				byKey[key] = []string{}

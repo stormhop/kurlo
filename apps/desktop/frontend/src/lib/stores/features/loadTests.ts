@@ -7,7 +7,7 @@ import { newEntityId, requestTabLabel } from '../../utils';
 import type { K6ExportResult, LoadStep, LoadTest } from '../../wire';
 import type { TopView } from '../ui';
 
-export type LoadTestTab = 'flow' | 'load' | 'data';
+export type LoadTestTab = 'flow' | 'load' | 'data' | 'results';
 
 const LOAD_TEST_REQUEST_TYPES = new Set(['', 'http', 'graphql']);
 
@@ -99,20 +99,25 @@ export const loadTestFeature = {
     return environments.find(environment => environment.id === this.activeEnvironmentId);
   },
 
-  async exportLoadTestK6(this: LoadTestHost & { loadTestEnvironment: (collection: Collection, test: LoadTest) => Environment | undefined }, collectionId: string, test: LoadTest, inlineSecrets: boolean): Promise<K6ExportResult> {
+  loadTestPayload(this: LoadTestHost & { loadTestEnvironment: (collection: Collection, test: LoadTest) => Environment | undefined }, collectionId: string, test: LoadTest): string | null {
     const collection = this.collections.find(candidate => candidate.id === collectionId);
-    if (!collection) return { script: '', fileName: '', warnings: [], error: 'The collection of this load test is gone.' };
+    if (!collection) return null;
     const requestIds = new Set((test.scenarios[0]?.steps ?? []).map(step => step.requestId));
     const environment = this.loadTestEnvironment(collection, test);
     const { loadTests: _loadTests, ...collectionWithoutTests } = collection;
-    const payload = {
+    return JSON.stringify({
       loadTest: test,
       collection: collectionWithoutTests,
       requests: this.requests.filter(request => requestIds.has(request.id) && request.collectionId === collectionId),
       environment: environment ? { name: environment.name, values: environment.values } : null,
       globals: this.globalVariables,
-    };
-    return exportLoadTestK6(JSON.stringify(payload), inlineSecrets);
+    });
+  },
+
+  async exportLoadTestK6(this: LoadTestHost & { loadTestPayload: (collectionId: string, test: LoadTest) => string | null }, collectionId: string, test: LoadTest, inlineSecrets: boolean): Promise<K6ExportResult> {
+    const payload = this.loadTestPayload(collectionId, test);
+    if (!payload) return { script: '', fileName: '', warnings: [], steps: [], error: 'The collection of this load test is gone.' };
+    return exportLoadTestK6(payload, inlineSecrets);
   },
 
   async openLoadTest(this: LoadTestHost, collectionId: string, loadTestId: string) {

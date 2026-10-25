@@ -215,6 +215,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       gitStatusOverride: null,
       gitBranchesOverride: null,
       failSaves: false,
+      k6Found: true,
       cookieSync: {
         enabled: false,
         running: false,
@@ -953,6 +954,30 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
           pending: { id: '', browser: '', extensionId: '', code: '', requestedAt: 0, expiresAt: 0 },
         };
         return clone(state.cookieSync);
+      },
+      K6Info: async (path: string) => {
+        state.calls.push(`K6Info:${path}`);
+        return state.k6Found
+          ? { found: true, path: '/usr/local/bin/k6', version: 'v1.3.0' }
+          : { found: false, path: '', version: '', error: 'k6 is not installed or not on the PATH.' };
+      },
+      LoadTestTargets: async () => ['shop.kurlo.test'],
+      StartLoadRun: async (payload: string) => {
+        const parsed = JSON.parse(payload) as { loadTest: { id: string } };
+        state.calls.push(`StartLoadRun:${parsed.loadTest.id}`);
+        return { running: true, stopping: false, loadTestId: parsed.loadTest.id, collectionId: '', startedAt: Date.now(), plannedMs: 60000, dashboardUrl: '', k6Version: 'v1.3.0', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } };
+      },
+      StopLoadRun: async () => {
+        state.calls.push('StopLoadRun');
+        return { running: true, stopping: true, loadTestId: '', collectionId: '', startedAt: 0, plannedMs: 0, dashboardUrl: '', k6Version: '', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } };
+      },
+      LoadRunStatus: async () => ({ running: false, stopping: false, loadTestId: '', collectionId: '', startedAt: 0, plannedMs: 0, dashboardUrl: '', k6Version: '', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } }),
+      LoadRunLog: async () => [],
+      LastLoadRun: async () => ({ loadTestId: '', thresholds: [], steps: [] }),
+      LoadRunSummaryJSON: async (loadTestId: string) => `{"metrics":{},"loadTestId":"${loadTestId}"}`,
+      OpenLoadRunReport: async (loadTestId: string) => {
+        state.calls.push(`OpenLoadRunReport:${loadTestId}`);
+        return '';
       },
       ExportLoadTestK6: async (payload: string, inlineSecrets: boolean) => {
         const parsed = JSON.parse(payload) as { loadTest: { name: string }; requests: Array<{ name: string }> };
@@ -3483,6 +3508,83 @@ test.describe('Kurlo desktop browser E2E', () => {
     await sidebarRow.getByRole('button', { name: 'Duplicate' }).click();
     await expect(editor.getByLabel('Load test name')).toHaveValue('Login load test copy');
     await expect(page.locator('.collection-request-wrap').filter({ hasText: 'load test' })).toHaveCount(2);
+  });
+
+  test('runs a load test in k6 and shows the result of the run', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Shop API');
+    await collectionRow(page, 'Shop API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Shop API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request name').fill('Login');
+    await page.getByLabel('Request name').press('Enter');
+    await page.getByLabel('Request URL').fill('https://shop.kurlo.test/login');
+    await page.locator('.save-btn:not(.revert-btn)').first().click();
+    await expect(page.locator('.save-btn:not(.revert-btn)').first()).toBeDisabled();
+    const loginRow = page.locator('.collection-request-wrap').filter({ hasText: 'Login' }).first();
+    await loginRow.hover();
+    await loginRow.getByLabel('Request menu').click();
+    await loginRow.getByRole('button', { name: 'Load test this request' }).click();
+    const editor = page.locator('section[aria-label="Load test"]');
+    await expect(editor).toBeVisible();
+    const loadTestId = await page.evaluate(() => {
+      const store = window.__kurloE2E.store as { collections?: Array<{ loadTests?: Array<{ id: string }> }> };
+      return store.collections?.flatMap(collection => collection.loadTests ?? [])[0]?.id ?? '';
+    });
+    expect(loadTestId).not.toBe('');
+
+    await page.evaluate(() => { (window.__kurloE2E as unknown as { k6Found: boolean }).k6Found = false; });
+    await editor.getByRole('button', { name: 'Run with k6' }).first().click();
+    const missing = page.getByRole('dialog', { name: 'k6 is not installed' });
+    await expect(missing).toBeVisible();
+    await expect(missing).toContainText('brew install k6');
+    await page.evaluate(() => { (window.__kurloE2E as unknown as { k6Found: boolean }).k6Found = true; });
+    await missing.getByRole('button', { name: 'Check again' }).click();
+    await expect(missing).toBeHidden();
+
+    await editor.getByRole('button', { name: 'Run with k6' }).first().click();
+    const confirm = page.getByRole('dialog', { name: 'Run load test' });
+    await expect(confirm).toContainText('shop.kurlo.test');
+    await confirm.getByRole('button', { name: 'Run load test' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('StartLoadRun')))).toEqual([`StartLoadRun:${loadTestId}`]);
+    await expect(editor.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
+
+    await page.evaluate((id) => {
+      const base = { running: true, stopping: false, loadTestId: id, collectionId: '', startedAt: Date.now(), plannedMs: 60000, dashboardUrl: 'http://127.0.0.1:5665', k6Version: 'v1.3.0' };
+      window.__kurloE2E.emit('load:progress', { ...base, progress: { elapsedMs: 15000, vus: 2, maxVUs: 2, iterations: 42, interrupted: 0 } });
+      window.__kurloE2E.emit('load:log', 'running (15.0s), 2/2 VUs, 42 complete and 0 interrupted iterations');
+    }, loadTestId);
+    await expect(editor.locator('.loadrun-progress')).toContainText('42');
+    await expect(editor.locator('.loadrun-progress')).toContainText('15s / 1m');
+    await expect(editor.locator('.loadrun-bar')).toHaveAttribute('aria-valuenow', '25');
+    await expect(editor.locator('.loadrun-log')).toContainText('42 complete');
+    await editor.getByRole('button', { name: 'Stop' }).first().click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.includes('StopLoadRun'))).toBe(true);
+
+    await page.evaluate((id) => {
+      window.__kurloE2E.emit('load:progress', { running: false, stopping: false, loadTestId: '', collectionId: '', startedAt: 0, plannedMs: 0, dashboardUrl: '', k6Version: '', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } });
+      window.__kurloE2E.emit('load:done', {
+        loadTestId: id, collectionId: '', loadTestName: 'Login load test', environment: '', k6Version: 'v1.3.0', status: 'failed', exitCode: 99,
+        startedAt: Date.now() - 60000, finishedAt: Date.now(), hasReport: true, hasSummary: true,
+        thresholds: [
+          { metric: 'http_req_duration', expression: 'p(95)<500', ok: true, actual: 212.4, hasActual: true },
+          { metric: 'http_req_failed', expression: 'rate<0.01', ok: false, actual: 0.04, hasActual: true },
+        ],
+        totals: { requests: 1200, rps: 20, avg: 90, med: 74, p95: 212.4, p99: 300, max: 900, failedRate: 0.04, failedCount: 48, checksPassed: 0, checksFailed: 0, iterations: 1200, interrupted: 0, maxVUs: 2 },
+        steps: [{ stepId: 'missing', tag: 'login', requests: 1200, med: 74, p95: 212.4, p99: 300, failedRate: 0.04, checksRate: 0, checksPassed: 0, checksFailed: 0 }],
+      });
+    }, loadTestId);
+    const banner = editor.locator('.loadrun-banner');
+    await expect(banner).toContainText('1 of 2 pass criteria not met');
+    await expect(banner).toContainText('exit code 99');
+    await expect(editor.locator('.loadrun-table').first()).toContainText('Not met');
+    await expect(editor.locator('.loadrun-totals')).toContainText('1,200');
+    await editor.getByRole('button', { name: 'Open HTML report' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('OpenLoadRunReport')))).toEqual([`OpenLoadRunReport:${loadTestId}`]);
+    await editor.getByRole('button', { name: 'Save summary JSON' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedFiles.map(file => file.name))).toEqual(['login-load-test-summary.json']);
   });
 
   test('sends an AI request, streams the answer and shows the tool call', async ({ page }) => {

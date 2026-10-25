@@ -87,9 +87,100 @@ type K6ExportWarning struct {
 	Message string `json:"message"`
 }
 
+type K6ExportStep struct {
+	StepID string `json:"stepId"`
+	Tag    string `json:"tag"`
+}
+
 type K6ExportResult struct {
 	Script   string            `json:"script"`
 	FileName string            `json:"fileName"`
 	Warnings []K6ExportWarning `json:"warnings"`
+	Steps    []K6ExportStep    `json:"steps"`
 	Error    string            `json:"error,omitempty"`
+}
+
+type K6Info struct {
+	Found   bool   `json:"found"`
+	Path    string `json:"path"`
+	Version string `json:"version"`
+	Error   string `json:"error,omitempty"`
+}
+
+type LoadRunProgress struct {
+	ElapsedMs   int64 `json:"elapsedMs"`
+	VUs         int   `json:"vus"`
+	MaxVUs      int   `json:"maxVUs"`
+	Iterations  int64 `json:"iterations"`
+	Interrupted int64 `json:"interrupted"`
+}
+
+type LoadRunState struct {
+	Running      bool            `json:"running"`
+	Stopping     bool            `json:"stopping"`
+	LoadTestID   string          `json:"loadTestId"`
+	CollectionID string          `json:"collectionId"`
+	StartedAt    int64           `json:"startedAt"`
+	PlannedMs    int64           `json:"plannedMs"`
+	DashboardURL string          `json:"dashboardUrl"`
+	K6Version    string          `json:"k6Version"`
+	Progress     LoadRunProgress `json:"progress"`
+	Error        string          `json:"error,omitempty"`
+}
+
+type LoadRunThreshold struct {
+	Metric     string  `json:"metric"`
+	StepID     string  `json:"stepId,omitempty"`
+	Expression string  `json:"expression"`
+	Ok         bool    `json:"ok"`
+	Actual     float64 `json:"actual"`
+	HasActual  bool    `json:"hasActual"`
+}
+
+type LoadRunStep struct {
+	StepID       string  `json:"stepId"`
+	Tag          string  `json:"tag"`
+	Requests     int64   `json:"requests"`
+	Med          float64 `json:"med"`
+	P95          float64 `json:"p95"`
+	P99          float64 `json:"p99"`
+	FailedRate   float64 `json:"failedRate"`
+	ChecksRate   float64 `json:"checksRate"`
+	ChecksPassed int64   `json:"checksPassed"`
+	ChecksFailed int64   `json:"checksFailed"`
+}
+
+type LoadRunTotals struct {
+	Requests     int64   `json:"requests"`
+	RPS          float64 `json:"rps"`
+	Avg          float64 `json:"avg"`
+	Med          float64 `json:"med"`
+	P95          float64 `json:"p95"`
+	P99          float64 `json:"p99"`
+	Max          float64 `json:"max"`
+	FailedRate   float64 `json:"failedRate"`
+	FailedCount  int64   `json:"failedCount"`
+	ChecksPassed int64   `json:"checksPassed"`
+	ChecksFailed int64   `json:"checksFailed"`
+	Iterations   int64   `json:"iterations"`
+	Interrupted  int64   `json:"interrupted"`
+	MaxVUs       int     `json:"maxVUs"`
+}
+
+type LoadRunResult struct {
+	LoadTestID   string             `json:"loadTestId"`
+	CollectionID string             `json:"collectionId"`
+	LoadTestName string             `json:"loadTestName"`
+	Environment  string             `json:"environment"`
+	K6Version    string             `json:"k6Version"`
+	Status       string             `json:"status"`
+	ExitCode     int                `json:"exitCode"`
+	StartedAt    int64              `json:"startedAt"`
+	FinishedAt   int64              `json:"finishedAt"`
+	Error        string             `json:"error,omitempty"`
+	Thresholds   []LoadRunThreshold `json:"thresholds"`
+	Totals       LoadRunTotals      `json:"totals"`
+	Steps        []LoadRunStep      `json:"steps"`
+	HasReport    bool               `json:"hasReport"`
+	HasSummary   bool               `json:"hasSummary"`
 }

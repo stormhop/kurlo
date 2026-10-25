@@ -25,6 +25,10 @@ export const options = {
     "http_req_failed{step:list_orders}": [],
     "http_req_failed{step:login}": [],
     "http_req_failed{step:order_details}": [],
+    "http_reqs{step:create_order}": [],
+    "http_reqs{step:list_orders}": [],
+    "http_reqs{step:login}": [],
+    "http_reqs{step:order_details}": [],
   },
   summaryTrendStats: ["avg","min","med","max","p(90)","p(95)","p(99)"],
 };

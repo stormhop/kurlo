@@ -29,6 +29,8 @@
   import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
   import type { SnippetLanguage } from './lib/stores/ui';
   import type { ResponseTab } from './lib/types/models';
+  import type { LoadTest } from './lib/wire';
+  import { openExternalURL } from './lib/externalLinks';
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from './lib/response-render';
   import { tallyCollectionRun } from './lib/collectionRuns';
 
@@ -262,6 +264,7 @@
       else if (action === 'reset') vm.resetZoom();
     });
     vm.initCookieSyncListeners();
+    vm.initLoadRunListeners();
     void vm.refreshMockServerStatus();
     const beforeUnload = (event: BeforeUnloadEvent) => {
       vm.flushPendingPersist();
@@ -770,6 +773,21 @@
         onExport={vm.exportLoadTestK6}
         onSaveScript={(fileName: string, script: string) => vm.saveTextFile(fileName, script)}
         onCopy={(text: string) => void clipboardSet(text)}
+        run={vm.loadRun}
+        logLines={vm.loadRunLogLines}
+        logTestId={vm.loadRunLogTestId}
+        result={active ? vm.loadRunResults[active.loadTest.id] ?? null : null}
+        k6Info={vm.k6Info}
+        bind:k6MissingOpen={vm.k6MissingOpen}
+        onRun={(collectionId: string, draft: LoadTest) => void vm.runLoadTest(collectionId, draft)}
+        onStop={() => void vm.stopLoadTest()}
+        onLoadResult={(loadTestId: string) => void vm.loadLastLoadRun(loadTestId)}
+        onOpenDashboard={(url: string) => openExternalURL(url)}
+        onOpenReport={(loadTestId: string) => void vm.openLoadTestReport(loadTestId)}
+        onSaveSummary={(loadTestId: string, fileName: string) => void vm.saveLoadTestSummary(loadTestId, fileName)}
+        onChooseK6={() => void vm.chooseK6Binary()}
+        onCheckK6={() => void vm.checkK6().then(info => { if (info.found) vm.k6MissingOpen = false; })}
+        onOpenK6Guide={() => openExternalURL('https://grafana.com/docs/k6/latest/set-up/install-k6/')}
       />
       {/if}
     {:else if vm.topView === 'history' && vm.historyDetailEntry}
