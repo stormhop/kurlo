@@ -254,13 +254,20 @@ func TestCookieSyncPairingCanBeDeniedAndThenCoolsDown(t *testing.T) {
 	}
 }
 
-func TestCookieSyncPairingIsIdempotentPerExtension(t *testing.T) {
+func TestCookieSyncPairingNeverHandsOutAWaitingRequestAgain(t *testing.T) {
 	harness := startTestCookieSync(t, "example.com")
 
 	_, first := harness.post(t, "/pair", map[string]any{"browser": "Chrome", "extensionId": "abc123"})
-	_, second := harness.post(t, "/pair", map[string]any{"browser": "Chrome", "extensionId": "abc123"})
-	if first["requestId"] != second["requestId"] || first["code"] != second["code"] {
-		t.Fatalf("the same extension should keep its request and code: %v then %v", first, second)
+	requestID, _ := first["requestId"].(string)
+	if !strings.HasPrefix(requestID, "pair-") || len(requestID) < 20 {
+		t.Fatalf("the request id should be random, got %q", requestID)
+	}
+	status, second := harness.post(t, "/pair", map[string]any{"browser": "Chrome", "extensionId": "abc123"})
+	if status != http.StatusConflict || second["requestId"] != nil {
+		t.Fatalf("repeating the extension id must not reveal the waiting request, got %d %v", status, second)
+	}
+	if _, guessed := harness.get(t, "/pair?requestId=pair-1", "chrome-extension://kurlotestextension"); guessed["status"] != "expired" {
+		t.Fatalf("a guessed request id should read as expired, got %v", guessed)
 	}
 
 	status, other := harness.post(t, "/pair", map[string]any{"browser": "Firefox", "extensionId": "zzz999"})

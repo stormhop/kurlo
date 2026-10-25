@@ -76,17 +76,17 @@ func TestMissingHistoryResponseIsNotAnError(t *testing.T) {
 	}
 }
 
-func TestOversizedHistoryResponseIsTruncated(t *testing.T) {
+func TestOversizedHistoryResponseIsNotStoredHalfCut(t *testing.T) {
 	withHistoryStore(t)
 	app := &App{}
 
 	oversized := strings.Repeat("x", maxHistoryResponseBytes+4096)
 	result := app.SaveHistoryResponse("history-1", oversized)
-	if !result.Stored || !result.Truncated {
-		t.Fatalf("expected a stored, truncated response, got %+v", result)
+	if result.Stored || !result.Truncated {
+		t.Fatalf("expected an oversized response to be reported and skipped, got %+v", result)
 	}
-	if got := len(app.LoadHistoryResponse("history-1").Payload); got != maxHistoryResponseBytes {
-		t.Errorf("stored %d bytes, want the %d-byte cap", got, maxHistoryResponseBytes)
+	if loaded := app.LoadHistoryResponse("history-1"); loaded.Stored || loaded.Payload != "" {
+		t.Errorf("a cut payload should not be stored, got %+v", loaded)
 	}
 }
 

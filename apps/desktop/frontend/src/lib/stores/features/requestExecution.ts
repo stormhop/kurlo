@@ -65,6 +65,11 @@ type RequestExecutionHost = {
   markRequestLoading: (requestId: string, loading: boolean) => void;
   activeEnvironmentId: string;
   applyEnvironmentChangesFromResponse: (resp: HttpResponse, environmentId: string) => Promise<void>;
+  applyCollectionVariableUpdates: (
+    req: Pick<SavedRequest, 'collectionId'>,
+    updates: Record<string, string> | undefined,
+    removed: string[] | undefined,
+  ) => Promise<boolean>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   promoteActiveRequestToSSE: () => void;
   noteSuccessfulSend: () => void;
@@ -199,6 +204,7 @@ export const requestExecutionFeature = {
         resp = await sendHttpRequest(serialized);
       }
       try { await this.applyEnvironmentChangesFromResponse(resp, sentEnvironmentId); } catch {}
+      try { await this.applyCollectionVariableUpdates(requestSnapshot, resp.collectionVariableUpdates, resp.collectionVariablesRemoved); } catch {}
       try { await this.syncGlobalsFromBackend(); } catch {}
       if (!isCurrent()) return;
       if (requestSnapshot.method === 'GET' && this.isEventStreamResponse(resp)) {
@@ -230,6 +236,7 @@ export const requestExecutionFeature = {
         this.savedResponse = true;
         setTimeout(() => (this.savedResponse = false), 1600);
       }
+      if (isCurrent()) this.markRequestLoading(requestId, false);
       await this.recordRequestHistory(resp, requestSnapshot);
       if (resp.statusCode && !resp.error) this.noteSuccessfulSend();
     } catch (e) {

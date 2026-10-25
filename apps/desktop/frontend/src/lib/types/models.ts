@@ -321,6 +321,8 @@ export type GrpcResponse = {
   method: GrpcMethodInfo;
   preRequestResult: ScriptResult;
   testResult: ScriptResult;
+  collectionVariableUpdates?: Record<string, string>;
+  collectionVariablesRemoved?: string[];
 };
 export type GrpcHeadersEvent = {
   requestId: string;

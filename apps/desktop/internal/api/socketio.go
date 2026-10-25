@@ -80,6 +80,8 @@ type pendingSocketIOAck struct {
 
 var socketIOAckTimeout = 60 * time.Second
 
+const socketIOHandshakeReadTimeout = 30 * time.Second
+
 func newSocketIOManager(jars *cookieJarRegistry) *socketIOManager {
 	if jars == nil {
 		jars = newCookieJarRegistry()
@@ -256,7 +258,9 @@ func (m *socketIOManager) emit(sessionID string, msg model.SocketIOEmitMessage) 
 	}
 
 	sess.writeMu.Lock()
-	err = conn.WriteMessage(websocket.TextMessage, []byte(packet))
+	if err = conn.SetWriteDeadline(websocketWriteDeadline(len(packet))); err == nil {
+		err = conn.WriteMessage(websocket.TextMessage, []byte(packet))
+	}
 	sess.writeMu.Unlock()
 	if err != nil {
 		if ackCh != nil {
@@ -546,7 +550,20 @@ func (m *socketIOManager) runConnectionOnce(ctx context.Context, sessionID strin
 	writeText := func(data []byte) error {
 		sess.writeMu.Lock()
 		defer sess.writeMu.Unlock()
+		if err := conn.SetWriteDeadline(websocketWriteDeadline(len(data))); err != nil {
+			return err
+		}
 		return conn.WriteMessage(websocket.TextMessage, data)
+	}
+	readHandshake := func() ([]byte, error) {
+		timeout := websocketHandshakeTimeout(req)
+		if timeout <= 0 {
+			timeout = socketIOHandshakeReadTimeout
+		}
+		_ = conn.SetReadDeadline(time.Now().Add(timeout))
+		defer func() { _ = conn.SetReadDeadline(time.Time{}) }()
+		_, data, err := conn.ReadMessage()
+		return data, err
 	}
 
 	if isV2 {
@@ -555,7 +572,7 @@ func (m *socketIOManager) runConnectionOnce(ctx context.Context, sessionID strin
 			emitError("probe failed: " + err.Error())
 			return false
 		}
-		_, probeResp, err := conn.ReadMessage()
+		probeResp, err := readHandshake()
 		if err != nil || len(probeResp) < 1 || probeResp[0] != eioPong {
 			emitError("probe response invalid")
 			return false
@@ -581,7 +598,7 @@ func (m *socketIOManager) runConnectionOnce(ctx context.Context, sessionID strin
 		}()
 	} else {
 
-		_, data, err := conn.ReadMessage()
+		data, err := readHandshake()
 		if err != nil {
 			if ctx.Err() != nil {
 				emitClose("Disconnected")

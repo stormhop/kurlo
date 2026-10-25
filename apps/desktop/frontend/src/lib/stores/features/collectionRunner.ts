@@ -93,6 +93,19 @@ type CollectionRunnerHost = {
 
 type RunnerRequestContext = { globals?: Record<string, string>; iterationCount?: number };
 
+const runnerResultIndexes = new WeakMap<CollectionRunnerResult[], Map<string, number>>();
+
+function runnerResultIndex(results: CollectionRunnerResult[], runId: string): number {
+  let indexes = runnerResultIndexes.get(results);
+  if (!indexes) {
+    indexes = new Map(results.map((result, index) => [result.runId, index]));
+    runnerResultIndexes.set(results, indexes);
+  }
+  const index = indexes.get(runId);
+  if (index !== undefined && results[index]?.runId === runId) return index;
+  return results.findIndex(result => result.runId === runId);
+}
+
 export const collectionRunnerFeature = {
   collectionRunnerDefaultCollectionId(this: CollectionRunnerHost) {
     return this.activeCollectionId() || this.collectionRunnerCollections[0]?.id || '';
@@ -317,7 +330,10 @@ export const collectionRunnerFeature = {
     return { total: results.length, completed: completed.length, passed, failed, skipped, testsPassed, testsTotal, duration: this.collectionRunnerStartedAt ? duration : 0, allPassed: results.length > 0 && results.every(result => result.status === 'passed') };
   },
   updateCollectionRunnerResult(this: CollectionRunnerHost, runId: string, patch: Partial<CollectionRunnerResult>) {
-    this.collectionRunnerResults = this.collectionRunnerResults.map(result => result.runId === runId ? { ...result, ...patch } : result);
+    const results = this.collectionRunnerResults;
+    const index = runnerResultIndex(results, runId);
+    if (index < 0) return;
+    results[index] = { ...results[index], ...patch };
   },
   async downloadCollectionRunnerReport(this: CollectionRunnerHost) {
     if (!this.collectionRunnerResults.length) return;
@@ -399,6 +415,9 @@ export const collectionRunnerFeature = {
           this.updateCollectionRunnerResult(runId, { status: 'skipped', error: '' });
         } else {
           this.updateCollectionRunnerResult(runId, this.runnerResultFromGrpcResponse(req, resp, runId, iteration));
+          try {
+            await this.applyCollectionVariableUpdates(req, resp.collectionVariableUpdates, resp.collectionVariablesRemoved);
+          } catch {}
         }
       } else {
         const headerError = this.headerValidationErrorForRequest(req, runnerEnvValues);
@@ -430,6 +449,7 @@ export const collectionRunnerFeature = {
     }
   },
   async startCollectionRunner(this: CollectionRunnerHost, title: string, requests: SavedRequest[], options: { delayMs?: number; iterations?: number; parallel?: boolean; concurrency?: number; dataRows?: RunnerDataRow[]; collectionId?: string } = {}) {
+    if (this.collectionRunnerRunning) return;
     if (!requests.length) {
       this.collectionImportToast = 'No requests to run';
       setTimeout(() => (this.collectionImportToast = ''), 2200);

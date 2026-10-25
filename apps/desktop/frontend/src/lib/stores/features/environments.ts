@@ -110,20 +110,13 @@ export const environmentFeature = {
   environmentVariableSuggestions(this: EnvironmentHost, environmentId = this.activeEnvironmentId): VariableSuggestion[] {
     const environment = this.environments.find(candidate => candidate.id === environmentId && candidate.workspaceId === this.activeWorkspaceId);
     if (!environment) return [];
-    const seen = new Set<string>();
-    return environment.values
-      .filter(row => row.enabled && row.key.trim())
-      .map(row => ({
-        key: row.key.trim(),
-        value: row.value,
-        description: row.description,
-        secret: row.secret ?? false,
-      }))
-      .filter(row => {
-        if (seen.has(row.key)) return false;
-        seen.add(row.key);
-        return true;
-      });
+    const byKey = new Map<string, VariableSuggestion>();
+    for (const row of environment.values) {
+      const key = row.key.trim();
+      if (!row.enabled || !key) continue;
+      byKey.set(key, { key, value: row.value, description: row.description, secret: row.secret ?? false });
+    }
+    return [...byKey.values()];
   },
   activeSecretEnvironmentKeys(this: EnvironmentHost) {
     return this.environmentVariableSuggestions()

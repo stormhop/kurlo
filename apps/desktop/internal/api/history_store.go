@@ -49,10 +49,8 @@ func (a *App) SaveHistoryResponse(id string, payload string) HistoryResponseResu
 	if err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
-	truncated := false
 	if len(payload) > maxHistoryResponseBytes {
-		payload = payload[:maxHistoryResponseBytes]
-		truncated = true
+		return HistoryResponseResult{Stored: false, Truncated: true}
 	}
 	if err := os.MkdirAll(historyResponseDir(), 0o700); err != nil {
 		return HistoryResponseResult{Error: err.Error()}
@@ -64,7 +62,7 @@ func (a *App) SaveHistoryResponse(id string, payload string) HistoryResponseResu
 	if err := writeFileAtomic(path, encrypted); err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
-	return HistoryResponseResult{Stored: true, Truncated: truncated}
+	return HistoryResponseResult{Stored: true}
 }
 
 func (a *App) LoadHistoryResponse(id string) HistoryResponseResult {

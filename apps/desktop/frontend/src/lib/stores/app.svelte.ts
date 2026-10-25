@@ -1480,6 +1480,7 @@ class AppVM {
     let lWorkspaceCookies: Record<string, CookieJarEntry[]> = {};
     let lGlobals: KVRow[] = withTrailingGlobalRow([]);
     let requestStoreRaw = '';
+    let requestStoreParsed: Partial<RequestStore> | null = null;
     let requestStoreReadFailed = false;
     const savedTopViewState = this.loadTopViewState();
     this.workspaceDiagnostics = normalizeWorkspaceDiagnostics(diagnosticsOverride ?? await loadWorkspaceDiagnostics());
@@ -1488,6 +1489,7 @@ class AppVM {
       requestStoreRaw = raw;
       if (raw.trim()) {
         const parsed = JSON.parse(raw) as Partial<RequestStore>;
+        requestStoreParsed = parsed;
         lWs = (parsed.workspaces ?? []).map(normalizeWorkspace);
         lWsId = parsed.activeWorkspaceId ?? '';
         lCols = (parsed.collections ?? []).map(c => normalizeCollection(c, lWsId));
@@ -1507,9 +1509,12 @@ class AppVM {
     if (lEnvId && !lEnvs.some(e => e.id === lEnvId && e.workspaceId === lWsId)) lEnvId = '';
     this.workspaces = lWs; this.collections = lCols; this.environments = lEnvs;
     try {
-      const raw = rawOverride ?? await loadRequestStore();
-      if (raw.trim()) {
-        const parsed = JSON.parse(raw) as Partial<RequestStore>;
+      let parsed = requestStoreParsed;
+      if (requestStoreReadFailed) {
+        const raw = rawOverride ?? await loadRequestStore();
+        parsed = raw.trim() ? JSON.parse(raw) as Partial<RequestStore> : null;
+      }
+      if (parsed) {
         lReqs = (parsed.requests ?? []).map(r => normalizeSavedRequest(r, lCols, lWsId));
         lHistory = (parsed.history ?? []).map(e => normalizeHistoryEntry(e, lCols, lWsId)).filter((e): e is RequestHistoryEntry => Boolean(e));
         lWorkspaceCookies = this.normalizeWorkspaceCookieStore(parsed.workspaceCookies);

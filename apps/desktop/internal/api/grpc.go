@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fullstorydev/grpcurl"
@@ -72,25 +73,49 @@ type grpcInvokeHandler struct {
 	requestID string
 	startedAt time.Time
 	formatter grpcurl.Formatter
-	response  *model.GrpcResponse
 	emit      grpcEventEmitter
+
+	mu       sync.Mutex
+	response *model.GrpcResponse
 }
 
 func (h *grpcInvokeHandler) OnResolveMethod(md *desc.MethodDescriptor) {
+	h.mu.Lock()
 	h.response.Method = grpcMethodInfo(md)
+	h.mu.Unlock()
 }
 
 func (h *grpcInvokeHandler) OnSendHeaders(metadata.MD) {}
 
 func (h *grpcInvokeHandler) OnReceiveHeaders(md metadata.MD) {
+	h.mu.Lock()
 	h.response.Headers = grpcMetadataToKeyValues(md)
-	h.emitEvent("grpc:headers", model.GrpcHeadersEvent{
+	event := model.GrpcHeadersEvent{
 		RequestID: h.requestID,
 		Headers:   h.response.Headers,
 		Method:    h.response.Method,
 		Duration:  h.durationMs(),
 		Timestamp: time.Now().UnixMilli(),
-	})
+	}
+	h.mu.Unlock()
+	h.emitEvent("grpc:headers", event)
+}
+
+func (h *grpcInvokeHandler) appendMessage(msg model.GrpcMessage, countSize bool) model.GrpcMessageEvent {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	msg.Index = len(h.response.Messages) + 1
+	h.response.Messages = append(h.response.Messages, msg)
+	if countSize {
+		h.response.Size += int64(msg.Size)
+	}
+	return model.GrpcMessageEvent{
+		RequestID: h.requestID,
+		Message:   msg,
+		Size:      h.response.Size,
+		Duration:  h.durationMs(),
+		Timestamp: time.Now().UnixMilli(),
+	}
 }
 
 func (h *grpcInvokeHandler) OnReceiveResponse(resp proto.Message) {
@@ -98,22 +123,12 @@ func (h *grpcInvokeHandler) OnReceiveResponse(resp proto.Message) {
 	if err != nil {
 		body = fmt.Sprintf("Failed to format response message: %v", err)
 	}
-	msg := model.GrpcMessage{
-		Index:     len(h.response.Messages) + 1,
+	h.emitEvent("grpc:message", h.appendMessage(model.GrpcMessage{
 		Direction: "incoming",
 		Body:      body,
 		Size:      proto.Size(resp),
 		Timestamp: time.Now().UnixMilli(),
-	}
-	h.response.Messages = append(h.response.Messages, msg)
-	h.response.Size += int64(msg.Size)
-	h.emitEvent("grpc:message", model.GrpcMessageEvent{
-		RequestID: h.requestID,
-		Message:   msg,
-		Size:      h.response.Size,
-		Duration:  h.durationMs(),
-		Timestamp: time.Now().UnixMilli(),
-	})
+	}, true))
 }
 
 func (h *grpcInvokeHandler) OnSendMessage(body string) {
@@ -121,24 +136,16 @@ func (h *grpcInvokeHandler) OnSendMessage(body string) {
 	if body == "" {
 		body = "{}"
 	}
-	msg := model.GrpcMessage{
-		Index:     len(h.response.Messages) + 1,
+	h.emitEvent("grpc:message", h.appendMessage(model.GrpcMessage{
 		Direction: "outgoing",
 		Body:      body,
 		Size:      len([]byte(body)),
 		Timestamp: time.Now().UnixMilli(),
-	}
-	h.response.Messages = append(h.response.Messages, msg)
-	h.emitEvent("grpc:message", model.GrpcMessageEvent{
-		RequestID: h.requestID,
-		Message:   msg,
-		Size:      h.response.Size,
-		Duration:  h.durationMs(),
-		Timestamp: time.Now().UnixMilli(),
-	})
+	}, false))
 }
 
 func (h *grpcInvokeHandler) OnReceiveTrailers(stat *status.Status, md metadata.MD) {
+	h.mu.Lock()
 	h.response.GrpcCode = stat.Code().String()
 	h.response.GrpcMessage = stat.Message()
 	h.response.Status = stat.Code().String()
@@ -153,7 +160,7 @@ func (h *grpcInvokeHandler) OnReceiveTrailers(stat *status.Status, md metadata.M
 			h.response.Error = "gRPC " + stat.Code().String()
 		}
 	}
-	h.emitEvent("grpc:trailers", model.GrpcTrailersEvent{
+	event := model.GrpcTrailersEvent{
 		RequestID:   h.requestID,
 		GrpcCode:    h.response.GrpcCode,
 		GrpcMessage: h.response.GrpcMessage,
@@ -162,7 +169,9 @@ func (h *grpcInvokeHandler) OnReceiveTrailers(stat *status.Status, md metadata.M
 		Error:       h.response.Error,
 		Duration:    h.durationMs(),
 		Timestamp:   time.Now().UnixMilli(),
-	})
+	}
+	h.mu.Unlock()
+	h.emitEvent("grpc:trailers", event)
 }
 
 func (h *grpcInvokeHandler) durationMs() int64 {
@@ -195,6 +204,7 @@ func sendGrpcRequest(requestCtx context.Context, req model.GrpcRequest, sm *stat
 				Error:            "pre-request script failed: " + preResult.Error,
 				PreRequestResult: preResult,
 			}
+			resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult)
 			emitGrpcDone(emit, req.RequestID, resp)
 			return resp
 		}
@@ -214,6 +224,7 @@ func sendGrpcRequest(requestCtx context.Context, req model.GrpcRequest, sm *stat
 		testScope.commit(sm)
 	}
 
+	resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult, resp.TestResult)
 	emitGrpcDone(emit, req.RequestID, resp)
 	return resp
 }

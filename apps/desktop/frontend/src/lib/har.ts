@@ -32,6 +32,10 @@ function bodyFromPostData(postData: unknown) {
       if (!key) return null;
       return row(key, asText(item.value));
     }).filter((r): r is KVRow => Boolean(r));
+    const text = asText(postData.text);
+    if (!result.formRows.length && text) {
+      result.formRows = [...new URLSearchParams(text)].filter(([key]) => key).map(([key, value]) => row(key, value));
+    }
     return result;
   }
 

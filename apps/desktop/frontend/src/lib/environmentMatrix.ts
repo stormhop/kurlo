@@ -15,9 +15,31 @@ function namedRows(environment: Environment): Array<{ row: KVRow; index: number 
     .filter(({ row }) => row.key.trim() !== '');
 }
 
+function effectiveRowIndex(values: KVRow[], key: string): number {
+  let fallback = -1;
+  for (let index = values.length - 1; index >= 0; index -= 1) {
+    if (values[index].key.trim() !== key) continue;
+    if (values[index].enabled) return index;
+    if (fallback < 0) fallback = index;
+  }
+  return fallback;
+}
+
+function effectiveRowIndexes(values: KVRow[]): Map<string, number> {
+  const indexes = new Map<string, number>();
+  values.forEach((row, index) => {
+    const key = row.key.trim();
+    if (!key) return;
+    const current = indexes.get(key);
+    if (current === undefined || row.enabled || !values[current].enabled) indexes.set(key, index);
+  });
+  return indexes;
+}
+
 export function buildEnvironmentMatrix(environments: Environment[]): MatrixRow[] {
   const rows = new Map<string, MatrixRow>();
   for (const environment of environments) {
+    const effective = effectiveRowIndexes(environment.values);
     for (const { row, index } of namedRows(environment)) {
       const key = row.key.trim();
       let matrixRow = rows.get(key);
@@ -25,7 +47,7 @@ export function buildEnvironmentMatrix(environments: Environment[]): MatrixRow[]
         matrixRow = { key, secret: false, cells: Object.fromEntries(environments.map(env => [env.id, null])) };
         rows.set(key, matrixRow);
       }
-      if (!matrixRow.cells[environment.id]) {
+      if (effective.get(key) === index) {
         matrixRow.cells[environment.id] = { index, value: row.value, enabled: row.enabled };
       }
       if (row.secret) matrixRow.secret = true;
@@ -51,7 +73,7 @@ export function secretFor(environments: Environment[], key: string): boolean {
 }
 
 export function setMatrixValue(environment: Environment, key: string, value: string, secret = false): KVRow[] {
-  const index = environment.values.findIndex(row => row.key.trim() === key);
+  const index = effectiveRowIndex(environment.values, key);
   if (index >= 0) {
     return environment.values.map((row, rowIndex) => (rowIndex === index ? { ...row, value } : row));
   }

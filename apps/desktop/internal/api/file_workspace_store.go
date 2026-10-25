@@ -2079,7 +2079,7 @@ func filesystemSegmentsForItems(items []map[string]any) map[string]string {
 		segment := filesystemSegmentForItem(item)
 		baseSegment := segment
 		for suffix := 0; ; suffix++ {
-			existingID, exists := used[segment]
+			existingID, exists := used[strings.ToLower(segment)]
 			if !exists || existingID == id {
 				break
 			}
@@ -2089,7 +2089,7 @@ func filesystemSegmentsForItems(items []map[string]any) map[string]string {
 				segment = fmt.Sprintf("%s-%d", baseSegment, suffix+1)
 			}
 		}
-		used[segment] = id
+		used[strings.ToLower(segment)] = id
 		segments[id] = segment
 		item[filesystemNameField] = segment
 	}

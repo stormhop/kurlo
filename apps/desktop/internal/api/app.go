@@ -247,10 +247,7 @@ func (a *App) LoadRequestStore() string {
 	gitOperationMu.RLock()
 	defer gitOperationMu.RUnlock()
 	root := fileWorkspaceStorePath()
-	if unlock, err := lockWorkspaceWrites(root); err == nil {
-		defer unlock()
-	}
-	payload, _, err := loadKurloStorePayloadWithDiagnostics(requestStorePath(), root)
+	payload, _, err := loadKurloStorePayloadLocked(requestStorePath(), root)
 	if hasYAMLWorkspaceStore(root) {
 		workspaceDisk.remember(root)
 	}
@@ -263,7 +260,7 @@ func (a *App) LoadRequestStore() string {
 func (a *App) LoadWorkspaceDiagnostics() []WorkspaceDiagnostic {
 	gitOperationMu.RLock()
 	defer gitOperationMu.RUnlock()
-	_, diagnostics, _ := loadKurloStorePayloadWithDiagnostics(requestStorePath(), fileWorkspaceStorePath())
+	_, diagnostics, _ := loadKurloStorePayloadLocked(requestStorePath(), fileWorkspaceStorePath())
 	if diagnostics == nil {
 		return []WorkspaceDiagnostic{}
 	}

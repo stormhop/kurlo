@@ -130,9 +130,37 @@ function parseFlowArray(source: string) {
   return splitTopLevel(body, ',').map(parseScalar);
 }
 
+let anchors = new Map<string, unknown>();
+
+const ANCHOR_PATTERN = /^&([^\s,[\]{}]+)(?:\s+|$)/;
+const ALIAS_PATTERN = /^\*([^\s,[\]{}]+)$/;
+
+function takeAnchor(rest: string): [string, string] {
+  const match = ANCHOR_PATTERN.exec(rest);
+  return match ? [match[1], rest.slice(match[0].length).trim()] : ['', rest];
+}
+
+function resolveAlias(name: string): unknown {
+  if (!anchors.has(name)) throw new Error(`YAML alias *${name} refers to an unknown anchor`);
+  const value = anchors.get(name);
+  return value && typeof value === 'object' ? structuredClone(value) : value;
+}
+
+function remember<T>(anchor: string, value: T): T {
+  if (anchor) anchors.set(anchor, value);
+  return value;
+}
+
+function mergeSources(value: unknown): Record<string, unknown>[] {
+  const sources = Array.isArray(value) ? value : [value];
+  return sources.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && !Array.isArray(item));
+}
+
 function parseScalar(raw: string): unknown {
   const text = raw.trim();
   if (!text) return '';
+  const alias = ALIAS_PATTERN.exec(text);
+  if (alias) return resolveAlias(alias[1]);
   if (text === 'null' || text === 'Null' || text === '~') return null;
   if (text === 'true' || text === 'True') return true;
   if (text === 'false' || text === 'False') return false;
@@ -168,6 +196,7 @@ function parseBlock(lines: YamlLine[], index: number, minIndent: number): [unkno
 
 function parseMap(lines: YamlLine[], index: number, indent: number): [Record<string, unknown>, number] {
   const out: Record<string, unknown> = {};
+  const merged: Record<string, unknown>[] = [];
   let cursor = index;
   while (cursor < lines.length) {
     const line = lines[cursor];
@@ -181,25 +210,24 @@ function parseMap(lines: YamlLine[], index: number, indent: number): [Record<str
       cursor += 1;
       continue;
     }
-    const [key, rest] = pair;
+    const [key, restWithAnchor] = pair;
+    const [anchor, rest] = takeAnchor(restWithAnchor);
+    let value: unknown;
     if (!rest) {
-      const [value, next] = parseBlock(lines, cursor + 1, indent + 1);
-      out[key] = value;
-      cursor = next;
+      [value, cursor] = parseBlock(lines, cursor + 1, indent + 1);
     } else if (rest === '|' || rest === '|-' || rest === '|+') {
-      const [value, next] = collectBlockScalar(lines, cursor + 1, indent, false);
-      out[key] = value;
-      cursor = next;
+      [value, cursor] = collectBlockScalar(lines, cursor + 1, indent, false);
     } else if (rest === '>' || rest === '>-' || rest === '>+') {
-      const [value, next] = collectBlockScalar(lines, cursor + 1, indent, true);
-      out[key] = value;
-      cursor = next;
+      [value, cursor] = collectBlockScalar(lines, cursor + 1, indent, true);
     } else {
-      out[key] = parseScalar(rest);
+      value = parseScalar(rest);
       cursor += 1;
     }
+    remember(anchor, value);
+    if (key === '<<') merged.push(...mergeSources(value));
+    else out[key] = value;
   }
-  return [out, cursor];
+  return [merged.length ? Object.assign({}, ...merged.reverse(), out) : out, cursor];
 }
 
 function parseSequence(lines: YamlLine[], index: number, indent: number): [unknown[], number] {
@@ -208,42 +236,46 @@ function parseSequence(lines: YamlLine[], index: number, indent: number): [unkno
   while (cursor < lines.length) {
     const line = lines[cursor];
     if (line.indent < indent || line.indent > indent || !line.text.startsWith('- ')) break;
-    const rest = line.text.slice(2).trim();
+    const [anchor, rest] = takeAnchor(line.text.slice(2).trim());
     if (!rest) {
       const [value, next] = parseBlock(lines, cursor + 1, indent + 1);
-      out.push(value);
+      out.push(remember(anchor, value));
       cursor = next;
       continue;
     }
     if (rest === '|' || rest === '|-' || rest === '|+') {
       const [value, next] = collectBlockScalar(lines, cursor + 1, indent, false);
-      out.push(value);
+      out.push(remember(anchor, value));
       cursor = next;
       continue;
     }
     if (rest === '>' || rest === '>-' || rest === '>+') {
       const [value, next] = collectBlockScalar(lines, cursor + 1, indent, true);
-      out.push(value);
+      out.push(remember(anchor, value));
       cursor = next;
       continue;
     }
 
     const pair = splitKeyValue(rest);
     if (!pair) {
-      out.push(parseScalar(rest));
+      out.push(remember(anchor, parseScalar(rest)));
       cursor += 1;
       continue;
     }
 
-    const item: Record<string, unknown> = {};
+    let item: Record<string, unknown> = {};
     const [extra, next] = parseBlock(lines, cursor + 1, indent + 1);
-    if (pair[1]) {
-      item[pair[0]] = parseScalar(pair[1]);
-      if (extra && typeof extra === 'object' && !Array.isArray(extra)) Object.assign(item, extra);
+    const extraMap = extra && typeof extra === 'object' && !Array.isArray(extra) ? extra as Record<string, unknown> : {};
+    const [valueAnchor, valueText] = takeAnchor(pair[1]);
+    const value = valueText ? remember(valueAnchor, parseScalar(valueText)) : remember(valueAnchor, extra);
+    if (pair[0] === '<<') {
+      item = Object.assign({}, ...mergeSources(value).reverse(), valueText ? extraMap : {});
+    } else if (valueText) {
+      Object.assign(item, extraMap, { [pair[0]]: value });
     } else {
-      item[pair[0]] = extra;
+      item[pair[0]] = value;
     }
-    out.push(item);
+    out.push(remember(anchor, item));
     cursor = next;
   }
   return [out, cursor];
@@ -252,6 +284,11 @@ function parseSequence(lines: YamlLine[], index: number, indent: number): [unkno
 export function parseYaml(source: string): unknown {
   const lines = preprocess(source);
   if (!lines.length) return {};
-  const [value] = parseBlock(lines, 0, 0);
-  return value;
+  anchors = new Map();
+  try {
+    const [value] = parseBlock(lines, 0, 0);
+    return value;
+  } finally {
+    anchors = new Map();
+  }
 }

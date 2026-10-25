@@ -155,7 +155,7 @@ Cookies are included in all-data backups and in the encrypted local request stor
 
 Cookie sync adds one local surface: a loopback-only HTTP listener, off unless you turn it on,
 reachable only with the pairing token. The token and the sync allowlist live in
-`preferences.json` next to the request store; no cookie leaves the machine, and the browser
-extension talks to `127.0.0.1` and nothing else.
+`preferences.json` next to the request store, with the token encrypted by the same key as the
+store; no cookie leaves the machine, and the browser extension talks to `127.0.0.1` and nothing else.
 
 If you need to remove sensitive cookies, clear them from the cookie modal or clear request history/all data from Settings.

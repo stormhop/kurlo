@@ -168,7 +168,9 @@ function rowsFromBruBlock(block = '') {
     .map(line => {
       const index = line.indexOf(':');
       if (index < 0) return null;
-      return { ...mkRow(), key: line.slice(0, index).trim(), value: line.slice(index + 1).trim(), enabled: true };
+      const key = line.slice(0, index).trim();
+      const disabled = key.startsWith('~');
+      return { ...mkRow(), key: disabled ? key.slice(1).trim() : key, value: line.slice(index + 1).trim(), enabled: !disabled };
     })
     .filter((row): row is KVRow => Boolean(row && (row.key || row.value)));
 }
@@ -727,7 +729,14 @@ function examplesToOpenCollection(
 function folderNameMapFromOpenCollection(files: CollectionTextFile[]) {
   const names = new Map<string, string>();
   for (const file of files) {
-    if (basename(file.path).toLowerCase() !== 'folder.yml') continue;
+    const base = basename(file.path).toLowerCase();
+    if (base === 'folder.bru') {
+      const meta = parseBruBlocks(file.content).find(block => block.name === 'meta');
+      const name = parseBruKeyValues(meta?.body).name;
+      if (name) names.set(dirname(file.path), name);
+      continue;
+    }
+    if (base !== 'folder.yml') continue;
     const parsed = parseYaml(file.content);
     if (!isRecord(parsed) || !isRecord(parsed.info)) continue;
     const name = asText(parsed.info.name);

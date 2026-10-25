@@ -27,16 +27,12 @@ func workspaceLockPath(root string) string {
 	return filepath.Join(requestStoreDir(), "locks", shortHash(workspaceLockKey(root))+".lock")
 }
 
-func openWorkspaceLockFile(root string) *os.File {
+func openWorkspaceLockFile(root string) (*os.File, error) {
 	path := workspaceLockPath(root)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return nil
+		return nil, err
 	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return nil
-	}
-	return file
+	return os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 }
 
 func releaseWorkspaceLock(file *os.File) func() {
@@ -47,9 +43,9 @@ func releaseWorkspaceLock(file *os.File) func() {
 }
 
 func tryLockWorkspaceWrites(root string) (func(), bool) {
-	file := openWorkspaceLockFile(root)
-	if file == nil {
-		return func() {}, true
+	file, err := openWorkspaceLockFile(root)
+	if err != nil {
+		return nil, false
 	}
 	if err := tryLockFile(file); err != nil {
 		_ = file.Close()
@@ -62,9 +58,9 @@ func tryLockWorkspaceWrites(root string) (func(), bool) {
 }
 
 func lockWorkspaceWrites(root string) (func(), error) {
-	file := openWorkspaceLockFile(root)
-	if file == nil {
-		return func() {}, nil
+	file, err := openWorkspaceLockFile(root)
+	if err != nil {
+		return nil, fmt.Errorf("could not open the workspace lock file: %w", err)
 	}
 	deadline := time.Now().Add(workspaceLockWait)
 	for {
@@ -82,4 +78,11 @@ func lockWorkspaceWrites(root string) (func(), error) {
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
+}
+
+func loadKurloStorePayloadLocked(localStorePath, root string) (string, []WorkspaceDiagnostic, error) {
+	if unlock, err := lockWorkspaceWrites(root); err == nil {
+		defer unlock()
+	}
+	return loadKurloStorePayloadWithDiagnostics(localStorePath, root)
 }

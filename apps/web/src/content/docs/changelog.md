@@ -16,7 +16,6 @@ This page summarizes the notable-change log maintained in the source repository.
 
 - **OAuth 1.0 auth:** HMAC, RSA and PLAINTEXT signatures, in the header, the query or a form body, with the secrets kept out of the YAML. See [Authentication](/docs/guides/authentication/#oauth-10).
 - **Find and replace** across a collection or a folder, with a preview of every match and **Undo**. See [Find and replace](/docs/guides/workspaces/#find-and-replace).
-
 - **Thirteen more keyboard shortcuts:** cancel a request, copy as cURL, find and replace, response layout, sidebar views, environment picker, new collection, import, collection runner, and closing other or all tabs. See [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
 
 ### Fixed
@@ -29,6 +28,12 @@ This page summarizes the notable-change log maintained in the source repository.
 - The shortcut list in Settings no longer scrolls sideways, and its keys line up in columns.
 - Merge conflicts in the diff3 style no longer put the base text into **Ours**.
 - Git status and diffs no longer race a running commit, pull or rebase, and an unreadable saved token is reported.
+- Postman, Insomnia, Bruno, HAR and cURL imports and Postman exports keep more of the source: v2.0 auth, OAuth 2.0 grants and fields, disabled rows, binary bodies and folder names. See [Import and export](/docs/guides/import-export/).
+- OpenAPI imports handle media type parameters, `2XX` responses, overridden parameters, cookie API keys and YAML anchors, and exports skip gRPC, MCP and AI requests.
+- Collection variables set by gRPC and AI scripts are saved, and the environment matrix shows the value a send uses for duplicated keys.
+- Sturdier connections: no late `Disconnected` after a WebSocket or SSE reconnect, write deadlines for WebSocket and Socket.IO, and no lost gRPC stream messages.
+- The mock server, the Collection Runner and history entries over the size limit behave better in long sessions.
+- Safer local data: case-only name clashes, atomic writes for credentials and keys, the workspace lock for every load and YAML save, an encrypted cookie sync token, random pairing ids, and an atomic app bundle swap on macOS update. See [Cookies](/docs/guides/cookies/#backup-and-privacy).
 
 ## 2.5.0
 

@@ -1,8 +1,6 @@
 package api
 
 import (
-	"strings"
-
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -31,14 +29,14 @@ func (a *App) ensureCookieSyncPreferences() {
 		a.cookieSync.port = saved.Port
 	}
 	a.cookieSync.domains = syncableCookieSyncDomains(saved.Domains)
-	a.cookieSync.token = strings.TrimSpace(saved.Token)
+	a.cookieSync.token = cookieSyncPreferencesToken(saved)
 	minted := a.cookieSync.token == ""
 	if minted {
 		a.cookieSync.token = newCookieSyncToken()
 	}
 	a.cookieSync.mu.Unlock()
 
-	if minted {
+	if minted || saved.Token != "" {
 		a.persistCookieSyncPreferences()
 	}
 }
@@ -52,9 +50,10 @@ func (a *App) persistCookieSyncPreferences() {
 		Enabled: a.cookieSync.enabled,
 		Port:    a.cookieSync.port,
 		Domains: append([]string{}, a.cookieSync.domains...),
-		Token:   a.cookieSync.token,
 	}
+	token := a.cookieSync.token
 	a.cookieSync.mu.RUnlock()
+	sealCookieSyncPreferencesToken(&next, token)
 
 	preferences, err := loadAppPreferences()
 	if err != nil {

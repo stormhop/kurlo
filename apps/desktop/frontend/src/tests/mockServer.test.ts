@@ -369,7 +369,6 @@ describe('mock server feature', () => {
       vi.mocked(backend.startMockServer).mockClear();
 
       host.scheduleMockServerReload();
-      expect(host.mockServerReloadTimer).toBeNull();
       await vi.runAllTimersAsync();
       expect(backend.startMockServer).not.toHaveBeenCalled();
     } finally {

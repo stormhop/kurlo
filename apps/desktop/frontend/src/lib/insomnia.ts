@@ -13,7 +13,7 @@ const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'sock
 const KURLO_REQUEST_TABS = new Set<RequestTab>(['docs', 'params', 'query', 'auth', 'headers', 'metadata', 'body', 'schema', 'service', 'events', 'scripts', 'settings']);
 
 function resourceType(resource: Record<string, unknown>) {
-  return asText(resource.type || resource._type);
+  return asText(resource.type || resource._type).toLowerCase();
 }
 
 function resourceId(resource: Record<string, unknown>) {
@@ -143,6 +143,13 @@ function bodyFromResource(resource: Record<string, unknown>) {
     }).filter((item): item is KVRow => Boolean(item));
     result.bodyType = mime.toLowerCase().includes('x-www-form-urlencoded') ? 'urlencoded' : 'form';
     result.formRows = rows;
+    return result;
+  }
+  const fileName = asText(body.fileName);
+  if (fileName) {
+    result.bodyType = 'binary';
+    result.bodyFilePath = fileName;
+    result.bodyFileName = fileName.split(/[\\/]/).pop() ?? '';
     return result;
   }
   const text = body.text !== undefined ? asText(body.text) : typeof resource.body === 'string' ? resource.body : '';
@@ -386,6 +393,9 @@ function insomniaBody(req: SavedRequest, stripFn: (source: string, bodyType: str
   }
   if (req.requestType === 'grpc') {
     return { mimeType: 'application/json', text: stripFn(req.bodyContent || DEFAULT_GRPC_MESSAGE, req.bodyType || 'json') };
+  }
+  if (req.bodyType === 'binary' && req.bodyFilePath) {
+    return { mimeType: 'application/octet-stream', fileName: req.bodyFilePath };
   }
   return {};
 }

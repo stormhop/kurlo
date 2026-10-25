@@ -137,14 +137,21 @@ function postmanBehaviorSettings(value: unknown): Partial<RequestSettings> {
   return settings;
 }
 
+function postmanAuthEntry(auth: Record<string, unknown>, bucket: string, key: string): { value: unknown } | undefined {
+  const params = auth[bucket];
+  if (isRecord(params)) return key in params ? { value: params[key] } : undefined;
+  const entry = asArray(params).find(item => isRecord(item) && item.key === key);
+  return isRecord(entry) ? { value: entry.value } : undefined;
+}
+
 function postmanAuthParam(auth: Record<string, unknown>, bucket: string, key: string) {
-  const entry = asArray(auth[bucket]).find(item => isRecord(item) && item.key === key);
-  return isRecord(entry) ? asText(entry.value) : '';
+  const entry = postmanAuthEntry(auth, bucket, key);
+  return entry ? asText(entry.value) : '';
 }
 
 function postmanAuthBool(auth: Record<string, unknown>, bucket: string, key: string) {
-  const entry = asArray(auth[bucket]).find(item => isRecord(item) && item.key === key);
-  if (!isRecord(entry)) return undefined;
+  const entry = postmanAuthEntry(auth, bucket, key);
+  if (!entry) return undefined;
   return entry.value === true || asText(entry.value).toLowerCase() === 'true';
 }
 
@@ -157,6 +164,7 @@ function postmanGrantType(value: string): { grant: OAuth2GrantType; pkce: boolea
     case 'client_credentials': return { grant: 'client_credentials', pkce: false };
     case 'password_credentials':
     case 'password': return { grant: 'password', pkce: false };
+    case 'device_code': return { grant: 'device_code', pkce: false };
     default: return null;
   }
 }
@@ -183,7 +191,7 @@ function postmanAuthConfig(authValue: unknown, inheritedAuth?: unknown): SavedRe
     config.type = 'oauth2';
     config.oauth2Token = postmanAuthParam(auth, 'oauth2', 'accessToken') || postmanAuthParam(auth, 'oauth2', 'token');
     config.bearerToken = config.oauth2Token;
-    config.oauth2TokenURL = postmanAuthParam(auth, 'oauth2', 'accessTokenUrl');
+    config.oauth2TokenURL = postmanAuthParam(auth, 'oauth2', 'accessTokenUrl') || postmanAuthParam(auth, 'oauth2', 'tokenUrl');
     config.oauth2AuthURL = postmanAuthParam(auth, 'oauth2', 'authUrl');
     config.oauth2ClientID = postmanAuthParam(auth, 'oauth2', 'clientId');
     config.oauth2Secret = postmanAuthParam(auth, 'oauth2', 'clientSecret');
@@ -556,7 +564,7 @@ function requestUrlWithParams(req: SavedRequest, includeSecrets = false) {
 
 function postmanUrlFromKurlo(req: SavedRequest, includeSecrets = false) {
   const raw = requestUrlWithParams(req, includeSecrets);
-  const query = req.params.filter(r => r.enabled && r.key).map(row => postmanKv(row, includeSecrets));
+  const query = req.params.filter(r => r.key).map(row => postmanKv(row, includeSecrets));
   const variable = (req.pathParams ?? []).filter(r => r.key).map(row => postmanKv(row, includeSecrets));
   try {
     const parsed = new URL(raw);
@@ -575,6 +583,15 @@ function postmanAuthPair(key: string, value: string, type = 'string', includeSec
   return { key, value: safeExportValue(redactionKey, value, includeSecrets), type };
 }
 
+function postmanGrantTypeFromKurlo(grant: OAuth2GrantType | undefined, pkce: boolean): string {
+  switch (grant ?? 'client_credentials') {
+    case 'authorization_code': return pkce ? 'authorization_code_with_pkce' : 'authorization_code';
+    case 'password': return 'password_credentials';
+    case 'device_code': return 'device_code';
+    default: return 'client_credentials';
+  }
+}
+
 function postmanAuthFromKurlo(auth: SavedRequest['auth'], includeSecrets = false) {
   if (auth.type === 'bearer') return { type: 'bearer', bearer: [postmanAuthPair('token', auth.bearerToken, 'string', includeSecrets)] };
   if (auth.type === 'basic' || auth.type === 'digest') {
@@ -583,8 +600,23 @@ function postmanAuthFromKurlo(auth: SavedRequest['auth'], includeSecrets = false
   if (auth.type === 'apikey') {
     return { type: 'apikey', apikey: [postmanAuthPair('key', auth.apiKeyName, 'string', includeSecrets), postmanAuthPair('value', auth.apiKeyValue, 'string', includeSecrets, 'apiKey'), postmanAuthPair('in', auth.apiKeyIn, 'string', true)] };
   }
+  if (auth.type === 'none') return { type: 'noauth' };
   if (auth.type === 'oauth2') {
-    return { type: 'oauth2', oauth2: [postmanAuthPair('accessToken', auth.oauth2Token || auth.bearerToken, 'string', includeSecrets), postmanAuthPair('clientId', auth.oauth2ClientID, 'string', includeSecrets), postmanAuthPair('clientSecret', auth.oauth2Secret, 'string', includeSecrets), postmanAuthPair('scope', auth.oauth2Scope, 'string', true), postmanAuthPair('tokenUrl', auth.oauth2TokenURL, 'string', true)].filter(i => i.value) };
+    const clientAuth = auth.oauth2ClientAuth === 'body' ? 'body' : !auth.oauth2ClientAuth || auth.oauth2ClientAuth === 'basic' ? 'header' : '';
+    return { type: 'oauth2', oauth2: [
+      postmanAuthPair('grant_type', postmanGrantTypeFromKurlo(auth.oauth2GrantType, auth.oauth2UsePKCE === true), 'string', true),
+      postmanAuthPair('accessToken', auth.oauth2Token || auth.bearerToken, 'string', includeSecrets),
+      postmanAuthPair('refreshToken', auth.oauth2RefreshToken ?? '', 'string', includeSecrets),
+      postmanAuthPair('clientId', auth.oauth2ClientID, 'string', includeSecrets),
+      postmanAuthPair('clientSecret', auth.oauth2Secret, 'string', includeSecrets),
+      postmanAuthPair('scope', auth.oauth2Scope, 'string', true),
+      postmanAuthPair('audience', auth.oauth2Audience ?? '', 'string', true),
+      postmanAuthPair('authUrl', auth.oauth2AuthURL ?? '', 'string', true),
+      postmanAuthPair('accessTokenUrl', auth.oauth2TokenURL, 'string', true),
+      postmanAuthPair('username', auth.oauth2Username ?? '', 'string', true),
+      postmanAuthPair('password', auth.oauth2Password ?? '', 'string', includeSecrets),
+      postmanAuthPair('client_authentication', clientAuth, 'string', true),
+    ].filter(i => i.value) };
   }
   if (auth.type === 'oauth1') {
     const secret = (key: string, value: string | undefined) => postmanAuthPair(key, value ?? '', 'string', includeSecrets);

@@ -220,6 +220,10 @@ export function expandReplacement(template: string, match: RegExpExecArray): str
     if (name !== undefined) return match.groups?.[name] ?? '';
     const index = Number(digits);
     if (index > 0 && index < match.length) return match[index] ?? '';
+    if (digits && digits.length === 2) {
+      const single = Number(digits[0]);
+      if (single > 0 && single < match.length) return (match[single] ?? '') + digits[1];
+    }
     return whole;
   });
 }

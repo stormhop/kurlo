@@ -701,7 +701,7 @@ func (a *App) UseLocalWorkspaceStore() WorkspaceOpenResult {
 	if err := persistActiveWorkspaceRootMode(root, workspaceStorageModeLocal); err != nil {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root)}
 	}
-	payload, diagnostics, err := loadKurloStorePayloadWithDiagnostics(requestStorePath(), root)
+	payload, diagnostics, err := loadKurloStorePayloadLocked(requestStorePath(), root)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root), Diagnostics: diagnostics}
 	}
@@ -934,7 +934,7 @@ func (a *App) openWorkspaceRootOpts(path string, ensureGitignore bool) Workspace
 			return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: status}
 		}
 	}
-	payload, diagnostics, err := loadKurloStorePayloadWithDiagnostics(requestStorePath(), root)
+	payload, diagnostics, err := loadKurloStorePayloadLocked(requestStorePath(), root)
 	if err != nil {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: gitStatusForWorkspace(root), Diagnostics: diagnostics}
 	}
@@ -975,7 +975,7 @@ func (a *App) openLocalWorkspaceRoot(path string) WorkspaceOpenResult {
 	if err := persistActiveWorkspaceRootMode(root, workspaceStorageModeLocal); err != nil {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root)}
 	}
-	payload, diagnostics, err := loadKurloStorePayloadWithDiagnostics(requestStorePath(), root)
+	payload, diagnostics, err := loadKurloStorePayloadLocked(requestStorePath(), root)
 	if err != nil {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root), Diagnostics: diagnostics}
 	}
@@ -2085,7 +2085,7 @@ func gitResolveConflictFileForRoot(root, path, resolution, content string) GitOp
 		if err != nil {
 			return GitOperationResult{Ok: false, Git: status, Error: err.Error(), Files: []string{relPath}}
 		}
-		if err := os.WriteFile(absolutePath, []byte(content), 0644); err != nil {
+		if err := writeTextFileAtomic(absolutePath, []byte(content)); err != nil {
 			return GitOperationResult{Ok: false, Git: status, Error: err.Error(), Files: []string{relPath}}
 		}
 	case "mark":
@@ -2179,9 +2179,9 @@ func gitResolvedConflictShouldStayLocal(status GitWorkspaceStatus) bool {
 }
 
 func writeGitConflictStageToWorktree(repoRoot, relPath string, stage int) (string, error) {
-	content, err := gitOutput(repoRoot, "show", fmt.Sprintf(":%d:%s", stage, relPath))
+	content, output, err := gitStageBlob(repoRoot, relPath, stage)
 	if err != nil {
-		return content, err
+		return output, err
 	}
 	absolutePath, err := safeRepoRelativeFilePath(repoRoot, relPath)
 	if err != nil {
@@ -2190,7 +2190,29 @@ func writeGitConflictStageToWorktree(repoRoot, relPath string, stage int) (strin
 	if err := os.MkdirAll(filepath.Dir(absolutePath), 0755); err != nil {
 		return "", err
 	}
-	return "", os.WriteFile(absolutePath, []byte(content), 0644)
+	return "", writeTextFileAtomic(absolutePath, content)
+}
+
+func gitStageBlob(repoRoot, relPath string, stage int) ([]byte, string, error) {
+	gitPath, err := lookupGitExecutable()
+	if err != nil {
+		return nil, "", err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), gitCommandTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, gitPath, "-c", "core.quotePath=false", "-C", repoRoot, "show", fmt.Sprintf(":%d:%s", stage, relPath))
+	hideCmdWindow(cmd)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			err = fmt.Errorf("git command timed out")
+		}
+		return nil, strings.TrimSpace(stderr.String()), err
+	}
+	return stdout.Bytes(), "", nil
 }
 
 func gitConflictStageContent(repoRoot, relPath string, stage int) (string, bool, bool) {

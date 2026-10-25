@@ -516,16 +516,24 @@ func loadRequestStoreKeychainMaterial() (string, error) {
 }
 
 func saveRequestStoreKeychainMaterial(material string) error {
-	cmd := exec.Command(
-		"/usr/bin/security",
-		"add-generic-password",
-		"-s", requestStoreKeyService,
-		"-a", requestStoreKeyAccount,
-		"-w", material,
-		"-U",
-	)
+	if strings.ContainsAny(material, "\"\\\n") {
+		return fmt.Errorf("unexpected characters in key material")
+	}
+	cmd := exec.Command("/usr/bin/security", "-i")
 	hideCmdWindow(cmd)
-	return cmd.Run()
+	cmd.Stdin = strings.NewReader(fmt.Sprintf("add-generic-password -s \"%s\" -a \"%s\" -w \"%s\" -U\n",
+		requestStoreKeyService, requestStoreKeyAccount, material))
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	stored, err := loadRequestStoreKeychainMaterial()
+	if err != nil {
+		return err
+	}
+	if stored != material {
+		return fmt.Errorf("keychain entry does not match the saved key")
+	}
+	return nil
 }
 
 func loadRequestStoreFileKeyMaterial() (string, error) {
@@ -543,10 +551,7 @@ func saveRequestStoreFileKeyMaterial(material string) error {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 		log.Printf("kurlo: storing encryption key as a plain file in %s; protect this directory from other users", requestStoreDir())
 	}
-	if err := os.WriteFile(requestStoreKeyPath(), []byte(material), 0600); err != nil {
-		return err
-	}
-	return syncDir(requestStoreDir())
+	return writeFileAtomic(requestStoreKeyPath(), []byte(material))
 }
 
 var errSecretToolUnavailable = errors.New("secret-tool not available")
@@ -637,10 +642,7 @@ func saveRequestStoreDPAPIMaterial(material string) error {
 		return fmt.Errorf("DPAPI returned an empty ciphertext")
 	}
 	path := requestStoreDPAPIKeyPath()
-	if err := os.WriteFile(path, []byte(encrypted), 0600); err != nil {
-		return err
-	}
-	return syncDir(requestStoreDir())
+	return writeFileAtomic(path, []byte(encrypted))
 }
 
 func requestStoreKeyPath() string {

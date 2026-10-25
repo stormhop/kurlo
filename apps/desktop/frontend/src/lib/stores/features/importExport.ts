@@ -1,7 +1,7 @@
 import { openDirectoryDialog, readCollectionTextFiles, sendHttpRequest, writeCollectionTextFiles } from '../../backend';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
 import type { BodyType, Collection, CollectionDefaults, Environment, KVRow, RequestHistoryEntry, SavedRequest, ScriptEngine, Workspace } from '../../types/models';
-import { mergeGlobalRowsWithValues } from './globals';
+import { mergeGlobalRowsWithImportedRows } from './globals';
 import { mkRow } from '../../constants';
 import type { TopView } from '../ui';
 import { filesystemNameFromName, makeCollection, normalizeCollection, normalizeEnvironment, normalizeSavedRequest } from '../../normalizers';
@@ -305,9 +305,7 @@ export const importExportFeature = {
     const filled = bundle.values.filter(row => row.key.trim());
     const plural = `${filled.length} variable${filled.length === 1 ? '' : 's'}`;
     if (bundle.scope === 'globals') {
-      const values: Record<string, string> = {};
-      for (const row of filled) if (row.enabled) values[row.key.trim()] = row.value;
-      this.globalVariables = mergeGlobalRowsWithValues(this.globalVariables, values);
+      this.globalVariables = mergeGlobalRowsWithImportedRows(this.globalVariables, filled);
       await this.persistRequestStore();
       this.collectionImportSummary = `Imported ${plural} into Globals`;
       return filled.length;
@@ -445,10 +443,10 @@ export const importExportFeature = {
     const reqs = this.requests.filter(r => r.collectionId === collectionId && !r.isDraft);
     this.closeFloatingMenus();
     const label = format === 'swagger2' ? 'Swagger 2.0' : 'OpenAPI 3.0';
-    const exportableReqs = reqs.filter(req => !this.savedRequestIsRealtime(req) && !this.savedRequestIsGraphQL(req));
+    const exportableReqs = reqs.filter(req => !this.savedRequestIsRealtime(req) && !this.savedRequestIsGraphQL(req) && !['grpc', 'mcp', 'ai'].includes(req.requestType ?? 'http'));
     const skippedUnsupported = reqs.length - exportableReqs.length;
     if (!exportableReqs.length) {
-      await this.openAlertDialog(`${label} export skipped`, `${label} export only supports HTTP and SSE requests. GraphQL and realtime requests are not written to the spec.`);
+      await this.openAlertDialog(`${label} export skipped`, `${label} export only supports HTTP and SSE requests. GraphQL, gRPC, MCP, AI and realtime requests are not written to the spec.`);
       return;
     }
     const includeSecrets = await this.chooseCollectionSecretExportMode(exportableReqs, `${label} export`);

@@ -10,6 +10,8 @@ import (
 
 const preflightMaxAgeCap = 300 * time.Second
 
+const preflightCacheLimit = 1024
+
 type preflightCacheEntry struct {
 	allowOrigin      string
 	allowCredentials bool
@@ -54,7 +56,29 @@ func (c *preflightCache) store(key string, entry preflightCacheEntry) {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if _, exists := c.entries[key]; !exists && len(c.entries) >= preflightCacheLimit {
+		c.evictLocked()
+	}
 	c.entries[key] = entry
+}
+
+func (c *preflightCache) evictLocked() {
+	now := c.now()
+	for key, entry := range c.entries {
+		if !now.Before(entry.expiresAt) {
+			delete(c.entries, key)
+		}
+	}
+	for len(c.entries) >= preflightCacheLimit {
+		oldestKey := ""
+		var oldest time.Time
+		for key, entry := range c.entries {
+			if oldestKey == "" || entry.expiresAt.Before(oldest) {
+				oldestKey, oldest = key, entry.expiresAt
+			}
+		}
+		delete(c.entries, oldestKey)
+	}
 }
 
 func preflightCacheKey(origin, target string, withCredentials bool) string {

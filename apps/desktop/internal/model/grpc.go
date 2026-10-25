@@ -56,6 +56,9 @@ type GrpcResponse struct {
 
 	PreRequestResult ScriptResult `json:"preRequestResult"`
 	TestResult       ScriptResult `json:"testResult"`
+
+	CollectionVariableUpdates  map[string]string `json:"collectionVariableUpdates,omitempty"`
+	CollectionVariablesRemoved []string          `json:"collectionVariablesRemoved,omitempty"`
 }
 
 type GrpcHeadersEvent struct {

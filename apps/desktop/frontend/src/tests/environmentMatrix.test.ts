@@ -37,9 +37,13 @@ describe('buildEnvironmentMatrix', () => {
     expect(matrix[1].secret).toBe(true);
   });
 
-  it('reads the first row with a name, as the request resolver does', () => {
+  it('reads the last enabled row of a duplicated name, as the request resolver does', () => {
     const local = env('local', [row('baseUrl', 'first'), row('baseUrl', 'second')]);
-    expect(buildEnvironmentMatrix([local])[0].cells.local).toEqual({ index: 0, value: 'first', enabled: true });
+    expect(buildEnvironmentMatrix([local])[0].cells.local).toEqual({ index: 1, value: 'second', enabled: true });
+
+    const withDisabled = env('local', [row('baseUrl', 'first'), { ...row('baseUrl', 'off'), enabled: false }]);
+    expect(buildEnvironmentMatrix([withDisabled])[0].cells.local).toEqual({ index: 0, value: 'first', enabled: true });
+    expect(setMatrixValue(withDisabled, 'baseUrl', 'new').map(item => item.value)).toEqual(['new', 'off']);
   });
 });
 

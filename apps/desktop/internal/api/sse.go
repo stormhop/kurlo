@@ -63,8 +63,15 @@ func (m *sseManager) connect(appCtx context.Context, sessionID string, req model
 			}
 			m.mu.Unlock()
 		}()
-		m.runStream(sseCtx, appCtx, sessionID, req)
+		m.runStream(sseCtx, appCtx, sessionID, seq, req)
 	}()
+}
+
+func (m *sseManager) replaced(sessionID string, seq uint64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sess, ok := m.sessions[sessionID]
+	return ok && sess.id != seq
 }
 
 func (m *sseManager) disconnect(sessionID string) {
@@ -86,22 +93,29 @@ func (m *sseManager) disconnectAll() {
 	}
 }
 
-func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string, req model.HttpRequest) {
+func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string, seq uint64, req model.HttpRequest) {
 	const batchWindow = 50 * time.Millisecond
 	const maxBatchSize = 100
 
+	emit := func(name string, payload any) {
+		if m.replaced(sessionID, seq) {
+			return
+		}
+		runtime.EventsEmit(appCtx, name, payload)
+	}
+
 	batch := newEventBatcher[model.SSEEvent](maxBatchSize, batchWindow,
 		func(ev model.SSEEvent) {
-			runtime.EventsEmit(appCtx, "sse:event", model.SSEPayload{SessionID: sessionID, Event: ev})
+			emit("sse:event", model.SSEPayload{SessionID: sessionID, Event: ev})
 		},
 		func(events []model.SSEEvent) {
-			runtime.EventsEmit(appCtx, "sse:events", model.SSEBatchPayload{SessionID: sessionID, Events: events})
+			emit("sse:events", model.SSEBatchPayload{SessionID: sessionID, Events: events})
 		},
 	)
 	defer batch.flush()
 
 	onOpen := func(ev model.SSEOpenEvent) {
-		runtime.EventsEmit(appCtx, "sse:open", ev)
+		emit("sse:open", ev)
 	}
 	onEvent := func(ev model.SSEEvent) {
 		batch.add(ev)
@@ -116,9 +130,9 @@ func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string,
 		if !res.reconnect || req.SSEDisableReconnect || sseCtx.Err() != nil {
 			batch.flush()
 			if res.errorEvent != nil {
-				runtime.EventsEmit(appCtx, "sse:error", *res.errorEvent)
+				emit("sse:error", *res.errorEvent)
 			} else if res.closeEvent != nil {
-				runtime.EventsEmit(appCtx, "sse:close", *res.closeEvent)
+				emit("sse:close", *res.closeEvent)
 			}
 			return
 		}
@@ -126,7 +140,7 @@ func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string,
 		delay := sseReconnectDelay(req, res.retry)
 		attempt++
 		batch.flush()
-		runtime.EventsEmit(appCtx, "sse:reconnecting", model.SSEReconnectEvent{
+		emit("sse:reconnecting", model.SSEReconnectEvent{
 			SessionID:   sessionID,
 			Attempt:     attempt,
 			DelayMs:     int(delay / time.Millisecond),

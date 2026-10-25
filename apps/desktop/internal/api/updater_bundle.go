@@ -128,6 +128,10 @@ func regularFileExists(path string) bool {
 func swapBundleContents(bundlePath, newContents, stage string) error {
 	current := filepath.Join(bundlePath, "Contents")
 	retired := filepath.Join(stage, "retired-Contents")
+	if err := exchangePaths(newContents, current); err == nil {
+		_ = os.Rename(newContents, retired)
+		return nil
+	}
 	if err := os.Rename(current, retired); err != nil {
 		return err
 	}

@@ -228,6 +228,11 @@ type AiHost = {
   syncBackendEnvironment: () => Promise<void>;
   syncActiveEnvironmentFromBackend: () => Promise<void>;
   applyEnvironmentChangesFromResponse: (resp: HttpResponse, environmentId: string) => Promise<void>;
+  applyCollectionVariableUpdates: (
+    req: Pick<SavedRequest, 'collectionId'>,
+    updates: Record<string, string> | undefined,
+    removed: string[] | undefined,
+  ) => Promise<boolean>;
   activeEnvironmentId: string;
   recordRequestHistory: (response: HttpResponse, req?: SavedRequest) => Promise<void>;
   setActiveResponse: (response: HttpResponse | null, requestId?: string) => void;
@@ -409,6 +414,7 @@ export const aiFeature = {
       if (keyProblem) throw new Error(keyProblem);
       const response = await sendAiRequest({ ...runnable, turnId: turn.id });
       try { await this.applyEnvironmentChangesFromResponse(response.http, environmentId); } catch {  }
+      try { await this.applyCollectionVariableUpdates(snapshot, response.http?.collectionVariableUpdates, response.http?.collectionVariablesRemoved); } catch {  }
       try { await this.syncActiveEnvironmentFromBackend(); } catch {  }
       const status: AiTurnStatus = response.error === 'Cancelled' ? 'cancelled' : response.error ? 'error' : 'done';
       this.updateAiTurn(requestId, turn.id, current => ({

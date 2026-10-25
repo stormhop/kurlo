@@ -293,3 +293,34 @@ func TestExampleNamesAreMadeUniqueOnDisk(t *testing.T) {
 		t.Errorf("both bodies should survive, got %v", bodies)
 	}
 }
+
+func TestExampleNamesDifferingOnlyInCaseGetSeparateFiles(t *testing.T) {
+	withRequestStoreTestKey(t)
+	dir := t.TempDir()
+	localPath := filepath.Join(dir, "requests.json")
+	workspaceRoot := filepath.Join(dir, "workspaces-root")
+
+	twoExamples := `[
+    {"id":"ex-1","name":"Alpha","filesystemName":"Alpha","response":{"statusCode":200,"bodyMediaType":"application/json","body":"{\"n\":1}","headers":[]}},
+    {"id":"ex-2","name":"alpha","filesystemName":"alpha","response":{"statusCode":200,"bodyMediaType":"application/json","body":"{\"n\":2}","headers":[]}}
+  ]`
+	if err := saveKurloStorePayload(localPath, workspaceRoot, exampleStorePayload(t, twoExamples)); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	entries, err := os.ReadDir(exampleDirFor(workspaceRoot))
+	if err != nil {
+		t.Fatalf("read example dir: %v", err)
+	}
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		lower := strings.ToLower(entry.Name())
+		if seen[lower] {
+			t.Fatalf("two example files collide on a case-insensitive filesystem: %s", entry.Name())
+		}
+		seen[lower] = true
+	}
+	if len(seen) != 2 {
+		t.Fatalf("expected two example files, got %v", seen)
+	}
+}

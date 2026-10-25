@@ -16,10 +16,33 @@ type appPreferences struct {
 }
 
 type cookieSyncPreferences struct {
-	Enabled bool     `json:"enabled"`
-	Port    int      `json:"port,omitempty"`
-	Domains []string `json:"domains,omitempty"`
-	Token   string   `json:"token,omitempty"`
+	Enabled        bool     `json:"enabled"`
+	Port           int      `json:"port,omitempty"`
+	Domains        []string `json:"domains,omitempty"`
+	Token          string   `json:"token,omitempty"`
+	TokenEncrypted string   `json:"tokenEncrypted,omitempty"`
+}
+
+func cookieSyncPreferencesToken(saved cookieSyncPreferences) string {
+	if saved.TokenEncrypted != "" {
+		if plaintext, err := decryptRequestStorePayload([]byte(saved.TokenEncrypted)); err == nil {
+			return strings.TrimSpace(string(plaintext))
+		}
+	}
+	return strings.TrimSpace(saved.Token)
+}
+
+func sealCookieSyncPreferencesToken(preferences *cookieSyncPreferences, token string) {
+	preferences.Token = ""
+	preferences.TokenEncrypted = ""
+	if token == "" {
+		return
+	}
+	if sealed, err := encryptRequestStorePayload([]byte(token)); err == nil {
+		preferences.TokenEncrypted = string(sealed)
+		return
+	}
+	preferences.Token = token
 }
 
 type DefaultWorkspaceLocationResult struct {

@@ -149,6 +149,14 @@ func newCookieSyncToken() string {
 	return base64.RawURLEncoding.EncodeToString(buf)
 }
 
+func newCookieSyncRequestID() string {
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return ""
+	}
+	return "pair-" + base64.RawURLEncoding.EncodeToString(buf)
+}
+
 func newCookieSyncApprovalCode() string {
 	value, err := rand.Int(rand.Reader, big.NewInt(1000000))
 	if err != nil {
@@ -563,19 +571,19 @@ func (s *cookieSyncServer) handlePairRequest(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	if existing := s.pending; existing != nil && !existing.approved && !existing.denied && now.Before(existing.expiresAt) {
-		if existing.extensionID == extensionID {
-			response := map[string]any{"requestId": existing.id, "code": existing.code, "status": "pending"}
-			s.mu.Unlock()
-			writeCookieSyncJSON(w, http.StatusOK, response)
-			return
-		}
 		s.mu.Unlock()
-		writeCookieSyncJSON(w, http.StatusConflict, map[string]any{"error": "another browser is already waiting to be approved"})
+		writeCookieSyncJSON(w, http.StatusConflict, map[string]any{"error": "a browser is already waiting to be approved — approve or deny it in Kurlo first"})
 		return
 	}
 
+	requestID := newCookieSyncRequestID()
+	if requestID == "" {
+		s.mu.Unlock()
+		writeCookieSyncJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not start pairing"})
+		return
+	}
 	pairing := &cookieSyncPairing{
-		id:          fmt.Sprintf("pair-%d", s.seq.Add(1)),
+		id:          requestID,
 		browser:     browser,
 		extensionID: extensionID,
 		code:        newCookieSyncApprovalCode(),
@@ -600,7 +608,7 @@ func (s *cookieSyncServer) handlePairPoll(w http.ResponseWriter, r *http.Request
 	requestID := strings.TrimSpace(r.URL.Query().Get("requestId"))
 	s.mu.Lock()
 	pairing := s.pending
-	if pairing == nil || pairing.id != requestID {
+	if pairing == nil || requestID == "" || subtle.ConstantTimeCompare([]byte(pairing.id), []byte(requestID)) != 1 {
 		s.mu.Unlock()
 		writeCookieSyncJSON(w, http.StatusOK, map[string]any{"status": "expired"})
 		return

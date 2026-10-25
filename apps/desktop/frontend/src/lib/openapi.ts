@@ -154,9 +154,19 @@ function formRowsFromSchema(schema: unknown, root: unknown, example: unknown): K
   return Object.entries(properties).map(([key, value]) => row(key, asText(schemaExample(value, root))));
 }
 
+function mediaTypeMatches(key: string, type: string) {
+  const base = key.split(';')[0].trim().toLowerCase();
+  if (type === 'application/*+json') return /^application\/(?:[^/]+\+json|\*\+json)$/.test(base);
+  return base === type;
+}
+
 function pickMediaType(content: Record<string, unknown>) {
   const keys = Object.keys(content);
-  return BODY_TYPE_PRIORITY.find(type => keys.some(key => key.toLowerCase() === type)) ?? keys[0] ?? '';
+  for (const type of BODY_TYPE_PRIORITY) {
+    const key = keys.find(candidate => mediaTypeMatches(candidate, type));
+    if (key) return key;
+  }
+  return keys[0] ?? '';
 }
 
 function openApiBody(operation: Record<string, unknown>, root: unknown): BodyImport {
@@ -201,7 +211,7 @@ function openApiExamplesFromResponses(
   for (const [code, responseValue] of Object.entries(responses)) {
     const response = deref(root, responseValue);
     if (!isRecord(response)) continue;
-    const statusCode = Number(code);
+    const statusCode = /^[1-5]xx$/i.test(code) ? Number(code[0]) * 100 : Number(code);
     if (!Number.isFinite(statusCode) || statusCode <= 0) continue;
 
     const payload = openApiResponsePayload(response, root);
@@ -286,8 +296,9 @@ function resolveServerUrl(server: Record<string, unknown>) {
   const variables = isRecord(server.variables) ? server.variables : {};
   return asText(server.url).replace(/\{([^}]+)\}/g, (_, key) => {
     const variable = variables[key];
-    if (isRecord(variable)) return asText(variable.default || asArray(variable.enum)[0] || key);
-    return key;
+    const fallback = `{{${key}}}`;
+    if (isRecord(variable)) return asText(variable.default || asArray(variable.enum)[0] || fallback);
+    return fallback;
   });
 }
 
@@ -322,9 +333,12 @@ function joinUrl(base: string, path: string) {
 }
 
 function parametersFor(pathItem: Record<string, unknown>, operation: Record<string, unknown>, root: unknown) {
-  return [...asArray(pathItem.parameters), ...asArray(operation.parameters)]
+  const resolved = [...asArray(pathItem.parameters), ...asArray(operation.parameters)]
     .map(param => deref(root, param))
     .filter(isRecord);
+  const byIdentity = new Map<string, Record<string, unknown>>();
+  for (const param of resolved) byIdentity.set(`${asText(param.in).toLowerCase()}\u0000${asText(param.name)}`, param);
+  return [...byIdentity.values()];
 }
 
 function parameterRows(parameters: Record<string, unknown>[], location: string, root: unknown) {
@@ -452,12 +466,21 @@ function authFromSecurityScheme(scheme: unknown, variables: Map<string, KVRow>):
   }
   if (type === 'apikey') {
     const name = asText(scheme.name) || 'X-API-Key';
-    const location = asText(scheme.in).toLowerCase() === 'query' ? 'query' : 'header';
+    const location = asText(scheme.in).toLowerCase();
+    if (location === 'cookie') {
+      return {
+        ...emptyAuthState(),
+        type: 'apikey',
+        apiKeyName: 'Cookie',
+        apiKeyIn: 'header',
+        apiKeyValue: `${name}=${declare('apiKey', `Value for the ${name} API key cookie`)}`,
+      };
+    }
     return {
       ...emptyAuthState(),
       type: 'apikey',
       apiKeyName: name,
-      apiKeyIn: location,
+      apiKeyIn: location === 'query' ? 'query' : 'header',
       apiKeyValue: declare('apiKey', `Value for the ${name} API key`),
     };
   }
@@ -474,7 +497,7 @@ function authFromSecurityScheme(scheme: unknown, variables: Map<string, KVRow>):
     ).join(' ');
     const grant = flow?.name === 'authorizationCode' || asText(scheme.flow) === 'accessCode'
       ? 'authorization_code'
-      : flow?.name === 'password' ? 'password' : 'client_credentials';
+      : flow?.name === 'password' || asText(scheme.flow) === 'password' ? 'password' : 'client_credentials';
     return {
       ...emptyAuthState(),
       type: 'oauth2',
@@ -699,8 +722,16 @@ function isGraphQLExportRequest(req: SavedRequest): boolean {
   return req.requestType === 'graphql' || req.bodyType === 'graphql';
 }
 
+function isNonHttpExportRequest(req: SavedRequest): boolean {
+  return req.requestType === 'grpc' || req.requestType === 'mcp' || req.requestType === 'ai';
+}
+
+function isOpenApiExportableRequest(req: SavedRequest): boolean {
+  return !isRealtimeExportRequest(req) && !isGraphQLExportRequest(req) && !isNonHttpExportRequest(req);
+}
+
 function httpExportRequests(requests: SavedRequest[]): SavedRequest[] {
-  return requests.filter(req => !isRealtimeExportRequest(req) && !isGraphQLExportRequest(req));
+  return requests.filter(isOpenApiExportableRequest);
 }
 
 function activeQueryRows(req: SavedRequest, urlRows: KVRow[]): KVRow[] {
@@ -1135,7 +1166,7 @@ export function buildOpenApiDocument(
 ): Record<string, unknown> {
   if (!requests.length) throw new Error('Collection has no saved requests to export.');
   const exportRequests = httpExportRequests(requests);
-  if (!exportRequests.length) throw new Error('OpenAPI export only supports HTTP and SSE requests. GraphQL and realtime requests are skipped.');
+  if (!exportRequests.length) throw new Error('OpenAPI export only supports HTTP and SSE requests. GraphQL, gRPC, MCP, AI and realtime requests are skipped.');
 
   const paths: Record<string, unknown> = {};
   const servers = new Map<string, ReturnType<typeof openApiServer>>();
@@ -1183,7 +1214,7 @@ export function buildSwaggerDocument(
 ): Record<string, unknown> {
   if (!requests.length) throw new Error('Collection has no saved requests to export.');
   const exportRequests = httpExportRequests(requests);
-  if (!exportRequests.length) throw new Error('Swagger export only supports HTTP and SSE requests. GraphQL and realtime requests are skipped.');
+  if (!exportRequests.length) throw new Error('Swagger export only supports HTTP and SSE requests. GraphQL, gRPC, MCP, AI and realtime requests are skipped.');
 
   const paths: Record<string, unknown> = {};
   const serverUrls: string[] = [];

@@ -21,6 +21,11 @@ import (
 )
 
 const websocketWriteTimeout = 10 * time.Second
+
+func websocketWriteDeadline(size int) time.Time {
+	return time.Now().Add(websocketWriteTimeout + time.Duration(size/(64<<10))*time.Second)
+}
+
 const defaultWebSocketKeepAliveInterval = 30 * time.Second
 
 type websocketSession struct {
@@ -82,8 +87,55 @@ func (m *websocketManager) connectWithCallbacks(appCtx context.Context, sessionI
 			}
 			m.mu.Unlock()
 		}()
-		m.runConnectionWithCallbacks(wsCtx, sessionID, seq, req, callbacks)
+		m.runConnectionWithCallbacks(wsCtx, sessionID, seq, req, m.currentSessionCallbacks(sessionID, seq, callbacks))
 	}()
+}
+
+func (m *websocketManager) replaced(sessionID string, seq uint64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sess, ok := m.sessions[sessionID]
+	return ok && sess.id != seq
+}
+
+func (m *websocketManager) currentSessionCallbacks(sessionID string, seq uint64, callbacks websocketCallbacks) websocketCallbacks {
+	guarded := callbacks
+	if callbacks.onOpen != nil {
+		guarded.onOpen = func(ev model.WebSocketOpenEvent) {
+			if !m.replaced(sessionID, seq) {
+				callbacks.onOpen(ev)
+			}
+		}
+	}
+	if callbacks.onEvent != nil {
+		guarded.onEvent = func(ev model.WebSocketMessage) {
+			if !m.replaced(sessionID, seq) {
+				callbacks.onEvent(ev)
+			}
+		}
+	}
+	if callbacks.onClose != nil {
+		guarded.onClose = func(ev model.WebSocketCloseEvent) {
+			if !m.replaced(sessionID, seq) {
+				callbacks.onClose(ev)
+			}
+		}
+	}
+	if callbacks.onError != nil {
+		guarded.onError = func(ev model.WebSocketErrorEvent) {
+			if !m.replaced(sessionID, seq) {
+				callbacks.onError(ev)
+			}
+		}
+	}
+	if callbacks.onReconnect != nil {
+		guarded.onReconnect = func(ev model.WebSocketReconnectEvent) {
+			if !m.replaced(sessionID, seq) {
+				callbacks.onReconnect(ev)
+			}
+		}
+	}
+	return guarded
 }
 
 func (m *websocketManager) runtimeCallbacks(appCtx context.Context, sessionID string) websocketCallbacks {
@@ -169,9 +221,13 @@ func (m *websocketManager) send(sessionID string, msg model.WebSocketSendMessage
 	deadline := time.Now().Add(websocketWriteTimeout)
 	switch strings.ToLower(msg.Type) {
 	case "", "text":
-		err = conn.WriteMessage(websocket.TextMessage, payload)
+		if err = conn.SetWriteDeadline(websocketWriteDeadline(len(payload))); err == nil {
+			err = conn.WriteMessage(websocket.TextMessage, payload)
+		}
 	case "binary":
-		err = conn.WriteMessage(websocket.BinaryMessage, payload)
+		if err = conn.SetWriteDeadline(websocketWriteDeadline(len(payload))); err == nil {
+			err = conn.WriteMessage(websocket.BinaryMessage, payload)
+		}
 	case "ping":
 		err = conn.WriteControl(websocket.PingMessage, payload, deadline)
 	case "pong":

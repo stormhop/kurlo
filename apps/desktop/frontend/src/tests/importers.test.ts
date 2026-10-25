@@ -982,7 +982,7 @@ describe('buildOpenApiDocument', () => {
         bodyType: 'graphql',
         bodyContent: '{"query":"query Viewer { viewer { id } }","variables":{}}',
       }),
-    ], strip)).toThrow(/GraphQL and realtime requests are skipped/);
+    ], strip)).toThrow(/GraphQL, gRPC, MCP, AI and realtime requests are skipped/);
   });
 
   it('throws a clear OpenAPI export error for WebSocket-only collections', () => {
@@ -993,7 +993,7 @@ describe('buildOpenApiDocument', () => {
         requestType: 'ws',
         url: 'wss://api.example.test/ws',
       }),
-    ], strip)).toThrow(/GraphQL and realtime requests are skipped/);
+    ], strip)).toThrow(/GraphQL, gRPC, MCP, AI and realtime requests are skipped/);
   });
 
   it('omits secret-like OpenAPI examples by default and can include them explicitly', () => {

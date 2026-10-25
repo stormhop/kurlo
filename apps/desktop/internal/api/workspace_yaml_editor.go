@@ -64,6 +64,11 @@ func (a *App) WriteWorkspaceYAMLFile(path string, content string) WorkspaceOpenR
 	if len(content) > maxTextFileReadSize {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: fmt.Sprintf("file is larger than %d MB", maxTextFileReadSize/(1024*1024)), Git: workspaceOpenStatus(root)}
 	}
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: workspaceOpenStatus(root)}
+	}
+	defer unlock()
 	if err := writeTextFileAtomic(fullPath, []byte(content)); err != nil {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: workspaceOpenStatus(root)}
 	}

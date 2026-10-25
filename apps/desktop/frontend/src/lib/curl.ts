@@ -331,31 +331,84 @@ function looksUrlencoded(body: string) {
 
 const IGNORED_VALUE_FLAGS = [
   '-c',
+  '-C',
   '-D',
   '-E',
+  '-K',
   '-o',
+  '-P',
+  '-Q',
+  '-r',
+  '-T',
+  '-w',
+  '-y',
+  '-Y',
+  '-z',
+  '--abstract-unix-socket',
   '--cacert',
   '--capath',
   '--cert',
   '--cert-type',
   '--connect-timeout',
+  '--ciphers',
+  '--config',
   '--connect-to',
+  '--continue-at',
   '--cookie-jar',
+  '--crlfile',
+  '--curves',
+  '--dns-servers',
   '--dump-header',
+  '--egd-file',
+  '--expect100-timeout',
+  '--happy-eyeballs-timeout-ms',
+  '--hostpubmd5',
+  '--hostpubsha256',
   '--interface',
+  '--keepalive-time',
   '--key',
   '--key-type',
   '--limit-rate',
   '--local-port',
+  '--max-filesize',
+  '--max-redirs',
+  '--netrc-file',
+  '--noproxy',
   '--output',
   '--output-dir',
   '--pass',
+  '--pinnedpubkey',
+  '--preproxy',
+  '--proto',
+  '--proto-default',
+  '--proto-redir',
+  '--proxy-cacert',
+  '--proxy-header',
   '--proxy-user',
+  '--pubkey',
+  '--quote',
+  '--random-file',
+  '--range',
   '--request-target',
   '--resolve',
   '--retry',
   '--retry-delay',
   '--retry-max-time',
+  '--socks4',
+  '--socks4a',
+  '--socks5',
+  '--socks5-hostname',
+  '--speed-limit',
+  '--speed-time',
+  '--stderr',
+  '--time-cond',
+  '--tls-max',
+  '--tls13-ciphers',
+  '--trace',
+  '--trace-ascii',
+  '--unix-socket',
+  '--upload-file',
+  '--write-out',
 ];
 
 function normalizeCurlInput(input: string): string {
@@ -399,9 +452,11 @@ function looksLikeUrl(value: string): boolean {
     || clean.startsWith('{{');
 }
 
+const URL_SCHEME = /^[a-z][a-z\d+.-]*:\/\//i;
+
 function setUrlCandidate(result: ParsedCurl, value: string) {
   const clean = cleanUrlToken(value);
-  if (!result.url || !looksLikeUrl(result.url)) {
+  if (!result.url || !looksLikeUrl(result.url) || (URL_SCHEME.test(clean) && !URL_SCHEME.test(result.url))) {
     result.url = clean;
   }
 }
@@ -506,7 +561,7 @@ function tokenise(input: string): string[] {
     if (ch === '"') {
       i++;
       while (i < input.length && input[i] !== '"') {
-        if (input[i] === '\\' && i + 1 < input.length) {
+        if (input[i] === '\\' && i + 1 < input.length && '$`"\\\n'.includes(input[i + 1])) {
           i++;
           token += input[i];
         } else {

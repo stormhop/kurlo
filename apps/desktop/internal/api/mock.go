@@ -22,6 +22,8 @@ const (
 	mockShutdownTimeout = 3 * time.Second
 	mockMaxDelay        = 30 * time.Second
 	mockDefaultPort     = 3100
+	mockReadTimeout     = time.Minute
+	mockIdleTimeout     = 2 * time.Minute
 )
 
 const mockClientClosedStatus = 499
@@ -225,6 +227,8 @@ func (m *mockServer) start(config model.MockServerConfig, emit func(model.MockRe
 	m.server = &http.Server{
 		Handler:           http.HandlerFunc(m.handle),
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       mockReadTimeout,
+		IdleTimeout:       mockIdleTimeout,
 	}
 	server := m.server
 	status := m.statusLocked()
@@ -360,13 +364,17 @@ func (m *mockServer) snapshot() ([]mockCompiledRoute, model.MockServerConfig, fu
 	return m.routes, m.config, m.emit
 }
 
-func (m *mockServer) record(entry model.MockRequestLog) {
+func (m *mockServer) record(entry model.MockRequestLog) bool {
 	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.running {
+		return false
+	}
 	m.log = append(m.log, entry)
 	if len(m.log) > mockLogLimit {
 		m.log = m.log[len(m.log)-mockLogLimit:]
 	}
-	m.mu.Unlock()
+	return true
 }
 
 func (m *mockServer) recentLog() []model.MockRequestLog {
@@ -390,8 +398,7 @@ func (m *mockServer) handle(w http.ResponseWriter, r *http.Request) {
 	}
 	finish := func() {
 		entry.DurationMs = time.Since(start).Milliseconds()
-		m.record(entry)
-		if emit != nil {
+		if m.record(entry) && emit != nil {
 			emit(entry)
 		}
 	}
@@ -411,6 +418,9 @@ func (m *mockServer) handle(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
 		w.Header().Set("Access-Control-Max-Age", "600")
 		w.WriteHeader(http.StatusNoContent)
+		entry.StatusCode = http.StatusNoContent
+		entry.Note = "CORS preflight"
+		finish()
 		return
 	}
 

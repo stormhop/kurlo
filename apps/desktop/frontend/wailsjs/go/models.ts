@@ -1927,6 +1927,8 @@ export namespace model {
 	    method: GrpcMethodInfo;
 	    preRequestResult: ScriptResult;
 	    testResult: ScriptResult;
+	    collectionVariableUpdates?: Record<string, string>;
+	    collectionVariablesRemoved?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new GrpcResponse(source);
@@ -1948,6 +1950,8 @@ export namespace model {
 	        this.method = this.convertValues(source["method"], GrpcMethodInfo);
 	        this.preRequestResult = this.convertValues(source["preRequestResult"], ScriptResult);
 	        this.testResult = this.convertValues(source["testResult"], ScriptResult);
+	        this.collectionVariableUpdates = source["collectionVariableUpdates"];
+	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

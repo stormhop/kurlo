@@ -84,6 +84,11 @@ type GrpcHost = {
   snapshotActiveRequest: (options?: { forPersistence?: boolean }) => SavedRequest;
   syncActiveEnvironmentFromBackend: () => Promise<void>;
   syncBackendEnvironment: () => Promise<void>;
+  applyCollectionVariableUpdates: (
+    req: Pick<SavedRequest, 'collectionId'>,
+    updates: Record<string, string> | undefined,
+    removed: string[] | undefined,
+  ) => Promise<boolean>;
 };
 
 export const grpcFeature = {
@@ -407,6 +412,7 @@ export const grpcFeature = {
       try { await this.syncBackendEnvironment(); } catch {}
       const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(requestSnapshot, envValues, secretValues, secretKeys, requestId));
       try { await this.syncActiveEnvironmentFromBackend(); } catch {}
+      try { await this.applyCollectionVariableUpdates(requestSnapshot, resp.collectionVariableUpdates, resp.collectionVariablesRemoved); } catch {}
       if (resp.error && !resp.grpcCode && !(resp.messages ?? []).length) {
         if (this.requestIsActive(requestId)) this.requestError = resp.error;
         if (resp.error !== REQUEST_CANCELED_ERROR) {

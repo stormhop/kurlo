@@ -186,7 +186,7 @@ export const mockServerFeature = {
       clearTimeout(this.mockServerReloadTimer);
       this.mockServerReloadTimer = null;
     }
-    if (!this.mockServerRoutesChanged()) return;
+    if (!this.mockServer.running) return;
     this.mockServerReloadTimer = setTimeout(() => {
       this.mockServerReloadTimer = null;
       void this.reloadMockServerRoutes();

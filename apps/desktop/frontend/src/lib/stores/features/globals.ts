@@ -52,6 +52,25 @@ export function mergeGlobalRowsWithValues(rows: KVRow[], values: Record<string, 
   return withTrailingRow(merged);
 }
 
+export function mergeGlobalRowsWithImportedRows(rows: KVRow[], imported: KVRow[]): KVRow[] {
+  const merged = [...rows];
+  for (const row of imported) {
+    const key = row.key.trim();
+    if (!key) continue;
+    const index = merged.findIndex(existing => existing.key.trim() === key);
+    const patch = {
+      key,
+      value: row.value,
+      enabled: row.enabled,
+      ...(row.description ? { description: row.description } : {}),
+      ...(row.secret ? { secret: true } : {}),
+    };
+    if (index >= 0) merged[index] = { ...merged[index], ...patch };
+    else merged.push({ id: nextRowId(merged), description: '', ...patch });
+  }
+  return withTrailingRow(merged);
+}
+
 export const globalsFeature = {
   openGlobals(this: GlobalsHost & { topView: string; closeFloatingMenus: () => void }) {
     this.closeFloatingMenus();

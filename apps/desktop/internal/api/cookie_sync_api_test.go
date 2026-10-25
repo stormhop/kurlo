@@ -16,6 +16,16 @@ func isolateAppData(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "config"))
 	t.Setenv("AppData", filepath.Join(home, "AppData"))
+	key := make([]byte, requestStoreKeySize)
+	for i := range key {
+		key[i] = byte(i + 7)
+	}
+	previousProvider, previousLoader := requestStoreKeyProvider, requestStoreKeyLoader
+	requestStoreKeyProvider = func() ([]byte, error) { return key, nil }
+	requestStoreKeyLoader = func() ([]byte, error) { return key, nil }
+	t.Cleanup(func() {
+		requestStoreKeyProvider, requestStoreKeyLoader = previousProvider, previousLoader
+	})
 }
 
 func readCookieSyncPreferences(t *testing.T) cookieSyncPreferences {
@@ -67,11 +77,37 @@ func TestCookieSyncStatusMintsAStableTokenOnFirstUse(t *testing.T) {
 	}
 
 	saved := readCookieSyncPreferences(t)
-	if len(saved.Token) < 16 {
-		t.Fatalf("expected a token to be minted and saved, got %q", saved.Token)
+	token := cookieSyncPreferencesToken(saved)
+	if len(token) < 16 {
+		t.Fatalf("expected a token to be minted and saved, got %q", token)
 	}
-	if app.CookieSyncStatus(); readCookieSyncPreferences(t).Token != saved.Token {
+	if saved.Token != "" || saved.TokenEncrypted == "" {
+		t.Fatalf("the token should be saved encrypted, not in plaintext: %+v", saved)
+	}
+	if app.CookieSyncStatus(); cookieSyncPreferencesToken(readCookieSyncPreferences(t)) != token {
 		t.Fatal("the token must not change every time the tab is opened")
+	}
+}
+
+func TestCookieSyncLegacyPlaintextTokenIsResavedEncrypted(t *testing.T) {
+	isolateAppData(t)
+	legacy := "legacy-plaintext-bridge-token"
+	if err := saveAppPreferences(appPreferences{CookieSync: &cookieSyncPreferences{Token: legacy}}); err != nil {
+		t.Fatalf("save preferences: %v", err)
+	}
+
+	app := NewApp()
+	app.CookieSyncStatus()
+
+	data, err := os.ReadFile(appPreferencesPath())
+	if err != nil {
+		t.Fatalf("read preferences: %v", err)
+	}
+	if strings.Contains(string(data), legacy) {
+		t.Fatal("the legacy token is still stored in plaintext")
+	}
+	if got := cookieSyncPreferencesToken(readCookieSyncPreferences(t)); got != legacy {
+		t.Fatalf("a paired extension should keep its token, got %q", got)
 	}
 }
 
@@ -91,8 +127,9 @@ func TestCookieSyncSettingsSurviveARestart(t *testing.T) {
 	if !saved.Enabled || saved.Port != started.Port {
 		t.Fatalf("preferences did not record the running bridge: %+v", saved)
 	}
-	if !strings.HasSuffix(started.PairingCode, saved.Token) {
-		t.Fatalf("the pairing code %q should carry the saved token %q", started.PairingCode, saved.Token)
+	savedToken := cookieSyncPreferencesToken(saved)
+	if !strings.HasSuffix(started.PairingCode, savedToken) {
+		t.Fatalf("the pairing code %q should carry the saved token %q", started.PairingCode, savedToken)
 	}
 
 	first.cookieSync.stopServer()
@@ -107,7 +144,7 @@ func TestCookieSyncSettingsSurviveARestart(t *testing.T) {
 	}
 
 	resumed := startAppCookieSync(t, second, restored.Domains)
-	wantCode := cookieSyncPairingCode(resumed.Port, saved.Token)
+	wantCode := cookieSyncPairingCode(resumed.Port, savedToken)
 	if resumed.PairingCode != wantCode {
 		t.Fatalf("a paired extension should keep working after a restart: %q, want %q", resumed.PairingCode, wantCode)
 	}

@@ -1873,6 +1873,9 @@ func TestGitPullMergeConflictCanResolveAndContinue(t *testing.T) {
 	if hasConflictedFiles(resolveResult.Git) {
 		t.Fatalf("expected conflicts to be resolved, got %#v", resolveResult.Git.Files)
 	}
+	if resolved, err := os.ReadFile(filepath.Join(dir, "kurlo.yml")); err != nil || string(resolved) != "version: 1\nlocal: true\n" {
+		t.Fatalf("taking our side should keep the file byte for byte, got %q (%v)", resolved, err)
+	}
 	continueResult := gitContinueOperationForRoot(dir, "Merge Kurlo workspace")
 	if !continueResult.Ok {
 		t.Fatalf("continue failed: %s\n%s", continueResult.Error, continueResult.Output)

@@ -195,7 +195,7 @@
   });
 
   $effect(() => {
-    vm.mockServerRoutesChanged();
+    if (vm.mockServer.running) vm.mockServerRunningRoutes();
     untrack(() => vm.scheduleMockServerReload());
   });
 

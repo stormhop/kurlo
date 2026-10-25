@@ -109,10 +109,7 @@ func saveGitCredentials(creds map[string]gitCredential) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(gitCredentialsPath(), envelope, 0600); err != nil {
-		return err
-	}
-	return nil
+	return writeFileAtomic(gitCredentialsPath(), envelope)
 }
 
 func gitCredentialLookup(host string) (gitCredential, bool) {
