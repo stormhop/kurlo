@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { useClock } from '../clock.svelte';
+  const now = useClock();
   import Keycaps from './Keycaps.svelte';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import { requestTabLabel, statusClass } from '../utils';
@@ -95,7 +97,7 @@
   let isEmpty = $derived(collectionGroups.length === 0 && requestCount === 0);
 
   function relativeTime(timestamp: number): string {
-    const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+    const seconds = Math.max(0, Math.round((now() - timestamp) / 1000));
     if (seconds < 60) return 'Just now';
     const minutes = Math.round(seconds / 60);
     if (minutes < 60) return `${minutes} min ago`;

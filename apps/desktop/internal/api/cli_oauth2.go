@@ -11,8 +11,9 @@ import (
 )
 
 type oauth2TokenCache struct {
-	mu     sync.Mutex
-	tokens map[string]cachedOAuth2Token
+	mu      sync.Mutex
+	tokens  map[string]cachedOAuth2Token
+	flights sync.Map
 }
 
 type cachedOAuth2Token struct {
@@ -30,6 +31,10 @@ func (c *oauth2TokenCache) resolveOAuth2Token(cfg *model.AuthConfig) error {
 	}
 
 	key := oauth2CacheKey(*cfg)
+	flight, _ := c.flights.LoadOrStore(key, &sync.Mutex{})
+	lock := flight.(*sync.Mutex)
+	lock.Lock()
+	defer lock.Unlock()
 	c.mu.Lock()
 	if cached, ok := c.tokens[key]; ok && cached.accessToken != "" && !oauth2TokenExpired(cached.expiresAt) {
 		cfg.Token = cached.accessToken

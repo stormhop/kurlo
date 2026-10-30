@@ -28,6 +28,8 @@ func websocketWriteDeadline(size int) time.Time {
 
 const defaultWebSocketKeepAliveInterval = 30 * time.Second
 
+const defaultWebSocketHandshakeTimeout = 30 * time.Second
+
 type websocketSession struct {
 	cancel  context.CancelFunc
 	conn    *websocket.Conn
@@ -474,7 +476,7 @@ func websocketHandshakeTimeout(req model.HttpRequest) time.Duration {
 	if req.WebSocketHandshakeTimeoutMs > 0 {
 		return time.Duration(req.WebSocketHandshakeTimeoutMs) * time.Millisecond
 	}
-	return 0
+	return defaultWebSocketHandshakeTimeout
 }
 
 func (m *websocketManager) keepAlive(ctx context.Context, sess *websocketSession, conn *websocket.Conn, interval time.Duration, stop <-chan struct{}) {

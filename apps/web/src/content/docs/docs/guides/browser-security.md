@@ -56,6 +56,8 @@ For standard HTTP requests, Kurlo sends an `OPTIONS` preflight when the method o
 - `Range` must be a single `bytes=N-` or `bytes=N-M`; a suffix range such as `bytes=-500` needs a preflight.
 - When the safelisted values add up to more than 1 KB, all of them need a preflight.
 
+The timeline shows separate preflight start and finish events. Request timings exclude the preflight.
+
 The preflight:
 
 - Does not include cookie-jar cookies.

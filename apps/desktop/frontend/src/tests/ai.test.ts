@@ -361,6 +361,18 @@ describe('sending an AI request', () => {
     expect(backend.sendAiRequest).not.toHaveBeenCalled();
   });
 
+  it('tells the composer whether the reply was sent so it can keep the text', async () => {
+    vi.mocked(backend.sendAiRequest).mockClear();
+    const noModel = sendHost({ snapshotActiveRequest: () => ({ id: 'req-1', aiPrompt: 'Hello', aiModel: '' }) });
+    expect(await (noModel.sendAiPrompt as (text?: string) => Promise<boolean>)('Keep me')).toBe(false);
+    expect(noModel.requestError).toBe('Choose a model before sending.');
+    const locked = sendHost({ guardWorkspaceWritable: () => false });
+    expect(await (locked.sendAiPrompt as (text?: string) => Promise<boolean>)('Keep me')).toBe(false);
+    expect(backend.sendAiRequest).not.toHaveBeenCalled();
+    vi.mocked(backend.sendAiRequest).mockResolvedValueOnce(aiResponse({ text: 'Sure' }));
+    expect(await (sendHost().sendAiPrompt as (text?: string) => Promise<boolean>)('Go')).toBe(true);
+  });
+
   it('sends a reply on Enter and keeps Shift+Enter for a new line', () => {
     const key = (init: Partial<KeyboardEvent>) => ({ key: 'Enter', shiftKey: false, altKey: false, isComposing: false, ...init });
     expect(aiComposerSends(key({}))).toBe(true);

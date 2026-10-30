@@ -265,6 +265,7 @@ export const aiFeature = {
   },
 
   clearAiConversation(this: AiHost, requestId = this.activeRequestId) {
+    if (requestId === this.activeRequestId) this.requestError = '';
     if (this.inFlightRequestIds.has(requestId)) return;
     this.setAiTurns(requestId, []);
   },
@@ -360,19 +361,19 @@ export const aiFeature = {
     this.aiToolRequestIds = [...current];
   },
 
-  async sendAiPrompt(this: AiHost, followUp?: string) {
-    if (!this.guardWorkspaceWritable('Sending requests')) return;
+  async sendAiPrompt(this: AiHost, followUp?: string): Promise<boolean> {
+    if (!this.guardWorkspaceWritable('Sending requests')) return false;
     const requestId = this.activeRequestId || newRequestId();
     if (this.inFlightRequestIds.has(requestId)) {
       await this.cancelActiveRequest();
-      return;
+      return false;
     }
     const snapshot = this.snapshotActiveRequest();
     const prompt = followUp === undefined ? (snapshot.aiPrompt ?? '') : followUp;
     if (!prompt.trim()) {
       this.requestError = followUp === undefined ? 'Write a prompt before sending.' : 'Write a message before sending.';
       if (followUp === undefined) this.requestTab = 'body';
-      return;
+      return false;
     }
     const lengthError = followUp === undefined
       ? aiPromptLengthError(snapshot)
@@ -380,17 +381,17 @@ export const aiFeature = {
     if (lengthError) {
       this.requestError = lengthError;
       if (followUp === undefined) this.requestTab = 'body';
-      return;
+      return false;
     }
     if (!(snapshot.aiModel ?? '').trim()) {
       this.requestError = 'Choose a model before sending.';
-      return;
+      return false;
     }
     const settingsError = aiSettingsError(snapshot);
     if (settingsError) {
       this.requestError = settingsError;
       this.requestTab = 'settings';
-      return;
+      return false;
     }
 
     const envValues = this.activeEnvironmentValues();
@@ -444,6 +445,7 @@ export const aiFeature = {
     } finally {
       this.markRequestLoading(requestId, false);
     }
+    return true;
   },
 
   initAiListeners(this: AiHost) {

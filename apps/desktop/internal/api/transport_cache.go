@@ -59,14 +59,21 @@ func (c *transportCache) get(req model.HttpRequest) *http.Transport {
 	key := newTransportKey(req)
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if entry, ok := c.entries[key]; ok {
 		entry.lastUsed = c.now()
+		c.mu.Unlock()
 		return entry.transport
 	}
 
+	c.mu.Unlock()
 	transport := newBaseHTTPTransport(req)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if entry, ok := c.entries[key]; ok {
+		entry.lastUsed = c.now()
+		transport.CloseIdleConnections()
+		return entry.transport
+	}
 	c.evictLocked()
 	c.entries[key] = &cachedTransport{transport: transport, lastUsed: c.now()}
 	return transport

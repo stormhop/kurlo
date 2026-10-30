@@ -117,6 +117,41 @@ func TestClientCertificateIsPresentedForMutualTLS(t *testing.T) {
 	}
 }
 
+func TestReplacedClientCertificateFileIsPickedUpWithoutRestart(t *testing.T) {
+	clientCerts = newClientCertCache()
+	httpTransports.closeAll()
+	t.Cleanup(httpTransports.closeAll)
+
+	oldCertPEM, oldKeyPEM, oldCert := issueCert(t, "old-client")
+	newCertPEM, newKeyPEM, newCert := issueCert(t, "new-client")
+	pool := x509.NewCertPool()
+	pool.AddCert(oldCert.Leaf)
+	pool.AddCert(newCert.Leaf)
+	server := mTLSServer(t, pool)
+
+	dir := t.TempDir()
+	certPath := writeTemp(t, dir, "client.crt", oldCertPEM)
+	keyPath := writeTemp(t, dir, "client.key", oldKeyPEM)
+	app := NewApp()
+
+	if resp := app.SendRequest(mTLSTestRequest(server.URL, certPath, keyPath)); resp.Body != "client=old-client" {
+		t.Fatalf("first request should present the old cert, got %q %s", resp.Body, resp.Error)
+	}
+
+	writeTemp(t, dir, "client.crt", newCertPEM)
+	writeTemp(t, dir, "client.key", newKeyPEM)
+	later := time.Now().Add(time.Second)
+	for _, path := range []string{certPath, keyPath} {
+		if err := os.Chtimes(path, later, later); err != nil {
+			t.Fatalf("touch %s: %v", path, err)
+		}
+	}
+
+	if resp := app.SendRequest(mTLSTestRequest(server.URL, certPath, keyPath)); resp.Body != "client=new-client" {
+		t.Fatalf("a replaced cert file should be used, got %q %s", resp.Body, resp.Error)
+	}
+}
+
 func TestMutualTLSServerRejectsRequestWithoutCert(t *testing.T) {
 	_, _, clientCert := issueCert(t, "stormhop")
 	pool := x509.NewCertPool()

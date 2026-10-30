@@ -14,6 +14,8 @@ import { cloneRowsForStore } from '../../utils';
 import type { CookieJarEntry } from '../../backend';
 import type { CollectionRunRecord } from '../../collectionRuns';
 
+const saveFailures = new WeakMap<object, number>();
+
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 type RequestPersistenceHost = {
@@ -211,12 +213,14 @@ export const requestPersistenceFeature = {
     try {
       const saved = await persistJob;
       if (saved && persistEpoch === this.requestStorePersistEpoch) {
+        saveFailures.delete(this);
         this.recordSavedRequestSnapshots(storeRequests);
         this.scheduleGitStatusRefreshAfterPersist();
         return true;
       }
       return false;
     } catch (err) {
+      saveFailures.set(this, Math.min(6, (saveFailures.get(this) ?? 0) + 1));
       const message = err instanceof Error ? err.message.trim() : String(err || '').trim();
       const detail = message && message !== 'request store save failed' ? ` — ${message.slice(0, 180)}` : ' — check disk space or permissions';
       this.collectionImportToast = `Warning: changes could not be saved${detail}`;
@@ -404,6 +408,6 @@ export const requestPersistenceFeature = {
     this.persistTimer = setTimeout(() => {
       this.persistTimer = null;
       void this.persistActiveRequestNow();
-    }, 1200);
+    }, Math.min(60000, 1200 * 2 ** (saveFailures.get(this) ?? 0)));
   },
 };

@@ -43,6 +43,7 @@ var (
 	errUpdateVersionRollback   = errors.New("update version is not newer than the installed version")
 	errUpdateURLNotTrusted     = errors.New("update url is not on the trusted releases host")
 	errUpdateSignatureRequired = errors.New("update public key is not embedded in this build")
+	errUpdateNoReleaseAsset    = errors.New("no release asset found")
 )
 
 var (
@@ -118,6 +119,9 @@ func semverIsNewer(latest, current string) bool {
 	l, lerr := semver.NewVersion(strings.TrimPrefix(latest, "v"))
 	c, cerr := semver.NewVersion(current)
 	if lerr != nil || cerr != nil {
+		return false
+	}
+	if l.Prerelease() != "" && c.Prerelease() == "" {
 		return false
 	}
 	return l.GreaterThan(c)
@@ -197,7 +201,7 @@ func updateInfoFromManifestFor(manifest *updateManifest, keys []string) (*model.
 	}
 	downloadURL := strings.TrimSpace(platform.URL)
 	if !found {
-		return nil, fmt.Errorf("no release asset found for %s", target)
+		return nil, fmt.Errorf("%w for %s", errUpdateNoReleaseAsset, target)
 	}
 	checksum := strings.TrimSpace(platform.SHA256)
 	if checksum == "" {

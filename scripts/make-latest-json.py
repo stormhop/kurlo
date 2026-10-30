@@ -15,7 +15,7 @@ Usage:
         [--platforms darwin-universal,darwin-universal-app,windows-amd64,windows-arm64,linux-amd64,linux-amd64-appimage]
 
 If --platforms is omitted, every entry from the default platform table is
-included. Missing assets cause an error UNLESS --platforms restricts the set.
+required. Any missing asset is an error.
 """
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ def main() -> int:
         "--platforms",
         default=None,
         help="comma-separated platform keys (e.g. 'darwin-universal'). "
-        "Defaults to every platform with a present asset.",
+        "Defaults to all platforms; every asset is required.",
     )
     parser.add_argument(
         "--require-signature",
@@ -84,10 +84,8 @@ def main() -> int:
                 print(f"error: unknown platform key: {platform}", file=sys.stderr)
                 return 1
         assets = {p: DEFAULT_ASSETS[p] for p in requested}
-        strict = True
     else:
         assets = DEFAULT_ASSETS
-        strict = False
     assets = {p: name.format(version=version) for p, name in assets.items()}
 
     manifest: dict = {
@@ -102,10 +100,8 @@ def main() -> int:
     for platform, asset in assets.items():
         asset_path = release_dir / asset
         if not asset_path.exists():
-            if strict:
-                print(f"error: missing asset for platform {platform}: {asset_path}", file=sys.stderr)
-                return 1
-            continue
+            print(f"error: missing asset for platform {platform}: {asset_path}", file=sys.stderr)
+            return 1
         entry = {
             "url": f"https://github.com/{args.repo}/releases/download/{tag}/{asset}",
             "sha256": sha256_file(asset_path),

@@ -5,15 +5,17 @@
 
   let issue = $state<{ line: number; message: string } | null>(null);
   let checked = $state(false);
+  let validationSequence = 0;
 
   const fileName = $derived(vm.yamlEditorPath.slice(vm.yamlEditorPath.lastIndexOf('/') + 1));
   const folder = $derived(vm.yamlEditorPath.includes('/') ? vm.yamlEditorPath.slice(0, vm.yamlEditorPath.lastIndexOf('/')) : '');
   const statusError = $derived(issue ? `Line ${issue.line}: ${issue.message}` : vm.yamlEditorError);
 
   async function validate(text: string) {
+    const sequence = ++validationSequence;
     const path = vm.yamlEditorPath;
     const result = await checkWorkspaceYAML(path, text);
-    if (path !== vm.yamlEditorPath) return null;
+    if (path !== vm.yamlEditorPath || sequence !== validationSequence || text !== vm.yamlEditorContent) return null;
     issue = result.ok ? null : { line: result.line, message: result.message };
     checked = true;
     return issue;

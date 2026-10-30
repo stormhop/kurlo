@@ -403,18 +403,20 @@ jobs:
           UPDATE_REPOSITORY: ${{ env.UPDATE_REPOSITORY }}
         run: |
           set -euo pipefail
+          channel=(--prerelease=false --latest=true)
+          case "${GITHUB_REF_NAME}" in *-*) channel=(--prerelease --latest=false) ;; esac
           if gh release view "${GITHUB_REF_NAME}" --repo "${UPDATE_REPOSITORY}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" release/* --repo "${UPDATE_REPOSITORY}" --clobber
-            gh release edit "${GITHUB_REF_NAME}" --repo "${UPDATE_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes-file release-notes.md
+            gh release edit "${GITHUB_REF_NAME}" --repo "${UPDATE_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes-file release-notes.md "${channel[@]}"
           else
-            gh release create "${GITHUB_REF_NAME}" release/* --repo "${UPDATE_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes-file release-notes.md
+            gh release create "${GITHUB_REF_NAME}" release/* --repo "${UPDATE_REPOSITORY}" --title "${GITHUB_REF_NAME}" --notes-file release-notes.md "${channel[@]}"
           fi
 
   homebrew:
     name: Update Homebrew cask
     needs: publish
     runs-on: ubuntu-22.04
-    if: ${{ vars.HOMEBREW_TAP_REPOSITORY != '' }}
+    if: ${{ vars.HOMEBREW_TAP_REPOSITORY != '' && !contains(github.ref_name, '-') }}
 
     steps:
       - name: Checkout tap

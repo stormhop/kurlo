@@ -84,6 +84,12 @@ func withResponseTiming(ctx context.Context, start time.Time) (context.Context, 
 	return httptrace.WithClientTrace(ctx, rec.clientTrace()), rec
 }
 
+func (r *responseTimingRecorder) markEvent(label, detail string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.addEventLocked(label, time.Now(), detail)
+}
+
 func (r *responseTimingRecorder) markPrepared() {
 	r.mu.Lock()
 	defer r.mu.Unlock()

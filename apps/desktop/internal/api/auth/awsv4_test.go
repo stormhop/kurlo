@@ -349,3 +349,17 @@ func TestCanonicalURIForNonS3DoubleEncodes(t *testing.T) {
 		})
 	}
 }
+
+func TestSignSendsQuerySpacesTheWayTheyAreSigned(t *testing.T) {
+	req, _ := http.NewRequest(http.MethodGet, "https://s3.us-east-1.amazonaws.com/bucket?name=My+Org&tag=a%2Bb", nil)
+	cfg := model.AuthConfig{AWSAccessKey: "AKID", AWSSecretKey: "SECRET", AWSRegion: "us-east-1", AWSService: "s3"}
+	if err := Sign(req, cfg); err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if req.URL.RawQuery != "name=My%20Org&tag=a%2Bb" {
+		t.Fatalf("the wire query must match the canonical one, got %q", req.URL.RawQuery)
+	}
+	if canonicalQueryString(req.URL.RawQuery) != "name=My%20Org&tag=a%2Bb" {
+		t.Fatalf("canonical query drifted: %q", canonicalQueryString(req.URL.RawQuery))
+	}
+}

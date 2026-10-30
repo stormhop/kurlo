@@ -673,3 +673,12 @@ func TestWebSocketIgnoresHandshakeHeadersCopiedFromABrowser(t *testing.T) {
 	default:
 	}
 }
+
+func TestWebSocketHandshakeHasADefaultTimeout(t *testing.T) {
+	if got := websocketHandshakeTimeout(model.HttpRequest{}); got != defaultWebSocketHandshakeTimeout || got <= 0 {
+		t.Fatalf("a request without its own handshake timeout must still time out, got %s", got)
+	}
+	if got := websocketHandshakeTimeout(model.HttpRequest{WebSocketHandshakeTimeoutMs: 1500}); got != 1500*time.Millisecond {
+		t.Fatalf("the request's own timeout should win, got %s", got)
+	}
+}

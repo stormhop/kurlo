@@ -52,14 +52,16 @@
       return;
     }
     const mayShow = shouldShowWhatsNew(version, lastSeen, hasReleaseNotes);
+    if (mayShow) {
+      const section = releaseNotesFor(await loadChangelog(), version);
+      if (!section) return;
+      whatsNewSection = section;
+    }
     if (isReleaseVersion(version)) {
       try {
         localStorage.setItem(LAST_SEEN_VERSION_KEY, version);
       } catch {  }
     }
-    if (!mayShow) return;
-    const section = releaseNotesFor(await loadChangelog(), version);
-    if (section) whatsNewSection = section;
   }
 
   function dismissWhatsNew() {

@@ -129,8 +129,37 @@ func (m *socketIOManager) connectWithCallbacks(appCtx context.Context, sessionID
 				m.clearPendingAcks(sessionID)
 			}
 		}()
-		m.runConnectionWithCallbacks(sioCtx, sessionID, seq, req, callbacks)
+		m.runConnectionWithCallbacks(sioCtx, sessionID, seq, req, m.currentSessionCallbacks(sessionID, seq, callbacks))
 	}()
+}
+
+func (m *socketIOManager) replaced(sessionID string, seq uint64) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	sess, ok := m.sessions[sessionID]
+	return ok && sess.id != seq
+}
+
+func guardSocketIOCallback[T any](m *socketIOManager, sessionID string, seq uint64, callback func(T)) func(T) {
+	if callback == nil {
+		return nil
+	}
+	return func(ev T) {
+		if !m.replaced(sessionID, seq) {
+			callback(ev)
+		}
+	}
+}
+
+func (m *socketIOManager) currentSessionCallbacks(sessionID string, seq uint64, callbacks socketIOCallbacks) socketIOCallbacks {
+	return socketIOCallbacks{
+		onOpen:      guardSocketIOCallback(m, sessionID, seq, callbacks.onOpen),
+		onEvent:     guardSocketIOCallback(m, sessionID, seq, callbacks.onEvent),
+		onClose:     guardSocketIOCallback(m, sessionID, seq, callbacks.onClose),
+		onError:     guardSocketIOCallback(m, sessionID, seq, callbacks.onError),
+		onReconnect: guardSocketIOCallback(m, sessionID, seq, callbacks.onReconnect),
+		onAck:       guardSocketIOCallback(m, sessionID, seq, callbacks.onAck),
+	}
 }
 
 func (m *socketIOManager) disconnect(sessionID string) {
@@ -590,7 +619,10 @@ func (m *socketIOManager) runConnectionOnce(ctx context.Context, sessionID strin
 			for {
 				select {
 				case <-ticker.C:
-					_ = writeText([]byte{eioPing})
+					if err := writeText([]byte{eioPing}); err != nil {
+						_ = conn.Close()
+						return
+					}
 				case <-pingCtx.Done():
 					return
 				}
@@ -669,9 +701,7 @@ func (m *socketIOManager) runConnectionOnce(ctx context.Context, sessionID strin
 	}
 
 	for {
-		if !isV2 {
-			_ = conn.SetReadDeadline(time.Now().Add(readDeadline))
-		}
+		_ = conn.SetReadDeadline(time.Now().Add(readDeadline))
 		msgType, data, err := conn.ReadMessage()
 		_ = conn.SetReadDeadline(time.Time{})
 

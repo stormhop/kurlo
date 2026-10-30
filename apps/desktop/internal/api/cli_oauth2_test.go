@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
@@ -136,5 +138,32 @@ func TestCLIRunLeavesOtherAuthTypesAlone(t *testing.T) {
 	}
 	if cfg.Token != "static" {
 		t.Errorf("token = %q, want it untouched", cfg.Token)
+	}
+}
+
+func TestCLIOAuth2ConcurrentRefreshUsesOneRequest(t *testing.T) {
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits.Add(1)
+		time.Sleep(20 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"fresh","expires_in":3600}`))
+	}))
+	defer server.Close()
+	cache := newOAuth2TokenCache()
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cfg := model.AuthConfig{Type: "oauth2", OAuth2GrantType: "authorization_code", OAuth2TokenURL: server.URL, OAuth2RefreshToken: "rotating"}
+			if err := cache.resolveOAuth2Token(&cfg); err != nil || cfg.Token != "fresh" {
+				t.Errorf("token=%q err=%v", cfg.Token, err)
+			}
+		}()
+	}
+	wg.Wait()
+	if hits.Load() != 1 {
+		t.Fatalf("refresh requests=%d, want 1", hits.Load())
 	}
 }

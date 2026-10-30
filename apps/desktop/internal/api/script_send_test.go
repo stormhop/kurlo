@@ -334,6 +334,44 @@ func TestSendRequestPmCookies(t *testing.T) {
 	}
 }
 
+func TestTestScriptSeesCollectionVariablesThePreRequestScriptSet(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{}`)
+	}))
+	defer server.Close()
+
+	req := model.HttpRequest{
+		Method:                "GET",
+		URL:                   server.URL,
+		EnableSSLVerification: true,
+		ScriptEngine:          "js",
+		CollectionVariables:   map[string]string{"token": "old", "stale": "x"},
+		PreRequestScript: `
+			pm.collectionVariables.set("token", "fresh")
+			pm.collectionVariables.unset("stale")
+		`,
+		TestScript: `
+			pm.test("token", () => pm.expect(pm.collectionVariables.get("token")).to.eql("fresh"))
+			pm.test("stale", () => pm.expect(pm.collectionVariables.get("stale")).to.not.eql("x"))
+		`,
+	}
+	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
+	if resp.Error != "" {
+		t.Fatalf("unexpected error: %s", resp.Error)
+	}
+	if len(resp.TestResult.Tests) != 2 {
+		t.Fatalf("expected two tests, got %#v", resp.TestResult)
+	}
+	for _, test := range resp.TestResult.Tests {
+		if !test.Passed {
+			t.Errorf("test %q failed: %s", test.Name, test.Error)
+		}
+	}
+	if resp.CollectionVariableUpdates["token"] != "fresh" {
+		t.Errorf("pre-request update not reported: %#v", resp.CollectionVariableUpdates)
+	}
+}
+
 func TestMergeCollectionVariableResults(t *testing.T) {
 	pre := model.ScriptResult{
 		CollectionVariables:        map[string]string{"a": "1", "shared": "from-pre"},

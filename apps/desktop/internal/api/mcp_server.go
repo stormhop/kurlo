@@ -671,7 +671,7 @@ func mcpRequestLabel(req cliSavedRequest) string {
 }
 
 func mcpRequestPath(req cliSavedRequest) string {
-	parts := make([]string, 0, len(req.FolderPath)+2)
+	parts := make([]string, 0, len(req.FolderPath))
 	if collection := strings.TrimSpace(req.Collection); collection != "" {
 		parts = append(parts, collection)
 	}

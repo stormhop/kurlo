@@ -163,3 +163,11 @@ func TestReadAllCappedRejectsBomb(t *testing.T) {
 		t.Fatal("over-cap decompression must be rejected")
 	}
 }
+
+func TestDeflateRejectsOversizedZlibStream(t *testing.T) {
+	body := strings.Repeat("A", maxDecodedResponseBodySize+1)
+	compressed := zlibBytes(t, body)
+	if _, ok := decodeResponseBody(compressed, respWithEncoding("deflate")); ok {
+		t.Fatal("oversized zlib stream must not fall back to raw deflate")
+	}
+}

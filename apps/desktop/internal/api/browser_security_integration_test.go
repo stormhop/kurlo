@@ -151,6 +151,26 @@ func TestCrossOriginJSONPOSTRequiresPreflight(t *testing.T) {
 	if optionsCount.Load() != 1 {
 		t.Fatalf("JSON POST cross-origin must preflight, got %d", optionsCount.Load())
 	}
+	started, done, sent := -1, -1, -1
+	for i, event := range resp.Timeline {
+		switch event.Label {
+		case "CORS preflight started":
+			started = i
+		case "CORS preflight done":
+			done = i
+			if event.Detail != "204 No Content" {
+				t.Fatalf("preflight marker should carry its status, got %q", event.Detail)
+			}
+		case "Request sent":
+			if done < 0 {
+				t.Fatal("preflight must not record main-request timing events")
+			}
+			sent = i
+		}
+	}
+	if started < 0 || done < started || sent < done {
+		t.Fatalf("timeline should frame the preflight before the request, got %#v", resp.Timeline)
+	}
 }
 
 func TestAuthorizationHeaderTriggersPreflight(t *testing.T) {

@@ -652,3 +652,74 @@ func TestSocketIOReceivesABinaryAck(t *testing.T) {
 		t.Fatal("timed out waiting for the binary ack")
 	}
 }
+
+func TestSocketIOCallbacksFromAReplacedConnectionAreDropped(t *testing.T) {
+	manager := newSocketIOManager(nil)
+	em := newSIOTestEmitter()
+	stale := manager.currentSessionCallbacks("sio-gen", 1, em.callbacks())
+	current := manager.currentSessionCallbacks("sio-gen", 2, em.callbacks())
+	manager.mu.Lock()
+	manager.sessions["sio-gen"] = &socketIOSession{cancel: func() {}, id: 2}
+	manager.mu.Unlock()
+
+	stale.onClose(model.SocketIOCloseEvent{SessionID: "sio-gen", Message: "old"})
+	stale.onEvent(model.SocketIOMessage{EventName: "old"})
+	current.onOpen(model.SocketIOOpenEvent{SessionID: "sio-gen"})
+
+	if len(em.closes) != 0 || len(em.events) != 0 {
+		t.Fatalf("a replaced connection must stay silent, got %d closes and %d events", len(em.closes), len(em.events))
+	}
+	if len(em.opens) != 1 {
+		t.Fatalf("the current connection should still report, got %d opens", len(em.opens))
+	}
+}
+
+func TestSocketIOV2NoticesAServerThatStopsAnsweringPings(t *testing.T) {
+	upgrader := websocket.Upgrader{CheckOrigin: func(r *http.Request) bool { return true }}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("transport") == "polling" {
+			open := `0{"sid":"v2-sid","pingInterval":100,"pingTimeout":100}`
+			fmt.Fprintf(w, "%d:%s", len(open), open)
+			return
+		}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		if _, data, err := conn.ReadMessage(); err != nil || string(data) != "2probe" {
+			return
+		}
+		_ = conn.WriteMessage(websocket.TextMessage, []byte("3probe"))
+		for {
+			_, data, err := conn.ReadMessage()
+			if err != nil {
+				return
+			}
+			if len(data) >= 2 && data[0] == eioMessage && data[1] == sioConnect {
+				_ = conn.WriteMessage(websocket.TextMessage, []byte("40"))
+			}
+		}
+	}))
+	defer server.Close()
+
+	manager := newSocketIOManager(nil)
+	em := newSIOTestEmitter()
+	manager.connectWithCallbacks(context.Background(), "sio-v2-dead", model.HttpRequest{
+		URL:                   sioHTTPToWS(server.URL),
+		EnableSSLVerification: true,
+		SocketIOClientVersion: "v2",
+	}, em.callbacks())
+	defer manager.disconnect("sio-v2-dead")
+
+	waitSIOOpen(t, em.opens)
+	select {
+	case ev := <-em.errors:
+		if !strings.Contains(ev.Message, "timeout") {
+			t.Fatalf("expected a read timeout, got %q", ev.Message)
+		}
+	case <-em.closes:
+	case <-time.After(3 * time.Second):
+		t.Fatal("a v2 connection whose server went silent must not stay connected")
+	}
+}

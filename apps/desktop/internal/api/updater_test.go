@@ -367,3 +367,42 @@ func containsAny(source string, needles []string) bool {
 	}
 	return false
 }
+
+func TestSemverIsNewerKeepsStableBuildsOffPrereleases(t *testing.T) {
+	if semverIsNewer("2.6.0-rc1", "2.5.1") {
+		t.Fatal("a stable build must not be offered a prerelease")
+	}
+	if !semverIsNewer("2.6.0-rc2", "2.6.0-rc1") {
+		t.Fatal("a prerelease build should move to the next prerelease")
+	}
+	if !semverIsNewer("2.6.0", "2.6.0-rc1") {
+		t.Fatal("a prerelease build should move to the final release")
+	}
+}
+
+type manifestRoundTripper string
+
+func (body manifestRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(string(body))),
+		Request:    r,
+	}, nil
+}
+
+func TestCheckForUpdateIsQuietWhenTheReleaseHasNoAssetForThisPlatform(t *testing.T) {
+	previousVersion := appVersion
+	appVersion = "2.5.1"
+	previousClient := updateMetadataHTTPClient
+	updateMetadataHTTPClient = &http.Client{Transport: manifestRoundTripper(`{"version":"2.5.2","platforms":{"plan9-mips":{"url":"https://github.com/x/y/releases/download/v2.5.2/k","sha256":"00"}}}`)}
+	t.Cleanup(func() {
+		appVersion = previousVersion
+		updateMetadataHTTPClient = previousClient
+	})
+
+	result := NewApp().CheckForUpdate()
+	if result.Error != "" || result.Info != nil {
+		t.Fatalf("a release without this platform's asset is not an update and not an error, got %+v", result)
+	}
+}

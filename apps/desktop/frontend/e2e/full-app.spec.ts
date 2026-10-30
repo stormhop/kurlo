@@ -3682,6 +3682,11 @@ test.describe('Kurlo desktop browser E2E', () => {
     const [topP, topPMessage] = [await page.locator('#ai-top-p').boundingBox(), await topPError.boundingBox()];
     expect(topPMessage!.y).toBeGreaterThanOrEqual(topP!.y + topP!.height - 1);
     expect(Math.abs((topPMessage!.x + topPMessage!.width) - (topP!.x + topP!.width))).toBeLessThan(2);
+    await reply.fill('Keep this follow-up when settings are invalid');
+    await reply.press('Enter');
+    await expect(reply).toHaveValue('Keep this follow-up when settings are invalid');
+    await expect(page.locator('.ai-composer-error')).toBeVisible();
+    await captureDocsScreenshot(page, 'request-ai-validation-error');
     await page.locator('#ai-top-p').fill('');
     await page.getByRole('tab', { name: /Prompt/ }).click();
 

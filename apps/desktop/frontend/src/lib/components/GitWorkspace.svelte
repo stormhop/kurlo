@@ -1246,6 +1246,7 @@
           {:else if commitRows.length}
             <div
               class="git-commit-list virtual"
+              bind:clientHeight={commitListHeight}
               onscroll={(event) => { updateVirtualScroll(event, value => (commitScrollTop = value), value => (commitListHeight = value)); loadMoreCommitsNearEnd(event); }}
             >
               <div class="git-list-spacer" style={`height: ${commitWindow.before}px`}></div>
@@ -1347,6 +1348,7 @@
             <div
               class="git-file-list virtual"
               role="list"
+              bind:clientHeight={fileListHeight}
               onscroll={(event) => updateVirtualScroll(event, value => (fileScrollTop = value), value => (fileListHeight = value))}
             >
               <div class="git-list-spacer" style={`height: ${fileWindow.before}px`}></div>
