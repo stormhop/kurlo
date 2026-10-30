@@ -22,6 +22,7 @@ export type GrpcServiceDefinition = Wire<model.GrpcServiceDefinition>;
 export type HttpRequest = Wire<model.HttpRequest>;
 export type HttpResponse = Wire<model.HttpResponse>;
 export type KeyValue = Wire<model.KeyValue>;
+export type LoadDataPreview = Wire<model.LoadDataPreview>;
 export type K6ExportResult = Wire<model.K6ExportResult>;
 export type K6ExportWarning = Wire<model.K6ExportWarning>;
 export type K6ExportStep = Wire<model.K6ExportStep>;

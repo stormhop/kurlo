@@ -51,6 +51,8 @@ export function DiagnosticsReport():Promise<string>;
 
 export function ExportLoadTestK6(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
 
+export function ExportLoadTestK6Files(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
+
 export function FetchOAuth2Token(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
 export function GetEnvironment():Promise<Record<string, string>>;
@@ -189,6 +191,8 @@ export function OpenLogFolder():Promise<string>;
 
 export function OpenWorkspaceRoot(arg1:string):Promise<api.WorkspaceOpenResult>;
 
+export function PreviewLoadTestData(arg1:string):Promise<model.LoadDataPreview>;
+
 export function PruneHistoryResponses(arg1:Array<string>):Promise<string>;
 
 export function Quit():Promise<void>;
@@ -212,6 +216,8 @@ export function SSEDisconnect(arg1:string):Promise<void>;
 export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
 
 export function SaveHistoryResponse(arg1:string,arg2:string):Promise<api.HistoryResponseResult>;
+
+export function SaveLoadTestK6Folder(arg1:string,arg2:boolean,arg3:string):Promise<string>;
 
 export function SaveRequestStore(arg1:string):Promise<boolean>;
 

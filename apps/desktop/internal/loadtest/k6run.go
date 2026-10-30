@@ -295,12 +295,12 @@ func RunStatus(exitCode int, stopped bool, runErr error) string {
 	switch {
 	case runErr != nil:
 		return "error"
-	case stopped:
-		return "stopped"
 	case exitCode == 0:
 		return "passed"
 	case exitCode == ExitThresholdsFailed:
 		return "failed"
+	case stopped:
+		return "stopped"
 	default:
 		return "error"
 	}

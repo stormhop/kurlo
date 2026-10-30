@@ -207,3 +207,17 @@ func TestEventPayloadsMatchTheirHandWrittenTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestCLILoadCollectionsDecodePersistedTests(t *testing.T) {
+	fields := jsonFieldNames(cliCollection{})
+	if missing := missingFrom([]string{"id", "workspaceId", "filesystemName", "loadTests", "defaults"}, fields); len(missing) > 0 {
+		t.Fatalf("CLI collections drop load-test fields: %v", missing)
+	}
+	field, ok := reflect.TypeOf(cliCollection{}).FieldByName("LoadTests")
+	if !ok || field.Type != reflect.TypeOf([]model.LoadTest{}) {
+		t.Fatal("CLI collections must use the shared load-test model")
+	}
+	if missing := missingFrom([]string{"workspaceId", "name", "values"}, jsonFieldNames(cliEnvironment{})); len(missing) > 0 {
+		t.Fatalf("CLI environments cannot be scoped to the test's workspace: %v", missing)
+	}
+}

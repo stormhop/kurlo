@@ -2010,6 +2010,20 @@ export namespace model {
 	}
 	
 	
+	export class K6ExportFile {
+	    path: string;
+	    content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new K6ExportFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.content = source["content"];
+	    }
+	}
 	export class K6ExportStep {
 	    stepId: string;
 	    tag: string;
@@ -2041,6 +2055,7 @@ export namespace model {
 	    }
 	}
 	export class K6ExportResult {
+	    files?: K6ExportFile[];
 	    script: string;
 	    fileName: string;
 	    warnings: K6ExportWarning[];
@@ -2053,6 +2068,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = this.convertValues(source["files"], K6ExportFile);
 	        this.script = source["script"];
 	        this.fileName = source["fileName"];
 	        this.warnings = this.convertValues(source["warnings"], K6ExportWarning);
@@ -2113,6 +2129,26 @@ export namespace model {
 	        this.type = source["type"];
 	        this.path = source["path"];
 	        this.value = source["value"];
+	    }
+	}
+	export class LoadDataPreview {
+	    path: string;
+	    columns: string[];
+	    rows: string[][];
+	    total: number;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoadDataPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.columns = source["columns"];
+	        this.rows = source["rows"];
+	        this.total = source["total"];
+	        this.error = source["error"];
 	    }
 	}
 	export class LoadDataSource {

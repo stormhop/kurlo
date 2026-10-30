@@ -98,6 +98,10 @@ export function ExportLoadTestK6(arg1, arg2) {
   return window['go']['api']['App']['ExportLoadTestK6'](arg1, arg2);
 }
 
+export function ExportLoadTestK6Files(arg1, arg2) {
+  return window['go']['api']['App']['ExportLoadTestK6Files'](arg1, arg2);
+}
+
 export function FetchOAuth2Token(arg1) {
   return window['go']['api']['App']['FetchOAuth2Token'](arg1);
 }
@@ -374,6 +378,10 @@ export function OpenWorkspaceRoot(arg1) {
   return window['go']['api']['App']['OpenWorkspaceRoot'](arg1);
 }
 
+export function PreviewLoadTestData(arg1) {
+  return window['go']['api']['App']['PreviewLoadTestData'](arg1);
+}
+
 export function PruneHistoryResponses(arg1) {
   return window['go']['api']['App']['PruneHistoryResponses'](arg1);
 }
@@ -420,6 +428,10 @@ export function SaveFileDialog(arg1, arg2) {
 
 export function SaveHistoryResponse(arg1, arg2) {
   return window['go']['api']['App']['SaveHistoryResponse'](arg1, arg2);
+}
+
+export function SaveLoadTestK6Folder(arg1, arg2, arg3) {
+  return window['go']['api']['App']['SaveLoadTestK6Folder'](arg1, arg2, arg3);
 }
 
 export function SaveRequestStore(arg1) {

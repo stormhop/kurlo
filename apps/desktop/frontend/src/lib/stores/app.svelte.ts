@@ -1231,6 +1231,9 @@ class AppVM {
   declare deleteLoadTest: typeof loadTestFeature.deleteLoadTest;
   declare saveLoadTest: typeof loadTestFeature.saveLoadTest;
   declare loadTestEnvironment: typeof loadTestFeature.loadTestEnvironment;
+  declare chooseLoadTestData: typeof loadTestFeature.chooseLoadTestData;
+  declare previewLoadTestData: typeof loadTestFeature.previewLoadTestData;
+  declare saveLoadTestK6Folder: typeof loadTestFeature.saveLoadTestK6Folder;
   declare exportLoadTestK6: typeof loadTestFeature.exportLoadTestK6;
   declare loadTestPayload: typeof loadTestFeature.loadTestPayload;
   k6Path = $state('');

@@ -197,3 +197,18 @@ func TestLastErrorLine(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestStartLoadRunRejectsNULInSecret(t *testing.T) {
+	payload := strings.Replace(runPayload(t, "http://127.0.0.1:1", map[string]any{"type": "constant-vus", "vus": 1, "durationMs": 1000}), `"s3cret"`, `"private\u0000value"`, 1)
+	app := &App{}
+	state := app.StartLoadRun(payload, "/no/k6")
+	if state.Running || !strings.Contains(state.Error, `Secret variable "password" contains a NUL byte`) {
+		t.Fatalf("invalid secrets should be explained before starting k6: %+v", state)
+	}
+	if strings.Contains(state.Error, "private") || strings.Contains(state.Error, "value") {
+		t.Fatal("the error must not reveal the secret")
+	}
+	if app.LoadRunStatus().Running {
+		t.Fatal("a rejected run must not change the running state")
+	}
+}

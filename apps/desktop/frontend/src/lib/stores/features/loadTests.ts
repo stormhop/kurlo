@@ -1,10 +1,10 @@
-import { exportLoadTestK6, validateLoadTest } from '../../backend';
+import { exportLoadTestK6, openDirectoryDialog, openFileDialog, previewLoadTestData, saveLoadTestK6Folder, validateLoadTest } from '../../backend';
 import { loadTestFingerprint, normalizeLoadTest } from '../../loadTests';
 import { presetExecutor } from '../../loadPresets';
 import { filesystemNameFromName } from '../../normalizers';
 import type { Collection, Environment, KVRow, PersistRequestStore, SavedRequest, SidebarView } from '../../types/models';
 import { newEntityId, requestTabLabel } from '../../utils';
-import type { K6ExportResult, LoadStep, LoadTest } from '../../wire';
+import type { K6ExportResult, LoadDataPreview, LoadStep, LoadTest } from '../../wire';
 import type { TopView } from '../ui';
 
 export type LoadTestTab = 'flow' | 'load' | 'data' | 'results';
@@ -114,10 +114,29 @@ export const loadTestFeature = {
     });
   },
 
-  async exportLoadTestK6(this: LoadTestHost & { loadTestPayload: (collectionId: string, test: LoadTest) => string | null }, collectionId: string, test: LoadTest, inlineSecrets: boolean): Promise<K6ExportResult> {
+  async exportLoadTestK6(this: LoadTestHost & { loadTestPayload: (collectionId: string, test: LoadTest) => string | null }, collectionId: string, test: LoadTest, inlineSecrets: boolean, folder = false): Promise<K6ExportResult> {
     const payload = this.loadTestPayload(collectionId, test);
     if (!payload) return { script: '', fileName: '', warnings: [], steps: [], error: 'The collection of this load test is gone.' };
-    return exportLoadTestK6(payload, inlineSecrets);
+    return exportLoadTestK6(payload, inlineSecrets, folder);
+  },
+
+  async chooseLoadTestData(): Promise<LoadDataPreview | null> {
+    const path = await openFileDialog('Choose CSV or JSON data inside the workspace folder');
+    return path ? previewLoadTestData(path) : null;
+  },
+
+  async previewLoadTestData(path: string): Promise<LoadDataPreview> {
+    return previewLoadTestData(path);
+  },
+
+  async saveLoadTestK6Folder(this: LoadTestHost & { loadTestPayload: (collectionId: string, test: LoadTest) => string | null }, collectionId: string, test: LoadTest, inlineSecrets: boolean): Promise<boolean> {
+    const payload = this.loadTestPayload(collectionId, test);
+    if (!payload) return false;
+    const parent = await openDirectoryDialog('Choose a parent folder for the k6 export');
+    if (!parent) return false;
+    const error = await saveLoadTestK6Folder(payload, inlineSecrets, parent);
+    if (error) await this.openAlertDialog('Could not export k6 folder', error);
+    return !error;
   },
 
   async openLoadTest(this: LoadTestHost, collectionId: string, loadTestId: string) {

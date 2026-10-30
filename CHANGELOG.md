@@ -9,12 +9,19 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- A load-testing guide covers flow construction, data, thresholds, k6 export and local execution, reports and CI, with reproducible screenshots from `make screenshots`.
+
+- **Load tests from the CLI.** `kurlo load list`, `export` and `run` read the same collection YAML files as the app. Select a test by name, ID or YAML path; use its saved environment or override it for CI. Export a script or folder without k6, or run installed k6 with progress, actual threshold values, summary JSON and an HTML report. Secrets pass through the process environment; threshold failures exit with code 99, and Ctrl+C stops k6 and keeps its summary when available.
+
+- Load-test data files can be chosen from the workspace with a preview of the first five rows. Export either one self-contained k6 script or a folder containing `script.k6.js` and `data.json`, and start local k6 directly from the export dialog.
+
 - **Load tests.** A collection can hold load tests: a flow of its HTTP and GraphQL requests, the load to put on it and the criteria for passing. Make one from a request's menu with **Load test this request**, or from a collection's menu with **New load test**. A step can run once per virtual user, for example to log in, save a value from the response as a variable for later steps, check the status or the body, and wait before the next step. The load starts from a preset (smoke, load, stress, spike, soak), as virtual users or iterations per second, constant or in stages, with a preview of its shape; pass criteria cover response time, failed requests and passed checks, for the whole flow or one step. Each load test is a YAML file in the collection's `loadtests/` folder, so it is reviewed and shared through Git like the requests.
 - **Export a load test to k6.** **Export k6 script** turns a load test into a [Grafana k6](https://grafana.com/docs/k6/) script that runs as it is: the requests with the collection's defaults and auth (bearer, basic, API key, digest, and OAuth 2.0 client credentials or password, fetched once before the test), the saved values, checks, waits, test data, load and pass criteria, with results broken out per step. Variables resolve when the script runs, in the same order as in Kurlo, and secrets stay out of the file unless you choose to write them in. Whatever does not carry over, such as request scripts, AWS and OAuth 1.0 auth or file uploads, is listed before you save the script.
 - **Run a load test with k6.** **Run with k6** starts the test on this computer with the k6 you have installed, or one you point Kurlo at. Before the first request it shows which hosts will get the load and asks you to confirm when they are not this computer; for an environment marked protected you type the host name. While it runs, the Results tab shows the stage, the users, the completed iterations and the k6 output, with **Stop** and a link to k6's live dashboard. Afterwards it shows whether each pass criterion was met, the totals and a table per step, and keeps the k6 summary and HTML report of the last run to open or save. Secrets reach k6 through its environment, never through the command line or the script.
 
 ### Fixed
 
+- Load tests wait after a once-per-user step only when that step runs. A late Stop preserves a completed k6 result, secret values containing NUL bytes get a clear error, JSON response keys with brackets can be extracted, and results show small percentage limits and unexecuted steps correctly.
 - Relative time labels update while the app is open. Autosave backs off after repeated failures, and workspace writes stop when an operating-system lock cannot be acquired.
 
 - Stable installations ignore prerelease updates. macOS-only releases stay off the stable update channel, so they cannot replace Windows and Linux update manifests.

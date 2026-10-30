@@ -3,7 +3,7 @@ title: Collection Runner
 description: Run saved requests as smoke tests, regressions, or data-driven checks.
 ---
 
-The Collection Runner executes saved requests from a collection or folder and turns the result into a pass/fail report. It is designed for local smoke tests: no account, no cloud monitor, no scheduler.
+The Collection Runner executes saved requests from a collection or folder and turns the result into a pass/fail report. It is designed for local smoke tests: no account, no cloud monitor, no scheduler. To generate sustained traffic with virtual users or iterations per second, use [load testing with k6](/docs/guides/load-testing/).
 
 ![Completed collection run with two passing requests](../../../../assets/screenshots/collection-runner-results.png)
 

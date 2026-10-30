@@ -225,3 +225,65 @@ func TestGeneratedAuthWorksInK6(t *testing.T) {
 		t.Errorf("api key query = %q", seen["status"])
 	}
 }
+
+func TestBracketedJSONKeysInK6(t *testing.T) {
+	k6 := k6Binary(t)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"a[b]":{"id":42},"[key]":42,"[":42,"]":42}`)
+	}))
+	defer ts.Close()
+	paths := []string{`$['a[b]'].id`, `$["[key]"]`, `$['[']`, `$[']']`}
+	script := "import http from 'k6/http'; import { check } from 'k6';\nexport const options = { iterations: 1, vus: 1, thresholds: { checks: ['rate==1'] } };\nexport default function () { const res = http.get(" + jsString(ts.URL) + ");\n"
+	for _, path := range paths {
+		converted, err := jsonPathToGJSON(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		script += "check(res, { " + jsString(path) + ": r => r.json(" + jsString(converted) + ") === 42 });\n"
+	}
+	script += "}\n"
+	file := filepath.Join(t.TempDir(), "keys.k6.js")
+	if err := os.WriteFile(file, []byte(script), 0600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, k6, "run", "--quiet", "--no-color", file)
+	cmd.Env = append(os.Environ(), "K6_NO_USAGE_REPORT=true")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("bracketed keys should resolve in k6: %v\n%s", err, output)
+	}
+}
+
+func TestGeneratedFolderRunsInK6(t *testing.T) {
+	k6 := k6Binary(t)
+	server := &shopServer{passwords: map[string]bool{}, authed: map[string]int{}}
+	ts := httptest.NewServer(server.handler())
+	defer ts.Close()
+	plan := checkoutPlan()
+	plan.Variables[1].Value = ts.URL
+	plan.Test.Scenarios[0].Executor = model.LoadExecutor{Type: "constant-vus", VUs: 2, DurationMs: 1000}
+	for i := range plan.Test.Scenarios[0].Steps {
+		plan.Test.Scenarios[0].Steps[i].ThinkTimeMs = 10
+		plan.Test.Scenarios[0].Steps[i].ThinkJitterMs = 0
+	}
+	result := GenerateK6(plan, Options{SeparateData: true})
+	dir := t.TempDir()
+	for _, file := range result.Files {
+		if err := os.WriteFile(filepath.Join(dir, file.Path), []byte(file.Content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, k6, "run", "--quiet", "--no-color", filepath.Join(dir, result.FileName))
+	cmd.Env = append(os.Environ(), "password=pw-1", "K6_NO_USAGE_REPORT=true")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("folder export failed in k6: %v\n%s", err, output)
+	}
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	if server.logins != 2 || !server.passwords["ada@shop.test/pw-1"] || !server.passwords["grace@shop.test/pw-1"] || server.created == 0 {
+		t.Fatalf("exported data did not reach the flow: %+v", server)
+	}
+}

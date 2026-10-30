@@ -136,6 +136,11 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	if problems := loadtest.Validate(plan.Test, targets); len(problems) > 0 {
 		return failed("Fix the problems in the load test before running it: " + problems[0])
 	}
+	for _, variable := range plan.Variables {
+		if variable.Secret && strings.ContainsRune(variable.Value, '\x00') {
+			return failed(fmt.Sprintf("Secret variable %q contains a NUL byte. Remove it before running with k6.", variable.Name))
+		}
+	}
 	k6 := loadtest.FindK6(k6Path, hideCmdWindow)
 	if !k6.Found {
 		return failed(k6.Error)

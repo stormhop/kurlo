@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { trapFocus } from '../a11y';
+  import { tabListKeyboard, trapFocus } from '../a11y';
   import CodeEditor from '../CodeEditor.svelte';
   import type { K6ExportResult, LoadTest } from '../wire';
 
@@ -7,11 +7,17 @@
     loadTest,
     onExport,
     onSave,
+    onSaveFolder,
+    onRun,
+    runDisabled = false,
     onCopy,
     onClose,
   }: {
     loadTest: LoadTest;
-    onExport: (inlineSecrets: boolean) => Promise<K6ExportResult>;
+    onExport: (inlineSecrets: boolean, folder: boolean) => Promise<K6ExportResult>;
+    onSaveFolder: (inlineSecrets: boolean) => Promise<boolean>;
+    onRun: () => void;
+    runDisabled?: boolean;
     onSave: (fileName: string, script: string) => Promise<boolean>;
     onCopy: (text: string) => void;
     onClose: () => void;
@@ -20,30 +26,51 @@
   let inlineSecrets = $state(false);
   let result = $state<K6ExportResult | null>(null);
   let loading = $state(true);
+  let folder = $state(false);
+  let activeFile = $state('script.k6.js');
+  let saving = $state(false);
+  let saved = $state(false);
   let copied = $state(false);
   let copiedTimer: ReturnType<typeof setTimeout> | null = null;
   let request = 0;
 
   const stepCount = $derived(loadTest.scenarios[0]?.steps.length ?? 0);
-  const warnings = $derived(result?.warnings.filter(warning => warning.level !== 'info') ?? []);
-  const notes = $derived(result?.warnings.filter(warning => warning.level === 'info') ?? []);
+  const warnings = $derived(result?.warnings?.filter(warning => warning.level !== 'info') ?? []);
+  const notes = $derived(result?.warnings?.filter(warning => warning.level === 'info') ?? []);
   const secretNames = $derived(notes.map(note => /^(\S+) is secret/.exec(note.message)?.[1]).filter((name): name is string => Boolean(name)));
   const command = $derived(`${secretNames.map(name => `${name}=…`).join(' ')}${secretNames.length ? ' ' : ''}k6 run ${result?.fileName || 'load-test.k6.js'}`);
 
   $effect(() => {
     const inline = inlineSecrets;
+    const separate = folder;
+    saved = false;
+    activeFile = 'script.k6.js';
     const current = ++request;
     loading = true;
-    void onExport(inline).then(next => {
+    void onExport(inline, separate).then(next => {
       if (current !== request) return;
       result = next;
+      loading = false;
+    }).catch(() => {
+      if (current !== request) return;
+      result = { script: '', fileName: '', warnings: [], steps: [], error: 'Could not generate the k6 export.' };
       loading = false;
     });
   });
 
+  async function save() {
+    if (!result?.script || loading || saving) return;
+    saving = true;
+    try {
+      saved = folder ? await onSaveFolder(inlineSecrets) : await onSave(result.fileName, result.script);
+    } finally {
+      saving = false;
+    }
+  }
+
   function copy() {
     if (!result?.script) return;
-    onCopy(result.script);
+    onCopy(folder ? result.files?.find(file => file.path === activeFile)?.content ?? result.script : result.script);
     copied = true;
     if (copiedTimer) clearTimeout(copiedTimer);
     copiedTimer = setTimeout(() => (copied = false), 1400);
@@ -70,10 +97,18 @@
     <div class="k6-export-body">
       <div class="k6-export-side">
         <section class="loadtest-field">
+          <span class="loadtest-label">Export as</span>
+          <div class="segmented segmented-md" role="radiogroup" aria-label="Export format">
+            <button class="segmented-item" type="button" role="radio" aria-checked={!folder} disabled={saving} onclick={() => (folder = false)}>Single script</button>
+            <button class="segmented-item" type="button" role="radio" aria-checked={folder} disabled={saving} onclick={() => (folder = true)}>Folder</button>
+          </div>
+          <span class="loadtest-hint">{folder ? 'A new folder with script.k6.js and data.json when the test uses data. Choose its parent folder when saving.' : 'One script with test data included.'}</span>
+        </section>
+        <section class="loadtest-field">
           <span class="loadtest-label">Secrets</span>
           <div class="segmented segmented-md" role="radiogroup" aria-label="Secrets">
-            <button class="segmented-item" type="button" role="radio" aria-checked={!inlineSecrets} onclick={() => (inlineSecrets = false)}>Pass when running</button>
-            <button class="segmented-item" type="button" role="radio" aria-checked={inlineSecrets} onclick={() => (inlineSecrets = true)}>Write into the script</button>
+            <button class="segmented-item" type="button" role="radio" aria-checked={!inlineSecrets} disabled={saving} onclick={() => (inlineSecrets = false)}>Pass when running</button>
+            <button class="segmented-item" type="button" role="radio" aria-checked={inlineSecrets} disabled={saving} onclick={() => (inlineSecrets = true)}>Write into the script</button>
           </div>
           <span class="loadtest-hint">
             {inlineSecrets
@@ -105,14 +140,22 @@
       </div>
 
       <div class="k6-export-code">
-        <CodeEditor value={result?.script ?? ''} language="javascript" readonly fillHeight ariaLabel="k6 script" />
+        {#if folder && result?.files?.length}
+          <div class="tab-bar tabs" role="tablist" aria-label="Export files" use:tabListKeyboard>
+            {#each result.files as file (file.path)}
+              <button class="tab" type="button" role="tab" aria-selected={activeFile === file.path} tabindex={activeFile === file.path ? 0 : -1} onclick={() => (activeFile = file.path)}>{file.path}</button>
+            {/each}
+          </div>
+        {/if}
+        <CodeEditor value={folder ? result?.files?.find(file => file.path === activeFile)?.content ?? '' : result?.script ?? ''} language={activeFile === 'data.json' && folder ? 'json' : 'javascript'} readonly fillHeight ariaLabel="k6 script" />
       </div>
     </div>
 
     <div class="modal-foot">
       <span class="loadtest-hint k6-export-file">{loading ? 'Generating…' : result?.fileName ?? ''}</span>
-      <button class="btn btn-secondary" class:feedback-ok={copied} type="button" disabled={!result?.script} onclick={copy}>{copied ? 'Copied' : 'Copy'}</button>
-      <button class="btn btn-primary" type="button" disabled={!result?.script} onclick={() => result && onSave(result.fileName, result.script)}>Save script…</button>
+      <button class="btn btn-secondary" class:feedback-ok={copied} type="button" disabled={loading || saving || !result?.script} onclick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+      <button class="btn btn-secondary" class:feedback-ok={saved} type="button" disabled={loading || saving || !result?.script} onclick={save}>{saving ? 'Saving…' : saved ? 'Saved' : folder ? 'Save folder…' : 'Save script…'}</button>
+      <button class="btn btn-primary" type="button" disabled={runDisabled || loading || saving || !result?.script} onclick={onRun}>Run with local k6</button>
     </div>
   </div>
 </div>

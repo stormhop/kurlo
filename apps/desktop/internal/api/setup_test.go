@@ -8,6 +8,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if os.Getenv("KURLO_TEST_K6_HELPER") == "1" {
+		os.Exit(runFakeCLIK6())
+	}
 	if len(os.Args) >= 2 && os.Args[1] == "git-credential" {
 		os.Exit(RunGitCredentialHelper(os.Args[2:]))
 	}

@@ -31,7 +31,22 @@ func jsonPathToGJSON(path string) (string, error) {
 			segments = append(segments, escapeGJSON(name))
 			rest = rest[end:]
 		case '[':
-			end := strings.IndexByte(rest, ']')
+			end := -1
+			var quote byte
+			for i := 1; i < len(rest); i++ {
+				if quote != 0 {
+					if rest[i] == '\\' {
+						i++
+					} else if rest[i] == quote {
+						quote = 0
+					}
+				} else if rest[i] == '\'' || rest[i] == '"' {
+					quote = rest[i]
+				} else if rest[i] == ']' {
+					end = i
+					break
+				}
+			}
 			if end < 0 {
 				return "", fmt.Errorf("JSON path %q has an unclosed [", path)
 			}
@@ -57,7 +72,7 @@ func escapeGJSON(name string) string {
 	var out strings.Builder
 	for _, r := range name {
 		switch r {
-		case '.', '*', '?', '|', '#', '@', '\\', '!', '=', '<', '>', '%':
+		case '.', '*', '?', '|', '#', '@', '\\', '!', '=', '<', '>', '%', '[', ']':
 			out.WriteByte('\\')
 		}
 		out.WriteRune(r)

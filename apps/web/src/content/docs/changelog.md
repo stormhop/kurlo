@@ -12,8 +12,17 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ## Unreleased
 
+### Added
+
+- [Load testing with k6](/docs/guides/load-testing/) now has a complete guide with screenshots of the flow, load profile, data, export and local run results.
+
+- **Load tests from the CLI.** `kurlo load list`, `export` and `run` read the same collection YAML files as the app. Select a test by name, ID or YAML path; use its saved environment or override it for CI. Export a script or folder without k6, or run installed k6 with progress, actual threshold values, summary JSON and an HTML report. Secrets pass through the process environment; threshold failures exit with code 99, and Ctrl+C stops k6 and keeps its summary when available.
+
+- Load-test data files can be chosen from the workspace with a preview of the first five rows. Export either one self-contained k6 script or a folder containing `script.k6.js` and `data.json`, and start local k6 directly from the export dialog.
+
 ### Fixed
 
+- Load tests preserve once-per-user pacing and completed results after a late Stop, explain invalid secret values, extract bracketed JSON keys, and distinguish unexecuted steps from zero timings. Small percentage limits keep their precision.
 - Relative time labels update while the app is open. Autosave backs off after repeated failures, and workspace writes stop when an operating-system lock cannot be acquired.
 - Stable updates exclude prereleases and macOS-only builds.
 - Realtime connections reject stale events and enforce connection deadlines.

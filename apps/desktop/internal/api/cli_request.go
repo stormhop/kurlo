@@ -147,16 +147,20 @@ type cliCollectionDefaults struct {
 }
 
 type cliCollection struct {
-	ID       string                `json:"id"`
-	Name     string                `json:"name"`
-	Defaults cliCollectionDefaults `json:"defaults"`
+	WorkspaceID    string                `json:"workspaceId"`
+	FilesystemName string                `json:"filesystemName"`
+	LoadTests      []model.LoadTest      `json:"loadTests"`
+	ID             string                `json:"id"`
+	Name           string                `json:"name"`
+	Defaults       cliCollectionDefaults `json:"defaults"`
 }
 
 type cliEnvironment struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Protected bool    `json:"protected"`
-	Values    []cliKV `json:"values"`
+	WorkspaceID string  `json:"workspaceId"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Protected   bool    `json:"protected"`
+	Values      []cliKV `json:"values"`
 }
 
 func decodeMaps[T any](maps []map[string]any) ([]T, error) {

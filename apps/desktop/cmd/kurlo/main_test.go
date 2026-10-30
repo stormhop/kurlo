@@ -35,3 +35,13 @@ func TestRunRejectsUnknownCommand(t *testing.T) {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
+
+func TestRunLoadHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"load", "run", "--help"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if !strings.Contains(stderr.String(), "--json") && !strings.Contains(stderr.String(), "-json") {
+		t.Fatalf("load help missing: %q", stderr.String())
+	}
+}

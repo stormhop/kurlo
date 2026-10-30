@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dop251/goja"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
 
@@ -255,15 +256,50 @@ func TestJSONPathToGJSON(t *testing.T) {
 		"$['x-trace'].value": "x-trace.value",
 		`$["a.b"]`:           `a\.b`,
 		"$.data.users[12]":   "data.users.12",
+		`$['a[b]'].id`:       `a\[b\].id`,
+		`$["[key]"]`:         `\[key\]`,
+		`$['['].id`:          `\[.id`,
+		`$[']'].id`:          `\].id`,
 	} {
 		got, err := jsonPathToGJSON(path)
 		if err != nil || got != want {
 			t.Errorf("jsonPathToGJSON(%q) = %q, %v; want %q", path, got, err, want)
 		}
 	}
-	for _, path := range []string{"items", "$.items[*]", "$.items[-1]", "$..id", "$.items[0", "$.*"} {
+	for _, path := range []string{"items", "$.items[*]", "$.items[-1]", "$..id", "$.items[0", "$.*", `$['a]']x`, `$['a]`, `$['a']` + `]`} {
 		if _, err := jsonPathToGJSON(path); err == nil {
 			t.Errorf("jsonPathToGJSON(%q) should fail", path)
+		}
+	}
+}
+
+func TestStepThinkTimeRunsOnlyWhenStepRuns(t *testing.T) {
+	for _, once := range []bool{false, true} {
+		for _, jitter := range []int{0, 1000} {
+			plan := checkoutPlan()
+			step := model.LoadStep{ID: "st", RequestID: "req-order", Once: once, ThinkTimeMs: 500, ThinkJitterMs: jitter}
+			g := &generator{plan: plan, needs: map[string]bool{}}
+			g.writeStep(1, step, Request{Method: "GET", URL: "http://localhost", VerifyTLS: true}, "order")
+			vm := goja.New()
+			requests, sleeps := 0, 0
+			_ = vm.Set("request", func() { requests++ })
+			_ = vm.Set("sleep", func(seconds float64) {
+				sleeps++
+				if seconds < 0.5 || seconds > 0.5+float64(jitter)/1000 {
+					t.Errorf("sleep = %v, jitter = %d", seconds, jitter)
+				}
+			})
+			_, err := vm.RunString("const done = {}; const http = { request }; function group(name, fn) { fn(); } function iteration() {\n" + g.out.String() + "\n} for (let i = 0; i < 3; i++) iteration();")
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 3
+			if once {
+				want = 1
+			}
+			if requests != want || sleeps != want {
+				t.Errorf("once=%v jitter=%d: requests=%d sleeps=%d, want %d each", once, jitter, requests, sleeps, want)
+			}
 		}
 	}
 }
@@ -279,5 +315,30 @@ func TestApplyPathParams(t *testing.T) {
 		if got := applyPathParams(tc.url, params); got != tc.want {
 			t.Errorf("applyPathParams(%q) = %q, want %q", tc.url, got, tc.want)
 		}
+	}
+}
+
+func TestGenerateK6FolderSeparatesDataAndPreservesSecrets(t *testing.T) {
+	plan := checkoutPlan()
+	result := GenerateK6(plan, Options{SeparateData: true})
+	if result.FileName != "script.k6.js" || len(result.Files) != 2 || result.Files[0].Content != result.Script || result.Files[1].Path != "data.json" {
+		t.Fatalf("unexpected bundle: %+v", result)
+	}
+	if !strings.Contains(result.Script, "JSON.parse(open('./data.json'))") || strings.Contains(result.Script, "ada@shop.test") || !strings.Contains(result.Files[1].Content, "ada@shop.test") {
+		t.Fatal("data should be read from the companion file")
+	}
+	for _, file := range result.Files {
+		if strings.Contains(file.Content, "hunter2") {
+			t.Fatal("secret leaked into export")
+		}
+	}
+	inlined := GenerateK6(plan, Options{SeparateData: true, InlineSecrets: true})
+	if !strings.Contains(inlined.Script, "hunter2") {
+		t.Fatal("explicit inline option should include secrets")
+	}
+	plan.Data = nil
+	plan.Test.Data = nil
+	if result := GenerateK6(plan, Options{SeparateData: true}); len(result.Files) != 1 || strings.Contains(result.Script, "data.json") {
+		t.Fatal("a test without data should export only the script")
 	}
 }

@@ -772,6 +772,9 @@
         onOpenRequest={(requestId: string) => void vm.switchRequest(requestId)}
         onDuplicate={vm.duplicateLoadTest}
         onDelete={vm.deleteLoadTest}
+        onChooseData={vm.chooseLoadTestData}
+        onPreviewData={vm.previewLoadTestData}
+        onSaveFolder={vm.saveLoadTestK6Folder}
         onExport={vm.exportLoadTestK6}
         onSaveScript={(fileName: string, script: string) => vm.saveTextFile(fileName, script)}
         onCopy={(text: string) => void clipboardSet(text)}

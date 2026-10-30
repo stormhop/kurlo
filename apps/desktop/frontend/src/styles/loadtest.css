@@ -728,3 +728,31 @@
   font-size: var(--text-label);
   user-select: text;
 }
+
+.loadtest-data-file {
+  align-items: flex-end;
+}
+
+.loadtest-data-file .loadtest-field {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.loadtest-data-file .loadtest-path {
+  width: 100%;
+}
+
+.loadtest-data-preview {
+  max-height: 16rem;
+}
+
+.loadtest-data-preview td {
+  max-width: 20rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loadtest-data-preview th:not(:first-child) {
+  text-align: left;
+}

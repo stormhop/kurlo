@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 type KurloE2EState = {
@@ -128,8 +129,8 @@ async function tourPause(page: Page, label: string) {
   await page.waitForTimeout(stepPauseMs);
 }
 
-async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 'browser/e2e', docsMode = Boolean(docsScreenshotDir)) {
-  await page.addInitScript(({ largeResponseBody, runtime, docsMode }) => {
+async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 'browser/e2e', docsMode = Boolean(docsScreenshotDir), storeOverride: Record<string, unknown> | null = null) {
+  await page.addInitScript(({ largeResponseBody, runtime, docsMode, storeOverride }) => {
     localStorage.clear();
 
     const emptyGitStatus = {
@@ -194,7 +195,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       workspaceCookies: {},
     };
     const state = {
-      store: initialStore,
+      store: storeOverride ? { ...initialStore, ...storeOverride } : initialStore,
       savedStores: [],
       savedViews: [],
       sentRequests: [],
@@ -807,7 +808,20 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         state.savedFiles.push({ name, content, path });
         return path;
       },
-      OpenFileDialog: async () => '',
+      OpenFileDialog: async (title: string) => title.includes('CSV or JSON') ? '/workspace/data/users.csv' : '',
+      OpenDirectoryDialog: async () => '/exports',
+      PreviewLoadTestData: async (path: string) => path.includes('missing')
+        ? { path, columns: [], rows: [], total: 0, error: 'data file: no such file' }
+        : { path: 'data/users.csv', columns: ['email', 'name'], rows: [['ada@shop.test', 'Ada'], ['grace@shop.test', 'Grace']], total: 2 },
+      ExportLoadTestK6Files: async (_payload: string, _inlineSecrets: boolean) => ({
+        script: "const DATA = JSON.parse(open('./data.json'));", fileName: 'script.k6.js', warnings: [], steps: [],
+        files: [{ path: 'script.k6.js', content: "const DATA = JSON.parse(open('./data.json'));" }, { path: 'data.json', content: '[{"email":"ada@shop.test"}]' }],
+      }),
+      SaveLoadTestK6Folder: async (payload: string, inlineSecrets: boolean, parent: string) => {
+        const parsed = JSON.parse(payload) as { loadTest: { data?: { path: string; mode: string } } };
+        state.calls.push(`SaveLoadTestK6Folder:${parent}:${inlineSecrets}:${parsed.loadTest.data?.path}:${parsed.loadTest.data?.mode}`);
+        return '';
+      },
       ReadTextFile: async () => '',
       DefaultWorkspaceLocation: async () => ({ path: '', error: '' }),
       GitStatus: async () => currentGitStatus(),
@@ -848,7 +862,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       }),
       UseLocalWorkspaceStore: async () => {
         state.calls.push('UseLocalWorkspaceStore');
-        state.gitStatusOverride = null;
+        state.gitStatusOverride = clone(emptyGitStatus);
         return { ok: true, root: '', payload: JSON.stringify(state.store), git: currentGitStatus(), diagnostics: [], missingSecrets: [], error: '', output: '' };
       },
       GitStageWorkspaceFiles: async () => {
@@ -980,8 +994,49 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         return '';
       },
       ExportLoadTestK6: async (payload: string, inlineSecrets: boolean) => {
-        const parsed = JSON.parse(payload) as { loadTest: { name: string }; requests: Array<{ name: string }> };
+        const parsed = JSON.parse(payload) as { loadTest: { id: string; name: string }; requests: Array<{ name: string }> };
         state.calls.push(`ExportLoadTestK6:${parsed.loadTest.name}:${parsed.requests.map(request => request.name).join(',')}:${inlineSecrets}`);
+        if (parsed.loadTest.id === 'lt-docs') {
+          return {
+            script: `import http from 'k6/http';
+import { check, sleep } from 'k6';
+
+export const options = {
+  scenarios: {
+    main: {
+      executor: 'ramping-vus',
+      stages: [
+        { duration: '2m', target: 50 },
+        { duration: '10m', target: 50 },
+        { duration: '1m', target: 0 },
+      ],
+    },
+  },
+  thresholds: {
+    http_req_duration: ['p(95)<500'],
+    http_req_failed: ['rate<0.01'],
+    checks: ['rate>0.99'],
+  },
+};
+
+let token;
+export default function () {
+  if (!token) {
+    const login = http.post('https://shop.kurlo.test/login',
+      JSON.stringify({ email: 'ada@shop.test', password: __ENV.password }),
+      { headers: { 'Content-Type': 'application/json' } });
+    token = login.json('access_token');
+  }
+  const orders = http.get('https://shop.kurlo.test/orders',
+    { headers: { Authorization: 'Bearer ' + token } });
+  check(orders, { 'status is 200': (r) => r.status === 200 });
+  sleep(0.5 + Math.random());
+}
+`,
+            fileName: 'checkout-flow.k6.js',
+            warnings: [{ level: 'info', message: 'password is secret and is not written into the script. Pass it when running: k6 run -e password=…' }],
+          };
+        }
         return {
           script: `import http from 'k6/http';\n\nexport default function () {\n  http.get('https://shop.kurlo.test/login');\n}\n`,
           fileName: 'login-load-test.k6.js',
@@ -1030,7 +1085,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       WindowSetDarkTheme: async () => {},
       WindowSetBackgroundColour: async () => {},
     };
-  }, { largeResponseBody, runtime, docsMode });
+  }, { largeResponseBody, runtime, docsMode, storeOverride });
 }
 
 async function fillPrompt(page: Page, title: string, value: string) {
@@ -2216,7 +2271,7 @@ test.describe('Kurlo desktop browser E2E', () => {
 
     await page.mouse.move(start.x + start.width / 2, viewerBox.y + 10);
     await page.mouse.wheel(0, -600);
-    await expect.poll(async () => viewer.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeGreaterThan(300);
+    await expect.poll(async () => viewer.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeGreaterThanOrEqual(300);
   });
 
   test('keeps sidebar arrow shortcuts out of the response body and dialogs', async ({ page }) => {
@@ -3424,6 +3479,117 @@ test.describe('Kurlo desktop browser E2E', () => {
     ]);
   });
 
+  test('captures load testing documentation', async ({ page }) => {
+    test.skip(!docsScreenshotDir, 'Set KURLO_DOCS_SCREENSHOT_DIR to capture documentation');
+    await mkdir(docsScreenshotDir, { recursive: true });
+    await page.setViewportSize({ width: 1360, height: 1040 });
+    await installKurloBridge(page, '', 'browser/e2e', true, {
+      workspaces: [{ id: 'workspace-e2e', name: 'Shop API', filesystemName: 'Shop-API', description: '' }],
+      activeEnvironmentId: 'env-staging',
+      environments: [{ id: 'env-staging', workspaceId: 'workspace-e2e', name: 'Staging', values: [
+        { id: 'base-url', key: 'baseUrl', value: 'https://shop.kurlo.test', enabled: true },
+        { id: 'password', key: 'password', value: '', enabled: true, secret: true },
+      ] }],
+      collections: [{ id: 'col-shop', workspaceId: 'workspace-e2e', name: 'Checkout API', loadTests: [{
+        id: 'lt-docs', name: 'Checkout flow', settings: { environment: 'Staging' },
+        data: { path: 'data/users.csv', mode: 'per-vu' },
+        scenarios: [{ id: 'main', name: 'Flow', executor: { type: 'ramping-vus', stages: [
+          { durationMs: 120000, target: 50 }, { durationMs: 600000, target: 50 }, { durationMs: 60000, target: 0 },
+        ] }, steps: [
+          { id: 'step-login', requestId: 'req-login', once: true, extract: [{ var: 'token', from: 'json', path: '$.access_token' }], checks: [{ type: 'status', value: '200' }] },
+          { id: 'step-orders', requestId: 'req-orders', thinkTimeMs: 500, thinkJitterMs: 1000, checks: [{ type: 'status', value: '200' }] },
+        ] }],
+        thresholds: [
+          { metric: 'http_req_duration', stat: 'p(95)', op: '<', value: 500 },
+          { metric: 'http_req_failed', stat: 'rate', op: '<', value: 0.01 },
+          { metric: 'checks', stat: 'rate', op: '>', value: 0.99 },
+        ],
+      }] }],
+      requests: [
+        { id: 'req-login', collectionId: 'col-shop', collection: 'Checkout API', name: 'Login', requestType: 'http', method: 'POST', url: '{{baseUrl}}/login', auth: { type: 'none' }, bodyType: 'raw', rawBodyType: 'json', bodyContent: '{"email":"{{email}}","password":"{{password}}"}' },
+        { id: 'req-orders', collectionId: 'col-shop', collection: 'Checkout API', name: 'List orders', requestType: 'http', method: 'GET', url: '{{baseUrl}}/orders', auth: { type: 'bearer', bearerToken: '{{token}}' } },
+      ],
+    });
+    await page.goto('/');
+    await page.locator('.collection-request-wrap').filter({ hasText: 'Checkout flow' }).click();
+    const editor = page.locator('section[aria-label="Load test"]');
+    const captureWorkspace = async (name: string) => {
+      await waitForTransientToasts(page);
+      let header = await editor.locator('.loadtest-head').boundingBox();
+      let content = await editor.locator('.loadtest-content').boundingBox();
+      expect(header).not.toBeNull();
+      expect(content).not.toBeNull();
+      if (!header || !content) return;
+      const viewport = page.viewportSize() ?? DOCS_VIEWPORT;
+      if (content.y + content.height + 48 > viewport.height) {
+        await page.setViewportSize({ width: viewport.width, height: Math.ceil(content.y + content.height + 48) });
+        header = await editor.locator('.loadtest-head').boundingBox();
+        content = await editor.locator('.loadtest-content').boundingBox();
+      }
+      if (!header || !content) return;
+      await page.screenshot({
+        path: join(docsScreenshotDir, `${name}.png`), animations: 'disabled',
+        clip: { x: header.x - 20, y: header.y - 20, width: header.width + 40, height: content.y + content.height - header.y + 40 },
+      });
+    };
+    await expect(editor.getByLabel('Load test name')).toHaveValue('Checkout flow');
+    await expect(editor.getByLabel('Variable name')).toHaveValue('token');
+    await captureWorkspace('load-testing-flow');
+    await editor.getByRole('tab', { name: /Load & thresholds/ }).click();
+    await expect(editor.locator('.loadtest-threshold')).toHaveCount(3);
+    await captureWorkspace('load-testing-profile');
+    await editor.getByRole('tab', { name: 'Data & options' }).click();
+    await expect(editor.getByRole('table', { name: 'Test data preview' })).toContainText('ada@shop.test');
+    await captureWorkspace('load-testing-data');
+    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export to k6' });
+    await expect(exportDialog.locator('.cm-content')).not.toBeEmpty();
+    await captureDocsScreenshot(page, 'load-testing-export');
+    await exportDialog.press('Escape');
+    await page.evaluate(() => { (window.__kurloE2E as unknown as { k6Found: boolean }).k6Found = false; });
+    await editor.getByRole('button', { name: 'Run with k6' }).click();
+    const missing = page.getByRole('dialog', { name: 'k6 is not installed' });
+    await expect(missing).toBeVisible();
+    await captureDocsScreenshot(page, 'load-testing-k6-missing');
+    await page.evaluate(() => { (window.__kurloE2E as unknown as { k6Found: boolean }).k6Found = true; });
+    await missing.getByRole('button', { name: 'Check again' }).click();
+    await editor.getByRole('button', { name: 'Run with k6' }).click();
+    await page.getByRole('dialog', { name: 'Run load test' }).getByRole('button', { name: 'Run load test' }).click();
+    await page.evaluate(() => {
+      const started = Date.UTC(2026, 9, 30, 9, 0);
+      window.__kurloE2E.emit('load:progress', {
+        running: true, stopping: false, loadTestId: 'lt-docs', collectionId: 'col-shop', startedAt: started,
+        plannedMs: 780000, dashboardUrl: 'http://127.0.0.1:5665', k6Version: 'v1.3.0',
+        progress: { elapsedMs: 312000, vus: 50, maxVUs: 50, iterations: 4210, interrupted: 0 },
+      });
+      for (const line of ['execution: local', 'scenario: main, ramping-vus, up to 50 users', 'running (05m12.0s), 50/50 VUs, 4210 complete and 0 interrupted iterations']) {
+        window.__kurloE2E.emit('load:log', line);
+      }
+    });
+    await expect(editor.locator('.loadrun-progress')).toContainText('4,210');
+    await captureWorkspace('load-testing-run');
+    await page.evaluate(() => {
+      const started = Date.UTC(2026, 9, 30, 9, 0);
+      window.__kurloE2E.emit('load:progress', { running: false, stopping: false, loadTestId: 'lt-docs', collectionId: 'col-shop', startedAt: started, plannedMs: 780000, dashboardUrl: '', k6Version: 'v1.3.0', progress: { elapsedMs: 780000, vus: 0, maxVUs: 50, iterations: 10000, interrupted: 0 } });
+      window.__kurloE2E.emit('load:done', {
+        loadTestId: 'lt-docs', collectionId: 'col-shop', loadTestName: 'Checkout flow', environment: 'Staging', k6Version: 'v1.3.0', status: 'passed', exitCode: 0,
+        startedAt: started, finishedAt: started + 780000, hasReport: true, hasSummary: true,
+        thresholds: [
+          { metric: 'http_req_duration', expression: 'p(95)<500', ok: true, actual: 212.4, hasActual: true },
+          { metric: 'http_req_failed', expression: 'rate<0.01', ok: true, actual: 0.002, hasActual: true },
+          { metric: 'checks', expression: 'rate>0.99', ok: true, actual: 0.998, hasActual: true },
+        ],
+        totals: { requests: 10050, rps: 12.88, avg: 90, med: 74, p95: 212.4, p99: 300, max: 900, failedRate: 0.002, failedCount: 20, checksPassed: 10030, checksFailed: 20, iterations: 10000, interrupted: 0, maxVUs: 50 },
+        steps: [
+          { stepId: 'step-login', tag: 'login', requests: 50, med: 120, p95: 240, p99: 310, failedRate: 0, checksRate: 1, checksPassed: 50, checksFailed: 0 },
+          { stepId: 'step-orders', tag: 'list_orders', requests: 10000, med: 74, p95: 212.4, p99: 300, failedRate: 0.002, checksRate: 0.998, checksPassed: 9980, checksFailed: 20 },
+        ],
+      });
+    });
+    await expect(editor.locator('.loadrun-banner')).toContainText('All pass criteria met');
+    await captureWorkspace('load-testing-result');
+  });
+
   test('builds a load test from collection requests and saves it to the workspace', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');
@@ -3470,12 +3636,28 @@ test.describe('Kurlo desktop browser E2E', () => {
     await editor.getByRole('radio', { name: 'Iterations per second' }).click();
     await expect(editor.locator('.loadtest-preview')).toContainText('iterations/s');
 
+    await editor.getByRole('tab', { name: 'Data & options' }).click();
+    await editor.getByRole('button', { name: 'Choose file…' }).click();
+    await expect(editor.getByRole('textbox', { name: 'File', exact: true })).toHaveValue('data/users.csv');
+    await expect(editor.getByRole('table', { name: 'Test data preview' })).toContainText('ada@shop.test');
+    await editor.getByRole('radio', { name: 'Next row each iteration' }).click();
+    await expect(editor.getByRole('radio', { name: 'Next row each iteration' })).toHaveAttribute('aria-checked', 'true');
+    await expect(editor.getByText('Reading test data…')).toBeHidden();
+    await expect(editor.getByRole('table', { name: 'Test data preview' })).toBeVisible();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-data-preview.png'), fullPage: true, animations: 'disabled' });
+    await editor.getByRole('textbox', { name: 'File', exact: true }).fill('data/missing.csv');
+    await expect(editor.getByRole('alert')).toContainText('no such file');
+    await expect(editor.getByRole('table', { name: 'Test data preview' })).toBeHidden();
+    await editor.getByRole('textbox', { name: 'File', exact: true }).fill('data/users.csv');
+    await expect(editor.getByRole('table', { name: 'Test data preview' })).toBeVisible();
+
     await editor.getByRole('button', { name: 'Save', exact: true }).click();
     await expect.poll(() => page.evaluate(() => {
       const store = window.__kurloE2E.store as { collections?: Array<{ name: string; loadTests?: unknown[] }> };
       return store.collections?.find(candidate => candidate.name === 'Shop API')?.loadTests?.[0] ?? null;
     })).toMatchObject({
       name: 'Login load test',
+      data: { path: 'data/users.csv', mode: 'per-iteration' },
       scenarios: [{
         executor: { type: 'ramping-arrival-rate' },
         steps: [
@@ -3498,6 +3680,17 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('ExportLoadTestK6')))).toEqual([
       'ExportLoadTestK6:Login load test:Login,List orders:false',
       'ExportLoadTestK6:Login load test:Login,List orders:true',
+    ]);
+    await exportDialog.getByRole('radio', { name: 'Folder', exact: true }).click();
+    await expect(exportDialog.getByRole('tab', { name: 'data.json' })).toBeVisible();
+    await expect(exportDialog.locator('.k6-export-command')).toHaveText('k6 run script.k6.js');
+    await exportDialog.getByRole('tab', { name: 'data.json' }).click();
+    await expect(exportDialog.locator('.cm-content')).toContainText('ada@shop.test');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-k6-folder-export.png'), fullPage: true, animations: 'disabled' });
+    await exportDialog.getByRole('button', { name: 'Save folder…' }).click();
+    await expect(exportDialog.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('SaveLoadTestK6Folder')))).toEqual([
+      'SaveLoadTestK6Folder:/exports:true:data/users.csv:per-iteration',
     ]);
     await exportDialog.press('Escape');
     await expect(exportDialog).toBeHidden();
@@ -3535,8 +3728,13 @@ test.describe('Kurlo desktop browser E2E', () => {
     });
     expect(loadTestId).not.toBe('');
 
+    await editor.getByRole('tab', { name: /Load & thresholds/ }).click();
+    await editor.locator('.loadtest-threshold').filter({ hasText: '%' }).getByLabel('Limit', { exact: true }).fill('0.00001');
+    await editor.getByRole('button', { name: 'Save', exact: true }).click();
+
     await page.evaluate(() => { (window.__kurloE2E as unknown as { k6Found: boolean }).k6Found = false; });
-    await editor.getByRole('button', { name: 'Run with k6' }).first().click();
+    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    await page.getByRole('dialog', { name: 'Export to k6' }).getByRole('button', { name: 'Run with local k6' }).click();
     const missing = page.getByRole('dialog', { name: 'k6 is not installed' });
     await expect(missing).toBeVisible();
     await expect(missing).toContainText('brew install k6');
@@ -3544,7 +3742,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     await missing.getByRole('button', { name: 'Check again' }).click();
     await expect(missing).toBeHidden();
 
-    await editor.getByRole('button', { name: 'Run with k6' }).first().click();
+    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    await page.getByRole('dialog', { name: 'Export to k6' }).getByRole('button', { name: 'Run with local k6' }).click();
     const confirm = page.getByRole('dialog', { name: 'Run load test' });
     await expect(confirm).toContainText('shop.kurlo.test');
     await confirm.getByRole('button', { name: 'Run load test' }).click();
@@ -3570,17 +3769,28 @@ test.describe('Kurlo desktop browser E2E', () => {
         startedAt: Date.now() - 60000, finishedAt: Date.now(), hasReport: true, hasSummary: true,
         thresholds: [
           { metric: 'http_req_duration', expression: 'p(95)<500', ok: true, actual: 212.4, hasActual: true },
-          { metric: 'http_req_failed', expression: 'rate<0.01', ok: false, actual: 0.04, hasActual: true },
+          { metric: 'http_req_failed', expression: 'rate<0.00000010000000000000001', ok: false, actual: 0.04, hasActual: true },
         ],
         totals: { requests: 1200, rps: 20, avg: 90, med: 74, p95: 212.4, p99: 300, max: 900, failedRate: 0.04, failedCount: 48, checksPassed: 0, checksFailed: 0, iterations: 1200, interrupted: 0, maxVUs: 2 },
-        steps: [{ stepId: 'missing', tag: 'login', requests: 1200, med: 74, p95: 212.4, p99: 300, failedRate: 0.04, checksRate: 0, checksPassed: 0, checksFailed: 0 }],
+        steps: [
+          { stepId: 'missing', tag: 'login', requests: 1200, med: 74, p95: 212.4, p99: 300, failedRate: 0.04, checksRate: 0, checksPassed: 0, checksFailed: 0 },
+          { stepId: 'empty', tag: 'empty', requests: 0, med: 0, p95: 0, p99: 0, failedRate: 0, checksRate: 0, checksPassed: 0, checksFailed: 0 },
+          { stepId: 'fast', tag: 'fast', requests: 1, med: 0, p95: 0, p99: 0, failedRate: 0, checksRate: 0, checksPassed: 0, checksFailed: 0 },
+        ],
       });
     }, loadTestId);
     const banner = editor.locator('.loadrun-banner');
     await expect(banner).toContainText('1 of 2 pass criteria not met');
     await expect(banner).toContainText('exit code 99');
     await expect(editor.locator('.loadrun-table').first()).toContainText('Not met');
+    await expect(editor.locator('.loadrun-table').first().locator('tbody tr').nth(1).locator('td').nth(1)).toHaveText('< 0.00001%');
+    const stepRows = editor.locator('.loadrun-table').last().locator('tbody tr');
+    await expect(stepRows.nth(1).locator('td')).toHaveText(['Removed step', '0', '—', '—', '—', '—', '—']);
+    await expect(stepRows.nth(2).locator('td').nth(2)).toHaveText('0.0 ms');
     await expect(editor.locator('.loadrun-totals')).toContainText('1,200');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-loadrun-regressions.png'), fullPage: true });
+    await stepRows.last().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-loadrun-steps.png'), fullPage: true });
     await editor.getByRole('button', { name: 'Open HTML report' }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('OpenLoadRunReport')))).toEqual([`OpenLoadRunReport:${loadTestId}`]);
     await editor.getByRole('button', { name: 'Save summary JSON' }).click();

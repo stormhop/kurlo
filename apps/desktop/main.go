@@ -38,6 +38,9 @@ func main() {
 	if len(os.Args) >= 2 && os.Args[1] == "run" {
 		os.Exit(api.RunCLI(os.Args[2:]))
 	}
+	if len(os.Args) >= 2 && os.Args[1] == "load" {
+		os.Exit(api.RunLoadCLI(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) >= 2 && os.Args[1] == "mcp" {
 		os.Exit(api.RunMCPServer(os.Args[2:]))
 	}

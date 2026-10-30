@@ -92,7 +92,21 @@ type K6ExportStep struct {
 	Tag    string `json:"tag"`
 }
 
+type K6ExportFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+type LoadDataPreview struct {
+	Path    string     `json:"path"`
+	Columns []string   `json:"columns"`
+	Rows    [][]string `json:"rows"`
+	Total   int        `json:"total"`
+	Error   string     `json:"error,omitempty"`
+}
+
 type K6ExportResult struct {
+	Files    []K6ExportFile    `json:"files,omitempty"`
 	Script   string            `json:"script"`
 	FileName string            `json:"fileName"`
 	Warnings []K6ExportWarning `json:"warnings"`

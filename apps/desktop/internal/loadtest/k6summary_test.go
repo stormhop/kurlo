@@ -97,8 +97,11 @@ func TestRunStatus(t *testing.T) {
 		want    string
 	}{
 		{0, false, nil, "passed"},
+		{0, true, nil, "passed"},
 		{99, false, nil, "failed"},
+		{99, true, nil, "failed"},
 		{105, true, nil, "stopped"},
+		{-1, true, nil, "stopped"},
 		{107, false, nil, "error"},
 		{0, false, errors.New("boom"), "error"},
 	} {

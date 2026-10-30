@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  McpResponse, AiRequest, AiResponse, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -598,12 +598,13 @@ export async function clearHistoryResponses(): Promise<string> {
   return (await window.go?.api?.App?.ClearHistoryResponses?.()) ?? '';
 }
 
-export async function exportLoadTestK6(payload: string, inlineSecrets: boolean): Promise<K6ExportResult> {
+export async function exportLoadTestK6(payload: string, inlineSecrets: boolean, folder = false): Promise<K6ExportResult> {
   const app = window.go?.api?.App;
-  if (!app?.ExportLoadTestK6) {
+  const generate = folder ? app?.ExportLoadTestK6Files : app?.ExportLoadTestK6;
+  if (!generate) {
     return { script: '', fileName: '', warnings: [], steps: [], error: 'Exporting to k6 is only available in the desktop app.' };
   }
-  return app.ExportLoadTestK6(payload, inlineSecrets);
+  return generate(payload, inlineSecrets);
 }
 
 const EMPTY_LOAD_RUN_STATE: LoadRunState = {
@@ -684,4 +685,12 @@ export async function mockServerLog(): Promise<MockRequestLog[]> {
   const app = window.go?.api?.App;
   if (!app?.MockServerLog) return [];
   return app.MockServerLog();
+}
+
+export async function previewLoadTestData(path: string): Promise<LoadDataPreview> {
+  return (await window.go?.api?.App?.PreviewLoadTestData?.(path)) ?? { path, columns: [], rows: [], total: 0, error: 'Test data preview is only available in the desktop app.' };
+}
+
+export async function saveLoadTestK6Folder(payload: string, inlineSecrets: boolean, parent: string): Promise<string> {
+  return (await window.go?.api?.App?.SaveLoadTestK6Folder?.(payload, inlineSecrets, parent)) ?? 'Folder export is only available in the desktop app.';
 }

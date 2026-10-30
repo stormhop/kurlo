@@ -3,7 +3,7 @@
   import { loadTestFingerprint, normalizeLoadTest } from '../loadTests';
   import type { LoadTestTab } from '../stores/features/loadTests';
   import type { Collection, Environment, SavedRequest } from '../types/models';
-  import type { K6ExportResult, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../wire';
+  import type { LoadDataPreview, K6ExportResult, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../wire';
   import K6MissingDialog from './K6MissingDialog.svelte';
   import LoadRunPanel from './LoadRunPanel.svelte';
   import K6ExportModal from './K6ExportModal.svelte';
@@ -31,6 +31,9 @@
     onDelete,
     onExport,
     onSaveScript,
+    onChooseData,
+    onPreviewData,
+    onSaveFolder,
     onCopy,
     run,
     logLines,
@@ -61,7 +64,10 @@
     onOpenRequest: (requestId: string) => void;
     onDuplicate: (collectionId: string, loadTestId: string) => void;
     onDelete: (collectionId: string, loadTestId: string) => void;
-    onExport: (collectionId: string, draft: LoadTest, inlineSecrets: boolean) => Promise<K6ExportResult>;
+    onExport: (collectionId: string, draft: LoadTest, inlineSecrets: boolean, folder: boolean) => Promise<K6ExportResult>;
+    onChooseData: () => Promise<LoadDataPreview | null>;
+    onPreviewData: (path: string) => Promise<LoadDataPreview>;
+    onSaveFolder: (collectionId: string, draft: LoadTest, inlineSecrets: boolean) => Promise<boolean>;
     onSaveScript: (fileName: string, script: string) => Promise<boolean>;
     onCopy: (text: string) => void;
     run: LoadRunState;
@@ -260,7 +266,7 @@
       {:else if loadTestTab === 'load'}
         <LoadProfileEditor bind:draft disabled={workspaceBlocked} {requests} />
       {:else if loadTestTab === 'data'}
-        <LoadDataTab bind:draft disabled={workspaceBlocked} />
+        <LoadDataTab bind:draft disabled={workspaceBlocked} onChoose={onChooseData} onPreview={onPreviewData} />
       {:else}
         <LoadRunPanel
           loadTest={draft}
@@ -293,7 +299,10 @@
       {@const snapshot = $state.snapshot(draft) as LoadTest}
       <K6ExportModal
         loadTest={snapshot}
-        onExport={(inlineSecrets) => onExport(collection.id, snapshot, inlineSecrets)}
+        onExport={(inlineSecrets, folder) => onExport(collection.id, snapshot, inlineSecrets, folder)}
+        onSaveFolder={(inlineSecrets) => onSaveFolder(collection.id, snapshot, inlineSecrets)}
+        runDisabled={workspaceBlocked || run.running}
+        onRun={() => { exportOpen = false; runDraft(); }}
         onSave={onSaveScript}
         {onCopy}
         onClose={() => (exportOpen = false)}

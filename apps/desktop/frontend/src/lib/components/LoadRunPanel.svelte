@@ -82,6 +82,7 @@
   }
 
   function pct(value: number) {
+    if (value !== 0 && Math.abs(value) < 0.001) return `${new Intl.NumberFormat('en-US', { maximumSignificantDigits: 3 }).format(value * 100)}%`;
     return `${(Math.round(value * 1000) / 10).toFixed(1)}%`;
   }
 
@@ -93,18 +94,20 @@
     return new Date(timestamp).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', hour12: false });
   }
 
-  function thresholdOf(stepId: string | undefined, expression: string): LoadThreshold | undefined {
-    return loadTest.thresholds?.find(threshold => (threshold.step ?? '') === (stepId ?? '') && `${threshold.stat}${threshold.op}${threshold.value}` === expression);
+  function thresholdOf(metric: string, stepId: string | undefined, expression: string): LoadThreshold | undefined {
+    const parts = /^(.*?)(<=|>=|<|>|==|!=)(.+)$/.exec(expression);
+    if (!parts) return undefined;
+    return loadTest.thresholds?.find(threshold => threshold.metric === metric && (threshold.step ?? '') === (stepId ?? '') && threshold.stat === parts[1] && threshold.op === parts[2] && threshold.value === Number(parts[3]));
   }
 
   function thresholdName(metric: string, stepId: string | undefined, expression: string) {
-    const threshold = thresholdOf(stepId, expression);
+    const threshold = thresholdOf(metric, stepId, expression);
     const stat = threshold && threshold.stat !== 'rate' ? ` ${threshold.stat === 'med' ? 'median' : threshold.stat}` : '';
     return `${METRIC_LABELS[metric] ?? metric}${stat} · ${stepId ? stepLabel(stepId) : 'all steps'}`;
   }
 
   function thresholdLimit(metric: string, stepId: string | undefined, expression: string) {
-    const threshold = thresholdOf(stepId, expression);
+    const threshold = thresholdOf(metric, stepId, expression);
     if (!threshold) return expression;
     return `${threshold.op} ${metric === 'http_req_duration' ? ms(threshold.value) : pct(threshold.value)}`;
   }
@@ -195,10 +198,10 @@
                 <tr class:bad={step.failedRate > 0}>
                   <td>{stepLabel(step.stepId)}</td>
                   <td class="num">{count(step.requests)}</td>
-                  <td class="num">{ms(step.med)}</td>
-                  <td class="num">{ms(step.p95)}</td>
-                  <td class="num">{ms(step.p99)}</td>
-                  <td class="num">{pct(step.failedRate)}</td>
+                  <td class="num">{step.requests ? ms(step.med) : '—'}</td>
+                  <td class="num">{step.requests ? ms(step.p95) : '—'}</td>
+                  <td class="num">{step.requests ? ms(step.p99) : '—'}</td>
+                  <td class="num">{step.requests ? pct(step.failedRate) : '—'}</td>
                   <td class="num">{step.checksPassed + step.checksFailed ? pct(step.checksRate) : '—'}</td>
                 </tr>
               {/each}

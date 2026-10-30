@@ -113,8 +113,9 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 - Drag-and-drop organisation
 - Request history — every send on its own page, request and stored response side by side, reopenable in the editor (14-day retention, 1000 entries)
 - Collection runner — sequential or parallel, data files, iterations, an HTML report, and the last run of every collection kept
+- [Load testing with k6](https://kurlo.dev/docs/guides/load-testing/) — collection flows with extraction and checks, virtual users or iteration rates, thresholds, CSV/JSON data, script export, local runs and last-run reports
 - Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets
-- **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure
+- **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure. `kurlo load list|export|run` lists collection load tests, exports k6 scripts or runs local k6 with threshold results and reports
 
 **AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved requests and whole collections with their auth, scripts and tests, and send one-off calls with your `{{variables}}`. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
 
@@ -199,7 +200,7 @@ See `make help` for every available target.
 ```
 apps/desktop/               Wails v2 desktop application
 apps/desktop/main.go        Entry point, window config, native menus
-apps/desktop/cmd/kurlo/     Headless CLI (run, mcp) published to npm as @kurlo/cli
+apps/desktop/cmd/kurlo/     Headless CLI (run, load, mcp) published to npm as @kurlo/cli
 apps/desktop/internal/
   api/                      HTTP executor, auth, request store, state
   api/auth/                 Bearer, Basic, Digest, API Key, OAuth2, AWS SigV4

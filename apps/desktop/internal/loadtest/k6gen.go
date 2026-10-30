@@ -92,12 +92,20 @@ func GenerateK6(plan Plan, options Options) model.K6ExportResult {
 	g.insecure = plan.Test.Settings.Insecure
 	body := g.defaultFunction(steps)
 	g.writeScript(body)
-	return model.K6ExportResult{
+	result := model.K6ExportResult{
 		Script:   g.out.String(),
 		FileName: fileName(plan.Test.Name),
 		Warnings: g.warnings,
 		Steps:    g.stepOrder,
 	}
+	if options.SeparateData {
+		result.FileName = "script.k6.js"
+		result.Files = []model.K6ExportFile{{Path: result.FileName, Content: result.Script}}
+		if len(plan.Data) > 0 {
+			result.Files = append(result.Files, model.K6ExportFile{Path: "data.json", Content: jsValue(plan.Data) + "\n"})
+		}
+	}
+	return result
 }
 
 func ThresholdKey(threshold model.LoadThreshold, tag string) string {
@@ -321,11 +329,6 @@ func (g *generator) writeStep(number int, step model.LoadStep, request Request, 
 	g.writeExtracts(number, step)
 	g.indent--
 	g.line("});")
-	if step.Once {
-		g.line("done[%s] = true;", jsString(step.ID))
-		g.indent--
-		g.line("}")
-	}
 	if step.ThinkTimeMs > 0 || step.ThinkJitterMs > 0 {
 		wait := seconds(step.ThinkTimeMs)
 		if step.ThinkJitterMs > 0 {
@@ -333,6 +336,11 @@ func (g *generator) writeStep(number int, step model.LoadStep, request Request, 
 		} else {
 			g.line("sleep(%s);", wait)
 		}
+	}
+	if step.Once {
+		g.line("done[%s] = true;", jsString(step.ID))
+		g.indent--
+		g.line("}")
 	}
 }
 
@@ -746,7 +754,11 @@ func (g *generator) writeScript(body string) {
 	g.indent--
 	g.line("};")
 	if len(g.plan.Data) > 0 {
-		g.line("const DATA = new SharedArray('data', () => %s);", jsValue(g.plan.Data))
+		if g.options.SeparateData {
+			g.line("const DATA = new SharedArray('data', () => JSON.parse(open('./data.json')));")
+		} else {
+			g.line("const DATA = new SharedArray('data', () => %s);", jsValue(g.plan.Data))
+		}
 	}
 	dynamicNames := make([]string, 0, len(g.dynamics))
 	for name := range g.dynamics {

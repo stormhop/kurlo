@@ -12,11 +12,12 @@ const usage = `Kurlo command-line tools
 
 Usage:
   kurlo run [workspace] [flags]   Run a workspace's requests and test scripts
+  kurlo load list|export|run     Manage and run collection load tests with k6
   kurlo mcp [workspace] [flags]   Serve a workspace to AI agents over MCP
   kurlo mcp install [client...]   Add Kurlo to Claude Code, Cursor, Codex and other AI clients
   kurlo version                   Print the version
 
-Run "kurlo run --help" or "kurlo mcp --help" for the flags.
+Run "kurlo run --help", "kurlo load --help" or "kurlo mcp --help" for the flags.
 The desktop app and the docs are at https://kurlo.dev
 `
 
@@ -32,6 +33,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "run":
 		return api.RunCLI(args[1:])
+	case "load":
+		return api.RunLoadCLI(args[1:], stdout, stderr)
 	case "mcp":
 		return api.RunMCPServer(args[1:])
 	case "version", "--version", "-version", "-v":

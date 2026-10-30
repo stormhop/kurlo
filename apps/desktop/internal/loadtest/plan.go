@@ -47,5 +47,6 @@ type Plan struct {
 }
 
 type Options struct {
+	SeparateData  bool
 	InlineSecrets bool
 }
