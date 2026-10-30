@@ -35,7 +35,7 @@ MSIX_CERT_PASSWORD ?=
 MSIX_TIMESTAMP_URL ?=
 
 
-_LAST_TAG   := $(shell git describe --tags --abbrev=0 2>/dev/null || echo v0.0.0)
+_LAST_TAG   := $(shell git describe --tags --abbrev=0 --exclude '*-*' 2>/dev/null || echo v0.0.0)
 _LAST_VER   := $(patsubst v%,%,$(_LAST_TAG))
 _VER_PARTS  := $(subst ., ,$(_LAST_VER))
 _V_MAJOR    := $(word 1,$(_VER_PARTS))
@@ -160,6 +160,10 @@ _guard-clean:
 	fi
 
 _do-release:
+	@if ! printf '%s' "$(_NEXT)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$'; then \
+		printf '\033[31mError:\033[0m "%s" is not a release version (expected 1.2.3 or 1.2.3-rc.1).\n' "$(_NEXT)"; \
+		exit 1; \
+	fi
 	@printf '\033[90mCurrent:\033[0m  $(_LAST_TAG)\n'
 	@printf '\033[32mNext:\033[0m     v$(_NEXT)\n'
 	@if [ -n "$(NOTES)" ]; then printf '\033[90mNotes:\033[0m    %s\n' "$(NOTES)"; fi
@@ -194,6 +198,10 @@ else
 endif
 
 _do-release-mac-local:
+	@if ! printf '%s' "$(_NEXT)" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$$'; then \
+		printf '\033[31mError:\033[0m "%s" is not a release version (expected 1.2.3 or 1.2.3-rc.1).\n' "$(_NEXT)"; \
+		exit 1; \
+	fi
 	@if [ "$$(uname -s)" != "Darwin" ]; then \
 		printf '\033[31mError:\033[0m release-mac-local must run on macOS.\n'; \
 		exit 1; \
@@ -283,9 +291,10 @@ _exec-release-mac-local:
 	if gh release view "v$(_NEXT)" --repo "$(UPDATE_REPO)" >/dev/null 2>&1; then \
 	  printf '       \033[90mrelease exists — uploading with --clobber\033[0m\n'; \
 	  gh release upload "v$(_NEXT)" "$$WORK_DIR"/* --repo "$(UPDATE_REPO)" --clobber; \
-	  gh release edit "v$(_NEXT)" --repo "$(UPDATE_REPO)" --title "v$(_NEXT)" --notes-file "$$NOTES_FILE"; \
+	  gh release edit "v$(_NEXT)" --repo "$(UPDATE_REPO)" --title "v$(_NEXT)" --notes-file "$$NOTES_FILE" --prerelease --latest=false; \
 	else \
-	  gh release create "v$(_NEXT)" "$$WORK_DIR"/* --repo "$(UPDATE_REPO)" --title "v$(_NEXT)" --notes-file "$$NOTES_FILE"; \
+	  CHANNEL="--prerelease --latest=false"; \
+	  gh release create "v$(_NEXT)" "$$WORK_DIR"/* --repo "$(UPDATE_REPO)" --title "v$(_NEXT)" --notes-file "$$NOTES_FILE" $$CHANNEL; \
 	fi; \
 	printf '\n\033[32m✓\033[0m Released v$(_NEXT) (macOS-only).\n'; \
 	printf '  https://github.com/$(UPDATE_REPO)/releases/tag/v$(_NEXT)\n'; \
@@ -320,17 +329,18 @@ release-mac-publish:
 	fi; \
 	NOTES_FILE="$$WORK_DIR/release-notes.md"; \
 	if [ ! -f "$$NOTES_FILE" ]; then printf 'Bug fixes and improvements\n' > "$$NOTES_FILE"; fi; \
+	CHANNEL="--prerelease --latest=false"; \
 	printf '\033[1m[1/1]\033[0m Publishing %s to github.com/$(UPDATE_REPO)\n' "$$TAG"; \
 	for attempt in 1 2 3; do \
 	  if gh release view "$$TAG" --repo "$(UPDATE_REPO)" >/dev/null 2>&1; then \
 	    printf '       \033[90mrelease exists — uploading with --clobber (try %d)\033[0m\n' "$$attempt"; \
 	    if gh release upload "$$TAG" "$$WORK_DIR"/* --repo "$(UPDATE_REPO)" --clobber; then \
-	      gh release edit "$$TAG" --repo "$(UPDATE_REPO)" --title "$$TAG" --notes-file "$$NOTES_FILE"; \
+	      gh release edit "$$TAG" --repo "$(UPDATE_REPO)" --title "$$TAG" --notes-file "$$NOTES_FILE" $$CHANNEL; \
 	      break; \
 	    fi; \
 	  else \
 	    printf '       \033[90mcreating new release (try %d)\033[0m\n' "$$attempt"; \
-	    if gh release create "$$TAG" "$$WORK_DIR"/* --repo "$(UPDATE_REPO)" --title "$$TAG" --notes-file "$$NOTES_FILE"; then \
+	    if gh release create "$$TAG" "$$WORK_DIR"/* --repo "$(UPDATE_REPO)" --title "$$TAG" --notes-file "$$NOTES_FILE" $$CHANNEL; then \
 	      break; \
 	    fi; \
 	  fi; \

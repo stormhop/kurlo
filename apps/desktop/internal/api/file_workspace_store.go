@@ -357,7 +357,7 @@ func secretsAhead(existing, next map[string]string) (map[string]string, bool) {
 }
 
 func buildLocalKurloStore(store map[string]any, workspaceRoot string, secrets map[string]string, sharedHash string, storageMode string) map[string]any {
-	localStore := make(map[string]any, len(store)+2)
+	localStore := make(map[string]any, len(store))
 	for key, value := range store {
 		switch key {
 		case "workspaces", "collections", "requests", "environments", "cookies", "workspaceCookies":

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -421,6 +422,9 @@ func (a *App) CheckForUpdate() model.UpdateCheckResult {
 	ctx, cancel := context.WithTimeout(updateBaseContext(a.ctx), updateMetadataTimeout)
 	defer cancel()
 	info, err := checkForUpdate(ctx)
+	if errors.Is(err, errUpdateNoReleaseAsset) {
+		return model.UpdateCheckResult{}
+	}
 	if err != nil {
 		return model.UpdateCheckResult{Error: friendlyUpdateError(err, "check for updates")}
 	}

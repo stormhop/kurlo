@@ -14,6 +14,12 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- Relative time labels update while the app is open. Autosave backs off after repeated failures, and workspace writes stop when an operating-system lock cannot be acquired.
+- Stable updates exclude prereleases and macOS-only builds.
+- Realtime connections reject stale events and enforce connection deadlines.
+- Cookie sync validates its host and extension origin.
+- Scripts share collection updates, changed client certificates reload, CORS preflights stay out of request timings, AWS query signing preserves spaces, and concurrent CLI sends share OAuth refreshes.
+- AI follow-up errors preserve your message, Git lists resize correctly, examples follow external edits, and YAML validation ignores stale results.
 - The response status pops in again on every send, not only the first.
 - Dates and numbers are shown in English whatever the system language is, with times on a 24-hour clock.
 

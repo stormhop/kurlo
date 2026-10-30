@@ -130,7 +130,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 	resp.PreRequestResult = preResult
 
 	if req.TestScript != "" {
-		testScope := beginScriptScope(sm, req.CollectionVariables)
+		testScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult))
 		testCtx := testScope.ctx
 		testCtx.Response = &resp
 		populateScriptRequestContext(testCtx, req)
@@ -145,6 +145,23 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 	envDelta.apply(&resp)
 
 	return resp
+}
+
+func collectionVariablesAfter(base map[string]string, result model.ScriptResult) map[string]string {
+	if len(result.CollectionVariables) == 0 && len(result.CollectionVariablesRemoved) == 0 {
+		return base
+	}
+	out := util.CloneMap(base)
+	if out == nil {
+		out = make(map[string]string)
+	}
+	for _, key := range result.CollectionVariablesRemoved {
+		delete(out, key)
+	}
+	for key, value := range result.CollectionVariables {
+		out[key] = value
+	}
+	return out
 }
 
 func mergeCollectionVariableResults(results ...model.ScriptResult) (map[string]string, []string) {
@@ -459,7 +476,15 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 	}
 	timings.markPrepared()
 	if browserCtx.enforceCORS && corsPreflightRequired(httpReq) {
-		preflightResp, corsMsg, networkErr := ensureCORSPreflight(traceCtx, client, httpReq, browserCtx, cache)
+		timings.markEvent("CORS preflight started", "OPTIONS "+u.String())
+		preflightResp, corsMsg, networkErr := ensureCORSPreflight(ctx, client, httpReq, browserCtx, cache)
+		preflightDetail := "from cache"
+		if networkErr != nil {
+			preflightDetail = networkErr.Error()
+		} else if preflightResp != nil {
+			preflightDetail = preflightResp.Status
+		}
+		timings.markEvent("CORS preflight done", preflightDetail)
 		if networkErr != nil {
 			finish := time.Now()
 			return withTrace(model.HttpResponse{
@@ -921,7 +946,14 @@ func writeMultipartPart(mw *multipart.Writer, kv model.KeyValue) error {
 			return fmt.Errorf("failed to read form file: %w", err)
 		}
 		defer file.Close()
-		if _, err := io.Copy(part, file); err != nil {
+		info, err := file.Stat()
+		if err != nil {
+			return fmt.Errorf("failed to inspect form file: %w", err)
+		}
+		if info.Size() > maxFileBodySize {
+			return fmt.Errorf("form file too large — multipart file limit is 256 MB")
+		}
+		if _, err := io.CopyN(part, file, info.Size()); err != nil {
 			return fmt.Errorf("failed to write multipart file field: %w", err)
 		}
 		return nil

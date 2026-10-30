@@ -60,7 +60,7 @@ type RequestExecutionHost = {
   headerValidationErrorForRequest: (req: SavedRequest, envValues?: Record<string, string>) => string;
   invokeGrpc: () => Promise<void>;
   sendMcpCall: () => Promise<void>;
-  sendAiPrompt: (followUp?: string) => Promise<void>;
+  sendAiPrompt: (followUp?: string) => Promise<boolean>;
   isEventStreamResponse: (response: HttpResponse | null) => boolean;
   markRequestLoading: (requestId: string, loading: boolean) => void;
   activeEnvironmentId: string;

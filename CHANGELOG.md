@@ -9,6 +9,17 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- Relative time labels update while the app is open. Autosave backs off after repeated failures, and workspace writes stop when an operating-system lock cannot be acquired.
+
+- Stable installations ignore prerelease updates. macOS-only releases stay off the stable update channel, so they cannot replace Windows and Linux update manifests.
+- Socket.IO ignores callbacks from replaced connections and detects silent v2 connections. WebSocket handshakes default to a 30-second timeout.
+- Cookie sync validates the loopback host and the browser extension origin.
+- Test scripts see collection variable changes from pre-request scripts. Client certificates reload after file changes, CORS preflights have separate timeline markers, and AWS signatures encode query spaces consistently.
+- Concurrent CLI requests share an OAuth token refresh. Loading a client certificate no longer holds the shared transport cache lock, and oversized deflate responses are rejected without retrying a different format.
+- Failed AI follow-up validation preserves the message and shows its error. Git lists adapt to their container height, open examples follow external body changes, YAML validation ignores outdated results, and release notes are marked seen after loading.
+
+### Fixed
+
 - The status of a response stopped popping in after the first send: once a response arrived, the badge kept its arrival animation class, so later answers came in without it.
 - Dates, times and numbers followed the system language, so an English interface showed dates such as `25 октября 2026 г.` on a Russian system. They are now always in English, with times on a 24-hour clock: What's new, update notes, history, Git, the collection runner and its report, cookies, JWT claims and the token counts of AI requests.
 

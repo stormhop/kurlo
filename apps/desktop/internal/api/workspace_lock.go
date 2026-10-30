@@ -52,7 +52,7 @@ func tryLockWorkspaceWrites(root string) (func(), bool) {
 		if errors.Is(err, errWorkspaceLockBusy) {
 			return nil, false
 		}
-		return func() {}, true
+		return nil, false
 	}
 	return releaseWorkspaceLock(file), true
 }
@@ -70,7 +70,7 @@ func lockWorkspaceWrites(root string) (func(), error) {
 		}
 		if !errors.Is(err, errWorkspaceLockBusy) {
 			_ = file.Close()
-			return func() {}, nil
+			return nil, fmt.Errorf("could not lock the workspace: %w", err)
 		}
 		if time.Now().After(deadline) {
 			_ = file.Close()
@@ -81,8 +81,10 @@ func lockWorkspaceWrites(root string) (func(), error) {
 }
 
 func loadKurloStorePayloadLocked(localStorePath, root string) (string, []WorkspaceDiagnostic, error) {
-	if unlock, err := lockWorkspaceWrites(root); err == nil {
-		defer unlock()
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		return "", nil, err
 	}
+	defer unlock()
 	return loadKurloStorePayloadWithDiagnostics(localStorePath, root)
 }

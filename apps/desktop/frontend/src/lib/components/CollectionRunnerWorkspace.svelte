@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { useClock } from '../clock.svelte';
+  const now = useClock();
   import type { Collection, CollectionRunnerResult, SavedRequest } from '../types/models';
   import { MAX_RUNNER_CONCURRENCY, MIN_RUNNER_CONCURRENCY } from '../concurrency';
   import Select from './Select.svelte';
@@ -260,7 +262,7 @@
     {#if hasResults}
       <section class="runner-results-panel" aria-label="Run results">
         {#if lastRunAt && !running}
-          <p class="runner-last-run" title={new Date(lastRunAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' })}>Last run {relativeTime(lastRunAt)}</p>
+          <p class="runner-last-run" title={new Date(lastRunAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' })}>Last run {relativeTime(lastRunAt, now())}</p>
         {/if}
         <div class="runner-results-summary">
           <div class="runner-stat">

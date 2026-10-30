@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = join(root, 'apps/web');
 const contentRoot = join(webRoot, 'src/content/docs');
 const screenshotsRoot = join(webRoot, 'src/assets/screenshots');

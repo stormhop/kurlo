@@ -495,7 +495,24 @@ func sanitizeCookieSyncLabel(value string) string {
 	return strings.TrimSpace(string(out))
 }
 
+func cookieSyncLoopbackHost(host string) bool {
+	name := host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		name = h
+	}
+	name = strings.TrimSuffix(strings.TrimPrefix(name, "["), "]")
+	if strings.EqualFold(name, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(name)
+	return ip != nil && ip.IsLoopback()
+}
+
 func (s *cookieSyncServer) handle(w http.ResponseWriter, r *http.Request) {
+	if !cookieSyncLoopbackHost(r.Host) {
+		writeCookieSyncJSON(w, http.StatusForbidden, map[string]any{"error": "cookie sync only answers on the loopback address"})
+		return
+	}
 	origin := r.Header.Get("Origin")
 	if !cookieSyncExtensionOrigin(origin) {
 		writeCookieSyncJSON(w, http.StatusForbidden, map[string]any{"error": "cookie sync only answers browser extensions"})

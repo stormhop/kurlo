@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { useClock } from '../clock.svelte';
+  const now = useClock();
   import { tabListKeyboard } from '../a11y';
   import { COLLECTION_AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
   import { HEADER_PICKER_NAMES, getHeaderValues } from '../headers';
@@ -227,7 +229,7 @@
         {#if lastRun}
           <p class="collection-last-run">
             <span class="collection-last-run-dot" class:fail={lastRun.failed > 0} aria-hidden="true"></span>
-            <button class="btn-link collection-last-run-link" type="button" onclick={() => onOpenRunner(collection.id)} disabled={workspaceBlocked}>Last run {relativeTime(lastRun.finishedAt)}</button>
+            <button class="btn-link collection-last-run-link" type="button" onclick={() => onOpenRunner(collection.id)} disabled={workspaceBlocked}>Last run {relativeTime(lastRun.finishedAt, now())}</button>
             · {lastRun.passed} of {lastRun.total} passed{#if lastRun.failed} · {lastRun.failed} failed{/if}
           </p>
         {/if}

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { useClock } from '../clock.svelte';
+  const now = useClock();
   import { openExternalURL } from '../externalLinks';
   import { getAppInfo, installBrowserExtension } from '../backend';
   import type { BrowserExtensionResult } from '../backend';
@@ -132,7 +134,7 @@
 
   function relativeTime(timestamp: number): string {
     if (!timestamp) return '';
-    const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+    const seconds = Math.max(0, Math.round((now() - timestamp) / 1000));
     if (seconds < 5) return 'just now';
     if (seconds < 60) return `${seconds}s ago`;
     const minutes = Math.round(seconds / 60);

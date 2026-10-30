@@ -9,6 +9,13 @@
   let bodyDraft = $state(untrack(() => example.response.body));
 
   $effect(() => {
+    const incoming = example.response.body;
+    untrack(() => {
+      if (incoming !== bodyDraft) bodyDraft = incoming;
+    });
+  });
+
+  $effect(() => {
     const next = bodyDraft;
     untrack(() => {
       if (next !== example.response.body) vm.updateExampleResponse(example.id, { body: next });

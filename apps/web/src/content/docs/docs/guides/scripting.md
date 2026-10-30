@@ -10,6 +10,8 @@ There are two script hooks per request:
 - **Pre-request** — runs after variable substitution, before the wire send. Use it to inject auth, set query params, log inputs.
 - **Tests** — runs after the response is received. Use it to assert and to extract values for chained requests.
 
+Collection variables set or removed in a pre-request script are available to the test script of the same request.
+
 ![Pre-request JavaScript in the request Scripts tab](../../../../assets/screenshots/scripting-pre-request.png)
 
 ![Legacy Tengo pre-request script in the request Scripts tab](../../../../assets/screenshots/scripting-tengo.png)

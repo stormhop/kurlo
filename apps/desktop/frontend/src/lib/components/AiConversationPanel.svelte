@@ -12,6 +12,7 @@
 
   let tab = $state<AiTab>('chat');
   let reply = $state('');
+  let composerError = $state('');
   let scroller = $state<HTMLDivElement>();
   let stickToBottom = $state(true);
   const openThinking = new SvelteSet<string>();
@@ -127,8 +128,12 @@
     const text = reply.trim();
     if (!text || vm.loading) return;
     reply = '';
+    composerError = '';
     stickToBottom = true;
-    await vm.sendAiPrompt(text);
+    const started = await vm.sendAiPrompt(text);
+    if (started) return;
+    if (!reply) reply = text;
+    composerError = vm.requestError;
   }
 
   function onReplyKeydown(event: KeyboardEvent) {
@@ -222,7 +227,7 @@
             {/if}
           </span>
         {/if}
-        <button class="btn btn-secondary btn-sm ai-new-chat" type="button" onclick={() => vm.clearAiConversation()} disabled={streaming} aria-label="New chat" title="Clear the chat. Send starts again from the Prompt tab.">
+        <button class="btn btn-secondary btn-sm ai-new-chat" type="button" onclick={() => { composerError = ''; reply = ''; vm.clearAiConversation(); }} disabled={streaming} aria-label="New chat" title="Clear the chat. Send starts again from the Prompt tab.">
           <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true">
             <path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
           </svg>
@@ -324,6 +329,9 @@
         {/each}
       </div>
 
+      {#if composerError}
+        <div class="ai-composer-error" role="alert">{composerError}</div>
+      {/if}
       <div class="ai-composer">
         <textarea
           class="field field-area ai-reply"
@@ -336,6 +344,7 @@
           {...NO_AUTOCORRECT}
           maxlength={AI_PROMPT_MAX_CHARS}
           bind:value={reply}
+          oninput={() => (composerError = '')}
           onkeydown={onReplyKeydown}
           disabled={streaming}
         ></textarea>
@@ -746,6 +755,15 @@
   }
   .ai-composer {
     --ai-composer-h: calc(var(--text-body) * var(--leading-normal) + var(--space-2) * 2 + 0.125rem);
+  }
+  .ai-composer-error {
+    padding: var(--space-2) var(--space-4) 0;
+    border-top: 0.0625rem solid var(--border);
+    color: var(--danger);
+    font-size: var(--text-caption);
+  }
+  .ai-composer-error + .ai-composer {
+    border-top: 0;
   }
   .ai-send {
     width: var(--ai-composer-h);

@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -34,7 +35,18 @@ func (c clientCertConfig) cacheKey() string {
 	if !c.enabled() {
 		return ""
 	}
-	return c.certPath + "\x00" + c.keyPath + "\x00" + c.password
+	return c.certPath + "\x00" + c.keyPath + "\x00" + c.password + "\x00" + clientCertFileStamp(c.certPath) + "\x00" + clientCertFileStamp(c.keyPath)
+}
+
+func clientCertFileStamp(path string) string {
+	if path == "" {
+		return ""
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return "missing"
+	}
+	return strconv.FormatInt(info.ModTime().UnixNano(), 10) + ":" + strconv.FormatInt(info.Size(), 10)
 }
 
 type cachedClientCert struct {

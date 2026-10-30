@@ -25,6 +25,10 @@ func Sign(req *http.Request, cfg model.AuthConfig) error {
 		return fmt.Errorf("aws auth requires region and service to be set")
 	}
 
+	if strings.Contains(req.URL.RawQuery, "+") {
+		req.URL.RawQuery = strings.ReplaceAll(req.URL.RawQuery, "+", "%20")
+	}
+
 	now := time.Now().UTC()
 	dateShort := now.Format("20060102")
 	dateLong := now.Format("20060102T150405Z")

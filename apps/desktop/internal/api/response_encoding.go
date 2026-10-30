@@ -67,9 +67,7 @@ func decodeOne(name string, data []byte) ([]byte, bool) {
 	case "deflate":
 		if r, err := zlib.NewReader(bytes.NewReader(data)); err == nil {
 			defer r.Close()
-			if out, ok := readAllCapped(r); ok {
-				return out, true
-			}
+			return readAllCapped(r)
 		}
 		r := flate.NewReader(bytes.NewReader(data))
 		defer r.Close()

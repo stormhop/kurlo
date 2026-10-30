@@ -22,11 +22,20 @@ function pageLink(id: string): string {
 
 const ENTITIES: Record<string, string> = { '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&nbsp;': ' ', '&amp;': '&' };
 
+function removeTags(text: string): string {
+  let previous;
+  do {
+    previous = text;
+    text = text.replace(/<\/?[A-Za-z][A-Za-z0-9.-]*(\s[^<>]*)?\/?>/g, '');
+  } while (text !== previous);
+  return text;
+}
+
 function stripTags(line: string): string {
   const withCode = line.replace(/<code>([\s\S]*?)<\/code>/g, (_, code: string) => `\`${code}\``);
   return withCode
     .split(/(`[^`]*`)/)
-    .map(part => (part.startsWith('`') ? part : part.replace(/<\/?[A-Za-z][A-Za-z0-9.-]*(\s[^<>]*)?\/?>/g, '')))
+    .map(part => (part.startsWith('`') ? part : removeTags(part)))
     .join('')
     .replace(/&(lt|gt|quot|#39|nbsp|amp);/g, entity => ENTITIES[entity]);
 }

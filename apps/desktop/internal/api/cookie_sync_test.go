@@ -189,6 +189,33 @@ func TestCookieSyncDiscoveryAnswersExtensionsOnly(t *testing.T) {
 	}
 }
 
+func TestCookieSyncRefusesARebindingHostWithoutOrigin(t *testing.T) {
+	harness := startTestCookieSync(t, "example.com")
+
+	for _, host := range []string{"attacker.test", fmt.Sprintf("attacker.test:%d", harness.port)} {
+		req, err := http.NewRequest(http.MethodGet, harness.base+"/discover", nil)
+		if err != nil {
+			t.Fatalf("build request: %v", err)
+		}
+		req.Host = host
+		if status, _ := harness.do(t, req); status != http.StatusForbidden {
+			t.Fatalf("Host %q must be refused, got %d", host, status)
+		}
+	}
+
+	for _, host := range []string{fmt.Sprintf("127.0.0.1:%d", harness.port), fmt.Sprintf("localhost:%d", harness.port), fmt.Sprintf("[::1]:%d", harness.port)} {
+		req, err := http.NewRequest(http.MethodGet, harness.base+"/discover", nil)
+		if err != nil {
+			t.Fatalf("build request: %v", err)
+		}
+		req.Host = host
+		req.Header.Set("Origin", "chrome-extension://kurlotestextension")
+		if status, _ := harness.do(t, req); status != http.StatusOK {
+			t.Fatalf("Host %q should be answered, got %d", host, status)
+		}
+	}
+}
+
 func TestCookieSyncPairingWaitsForApprovalInKurlo(t *testing.T) {
 	harness := startTestCookieSync(t, "example.com")
 	harness.server.token = ""
