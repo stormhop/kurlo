@@ -13,7 +13,7 @@ vi.mock('../lib/backend', async () => {
 
 import * as backend from '../lib/backend';
 import { EMPTY_MOCK_SERVER_STATUS } from '../lib/wire';
-import { collectionsWithExamples, mockRouteConflicts, mockRoutesForCollection, mockRoutesSignature } from '../lib/mockRoutes';
+import { collectionsWithExamples, mockRouteConflicts, mockRouteShadows, mockRoutesForCollection, mockRoutesSignature } from '../lib/mockRoutes';
 import { mockServerFeature } from '../lib/stores/features/mockServer';
 import { normalizeSavedRequest } from '../lib/normalizers';
 import type { SavedRequest } from '../lib/types/models';
@@ -169,6 +169,25 @@ function makeHost(overrides: Record<string, unknown> = {}) {
     Object.entries(mockServerFeature).map(([key, value]) => [key, (value as () => unknown).bind(host)]),
   )) as typeof host & Record<string, (...args: never[]) => unknown>;
 }
+
+describe('mockRouteShadows', () => {
+  it('names the example that answers first for every example it hides', () => {
+    const routes = mockRoutesForCollection(
+      [requestWithExamples({ collectionId: 'c' }, [okExample, { ...okExample, id: 'ex-2', name: 'Empty' }, { ...okExample, id: 'ex-3', name: 'Gone' }])],
+      'c',
+    );
+    const shadows = mockRouteShadows(routes);
+    expect([...shadows.keys()]).toEqual(['ex-2', 'ex-3']);
+    expect(shadows.get('ex-2')?.exampleId).toBe(okExample.id);
+    expect(shadows.get('ex-3')?.exampleId).toBe(okExample.id);
+  });
+
+  it('hides nothing when a query separates the examples', () => {
+    const narrowed = { ...okExample, id: 'ex-2', match: { pathTemplate: '/pets', query: { status: 'archived' } } };
+    const routes = mockRoutesForCollection([requestWithExamples({ collectionId: 'c' }, [okExample, narrowed])], 'c');
+    expect(mockRouteShadows(routes).size).toBe(0);
+  });
+});
 
 describe('mock server feature', () => {
   it('starts the selected collection and records what came back', async () => {

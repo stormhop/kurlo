@@ -606,6 +606,7 @@ export namespace api {
 	    key: string;
 	    label: string;
 	    scope: string;
+	    rowKey: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceSecretRef(source);
@@ -616,6 +617,7 @@ export namespace api {
 	        this.key = source["key"];
 	        this.label = source["label"];
 	        this.scope = source["scope"];
+	        this.rowKey = source["rowKey"];
 	    }
 	}
 	export class WorkspaceOpenResult {

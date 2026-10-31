@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { MockRequestLog, MockRoute, MockServerStatus } from '../backend';
   import { methodColor, statusClass } from '../utils';
-  import { mockRouteConflicts, mockRouteLabel } from '../mockRoutes';
+  import { mockRouteConflicts, mockRouteLabel, mockRouteShadows } from '../mockRoutes';
   import Select from './Select.svelte';
 
   let {
@@ -69,12 +69,33 @@
   );
   const canStart = $derived(routes.length > 0 && collections.length > 0);
 
+  const routeGroups = $derived.by(() => {
+    const groups: Array<{ name: string; routes: MockRoute[] }> = [];
+    for (const route of filteredRoutes) {
+      const name = route.requestName || 'Examples';
+      const group = groups.find(candidate => candidate.name === name);
+      if (group) group.routes.push(route);
+      else groups.push({ name, routes: [route] });
+    }
+    return groups;
+  });
+
+  const shadows = $derived(mockRouteShadows(routes));
+
+  function routeKey(route: MockRoute) {
+    return `${mockRouteLabel(route)}|${JSON.stringify(route.query.map(pair => [pair.key, pair.value]))}`;
+  }
+
+  function shadowedBy(route: MockRoute) {
+    return shadows.get(route.exampleId) ?? null;
+  }
+
   function routeUrl(route: MockRoute) {
     return `${status.url}${route.pathTemplate}`;
   }
 
   function isConflicting(route: MockRoute) {
-    return conflicts.has(`${mockRouteLabel(route)}|${JSON.stringify(route.query.map(pair => [pair.key, pair.value]))}`);
+    return conflicts.has(routeKey(route));
   }
 
   function copy(text: string, token: string) {
@@ -100,141 +121,130 @@
 
 <div class="mock-shell">
 <section class="mock-workspace" aria-label="Mock server">
-  <aside class="mock-config">
-    <div class="mock-title">
-      <span class="mock-glyph" aria-hidden="true">
-        <svg width="1.1875rem" height="1.1875rem" viewBox="0 0 24 24" fill="none">
-          <rect x="3" y="5" width="18" height="14" rx="2.4" stroke="currentColor" stroke-width="1.8"/>
-          <path d="M3 10h18" stroke="currentColor" stroke-width="1.8"/>
-          <circle cx="6.6" cy="7.5" r="0.95" fill="currentColor"/>
-        </svg>
-      </span>
-      <div>
-        <h2>Mock server</h2>
-        <p>{routes.length} example{routes.length === 1 ? '' : 's'} ready to serve</p>
+  <header class="mock-head">
+    <div class="mock-head-top">
+      <div class="mock-title">
+        <span class="mock-glyph" aria-hidden="true">
+          <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="5" width="18" height="14" rx="2.4" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M3 10h18" stroke="currentColor" stroke-width="1.8"/>
+            <circle cx="6.6" cy="7.5" r="0.95" fill="currentColor"/>
+          </svg>
+        </span>
+        <div>
+          <h2>Mock server</h2>
+          <p>{routes.length} example{routes.length === 1 ? '' : 's'} ready to serve</p>
+        </div>
+      </div>
+      <div class="mock-status" class:running={status.running}>
+        {#if status.running}
+          <span class="mock-status-state"><span class="mock-pulse" aria-hidden="true"></span><span class="mock-live-label">Running</span></span>
+          <button class="mock-url" type="button" title="Copy the base URL" onclick={() => copy(status.url, 'base')}>
+            <code>{status.url}</code>
+            <span class="mock-url-action">{copied === 'base' ? 'Copied' : 'Copy URL'}</span>
+          </button>
+          <span class="mock-status-meta">{status.routeCount} example{status.routeCount === 1 ? '' : 's'} from <strong>{status.collectionName || 'this collection'}</strong>{#if simulateLatency} · recorded latency{/if}</span>
+        {:else}
+          <span class="mock-status-state">Stopped</span>
+          <span class="mock-status-meta">{canStart ? `Start it to serve these examples on port ${port || 3100}.` : 'Nothing to serve yet.'}</span>
+        {/if}
+      </div>
+      <div class="mock-actions">
+        {#if status.running}
+          <button class="btn btn-secondary" type="button" onclick={onToggle} disabled={busy}>Stop</button>
+        {:else}
+          <button class="btn btn-primary" type="button" onclick={onToggle} disabled={busy || !canStart}>Start server</button>
+        {/if}
       </div>
     </div>
-
-    {#if status.running}
-      <div class="mock-live">
-        <div class="mock-live-head">
-          <span class="mock-pulse" aria-hidden="true"></span>
-          <span class="mock-live-label">Running</span>
-          {#if simulateLatency}<span class="mock-chip">recorded latency</span>{/if}
-        </div>
-        <button
-          class="mock-url"
-          type="button"
-          title="Copy the base URL"
-          onclick={() => copy(status.url, 'base')}
-        >
-          <code>{status.url}</code>
-          <span class="mock-url-action">{copied === 'base' ? 'Copied' : 'Copy'}</span>
-        </button>
-        <p class="mock-live-meta">
-          Serving {status.routeCount} example{status.routeCount === 1 ? '' : 's'} from
-          <strong>{status.collectionName || 'this collection'}</strong>. Edits to those examples reload automatically.
-        </p>
-      </div>
-    {/if}
-
+    <div class="mock-settings">
+      <label class="mock-field">
+        <span>Collection</span>
+        <Select
+          value={selectedCollectionId}
+          options={collectionOptions}
+          className="mock-select"
+          disabled={!collections.length}
+          onChange={onSelectCollection}
+        />
+      </label>
+      <label class="mock-field">
+        <span>Port</span>
+        <input class="field field-mono mock-port"
+          type="number"
+          min="1"
+          max="65535"
+          value={port}
+          placeholder="3100"
+          onchange={(event) => onPortChange(portValue(event))}
+        />
+      </label>
+      <label class="mock-toggle-row" title="Each example knows how long the real call took.">
+        <input
+          class="check"
+          type="checkbox"
+          checked={simulateLatency}
+          onchange={(event) => onSimulateLatencyChange(event.currentTarget instanceof HTMLInputElement && event.currentTarget.checked)}
+        />
+        Reproduce recorded response times
+      </label>
+      <span class="mock-settings-note">Edits to examples reload the server automatically.</span>
+    </div>
     {#if error}
       <p class="mock-error" role="alert">{error}</p>
     {/if}
-
     {#if servedElsewhere}
       <p class="mock-hint">
-        The server is serving <strong>{status.collectionName}</strong>. Starting again switches it to the collection below.
+        The server is serving <strong>{status.collectionName}</strong>. Starting again switches it to the collection above.
       </p>
     {/if}
-
-    <label class="mock-field">
-      <span>Collection</span>
-      <Select
-        value={selectedCollectionId}
-        options={collectionOptions}
-        className="mock-select"
-        disabled={!collections.length}
-        onChange={onSelectCollection}
-      />
-    </label>
-
-    <label class="mock-field">
-      <span>Port</span>
-      <input class="field"
-        type="number"
-        min="1"
-        max="65535"
-        value={port}
-        placeholder="3100"
-        onchange={(event) => onPortChange(portValue(event))}
-      />
-    </label>
-
-    <label class="mock-toggle-row">
-      <input
-        class="check"
-        type="checkbox"
-        checked={simulateLatency}
-        onchange={(event) => onSimulateLatencyChange(event.currentTarget instanceof HTMLInputElement && event.currentTarget.checked)}
-      />
-      <span>
-        Reproduce recorded response times
-        <small>Each example knows how long the real call took.</small>
-      </span>
-    </label>
-
-    {#if conflictCount > 0}
-      <p class="mock-warn">
-        {conflictCount} example{conflictCount === 1 ? '' : 's'} answer a request another one already claims. The first match wins — give them different paths or query values to reach the rest.
-      </p>
-    {/if}
-
-    <div class="mock-actions">
-      {#if status.running}
-        <button class="btn btn-secondary btn-lg" type="button" onclick={onToggle} disabled={busy}>Stop</button>
-      {:else}
-        <button class="btn btn-primary btn-lg" type="button" onclick={onToggle} disabled={busy || !canStart}>
-          Start server
-        </button>
-      {/if}
-    </div>
-
     {#if !canStart && !status.running}
       <p class="mock-hint">
         Nothing to serve yet. Send a request, then use <strong>Save as example</strong> in the response panel — the mock replays what you captured.
       </p>
     {/if}
-  </aside>
-
-  <section class="mock-main">
-    <div class="mock-panes">
-      <div class="mock-pane-wrap">
-        <div class="mock-pane-head">
-          <span class="mock-pane-title">Routes <span class="mock-count">{routes.length}</span></span>
-          <input
-            class="field field-md mock-filter"
-            placeholder="Filter routes"
-            value={filter}
-            oninput={(event) => (filter = event.currentTarget instanceof HTMLInputElement ? event.currentTarget.value : '')}
-          />
+  </header>
+  <div class="mock-panes">
+    <div class="mock-pane-wrap">
+      <div class="mock-pane-head">
+        <span class="mock-pane-title">
+          Routes <span class="mock-count">{routes.length}</span>
+          {#if conflictCount > 0}<span class="mock-count-warn" title="The first matching example wins">· {conflictCount} never reached</span>{/if}
+        </span>
+        <input
+          class="field field-md mock-filter"
+          placeholder="Filter routes"
+          aria-label="Filter routes"
+          value={filter}
+          oninput={(event) => (filter = event.currentTarget instanceof HTMLInputElement ? event.currentTarget.value : '')}
+        />
+      </div>
+      <div class="mock-pane">
+      {#if routes.length === 0}
+        <div class="empty-state mock-empty">
+          <strong class="empty-state-title">No examples in this collection</strong>
+          <span class="empty-state-text">Capture a response as an example and it becomes a route here.</span>
         </div>
-        <div class="mock-pane">
-        {#if routes.length === 0}
-          <div class="empty-state mock-empty">
-            <strong class="empty-state-title">No examples in this collection</strong>
-            <span class="empty-state-text">Capture a response as an example and it becomes a route here.</span>
-          </div>
-        {:else if filteredRoutes.length === 0}
-          <div class="empty-state mock-empty"><strong class="empty-state-title">No route matches “{filter}”</strong></div>
-        {:else}
-          {#each filteredRoutes as route (route.exampleId)}
-            <div class="mock-row" class:conflict={isConflicting(route)}>
+      {:else if filteredRoutes.length === 0}
+        <div class="empty-state mock-empty"><strong class="empty-state-title">No route matches “{filter}”</strong></div>
+      {:else}
+        {#each routeGroups as group (group.name)}
+          <div class="mock-group">{group.name}</div>
+          {#each group.routes as route (route.exampleId)}
+            {@const shadow = shadowedBy(route)}
+            <div class="mock-row" class:conflict={Boolean(shadow)}>
               <span class="collection-method {methodColor(route.method)}">{route.method.toUpperCase()}</span>
-              <code class="mock-path">{route.pathTemplate}</code>
-              {#each route.query as pair, eachIndex (eachIndex)}
-                <span class="mock-chip mono">{pair.key}={pair.value}</span>
-              {/each}
+              <span class="mock-route-main">
+                <span class="mock-route-line">
+                  <code class="mock-path">{route.pathTemplate}</code>
+                  {#each route.query as pair, eachIndex (eachIndex)}
+                    <span class="mock-chip mono">{pair.key}={pair.value}</span>
+                  {/each}
+                </span>
+                {#if shadow}
+                  <span class="mock-row-warning">Never reached — {exampleLabel(shadow.requestName, shadow.exampleName)} answers the same request first. Give it a different path or query value.</span>
+                {/if}
+              </span>
               <span class="status-badge {statusClass(route.statusCode)}">{route.statusCode}</span>
               <button
                 class="mock-row-name"
@@ -256,59 +266,60 @@
               {/if}
             </div>
           {/each}
-        {/if}
-        </div>
-      </div>
-
-      <div class="mock-pane-wrap mock-pane-log">
-        <div class="mock-pane-head">
-          <span class="mock-pane-title">
-            Requests <span class="mock-count">{log.length}</span>
-            {#if unmatchedCount > 0}<span class="mock-count-bad">· {unmatchedCount} unmatched</span>{/if}
-          </span>
-          {#if log.length}
-            <button class="btn btn-secondary" type="button" onclick={onClearLog}>Clear</button>
-          {/if}
-        </div>
-        <div class="mock-pane">
-        {#if log.length === 0}
-          <div class="empty-state mock-empty">
-            <strong class="empty-state-title">{status.running ? 'Waiting for the first request' : 'Not running'}</strong>
-            <span class="empty-state-text">
-              {status.running
-                ? 'Point a client at the base URL and every call shows up here.'
-                : 'Start the server to watch what your client asks for.'}
-            </span>
-          </div>
-        {:else}
-          {#each reversedLog as entry (entry.id)}
-            <div class="mock-row mock-log-row" class:unmatched={!entry.matched}>
-              <span class="mock-time">{formatTime(entry.timestamp)}</span>
-              <span class="collection-method {methodColor(entry.method)}">{entry.method}</span>
-              <code class="mock-path">{entry.path}{entry.query ? `?${entry.query}` : ''}</code>
-              <span class="status-badge {statusClass(entry.statusCode)}">{entry.statusCode}</span>
-              {#if entry.matched}
-                <button
-                  class="mock-row-name"
-                  type="button"
-                  title="Open the example that answered"
-                  onclick={() => onOpenExample(entry.exampleId ?? '')}
-                >
-                  {exampleLabel(entry.requestName ?? '', entry.exampleName ?? '')}
-                </button>
-              {:else}
-                <span class="mock-row-name bad">{entry.note || 'no example matched'}</span>
-              {/if}
-              {#if entry.matched && entry.note}
-                <span class="mock-row-note">{entry.note}</span>
-              {/if}
-              <span class="mock-duration">{entry.durationMs}ms</span>
-            </div>
-          {/each}
-        {/if}
-        </div>
+        {/each}
+      {/if}
       </div>
     </div>
-  </section>
+    <div class="mock-pane-wrap mock-pane-log">
+      <div class="mock-pane-head">
+        <span class="mock-pane-title">
+          Requests <span class="mock-count">{log.length}</span>
+          {#if unmatchedCount > 0}<span class="mock-count-bad">· {unmatchedCount} unmatched</span>{/if}
+        </span>
+        {#if log.length}
+          <button class="btn btn-secondary btn-sm" type="button" onclick={onClearLog}>Clear</button>
+        {/if}
+      </div>
+      <div class="mock-pane">
+      {#if log.length === 0}
+        <div class="empty-state mock-empty">
+          <strong class="empty-state-title">{status.running ? 'Waiting for the first request' : 'Not running'}</strong>
+          <span class="empty-state-text">
+            {status.running
+              ? 'Point a client at the base URL and every call shows up here.'
+              : 'Start the server to watch what your client asks for.'}
+          </span>
+        </div>
+      {:else}
+        {#each reversedLog as entry (entry.id)}
+          <div class="mock-row mock-log-row" class:unmatched={!entry.matched}>
+            <span class="mock-time">{formatTime(entry.timestamp)}</span>
+            <span class="collection-method {methodColor(entry.method)}">{entry.method}</span>
+            <span class="mock-route-main">
+              <code class="mock-path">{entry.path}{entry.query ? `?${entry.query}` : ''}</code>
+              {#if !entry.matched}
+                <span class="mock-row-warning bad">{entry.note || 'no example matched'} · save one from a real response</span>
+              {:else if entry.note}
+                <span class="mock-row-note">{entry.note}</span>
+              {/if}
+            </span>
+            {#if entry.matched}
+              <button
+                class="mock-row-name"
+                type="button"
+                title="Open the example that answered"
+                onclick={() => onOpenExample(entry.exampleId ?? '')}
+              >
+                {exampleLabel(entry.requestName ?? '', entry.exampleName ?? '')}
+              </button>
+            {/if}
+            <span class="status-badge {statusClass(entry.statusCode)}">{entry.statusCode}</span>
+            <span class="mock-duration">{entry.durationMs}ms</span>
+          </div>
+        {/each}
+      {/if}
+      </div>
+    </div>
+  </div>
 </section>
 </div>

@@ -81,7 +81,7 @@ type RequestCrudHost = {
   blankSavedRequest: (collectionId?: string, requestType?: RequestType) => SavedRequest;
   closeCollectionRunnerTab: () => void;
   closeCollectionSettingsTab: () => void;
-  closeLoadTestTab: () => void;
+  closeLoadTestTab: () => Promise<void>;
   closeFloatingMenus: () => void;
   closeGitTab: () => void;
   closeHistoryDetail: () => void;
@@ -646,7 +646,7 @@ export const requestCrudFeature = {
     } else if (this.topView === 'collection') {
       this.closeCollectionSettingsTab();
     } else if (this.topView === 'loadtest') {
-      this.closeLoadTestTab();
+      await this.closeLoadTestTab();
     } else if (this.topView === 'git') {
       this.closeGitTab();
     } else if (this.topView === 'history') {

@@ -5,6 +5,19 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Clearer load-test editor.** A plan line under the test name sums up steps, peak load, duration, pass criteria and test data, and jumps to the tab that sets each one; a tab with something to fix gets a dot. Flows read as a timeline split into setup and every-iteration steps, with the values each step saves and uses. Presets show their shape and a **Custom** card lights up when the settings match none of them, the load model is chosen with described cards, the load chart has axes and highlights the edited stage, load fields keep a compact width, and pass criteria read as sentences.
+- **Easier-to-follow load runs and results.** A running test shows its current stage, a clock such as `0:15 / 1:00`, the approximate time left and the planned load with a marker at the current moment; the k6 log can be collapsed. Results lead with an icon verdict, compare each threshold with its limit, and draw each step's p95; the Results tab shows the last status.
+- **New load tests start as drafts.** A new test is named *New load test* and stays an unsaved draft until you save it, even with autosave on, instead of adding an empty test to the collection. The open load test has its own tab, keeps its edits while you work in other tabs, and asks to save or discard when closed unsaved. **New load test** on a collection fills the flow with every HTTP and GraphQL request in it, **New load test from folder** does the same for a folder and its subfolders, and an empty flow lists the collection's requests to tick in the order they should run.
+- **Load tests from the sidebar.** Load tests sit in a collapsible **Load tests** group at the end of their collection. A dot beside each one shows its last result or a running run, and its menu can run it with k6 or export its k6 script. Load-test files are stored as before.
+- **Mock server status at the top.** The running state, base URL and Start/Stop sit in one bar above compact settings; routes and requests appear side by side, routes are grouped by request, and an unreachable example names the one that answers first.
+- **Git lives in the status bar.** The branch at the bottom left is now the single way into Git — the duplicate activity-bar button is gone — and shows commits to push and pull, changed files, and merge, rebase or missing-remote flags at a glance.
+- **Missing secrets in plain words.** The dialog for secrets a workspace needs on this computer now groups them by request, collection, environment and cookie jar and names each one — *Login user · POST · Shop API / Auth → Bearer token*, *Environment “Staging” → Variable “password”* — instead of showing internal ids. It counts the values you filled in and lets you postpone the rest.
+- **Clearer collection runner.** Settings are grouped into what to run, how many times and order; the header shows the total number of calls; results can be narrowed to failures; and requests are grouped by folder.
+
 ## [2.6.0] - 2026-10-31
 
 ### Added

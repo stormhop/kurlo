@@ -118,16 +118,41 @@
       title={storageTitle}
       aria-label="Open Git and storage status"
     >
-      <svg width="0.875rem" height="0.875rem" viewBox="0 0 15 15" fill="none" aria-hidden="true">
-        <path d="M4 12.2V4.8a2 2 0 114 0v5.4a2 2 0 104 0V3" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
-      </svg>
-      <span class="storage-status-main">{storageLabel}</span>
-      {#if gitStatus.isRepo && upstreamGone}
-        <span class="storage-upstream-gone" title={upstreamLabel ? `${upstreamLabel} no longer exists on the remote` : 'Tracked remote branch no longer exists'}>gone</span>
+      {#if gitStatus.isRepo}
+        <svg class="storage-branch-icon" width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="4.5" cy="3.5" r="1.6" stroke="currentColor" stroke-width="1.3"/>
+          <circle cx="4.5" cy="12.5" r="1.6" stroke="currentColor" stroke-width="1.3"/>
+          <circle cx="11.5" cy="5" r="1.6" stroke="currentColor" stroke-width="1.3"/>
+          <path d="M4.5 5.1v5.8M11.5 6.6c0 3-4.5 2.4-6.6 4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      {:else}
+        <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M2.5 4.2h4l1.3 1.3h5.7v6.3a1.2 1.2 0 01-1.2 1.2H3.7a1.2 1.2 0 01-1.2-1.2V4.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
       {/if}
-      <span class="storage-status-mode">{storageMode}</span>
-      {#if gitStatus.isRepo && changeCount > 0}
-        <span class="storage-change-count">· {changeCount} changed</span>
+      <span class="storage-status-main">{storageLabel}</span>
+      {#if gitStatus.isRepo}
+        {#if gitStatus.operation}
+          <span class="storage-flag warn" title={`A ${gitStatus.operation} is in progress`}>{gitStatus.operation}</span>
+        {/if}
+        {#if upstreamGone}
+          <span class="storage-flag warn" title={upstreamLabel ? `${upstreamLabel} no longer exists on the remote` : 'Tracked remote branch no longer exists'}>gone</span>
+        {/if}
+        {#if gitStatus.ahead > 0 || gitStatus.behind > 0}
+          <span class="storage-sync" title={[gitStatus.ahead ? `${gitStatus.ahead} commit${gitStatus.ahead === 1 ? '' : 's'} to push` : '', gitStatus.behind ? `${gitStatus.behind} to pull` : ''].filter(Boolean).join(' · ')}>
+            {#if gitStatus.ahead > 0}<span>↑{gitStatus.ahead}</span>{/if}
+            {#if gitStatus.behind > 0}<span>↓{gitStatus.behind}</span>{/if}
+          </span>
+        {/if}
+        {#if changeCount > 0}
+          <span class="storage-change-count"><span class="storage-change-dot" aria-hidden="true"></span>{changeCount} changed</span>
+        {:else}
+          <span class="storage-clean" title="No unsaved Kurlo changes in Git" aria-label="No changes">
+            <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+        {/if}
+      {:else}
+        <span class="storage-status-mode">{storageMode}</span>
       {/if}
     </button>
   </div>

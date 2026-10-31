@@ -10,6 +10,18 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Changed
+
+- **Clearer load-test editor.** A plan line summarises the test and jumps to each setting, a **Custom** card shows when settings match no preset, tabs with something to fix are marked, flows read as setup and per-iteration steps with saved and used values, and pass criteria read as sentences. See [Load testing with k6](/docs/guides/load-testing/).
+- **Easier load runs and results.** Runs show the current stage, remaining time and planned load; results compare each threshold with its limit and chart per-step p95.
+- **New load tests start as drafts.** They reach the collection only when saved, get their own tab and ask to save when closed; a collection's **New load test** includes all its HTTP and GraphQL requests, and folders offer the same, and an empty flow lists requests to tick in run order.
+- **Load tests from the sidebar.** Tests sit in a collapsible **Load tests** group, each shows its last result, and its menu runs it or exports its k6 script.
+- **Git in the status bar.** The branch at the bottom left opens Git and shows commits to push and pull, changed files and merge or missing-remote flags; the duplicate activity-bar button is gone. See [Git-backed workspaces](/docs/guides/git-workspaces/).
+- **Missing secrets in plain words.** The dialog groups secrets by request, collection, environment and cookies and names each one instead of showing internal ids. See [Git-backed workspaces](/docs/guides/git-workspaces/).
+- **Mock server and runner layout.** The mock server keeps its status, URL and Start/Stop in one bar and names the example that hides another. The runner groups settings and requests, shows the total number of calls and can show only failures. See [Mock server](/docs/guides/mock-server/) and [Collection Runner](/docs/guides/collection-runner/).
+
 ## 2.6.0
 
 ### Added

@@ -831,6 +831,7 @@ func TestMissingWorkspaceSecretsFindsPlaceholdersWithoutLocalValues(t *testing.T
     bearerToken: "{{kurloSecret:request.req-main.auth.bearerToken}}"
   headers:
     - id: 7
+      key: Authorization
       secret: true
       value: "{{kurloSecret:request.req-main.headers.row.7.value}}"
 `
@@ -846,6 +847,9 @@ func TestMissingWorkspaceSecretsFindsPlaceholdersWithoutLocalValues(t *testing.T
 	}
 	if missing[0].Key != "request.req-main.headers.row.7.value" || missing[0].Scope != "request" {
 		t.Fatalf("unexpected missing secret: %#v", missing[0])
+	}
+	if missing[0].RowKey != "Authorization" {
+		t.Fatalf("missing secret should name its row, got %#v", missing[0])
 	}
 }
 

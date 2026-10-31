@@ -20,20 +20,20 @@ Kurlo opens the runner workspace and selects runnable requests from the current 
 
 ## Selecting requests
 
-The runner list shows method/transport, request name, folder path, and tags. You can:
+The runner list groups requests by folder and shows each request's method/transport, name, URL and tags. You can:
 
 - Select/deselect individual requests.
 - Select all or deselect all.
-- Filter by include/exclude tags.
+- Filter with **Only requests tagged** and **Skip requests tagged**.
 - Run just a folder by launching from that folder's menu.
 
 Tags are inferred from folder path, transport label, and request type. For example, `Billing / Refunds / POST / http` gives you useful filters without adding a separate tagging UI.
 
 ## Timing and parallelism
 
-Use **Delay between requests** when a server rate-limits or when order matters. Sequential runs wait between each request. Parallel runs execute one iteration at a time and wait between iterations.
+The header sums up the run before you start it: selected requests, iterations, the total number of calls and the order. Use **Delay between requests** when a server rate-limits or when order matters. Sequential runs wait between each request. Parallel runs execute one iteration at a time and wait between iterations.
 
-Enable **Run in parallel** only for independent requests. If a test mutates shared environment values, keep the run sequential so each request sees the latest values from the previous request.
+Choose **In parallel** under **Order & pacing** only for independent requests. If a test mutates shared environment values, keep the run sequential so each request sees the latest values from the previous request.
 
 **Max concurrent requests** caps how many run at the same time (default 8, maximum 64). Raise it for fast, independent read-only endpoints; lower it when the server rate-limits or when a large collection would otherwise open more sockets than the machine is happy with.
 
@@ -92,6 +92,8 @@ Reports are local files; Kurlo does not upload them anywhere.
 ## Last run
 
 Kurlo remembers the most recent finished run of each collection — every request's status, time, checks and error, up to 500 results. Open the runner on that collection, or switch its *Collection* picker back to it, and the results are there with *Last run* and when it happened above them, until you run again. The collection's own page shows the same run as one line — *Last run 2 hours ago · 12 of 13 passed* — and the link opens the runner.
+
+After a run, **Failed** above the results narrows the list to the requests that failed or errored, with their failed checks; **All** shows everything again.
 
 A run where every request was skipped is not recorded. The results live in the encrypted local profile next to your history, never in the workspace YAML, so they are not committed to Git and stay on this device.
 

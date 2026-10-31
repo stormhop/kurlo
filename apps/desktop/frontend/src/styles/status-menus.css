@@ -89,40 +89,85 @@
   border-color: var(--border);
 }
 
-.storage-status-btn {
+.btn.storage-status-btn {
   display: inline-flex;
-  max-width: min(22.5rem, 42vw);
+  align-items: center;
+  gap: var(--space-2);
+  max-width: min(28rem, 48vw);
+  padding: 0 var(--space-2);
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-2);
 }
 
-.storage-status-btn.active {
-  border-color: var(--border);
+.btn.storage-status-btn.git {
+  color: var(--text);
 }
 
-.storage-status-btn.missing {
+.btn.storage-status-btn:hover:not(:disabled),
+.btn.storage-status-btn.active {
+  border-color: transparent;
+  background: var(--hover);
+}
+
+.btn.storage-status-btn.git.active {
+  background: var(--accent-dim);
+}
+
+.btn.storage-status-btn.missing {
   color: color-mix(in srgb, var(--delete) 68%, var(--text-2));
-}
-
-.storage-status-btn.git.active {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
 }
 
 .storage-status-btn.missing:hover,
 .storage-status-btn.missing.active {
-  border-color: color-mix(in srgb, var(--delete) 32%, var(--border));
   background: color-mix(in srgb, var(--delete) 8%, var(--surface));
+}
+
+.storage-branch-icon {
+  flex-shrink: 0;
+  color: var(--accent);
 }
 
 .storage-status-main {
   min-width: 0;
   overflow: hidden;
+  font-weight: var(--weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.storage-status-mode,
-.storage-upstream-gone,
+.storage-sync,
+.storage-change-count,
+.storage-clean {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+}
+
 .storage-change-count {
+  color: var(--warning);
+}
+
+.storage-change-dot {
+  width: 0.375rem;
+  height: 0.375rem;
+  border-radius: var(--radius-full);
+  background: var(--warning);
+}
+
+.storage-clean {
+  color: var(--success);
+}
+
+.storage-flag,
+.storage-status-mode {
   display: grid;
+  flex-shrink: 0;
   place-items: center;
   height: 1rem;
   padding: 0 var(--space-1-5);
@@ -135,32 +180,21 @@
   text-transform: uppercase;
 }
 
+.storage-flag.warn {
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border));
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  color: color-mix(in srgb, var(--warning) 78%, var(--text-2));
+}
+
 .storage-status-mode {
   border: 1px solid var(--border-subtle);
   color: var(--text-3);
-}
-
-.storage-upstream-gone {
-  border: 1px solid color-mix(in srgb, var(--s4xx) 34%, var(--border));
-  background: color-mix(in srgb, var(--s4xx) 10%, transparent);
-  color: color-mix(in srgb, var(--s4xx) 78%, var(--text-2));
-}
-
-.storage-status-btn.git .storage-status-mode {
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
-  color: color-mix(in srgb, var(--accent) 70%, var(--text-2));
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .storage-status-btn.missing .storage-status-mode {
   border-color: color-mix(in srgb, var(--delete) 30%, var(--border));
   color: color-mix(in srgb, var(--delete) 74%, var(--text-2));
   background: color-mix(in srgb, var(--delete) 8%, transparent);
-}
-
-.storage-change-count {
-  text-transform: none;
-  letter-spacing: 0;
 }
 
 .workspace-menu-item {
@@ -261,50 +295,8 @@
   font-size: var(--text-caption);
 }
 
-.storage-status-btn.git {
-  color: var(--text-3);
-}
-
-.storage-status-btn:hover {
-  border: none;
-}
-
-.storage-status-btn.active,
-.storage-status-btn.git.active {
-  border: none;
-  background: transparent;
-  color: var(--text);
-}
-
-.storage-status-btn.active .storage-status-main {
-  color: var(--text);
-}
-
 :root[data-platform="darwin"] .status-bar {
   padding-inline: var(--space-3);
-}
-
-.storage-status-main {
-  color: inherit;
-  font-size: var(--text-caption);
-  font-weight: var(--weight-medium);
-}
-
-.storage-status-mode {
-  display: none;
-}
-
-.storage-change-count {
-  display: inline;
-  height: auto;
-  min-width: 0;
-  padding: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--text-3);
-  font-family: var(--font-ui);
-  font-size: var(--text-caption);
-  font-weight: var(--weight-regular);
 }
 
 .version-pill {

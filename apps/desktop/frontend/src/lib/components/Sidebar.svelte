@@ -19,7 +19,7 @@
     WorkspaceDiagnostic,
   } from '../types/models';
   import type { TopView } from '../stores/ui';
-  import type { LoadTest } from '../wire';
+  import type { LoadRunResult, LoadTest } from '../wire';
 
   type DropPlacement = 'before' | 'after';
   type CollectionSidebarRow =
@@ -29,6 +29,7 @@
     | { type: 'collection'; key: string; height: number; group: CollectionGroup }
     | { type: 'collection-empty'; key: string; height: number; collectionId: string; depth: number }
     | { type: 'loadtest'; key: string; height: number; collectionId: string; loadTest: LoadTest; depth: number }
+    | { type: 'loadtest-group'; key: string; height: number; collectionId: string; count: number; collapsed: boolean; depth: number }
     | { type: 'folder'; key: string; height: number; folder: FolderGroup; collectionId: string; depth: number }
     | { type: 'folder-empty'; key: string; height: number; folder: FolderGroup; collectionId: string; depth: number };
   type HistorySidebarRow =
@@ -126,6 +127,11 @@
     duplicateLoadTest,
     renameLoadTest,
     deleteLoadTest,
+    runningLoadTestId = '',
+    loadRunResults = {},
+    runLoadTest = () => {},
+    exportLoadTest = () => {},
+    loadLoadTestResult = () => {},
     workspaceBlocked = false,
   }: {
     sidebarView: SidebarView;
@@ -193,13 +199,18 @@
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
     activeLoadTestId?: string;
     openLoadTestMenuId?: string;
-    createLoadTest: (collectionId: string) => void;
+    createLoadTest: (collectionId: string, requestIds?: string[]) => void;
     createLoadTestFromRequest: (requestId: string) => void;
     openLoadTest: (collectionId: string, loadTestId: string) => void;
     toggleLoadTestMenu: (id: string, event: MouseEvent) => void;
     duplicateLoadTest: (collectionId: string, loadTestId: string) => void;
     renameLoadTest: (collectionId: string, loadTestId: string, name?: string) => void | Promise<void>;
     deleteLoadTest: (collectionId: string, loadTestId: string) => void;
+    runningLoadTestId?: string;
+    loadRunResults?: Record<string, LoadRunResult>;
+    runLoadTest?: (collectionId: string, loadTestId: string) => void;
+    exportLoadTest?: (collectionId: string, loadTestId: string) => void;
+    loadLoadTestResult?: (loadTestId: string) => void;
     workspaceBlocked?: boolean;
   } = $props();
 
@@ -258,6 +269,14 @@
   let collectionRows = $derived(buildCollectionRows());
   let visibleCollectionRows = $derived(virtualizeRows(collectionRows, collectionScrollTop, collectionViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, collectionRowHeights, $uiScale));
   let historyRows = $derived(buildHistoryRows());
+
+  const LOAD_RUN_STATUS: Record<string, string> = { passed: 'passed', failed: 'failed', stopped: 'stopped', error: 'did not finish' };
+
+  $effect(() => {
+    for (const row of visibleCollectionRows.rows) {
+      if (row.type === 'loadtest' && !loadRunResults[row.loadTest.id]) loadLoadTestResult(row.loadTest.id);
+    }
+  });
   let visibleHistoryRows = $derived(virtualizeRows(historyRows, historyScrollTop, historyViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, undefined, $uiScale));
   let environmentRows = $derived(buildEnvironmentRows());
   let visibleEnvironmentRows = $derived(virtualizeRows(environmentRows, environmentScrollTop, environmentViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, undefined, $uiScale));
@@ -359,6 +378,35 @@
     for (const req of folder.requests) rows.push({ type: 'request', key: `request:${req.id}`, height: REQUEST_ROW_HEIGHT, req, depth: depth + 1, menuKey: `request:${req.id}` });
   }
 
+  const LOAD_TEST_GROUPS_KEY = 'kurlo.sidebar.collapsedLoadTests.v1';
+  let collapsedLoadTestGroups = $state<Set<string>>(readCollapsedLoadTestGroups());
+
+  function readCollapsedLoadTestGroups(): Set<string> {
+    try {
+      const stored = JSON.parse(localStorage.getItem(LOAD_TEST_GROUPS_KEY) ?? '[]');
+      return new Set(Array.isArray(stored) ? stored.filter(value => typeof value === 'string') : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function folderLoadTestRequestIds(folder: FolderGroup): string[] {
+    const own = folder.requests.filter(request => !request.isDraft && !request.isInvalid && ['', 'http', 'graphql'].includes(request.requestType ?? '')).map(request => request.id);
+    return [...own, ...folder.children.flatMap(folderLoadTestRequestIds)];
+  }
+
+  function toggleLoadTestGroup(collectionId: string) {
+    const next = new Set(collapsedLoadTestGroups);
+    if (next.has(collectionId)) next.delete(collectionId);
+    else next.add(collectionId);
+    collapsedLoadTestGroups = next;
+    try {
+      localStorage.setItem(LOAD_TEST_GROUPS_KEY, JSON.stringify([...next]));
+    } catch {
+      return;
+    }
+  }
+
   function buildCollectionRows(): CollectionSidebarRow[] {
     const rows: CollectionSidebarRow[] = [];
     const hasSearch = Boolean(sidebarSearch.trim());
@@ -380,9 +428,13 @@
       for (const folder of group.folders) addFolderRows(rows, group.collection.id, folder, COLLECTION_CHILD_DEPTH, hasSearch);
       for (const req of group.rootRequests) rows.push({ type: 'request', key: `request:${req.id}`, height: REQUEST_ROW_HEIGHT, req, depth: COLLECTION_CHILD_DEPTH, menuKey: `request:${req.id}` });
       const query = sidebarSearch.trim().toLowerCase();
-      for (const loadTest of group.collection.loadTests ?? []) {
-        if (query && !loadTest.name.toLowerCase().includes(query)) continue;
-        rows.push({ type: 'loadtest', key: `loadtest:${loadTest.id}`, height: LOADTEST_ROW_HEIGHT, collectionId: group.collection.id, loadTest, depth: COLLECTION_CHILD_DEPTH });
+      const loadTests = (group.collection.loadTests ?? []).filter(loadTest => !query || loadTest.name.toLowerCase().includes(query));
+      if (loadTests.length) {
+        const collapsed = collapsedLoadTestGroups.has(group.collection.id) && !hasSearch;
+        rows.push({ type: 'loadtest-group', key: `loadtest-group:${group.collection.id}`, height: FOLDER_ROW_HEIGHT, collectionId: group.collection.id, count: loadTests.length, collapsed, depth: COLLECTION_CHILD_DEPTH });
+        if (!collapsed) {
+          for (const loadTest of loadTests) rows.push({ type: 'loadtest', key: `loadtest:${loadTest.id}`, height: LOADTEST_ROW_HEIGHT, collectionId: group.collection.id, loadTest, depth: COLLECTION_CHILD_DEPTH + 1 });
+        }
       }
     }
     return rows;
@@ -694,6 +746,19 @@
                 {/if}
               </div>
             </div>
+          {:else if row.type === 'loadtest-group'}
+            <div class="collection-tree-node" style={`--tree-depth: ${row.depth}`}>
+              <div class="collection-subfolder sidebar-loadtest-group" role="presentation">
+                <button class="subfolder-collapse" type="button" onclick={() => toggleLoadTestGroup(row.collectionId)} aria-label={row.collapsed ? 'Expand load tests' : 'Collapse load tests'} aria-expanded={!row.collapsed}>
+                  <svg class:collapsed={row.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </button>
+                <span class="folder-title sidebar-loadtest-group-title"><span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>Load tests</span>
+                <span class="collection-count">{row.count}</span>
+                <button class="btn btn-ghost btn-icon btn-sm folder-menu-btn" type="button" onclick={() => createLoadTest(row.collectionId)} aria-label="New load test" title="New load test" disabled={workspaceBlocked}>+</button>
+              </div>
+            </div>
           {:else if row.type === 'loadtest'}
             <div
               class="collection-request-wrap"
@@ -718,11 +783,20 @@
               >
                 <span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>
                 <span class="collection-title">{row.loadTest.name}</span>
+                {#if runningLoadTestId === row.loadTest.id}
+                  <span class="sidebar-loadtest-status running" title="Running in k6"><span class="sr-only">running</span></span>
+                {:else if loadRunResults[row.loadTest.id]}
+                  {@const status = loadRunResults[row.loadTest.id].status}
+                  <span class="sidebar-loadtest-status {status}" title={`Last run ${LOAD_RUN_STATUS[status] ?? status}`}><span class="sr-only">last run {LOAD_RUN_STATUS[status] ?? status}</span></span>
+                {/if}
               </button>
               {/if}
               <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleLoadTestMenu(row.loadTest.id, event)} aria-label="Load test menu" disabled={workspaceBlocked}>•••</button>
               {#if openLoadTestMenuId === row.loadTest.id}
                 <div class="menu request-menu">
+                  <button class="menu-item" type="button" onclick={() => runLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked || Boolean(runningLoadTestId)}><MenuIcon name="play" />Run with k6</button>
+                  <button class="menu-item" type="button" onclick={() => exportLoadTest(row.collectionId, row.loadTest.id)}><MenuIcon name="export" />Export k6 script</button>
+                  <div class="menu-separator" role="separator"></div>
                   <button class="menu-item" type="button" onclick={() => renameLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                   <button class="menu-item" type="button" onclick={() => duplicateLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="duplicate" />Duplicate</button>
                   <div class="menu-separator" role="separator"></div>
@@ -754,6 +828,7 @@
                 <span class="collection-count">{row.folder.requestCount}</span>
                 <button class="btn btn-ghost btn-icon btn-sm folder-menu-btn" type="button" onclick={(event) => toggleFolderMenu(row.folder.key, event)} aria-label="Folder menu" disabled={workspaceBlocked}>•••</button>
                 {#if openFolderMenuKey === row.folder.key}
+                  {@const folderLoadIds = folderLoadTestRequestIds(row.folder)}
                   <div class="menu request-menu folder-menu">
                     <button class="menu-item"
                       type="button"
@@ -769,6 +844,7 @@
                     ><MenuIcon name="folder" />Add subfolder</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item" type="button" onclick={() => runFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="play" />Run folder</button>
+                    <button class="menu-item" type="button" onclick={() => createLoadTest(row.collectionId, folderLoadIds)} disabled={workspaceBlocked || !folderLoadIds.length} title={folderLoadIds.length ? `Start a load test with the ${folderLoadIds.length} HTTP and GraphQL requests in this folder` : 'This folder has no HTTP or GraphQL requests'}><MenuIcon name="load" />New load test from folder</button>
                     <button class="menu-item" type="button" onclick={() => openFindReplace(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
                     <button class="menu-item" type="button" onclick={() => renameFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                     <div class="menu-separator" role="separator"></div>

@@ -7,13 +7,11 @@
     sidebarHidden = $bindable(false),
     topView,
     mockRunning = false,
-    gitChangeCount = 0,
     cookieCount = 0,
     settingsShortcut = '',
     workspaceBlocked = false,
     openCollectionRunner,
     openMockTab,
-    openGitTab,
     openCookieJar,
     openSettings,
   }: {
@@ -21,13 +19,11 @@
     sidebarHidden: boolean;
     topView: TopView;
     mockRunning?: boolean;
-    gitChangeCount?: number;
     cookieCount?: number;
     settingsShortcut?: string;
     workspaceBlocked?: boolean;
     openCollectionRunner: () => void;
     openMockTab: () => void;
-    openGitTab: () => void;
     openCookieJar: () => void;
     openSettings: (tab?: SettingsTab) => void;
   } = $props();
@@ -74,12 +70,6 @@
         <rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>
       </svg>
       {#if mockRunning}<span class="activity-rail-dot" aria-hidden="true"></span>{/if}
-    </button>
-    <button class="activity-rail-btn" class:active={topView === 'git'} type="button" aria-label="Git" title={gitChangeCount > 0 ? `Git (${gitChangeCount} changed)` : 'Git'} onclick={openGitTab}>
-      <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 8v8M18 10c0 4-6 3-10 6"/>
-      </svg>
-      {#if gitChangeCount > 0}<span class="activity-rail-count" aria-hidden="true">{gitChangeCount > 99 ? '99+' : gitChangeCount}</span>{/if}
     </button>
   </div>
 

@@ -163,9 +163,10 @@ type GitBranchListResult struct {
 }
 
 type WorkspaceSecretRef struct {
-	Key   string `json:"key"`
-	Label string `json:"label"`
-	Scope string `json:"scope"`
+	Key    string `json:"key"`
+	Label  string `json:"label"`
+	Scope  string `json:"scope"`
+	RowKey string `json:"rowKey"`
 }
 
 type WorkspaceOpenResult struct {
@@ -3586,11 +3587,13 @@ func deriveCloneDirectoryName(remoteURL string) string {
 
 func missingWorkspaceSecrets(root string, secrets map[string]string) []WorkspaceSecretRef {
 	keys := map[string]struct{}{}
+	rowKeys := map[string]string{}
 	scanFile := func(path string) {
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return
 		}
+		found := false
 		for _, match := range kurloSecretRefPattern.FindAllSubmatch(data, -1) {
 			if len(match) < 2 {
 				continue
@@ -3598,7 +3601,11 @@ func missingWorkspaceSecrets(root string, secrets map[string]string) []Workspace
 			key := string(match[1])
 			if secrets[key] == "" {
 				keys[key] = struct{}{}
+				found = true
 			}
+		}
+		if found {
+			collectSecretRowKeys(data, rowKeys)
 		}
 	}
 	scanFile(filepath.Join(root, fileStoreRootIndex))
@@ -3611,10 +3618,46 @@ func missingWorkspaceSecrets(root string, secrets map[string]string) []Workspace
 	})
 	result := make([]WorkspaceSecretRef, 0, len(keys))
 	for key := range keys {
-		result = append(result, WorkspaceSecretRef{Key: key, Label: workspaceSecretLabel(key), Scope: workspaceSecretScope(key)})
+		result = append(result, WorkspaceSecretRef{Key: key, Label: workspaceSecretLabel(key), Scope: workspaceSecretScope(key), RowKey: rowKeys[key]})
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Key < result[j].Key })
 	return result
+}
+
+func collectSecretRowKeys(data []byte, rowKeys map[string]string) {
+	var document yaml.Node
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return
+	}
+	var walk func(node *yaml.Node)
+	walk = func(node *yaml.Node) {
+		if node == nil {
+			return
+		}
+		if node.Kind == yaml.MappingNode {
+			rowKey := ""
+			for index := 0; index+1 < len(node.Content); index += 2 {
+				if node.Content[index].Value == "key" && node.Content[index+1].Kind == yaml.ScalarNode {
+					rowKey = strings.TrimSpace(node.Content[index+1].Value)
+				}
+			}
+			if rowKey != "" {
+				for index := 0; index+1 < len(node.Content); index += 2 {
+					value := node.Content[index+1]
+					if value.Kind != yaml.ScalarNode {
+						continue
+					}
+					if key, ok := kurloSecretKeyFromPlaceholder(strings.TrimSpace(value.Value)); ok {
+						rowKeys[key] = rowKey
+					}
+				}
+			}
+		}
+		for _, child := range node.Content {
+			walk(child)
+		}
+	}
+	walk(&document)
 }
 
 func workspaceSecretScope(key string) string {

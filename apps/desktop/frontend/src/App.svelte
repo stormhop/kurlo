@@ -75,6 +75,16 @@
 
   const whatsNewAvailable = hasReleaseNotes;
 
+  const loadTestTab = $derived.by(() => {
+    const active = vm.activeLoadTest();
+    if (!active) return null;
+    const edits = vm.loadTestEdits?.test.id === active.loadTest.id ? vm.loadTestEdits : null;
+    const title = (edits?.test.name ?? active.loadTest.name).trim() || 'New load test';
+    const unsaved = active.isDraft ? 'Unsaved draft' : edits?.dirty && !vm.autosave ? 'Unsaved changes' : '';
+    return { title, unsaved };
+  });
+
+
   let updateInfo = $state<UpdateInfo | null>(null);
   let updateReady = $state(false);
   let autoUpdateInstall = $state(localStorage.getItem(AUTO_UPDATE_INSTALL_KEY) === 'true');
@@ -447,13 +457,11 @@
     bind:sidebarHidden={vm.sidebarHidden}
     topView={vm.topView}
     mockRunning={vm.mockServer.running}
-    gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
     cookieCount={vm.cookies.length}
     settingsShortcut={shortcutComboLabel(vm.shortcutCombo('settings'), vm.appRuntime)}
     workspaceBlocked={vm.workspaceBlocked}
     openCollectionRunner={vm.openCollectionRunner}
     openMockTab={vm.openMockServerTab}
-    openGitTab={() => vm.openGitTab()}
     openCookieJar={vm.openCookieJar}
     openSettings={vm.openSettings}
   />
@@ -491,13 +499,18 @@
     copyRequestCurl={vm.copyRequestCurl}
     activeLoadTestId={vm.activeLoadTestId}
     openLoadTestMenuId={vm.openLoadTestMenuId}
-    createLoadTest={(collectionId: string) => void vm.createLoadTest(collectionId)}
+    createLoadTest={(collectionId: string, requestIds?: string[]) => void vm.createLoadTest(collectionId, requestIds)}
     createLoadTestFromRequest={(requestId: string) => void vm.createLoadTestFromRequest(requestId)}
     openLoadTest={(collectionId: string, loadTestId: string) => void vm.openLoadTest(collectionId, loadTestId)}
     toggleLoadTestMenu={vm.toggleLoadTestMenu}
     renameLoadTest={vm.renameLoadTest}
     duplicateLoadTest={(collectionId: string, loadTestId: string) => void vm.duplicateLoadTest(collectionId, loadTestId)}
     deleteLoadTest={(collectionId: string, loadTestId: string) => void vm.deleteLoadTest(collectionId, loadTestId)}
+    runningLoadTestId={vm.loadRun.running ? vm.loadRun.loadTestId : ''}
+    loadRunResults={vm.loadRunResults}
+    runLoadTest={(collectionId: string, loadTestId: string) => void vm.runSavedLoadTest(collectionId, loadTestId)}
+    exportLoadTest={(collectionId: string, loadTestId: string) => void vm.exportSavedLoadTest(collectionId, loadTestId)}
+    loadLoadTestResult={(loadTestId: string) => void vm.loadLastLoadRun(loadTestId)}
     toggleRequestPinned={vm.toggleRequestPinned}
     deleteRequest={vm.deleteRequest}
     toggleFolderCollapsed={vm.toggleFolderCollapsed}
@@ -566,6 +579,10 @@
       historyDetailOpen={Boolean(vm.historyDetailEntry)}
       gitTabOpen={vm.gitWorkspaceOpen}
       mockTabOpen={vm.mockServerTabOpen}
+      loadTestTabTitle={loadTestTab ? loadTestTab.title : ''}
+      loadTestTabUnsaved={loadTestTab ? loadTestTab.unsaved : ''}
+      openLoadTestTab={() => (vm.topView = 'loadtest')}
+      closeLoadTestTab={() => void vm.closeLoadTestTab()}
       mockRunning={vm.mockServer.running}
       gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
       autosave={vm.autosave}
@@ -762,6 +779,7 @@
       <lazy.LoadTestWorkspaceComponent
         collection={active?.collection}
         loadTest={active?.loadTest}
+        isDraft={active?.isDraft ?? false}
         requests={active ? vm.loadTestRequestOptions(active.collection.id) : []}
         environments={vm.environments.filter(environment => environment.workspaceId === vm.activeWorkspaceId)}
         bind:loadTestTab={vm.loadTestTab}
@@ -792,6 +810,10 @@
         onChooseK6={() => void vm.chooseK6Binary()}
         onCheckK6={() => void vm.checkK6().then(info => { if (info.found) vm.k6MissingOpen = false; })}
         onOpenK6Guide={() => openExternalURL('https://grafana.com/docs/k6/latest/set-up/install-k6/')}
+        pendingEdits={vm.loadTestEdits?.test ?? null}
+        onEdits={(collectionId: string, test: LoadTest, dirty: boolean) => vm.reportLoadTestEdits(collectionId, test, dirty)}
+        exportRequestId={vm.loadTestExportRequestId}
+        onExportRequestHandled={() => (vm.loadTestExportRequestId = '')}
       />
       {/if}
     {:else if vm.topView === 'history' && vm.historyDetailEntry}

@@ -9,7 +9,7 @@ It needs no account and no configuration. An example already records a status, h
 
 ## Starting it
 
-Open the **Mock** tab from the server icon in the activity rail on the left, pick a collection, and press **Start server**. Kurlo reports the base URL:
+Open the **Mock** tab from the server icon in the activity rail on the left, pick a collection, and press **Start server** at the top right. The status bar beside it shows whether the server runs and its base URL; click the URL to copy it:
 
 ```
 http://127.0.0.1:3100
@@ -42,7 +42,7 @@ An example that recorded **query parameters** only answers requests that carry t
 | `GET /pets` | any request to `/pets` |
 | `GET /pets` with `status=archived` | only `/pets?status=archived` |
 
-When two examples would answer the same request, only the first can ever reply. Kurlo flags this: the count appears beside the collection and the shadowed rows are marked in the route list. Give them different paths or query values to make the rest reachable.
+When two examples would answer the same request, only the first can ever reply. Kurlo flags this: the **Routes** header counts the examples that are never reached, and each of them names the example that answers first. Routes are grouped by request. Give them different paths or query values to make the rest reachable.
 
 ## The request log
 

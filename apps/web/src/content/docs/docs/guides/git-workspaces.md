@@ -58,11 +58,13 @@ Kurlo only manages its own files. Other project files in the same repository are
 
 You can open an existing folder workspace or clone a remote repository. After opening, Kurlo reads the YAML store, merges local secrets where available, and shows diagnostics for files it could not fully understand.
 
+When the workspace uses secrets this computer does not have yet — after a clone, or on another machine — Kurlo lists them grouped by where they are used: each request by name, method and location, each collection and environment by name, and saved cookies by cookie name. Fill in the values you need now and choose **Later** for the rest; empty ones can be added where they are used.
+
 If the folder is missing or moved, Kurlo enters recovery mode and lets you choose another folder, open an existing repository, or clone again.
 
 ## Daily Git flow
 
-The Git workspace screen covers the common loop:
+Open the Git workspace screen from the branch at the left of the status bar. The status bar also shows commits to push and pull (↑ ↓), how many Kurlo files changed, and a flag while a merge or rebase is in progress or when the tracked remote branch is gone. The screen covers the common loop:
 
 ![Git workspace tab with branch status, changed YAML files, and diff preview](../../../../assets/screenshots/git-workspace.png)
 

@@ -90,6 +90,7 @@
     values={vm.missingSecretValues}
     saving={vm.missingSecretsSaving}
     error={vm.missingSecretsError}
+    context={{ requests: vm.requests, collections: vm.collections, environments: vm.environments, workspaces: vm.workspaces, cookies: vm.cookies }}
     onUpdate={vm.updateMissingSecretValue}
     onSave={vm.saveMissingSecrets}
     onDismiss={vm.dismissMissingSecretsWizard}

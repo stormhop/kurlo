@@ -97,3 +97,15 @@ export function mockRouteConflicts(routes: MockRoute[]): Map<string, number> {
   }
   return new Map([...counts].filter(([, count]) => count > 1));
 }
+
+export function mockRouteShadows(routes: MockRoute[]): Map<string, MockRoute> {
+  const first = new Map<string, MockRoute>();
+  const shadows = new Map<string, MockRoute>();
+  for (const route of routes) {
+    const key = `${mockRouteLabel(route)}|${JSON.stringify(route.query.map(q => [q.key, q.value]))}`;
+    const winner = first.get(key);
+    if (winner) shadows.set(route.exampleId, winner);
+    else first.set(key, route);
+  }
+  return shadows;
+}

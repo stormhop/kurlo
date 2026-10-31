@@ -16,6 +16,7 @@ import type { LoadTestTab } from './loadTests';
 
 const K6_PATH_STORAGE_KEY = 'kurlo.k6Path.v1';
 const LOAD_RUN_LOG_LIMIT = 500;
+const requestedLastRuns = new Set<string>();
 
 export function isLoopbackHost(host: string): boolean {
   const clean = host.trim().toLowerCase().replace(/^\[|\]$/g, '');
@@ -33,6 +34,9 @@ type LoadRunHost = {
   loadRunLogTestId: string;
   loadRunResults: Record<string, LoadRunResult>;
   loadTestTab: LoadTestTab;
+  loadTestExportRequestId: string;
+  openLoadTest: (collectionId: string, loadTestId: string) => Promise<void>;
+  runLoadTest: (collectionId: string, test: LoadTest) => Promise<void>;
   guardWorkspaceWritable: (action?: string) => boolean;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
@@ -114,7 +118,8 @@ export const loadRunFeature = {
   },
 
   async loadLastLoadRun(this: LoadRunHost, loadTestId: string) {
-    if (!loadTestId || this.loadRunResults[loadTestId]) return;
+    if (!loadTestId || this.loadRunResults[loadTestId] || requestedLastRuns.has(loadTestId)) return;
+    requestedLastRuns.add(loadTestId);
     const result = await lastLoadRun(loadTestId);
     if (result) this.loadRunResults = { ...this.loadRunResults, [loadTestId]: result };
   },
@@ -166,6 +171,20 @@ export const loadRunFeature = {
       return;
     }
     this.loadRun = state;
+  },
+
+  async runSavedLoadTest(this: LoadRunHost, collectionId: string, loadTestId: string) {
+    const test = this.collections.find(candidate => candidate.id === collectionId)?.loadTests?.find(candidate => candidate.id === loadTestId);
+    if (!test) return;
+    await this.openLoadTest(collectionId, loadTestId);
+    if (this.activeLoadTestId !== loadTestId) return;
+    await this.runLoadTest(collectionId, test);
+  },
+
+  async exportSavedLoadTest(this: LoadRunHost, collectionId: string, loadTestId: string) {
+    await this.openLoadTest(collectionId, loadTestId);
+    if (this.activeLoadTestId !== loadTestId) return;
+    this.loadTestExportRequestId = loadTestId;
   },
 
   async stopLoadTest(this: LoadRunHost) {

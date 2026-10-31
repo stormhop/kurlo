@@ -14,6 +14,10 @@ const LOAD_TEST_REQUEST_TYPES = new Set(['', 'http', 'graphql']);
 type LoadTestHost = {
   activeLoadTestId: string;
   activeLoadTestCollectionId: string;
+  loadTestDraft: { collectionId: string; test: LoadTest } | null;
+  loadTestEdits: { collectionId: string; test: LoadTest; dirty: boolean } | null;
+  autosave: boolean;
+  openSaveChangesDialog: (name: string) => Promise<'save' | 'discard' | 'cancel'>;
   activeEnvironmentId: string;
   activeRequestId: string;
   activeWorkspaceId: string;
@@ -80,10 +84,13 @@ export const loadTestFeature = {
     return request ? requestTabLabel(request) : '';
   },
 
-  activeLoadTest(this: LoadTestHost): { collection: Collection; loadTest: LoadTest } | null {
+  activeLoadTest(this: LoadTestHost): { collection: Collection; loadTest: LoadTest; isDraft: boolean } | null {
     const collection = this.collections.find(candidate => candidate.id === this.activeLoadTestCollectionId);
-    const loadTest = collection?.loadTests?.find(candidate => candidate.id === this.activeLoadTestId);
-    return collection && loadTest ? { collection, loadTest } : null;
+    if (!collection) return null;
+    const draft = this.loadTestDraft;
+    if (draft && draft.collectionId === collection.id && draft.test.id === this.activeLoadTestId) return { collection, loadTest: draft.test, isDraft: true };
+    const loadTest = collection.loadTests?.find(candidate => candidate.id === this.activeLoadTestId);
+    return loadTest ? { collection, loadTest, isDraft: false } : null;
   },
 
   async validateLoadTestDraft(this: LoadTestHost, collectionId: string, test: LoadTest): Promise<string[]> {
@@ -140,9 +147,33 @@ export const loadTestFeature = {
     return !error;
   },
 
-  async openLoadTest(this: LoadTestHost, collectionId: string, loadTestId: string) {
+  reportLoadTestEdits(this: LoadTestHost, collectionId: string, test: LoadTest, dirty: boolean) {
+    if (test.id !== this.activeLoadTestId) return;
+    this.loadTestEdits = { collectionId, test, dirty };
+  },
+
+  async confirmLeaveLoadTest(this: LoadTestHost & { saveLoadTest: (collectionId: string, draft: LoadTest) => Promise<boolean> }): Promise<boolean> {
+    const id = this.activeLoadTestId;
+    if (!id) return true;
+    const draft = this.loadTestDraft?.test.id === id ? this.loadTestDraft : null;
+    const edits = this.loadTestEdits?.test.id === id ? this.loadTestEdits : null;
+    const unsaved = Boolean(draft) || Boolean(edits?.dirty && !this.autosave);
+    if (unsaved) {
+      const test = edits?.test ?? draft!.test;
+      const collectionId = edits?.collectionId ?? draft!.collectionId;
+      const choice = await this.openSaveChangesDialog(test.name.trim() || 'New load test');
+      if (choice === 'cancel') return false;
+      if (choice === 'save' && !await this.saveLoadTest(collectionId, test)) return false;
+    }
+    this.loadTestDraft = null;
+    this.loadTestEdits = null;
+    return true;
+  },
+
+  async openLoadTest(this: LoadTestHost & { confirmLeaveLoadTest: () => Promise<boolean> }, collectionId: string, loadTestId: string) {
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection?.loadTests?.some(test => test.id === loadTestId)) return;
+    if (this.activeLoadTestId && this.activeLoadTestId !== loadTestId && !await this.confirmLeaveLoadTest()) return;
     this.closeFloatingMenus();
     await this.persistActiveRequestNow();
     if (this.activeLoadTestId !== loadTestId) this.loadTestTab = 'flow';
@@ -153,7 +184,8 @@ export const loadTestFeature = {
     this.topView = 'loadtest';
   },
 
-  closeLoadTestTab(this: LoadTestHost) {
+  async closeLoadTestTab(this: LoadTestHost & { confirmLeaveLoadTest: () => Promise<boolean> }) {
+    if (!await this.confirmLeaveLoadTest()) return;
     this.activeLoadTestId = '';
     this.activeLoadTestCollectionId = '';
     this.topView = this.activeRequestId ? 'request' : 'overview';
@@ -172,16 +204,25 @@ export const loadTestFeature = {
     return this.persistRequestStore();
   },
 
-  async createLoadTest(this: LoadTestHost, collectionId: string, requestIds: string[] = []) {
+  async createLoadTest(this: LoadTestHost & { loadTestRequestOptions: (collectionId: string) => SavedRequest[]; confirmLeaveLoadTest: () => Promise<boolean> }, collectionId: string, requestIds: string[] = []) {
     if (!this.guardWorkspaceWritable('Creating a load test')) return;
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection || collection.isInvalid) return;
-    const request = requestIds.length === 1 ? this.requestForEditing(requestIds[0]) : undefined;
-    const base = request ? `${requestTabLabel(request)} load test` : 'New load test';
-    const test = newLoadTest(uniqueLoadTestName(base, collection.loadTests ?? []), requestIds);
-    if (!await this.updateCollectionLoadTests(collectionId, tests => [...tests, test])) return;
-    await this.openLoadTest(collectionId, test.id);
+    if (!await this.confirmLeaveLoadTest()) return;
+    this.closeFloatingMenus();
+    await this.persistActiveRequestNow();
+    const steps = requestIds.length ? requestIds : this.loadTestRequestOptions(collectionId).map(request => request.id);
+    const test = newLoadTest(uniqueLoadTestName('New load test', collection.loadTests ?? []), steps);
+    this.loadTestDraft = { collectionId, test };
+    this.loadTestTab = 'flow';
+    this.activeWorkspaceId = collection.workspaceId;
+    this.activeLoadTestCollectionId = collectionId;
+    this.activeLoadTestId = test.id;
+    this.sidebarView = 'collections';
+    this.topView = 'loadtest';
   },
+
+
 
   async createLoadTestFromRequest(this: LoadTestHost & { createLoadTest: (collectionId: string, requestIds?: string[]) => Promise<void> }, requestId: string) {
     await this.persistActiveRequestNow();
@@ -232,6 +273,7 @@ export const loadTestFeature = {
     if (!await this.openConfirmDialog('Delete load test', `Delete "${test.name}"? Its file is removed from the workspace.`, 'Delete')) return;
     if (!await this.updateCollectionLoadTests(collectionId, tests => tests.filter(candidate => candidate.id !== loadTestId))) return;
     if (this.activeLoadTestId === loadTestId) {
+      this.loadTestEdits = null;
       this.activeLoadTestId = '';
       this.activeLoadTestCollectionId = '';
       if (this.topView === 'loadtest') this.topView = this.activeRequestId ? 'request' : 'overview';
@@ -242,22 +284,25 @@ export const loadTestFeature = {
     if (!this.guardWorkspaceWritable('Saving a load test')) return false;
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     const current = collection?.loadTests?.find(test => test.id === draft.id);
-    if (!collection || !current) return false;
-    if (baseFingerprint && loadTestFingerprint(current) !== baseFingerprint) {
+    const isNew = !current && this.loadTestDraft?.collectionId === collectionId && this.loadTestDraft.test.id === draft.id;
+    if (!collection || (!current && !isNew)) return false;
+    if (current && baseFingerprint && loadTestFingerprint(current) !== baseFingerprint) {
       await this.openAlertDialog(
         'Load test changed',
         'This load test was updated outside the open editor. Reload it before saving so the newer changes are not overwritten.',
       );
       return false;
     }
-    const name = draft.name.trim() || current.name;
+    const name = draft.name.trim() || current?.name || 'New load test';
     const next = normalizeLoadTest(JSON.parse(JSON.stringify({ ...draft, name, filesystemName: filesystemNameFromName(name, 'load-test') })));
     this.loadTestSaveState = 'saving';
     if (this.loadTestSavedTimer) {
       clearTimeout(this.loadTestSavedTimer);
       this.loadTestSavedTimer = null;
     }
-    const ok = await this.updateCollectionLoadTests(collectionId, tests => tests.map(test => test.id === draft.id ? next : test));
+    const ok = await this.updateCollectionLoadTests(collectionId, tests => isNew ? [...tests, next] : tests.map(test => test.id === draft.id ? next : test));
+    if (ok && isNew) this.loadTestDraft = null;
+    if (ok && this.loadTestEdits?.test.id === draft.id) this.loadTestEdits = { ...this.loadTestEdits, test: next, dirty: false };
     this.loadTestSaveState = ok ? 'saved' : 'idle';
     if (ok) {
       this.loadTestSavedTimer = setTimeout(() => {

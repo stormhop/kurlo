@@ -5,7 +5,7 @@ import {
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
   emptyLoadRunState,
 } from '../backend';
-import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState } from '../backend';
+import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../backend';
 import { EMPTY_COOKIE_SYNC_STATUS, EMPTY_MOCK_SERVER_STATUS } from '../wire';
 import { DEFAULT_MOCK_PORT } from '../mockRoutes';
 import type { SSEEventEntry, SSESession, WebSocketMessageEntry, WebSocketSession, SocketIOMessageEntry, SocketIOSession, SocketIOClientVersion } from '../types/models';
@@ -1226,6 +1226,10 @@ class AppVM {
   declare closeLoadTestTab: typeof loadTestFeature.closeLoadTestTab;
   declare updateCollectionLoadTests: typeof loadTestFeature.updateCollectionLoadTests;
   declare createLoadTest: typeof loadTestFeature.createLoadTest;
+  declare reportLoadTestEdits: typeof loadTestFeature.reportLoadTestEdits;
+  declare confirmLeaveLoadTest: typeof loadTestFeature.confirmLeaveLoadTest;
+  loadTestEdits = $state<{ collectionId: string; test: LoadTest; dirty: boolean } | null>(null);
+  loadTestDraft = $state<{ collectionId: string; test: LoadTest } | null>(null);
   declare createLoadTestFromRequest: typeof loadTestFeature.createLoadTestFromRequest;
   declare renameLoadTest: typeof loadTestFeature.renameLoadTest;
   declare duplicateLoadTest: typeof loadTestFeature.duplicateLoadTest;
@@ -1244,6 +1248,9 @@ class AppVM {
   loadRunLogLines = $state<string[]>([]);
   loadRunLogTestId = $state('');
   loadRunResults = $state<Record<string, LoadRunResult>>({});
+  loadTestExportRequestId = $state('');
+  declare runSavedLoadTest: typeof loadRunFeature.runSavedLoadTest;
+  declare exportSavedLoadTest: typeof loadRunFeature.exportSavedLoadTest;
   declare initLoadRunListeners: typeof loadRunFeature.initLoadRunListeners;
   declare checkK6: typeof loadRunFeature.checkK6;
   declare chooseK6Binary: typeof loadRunFeature.chooseK6Binary;

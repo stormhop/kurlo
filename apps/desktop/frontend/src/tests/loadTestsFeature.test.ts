@@ -18,6 +18,10 @@ function makeHost(requestType: SavedRequest['requestType'] = 'http') {
     globalVariables: [],
     activeLoadTestId: '',
     activeLoadTestCollectionId: '',
+    loadTestDraft: null as { collectionId: string; test: LoadTest } | null,
+    loadTestEdits: null as { collectionId: string; test: LoadTest; dirty: boolean } | null,
+    autosave: false,
+    openSaveChangesDialog: vi.fn().mockResolvedValue('discard' as 'save' | 'discard' | 'cancel'),
     activeRequestId: 'req-login',
     activeWorkspaceId: 'ws-1',
     collections: [collection] as Collection[],
@@ -46,19 +50,47 @@ function testsOf(host: { collections: Collection[] }): LoadTest[] {
   return host.collections[0].loadTests ?? [];
 }
 
+async function createSaved(host: ReturnType<typeof makeHost>['host'], collectionId: string, requestIds?: string[], name?: string) {
+  await host.createLoadTest(collectionId, requestIds);
+  const draft = host.loadTestDraft!.test;
+  expect(await host.saveLoadTest(collectionId, name ? { ...draft, name } : draft)).toBe(true);
+}
+
 describe('load test store', () => {
-  it('creates a smoke test from a request and opens it', async () => {
-    const { host, saved } = makeHost();
+  it('opens a new test from a request as a draft that reaches the collection only when saved', async () => {
+    const { host, collection, saved } = makeHost();
     await host.createLoadTestFromRequest('req-login');
-    const [test] = testsOf(host);
-    expect(test.name).toBe('Login load test');
+    expect(testsOf(host)).toEqual([]);
+    expect(saved).toEqual([]);
+    const test = host.loadTestDraft!.test;
+    expect(host.activeLoadTest()).toMatchObject({ isDraft: true, loadTest: { id: test.id } });
+    expect(test.name).toBe('New load test');
     expect(test.scenarios[0].executor).toEqual({ type: 'constant-vus', vus: 2, durationMs: 60000 });
     expect(test.scenarios[0].steps.map(step => step.requestId)).toEqual(['req-login']);
     expect(host.topView).toBe('loadtest');
     expect(host.activeLoadTestId).toBe(test.id);
     expect(host.loadTestTab).toBe('flow');
     expect(host.sidebarView).toBe('collections');
+    expect(await host.saveLoadTest(collection.id, test)).toBe(true);
     expect(saved.at(-1)?.[0].loadTests?.[0].id).toBe(test.id);
+    expect(host.loadTestDraft).toBeNull();
+    expect(host.activeLoadTest()).toMatchObject({ isDraft: false, loadTest: { id: test.id } });
+  });
+
+  it('starts a collection load test with every request it can run', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id);
+    expect(host.loadTestDraft!.test.scenarios[0].steps.map(step => step.requestId)).toEqual(['req-login', 'req-orders']);
+  });
+
+  it('drops an unsaved draft when another test opens', async () => {
+    const { host, collection } = makeHost();
+    await createSaved(host, collection.id, ['req-login'], 'Saved one');
+    const kept = testsOf(host)[0];
+    await host.createLoadTest(collection.id);
+    await host.openLoadTest(collection.id, kept.id);
+    expect(host.loadTestDraft).toBeNull();
+    expect(testsOf(host).map(test => test.name)).toEqual(['Saved one']);
   });
 
   it('uses the current unsaved request name and URL when creating and exporting a load test', async () => {
@@ -67,8 +99,8 @@ describe('load test store', () => {
     const edited = { ...saved, name: 'стресс', url: 'http://127.0.0.1:18080/work' };
     host.requestForEditing = id => id === saved.id ? edited : host.requests.find(request => request.id === id);
     await host.createLoadTestFromRequest(saved.id);
-    const test = testsOf(host)[0];
-    expect(test.name).toBe('стресс load test');
+    const test = host.loadTestDraft!.test;
+    expect(test.name).toBe('New load test');
     expect(test.scenarios[0].steps[0].requestId).toBe(saved.id);
     expect(host.loadTestRequestOptions(collection.id)[0]).toMatchObject({ name: 'стресс', url: edited.url });
     const payload = JSON.parse(host.loadTestPayload(collection.id, test)!);
@@ -80,15 +112,16 @@ describe('load test store', () => {
   it('refuses requests that a load test cannot run', async () => {
     const { host } = makeHost();
     await host.createLoadTestFromRequest('req-socket');
-    expect(testsOf(host)).toEqual([]);
+    expect(host.loadTestDraft).toBeNull();
     expect(host.openAlertDialog).toHaveBeenCalled();
   });
 
   it('gives new tests unique names in the collection', async () => {
     const { host, collection } = makeHost();
+    await createSaved(host, collection.id);
     await host.createLoadTest(collection.id);
-    await host.createLoadTest(collection.id);
-    expect(testsOf(host).map(test => test.name)).toEqual(['New load test', 'New load test 2']);
+    expect(testsOf(host).map(test => test.name)).toEqual(['New load test']);
+    expect(host.loadTestDraft!.test.name).toBe('New load test 2');
     expect(uniqueLoadTestName('Smoke', [{ id: 'a', name: 'smoke', scenarios: [], settings: {} }])).toBe('Smoke 2');
   });
 
@@ -99,7 +132,7 @@ describe('load test store', () => {
 
   it('renames a test from the menu or inline without changing its flow', async () => {
     const { host, collection, saved } = makeHost();
-    await host.createLoadTest(collection.id, ['req-login']);
+    await createSaved(host, collection.id, ['req-login']);
     const original = testsOf(host)[0];
     host.openPromptDialog.mockResolvedValueOnce(' Checkout smoke ');
     await host.renameLoadTest(collection.id, original.id);
@@ -118,8 +151,8 @@ describe('load test store', () => {
 
   it('duplicates a test right after the original with fresh ids', async () => {
     const { host, collection } = makeHost();
-    await host.createLoadTest(collection.id, ['req-login']);
-    await host.createLoadTest(collection.id);
+    await createSaved(host, collection.id, ['req-login'], 'Login load test');
+    await createSaved(host, collection.id);
     const original = testsOf(host)[0];
     await host.duplicateLoadTest(collection.id, original.id);
     const tests = testsOf(host);
@@ -131,7 +164,7 @@ describe('load test store', () => {
 
   it('deletes a test after confirmation and leaves the editor', async () => {
     const { host, collection } = makeHost();
-    await host.createLoadTest(collection.id);
+    await createSaved(host, collection.id);
     const [test] = testsOf(host);
     await host.deleteLoadTest(collection.id, test.id);
     expect(host.collections[0].loadTests).toBeUndefined();
@@ -141,7 +174,7 @@ describe('load test store', () => {
 
   it('keeps the test when deletion is cancelled', async () => {
     const { host, collection } = makeHost();
-    await host.createLoadTest(collection.id);
+    await createSaved(host, collection.id);
     host.openConfirmDialog.mockResolvedValueOnce(false);
     await host.deleteLoadTest(collection.id, testsOf(host)[0].id);
     expect(testsOf(host)).toHaveLength(1);
@@ -149,7 +182,7 @@ describe('load test store', () => {
 
   it('saves edits, renames the file and survives a reload', async () => {
     const { host, collection, saved } = makeHost();
-    await host.createLoadTest(collection.id, ['req-login']);
+    await createSaved(host, collection.id, ['req-login']);
     const [test] = testsOf(host);
     const draft: LoadTest = {
       ...test,
@@ -168,7 +201,7 @@ describe('load test store', () => {
 
   it('refuses to overwrite a test that changed elsewhere', async () => {
     const { host, collection } = makeHost();
-    await host.createLoadTest(collection.id);
+    await createSaved(host, collection.id);
     const [test] = testsOf(host);
     const stale = loadTestFingerprint(test);
     await host.saveLoadTest(collection.id, { ...test, name: 'Edited in YAML' }, stale);
@@ -177,11 +210,49 @@ describe('load test store', () => {
     expect(host.openAlertDialog).toHaveBeenCalled();
   });
 
-  it('closes the editor back to the open request', () => {
+  it('asks before closing a draft and saves, discards or stays as chosen', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id, ['req-login']);
+    const draft = host.loadTestDraft!.test;
+    host.reportLoadTestEdits(collection.id, { ...draft, name: 'Checkout' }, false);
+    host.openSaveChangesDialog.mockResolvedValueOnce('cancel');
+    await host.closeLoadTestTab();
+    expect(host.openSaveChangesDialog).toHaveBeenCalledWith('Checkout');
+    expect(host.activeLoadTestId).toBe(draft.id);
+    expect(host.loadTestDraft).not.toBeNull();
+    host.openSaveChangesDialog.mockResolvedValueOnce('save');
+    await host.closeLoadTestTab();
+    expect(testsOf(host).map(test => test.name)).toEqual(['Checkout']);
+    expect(host.activeLoadTestId).toBe('');
+    await host.createLoadTest(collection.id);
+    host.openSaveChangesDialog.mockResolvedValueOnce('discard');
+    await host.closeLoadTestTab();
+    expect(testsOf(host)).toHaveLength(1);
+    expect(host.loadTestDraft).toBeNull();
+  });
+
+  it('asks about unsaved edits of a saved test only when autosave is off', async () => {
+    const { host, collection } = makeHost();
+    await createSaved(host, collection.id, ['req-login']);
+    const [test] = testsOf(host);
+    host.reportLoadTestEdits(collection.id, { ...test, name: 'Edited' }, true);
+    host.openSaveChangesDialog.mockClear();
+    host.openSaveChangesDialog.mockResolvedValueOnce('cancel');
+    await host.createLoadTest(collection.id);
+    expect(host.openSaveChangesDialog).toHaveBeenCalledWith('Edited');
+    expect(host.activeLoadTestId).toBe(test.id);
+    host.autosave = true;
+    host.openSaveChangesDialog.mockClear();
+    await host.closeLoadTestTab();
+    expect(host.openSaveChangesDialog).not.toHaveBeenCalled();
+    expect(host.activeLoadTestId).toBe('');
+  });
+
+  it('closes the editor back to the open request', async () => {
     const { host } = makeHost();
     host.topView = 'loadtest';
     host.activeLoadTestId = 'lt';
-    host.closeLoadTestTab();
+    await host.closeLoadTestTab();
     expect(host.topView).toBe('request');
     expect(host.activeLoadTestId).toBe('');
   });

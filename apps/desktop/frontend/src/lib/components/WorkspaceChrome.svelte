@@ -34,6 +34,10 @@
     historyDetailOpen = false,
     gitTabOpen = false,
     mockTabOpen = false,
+    loadTestTabTitle = '',
+    loadTestTabUnsaved = '',
+    openLoadTestTab = () => {},
+    closeLoadTestTab = () => {},
     mockRunning = false,
     gitChangeCount = 0,
     autosave,
@@ -85,6 +89,10 @@
     historyDetailOpen?: boolean;
     gitTabOpen?: boolean;
     mockTabOpen?: boolean;
+    loadTestTabTitle?: string;
+    loadTestTabUnsaved?: string;
+    openLoadTestTab?: () => void;
+    closeLoadTestTab?: () => void;
     mockRunning?: boolean;
     gitChangeCount?: number;
     autosave: boolean;
@@ -288,6 +296,15 @@
           <button class="tab-close" type="button" onclick={closeMockTab} aria-label="Close Mock tab"><svg width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
         </div>
       {/if}
+      {#if loadTestTabTitle}
+        <div class="saved-request-tab runner-tab loadtest-tab" class:active={topView === 'loadtest'} class:unsaved={Boolean(loadTestTabUnsaved)} title={loadTestTabUnsaved || undefined} use:middleClick={workspaceBlocked ? undefined : closeLoadTestTab}>
+          <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={topView === 'loadtest'} tabindex={topView === 'loadtest' ? 0 : -1} onclick={openLoadTestTab}>
+            <svg width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 17l5-6 4 3 4-7 5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="tab-title">{loadTestTabTitle}</span>
+          </button>
+          <button class="tab-close" type="button" onclick={closeLoadTestTab} aria-label="Close load test tab" disabled={workspaceBlocked}><svg width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
+        </div>
+      {/if}
       {#if activeCollectionSettings}
         <div class="saved-request-tab runner-tab" class:active={topView === 'collection'} use:middleClick={workspaceBlocked ? undefined : closeCollectionSettings}>
           <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={topView === 'collection'} tabindex={topView === 'collection' ? 0 : -1} onclick={() => (topView = 'collection')} disabled={workspaceBlocked}>
@@ -350,6 +367,11 @@
             {#if mockTabOpen}
               <button class="menu-item" role="option" class:active={topView === 'mock'} aria-selected={topView === 'mock'} type="button" onclick={() => pickTab(openMockTab)}>
                 <span class="tab-overflow-name">Mock</span>
+              </button>
+            {/if}
+            {#if loadTestTabTitle}
+              <button class="menu-item" role="option" class:active={topView === 'loadtest'} aria-selected={topView === 'loadtest'} type="button" onclick={() => pickTab(openLoadTestTab)}>
+                <span class="tab-overflow-name">{loadTestTabTitle}</span>
               </button>
             {/if}
             {#if activeCollectionSettings}
