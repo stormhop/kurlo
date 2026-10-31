@@ -9,56 +9,23 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
-- The landing page highlights k6 load testing as its third main feature, with an example flow, load profile and a link to the guide.
-
-- Click a load-test step to view its settings. A separate Replace request button beside the move and remove controls changes its request while keeping the step settings.
-
-- A load-testing guide covers flow construction, data, thresholds, k6 export and local execution, reports and CI, with reproducible screenshots from `make screenshots`.
-
-- **Load tests from the CLI.** `kurlo load list`, `export` and `run` read the same collection YAML files as the app. Select a test by name, ID or YAML path; use its saved environment or override it for CI. Export a script or folder without k6, or run installed k6 with progress, actual threshold values, summary JSON and an HTML report. Secrets pass through the process environment; threshold failures exit with code 99, and Ctrl+C stops k6 and keeps its summary when available.
-
-- Load-test data files can be chosen from the workspace with a preview of the first five rows. Export either one self-contained k6 script or a folder containing `script.k6.js` and `data.json`, and start local k6 directly from the export dialog.
-
-- **Load tests.** A collection can hold load tests: a flow of its HTTP and GraphQL requests, the load to put on it and the criteria for passing. Make one from a request's menu with **Load test this request**, or from a collection's menu with **New load test**. A step can run once per virtual user, for example to log in, save a value from the response as a variable for later steps, check the status or the body, and wait before the next step. The load starts from a preset (smoke, load, stress, spike, soak), as virtual users or iterations per second, constant or in stages, with a preview of its shape; pass criteria cover response time, failed requests and passed checks, for the whole flow or one step. Each load test is a YAML file in the collection's `loadtests/` folder, so it is reviewed and shared through Git like the requests.
-- **Export a load test to k6.** **Export k6 script** turns a load test into a [Grafana k6](https://grafana.com/docs/k6/) script that runs as it is: the requests with the collection's defaults and auth (bearer, basic, API key, digest, and OAuth 2.0 client credentials or password, fetched once before the test), the saved values, checks, waits, test data, load and pass criteria, with results broken out per step. Variables resolve when the script runs, in the same order as in Kurlo, and secrets stay out of the file unless you choose to write them in. Whatever does not carry over, such as request scripts, AWS and OAuth 1.0 auth or file uploads, is listed before you save the script.
-- **Run a load test with k6.** **Run with k6** starts the test on this computer with the k6 you have installed, or one you point Kurlo at. Before the first request it shows which hosts will get the load and asks you to confirm when they are not this computer; for an environment marked protected you type the host name. While it runs, the Results tab shows the stage, the users, the completed iterations and the k6 output, with **Stop** and a link to k6's live dashboard. Afterwards it shows whether each pass criterion was met, the totals and a table per step, and keeps the k6 summary and HTML report of the last run to open or save. Secrets reach k6 through its environment, never through the command line or the script.
+- **Load testing with k6.** Turn a collection’s HTTP and GraphQL requests into a repeatable flow. Start with a smoke, load, stress, spike or soak preset; choose virtual users or iterations per second, constant or staged load, and pass criteria for response times, failed requests and checks. Load tests live as YAML files alongside the collection’s requests and can be reviewed and shared through Git.
+- **Flows with setup, checks and test data.** Run a login step once per virtual user, save response values for later steps, check response statuses and bodies, and add waits with millisecond precision. Choose a CSV or JSON file from the workspace and preview its rows. Replace a step’s request without losing its settings; rename, duplicate, save or revert tests using the same controls as requests.
+- **Local runs and reports.** Run an installed k6 from Kurlo, follow progress and bounded console output, stop the run, or open k6’s live dashboard. Results show totals, actual threshold values and a per-step breakdown; keep the last summary JSON and HTML report. Remote targets require confirmation, and protected environments require the target hostname.
+- **Export a k6 script or folder.** Export a self-contained script or a folder with `script.k6.js` and its test data, without installing k6. Collection defaults, supported auth, variables, extraction, checks and thresholds carry over; unsupported request features are listed before export. Secrets stay outside the script unless explicitly included and reach local k6 through its process environment.
+- **Load tests from the CLI.** `kurlo load list`, `export` and `run` use the same YAML definitions as the app. Select a test by name, ID or path, override its environment for CI, and save summary JSON and an HTML report. Threshold failures exit with code 99; Ctrl+C stops k6 and keeps its summary when available.
+- **Load-testing guide and examples.** The documentation covers building flows, choosing load profiles, data, export, local execution, reports and CI, with seven reproducible screenshots. The landing page introduces load testing as its third main feature.
 
 ### Fixed
 
-- Load profile validation messages wrap beneath their fields without moving neighbouring controls or changing the parameter columns.
-
-- Load tests use the current request name and URL, including pending edits, instead of silently using the saved snapshot. Extraction and check errors appear beside the affected rows. Invalid HTTP URLs are rejected before k6 starts. High-volume k6 output is batched and bounded so logs do not monopolize the interface or block Stop.
-
-- Load-test result badges align with their headings, including stopped runs.
-
-- Active load tests show a single Stop button in the editor header instead of duplicating it in Results.
-
-- The load-test sidebar menu contains Rename, Duplicate and Delete; the redundant Open action is removed. Double-click a load-test name to rename it inline; duplicate and delete buttons no longer clutter the editor header.
-
-- Load-test headers use the same compact name field and Save/Revert controls as requests. Actions stay aligned, and step settings no longer duplicate the request picker.
-
-- Load-test presets show which profile matches the current settings. Validation highlights the relevant fields and steps instead of inserting a banner above the tabs.
-
-- Load-test durations preserve milliseconds when displayed and edited, so a `500ms` step wait no longer changes to `1s`.
-
-- Request replacement is a separate action, so selecting a load-test step does not open the request picker.
-
-- Load-test request menus stay inside the visible editor, open upwards when needed and scroll through long collections. The empty flow panel is more compact.
-
-- Load tests wait after a once-per-user step only when that step runs. A late Stop preserves a completed k6 result, secret values containing NUL bytes get a clear error, JSON response keys with brackets can be extracted, and results show small percentage limits and unexecuted steps correctly.
-- Relative time labels update while the app is open. Autosave backs off after repeated failures, and workspace writes stop when an operating-system lock cannot be acquired.
-
-- Stable installations ignore prerelease updates. macOS-only releases stay off the stable update channel, so they cannot replace Windows and Linux update manifests.
-- Socket.IO ignores callbacks from replaced connections and detects silent v2 connections. WebSocket handshakes default to a 30-second timeout.
-- Cookie sync validates the loopback host and the browser extension origin.
-- Test scripts see collection variable changes from pre-request scripts. Client certificates reload after file changes, CORS preflights have separate timeline markers, and AWS signatures encode query spaces consistently.
-- Concurrent CLI requests share an OAuth token refresh. Loading a client certificate no longer holds the shared transport cache lock, and oversized deflate responses are rejected without retrying a different format.
-- Failed AI follow-up validation preserves the message and shows its error. Git lists adapt to their container height, open examples follow external body changes, YAML validation ignores outdated results, and release notes are marked seen after loading.
-
-### Fixed
-
-- The status of a response stopped popping in after the first send: once a response arrived, the badge kept its arrival animation class, so later answers came in without it.
-- Dates, times and numbers followed the system language, so an English interface showed dates such as `25 октября 2026 г.` on a Russian system. They are now always in English, with times on a 24-hour clock: What's new, update notes, history, Git, the collection runner and its report, cookies, JWT claims and the token counts of AI requests.
+- **Load runs use the current request.** Pending name, URL and parameter edits are included instead of silently using an older saved snapshot. Invalid literal HTTP URLs are rejected before k6 starts. Once-per-user waits run only with their step, and a late Stop preserves an already completed result.
+- **Responsive load-test controls.** High-volume k6 output is batched and bounded instead of redrawing the interface for every line. Validation appears beside the affected field or row without shifting neighbouring controls; request menus stay inside the editor, and selected presets reflect the current settings.
+- **More precise load-test results.** Millisecond waits, small percentage limits and bracketed JSON response keys retain their meaning. Unexecuted steps are distinguished from zero-duration responses, and invalid secret values produce a clear error.
+- **Stable update channels.** Stable installations ignore prereleases, and macOS-only releases no longer replace the Windows and Linux update manifests. Release notes are marked seen after they load.
+- **Safer saves and workspace writes.** Autosave backs off after repeated failures, workspace writes stop when an operating-system lock cannot be acquired, and YAML validation ignores outdated results.
+- **Sturdier realtime connections.** Socket.IO ignores callbacks from replaced connections and detects silent v2 connections. WebSocket handshakes default to a 30-second timeout. Cookie sync validates the loopback host and browser extension origin.
+- **Consistent scripts and request authentication.** Tests see collection variable changes from pre-request scripts, changed client certificates reload, CORS preflights have separate timeline markers, and AWS signatures encode query spaces consistently. Concurrent CLI requests share an OAuth token refresh; loading a client certificate no longer blocks the shared transport cache, and oversized deflate responses are rejected without retrying another format.
+- **Predictable editor and response feedback.** Failed model follow-ups keep the message and show the validation error. Git lists adapt to their container, open examples follow external body edits, and relative time labels update while the app stays open. Response status badges animate on every send, and dates, times and numbers use English formatting with a 24-hour clock regardless of the system language.
 
 ## [2.5.1] - 2026-10-25
 
