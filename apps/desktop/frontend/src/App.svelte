@@ -495,6 +495,7 @@
     createLoadTestFromRequest={(requestId: string) => void vm.createLoadTestFromRequest(requestId)}
     openLoadTest={(collectionId: string, loadTestId: string) => void vm.openLoadTest(collectionId, loadTestId)}
     toggleLoadTestMenu={vm.toggleLoadTestMenu}
+    renameLoadTest={vm.renameLoadTest}
     duplicateLoadTest={(collectionId: string, loadTestId: string) => void vm.duplicateLoadTest(collectionId, loadTestId)}
     deleteLoadTest={(collectionId: string, loadTestId: string) => void vm.deleteLoadTest(collectionId, loadTestId)}
     toggleRequestPinned={vm.toggleRequestPinned}
@@ -770,8 +771,6 @@
         onSave={vm.saveLoadTest}
         onValidate={vm.validateLoadTestDraft}
         onOpenRequest={(requestId: string) => void vm.switchRequest(requestId)}
-        onDuplicate={vm.duplicateLoadTest}
-        onDelete={vm.deleteLoadTest}
         onChooseData={vm.chooseLoadTestData}
         onPreviewData={vm.previewLoadTestData}
         onSaveFolder={vm.saveLoadTestK6Folder}

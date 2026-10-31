@@ -22,21 +22,25 @@ import (
 )
 
 const (
-	loadRunsDirName   = "loadruns"
-	loadRunLogLimit   = 500
-	loadRunResultFile = "result.json"
-	loadRunReportFile = "report.html"
-	loadRunSummary    = "summary.json"
+	loadRunsDirName      = "loadruns"
+	loadRunLogLimit      = 500
+	loadRunLogLineLimit  = 4096
+	loadRunEventInterval = 100 * time.Millisecond
+	loadRunResultFile    = "result.json"
+	loadRunReportFile    = "report.html"
+	loadRunSummary       = "summary.json"
 )
 
 var safeLoadTestID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
 
 type loadRunManager struct {
-	mu     sync.Mutex
-	run    *loadtest.Run
-	state  model.LoadRunState
-	log    []string
-	result model.LoadRunResult
+	mu              sync.Mutex
+	run             *loadtest.Run
+	state           model.LoadRunState
+	log             []string
+	pendingLog      []string
+	pendingProgress bool
+	result          model.LoadRunResult
 }
 
 func loadRunDir(loadTestID string) string {
@@ -73,7 +77,7 @@ func (a *App) LoadRunLog() []string {
 
 func (a *App) LoadTestTargets(payload string) []string {
 	plan, err := loadTestPlanFromPayload(payload, "")
-	if err != nil {
+	if err != nil || loadtest.ValidateRunTargets(plan) != nil {
 		return []string{}
 	}
 	return loadTestHosts(plan)
@@ -136,6 +140,9 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	if problems := loadtest.Validate(plan.Test, targets); len(problems) > 0 {
 		return failed("Fix the problems in the load test before running it: " + problems[0])
 	}
+	if err := loadtest.ValidateRunTargets(plan); err != nil {
+		return failed(err.Error())
+	}
 	for _, variable := range plan.Variables {
 		if variable.Secret && strings.ContainsRune(variable.Value, '\x00') {
 			return failed(fmt.Sprintf("Secret variable %q contains a NUL byte. Remove it before running with k6.", variable.Name))
@@ -196,6 +203,8 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	}
 	a.loadRuns.state = state
 	a.loadRuns.log = nil
+	a.loadRuns.pendingLog = nil
+	a.loadRuns.pendingProgress = false
 	a.loadRuns.result = result
 	run, err := loadtest.StartK6(loadtest.RunOptions{
 		K6Path:     k6.Path,
@@ -214,7 +223,15 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	a.loadRuns.run = run
 	a.loadRuns.mu.Unlock()
 	a.emit("load:progress", state)
-	go a.finishLoadRun(run, dir, plan.Test, export.Steps)
+	stopEvents := make(chan struct{})
+	eventsDone := make(chan struct{})
+	go a.pumpLoadRunEvents(stopEvents, eventsDone)
+	go func() {
+		run.Wait()
+		close(stopEvents)
+		<-eventsDone
+		a.finishLoadRun(run, dir, plan.Test, export.Steps)
+	}()
 	return state
 }
 
@@ -227,11 +244,49 @@ func freeLocalPort() (int, error) {
 	return listener.Addr().(*net.TCPAddr).Port, nil
 }
 
+func (a *App) pumpLoadRunEvents(stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
+	ticker := time.NewTicker(loadRunEventInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			a.flushLoadRunEvents()
+		case <-stop:
+			a.flushLoadRunEvents()
+			return
+		}
+	}
+}
+
+func (a *App) flushLoadRunEvents() {
+	a.loadRuns.mu.Lock()
+	lines := a.loadRuns.pendingLog
+	a.loadRuns.pendingLog = nil
+	changed := a.loadRuns.pendingProgress
+	a.loadRuns.pendingProgress = false
+	state := a.loadRuns.state
+	a.loadRuns.mu.Unlock()
+	if len(lines) > 0 {
+		a.emit("load:logs", lines)
+	}
+	if changed {
+		a.emit("load:progress", state)
+	}
+}
+
 func (a *App) onLoadRunLine(line string) {
+	if len(line) > loadRunLogLineLimit {
+		line = strings.ToValidUTF8(line[:loadRunLogLineLimit], "") + "…"
+	}
 	a.loadRuns.mu.Lock()
 	a.loadRuns.log = append(a.loadRuns.log, line)
 	if len(a.loadRuns.log) > loadRunLogLimit {
 		a.loadRuns.log = a.loadRuns.log[len(a.loadRuns.log)-loadRunLogLimit:]
+	}
+	a.loadRuns.pendingLog = append(a.loadRuns.pendingLog, line)
+	if len(a.loadRuns.pendingLog) > loadRunLogLimit {
+		a.loadRuns.pendingLog = a.loadRuns.pendingLog[len(a.loadRuns.pendingLog)-loadRunLogLimit:]
 	}
 	changed := false
 	if progress, ok := loadtest.ParseProgress(line); ok {
@@ -243,12 +298,8 @@ func (a *App) onLoadRunLine(line string) {
 		a.loadRuns.state.DashboardURL = dashboard
 		changed = true
 	}
-	state := a.loadRuns.state
+	a.loadRuns.pendingProgress = a.loadRuns.pendingProgress || changed
 	a.loadRuns.mu.Unlock()
-	a.emit("load:log", line)
-	if changed {
-		a.emit("load:progress", state)
-	}
 }
 
 func (a *App) finishLoadRun(run *loadtest.Run, dir string, test model.LoadTest, steps []model.K6ExportStep) {

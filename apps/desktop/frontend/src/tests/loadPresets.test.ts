@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LOAD_PRESETS,
+  matchingLoadPreset,
   executorDurationMs,
   executorModel,
   executorPeak,
@@ -92,6 +93,24 @@ describe('stagesToPolyline', () => {
   });
 });
 
+describe('matchingLoadPreset', () => {
+  it('recognizes saved presets in both load models and at different targets', () => {
+    for (const preset of LOAD_PRESETS) {
+      for (const model of ['vus', 'rate'] as const) {
+        for (const target of [10, 50, 123]) {
+          const executor = JSON.parse(JSON.stringify(presetExecutor(preset.id, model, target)));
+          expect(matchingLoadPreset(executor)).toBe(preset.id);
+        }
+      }
+    }
+  });
+
+  it('clears the selection when load settings differ from a preset', () => {
+    expect(matchingLoadPreset({ ...presetExecutor('smoke', 'vus'), vus: 3 })).toBeNull();
+    expect(matchingLoadPreset({ ...presetExecutor('smoke', 'vus'), durationMs: 30000 })).toBeNull();
+  });
+});
+
 describe('durations', () => {
   it('formats milliseconds the way people type them', () => {
     expect(formatDuration(60000)).toBe('1m');
@@ -99,10 +118,16 @@ describe('durations', () => {
     expect(formatDuration(2 * 60 * 60000 + 5 * 60000)).toBe('2h5m');
     expect(formatDuration(10000)).toBe('10s');
     expect(formatDuration(0)).toBe('0s');
+    expect(formatDuration(1)).toBe('1ms');
+    expect(formatDuration(250)).toBe('250ms');
+    expect(formatDuration(500)).toBe('500ms');
+    expect(formatDuration(999)).toBe('999ms');
+    expect(formatDuration(1500)).toBe('1s500ms');
+    expect(formatDuration(60500)).toBe('1m500ms');
   });
 
   it('parses what formatDuration writes and plain seconds', () => {
-    for (const ms of [1000, 60000, 90000, 7500000]) expect(parseDuration(formatDuration(ms))).toBe(ms);
+    for (const ms of [0, 1, 250, 500, 999, 1000, 1001, 1500, 59999, 60000, 60500, 90000, 7500001]) expect(parseDuration(formatDuration(ms))).toBe(ms);
     expect(parseDuration('45')).toBe(45000);
     expect(parseDuration(' 1m 30s ')).toBe(90000);
     expect(parseDuration('250ms')).toBe(250);

@@ -7,6 +7,7 @@
   padding: var(--space-8) var(--space-12) var(--space-12);
   overflow: auto;
   background: var(--bg);
+  container: loadtest / inline-size;
 }
 
 .loadtest-workspace > * {
@@ -15,35 +16,29 @@
 
 .loadtest-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-3);
 }
 
-.loadtest-title {
-  display: flex;
-  flex: 1 1 18rem;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+.loadtest-meta {
+  margin-bottom: 0;
+}
+
+.loadtest-save-status {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: var(--text-caption);
+}
+
+.loadtest-run-action {
+  margin-left: auto;
 }
 
 .loadtest-crumb {
   color: var(--text-3);
   font-size: var(--text-label);
   user-select: none;
-}
-
-.loadtest-name {
-  width: 100%;
-  height: auto;
-  padding: 0;
-  color: var(--text);
-  font-size: var(--text-display);
-  font-weight: var(--weight-semibold);
-  letter-spacing: -0.02em;
-  line-height: var(--leading-tight);
 }
 
 .loadtest-actions {
@@ -57,26 +52,20 @@
   min-width: 11rem;
 }
 
-.loadtest-problems {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2-5);
-  margin-top: var(--space-4);
-  padding: var(--space-2-5) var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--warning) 32%, var(--border-subtle));
-  border-radius: var(--radius-lg);
-  color: var(--text-2);
-  font-size: var(--text-label);
-  line-height: var(--leading-normal);
-}
-
-.loadtest-problems ul {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
+.loadtest-errors {
   margin: 0;
   padding: 0;
+  color: var(--danger);
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
   list-style: none;
+}
+
+.loadtest-workspace .field[aria-invalid="true"],
+.loadtest-workspace .request-title-input[aria-invalid="true"],
+.loadtest-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--danger) 35%, transparent);
 }
 
 .loadtest-tabs {
@@ -181,14 +170,31 @@
 }
 
 .loadtest-step {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: var(--space-1);
 }
 
+.loadtest-step-picker {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.loadtest-request-menu {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 20;
+  width: min(100%, 22rem);
+  max-height: 20rem;
+  overflow: auto;
+}
+
 .loadtest-step-main {
   display: flex;
-  flex: 1;
+  width: 100%;
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
@@ -197,6 +203,7 @@
 
 .loadtest-step-line {
   display: flex;
+  width: 100%;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
@@ -243,7 +250,9 @@
 }
 
 .loadtest-empty {
-  padding: var(--space-8) var(--space-4);
+  width: 100%;
+  max-width: 24rem;
+  padding: var(--space-4);
   border: 1px dashed var(--border);
   border-radius: var(--radius-lg);
 }
@@ -261,7 +270,8 @@
   top: calc(100% + var(--space-1));
   left: 0;
   z-index: 20;
-  min-width: 18rem;
+  width: 22rem;
+  max-width: 100%;
   max-height: 20rem;
   overflow: auto;
 }
@@ -364,6 +374,22 @@
   border-radius: var(--radius-lg);
 }
 
+.loadtest-parameter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.loadtest-parameter-grid .field {
+  width: 100%;
+  min-width: 0;
+}
+
+.loadtest-parameter-grid .loadtest-errors {
+  overflow-wrap: anywhere;
+}
+
 .loadtest-stages {
   display: flex;
   flex-direction: column;
@@ -415,6 +441,13 @@
 
 .loadtest-threshold {
   padding: var(--space-1-5) 0;
+}
+
+@container loadtest (max-width: 52rem) {
+  .loadtest-flow,
+  .loadtest-load-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 60rem) {
@@ -622,6 +655,13 @@
   min-width: 0;
 }
 
+.loadrun-banner-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .loadrun-banner-text strong {
   color: var(--text);
   font-size: var(--text-body);
@@ -755,4 +795,14 @@
 
 .loadtest-data-preview th:not(:first-child) {
   text-align: left;
+}
+
+.loadtest-card > .loadtest-row {
+  align-items: flex-start;
+}
+
+.loadtest-rule {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
 }

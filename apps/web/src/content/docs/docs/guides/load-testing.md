@@ -22,7 +22,7 @@ A test has one flow. Its steps can use saved HTTP and GraphQL requests from the 
 
 ## Build a flow
 
-Each virtual user, or **VU**, runs the steps from top to bottom. One pass through the flow is an **iteration**. Add a request with **+ Add request from collection**, select a step to edit it, and use its move buttons to change the order. **Open request** opens the linked request itself.
+Each virtual user, or **VU**, runs the steps from top to bottom. One pass through the flow is an **iteration**. Add a request with **+ Add request from collection**, click a step to edit its settings, and use its move buttons to change the order. To replace its request, use the **Replace request** button beside the move and remove buttons. Replacing a request keeps the step’s checks, saved values and waits. The compact name field and **Save** / **Revert unsaved changes** controls above the flow work like those on saved requests. Revert restores the whole test to its saved state. Use the load test’s sidebar menu to **Rename**, **Duplicate** or **Delete** it; double-click its sidebar name to rename it inline. **Open request** opens the linked request itself.
 
 ### Run once per user
 

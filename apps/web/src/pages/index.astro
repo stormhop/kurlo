@@ -35,6 +35,13 @@ const features = [
     visual: 'video',
   },
   {
+    title: 'Find your API’s limits.',
+    text: 'Turn saved requests into load tests powered by k6. Build a flow, ramp up virtual users or iterations per second, and set limits for response times and failures. Run locally, export a k6 script or use the CLI.',
+    link: 'docs/guides/load-testing/',
+    plate: 'c',
+    visual: 'load',
+  },
+  {
     title: 'Postman scripts, unchanged.',
     text: 'Drop a Postman v2.1 export on the sidebar. Folders, auth, environments and saved responses come across, and the pm.* tests keep running. Nothing to rewrite.',
     link: 'docs/getting-started/migrating/',
@@ -209,6 +216,24 @@ const ldJson = structuredData({
           {feature.visual === 'video' && (
             <figure class="k-video">
               <video src={href('media/agent-demo.mp4')} poster={href('media/agent-demo.jpg')} width="1600" height="1214" autoplay muted loop playsinline preload="metadata" data-motion aria-label="Claude Code adds tests to a Kurlo collection over MCP, finds that an order total ignores quantity, fixes the server and runs the collection again while the tests appear in Kurlo"></video>
+            </figure>
+          )}
+          {feature.visual === 'load' && (
+            <figure class="k-card">
+              <figcaption><span>Load test · Checkout flow</span><span>k6 · local</span></figcaption>
+<pre><span class="dim">01</span> <span class="ok">POST</span> /login      → save token
+<span class="dim">02</span> <span class="ok">GET</span>  /products   → status 200
+<span class="dim">03</span> <span class="ok">POST</span> /orders     → status 201</pre>
+              <svg class="k-load-chart" viewBox="0 0 480 110" role="img" aria-label="Example load profile: ramp up to 50 virtual users, hold, then ramp down">
+                <path d="M0 100 L90 20 H350 L440 100 Z" fill="currentColor" opacity="0.15" />
+                <path d="M0 100 L90 20 H350 L440 100 H480" fill="none" stroke="currentColor" stroke-width="2" />
+                <text x="110" y="52" fill="currentColor" font-size="13">50 virtual users · ramp, hold, down</text>
+              </svg>
+              <div class="k-out">
+                <span class="dim">Example result · pass criteria</span>
+                <span><b class="ok">✓</b> p95 response time &lt; 500 ms</span>
+                <span><b class="ok">✓</b> failed requests &lt; 1%</span>
+              </div>
             </figure>
           )}
           {feature.visual === 'script' && (

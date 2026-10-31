@@ -49,6 +49,20 @@ export function presetExecutor(preset: LoadPreset, model: LoadModel, target = DE
   return { type: 'ramping-arrival-rate', stages, preAllocatedVUs: Math.max(10, peak), maxVUs: Math.max(20, peak * 4) };
 }
 
+export function matchingLoadPreset(executor: LoadExecutor): LoadPreset | null {
+  const peak = executorPeak(executor);
+  const signature = (value: LoadExecutor) => JSON.stringify([
+    value.type, value.vus ?? 0, value.rate ?? 0, value.durationMs ?? 0,
+    value.timeUnitMs || SECOND, value.preAllocatedVUs ?? 0, value.maxVUs ?? 0,
+    (value.stages ?? []).map(stage => [stage.durationMs, stage.target]),
+  ]);
+  for (const preset of LOAD_PRESETS) {
+    const target = preset.id === 'stress' ? peak / 2 : preset.id === 'spike' ? peak / 10 : peak;
+    if (signature(executor) === signature(presetExecutor(preset.id, executorModel(executor), target))) return preset.id;
+  }
+  return null;
+}
+
 export function executorModel(executor: LoadExecutor): LoadModel {
   return executor.type.endsWith('arrival-rate') ? 'rate' : 'vus';
 }
@@ -116,14 +130,18 @@ function round(value: number): number {
 export function formatDuration(ms: number): string {
   if (!Number.isFinite(ms) || ms <= 0) return '0s';
   const parts: string[] = [];
-  let rest = Math.round(ms / SECOND);
+  const rounded = Math.round(ms);
+  let rest = Math.floor(rounded / SECOND);
+  const milliseconds = rounded % SECOND;
   const hours = Math.floor(rest / 3600);
   rest -= hours * 3600;
   const minutes = Math.floor(rest / 60);
   const seconds = rest - minutes * 60;
   if (hours) parts.push(`${hours}h`);
   if (minutes) parts.push(`${minutes}m`);
-  if (seconds || !parts.length) parts.push(`${seconds}s`);
+  if (seconds) parts.push(`${seconds}s`);
+  if (milliseconds) parts.push(`${milliseconds}ms`);
+  if (!parts.length) return '0s';
   return parts.join('');
 }
 

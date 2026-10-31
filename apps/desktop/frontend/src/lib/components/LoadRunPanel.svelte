@@ -13,7 +13,6 @@
     otherRunning = false,
     disabled = false,
     onRun,
-    onStop,
     onOpenDashboard,
     onOpenReport,
     onSaveSummary,
@@ -26,7 +25,6 @@
     otherRunning?: boolean;
     disabled?: boolean;
     onRun: () => void;
-    onStop: () => void;
     onOpenDashboard: (url: string) => void;
     onOpenReport: () => void;
     onSaveSummary: () => void;
@@ -135,20 +133,21 @@
       </div>
       <div class="loadtest-row">
         <button class="btn btn-secondary" type="button" disabled={!run.dashboardUrl} onclick={() => onOpenDashboard(run.dashboardUrl)}>Open k6 live dashboard</button>
-        <button class="btn btn-secondary btn-danger" type="button" disabled={run.stopping} onclick={onStop}>{run.stopping ? 'Stopping…' : 'Stop'}</button>
         <span class="loadtest-hint">k6 {run.k6Version}</span>
       </div>
     </section>
   {:else if result}
     <section class="loadrun-banner" class:failed={result.status !== 'passed'} role="status">
-      <span class="tag" class:tag-success={result.status === 'passed'} class:tag-danger={result.status === 'failed' || result.status === 'error'} class:tag-warning={result.status === 'stopped'}>{STATUS_LABELS[result.status] ?? result.status}</span>
       <div class="loadrun-banner-text">
+        <div class="loadrun-banner-heading">
+          <span class="tag" class:tag-success={result.status === 'passed'} class:tag-danger={result.status === 'failed' || result.status === 'error'} class:tag-warning={result.status === 'stopped'}>{STATUS_LABELS[result.status] ?? result.status}</span>
         <strong>
           {#if result.status === 'failed'}{failedThresholds} of {result.thresholds.length} pass criteria not met
           {:else if result.status === 'passed'}All pass criteria met
           {:else if result.status === 'stopped'}Stopped before the end
           {:else}The run did not finish{/if}
         </strong>
+        </div>
         <span class="loadtest-hint">{when(result.finishedAt)} · {formatDuration(result.finishedAt - result.startedAt)}{result.environment ? ` · ${result.environment}` : ''} · k6 {result.k6Version}{result.exitCode ? ` · exit code ${result.exitCode}` : ''}</span>
         {#if result.error}<span class="loadrun-error">{result.error}</span>{/if}
       </div>

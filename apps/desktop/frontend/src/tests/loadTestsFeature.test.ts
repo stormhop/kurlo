@@ -13,6 +13,9 @@ function makeHost(requestType: SavedRequest['requestType'] = 'http') {
   const saved: Collection[][] = [];
   const host = {
     ...loadTestFeature,
+    activeEnvironmentId: '',
+    environments: [],
+    globalVariables: [],
     activeLoadTestId: '',
     activeLoadTestCollectionId: '',
     activeRequestId: 'req-login',
@@ -26,8 +29,10 @@ function makeHost(requestType: SavedRequest['requestType'] = 'http') {
     topView: 'request' as string,
     closeFloatingMenus: vi.fn(),
     guardWorkspaceWritable: () => true,
+    openPromptDialog: vi.fn().mockResolvedValue(null),
     openAlertDialog: vi.fn().mockResolvedValue(undefined),
     openConfirmDialog: vi.fn().mockResolvedValue(true),
+    requestForEditing: (id: string): SavedRequest | undefined => host.requests.find(request => request.id === id),
     persistActiveRequestNow: vi.fn().mockResolvedValue(undefined),
     persistRequestStore: vi.fn(async function (this: { collections: Collection[] }) {
       saved.push(JSON.parse(JSON.stringify(host.collections)));
@@ -56,6 +61,22 @@ describe('load test store', () => {
     expect(saved.at(-1)?.[0].loadTests?.[0].id).toBe(test.id);
   });
 
+  it('uses the current unsaved request name and URL when creating and exporting a load test', async () => {
+    const { host, collection } = makeHost();
+    const saved = host.requests[0];
+    const edited = { ...saved, name: 'стресс', url: 'http://127.0.0.1:18080/work' };
+    host.requestForEditing = id => id === saved.id ? edited : host.requests.find(request => request.id === id);
+    await host.createLoadTestFromRequest(saved.id);
+    const test = testsOf(host)[0];
+    expect(test.name).toBe('стресс load test');
+    expect(test.scenarios[0].steps[0].requestId).toBe(saved.id);
+    expect(host.loadTestRequestOptions(collection.id)[0]).toMatchObject({ name: 'стресс', url: edited.url });
+    const payload = JSON.parse(host.loadTestPayload(collection.id, test)!);
+    expect(payload.requests[0]).toMatchObject({ name: 'стресс', url: edited.url });
+    expect(host.requests[0]).toBe(saved);
+    expect(host.persistActiveRequestNow).toHaveBeenCalled();
+  });
+
   it('refuses requests that a load test cannot run', async () => {
     const { host } = makeHost();
     await host.createLoadTestFromRequest('req-socket');
@@ -74,6 +95,25 @@ describe('load test store', () => {
   it('only offers HTTP and GraphQL requests of the collection as steps', () => {
     const { host, collection } = makeHost();
     expect(host.loadTestRequestOptions(collection.id).map(request => request.id)).toEqual(['req-login', 'req-orders']);
+  });
+
+  it('renames a test from the menu or inline without changing its flow', async () => {
+    const { host, collection, saved } = makeHost();
+    await host.createLoadTest(collection.id, ['req-login']);
+    const original = testsOf(host)[0];
+    host.openPromptDialog.mockResolvedValueOnce(' Checkout smoke ');
+    await host.renameLoadTest(collection.id, original.id);
+    expect(host.openPromptDialog).toHaveBeenCalledWith('Rename load test', original.name);
+    expect(testsOf(host)[0]).toMatchObject({ id: original.id, name: 'Checkout smoke', scenarios: original.scenarios, settings: original.settings });
+    expect(saved.at(-1)?.[0].loadTests?.[0].name).toBe('Checkout smoke');
+    const filename = testsOf(host)[0].filesystemName;
+    await host.renameLoadTest(collection.id, original.id, 'Inline name');
+    expect(testsOf(host)[0].name).toBe('Inline name');
+    expect(testsOf(host)[0].filesystemName).not.toBe(filename);
+    host.openPromptDialog.mockResolvedValueOnce(null);
+    await host.renameLoadTest(collection.id, original.id);
+    await host.renameLoadTest(collection.id, original.id, '  ');
+    expect(testsOf(host)[0].name).toBe('Inline name');
   });
 
   it('duplicates a test right after the original with fresh ids', async () => {

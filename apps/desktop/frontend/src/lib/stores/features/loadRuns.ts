@@ -56,21 +56,41 @@ export const loadRunFeature = {
       this.loadRun = state;
       if (state.running) this.loadRunLogTestId = state.loadTestId;
     });
-    void loadRunLog().then(lines => (this.loadRunLogLines = lines));
+    let receivedLogs = false;
+    let pending: string[] = [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const flush = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = undefined;
+      if (!pending.length) return;
+      this.loadRunLogLines = [...this.loadRunLogLines, ...pending].slice(-LOAD_RUN_LOG_LIMIT);
+      pending = [];
+    };
+    const enqueue = (lines: string[]) => {
+      receivedLogs = true;
+      pending = [...pending, ...lines.slice(-LOAD_RUN_LOG_LIMIT).map(line => line.slice(0, 4096))].slice(-LOAD_RUN_LOG_LIMIT);
+      if (timer === undefined) timer = setTimeout(flush, 100);
+    };
+    void loadRunLog().then(lines => {
+      if (!receivedLogs) this.loadRunLogLines = lines.slice(-LOAD_RUN_LOG_LIMIT);
+    });
     const runtime = window.runtime;
     if (!runtime?.EventsOn) return;
     runtime.EventsOn<LoadRunState>('load:progress', state => {
       if (state.running && state.loadTestId !== this.loadRunLogTestId) {
+        if (timer !== undefined) clearTimeout(timer);
+        timer = undefined;
+        pending = [];
+        receivedLogs = true;
         this.loadRunLogLines = [];
         this.loadRunLogTestId = state.loadTestId;
       }
       this.loadRun = state;
     });
-    runtime.EventsOn<string>('load:log', line => {
-      const lines = [...this.loadRunLogLines, line];
-      this.loadRunLogLines = lines.length > LOAD_RUN_LOG_LIMIT ? lines.slice(lines.length - LOAD_RUN_LOG_LIMIT) : lines;
-    });
+    runtime.EventsOn<string>('load:log', line => enqueue([line]));
+    runtime.EventsOn<string[]>('load:logs', lines => enqueue(lines));
     runtime.EventsOn<LoadRunResult>('load:done', result => {
+      flush();
       this.loadRunResults = { ...this.loadRunResults, [result.loadTestId]: result };
     });
   },

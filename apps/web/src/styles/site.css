@@ -870,6 +870,15 @@ code {
   overflow-x: auto;
 }
 
+.k-load-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0 0.9rem 0.9rem;
+  color: var(--con-num);
+  font-family: var(--mono);
+}
+
 .k-git {
   color: var(--con-ok);
 }

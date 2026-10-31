@@ -1,15 +1,18 @@
 <script lang="ts">
+  import LoadValidationMessages from './LoadValidationMessages.svelte';
   import { formatDuration, parseDuration } from '../loadPresets';
   import type { LoadDataPreview, LoadTest } from '../wire';
 
   let {
     draft = $bindable(),
     disabled = false,
+    problems = [],
     onChoose,
     onPreview,
   }: {
     draft: LoadTest;
     disabled?: boolean;
+    problems?: string[];
     onChoose: () => Promise<LoadDataPreview | null>;
     onPreview: (path: string) => Promise<LoadDataPreview>;
   } = $props();
@@ -115,10 +118,11 @@
     <div class="loadtest-row loadtest-data-file">
     <label class="loadtest-field">
       <span class="loadtest-label">File</span>
-      <input class="field field-mono loadtest-path" value={draft.data?.path ?? ''} placeholder="data/users.csv" spellcheck="false" {disabled} oninput={(event) => setPath(inputValue(event))} />
+      <input class="field field-mono loadtest-path" value={draft.data?.path ?? ''} placeholder="data/users.csv" aria-invalid={problems.some(problem => !problem.includes('timeout')) || Boolean(selectionError || preview?.error)} spellcheck="false" {disabled} oninput={(event) => setPath(inputValue(event))} />
     </label>
     <button class="btn btn-secondary" type="button" disabled={disabled || choosing} onclick={choose}>{choosing ? 'Opening…' : 'Choose file…'}</button>
     </div>
+    <LoadValidationMessages problems={problems.filter(problem => !problem.includes('timeout'))} />
     {#if loading}<p class="loadtest-hint" role="status">Reading test data…</p>{/if}
     {#if selectionError || preview?.error}<p class="k6-export-error" role="alert">{selectionError || preview?.error}</p>{/if}
     {#if preview && !preview.error}
@@ -147,8 +151,9 @@
     <h2 class="loadtest-section-title">Request options</h2>
     <label class="loadtest-field">
       <span class="loadtest-label">Timeout per request</span>
-      <input class="field field-mono loadtest-duration" value={draft.settings.timeoutMs ? formatDuration(draft.settings.timeoutMs) : ''} placeholder="60s" spellcheck="false" {disabled} onchange={setRequestTimeout} />
+      <input class="field field-mono loadtest-duration" value={draft.settings.timeoutMs ? formatDuration(draft.settings.timeoutMs) : ''} placeholder="60s" aria-invalid={problems.some(problem => problem.includes('timeout'))} spellcheck="false" {disabled} onchange={setRequestTimeout} />
     </label>
+    <LoadValidationMessages problems={problems.filter(problem => problem.includes('timeout'))} />
     <label class="check-label">
       <input class="check" type="checkbox" checked={Boolean(draft.settings.insecure)} {disabled} onchange={(event) => setInsecure(event.currentTarget.checked)} />
       Skip TLS certificate checks

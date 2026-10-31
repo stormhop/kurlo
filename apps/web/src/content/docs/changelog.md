@@ -14,6 +14,10 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- The landing page highlights k6 load testing as its third main feature, with an example flow, load profile and a link to the guide.
+
+- Click a load-test step to view its settings. A separate Replace request button beside the move and remove controls changes its request while keeping the step settings.
+
 - [Load testing with k6](/docs/guides/load-testing/) now has a complete guide with screenshots of the flow, load profile, data, export and local run results.
 
 - **Load tests from the CLI.** `kurlo load list`, `export` and `run` read the same collection YAML files as the app. Select a test by name, ID or YAML path; use its saved environment or override it for CI. Export a script or folder without k6, or run installed k6 with progress, actual threshold values, summary JSON and an HTML report. Secrets pass through the process environment; threshold failures exit with code 99, and Ctrl+C stops k6 and keeps its summary when available.
@@ -21,6 +25,26 @@ This page summarizes the notable-change log maintained in the source repository.
 - Load-test data files can be chosen from the workspace with a preview of the first five rows. Export either one self-contained k6 script or a folder containing `script.k6.js` and `data.json`, and start local k6 directly from the export dialog.
 
 ### Fixed
+
+- Load profile validation messages wrap beneath their fields without moving neighbouring controls or changing the parameter columns.
+
+- Load tests use the current request name and URL, including pending edits, instead of silently using the saved snapshot. Extraction and check errors appear beside the affected rows. Invalid HTTP URLs are rejected before k6 starts. High-volume k6 output is batched and bounded so logs do not monopolize the interface or block Stop.
+
+- Load-test result badges align with their headings, including stopped runs.
+
+- Active load tests show a single Stop button in the editor header instead of duplicating it in Results.
+
+- The load-test sidebar menu contains Rename, Duplicate and Delete; the redundant Open action is removed. Double-click a load-test name to rename it inline; duplicate and delete buttons no longer clutter the editor header.
+
+- Load-test headers use the same compact name field and Save/Revert controls as requests. Actions stay aligned, and step settings no longer duplicate the request picker.
+
+- Load-test presets show which profile matches the current settings. Validation highlights the relevant fields and steps instead of inserting a banner above the tabs.
+
+- Load-test durations preserve milliseconds when displayed and edited, so a `500ms` step wait no longer changes to `1s`.
+
+- Request replacement is a separate action, so selecting a load-test step does not open the request picker.
+
+- Load-test request menus stay inside the visible editor, open upwards when needed and scroll through long collections. The empty flow panel is more compact.
 
 - Load tests preserve once-per-user pacing and completed results after a late Stop, explain invalid secret values, extract bracketed JSON keys, and distinguish unexecuted steps from zero timings. Small percentage limits keep their precision.
 - Relative time labels update while the app is open. Autosave backs off after repeated failures, and workspace writes stop when an operating-system lock cannot be acquired.

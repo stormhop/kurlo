@@ -1227,6 +1227,7 @@ class AppVM {
   declare updateCollectionLoadTests: typeof loadTestFeature.updateCollectionLoadTests;
   declare createLoadTest: typeof loadTestFeature.createLoadTest;
   declare createLoadTestFromRequest: typeof loadTestFeature.createLoadTestFromRequest;
+  declare renameLoadTest: typeof loadTestFeature.renameLoadTest;
   declare duplicateLoadTest: typeof loadTestFeature.duplicateLoadTest;
   declare deleteLoadTest: typeof loadTestFeature.deleteLoadTest;
   declare saveLoadTest: typeof loadTestFeature.saveLoadTest;

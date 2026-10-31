@@ -24,6 +24,7 @@ type LoadTestHost = {
   loadTestSavedTimer: ReturnType<typeof setTimeout> | null;
   loadTestTab: LoadTestTab;
   requests: SavedRequest[];
+  requestForEditing: (id: string) => SavedRequest | undefined;
   sidebarView: SidebarView;
   topView: TopView;
   closeFloatingMenus: () => void;
@@ -70,12 +71,12 @@ export function newLoadTest(name: string, requestIds: string[] = []): LoadTest {
 
 export const loadTestFeature = {
   loadTestRequestOptions(this: LoadTestHost, collectionId: string): SavedRequest[] {
-    return this.requests.filter(request =>
+    return this.requests.map(request => this.requestForEditing(request.id) ?? request).filter(request =>
       !request.isDraft && !request.isInvalid && request.collectionId === collectionId && LOAD_TEST_REQUEST_TYPES.has(request.requestType ?? ''));
   },
 
   loadTestRequestLabel(this: LoadTestHost, requestId: string): string {
-    const request = this.requests.find(candidate => candidate.id === requestId);
+    const request = this.requestForEditing(requestId);
     return request ? requestTabLabel(request) : '';
   },
 
@@ -108,7 +109,7 @@ export const loadTestFeature = {
     return JSON.stringify({
       loadTest: test,
       collection: collectionWithoutTests,
-      requests: this.requests.filter(request => requestIds.has(request.id) && request.collectionId === collectionId),
+      requests: this.requests.map(request => this.requestForEditing(request.id) ?? request).filter(request => requestIds.has(request.id) && request.collectionId === collectionId),
       environment: environment ? { name: environment.name, values: environment.values } : null,
       globals: this.globalVariables,
     });
@@ -175,7 +176,7 @@ export const loadTestFeature = {
     if (!this.guardWorkspaceWritable('Creating a load test')) return;
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection || collection.isInvalid) return;
-    const request = requestIds.length === 1 ? this.requests.find(candidate => candidate.id === requestIds[0]) : undefined;
+    const request = requestIds.length === 1 ? this.requestForEditing(requestIds[0]) : undefined;
     const base = request ? `${requestTabLabel(request)} load test` : 'New load test';
     const test = newLoadTest(uniqueLoadTestName(base, collection.loadTests ?? []), requestIds);
     if (!await this.updateCollectionLoadTests(collectionId, tests => [...tests, test])) return;
@@ -183,13 +184,25 @@ export const loadTestFeature = {
   },
 
   async createLoadTestFromRequest(this: LoadTestHost & { createLoadTest: (collectionId: string, requestIds?: string[]) => Promise<void> }, requestId: string) {
-    const request = this.requests.find(candidate => candidate.id === requestId);
+    await this.persistActiveRequestNow();
+    const request = this.requestForEditing(requestId);
     if (!request || request.isDraft || !request.collectionId) return;
     if (!LOAD_TEST_REQUEST_TYPES.has(request.requestType ?? '')) {
       await this.openAlertDialog('Load test', 'Load tests run HTTP and GraphQL requests only.');
       return;
     }
     await this.createLoadTest(request.collectionId, [request.id]);
+  },
+
+  async renameLoadTest(this: LoadTestHost & { openPromptDialog: (title: string, value: string) => Promise<string | null> }, collectionId: string, loadTestId: string, nextName?: string) {
+    if (!this.guardWorkspaceWritable('Renaming a load test')) return;
+    this.closeFloatingMenus();
+    const test = this.collections.find(collection => collection.id === collectionId)?.loadTests?.find(candidate => candidate.id === loadTestId);
+    if (!test) return;
+    const name = (nextName ?? await this.openPromptDialog('Rename load test', test.name))?.trim();
+    if (!name || name === test.name) return;
+    await this.updateCollectionLoadTests(collectionId, tests => tests.map(candidate => candidate.id === loadTestId
+      ? { ...candidate, name, filesystemName: filesystemNameFromName(name, 'load-test') } : candidate));
   },
 
   async duplicateLoadTest(this: LoadTestHost, collectionId: string, loadTestId: string) {

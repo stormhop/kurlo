@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -210,5 +211,86 @@ func TestStartLoadRunRejectsNULInSecret(t *testing.T) {
 	}
 	if app.LoadRunStatus().Running {
 		t.Fatal("a rejected run must not change the running state")
+	}
+}
+
+func TestLoadRunLogFloodIsBoundedAndFlushed(t *testing.T) {
+	app := &App{}
+	for i := range 60000 {
+		app.onLoadRunLine(strings.Repeat("x", 100) + fmt.Sprint(i))
+	}
+	if len(app.LoadRunLog()) != loadRunLogLimit || len(app.loadRuns.pendingLog) != loadRunLogLimit {
+		t.Fatal("unbounded log buffers")
+	}
+	if !strings.HasSuffix(app.LoadRunLog()[loadRunLogLimit-1], "59999") {
+		t.Fatal("lost final log line")
+	}
+	app.flushLoadRunEvents()
+	if len(app.loadRuns.pendingLog) != 0 {
+		t.Fatal("pending logs not drained")
+	}
+	app.onLoadRunLine(strings.Repeat("я", 10000))
+	if len(app.LoadRunLog()[loadRunLogLimit-1]) > loadRunLogLineLimit+3 {
+		t.Fatal("unbounded line")
+	}
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go app.pumpLoadRunEvents(stop, done)
+	close(stop)
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("event pump did not stop")
+	}
+	if len(app.loadRuns.pendingLog) != 0 {
+		t.Fatal("final logs not drained")
+	}
+}
+
+func TestLoadRunRejectsInvalidURLBeforeStartingK6(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	app := &App{}
+	payload := runPayload(t, "not-a-url", map[string]any{"type": "constant-vus", "vus": 1, "durationMs": 1000})
+	state := app.StartLoadRun(payload, "/missing-k6")
+	if state.Running || !strings.Contains(state.Error, "http:// or https://") {
+		t.Fatalf("state: %+v", state)
+	}
+	if len(app.LoadTestTargets(payload)) != 0 {
+		t.Fatal("invalid URL presented as a remote host")
+	}
+}
+
+func TestLoadRunErrorFloodRemainsStoppable(t *testing.T) {
+	k6 := k6ForTest(t)
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	target := server.URL
+	server.Close()
+	app := &App{}
+	state := app.StartLoadRun(runPayload(t, target, map[string]any{"type": "constant-arrival-rate", "rate": 1000, "durationMs": 10000, "preAllocatedVUs": 128, "maxVUs": 256}), k6)
+	if !state.Running || state.Error != "" {
+		t.Fatalf("start: %+v", state)
+	}
+	defer app.StopLoadRun()
+	deadline := time.Now().Add(5 * time.Second)
+	for len(app.LoadRunLog()) < 100 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	lines := app.LoadRunLog()
+	if len(lines) < 100 {
+		t.Fatal("the error flood did not start")
+	}
+	before := time.Now()
+	app.LoadRunStatus()
+	stopping := app.StopLoadRun()
+	if !stopping.Stopping {
+		t.Fatal("stop not acknowledged")
+	}
+	if time.Since(before) > time.Second {
+		t.Fatal("status or Stop blocked behind log output")
+	}
+	waitForLoadRun(t, app, 10*time.Second)
+	if len(app.LoadRunLog()) > loadRunLogLimit {
+		t.Fatal("unbounded log history")
 	}
 }

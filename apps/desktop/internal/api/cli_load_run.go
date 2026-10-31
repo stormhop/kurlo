@@ -22,6 +22,9 @@ func runCLILoadTest(ctx context.Context, opts loadCLIOptions, plan loadtest.Plan
 	if ctx.Err() != nil {
 		return 130
 	}
+	if err := loadtest.ValidateRunTargets(plan); err != nil {
+		return fail(err)
+	}
 	if opts.k6 != "" {
 		path, err := filepath.Abs(opts.k6)
 		if err != nil {

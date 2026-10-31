@@ -9,6 +9,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- The landing page highlights k6 load testing as its third main feature, with an example flow, load profile and a link to the guide.
+
+- Click a load-test step to view its settings. A separate Replace request button beside the move and remove controls changes its request while keeping the step settings.
+
 - A load-testing guide covers flow construction, data, thresholds, k6 export and local execution, reports and CI, with reproducible screenshots from `make screenshots`.
 
 - **Load tests from the CLI.** `kurlo load list`, `export` and `run` read the same collection YAML files as the app. Select a test by name, ID or YAML path; use its saved environment or override it for CI. Export a script or folder without k6, or run installed k6 with progress, actual threshold values, summary JSON and an HTML report. Secrets pass through the process environment; threshold failures exit with code 99, and Ctrl+C stops k6 and keeps its summary when available.
@@ -20,6 +24,26 @@ All notable changes to Kurlo are documented here. This project follows
 - **Run a load test with k6.** **Run with k6** starts the test on this computer with the k6 you have installed, or one you point Kurlo at. Before the first request it shows which hosts will get the load and asks you to confirm when they are not this computer; for an environment marked protected you type the host name. While it runs, the Results tab shows the stage, the users, the completed iterations and the k6 output, with **Stop** and a link to k6's live dashboard. Afterwards it shows whether each pass criterion was met, the totals and a table per step, and keeps the k6 summary and HTML report of the last run to open or save. Secrets reach k6 through its environment, never through the command line or the script.
 
 ### Fixed
+
+- Load profile validation messages wrap beneath their fields without moving neighbouring controls or changing the parameter columns.
+
+- Load tests use the current request name and URL, including pending edits, instead of silently using the saved snapshot. Extraction and check errors appear beside the affected rows. Invalid HTTP URLs are rejected before k6 starts. High-volume k6 output is batched and bounded so logs do not monopolize the interface or block Stop.
+
+- Load-test result badges align with their headings, including stopped runs.
+
+- Active load tests show a single Stop button in the editor header instead of duplicating it in Results.
+
+- The load-test sidebar menu contains Rename, Duplicate and Delete; the redundant Open action is removed. Double-click a load-test name to rename it inline; duplicate and delete buttons no longer clutter the editor header.
+
+- Load-test headers use the same compact name field and Save/Revert controls as requests. Actions stay aligned, and step settings no longer duplicate the request picker.
+
+- Load-test presets show which profile matches the current settings. Validation highlights the relevant fields and steps instead of inserting a banner above the tabs.
+
+- Load-test durations preserve milliseconds when displayed and edited, so a `500ms` step wait no longer changes to `1s`.
+
+- Request replacement is a separate action, so selecting a load-test step does not open the request picker.
+
+- Load-test request menus stay inside the visible editor, open upwards when needed and scroll through long collections. The empty flow panel is more compact.
 
 - Load tests wait after a once-per-user step only when that step runs. A late Stop preserves a completed k6 result, secret values containing NUL bytes get a clear error, JSON response keys with brackets can be extracted, and results show small percentage limits and unexecuted steps correctly.
 - Relative time labels update while the app is open. Autosave backs off after repeated failures, and workspace writes stop when an operating-system lock cannot be acquired.

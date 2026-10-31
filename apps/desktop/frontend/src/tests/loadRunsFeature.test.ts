@@ -187,3 +187,32 @@ describe('load run results', () => {
     expect(host.loadRunResults['lt-1'].status).toBe('failed');
   });
 });
+
+describe('load log backpressure', () => {
+  it('renders a burst of 60000 log lines in one bounded update and flushes final messages', async () => {
+    vi.useFakeTimers();
+    try {
+      const handlers: Record<string, (payload: unknown) => void> = {};
+      vi.stubGlobal('window', { runtime: { EventsOn: (name: string, callback: (payload: unknown) => void) => { handlers[name] = callback; return () => {}; } } });
+      const host = makeHost();
+      host.initLoadRunListeners();
+      await Promise.resolve();
+      handlers['load:progress'](running);
+      let updates = 0;
+      let lines = host.loadRunLogLines;
+      Object.defineProperty(host, 'loadRunLogLines', { get: () => lines, set: value => { updates++; lines = value; }, configurable: true });
+      for (let i = 0; i < 60000; i++) handlers['load:log'](`Request Failed ${i}`);
+      expect(updates).toBe(0);
+      vi.advanceTimersByTime(100);
+      expect(updates).toBe(1);
+      expect(lines).toHaveLength(500);
+      expect(lines.at(-1)).toBe('Request Failed 59999');
+      handlers['load:logs'](['last message', 'x'.repeat(20000)]);
+      handlers['load:done']({ loadTestId: 'lt-1', status: 'failed' });
+      expect(updates).toBe(2);
+      expect(lines.at(-1)).toHaveLength(4096);
+      expect(lines.at(-2)).toBe('last message');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+});

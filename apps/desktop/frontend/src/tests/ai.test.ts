@@ -299,7 +299,7 @@ describe('sending an AI request', () => {
   it('sends the saved prompt as a fresh conversation and keeps the answer', async () => {
     vi.mocked(backend.sendAiRequest).mockResolvedValueOnce(aiResponse({
       text: 'Hi there',
-      steps: [{ index: 0, blocks: [{ type: 'text', text: 'Hi there' }], toolResults: [], stopReason: 'end_turn', rawStopReason: 'end_turn', model: 'm', usage: { input: 3, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 }, hasUsage: true, firstTokenMs: 10, durationMs: 50, http: { ...emptyHttpResponse(), statusCode: 200 } }],
+      steps: [{ index: 0, method: '', url: '', requestBody: '', blocks: [{ type: 'text', text: 'Hi there' }], toolResults: [], stopReason: 'end_turn', rawStopReason: 'end_turn', model: 'm', usage: { input: 3, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 }, hasUsage: true, firstTokenMs: 10, durationMs: 50, http: { ...emptyHttpResponse(), statusCode: 200 } }],
       messages: [{ role: 'assistant', blocks: [{ type: 'text', text: 'Hi there' }] }],
     }));
     const host = sendHost();

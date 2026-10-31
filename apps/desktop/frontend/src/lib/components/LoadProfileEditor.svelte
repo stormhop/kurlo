@@ -1,6 +1,7 @@
 <script lang="ts">
   import {
     LOAD_PRESETS,
+    matchingLoadPreset,
     executorDurationMs,
     executorModel,
     executorPeak,
@@ -17,15 +18,18 @@
   import { newEntityId, requestTabLabel } from '../utils';
   import type { LoadExecutor, LoadStage, LoadTest, LoadThreshold } from '../wire';
   import Select from './Select.svelte';
+  import LoadValidationMessages from './LoadValidationMessages.svelte';
 
   let {
     draft = $bindable(),
     requests,
     disabled = false,
+    problems = [],
   }: {
     draft: LoadTest;
     requests: SavedRequest[];
     disabled?: boolean;
+    problems?: string[];
   } = $props();
 
   const PREVIEW_WIDTH = 600;
@@ -42,6 +46,8 @@
 
   const executor = $derived<LoadExecutor>(draft.scenarios[0]?.executor ?? { type: 'constant-vus' });
   const model = $derived(executorModel(executor));
+  const activePreset = $derived(matchingLoadPreset(executor));
+  const amountProblem = $derived(model === 'rate' ? 'Set how many iterations start per second.' : 'Set the number of virtual users.');
   const ramping = $derived(executor.type.startsWith('ramping'));
   const unit = $derived(model === 'rate' ? 'iterations/s' : 'users');
   const polyline = $derived(stagesToPolyline(executor, PREVIEW_WIDTH, PREVIEW_HEIGHT));
@@ -182,7 +188,7 @@
     <h2 class="loadtest-section-title">Start from a preset</h2>
     <div class="loadtest-presets">
       {#each LOAD_PRESETS as preset (preset.id)}
-        <button class="option-card loadtest-preset" type="button" {disabled} onclick={() => applyPreset(preset.id)}>
+        <button class="option-card loadtest-preset" class:active={activePreset === preset.id} aria-pressed={activePreset === preset.id} type="button" {disabled} onclick={() => applyPreset(preset.id)}>
           <strong>{preset.label}</strong>
           <span>{preset.hint}</span>
         </button>
@@ -228,37 +234,43 @@
             {#each executor.stages ?? [] as stage, index (index)}
               <div class="loadtest-stage" role="row">
                 <span role="cell">{index + 1}</span>
-                <span role="cell"><input class="field field-mono loadtest-duration" value={formatDuration(stage.durationMs)} aria-label={`Stage ${index + 1} duration`} spellcheck="false" {disabled} onchange={(event) => durationInput(event, stage.durationMs, ms => (stage.durationMs = ms))} /></span>
+                <span role="cell"><input class="field field-mono loadtest-duration" value={formatDuration(stage.durationMs)} aria-label={`Stage ${index + 1} duration`} aria-invalid={problems.includes(`Stage ${index + 1} needs a duration.`)} spellcheck="false" {disabled} onchange={(event) => durationInput(event, stage.durationMs, ms => (stage.durationMs = ms))} /></span>
                 <span role="cell"><input class="field field-mono loadtest-number" type="number" min="0" value={stage.target} aria-label={`Stage ${index + 1} target`} {disabled} oninput={(event) => (stage.target = Math.max(0, Math.round(Number(inputValue(event)) || 0)))} /></span>
                 <span role="cell"><button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Remove stage ${index + 1}`} {disabled} onclick={() => removeStage(index)}>✕</button></span>
               </div>
+              <LoadValidationMessages problems={problems.filter(problem => problem.startsWith(`Stage ${index + 1} `) || problem.startsWith(`Stage ${index + 1}:`))} />
             {/each}
           </div>
           <button class="btn btn-dashed btn-sm loadtest-inline-add" type="button" {disabled} onclick={addStage}>+ Add stage</button>
         {:else}
-          <div class="loadtest-row">
+          <div class="loadtest-parameter-grid">
             <label class="loadtest-field">
               <span class="loadtest-label">{model === 'rate' ? 'Iterations per second' : 'Virtual users'}</span>
-              <input class="field field-mono loadtest-number" type="number" min="1" value={model === 'rate' ? executor.rate ?? 0 : executor.vus ?? 0} {disabled} oninput={(event) => setAmount(inputCount(event))} />
+              <input class="field field-mono loadtest-number" type="number" min="1" value={model === 'rate' ? executor.rate ?? 0 : executor.vus ?? 0} aria-label={model === 'rate' ? 'Iterations per second' : 'Virtual users'} aria-invalid={problems.includes(amountProblem)} {disabled} oninput={(event) => setAmount(inputCount(event))} />
+              <LoadValidationMessages problems={problems.filter(problem => problem === amountProblem)} />
             </label>
             <label class="loadtest-field">
               <span class="loadtest-label">Duration</span>
-              <input class="field field-mono loadtest-duration" value={formatDuration(executor.durationMs ?? 0)} spellcheck="false" {disabled} onchange={(event) => durationInput(event, executor.durationMs ?? 0, ms => (executor.durationMs = ms))} />
+              <input class="field field-mono loadtest-duration" value={formatDuration(executor.durationMs ?? 0)} aria-label="Duration" aria-invalid={problems.includes('Set how long the test runs.')} spellcheck="false" {disabled} onchange={(event) => durationInput(event, executor.durationMs ?? 0, ms => (executor.durationMs = ms))} />
+              <LoadValidationMessages problems={problems.filter(problem => problem === 'Set how long the test runs.')} />
             </label>
           </div>
         {/if}
         {#if model === 'rate'}
-          <div class="loadtest-row">
+          <div class="loadtest-parameter-grid">
             <label class="loadtest-field">
               <span class="loadtest-label">Users prepared</span>
-              <input class="field field-mono loadtest-number" type="number" min="1" value={executor.preAllocatedVUs ?? 0} {disabled} oninput={(event) => setPool('preAllocatedVUs', inputCount(event))} />
+              <input class="field field-mono loadtest-number" type="number" min="1" value={executor.preAllocatedVUs ?? 0} aria-label="Users prepared" aria-invalid={problems.includes('Set how many virtual users to prepare.')} {disabled} oninput={(event) => setPool('preAllocatedVUs', inputCount(event))} />
+              <LoadValidationMessages problems={problems.filter(problem => problem === 'Set how many virtual users to prepare.')} />
             </label>
             <label class="loadtest-field">
               <span class="loadtest-label">Users at most</span>
-              <input class="field field-mono loadtest-number" type="number" min="1" value={executor.maxVUs ?? 0} {disabled} oninput={(event) => setPool('maxVUs', inputCount(event))} />
+              <input class="field field-mono loadtest-number" type="number" min="1" value={executor.maxVUs ?? 0} aria-label="Users at most" aria-invalid={problems.includes('The virtual user limit is lower than the number prepared.')} {disabled} oninput={(event) => setPool('maxVUs', inputCount(event))} />
+              <LoadValidationMessages problems={problems.filter(problem => problem === 'The virtual user limit is lower than the number prepared.')} />
             </label>
           </div>
         {/if}
+        <LoadValidationMessages problems={problems.filter(problem => !problem.startsWith('Threshold ') && !problem.startsWith('Stage ') && ![amountProblem, 'Set how long the test runs.', 'Set how many virtual users to prepare.', 'The virtual user limit is lower than the number prepared.'].includes(problem))} />
       </div>
 
       <figure class="loadtest-card loadtest-preview">
@@ -285,7 +297,7 @@
           <Select ariaLabel="Statistic" value={threshold.stat} options={DURATION_STATS} {disabled} onChange={(value) => (threshold.stat = value)} />
         {/if}
         <Select className="loadtest-op" ariaLabel="Comparison" value={threshold.op} options={OPS} {disabled} onChange={(value) => (threshold.op = value)} />
-        <input class="field field-mono loadtest-number" type="number" min="0" step="any" value={thresholdValueText(threshold)} aria-label="Limit" {disabled} oninput={(event) => setThresholdValue(threshold, inputValue(event))} />
+        <input class="field field-mono loadtest-number" type="number" min="0" step="any" value={thresholdValueText(threshold)} aria-label="Limit" aria-invalid={problems.includes(`Threshold ${index + 1}: the limit is out of range.`)} {disabled} oninput={(event) => setThresholdValue(threshold, inputValue(event))} />
         <span class="loadtest-hint">{isRate(threshold) ? '%' : 'ms'}</span>
         <Select ariaLabel="Applies to" value={threshold.step ?? ''} options={stepOptions} {disabled} onChange={(value) => setThresholdStep(threshold, value)} />
         <label class="check-label">
@@ -293,6 +305,7 @@
           Stop the test early
         </label>
         <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove threshold" {disabled} onclick={() => removeThreshold(index)}>✕</button>
+        <LoadValidationMessages problems={problems.filter(problem => problem.startsWith(`Threshold ${index + 1}:`) || problem.startsWith(`Threshold ${index + 1} `))} />
       </div>
     {/each}
     <button class="btn btn-dashed btn-sm loadtest-inline-add" type="button" {disabled} onclick={addThreshold}>+ Add threshold</button>

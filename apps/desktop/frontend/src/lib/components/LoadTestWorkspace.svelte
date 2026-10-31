@@ -11,6 +11,8 @@
   import LoadFlowEditor from './LoadFlowEditor.svelte';
   import LoadProfileEditor from './LoadProfileEditor.svelte';
   import Select from './Select.svelte';
+  import RequestSaveActions from './RequestSaveActions.svelte';
+  import LoadValidationMessages from './LoadValidationMessages.svelte';
 
   const AUTOSAVE_DEBOUNCE_MS = 1200;
   const VALIDATE_DEBOUNCE_MS = 300;
@@ -27,8 +29,6 @@
     onSave,
     onValidate,
     onOpenRequest,
-    onDuplicate,
-    onDelete,
     onExport,
     onSaveScript,
     onChooseData,
@@ -62,8 +62,6 @@
     onSave: (collectionId: string, draft: LoadTest, baseFingerprint: string) => Promise<boolean>;
     onValidate: (collectionId: string, draft: LoadTest) => Promise<string[]>;
     onOpenRequest: (requestId: string) => void;
-    onDuplicate: (collectionId: string, loadTestId: string) => void;
-    onDelete: (collectionId: string, loadTestId: string) => void;
     onExport: (collectionId: string, draft: LoadTest, inlineSecrets: boolean, folder: boolean) => Promise<K6ExportResult>;
     onChooseData: () => Promise<LoadDataPreview | null>;
     onPreviewData: (path: string) => Promise<LoadDataPreview>;
@@ -96,7 +94,6 @@
   let exportOpen = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const saved = $derived(saveState === 'saved');
   const runningHere = $derived(run.running && run.loadTestId === loadTest?.id);
   const runningElsewhere = $derived(run.running && run.loadTestId !== loadTest?.id);
   const ready = $derived(Boolean(loadedId) && draft.id === loadedId);
@@ -104,6 +101,11 @@
   const dirty = $derived(ready && draftFingerprint !== loadedFingerprint);
   const stepCount = $derived(draft.scenarios[0]?.steps.length ?? 0);
   const thresholdCount = $derived(draft.thresholds?.length ?? 0);
+  const nameProblems = $derived<string[]>(problems.filter(problem => problem === 'The load test needs a name.'));
+  const dataProblems = $derived(problems.filter(problem => /data|timeout/i.test(problem)));
+  const profileProblems = $derived(problems.filter(problem => /^(Set |Stage |Threshold |Add at least one stage|Unknown load model|The rate time unit|The virtual user limit)/.test(problem)));
+  const flowProblems = $derived(problems.filter(problem => !nameProblems.includes(problem) && !dataProblems.includes(problem) && !profileProblems.includes(problem)));
+
   const environmentOptions = $derived([
     { value: '', label: 'Active environment' },
     ...environments.map(environment => ({ value: environment.name, label: environment.name })),
@@ -141,10 +143,11 @@
     const collectionId = collection.id;
     const snapshot = $state.snapshot(draft) as LoadTest;
     void draftFingerprint;
+    let cancelled = false;
     const timer = setTimeout(() => {
-      void onValidate(collectionId, snapshot).then(result => (problems = result));
+      void onValidate(collectionId, snapshot).then(result => { if (!cancelled) problems = result; });
     }, VALIDATE_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   });
 
   $effect(() => {
@@ -165,6 +168,7 @@
     loadedId = next.id;
     loadedFingerprint = loadTestFingerprint(next);
     externalUpdate = false;
+    problems = [];
   }
 
   async function save() {
@@ -200,26 +204,35 @@
 <section class="loadtest-workspace" aria-label="Load test">
   {#if collection && loadTest && ready}
     <header class="loadtest-head">
-      <div class="loadtest-title">
-        <span class="loadtest-crumb">{collection.name} / Load tests</span>
+      <span class="loadtest-crumb">{collection.name} / Load tests</span>
+      <div class="request-meta loadtest-meta">
         <input
-          class="field field-bare loadtest-name"
+          class="request-title-input"
           value={draft.name}
+          title={draft.name}
           aria-label="Load test name"
+          aria-invalid={nameProblems.length > 0}
           spellcheck="false"
           disabled={workspaceBlocked}
           oninput={(event) => (draft.name = inputValue(event))}
+          onkeydown={(event) => {
+            if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
+          }}
         />
-      </div>
-      <div class="loadtest-actions">
-        {#if externalUpdate}
-          <span class="env-save-indicator">Updated elsewhere</span>
-          <button class="btn btn-secondary" type="button" onclick={() => loadTest && load(loadTest)} disabled={workspaceBlocked}>Reload</button>
-        {:else if autosave && saveState !== 'idle'}
-          <span class="env-save-indicator" class:saved>{saveState === 'saving' ? 'Saving changes…' : 'Saved'}</span>
-        {:else if !autosave && dirty}
-          <span class="env-save-indicator dirty">Unsaved changes</span>
+        {#if !autosave}
+          <RequestSaveActions saveDirty={dirty} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
+        {:else}
+          <span class="loadtest-save-status">{saveState === 'saving' ? 'Saving changes…' : 'Saved'}</span>
         {/if}
+      </div>
+      <LoadValidationMessages problems={nameProblems} />
+      {#if externalUpdate}
+        <div class="loadtest-row">
+          <span class="loadtest-hint">Updated elsewhere</span>
+          <button class="btn btn-secondary btn-sm" type="button" onclick={() => load(loadTest)} disabled={workspaceBlocked}>Reload</button>
+        </div>
+      {/if}
+      <div class="loadtest-actions">
         <Select
           className="loadtest-environment"
           ariaLabel="Environment"
@@ -229,29 +242,13 @@
           onChange={setEnvironment}
         />
         <button class="btn btn-secondary" type="button" onclick={() => (exportOpen = true)}>Export k6 script</button>
-        <button class="btn btn-ghost" type="button" onclick={() => onDuplicate(collection.id, loadTest.id)} disabled={workspaceBlocked}>Duplicate</button>
-        <button class="btn btn-ghost btn-danger" type="button" onclick={() => onDelete(collection.id, loadTest.id)} disabled={workspaceBlocked}>Delete</button>
-        {#if !autosave}
-          <button class="btn btn-secondary" class:feedback-ok={saved && !dirty} type="button" onclick={save} disabled={workspaceBlocked || !dirty}>{saved && !dirty ? 'Saved' : 'Save'}</button>
-        {/if}
         {#if runningHere}
-          <button class="btn btn-secondary btn-danger" type="button" disabled={run.stopping} onclick={onStop}>{run.stopping ? 'Stopping…' : 'Stop'}</button>
+          <button class="btn btn-secondary btn-danger loadtest-run-action" type="button" disabled={run.stopping} onclick={onStop}>{run.stopping ? 'Stopping…' : 'Stop'}</button>
         {:else}
-          <button class="btn btn-primary" type="button" disabled={workspaceBlocked || runningElsewhere} title={runningElsewhere ? 'Another load test is running' : ''} onclick={runDraft}>Run with k6</button>
+          <button class="btn btn-primary loadtest-run-action" type="button" disabled={workspaceBlocked || runningElsewhere} title={runningElsewhere ? 'Another load test is running' : ''} onclick={runDraft}>Run with k6</button>
         {/if}
       </div>
     </header>
-
-    {#if problems.length}
-      <div class="loadtest-problems" role="status">
-        <span class="tag tag-warning">{problems.length} to fix</span>
-        <ul>
-          {#each problems as problem (problem)}
-            <li>{problem}</li>
-          {/each}
-        </ul>
-      </div>
-    {/if}
 
     <div class="tab-bar tabs loadtest-tabs" role="tablist" use:tabListKeyboard>
       <button class="tab" role="tab" aria-selected={loadTestTab === 'flow'} tabindex={loadTestTab === 'flow' ? 0 : -1} type="button" onclick={() => selectTab('flow')}>Flow{#if stepCount}<span class="badge">{stepCount}</span>{/if}</button>
@@ -262,11 +259,11 @@
 
     <div class="loadtest-content" role="tabpanel">
       {#if loadTestTab === 'flow'}
-        <LoadFlowEditor bind:draft {requests} disabled={workspaceBlocked} {onOpenRequest} />
+        <LoadFlowEditor bind:draft {requests} problems={flowProblems} disabled={workspaceBlocked} {onOpenRequest} />
       {:else if loadTestTab === 'load'}
-        <LoadProfileEditor bind:draft disabled={workspaceBlocked} {requests} />
+        <LoadProfileEditor bind:draft problems={profileProblems} disabled={workspaceBlocked} {requests} />
       {:else if loadTestTab === 'data'}
-        <LoadDataTab bind:draft disabled={workspaceBlocked} onChoose={onChooseData} onPreview={onPreviewData} />
+        <LoadDataTab bind:draft problems={dataProblems} disabled={workspaceBlocked} onChoose={onChooseData} onPreview={onPreviewData} />
       {:else}
         <LoadRunPanel
           loadTest={draft}
@@ -277,7 +274,6 @@
           otherRunning={runningElsewhere}
           disabled={workspaceBlocked}
           onRun={runDraft}
-          {onStop}
           {onOpenDashboard}
           onOpenReport={() => onOpenReport(loadTest.id)}
           onSaveSummary={() => onSaveSummary(loadTest.id, summaryName())}

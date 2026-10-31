@@ -124,6 +124,7 @@
     openLoadTest,
     toggleLoadTestMenu,
     duplicateLoadTest,
+    renameLoadTest,
     deleteLoadTest,
     workspaceBlocked = false,
   }: {
@@ -197,6 +198,7 @@
     openLoadTest: (collectionId: string, loadTestId: string) => void;
     toggleLoadTestMenu: (id: string, event: MouseEvent) => void;
     duplicateLoadTest: (collectionId: string, loadTestId: string) => void;
+    renameLoadTest: (collectionId: string, loadTestId: string, name?: string) => void | Promise<void>;
     deleteLoadTest: (collectionId: string, loadTestId: string) => void;
     workspaceBlocked?: boolean;
   } = $props();
@@ -204,6 +206,40 @@
   let draggingCollectionId = $state('');
   let dragOverCollectionId = $state('');
   let dragOverPlacement = $state<DropPlacement>('before');
+  let editingLoadTestId = $state('');
+  let editingLoadTestCollectionId = $state('');
+  let editingLoadTestName = $state('');
+  let editingLoadTestInput = $state<HTMLInputElement>();
+
+  $effect(() => {
+    if (!editingLoadTestId || !editingLoadTestInput) return;
+    editingLoadTestInput.focus();
+    editingLoadTestInput.select();
+  });
+
+  function startLoadTestRename(collectionId: string, test: LoadTest, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    editingLoadTestId = test.id;
+    editingLoadTestCollectionId = collectionId;
+    editingLoadTestName = test.name;
+  }
+
+  function cancelLoadTestRename() {
+    editingLoadTestId = '';
+    editingLoadTestCollectionId = '';
+    editingLoadTestName = '';
+    editingLoadTestInput = undefined;
+  }
+
+  async function commitLoadTestRename() {
+    const collectionId = editingLoadTestCollectionId;
+    const id = editingLoadTestId;
+    const name = editingLoadTestName.trim();
+    cancelLoadTestRename();
+    if (id && name) await renameLoadTest(collectionId, id, name);
+  }
+
   let editingCollectionId = $state('');
   let editingCollectionName = $state('');
   let editingCollectionInput = $state<HTMLInputElement | undefined>();
@@ -665,21 +701,29 @@
               class:active={row.loadTest.id === activeLoadTestId && topView === 'loadtest'}
               style={`--tree-depth: ${row.depth}`}
             >
+              {#if editingLoadTestId === row.loadTest.id}
+                <input class="field field-sm sidebar-request-title-input" bind:this={editingLoadTestInput} bind:value={editingLoadTestName} aria-label="Load test name" spellcheck="false" onblur={commitLoadTestRename} onkeydown={(event) => {
+                  if (event.key === 'Enter') { event.preventDefault(); void commitLoadTestRename(); }
+                  else if (event.key === 'Escape') { event.preventDefault(); cancelLoadTestRename(); }
+                }} />
+              {:else}
               <button
                 class="collection-request"
                 type="button"
                 title={row.loadTest.name}
                 onclick={() => openLoadTest(row.collectionId, row.loadTest.id)}
+                ondblclick={(event) => { if (!workspaceBlocked) startLoadTestRename(row.collectionId, row.loadTest, event); }}
                 oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleLoadTestMenu(row.loadTest.id, event); }}
                 disabled={workspaceBlocked}
               >
                 <span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>
                 <span class="collection-title">{row.loadTest.name}</span>
               </button>
+              {/if}
               <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleLoadTestMenu(row.loadTest.id, event)} aria-label="Load test menu" disabled={workspaceBlocked}>•••</button>
               {#if openLoadTestMenuId === row.loadTest.id}
                 <div class="menu request-menu">
-                  <button class="menu-item" type="button" onclick={() => openLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="open" />Open</button>
+                  <button class="menu-item" type="button" onclick={() => renameLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                   <button class="menu-item" type="button" onclick={() => duplicateLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="duplicate" />Duplicate</button>
                   <div class="menu-separator" role="separator"></div>
                   <button class="menu-item danger" type="button" onclick={() => deleteLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete</button>
