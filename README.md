@@ -23,7 +23,7 @@ No account, no paid plan, no telemetry. Collections live as YAML in your Git rep
 - **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
 - **Your AI agent can use it.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
 - **See what the browser will do.** Send a request with a browser's CORS and CSP rules and get the error before your users do. Postman, Insomnia and Bruno do not do this.
-- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 22.9 MB and the Linux one is 12.1 MB.
+- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 23.2 MB and the Linux one is 12.3 MB.
 
 | | Kurlo | Postman | Insomnia | Bruno |
 |---|---|---|---|---|
