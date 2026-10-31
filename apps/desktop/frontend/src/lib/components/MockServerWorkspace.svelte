@@ -82,9 +82,6 @@
 
   const shadows = $derived(mockRouteShadows(routes));
 
-  function routeKey(route: MockRoute) {
-    return `${mockRouteLabel(route)}|${JSON.stringify(route.query.map(pair => [pair.key, pair.value]))}`;
-  }
 
   function shadowedBy(route: MockRoute) {
     return shadows.get(route.exampleId) ?? null;
@@ -94,9 +91,6 @@
     return `${status.url}${route.pathTemplate}`;
   }
 
-  function isConflicting(route: MockRoute) {
-    return conflicts.has(routeKey(route));
-  }
 
   function copy(text: string, token: string) {
     onCopy(text);

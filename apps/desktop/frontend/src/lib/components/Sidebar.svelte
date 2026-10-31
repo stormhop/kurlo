@@ -1,6 +1,6 @@
 <script lang="ts">
   import KurloBird from './KurloBird.svelte';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import SidebarRequestRow from './SidebarRequestRow.svelte';
   import MenuIcon from './MenuIcon.svelte';
@@ -379,14 +379,14 @@
   }
 
   const LOAD_TEST_GROUPS_KEY = 'kurlo.sidebar.collapsedLoadTests.v1';
-  let collapsedLoadTestGroups = $state<Set<string>>(readCollapsedLoadTestGroups());
+  const collapsedLoadTestGroups = new SvelteSet<string>(readCollapsedLoadTestGroups());
 
-  function readCollapsedLoadTestGroups(): Set<string> {
+  function readCollapsedLoadTestGroups(): string[] {
     try {
       const stored = JSON.parse(localStorage.getItem(LOAD_TEST_GROUPS_KEY) ?? '[]');
-      return new Set(Array.isArray(stored) ? stored.filter(value => typeof value === 'string') : []);
+      return Array.isArray(stored) ? stored.filter(value => typeof value === 'string') : [];
     } catch {
-      return new Set();
+      return [];
     }
   }
 
@@ -396,12 +396,10 @@
   }
 
   function toggleLoadTestGroup(collectionId: string) {
-    const next = new Set(collapsedLoadTestGroups);
-    if (next.has(collectionId)) next.delete(collectionId);
-    else next.add(collectionId);
-    collapsedLoadTestGroups = next;
+    if (collapsedLoadTestGroups.has(collectionId)) collapsedLoadTestGroups.delete(collectionId);
+    else collapsedLoadTestGroups.add(collectionId);
     try {
-      localStorage.setItem(LOAD_TEST_GROUPS_KEY, JSON.stringify([...next]));
+      localStorage.setItem(LOAD_TEST_GROUPS_KEY, JSON.stringify([...collapsedLoadTestGroups]));
     } catch {
       return;
     }

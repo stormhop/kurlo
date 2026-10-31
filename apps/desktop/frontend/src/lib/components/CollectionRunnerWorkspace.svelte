@@ -134,9 +134,6 @@
     return event.currentTarget instanceof HTMLInputElement ? event.currentTarget.value : '';
   }
 
-  function inputChecked(event: Event): boolean {
-    return event.currentTarget instanceof HTMLInputElement ? event.currentTarget.checked : false;
-  }
 
   function rangeLabel(page: number, size: number, total: number): string {
     if (!total) return '0 of 0';
