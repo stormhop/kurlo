@@ -240,6 +240,7 @@ func TestLoadCLIRunExitCodesArtifactsSecretsAndStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Chdir(filepath.Dir(k6))
 	t.Setenv("KURLO_TEST_K6_HELPER", "1")
 	t.Setenv("baseUrl", "https://ci-secret.test")
 	for mode, want := range map[string]int{"passed": 0, "failed": 99, "error": 1, "no-summary": 1, "broken-summary": 1, "no-report": 1, "stop": 130} {
