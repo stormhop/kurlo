@@ -21,6 +21,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Current application screenshots.** Landing-page and documentation images now show the current sidebar and bottom status bar, with Git accessed from the status bar.
 - **Inherited secrets.** Script changes in a child environment keep inherited variables secret, masked and outside workspace YAML.
 - **OAuth and tab switching.** Tokens stay with the original request, Send keeps its original request and variables, and the runner uses refreshed tokens for HTTP and gRPC.
 - **Digest redirects.** Authentication follows the forwarding setting and is blocked on HTTPS-to-HTTP redirects.

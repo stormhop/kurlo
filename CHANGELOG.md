@@ -17,6 +17,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Current application screenshots.** Landing-page and documentation images now show the current sidebar and bottom status bar, with Git accessed from the status bar.
 - **Inherited secrets stay secret after scripts change them.** An override written to a child environment keeps the variable's secret flag and description, so its value stays masked and outside the workspace YAML.
 - **OAuth results stay with their request.** Getting or refreshing a token while switching tabs updates the original request, respects manual saving, and never replaces another tab's credentials. Send keeps the request and variables you started with. The collection runner uses the refreshed token for HTTP and gRPC calls and reuses it on later iterations.
 - **Digest auth respects redirect settings.** A redirect to another host cannot trigger authentication unless forwarding is enabled, and HTTPS-to-HTTP redirects never receive Digest credentials.

@@ -67,7 +67,7 @@ Each guide page benefits from at least one screenshot. To take the doc site from
 ## Capturing tips
 
 - Prefer the automated capture flow for screens it covers.
-- Use a 1× DPI window — Retina captures bloat the page weight.
+- Capture at 2× device pixels to match the automated set; Astro optimizes the delivered images.
 - Match the automated set: 1200×780 for a whole window, cropped tight for a dialog or a
   single panel. Narrow fragments such as `sidebar-collections.png` and `status-bar.png` are
   captured from their own element.
