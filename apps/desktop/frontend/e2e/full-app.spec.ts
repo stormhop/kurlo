@@ -3469,6 +3469,61 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.locator('.saved-request-tab.dirty')).toHaveCount(0);
   });
 
+  test('suggests the rest of a URL and the next JSON key as ghost text', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Orders API');
+    await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request name').fill('Create order');
+    await page.getByLabel('Request name').press('Enter');
+    await page.getByLabel('Method and protocol').click();
+    await page.getByRole('option', { name: 'POST' }).click();
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/orders');
+    await chooseRequestSection(page, 'Body');
+    await page.locator('label.body-mode-label').filter({ hasText: 'raw' }).click();
+    await fillCodeEditor(page, 'request-body-editor', '{\n  "customerId": "cus_1",\n  "currency": "EUR"\n}');
+    await page.getByRole('button', { name: /^Send( |$)/ }).first().click();
+    await expect(page.locator('.response-status-bar')).toContainText(/\d{3}/);
+    await page.getByRole('button', { name: 'Save as example', exact: true }).click();
+    await expect(page.locator('.examples-row')).toHaveCount(1);
+
+    await chooseRequestSection(page, 'Body');
+    await fillCodeEditor(page, 'request-body-editor', '{\n  "customerId": "cus_2",\n  ');
+    const editorGhost = page.getByTestId('editor-ghost-text');
+    await expect(editorGhost).toHaveText('"currency": ');
+    await page.keyboard.press('Tab');
+    await expect(editorGhost).toHaveCount(0);
+    await expect(page.getByTestId('request-body-editor').locator('.cm-content')).toContainText('"currency":');
+
+    await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request name').fill('Another');
+    await page.getByLabel('Request name').press('Enter');
+    const url = page.getByLabel('Request URL');
+    await url.click();
+    await url.pressSequentially('https://api.k');
+    const urlGhost = page.getByTestId('ghost-text');
+    await expect(urlGhost).toHaveText('urlo.test/orders');
+    await url.press('Escape');
+    await expect(urlGhost).toHaveCount(0);
+    await url.pressSequentially('u');
+    await expect(urlGhost).toHaveText('rlo.test/orders');
+    await url.press('Tab');
+    await expect(url).toHaveValue('https://api.kurlo.test/orders');
+    await expect(urlGhost).toHaveCount(0);
+
+    await url.fill('');
+    await url.pressSequentially('crea');
+    await expect(urlGhost).toHaveText('te order → https://api.kurlo.test/orders');
+    await url.press('Tab');
+    await expect(url).toHaveValue('https://api.kurlo.test/orders');
+  });
+
   test('saves a response as an example, and keeps it in the store', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);

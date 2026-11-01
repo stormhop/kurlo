@@ -7,6 +7,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Suggestions while you type.** The URL field offers the rest of a URL you have sent or saved in the workspace, newest history first, and typing the start of a request's name offers that request's URL. A JSON body offers the next key from the request's saved examples, including those an OpenAPI import created, following the nested object you are in and skipping keys already there. The suggestion shows in faded text; `Tab` accepts it and `Escape` hides it.
+
 ### Fixed
 
 - **Mock server replays every repeated header.** An example that recorded a header more than once, such as two `Set-Cookie` lines, now replays all of them instead of only the last.

@@ -5,8 +5,14 @@
   import CodeEditor from '../CodeEditor.svelte';
   import VariableInput from './VariableInput.svelte';
   import BulkEditPanel from './BulkEditPanel.svelte';
+  import { jsonKeyGhost, jsonKeySchema } from '../ghostText';
 
   let bodyEditorRef = $state<CodeEditor>();
+
+  const bodyKeySchema = $derived(vm.bodyLang === 'json'
+    ? jsonKeySchema(vm.requestExamples.map(example => example.snapshot.bodyContent))
+    : new Map<string, string[]>());
+  const bodyGhost = $derived(bodyKeySchema.size ? (doc: string, pos: number) => jsonKeyGhost(doc, pos, bodyKeySchema) : undefined);
 
   const FORM_TYPE_MENU_HEIGHT = 132;
   let formTypeMenuPos = $state({ top: 0, left: 0 });
@@ -196,6 +202,7 @@
         ariaLabel="Request body editor"
         variableSuggestions={vm.variableSuggestions}
         onformat={vm.markBodyFormatted}
+        ghost={bodyGhost}
       />
     </div>
   {/if}

@@ -461,6 +461,9 @@ textarea.url-input {
   top: 1.125rem;
   transform: translateY(-50%);
 }
+.ghost-text {
+  color: var(--text-3);
+}
 .var-token-err {
   background: color-mix(in srgb, var(--danger) 22%, transparent);
   border-radius: var(--radius-xs);

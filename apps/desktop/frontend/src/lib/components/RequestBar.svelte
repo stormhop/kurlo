@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import RequestSaveActions from './RequestSaveActions.svelte';
   import VariableInput from './VariableInput.svelte';
+  import { urlGhost, urlGhostCandidates } from '../ghostText';
   import AiModelPicker from './AiModelPicker.svelte';
   import { vm } from '../stores/app.svelte';
   import { aiEndpointParts } from '../stores/features/ai';
@@ -88,6 +89,12 @@
     onGrpcDiscover?: () => Promise<void> | void;
   } = $props();
 
+  let urlCandidates = $derived(urlGhostCandidates(vm.requests, vm.requestHistory, {
+    workspaceCollectionIds: new Set(vm.collections.filter(collection => collection.workspaceId === vm.activeWorkspaceId).map(collection => collection.id)),
+    requestType,
+    excludeRequestId: vm.activeRequestId,
+  }));
+  const urlGhostFor = (typed: string) => urlGhost(typed, urlCandidates);
   let isSSE = $derived(method === 'SSE');
   let isGraphQL = $derived(requestType === 'graphql');
   let isGRPC = $derived(requestType === 'grpc');
@@ -321,6 +328,7 @@
         bind:value={url}
         multiline
         suggestions={variableSuggestions}
+        ghost={urlGhostFor}
         placeholder={requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Base URL' : 'Enter request URL or paste cURL…'}
         ariaLabel={requestType === 'grpc' ? 'gRPC target' : requestType === 'ai' ? 'Provider base URL' : 'Request URL'}
         oninput={onUrlInput}

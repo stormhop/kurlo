@@ -12,6 +12,10 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ## Unreleased
 
+### Added
+
+- **Suggestions while you type.** The URL field completes URLs from history and saved requests, and finds a request by name; a JSON body offers the next key from the request's examples. `Tab` accepts. See [Suggestions while you type](/docs/guides/request-types/#suggestions-while-you-type).
+
 ### Fixed
 
 - **Mock server headers and `HEAD`.** Repeated headers such as several `Set-Cookie` lines are all replayed, and `HEAD` is answered from the `GET` example.

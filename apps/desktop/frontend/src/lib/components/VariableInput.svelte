@@ -4,6 +4,7 @@
   import { variableDisplayValue } from '../variables';
   import { isDynamicVariableName } from '../dynamicVariables';
   import { escapeHtml } from '../utils';
+  import type { InputGhost } from '../ghostText';
 
   type VariableInputElement = HTMLInputElement | HTMLTextAreaElement;
 
@@ -22,6 +23,7 @@
     validationMessage = '',
     pickerOptions = [],
     pickerLabel = 'Suggestions',
+    ghost = undefined,
     oninput,
     onfocus,
     onclick,
@@ -43,6 +45,7 @@
     validationMessage?: string;
     pickerOptions?: string[];
     pickerLabel?: string;
+    ghost?: (value: string) => InputGhost | null;
     oninput?: (event: Event) => void;
     onfocus?: (event: FocusEvent) => void;
     onclick?: (event: MouseEvent) => void;
@@ -62,10 +65,18 @@
   let pickerWidth = $state(260);
   let pickerMaxHeight = $state(220);
   let multilineExpanded = $state(false);
+  let focused = $state(false);
+  let caretAtEnd = $state(true);
+  let ghostDismissedFor = $state<string | null>(null);
 
   const knownKeySet = $derived(new Set(suggestions.map(s => s.key)));
 
-  const backdropHtml = $derived.by(() => {
+  const activeGhost = $derived.by(() => {
+    if (!ghost || !focused || !caretAtEnd || open || pickerOpen || disabled || ghostDismissedFor === value) return null;
+    return ghost(value);
+  });
+
+  const highlightHtml = $derived.by(() => {
     if (!suggestions.length || !value) return '';
     const VAR_RE = /\{\{([^{}]*)}}/g;
     let result = '';
@@ -85,9 +96,35 @@
     return result;
   });
 
+  const backdropHtml = $derived.by(() => {
+    if (!activeGhost) return highlightHtml;
+    return `${highlightHtml || escapeHtml(value)}<span class="ghost-text" data-testid="ghost-text">${escapeHtml(activeGhost.text)}</span>`;
+  });
+
   const hasUnresolved = $derived(
-    suggestions.length > 0 && /\{\{/.test(value) && backdropHtml.includes('var-token-err')
+    suggestions.length > 0 && /\{\{/.test(value) && highlightHtml.includes('var-token-err')
   );
+
+  function updateCaret() {
+    if (!inputRef) return;
+    const end = inputRef.selectionEnd ?? value.length;
+    caretAtEnd = inputRef.selectionStart === end && end === inputRef.value.length;
+  }
+
+  function acceptGhost(suggestion: InputGhost) {
+    value = suggestion.value;
+    ghostDismissedFor = null;
+    const target = inputRef;
+    if (!target) return;
+    target.value = suggestion.value;
+    target.setSelectionRange(suggestion.value.length, suggestion.value.length);
+    target.dispatchEvent(new Event('input', { bubbles: true }));
+    setTimeout(() => {
+      target.scrollLeft = target.scrollWidth;
+      updateCaret();
+      syncScroll();
+    }, 0);
+  }
 
   const pickerMatches = $derived.by(() => {
     if (!pickerOptions.length) return [];
@@ -275,6 +312,7 @@
 
   function onInput(event: Event) {
     normalizeMultilineValue(event);
+    updateCaret();
     oninput?.(event);
     refreshMenu();
     refreshPicker();
@@ -293,6 +331,8 @@
   }
 
   function onFocus(event: FocusEvent) {
+    focused = true;
+    updateCaret();
     onfocus?.(event);
     if (multiline) {
       multilineExpanded = true;
@@ -303,6 +343,7 @@
   }
 
   function onClick(event: MouseEvent) {
+    updateCaret();
     onclick?.(event);
     if (multiline) {
       multilineExpanded = true;
@@ -341,6 +382,19 @@
       return;
     }
 
+    if (activeGhost && !event.metaKey && !event.ctrlKey && !event.altKey && !event.isComposing) {
+      if ((event.key === 'Tab' && !event.shiftKey) || (event.key === 'ArrowRight' && !event.shiftKey)) {
+        event.preventDefault();
+        acceptGhost(activeGhost);
+        return;
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        ghostDismissedFor = value;
+        return;
+      }
+    }
+
     if (event.key !== 'Enter' || event.metaKey || event.ctrlKey || event.altKey) return;
     if (multiline) event.preventDefault();
     if (onenter && !event.shiftKey && !event.isComposing) {
@@ -352,6 +406,7 @@
   function onFocusOut(event: FocusEvent) {
     const next = event.relatedTarget;
     if (!(next instanceof Node) || !wrap?.contains(next)) {
+      focused = false;
       open = false;
       pickerOpen = false;
       if (multiline) {
@@ -401,7 +456,7 @@
       onfocus={onFocus}
       onclick={onClick}
       ondblclick={ondblclick}
-      onkeyup={() => { if (!suppressRefresh) { refreshMenu(); refreshPicker(); } }}
+      onkeyup={() => { updateCaret(); if (!suppressRefresh) { refreshMenu(); refreshPicker(); } }}
       onkeydown={onKeydown}
       onpaste={(event) => { onpaste?.(event); setTimeout(() => { refreshMenu(); refreshPicker(); void resizeMultilineInput(); }, 0); }}
       onscroll={syncScroll}
@@ -424,7 +479,7 @@
       onfocus={onFocus}
       onclick={onClick}
       ondblclick={ondblclick}
-      onkeyup={() => { if (!suppressRefresh) { refreshMenu(); refreshPicker(); } }}
+      onkeyup={() => { updateCaret(); if (!suppressRefresh) { refreshMenu(); refreshPicker(); } }}
       onkeydown={onKeydown}
       onpaste={(event) => { onpaste?.(event); setTimeout(() => { refreshMenu(); refreshPicker(); }, 0); }}
       onscroll={syncScroll}

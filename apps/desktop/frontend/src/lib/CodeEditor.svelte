@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from 'svelte';
-  import { Decoration, EditorView, ViewPlugin, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
-  import { EditorState, Compartment, RangeSetBuilder, type Extension } from '@codemirror/state';
+  import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { EditorState, Compartment, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
   import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
   import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
-  import { autocompletion, completionKeymap, closeBrackets, closeBracketsKeymap, type CompletionContext } from '@codemirror/autocomplete';
+  import { autocompletion, completionKeymap, completionStatus, closeBrackets, closeBracketsKeymap, type CompletionContext } from '@codemirror/autocomplete';
   import { forEachDiagnostic, linter, type Diagnostic } from '@codemirror/lint';
   import { tags } from '@lezer/highlight';
   import { selectedLineNumbersForComment } from './editorSelection';
@@ -15,6 +15,7 @@
   import { variableDisplayValue } from './variables';
   import { DYNAMIC_VARIABLES } from './dynamicVariables';
   import { maxLength as maxLengthFilter } from './editorLimit';
+  import type { EditorGhost } from './ghostText';
 
   type Lang = 'json' | 'javascript' | 'html' | 'xml' | 'graphql' | 'yaml' | 'text';
 
@@ -34,6 +35,7 @@
     maxLength = 0,
     onformat,
     validate,
+    ghost = undefined,
   }: {
     value?: string;
     language?: Lang;
@@ -50,6 +52,7 @@
     maxLength?: number;
     onformat?: () => void;
     validate?: (text: string) => Promise<{ line: number; message: string } | null>;
+    ghost?: (doc: string, pos: number) => EditorGhost | null;
   } = $props();
 
   let container: HTMLDivElement;
@@ -124,6 +127,10 @@
     '.cm-tooltip-autocomplete ul li[aria-selected]': {
       backgroundColor: 'var(--accent-dim)',
       color: 'var(--text)',
+    },
+    '.cm-ghost-text': {
+      color: 'var(--text-3)',
+      pointerEvents: 'none',
     },
     '.cm-placeholder': {
       color: 'var(--text-3)',
@@ -379,6 +386,92 @@
     return builder.finish();
   }
 
+  const setGhost = StateEffect.define<EditorGhost | null>();
+
+  const ghostField = StateField.define<EditorGhost | null>({
+    create: () => null,
+    update(current, tr) {
+      for (const effect of tr.effects) if (effect.is(setGhost)) return effect.value;
+      return tr.docChanged || tr.selection ? null : current;
+    },
+  });
+
+  class GhostWidget extends WidgetType {
+    text: string;
+    constructor(text: string) { super(); this.text = text; }
+    eq(other: GhostWidget) { return other.text === this.text; }
+    toDOM() {
+      const span = document.createElement('span');
+      span.className = 'cm-ghost-text';
+      span.setAttribute('aria-hidden', 'true');
+      span.dataset.testid = 'editor-ghost-text';
+      span.textContent = this.text;
+      return span;
+    }
+    ignoreEvent() { return true; }
+  }
+
+  const ghostDecorations = EditorView.decorations.compute([ghostField], state => {
+    const current = state.field(ghostField);
+    if (!current) return Decoration.none;
+    return Decoration.set([Decoration.widget({ widget: new GhostWidget(current.text), side: 1 }).range(state.selection.main.head)]);
+  });
+
+  function computeGhost(target: EditorView): EditorGhost | null {
+    const provider = ghost;
+    const selection = target.state.selection.main;
+    if (!provider || readonly || target.root.activeElement !== target.contentDOM || !selection.empty || completionStatus(target.state) === 'active') return null;
+    return provider(target.state.doc.toString(), selection.head);
+  }
+
+  const ghostPlugin = ViewPlugin.fromClass(class {
+    pending = false;
+    target: EditorView;
+    constructor(target: EditorView) { this.target = target; }
+    update(update: ViewUpdate) {
+      const completionChanged = completionStatus(update.startState) !== completionStatus(update.state);
+      if (!update.docChanged && !update.selectionSet && !update.focusChanged && !completionChanged) return;
+      if (this.pending) return;
+      this.pending = true;
+      queueMicrotask(() => {
+        this.pending = false;
+        const next = computeGhost(this.target);
+        const current = this.target.state.field(ghostField, false) ?? null;
+        if (!next && !current) return;
+        if (next && current && next.text === current.text && next.from === current.from && next.to === current.to && next.insert === current.insert) return;
+        this.target.dispatch({ effects: setGhost.of(next) });
+      });
+    }
+  });
+
+  function acceptGhost(target: EditorView) {
+    const current = target.state.field(ghostField, false);
+    if (!current) return false;
+    target.dispatch({
+      changes: { from: current.from, to: current.to, insert: current.insert },
+      selection: { anchor: current.from + current.insert.length },
+      effects: setGhost.of(null),
+      userEvent: 'input.complete',
+    });
+    return true;
+  }
+
+  function dismissGhost(target: EditorView) {
+    if (!target.state.field(ghostField, false)) return false;
+    target.dispatch({ effects: setGhost.of(null) });
+    return true;
+  }
+
+  const ghostExtension = [
+    ghostField,
+    ghostDecorations,
+    ghostPlugin,
+    Prec.highest(keymap.of([
+      { key: 'Tab', run: acceptGhost },
+      { key: 'Escape', run: dismissGhost },
+    ])),
+  ];
+
   const commentDecorationPlugin = ViewPlugin.fromClass(class {
     decorations: DecorationSet;
 
@@ -573,6 +666,7 @@
       indentOnInput(),
       autocompletion({ override: [variableCompletionSource] }),
       commentDecorationPlugin,
+      ghostExtension,
       kurloLinter,
       kurloLintTooltip,
       keymap.of([
