@@ -6,6 +6,10 @@ export function AckQuit() {
   return window['go']['api']['App']['AckQuit']();
 }
 
+export function AiConnections() {
+  return window['go']['api']['App']['AiConnections']();
+}
+
 export function AppInfo() {
   return window['go']['api']['App']['AppInfo']();
 }
@@ -24,6 +28,10 @@ export function AuthorizeOAuth2(arg1) {
 
 export function AuthorizeOAuth2Device(arg1) {
   return window['go']['api']['App']['AuthorizeOAuth2Device'](arg1);
+}
+
+export function CancelOpenRouterConnect() {
+  return window['go']['api']['App']['CancelOpenRouterConnect']();
 }
 
 export function CancelQuit() {
@@ -92,6 +100,10 @@ export function DenyCookieSyncPairing(arg1) {
 
 export function DiagnosticsReport() {
   return window['go']['api']['App']['DiagnosticsReport']();
+}
+
+export function DiscoverLocalAiServers() {
+  return window['go']['api']['App']['DiscoverLocalAiServers']();
 }
 
 export function ExportLoadTestK6(arg1, arg2) {
@@ -374,6 +386,10 @@ export function OpenLogFolder() {
   return window['go']['api']['App']['OpenLogFolder']();
 }
 
+export function OpenRouterConnectStatus() {
+  return window['go']['api']['App']['OpenRouterConnectStatus']();
+}
+
 export function OpenWorkspaceRoot(arg1) {
   return window['go']['api']['App']['OpenWorkspaceRoot'](arg1);
 }
@@ -406,6 +422,14 @@ export function RefreshOAuth2Token(arg1) {
   return window['go']['api']['App']['RefreshOAuth2Token'](arg1);
 }
 
+export function RemoveAiConnection(arg1) {
+  return window['go']['api']['App']['RemoveAiConnection'](arg1);
+}
+
+export function ReopenOpenRouterConnect() {
+  return window['go']['api']['App']['ReopenOpenRouterConnect']();
+}
+
 export function RestartApp() {
   return window['go']['api']['App']['RestartApp']();
 }
@@ -420,6 +444,10 @@ export function SSEConnect(arg1, arg2) {
 
 export function SSEDisconnect(arg1) {
   return window['go']['api']['App']['SSEDisconnect'](arg1);
+}
+
+export function SaveAiConnection(arg1) {
+  return window['go']['api']['App']['SaveAiConnection'](arg1);
 }
 
 export function SaveFileDialog(arg1, arg2) {
@@ -486,6 +514,10 @@ export function SetCookieSyncWorkspace(arg1) {
   return window['go']['api']['App']['SetCookieSyncWorkspace'](arg1);
 }
 
+export function SetDefaultAiConnection(arg1) {
+  return window['go']['api']['App']['SetDefaultAiConnection'](arg1);
+}
+
 export function SetDefaultWorkspaceLocation(arg1) {
   return window['go']['api']['App']['SetDefaultWorkspaceLocation'](arg1);
 }
@@ -534,6 +566,10 @@ export function StartMockServer(arg1) {
   return window['go']['api']['App']['StartMockServer'](arg1);
 }
 
+export function StartOpenRouterConnect() {
+  return window['go']['api']['App']['StartOpenRouterConnect']();
+}
+
 export function StopCookieSync() {
   return window['go']['api']['App']['StopCookieSync']();
 }
@@ -548,6 +584,10 @@ export function StopMockServer() {
 
 export function StoredHistoryResponseIDs() {
   return window['go']['api']['App']['StoredHistoryResponseIDs']();
+}
+
+export function TestAiConnection(arg1) {
+  return window['go']['api']['App']['TestAiConnection'](arg1);
 }
 
 export function UpsertCookie(arg1, arg2) {

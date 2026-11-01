@@ -8,6 +8,7 @@
   import { tick } from 'svelte';
   import { vm } from '../stores/app.svelte';
   import { AI_PRESETS, type AiPresetId } from '../stores/features/ai';
+  import { aiConnectionsStore } from '../stores/aiConnections.svelte';
 
   let open = $state(false);
   let modelInput = $state<HTMLInputElement>();
@@ -15,6 +16,13 @@
   let wrapEl = $state<HTMLDivElement>();
 
   const preset = $derived(vm.aiCurrentPreset());
+  const usesConnection = $derived(preset.id === 'kurlo');
+  const connection = $derived(aiConnectionsStore.defaultConnection);
+  const shownModel = $derived(usesConnection ? (connection?.model ?? '') : vm.aiModel.trim());
+
+  $effect(() => {
+    if (usesConnection) void aiConnectionsStore.refresh();
+  });
   const models = $derived(vm.aiModelOptions());
   const filter = $derived(vm.aiModel.trim().toLowerCase());
   const visibleModels = $derived(
@@ -23,7 +31,7 @@
 
   function autoLoadModels() {
     const key = `${vm.aiProvider}|${vm.url.trim()}`;
-    if (!vm.url.trim() || vm.aiModelOptions().length || vm.aiModelsLoading || autoLoaded.has(key)) return;
+    if (vm.aiProvider === 'kurlo' || !vm.url.trim() || vm.aiModelOptions().length || vm.aiModelsLoading || autoLoaded.has(key)) return;
     autoLoaded.add(key);
     void vm.loadAiModels();
   }
@@ -89,7 +97,7 @@
     onclick={toggle}
   >
     <span class="ai-model-provider">{preset.label}</span>
-    <span class="grpc-method-label" class:ai-model-empty={!vm.aiModel.trim()} title={vm.aiModel}>{vm.aiModel.trim() || 'Choose a model'}</span>
+    <span class="grpc-method-label" class:ai-model-empty={!shownModel} title={shownModel}>{shownModel || (usesConnection ? 'Choose a model in Settings → AI' : 'Choose a model')}</span>
     <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
       <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>
@@ -111,6 +119,18 @@
         {/each}
       </div>
 
+      {#if usesConnection}
+        <div class="ai-model-connection">
+          {#if connection}
+            <span class="ai-model-connection-name">{connection.label}</span>
+            <span class="ai-model-connection-model">{connection.model || 'No model chosen yet'}</span>
+          {:else}
+            <span class="ai-model-connection-name">No AI connection yet</span>
+          {/if}
+          <p class="ai-model-hint">The request uses the default connection and its model. Change both in Settings → AI.</p>
+          <button class="btn btn-secondary btn-sm" type="button" onclick={() => { open = false; vm.openSettings('ai'); }}>Open Settings → AI</button>
+        </div>
+      {:else}
       <label class="field-label" for="ai-model-input">Model</label>
       <input
         id="ai-model-input"
@@ -161,11 +181,20 @@
       {:else}
         <button class="btn btn-ghost btn-sm ai-model-retry" type="button" onclick={() => vm.loadAiModels()}>Load the provider's models</button>
       {/if}
+      {/if}
     </div>
   {/if}
 </div>
 
 <style>
+  .ai-model-connection {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1-5);
+  }
+  .ai-model-connection-name { font-weight: var(--weight-medium); color: var(--text); }
+  .ai-model-connection-model { font-family: var(--font-mono); font-size: var(--text-code); color: var(--text-2); word-break: break-all; }
   .ai-model-wrap :global(.grpc-method-label) {
     flex: 1 1 auto;
     justify-self: stretch;

@@ -4,12 +4,12 @@ import type { AiBlock, AiMessage, AiRequest, AiResponse, AiStep, AiUsage, HttpRe
 import type { AuthType, RequestTab, RequestType, SavedRequest } from '../../types/models';
 import { newRequestId } from '../../utils';
 
-export type AiPresetId = 'openai' | 'anthropic' | 'openrouter' | 'groq' | 'ollama' | 'lmstudio' | 'custom';
+export type AiPresetId = 'kurlo' | 'openai' | 'anthropic' | 'openrouter' | 'groq' | 'ollama' | 'lmstudio' | 'custom';
 
 export type AiPreset = {
   id: AiPresetId;
   label: string;
-  provider: 'openai' | 'anthropic';
+  provider: 'openai' | 'anthropic' | 'kurlo';
   url: string;
   auth: { type: AuthType; variable?: string };
   modelExample: string;
@@ -23,11 +23,13 @@ export const AI_PRESETS: AiPreset[] = [
   { id: 'ollama', label: 'Ollama', provider: 'openai', url: 'http://localhost:11434/v1', auth: { type: 'none' }, modelExample: 'llama3.2' },
   { id: 'lmstudio', label: 'LM Studio', provider: 'openai', url: 'http://localhost:1234/v1', auth: { type: 'none' }, modelExample: 'qwen2.5-7b-instruct' },
   { id: 'custom', label: 'Custom URL', provider: 'openai', url: '', auth: { type: 'bearer', variable: 'apiKey' }, modelExample: 'the model name your server expects' },
+  { id: 'kurlo', label: 'Kurlo connection', provider: 'kurlo', url: '', auth: { type: 'none' }, modelExample: 'the model chosen in Settings → AI' },
 ];
 
 export const AI_DEFAULT_PRESET = AI_PRESETS[0];
 
 export function aiPresetFor(url: string, provider: string): AiPreset {
+  if (provider === 'kurlo') return AI_PRESETS.find(preset => preset.id === 'kurlo')!;
   const clean = url.trim().replace(/\/+$/, '').toLowerCase();
   const match = AI_PRESETS.find(preset => preset.url && clean === preset.url.toLowerCase());
   if (match) return match;
@@ -383,7 +385,7 @@ export const aiFeature = {
       if (followUp === undefined) this.requestTab = 'body';
       return false;
     }
-    if (!(snapshot.aiModel ?? '').trim()) {
+    if (!(snapshot.aiModel ?? '').trim() && snapshot.aiProvider !== 'kurlo') {
       this.requestError = 'Choose a model before sending.';
       return false;
     }
@@ -411,7 +413,7 @@ export const aiFeature = {
       const runnable = this.savedRequestToRunnableAiRequest(
         snapshot, messages, envValues, this.activeSecretEnvironmentValues(), this.activeSecretEnvironmentKeys(), requestId,
       );
-      const keyProblem = aiUnresolvedKey(runnable.http);
+      const keyProblem = snapshot.aiProvider === 'kurlo' ? '' : aiUnresolvedKey(runnable.http);
       if (keyProblem) throw new Error(keyProblem);
       const response = await sendAiRequest({ ...runnable, turnId: turn.id });
       try { await this.applyEnvironmentChangesFromResponse(response.http, environmentId); } catch {  }

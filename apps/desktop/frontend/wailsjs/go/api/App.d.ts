@@ -5,6 +5,8 @@ import {api} from '../models';
 
 export function AckQuit():Promise<void>;
 
+export function AiConnections():Promise<model.AiConnectionsState>;
+
 export function AppInfo():Promise<model.AppInfo>;
 
 export function ApplyUpdate(arg1:model.UpdateInfo):Promise<string>;
@@ -14,6 +16,8 @@ export function ApproveCookieSyncPairing(arg1:string):Promise<model.CookieSyncSt
 export function AuthorizeOAuth2(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
 export function AuthorizeOAuth2Device(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
+
+export function CancelOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 
 export function CancelQuit():Promise<void>;
 
@@ -48,6 +52,8 @@ export function DeleteVariable(arg1:string):Promise<void>;
 export function DenyCookieSyncPairing(arg1:string):Promise<model.CookieSyncStatus>;
 
 export function DiagnosticsReport():Promise<string>;
+
+export function DiscoverLocalAiServers():Promise<model.AiLocalDiscovery>;
 
 export function ExportLoadTestK6(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
 
@@ -189,6 +195,8 @@ export function OpenLoadRunReport(arg1:string):Promise<string>;
 
 export function OpenLogFolder():Promise<string>;
 
+export function OpenRouterConnectStatus():Promise<model.OpenRouterConnectState>;
+
 export function OpenWorkspaceRoot(arg1:string):Promise<api.WorkspaceOpenResult>;
 
 export function PreviewLoadTestData(arg1:string):Promise<model.LoadDataPreview>;
@@ -205,6 +213,10 @@ export function ReadWorkspaceYAMLFile(arg1:string):Promise<api.WorkspaceYAMLFile
 
 export function RefreshOAuth2Token(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
+export function RemoveAiConnection(arg1:string):Promise<model.AiConnectionsState>;
+
+export function ReopenOpenRouterConnect():Promise<model.OpenRouterConnectState>;
+
 export function RestartApp():Promise<void>;
 
 export function RevokeCookieSyncPairing():Promise<model.CookieSyncStatus>;
@@ -212,6 +224,8 @@ export function RevokeCookieSyncPairing():Promise<model.CookieSyncStatus>;
 export function SSEConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
 
 export function SSEDisconnect(arg1:string):Promise<void>;
+
+export function SaveAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionsState>;
 
 export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
 
@@ -245,6 +259,8 @@ export function SetCookieSyncDomains(arg1:Array<string>):Promise<model.CookieSyn
 
 export function SetCookieSyncWorkspace(arg1:string):Promise<model.CookieSyncStatus>;
 
+export function SetDefaultAiConnection(arg1:string):Promise<model.AiConnectionsState>;
+
 export function SetDefaultWorkspaceLocation(arg1:string):Promise<api.DefaultWorkspaceLocationResult>;
 
 export function SetEnvironment(arg1:Record<string, string>):Promise<void>;
@@ -269,6 +285,8 @@ export function StartLoadRun(arg1:string,arg2:string):Promise<model.LoadRunState
 
 export function StartMockServer(arg1:model.MockServerConfig):Promise<model.MockServerStatus>;
 
+export function StartOpenRouterConnect():Promise<model.OpenRouterConnectState>;
+
 export function StopCookieSync():Promise<model.CookieSyncStatus>;
 
 export function StopLoadRun():Promise<model.LoadRunState>;
@@ -276,6 +294,8 @@ export function StopLoadRun():Promise<model.LoadRunState>;
 export function StopMockServer():Promise<model.MockServerStatus>;
 
 export function StoredHistoryResponseIDs():Promise<Array<string>>;
+
+export function TestAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionTestResult>;
 
 export function UpsertCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 

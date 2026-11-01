@@ -4,6 +4,7 @@
   import VariableInput from './VariableInput.svelte';
   import { urlGhost, urlGhostCandidates } from '../ghostText';
   import AiModelPicker from './AiModelPicker.svelte';
+  import { aiConnectionsStore } from '../stores/aiConnections.svelte';
   import { vm } from '../stores/app.svelte';
   import { aiEndpointParts } from '../stores/features/ai';
   import type { VariableSuggestion } from '../variables';
@@ -322,6 +323,12 @@
         {/if}
       </div>
 
+      {#if isAI && vm.aiProvider === 'kurlo'}
+      <button class="field url-input ai-connection-url" type="button" title="Uses the default connection in Settings → AI" aria-label="Default AI connection" onclick={() => vm.openSettings('ai')}>
+        <span class="ai-connection-url-label">{aiConnectionsStore.defaultConnection?.label ?? 'No AI connection yet'}</span>
+        <span class="ai-connection-url-hint">Settings → AI</span>
+      </button>
+      {:else}
       <VariableInput
         className="url-input"
         bind:inputRef={urlInputRef}
@@ -335,6 +342,7 @@
         onpaste={(event) => { onUrlPaste(event); keepHostVisible(); }}
         onenter={sendFromUrl}
       />
+      {/if}
     </div>
 
     {#if isAI}

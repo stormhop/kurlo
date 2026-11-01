@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  McpResponse, AiRequest, AiResponse, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -693,4 +693,50 @@ export async function previewLoadTestData(path: string): Promise<LoadDataPreview
 
 export async function saveLoadTestK6Folder(payload: string, inlineSecrets: boolean, parent: string): Promise<string> {
   return (await window.go?.api?.App?.SaveLoadTestK6Folder?.(payload, inlineSecrets, parent)) ?? 'Folder export is only available in the desktop app.';
+}
+
+const AI_DESKTOP_ONLY = 'AI connections are only available in the desktop app.';
+
+export async function aiConnections(): Promise<AiConnectionsState> {
+  return (await window.go?.api?.App?.AiConnections?.()) ?? { connections: [], error: AI_DESKTOP_ONLY };
+}
+
+export async function saveAiConnection(input: AiConnectionInput): Promise<AiConnectionsState> {
+  return (await window.go?.api?.App?.SaveAiConnection?.(input)) ?? { connections: [], error: AI_DESKTOP_ONLY };
+}
+
+export async function removeAiConnection(id: string): Promise<AiConnectionsState> {
+  return (await window.go?.api?.App?.RemoveAiConnection?.(id)) ?? { connections: [], error: AI_DESKTOP_ONLY };
+}
+
+export async function setDefaultAiConnection(id: string): Promise<AiConnectionsState> {
+  return (await window.go?.api?.App?.SetDefaultAiConnection?.(id)) ?? { connections: [], error: AI_DESKTOP_ONLY };
+}
+
+export async function testAiConnection(input: AiConnectionInput): Promise<AiConnectionTestResult> {
+  return (await window.go?.api?.App?.TestAiConnection?.(input)) ?? { ok: false, models: [], error: AI_DESKTOP_ONLY };
+}
+
+export async function discoverLocalAiServers(): Promise<AiLocalDiscovery> {
+  return (await window.go?.api?.App?.DiscoverLocalAiServers?.()) ?? { servers: [] };
+}
+
+export async function startOpenRouterConnect(): Promise<OpenRouterConnectState> {
+  return (await window.go?.api?.App?.StartOpenRouterConnect?.()) ?? { status: 'failed', authUrl: '', error: AI_DESKTOP_ONLY };
+}
+
+export async function cancelOpenRouterConnect(): Promise<OpenRouterConnectState> {
+  return (await window.go?.api?.App?.CancelOpenRouterConnect?.()) ?? { status: 'cancelled', authUrl: '' };
+}
+
+export async function reopenOpenRouterConnect(): Promise<OpenRouterConnectState> {
+  return (await window.go?.api?.App?.ReopenOpenRouterConnect?.()) ?? { status: 'idle', authUrl: '' };
+}
+
+export async function openRouterConnectStatus(): Promise<OpenRouterConnectState> {
+  return (await window.go?.api?.App?.OpenRouterConnectStatus?.()) ?? { status: 'idle', authUrl: '' };
+}
+
+export function onOpenRouterConnect(callback: (state: OpenRouterConnectState) => void): () => void {
+  return window.runtime?.EventsOn?.<OpenRouterConnectState>('ai:openrouter-connect', callback) ?? (() => {});
 }

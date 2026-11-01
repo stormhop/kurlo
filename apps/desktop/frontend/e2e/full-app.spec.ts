@@ -4804,6 +4804,83 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(panel).toContainText('Send the prompt to start a conversation.');
   });
 
+  test('sends an AI request through the Kurlo connection from settings', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const connections = [
+        { id: 'c1', kind: 'anthropic', label: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-5', hasKey: true, keyHint: 'sk-ant-…XYZ', default: true, provider: 'anthropic' },
+        { id: 'c2', kind: 'compatible', label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', hasKey: true, keyHint: 'sk-…d5e', default: false, provider: 'openai' },
+      ];
+      const app = window.go.api.App as Record<string, unknown>;
+      app.AiConnections = async () => ({ connections: structuredClone(connections) });
+      app.SetDefaultAiConnection = async (id: string) => {
+        for (const connection of connections) connection.default = connection.id === id;
+        return { connections: structuredClone(connections) };
+      };
+    });
+    await page.goto('/');
+
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await page.getByLabel('Provider and model').click();
+    await page.getByRole('radio', { name: 'Kurlo connection' }).click();
+    await expect(page.getByLabel('Provider base URL')).toHaveCount(0);
+    const menu = page.getByRole('dialog', { name: 'Provider and model' });
+    await expect(menu).toContainText('Anthropic');
+    await expect(menu).toContainText('claude-sonnet-4-5');
+    await expect(menu.getByLabel('Model', { exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    const connectionButton = page.getByRole('button', { name: 'Default AI connection' });
+    await expect(connectionButton).toContainText('Anthropic');
+    await expect(page.getByRole('button', { name: 'Provider and model' })).toContainText('claude-sonnet-4-5');
+
+    await fillCodeEditor(page, 'ai-prompt-editor', 'Hello');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.locator('.ai-text').last()).toBeVisible();
+    const sent = await page.evaluate(() => window.__kurloE2E.sentAiRequests);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ provider: 'kurlo', model: '' });
+    expect((sent[0].http as Record<string, unknown>).url).toBe('');
+    expect((sent[0].http as Record<string, unknown>).auth).toMatchObject({ type: 'none' });
+
+    await connectionButton.click();
+    const panel = page.locator('#settings-panel-ai');
+    await panel.getByRole('listitem').filter({ hasText: 'DeepSeek' }).getByRole('button', { name: 'Make default' }).click();
+    await expect(panel.getByRole('listitem').filter({ hasText: 'DeepSeek' })).toContainText('Default');
+    await page.getByRole('button', { name: 'Close settings' }).click();
+    await expect(connectionButton).toContainText('DeepSeek');
+    await expect(page.getByRole('button', { name: 'Provider and model' })).toContainText('deepseek-chat');
+  });
+
+  test('ignores the old auth of a request switched to the Kurlo connection', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const app = window.go.api.App as Record<string, unknown>;
+      app.AiConnections = async () => ({ connections: [{ id: 'c1', kind: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: 'deepseek-flash', hasKey: true, keyHint: 'sk-or-v1-…bb9', default: true, provider: 'openai' }] });
+      app.TestAiConnection = async () => ({ ok: true, models: [{ id: 'deepseek-flash', name: 'DeepSeek Flash', recommended: false, weakTools: false }] });
+    });
+    await page.goto('/');
+
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await page.getByRole('tab', { name: /^Auth/ }).click();
+    await page.locator('#bearer-token').fill('{{missingSecretKey}}');
+    await page.getByLabel('Provider and model').click();
+    await page.getByRole('radio', { name: 'Kurlo connection' }).click();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('note')).toContainText('The auth below is not sent');
+
+    await page.getByRole('tab', { name: /^Prompt/ }).click();
+    await fillCodeEditor(page, 'ai-prompt-editor', 'привет bro');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.locator('.ai-text').last()).toBeVisible();
+    const sent = await page.evaluate(() => window.__kurloE2E.sentAiRequests);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]).toMatchObject({ provider: 'kurlo', model: '' });
+    expect((sent[0].http as Record<string, unknown>).auth).toMatchObject({ type: 'none' });
+    expect(JSON.stringify(sent[0].http)).not.toContain('missingSecretKey');
+  });
+
   test('keeps the AI prompt and settings inside a narrow request panel', async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 470 });
     await installKurloBridge(page);
@@ -5350,6 +5427,152 @@ test.describe('Startup screen', () => {
     await expect(card.getByRole('radio', { name: /Where you left off/ })).toHaveAttribute('aria-checked', 'true');
     await expect(card.locator('.settings-card-subtitle')).toHaveText('Where you left off');
     expect(await page.evaluate(() => localStorage.getItem('kurlo.startupView.v1'))).toBe('restore');
+  });
+
+  test('scrolls to the new key form below a long list of AI connections', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const connections = Array.from({ length: 9 }, (_, index) => ({ id: `c${index}`, kind: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: '', hasKey: true, keyHint: '…sd', default: index === 0, provider: 'openai' }));
+      (window.go.api.App as Record<string, unknown>).AiConnections = async () => ({ connections });
+    });
+    await page.goto('/');
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'AI', exact: true }).click();
+    const panel = page.locator('#settings-panel-ai');
+    await panel.getByRole('button', { name: 'Add key' }).click();
+    const form = panel.getByRole('form', { name: 'Add an API key' });
+    await expect(form.getByLabel('API key')).toBeFocused();
+    await expect(form.getByRole('button', { name: 'Save' })).toBeInViewport();
+  });
+
+  test('stops offering new AI connections at the limit and wraps long model errors', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const connections = Array.from({ length: 10 }, (_, index) => ({ id: `c${index}`, kind: 'openai', label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: '', hasKey: true, keyHint: '…sd', default: index === 0, provider: 'openai' }));
+      const app = window.go.api.App as Record<string, unknown>;
+      app.AiConnections = async () => ({ connections });
+      app.TestAiConnection = async () => ({ ok: false, models: [], error: 'The API key was not accepted: invalid_request_error: Incorrect API key provided: [your key]. You can find your API key at https://platform.openai.com/account/api-keys.' });
+    });
+    await page.goto('/');
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'AI', exact: true }).click();
+    const panel = page.locator('#settings-panel-ai');
+    await expect(panel.getByRole('status')).toContainText('You have 10 connections');
+    await expect(panel.getByRole('button', { name: 'Add key' })).toHaveCount(0);
+    await expect(panel.getByRole('button', { name: 'Make default' })).toHaveCount(9);
+
+    await panel.getByRole('button', { name: /Model for/ }).nth(3).click();
+    const error = page.locator('.ai-combo-error');
+    await expect(error).toContainText('[your key]');
+    const contained = await page.evaluate(() => {
+      const menu = document.querySelector('.ai-combo-menu')!.getBoundingClientRect();
+      const message = document.querySelector('.ai-combo-error')!;
+      return message.scrollWidth <= message.clientWidth && message.getBoundingClientRect().right <= menu.right;
+    });
+    expect(contained).toBe(true);
+  });
+
+  test('connects AI models with a key, OpenRouter and removal', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      type Connection = { id: string; kind: string; label: string; baseUrl: string; model: string; hasKey: boolean; keyHint: string; default: boolean; provider: string };
+      const store: { connections: Connection[]; saved: unknown[] } = { connections: [], saved: [] };
+      const labels: Record<string, string> = { anthropic: 'Anthropic', openrouter: 'OpenRouter', openai: 'OpenAI', compatible: 'OpenAI-compatible', local: 'Local model' };
+      const view = () => ({ connections: store.connections.map(connection => ({ ...connection, default: connection.id === store.connections[0]?.id })) });
+      const app = window.go.api.App as Record<string, unknown>;
+      app.AiConnections = async () => view();
+      app.SaveAiConnection = async (input: { id: string; kind: string; key: string; model: string; baseUrl: string }) => {
+        store.saved.push({ ...input, key: input.key ? 'set' : '' });
+        const existing = store.connections.find(connection => connection.id === input.id);
+        if (existing) {
+          existing.model = input.model;
+          return view();
+        }
+        store.connections.push({ id: `c${store.connections.length + 1}`, kind: input.kind, label: labels[input.kind], baseUrl: input.baseUrl || 'https://api.anthropic.com/v1', model: input.model, hasKey: Boolean(input.key), keyHint: 'sk-ant-…XYZ', default: false, provider: 'anthropic' });
+        return view();
+      };
+      app.RemoveAiConnection = async (id: string) => {
+        store.connections = store.connections.filter(connection => connection.id !== id);
+        return view();
+      };
+      app.SetDefaultAiConnection = async () => view();
+      app.TestAiConnection = async (input: { key: string }) => input.key === 'sk-ant-good'
+        ? { ok: true, models: [{ id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', recommended: true, weakTools: false }, { id: 'claude-3-haiku', name: 'Claude 3 Haiku', recommended: false, weakTools: false }] }
+        : { ok: false, models: [], error: 'The API key was not accepted' };
+      app.DiscoverLocalAiServers = async () => ({ servers: [] });
+      app.OpenRouterConnectStatus = async () => ({ status: 'idle', authUrl: '' });
+      app.StartOpenRouterConnect = async () => ({ status: 'waiting', authUrl: 'https://openrouter.ai/auth?callback_url=x' });
+      app.CancelOpenRouterConnect = async () => ({ status: 'cancelled', authUrl: '' });
+      app.ReopenOpenRouterConnect = async () => ({ status: 'waiting', authUrl: 'https://openrouter.ai/auth?callback_url=x' });
+      (window as unknown as { __aiStore: typeof store }).__aiStore = store;
+    });
+    await page.goto('/');
+
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'AI', exact: true }).click();
+    const panel = page.locator('#settings-panel-ai');
+    await expect(panel.getByText('Connect a model')).toBeVisible();
+
+    await panel.getByRole('button', { name: 'Add key' }).click();
+    const form = panel.getByRole('form', { name: 'Add an API key' });
+    await expect(form.getByLabel('API key')).toBeFocused();
+    await expect(form).toBeInViewport();
+    await form.getByLabel('API key').fill('sk-ant-bad');
+    await form.getByRole('button', { name: 'Test' }).click();
+    await expect(form.getByRole('alert')).toHaveText('The API key was not accepted');
+    await form.getByLabel('API key').fill('sk-ant-good');
+    await form.getByRole('button', { name: 'Test' }).click();
+    await expect(form.getByText('The key works. 2 models available.')).toBeVisible();
+    await form.getByRole('button', { name: 'Model' }).click();
+    await page.getByRole('textbox', { name: 'Search models' }).fill('haiku');
+    await expect(page.getByRole('option')).toHaveCount(1);
+    await page.getByRole('option', { name: /Claude 3 Haiku/ }).click();
+    await expect(form.getByRole('button', { name: 'Model' })).toContainText('Claude 3 Haiku');
+    await form.getByRole('button', { name: 'Model' }).click();
+    await page.getByRole('textbox', { name: 'Search models' }).fill('sonnet');
+    await page.keyboard.press('Enter');
+    await expect(form.getByRole('button', { name: 'Model' })).toContainText('Claude Sonnet 4.5');
+    await form.getByRole('button', { name: 'Save' }).click();
+    await expect(form).toBeHidden();
+
+    const list = panel.getByRole('list', { name: 'AI connections' });
+    const anthropic = list.getByRole('listitem').filter({ hasText: 'Anthropic' });
+    await expect(anthropic).toContainText('Default');
+    await expect(anthropic).toContainText('claude-sonnet-4-5');
+    await expect(anthropic).toContainText('sk-ant-…XYZ');
+    expect(await page.evaluate(() => (window as unknown as { __aiStore: { saved: Array<{ kind: string; key: string; model: string }> } }).__aiStore.saved))
+      .toEqual([expect.objectContaining({ kind: 'anthropic', key: 'set', model: 'claude-sonnet-4-5' })]);
+    await expect(panel.getByText('Add another connection')).toBeVisible();
+    await captureDocsScreenshot(page, 'settings-ai');
+    await anthropic.getByRole('button', { name: /Model for/ }).click();
+    await expect(page.getByRole('textbox', { name: 'Search models' })).toBeFocused();
+    const placement = await page.evaluate(() => {
+      const menu = document.querySelector('.ai-combo-menu')!.getBoundingClientRect();
+      const body = document.querySelector('#settings-panel-ai')!;
+      const box = body.getBoundingClientRect();
+      return { scrollLeft: body.scrollLeft, fits: menu.left >= box.left && menu.right <= box.left + body.clientWidth };
+    });
+    expect(placement).toEqual({ scrollLeft: 0, fits: true });
+    await page.keyboard.press('Escape');
+
+    await panel.getByRole('button', { name: 'Connect OpenRouter' }).click();
+    await expect(panel.getByText('Finish signing in in your browser')).toBeVisible();
+    await page.evaluate(() => {
+      const store = (window as unknown as { __aiStore: { connections: Array<Record<string, unknown>> } }).__aiStore;
+      store.connections.push({ id: 'or', kind: 'openrouter', label: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1', model: '', hasKey: true, keyHint: 'sk-or-v1-…789', default: false, provider: 'openai' });
+      window.__kurloE2E.emit('ai:openrouter-connect', { status: 'connected', authUrl: '' });
+    });
+    await expect(list.getByRole('listitem').filter({ hasText: 'OpenRouter' })).toContainText('sk-or-v1-…789');
+    await expect(panel.getByRole('button', { name: 'Reconnect' })).toBeVisible();
+    const fieldLefts = await panel.getByRole('button', { name: /Model for/ }).evaluateAll(nodes => nodes.map(node => Math.round(node.getBoundingClientRect().left)));
+    expect(new Set(fieldLefts).size).toBe(1);
+
+    const remove = anthropic.getByRole('button', { name: 'Remove' });
+    await remove.click();
+    await anthropic.getByRole('button', { name: 'Remove?' }).click();
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await expect(list.getByRole('listitem').first()).toContainText('OpenRouter');
+    await expect(list.getByRole('listitem').first()).toContainText('Default');
   });
 });
 

@@ -736,6 +736,205 @@ export namespace model {
 	        this.data = source["data"];
 	    }
 	}
+	export class AiConnection {
+	    id: string;
+	    kind: string;
+	    label: string;
+	    baseUrl: string;
+	    model: string;
+	    hasKey: boolean;
+	    keyHint: string;
+	    default: boolean;
+	    provider: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiConnection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.kind = source["kind"];
+	        this.label = source["label"];
+	        this.baseUrl = source["baseUrl"];
+	        this.model = source["model"];
+	        this.hasKey = source["hasKey"];
+	        this.keyHint = source["keyHint"];
+	        this.default = source["default"];
+	        this.provider = source["provider"];
+	    }
+	}
+	export class AiConnectionInput {
+	    id: string;
+	    kind: string;
+	    label: string;
+	    baseUrl: string;
+	    key: string;
+	    model: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiConnectionInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.kind = source["kind"];
+	        this.label = source["label"];
+	        this.baseUrl = source["baseUrl"];
+	        this.key = source["key"];
+	        this.model = source["model"];
+	    }
+	}
+	export class AiConnectionModel {
+	    id: string;
+	    name: string;
+	    recommended: boolean;
+	    weakTools: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiConnectionModel(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.recommended = source["recommended"];
+	        this.weakTools = source["weakTools"];
+	    }
+	}
+	export class AiConnectionTestResult {
+	    ok: boolean;
+	    models: AiConnectionModel[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiConnectionTestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.models = this.convertValues(source["models"], AiConnectionModel);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiConnectionsState {
+	    connections: AiConnection[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AiConnectionsState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.connections = this.convertValues(source["connections"], AiConnection);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiLocalServer {
+	    name: string;
+	    baseUrl: string;
+	    models: AiConnectionModel[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AiLocalServer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.baseUrl = source["baseUrl"];
+	        this.models = this.convertValues(source["models"], AiConnectionModel);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AiLocalDiscovery {
+	    servers: AiLocalServer[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AiLocalDiscovery(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.servers = this.convertValues(source["servers"], AiLocalServer);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class AiMessage {
 	    role: string;
 	    blocks: AiBlock[];
@@ -2993,6 +3192,42 @@ export namespace model {
 	        this.error = source["error"];
 	        this.error_description = source["error_description"];
 	    }
+	}
+	export class OpenRouterConnectState {
+	    status: string;
+	    authUrl: string;
+	    error?: string;
+	    connection?: AiConnection;
+	
+	    static createFrom(source: any = {}) {
+	        return new OpenRouterConnectState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.status = source["status"];
+	        this.authUrl = source["authUrl"];
+	        this.error = source["error"];
+	        this.connection = this.convertValues(source["connection"], AiConnection);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	
 	

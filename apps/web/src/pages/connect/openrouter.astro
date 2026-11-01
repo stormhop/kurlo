@@ -1,0 +1,120 @@
+---
+import SiteLayout from '../../components/SiteLayout.astro';
+---
+
+<SiteLayout title="Connecting Kurlo to OpenRouter" description="Finishing the OpenRouter sign-in for the Kurlo desktop app." noindex overlay={false}>
+  <section class="k-connect" aria-live="polite">
+    <div class="k-connect-card">
+      <div class="k-connect-logos" aria-hidden="true">
+        <span class="k-connect-logo">K</span>
+        <span class="k-connect-dots"><i></i><i></i><i></i></span>
+        <span class="k-connect-logo k-connect-logo-or">OR</span>
+      </div>
+      <h1 data-connect-title>Connecting Kurlo to OpenRouter</h1>
+      <p data-connect-detail>Handing the sign-in back to the Kurlo app on this computer…</p>
+      <a class="k-btn k-btn-solid k-connect-btn" data-connect-link hidden>Return to Kurlo</a>
+      <p class="k-connect-note">Your key is created by OpenRouter and stays on this computer. This page never sees it.</p>
+    </div>
+  </section>
+</SiteLayout>
+
+<script is:inline>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var code = params.get('code') || '';
+    var state = params.get('state') || '';
+    var title = document.querySelector('[data-connect-title]');
+    var detail = document.querySelector('[data-connect-detail]');
+    var link = document.querySelector('[data-connect-link]');
+    var match = /^(\d{2,5})\.([A-Za-z0-9_-]{16,64})$/.exec(state);
+    var port = match ? Number(match[1]) : 0;
+    if (!code || !match || port < 1024 || port > 65535) {
+      title.textContent = 'This sign-in link is incomplete';
+      detail.textContent = 'Go back to Kurlo and click Connect OpenRouter again.';
+      return;
+    }
+    var target = 'http://127.0.0.1:' + port + '/callback?' + new URLSearchParams({ code: code, state: state }).toString();
+    if (window.history && window.history.replaceState) window.history.replaceState(null, '', window.location.pathname);
+    link.href = target;
+    link.hidden = false;
+    window.setTimeout(function () {
+      detail.textContent = 'If Kurlo did not open, click Return to Kurlo. The sign-in works for ten minutes.';
+    }, 2500);
+    window.location.replace(target);
+  })();
+</script>
+
+<style>
+  .k-connect {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background: #111113;
+    color: #ececef;
+  }
+  .k-connect-card {
+    max-width: 26rem;
+    text-align: center;
+  }
+  .k-connect-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-bottom: 1.75rem;
+  }
+  .k-connect-logo {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    background: #5865f2;
+    color: #fff;
+  }
+  .k-connect-logo-or {
+    background: #23242e;
+    font-size: 0.8rem;
+    letter-spacing: 0.05em;
+  }
+  .k-connect-dots {
+    display: inline-flex;
+    gap: 0.3rem;
+  }
+  .k-connect-dots i {
+    width: 0.35rem;
+    height: 0.35rem;
+    border-radius: 50%;
+    background: #85858e;
+    animation: k-connect-pulse 1.2s infinite ease-in-out;
+  }
+  .k-connect-dots i:nth-child(2) { animation-delay: 0.15s; }
+  .k-connect-dots i:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes k-connect-pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+  .k-connect h1 {
+    font-size: 1.5rem;
+    margin: 0 0 0.6rem;
+  }
+  .k-connect p {
+    color: #a6a6ae;
+    line-height: 1.55;
+    margin: 0;
+  }
+  .k-connect-btn {
+    margin-top: 1.5rem;
+    display: inline-flex;
+  }
+  .k-connect-btn[hidden] { display: none; }
+  .k-connect-note {
+    margin-top: 2rem !important;
+    font-size: 0.8rem;
+    color: #85858e !important;
+  }
+</style>

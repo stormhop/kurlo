@@ -13,6 +13,7 @@ const appPreferencesFileName = "preferences.json"
 type appPreferences struct {
 	DefaultWorkspaceLocation string                 `json:"defaultWorkspaceLocation,omitempty"`
 	CookieSync               *cookieSyncPreferences `json:"cookieSync,omitempty"`
+	AiConnections            []savedAiConnection    `json:"aiConnections,omitempty"`
 }
 
 type cookieSyncPreferences struct {

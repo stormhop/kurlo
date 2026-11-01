@@ -56,6 +56,9 @@
   }
 </script>
 
+{#if vm.requestType === 'ai' && vm.aiProvider === 'kurlo'}
+  <p class="auth-connection-note" role="note">This request uses the default connection from Settings → AI, which adds its own key. The auth below is not sent.</p>
+{/if}
 <div class="auth-section">
   <div class="auth-type-column">
     <span class="field-label">Auth type</span>

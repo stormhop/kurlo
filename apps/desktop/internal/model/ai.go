@@ -3,6 +3,7 @@ package model
 const (
 	AiProviderOpenAI    = "openai"
 	AiProviderAnthropic = "anthropic"
+	AiProviderKurlo     = "kurlo"
 
 	AiBlockText       = "text"
 	AiBlockThinking   = "thinking"

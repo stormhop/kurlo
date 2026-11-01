@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AiConnectionsSettings from './AiConnectionsSettings.svelte';
   import Keycaps from './Keycaps.svelte';
   import { openExternalURL } from '../externalLinks';
   import { KURLO_REPO_URL } from '../starPrompt';
@@ -76,6 +77,7 @@
     { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave manual save default location workspace collection folder data export import backup script engine javascript tengo' },
     { id: 'theme', label: 'Theme', keywords: 'theme appearance dark light system color scheme' },
     { id: 'proxy', label: 'Proxy', keywords: 'proxy http https socks5 system bypass network hostname port credentials' },
+    { id: 'ai', label: 'AI', keywords: 'ai agent model llm openrouter anthropic claude openai gpt key api byok ollama lm studio local connection' },
     { id: 'shortcuts', label: 'Shortcuts', keywords: 'shortcuts keybindings keyboard hotkeys' },
     { id: 'support', label: 'Support', keywords: 'support report issues bug github questions telegram help' },
     { id: 'about', label: 'About', keywords: 'updates check upgrade release notes about version platform runtime auto update install' },
@@ -436,6 +438,11 @@
                   <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" stroke-width="1.3"/>
                   <path d="M1.5 7.5h12M7.5 1.5c2 2 2 10 0 12M7.5 1.5c-2 2-2 10 0 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                 </svg>
+              {:else if item.id === 'ai'}
+                <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+                  <path d="M6.5 2l1.2 3.3L11 6.5 7.7 7.7 6.5 11 5.3 7.7 2 6.5l3.3-1.2L6.5 2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                  <path d="M11.5 9.5l.5 1.5 1.5.5-1.5.5-.5 1.5-.5-1.5-1.5-.5 1.5-.5.5-1.5z" fill="currentColor"/>
+                </svg>
               {:else if item.id === 'shortcuts'}
                 <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 15 15" fill="none" aria-hidden="true">
                   <rect x="1.5" y="3.5" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
@@ -656,6 +663,10 @@
             </div>
           </div>
         </div>
+      {/if}
+
+      {#if settingsTab === 'ai'}
+        <AiConnectionsSettings />
       {/if}
 
       {#if settingsTab === 'general'}

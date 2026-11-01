@@ -26,7 +26,7 @@ Inside that directory you may find:
 - `requests.json` — an AES-256-GCM encrypted JSON envelope containing local profile state, history, workspace cookies, Git-local secret values, and storage metadata.
 - `request-store.key` — a base64-encoded recovery copy of the encryption key, written with owner-only `0600` permissions.
 - `request-store.key.dpapi` — an additional Windows DPAPI-protected key copy.
-- `preferences.json` — the configured default workspace location. Other UI preferences are stored by the desktop WebView.
+- `preferences.json` — the configured default workspace location, cookie sync settings, and [AI connections](/docs/guides/settings/#ai) with their keys encrypted by the request-store key. Other UI preferences are stored by the desktop WebView.
 - `workspaces/` — the default folder-backed YAML workspace location.
 
 If you select another workspace folder or Git repository, its shared YAML files live at that selected path. Those files are intentionally human-readable and are not encrypted as a unit.
@@ -59,15 +59,18 @@ A few bounded categories of network calls happen on your behalf:
 5. **Git remotes.** Clone, fetch, pull, push, remote tests, and remote branch actions contact the Git server you configured.
 6. **An OpenAPI spec you import from a URL.** *Import collection -> OpenAPI / Swagger from URL* fetches the link you paste, through the same sender your requests use, so it honours your proxy settings and the response cap. Cookies are not attached to it.
 
+7. **AI connections.** When you test an AI connection or load its models, Kurlo calls that provider's model list (and, for OpenRouter, its key check) with your key. Connecting OpenRouter opens openrouter.ai in your browser; after you approve, OpenRouter sends the browser to `kurlo.dev/connect/openrouter/`, a static page that forwards it to Kurlo on `127.0.0.1`, and Kurlo exchanges the code for a key at `openrouter.ai/api/v1/auth/keys`. The code passes through that page's URL but cannot be exchanged without a secret that never leaves Kurlo, and it expires after ten minutes. If kurlo.dev cannot be reached, OpenRouter returns to `localhost` directly. *Find local models* only contacts `127.0.0.1` ports 11434 and 1234. These calls follow the system proxy environment variables, not the proxy configured in Kurlo.
+
 Proxy settings can route these requests through your selected system or custom proxy. There is no separate telemetry channel or first-launch ping.
 
 ## Ports Kurlo opens on your machine
 
-Three features bind a local listener. All three are loopback-only (`127.0.0.1`), so nothing on your network can reach them, and none of them is open unless you start it.
+Four features bind a local listener. All four are loopback-only (`127.0.0.1`, and `::1` for the OpenRouter sign-in), so nothing on your network can reach them, and none of them is open unless you start it.
 
 | Listener | When it exists | What it serves |
 |----------|----------------|----------------|
 | OAuth 2.0 redirect | Only while an Authorization Code sign-in is in flight, on an ephemeral port | The single `/callback` that receives the authorization code, then closes |
+| OpenRouter sign-in | Only while *Connect OpenRouter* is waiting (at most five minutes), on an ephemeral port | The single `/callback` that receives OpenRouter's code, then closes |
 | [Cookie sync](/docs/guides/cookies/#sync-cookies-from-your-browser) bridge | While *Sync Cookies* is on (ports 3199-3203) | Pairing and the WebSocket a paired browser pushes cookies over. Extension origins only; a web page probing the port gets a `403` |
 | [Mock server](/docs/guides/mock-server/) | While you have it running, on the port you choose | The saved examples of the collection you pointed it at — status, headers and body as recorded. Any program on your machine that can reach the port can read them, so treat a mock made from real responses accordingly. In a browser, only a page served from this machine is answered; a site on another host gets a `403` |
 

@@ -7,6 +7,14 @@ type Wire<T> = T extends (infer U)[]
     : T;
 
 export type AppInfo = Wire<model.AppInfo>;
+export type AiConnection = Wire<model.AiConnection>;
+export type AiConnectionsState = Wire<model.AiConnectionsState>;
+export type AiConnectionInput = Wire<model.AiConnectionInput>;
+export type AiConnectionModel = Wire<model.AiConnectionModel>;
+export type AiConnectionTestResult = Wire<model.AiConnectionTestResult>;
+export type AiLocalServer = Wire<model.AiLocalServer>;
+export type AiLocalDiscovery = Wire<model.AiLocalDiscovery>;
+export type OpenRouterConnectState = Wire<model.OpenRouterConnectState>;
 export type AuthConfig = Wire<model.AuthConfig>;
 export type ConnectionInfo = Wire<model.ConnectionInfo>;
 export type CookieJarResult = Wire<model.CookieJarResult>;

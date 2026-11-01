@@ -198,7 +198,7 @@ export default defineConfig({
       disable404Route: true,
     }),
     sitemap({
-      filter: page => !page.endsWith('/pricing/'),
+      filter: page => !page.endsWith('/pricing/') && !page.includes('/connect/'),
       serialize: item => {
         const lastmod = lastModified(new URL(item.url).pathname);
         return lastmod ? { ...item, lastmod } : item;

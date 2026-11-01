@@ -275,7 +275,9 @@ export const requestSerializationFeature = {
     secretEnvironmentKeys = this.activeSecretEnvironmentKeys(),
     requestId = req.id,
   ): AiRequest {
-    const base = this.savedRequestToRunnableHttpRequest(req, envValues, secretEnvironmentValues, secretEnvironmentKeys, requestId);
+    const usesConnection = req.aiProvider === 'kurlo';
+    const source = usesConnection ? { ...req, url: '', auth: { ...req.auth, type: 'none' as const } } : req;
+    const base = this.savedRequestToRunnableHttpRequest(source, envValues, secretEnvironmentValues, secretEnvironmentKeys, requestId);
     const resolved = this.requestWithCollectionDefaults(req);
     const values = this.environmentValuesForRequest(req, envValues);
     const resolve = (value: string) => this.resolveTemplate(value, values);
@@ -292,14 +294,15 @@ export const requestSerializationFeature = {
       http: {
         ...base,
         method: 'POST',
-        url: resolve((resolved.url ?? '').trim()),
+        url: usesConnection ? '' : resolve((resolved.url ?? '').trim()),
+        auth: usesConnection ? { ...clearedAuth(base.auth), type: 'none' } : base.auth,
         bodyType: 'none',
         body: '',
         formData: [],
         bodyFilePath: '',
       },
       provider: resolved.aiProvider || 'openai',
-      model: resolve((resolved.aiModel ?? '').trim()),
+      model: usesConnection ? '' : resolve((resolved.aiModel ?? '').trim()),
       system: resolve(resolved.aiSystem ?? ''),
       messages: messages.map(message => message.role === 'user'
         ? { ...message, blocks: message.blocks.map(block => block.type === 'text' ? { ...block, text: resolve(block.text ?? '') } : block) }
@@ -398,4 +401,8 @@ function isRawBodyType(type: string): type is (typeof RAW_BODY_TYPES)[number] {
 
 function bodyContentForSend(host: RequestSerializationHost, req: SavedRequest): string {
   return isRawBodyType(req.bodyType) ? host.stripBodyComments(req.bodyContent, req.bodyType) : req.bodyContent;
+}
+
+function clearedAuth<T extends object>(auth: T): T {
+  return Object.fromEntries(Object.entries(auth).map(([key, value]) => [key, typeof value === 'string' ? '' : value])) as T;
 }

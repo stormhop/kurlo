@@ -2165,3 +2165,36 @@ textarea.url-input {
 .radio-group {
   justify-self: start;
 }
+
+.ai-connection-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.ai-connection-url-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-connection-url-hint {
+  flex: 0 0 auto;
+  font-size: var(--text-caption);
+  color: var(--text-3);
+}
+
+.auth-connection-note {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-2);
+  font-size: var(--text-label);
+}

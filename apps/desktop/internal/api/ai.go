@@ -47,6 +47,15 @@ func (a *App) SendAiRequest(req model.AiRequest) model.AiResponse {
 	if a.ctx != nil {
 		baseCtx = a.ctx
 	}
+	connectionKey := ""
+	if strings.EqualFold(strings.TrimSpace(req.Provider), model.AiProviderKurlo) {
+		resolved, key, err := resolveKurloAiRequest(req)
+		if err != nil {
+			return model.NormalizeAiResponse(model.AiResponse{Error: err.Error()})
+		}
+		req = resolved
+		connectionKey = key
+	}
 	ctx, cancel := context.WithCancel(baseCtx)
 	seq := a.registerRequestCancel(req.HTTP.RequestID, cancel)
 	defer func() {
@@ -72,7 +81,7 @@ func (a *App) SendAiRequest(req model.AiRequest) model.AiResponse {
 	}
 	out := runner.run()
 	out = finishAiTests(ctx, req, out, a.state, a.cookieJars)
-	return model.NormalizeAiResponse(out)
+	return model.NormalizeAiResponse(redactAiResponseKey(out, connectionKey))
 }
 
 func aiLengthError(req model.AiRequest) string {

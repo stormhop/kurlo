@@ -215,7 +215,7 @@ request:
 | `mcpMethod`, `mcpName`, `mcpArguments` | The MCP call: the method (`tools/list`, `tools/call` and the like), the tool, resource or prompt name, and the arguments as JSON text. |
 | `mcpProtocolVersion` | Pins an MCP protocol revision, such as `2025-06-18`. Empty lets Kurlo find the one the server speaks. |
 | `grpcMethod`, `grpcUseReflection`, `grpcProtoFilePath`, `grpcProtoFileName`, `grpcProtoImportPaths` | gRPC method and service-definition source metadata. |
-| `aiProvider` | `openai` (Chat Completions, also for OpenAI-compatible servers) or `anthropic` (Messages). `url` is the provider's base URL. |
+| `aiProvider` | `openai` (Chat Completions, also for OpenAI-compatible servers), `anthropic` (Messages), or `kurlo` (the default connection in Settings → AI on the machine that sends; `url` is empty). Otherwise `url` is the provider's base URL. |
 | `aiModel`, `aiSystem`, `aiPrompt` | Model ID, system prompt (up to 50,000 characters) and prompt (up to 200,000); all accept `{{variables}}`. |
 | `aiTemperature`, `aiTopP`, `aiMaxTokens`, `aiMaxSteps`, `aiIdleTimeoutSec` | Strings; empty means the default: the provider's, 8 steps for `aiMaxSteps`, 300 seconds of silence for `aiIdleTimeoutSec`. |
 | `aiThinking` | Empty, or `summarized` to show an Anthropic model's thinking. |
