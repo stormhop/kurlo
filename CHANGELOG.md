@@ -19,6 +19,8 @@ All notable changes to Kurlo are documented here. This project follows
 - **Mock server answers `HEAD`.** A `HEAD` request to a path that only has a `GET` example gets that example's status and headers without a body instead of a `404`.
 - **MCP tools of an AI request see every variable.** When an AI request calls an MCP server from another collection, that server's URL, tool name and arguments now resolve its collection variables and globals, not only the environment.
 - **gRPC in the collection runner sees globals set earlier in the run.** A gRPC request now resolves globals that a previous request's script set during the same run.
+- **Git status in the status bar sits on one line.** The branch name, the ahead/behind arrows and the change count now share a baseline and stay centred in the bar, instead of the count sitting a pixel lower.
+- **The Secret button of a global variable fits its label.** Its highlight was a square narrower than the word; it now covers the whole label.
 - **cURL import keeps `--data-raw '@…'` as text.** A `--data-raw` body that starts with `@` is imported as that text, the way cURL sends it, instead of as a file to upload.
 
 ## [2.6.1] - 2026-10-31

@@ -22,6 +22,8 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Inherited secrets.** Script changes in a child environment keep inherited variables secret, masked and outside workspace YAML.
 - **Mock server headers and `HEAD`.** Repeated headers such as several `Set-Cookie` lines are all replayed, and `HEAD` is answered from the `GET` example.
 - **Variables in MCP tools and runner gRPC.** An AI request's MCP tools resolve their own collection variables and globals, and gRPC requests in the runner see globals set earlier in the run.
+- **Status bar alignment.** The branch name and the change count of the Git status sit on one baseline.
+- **Globals Secret button.** Its highlight covers the whole word.
 - **cURL `--data-raw '@…'`.** The body is imported as text instead of a file.
 
 ## 2.6.1

@@ -84,7 +84,7 @@
         </span>
         <span role="cell" class="globals-col-actions">
           <button
-            class="btn btn-ghost btn-icon btn-sm globals-secret-toggle"
+            class="btn btn-ghost btn-sm globals-secret-toggle"
             class:active={row.secret}
             type="button"
             aria-pressed={Boolean(row.secret)}

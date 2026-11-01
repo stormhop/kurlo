@@ -130,6 +130,7 @@
           <path d="M2.5 4.2h4l1.3 1.3h5.7v6.3a1.2 1.2 0 01-1.2 1.2H3.7a1.2 1.2 0 01-1.2-1.2V4.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
         </svg>
       {/if}
+      <span class="storage-status-line">
       <span class="storage-status-main">{storageLabel}</span>
       {#if gitStatus.isRepo}
         {#if gitStatus.operation}
@@ -154,6 +155,7 @@
       {:else}
         <span class="storage-status-mode">{storageMode}</span>
       {/if}
+      </span>
     </button>
   </div>
   <div class="status-bar-right">

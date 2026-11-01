@@ -123,6 +123,19 @@
   background: color-mix(in srgb, var(--delete) 8%, var(--surface));
 }
 
+.storage-status-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.storage-flag,
+.storage-status-mode,
+.storage-clean {
+  align-self: center;
+}
+
 .storage-branch-icon {
   flex-shrink: 0;
   color: var(--accent);
@@ -141,7 +154,7 @@
 .storage-clean {
   display: inline-flex;
   flex-shrink: 0;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-1);
   color: var(--text-3);
   font-family: var(--font-mono);
@@ -154,6 +167,7 @@
 }
 
 .storage-change-dot {
+  align-self: center;
   width: 0.375rem;
   height: 0.375rem;
   border-radius: var(--radius-full);

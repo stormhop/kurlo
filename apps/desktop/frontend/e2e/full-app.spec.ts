@@ -3444,6 +3444,49 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.getByTestId('environment-variable-row').first().getByLabel('Environment variable key')).toHaveValue('apiBase');
   });
 
+  test('fits the Secret label of a global variable inside its button', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Environments' }).click();
+    await page.locator('.environment-globals-item').click();
+    await page.getByLabel('Variable name').first().fill('token');
+    const toggle = page.locator('.globals-secret-toggle').first();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    const fit = await toggle.evaluate(element => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const text = range.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      return { left: text.left - box.left, right: box.right - text.right };
+    });
+    expect(fit.left).toBeGreaterThanOrEqual(4);
+    expect(fit.right).toBeGreaterThanOrEqual(4);
+  });
+
+  test('keeps the branch name and change counters of the status bar on one baseline', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', true);
+    await page.goto('/');
+    const button = page.locator('.storage-status-btn.git');
+    await expect(button.locator('.storage-change-count')).toBeVisible();
+    const baselines = await button.evaluate(element => [...element.querySelectorAll('.storage-status-main, .storage-sync > span, .storage-change-count')].map(item => {
+      const marker = document.createElement('span');
+      marker.style.cssText = 'display:inline-block;width:0;height:0;vertical-align:baseline';
+      item.appendChild(marker);
+      const bottom = marker.getBoundingClientRect().bottom;
+      marker.remove();
+      return bottom;
+    }));
+    expect(baselines.length).toBeGreaterThan(2);
+    for (const baseline of baselines) expect(Math.abs(baseline - baselines[0])).toBeLessThan(0.6);
+    const offset = await button.evaluate(element => {
+      const outer = element.getBoundingClientRect();
+      const line = element.querySelector('.storage-status-line')!.getBoundingClientRect();
+      return (line.top + line.height / 2) - (outer.top + outer.height / 2);
+    });
+    expect(Math.abs(offset)).toBeLessThan(1);
+  });
+
   test('lets an environment inherit the variables it does not set from another', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);
