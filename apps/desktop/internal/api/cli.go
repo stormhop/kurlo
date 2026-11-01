@@ -595,7 +595,7 @@ func loadCLIWorkspaceWithSecrets(root string, secrets map[string]string) ([]map[
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	return workspaces, collections, requests, environments, nil
+	return workspaces, collections, requests, flattenCLIEnvironments(environments), nil
 }
 
 func exportScopes(opts cliOptions, sm *state.Manager, globals map[string]string) error {

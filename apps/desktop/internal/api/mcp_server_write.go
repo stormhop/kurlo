@@ -1004,6 +1004,22 @@ func (s *mcpServer) toolSetVariable(_ context.Context, arguments json.RawMessage
 		if boolValue(environment["protected"]) {
 			return nil, fmt.Errorf("environment %s is protected; change its variables in Kurlo", stringValue(environment, "name"))
 		}
+		ancestors := rawEnvironmentAncestors(st.environments, environment)
+		for _, ancestor := range ancestors {
+			if boolValue(ancestor["protected"]) {
+				return nil, fmt.Errorf("environment %s inherits from the protected environment %s; change its variables in Kurlo", stringValue(environment, "name"), stringValue(ancestor, "name"))
+			}
+		}
+		if _, own := rawEnvironmentRow(environment, key); !own {
+			for _, ancestor := range ancestors {
+				if row, ok := rawEnvironmentRow(ancestor, key); ok {
+					if boolValue(row["secret"]) {
+						return nil, fmt.Errorf("%s in %s comes from %s and is a secret; change it in Kurlo", key, stringValue(environment, "name"), stringValue(ancestor, "name"))
+					}
+					break
+				}
+			}
+		}
 		rows, _ := environment["values"].([]any)
 		var target map[string]any
 		maxID := 0

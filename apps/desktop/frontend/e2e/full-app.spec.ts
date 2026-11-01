@@ -3444,6 +3444,70 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.getByTestId('environment-variable-row').first().getByLabel('Environment variable key')).toHaveValue('apiBase');
   });
 
+  test('lets an environment inherit the variables it does not set from another', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'Environments' }).click();
+    await page.getByLabel('New environment').click();
+    await fillPrompt(page, 'New environment', 'Base');
+    const envRows = page.getByTestId('environment-variable-row');
+    await envRows.nth(0).getByLabel('Environment variable key').fill('baseUrl');
+    await envRows.nth(0).getByLabel('Environment variable value').fill('https://api.kurlo.test');
+    await envRows.nth(1).getByLabel('Environment variable key').fill('region');
+    await envRows.nth(1).getByLabel('Environment variable value').fill('us');
+
+    await page.getByLabel('New environment').click();
+    await fillPrompt(page, 'New environment', 'Staging');
+    await page.getByRole('radio', { name: 'Single' }).click();
+    await page.getByRole('button', { name: 'Inherits from: Nothing' }).click();
+    await page.getByRole('option', { name: 'Base' }).click();
+
+    const inherited = page.getByTestId('environment-inherited-row');
+    await expect(inherited).toHaveCount(2);
+    await expect(inherited.first()).toContainText('baseUrl');
+    await expect(inherited.first()).toContainText('from Base');
+    await page.getByRole('button', { name: 'Override region in Staging' }).click();
+    await expect(inherited).toHaveCount(1);
+    await page.getByTestId('environment-variable-row').first().getByLabel('Environment variable value').fill('eu');
+    await expect(page.getByText('1 variable · 1 inherited from Base')).toBeVisible();
+    await expect(page.locator('.environment-item.active small')).toHaveText('In use · 1 variable · inherits Base');
+    await captureDocsScreenshot(page, 'environment-inheritance');
+
+    await page.getByRole('radio', { name: 'Matrix' }).click();
+    const fromBase = page.getByRole('button', { name: 'Override baseUrl in Staging, now inherited from Base' });
+    await expect(fromBase).toContainText('https://api.kurlo.test');
+    await expect(page.getByLabel('region in Staging', { exact: true })).toHaveValue('eu');
+    await expect(page.locator('.env-matrix-parent')).toHaveText('↳ Base');
+    await captureDocsScreenshot(page, 'environment-matrix-inherited');
+    await page.getByRole('radio', { name: 'Single' }).click();
+
+    await page.getByRole('button', { name: /^(Use environment|In use)$/ }).click();
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    const url = page.getByLabel('Request URL');
+    await url.fill('{{baseUrl}}/{{region}}/orders');
+    await url.press('Enter');
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.sentRequests.at(-1) as { url?: string } | undefined)?.url)).toBe('https://api.kurlo.test/eu/orders');
+
+    await expect.poll(async () => {
+      const store = await page.evaluate(() => window.__kurloE2E.store as {
+        environments?: Array<{ name: string; parentId?: string; id: string; values: Array<{ key: string; value: string }> }>;
+      });
+      const environments = store.environments ?? [];
+      const base = environments.find(environment => environment.name === 'Base');
+      return environments.map(environment => ({
+        name: environment.name,
+        inherits: environment.parentId === base?.id ? 'Base' : '',
+        values: environment.values.filter(row => row.key).map(row => `${row.key}=${row.value}`),
+      }));
+    }).toEqual([
+      { name: 'Base', inherits: '', values: ['baseUrl=https://api.kurlo.test', 'region=us'] },
+      { name: 'Staging', inherits: 'Base', values: ['region=eu'] },
+    ]);
+  });
+
   test('sending a saved request leaves it saved', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');

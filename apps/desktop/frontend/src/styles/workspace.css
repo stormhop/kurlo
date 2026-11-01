@@ -5079,3 +5079,70 @@
   background: color-mix(in srgb, var(--s2xx) 24%, transparent);
   text-decoration: none;
 }
+
+.env-parent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2-5);
+  margin: var(--space-4) 0 var(--space-1);
+  font-size: var(--text-body);
+}
+
+.env-parent-label {
+  color: var(--text-2);
+}
+
+.env-parent .env-parent-select {
+  min-width: 10rem;
+}
+
+.env-parent-hint {
+  color: var(--text-3);
+}
+
+.env-inherited-head {
+  padding: var(--space-3) var(--space-4) var(--space-1-5);
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-3);
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+}
+
+.environment-editor-card .env-inherited-row > span {
+  min-width: 0;
+  padding: 0 var(--space-2-5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+
+.environment-editor-card .env-inherited-row > span:first-child {
+  padding: 0;
+}
+
+.environment-editor-card .env-inherited-key,
+.environment-editor-card .env-inherited-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+}
+
+.environment-editor-card .env-inherited-key {
+  color: var(--text-2);
+}
+
+.environment-editor-card .env-inherited-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.environment-editor-card .env-inherited-row .env-inherited-source > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.env-parent .env-parent-select .app-select-trigger {
+  width: 100%;
+}

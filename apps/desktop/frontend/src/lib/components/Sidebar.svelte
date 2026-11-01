@@ -988,7 +988,7 @@
                   <span class="environment-dot" aria-hidden="true"></span>
                   <span class="environment-item-text">
                     <span>{row.environment.name}</span>
-                    <small>{row.environment.id === activeEnvironmentId ? 'In use · ' : ''}{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}</small>
+                    <small>{row.environment.id === activeEnvironmentId ? 'In use · ' : ''}{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}{#if row.environment.parentId && activeWorkspaceEnvironments.some(candidate => candidate.id === row.environment.parentId)}{` · inherits ${activeWorkspaceEnvironments.find(candidate => candidate.id === row.environment.parentId)?.name}`}{/if}</small>
                   </span>
                 </button>
               </div>

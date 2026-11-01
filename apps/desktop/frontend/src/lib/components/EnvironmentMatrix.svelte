@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { buildEnvironmentMatrix, type MatrixRow } from '../environmentMatrix';
+  import { effectiveEnvironmentRows, parentEnvironment } from '../environmentInheritance';
   import type { Environment } from '../types/models';
 
   let {
@@ -29,6 +30,13 @@
   let gridEl = $state<HTMLDivElement>();
 
   let rows = $derived(buildEnvironmentMatrix(environments));
+  let effective = $derived(new Map(environments.map(environment => [environment.id, effectiveEnvironmentRows(environments, environment.id)])));
+  let parents = $derived(new Map(environments.map(environment => [environment.id, parentEnvironment(environments, environment)])));
+
+  function inheritedCell(environmentId: string, key: string) {
+    const item = effective.get(environmentId)?.get(key);
+    return item && item.sourceId !== environmentId ? item : undefined;
+  }
   let visibleRows = $derived.by(() => {
     const query = filter.trim().toLowerCase();
     return query ? rows.filter(row => row.key.toLowerCase().includes(query)) : rows;
@@ -106,6 +114,9 @@
             {#if environment.id === activeEnvironmentId}<span class="env-matrix-dot" aria-hidden="true"></span>{/if}
             <span>{environment.name}</span>
           </button>
+          {#if parents.get(environment.id)}
+            <span class="env-matrix-parent" title={`${environment.name} inherits the variables it does not set from ${parents.get(environment.id)?.name}`}>↳ {parents.get(environment.id)?.name}</span>
+          {/if}
         </span>
       {/each}
       <span role="columnheader" aria-label="Actions"></span>
@@ -142,6 +153,7 @@
 
         {#each environments as environment (environment.id)}
           {@const cell = row.cells[environment.id]}
+          {@const inherited = cell?.enabled ? undefined : inheritedCell(environment.id, row.key)}
           <span class="env-matrix-cell" class:in-use={environment.id === activeEnvironmentId} role="cell">
             {#if cell}
               <input
@@ -156,7 +168,7 @@
                 autocomplete="off"
                 oninput={(event) => onSetValue(environment.id, row.key, inputValue(event))}
               />
-              <button class="env-matrix-unset" type="button" aria-label={`Unset ${row.key} in ${environment.name}`} title="Unset in this environment" onclick={() => onUnsetValue(environment.id, row.key)}>×</button>
+              <button class="env-matrix-unset" type="button" aria-label={`Unset ${row.key} in ${environment.name}`} title={parents.get(environment.id) ? `Unset in this environment and take it from ${parents.get(environment.id)?.name}` : 'Unset in this environment'} onclick={() => onUnsetValue(environment.id, row.key)}>×</button>
             {:else if editingUnset?.environmentId === environment.id && editingUnset.key === row.key}
               <input
                 class="field field-bare field-md env-matrix-value"
@@ -170,6 +182,11 @@
                 oninput={(event) => onUnsetInput(environment.id, row.key, event)}
                 onblur={() => (editingUnset = null)}
               />
+            {:else if inherited}
+              <button class="env-matrix-inherited" type="button" data-testid="environment-matrix-inherited" aria-label={`Override ${row.key} in ${environment.name}, now inherited from ${inherited.sourceName}`} title={`Inherited from ${inherited.sourceName} — click to set a value here`} onclick={() => startSetting(environment.id, row.key)}>
+                <span class="env-matrix-inherited-value">{row.secret && !revealed.has(row.key) ? '••••••••' : inherited.row.value || 'empty'}</span>
+                <span class="env-matrix-inherited-source">{inherited.sourceName}</span>
+              </button>
             {:else}
               <button class="env-matrix-not-set" type="button" aria-label={`Set ${row.key} in ${environment.name}`} onclick={() => startSetting(environment.id, row.key)}>Not set</button>
             {/if}
@@ -346,6 +363,60 @@
   .env-matrix-not-set:hover {
     background: var(--hover);
     color: var(--text);
+  }
+
+  .env-matrix-col-head {
+    gap: var(--space-1);
+  }
+
+  .env-matrix-parent {
+    overflow: hidden;
+    color: var(--text-3);
+    font-size: var(--text-label);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .env-matrix-inherited {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-width: 0;
+    height: 1.875rem;
+    padding: 0 var(--space-2);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-3);
+    text-align: left;
+  }
+
+  .env-matrix-inherited:hover {
+    background: var(--hover);
+    color: var(--text-2);
+  }
+
+  .env-matrix-inherited-value {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .env-matrix-inherited-source {
+    flex: 0 0 auto;
+    max-width: 45%;
+    overflow: hidden;
+    padding: 0 var(--space-1-5);
+    border-radius: var(--radius-sm);
+    background: var(--hover);
+    font-size: var(--text-caption);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .env-matrix-actions {

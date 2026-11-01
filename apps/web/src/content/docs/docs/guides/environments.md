@@ -72,6 +72,24 @@ With two or more environments, the environment page has a **Matrix** view: every
 - **+ Variable** adds a variable to every environment at once, empty; the bin removes it from all of them.
 - Click an environment's name to open it on its own. **Single** switches back to one environment at a time; Kurlo remembers which view you used.
 
+## Inheriting from another environment
+
+Environments often share most of their variables and differ in a few: staging and production use the same paths and client ID but different hosts and tokens. Instead of copying the shared ones into each, keep them in one environment, say *Base*, and let the others inherit from it.
+
+Open an environment and pick its parent under **Inherits from**. A variable the environment does not set itself is taken from its parent, and from the parent's parent after that; the nearest one that sets it wins. Requests, the collection runner, load tests, the CLI and [`kurlo mcp`](/docs/guides/mcp-server/) all resolve variables this way.
+
+![Staging inheriting baseUrl from Base and setting its own region](../../../../assets/screenshots/environment-inheritance.png)
+
+- The **Inherited** list under the variables shows what comes from the parent and from where. **Override** copies a value into this environment so you can change it there.
+- In the **Matrix**, a cell the environment does not set shows the inherited value in grey with the name of the environment it comes from. Click it to set a value of its own. The column header shows the parent.
+- A script that calls `pm.environment.set` writes to the environment in use, never to its parent. `pm.environment.unset` removes the environment's own value, so the inherited one applies again.
+- **+ Variable** adds the new variable only to environments that inherit from nothing; the others pick it up from them.
+- An environment under a protected one is protected too.
+- Deleting a parent moves the environments that inherited from it up to the parent's own parent, or leaves them on their own.
+- Postman has no inheritance, so **Export…** writes the environment with the inherited values included.
+
+The parent is saved as `parentId` in the environment's file.
+
 ## Switching environments
 
 Use the environment switcher in the title bar. The active environment is per-workspace — switching to a different workspace remembers its last-used environment.

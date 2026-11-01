@@ -929,12 +929,13 @@ func (s *mcpServer) toolListEnvironments(_ context.Context, _ json.RawMessage) (
 	type environment struct {
 		Name             string     `json:"name"`
 		Protected        bool       `json:"protected,omitempty"`
+		Inherits         string     `json:"inherits,omitempty"`
 		Variables        []variable `json:"variables"`
 		SessionVariables []string   `json:"sessionVariables,omitempty"`
 	}
 	environments := make([]environment, 0, len(ws.environments))
 	for _, env := range ws.environments {
-		entry := environment{Name: env.Name, Protected: env.Protected, Variables: []variable{}}
+		entry := environment{Name: env.Name, Protected: env.Protected, Inherits: env.Parent, Variables: []variable{}}
 		for _, row := range env.Values {
 			if !row.Enabled || strings.TrimSpace(row.Key) == "" {
 				continue

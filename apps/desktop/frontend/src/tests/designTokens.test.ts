@@ -64,7 +64,7 @@ const KIT_BUTTON_CLASSES = new Set(['btn', 'btn-link', 'menu-item', 'segmented-i
 const SPECIAL_BUTTON_CLASSES = new Set([
   'about-item', 'activity-rail-btn', 'btn-send', 'btn-send-caret', 'code-panel-resizer', 'collection-collapse',
   'collection-empty-row', 'collection-name', 'collection-request', 'cookie-add-chip', 'cookie-chip-delete',
-  'cookie-chip-select', 'cookie-domain-title', 'dialog-choice-card', 'env-in-use', 'env-matrix-not-set',
+  'cookie-chip-select', 'cookie-domain-title', 'dialog-choice-card', 'env-in-use', 'env-matrix-inherited', 'env-matrix-not-set',
   'env-matrix-unset', 'env-type-toggle', 'environment-globals-item', 'environment-item-main',
   'environment-none-item', 'examples-row-main', 'git-branch-chip', 'git-branch-row-main', 'git-branch-section',
   'git-commit-row', 'git-conflict-choice-btn', 'git-conflict-file-pill', 'git-file-open', 'git-history-toggle', 'git-popover-scrim',

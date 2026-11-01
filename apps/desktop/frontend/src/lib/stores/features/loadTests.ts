@@ -1,6 +1,7 @@
 import { exportLoadTestK6, openDirectoryDialog, openFileDialog, previewLoadTestData, saveLoadTestK6Folder, validateLoadTest } from '../../backend';
 import { loadTestFingerprint, normalizeLoadTest } from '../../loadTests';
 import { presetExecutor } from '../../loadPresets';
+import { flattenedEnvironment } from '../../environmentInheritance';
 import { filesystemNameFromName } from '../../normalizers';
 import type { Collection, Environment, KVRow, PersistRequestStore, SavedRequest, SidebarView } from '../../types/models';
 import { newEntityId, requestTabLabel } from '../../utils';
@@ -117,7 +118,7 @@ export const loadTestFeature = {
       loadTest: test,
       collection: collectionWithoutTests,
       requests: this.requests.map(request => this.requestForEditing(request.id) ?? request).filter(request => requestIds.has(request.id) && request.collectionId === collectionId),
-      environment: environment ? { name: environment.name, values: environment.values } : null,
+      environment: environment ? { name: environment.name, values: flattenedEnvironment(this.environments, environment).values } : null,
       globals: this.globalVariables,
     });
   },

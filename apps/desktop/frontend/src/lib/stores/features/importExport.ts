@@ -9,6 +9,7 @@ import { normalizeCollectionDefaults } from '../../collectionDefaults';
 import { routeImportedScripts, withActiveScripts } from '../../scriptEngine';
 import { downloadTextFile, safeFileName } from '../../utils';
 import { requestsHaveExportSecrets } from '../../secretExport';
+import { flattenedEnvironment } from '../../environmentInheritance';
 import type { OpenApiExportFormat } from '../../openapi';
 
 type ImportedCollectionDefaults = { variables?: KVRow[]; auth?: import('../../types/models').AuthState };
@@ -487,7 +488,8 @@ export const importExportFeature = {
     return selected === 'include';
   },
   async exportEnvironmentToPostman(this: ImportExportHost, environmentId: string) {
-    const env = this.environments.find(e => e.id === environmentId); if (!env) return;
+    const own = this.environments.find(e => e.id === environmentId); if (!own) return;
+    const env = flattenedEnvironment(this.environments, own);
     const hasSecretValues = env.values.some(row => row.secret && row.value);
     let includeSecrets = false;
     if (hasSecretValues) {

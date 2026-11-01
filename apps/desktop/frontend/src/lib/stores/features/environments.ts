@@ -17,6 +17,13 @@ import {
   setMatrixValue,
   unsetMatrixValue,
 } from '../../environmentMatrix';
+import {
+  effectiveEnvironmentRows,
+  environmentChildren,
+  environmentParentCandidates,
+  inheritedEnvironmentRows,
+  type InheritedRow,
+} from '../../environmentInheritance';
 
 export type EnvironmentView = 'single' | 'matrix';
 export const ENVIRONMENT_VIEW_KEY = 'kurlo.environmentView.v1';
@@ -69,7 +76,7 @@ type EnvironmentHost = {
   updateWorkspaceEnvironments: (change: (environment: Environment) => KVRow[], onlyId?: string) => void;
 };
 
-export function mergeEnvironmentRowsWithValues(rows: KVRow[], values: Record<string, string>) {
+export function mergeEnvironmentRowsWithValues(rows: KVRow[], values: Record<string, string>, inherited: Map<string, InheritedRow> = new Map()) {
   const remaining = new Map(Object.entries(values));
   const next: KVRow[] = [];
   const trailing = rows.at(-1);
@@ -86,7 +93,10 @@ export function mergeEnvironmentRowsWithValues(rows: KVRow[], values: Record<str
     remaining.delete(key);
   }
   for (const [key, value] of remaining) {
-    next.push({ ...mkRow(), key, value, enabled: true });
+    const source = inherited.get(key)?.row;
+    if (source && source.value === value) continue;
+    const row = mkRow();
+    next.push({ ...row, ...source, id: row.id, key, value, enabled: true });
   }
   return [...next, trailingIsBlank ? trailing! : mkRow()];
 }
@@ -99,9 +109,7 @@ export const environmentFeature = {
     const values: Record<string, string> = {};
     const environment = this.environments.find(candidate => candidate.id === environmentId && candidate.workspaceId === this.activeWorkspaceId);
     if (!environment) return values;
-    for (const row of environment.values) {
-      if (row.enabled && row.key.trim()) values[row.key.trim()] = row.value;
-    }
+    for (const [key, { row }] of effectiveEnvironmentRows(this.environments, environment.id)) values[key] = row.value;
     return values;
   },
   activeEnvironmentValues(this: EnvironmentHost) {
@@ -110,13 +118,9 @@ export const environmentFeature = {
   environmentVariableSuggestions(this: EnvironmentHost, environmentId = this.activeEnvironmentId): VariableSuggestion[] {
     const environment = this.environments.find(candidate => candidate.id === environmentId && candidate.workspaceId === this.activeWorkspaceId);
     if (!environment) return [];
-    const byKey = new Map<string, VariableSuggestion>();
-    for (const row of environment.values) {
-      const key = row.key.trim();
-      if (!row.enabled || !key) continue;
-      byKey.set(key, { key, value: row.value, description: row.description, secret: row.secret ?? false });
-    }
-    return [...byKey.values()];
+    return [...effectiveEnvironmentRows(this.environments, environment.id)].map(([key, { row }]) => (
+      { key, value: row.value, description: row.description, secret: row.secret ?? false }
+    ));
   },
   activeSecretEnvironmentKeys(this: EnvironmentHost) {
     return this.environmentVariableSuggestions()
@@ -210,13 +214,37 @@ export const environmentFeature = {
     });
     await this.persistRequestStore();
   },
+  async setEnvironmentParent(this: EnvironmentHost, environmentId: string, parentId: string) {
+    if (!this.guardWorkspaceWritable('Environment changes')) return;
+    const environment = this.environments.find(candidate => candidate.id === environmentId);
+    if (!environment) return;
+    if (parentId && !environmentParentCandidates(this.environments, environment).some(candidate => candidate.id === parentId)) return;
+    this.environments = this.environments.map(candidate => {
+      if (candidate.id !== environmentId) return candidate;
+      const { parentId: _previous, ...rest } = candidate;
+      return parentId ? { ...rest, parentId } : rest;
+    });
+    if (environmentId === this.activeEnvironmentId) await this.syncBackendEnvironment();
+    await this.persistRequestStore();
+  },
   async deleteEnvironment(this: EnvironmentHost, environmentId: string) {
     if (!this.guardWorkspaceWritable('Deleting environments')) return;
     const environment = this.environments.find(candidate => candidate.id === environmentId);
     if (!environment) return;
-    const confirmed = await this.openConfirmDialog('Delete environment', `Delete "${environment.name}" from this workspace?`);
+    const children = environmentChildren(this.environments, environmentId);
+    const grandparent = this.environments.find(candidate => candidate.id === environment.parentId);
+    const childNote = children.length
+      ? ` ${children.map(child => child.name).join(', ')} ${children.length === 1 ? 'inherits' : 'inherit'} from it and will ${grandparent ? `inherit from ${grandparent.name} instead` : 'keep only the values set there'}.`
+      : '';
+    const confirmed = await this.openConfirmDialog('Delete environment', `Delete "${environment.name}" from this workspace?${childNote}`);
     if (!confirmed) return;
-    this.environments = this.environments.filter(candidate => candidate.id !== environmentId);
+    this.environments = this.environments
+      .filter(candidate => candidate.id !== environmentId)
+      .map(candidate => {
+        if (candidate.parentId !== environmentId) return candidate;
+        const { parentId: _previous, ...rest } = candidate;
+        return environment.parentId ? { ...rest, parentId: environment.parentId } : rest;
+      });
     if (this.activeEnvironmentId === environmentId) this.activeEnvironmentId = '';
     if (this.topView === 'environment') this.topView = 'overview';
     await this.persistRequestStore();
@@ -319,14 +347,18 @@ export const environmentFeature = {
   async addEnvironmentVariable(this: EnvironmentHost) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
     const existing = buildEnvironmentMatrix(this.activeWorkspaceEnvironments).map(row => row.key);
-    let message = 'Added to every environment, empty. Fill in the value each one should use.';
+    const inherits = this.activeWorkspaceEnvironments.some(environment => environment.parentId);
+    let message = inherits
+      ? 'Added empty to every environment that does not inherit; the others pick it up from their parent. Fill in the value each one should use.'
+      : 'Added to every environment, empty. Fill in the value each one should use.';
     let draft = '';
     for (;;) {
       const name = await this.openPromptDialog('New variable', draft, message);
       if (name === null) return;
       const problem = matrixKeyProblem(existing, name);
       if (!problem) {
-        this.updateWorkspaceEnvironments(environment => addMatrixKey(environment, name.trim()));
+        const roots = new Set(this.activeWorkspaceEnvironments.filter(environment => !environment.parentId || !this.activeWorkspaceEnvironments.some(candidate => candidate.id === environment.parentId)).map(environment => environment.id));
+        this.updateWorkspaceEnvironments(environment => roots.has(environment.id) ? addMatrixKey(environment, name.trim()) : environment.values);
         return;
       }
       message = problem;
@@ -355,7 +387,7 @@ export const environmentFeature = {
     if (!this.guardWorkspaceWritable('Environment sync')) return false;
     const environment = this.environments.find(candidate => candidate.id === this.activeEnvironmentId && candidate.workspaceId === this.activeWorkspaceId);
     if (!environment) return false;
-    const nextValues = mergeEnvironmentRowsWithValues(environment.values, values);
+    const nextValues = mergeEnvironmentRowsWithValues(environment.values, values, inheritedEnvironmentRows(this.environments, environment.id));
     if (JSON.stringify(environment.values) === JSON.stringify(nextValues)) return false;
     this.environments = this.environments.map(candidate => candidate.id === environment.id ? { ...candidate, values: nextValues } : candidate);
     await this.persistRequestStore();
@@ -376,7 +408,7 @@ export const environmentFeature = {
         if (key && row.enabled && !removed.has(key)) values[key] = row.value;
       }
       Object.assign(values, updates);
-      const nextValues = mergeEnvironmentRowsWithValues(environment.values, values);
+      const nextValues = mergeEnvironmentRowsWithValues(environment.values, values, inheritedEnvironmentRows(this.environments, environment.id));
       this.environments = this.environments.map(candidate => candidate.id === environment.id ? { ...candidate, values: nextValues } : candidate);
       await this.persistRequestStore();
     }

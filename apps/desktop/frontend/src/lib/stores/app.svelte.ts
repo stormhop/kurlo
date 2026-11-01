@@ -859,6 +859,7 @@ class AppVM {
   declare createEnvironment: typeof environmentFeature.createEnvironment;
   declare renameEnvironment: typeof environmentFeature.renameEnvironment;
   declare setEnvironmentProtected: typeof environmentFeature.setEnvironmentProtected;
+  declare setEnvironmentParent: typeof environmentFeature.setEnvironmentParent;
   declare deleteEnvironment: typeof environmentFeature.deleteEnvironment;
   declare openEnvironment: typeof environmentFeature.openEnvironment;
   declare environmentRowsWithTrailing: typeof environmentFeature.environmentRowsWithTrailing;

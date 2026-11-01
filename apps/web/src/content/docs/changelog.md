@@ -15,9 +15,11 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Added
 
 - **Suggestions while you type.** The URL field completes URLs from history and saved requests, and finds a request by name; a JSON body offers the next key from the request's examples. `Tab` accepts. See [Suggestions while you type](/docs/guides/request-types/#suggestions-while-you-type).
+- **Environment inheritance.** An environment takes the variables it does not set from a parent environment; the matrix shows where each value comes from. See [Inheriting from another environment](/docs/guides/environments/#inheriting-from-another-environment).
 
 ### Fixed
 
+- **Inherited secrets.** Script changes in a child environment keep inherited variables secret, masked and outside workspace YAML.
 - **Mock server headers and `HEAD`.** Repeated headers such as several `Set-Cookie` lines are all replayed, and `HEAD` is answered from the `GET` example.
 - **Variables in MCP tools and runner gRPC.** An AI request's MCP tools resolve their own collection variables and globals, and gRPC requests in the runner see globals set earlier in the run.
 - **cURL `--data-raw '@…'`.** The body is imported as text instead of a file.

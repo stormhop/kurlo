@@ -11,6 +11,7 @@ import {
   stopLoadRun,
 } from '../../backend';
 import type { Collection, Environment } from '../../types/models';
+import { environmentIsProtected } from '../../environmentInheritance';
 import type { K6Info, LoadRunResult, LoadRunState, LoadTest } from '../../wire';
 import type { LoadTestTab } from './loadTests';
 
@@ -26,6 +27,7 @@ export function isLoopbackHost(host: string): boolean {
 type LoadRunHost = {
   activeLoadTestId: string;
   collections: Collection[];
+  environments: Environment[];
   k6Path: string;
   k6Info: K6Info | null;
   k6MissingOpen: boolean;
@@ -128,7 +130,7 @@ export const loadRunFeature = {
     const hosts = await loadTestTargets(payload);
     const remote = hosts.filter(host => !isLoopbackHost(host));
     const environment = this.loadTestEnvironment(collection, test);
-    if (environment?.protected && remote.length) {
+    if (environment && (environment.protected || environmentIsProtected(this.environments, environment.id)) && remote.length) {
       const typed = await this.openPromptDialog(
         'Run against a protected environment',
         '',

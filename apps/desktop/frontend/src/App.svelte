@@ -715,6 +715,7 @@
         createEnvironment={vm.createEnvironment}
         renameEnvironment={vm.renameEnvironment}
         setEnvironmentProtected={vm.setEnvironmentProtected}
+        setEnvironmentParent={vm.setEnvironmentParent}
         useEnvironment={vm.useEnvironment}
         deleteEnvironment={vm.deleteEnvironment}
         saveEnvironment={vm.saveEnvironment}

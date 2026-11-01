@@ -1,6 +1,8 @@
 <script lang="ts">
   import MenuIcon from './MenuIcon.svelte';
   import EnvironmentMatrix from './EnvironmentMatrix.svelte';
+  import Select from './Select.svelte';
+  import { effectiveEnvironmentRows, environmentParentCandidates, parentEnvironment, protectingAncestor } from '../environmentInheritance';
   import type { Environment, KVRow } from '../types/models';
 
   let {
@@ -11,6 +13,7 @@
     createEnvironment,
     renameEnvironment,
     setEnvironmentProtected = () => {},
+    setEnvironmentParent = () => {},
     useEnvironment,
     deleteEnvironment,
     saveEnvironment,
@@ -36,6 +39,7 @@
     createEnvironment: () => void;
     renameEnvironment: (environmentId: string) => void;
     setEnvironmentProtected?: (environmentId: string, isProtected: boolean) => void;
+    setEnvironmentParent?: (environmentId: string, parentId: string) => void;
     useEnvironment: (environmentId: string) => void;
     deleteEnvironment: (environmentId: string) => void;
     saveEnvironment: () => void;
@@ -61,6 +65,25 @@
 
   let moreMenuOpen = $state(false);
   let variableCount = $derived((activeEnvironment?.values ?? []).filter(row => row.key.trim()).length);
+  let parent = $derived(activeEnvironment ? parentEnvironment(environments, activeEnvironment) : undefined);
+  let protectedBy = $derived(activeEnvironment ? protectingAncestor(environments, activeEnvironment.id) : undefined);
+  let parentOptions = $derived(activeEnvironment
+    ? [{ value: '', label: 'Nothing' }, ...environmentParentCandidates(environments, activeEnvironment).map(environment => ({ value: environment.id, label: environment.name }))]
+    : []);
+  let inheritedRows = $derived.by(() => {
+    if (!activeEnvironment || !parent) return [];
+    const own = new Set(activeEnvironment.values.filter(row => row.enabled && row.key.trim()).map(row => row.key.trim()));
+    return [...effectiveEnvironmentRows(environments, activeEnvironment.id).entries()]
+      .filter(([key, item]) => !own.has(key) && item.sourceId !== activeEnvironment.id)
+      .map(([key, item]) => ({ key, ...item }));
+  });
+  let revealedInherited = $state<Set<string>>(new Set());
+
+  function toggleInheritedReveal(key: string) {
+    revealedInherited = revealedInherited.has(key)
+      ? new Set([...revealedInherited].filter(item => item !== key))
+      : new Set([...revealedInherited, key]);
+  }
 
   function closeMoreMenuOnFocusOut(event: FocusEvent) {
     const current = event.currentTarget;
@@ -160,10 +183,12 @@
           {activeEnvironment.name}
           {#if activeEnvironment.protected}
             <span class="env-protected" title="AI agents connected through kurlo mcp cannot send requests with this environment or change it"><MenuIcon name="lock" />Protected</span>
+          {:else if protectedBy}
+            <span class="env-protected" title={`Protected because it inherits from ${protectedBy.name}: AI agents connected through kurlo mcp cannot send requests with it or change it`}><MenuIcon name="lock" />Protected through {protectedBy.name}</span>
           {/if}
         </h1>
         <p>
-          {variableCount} {variableCount === 1 ? 'variable' : 'variables'} · use them in requests as {'{{variableName}}'}
+          {variableCount} {variableCount === 1 ? 'variable' : 'variables'}{#if parent}{` · ${inheritedRows.length} inherited from ${parent.name}`}{/if} · use them in requests as {'{{variableName}}'}
           {#if environmentSaveState !== 'idle'}
             <span class="env-save-indicator" class:saved={environmentSaveState === 'saved'} class:dirty={environmentSaveState === 'dirty'}> · {environmentSaveState === 'saving' ? 'Saving…' : environmentSaveState === 'dirty' ? 'Unsaved changes' : 'Saved'}</span>
           {/if}
@@ -184,7 +209,7 @@
           {#if moreMenuOpen}
             <div class="menu request-menu env-more-menu" role="menu">
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => renameEnvironment(activeEnvironment.id))}><MenuIcon name="rename" />Rename</button>
-              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.protected)} title="AI agents connected through kurlo mcp cannot send requests with a protected environment or change it" onclick={() => runMenuAction(() => setEnvironmentProtected(activeEnvironment.id, !activeEnvironment.protected))}><MenuIcon name="lock" />{activeEnvironment.protected ? 'Unprotect from AI agents' : 'Protect from AI agents'}</button>
+              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.protected || protectedBy)} disabled={Boolean(protectedBy && !activeEnvironment.protected)} title={protectedBy && !activeEnvironment.protected ? `Protected through ${protectedBy.name}` : 'AI agents connected through kurlo mcp cannot send requests with a protected environment or change it'} onclick={() => runMenuAction(() => setEnvironmentProtected(activeEnvironment.id, !activeEnvironment.protected))}><MenuIcon name="lock" />{activeEnvironment.protected ? 'Unprotect from AI agents' : 'Protect from AI agents'}</button>
               <div class="menu-separator" role="separator"></div>
               <button class="menu-item" type="button" role="menuitem" title="Import variables from a .env file" onclick={() => runMenuAction(() => importEnvFromFile(activeEnvironment.id))}><MenuIcon name="import" />Import .env</button>
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => exportEnvironment(activeEnvironment.id))}><MenuIcon name="export" />Export…</button>
@@ -195,6 +220,13 @@
         </div>
       </div>
     </div>
+    {#if parentOptions.length > 1}
+      <div class="env-parent">
+        <span class="env-parent-label">Inherits from</span>
+        <Select value={activeEnvironment.parentId ?? ''} options={parentOptions} className="env-parent-select" ariaLabel="Inherits from" onChange={value => setEnvironmentParent(activeEnvironment.id, value)} />
+        <span class="env-parent-hint">{parent ? `Variables not set here come from ${parent.name}.` : 'Pick an environment to take the variables this one does not set.'}</span>
+      </div>
+    {/if}
     <div class="environment-editor-card">
       <div class="kv-head env-kv-head">
         <span></span>
@@ -234,6 +266,26 @@
             <button class="btn btn-secondary btn-sm" type="button" onclick={() => (valuePage = Math.min(valuePageCount - 1, valuePage + 1))} disabled={valuePage + 1 >= valuePageCount}>Next</button>
           </div>
         </div>
+      {/if}
+      {#if inheritedRows.length}
+        <div class="env-inherited-head">Inherited</div>
+        {#each inheritedRows as item (item.key)}
+          <div class="kv-row env-kv-row env-inherited-row" data-testid="environment-inherited-row">
+            <span></span>
+            <span class="env-inherited-key">{item.key}</span>
+            {#if item.row.secret}
+              <button class="env-type-toggle secret" type="button" title={revealedInherited.has(item.key) ? 'Hide value' : 'Show value'} onclick={() => toggleInheritedReveal(item.key)}>Secret</button>
+            {:else}
+              <span class="env-inherited-type">Default</span>
+            {/if}
+            <span class="env-inherited-value">{item.row.secret && !revealedInherited.has(item.key) ? '••••••••' : item.row.value || 'empty'}</span>
+            <span class="env-inherited-source">
+              <span>from {item.sourceName}</span>
+              <button class="btn btn-ghost btn-sm" type="button" aria-label={`Override ${item.key} in ${activeEnvironment.name}`} title={`Set ${item.key} in ${activeEnvironment.name} instead of taking it from ${item.sourceName}`} onclick={() => setMatrixValue(activeEnvironment.id, item.key, item.row.value)}>Override</button>
+            </span>
+            <span></span>
+          </div>
+        {/each}
       {/if}
     </div>
   {:else}

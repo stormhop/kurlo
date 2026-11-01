@@ -23,9 +23,10 @@ import type { LoadRunResult, LoadRunState, LoadTest } from '../lib/wire';
 const test: LoadTest = { id: 'lt-1', name: 'Smoke', scenarios: [], settings: {} };
 const collection = { id: 'col', workspaceId: 'ws', name: 'Shop' } as Collection;
 
-function makeHost(environment?: Partial<Environment>) {
+function makeHost(environment?: Partial<Environment>, environments: Environment[] = []) {
   return {
     ...loadRunFeature,
+    environments,
     activeLoadTestId: 'lt-1',
     collections: [collection],
     k6Path: '',
@@ -119,6 +120,16 @@ describe('running a load test', () => {
     await host.runLoadTest('col', test);
     expect(backend.startLoadRun).toHaveBeenCalledTimes(1);
     expect(host.openConfirmDialog).not.toHaveBeenCalled();
+  });
+
+  it('wants the host typed when the environment inherits from a protected one', async () => {
+    backend.loadTestTargets.mockResolvedValue(['api.shop.test']);
+    const parent: Environment = { id: 'base', workspaceId: 'ws', name: 'base', filesystemName: 'base', values: [], protected: true };
+    const child: Environment = { id: 'env', workspaceId: 'ws', name: 'prod', filesystemName: 'prod', values: [], parentId: 'base' };
+    const host = makeHost({ parentId: 'base' }, [parent, child]);
+    await host.runLoadTest('col', test);
+    expect(host.openPromptDialog).toHaveBeenCalled();
+    expect(backend.startLoadRun).not.toHaveBeenCalled();
   });
 
   it('explains why k6 did not start', async () => {

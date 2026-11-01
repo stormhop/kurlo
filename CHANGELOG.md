@@ -10,9 +10,11 @@ All notable changes to Kurlo are documented here. This project follows
 ### Added
 
 - **Suggestions while you type.** The URL field offers the rest of a URL you have sent or saved in the workspace, newest history first, and typing the start of a request's name offers that request's URL. A JSON body offers the next key from the request's saved examples, including those an OpenAPI import created, following the nested object you are in and skipping keys already there. The suggestion shows in faded text; `Tab` accepts it and `Escape` hides it.
+- **Environment inheritance.** An environment can inherit from another: every variable it does not set comes from its parent, then from the parent's parent. The environment page lists the inherited variables with an **Override** button, the matrix shows inherited values in grey with the environment they come from, and the sidebar names the parent. Requests, scripts, the runner, load tests, `kurlo run` and `kurlo mcp` resolve variables the same way; scripts write to the environment in use, never to its parent. An environment under a protected one is protected too. The parent is stored as `parentId` in the environment file, so existing workspaces need no migration.
 
 ### Fixed
 
+- **Inherited secrets stay secret after scripts change them.** An override written to a child environment keeps the variable's secret flag and description, so its value stays masked and outside the workspace YAML.
 - **Mock server replays every repeated header.** An example that recorded a header more than once, such as two `Set-Cookie` lines, now replays all of them instead of only the last.
 - **Mock server answers `HEAD`.** A `HEAD` request to a path that only has a `GET` example gets that example's status and headers without a body instead of a `404`.
 - **MCP tools of an AI request see every variable.** When an AI request calls an MCP server from another collection, that server's URL, tool name and arguments now resolve its collection variables and globals, not only the environment.
