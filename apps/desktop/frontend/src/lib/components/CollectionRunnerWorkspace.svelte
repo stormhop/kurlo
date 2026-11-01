@@ -309,7 +309,7 @@
             <button class="segmented-item" type="button" role="radio" aria-checked={failedOnly && failedCount > 0} disabled={!failedCount} onclick={() => (failedOnly = true)}>Failed {failedCount}</button>
           </div>
           {#if lastRunAt && !running}
-            <p class="runner-last-run" title={new Date(lastRunAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' })}>Last run {relativeTime(lastRunAt, now())}</p>
+            <p class="runner-last-run" title={new Date(lastRunAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' })}>Last run {relativeTime(lastRunAt, now())}{#if results.length < summary.total} · {results.length} of {summary.total} results kept{/if}</p>
           {/if}
         </div>
         {#if shownResults.length > RUNNER_RESULT_PAGE_SIZE}

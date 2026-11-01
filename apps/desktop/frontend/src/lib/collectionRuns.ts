@@ -7,13 +7,24 @@ export type CollectionRunRecord = {
   title: string;
   startedAt: number;
   finishedAt: number;
+  summary: CollectionRunSummary;
   results: CollectionRunnerResult[];
 };
 
 export type CollectionRunTally = { total: number; passed: number; failed: number; skipped: number };
+export type CollectionRunSummary = CollectionRunTally & { testsPassed: number; testsTotal: number };
 
 const FINISHED_STATUSES: CollectionRunnerStatus[] = ['passed', 'failed', 'error', 'skipped'];
 const STATUSES: CollectionRunnerStatus[] = ['queued', 'running', ...FINISHED_STATUSES];
+
+function limitedResults(results: CollectionRunnerResult[]): CollectionRunnerResult[] {
+  const indexes = new Set<number>();
+  for (let index = 0; index < results.length && indexes.size < LAST_RUN_RESULT_LIMIT; index += 1) {
+    if (results[index].status === 'failed' || results[index].status === 'error') indexes.add(index);
+  }
+  for (let index = 0; index < results.length && indexes.size < LAST_RUN_RESULT_LIMIT; index += 1) indexes.add(index);
+  return results.filter((_, index) => indexes.has(index));
+}
 
 export function collectionRunRecord(collectionId: string, title: string, startedAt: number, finishedAt: number, results: CollectionRunnerResult[]): CollectionRunRecord | null {
   if (!collectionId || !results.some(result => result.status !== 'skipped')) return null;
@@ -22,7 +33,8 @@ export function collectionRunRecord(collectionId: string, title: string, started
     title,
     startedAt,
     finishedAt,
-    results: results.slice(0, LAST_RUN_RESULT_LIMIT).map(result => ({
+    summary: summarizeResults(results),
+    results: limitedResults(results).map(result => ({
       ...result,
       status: FINISHED_STATUSES.includes(result.status) ? result.status : 'skipped',
       tests: result.tests?.map(test => ({ ...test })),
@@ -30,16 +42,36 @@ export function collectionRunRecord(collectionId: string, title: string, started
   };
 }
 
-export function tallyCollectionRun(record: CollectionRunRecord): CollectionRunTally {
+function summarizeResults(results: CollectionRunnerResult[]): CollectionRunSummary {
   let passed = 0;
   let failed = 0;
   let skipped = 0;
-  for (const result of record.results) {
+  let testsPassed = 0;
+  let testsTotal = 0;
+  for (const result of results) {
     if (result.status === 'passed') passed += 1;
     else if (result.status === 'failed' || result.status === 'error') failed += 1;
     else skipped += 1;
+    testsPassed += result.testsPassed;
+    testsTotal += result.testsTotal;
   }
-  return { total: record.results.length, passed, failed, skipped };
+  return { total: results.length, passed, failed, skipped, testsPassed, testsTotal };
+}
+
+export function tallyCollectionRun(record: CollectionRunRecord): CollectionRunTally {
+  const { total, passed, failed, skipped } = record.summary;
+  return { total, passed, failed, skipped };
+}
+
+function normalizeSummary(value: unknown, results: CollectionRunnerResult[]): CollectionRunSummary {
+  const fallback = summarizeResults(results);
+  if (!value || typeof value !== 'object') return fallback;
+  const raw = value as Record<string, unknown>;
+  const keys = ['total', 'passed', 'failed', 'skipped', 'testsPassed', 'testsTotal'] as const;
+  if (!keys.every(key => typeof raw[key] === 'number' && Number.isSafeInteger(raw[key]) && raw[key] >= fallback[key])) return fallback;
+  const summary = Object.fromEntries(keys.map(key => [key, raw[key]])) as CollectionRunSummary;
+  if (summary.passed + summary.failed + summary.skipped !== summary.total || summary.testsPassed > summary.testsTotal) return fallback;
+  return summary;
 }
 
 function numberOr(value: unknown, fallback: number): number {
@@ -83,7 +115,7 @@ export function normalizeCollectionRuns(value: unknown, collectionIds: Set<strin
     if (!collectionIds.has(collectionId) || !raw || typeof raw !== 'object') continue;
     const record = raw as Record<string, unknown>;
     const results = Array.isArray(record.results)
-      ? record.results.map(normalizeResult).filter((result): result is CollectionRunnerResult => Boolean(result)).slice(0, LAST_RUN_RESULT_LIMIT)
+      ? record.results.map(normalizeResult).filter((result): result is CollectionRunnerResult => Boolean(result))
       : [];
     if (!results.length) continue;
     runs[collectionId] = {
@@ -91,7 +123,8 @@ export function normalizeCollectionRuns(value: unknown, collectionIds: Set<strin
       title: stringOr(record.title),
       startedAt: numberOr(record.startedAt, 0),
       finishedAt: numberOr(record.finishedAt, 0),
-      results,
+      summary: normalizeSummary(record.summary, results),
+      results: limitedResults(results),
     };
   }
   return runs;

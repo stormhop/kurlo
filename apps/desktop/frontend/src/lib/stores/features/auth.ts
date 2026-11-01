@@ -7,6 +7,7 @@ import { authForPersistence as resolveAuthForPersistence, authStateHasData as au
 
 type AuthHost = {
   activeRequestId: string;
+  autosave: boolean;
   apiKeyIn: 'header' | 'query';
   apiKeyName: string;
   apiKeyValue: string;
@@ -49,12 +50,15 @@ type AuthHost = {
   collections: import('../../types/models').Collection[];
   savedRequestSnapshots: Map<string, SavedRequest>;
   requestWithCollectionDefaults: (req: SavedRequest) => SavedRequest;
-  ensureValidOAuth2TokenForRequest: (req: SavedRequest) => Promise<void>;
+  ensureValidOAuth2TokenForRequest: (req: SavedRequest, values?: Record<string, string>) => Promise<SavedRequest>;
   oauth2ConfigForAuthState: (auth: SavedRequest['auth'], values: Record<string, string>, verifySsl: boolean) => AuthConfig;
   collectionForRequest: (req: Pick<SavedRequest, 'collectionId'>) => import('../../types/models').Collection | undefined;
   currentAuthState: () => SavedRequest['auth'];
   oauth2ConfigForRequest: () => AuthConfig;
-  applyOAuth2Result: (result: OAuth2TokenResponse) => void;
+  applyOAuth2Result: (result: OAuth2TokenResponse, requestId?: string) => void;
+  requestForEditing: (id: string) => SavedRequest | undefined;
+  updateRequestDirtyState: (id: string, req?: SavedRequest) => void;
+  scheduleRequestStorePersist: () => void;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   resolveTemplate: (value: string, values?: Record<string, string>) => string;
   snapshotActiveRequest: (options?: { forPersistence?: boolean }) => SavedRequest;
@@ -67,6 +71,16 @@ function requestOAuth2ForGrant(grant: OAuth2GrantType, cfg: AuthConfig): Promise
     case 'device_code': return requestOAuth2Device(cfg);
     default: return requestOAuth2Token(cfg);
   }
+}
+
+function authWithOAuth2Result(auth: SavedRequest['auth'], result: OAuth2TokenResponse): SavedRequest['auth'] {
+  return {
+    ...auth,
+    oauth2Token: result.access_token,
+    bearerToken: result.access_token,
+    oauth2TokenExpiry: result.expires_in > 0 ? Date.now() + result.expires_in * 1000 : 0,
+    oauth2RefreshToken: result.refresh_token || auth.oauth2RefreshToken,
+  };
 }
 
 export const authFeature = {
@@ -226,8 +240,19 @@ export const authFeature = {
     };
   },
 
-  applyOAuth2Result(this: AuthHost, result: OAuth2TokenResponse) {
+  applyOAuth2Result(this: AuthHost, result: OAuth2TokenResponse, requestId = this.activeRequestId) {
     if (!result.access_token) return;
+    const request = requestId === this.activeRequestId ? this.snapshotActiveRequest() : this.requestForEditing(requestId);
+    if (request?.auth.type === 'oauth2') {
+      const updated = { ...request, auth: authWithOAuth2Result(request.auth, result) };
+      if (this.autosave || request.isDraft) {
+        this.requests = this.requests.map(candidate => candidate.id === requestId ? updated : candidate);
+        this.scheduleRequestStorePersist();
+      } else {
+        this.updateRequestDirtyState(requestId, updated);
+      }
+    }
+    if (requestId !== this.activeRequestId || this.authType !== 'oauth2') return;
     this.oauth2Token = result.access_token;
     this.bearerToken = result.access_token;
     this.oauth2TokenExpiry = result.expires_in > 0 ? Date.now() + result.expires_in * 1000 : 0;
@@ -235,13 +260,14 @@ export const authFeature = {
   },
 
   async fetchOAuth2Token(this: AuthHost) {
+    const requestId = this.activeRequestId;
     this.oauth2Loading = true;
     try {
       const cfg = this.oauth2ConfigForRequest();
       if (this.oauth2GrantType === 'device_code') this.oauth2DevicePrompt = null;
       const result = await requestOAuth2ForGrant(this.oauth2GrantType, cfg);
       if (result?.error) void this.openAlertDialog('OAuth2 error', `${result.error}${result.error_description ? ' — ' + result.error_description : ''}`);
-      else if (result?.access_token) this.applyOAuth2Result(result);
+      else if (result?.access_token) this.applyOAuth2Result(result, requestId);
     } catch (e) {
       void this.openAlertDialog('OAuth2 error', String(e));
     } finally {
@@ -252,11 +278,12 @@ export const authFeature = {
 
   async refreshOAuth2Token(this: AuthHost) {
     if (!this.oauth2RefreshToken) return;
+    const requestId = this.activeRequestId;
     this.oauth2Loading = true;
     try {
       const result = await requestOAuth2Refresh(this.oauth2ConfigForRequest());
       if (result?.error) void this.openAlertDialog('OAuth2 error', `${result.error}${result.error_description ? ' — ' + result.error_description : ''}`);
-      else if (result?.access_token) this.applyOAuth2Result(result);
+      else if (result?.access_token) this.applyOAuth2Result(result, requestId);
     } catch (e) {
       void this.openAlertDialog('OAuth2 error', String(e));
     } finally {
@@ -265,6 +292,7 @@ export const authFeature = {
   },
 
   async ensureValidOAuth2Token(this: AuthHost) {
+    const requestId = this.activeRequestId;
     if (this.authType === 'inherit') {
       await this.ensureValidOAuth2TokenForRequest(this.snapshotActiveRequest());
       return;
@@ -273,51 +301,42 @@ export const authFeature = {
     if (!oauth2TokenNeedsRefresh(this.oauth2Token, this.oauth2RefreshToken, this.oauth2TokenExpiry)) return;
     try {
       const result = await requestOAuth2Refresh(this.oauth2ConfigForRequest());
-      if (result?.access_token) this.applyOAuth2Result(result);
+      if (result?.access_token) this.applyOAuth2Result(result, requestId);
     } catch {
     }
   },
 
-  async ensureValidOAuth2TokenForRequest(this: AuthHost, req: SavedRequest) {
+  async ensureValidOAuth2TokenForRequest(this: AuthHost, req: SavedRequest, envValues?: Record<string, string>): Promise<SavedRequest> {
     const effective = this.requestWithCollectionDefaults(req);
-    if (effective.auth.type !== 'oauth2') return;
-    if (!oauth2TokenNeedsRefresh(effective.auth.oauth2Token, effective.auth.oauth2RefreshToken, effective.auth.oauth2TokenExpiry)) return;
+    if (effective.auth.type !== 'oauth2') return req;
+    if (!oauth2TokenNeedsRefresh(effective.auth.oauth2Token, effective.auth.oauth2RefreshToken, effective.auth.oauth2TokenExpiry)) return req;
 
     const inherited = req.auth.type === 'inherit';
     const collection = inherited ? this.collectionForRequest(req) : undefined;
-    if (inherited && !collection) return;
+    if (inherited && !collection) return req;
 
     let result: OAuth2TokenResponse | null = null;
     try {
-      const values = this.environmentValuesForRequest(req);
+      const values = this.environmentValuesForRequest(req, envValues);
       result = await requestOAuth2Refresh(
         this.oauth2ConfigForAuthState(effective.auth, values, effective.settings.enableSSLVerification),
       );
     } catch {
-      return;
+      return req;
     }
-    if (!result?.access_token) return;
-
-    const refreshed = (auth: SavedRequest['auth']): SavedRequest['auth'] => ({
-      ...auth,
-      oauth2Token: result.access_token,
-      bearerToken: result.access_token,
-      oauth2TokenExpiry: result.expires_in > 0 ? Date.now() + result.expires_in * 1000 : 0,
-      oauth2RefreshToken: result.refresh_token || auth.oauth2RefreshToken,
-    });
+    if (!result?.access_token) return req;
 
     if (inherited && collection) {
       this.collections = this.collections.map(candidate =>
         candidate.id === collection.id
-          ? { ...candidate, defaults: { ...candidate.defaults, auth: refreshed(candidate.defaults.auth) } }
+          ? { ...candidate, defaults: { ...candidate.defaults, auth: authWithOAuth2Result(candidate.defaults.auth, result) } }
           : candidate,
       );
+      this.scheduleRequestStorePersist();
     } else {
-      this.requests = this.requests.map(candidate =>
-        candidate.id === req.id ? { ...candidate, auth: refreshed(candidate.auth) } : candidate,
-      );
+      this.applyOAuth2Result(result, req.id);
     }
-    if (req.id === this.activeRequestId && !inherited) this.applyOAuth2Result(result);
+    return { ...req, auth: authWithOAuth2Result(effective.auth, result) };
   },
 };
 

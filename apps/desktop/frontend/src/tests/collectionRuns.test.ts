@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { collectionRunRecord, LAST_RUN_RESULT_LIMIT, normalizeCollectionRuns, relativeTime, tallyCollectionRun } from '../lib/collectionRuns';
 import type { CollectionRunnerResult } from '../lib/types/models';
+import { collectionRunnerFeature } from '../lib/stores/features/collectionRunner';
 
 function result(over: Partial<CollectionRunnerResult> = {}): CollectionRunnerResult {
   return {
@@ -62,6 +63,42 @@ describe('normalizeCollectionRuns', () => {
   it('reads back what was stored', () => {
     const record = collectionRunRecord('col-1', 'Users API', 1, 2, [result()])!;
     expect(normalizeCollectionRuns(JSON.parse(JSON.stringify({ 'col-1': record })), ids)).toEqual({ 'col-1': record });
+  });
+
+  it('keeps failures and test totals beyond the stored detail limit after reopening a run', () => {
+    const results = Array.from({ length: LAST_RUN_RESULT_LIMIT + 1 }, (_, index) => result({
+      runId: `r${index}`,
+      status: index === LAST_RUN_RESULT_LIMIT ? 'failed' : 'passed',
+      testsPassed: index === LAST_RUN_RESULT_LIMIT ? 1 : 2,
+    }));
+    const record = collectionRunRecord('col-1', 'Users API', 1_000, 2_500, results)!;
+    const runs = normalizeCollectionRuns(JSON.parse(JSON.stringify({ 'col-1': record })), ids);
+    expect(runs['col-1'].results).toHaveLength(LAST_RUN_RESULT_LIMIT);
+    expect(runs['col-1'].results.at(-1)?.status).toBe('failed');
+    expect(tallyCollectionRun(runs['col-1'])).toEqual({ total: 501, passed: 500, failed: 1, skipped: 0 });
+    const host = {
+      collectionLastRuns: runs,
+      collectionRunnerCollectionId: 'col-1',
+      collectionRunnerRunning: false,
+      collectionRunnerShowingLastRun: false,
+      collectionRunnerResults: [] as CollectionRunnerResult[],
+    };
+    collectionRunnerFeature.showCollectionLastRun.call(host as never, 'col-1');
+    expect(collectionRunnerFeature.buildCollectionRunnerSummary.call(host as never)).toEqual({
+      total: 501, completed: 501, passed: 500, failed: 1, skipped: 0,
+      testsPassed: 1001, testsTotal: 1002, duration: 1500, allPassed: false,
+    });
+  });
+
+  it('counts every result before limiting details when a stored summary is missing or damaged', () => {
+    const results = Array.from({ length: LAST_RUN_RESULT_LIMIT + 1 }, (_, index) => result({
+      runId: `r${index}`, status: index === LAST_RUN_RESULT_LIMIT ? 'error' : 'passed',
+    }));
+    for (const summary of [undefined, { total: -1 }, { total: 501, passed: 501, failed: 0, skipped: 0, testsPassed: 1002, testsTotal: 1002 }]) {
+      const runs = normalizeCollectionRuns({ 'col-1': { results, summary } }, ids);
+      expect(tallyCollectionRun(runs['col-1'])).toMatchObject({ total: 501, failed: 1, passed: 500 });
+      expect(runs['col-1'].results).toHaveLength(LAST_RUN_RESULT_LIMIT);
+    }
   });
 
   it('drops runs of collections that no longer exist', () => {

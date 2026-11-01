@@ -15,9 +15,10 @@ import (
 const maxDigestAuthIntBody = 32 * 1024 * 1024
 
 type DigestTransport struct {
-	username string
-	password string
-	base     http.RoundTripper
+	username     string
+	password     string
+	base         http.RoundTripper
+	AllowRequest func(*http.Request) bool
 }
 
 func NewDigestTransport(username, password string, base http.RoundTripper) *DigestTransport {
@@ -25,6 +26,9 @@ func NewDigestTransport(username, password string, base http.RoundTripper) *Dige
 }
 
 func (d *DigestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if d.AllowRequest != nil && !d.AllowRequest(req) {
+		return d.base.RoundTrip(req)
+	}
 	first := req.Clone(req.Context())
 	if req.GetBody != nil {
 		body, err := req.GetBody()

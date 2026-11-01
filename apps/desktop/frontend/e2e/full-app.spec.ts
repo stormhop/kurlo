@@ -2635,6 +2635,50 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(trigger).toContainText('Billing');
   });
 
+  test('keeps the full saved runner verdict when result details are limited', async ({ page, browserName }) => {
+    const results = Array.from({ length: 501 }, (_, index) => ({
+      runId: `run-${index}`, requestId: 'req-limited', iteration: index + 1,
+      name: index === 500 ? 'Failure on iteration 501' : 'Health check', method: 'GET', url: 'https://api.kurlo.test/ping',
+      status: index === 500 ? 'failed' : 'passed', statusCode: index === 500 ? 500 : 200,
+      duration: 5, testsPassed: index === 500 ? 0 : 1, testsTotal: 1,
+      error: index === 500 ? 'Unexpected server error' : '', tests: [],
+    }));
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-limited', workspaceId: 'workspace-e2e', name: 'Health API' }],
+      requests: [{ id: 'req-limited', collectionId: 'col-limited', name: 'Health check', method: 'GET', url: 'https://api.kurlo.test/ping' }],
+      collectionRuns: {
+        'col-limited': {
+          collectionId: 'col-limited', title: 'Health API', startedAt: Date.now() - 6000, finishedAt: Date.now(),
+          summary: { total: 501, passed: 500, failed: 1, skipped: 0, testsPassed: 500, testsTotal: 501 }, results,
+        },
+      },
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+    const runner = page.getByRole('region', { name: 'Collection runner' });
+    await runner.locator('.runner-select .app-select-trigger').click();
+    await runner.getByRole('option', { name: 'Health API' }).click();
+    await expect(runner.locator('.runner-verdict')).toContainText('Failed');
+    await expect(runner.locator('.runner-results-summary')).toContainText('501/501');
+    await expect(runner.locator('.runner-results-summary')).toContainText('500/501');
+    await expect(runner.locator('.runner-last-run')).toContainText('500 of 501 results kept');
+    await runner.getByRole('radio', { name: 'Failed 1', exact: true }).click();
+    await expect(runner.getByTestId('runner-result-row')).toHaveCount(1);
+    await expect(runner.getByTestId('runner-result-row')).toContainText('Failure on iteration 501');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-runner-retained-failures-${browserName}.png`), animations: 'disabled' });
+    await runner.getByRole('button', { name: 'Download report' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedFiles.length)).toBe(1);
+    const report = await page.evaluate(() => window.__kurloE2E.savedFiles.at(-1)?.content ?? '');
+    expect(report).toContain('501/501');
+    expect(report).toContain('Showing 500 of 501 results');
+    expect(report).toContain('Failure on iteration 501');
+    const reportPage = await page.context().newPage();
+    await reportPage.setContent(report);
+    await expect(reportPage.locator('.badge')).toHaveText('Failed');
+    await reportPage.screenshot({ path: join(tmpdir(), `kurlo-runner-retained-report-${browserName}.png`), animations: 'disabled' });
+    await reportPage.close();
+  });
+
   test('shows only the failed runner results when asked, grouped requests by folder', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       collections: [{ id: 'col-filter', workspaceId: 'workspace-e2e', name: 'Filter API' }],

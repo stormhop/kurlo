@@ -1,4 +1,4 @@
-import { cancelHttpRequest, sendHttpRequest, sendHttpRequestToFile } from '../../backend';
+import { cancelHttpRequest, sendHttpRequest, sendHttpRequestToFile, setEnvironment, setGlobalVariables } from '../../backend';
 import type { HttpRequest, HttpResponse } from '../../backend';
 import type {
   AuthType,
@@ -29,6 +29,7 @@ function downloadFilenameFromUrl(url: string): string {
 
 type RequestExecutionHost = {
   activeRequestId: string;
+  activeWorkspaceId: string;
   authType: AuthType;
   bearerToken: string;
   disableCookieJar: boolean;
@@ -51,10 +52,11 @@ type RequestExecutionHost = {
   activeEnvironmentValues: () => Record<string, string>;
   activeSecretEnvironmentKeys: () => string[];
   activeSecretEnvironmentValues: () => string[];
+  globalVariableValues: () => Record<string, string>;
   buildRequest: (envValues?: Record<string, string>, secretEnvironmentValues?: string[], requestId?: string) => HttpRequest;
   cancelActiveRequest: () => Promise<void>;
   clearTransientSSESession: (id?: string) => void;
-  ensureValidOAuth2Token: () => Promise<void>;
+  ensureValidOAuth2TokenForRequest: (req: SavedRequest, values?: Record<string, string>) => Promise<SavedRequest>;
   graphQLPayloadError: () => string;
   guardWorkspaceWritable: (action?: string) => boolean;
   headerValidationErrorForRequest: (req: SavedRequest, envValues?: Record<string, string>) => string;
@@ -74,7 +76,7 @@ type RequestExecutionHost = {
   promoteActiveRequestToSSE: () => void;
   noteSuccessfulSend: () => void;
   recordRequestHistory: (httpResponse: HttpResponse, requestSnapshot?: SavedRequest) => Promise<void>;
-  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean) => Promise<void>;
+  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean, workspaceId?: string) => Promise<void>;
   requestIsActive: (requestId: string) => boolean;
   savedRequestToRunnableHttpRequest: (
     req: SavedRequest,
@@ -172,16 +174,17 @@ export const requestExecutionFeature = {
     const requestId = this.activeRequestId || newRequestId();
     const generation = nextSendGeneration(requestId);
     const isCurrent = () => sendGenerations.get(requestId) === generation;
+    const workspaceId = this.activeWorkspaceId;
+    const useCookieJar = !this.disableCookieJar;
     this.markRequestLoading(requestId, true);
     this.requestError = '';
     try {
-      await this.ensureValidOAuth2Token();
-      if (!isCurrent()) return;
-      const requestSnapshot = this.snapshotActiveRequest();
+      let requestSnapshot = this.snapshotActiveRequest();
       const sentEnvironmentId = this.activeEnvironmentId;
       const envValues = this.activeEnvironmentValues();
       const secretValues = this.activeSecretEnvironmentValues();
       const secretKeys = this.activeSecretEnvironmentKeys();
+      const globals = this.globalVariableValues();
       const headerError = this.headerValidationErrorForRequest(requestSnapshot, envValues);
       if (headerError) {
         this.requestError = headerError;
@@ -189,11 +192,20 @@ export const requestExecutionFeature = {
         this.requestTab = 'headers';
         return;
       }
+      const serialized = this.savedRequestToRunnableHttpRequest(requestSnapshot, envValues, secretValues, secretKeys, requestId, { deferTemplates: true, globals });
       this.clearTransientSSESession(requestId);
       await this.persistActiveRequestNow();
-      try { await this.syncBackendEnvironment(); } catch {  }
-      try { await this.syncBackendGlobals(); } catch {}
-      const serialized = this.savedRequestToRunnableHttpRequest(requestSnapshot, envValues, secretValues, secretKeys, requestId, { deferTemplates: true });
+      if (!isCurrent()) return;
+      const refreshed = await this.ensureValidOAuth2TokenForRequest(requestSnapshot, serialized.templateValues ?? envValues);
+      if (refreshed !== requestSnapshot) {
+        requestSnapshot = refreshed;
+        serialized.auth.token = refreshed.auth.oauth2Token;
+        serialized.auth.oauth2RefreshToken = refreshed.auth.oauth2RefreshToken ?? '';
+      }
+      if (!isCurrent()) return;
+      try { await setEnvironment(envValues); } catch {}
+      try { await setGlobalVariables(globals); } catch {}
+      if (!isCurrent()) return;
       let resp: HttpResponse;
       let downloadedPath = '';
       if (opts?.downloadName !== undefined) {
@@ -244,7 +256,7 @@ export const requestExecutionFeature = {
     }
     finally {
       if (isCurrent()) this.markRequestLoading(requestId, false);
-      if (!this.disableCookieJar) void this.refreshCookieJar(true, true);
+      if (useCookieJar) void this.refreshCookieJar(true, true, workspaceId);
     }
   },
 

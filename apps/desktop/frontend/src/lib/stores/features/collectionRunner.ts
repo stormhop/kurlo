@@ -70,7 +70,8 @@ type CollectionRunnerHost = {
     removed: string[] | undefined,
   ) => Promise<boolean>;
   refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean) => Promise<void>;
-  ensureValidOAuth2TokenForRequest: (req: SavedRequest) => Promise<void>;
+  ensureValidOAuth2TokenForRequest: (req: SavedRequest, values?: Record<string, string>) => Promise<SavedRequest>;
+  requestForEditing: (id: string) => SavedRequest | undefined;
   saveTextFile: (name: string, content: string) => Promise<boolean>;
   collectionRunnerDefaultCollectionId: () => string;
   collectionRunnerFilterTokens: (value: string) => string[];
@@ -319,6 +320,15 @@ export const collectionRunnerFeature = {
     };
   },
   buildCollectionRunnerSummary(this: CollectionRunnerHost) {
+    const record = this.collectionRunnerShowingLastRun ? this.collectionLastRuns[this.collectionRunnerCollectionId] : undefined;
+    if (record) {
+      return {
+        ...record.summary,
+        completed: record.summary.total,
+        duration: record.finishedAt - record.startedAt,
+        allPassed: record.summary.total > 0 && record.summary.passed === record.summary.total,
+      };
+    }
     const results = this.collectionRunnerResults;
     const completed = results.filter(result => ['passed', 'failed', 'error', 'skipped'].includes(result.status));
     const failed = results.filter(result => result.status === 'failed' || result.status === 'error').length;
@@ -403,8 +413,9 @@ export const collectionRunnerFeature = {
     this.collectionRunnerActiveRequestId = runnerRequestId;
     this.collectionRunnerActiveRequestIds.add(runnerRequestId);
     try {
-      try { await this.ensureValidOAuth2TokenForRequest(req); } catch {}
+      req = { ...req, auth: this.requestForEditing(req.id)?.auth ?? req.auth };
       const runnerEnvValues = { ...envValues, ...dataRow };
+      try { req = await this.ensureValidOAuth2TokenForRequest(req, runnerEnvValues); } catch {}
       if (this.normalizeRequestTypeValue(req.requestType, req.url) === 'grpc') {
         if (!(req.grpcMethod ?? '').trim()) {
           this.updateCollectionRunnerResult(runId, { status: 'error', error: 'Select a gRPC method before running this request' });

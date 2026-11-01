@@ -1,8 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { clearCookies, deleteCookie, listCookies, upsertCookie } from '../lib/backend';
 import { cookieFeature } from '../lib/stores/features/cookies';
 import { requestPersistenceFeature } from '../lib/stores/features/requestPersistence';
 import { workspaceFeature } from '../lib/stores/features/workspace';
 import type { CookieJarEntry, Workspace } from '../lib/types/models';
+
+vi.mock('../lib/backend', () => ({
+  clearCookies: vi.fn(), deleteCookie: vi.fn(), listCookies: vi.fn(), upsertCookie: vi.fn(),
+}));
+
+afterEach(() => vi.resetAllMocks());
 
 function workspace(id: string): Workspace {
   return { id, name: id, filesystemName: id, description: '' };
@@ -26,6 +33,73 @@ function cookie(name: string, value: string): CookieJarEntry {
 }
 
 describe('workspace scoped cookies', () => {
+  function host() {
+    return {
+      ...cookieFeature,
+      activeWorkspaceId: 'workspace-1',
+      cookies: [cookie('sid', 'old-a')],
+      workspaceCookies: { 'workspace-1': [cookie('sid', 'old-a')], 'workspace-2': [cookie('sid', 'b')] } as Record<string, CookieJarEntry[]>,
+      cookieJarError: '', cookieJarLoading: false, cookieJarSaving: false,
+      scheduleRequestStorePersist: vi.fn(), pointCookieSyncAtActiveWorkspace: vi.fn(),
+    };
+  }
+
+  it.each(['refresh', 'capture', 'save', 'remove', 'clear'] as const)('keeps a pending %s in its original workspace', async operation => {
+    let resolve!: (cookies: CookieJarEntry[]) => void;
+    const pending = new Promise<CookieJarEntry[]>(done => { resolve = done; });
+    vi.mocked(listCookies).mockReturnValue(pending);
+    vi.mocked(clearCookies).mockReturnValue(pending);
+    vi.mocked(upsertCookie).mockImplementation(() => pending.then(cookies => ({ cookies, error: '' })));
+    vi.mocked(deleteCookie).mockImplementation(() => pending.then(cookies => ({ cookies, error: '' })));
+    const h = host();
+    const operations = {
+      refresh: () => cookieFeature.refreshCookieJar.call(h as never, true, true),
+      capture: () => cookieFeature.captureActiveWorkspaceCookies.call(h as never),
+      save: () => cookieFeature.saveCookie.call(h as never, cookie('sid', 'new-a')),
+      remove: () => cookieFeature.removeCookie.call(h as never, cookie('sid', 'old-a')),
+      clear: () => cookieFeature.clearCookieJar.call(h as never),
+    };
+    const updating = operations[operation]();
+    h.activeWorkspaceId = 'workspace-2';
+    h.cookies = [cookie('sid', 'b')];
+    resolve([cookie('sid', 'new-a')]);
+    await updating;
+
+    expect(h.cookies).toEqual([cookie('sid', 'b')]);
+    expect(h.workspaceCookies['workspace-2']).toEqual([cookie('sid', 'b')]);
+    expect(h.workspaceCookies['workspace-1']).toEqual([cookie('sid', 'new-a')]);
+  });
+
+  it('keeps every restore write on the selected workspace after switching away', async () => {
+    let resolve!: (cookies: CookieJarEntry[]) => void;
+    vi.mocked(clearCookies).mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    vi.mocked(upsertCookie).mockResolvedValue({ cookies: [cookie('sid', 'restored-a')], error: '' });
+    const h = host();
+    h.workspaceCookies['workspace-1'] = [cookie('sid', 'restored-a')];
+    const restoring = cookieFeature.restoreWorkspaceCookieJar.call(h as never, 'workspace-1');
+    h.activeWorkspaceId = 'workspace-2';
+    h.cookies = [cookie('sid', 'b')];
+    resolve([]);
+    await restoring;
+
+    expect(clearCookies).toHaveBeenCalledWith('workspace-1');
+    expect(upsertCookie).toHaveBeenCalledWith('workspace-1', cookie('sid', 'restored-a'));
+    expect(h.cookies).toEqual([cookie('sid', 'b')]);
+    expect(h.workspaceCookies['workspace-2']).toEqual([cookie('sid', 'b')]);
+    expect(h.pointCookieSyncAtActiveWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('captures an explicitly named workspace instead of the active one', async () => {
+    vi.mocked(listCookies).mockResolvedValue([cookie('sid', 'a')]);
+    const h = host();
+    h.activeWorkspaceId = 'workspace-2';
+    h.cookies = [cookie('sid', 'b')];
+    await cookieFeature.captureActiveWorkspaceCookies.call(h as never, 'workspace-1');
+    expect(listCookies).toHaveBeenCalledWith('workspace-1');
+    expect(h.cookies).toEqual([cookie('sid', 'b')]);
+    expect(h.workspaceCookies['workspace-1']).toEqual([cookie('sid', 'a')]);
+  });
+
   it('normalizes only workspace cookie buckets from the request store', () => {
     const host = {
       activeWorkspaceId: 'workspace-1',

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CookieJarEntry, HttpRequest, HttpResponse, SaveRequestStoreResult } from '../lib/backend';
+import type { CookieJarEntry, HttpRequest, HttpResponse, OAuth2TokenResponse, SaveRequestStoreResult } from '../lib/backend';
 import { DEFAULT_REQUEST_SETTINGS, mkRow } from '../lib/constants';
 import { buildOpenCollectionFiles, openCollectionBundleFromFiles } from '../lib/opencollection';
 import { buildOpenApiDocument } from '../lib/openapi';
@@ -137,6 +137,8 @@ const backend = vi.hoisted(() => {
       testResult: { tests: [{ name: 'grpc ok', passed: true }] },
     })),
     cancelHttpRequest: vi.fn(async () => undefined),
+    refreshOAuth2Token: vi.fn(async (): Promise<OAuth2TokenResponse | null> => null),
+    fetchOAuth2Token: vi.fn(async (): Promise<OAuth2TokenResponse | null> => null),
     cancelQuit: vi.fn(async () => undefined),
     confirmQuit: vi.fn(async () => undefined),
     sseDisconnect: vi.fn(async () => undefined),
@@ -862,6 +864,7 @@ describe('full application e2e smoke', () => {
 
     const host = {
       activeRequestId: 'req-retry',
+      activeWorkspaceId: 'workspace-1',
       authType: 'none',
       bearerToken: '',
       disableCookieJar: true,
@@ -878,9 +881,10 @@ describe('full application e2e smoke', () => {
       activeEnvironmentValues: () => ({}),
       activeSecretEnvironmentKeys: () => [],
       activeSecretEnvironmentValues: () => [],
+      globalVariableValues: () => ({}),
       cancelActiveRequest: async () => undefined,
       clearTransientSSESession: () => undefined,
-      ensureValidOAuth2Token: async () => undefined,
+      ensureValidOAuth2TokenForRequest: async (request: SavedRequest) => request,
       graphQLPayloadError: () => '',
       guardWorkspaceWritable: () => true,
       headerValidationErrorForRequest: () => '',
@@ -901,7 +905,7 @@ describe('full application e2e smoke', () => {
     };
 
     const sendPromise = requestExecutionFeature.send.call(host as never);
-    await settleMicrotasks();
+    await vi.waitFor(() => expect(resolveRequest).toBeTypeOf('function'));
 
     expect(activeResponse).toBe(previous);
 
@@ -1251,6 +1255,122 @@ describe('request templates reach the backend unresolved', () => {
     await app.saveActiveRequest();
     return app;
   }
+
+  it('sends the original request, credentials and variables when tabs change during OAuth refresh', async () => {
+    const app = await appWithRequest('{{host}}/source');
+    const sourceId = app.activeRequestId;
+    app.selectAuthType('oauth2');
+    app.oauth2Token = 'expired-a';
+    app.oauth2RefreshToken = 'refresh-a';
+    app.oauth2TokenExpiry = 1;
+    app.globalVariables = [row('host', 'https://source.example.test')];
+    await app.saveActiveRequest();
+    await app.createNewRequest(app.collections[0].id);
+    const otherId = app.activeRequestId;
+    app.url = 'https://other.example.test';
+    app.selectAuthType('bearer');
+    app.bearerToken = 'token-b';
+    await app.saveActiveRequest();
+    await app.switchRequest(sourceId);
+    let resolve!: (result: OAuth2TokenResponse) => void;
+    backend.refreshOAuth2Token.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    let sent: HttpRequest | undefined;
+    backend.sendHttpRequest.mockImplementationOnce(async request => {
+      sent = request;
+      return httpResponse(200, { ok: true });
+    });
+
+    const sending = app.runActiveRequest();
+    await vi.waitFor(() => expect(resolve).toBeTypeOf('function'));
+    await app.switchRequest(otherId);
+    app.globalVariables = [row('host', 'https://other.example.test')];
+    resolve({ access_token: 'fresh-a', refresh_token: 'rotated-a', token_type: 'Bearer', expires_in: 3600 });
+    await sending;
+
+    expect(sent).toMatchObject({ requestId: sourceId, url: '{{host}}/source', auth: { token: 'fresh-a' }, templateValues: { host: 'https://source.example.test' } });
+    expect(app.activeRequestId).toBe(otherId);
+    expect(app.bearerToken).toBe('token-b');
+    expect(app.requests.find(request => request.id === sourceId)?.auth.oauth2RefreshToken).toBe('rotated-a');
+  });
+
+  it('keeps an inactive OAuth result unsaved until its request is saved in manual mode', async () => {
+    const app = await appWithRequest('https://source.example.test');
+    const sourceId = app.activeRequestId;
+    app.selectAuthType('oauth2');
+    app.oauth2Token = 'old-a';
+    await app.saveActiveRequest();
+    await app.createNewRequest(app.collections[0].id);
+    const otherId = app.activeRequestId;
+    app.url = 'https://other.example.test';
+    await app.saveActiveRequest();
+    app.autosave = false;
+    await app.switchRequest(sourceId);
+    let resolve!: (result: OAuth2TokenResponse) => void;
+    backend.fetchOAuth2Token.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+
+    const fetching = app.fetchOAuth2Token();
+    await app.switchRequest(otherId);
+    resolve({ access_token: 'fresh-a', token_type: 'Bearer', expires_in: 3600 });
+    await fetching;
+
+    expect(app.requestForEditing(sourceId).auth.oauth2Token).toBe('fresh-a');
+    expect(app.requestsForStore(app.requests).find((request: SavedRequest) => request.id === sourceId)?.auth.oauth2Token).toBe('old-a');
+    await app.switchRequest(sourceId);
+    expect(app.oauth2Token).toBe('fresh-a');
+    await app.saveActiveRequest();
+    expect(backend.state.savedStores.at(-1)?.requests.find(request => request.id === sourceId)?.auth.oauth2Token).toBe('fresh-a');
+  });
+
+  it.each(['http', 'grpc'] as const)('uses the refreshed token for %s requests in the runner', async protocol => {
+    const app = await appWithRequest('https://source.example.test');
+    app.selectAuthType('oauth2');
+    app.oauth2Token = 'expired-a';
+    app.oauth2RefreshToken = 'refresh-a';
+    app.oauth2TokenExpiry = 1;
+    await app.saveActiveRequest();
+    const request = { ...app.requests[0], requestType: protocol, grpcMethod: 'example.Service/Call' };
+    app.requests = [request];
+    app.activeRequestId = 'another-request';
+    app.collectionRunnerResults = [app.runnerResultShell(request, 'queued', 'run', 1)];
+    backend.refreshOAuth2Token.mockResolvedValueOnce({ access_token: 'fresh-a', token_type: 'Bearer', expires_in: 3600 });
+    if (protocol === 'http') backend.sendHttpRequest.mockResolvedValueOnce(httpResponse(200, { ok: true }));
+    const refreshesBefore = backend.refreshOAuth2Token.mock.calls.length;
+    await app.executeCollectionRunnerRequest(request, 'run', 1, {}, [], []);
+
+    const sent = protocol === 'http' ? backend.sendHttpRequest.mock.calls.at(-1)?.[0] : backend.sendGrpcRequest.mock.calls.at(-1)?.[0];
+    expect(sent?.auth.token).toBe('fresh-a');
+    expect(app.collectionRunnerResults[0].status).toBe('passed');
+    expect(app.requests[0].auth.oauth2Token).toBe('fresh-a');
+    if (protocol === 'http') backend.sendHttpRequest.mockResolvedValueOnce(httpResponse(200, { ok: true }));
+    await app.executeCollectionRunnerRequest(request, 'run', 2, {}, [], []);
+    const repeated = protocol === 'http' ? backend.sendHttpRequest.mock.calls.at(-1)?.[0] : backend.sendGrpcRequest.mock.calls.at(-1)?.[0];
+    expect(repeated?.auth.token).toBe('fresh-a');
+    expect(backend.refreshOAuth2Token.mock.calls.length - refreshesBefore).toBe(1);
+  });
+
+  it('persists inherited script overrides as secrets and keeps masking them after reload', async () => {
+    const app = await appWithRequest('https://source.example.test');
+    const workspaceId = app.activeWorkspaceId;
+    app.environments = [
+      { id: 'base', workspaceId, name: 'Base', values: [row('credential', 'old-secret', { secret: true })] },
+      { id: 'child', workspaceId, name: 'Child', parentId: 'base', values: [] },
+    ];
+    app.activeEnvironmentId = 'child';
+    backend.sendHttpRequest.mockImplementationOnce(async () => {
+      backend.state.environment.credential = 'new-secret';
+      return httpResponse(200, { ok: true });
+    });
+    await app.runActiveRequest();
+
+    const stored = backend.state.savedStores.at(-1)!;
+    expect(stored.environments.find(environment => environment.id === 'child')?.values).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'credential', value: 'new-secret', secret: true }),
+    ]));
+    app.environments = JSON.parse(JSON.stringify(stored.environments));
+    expect(app.activeSecretEnvironmentValues()).toContain('new-secret');
+    expect(app.redactedActiveEnvironmentValues().credential).toBe('{{credential}}');
+    expect(app.environments[0].values[0].value).toBe('old-secret');
+  });
 
   it('resolves globals below collection and environment values', async () => {
     const app = await appWithRequest('{{host}}/{{scope}}/{{only}}');

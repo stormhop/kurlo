@@ -1050,7 +1050,12 @@ func buildHTTPClient(req model.HttpRequest, jar http.CookieJar, timeout time.Dur
 func buildHTTPRoundTripper(req model.HttpRequest, transport *http.Transport) http.RoundTripper {
 	var roundTripper http.RoundTripper = transport
 	if req.Auth.Type == "digest" && req.Auth.Username != "" {
-		roundTripper = auth.NewDigestTransport(req.Auth.Username, req.Auth.Password, transport)
+		digest := auth.NewDigestTransport(req.Auth.Username, req.Auth.Password, transport)
+		source, _ := url.Parse(normalizeRequestURL(req.URL))
+		digest.AllowRequest = func(next *http.Request) bool {
+			return redirectKeepsAuthorization(source, next.URL, req.FollowAuthorizationHeader)
+		}
+		roundTripper = digest
 	}
 	return roundTripper
 }

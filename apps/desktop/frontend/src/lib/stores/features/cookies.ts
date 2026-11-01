@@ -19,13 +19,18 @@ type CookieHost = {
   normalizeCookieEntry: (input: unknown) => CookieJarEntry | null;
   rememberActiveWorkspaceCookies: (workspaceId?: string) => void;
   cookiesForWorkspace: (workspaceId: string) => CookieJarEntry[];
-  restoreCookieJar: (cookies: CookieJarEntry[]) => Promise<void>;
-  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean) => Promise<void>;
+  restoreCookieJar: (cookies: CookieJarEntry[], workspaceId?: string) => Promise<void>;
+  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean, workspaceId?: string) => Promise<void>;
   pointCookieSyncAtActiveWorkspace: () => Promise<void>;
 };
 
 function cloneCookies(cookies: CookieJarEntry[]) {
   return cookies.map(cookie => ({ ...cookie }));
+}
+
+function applyWorkspaceCookies(host: CookieHost, workspaceId: string, cookies: CookieJarEntry[]) {
+  host.workspaceCookies = { ...host.workspaceCookies, [workspaceId]: cloneCookies(cookies) };
+  if (host.activeWorkspaceId === workspaceId) host.cookies = cloneCookies(cookies);
 }
 
 export const cookieFeature = {
@@ -84,36 +89,34 @@ export const cookieFeature = {
   async captureActiveWorkspaceCookies(this: CookieHost, workspaceId = this.activeWorkspaceId) {
     if (!workspaceId) return;
     try {
-      this.cookies = (await listCookies(this.activeWorkspaceId)) ?? this.cookies;
+      const cookies = await listCookies(workspaceId);
+      if (cookies) applyWorkspaceCookies(this, workspaceId, cookies);
     } catch {}
-    this.rememberActiveWorkspaceCookies(workspaceId);
   },
   async restoreWorkspaceCookieJar(this: CookieHost, workspaceId = this.activeWorkspaceId) {
-    await this.restoreCookieJar(this.cookiesForWorkspace(workspaceId));
-    await this.pointCookieSyncAtActiveWorkspace();
+    await this.restoreCookieJar(this.cookiesForWorkspace(workspaceId), workspaceId);
+    if (this.activeWorkspaceId === workspaceId) await this.pointCookieSyncAtActiveWorkspace();
   },
-  async restoreCookieJar(this: CookieHost, cookies: CookieJarEntry[]) {
+  async restoreCookieJar(this: CookieHost, cookies: CookieJarEntry[], workspaceId = this.activeWorkspaceId) {
     try {
-      this.cookies = (await clearCookies(this.activeWorkspaceId)) ?? [];
-    } catch {
-      this.cookies = [];
-    }
-    this.cookies = cookies;
+      await clearCookies(workspaceId);
+    } catch {}
+    let nextCookies = cloneCookies(cookies);
     for (const cookie of cookies) {
-      const result = await upsertCookie(this.activeWorkspaceId, cookie);
-      if (!result.error) this.cookies = result.cookies ?? this.cookies;
+      const result = await upsertCookie(workspaceId, cookie);
+      if (!result.error) nextCookies = result.cookies ?? nextCookies;
     }
-    this.rememberActiveWorkspaceCookies();
+    applyWorkspaceCookies(this, workspaceId, nextCookies);
   },
-  async refreshCookieJar(this: CookieHost, silent = false, persistAfterRefresh = false) {
+  async refreshCookieJar(this: CookieHost, silent = false, persistAfterRefresh = false, workspaceId = this.activeWorkspaceId) {
     if (!silent) this.cookieJarLoading = true;
     this.cookieJarError = '';
     try {
-      this.cookies = (await listCookies(this.activeWorkspaceId)) ?? [];
-      this.rememberActiveWorkspaceCookies();
+      const cookies = (await listCookies(workspaceId)) ?? [];
+      applyWorkspaceCookies(this, workspaceId, cookies);
       if (persistAfterRefresh) this.scheduleRequestStorePersist();
     } catch (error) {
-      this.cookieJarError = error instanceof Error ? error.message : String(error);
+      if (this.activeWorkspaceId === workspaceId) this.cookieJarError = error instanceof Error ? error.message : String(error);
     } finally {
       if (!silent) this.cookieJarLoading = false;
     }
@@ -128,6 +131,7 @@ export const cookieFeature = {
     this.cookieJarError = '';
   },
   async importCookieHeaderForUrl(this: CookieHost, requestUrl: string, cookieHeader: string) {
+    const workspaceId = this.activeWorkspaceId;
     let hostname: string;
     try {
       hostname = new URL(this.normalizeRequestUrlForSend(this.resolveTemplate(requestUrl.trim()))).hostname;
@@ -141,13 +145,12 @@ export const cookieFeature = {
     try {
       let nextCookies = this.cookies;
       for (const cookie of cookies) {
-        const result = await upsertCookie(this.activeWorkspaceId, cookie);
+        const result = await upsertCookie(workspaceId, cookie);
         nextCookies = result.cookies ?? nextCookies;
         if (result.error) this.cookieJarError = result.error;
       }
-      this.cookies = nextCookies;
+      applyWorkspaceCookies(this, workspaceId, nextCookies);
       if (!this.cookieJarError) {
-        this.rememberActiveWorkspaceCookies();
         this.scheduleRequestStorePersist();
       }
     } catch (error) {
@@ -157,14 +160,14 @@ export const cookieFeature = {
     }
   },
   async saveCookie(this: CookieHost, cookie: CookieJarEntry) {
+    const workspaceId = this.activeWorkspaceId;
     this.cookieJarSaving = true;
     this.cookieJarError = '';
     try {
-      const result = await upsertCookie(this.activeWorkspaceId, cookie);
-      this.cookies = result.cookies ?? [];
+      const result = await upsertCookie(workspaceId, cookie);
+      applyWorkspaceCookies(this, workspaceId, result.cookies ?? []);
       if (result.error) this.cookieJarError = result.error;
       else {
-        this.rememberActiveWorkspaceCookies();
         this.scheduleRequestStorePersist();
       }
     } catch (error) {
@@ -174,14 +177,14 @@ export const cookieFeature = {
     }
   },
   async removeCookie(this: CookieHost, cookie: CookieJarEntry) {
+    const workspaceId = this.activeWorkspaceId;
     this.cookieJarSaving = true;
     this.cookieJarError = '';
     try {
-      const result = await deleteCookie(this.activeWorkspaceId, cookie);
-      this.cookies = result.cookies ?? [];
+      const result = await deleteCookie(workspaceId, cookie);
+      applyWorkspaceCookies(this, workspaceId, result.cookies ?? []);
       if (result.error) this.cookieJarError = result.error;
       else {
-        this.rememberActiveWorkspaceCookies();
         this.scheduleRequestStorePersist();
       }
     } catch (error) {
@@ -191,11 +194,12 @@ export const cookieFeature = {
     }
   },
   async clearCookieJar(this: CookieHost) {
+    const workspaceId = this.activeWorkspaceId;
     this.cookieJarSaving = true;
     this.cookieJarError = '';
     try {
-      this.cookies = (await clearCookies(this.activeWorkspaceId)) ?? [];
-      this.rememberActiveWorkspaceCookies();
+      const cookies = (await clearCookies(workspaceId)) ?? [];
+      applyWorkspaceCookies(this, workspaceId, cookies);
       this.scheduleRequestStorePersist();
     } catch (error) {
       this.cookieJarError = error instanceof Error ? error.message : String(error);

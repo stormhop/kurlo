@@ -20,6 +20,10 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Fixed
 
 - **Inherited secrets.** Script changes in a child environment keep inherited variables secret, masked and outside workspace YAML.
+- **OAuth and tab switching.** Tokens stay with the original request, Send keeps its original request and variables, and the runner uses refreshed tokens for HTTP and gRPC.
+- **Digest redirects.** Authentication follows the forwarding setting and is blocked on HTTPS-to-HTTP redirects.
+- **Workspace cookies.** Pending cookie updates cannot overwrite another workspace's jar after switching.
+- **Saved runner results.** Totals and verdicts cover the full run; the 500 retained details prioritize failures, and limited details are labelled in the runner and HTML report.
 - **Mock server headers and `HEAD`.** Repeated headers such as several `Set-Cookie` lines are all replayed, and `HEAD` is answered from the `GET` example.
 - **Variables in MCP tools and runner gRPC.** An AI request's MCP tools resolve their own collection variables and globals, and gRPC requests in the runner see globals set earlier in the run.
 - **Status bar alignment.** The branch name and the change count of the Git status sit on one baseline.

@@ -177,6 +177,7 @@ export function buildCollectionRunnerReportHtml(input: CollectionRunnerReportInp
       <div class="setting"><small>Data file</small><span>${escapeHtml(input.dataFileName ? `${input.dataFileName} (${dataRows.length} rows)` : 'None')}</span></div>
     </section>
     <h2>Results</h2>
+    ${input.results.length < input.summary.total ? `<p class="muted">Showing ${escapeHtml(input.results.length)} of ${escapeHtml(input.summary.total)} results. Totals include the full run.</p>` : ''}
     <table>
       <thead>
         <tr>

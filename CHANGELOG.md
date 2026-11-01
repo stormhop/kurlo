@@ -15,6 +15,10 @@ All notable changes to Kurlo are documented here. This project follows
 ### Fixed
 
 - **Inherited secrets stay secret after scripts change them.** An override written to a child environment keeps the variable's secret flag and description, so its value stays masked and outside the workspace YAML.
+- **OAuth results stay with their request.** Getting or refreshing a token while switching tabs updates the original request, respects manual saving, and never replaces another tab's credentials. Send keeps the request and variables you started with. The collection runner uses the refreshed token for HTTP and gRPC calls and reuses it on later iterations.
+- **Digest auth respects redirect settings.** A redirect to another host cannot trigger authentication unless forwarding is enabled, and HTTPS-to-HTTP redirects never receive Digest credentials.
+- **Cookie updates stay in their workspace.** A pending read, edit or restore cannot replace another workspace's cookies after you switch workspaces.
+- **Saved runs keep their full verdict.** Request and check totals cover the whole run even when only 500 result details are kept. Failures are kept first, and the runner and HTML report show when details are limited.
 - **Mock server replays every repeated header.** An example that recorded a header more than once, such as two `Set-Cookie` lines, now replays all of them instead of only the last.
 - **Mock server answers `HEAD`.** A `HEAD` request to a path that only has a `GET` example gets that example's status and headers without a body instead of a `404`.
 - **MCP tools of an AI request see every variable.** When an AI request calls an MCP server from another collection, that server's URL, tool name and arguments now resolve its collection variables and globals, not only the environment.

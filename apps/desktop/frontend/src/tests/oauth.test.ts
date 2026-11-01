@@ -10,6 +10,9 @@ vi.mock('../lib/backend', () => ({
 import { authorizeOAuth2, authorizeOAuth2Device, fetchOAuth2Token, refreshOAuth2Token } from '../lib/backend';
 import { authFeature } from '../lib/stores/features/auth';
 import type { OAuth2TokenResponse } from '../lib/backend';
+import { normalizeSavedRequest } from '../lib/normalizers';
+import { emptyAuthState } from '../lib/utils';
+import type { SavedRequest } from '../lib/types/models';
 
 const mockAuthorize = vi.mocked(authorizeOAuth2);
 const mockDevice = vi.mocked(authorizeOAuth2Device);
@@ -18,6 +21,7 @@ const mockRefresh = vi.mocked(refreshOAuth2Token);
 
 function makeHost(over: Record<string, unknown> = {}) {
   return {
+    autosave: true,
     authType: 'oauth2',
     enableSSLVerification: true,
     oauth2GrantType: 'client_credentials',
@@ -44,7 +48,13 @@ function makeHost(over: Record<string, unknown> = {}) {
     bearerToken: '',
     resolveTemplate: (value: string) => value,
     environmentValuesForRequest: () => ({}),
-    snapshotActiveRequest: () => ({}),
+    snapshotActiveRequest() {
+      return this.requests.find((request: { id: string }) => request.id === this.activeRequestId)
+        ?? { id: this.activeRequestId, auth: { type: this.authType }, settings: { enableSSLVerification: true } };
+    },
+    requestForEditing(id: string) { return this.requests.find((request: { id: string }) => request.id === id); },
+    updateRequestDirtyState: vi.fn(),
+    scheduleRequestStorePersist: vi.fn(),
     openAlertDialog: vi.fn(),
     oauth2ConfigForRequest: authFeature.oauth2ConfigForRequest,
     applyOAuth2Result: authFeature.applyOAuth2Result,
@@ -256,12 +266,14 @@ describe('ensureValidOAuth2TokenForRequest (collection runner path)', () => {
       requestWithCollectionDefaults: (req: Record<string, unknown>) => req,
     });
 
-    await host.ensureValidOAuth2TokenForRequest(request);
+    const refreshed = await host.ensureValidOAuth2TokenForRequest(request);
 
     expect(mockRefresh).toHaveBeenCalledTimes(1);
     expect(host.requests[0].auth.oauth2Token).toBe('FRESH');
     expect(host.requests[0].auth.bearerToken).toBe('FRESH');
     expect(host.requests[0].auth.oauth2RefreshToken).toBe('RT2');
+    expect(refreshed.auth.oauth2Token).toBe('FRESH');
+    expect(request.auth.oauth2Token).toBe('stale');
   });
 
   it('writes the refreshed token back to the collection when auth is inherited', async () => {
@@ -291,5 +303,69 @@ describe('ensureValidOAuth2TokenForRequest (collection runner path)', () => {
 
     await host.ensureValidOAuth2TokenForRequest(request);
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('OAuth2 request ownership', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    mockRefresh.mockReset();
+  });
+
+  function request(id: string, token: string): SavedRequest {
+    return normalizeSavedRequest({ id, auth: { ...emptyAuthState(), type: 'oauth2', oauth2Token: token, oauth2RefreshToken: `refresh-${id}`, oauth2TokenExpiry: 1 } }, [], 'ws');
+  }
+
+  it.each(['fetchOAuth2Token', 'refreshOAuth2Token', 'ensureValidOAuth2Token'] as const)('keeps %s results on the original request after a tab switch', async method => {
+    let resolve!: (value: OAuth2TokenResponse) => void;
+    const pending = new Promise<OAuth2TokenResponse>(done => { resolve = done; });
+    (method === 'fetchOAuth2Token' ? mockFetch : mockRefresh).mockReturnValueOnce(pending);
+    const host = makeHost({ requests: [request('req-1', 'old-a'), request('req-2', 'old-b')], oauth2Token: 'old-a', oauth2RefreshToken: 'refresh-a', oauth2TokenExpiry: 1 });
+
+    const fetching = host[method]();
+    host.activeRequestId = 'req-2';
+    host.oauth2Token = 'old-b';
+    host.bearerToken = 'old-b';
+    host.oauth2RefreshToken = 'refresh-b';
+    resolve(tokenResponse({ access_token: 'new-a', refresh_token: 'rotated-a' }));
+    await fetching;
+
+    expect(host.oauth2Token).toBe('old-b');
+    expect(host.bearerToken).toBe('old-b');
+    expect(host.oauth2RefreshToken).toBe('refresh-b');
+    expect(host.requests[0].auth).toMatchObject({ oauth2Token: 'new-a', oauth2RefreshToken: 'rotated-a' });
+    expect(host.requests[1].auth.oauth2Token).toBe('old-b');
+    expect(host.scheduleRequestStorePersist).toHaveBeenCalled();
+  });
+
+  it('keeps a token received in manual-save mode in the original request draft', async () => {
+    let resolve!: (value: OAuth2TokenResponse) => void;
+    mockFetch.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const original = request('req-1', 'old-a');
+    const host = makeHost({ autosave: false, requests: [original, request('req-2', 'old-b')] });
+    const fetching = host.fetchOAuth2Token();
+    host.activeRequestId = 'req-2';
+    host.oauth2Token = 'old-b';
+    resolve(tokenResponse({ access_token: 'new-a' }));
+    await fetching;
+
+    expect(host.updateRequestDirtyState).toHaveBeenCalledWith('req-1', expect.objectContaining({ auth: expect.objectContaining({ oauth2Token: 'new-a' }) }));
+    expect(host.requests[0]).toBe(original);
+    expect(host.scheduleRequestStorePersist).not.toHaveBeenCalled();
+    expect(host.oauth2Token).toBe('old-b');
+  });
+
+  it('does not recreate a request deleted while fetching its token', async () => {
+    let resolve!: (value: OAuth2TokenResponse) => void;
+    mockFetch.mockReturnValueOnce(new Promise(done => { resolve = done; }));
+    const host = makeHost({ requests: [request('req-1', 'old-a')] });
+    const fetching = host.fetchOAuth2Token();
+    host.requests = [];
+    host.activeRequestId = 'req-2';
+    host.oauth2Token = 'old-b';
+    resolve(tokenResponse({ access_token: 'new-a' }));
+    await fetching;
+    expect(host.requests).toEqual([]);
+    expect(host.oauth2Token).toBe('old-b');
   });
 });

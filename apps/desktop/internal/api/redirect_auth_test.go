@@ -95,6 +95,51 @@ func TestRedirectFromHTTPToHTTPSOnTheSameHostKeepsAuthorization(t *testing.T) {
 	}
 }
 
+func TestDigestRedirectRespectsAuthorizationPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		crossHost bool
+		tlsSource bool
+		follow    bool
+		wantAuth  bool
+	}{
+		{name: "same host", wantAuth: true},
+		{name: "foreign host", crossHost: true},
+		{name: "foreign host allowed", crossHost: true, follow: true, wantAuth: true},
+		{name: "TLS downgrade", tlsSource: true},
+		{name: "TLS downgrade with forwarding", tlsSource: true, follow: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var received string
+			target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				received = r.Header.Get("Authorization")
+				if received == "" {
+					w.Header().Set("WWW-Authenticate", `Digest realm="target", nonce="redirect-nonce", qop="auth", algorithm=MD5`)
+					w.WriteHeader(http.StatusUnauthorized)
+				}
+			}))
+			defer target.Close()
+			targetURL := target.URL
+			if tc.crossHost {
+				targetURL = strings.Replace(targetURL, "127.0.0.1", "localhost", 1)
+			}
+			source := redirectingServer(tc.tlsSource)(targetURL)
+			defer source.Close()
+			req := traceTestRequest(source.URL)
+			req.EnableSSLVerification = false
+			req.Auth = model.AuthConfig{Type: "digest", Username: "user", Password: "password"}
+			req.FollowAuthorizationHeader = tc.follow
+			resp := sendRequest(t.Context(), req, state.New(), newCookieJarRegistry(), newPreflightCache())
+			if resp.Error != "" {
+				t.Fatal(resp.Error)
+			}
+			if got := strings.HasPrefix(received, "Digest "); got != tc.wantAuth {
+				t.Fatalf("authenticated=%v, want %v; header=%q", got, tc.wantAuth, received)
+			}
+		})
+	}
+}
+
 func TestZeroTimeoutWaitsIndefinitely(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(150 * time.Millisecond)
