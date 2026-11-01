@@ -55,7 +55,7 @@ type CollectionRunnerHost = {
   folderPathMatches: (path?: string[], prefix?: string[]) => boolean;
   headerValidationErrorForRequest: (req: SavedRequest, envValues?: Record<string, string>) => string;
   savedRequestToRunnableHttpRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string, options?: RunnableHttpOptions) => HttpRequest;
-  savedRequestToRunnableGrpcRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string) => GrpcRequest;
+  savedRequestToRunnableGrpcRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string, globals?: Record<string, string>) => GrpcRequest;
   activeEnvironmentValues: () => Record<string, string>;
   globalVariableValues: () => Record<string, string>;
   activeSecretEnvironmentValues: () => string[];
@@ -410,7 +410,7 @@ export const collectionRunnerFeature = {
           this.updateCollectionRunnerResult(runId, { status: 'error', error: 'Select a gRPC method before running this request' });
           return;
         }
-        const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(req, runnerEnvValues, secretValues, secretKeys, runnerRequestId));
+        const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(req, runnerEnvValues, secretValues, secretKeys, runnerRequestId, context.globals));
         if (this.collectionRunnerCancelRequested && resp.error === REQUEST_CANCELED_ERROR) {
           this.updateCollectionRunnerResult(runId, { status: 'skipped', error: '' });
         } else {

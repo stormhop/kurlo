@@ -250,13 +250,14 @@ export const requestSerializationFeature = {
   ): HttpRequest {
     const base = this.savedRequestToRunnableHttpRequest(req, envValues, secretEnvironmentValues, secretEnvironmentKeys, requestId);
     const resolved = this.requestWithCollectionDefaults(req);
+    const values = this.environmentValuesForRequest(req, envValues);
     return {
       ...base,
-      url: this.resolveTemplate((resolved.url ?? '').trim(), envValues),
+      url: this.resolveTemplate((resolved.url ?? '').trim(), values),
       mcpProtocolVersion: resolved.mcpProtocolVersion ?? '',
       mcpMethod: overrides.method ?? resolved.mcpMethod ?? '',
-      mcpName: this.resolveTemplate(overrides.name ?? resolved.mcpName ?? '', envValues),
-      mcpArguments: this.resolveTemplate(overrides.args ?? resolved.mcpArguments ?? '', envValues),
+      mcpName: this.resolveTemplate(overrides.name ?? resolved.mcpName ?? '', values),
+      mcpArguments: this.resolveTemplate(overrides.args ?? resolved.mcpArguments ?? '', values),
       mcpCursor: overrides.cursor ?? '',
       mcpInputResponses: '',
       mcpRequestState: '',
@@ -323,9 +324,10 @@ export const requestSerializationFeature = {
     secretEnvironmentValues = this.activeSecretEnvironmentValues(),
     secretEnvironmentKeys = this.activeSecretEnvironmentKeys(),
     requestId = req.id,
+    globals?: Record<string, string>,
   ): GrpcRequest {
     req = this.requestWithCollectionDefaults(req);
-    envValues = this.environmentValuesForRequest(req, envValues);
+    envValues = this.environmentValuesForRequest(req, envValues, globals);
     secretEnvironmentValues = this.secretEnvironmentValuesForRequest(req, secretEnvironmentValues);
     secretEnvironmentKeys = this.secretEnvironmentKeysForRequest(req, secretEnvironmentKeys);
     const auth = req.auth;

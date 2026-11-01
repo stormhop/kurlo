@@ -141,6 +141,13 @@ func mockQueryMatches(required []model.KeyValue, actual url.Values) bool {
 
 func selectMockRoute(routes []mockCompiledRoute, method, path string, query url.Values) (mockCompiledRoute, bool) {
 	wanted := strings.ToUpper(strings.TrimSpace(method))
+	if route, ok := selectMockRouteForMethod(routes, wanted, path, query); ok || wanted != http.MethodHead {
+		return route, ok
+	}
+	return selectMockRouteForMethod(routes, http.MethodGet, path, query)
+}
+
+func selectMockRouteForMethod(routes []mockCompiledRoute, wanted, path string, query url.Values) (mockCompiledRoute, bool) {
 	actual := normalizeMockPath(path)
 	for _, candidate := range routes {
 		if candidate.method != "" && candidate.method != wanted {
@@ -457,11 +464,17 @@ func (m *mockServer) handle(w http.ResponseWriter, r *http.Request) {
 		status = http.StatusOK
 	}
 
+	replayed := map[string]bool{}
 	for _, header := range matched.route.Headers {
 		if header.Key == "" || !mockHeaderIsForwardable(header.Key) {
 			continue
 		}
-		w.Header().Set(header.Key, header.Value)
+		name := http.CanonicalHeaderKey(header.Key)
+		if !replayed[name] {
+			w.Header().Del(name)
+			replayed[name] = true
+		}
+		w.Header().Add(name, header.Value)
 	}
 	if w.Header().Get("Content-Type") == "" && matched.route.BodyMediaType != "" {
 		w.Header().Set("Content-Type", matched.route.BodyMediaType)

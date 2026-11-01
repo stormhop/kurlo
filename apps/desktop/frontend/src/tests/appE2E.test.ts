@@ -1334,5 +1334,23 @@ describe('request templates reach the backend unresolved', () => {
     expect(sent[0].templateValues?.counter).toBeUndefined();
     expect(sent[1].templateValues).toEqual(expect.objectContaining({ name: 'bob', counter: '1' }));
   });
+
+  it('gives runner gRPC requests the globals written by earlier requests of the run', async () => {
+    const app = await appWithRequest('https://api.example.test/login');
+    const login = app.requests.find((req: SavedRequest) => req.id === app.activeRequestId)!;
+    const grpc = { ...login, id: 'grpc-1', name: 'Greet', requestType: 'grpc', url: 'grpc.example.test:443', grpcMethod: 'greeter.Greeter/Hello', bodyContent: '{"token":"{{token}}"}' } as SavedRequest;
+    vi.mocked(backend.sendHttpRequest).mockImplementation(async () => {
+      backend.state.globals = { ...backend.state.globals, token: 'from-login' };
+      return httpResponse(200, { ok: true });
+    });
+    const grpcSent: GrpcRequest[] = [];
+    vi.mocked(backend.sendGrpcRequest).mockImplementationOnce(async (req: GrpcRequest) => {
+      grpcSent.push(req);
+      return { status: 'OK', grpcCode: 'OK', grpcMessage: '', messages: [], headers: [], trailers: [], duration: 1, error: '', timestamp: Date.now(), preRequestResult: { tests: [] }, testResult: { tests: [] } } as GrpcResponse;
+    });
+    await app.startCollectionRunner('Templates', [login, grpc], { parallel: false });
+    vi.mocked(backend.sendHttpRequest).mockReset();
+    expect(grpcSent[0]?.message).toBe('{"token":"from-login"}');
+  });
 });
 

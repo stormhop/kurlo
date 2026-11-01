@@ -322,3 +322,18 @@ describe('parseCurl data flags', () => {
     expect(parsed.headers).toEqual([{ key: 'Cookie', value: 'a=1; b=2; c=3' }]);
   });
 });
+
+describe('parseCurl --data-raw', () => {
+  it('keeps a body that opens with @ as text instead of reading a file', () => {
+    const parsed = parseCurl(`curl -X PATCH https://a.test --data-raw '@handle mentioned'`);
+    expect(parsed.bodyType).toBe('text');
+    expect(parsed.body).toBe('@handle mentioned');
+    expect(parsed.bodyFilePath).toBeUndefined();
+  });
+
+  it('still reads a file for -d @path', () => {
+    const parsed = parseCurl(`curl https://a.test -d @payload.json`);
+    expect(parsed.bodyType).toBe('binary');
+    expect(parsed.bodyFilePath).toBe('payload.json');
+  });
+});

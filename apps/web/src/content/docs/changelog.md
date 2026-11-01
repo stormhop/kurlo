@@ -10,6 +10,14 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Fixed
+
+- **Mock server headers and `HEAD`.** Repeated headers such as several `Set-Cookie` lines are all replayed, and `HEAD` is answered from the `GET` example.
+- **Variables in MCP tools and runner gRPC.** An AI request's MCP tools resolve their own collection variables and globals, and gRPC requests in the runner see globals set earlier in the run.
+- **cURL `--data-raw '@…'`.** The body is imported as text instead of a file.
+
 ## 2.6.1
 
 ### Changed

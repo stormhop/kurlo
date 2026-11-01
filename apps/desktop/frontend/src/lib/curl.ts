@@ -204,7 +204,8 @@ export function parseCurl(input: string): ParsedCurl {
       }
       i = cookie.index;
     } else if (data) {
-      if (data.value.startsWith('@') && result.body === undefined && data.value.length > 1) {
+      const literal = t === '--data-raw' || t.startsWith('--data-raw=');
+      if (!literal && data.value.startsWith('@') && result.body === undefined && data.value.length > 1) {
         result.bodyType = 'binary';
         result.bodyFilePath = data.value.slice(1);
       } else {

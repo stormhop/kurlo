@@ -549,3 +549,55 @@ func TestMockServerLogsARequestTheClientGaveUpOn(t *testing.T) {
 		t.Error("the abandoned request was not logged")
 	}
 }
+
+func TestMockServerReplaysEveryValueOfARepeatedHeader(t *testing.T) {
+	route := mockRoute("GET", "/login", 200, `{}`)
+	route.Headers = []model.KeyValue{
+		{Key: "Set-Cookie", Value: "session=abc; Path=/"},
+		{Key: "Set-Cookie", Value: "theme=dark; Path=/"},
+	}
+	_, base, _ := startTestMock(t, model.MockServerConfig{Routes: []model.MockRoute{route}})
+
+	resp, err := http.Get(base + "/login")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+
+	got := resp.Header.Values("Set-Cookie")
+	if len(got) != 2 || got[0] != "session=abc; Path=/" || got[1] != "theme=dark; Path=/" {
+		t.Fatalf("Set-Cookie = %q, want both recorded cookies in order", got)
+	}
+}
+
+func TestMockServerAnswersHeadFromAGetExample(t *testing.T) {
+	route := mockRoute("GET", "/pets", 200, `[{"id":1}]`)
+	route.Headers = []model.KeyValue{{Key: "X-Total-Count", Value: "1"}}
+	_, base, _ := startTestMock(t, model.MockServerConfig{Routes: []model.MockRoute{route}})
+
+	resp, err := http.Head(base + "/pets")
+	if err != nil {
+		t.Fatalf("head: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != 200 || resp.Header.Get("X-Total-Count") != "1" || len(body) != 0 {
+		t.Fatalf("HEAD = %d %q body %q, want the GET example's status and headers without a body", resp.StatusCode, resp.Header.Get("X-Total-Count"), body)
+	}
+}
+
+func TestMockServerPrefersAnExplicitHeadExample(t *testing.T) {
+	head := mockRoute("HEAD", "/pets", 204, ``)
+	get := mockRoute("GET", "/pets", 200, `[]`)
+	_, base, _ := startTestMock(t, model.MockServerConfig{Routes: []model.MockRoute{get, head}})
+
+	resp, err := http.Head(base + "/pets")
+	if err != nil {
+		t.Fatalf("head: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("status = %d, want the HEAD example's 204", resp.StatusCode)
+	}
+}

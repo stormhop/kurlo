@@ -439,3 +439,20 @@ describe('ai request serialization', () => {
     expect(built.http.testScript).toBe('pm.test()');
   });
 });
+
+describe('mcp request serialization', () => {
+  it('resolves the endpoint, tool name and arguments with collection and global variables', () => {
+    const merged = (_req: unknown, env: Record<string, string>) => ({ mcpHost: 'http://tools.test', tool: 'forecast', ...env });
+    const host = {
+      environmentValuesForRequest: merged,
+      requestWithCollectionDefaults: (req: SavedRequest) => req,
+      resolveTemplate: (value: string, values: Record<string, string> = {}) => value.replace(/\{\{(\w+)\}\}/g, (_, key: string) => values[key] ?? `{{${key}}}`),
+      savedRequestToRunnableHttpRequest: () => ({ url: '', headers: [] }),
+    };
+    const server = { id: 'mcp-1', collectionId: 'col-tools', requestType: 'mcp', url: '{{mcpHost}}/mcp', mcpName: '{{tool}}', mcpArguments: '{"city":"{{city}}"}' } as SavedRequest;
+    const built = requestSerializationFeature.savedRequestToRunnableMcpRequest.call(host as never, server, { city: 'Lisbon' }, [], []);
+    expect(built.url).toBe('http://tools.test/mcp');
+    expect(built.mcpName).toBe('forecast');
+    expect(built.mcpArguments).toBe('{"city":"Lisbon"}');
+  });
+});
