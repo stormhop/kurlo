@@ -38,7 +38,7 @@ What carries over:
 - Collection-level variables, auth, and scripts, which become the collection's [defaults](/docs/guides/collection-defaults/). A request that declared no auth of its own is set to **Inherit auth**, so the collection's auth applies exactly as it did in Postman.
 - The whole OAuth 2.0 configuration, not just a stored access token: grant type, authorization and token URLs, client id and secret, scope, audience, and refresh token.
 
-Folders in Postman can carry their own scripts. Kurlo has no folder layer, so a folder's script is copied into each request it contains, marked with a `// --- from Postman folder "…" ---` comment.
+Postman folders can carry their own auth and scripts. They become the folder's [defaults](/docs/guides/collection-defaults/#folder-defaults), so every request in the folder still runs them, and you change them in one place. Exporting to Postman writes them back to the folder. Postman folders have no headers, so folder headers are left out of a Postman export.
 
 ### Environments and globals
 
@@ -113,11 +113,11 @@ URL-only curl commands work too — `curl https://api.example.com/users` becomes
 
 ## From Bruno/OpenCollection
 
-Kurlo imports OpenCollection-style folders and request files. Empty folders are preserved explicitly, so a folder can exist before it contains a request.
+Kurlo imports OpenCollection-style folders and request files. Empty folders are preserved explicitly, so a folder can exist before it contains a request. Headers, auth, and scripts in a `folder.yml` or Bruno `folder.bru` become that folder's [defaults](/docs/guides/collection-defaults/#folder-defaults); a folder without an auth block inherits.
 
 Kurlo's OpenCollection export writes:
 
-- `folder.yml` files for explicit folder paths.
+- `folder.yml` files for explicit folder paths, with the folder's headers, auth, and scripts.
 - HTTP and GraphQL requests.
 - Request-level scripts, settings, auth, params, headers, and bodies where the format supports them.
 

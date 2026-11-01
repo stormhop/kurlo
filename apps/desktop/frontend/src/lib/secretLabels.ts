@@ -96,6 +96,18 @@ export function describeWorkspaceSecret(key: string, context: SecretLabelContext
       groupTitle: collection ? `Collection “${collection.name}”` : 'Collection no longer in this workspace',
       groupDetail: 'Shared by all its requests',
     };
+    if (parts[2] === 'folder' && parts.length >= 6) {
+      const folder = collection?.folderDefaults?.find(candidate => candidate.id === parts[3]);
+      const folderGroup = {
+        groupKey: `folder:${parts[1]}:${parts[3]}`,
+        groupKind: 'collection' as const,
+        groupTitle: folder && collection ? `Folder “${folder.path.join(' / ')}” in ${collection.name}` : 'Folder no longer in this workspace',
+        groupDetail: 'Shared by the requests in the folder',
+      };
+      if (parts[4] === 'auth' && parts.length === 6) return { ...base, ...folderGroup, title: fieldLabel(parts[5]) };
+      if (parts[5] === 'row' && parts.length >= 7) return { ...base, ...folderGroup, title: rowLabel(parts[4], parts[6], folder?.headers, rowKey) };
+      return { ...base, ...folderGroup, title: humanize(parts.slice(4).join(' ')) };
+    }
     if ((parts[2] === 'auth' || parts[2] === 'settings') && parts.length === 4) return { ...base, ...group, title: fieldLabel(parts[3]) };
     if (parts[3] === 'row' && parts.length >= 5) {
       const rows = collection ? (parts[2] === 'variables' ? collection.defaults.variables : parts[2] === 'headers' ? collection.defaults.headers : undefined) : undefined;

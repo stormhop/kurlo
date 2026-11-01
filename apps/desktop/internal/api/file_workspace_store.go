@@ -1512,8 +1512,88 @@ func sanitizeRequestsForFilesystem(requests []map[string]any, existingSecrets, s
 	return sanitized
 }
 
+func collectionFolderDefaults(collection map[string]any) []map[string]any {
+	raw, _ := collection["folderDefaults"].([]any)
+	folders := make([]map[string]any, 0, len(raw))
+	for _, item := range raw {
+		if folder, ok := item.(map[string]any); ok {
+			folders = append(folders, folder)
+		}
+	}
+	return folders
+}
+
+func sanitizeFolderDefaultsSecrets(collection map[string]any, collectionID string, existingSecrets, secrets map[string]string) {
+	for _, folder := range collectionFolderDefaults(collection) {
+		folderID := stringValue(folder, "id")
+		if folderID == "" {
+			continue
+		}
+		if auth := nestedMap(folder, "auth"); auth != nil {
+			for _, field := range requestAuthSecretFields {
+				value := stringFromAny(auth[field])
+				key := folderSecretKey(collectionID, folderID, field)
+				if placeholderKey, ok := kurloSecretKeyFromPlaceholder(value); ok {
+					if existingValue, exists := existingSecrets[placeholderKey]; exists {
+						secrets[placeholderKey] = existingValue
+					}
+				} else if secretFieldNeedsVault(value) {
+					secrets[key] = value
+					auth[field] = kurloSecretPlaceholder(key)
+				}
+			}
+		}
+		rows, _ := folder["headers"].([]any)
+		for index, rawRow := range rows {
+			row, ok := rawRow.(map[string]any)
+			if !ok || !boolValue(row["secret"]) {
+				continue
+			}
+			value := stringFromAny(row["value"])
+			key := folderRowSecretKey(collectionID, folderID, "headers", secretRowID(row, index))
+			if placeholderKey, ok := kurloSecretKeyFromPlaceholder(value); ok {
+				if existingValue, exists := existingSecrets[placeholderKey]; exists {
+					secrets[placeholderKey] = existingValue
+				}
+			} else if value != "" {
+				secrets[key] = value
+				row["value"] = kurloSecretPlaceholder(key)
+			}
+		}
+	}
+}
+
+func mergeFolderDefaultsSecrets(collection map[string]any, secrets map[string]string) {
+	for _, folder := range collectionFolderDefaults(collection) {
+		if auth := nestedMap(folder, "auth"); auth != nil {
+			for _, field := range requestAuthSecretFields {
+				if key, ok := kurloSecretKeyFromPlaceholder(stringFromAny(auth[field])); ok {
+					if value, exists := secrets[key]; exists {
+						auth[field] = value
+					}
+				}
+			}
+		}
+		rows, _ := folder["headers"].([]any)
+		for _, rawRow := range rows {
+			row, ok := rawRow.(map[string]any)
+			if !ok {
+				continue
+			}
+			if key, ok := kurloSecretKeyFromPlaceholder(stringFromAny(row["value"])); ok {
+				if value, exists := secrets[key]; exists {
+					row["value"] = value
+				}
+			}
+		}
+	}
+}
+
 func sanitizeCollectionSecrets(collection map[string]any, existingSecrets, secrets map[string]string) {
 	collectionID := stringValue(collection, "id")
+	if collectionID != "" {
+		sanitizeFolderDefaultsSecrets(collection, collectionID, existingSecrets, secrets)
+	}
 	defaults := nestedMap(collection, "defaults")
 	if collectionID == "" || defaults == nil {
 		return
@@ -1705,6 +1785,7 @@ func mergeRequestSecrets(request map[string]any, secrets map[string]string) {
 }
 
 func mergeCollectionSecrets(collection map[string]any, secrets map[string]string) {
+	mergeFolderDefaultsSecrets(collection, secrets)
 	defaults := nestedMap(collection, "defaults")
 	if defaults == nil {
 		return
@@ -2249,6 +2330,14 @@ func collectionSecretKey(collectionID, field string) string {
 
 func collectionSettingSecretKey(collectionID, field string) string {
 	return "collection." + collectionID + ".settings." + field
+}
+
+func folderSecretKey(collectionID, folderID, field string) string {
+	return "collection." + collectionID + ".folder." + folderID + ".auth." + field
+}
+
+func folderRowSecretKey(collectionID, folderID, field, rowID string) string {
+	return "collection." + collectionID + ".folder." + folderID + "." + field + ".row." + rowID + ".value"
 }
 
 func collectionRowSecretKey(collectionID, field, rowID string) string {

@@ -87,11 +87,23 @@ collection:
     - - Auth
     - - Auth
       - Admin
+  folderDefaults:
+    - id: folder-admin
+      path:
+        - Auth
+        - Admin
+      headers:
+        - key: X-Admin
+          value: "1"
+          enabled: true
+      auth:
+        type: bearer
+        bearerToken: '{{kurloSecret:collection.collection-core.folder.folder-admin.auth.bearerToken}}'
 requestOrder:
   - req-login
 ```
 
-`collection.folderPaths` preserves explicit folders, including empty folders. Request files stay flat under `requests/`; the UI hierarchy comes from `request.folderPath` and `collection.folderPaths`, not from nested filesystem directories.
+`collection.folderPaths` preserves explicit folders, including empty folders. `collection.folderDefaults` holds the headers, auth, `preRequestScript`/`testScript` (and their `Js` variants) a folder applies to its requests, keyed by `path`. An `auth.type` of `none` means the folder's requests send no auth; a missing `auth` means they inherit. Secret auth fields and secret header values become placeholders, as in collection defaults. Request files stay flat under `requests/`; the UI hierarchy comes from `request.folderPath` and `collection.folderPaths`, not from nested filesystem directories.
 
 ## Request file
 

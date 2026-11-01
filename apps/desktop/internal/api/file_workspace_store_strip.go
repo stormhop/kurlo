@@ -376,7 +376,42 @@ func stripWorkspaceForFilesystem(workspace map[string]any) {
 func stripCollectionForFilesystem(collection map[string]any) {
 	stripTimestamps(collection)
 	stripCollectionDefaultsForFilesystem(collection)
+	stripFolderDefaultsForFilesystem(collection)
 	stripEmptyAndDefaults(collection, collectionFieldDefaults)
+}
+
+func stripFolderDefaultsForFilesystem(collection map[string]any) {
+	raw, ok := collection["folderDefaults"].([]any)
+	if !ok {
+		return
+	}
+	kept := make([]any, 0, len(raw))
+	for _, item := range raw {
+		folder, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		stripNonSecretRowIDs(folder["headers"])
+		if auth, ok := folder["auth"].(map[string]any); ok {
+			switch stringValue(auth, "type") {
+			case "", "inherit":
+				delete(folder, "auth")
+			case "none":
+				folder["auth"] = map[string]any{"type": "none"}
+			default:
+				stripAuthForFilesystem(folder)
+			}
+		}
+		stripEmptyAndDefaults(folder, nil)
+		if len(folder) > 2 {
+			kept = append(kept, folder)
+		}
+	}
+	if len(kept) == 0 {
+		delete(collection, "folderDefaults")
+		return
+	}
+	collection["folderDefaults"] = kept
 }
 
 func stripCollectionDefaultsForFilesystem(collection map[string]any) {

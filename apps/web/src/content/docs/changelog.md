@@ -16,6 +16,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 - **Suggestions while you type.** The URL field completes URLs from history and saved requests, and finds a request by name; a JSON body offers the next key from the request's examples. `Tab` accepts. See [Suggestions while you type](/docs/guides/request-types/#suggestions-while-you-type).
 - **Environment inheritance.** An environment takes the variables it does not set from a parent environment; the matrix shows where each value comes from. See [Inheriting from another environment](/docs/guides/environments/#inheriting-from-another-environment).
+- **Folder defaults.** Folders set headers, auth, scripts and tests for the requests inside them, and Postman and Bruno folder auth and scripts import onto the folder. See [Folder defaults](/docs/guides/collection-defaults/#folder-defaults).
 
 ### Fixed
 
@@ -26,6 +27,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Saved runner results.** Totals and verdicts cover the full run; the 500 retained details prioritize failures, and limited details are labelled in the runner and HTML report.
 - **Mock server headers and `HEAD`.** Repeated headers such as several `Set-Cookie` lines are all replayed, and `HEAD` is answered from the `GET` example.
 - **Variables in MCP tools and runner gRPC.** An AI request's MCP tools resolve their own collection variables and globals, and gRPC requests in the runner see globals set earlier in the run.
+- **Collection test hint.** The Tests tab now says the collection script runs after each request's own tests.
 - **Status bar alignment.** The branch name and the change count of the Git status sit on one baseline.
 - **Globals Secret button.** Its highlight covers the whole word.
 - **cURL `--data-raw '@…'`.** The body is imported as text instead of a file.

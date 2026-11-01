@@ -363,7 +363,7 @@ describe('postmanRequestsFromItems', () => {
     expect(requests[0].testScript).toBe('');
   });
 
-  it('flattens folder scripts into every request the folder contains', () => {
+  it('keeps folder scripts on the folder instead of copying them into requests', () => {
     const requests = postmanRequestsFromItems([
       {
         name: 'Billing',
@@ -378,9 +378,8 @@ describe('postmanRequestsFromItems', () => {
       },
     ], 'collection-1', 'Postman API', undefined);
 
-    expect(requests[0].preRequestScript).toBe(
-      '// --- from Postman folder "Billing" ---\npm.variables.set("scope", "billing")\n\npm.variables.set("page", "1")',
-    );
+    expect(requests[0].preRequestScript).toBe('pm.variables.set("page", "1")');
+    expect(requests[0].folderPath).toEqual(['Billing']);
   });
 
   it('carries the whole OAuth 2.0 flow across, not just the access token', () => {

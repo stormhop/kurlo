@@ -1,6 +1,10 @@
 import {
   applyCollectionDefaultsToRequest,
   collectionDefaultsHaveContent,
+  folderDefaultsChain,
+  inheritedAuth,
+  inheritedAuthSource,
+  inheritedHeaderRows,
   REQUEST_SETTING_KEYS,
 } from '../../collectionDefaults';
 import { DEFAULT_REQUEST_SETTINGS } from '../../constants';
@@ -201,7 +205,9 @@ export const collectionDefaultsFeature = {
     const host = this as unknown as CollectionDefaultsHost;
     const collection = host.activeRequestCollection();
     const defaults = collection?.defaults;
-    if (!defaults || !collectionDefaultsHaveContent(defaults)) return [];
+    const folderPath = host.snapshotActiveRequest().folderPath;
+    const folders = folderDefaultsChain(collection, folderPath);
+    if (!defaults || (!collectionDefaultsHaveContent(defaults) && !folders.length)) return [];
     const notes: string[] = [];
     const requestHeaderKeys = new Set(
       host.reqHeaders
@@ -209,7 +215,7 @@ export const collectionDefaultsFeature = {
         .map(row => row.key.trim().toLowerCase())
         .filter(Boolean),
     );
-    const headerNames = defaults.headers
+    const headerNames = inheritedHeaderRows(collection, folderPath)
       .filter(row => row.enabled && row.key.trim() && !requestHeaderKeys.has(row.key.trim().toLowerCase()))
       .map(row => row.key.trim());
     if (headerNames.length) notes.push(`Headers: ${host.previewNames(headerNames)}`);
@@ -217,12 +223,15 @@ export const collectionDefaultsFeature = {
       .filter(row => row.enabled && row.key.trim())
       .map(row => `${row.key.trim()}${row.secret ? ' (secret)' : ''}`);
     if (variableNames.length) notes.push(`Variables: ${host.previewNames(variableNames)}`);
-    if (host.authType === 'inherit' && host.authStateHasData(defaults.auth, defaults.auth.type)) {
-      notes.push(`Auth: ${host.authLabel(defaults.auth.type)}`);
+    const auth = inheritedAuth(collection, folderPath);
+    if (host.authType === 'inherit' && auth && host.authStateHasData(auth, auth.type)) {
+      const source = inheritedAuthSource(collection, folderPath);
+      notes.push(`Auth: ${host.authLabel(auth.type)}${source.kind === 'folder' ? ` from folder ${source.folder.path.join(' / ')}` : ''}`);
     }
-    const preRequestLines = scriptLineCount(defaults.preRequestScript);
+    const scriptSources = [defaults, ...folders];
+    const preRequestLines = scriptSources.reduce((total, source) => total + scriptLineCount(source.preRequestScript) + scriptLineCount(source.preRequestScriptJs), 0);
     if (preRequestLines) notes.push(`Pre-request script: ${preRequestLines}L`);
-    const testLines = scriptLineCount(defaults.testScript);
+    const testLines = scriptSources.reduce((total, source) => total + scriptLineCount(source.testScript) + scriptLineCount(source.testScriptJs), 0);
     if (testLines) notes.push(`Test script: ${testLines}L`);
     const settings = REQUEST_SETTING_KEYS
       .filter(key => host.collectionSettingIsInherited(key))

@@ -2,6 +2,7 @@ import { authorizeOAuth2 as requestOAuth2Authorize, authorizeOAuth2Device as req
 import { emptyAuthConfig } from '../../wire';
 import type { AuthConfig, OAuth2DevicePrompt, OAuth2TokenResponse } from '../../backend';
 import { AUTH_OPTIONS } from '../../constants';
+import { inheritedAuth, withInheritedAuth } from '../../collectionDefaults';
 import type { AuthType, OAuth2ClientAuth, OAuth2GrantType, RequestType, SavedRequest } from '../../types/models';
 import { authForPersistence as resolveAuthForPersistence, authStateHasData as authHasPersistableData, oauth1AuthFields, type OAuth1Fields } from '../../utils';
 
@@ -133,7 +134,8 @@ export const authFeature = {
 
   authHasConfig(this: AuthHost) {
     if (this.authType === 'inherit') {
-      const auth = this.collectionForRequest(this.snapshotActiveRequest())?.defaults.auth;
+      const request = this.snapshotActiveRequest();
+      const auth = inheritedAuth(this.collectionForRequest(request), request.folderPath);
       return Boolean(auth && authHasPersistableData(auth, auth.type));
     }
     if (this.authType === 'bearer') return Boolean(this.bearerToken);
@@ -329,7 +331,7 @@ export const authFeature = {
     if (inherited && collection) {
       this.collections = this.collections.map(candidate =>
         candidate.id === collection.id
-          ? { ...candidate, defaults: { ...candidate.defaults, auth: authWithOAuth2Result(candidate.defaults.auth, result) } }
+          ? withInheritedAuth(candidate, req.folderPath, auth => authWithOAuth2Result(auth, result))
           : candidate,
       );
       this.scheduleRequestStorePersist();

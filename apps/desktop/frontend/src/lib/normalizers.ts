@@ -16,7 +16,7 @@ import {
     DEFAULT_WORKSPACE,
     mkRow,
 } from './constants';
-import { emptyCollectionDefaults, normalizeCollectionDefaults, normalizeRequestSettingsOverrides } from './collectionDefaults';
+import { emptyCollectionDefaults, normalizeCollectionDefaults, normalizeFolderDefaultsList, normalizeRequestSettingsOverrides } from './collectionDefaults';
 import { normalizeRequestExamples } from './examples';
 import { normalizeLoadTests } from './loadTests';
 import { normalizeCollectionFolderPaths } from './collections';
@@ -157,10 +157,11 @@ export function normalizeWorkspace(raw: Partial<Workspace>): Workspace {
 }
 
 export function normalizeCollection(raw: Partial<Collection>, workspaceId: string): Collection {
-    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['collapsed'], arrays: ['folderPaths', 'loadTests'], objects: ['defaults'] });
+    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['collapsed'], arrays: ['folderPaths', 'loadTests', 'folderDefaults'], objects: ['defaults'] });
     const id = input.id || newEntityId('collection');
     const name = input.name || DEFAULT_COLLECTION;
     const loadTests = normalizeLoadTests(input.loadTests);
+    const folderDefaults = normalizeFolderDefaultsList(input.folderDefaults);
     return {
         id,
         workspaceId: input.workspaceId || workspaceId,
@@ -170,6 +171,7 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
         collapsed: input.collapsed ?? false,
         folderPaths: normalizeCollectionFolderPaths(input.folderPaths),
         defaults: normalizeCollectionDefaults(input.defaults),
+        ...(folderDefaults.length ? { folderDefaults } : {}),
         ...(loadTests ? { loadTests } : {}),
     };
 }

@@ -31,6 +31,7 @@
     collectionRunnerOpen = false,
     collectionRunnerRunning = false,
     activeCollectionSettings,
+    activeFolderSettingsPath = [],
     historyDetailOpen = false,
     gitTabOpen = false,
     mockTabOpen = false,
@@ -86,6 +87,7 @@
     collectionRunnerOpen?: boolean;
     collectionRunnerRunning?: boolean;
     activeCollectionSettings?: Collection;
+    activeFolderSettingsPath?: string[];
     historyDetailOpen?: boolean;
     gitTabOpen?: boolean;
     mockTabOpen?: boolean;
@@ -312,7 +314,7 @@
               <path d="M2.2 4h3.3l1.2 1.2h6.1v6.1a1.2 1.2 0 01-1.2 1.2H3.4a1.2 1.2 0 01-1.2-1.2V4z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
               <path d="M5 8.2h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
             </svg>
-            <span class="tab-title">{activeCollectionSettings.name}</span>
+            <span class="tab-title">{activeFolderSettingsPath.at(-1) ?? activeCollectionSettings.name}</span>
           </button>
           <button class="tab-close" type="button" onclick={closeCollectionSettings} aria-label="Close collection settings" disabled={workspaceBlocked}><svg width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></button>
         </div>
@@ -376,7 +378,7 @@
             {/if}
             {#if activeCollectionSettings}
               <button class="menu-item" role="option" class:active={topView === 'collection'} aria-selected={topView === 'collection'} type="button" onclick={() => pickTab(() => (topView = 'collection'))} disabled={workspaceBlocked}>
-                <span class="tab-overflow-name">{activeCollectionSettings.name}</span>
+                <span class="tab-overflow-name">{activeFolderSettingsPath.at(-1) ?? activeCollectionSettings.name}</span>
               </button>
             {/if}
             {#if historyDetailOpen}

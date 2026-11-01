@@ -76,6 +76,7 @@
     createNewRequest,
     renameCollection,
     openCollectionSettings,
+    openFolderSettings = () => {},
     exportCollection,
     deleteCollection,
     moveCollection,
@@ -155,6 +156,7 @@
     createNewRequest: (collectionId?: string) => void;
     renameCollection: (id: string, name?: string) => void | Promise<void>;
     openCollectionSettings: (id: string) => void | Promise<void>;
+    openFolderSettings?: (collectionId: string, folderPath: string[]) => void | Promise<void>;
     exportCollection: (id: string) => void;
     deleteCollection: (id: string) => void;
     moveCollection: (sourceId: string, targetId: string, placement: DropPlacement) => void;
@@ -844,6 +846,7 @@
                     <button class="menu-item" type="button" onclick={() => runFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="play" />Run folder</button>
                     <button class="menu-item" type="button" onclick={() => createLoadTest(row.collectionId, folderLoadIds)} disabled={workspaceBlocked || !folderLoadIds.length} title={folderLoadIds.length ? `Start a load test with the ${folderLoadIds.length} HTTP and GraphQL requests in this folder` : 'This folder has no HTTP or GraphQL requests'}><MenuIcon name="load" />New load test from folder</button>
                     <button class="menu-item" type="button" onclick={() => openFindReplace(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
+                    <button class="menu-item" type="button" onclick={() => openFolderSettings(row.collectionId, row.folder.path)} disabled={workspaceBlocked} title="Headers, auth and scripts for every request in this folder"><MenuIcon name="settings" />Settings</button>
                     <button class="menu-item" type="button" onclick={() => renameFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item danger" type="button" onclick={() => deleteFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete folder</button>

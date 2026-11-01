@@ -146,7 +146,19 @@ type cliCollectionDefaults struct {
 	Settings           cliSettings `json:"settings"`
 }
 
+type cliFolderDefaults struct {
+	ID                 string   `json:"id"`
+	Path               []string `json:"path"`
+	Headers            []cliKV  `json:"headers"`
+	Auth               cliAuth  `json:"auth"`
+	PreRequestScript   string   `json:"preRequestScript"`
+	TestScript         string   `json:"testScript"`
+	PreRequestScriptJs string   `json:"preRequestScriptJs"`
+	TestScriptJs       string   `json:"testScriptJs"`
+}
+
 type cliCollection struct {
+	FolderDefaults []cliFolderDefaults   `json:"folderDefaults"`
 	WorkspaceID    string                `json:"workspaceId"`
 	FilesystemName string                `json:"filesystemName"`
 	LoadTests      []model.LoadTest      `json:"loadTests"`

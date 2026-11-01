@@ -244,6 +244,7 @@
     vm.requestStoreLoaded;
     vm.topView;
     vm.activeCollectionSettingsId;
+    vm.activeFolderSettingsPath;
     vm.collectionRunnerOpen;
     vm.collectionRunnerCollectionId;
     vm.gitWorkspaceOpen;
@@ -488,6 +489,7 @@
     createNewRequest={vm.createNewRequest}
     renameCollection={vm.renameCollection}
     openCollectionSettings={vm.openCollectionSettings}
+    openFolderSettings={vm.openFolderSettings}
     exportCollection={vm.exportCollection}
     deleteCollection={vm.deleteCollection}
     moveCollection={vm.moveCollection}
@@ -576,6 +578,7 @@
       collectionRunnerOpen={vm.collectionRunnerOpen}
       collectionRunnerRunning={vm.collectionRunnerRunning}
       activeCollectionSettings={vm.activeCollectionSettings}
+      activeFolderSettingsPath={vm.activeFolderSettingsPath}
       historyDetailOpen={Boolean(vm.historyDetailEntry)}
       gitTabOpen={vm.gitWorkspaceOpen}
       mockTabOpen={vm.mockServerTabOpen}
@@ -751,6 +754,11 @@
         onSave={vm.saveCollectionSettings}
         onReset={vm.resetCollectionSettings}
         onCreateRequest={vm.createNewRequest}
+        folderPath={vm.activeFolderSettingsPath}
+        folderRequestCount={vm.activeCollectionSettings && vm.activeFolderSettingsPath.length ? vm.requests.filter(request => !request.isDraft && request.collectionId === vm.activeCollectionSettings?.id && vm.folderPathMatches(request.folderPath ?? [], vm.activeFolderSettingsPath)).length : 0}
+        onSaveFolder={vm.saveFolderSettings}
+        onResetFolder={vm.resetFolderSettings}
+        onCreateRequestInFolder={vm.createRequestInFolder}
       />
       {/if}
     {:else if vm.topView === 'mock'}

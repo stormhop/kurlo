@@ -182,11 +182,22 @@ export type CollectionDefaults = {
   testScriptJs: string;
   settings: RequestSettings;
 };
+export type FolderDefaults = {
+  id: string;
+  path: string[];
+  headers: KVRow[];
+  auth: AuthState;
+  preRequestScript: string;
+  testScript: string;
+  preRequestScriptJs: string;
+  testScriptJs: string;
+};
 export type Collection = {
   id: string; workspaceId: string; name: string; filesystemName: string; description: string;
   collapsed: boolean;
   folderPaths?: string[][];
   defaults: CollectionDefaults;
+  folderDefaults?: FolderDefaults[];
   loadTests?: LoadTest[];
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;

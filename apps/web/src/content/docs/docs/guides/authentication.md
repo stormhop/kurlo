@@ -77,9 +77,9 @@ Kurlo computes the canonical request, derives the signing key, and adds `Authori
 
 ## Inheriting auth
 
-A request set to **Inherit auth** uses the auth configured in the collection defaults. This is useful when an entire collection talks to the same API.
+A request set to **Inherit auth** uses the auth of the nearest enclosing folder that sets one, or the collection's when none does. This is useful when an entire collection, or one part of it, talks to the same API. See [Folder defaults](/docs/guides/collection-defaults/#folder-defaults).
 
-Imported Postman/Insomnia/Bruno folders that have their own auth are flattened into request-level or collection-level settings where Kurlo can represent them. After a large import, spot-check the Auth tab for the most sensitive requests.
+Postman and Bruno folders that have their own auth keep it as folder auth. Insomnia folder auth is flattened into request-level or collection-level settings where Kurlo can represent it. After a large import, spot-check the Auth tab for the most sensitive requests.
 
 ## The Auth tab wins over a hand-written header
 

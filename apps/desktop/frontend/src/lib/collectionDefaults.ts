@@ -1,6 +1,7 @@
 import { DEFAULT_REQUEST_SETTINGS } from './constants';
-import type { AuthState, Collection, CollectionDefaults, KVRow, RequestSettings, RequestSettingsOverrides, SavedRequest } from './types/models';
-import { authStateHasData, cloneRowsForStore, emptyAuthState, rowHasContent, sanitizeLike } from './utils';
+import type { AuthState, Collection, CollectionDefaults, FolderDefaults, KVRow, RequestSettings, RequestSettingsOverrides, SavedRequest } from './types/models';
+import { authStateHasData, cloneRowsForStore, emptyAuthState, newEntityId, rowHasContent, sanitizeLike } from './utils';
+import { folderPathKey, folderPathStartsWith, normalizeFolderPath } from './collections';
 
 type RequestSettingKey = keyof RequestSettings;
 
@@ -201,18 +202,149 @@ function joinScripts(...scripts: string[]) {
   return parts.join('\n\n');
 }
 
+export function emptyFolderDefaults(path: string[], id = newEntityId('folder')): FolderDefaults {
+  return {
+    id,
+    path: normalizeFolderPath(path),
+    headers: [],
+    auth: { ...emptyAuthState(), type: 'inherit' },
+    preRequestScript: '',
+    testScript: '',
+    preRequestScriptJs: '',
+    testScriptJs: '',
+  };
+}
+
+export function folderDefaultsFingerprint(folder: FolderDefaults | undefined): string {
+  if (!folder || !folderDefaultsHaveContent(folder)) return '';
+  const normalized = normalizeFolderDefaults(folder);
+  return JSON.stringify(normalized, (key, value) => (key === 'id' ? undefined : value));
+}
+
+export function folderDefaultsHaveContent(folder: FolderDefaults | undefined): boolean {
+  if (!folder) return false;
+  return Boolean(
+    folder.headers.some(rowHasContent)
+    || folder.auth.type !== 'inherit'
+    || folder.preRequestScript.trim()
+    || folder.testScript.trim()
+    || folder.preRequestScriptJs.trim()
+    || folder.testScriptJs.trim()
+  );
+}
+
+export function normalizeFolderDefaults(raw: unknown): FolderDefaults | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const input = raw as Partial<FolderDefaults>;
+  const path = normalizeFolderPath(Array.isArray(input.path) ? input.path.map(String) : []);
+  if (!path.length) return null;
+  const empty = emptyFolderDefaults(path, typeof input.id === 'string' && input.id.trim() ? input.id.trim() : undefined);
+  const auth = { ...empty.auth, ...sanitizeLike(input.auth, empty.auth) };
+  return {
+    ...empty,
+    headers: cloneRowsForStore(Array.isArray(input.headers) ? input.headers : []),
+    auth: { ...auth, type: auth.type || 'inherit' },
+    preRequestScript: typeof input.preRequestScript === 'string' ? input.preRequestScript : '',
+    testScript: typeof input.testScript === 'string' ? input.testScript : '',
+    preRequestScriptJs: typeof input.preRequestScriptJs === 'string' ? input.preRequestScriptJs : '',
+    testScriptJs: typeof input.testScriptJs === 'string' ? input.testScriptJs : '',
+  };
+}
+
+export function normalizeFolderDefaultsList(raw: unknown): FolderDefaults[] {
+  const byPath = new Map<string, FolderDefaults>();
+  for (const item of Array.isArray(raw) ? raw : []) {
+    const folder = normalizeFolderDefaults(item);
+    if (!folder || !folderDefaultsHaveContent(folder)) continue;
+    const key = folderPathKey(folder.path);
+    byPath.delete(key);
+    byPath.set(key, folder);
+  }
+  return [...byPath.values()];
+}
+
+export function folderDefaultsFor(collection: Collection | undefined, path: string[] | undefined): FolderDefaults | undefined {
+  const key = folderPathKey(path);
+  if (!key) return undefined;
+  return collection?.folderDefaults?.find(folder => folderPathKey(folder.path) === key);
+}
+
+export function folderDefaultsChain(collection: Collection | undefined, path: string[] | undefined): FolderDefaults[] {
+  const normalized = normalizeFolderPath(path);
+  const chain: FolderDefaults[] = [];
+  for (let depth = 1; depth <= normalized.length; depth += 1) {
+    const folder = folderDefaultsFor(collection, normalized.slice(0, depth));
+    if (folder) chain.push(folder);
+  }
+  return chain;
+}
+
+export function withFolderDefaults(collection: Collection, folder: FolderDefaults): Collection {
+  const key = folderPathKey(folder.path);
+  const others = (collection.folderDefaults ?? []).filter(candidate => folderPathKey(candidate.path) !== key);
+  return { ...collection, folderDefaults: normalizeFolderDefaultsList([...others, folder]) };
+}
+
+export function renameFolderDefaults(collection: Collection, oldPath: string[], newPath: string[]): Collection {
+  if (!collection.folderDefaults?.length) return collection;
+  const from = normalizeFolderPath(oldPath);
+  const to = normalizeFolderPath(newPath);
+  const moved: FolderDefaults[] = [];
+  const kept: FolderDefaults[] = [];
+  for (const folder of collection.folderDefaults) {
+    if (folderPathStartsWith(folder.path, from)) moved.push({ ...folder, path: [...to, ...folder.path.slice(from.length)] });
+    else kept.push(folder);
+  }
+  return { ...collection, folderDefaults: normalizeFolderDefaultsList([...kept, ...moved]) };
+}
+
+export function removeFolderDefaultsTree(collection: Collection, path: string[]): Collection {
+  if (!collection.folderDefaults?.length) return collection;
+  return { ...collection, folderDefaults: collection.folderDefaults.filter(folder => !folderPathStartsWith(folder.path, path)) };
+}
+
+export type InheritedAuthSource = { kind: 'collection' } | { kind: 'folder'; folder: FolderDefaults };
+
+export function inheritedAuthSource(collection: Collection | undefined, path: string[] | undefined): InheritedAuthSource {
+  const chain = folderDefaultsChain(collection, path);
+  for (let index = chain.length - 1; index >= 0; index -= 1) {
+    if (chain[index].auth.type !== 'inherit') return { kind: 'folder', folder: chain[index] };
+  }
+  return { kind: 'collection' };
+}
+
+export function inheritedAuth(collection: Collection | undefined, path: string[] | undefined): AuthState | undefined {
+  const source = inheritedAuthSource(collection, path);
+  return source.kind === 'folder' ? source.folder.auth : collection?.defaults.auth;
+}
+
+export function withInheritedAuth(collection: Collection, path: string[] | undefined, change: (auth: AuthState) => AuthState): Collection {
+  const source = inheritedAuthSource(collection, path);
+  if (source.kind === 'folder') return withFolderDefaults(collection, { ...source.folder, auth: change(source.folder.auth) });
+  return { ...collection, defaults: { ...collection.defaults, auth: change(collection.defaults.auth) } };
+}
+
+export function inheritedHeaderRows(collection: Collection | undefined, path: string[] | undefined): KVRow[] {
+  let rows = collection?.defaults.headers ?? [];
+  for (const folder of folderDefaultsChain(collection, path)) rows = mergeDefaultRows(rows, folder.headers);
+  return rows;
+}
+
 export function applyCollectionDefaultsToRequest(req: SavedRequest, collection: Collection | undefined): SavedRequest {
   const defaults = collection?.defaults;
   if (!defaults) return req.auth.type === 'inherit' ? { ...req, auth: emptyAuthState() } : req;
-  if (!collectionDefaultsHaveContent(defaults) && req.auth.type !== 'inherit') return req;
+  const folders = folderDefaultsChain(collection, req.folderPath);
+  if (!folders.length && !collectionDefaultsHaveContent(defaults) && req.auth.type !== 'inherit') return req;
+  const outerFirst = folders;
+  const innerFirst = [...folders].reverse();
   return {
     ...req,
-    headers: mergeDefaultRows(defaults.headers, req.headers),
-    auth: mergeCollectionAuth(defaults.auth, req.auth),
-    preRequestScript: joinScripts(defaults.preRequestScript, req.preRequestScript),
-    testScript: joinScripts(req.testScript, defaults.testScript),
-    preRequestScriptJs: joinScripts(defaults.preRequestScriptJs, req.preRequestScriptJs ?? ''),
-    testScriptJs: joinScripts(req.testScriptJs ?? '', defaults.testScriptJs),
+    headers: mergeDefaultRows(inheritedHeaderRows(collection, req.folderPath), req.headers),
+    auth: mergeCollectionAuth(inheritedAuth(collection, req.folderPath) ?? defaults.auth, req.auth),
+    preRequestScript: joinScripts(defaults.preRequestScript, ...outerFirst.map(folder => folder.preRequestScript), req.preRequestScript),
+    testScript: joinScripts(req.testScript, ...innerFirst.map(folder => folder.testScript), defaults.testScript),
+    preRequestScriptJs: joinScripts(defaults.preRequestScriptJs, ...outerFirst.map(folder => folder.preRequestScriptJs), req.preRequestScriptJs ?? ''),
+    testScriptJs: joinScripts(req.testScriptJs ?? '', ...innerFirst.map(folder => folder.testScriptJs), defaults.testScriptJs),
     settings: mergeCollectionSettings(defaults.settings, req.settings, req.settingsOverrides),
   };
 }

@@ -2,12 +2,12 @@
   import { useClock } from '../clock.svelte';
   const now = useClock();
   import { tabListKeyboard } from '../a11y';
-  import { COLLECTION_AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
+  import { AUTH_OPTIONS, COLLECTION_AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
   import { HEADER_PICKER_NAMES, getHeaderValues } from '../headers';
-  import { collectionSettingsFingerprint, emptyCollectionDefaults, normalizeCollectionDefaults } from '../collectionDefaults';
+  import { collectionSettingsFingerprint, emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsFingerprint, folderDefaultsFor, inheritedAuthSource, normalizeCollectionDefaults } from '../collectionDefaults';
   import { activeCount, cloneRowsForStore, guardTrailing, removeRow, restoreRows, scriptLineCount } from '../utils';
   import { openFileDialog } from '../backend';
-  import type { AuthState, Collection, CollectionDefaults, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
+  import type { AuthState, Collection, CollectionDefaults, FolderDefaults, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
   import type { VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
   import Select from './Select.svelte';
@@ -41,6 +41,11 @@
     onSave,
     onReset,
     onCreateRequest,
+    folderPath = [],
+    folderRequestCount = 0,
+    onSaveFolder = () => false,
+    onResetFolder = () => false,
+    onCreateRequestInFolder = () => {},
   }: {
     collection: Collection | undefined;
     requestCount?: number;
@@ -55,7 +60,43 @@
     onSave: (collectionId: string, patch: CollectionSettingsPatch) => boolean | void | Promise<boolean | void>;
     onReset: (collectionId: string) => boolean | Promise<boolean>;
     onCreateRequest: (collectionId: string) => void | Promise<void>;
+    folderPath?: string[];
+    folderRequestCount?: number;
+    onSaveFolder?: (collectionId: string, folder: FolderDefaults, baseFingerprint?: string) => boolean | Promise<boolean>;
+    onResetFolder?: (collectionId: string, folderPath: string[]) => boolean | Promise<boolean>;
+    onCreateRequestInFolder?: (collectionId: string, folderPath: string[]) => void | Promise<void>;
   } = $props();
+
+  const FOLDER_AUTH_OPTIONS = [
+    { value: 'inherit' as const, label: 'Inherit from parent' },
+    ...COLLECTION_AUTH_OPTIONS,
+  ];
+
+  const isFolder = $derived(folderPath.length > 0);
+  const folderName = $derived(folderPath.at(-1) ?? '');
+  const authOptions = $derived(isFolder ? FOLDER_AUTH_OPTIONS : COLLECTION_AUTH_OPTIONS);
+  const parentAuthSource = $derived.by(() => {
+    if (!collection || !isFolder) return '';
+    const source = inheritedAuthSource(collection, folderPath.slice(0, -1));
+    if (source.kind === 'folder') return `the ${source.folder.path.at(-1)} folder (${AUTH_OPTIONS.find(option => option.value === source.folder.auth.type)?.label ?? source.folder.auth.type})`;
+    const type = collection.defaults.auth.type;
+    return type === 'none' ? 'the collection, which sets no auth' : `the collection (${AUTH_OPTIONS.find(option => option.value === type)?.label ?? type})`;
+  });
+  let folderId = $state('');
+
+  function settingsKey(target: Collection | undefined): string {
+    return target ? `${target.id}\u001f${folderPath.join('\u001f')}` : '';
+  }
+
+  function incomingFingerprint(target: Collection): string {
+    return isFolder ? folderDefaultsFingerprint(folderDefaultsFor(target, folderPath)) : collectionSettingsFingerprint(target);
+  }
+
+  $effect(() => {
+    if (isFolder && (collectionSettingsTab === 'overview' || collectionSettingsTab === 'vars' || collectionSettingsTab === 'proxy')) {
+      collectionSettingsTab = 'headers';
+    }
+  });
 
   let loadedCollectionId = $state('');
   let loadedFingerprint = $state('');
@@ -82,15 +123,15 @@
 
   $effect(() => {
     if (!collection) return;
-    const incomingFingerprint = collectionSettingsFingerprint(collection);
-    if (collection.id !== loadedCollectionId) {
+    const incoming = incomingFingerprint(collection);
+    if (settingsKey(collection) !== loadedCollectionId) {
       loadCollection(collection);
       return;
     }
 
 
     if (savingInFlight) return;
-    if (incomingFingerprint !== loadedFingerprint) {
+    if (incoming !== loadedFingerprint) {
       if (draftFingerprint() === loadedFingerprint) {
         loadCollection(collection);
       } else {
@@ -117,10 +158,25 @@
   });
 
   function loadCollection(next: Collection) {
-    const defaults = normalizeCollectionDefaults(next.defaults);
-    loadedCollectionId = next.id;
-    loadedFingerprint = collectionSettingsFingerprint(next);
+    loadedCollectionId = settingsKey(next);
+    loadedFingerprint = incomingFingerprint(next);
     externalUpdate = false;
+    authMenuOpen = false;
+    if (isFolder) {
+      const folder = folderDefaultsFor(next, folderPath) ?? emptyFolderDefaults(folderPath);
+      folderId = folder.id;
+      name = next.name;
+      description = next.description ?? '';
+      headers = restoreRows(folder.headers);
+      variables = [];
+      auth = { ...folder.auth };
+      preRequestScript = folder.preRequestScript;
+      testScript = folder.testScript;
+      preRequestScriptJs = folder.preRequestScriptJs;
+      testScriptJs = folder.testScriptJs;
+      return;
+    }
+    const defaults = normalizeCollectionDefaults(next.defaults);
     name = next.name;
     description = next.description ?? '';
     headers = restoreRows(defaults.headers);
@@ -170,7 +226,21 @@
     });
   }
 
+  function draftFolder(): FolderDefaults {
+    return {
+      id: folderId || emptyFolderDefaults(folderPath).id,
+      path: [...folderPath],
+      headers: cloneRowsForStore(headers),
+      auth: { ...auth },
+      preRequestScript,
+      testScript,
+      preRequestScriptJs,
+      testScriptJs,
+    };
+  }
+
   function draftFingerprint(): string {
+    if (isFolder) return folderDefaultsFingerprint(draftFolder());
     return collectionSettingsFingerprint({
       name,
       description,
@@ -183,6 +253,15 @@
     const baseFingerprint = loadedFingerprint;
     savingInFlight = true;
     try {
+      if (isFolder) {
+        const folder = draftFolder();
+        folderId = folder.id;
+        const didSaveFolder = await onSaveFolder(collection.id, folder, baseFingerprint);
+        if (!didSaveFolder) return;
+        loadedFingerprint = incomingFingerprint(collection);
+        externalUpdate = false;
+        return;
+      }
       const didSave = await onSave(collection.id, {
         name,
         description,
@@ -203,6 +282,21 @@
     if (!collection || savingInFlight) return;
     savingInFlight = true;
     try {
+      if (isFolder) {
+        const didResetFolder = await onResetFolder(collection.id, folderPath);
+        if (!didResetFolder) return;
+        const empty = emptyFolderDefaults(folderPath);
+        folderId = empty.id;
+        headers = restoreRows([]);
+        auth = { ...empty.auth };
+        preRequestScript = '';
+        testScript = '';
+        preRequestScriptJs = '';
+        testScriptJs = '';
+        loadedFingerprint = incomingFingerprint(collection);
+        externalUpdate = false;
+        return;
+      }
       const didReset = await onReset(collection.id);
       if (!didReset) return;
       const defaults = emptyCollectionDefaults();
@@ -224,9 +318,14 @@
   {#if collection}
     <div class="collection-workspace-head">
       <div>
-        <h1>{collection.name}</h1>
-        <p>{requestCount} request{requestCount === 1 ? '' : 's'} · defaults are applied when requests are sent</p>
-        {#if lastRun}
+        {#if isFolder}
+          <h1>{folderName}</h1>
+          <p>Folder in {[collection.name, ...folderPath.slice(0, -1)].join(' / ')} · {folderRequestCount} request{folderRequestCount === 1 ? '' : 's'} · applies to every request inside, subfolders included</p>
+        {:else}
+          <h1>{collection.name}</h1>
+          <p>{requestCount} request{requestCount === 1 ? '' : 's'} · defaults are applied when requests are sent</p>
+        {/if}
+        {#if lastRun && !isFolder}
           <p class="collection-last-run">
             <span class="collection-last-run-dot" class:fail={lastRun.failed > 0} aria-hidden="true"></span>
             <button class="btn-link collection-last-run-link" type="button" onclick={() => onOpenRunner(collection.id)} disabled={workspaceBlocked}>Last run {relativeTime(lastRun.finishedAt, now())}</button>
@@ -243,7 +342,7 @@
         {:else if !autosave && saved}
           <span class="env-save-indicator saved">Saved</span>
         {/if}
-        <button class="btn btn-secondary" type="button" onclick={() => onCreateRequest(collection.id)} disabled={workspaceBlocked}>New request</button>
+        <button class="btn btn-secondary" type="button" onclick={() => (isFolder ? onCreateRequestInFolder(collection.id, folderPath) : onCreateRequest(collection.id))} disabled={workspaceBlocked}>New request</button>
         <button class="btn btn-ghost" type="button" onclick={reset} disabled={workspaceBlocked}>Reset defaults</button>
         {#if !autosave}
           <button class="btn btn-primary" class:feedback-ok={saved} type="button" onclick={save} disabled={workspaceBlocked}>{saved ? 'Saved' : 'Save'}</button>
@@ -253,13 +352,19 @@
 
     <div class="collection-settings-shell">
       <div class="tab-bar tabs collection-tabs" role="tablist" use:tabListKeyboard>
+        {#if !isFolder}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'overview'} aria-selected={collectionSettingsTab === 'overview'} tabindex={collectionSettingsTab === 'overview' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'overview')}>Overview</button>
+        {/if}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'headers'} aria-selected={collectionSettingsTab === 'headers'} tabindex={collectionSettingsTab === 'headers' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'headers')}>Headers{#if activeCount(headers) > 0}<span class="badge">{activeCount(headers)}</span>{/if}</button>
+        {#if !isFolder}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'vars'} aria-selected={collectionSettingsTab === 'vars'} tabindex={collectionSettingsTab === 'vars' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'vars')}>Vars{#if activeCount(variables) > 0}<span class="badge">{activeCount(variables)}</span>{/if}</button>
-        <button class="tab" role="tab" class:active={collectionSettingsTab === 'auth'} aria-selected={collectionSettingsTab === 'auth'} tabindex={collectionSettingsTab === 'auth' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'auth')}>Auth{#if auth.type !== 'none'}<span class="badge badge-on">On</span>{/if}</button>
+        {/if}
+        <button class="tab" role="tab" class:active={collectionSettingsTab === 'auth'} aria-selected={collectionSettingsTab === 'auth'} tabindex={collectionSettingsTab === 'auth' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'auth')}>Auth{#if auth.type !== 'none' && auth.type !== 'inherit'}<span class="badge badge-on">On</span>{/if}</button>
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'script'} aria-selected={collectionSettingsTab === 'script'} tabindex={collectionSettingsTab === 'script' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'script')}>Script{#if scriptLineCount(activePre) > 0}<span class="badge badge-on">{scriptLineCount(activePre)} lines</span>{/if}</button>
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'tests'} aria-selected={collectionSettingsTab === 'tests'} tabindex={collectionSettingsTab === 'tests' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'tests')}>Tests{#if scriptLineCount(activeTest) > 0}<span class="badge badge-on">{scriptLineCount(activeTest)} lines</span>{/if}</button>
+        {#if !isFolder}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'proxy'} aria-selected={collectionSettingsTab === 'proxy'} tabindex={collectionSettingsTab === 'proxy' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'proxy')}>Proxy</button>
+        {/if}
       </div>
 
       <div class="collection-settings-content">
@@ -283,7 +388,7 @@
         {:else if collectionSettingsTab === 'headers'}
           <div class="request-section-bar">
             <span class="request-section-title">Default headers</span>
-            <span class="request-section-meta">Request headers with the same key override these defaults</span>
+            <span class="request-section-meta">{isFolder ? 'Added to every request in this folder; they override the collection and parent folders, and a request header with the same key overrides them' : 'Request headers with the same key override these defaults'}</span>
           </div>
           <div class="kv-table collection-kv-table" style="--kw: 13.75rem; --vw: 16.25rem">
             <div class="kv-head">
@@ -334,12 +439,12 @@
               <span class="field-label">Auth type</span>
               <div class="auth-select">
                 <button class="field select-trigger auth-select-trigger" type="button" onclick={() => (authMenuOpen = !authMenuOpen)} aria-label="Auth type" aria-expanded={authMenuOpen}>
-                  <span>{COLLECTION_AUTH_OPTIONS.find(option => option.value === auth.type)?.label ?? 'No auth'}</span>
+                  <span>{authOptions.find(option => option.value === auth.type)?.label ?? 'No auth'}</span>
                   <svg width="0.625rem" height="0.4375rem" viewBox="0 0 10 7" fill="none" aria-hidden="true"><path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
                 {#if authMenuOpen}
                   <div class="menu auth-select-menu">
-                    {#each COLLECTION_AUTH_OPTIONS as option, eachIndex (eachIndex)}
+                    {#each authOptions as option, eachIndex (eachIndex)}
                       <button class="menu-item" class:active={auth.type === option.value} type="button" onclick={() => { auth.type = option.value; authMenuOpen = false; }}>
                         {#if auth.type === option.value}<span class="auth-check">✓</span>{:else}<span class="auth-check"></span>{/if}
                         <span>{option.label}</span>
@@ -410,6 +515,10 @@
                   <div><label class="field-label" for="collection-aws-region">Region</label><input id="collection-aws-region" class="field field-input" bind:value={auth.awsRegion} spellcheck="false" /></div>
                   <div><label class="field-label" for="collection-aws-service">Service</label><input id="collection-aws-service" class="field field-input" bind:value={auth.awsService} spellcheck="false" /></div>
                 </div>
+              {:else if auth.type === 'inherit'}
+                <p class="auth-none-hint">Requests in this folder that inherit auth take it from {parentAuthSource}.</p>
+              {:else if isFolder}
+                <p class="auth-none-hint">Requests in this folder that inherit auth are sent without auth, whatever the collection sets.</p>
               {:else}
                 <p class="auth-none-hint">Requests in this collection use their own auth unless a default is configured here.</p>
               {/if}
@@ -417,7 +526,7 @@
           </div>
         {:else if collectionSettingsTab === 'script'}
           <div class="script-section collection-script-section">
-            <div class="script-head"><span class="script-hint">{engineLabel} · runs before each request's own pre-request script</span></div>
+            <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after the collection and parent folder scripts, before each request’s own pre-request script' : 'runs before each request\'s own pre-request script'}</span></div>
             {#if scriptEngine === 'js'}
               <CodeEditor bind:value={preRequestScriptJs} language="javascript" placeholder={'// Collection pre-request script (JavaScript) pm.variables.set("traceId", "kurlo-001")'} minHeight="17.5rem" maxHeight="32.5rem" />
             {:else}
@@ -426,7 +535,7 @@
           </div>
         {:else if collectionSettingsTab === 'tests'}
           <div class="script-section collection-script-section">
-            <div class="script-head"><span class="script-hint">{engineLabel} · runs before each request's own test script, after the response arrives</span></div>
+            <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after each request’s own test script, before the parent folder and collection tests' : 'runs after each request\'s own test script, after the response arrives'}</span></div>
             {#if scriptEngine === 'js'}
               <CodeEditor bind:value={testScriptJs} language="javascript" placeholder={'// Collection test script (JavaScript) pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} minHeight="17.5rem" maxHeight="32.5rem" />
             {:else}

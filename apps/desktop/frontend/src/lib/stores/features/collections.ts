@@ -1,5 +1,5 @@
 import type { WorkspaceDiagnostic } from '../../backend';
-import { collectionDefaultsHaveContent, collectionSettingsFingerprint, emptyCollectionDefaults, normalizeCollectionDefaults } from '../../collectionDefaults';
+import { collectionDefaultsHaveContent, collectionSettingsFingerprint, emptyCollectionDefaults, folderDefaultsFingerprint, folderDefaultsFor, folderDefaultsHaveContent, normalizeCollectionDefaults, normalizeFolderDefaults, withFolderDefaults } from '../../collectionDefaults';
 import {
   folderCollapsedByDefault,
   normalizeCollectionFolderPaths,
@@ -7,7 +7,7 @@ import {
   type DropPlacement,
 } from '../../collections';
 import { makeCollection } from '../../normalizers';
-import type { Collection, CollectionGroup, FolderGroup, PersistRequestStore, RequestType, SavedRequest, SidebarView } from '../../types/models';
+import type { Collection, CollectionGroup, FolderDefaults, FolderGroup, PersistRequestStore, RequestType, SavedRequest, SidebarView } from '../../types/models';
 import { requestTabLabel } from '../../utils';
 import type { TopView } from '../ui';
 
@@ -24,6 +24,7 @@ type CollectionHost = {
   collectionSettingsSavedTimer: ReturnType<typeof setTimeout> | null;
   collectionSettingsSaveState: 'idle' | 'saving' | 'saved';
   collectionSettingsTab: CollectionSettingsTab;
+  activeFolderSettingsPath: string[];
   folderCollapseState: Record<string, boolean>;
   openCollectionMenuId: string;
   openRequestIds: string[];
@@ -110,13 +111,72 @@ export const collectionFeature = {
     await this.persistActiveRequestNow();
     this.activeWorkspaceId = collection.workspaceId;
     this.activeCollectionSettingsId = collectionId;
+    this.activeFolderSettingsPath = [];
     this.collectionSettingsTab = 'overview';
     this.sidebarView = 'collections';
     this.topView = 'collection';
     await this.persistRequestStore();
   },
+  async openFolderSettings(this: CollectionHost, collectionId: string, folderPath: string[]) {
+    if (!this.guardWorkspaceWritable('Folder settings')) return;
+    const collection = this.collections.find(candidate => candidate.id === collectionId);
+    if (!collection || collection.isInvalid || !folderPath.length) return;
+    this.closeFloatingMenus();
+    await this.persistActiveRequestNow();
+    this.activeWorkspaceId = collection.workspaceId;
+    this.activeCollectionSettingsId = collectionId;
+    this.activeFolderSettingsPath = [...folderPath];
+    this.collectionSettingsTab = 'headers';
+    this.sidebarView = 'collections';
+    this.topView = 'collection';
+    await this.persistRequestStore();
+  },
+  async saveFolderSettings(this: CollectionHost, collectionId: string, folder: FolderDefaults, baseFingerprint?: string): Promise<boolean> {
+    if (!this.guardWorkspaceWritable('Saving folder settings')) return false;
+    const collection = this.collections.find(candidate => candidate.id === collectionId);
+    const next = normalizeFolderDefaults(folder);
+    if (!collection || collection.isInvalid || !next) return false;
+    if (baseFingerprint !== undefined && folderDefaultsFingerprint(folderDefaultsFor(collection, next.path)) !== baseFingerprint) {
+      await this.openAlertDialog(
+        'Folder changed',
+        'This folder was updated outside the open settings form. Reload the folder settings before saving so the newer YAML changes are not overwritten.'
+      );
+      return false;
+    }
+    this.collections = this.collections.map(candidate => candidate.id === collectionId ? withFolderDefaults(candidate, next) : candidate);
+    this.collectionSettingsSaveState = 'saving';
+    if (this.collectionSettingsSavedTimer) {
+      clearTimeout(this.collectionSettingsSavedTimer);
+      this.collectionSettingsSavedTimer = null;
+    }
+    const ok = await this.persistRequestStore();
+    this.collectionSettingsSaveState = ok ? 'saved' : 'idle';
+    if (ok) {
+      this.collectionSettingsSavedTimer = setTimeout(() => {
+        this.collectionSettingsSaveState = 'idle';
+        this.collectionSettingsSavedTimer = null;
+      }, 1800);
+    }
+    return ok;
+  },
+  async resetFolderSettings(this: CollectionHost, collectionId: string, folderPath: string[]): Promise<boolean> {
+    if (!this.guardWorkspaceWritable('Resetting folder settings')) return false;
+    const collection = this.collections.find(candidate => candidate.id === collectionId);
+    if (!collection || collection.isInvalid) return false;
+    const folder = folderDefaultsFor(collection, folderPath);
+    const confirmed = folderDefaultsHaveContent(folder)
+      ? await this.openConfirmDialog('Reset folder defaults', `Clear headers, auth, scripts and tests for "${folderPath.at(-1) ?? 'this folder'}"? Its requests go back to what the parent folder or collection sets.`, 'Reset')
+      : true;
+    if (!confirmed) return false;
+    this.collections = this.collections.map(candidate => candidate.id === collectionId && folder
+      ? { ...candidate, folderDefaults: (candidate.folderDefaults ?? []).filter(item => item.id !== folder.id) }
+      : candidate);
+    await this.persistRequestStore();
+    return true;
+  },
   closeCollectionSettingsTab(this: CollectionHost) {
     this.activeCollectionSettingsId = '';
+    this.activeFolderSettingsPath = [];
     if (this.activeRequestId) this.topView = 'request';
     else this.topView = 'overview';
   },

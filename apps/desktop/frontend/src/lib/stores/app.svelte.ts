@@ -102,6 +102,7 @@ type ImportSource = 'bruno' | 'postman' | 'insomnia' | 'openapi' | 'har';
 type TopViewState = {
   topView: TopView;
   activeCollectionSettingsId?: string;
+  activeFolderSettingsPath?: string[];
   collectionRunnerOpen?: boolean;
   collectionRunnerCollectionId?: string;
   gitWorkspaceOpen?: boolean;
@@ -129,6 +130,7 @@ function normalizeTopViewState(value: unknown): TopViewState | null {
   if (!isPlainRecord(value) || !isTopViewValue(value.topView)) return null;
   const state: TopViewState = { topView: value.topView };
   if (typeof value.activeCollectionSettingsId === 'string') state.activeCollectionSettingsId = value.activeCollectionSettingsId;
+  if (Array.isArray(value.activeFolderSettingsPath) && value.activeFolderSettingsPath.every(part => typeof part === 'string')) state.activeFolderSettingsPath = value.activeFolderSettingsPath;
   if (typeof value.collectionRunnerOpen === 'boolean') state.collectionRunnerOpen = value.collectionRunnerOpen;
   if (typeof value.collectionRunnerCollectionId === 'string') state.collectionRunnerCollectionId = value.collectionRunnerCollectionId;
   if (typeof value.gitWorkspaceOpen === 'boolean') state.gitWorkspaceOpen = value.gitWorkspaceOpen;
@@ -363,6 +365,9 @@ class AppVM {
   declare closeCollectionSettingsTab: typeof collectionFeature.closeCollectionSettingsTab;
   declare collectionRequestCount: typeof collectionFeature.collectionRequestCount;
   declare saveCollectionSettings: typeof collectionFeature.saveCollectionSettings;
+  declare openFolderSettings: typeof collectionFeature.openFolderSettings;
+  declare saveFolderSettings: typeof collectionFeature.saveFolderSettings;
+  declare resetFolderSettings: typeof collectionFeature.resetFolderSettings;
   declare resetCollectionSettings: typeof collectionFeature.resetCollectionSettings;
   declare deleteCollection: typeof collectionFeature.deleteCollection;
   declare moveCollection: typeof collectionFeature.moveCollection;
@@ -1210,6 +1215,7 @@ class AppVM {
   openRequestMenuId = $state('');
   openCollectionMenuId = $state('');
   activeCollectionSettingsId = $state('');
+  activeFolderSettingsPath = $state<string[]>([]);
   collectionSettingsTab = $state<'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy'>('overview');
   collectionSettingsSaveState = $state<'idle' | 'saving' | 'saved'>('idle');
   openFolderMenuKey = $state('');
@@ -1849,6 +1855,7 @@ class AppVM {
     if (!this.requestStoreLoaded) return;
     const state: TopViewState = { topView: this.topView };
     if (this.activeCollectionSettingsId) state.activeCollectionSettingsId = this.activeCollectionSettingsId;
+    if (this.activeFolderSettingsPath.length) state.activeFolderSettingsPath = [...this.activeFolderSettingsPath];
     if (this.collectionRunnerOpen) {
       state.collectionRunnerOpen = true;
       if (this.collectionRunnerCollectionId) state.collectionRunnerCollectionId = this.collectionRunnerCollectionId;
@@ -1884,6 +1891,7 @@ class AppVM {
       const collectionId = state.activeCollectionSettingsId ?? '';
       if (collectionId && this.collections.some(collection => collection.id === collectionId && !collection.isInvalid)) {
         this.activeCollectionSettingsId = collectionId;
+        this.activeFolderSettingsPath = state.activeFolderSettingsPath ?? [];
         this.topView = 'collection';
         return;
       }

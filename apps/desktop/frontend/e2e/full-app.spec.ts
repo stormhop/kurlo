@@ -3531,6 +3531,62 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(Math.abs(offset)).toBeLessThan(1);
   });
 
+  test('applies the headers and auth a folder sets to the requests inside it', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Shop API');
+    await collectionRow(page, 'Shop API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Shop API').locator('.collection-menu').getByRole('button', { name: 'Add folder' }).click();
+    await fillPrompt(page, 'New folder', 'Orders');
+
+    await folderRow(page, 'Orders').getByLabel('Folder menu').click();
+    await folderRow(page, 'Orders').locator('.folder-menu').getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Orders' })).toBeVisible();
+    await expect(page.getByText('Folder in Shop API', { exact: false })).toBeVisible();
+    const tabs = page.locator('.collection-tabs').getByRole('tab');
+    await expect(tabs).toHaveText(['Headers', 'Auth', 'Script', 'Tests']);
+    await expect(page.locator('.saved-request-tab.runner-tab .tab-title').last()).toHaveText('Orders');
+
+    const content = page.locator('.collection-settings-content');
+    await content.getByPlaceholder('Header').first().fill('X-Scope');
+    await content.getByPlaceholder('Value').first().fill('orders');
+    await tabs.filter({ hasText: 'Auth' }).click();
+    await expect(page.getByRole('button', { name: 'Auth type' })).toHaveText('Inherit from parent');
+    await expect(page.getByText('take it from the collection, which sets no auth')).toBeVisible();
+    await page.getByRole('button', { name: 'Auth type' }).click();
+    await page.locator('.auth-select-menu').getByRole('button', { name: 'Bearer token' }).click();
+    await page.locator('#collection-bearer-token').fill('folder-token');
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    if (await save.isVisible()) await save.click();
+    await expect.poll(async () => {
+      const store = await page.evaluate(() => window.__kurloE2E.store as { collections?: Array<{ name: string; folderDefaults?: Array<{ path: string[]; auth: { type: string }; headers: Array<{ key: string; value: string }> }> }> });
+      const folder = store.collections?.find(item => item.name === 'Shop API')?.folderDefaults?.[0];
+      return folder ? { path: folder.path, auth: folder.auth.type, headers: folder.headers.map(row => `${row.key}=${row.value}`) } : null;
+    }).toEqual({ path: ['Orders'], auth: 'bearer', headers: ['X-Scope=orders'] });
+    await captureDocsScreenshot(page, 'folder-settings');
+
+    await addRequestFromFolder(page, 'Orders', 'HTTP Request');
+    const url = page.getByLabel('Request URL');
+    await url.fill('https://api.kurlo.test/orders');
+    await url.press('Enter');
+    await expect.poll(() => page.evaluate(() => {
+      const sent = window.__kurloE2E.sentRequests.at(-1) as { headers?: Array<{ key: string; value: string }>; auth?: { type?: string; token?: string } } | undefined;
+      return sent ? { headers: (sent.headers ?? []).filter(row => row.key === 'X-Scope').map(row => row.value), auth: sent.auth?.type, token: sent.auth?.token } : null;
+    })).toEqual({ headers: ['orders'], auth: 'bearer', token: 'folder-token' });
+
+    await page.getByRole('button', { name: 'Collections' }).click();
+    await folderRow(page, 'Orders').getByLabel('Folder menu').click();
+    await folderRow(page, 'Orders').locator('.folder-menu').getByRole('button', { name: 'Rename' }).click();
+    await fillPrompt(page, 'Rename folder', 'Sales');
+    await expect.poll(async () => {
+      const store = await page.evaluate(() => window.__kurloE2E.store as { collections?: Array<{ name: string; folderDefaults?: Array<{ path: string[] }> }> });
+      return store.collections?.find(item => item.name === 'Shop API')?.folderDefaults?.map(item => item.path.join('/'));
+    }).toEqual(['Sales']);
+  });
+
   test('lets an environment inherit the variables it does not set from another', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);

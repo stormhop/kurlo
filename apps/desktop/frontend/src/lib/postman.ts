@@ -1,4 +1,4 @@
-import type { KVRow, SavedRequest, CollectionDefaults, Environment, AuthType, BodyType, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SIOArg } from './types/models';
+import type { KVRow, SavedRequest, CollectionDefaults, Environment, FolderDefaults, AuthType, BodyType, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SIOArg } from './types/models';
 import { DEFAULT_REQUEST_SETTINGS } from './constants';
 import { isRecord, asArray, asText, newRequestId } from './utils';
 import { mkRow } from './constants';
@@ -7,7 +7,7 @@ import { safeExportRow, safeExportUrl, safeExportValue, sanitizeExportExample } 
 import { parseGraphQLPayload, parseGraphQLVariables, serializeGraphQLPayload } from './graphql';
 import { filterSocketIOTransportParams, graphQLBodyContentFromJsonText, isWebSocketUrl, socketIOImportDetails } from './importDetection';
 import { filesystemNameFromName } from './normalizers';
-import { emptyCollectionDefaults } from './collectionDefaults';
+import { emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsHaveContent } from './collectionDefaults';
 import { mediaTypeOf, normalizeRequestExample } from './examples';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
 import { applyPathParams, pathParamsFromUrl } from './pathParams';
@@ -62,10 +62,6 @@ function mergeScripts(outer: PostmanScripts, inner: PostmanScripts): PostmanScri
   };
 }
 
-function hasScripts(scripts: PostmanScripts) {
-  return Boolean(scripts.preRequestScript.trim() || scripts.testScript.trim());
-}
-
 export function postmanScriptsFromEvents(...sources: unknown[]): PostmanScripts {
   const result = { preRequestScript: '', testScript: '' };
   for (const source of sources) {
@@ -79,14 +75,6 @@ export function postmanScriptsFromEvents(...sources: unknown[]): PostmanScripts 
     }
   }
   return result;
-}
-
-function labelledFolderScripts(scripts: PostmanScripts, folderName: string): PostmanScripts {
-  const label = `// --- from Postman folder "${folderName}" ---`;
-  return {
-    preRequestScript: scripts.preRequestScript.trim() ? `${label}\n${scripts.preRequestScript}` : '',
-    testScript: scripts.testScript.trim() ? `${label}\n${scripts.testScript}` : '',
-  };
 }
 
 function kurloExtensionFromPostman(item: Record<string, unknown>, req: Record<string, unknown>): Record<string, unknown> {
@@ -404,13 +392,9 @@ export function postmanRequestsFromItems(
   return asArray(items).flatMap(item => {
     if (!isRecord(item)) return [];
     const name = asText(item.name) || 'Imported Request';
-    const childAuth = item.auth ?? inheritedAuth;
+    const childAuth = inheritedAuth;
     if (Array.isArray(item.item)) {
-      const folderScripts = postmanScriptsFromEvents(item.event);
-      const nextScripts = hasScripts(folderScripts)
-        ? mergeScripts(inheritedScripts, labelledFolderScripts(folderScripts, name))
-        : inheritedScripts;
-      return postmanRequestsFromItems(item.item, collectionId, collectionName, childAuth, [...path, name], nextScripts);
+      return postmanRequestsFromItems(item.item, collectionId, collectionName, inheritedAuth, [...path, asText(item.name) || 'Folder'], inheritedScripts);
     }
     const requestValue = item.request;
     if (!requestValue) return [];
@@ -485,6 +469,24 @@ function postmanVariableRows(list: unknown): KVRow[] {
     .filter((row): row is KVRow => Boolean(row));
 }
 
+function postmanFolderDefaults(items: unknown, path: string[] = []): FolderDefaults[] {
+  const folders: FolderDefaults[] = [];
+  for (const item of asArray(items)) {
+    if (!isRecord(item) || !Array.isArray(item.item)) continue;
+    const next = [...path, asText(item.name) || 'Folder'];
+    const scripts = postmanScriptsFromEvents(item.event);
+    const folder = {
+      ...emptyFolderDefaults(next),
+      ...(item.auth !== undefined ? { auth: postmanAuthConfig(item.auth) } : {}),
+      preRequestScript: scripts.preRequestScript,
+      testScript: scripts.testScript,
+    };
+    if (folderDefaultsHaveContent(folder)) folders.push(folder);
+    folders.push(...postmanFolderDefaults(item.item, next));
+  }
+  return folders;
+}
+
 function postmanFolderPaths(items: unknown, path: string[] = []): string[][] {
   const paths: string[][] = [];
   for (const item of asArray(items)) {
@@ -501,6 +503,7 @@ export type PostmanCollectionBundle = {
   description: string;
   defaults: CollectionDefaults;
   folderPaths: string[][];
+  folderDefaults: FolderDefaults[];
   requests: SavedRequest[];
 };
 
@@ -520,6 +523,7 @@ export function postmanCollectionBundle(payload: unknown, collectionId: string, 
       testScript: scripts.testScript,
     },
     folderPaths: postmanFolderPaths(payload.item),
+    folderDefaults: postmanFolderDefaults(payload.item),
     requests: postmanRequestsFromItems(payload.item, collectionId, name, undefined),
   };
 }
@@ -778,12 +782,20 @@ function postmanEventsFromScripts(preRequestScript: string, testScript: string) 
   return events.length ? events : undefined;
 }
 
+function postmanFolderNode(items: Record<string, unknown>[], path: string[]): Record<string, unknown> | undefined {
+  let level = items;
+  let folder: Record<string, unknown> | undefined;
+  for (const folderName of path) {
+    folder = level.find(c => c.name === folderName && Array.isArray(c.item)) as Record<string, unknown> | undefined;
+    if (!folder) { folder = { name: folderName, item: [] }; level.push(folder); }
+    level = folder.item as Record<string, unknown>[];
+  }
+  return folder;
+}
+
 function addPostmanItemToTree(items: Record<string, unknown>[], path: string[], item: Record<string, unknown>) {
-  if (!path.length) { items.push(item); return; }
-  const [folderName, ...rest] = path;
-  let folder = items.find(c => c.name === folderName && Array.isArray(c.item)) as Record<string, unknown> | undefined;
-  if (!folder) { folder = { name: folderName, item: [] }; items.push(folder); }
-  addPostmanItemToTree(folder.item as Record<string, unknown>[], rest, item);
+  const folder = postmanFolderNode(items, path);
+  (folder ? folder.item as Record<string, unknown>[] : items).push(item);
 }
 
 export function buildPostmanCollection(
@@ -793,10 +805,19 @@ export function buildPostmanCollection(
   stripFn: (s: string, t: string) => string,
   includeSecrets = false,
   defaults?: CollectionDefaults,
+  folderDefaults: FolderDefaults[] = [],
 ) {
   const items: Record<string, unknown>[] = [];
   for (const req of requests) {
     addPostmanItemToTree(items, req.folderPath ?? [], postmanItemFromRequest(req, stripFn, includeSecrets));
+  }
+  for (const folderDefault of folderDefaults) {
+    const folder = postmanFolderNode(items, folderDefault.path);
+    if (!folder) continue;
+    const folderEvent = postmanEventsFromScripts(folderDefault.preRequestScript, folderDefault.testScript);
+    if (folderEvent) folder.event = folderEvent;
+    if (folderDefault.auth.type === 'none') folder.auth = { type: 'noauth' };
+    else if (folderDefault.auth.type !== 'inherit') folder.auth = postmanAuthFromKurlo(folderDefault.auth, includeSecrets);
   }
   const event = postmanEventsFromScripts(defaults?.preRequestScript ?? '', defaults?.testScript ?? '');
   const auth = defaults && defaults.auth.type !== 'none' && defaults.auth.type !== 'inherit'

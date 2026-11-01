@@ -1,8 +1,9 @@
 import { DEFAULT_REQUEST_SETTINGS, mkRow } from './constants';
-import { normalizeCollectionDefaults, requestSettingsOverridesFromPatch, REQUEST_SETTING_KEYS } from './collectionDefaults';
+import { emptyFolderDefaults, folderDefaultsHaveContent, normalizeCollectionDefaults, requestSettingsOverridesFromPatch, REQUEST_SETTING_KEYS } from './collectionDefaults';
+import { folderPathKey } from './collections';
 import { normalizeRequestExample } from './examples';
 import { safeExportRow, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
-import type { AuthState, AuthType, BodyType, CollectionDefaults, Environment, KVRow, Method, RawBodyType, RequestExample, RequestSettings, RequestSettingsOverrides, RequestTab, RequestType, SavedRequest, SIOArg } from './types/models';
+import type { AuthState, AuthType, BodyType, CollectionDefaults, Environment, FolderDefaults, KVRow, Method, RawBodyType, RequestExample, RequestSettings, RequestSettingsOverrides, RequestTab, RequestType, SavedRequest, SIOArg } from './types/models';
 import { asArray, asText, authStateHasData, emptyAuthState, inheritAuthState, isRecord, newEntityId, newRequestId, safeFileName } from './utils';
 import { filesystemNameFromName } from './normalizers';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
@@ -19,6 +20,7 @@ export type OpenCollectionImportBundle = {
   description: string;
   defaults: CollectionDefaults;
   folderPaths: string[][];
+  folderDefaults: FolderDefaults[];
   requests: SavedRequest[];
   environments: Environment[];
 };
@@ -757,6 +759,64 @@ function folderPathForFile(path: string, folderNames: Map<string, string>) {
   return out;
 }
 
+function folderDefaultsFromFolderFile(file: CollectionTextFile, folderPath: string[]): FolderDefaults | null {
+  const base = basename(file.path).toLowerCase();
+  const folder = emptyFolderDefaults(folderPath);
+  if (base === 'folder.bru') {
+    const byName = new Map(parseBruBlocks(file.content).map(block => [block.name, block.body]));
+    const authConfig = parseBruKeyValues(byName.get('auth'));
+    const authType = (authConfig.mode || authConfig.type || 'inherit').toLowerCase();
+    const next: FolderDefaults = {
+      ...folder,
+      headers: rowsFromBruBlock(byName.get('headers')),
+      auth: authType === 'inherit' ? folder.auth : authType === 'none' ? emptyAuthState() : authFromBruBlocks(byName, authType),
+      preRequestScript: byName.get('script:pre-request') || '',
+      testScript: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
+    };
+    return folderDefaultsHaveContent(next) ? next : null;
+  }
+  const parsed = parseYaml(file.content);
+  if (!isRecord(parsed)) return null;
+  const http = isRecord(parsed.http) ? parsed.http : {};
+  const authValue = parsed.auth ?? http.auth;
+  const scripts = scriptsFromOpenCollection(parsed.runtime);
+  const next: FolderDefaults = {
+    ...folder,
+    headers: rowsFromOpenCollectionValue(parsed.headers ?? http.headers),
+    auth: authValue === undefined ? folder.auth : openCollectionAuth(authValue),
+    preRequestScript: scripts.preRequestScript,
+    testScript: scripts.testScript,
+  };
+  return folderDefaultsHaveContent(next) ? next : null;
+}
+
+function folderDefaultsFromOpenCollection(files: CollectionTextFile[], folderNames: Map<string, string>): FolderDefaults[] {
+  const folders: FolderDefaults[] = [];
+  for (const file of files) {
+    const base = basename(file.path).toLowerCase();
+    if (base !== 'folder.bru' && base !== 'folder.yml') continue;
+    const path = folderPathForFile(`${dirname(file.path)}/__folder__.yml`, folderNames);
+    if (!path.length) continue;
+    const folder = folderDefaultsFromFolderFile(file, path);
+    if (folder) folders.push(folder);
+  }
+  return folders;
+}
+
+function folderDefaultsToOpenCollection(folder: FolderDefaults | undefined, includeSecrets: boolean): Record<string, unknown> {
+  if (!folder || !folderDefaultsHaveContent(folder)) return {};
+  const runtimeScripts = [
+    folder.preRequestScript ? { type: 'before-request', code: folder.preRequestScript } : undefined,
+    folder.testScript ? { type: 'tests', code: folder.testScript } : undefined,
+  ].filter(Boolean);
+  const headers = folder.headers.filter(row => row.key || row.value);
+  return {
+    ...(headers.length ? { headers: headers.map(row => rowToOpenCollection(row, undefined, includeSecrets)) } : {}),
+    ...(folder.auth.type === 'none' ? { auth: 'none' } : folder.auth.type !== 'inherit' ? { auth: authToOpenCollection(folder.auth, includeSecrets) } : {}),
+    ...(runtimeScripts.length ? { runtime: { scripts: runtimeScripts } } : {}),
+  };
+}
+
 function folderPathsFromFolderFiles(folderNames: Map<string, string>) {
   return [...folderNames.keys()]
     .sort((left, right) => left.localeCompare(right))
@@ -1002,7 +1062,8 @@ export function openCollectionBundleFromFiles(files: CollectionTextFile[], colle
   }
   const folderPaths = folderPathsFromFolderFiles(folderNames);
   if (!requests.length && !folderPaths.length) throw new Error('No Bruno/OpenCollection requests found');
-  return { name, description, defaults, folderPaths, requests, environments };
+  const folderDefaults = folderDefaultsFromOpenCollection(sorted, folderNames);
+  return { name, description, defaults, folderPaths, folderDefaults, requests, environments };
 }
 
 function yamlScalar(value: unknown, indent: number): string {
@@ -1119,7 +1180,9 @@ export function buildOpenCollectionFiles(
   stripFn: (source: string, bodyType: string) => string,
   includeSecrets = false,
   folderPaths: string[][] = [],
+  folderDefaults: FolderDefaults[] = [],
 ): CollectionTextFile[] {
+  const folderDefaultsByPath = new Map(folderDefaults.map(folder => [folderPathKey(folder.path), folder]));
   const files: CollectionTextFile[] = [{
     path: 'opencollection.yml',
     content: yamlMap({
@@ -1147,21 +1210,23 @@ export function buildOpenCollectionFiles(
   const folderSeq = new Map<string, number>();
   const writeFolderFiles = (folderPath: string[]) => {
     const folderSegments: string[] = [];
-    for (const folder of folderPath) {
+    folderPath.forEach((folder, depth) => {
       folderSegments.push(fileSegment(folder, 'folder'));
       const path = folderSegments.join('/');
       if (!seen.has(`${path}/folder.yml`)) {
         seen.add(`${path}/folder.yml`);
         folderSeq.set(path, folderSeq.size + 1);
+        const settings = folderDefaultsToOpenCollection(folderDefaultsByPath.get(folderPathKey(folderPath.slice(0, depth + 1))), includeSecrets);
         files.push({
           path: `${path}/folder.yml`,
-          content: yamlMap({ info: { name: folder, type: 'folder', seq: folderSeq.get(path) } }),
+          content: yamlMap({ info: { name: folder, type: 'folder', seq: folderSeq.get(path) }, ...settings }),
         });
       }
-    }
+    });
     return folderSegments;
   };
   for (const path of folderPaths) writeFolderFiles(path);
+  for (const folder of folderDefaults) writeFolderFiles(folder.path);
   const sortedRequests = [...requests].sort((left, right) => (left.folderPath ?? []).join('/').localeCompare((right.folderPath ?? []).join('/')) || left.name.localeCompare(right.name));
   sortedRequests.forEach((req, index) => {
     const folderSegments = writeFolderFiles(req.folderPath ?? []);

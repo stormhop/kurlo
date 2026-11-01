@@ -12,16 +12,73 @@ func applyCollectionDefaults(req cliSavedRequest, collection *cliCollection) cli
 		return req
 	}
 	defaults := collection.Defaults
+	folders := folderDefaultsChain(collection, req.FolderPath)
 
-	req.Auth = mergeCollectionAuth(defaults.Auth, req.Auth)
-	req.Headers = mergeDefaultRows(defaults.Headers, req.Headers)
-	req.PreRequestScript = joinScripts(defaults.PreRequestScript, req.PreRequestScript)
-	req.TestScript = joinScripts(req.TestScript, defaults.TestScript)
-	req.PreRequestScriptJs = joinScripts(defaults.PreRequestScriptJs, req.PreRequestScriptJs)
-	req.TestScriptJs = joinScripts(req.TestScriptJs, defaults.TestScriptJs)
+	auth := defaults.Auth
+	headers := defaults.Headers
+	pre := []string{defaults.PreRequestScript}
+	preJs := []string{defaults.PreRequestScriptJs}
+	for _, folder := range folders {
+		if folder.Auth.Type != "" && !strings.EqualFold(folder.Auth.Type, "inherit") {
+			auth = folder.Auth
+		}
+		headers = mergeDefaultRows(headers, folder.Headers)
+		pre = append(pre, folder.PreRequestScript)
+		preJs = append(preJs, folder.PreRequestScriptJs)
+	}
+	tests := []string{req.TestScript}
+	testsJs := []string{req.TestScriptJs}
+	for i := len(folders) - 1; i >= 0; i-- {
+		tests = append(tests, folders[i].TestScript)
+		testsJs = append(testsJs, folders[i].TestScriptJs)
+	}
+
+	req.Auth = mergeCollectionAuth(auth, req.Auth)
+	req.Headers = mergeDefaultRows(headers, req.Headers)
+	req.PreRequestScript = joinScripts(append(pre, req.PreRequestScript)...)
+	req.TestScript = joinScripts(append(tests, defaults.TestScript)...)
+	req.PreRequestScriptJs = joinScripts(append(preJs, req.PreRequestScriptJs)...)
+	req.TestScriptJs = joinScripts(append(testsJs, defaults.TestScriptJs)...)
 	req.Settings = mergeCollectionSettings(defaults.Settings, req.Settings)
 	req.Settings = mergeBrowserSettings(defaults.Settings, req.Settings, req.SettingsOverrides)
 	return req
+}
+
+func folderDefaultsChain(collection *cliCollection, folderPath []string) []cliFolderDefaults {
+	path := make([]string, 0, len(folderPath))
+	for _, part := range folderPath {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			path = append(path, trimmed)
+		}
+	}
+	chain := []cliFolderDefaults{}
+	for depth := 1; depth <= len(path); depth++ {
+		for _, folder := range collection.FolderDefaults {
+			if sameFolderPath(folder.Path, path[:depth]) {
+				chain = append(chain, folder)
+				break
+			}
+		}
+	}
+	return chain
+}
+
+func sameFolderPath(left, right []string) bool {
+	trimmed := make([]string, 0, len(left))
+	for _, part := range left {
+		if part = strings.TrimSpace(part); part != "" {
+			trimmed = append(trimmed, part)
+		}
+	}
+	if len(trimmed) != len(right) {
+		return false
+	}
+	for i := range trimmed {
+		if trimmed[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func mergeBrowserSettings(defaults, req cliSettings, overrides map[string]bool) cliSettings {

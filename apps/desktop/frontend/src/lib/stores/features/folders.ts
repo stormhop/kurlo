@@ -5,11 +5,15 @@ import {
   removeCollectionFolderPathTree,
   renameCollectionFolderPath,
 } from '../../collections';
+import { removeFolderDefaultsTree, renameFolderDefaults } from '../../collectionDefaults';
 import type { Collection, PersistRequestStore, RequestType, SavedRequest } from '../../types/models';
 import type { TopView } from '../ui';
 
 type FolderHost = {
   activeRequestId: string;
+  activeCollectionSettingsId: string;
+  activeFolderSettingsPath: string[];
+  closeCollectionSettingsTab: () => void;
   activeWorkspaceId: string;
   collections: Collection[];
   folderCollapseState: Record<string, boolean>;
@@ -123,13 +127,16 @@ export const folderFeature = {
     if (!name || name === oldName) return;
     const newPath = [...folderPath.slice(0, -1), name];
     this.collections = this.collections.map(collection =>
-      collection.id === collectionId ? renameCollectionFolderPath(collection, folderPath, newPath) : collection
+      collection.id === collectionId ? renameFolderDefaults(renameCollectionFolderPath(collection, folderPath, newPath), folderPath, newPath) : collection
     );
     this.requests = this.requests.map(request =>
       request.collectionId === collectionId && this.folderPathMatches(request.folderPath ?? [], folderPath)
         ? { ...request, folderPath: [...newPath, ...(request.folderPath ?? []).slice(folderPath.length)] }
         : request
     );
+    if (this.activeCollectionSettingsId === collectionId && this.folderPathMatches(this.activeFolderSettingsPath, folderPath)) {
+      this.activeFolderSettingsPath = [...newPath, ...this.activeFolderSettingsPath.slice(folderPath.length)];
+    }
     await this.persistRequestStore();
   },
   async deleteFolder(this: FolderHost, collectionId: string, folderPath: string[]) {
@@ -143,9 +150,12 @@ export const folderFeature = {
       .filter(request => request.collectionId === collectionId && this.folderPathMatches(request.folderPath ?? [], folderPath))
       .map(request => request.id);
     this.collections = this.collections.map(collection =>
-      collection.id === collectionId ? removeCollectionFolderPathTree(collection, folderPath) : collection
+      collection.id === collectionId ? removeFolderDefaultsTree(removeCollectionFolderPathTree(collection, folderPath), folderPath) : collection
     );
     this.requests = this.requests.filter(request => !removed.includes(request.id));
+    if (this.activeCollectionSettingsId === collectionId && this.folderPathMatches(this.activeFolderSettingsPath, folderPath)) {
+      this.closeCollectionSettingsTab();
+    }
     for (const requestId of removed) this.disposeRealtimeSession(requestId);
     if (removed.includes(this.activeRequestId)) {
       const fallback = this.requests.find(request => !request.isDraft);

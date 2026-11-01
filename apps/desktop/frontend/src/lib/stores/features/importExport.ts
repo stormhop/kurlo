@@ -1,6 +1,6 @@
 import { openDirectoryDialog, readCollectionTextFiles, sendHttpRequest, writeCollectionTextFiles } from '../../backend';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
-import type { BodyType, Collection, CollectionDefaults, Environment, KVRow, RequestHistoryEntry, SavedRequest, ScriptEngine, Workspace } from '../../types/models';
+import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, ScriptEngine, Workspace } from '../../types/models';
 import { mergeGlobalRowsWithImportedRows } from './globals';
 import { mkRow } from '../../constants';
 import type { TopView } from '../ui';
@@ -65,6 +65,7 @@ export type ImportedCollectionBundle = {
   description: string;
   defaults?: Partial<CollectionDefaults>;
   folderPaths?: string[][];
+  folderDefaults?: FolderDefaults[];
   requests: SavedRequest[];
   environments?: Environment[];
 };
@@ -245,6 +246,7 @@ export const importExportFeature = {
       filesystemName: filesystemNameFromName(bundle.name, collectionId),
       folderPaths: bundle.folderPaths,
       defaults: routeImportedScripts(normalizeCollectionDefaults(bundle.defaults)),
+      folderDefaults: (bundle.folderDefaults ?? []).map(folder => routeImportedScripts(folder)),
     }, wsId);
     const importCollections = [...this.collections, importedCollection];
     const importedReqs = bundle.requests.map(req => routeImportedScripts(normalizeSavedRequest({ ...req, collectionId: importedCollection.id, collection: importedCollection.name }, importCollections, wsId)));
@@ -385,7 +387,7 @@ export const importExportFeature = {
     const exportDefaults = withActiveScripts(col.defaults, 'js');
     const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildOpenCollectionFiles } = await import('../../opencollection');
-    const files = buildOpenCollectionFiles(col.name, col.description ?? '', exportDefaults, exportReqs, envs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, folderPaths);
+    const files = buildOpenCollectionFiles(col.name, col.description ?? '', exportDefaults, exportReqs, envs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, folderPaths, (col.folderDefaults ?? []).map(folder => withActiveScripts(folder, 'js')));
     const error = await writeCollectionTextFiles(targetRoot, files);
     if (error) {
       this.collectionImportToast = 'OpenCollection export failed';
@@ -407,7 +409,7 @@ export const importExportFeature = {
     if (includeSecrets === null) return;
     const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildPostmanCollection } = await import('../../postman');
-    const payload = buildPostmanCollection(col.name, col.description ?? '', exportReqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, withActiveScripts(col.defaults, 'js'));
+    const payload = buildPostmanCollection(col.name, col.description ?? '', exportReqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, withActiveScripts(col.defaults, 'js'), (col.folderDefaults ?? []).map(folder => withActiveScripts(folder, 'js')));
     this.closeFloatingMenus();
     const name = `${safeFileName(col.name)}.postman_collection.json`;
     const content = JSON.stringify(payload, null, 2);
