@@ -295,15 +295,15 @@
         <span class="sse-summary-dot"></span>
         <span>{formatSize(streamSize)}</span>
         <span class="sse-summary-dot"></span>
-        <span class="sse-stream-elapsed" title="Stream duration">{elapsed}</span>
-        <span class="sse-summary-url" title={connectedUrl}>{connectedUrl}</span>
+        <span class="sse-stream-elapsed">{elapsed}</span>
+        <span class="sse-summary-url">{connectedUrl}</span>
       {:else if status === 'connecting'}
         <span class="sse-summary-dot"></span>
         <span class="sse-spinner-sm"></span>
         <span>Opening stream</span>
       {:else if status === 'error'}
         <span class="sse-summary-dot"></span>
-        <span class="sse-status-error" title={error}>{friendlySSEError(error)}</span>
+        <span class="sse-status-error">{friendlySSEError(error)}</span>
       {:else}
         <span>{events.length.toLocaleString('en-US')} {events.length === 1 ? 'event' : 'events'}</span>
         <span class="sse-summary-dot"></span>
@@ -343,7 +343,7 @@
 
     <div class="resp-actions">
       {#if sseTab === 'messages'}
-        <button class="btn btn-icon" title="Search response" aria-label="Search response" aria-pressed={searchOpen} onclick={() => (searchOpen = !searchOpen)} type="button">
+        <button class="btn btn-icon" aria-label="Search response" aria-pressed={searchOpen} onclick={() => (searchOpen = !searchOpen)} type="button">
           <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none">
             <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
             <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -359,7 +359,7 @@
         </button>
       {/if}
       {#if sseTab === 'messages'}
-        <button class="btn btn-icon" type="button" onclick={onClear} disabled={events.length === 0} title="Clear messages" aria-label="Clear messages">
+        <button class="btn btn-icon" type="button" onclick={onClear} disabled={events.length === 0} aria-label="Clear messages">
           <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
             <path d="M2 3h9M5 3V2h3v1M4 3v7a1 1 0 001 1h3a1 1 0 001-1V3"
               stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>

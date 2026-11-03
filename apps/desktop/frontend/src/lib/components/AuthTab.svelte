@@ -92,7 +92,6 @@
             type="button"
             aria-label={bearerTokenVisible ? 'Hide token' : 'Show token'}
             aria-pressed={bearerTokenVisible}
-            title={bearerTokenVisible ? 'Hide token' : 'Show token'}
             onclick={() => (bearerTokenVisible = !bearerTokenVisible)}
           >
             {#if bearerTokenVisible}

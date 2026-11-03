@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { trapFocus } from '../a11y';
   import type { WorkspaceSecretRef } from '../backend';
   import { groupWorkspaceSecrets, type SecretLabelContext } from '../secretLabels';
@@ -32,7 +33,7 @@
   <div class="modal missing-secrets-modal" role="dialog" aria-modal="true" aria-labelledby="missing-secrets-title" aria-describedby="missing-secrets-intro" tabindex="-1" use:trapFocus>
     <div class="modal-head dialog-head">
       <h2 class="modal-title" id="missing-secrets-title">Add secrets on this computer</h2>
-      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog">×</button>
+      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog"><AddCloseIcon /></button>
     </div>
     <div class="missing-secrets-body">
       <p id="missing-secrets-intro">Secret values stay on the device where they were entered and never go into Git, so {secrets.length === 1 ? 'one secret this workspace uses is' : `${secrets.length} secrets this workspace uses are`} not on this computer yet. Fill in the ones you need now; anything left empty can be added later where it is used.</p>
@@ -57,7 +58,7 @@
               {#if group.detail}<span class="missing-secrets-group-detail">{group.detail}</span>{/if}
             </header>
             {#each group.items as item (item.key)}
-              <label class="missing-secrets-item" title={item.key}>
+              <label class="missing-secrets-item">
                 <span class="missing-secrets-item-label">
                   <span>{item.title}</span>
                   {#if item.detail}<small>{item.detail}</small>{/if}

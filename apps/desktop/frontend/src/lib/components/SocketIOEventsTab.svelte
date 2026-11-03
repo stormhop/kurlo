@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { vm } from '../stores/app.svelte';
 
   function inputValue(event: Event): string {
@@ -32,7 +33,6 @@
             class="btn btn-secondary btn-sm sio-listen-btn"
             class:active={row.enabled}
             type="button"
-            title={row.enabled ? 'Listening — click to stop' : 'Not listening — click to listen'}
             onclick={() => vm.updateSioEventRow(row.id, { enabled: !row.enabled })}
           >
             <span class="sio-listen-dot"></span>
@@ -54,10 +54,9 @@
             <button
               class="btn btn-ghost btn-icon btn-xs sio-del-btn"
               type="button"
-              title="Remove"
               onclick={() => vm.removeSioEventRow(row.id)}
               aria-label="Remove event"
-            >×</button>
+            ><AddCloseIcon /></button>
           {/if}
         </div>
       </div>

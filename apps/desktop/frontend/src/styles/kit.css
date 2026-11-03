@@ -153,6 +153,10 @@
   width: var(--control-xl);
 }
 
+.btn-primary.btn-icon {
+  color: var(--on-accent);
+}
+
 :where(.btn-link) {
   display: inline;
   padding: 0;
@@ -647,6 +651,7 @@
   font-size: var(--text-label);
   white-space: nowrap;
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 }
 

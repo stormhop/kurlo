@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { useClock } from '../clock.svelte';
   const now = useClock();
   import type { Collection, CollectionRunnerResult, SavedRequest } from '../types/models';
@@ -189,7 +190,7 @@
         </button>
         {#if dataFileName}
           <button class="btn btn-secondary btn-icon btn-lg runner-file-clear" type="button" aria-label="Remove runner data file" onclick={onClearDataFile} disabled={running}>
-            ×
+            <AddCloseIcon />
           </button>
         {/if}
       </div>
@@ -309,7 +310,7 @@
             <button class="segmented-item" type="button" role="radio" aria-checked={failedOnly && failedCount > 0} disabled={!failedCount} onclick={() => (failedOnly = true)}>Failed {failedCount}</button>
           </div>
           {#if lastRunAt && !running}
-            <p class="runner-last-run" title={new Date(lastRunAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' })}>Last run {relativeTime(lastRunAt, now())}{#if results.length < summary.total} · {results.length} of {summary.total} results kept{/if}</p>
+            <p class="runner-last-run">Last run {relativeTime(lastRunAt, now())}{#if results.length < summary.total} · {results.length} of {summary.total} results kept{/if}</p>
           {/if}
         </div>
         {#if shownResults.length > RUNNER_RESULT_PAGE_SIZE}
@@ -328,7 +329,7 @@
           </div>
           {#each visibleResults as result (result.runId)}
             <div class="runner-result-row" data-testid="runner-result-row" class:running={result.status === 'running'} class:pass={result.status === 'passed'} class:fail={result.status === 'failed' || result.status === 'error'}>
-              <span class="collection-method {methodColor(result.method)}" title={result.method}>{requestKindShortLabel(result.method)}</span>
+              <span class="collection-method {methodColor(result.method)}">{requestKindShortLabel(result.method)}</span>
               <div class="runner-request-main">
                 <span>{result.name}</span>
                 {#if iterations > 1}<small>iteration {result.iteration}</small>{/if}
@@ -394,7 +395,7 @@
                 aria-label={`Select ${requestTabLabel(request)}`}
                 onchange={() => onToggleRequest(request.id)}
               />
-              <span class="collection-method {methodColor(transportLabel)}" title={transportLabel}>{requestKindShortLabel(transportLabel)}</span>
+              <span class="collection-method {methodColor(transportLabel)}">{requestKindShortLabel(transportLabel)}</span>
               <span class="runner-request-copy">
                 <strong>{requestTabLabel(request)}</strong>
                 <small>{request.url}</small>

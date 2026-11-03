@@ -127,10 +127,10 @@
   {:else if needsName && rejection}
     <p class="mcp-notice mcp-notice-bad" role="alert">Kurlo will not call this tool: {rejection}</p>
   {:else if catalog}
-    <p class="mcp-server" title={summaryTitle}>
+    <p class="mcp-server">
       <span class="mcp-server-name">{catalog.serverName || 'This server'}</span>
       {#if catalog.serverVersion}<span class="mcp-server-version">{catalog.serverVersion}</span>{/if}
-      {#if sessionProtocol}<span class="mcp-server-meta" title="This server predates stateless MCP, so Kurlo talks to it in a session">· MCP {sessionProtocol}</span>{/if}
+      {#if sessionProtocol}<span class="mcp-server-meta">· MCP {sessionProtocol}</span>{/if}
       {#if counts.length}<span class="mcp-server-meta">· {counts.join(' · ')}</span>{/if}
       {#if detail}<span class="mcp-server-detail">— {detail}</span>{/if}
     </p>

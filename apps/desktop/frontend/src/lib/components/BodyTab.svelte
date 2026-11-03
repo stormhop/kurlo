@@ -76,7 +76,7 @@
       <button class="kv-col-resizer kv-col-resizer--form-type" type="button" onmousedown={(e) => vm.startColResize('type', e)} aria-label="Resize type column"></button>
       <button class="kv-col-resizer kv-col-resizer--form-value" type="button" onmousedown={(e) => vm.startColResize('val', e)} aria-label="Resize value column"></button>
       {#each vm.formRows as row, i (row.id)}
-        <div class="kv-row form-kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description || row.isFile)} title={!row.enabled && (row.key || row.value || row.description || row.isFile) ? 'Disabled rows are not sent with the request' : ''}>
+        <div class="kv-row form-kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description || row.isFile)}>
           <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable" disabled={!row.key && !row.value} />
           <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={vm.variableSuggestions} placeholder="Key" oninput={() => guardTrailing(vm.formRows, i)} />
           <div class="form-type-cell">
@@ -123,9 +123,9 @@
             </div>
           </div>
           {#if row.isFile}
-            <button class="kv-file-value" type="button" onclick={() => vm.pickFileForRow(row, i)} title={row.value ? 'Replace file' : 'Attach file'}>
+            <button class="kv-file-value" type="button" onclick={() => vm.pickFileForRow(row, i)}>
               {#if row.value}
-                <span class="kv-file-name" title={row.value}>{row.fileName ?? row.value}</span>
+                <span class="kv-file-name">{row.fileName ?? row.value}</span>
               {:else}
                 <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 2v6.5M4 4.5L6.5 2 9 4.5M2.5 10.5h8" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 Attach file
@@ -162,7 +162,7 @@
       <button class="kv-col-resizer kv-col-resizer--key" type="button" onmousedown={(e) => vm.startColResize('key', e)} aria-label="Resize key column"></button>
       <button class="kv-col-resizer kv-col-resizer--value" type="button" onmousedown={(e) => vm.startColResize('val', e)} aria-label="Resize value column"></button>
       {#each vm.formRows as row, i (row.id)}
-        <div class="kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)} title={!row.enabled && (row.key || row.value || row.description) ? 'Disabled rows are not sent with the request' : ''}>
+        <div class="kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
           <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable" disabled={!row.key && !row.value} />
           <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={vm.variableSuggestions} placeholder="Key" oninput={() => guardTrailing(vm.formRows, i)} />
           <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => { row.isFile = false; row.fileName = undefined; guardTrailing(vm.formRows, i); }} />

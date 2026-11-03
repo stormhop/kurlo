@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS } from '../constants';
   import SidebarFolderNode from './SidebarFolderNode.svelte';
   import SidebarRequestRow from './SidebarRequestRow.svelte';
@@ -83,13 +84,11 @@
         <button class="menu-item"
           type="button"
           disabled={!folderCanAcceptRequest(folder)}
-          title={folderCanAcceptRequest(folder) ? 'Add request' : `Limit: ${MAX_FOLDER_REQUESTS} requests in one folder`}
           onclick={() => createRequestInFolder(collectionId, folder.path)}
         ><MenuIcon name="request" />Add request</button>
         <button class="menu-item"
           type="button"
           disabled={!folderCanAcceptSubfolder(folder)}
-          title={folderCanAcceptSubfolder(folder) ? 'Add subfolder' : `Limit: ${MAX_FOLDER_DEPTH} folder levels`}
           onclick={() => createSubfolder(collectionId, folder.path)}
         ><MenuIcon name="folder" />Add subfolder</button>
         <div class="menu-separator" role="separator"></div>
@@ -105,11 +104,11 @@
       {#if !folder.children.length && !folder.requests.length && !sidebarSearch.trim()}
         <div class="collection-empty" role="status" style={`--tree-depth: ${depth + 1}`}>
           <button type="button" class="collection-empty-row" onclick={() => createRequestInFolder(collectionId, folder.path)} disabled={!folderCanAcceptRequest(folder)}>
-            <span class="collection-empty-plus" aria-hidden="true">+</span>
+            <span class="collection-empty-plus" aria-hidden="true"><AddCloseIcon add /></span>
             Add request
           </button>
           <button type="button" class="collection-empty-row" onclick={() => createSubfolder(collectionId, folder.path)} disabled={!folderCanAcceptSubfolder(folder)}>
-            <span class="collection-empty-plus" aria-hidden="true">+</span>
+            <span class="collection-empty-plus" aria-hidden="true"><AddCloseIcon add /></span>
             Add folder
           </button>
         </div>

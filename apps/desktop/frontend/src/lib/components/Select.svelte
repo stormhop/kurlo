@@ -1,9 +1,11 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   let {
     value = $bindable(''),
     options = [],
     className = '',
     disabled = false,
+    searchable = false,
     ariaLabel = undefined,
     onChange = () => {},
   }: {
@@ -11,6 +13,7 @@
     options: Array<{ value: string; label: string }>;
     className?: string;
     disabled?: boolean;
+    searchable?: boolean;
     ariaLabel?: string;
     onChange?: (value: string) => void;
   } = $props();
@@ -19,8 +22,39 @@
   let wrap = $state<HTMLDivElement>();
   let menu = $state<HTMLDivElement>();
   let menuStyle = $state('');
+  let search = $state('');
+  let triggerButton = $state<HTMLButtonElement>();
+  let searchInput = $state<HTMLInputElement>();
 
   const selected = $derived(options.find(o => o.value === value));
+  const filteredOptions = $derived(options.filter(option => option.label.toLowerCase().includes(search.trim().toLowerCase())));
+
+  async function toggle() {
+    open = !open;
+    search = '';
+    if (open && searchable) {
+      await tick();
+      searchInput?.focus();
+    }
+  }
+
+  async function navigate(event: KeyboardEvent) {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const wasOpen = open;
+    if (!open) {
+      search = '';
+      open = true;
+      await tick();
+    }
+    const items = Array.from(menu?.querySelectorAll<HTMLButtonElement>('[role="option"]') ?? []);
+    if (!items.length) return;
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    const selectedIndex = Math.max(0, filteredOptions.findIndex(option => option.value === value));
+    const next = !wasOpen ? selectedIndex : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items[next]?.focus();
+  }
 
   const MENU_MARGIN = 10;
   const MENU_MIN_HEIGHT = 120;
@@ -44,11 +78,19 @@
     const below = bounds.bottom - trigger.bottom - MENU_MARGIN;
     const above = trigger.top - bounds.top - MENU_MARGIN;
     const natural = menu.scrollHeight;
+    const viewportRight = Math.min(bounds.right, window.innerWidth) - MENU_MARGIN;
+    const viewportLeft = Math.max(bounds.left, 0) + MENU_MARGIN;
+    const width = menu.getBoundingClientRect().width;
+    let horizontal = '';
+    if (trigger.left + width > viewportRight) {
+      const room = trigger.right - viewportLeft;
+      horizontal = `left:auto;right:0;max-width:${Math.max(trigger.width, Math.floor(room))}px;`;
+    }
     if (natural <= below || below >= above) {
-      menuStyle = `max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(below))}px`;
+      menuStyle = `${horizontal}max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(below))}px`;
       return;
     }
-    menuStyle = `top:auto;bottom:calc(100% + 4px);max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(above))}px`;
+    menuStyle = `${horizontal}top:auto;bottom:calc(100% + 4px);max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(above))}px`;
   }
 
   function onPointerDownOutside(event: PointerEvent) {
@@ -62,6 +104,7 @@
     event.preventDefault();
     event.stopPropagation();
     open = false;
+    triggerButton?.focus();
   }
 
   $effect(() => {
@@ -82,11 +125,12 @@
     value = v;
     open = false;
     onChange(v);
+    triggerButton?.focus();
   }
 
   function onFocusOut(event: FocusEvent) {
     const next = event.relatedTarget;
-    if (!(next instanceof Node) || !wrap?.contains(next)) open = false;
+    if (next instanceof Node && !wrap?.contains(next)) open = false;
   }
 </script>
 
@@ -94,11 +138,13 @@
   <button
     class="field select-trigger app-select-trigger"
     type="button"
+    bind:this={triggerButton}
     {disabled}
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-label={ariaLabel ? `${ariaLabel}: ${selected?.label ?? value}` : undefined}
-    onclick={() => (open = !open)}
+    onclick={() => void toggle()}
+    onkeydown={navigate}
   >
     <span>{selected?.label ?? value}</span>
     <svg class="app-select-chevron" width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
@@ -106,8 +152,11 @@
     </svg>
   </button>
   {#if open}
-    <div class="menu app-select-menu" role="listbox" bind:this={menu} style={menuStyle}>
-      {#each options as opt, eachIndex (eachIndex)}
+    <div class="menu app-select-menu" role="listbox" tabindex="-1" bind:this={menu} style={menuStyle} onkeydown={navigate} aria-label={ariaLabel}>
+      {#if searchable}
+        <input class="field field-sm" type="search" bind:value={search} bind:this={searchInput} aria-label={`Search ${ariaLabel || 'options'}`} placeholder="Search models" spellcheck="false" />
+      {/if}
+      {#each filteredOptions as opt (opt.value)}
         <button
           class="menu-item app-select-option"
           class:active={opt.value === value}
@@ -121,6 +170,7 @@
           <span>{opt.label}</span>
         </button>
       {/each}
+      {#if !filteredOptions.length}<div class="empty-state">No matches</div>{/if}
     </div>
   {/if}
 </div>

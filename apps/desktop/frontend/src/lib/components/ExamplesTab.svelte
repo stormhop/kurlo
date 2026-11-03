@@ -30,13 +30,12 @@
               <span class="examples-status {statusClass(example.response.statusCode)}">
                 {example.response.statusCode || '—'}
               </span>
-              <span class="examples-name" title={example.name}>{example.name}</span>
+              <span class="examples-name">{example.name}</span>
             </button>
             <div class="examples-row-actions">
               <button
                 class="btn btn-ghost btn-icon btn-xs examples-move"
                 type="button"
-                title="Move up"
                 aria-label="Move {example.name} up"
                 disabled={index === 0}
                 onclick={() => vm.moveExample(example.id, -1)}
@@ -44,7 +43,6 @@
               <button
                 class="btn btn-ghost btn-icon btn-xs examples-move"
                 type="button"
-                title="Move down"
                 aria-label="Move {example.name} down"
                 disabled={index === vm.requestExamples.length - 1}
                 onclick={() => vm.moveExample(example.id, 1)}
@@ -52,14 +50,12 @@
               <button
                 class="btn btn-ghost btn-icon btn-xs examples-move"
                 type="button"
-                title="Rename"
                 aria-label="Rename {example.name}"
                 onclick={() => vm.renameExample(example.id)}
               >✎</button>
               <button
                 class="btn btn-ghost btn-icon btn-xs examples-move examples-delete"
                 type="button"
-                title="Delete"
                 aria-label="Delete {example.name}"
                 onclick={() => vm.deleteExample(example.id)}
               >✕</button>

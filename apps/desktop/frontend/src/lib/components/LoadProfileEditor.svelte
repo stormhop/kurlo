@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import {
     LOAD_PRESETS,
     matchingLoadPreset,
@@ -262,7 +263,7 @@
             <LoadValidationMessages problems={problems.filter(problem => problem.startsWith(`Stage ${index + 1} `) || problem.startsWith(`Stage ${index + 1}:`))} />
           {/each}
         </div>
-        <button class="btn btn-dashed btn-sm loadtest-inline-add" type="button" {disabled} onclick={addStage}>+ Add stage</button>
+        <button class="btn btn-dashed btn-sm loadtest-inline-add" type="button" {disabled} onclick={addStage}><AddCloseIcon add /> Add stage</button>
       {:else}
         <div class="loadtest-parameter-grid">
           <label class="loadtest-field">
@@ -323,6 +324,6 @@
         <LoadValidationMessages problems={problems.filter(problem => problem.startsWith(`Threshold ${index + 1}:`) || problem.startsWith(`Threshold ${index + 1} `))} />
       </div>
     {/each}
-    <button class="btn btn-dashed btn-sm loadtest-inline-add" type="button" {disabled} onclick={addThreshold}>+ Add threshold</button>
+    <button class="btn btn-dashed btn-sm loadtest-inline-add" type="button" {disabled} onclick={addThreshold}><AddCloseIcon add /> Add threshold</button>
   </section>
 </div>

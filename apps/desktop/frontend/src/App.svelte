@@ -862,7 +862,6 @@
         parallel={vm.collectionRunnerParallel}
         concurrency={vm.collectionRunnerConcurrency}
         running={vm.collectionRunnerRunning}
-        title={vm.collectionRunnerTitle}
         results={vm.collectionRunnerResults}
         summary={vm.collectionRunnerSummary}
         lastRunAt={vm.collectionRunnerShowingLastRun ? vm.collectionRunnerFinishedAt : 0}

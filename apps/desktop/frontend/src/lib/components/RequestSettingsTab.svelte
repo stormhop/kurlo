@@ -17,8 +17,8 @@
       <span class="settings-subtitle">Kept with this request. Save them as the default to start new requests with the same values.</span>
     </div>
     <div class="settings-actions">
-      <button class="btn btn-ghost" type="button" onclick={vm.resetRequestSettings} title="Return every setting to Kurlo's defaults and forget the saved default">Reset</button>
-      <button class="btn btn-secondary" class:feedback-ok={vm.settingsSaved} type="button" onclick={vm.saveRequestSettings} title="New requests start with these settings">
+      <button class="btn btn-ghost" type="button" onclick={vm.resetRequestSettings}>Reset</button>
+      <button class="btn btn-secondary" class:feedback-ok={vm.settingsSaved} type="button" onclick={vm.saveRequestSettings}>
         {vm.settingsSaved ? 'Saved as default' : 'Save as default'}
       </button>
     </div>
@@ -68,7 +68,7 @@
         <div class="client-cert-row">
           <span class="client-cert-label">Certificate (CRT/PEM)</span>
           {#if vm.clientCertPath}
-            <span class="client-cert-path" title={vm.clientCertPath}>{vm.clientCertPath}</span>
+            <span class="client-cert-path">{vm.clientCertPath}</span>
             <button class="btn btn-secondary" type="button" onclick={() => vm.clearClientCertField('clientCertPath')}>Clear</button>
           {:else}
             <button class="btn btn-secondary" type="button" onclick={() => vm.pickClientCertFile('clientCertPath')}>Choose file…</button>
@@ -77,7 +77,7 @@
         <div class="client-cert-row">
           <span class="client-cert-label">Private key (optional)</span>
           {#if vm.clientKeyPath}
-            <span class="client-cert-path" title={vm.clientKeyPath}>{vm.clientKeyPath}</span>
+            <span class="client-cert-path">{vm.clientKeyPath}</span>
             <button class="btn btn-secondary" type="button" onclick={() => vm.clearClientCertField('clientKeyPath')}>Clear</button>
           {:else}
             <button class="btn btn-secondary" type="button" onclick={() => vm.pickClientCertFile('clientKeyPath')} disabled={!vm.clientCertPath}>Choose file…</button>

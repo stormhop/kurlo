@@ -97,7 +97,7 @@
     onclick={toggle}
   >
     <span class="ai-model-provider">{preset.label}</span>
-    <span class="grpc-method-label" class:ai-model-empty={!shownModel} title={shownModel}>{shownModel || (usesConnection ? 'Choose a model in Settings → AI' : 'Choose a model')}</span>
+    <span class="grpc-method-label" class:ai-model-empty={!shownModel}>{shownModel || (usesConnection ? 'Choose a model in Settings → AI' : 'Choose a model')}</span>
     <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
       <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>
@@ -278,6 +278,7 @@
     font-size: var(--text-caption);
     line-height: var(--leading-normal);
     overflow-wrap: anywhere;
+    -webkit-user-select: text;
     user-select: text;
   }
   .ai-model-problem-detail {

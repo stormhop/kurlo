@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { loadStepErrors, loadExtractErrors, loadCheckErrors, loadStepStructuralErrors } from '../loadFlowErrors';
   import { formatDuration, parseDuration } from '../loadPresets';
   import { loadTestStep } from '../stores/features/loadTests';
@@ -324,19 +325,19 @@
                       <span class="loadtest-step-summary">
                         {#if used.length}<span class="loadtest-chip">uses {used.join(', ')}</span>{/if}
                         {#if saved.length}<span class="loadtest-chip loadtest-chip-accent">saves {saved.join(', ')}</span>{/if}
-                        {#if checks.length}<span class="loadtest-chip" title={checks.map(checkLabel).join(' · ')}>{checks.length === 1 ? checkLabel(checks[0]) : `${checks.length} checks`}</span>{/if}
-                        {#if hasScript(request)}<span class="loadtest-chip loadtest-chip-warning" title="Pre-request and test scripts are not run in load tests">scripts not run</span>{/if}
+                        {#if checks.length}<span class="loadtest-chip">{checks.length === 1 ? checkLabel(checks[0]) : `${checks.length} checks`}</span>{/if}
+                        {#if hasScript(request)}<span class="loadtest-chip loadtest-chip-warning">scripts not run</span>{/if}
                       </span>
                     {/if}
                     {#if wait}<span class="loadtest-step-wait">{wait}</span>{/if}
                   </button>
                   <div class="loadtest-step-actions">
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Replace request for step ${index + 1}`} title="Replace request" aria-haspopup="listbox" aria-expanded={requestMenuStepId === step.id} data-request-picker-trigger {disabled} onclick={() => toggleRequestMenu(step)}>
+                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Replace request for step ${index + 1}`} aria-haspopup="listbox" aria-expanded={requestMenuStepId === step.id} data-request-picker-trigger {disabled} onclick={() => toggleRequestMenu(step)}>
                       <svg width="1rem" height="1rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 5h10m-3-3 3 3-3 3M13 11H3m3-3-3 3 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" /></svg>
                     </button>
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step up" title="Move up" disabled={disabled || index === 0} onclick={() => moveStep(index, -1)}>↑</button>
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step down" title="Move down" disabled={disabled || index === steps.length - 1} onclick={() => moveStep(index, 1)}>↓</button>
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove step" title="Remove" {disabled} onclick={() => removeStep(index)}>✕</button>
+                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step up" disabled={disabled || index === 0} onclick={() => moveStep(index, -1)}>↑</button>
+                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step down" disabled={disabled || index === steps.length - 1} onclick={() => moveStep(index, 1)}>↓</button>
+                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove step" {disabled} onclick={() => removeStep(index)}>✕</button>
                   </div>
                 </div>
                 <LoadValidationMessages problems={loadStepStructuralErrors(loadStepErrors(problems, index))} />
@@ -380,7 +381,7 @@
                   <span>{requestTabLabel(request)}</span>
                   {#if request.folderPath?.length}<small>{request.folderPath.join(' / ')}</small>{/if}
                 </span>
-                <code class="loadtest-start-url" title={request.url}>{request.url}</code>
+                <code class="loadtest-start-url">{request.url}</code>
               </label>
             {/each}
           </div>
@@ -394,7 +395,7 @@
     {/if}
     {#if steps.length}<LoadValidationMessages problems={problems.filter(problem => !problem.startsWith('Step ') && problem !== EMPTY_FLOW_PROBLEM)} />{/if}
     <div class="loadtest-add" class:hidden={!steps.length}>
-      <button class="btn btn-dashed loadtest-add-button" type="button" aria-expanded={addMenuOpen} disabled={disabled || !requests.length} onclick={() => { requestMenuStepId = ''; addMenuOpen = !addMenuOpen; }}>+ Add request from collection</button>
+      <button class="btn btn-dashed loadtest-add-button" type="button" aria-expanded={addMenuOpen} disabled={disabled || !requests.length} onclick={() => { requestMenuStepId = ''; addMenuOpen = !addMenuOpen; }}><AddCloseIcon add /> Add request from collection</button>
       {#if addMenuOpen}
         <div class="menu loadtest-add-menu" use:fitRequestMenu role="menu" aria-label="Requests">
           {#each requests as request (request.id)}
@@ -443,7 +444,7 @@
             <LoadValidationMessages problems={[...errors.name, ...errors.path, ...errors.source]} />
           </div>
         {/each}
-        <button class="btn-link loadtest-inline-add" type="button" {disabled} onclick={() => addExtract(step)}>+ Save a value</button>
+        <button class="btn-link loadtest-inline-add" type="button" {disabled} onclick={() => addExtract(step)}><AddCloseIcon add /> Save a value</button>
       </section>
       <section class="loadtest-field">
         <div class="loadtest-inspector-label-row">
@@ -461,7 +462,7 @@
             <LoadValidationMessages problems={errors} />
           </div>
         {/each}
-        <button class="btn-link loadtest-inline-add" type="button" {disabled} onclick={() => addCheck(step)}>+ Add check</button>
+        <button class="btn-link loadtest-inline-add" type="button" {disabled} onclick={() => addCheck(step)}><AddCloseIcon add /> Add check</button>
       </section>
       <div class="loadtest-field">
         <span class="loadtest-inspector-label">Wait after this step</span>

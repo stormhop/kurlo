@@ -28,6 +28,7 @@
   font-family: var(--font-mono);
   white-space: nowrap;
   text-overflow: ellipsis;
+  -webkit-user-select: text;
   user-select: text;
 }
 

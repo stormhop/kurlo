@@ -203,13 +203,13 @@
           </div>
         {/if}
         <div class="resp-actions">
-          <button class="btn btn-icon" title="Search response" aria-label="Search response" aria-pressed={responseSearchOpen} onclick={toggleResponseSearch} type="button">
+          <button class="btn btn-icon" aria-label="Search response" aria-pressed={responseSearchOpen} onclick={toggleResponseSearch} type="button">
             <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none">
               <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
               <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
             </svg>
           </button>
-          <button class="btn btn-icon" class:feedback-ok={copiedBody} title={copiedBody ? 'Copied response' : 'Copy response'} aria-label={copiedBody ? 'Copied response' : 'Copy response'} onclick={copyResponseBody} type="button">
+          <button class="btn btn-icon" class:feedback-ok={copiedBody} aria-label={copiedBody ? 'Copied response' : 'Copy response'} onclick={copyResponseBody} type="button">
             {#if copiedBody}
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             {:else}
@@ -219,7 +219,6 @@
           {#if saveResponseAsExample}
             <button
               class="btn btn-icon"
-              title="Save as example"
               aria-label="Save as example"
               onclick={saveResponseAsExample}
               type="button"
@@ -229,7 +228,7 @@
               </svg>
             </button>
           {/if}
-          <button class="btn btn-icon" class:feedback-ok={savedResponse} title={savedResponse ? 'Saved response' : 'Save to file'} aria-label={savedResponse ? 'Saved response' : 'Save to file'} onclick={saveResponseFile} type="button">
+          <button class="btn btn-icon" class:feedback-ok={savedResponse} aria-label={savedResponse ? 'Saved response' : 'Save to file'} onclick={saveResponseFile} type="button">
             {#if savedResponse}
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             {:else}

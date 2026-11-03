@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import { checkWorkspaceYAML } from '../backend';
   import { vm } from '../stores/app.svelte';
@@ -37,9 +38,9 @@
     <div class="modal-head modal-header">
       <div class="yaml-editor-title">
         <span class="modal-title" id="yaml-editor-title">{fileName || 'Edit YAML'}</span>
-        {#if folder}<small title={vm.yamlEditorPath}>{folder}</small>{/if}
+        {#if folder}<small>{folder}</small>{/if}
       </div>
-      <button class="btn btn-ghost btn-icon modal-close" type="button" onclick={vm.closeWorkspaceYAMLEditor} aria-label="Close">&times;</button>
+      <button class="btn btn-ghost btn-icon modal-close" type="button" onclick={vm.closeWorkspaceYAMLEditor} aria-label="Close"><AddCloseIcon /></button>
     </div>
     <div class="yaml-editor-body">
       {#if vm.yamlEditorLoading}
@@ -57,7 +58,7 @@
       {/if}
     </div>
     <div class="modal-foot modal-footer yaml-editor-foot">
-      <div class="yaml-editor-status" class:error={Boolean(statusError)} role="status" aria-live="polite" title={statusError || undefined}>
+      <div class="yaml-editor-status" class:error={Boolean(statusError)} role="status" aria-live="polite">
         {#if statusError}
           <span class="yaml-editor-dot" aria-hidden="true"></span>
           <span>{statusError}</span>
@@ -67,7 +68,7 @@
         {/if}
       </div>
       <button class="btn btn-secondary btn-lg" type="button" onclick={vm.closeWorkspaceYAMLEditor} disabled={vm.yamlEditorSaving}>Cancel</button>
-      <button class="btn btn-primary btn-lg" type="button" onclick={vm.saveWorkspaceYAMLEditor} disabled={vm.yamlEditorLoading || vm.yamlEditorSaving} title="Save (⌘S)">
+      <button class="btn btn-primary btn-lg" type="button" onclick={vm.saveWorkspaceYAMLEditor} disabled={vm.yamlEditorLoading || vm.yamlEditorSaving}>
         {vm.yamlEditorSaving ? 'Saving…' : 'Save YAML'}
       </button>
     </div>

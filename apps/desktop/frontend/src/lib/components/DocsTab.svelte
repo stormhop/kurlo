@@ -207,6 +207,7 @@
     gap: var(--space-2);
     font-family: var(--font-mono);
     font-size: var(--text-code);
+    -webkit-user-select: text;
     user-select: text;
   }
   .docs-ref-method {
@@ -258,6 +259,7 @@
     padding: var(--space-1-5) 0;
     border-bottom: 1px solid var(--border-subtle);
     font-size: var(--text-label);
+    -webkit-user-select: text;
     user-select: text;
   }
   .docs-ref-key {
@@ -286,6 +288,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-code);
     line-height: var(--leading-relaxed);
+    -webkit-user-select: text;
     user-select: text;
   }
   @container (max-width: 40rem) {

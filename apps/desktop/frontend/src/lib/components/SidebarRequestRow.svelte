@@ -115,7 +115,7 @@
       />
     </div>
   {:else}
-    <button class="collection-request" type="button" title={requestTabLabel(req)} onclick={() => switchRequest(req.id)} ondblclick={startRequestInlineRename} oncontextmenu={(event) => { if (disabled || req.isInvalid) return; event.preventDefault(); toggleRequestMenu(menuKey, event); }} disabled={disabled}>
+    <button class="collection-request" type="button" onclick={() => switchRequest(req.id)} ondblclick={startRequestInlineRename} oncontextmenu={(event) => { if (disabled || req.isInvalid) return; event.preventDefault(); toggleRequestMenu(menuKey, event); }} disabled={disabled}>
       <RequestTypeBadge request={req} invalid={req.isInvalid} />
       <span class="collection-title">{requestTabLabel(req)}</span>
     </button>
@@ -124,7 +124,6 @@
     <button
       class="workspace-diagnostic-chip request-diagnostic-chip"
       type="button"
-      title={req.workspaceDiagnostics[0].message}
       aria-label="Request YAML error"
       onclick={openDiagnostics}
     >!</button>
@@ -136,7 +135,6 @@
       type="button"
       onclick={(event) => { event.stopPropagation(); toggleRequestPinned(req.id); }}
       aria-label={req.isPinned ? 'Unstar request' : 'Star request'}
-      title={req.isPinned ? 'Unstar request' : 'Star request'}
       disabled={disabled}
     >★</button>
   {/if}

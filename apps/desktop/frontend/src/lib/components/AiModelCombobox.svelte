@@ -119,7 +119,7 @@
 
 <div class="ai-combo" bind:this={wrap} onfocusout={closeOnFocusOut}>
   <button class="field ai-combo-trigger" type="button" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} onclick={toggle}>
-    <span class="ai-combo-value" class:ai-combo-placeholder={!label} title={selected && selected.name !== value ? `${selected.name} (${value})` : value}>{label || placeholder}</span>
+    <span class="ai-combo-value" class:ai-combo-placeholder={!label}>{label || placeholder}</span>
     <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
       <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import KurloBird from './KurloBird.svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
@@ -605,10 +606,10 @@
       <div class="collections-head">
         <span>Collections</span>
         <div class="collections-head-actions">
-          <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={openPostmanImport} aria-label="Import collection" title="Import collection" disabled={workspaceBlocked}>
+          <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={openPostmanImport} aria-label="Import collection" disabled={workspaceBlocked}>
             <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1.5v6M4 5l2.5 2.5L9 5M2 9.5v1.2c0 .4.3.8.8.8h7.4c.5 0 .8-.4.8-.8V9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
-          <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createCollection} aria-label="New collection" disabled={workspaceBlocked}>+</button>
+          <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createCollection} aria-label="New collection" disabled={workspaceBlocked}><AddCloseIcon add /></button>
         </div>
       </div>
       <div class="collection-list" role="list" bind:this={collectionListEl} onscroll={onCollectionScroll}>
@@ -711,7 +712,6 @@
                   <button
                     class="collection-name"
                     type="button"
-                    title={row.group.collection.name}
                     onclick={(event) => { event.stopPropagation(); if (row.group.collection.workspaceDiagnostics?.length) openWorkspaceDiagnostic(row.group.collection.workspaceDiagnostics); else void openCollectionSettings(row.group.collection.id); }}
                     disabled={workspaceBlocked}
                     ondblclick={(event) => { if (!workspaceBlocked) startCollectionInlineRename(row.group.collection, event); }}
@@ -721,7 +721,6 @@
                   <button
                     class="workspace-diagnostic-chip"
                     type="button"
-                    title={row.group.collection.workspaceDiagnostics[0].message}
                     aria-label="Collection YAML error"
                     onclick={(event) => { event.stopPropagation(); openWorkspaceDiagnostic(row.group.collection.workspaceDiagnostics ?? []); }}
                   >!</button>
@@ -756,7 +755,7 @@
                 </button>
                 <span class="folder-title sidebar-loadtest-group-title"><span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>Load tests</span>
                 <span class="collection-count">{row.count}</span>
-                <button class="btn btn-ghost btn-icon btn-sm folder-menu-btn" type="button" onclick={() => createLoadTest(row.collectionId)} aria-label="New load test" title="New load test" disabled={workspaceBlocked}>+</button>
+                <button class="btn btn-ghost btn-icon btn-sm folder-menu-btn" type="button" onclick={() => createLoadTest(row.collectionId)} aria-label="New load test" disabled={workspaceBlocked}><AddCloseIcon add /></button>
               </div>
             </div>
           {:else if row.type === 'loadtest'}
@@ -775,7 +774,6 @@
               <button
                 class="collection-request"
                 type="button"
-                title={row.loadTest.name}
                 onclick={() => openLoadTest(row.collectionId, row.loadTest.id)}
                 ondblclick={(event) => { if (!workspaceBlocked) startLoadTestRename(row.collectionId, row.loadTest, event); }}
                 oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleLoadTestMenu(row.loadTest.id, event); }}
@@ -784,10 +782,10 @@
                 <span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>
                 <span class="collection-title">{row.loadTest.name}</span>
                 {#if runningLoadTestId === row.loadTest.id}
-                  <span class="sidebar-loadtest-status running" title="Running in k6"><span class="sr-only">running</span></span>
+                  <span class="sidebar-loadtest-status running"><span class="sr-only">running</span></span>
                 {:else if loadRunResults[row.loadTest.id]}
                   {@const status = loadRunResults[row.loadTest.id].status}
-                  <span class="sidebar-loadtest-status {status}" title={`Last run ${LOAD_RUN_STATUS[status] ?? status}`}><span class="sr-only">last run {LOAD_RUN_STATUS[status] ?? status}</span></span>
+                  <span class="sidebar-loadtest-status {status}"><span class="sr-only">last run {LOAD_RUN_STATUS[status] ?? status}</span></span>
                 {/if}
               </button>
               {/if}
@@ -807,11 +805,11 @@
           {:else if row.type === 'collection-empty'}
             <div class="collection-empty" role="status" style={`--tree-depth: ${row.depth}`}>
               <button type="button" class="collection-empty-row" onclick={() => createNewRequest(row.collectionId)} disabled={workspaceBlocked}>
-                <span class="collection-empty-plus" aria-hidden="true">+</span>
+                <span class="collection-empty-plus" aria-hidden="true"><AddCloseIcon add /></span>
                 Add request
               </button>
               <button type="button" class="collection-empty-row" onclick={() => createFolderInCollection(row.collectionId)} disabled={workspaceBlocked}>
-                <span class="collection-empty-plus" aria-hidden="true">+</span>
+                <span class="collection-empty-plus" aria-hidden="true"><AddCloseIcon add /></span>
                 Add folder
               </button>
             </div>
@@ -833,20 +831,18 @@
                     <button class="menu-item"
                       type="button"
                       disabled={workspaceBlocked || !folderCanAcceptRequest(row.folder)}
-                      title={folderCanAcceptRequest(row.folder) ? 'Add request' : `Limit: ${MAX_FOLDER_REQUESTS} requests in one folder`}
                       onclick={() => createRequestInFolder(row.collectionId, row.folder.path)}
                     ><MenuIcon name="request" />Add request</button>
                     <button class="menu-item"
                       type="button"
                       disabled={workspaceBlocked || !folderCanAcceptSubfolder(row.folder)}
-                      title={folderCanAcceptSubfolder(row.folder) ? 'Add subfolder' : `Limit: ${MAX_FOLDER_DEPTH} folder levels`}
                       onclick={() => createSubfolder(row.collectionId, row.folder.path)}
                     ><MenuIcon name="folder" />Add subfolder</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item" type="button" onclick={() => runFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="play" />Run folder</button>
-                    <button class="menu-item" type="button" onclick={() => createLoadTest(row.collectionId, folderLoadIds)} disabled={workspaceBlocked || !folderLoadIds.length} title={folderLoadIds.length ? `Start a load test with the ${folderLoadIds.length} HTTP and GraphQL requests in this folder` : 'This folder has no HTTP or GraphQL requests'}><MenuIcon name="load" />New load test from folder</button>
+                    <button class="menu-item" type="button" onclick={() => createLoadTest(row.collectionId, folderLoadIds)} disabled={workspaceBlocked || !folderLoadIds.length}><MenuIcon name="load" />New load test from folder</button>
                     <button class="menu-item" type="button" onclick={() => openFindReplace(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
-                    <button class="menu-item" type="button" onclick={() => openFolderSettings(row.collectionId, row.folder.path)} disabled={workspaceBlocked} title="Headers, auth and scripts for every request in this folder"><MenuIcon name="settings" />Settings</button>
+                    <button class="menu-item" type="button" onclick={() => openFolderSettings(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="settings" />Settings</button>
                     <button class="menu-item" type="button" onclick={() => renameFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item danger" type="button" onclick={() => deleteFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete folder</button>
@@ -861,11 +857,11 @@
                 <small>Add a request, a folder, or drag items here to group them together.</small>
               </div>
               <button type="button" class="collection-empty-row" onclick={() => createRequestInFolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked || !folderCanAcceptRequest(row.folder)}>
-                <span class="collection-empty-plus" aria-hidden="true">+</span>
+                <span class="collection-empty-plus" aria-hidden="true"><AddCloseIcon add /></span>
                 Add request
               </button>
               <button type="button" class="collection-empty-row" onclick={() => createSubfolder(row.collectionId, row.folder.path)} disabled={workspaceBlocked || !folderCanAcceptSubfolder(row.folder)}>
-                <span class="collection-empty-plus" aria-hidden="true">+</span>
+                <span class="collection-empty-plus" aria-hidden="true"><AddCloseIcon add /></span>
                 Add folder
               </button>
             </div>
@@ -913,7 +909,7 @@
               </button>
             {:else if row.type === 'entry'}
               <div class="history-entry" class:active={row.entry.id === activeHistoryId}>
-                <button class="history-entry-main" type="button" onclick={() => openHistoryDetail(row.entry.id)} title={historyTitle(row.entry)} aria-current={row.entry.id === activeHistoryId ? 'page' : undefined} disabled={workspaceBlocked}>
+                <button class="history-entry-main" type="button" onclick={() => openHistoryDetail(row.entry.id)} aria-current={row.entry.id === activeHistoryId ? 'page' : undefined} disabled={workspaceBlocked}>
                   <RequestTypeBadge request={row.entry.request} />
                   <span class="history-url">{historyPath(row.entry)}</span>
                   {#if row.entry.statusCode}
@@ -921,7 +917,7 @@
                   {/if}
                   <span class="history-time">{historyTime(row.entry)}</span>
                   {#if row.entry.responseStored}
-                    <span class="history-stored" title="Response saved — open the row menu to view it" aria-label="Response saved">&#9673;</span>
+                    <span class="history-stored" aria-label="Response saved">&#9673;</span>
                   {/if}
                 </button>
                 <button class="btn btn-ghost btn-icon btn-sm history-entry-menu-btn" type="button" onclick={(event) => toggleHistoryEntryMenu(row.entry.id, event)} aria-label="History request menu" disabled={workspaceBlocked}>•••</button>
@@ -964,7 +960,7 @@
     <div class="environment-panel">
       <div class="collections-head">
         <span>Environments</span>
-        <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createEnvironment} aria-label="New environment" disabled={workspaceBlocked}>+</button>
+        <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createEnvironment} aria-label="New environment" disabled={workspaceBlocked}><AddCloseIcon add /></button>
       </div>
       <button class="environment-globals-item" class:active={topView === 'globals'} type="button" onclick={openGlobals} disabled={workspaceBlocked}>
         <span class="environment-dot environment-dot--globals" aria-hidden="true"></span>

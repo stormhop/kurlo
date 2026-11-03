@@ -17,7 +17,7 @@
 {#if keycaps.length}
   <span class="keycaps keycaps-{size}" role="img" aria-label={shortcutComboLabel(combo, runtime)}>
     {#each keycaps as keycap, index (index)}
-      <kbd class="keycap" class:keycap-glyph={keycap.label.length === 1} title={keycap.title} aria-hidden="true">
+      <kbd class="keycap" class:keycap-glyph={keycap.label.length === 1} aria-hidden="true">
         {#if keycap.icon === 'windows'}
           <svg class="keycap-icon" viewBox="0 0 16 16" aria-hidden="true">
             <path d="M1 2.3 6.7 1.5v5.6H1zM7.5 1.4 15 .3v6.8H7.5zM1 7.9h5.7v5.6L1 12.7zM7.5 7.9H15v6.8l-7.5-1.1z" fill="currentColor"/>

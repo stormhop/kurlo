@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import type { UpdateInfo } from '../backend';
 
   let {
@@ -40,9 +41,7 @@
   </span>
   <button class="btn btn-primary btn-sm update-notif-btn" type="button" onclick={handleAction} disabled={installing}>{actionLabel}</button>
   <button class="btn btn-ghost btn-icon btn-sm update-notif-close" type="button" onclick={onDismiss} aria-label="Dismiss">
-    <svg width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-      <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-    </svg>
+    <AddCloseIcon />
   </button>
 </div>
 

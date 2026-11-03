@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { tick } from 'svelte';
   import { buildEnvironmentMatrix, type MatrixRow } from '../environmentMatrix';
   import { effectiveEnvironmentRows, parentEnvironment } from '../environmentInheritance';
@@ -110,12 +111,12 @@
       <span class="env-matrix-name-head" role="columnheader">Variable</span>
       {#each environments as environment (environment.id)}
         <span class="env-matrix-col-head" class:in-use={environment.id === activeEnvironmentId} role="columnheader">
-          <button class="btn btn-ghost btn-sm" type="button" onclick={() => onOpenEnvironment(environment.id)} title={environment.id === activeEnvironmentId ? `${environment.name} is in use — open it` : `Open ${environment.name}`}>
+          <button class="btn btn-ghost btn-sm" type="button" onclick={() => onOpenEnvironment(environment.id)}>
             {#if environment.id === activeEnvironmentId}<span class="env-matrix-dot" aria-hidden="true"></span>{/if}
             <span>{environment.name}</span>
           </button>
           {#if parents.get(environment.id)}
-            <span class="env-matrix-parent" title={`${environment.name} inherits the variables it does not set from ${parents.get(environment.id)?.name}`}>↳ {parents.get(environment.id)?.name}</span>
+            <span class="env-matrix-parent">↳ {parents.get(environment.id)?.name}</span>
           {/if}
         </span>
       {/each}
@@ -139,13 +140,12 @@
             type="button"
             aria-pressed={row.secret}
             aria-label={row.secret ? `${row.key} is secret — make it a plain variable` : `Make ${row.key} secret`}
-            title={row.secret ? 'Secret: masked in the UI, logs and snippets' : 'Make secret'}
             onclick={() => onSetSecret(row.key, !row.secret)}
           >
             <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
           </button>
           {#if row.secret}
-            <button class="btn btn-ghost btn-icon btn-sm env-matrix-icon" type="button" aria-pressed={revealed.has(row.key)} aria-label={revealed.has(row.key) ? `Hide ${row.key}` : `Show ${row.key}`} title={revealed.has(row.key) ? 'Hide values' : 'Show values'} onclick={() => toggleReveal(row.key)}>
+            <button class="btn btn-ghost btn-icon btn-sm env-matrix-icon" type="button" aria-pressed={revealed.has(row.key)} aria-label={revealed.has(row.key) ? `Hide ${row.key}` : `Show ${row.key}`} onclick={() => toggleReveal(row.key)}>
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           {/if}
@@ -163,12 +163,11 @@
                 value={cell.value}
                 placeholder="empty"
                 aria-label={`${row.key} in ${environment.name}`}
-                title={cell.enabled ? undefined : 'Disabled in this environment — not applied to requests'}
                 spellcheck="false"
                 autocomplete="off"
                 oninput={(event) => onSetValue(environment.id, row.key, inputValue(event))}
               />
-              <button class="env-matrix-unset" type="button" aria-label={`Unset ${row.key} in ${environment.name}`} title={parents.get(environment.id) ? `Unset in this environment and take it from ${parents.get(environment.id)?.name}` : 'Unset in this environment'} onclick={() => onUnsetValue(environment.id, row.key)}>×</button>
+              <button class="env-matrix-unset" type="button" aria-label={`Unset ${row.key} in ${environment.name}`} onclick={() => onUnsetValue(environment.id, row.key)}><AddCloseIcon /></button>
             {:else if editingUnset?.environmentId === environment.id && editingUnset.key === row.key}
               <input
                 class="field field-bare field-md env-matrix-value"
@@ -183,7 +182,7 @@
                 onblur={() => (editingUnset = null)}
               />
             {:else if inherited}
-              <button class="env-matrix-inherited" type="button" data-testid="environment-matrix-inherited" aria-label={`Override ${row.key} in ${environment.name}, now inherited from ${inherited.sourceName}`} title={`Inherited from ${inherited.sourceName} — click to set a value here`} onclick={() => startSetting(environment.id, row.key)}>
+              <button class="env-matrix-inherited" type="button" data-testid="environment-matrix-inherited" aria-label={`Override ${row.key} in ${environment.name}, now inherited from ${inherited.sourceName}`} onclick={() => startSetting(environment.id, row.key)}>
                 <span class="env-matrix-inherited-value">{row.secret && !revealed.has(row.key) ? '••••••••' : inherited.row.value || 'empty'}</span>
                 <span class="env-matrix-inherited-source">{inherited.sourceName}</span>
               </button>
@@ -194,7 +193,7 @@
         {/each}
 
         <span class="env-matrix-actions" role="cell">
-          <button class="btn btn-ghost btn-icon btn-sm env-matrix-icon env-matrix-remove" type="button" aria-label={`Delete ${row.key} from every environment`} title="Delete from every environment" onclick={() => onRemove(row.key)}>
+          <button class="btn btn-ghost btn-icon btn-sm env-matrix-icon env-matrix-remove" type="button" aria-label={`Delete ${row.key} from every environment`} onclick={() => onRemove(row.key)}>
             <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2 3.5h9M5 3.5V2.5h3v1M3.5 3.5l.5 7h5l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </span>

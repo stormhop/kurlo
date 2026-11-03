@@ -21,8 +21,14 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
+
 - **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 
+- **No browser tooltips.** The grey tooltips the system drew on hover are gone everywhere in the app; icon-only buttons keep their names for screen readers.
+- **Selectable text in the macOS app.** Chat messages in AI requests and other text marked as selectable could not be selected in the macOS and Linux WebView, which needs a prefixed CSS property; the prefix is now set everywhere, and panel resizing no longer selects text there.
+- **Readable icons on primary buttons.** Icon-only primary buttons, such as **Send** in an AI request, drew their icon in a faint grey on the accent colour; the icon now uses the accent's text colour in every theme.
+- **Dropdowns stay inside the window.** A dropdown near the right edge opens towards the left and shortens long option names instead of running past the window.
 - **Current application screenshots.** Landing-page and documentation images now show the current sidebar and bottom status bar, with Git accessed from the status bar.
 - **Inherited secrets stay secret after scripts change them.** An override written to a child environment keeps the variable's secret flag and description, so its value stays masked and outside the workspace YAML.
 - **OAuth results stay with their request.** Getting or refreshing a token while switching tabs updates the original request, respects manual saving, and never replaces another tab's credentials. Send keeps the request and variables you started with. The collection runner uses the refreshed token for HTTP and gRPC calls and reuses it on later iterations.

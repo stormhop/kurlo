@@ -67,7 +67,7 @@
           vm.updateExampleResponse(example.id, { status: (event.currentTarget as HTMLInputElement).value })}
       />
     </label>
-    <span class="examples-source" title="Where this example came from">{sourceLabel(example.source)}</span>
+    <span class="examples-source">{sourceLabel(example.source)}</span>
   </div>
 
   {#if warning}

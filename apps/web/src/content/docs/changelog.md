@@ -25,8 +25,14 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
+
 - **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 
+- **No browser tooltips.** The grey hover tooltips are gone throughout the app.
+- **Selectable chat text on macOS and Linux.** AI request messages can be selected and copied again.
+- **Primary icon buttons.** The icon on buttons such as **Send** in an AI request is no longer faint grey.
+- **Dropdowns near the window edge** open towards the left instead of running off-screen.
 - **Current application screenshots.** Landing-page and documentation images now show the current sidebar and bottom status bar, with Git accessed from the status bar.
 - **Inherited secrets.** Script changes in a child environment keep inherited variables secret, masked and outside workspace YAML.
 - **OAuth and tab switching.** Tokens stay with the original request, Send keeps its original request and variables, and the runner uses refreshed tokens for HTTP and gRPC.

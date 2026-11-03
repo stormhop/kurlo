@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { trapFocus } from '../a11y';
   import type { K6Info } from '../wire';
 
@@ -48,7 +49,7 @@
   <div class="modal k6-missing" role="dialog" aria-modal="true" aria-labelledby="k6-missing-title" tabindex="-1" use:trapFocus onkeydown={onKeydown}>
     <div class="modal-head">
       <h2 class="modal-title" id="k6-missing-title">k6 is not installed</h2>
-      <button type="button" class="btn btn-ghost btn-icon" onclick={onClose} aria-label="Close dialog">×</button>
+      <button type="button" class="btn btn-ghost btn-icon" onclick={onClose} aria-label="Close dialog"><AddCloseIcon /></button>
     </div>
     <div class="k6-missing-body">
       <p class="loadtest-hint">Kurlo builds the load test and Grafana k6 runs it. k6 is free and open source; install it once, then run the test again.</p>

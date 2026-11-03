@@ -9,8 +9,8 @@
       <span class="settings-subtitle">Connection, TLS, response formatting, and timeouts for this request.</span>
     </div>
     <div class="settings-actions">
-      <button class="btn btn-ghost" type="button" onclick={vm.resetRequestSettings} title="Return every setting to Kurlo's defaults and forget the saved default">Reset</button>
-      <button class="btn btn-secondary" class:feedback-ok={vm.settingsSaved} type="button" onclick={vm.saveRequestSettings} title="New requests start with these settings">
+      <button class="btn btn-ghost" type="button" onclick={vm.resetRequestSettings}>Reset</button>
+      <button class="btn btn-secondary" class:feedback-ok={vm.settingsSaved} type="button" onclick={vm.saveRequestSettings}>
         {vm.settingsSaved ? 'Saved as default' : 'Save as default'}
       </button>
     </div>

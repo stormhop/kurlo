@@ -133,7 +133,7 @@
       <div class="mock-status" class:running={status.running}>
         {#if status.running}
           <span class="mock-status-state"><span class="mock-pulse" aria-hidden="true"></span><span class="mock-live-label">Running</span></span>
-          <button class="mock-url" type="button" title="Copy the base URL" onclick={() => copy(status.url, 'base')}>
+          <button class="mock-url" type="button" onclick={() => copy(status.url, 'base')}>
             <code>{status.url}</code>
             <span class="mock-url-action">{copied === 'base' ? 'Copied' : 'Copy URL'}</span>
           </button>
@@ -173,7 +173,7 @@
           onchange={(event) => onPortChange(portValue(event))}
         />
       </label>
-      <label class="mock-toggle-row" title="Each example knows how long the real call took.">
+      <label class="mock-toggle-row">
         <input
           class="check"
           type="checkbox"
@@ -203,7 +203,7 @@
       <div class="mock-pane-head">
         <span class="mock-pane-title">
           Routes <span class="mock-count">{routes.length}</span>
-          {#if conflictCount > 0}<span class="mock-count-warn" title="The first matching example wins">· {conflictCount} never reached</span>{/if}
+          {#if conflictCount > 0}<span class="mock-count-warn">· {conflictCount} never reached</span>{/if}
         </span>
         <input
           class="field field-md mock-filter"
@@ -243,7 +243,6 @@
               <button
                 class="mock-row-name"
                 type="button"
-                title="Open this example"
                 onclick={() => onOpenExample(route.exampleId)}
               >
                 {exampleLabel(route.requestName, route.exampleName)}
@@ -252,7 +251,6 @@
                 <button
                   class="btn btn-ghost btn-xs mock-row-copy"
                   type="button"
-                  title="Copy this route's URL"
                   onclick={() => copy(routeUrl(route), route.exampleId)}
                 >
                   {copied === route.exampleId ? 'Copied' : 'Copy URL'}
@@ -301,7 +299,6 @@
               <button
                 class="mock-row-name"
                 type="button"
-                title="Open the example that answered"
                 onclick={() => onOpenExample(entry.exampleId ?? '')}
               >
                 {exampleLabel(entry.requestName ?? '', entry.exampleName ?? '')}

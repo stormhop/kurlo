@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { vm } from '../stores/app.svelte';
   import { openFileDialog } from '../backend';
 
@@ -50,7 +51,7 @@
           <rect x="3" y="7" width="10" height="6.5" rx="1.4" stroke="currentColor" stroke-width="1.4"/>
         </svg>
         <h2 class="modal-title" id="gitauth-title">{req.tokenRejected ? 'Token expired — re-authenticate' : 'Private repository — sign in'}</h2>
-        <button class="btn btn-ghost btn-icon gitauth-x" type="button" aria-label="Cancel" onclick={() => vm.resolveGitAuth(null)}>×</button>
+        <button class="btn btn-ghost btn-icon gitauth-x" type="button" aria-label="Cancel" onclick={() => vm.resolveGitAuth(null)}><AddCloseIcon /></button>
       </div>
 
       <p class="gitauth-host">

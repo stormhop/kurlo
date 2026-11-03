@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { vm } from '../stores/app.svelte';
 
   let schemaValue = $derived(vm.grpcProtoFilePath);
@@ -75,7 +76,7 @@
         {#if vm.grpcProtoFileName}
           <div class="grpc-proto-row">
             <span class="grpc-proto-icon" aria-hidden="true">&lt;/&gt;</span>
-            <span class="grpc-proto-name" title={vm.grpcProtoFilePath}>{vm.grpcProtoFileName}</span>
+            <span class="grpc-proto-name">{vm.grpcProtoFileName}</span>
             <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={vm.clearGrpcProtoFile} aria-label="Clear proto file">✕</button>
           </div>
         {/if}
@@ -93,9 +94,9 @@
         {#if vm.grpcProtoImportPaths.length}
           <div class="grpc-import-paths">
             {#each vm.grpcProtoImportPaths as path, index (index)}
-              <span class="grpc-import-path" title={path}>
+              <span class="grpc-import-path">
                 {path}
-                <button class="btn btn-ghost btn-icon btn-xs" type="button" onclick={() => vm.removeGrpcProtoImportPath(index)} aria-label="Remove import path">×</button>
+                <button class="btn btn-ghost btn-icon btn-xs" type="button" onclick={() => vm.removeGrpcProtoImportPath(index)} aria-label="Remove import path"><AddCloseIcon /></button>
               </span>
             {/each}
           </div>

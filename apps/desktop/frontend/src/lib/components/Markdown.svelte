@@ -51,7 +51,7 @@
 
 {#snippet inline(nodes: MdInline[])}
   {#each nodes as node, index (index)}
-    {#if node.type === 'text'}{node.text}{:else if node.type === 'strong'}<strong>{@render inline(node.children)}</strong>{:else if node.type === 'em'}<em>{@render inline(node.children)}</em>{:else if node.type === 'del'}<del>{@render inline(node.children)}</del>{:else if node.type === 'code'}<code class="md-code">{node.text}</code>{:else if node.type === 'link'}<a class="md-link" href={node.href} title={node.href} onclick={(event) => openLink(event, node.href)}>{@render inline(node.children)}</a>{:else if node.type === 'image'}{#if showsImage(node.src)}<img class="md-image" src={node.src} alt={node.alt} loading="lazy" />{:else}<a class="md-link" href={node.src} title={node.src} onclick={(event) => openLink(event, node.src)}>{node.alt || 'Image'}</a>{/if}{:else if node.type === 'break'}<br />{/if}
+    {#if node.type === 'text'}{node.text}{:else if node.type === 'strong'}<strong>{@render inline(node.children)}</strong>{:else if node.type === 'em'}<em>{@render inline(node.children)}</em>{:else if node.type === 'del'}<del>{@render inline(node.children)}</del>{:else if node.type === 'code'}<code class="md-code">{node.text}</code>{:else if node.type === 'link'}<a class="md-link" href={node.href} aria-label={node.href} onclick={(event) => openLink(event, node.href)}>{@render inline(node.children)}</a>{:else if node.type === 'image'}{#if showsImage(node.src)}<img class="md-image" src={node.src} alt={node.alt} loading="lazy" />{:else}<a class="md-link" href={node.src} onclick={(event) => openLink(event, node.src)}>{node.alt || 'Image'}</a>{/if}{:else if node.type === 'break'}<br />{/if}
   {/each}
 {/snippet}
 
@@ -119,6 +119,7 @@
     font-size: var(--text-body);
     line-height: var(--leading-relaxed);
     overflow-wrap: anywhere;
+    -webkit-user-select: text;
     user-select: text;
   }
   .md > :global(:first-child),
@@ -202,6 +203,7 @@
     color: var(--text-3);
     font-family: var(--font-mono);
     font-size: var(--text-caption);
+    -webkit-user-select: none;
     user-select: none;
   }
   .md pre {

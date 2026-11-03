@@ -76,7 +76,7 @@
         </div>
       {/if}
     </div>
-    <button class="btn btn-ghost code-copy-btn" class:feedback-ok={copiedSnippet} title={copiedSnippet ? 'Copied snippet' : 'Copy snippet'} onclick={onCopy} type="button">
+    <button class="btn btn-ghost code-copy-btn" class:feedback-ok={copiedSnippet} onclick={onCopy} type="button">
       {#if copiedSnippet}
         <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         Copied

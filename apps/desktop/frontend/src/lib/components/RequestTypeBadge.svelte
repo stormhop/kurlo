@@ -56,7 +56,6 @@
   class:request-kind-badge--search={variant === 'search'}
   class:request-kind-badge--protocol={!invalid && currentKind !== 'http' && currentKind !== 'sse'}
   class:request-kind-badge--invalid={invalid}
-  title={invalid ? 'Invalid request — open the diagnostic for details' : currentLabel}
   aria-label={invalid ? 'Invalid request' : currentLabel}
 >
   {#if invalid}

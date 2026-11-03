@@ -1989,6 +1989,7 @@
 .git-diff-sign {
   color: inherit;
   text-align: center;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2031,6 +2032,7 @@
   color: var(--text-3);
   font-size: var(--text-micro);
   text-align: right;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2453,6 +2455,7 @@
   color: color-mix(in srgb, var(--text-3) 70%, transparent);
   font-size: var(--text-micro);
   text-align: right;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2604,6 +2607,7 @@
   font-size: var(--text-caption);
   line-height: var(--leading-normal);
   white-space: pre;
+  -webkit-user-select: text;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -4579,6 +4583,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-body);
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -4622,6 +4627,7 @@
   border-top: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
   font-size: var(--text-label);
+  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -4656,6 +4662,7 @@
   line-height: var(--leading-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
   user-select: text;
 }
 

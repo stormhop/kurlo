@@ -51,6 +51,7 @@
     display: grid;
     gap: var(--space-4);
     align-content: start;
+    -webkit-user-select: text;
     user-select: text;
   }
 

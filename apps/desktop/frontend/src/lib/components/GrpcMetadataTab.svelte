@@ -21,7 +21,7 @@
   <button class="kv-col-resizer kv-col-resizer--key" type="button" onmousedown={(e) => vm.startColResize('key', e)} aria-label="Resize key column"></button>
   <button class="kv-col-resizer kv-col-resizer--value" type="button" onmousedown={(e) => vm.startColResize('val', e)} aria-label="Resize value column"></button>
   {#each vm.grpcMetadata as row, i (row.id)}
-    <div class="kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)} title={!row.enabled && (row.key || row.value || row.description) ? 'Disabled rows are not sent with the request' : ''}>
+    <div class="kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
       <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable" disabled={!row.key && !row.value} />
       <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={vm.variableSuggestions} placeholder="Metadata key" oninput={() => guardTrailing(vm.grpcMetadata, i)} />
       <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => guardTrailing(vm.grpcMetadata, i)} />

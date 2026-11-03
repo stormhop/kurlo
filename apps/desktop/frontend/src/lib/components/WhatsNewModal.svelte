@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { trapFocus } from '../a11y';
   import type { ChangelogSection } from '../whatsNew';
   import ReleaseNotes from './ReleaseNotes.svelte';
@@ -31,7 +32,7 @@
           <span class="whats-new-date">{formatDate(section.date)}</span>
         {/if}
       </div>
-      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog">×</button>
+      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog"><AddCloseIcon /></button>
     </div>
 
     <div class="whats-new-body">

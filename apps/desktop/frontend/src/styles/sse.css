@@ -259,6 +259,7 @@
   border: 1px solid var(--border-subtle);
   max-height: 18.75rem;
   overflow-y: auto;
+  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -281,6 +282,7 @@
   white-space: pre;
   word-break: normal;
   overflow: auto;
+  -webkit-user-select: text;
   user-select: text;
 }
 

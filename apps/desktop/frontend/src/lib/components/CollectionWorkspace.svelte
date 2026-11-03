@@ -586,7 +586,7 @@
                   <div class="client-cert-row">
                     <span class="client-cert-label">Certificate (CRT/PEM)</span>
                     {#if settings.clientCertPath}
-                      <span class="client-cert-path" title={settings.clientCertPath}>{settings.clientCertPath}</span>
+                      <span class="client-cert-path">{settings.clientCertPath}</span>
                       <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientCertPath')}>Clear</button>
                     {:else}
                       <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientCertPath')}>Choose file…</button>
@@ -595,7 +595,7 @@
                   <div class="client-cert-row">
                     <span class="client-cert-label">Private key (optional)</span>
                     {#if settings.clientKeyPath}
-                      <span class="client-cert-path" title={settings.clientKeyPath}>{settings.clientKeyPath}</span>
+                      <span class="client-cert-path">{settings.clientKeyPath}</span>
                       <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientKeyPath')}>Clear</button>
                     {:else}
                       <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientKeyPath')} disabled={!settings.clientCertPath}>Choose file…</button>

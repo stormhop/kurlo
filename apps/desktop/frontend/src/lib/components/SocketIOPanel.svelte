@@ -266,7 +266,7 @@
       {/if}
       {#if status === 'error' && error}
         <span class="sse-summary-dot"></span>
-        <span class="sse-status-error" title={error}>{error}</span>
+        <span class="sse-status-error">{error}</span>
       {/if}
       {#if status !== 'idle'}<span class="sse-summary-dot"></span>{/if}
       <span>{messages.length} event{messages.length === 1 ? '' : 's'}</span>
@@ -332,7 +332,7 @@
     </div>
 
     <div class="resp-actions">
-      <button class="btn btn-icon" title="Search response" aria-label="Search response" aria-pressed={searchOpen} onclick={() => (searchOpen = !searchOpen)} type="button">
+      <button class="btn btn-icon" aria-label="Search response" aria-pressed={searchOpen} onclick={() => (searchOpen = !searchOpen)} type="button">
         <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none">
           <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
           <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -346,7 +346,7 @@
           Restore
         </button>
       {/if}
-      <button class="btn btn-icon" type="button" onclick={onClear} disabled={messages.length === 0} title="Clear events" aria-label="Clear events">
+      <button class="btn btn-icon" type="button" onclick={onClear} disabled={messages.length === 0} aria-label="Clear events">
         <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
           <path d="M2 3h9M5 3V2h3v1M4 3v7a1 1 0 001 1h3a1 1 0 001-1V3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>

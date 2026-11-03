@@ -42,6 +42,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     background: #0b0c26;
+    -webkit-user-select: none;
     user-select: none;
   }
   .about-night img,
