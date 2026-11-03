@@ -29,6 +29,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 - **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 
+- **Cookies without their secret.** A workspace cookie whose secret value is missing on this computer is no longer sent as `{{kurloSecret:…}}` text; the Cookies window marks it *no value*.
 - **No browser tooltips.** The grey hover tooltips are gone throughout the app.
 - **Selectable chat text on macOS and Linux.** AI request messages can be selected and copied again.
 - **Primary icon buttons.** The icon on buttons such as **Send** in an AI request is no longer faint grey.

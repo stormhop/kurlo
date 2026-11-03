@@ -25,6 +25,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 - **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 
+- **Cookies without their secret are no longer sent.** A workspace cookie whose value is kept as a secret that this computer does not have, for example after cloning the workspace elsewhere, was sent as the literal `{{kurloSecret:…}}` text. Kurlo now leaves such a cookie out of requests, the header preview and `pm.cookies`, and the Cookies window marks it *no value* and explains how to fill it in.
 - **No browser tooltips.** The grey tooltips the system drew on hover are gone everywhere in the app; icon-only buttons keep their names for screen readers.
 - **Selectable text in the macOS app.** Chat messages in AI requests and other text marked as selectable could not be selected in the macOS and Linux WebView, which needs a prefixed CSS property; the prefix is now set everywhere, and panel resizing no longer selects text there.
 - **Readable icons on primary buttons.** Icon-only primary buttons, such as **Send** in an AI request, drew their icon in a faint grey on the accent colour; the icon now uses the accent's text colour in every theme.

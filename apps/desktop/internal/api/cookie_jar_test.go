@@ -295,3 +295,19 @@ func TestCookieJarRegistryDefaultJarStable(t *testing.T) {
 		t.Fatal("default-workspace jar must be stable across lookups")
 	}
 }
+
+func TestCookieJarNeverSendsAnUnresolvedSecretPlaceholder(t *testing.T) {
+	jar := newCookieJarRegistry().jar("ws")
+	u := mustURL("https://httpbin.org/get")
+	jar.SetCookies(u, []*http.Cookie{
+		{Name: "name", Value: "{{kurloSecret:workspace.ws.cookies.name.2ff83fa72e.value}}", Path: "/"},
+		{Name: "theme", Value: "dark", Path: "/"},
+	})
+	got := jar.Cookies(u)
+	if len(got) != 1 || got[0].Name != "theme" {
+		t.Fatalf("cookies = %v", got)
+	}
+	if listed := jar.ListCookies(); len(listed) != 2 {
+		t.Fatalf("the cookie stays in the jar so its value can be filled in, got %d", len(listed))
+	}
+}
