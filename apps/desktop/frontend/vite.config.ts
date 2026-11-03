@@ -2,7 +2,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
-import { latestReleaseNotes } from './src/lib/whatsNew';
+import { latestReleaseNotes } from './src/lib/whatsNew.ts';
 
 const CHANGELOG_PATH = resolve(import.meta.dirname, '../../../CHANGELOG.md');
 const CHANGELOG_ID = 'virtual:kurlo-changelog';

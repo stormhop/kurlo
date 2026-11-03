@@ -19,7 +19,13 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Folder defaults.** Folders set headers, auth, scripts and tests for the requests inside them, and Postman and Bruno folder auth and scripts import onto the folder. See [Folder defaults](/docs/guides/collection-defaults/#folder-defaults).
 - **AI connections.** Settings → AI connects OpenRouter by signing in, an Anthropic, OpenAI or compatible key, or a local Ollama or LM Studio model. Keys are encrypted and stay out of workspace files, and AI requests can use the default connection. See [AI](/docs/guides/settings/#ai).
 
+### Changed
+
+- **Faster test runs.** Browser tests run in parallel with a bounded worker count; documentation screenshots, profiling and interactive slow runs stay serial. `make check` runs independent checks concurrently, and focused, watch, failed-only and full test commands are available from the repository root.
+
 ### Fixed
+
+- **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 
 - **Current application screenshots.** Landing-page and documentation images now show the current sidebar and bottom status bar, with Git accessed from the status bar.
 - **Inherited secrets.** Script changes in a child environment keep inherited variables secret, masked and outside workspace YAML.

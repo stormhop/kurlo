@@ -15,7 +15,13 @@ All notable changes to Kurlo are documented here. This project follows
 
 - **AI connections.** **Settings → AI** keeps the models Kurlo's own AI features use: sign in with OpenRouter (Kurlo opens the browser and receives the key on a one-time loopback callback), add an Anthropic, OpenAI or OpenAI-compatible key, or pick a local Ollama or LM Studio model that Kurlo finds on this machine. OpenRouter returns through kurlo.dev, so its approval page names Kurlo instead of a localhost port. **Test** checks the key and lists the provider's models in a searchable picker, marking those recommended for tool use and those without tool support. An AI request can use the default connection and its model by choosing **Kurlo connection** as its provider; changing the default in Settings updates open requests at once. Keys are encrypted with the profile key from the system keychain, are never written to workspace YAML and never reach the interface; only a hint such as `sk-ant-…XYZ` is shown, and a key a provider repeats in an error is masked. Up to ten connections are kept. Other AI request providers keep their own URL and key.
 
+### Changed
+
+- **Faster test runs.** Browser tests run in parallel with a bounded worker count; documentation screenshots, profiling and interactive slow runs stay serial. `make check` runs independent checks concurrently, and focused, watch, failed-only and full test commands are available from the repository root.
+
 ### Fixed
+
+- **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 
 - **Current application screenshots.** Landing-page and documentation images now show the current sidebar and bottom status bar, with Git accessed from the status bar.
 - **Inherited secrets stay secret after scripts change them.** An override written to a child environment keeps the variable's secret flag and description, so its value stays masked and outside the workspace YAML.

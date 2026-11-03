@@ -14,8 +14,8 @@
     "frontend:dev": "npm --workspace @kurlo/desktop-frontend run dev",
     "frontend:build": "npm --workspace @kurlo/desktop-frontend run build",
     "frontend:check": "npm --workspace @kurlo/desktop-frontend run check",
-    "frontend:e2e": "npm --workspace @kurlo/desktop-frontend run e2e",
-    "frontend:e2e:webkit": "npm --workspace @kurlo/desktop-frontend run e2e:webkit",
+    "frontend:e2e": "npm --workspace @kurlo/desktop-frontend run e2e --",
+    "frontend:e2e:webkit": "npm --workspace @kurlo/desktop-frontend run e2e:webkit --",
     "frontend:e2e:headed": "npm --workspace @kurlo/desktop-frontend run e2e:headed",
     "frontend:e2e:headed:slow": "npm --workspace @kurlo/desktop-frontend run e2e:headed:slow",
     "perf:fixtures": "node scripts/generate-perf-fixtures.mjs",
@@ -25,7 +25,14 @@
     "web:dev": "npm --workspace @kurlo/web run dev",
     "web:build": "npm --workspace @kurlo/web run build",
     "web:check-docs": "node scripts/check-web-docs.mjs",
-    "web:preview": "npm --workspace @kurlo/web run preview"
+    "web:preview": "npm --workspace @kurlo/web run preview",
+    "test:unit": "npm --workspace @kurlo/desktop-frontend run test --",
+    "test:watch": "npm --workspace @kurlo/desktop-frontend run test:watch --",
+    "test:changed": "npm --workspace @kurlo/desktop-frontend run test:changed --",
+    "test:e2e": "npm --workspace @kurlo/desktop-frontend run e2e --",
+    "test:e2e:all": "npm --workspace @kurlo/desktop-frontend run e2e:all --",
+    "test:e2e:ui": "npm --workspace @kurlo/desktop-frontend run e2e:ui --",
+    "test:e2e:failed": "npm --workspace @kurlo/desktop-frontend run e2e:failed --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
