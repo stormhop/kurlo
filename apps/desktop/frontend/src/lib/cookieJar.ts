@@ -147,10 +147,120 @@ function cookieMatchesUrl(cookie: CookieJarEntry, requestUrl: string, now = Date
   return requestPath === cookiePath || requestPath.startsWith(cookiePath.endsWith('/') ? cookiePath : `${cookiePath}/`);
 }
 
+export function cookieValueIsMissingSecret(value: string): boolean {
+  return /^\{\{kurloSecret:[^{}]+\}\}$/.test(value);
+}
+
 export function cookieHeaderForUrl(cookies: CookieJarEntry[], requestUrl: string, now = Date.now()): string {
   return cookies
-    .filter(cookie => cookieMatchesUrl(cookie, requestUrl, now))
+    .filter(cookie => cookieMatchesUrl(cookie, requestUrl, now) && !cookieValueIsMissingSecret(cookie.value))
     .sort((a, b) => (b.path || '/').length - (a.path || '/').length || a.name.localeCompare(b.name))
     .map(cookie => `${cookie.name}=${cookie.value}`)
     .join('; ');
+}
+
+export type CookieSameSite = '' | 'lax' | 'strict' | 'none';
+
+export type CookieForm = {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: string;
+  expiresAt: number;
+  sameSite: CookieSameSite;
+  secure: boolean;
+  httpOnly: boolean;
+  subdomains: boolean;
+};
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+export function toLocalDateTimeInput(timestamp: number): string {
+  if (!timestamp) return '';
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function blankCookieForm(domain: string, name = ''): CookieForm {
+  return {
+    name,
+    value: '',
+    domain: normalizeCookieDomain(domain),
+    path: '/',
+    expires: '',
+    expiresAt: 0,
+    sameSite: '',
+    secure: false,
+    httpOnly: false,
+    subdomains: false,
+  };
+}
+
+export function cookieFormFromCookie(cookie: CookieJarEntry): CookieForm {
+  const sameSite = cookie.sameSite.toLowerCase();
+  return {
+    name: cookie.name,
+    value: cookie.value,
+    domain: normalizeCookieDomain(cookie.domain),
+    path: cookie.path || '/',
+    expires: cookie.session ? '' : toLocalDateTimeInput(cookie.expiresAt),
+    expiresAt: cookie.session ? 0 : cookie.expiresAt,
+    sameSite: sameSite === 'lax' || sameSite === 'strict' || sameSite === 'none' ? sameSite : '',
+    secure: cookie.secure,
+    httpOnly: cookie.httpOnly,
+    subdomains: !cookie.hostOnly,
+  };
+}
+
+export function cookieFromForm(form: CookieForm, fallbackDomain: string, timestamp = Date.now()): CookieJarEntry {
+  const name = form.name.trim();
+  if (!name) throw new Error('Cookie name is required.');
+  if (/[=;\s]/.test(name)) throw new Error('Cookie name cannot contain "=", ";" or spaces.');
+  if (form.value.includes(';')) throw new Error('Cookie value cannot contain ";".');
+  const domain = normalizeCookieDomain(form.domain || fallbackDomain);
+  let expiresAt = 0;
+  if (form.expiresAt && form.expires === toLocalDateTimeInput(form.expiresAt)) {
+    expiresAt = form.expiresAt;
+  } else if (form.expires.trim()) {
+    expiresAt = new Date(form.expires).getTime();
+    if (Number.isNaN(expiresAt)) throw new Error('Expires is not a valid date.');
+  }
+  const draft: CookieJarEntry = {
+    name,
+    value: form.value.trim(),
+    domain,
+    path: form.path.trim() || '/',
+    expiresAt,
+    session: !expiresAt,
+    secure: form.secure,
+    httpOnly: form.httpOnly,
+    sameSite: form.sameSite,
+    hostOnly: !form.subdomains,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const parsed = parseRawCookie(serializeCookie(draft), domain, timestamp);
+  return { ...parsed, expiresAt, session: !expiresAt };
+}
+
+export function cookieIsExpired(cookie: CookieJarEntry, now = Date.now()): boolean {
+  return !cookie.session && cookie.expiresAt > 0 && cookie.expiresAt <= now;
+}
+
+export function cookieExpiryLabel(cookie: CookieJarEntry, now = Date.now()): string {
+  if (cookie.session || !cookie.expiresAt) return 'Session';
+  if (cookieIsExpired(cookie, now)) return 'Expired';
+  const minutes = Math.round((cookie.expiresAt - now) / 60000);
+  if (minutes < 1) return 'in under a minute';
+  if (minutes < 60) return `in ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `in ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days < 60) return `in ${days} day${days === 1 ? '' : 's'}`;
+  const months = Math.round(days / 30);
+  if (months < 24) return `in ${months} months`;
+  return `in ${Math.round(days / 365)} years`;
 }

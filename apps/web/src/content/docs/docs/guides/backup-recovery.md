@@ -13,7 +13,7 @@ Kurlo has three complementary protection layers:
 
 ## Export all data
 
-Open **Settings -> General -> Advanced data -> Export all data**.
+Open **Settings -> General -> Data -> Export all data**.
 
 ![Export confirmation warning that the backup contains secrets and excludes unsaved changes](../../../../assets/screenshots/backup-export-warning.png)
 
@@ -39,7 +39,7 @@ The exported JSON is not encrypted. It can contain auth tokens, OAuth credential
 ## Restore an all-data export
 
 1. Export the current profile first if it is still usable.
-2. Open **Settings -> General -> Advanced data -> Import all data**.
+2. Open **Settings -> General -> Data -> Import all data**.
 3. Select a Kurlo backup JSON file.
 4. Confirm the replacement.
 5. Re-enter the global proxy password and reconnect any external workspace paths if needed.

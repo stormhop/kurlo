@@ -21,7 +21,10 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Changed
 
+- **Cookie jar redesign.** Domains on the left, cookies in a table with expiry and flags, and an editor with **Fields** and **Raw** modes. The **Sync** tab uses Settings-style cards. See [Managing cookies](/docs/guides/cookies/#managing-cookies).
 - **Faster test runs.** Browser tests run in parallel with a bounded worker count; documentation screenshots, profiling and interactive slow runs stay serial. `make check` runs independent checks concurrently, and focused, watch, failed-only and full test commands are available from the repository root.
+
+- **Settings layout.** Every Settings page now shares one layout: a title, then grouped rows with the control on the right. General shows all settings at once, Proxy shows its server fields only when on, and the AI page shows Codex with its model and plan limits first. See [App settings](/docs/guides/settings/).
 
 ### Fixed
 

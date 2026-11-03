@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  blankCookieForm,
   buildCookieDomainGroups,
+  cookieExpiryLabel,
+  cookieFormFromCookie,
+  cookieFromForm,
   cookieHeaderForUrl,
+  cookieValueIsMissingSecret,
   parseCookieHeader,
   parseRawCookie,
   serializeCookie,
@@ -99,5 +104,56 @@ describe('cookie jar helpers', () => {
       ['api.example.test', ['csrfToken', 'sessionId']],
       ['new-api.example.test', []],
     ]);
+  });
+
+  it('leaves out cookies whose value is a secret this computer does not have', () => {
+    const base = { domain: 'httpbin.org', path: '/', hostOnly: true, secure: false, httpOnly: false, session: true, expiresAt: 0, sameSite: '' };
+    const header = cookieHeaderForUrl([
+      { ...base, name: 'name', value: '{{kurloSecret:workspace.ws.cookies.name.2ff83fa72e.value}}' },
+      { ...base, name: 'theme', value: 'dark' },
+    ], 'https://httpbin.org/get');
+    expect(header).toBe('theme=dark');
+    expect(cookieValueIsMissingSecret('{{kurloSecret:a.b}}')).toBe(true);
+    expect(cookieValueIsMissingSecret('x{{kurloSecret:a.b}}')).toBe(false);
+  });
+});
+
+describe('cookie form', () => {
+  it('round-trips a jar cookie through the form fields', () => {
+    const expiresAt = now + 3 * 86400000 + 17250;
+    const source = cookie({ name: 'sid', value: 'v1', path: '/auth', expiresAt, session: false, secure: true, httpOnly: true, sameSite: 'strict', hostOnly: false });
+    const form = cookieFormFromCookie(source);
+
+    expect(form).toMatchObject({ name: 'sid', value: 'v1', path: '/auth', sameSite: 'strict', secure: true, httpOnly: true, subdomains: true });
+    expect(form.expires).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    const back = cookieFromForm(form, 'api.example.test', now);
+    expect(back).toMatchObject({ name: 'sid', value: 'v1', domain: 'api.example.test', path: '/auth', session: false, secure: true, httpOnly: true, sameSite: 'strict', hostOnly: false });
+    expect(back.expiresAt).toBe(expiresAt);
+    const moved = cookieFromForm({ ...form, expires: '2030-05-01T10:30' }, 'api.example.test', now);
+    expect(moved.expiresAt).toBe(new Date(2030, 4, 1, 10, 30).getTime());
+  });
+
+  it('turns an empty Expires into a session cookie scoped to the host', () => {
+    const form = { ...blankCookieForm('API.Example.test'), name: 'theme', value: 'dark' };
+    expect(cookieFromForm(form, '', now)).toMatchObject({ name: 'theme', value: 'dark', domain: 'api.example.test', session: true, expiresAt: 0, hostOnly: true, path: '/' });
+  });
+
+  it('applies the same rules as raw Set-Cookie text', () => {
+    const base = blankCookieForm('api.example.test', 'sid');
+    expect(() => cookieFromForm({ ...base, name: '' }, '', now)).toThrow('Cookie name is required.');
+    expect(() => cookieFromForm({ ...base, name: 'a b' }, '', now)).toThrow(/cannot contain/);
+    expect(() => cookieFromForm({ ...base, value: 'a;b' }, '', now)).toThrow('Cookie value cannot contain ";".');
+    expect(() => cookieFromForm({ ...base, sameSite: 'none' }, '', now)).toThrow('SameSite=None cookies must also be marked Secure.');
+    expect(() => cookieFromForm({ ...base, expires: 'soon' }, '', now)).toThrow('Expires is not a valid date.');
+    expect(cookieFromForm({ ...base, path: 'admin' }, '', now).path).toBe('/admin');
+  });
+
+  it('labels when a cookie expires', () => {
+    expect(cookieExpiryLabel(cookie({}), now)).toBe('Session');
+    expect(cookieExpiryLabel(cookie({ session: false, expiresAt: now - 1000 }), now)).toBe('Expired');
+    expect(cookieExpiryLabel(cookie({ session: false, expiresAt: now + 5 * 60000 }), now)).toBe('in 5 min');
+    expect(cookieExpiryLabel(cookie({ session: false, expiresAt: now + 3 * 3600000 }), now)).toBe('in 3 h');
+    expect(cookieExpiryLabel(cookie({ session: false, expiresAt: now + 86400000 }), now)).toBe('in 1 day');
+    expect(cookieExpiryLabel(cookie({ session: false, expiresAt: now + 90 * 86400000 }), now)).toBe('in 3 months');
   });
 });

@@ -17,7 +17,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
+- **Cookie jar redesign.** The Cookies window now matches Settings: domains in a filterable list on the left, the selected domain's cookies in a table with value, path, expiry and flags, and expired cookies struck through. Clicking a row opens an editor below the table with **Fields** (name, value, path, expires, SameSite, HttpOnly, Secure, include subdomains) and **Raw** for pasting a `Set-Cookie` string; `Cmd/Ctrl Enter` saves. Domains holding a cookie without a value are marked. Opening the window no longer adds the open request's domain as an empty entry; an empty jar offers to add a cookie for it instead. The **Sync** tab is laid out as Settings cards with a switch to turn sync on, and the manual pairing code stays hidden until **Show code**.
 - **Faster test runs.** Browser tests run in parallel with a bounded worker count; documentation screenshots, profiling and interactive slow runs stay serial. `make check` runs independent checks concurrently, and focused, watch, failed-only and full test commands are available from the repository root.
+
+- **Settings, one layout for every page.** The Settings window is wider, and each page has a title and a line on what it covers, with settings grouped in boxes: name and description on the left, the control on the right. General shows every setting at once instead of folded cards (Saving and Script engine are switches, On launch is a list), Proxy shows the server and sign-in fields only when the proxy is **On**, Shortcuts, Support and About use the same rows, and the AI page puts **Your agents** first: the Codex row shows its state, account, model (saved as soon as you pick it) and plan limits as bars, with the executable path folded below.
 
 ### Fixed
 
