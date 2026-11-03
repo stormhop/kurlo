@@ -18,7 +18,6 @@
     showSave = false,
     saveDirty = false,
     canRevert = false,
-    saveShortcut = '',
     sendShortcut = '',
     sendShortcutInline = false,
     onSave = () => {},
@@ -56,7 +55,6 @@
     showSave?: boolean;
     saveDirty?: boolean;
     canRevert?: boolean;
-    saveShortcut?: string;
     sendShortcut?: string;
     sendShortcutInline?: boolean;
     onSave?: () => void;
@@ -255,7 +253,7 @@
       onkeydown={onNameKeydown}
     />
     {#if showSave}
-      <RequestSaveActions {saveDirty} {canRevert} {saveShortcut} {onSave} {onRevert} />
+      <RequestSaveActions {saveDirty} {canRevert} {onSave} {onRevert} />
     {/if}
   </div>
 

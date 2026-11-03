@@ -146,7 +146,8 @@ describe('design tokens', () => {
 
   it('shows no native browser tooltips', () => {
     const offenders = walk(SRC).filter(file => file.endsWith('.svelte')).flatMap(file => {
-      const markup = readFileSync(file, 'utf8').replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/g, '');
+      const source = readFileSync(file, 'utf8');
+      const markup = Array.from(source.matchAll(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/g)).reduce((text, block) => text.replace(block[0], ' '.repeat(block[0].length)), source);
       return Array.from(markup.matchAll(/<([a-z][a-z0-9-]*)\b(?:[^<>{}]|\{[^{}]*\})*?\stitle=/g))
         .filter(match => match[1] !== 'iframe')
         .map(match => `${relative(SRC, file)}:${markup.slice(0, match.index).split('\n').length} <${match[1]}>`);

@@ -8,7 +8,6 @@
     topView,
     mockRunning = false,
     cookieCount = 0,
-    settingsShortcut = '',
     workspaceBlocked = false,
     openCollectionRunner,
     openMockTab,
@@ -21,7 +20,6 @@
     topView: TopView;
     mockRunning?: boolean;
     cookieCount?: number;
-    settingsShortcut?: string;
     workspaceBlocked?: boolean;
     openCollectionRunner: () => void;
     openMockTab: () => void;

@@ -258,7 +258,6 @@
   let stashCount = $derived(status.stashes?.length ?? 0);
   let canStash = $derived(Boolean(canRepoAction && !status.operation && changedFiles.length > 0));
   let canPopStash = $derived(Boolean(canRepoAction && !status.operation && stashCount > 0));
-  let statusTitle = $derived(`Git ${status.operation} in progress. Resolve the conflicted files, then continue or abort it.`);
 
 
   let canDiscardAction = $derived(status.isRepo && !loading);
@@ -393,16 +392,6 @@
     return fullConflictSideActionLabel(side);
   }
 
-  function conflictSideTitle(side: ConflictSide) {
-    const available = side === 'ours' ? hasOursVersion : hasTheirsVersion;
-    if (currentConflict) return side === 'ours' ? 'Apply local lines to the current result hunk' : 'Apply remote lines to the current result hunk';
-    if (!conflictLoaded) return side === 'ours' ? 'Loading the local conflict side' : 'Loading the remote conflict side';
-    if (available) return side === 'ours' ? 'Resolve this file using the local version' : 'Resolve this file using the remote version';
-    return side === 'ours'
-      ? 'Resolve by keeping the local absence of this file'
-      : 'Resolve by keeping the remote absence of this file';
-  }
-
   function sideFallbackLabel(side: ConflictSide) {
     const available = side === 'ours' ? hasOursVersion : hasTheirsVersion;
     if (!conflictLoaded) return side === 'ours' ? 'Loading local version...' : 'Loading remote version...';
@@ -471,23 +460,6 @@
       changed: '*',
     };
     return labels[fileStatus] ?? '*';
-  }
-
-  function pullTitle() {
-    if (!status.isRepo) return 'Open a Git repository first';
-    if (status.operation) return `Finish or abort the current ${status.operation} first`;
-    if (!status.clean) return 'Pull remote updates and re-apply local edits';
-    return status.behind > 0 ? `Pull ${status.behind} remote update${status.behind === 1 ? '' : 's'}` : 'Pull latest changes';
-  }
-
-  function pushTitle() {
-    if (!status.isRepo) return 'Open a Git repository first';
-    if (status.operation) return `Finish or abort the current ${status.operation} first`;
-    if (!hasPushTarget) return 'Add a remote before pushing';
-    if (!status.upstream && pushCount > 0) return `Publish ${pushCount} local commit${pushCount === 1 ? '' : 's'} to ${status.pushRemote || 'remote'}`;
-    if (!status.upstream) return `Publish this branch to ${status.pushRemote || 'remote'} and set its upstream`;
-    if (status.upstreamGone) return `${status.upstream} is gone. Push to publish this branch again`;
-    return pushCount > 0 ? `Push ${pushCount} local commit${pushCount === 1 ? '' : 's'}` : 'Nothing to push';
   }
 
   function operationTitle() {

@@ -326,7 +326,7 @@ func mcpRows(field string, args []mcpRowArg, existing any) ([]any, error) {
 			usedIDs[rowIDValue(row)] = true
 		}
 	}
-	out := make([]any, 0, len(args)+len(kept))
+	out := []any{}
 	nextID := 1
 	for _, arg := range args {
 		key := strings.TrimSpace(arg.Key)

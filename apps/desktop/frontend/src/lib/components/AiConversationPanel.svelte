@@ -30,7 +30,6 @@
   const usage = $derived(last ? aiTurnUsage(last) : null);
   const hasUsage = $derived(Boolean(last?.response?.hasUsage || last?.steps.some(step => step.hasUsage)));
   const firstTokenMs = $derived(last?.response?.firstTokenMs || last?.steps[0]?.firstTokenMs || 0);
-  const durationMs = $derived(last?.response?.durationMs || last?.steps.reduce((sum, step) => sum + step.durationMs, 0) || 0);
   const tokensPerSecond = $derived.by(() => {
     if (!last || !usage || !usage.output) return 0;
     const generating = last.steps.reduce((sum, step) => sum + Math.max(step.durationMs - step.firstTokenMs, 0), 0);
@@ -41,20 +40,6 @@
   const testPassed = $derived(tests?.tests?.filter(test => test.passed).length ?? 0);
   const rawSteps = $derived(last?.response?.steps ?? []);
   const turnKey = $derived(last?.id ?? '');
-  const metricsTitle = $derived.by(() => {
-    if (!usage) return '';
-    const lines = [
-      `First token: ${formatMs(firstTokenMs)}`,
-      `Total: ${formatMs(durationMs)}`,
-      `Input: ${usage.input.toLocaleString('en-US')}`,
-      `Output: ${usage.output.toLocaleString('en-US')}`,
-    ];
-    if (usage.cacheRead) lines.push(`Cache read: ${usage.cacheRead.toLocaleString('en-US')}`);
-    if (usage.cacheWrite) lines.push(`Cache write: ${usage.cacheWrite.toLocaleString('en-US')}`);
-    if (usage.reasoning) lines.push(`Reasoning: ${usage.reasoning.toLocaleString('en-US')}`);
-    if (last && last.steps.length > 1) lines.push(`Steps: ${last.steps.length}`);
-    return lines.join('\n');
-  });
 
   $effect(() => {
     void turns;

@@ -7,8 +7,6 @@
   import { KURLO_REPO_URL } from '../starPrompt';
   import type { GitWorkspaceStatus } from '../backend';
   import type { TopView } from '../stores/ui';
-  import { shortcutComboLabel } from '../stores/features/preferences';
-  import { RESPONSE_RIGHT_CHOSEN_MIN_WIDTH } from '../stores/features/uiShell';
   import {
     DARK_THEME_VARIANTS,
     LIGHT_THEME_VARIANTS,
@@ -27,7 +25,6 @@
     topView,
     gitStatus,
     appVersion = '',
-    appRuntime = '',
     appTheme,
     resolvedAppTheme,
     setThemeMode,
@@ -45,7 +42,6 @@
     topView: TopView;
     gitStatus: GitWorkspaceStatus;
     appVersion?: string;
-    appRuntime?: string;
     appTheme: AppTheme;
     resolvedAppTheme: ResolvedAppTheme;
     setThemeMode: (mode: AppThemeMode) => void;
@@ -65,7 +61,6 @@
   const KURLO_UPDATES_URL = 'https://github.com/stormhop/kurlo/releases';
   let themeVariantList = $derived(resolvedAppTheme === 'light' ? LIGHT_THEME_VARIANTS : DARK_THEME_VARIANTS);
   let activeVariantId = $derived(resolvedAppTheme === 'light' ? appTheme.light : appTheme.dark);
-  let toggleSidebarShortcut = $derived(shortcutComboLabel(vm.shortcutCombo('toggle-left-sidebar'), appRuntime));
 
   function starKurlo() {
     openExternalURL(KURLO_REPO_URL);
@@ -81,31 +76,16 @@
     return (bracketIndex >= 0 ? withoutTracking.slice(0, bracketIndex) : withoutTracking).trim();
   }
 
-  function upstreamFromRawBranch(value: string) {
-    const branch = (value || '').trim();
-    const trackingIndex = branch.indexOf('...');
-    if (trackingIndex < 0) return '';
-    const upstream = branch.slice(trackingIndex + 3);
-    const bracketIndex = upstream.indexOf(' [');
-    return (bracketIndex >= 0 ? upstream.slice(0, bracketIndex) : upstream).trim();
-  }
-
   function rawBranchHasGoneUpstream(value: string) {
     return /\[\s*gone\s*\]/.test(value || '');
   }
 
   let changeCount = $derived(kurloChangedFiles(gitStatus).length);
   let branchLabel = $derived(branchNameOnly(gitStatus.branch) || (gitStatus.isRepo ? 'HEAD' : 'Local'));
-  let upstreamLabel = $derived(gitStatus.upstream || upstreamFromRawBranch(gitStatus.branch));
   let upstreamGone = $derived(Boolean(gitStatus.upstreamGone || rawBranchHasGoneUpstream(gitStatus.branch)));
   let workspaceMissing = $derived(!gitStatus.isRepo && Boolean(gitStatus.missingRoot));
   let storageMode = $derived(gitStatus.isRepo ? 'Git' : (workspaceMissing ? 'Missing' : 'Local'));
   let storageLabel = $derived(gitStatus.isRepo ? branchLabel : (workspaceMissing ? 'Missing folder' : 'Local storage'));
-  let storageTitle = $derived(gitStatus.isRepo
-    ? `Workspace storage: Git repository (${gitStatus.root || gitStatus.workspaceRoot})${upstreamLabel ? ` · tracks ${upstreamLabel}${upstreamGone ? ' (remote branch gone)' : ''}` : ''}`
-    : (workspaceMissing
-      ? `Workspace folder is missing (${gitStatus.workspaceRoot})`
-      : `Workspace storage: local filesystem (${gitStatus.workspaceRoot || 'Kurlo app data'})`));
 </script>
 
 <div class="status-bar">

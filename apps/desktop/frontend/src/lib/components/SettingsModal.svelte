@@ -26,7 +26,6 @@
   import ThemePreview from './ThemePreview.svelte';
   import AboutNight from './AboutNight.svelte';
   import { friendlyUpdateError } from '../updateErrors';
-  import { shortcutComboLabel } from '../stores/features/preferences';
 
   let diagnosticsCopied = $state(false);
   let diagnosticsError = $state('');
@@ -182,7 +181,6 @@
 
 
   let settingsQuery = $state('');
-  let saveShortcut = $derived(shortcutComboLabel(shortcutCombo('save-request'), appRuntime));
   let normalizedQuery = $derived(settingsQuery.trim().toLowerCase());
   let filteredNav = $derived(
     !normalizedQuery

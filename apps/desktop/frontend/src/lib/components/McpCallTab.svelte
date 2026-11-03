@@ -61,14 +61,6 @@
 
   const sessionProtocol = $derived(mcpSessionProtocolVersion(catalog));
 
-  const summaryTitle = $derived([
-    catalog?.serverName,
-    catalog?.serverVersion,
-    sessionProtocol && `MCP ${sessionProtocol}`,
-    counts.join(' · '),
-    detail,
-  ].filter(Boolean).join(' · '));
-
   function chooseName(value: string) {
     if (vm.mcpMethod === 'tools/call') vm.selectMcpTool(value);
     else vm.mcpName = value;

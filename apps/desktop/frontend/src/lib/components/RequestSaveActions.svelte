@@ -2,14 +2,12 @@
   let {
     saveDirty = false,
     canRevert = false,
-    saveShortcut = '',
     disabled = false,
     onSave = () => {},
     onRevert = () => {},
   }: {
     saveDirty?: boolean;
     canRevert?: boolean;
-    saveShortcut?: string;
     disabled?: boolean;
     onSave?: () => void;
     onRevert?: () => void;

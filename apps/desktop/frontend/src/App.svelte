@@ -482,7 +482,6 @@
     topView={vm.topView}
     mockRunning={vm.mockServer.running}
     cookieCount={vm.cookies.length}
-    settingsShortcut={shortcutComboLabel(vm.shortcutCombo('settings'), vm.appRuntime)}
     workspaceBlocked={vm.workspaceBlocked}
     openCollectionRunner={vm.openCollectionRunner}
     openMockTab={vm.openMockServerTab}
@@ -924,7 +923,6 @@
         showSave={!vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
         saveDirty={!vm.workspaceBlocked && vm.activeRequestIsDirty}
         canRevert={!vm.workspaceBlocked && vm.activeRequestCanRevert}
-        saveShortcut={shortcutComboLabel(vm.shortcutCombo('save-request'), vm.appRuntime)}
         sendShortcut={shortcutComboLabel(vm.shortcutCombo('send-request'), vm.appRuntime)}
         sendShortcutInline={usesMacShortcutGlyphs(vm.appRuntime)}
         onSave={vm.saveActiveRequest}
@@ -1184,7 +1182,6 @@
     topView={vm.topView}
     gitStatus={vm.gitStatus}
     appVersion={vm.appVersion}
-    appRuntime={vm.appRuntime}
     appTheme={vm.appTheme}
     resolvedAppTheme={vm.resolvedAppTheme}
     setThemeMode={vm.setThemeMode}
