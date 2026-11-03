@@ -14,6 +14,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **Rename environments from their names.** Edit the environment name directly in the editor, or double-click it in the sidebar. **Rename** focuses the name field; Enter or leaving the field saves, and Escape cancels.
+
 - **Suggestions while you type.** The URL field completes URLs from history and saved requests, and finds a request by name; a JSON body offers the next key from the request's examples. `Tab` accepts. See [Suggestions while you type](/docs/guides/request-types/#suggestions-while-you-type).
 - **Environment inheritance.** An environment takes the variables it does not set from a parent environment; the matrix shows where each value comes from. See [Inheriting from another environment](/docs/guides/environments/#inheriting-from-another-environment).
 - **Folder defaults.** Folders set headers, auth, scripts and tests for the requests inside them, and Postman and Bruno folder auth and scripts import onto the folder. See [Folder defaults](/docs/guides/collection-defaults/#folder-defaults).
@@ -29,6 +31,8 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Fixed
 
 - **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
+
+- **Environment actions dismiss normally.** Click outside the menu or press Escape to close it. The editor no longer duplicates environment switching with an **In use** or **Use environment** button; use the top bar or sidebar.
 
 - **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 

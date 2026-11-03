@@ -118,6 +118,7 @@
     globalVariableCount,
     selectEnvironment,
     openEnvironment,
+    renameEnvironment,
     environmentValueCount,
     openWorkspaceDiagnostic,
     activeLoadTestId = '',
@@ -198,6 +199,7 @@
     globalVariableCount: number;
     selectEnvironment: (environmentId: string) => void;
     openEnvironment: (environmentId: string) => void;
+    renameEnvironment: (environmentId: string, name: string) => void | Promise<void>;
     environmentValueCount: (environment: Environment) => number;
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
     activeLoadTestId?: string;
@@ -486,6 +488,47 @@
       }
     }
     return rows;
+  }
+
+  let editingEnvironmentId = $state('');
+  let editingEnvironmentName = $state('');
+  let editingEnvironmentInput = $state<HTMLInputElement>();
+
+  $effect(() => {
+    if (!editingEnvironmentId || !editingEnvironmentInput) return;
+    editingEnvironmentInput.focus();
+    editingEnvironmentInput.select();
+  });
+
+  $effect(() => {
+    if (editingEnvironmentId && !activeWorkspaceEnvironments.some(environment => environment.id === editingEnvironmentId)) cancelEnvironmentRename();
+  });
+
+  function startEnvironmentRename(environment: Environment) {
+    if (workspaceBlocked) return;
+    editingEnvironmentId = environment.id;
+    editingEnvironmentName = environment.name;
+  }
+
+  function cancelEnvironmentRename() {
+    editingEnvironmentId = '';
+    editingEnvironmentName = '';
+    editingEnvironmentInput = undefined;
+  }
+
+  function commitEnvironmentRename() {
+    const id = editingEnvironmentId;
+    const name = editingEnvironmentName.trim();
+    cancelEnvironmentRename();
+    if (id && name) void renameEnvironment(id, name);
+  }
+
+  function onEnvironmentNameKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Enter' && event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Enter') commitEnvironmentRename();
+    else cancelEnvironmentRename();
   }
 
   function buildEnvironmentRows(): EnvironmentSidebarRow[] {
@@ -983,13 +1026,23 @@
               </button>
             {:else if row.type === 'environment'}
               <div class="environment-item" class:active={row.environment.id === activeEnvironmentId}>
-                <button class="environment-item-main" type="button" onclick={() => openEnvironment(row.environment.id)} disabled={workspaceBlocked}>
+                {#if editingEnvironmentId === row.environment.id}
+                <div class="environment-item-main">
+                  <span class="environment-dot" aria-hidden="true"></span>
+                  <span class="environment-item-text">
+                    <input class="sidebar-request-title-input" bind:this={editingEnvironmentInput} bind:value={editingEnvironmentName} aria-label="Sidebar environment name" spellcheck="false" onblur={commitEnvironmentRename} onkeydown={onEnvironmentNameKeydown} />
+                    <small>{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}</small>
+                  </span>
+                </div>
+                {:else}
+                <button class="environment-item-main" type="button" onclick={(event) => { if (event.detail < 2) openEnvironment(row.environment.id); }} ondblclick={() => startEnvironmentRename(row.environment)} onkeydown={(event) => { if (event.key === 'F2' && !event.repeat) { event.preventDefault(); event.stopPropagation(); startEnvironmentRename(row.environment); } }} disabled={workspaceBlocked}>
                   <span class="environment-dot" aria-hidden="true"></span>
                   <span class="environment-item-text">
                     <span>{row.environment.name}</span>
                     <small>{row.environment.id === activeEnvironmentId ? 'In use · ' : ''}{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}{#if row.environment.parentId && activeWorkspaceEnvironments.some(candidate => candidate.id === row.environment.parentId)}{` · inherits ${activeWorkspaceEnvironments.find(candidate => candidate.id === row.environment.parentId)?.name}`}{/if}</small>
                   </span>
                 </button>
+                {/if}
               </div>
             {/if}
           {/each}

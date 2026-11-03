@@ -5,6 +5,8 @@ description: Switch between staging, prod, and local without rewriting every req
 
 Variables in Kurlo use the `{{name}}` template syntax. They expand in URLs, headers, query params, request bodies, and auth fields just before send.
 
+Edit the environment name directly in the editor, or double-click its name in the sidebar. `F2` or **Rename** in the editor’s **•••** menu focuses the name field. Press `Enter` or click elsewhere to save; `Escape` cancels the edit.
+
 ![Environment editor with a base URL and masked secret token](../../../../assets/screenshots/environments-panel.png)
 
 ## Scopes

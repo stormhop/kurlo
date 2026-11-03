@@ -544,6 +544,7 @@
     globalVariableCount={vm.globalVariableCount()}
     selectEnvironment={vm.selectEnvironment}
     openEnvironment={vm.openEnvironment}
+    renameEnvironment={vm.renameEnvironment}
     environmentValueCount={vm.environmentValueCount}
     openWorkspaceDiagnostic={vm.openWorkspaceDiagnostic}
     workspaceBlocked={vm.workspaceBlocked}
@@ -719,7 +720,6 @@
         renameEnvironment={vm.renameEnvironment}
         setEnvironmentProtected={vm.setEnvironmentProtected}
         setEnvironmentParent={vm.setEnvironmentParent}
-        useEnvironment={vm.useEnvironment}
         deleteEnvironment={vm.deleteEnvironment}
         saveEnvironment={vm.saveEnvironment}
         updateEnvironmentRow={vm.updateEnvironmentRow}

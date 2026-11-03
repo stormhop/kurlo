@@ -51,7 +51,7 @@ type EnvironmentHost = {
   environments: Environment[];
   environmentView: EnvironmentView;
   workspaces: Workspace[];
-  sidebarView: 'collections' | 'environments' | 'history';
+  sidebarView: 'collections' | 'environments' | 'history' | 'agent';
   topView: string;
   activeEnvironment: Environment | undefined;
   activeWorkspaceEnvironments: Environment[];
@@ -196,12 +196,12 @@ export const environmentFeature = {
     this.topView = 'environment';
     await this.persistRequestStore();
   },
-  async renameEnvironment(this: EnvironmentHost, environmentId: string) {
+  async renameEnvironment(this: EnvironmentHost, environmentId: string, nextName: string) {
     if (!this.guardWorkspaceWritable('Renaming environments')) return;
     const environment = this.environments.find(candidate => candidate.id === environmentId);
     if (!environment) return;
-    const name = await this.openPromptDialog('Rename environment', environment.name);
-    if (!name) return;
+    const name = nextName.trim();
+    if (!name || name === environment.name) return;
     this.environments = this.environments.map(candidate => candidate.id === environmentId ? { ...candidate, name } : candidate);
     await this.persistRequestStore();
   },

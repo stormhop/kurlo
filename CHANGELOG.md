@@ -9,6 +9,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Rename environments from their names.** Edit the environment name directly in the editor, or double-click it in the sidebar. **Rename** focuses the name field; Enter or leaving the field saves, and Escape cancels.
+
 - **Suggestions while you type.** The URL field offers the rest of a URL you have sent or saved in the workspace, newest history first, and typing the start of a request's name offers that request's URL. A JSON body offers the next key from the request's saved examples, including those an OpenAPI import created, following the nested object you are in and skipping keys already there. The suggestion shows in faded text; `Tab` accepts it and `Escape` hides it.
 - **Environment inheritance.** An environment can inherit from another: every variable it does not set comes from its parent, then from the parent's parent. The environment page lists the inherited variables with an **Override** button, the matrix shows inherited values in grey with the environment they come from, and the sidebar names the parent. Requests, scripts, the runner, load tests, `kurlo run` and `kurlo mcp` resolve variables the same way; scripts write to the environment in use, never to its parent. An environment under a protected one is protected too. The parent is stored as `parentId` in the environment file, so existing workspaces need no migration.
 - **Folder defaults.** A folder's **Settings** (in its `...` menu) set headers, auth, a pre-request script and tests for every request inside it, subfolders included. Headers layer collection → outer folder → inner folder → request; a request set to **Inherit auth** takes the nearest folder's auth, and a folder can switch auth off for its requests; folder scripts run between the collection's and the request's. Renaming a folder keeps its settings, refreshed OAuth 2.0 tokens are saved to the folder that supplies them, and the CLI, runner, load tests and `kurlo mcp` apply the same layers. Postman and Bruno/OpenCollection folder auth and scripts now import as folder defaults instead of being copied into every request, and export back to the folder. Stored as `folderDefaults` in `collection.yml`, with secrets kept out of the YAML.
@@ -25,6 +27,8 @@ All notable changes to Kurlo are documented here. This project follows
 ### Fixed
 
 - **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
+
+- **Environment actions dismiss normally.** Click outside the menu or press Escape to close it. The editor no longer duplicates environment switching with an **In use** or **Use environment** button; use the top bar or sidebar.
 
 - **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
 
