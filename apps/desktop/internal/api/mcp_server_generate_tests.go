@@ -93,7 +93,7 @@ func (s *mcpServer) toolGenerateTests(ctx context.Context, arguments json.RawMes
 		warnings = append(warnings, "no example was saved: pass body to describe the response")
 	}
 
-	return s.mutate(func(st *mcpStore) (func() any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
 		request, saved, err := st.request(args.Request)
 		if err != nil {
 			return nil, err

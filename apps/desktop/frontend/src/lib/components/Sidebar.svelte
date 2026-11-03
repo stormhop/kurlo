@@ -5,6 +5,7 @@
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import SidebarRequestRow from './SidebarRequestRow.svelte';
   import MenuIcon from './MenuIcon.svelte';
+  import AgentSidebar from './AgentSidebar.svelte';
   import { virtualizeRows } from '../sidebarVirtual';
   import { uiScale } from '../uiScale';
   import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS } from '../constants';
@@ -999,6 +1000,8 @@
         {/if}
       {/if}
     </div>
+  {:else if sidebarView === 'agent'}
+    <AgentSidebar {workspaceBlocked} />
   {:else}
     <div class="environment-panel">
       <div class="collections-head">

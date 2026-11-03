@@ -296,7 +296,7 @@ export const collectionFeature = {
   },
   buildCollectionGroups(this: CollectionHost): CollectionGroup[] {
     const query = this.sidebarSearch.trim().toLowerCase();
-    const requests = this.requestsForDisplay();
+    const requests = this.requests;
     const collections = [...this.collections.filter(collection => collection.workspaceId === this.activeWorkspaceId)];
     const existingCollectionIds = new Set(collections.map(collection => collection.id));
     for (const diagnostic of this.workspaceDiagnostics) {

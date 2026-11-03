@@ -61,6 +61,11 @@ type mcpServer struct {
 	session  map[string]*mcpSessionScope
 	lastRuns map[string]mcpLastRun
 
+	clientMu sync.Mutex
+	client   string
+	chatID   string
+	onWrite  func(root string, changes []model.AgentFileChange)
+
 	pendingMu sync.Mutex
 	pending   map[string]context.CancelFunc
 	inflight  sync.WaitGroup
@@ -348,6 +353,7 @@ func (s *mcpServer) initializeResult(params json.RawMessage) map[string]any {
 		ProtocolVersion string `json:"protocolVersion"`
 	}
 	_ = json.Unmarshal(params, &payload)
+	s.rememberClient(params)
 	version := mcpServerLatestHandshakeVersion
 	for _, supported := range mcpServerHandshakeVersions {
 		if supported == payload.ProtocolVersion {
@@ -503,6 +509,7 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 	if err := json.Unmarshal(params, &call); err != nil {
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "invalid tools/call params: " + err.Error()}
 	}
+	s.rememberClient(params)
 	if token := call.Meta.ProgressToken; len(token) > 0 && string(token) != "null" {
 		ctx = context.WithValue(ctx, mcpProgressTokenKey{}, token)
 	}
@@ -555,15 +562,29 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
+	record := &mcpCallRecord{}
+	ctx = context.WithValue(ctx, mcpCallRecordKey{}, record)
+	if gate := mcpGateFrom(ctx); gate != nil {
+		if err := gate(call.Name, arguments); err != nil {
+			s.logCall(call.Name, arguments, record, nil, err)
+			return mcpToolText(err.Error(), true), nil
+		}
+	}
 	value, err := run(ctx, arguments)
 	if err != nil {
+		s.logCall(call.Name, arguments, record, nil, err)
 		var rpcErr *mcpServerError
 		if errors.As(err, &rpcErr) {
 			return nil, err
 		}
 		return mcpToolText(err.Error(), true), nil
 	}
-	return mcpToolValue(value)
+	result, err := mcpToolValue(value)
+	if err != nil {
+		return nil, err
+	}
+	s.logCall(call.Name, arguments, record, result, nil)
+	return result, nil
 }
 
 type mcpProgressTokenKey struct{}

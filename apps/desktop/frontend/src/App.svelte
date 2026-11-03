@@ -8,7 +8,9 @@
   import WhatsNewModal from './lib/components/WhatsNewModal.svelte';
   import UpdateBanner from './lib/components/UpdateBanner.svelte';
   import { vm } from './lib/stores/app.svelte';
+  import { syncAgentWorkspace } from './lib/stores/agent.svelte';
   import { appLazyComponents as lazy } from './lib/stores/lazyComponents.svelte';
+
   import AppOverlays from './lib/components/AppOverlays.svelte';
   import AppToasts from './lib/components/AppToasts.svelte';
   import BodyModeSelector from './lib/components/BodyModeSelector.svelte';
@@ -24,6 +26,7 @@
   import WorkspaceOverview from './lib/components/WorkspaceOverview.svelte';
   import GlobalsWorkspace from './lib/components/GlobalsWorkspace.svelte';
   import HistoryDetail from './lib/components/HistoryDetail.svelte';
+  import AgentWorkspace from './lib/components/AgentWorkspace.svelte';
   import { METHODS, REQUEST_TYPES, DEFAULT_WORKSPACE, RAW_BODY_TYPES } from './lib/constants';
   import { installTitlebarDoubleClickHandler } from './lib/windowControls';
   import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
@@ -33,6 +36,17 @@
   import { openExternalURL } from './lib/externalLinks';
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from './lib/response-render';
   import { tallyCollectionRun } from './lib/collectionRuns';
+
+  $effect(() => {
+    if (!vm.requestStoreLoaded) return;
+    const workspaceId = vm.activeWorkspaceId;
+    const collections = vm.activeWorkspaceCollections().map(collection => collection.name);
+    const environments = vm.activeWorkspaceEnvironments.map(environment => environment.name);
+    const activeEnvironment = vm.activeEnvironment?.name ?? '';
+    untrack(() => {
+      syncAgentWorkspace(workspaceId, collections, environments, activeEnvironment);
+    });
+  });
 
   const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
   const UPDATE_READY_KEY = 'kurlo:update-ready';
@@ -198,6 +212,15 @@
     localStorage.removeItem(UPDATE_READY_KEY);
     void restartApp();
   }
+
+  $effect(() => {
+    void vm.topView;
+    untrack(() => vm.syncAgentSidebar());
+  });
+
+  $effect(() => {
+    if (vm.sidebarView === 'agent' && untrack(() => vm.topView) !== 'agent') untrack(() => vm.syncAgentSidebar());
+  });
 
   $effect(() => {
     vm.requestEditSignal();
@@ -465,6 +488,7 @@
     openMockTab={vm.openMockServerTab}
     openCookieJar={vm.openCookieJar}
     openSettings={vm.openSettings}
+    openAgent={() => vm.openAgentTab()}
   />
 
   <Sidebar
@@ -582,6 +606,9 @@
       activeFolderSettingsPath={vm.activeFolderSettingsPath}
       historyDetailOpen={Boolean(vm.historyDetailEntry)}
       gitTabOpen={vm.gitWorkspaceOpen}
+      agentTabOpen={vm.agentTabOpen}
+      openAgentTab={() => vm.openAgentTab()}
+      closeAgentTab={() => vm.closeAgentTab()}
       mockTabOpen={vm.mockServerTabOpen}
       loadTestTabTitle={loadTestTab ? loadTestTab.title : ''}
       loadTestTabUnsaved={loadTestTab ? loadTestTab.unsaved : ''}
@@ -844,6 +871,8 @@
         onCopyCurl={() => vm.copyHistoryEntryCurl(historyEntry.id)}
         onDelete={() => vm.deleteHistoryEntry(historyEntry.id)}
       />
+    {:else if vm.topView === 'agent'}
+      <AgentWorkspace workspaceBlocked={vm.workspaceBlocked} />
     {:else if vm.topView === 'runner'}
       {#if lazy.CollectionRunnerWorkspaceComponent}
       <lazy.CollectionRunnerWorkspaceComponent

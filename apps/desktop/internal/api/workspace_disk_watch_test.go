@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -89,7 +90,7 @@ func appWorkspaceForTest(t *testing.T) (*App, string) {
 	}
 	t.Cleanup(func() {
 		workspaceDisk.mu.Lock()
-		workspaceDisk.root, workspaceDisk.known, workspaceDisk.announced = "", nil, ""
+		workspaceDisk.root, workspaceDisk.known, workspaceDisk.announced, workspaceDisk.agentFiles = "", nil, "", nil
 		workspaceDisk.mu.Unlock()
 	})
 	return app, fileWorkspaceStorePath()
@@ -132,10 +133,10 @@ func TestAppSaveKeepsRequestsAnAgentAddedMeanwhile(t *testing.T) {
 	app, root := appWorkspaceForTest(t)
 	agentAddsRequest(t, root, "Orders")
 
-	if !app.workspaceChangedOutside() {
+	if changed, _ := app.workspaceChangedOutside(); !changed {
 		t.Fatal("the poll should notice files written by another process")
 	}
-	if app.workspaceChangedOutside() {
+	if changed, _ := app.workspaceChangedOutside(); changed {
 		t.Fatal("the same change should be announced once")
 	}
 
@@ -151,7 +152,7 @@ func TestAppSaveKeepsRequestsAnAgentAddedMeanwhile(t *testing.T) {
 	if !names["Main request edited"] {
 		t.Fatalf("the app's own edit was lost: %v", names)
 	}
-	if app.workspaceChangedOutside() {
+	if changed, _ := app.workspaceChangedOutside(); changed {
 		t.Fatal("after a reload nothing is outstanding")
 	}
 }
@@ -240,4 +241,91 @@ func TestWorkspaceLockIsExclusiveAcrossHolders(t *testing.T) {
 		t.Fatal("the lock was not released")
 	}
 	again()
+}
+
+func inAppAgentSaves(t *testing.T, root, name string) {
+	t.Helper()
+	time.Sleep(10 * time.Millisecond)
+	bridge := newAgentToolBridge(mcpServerOptions{workspace: root}, "chat", []string{"save_request"})
+	bridge.server.onWrite = noteAgentWorkspaceWrite
+	if text, isError := bridge.call(context.Background(), aiTool{Name: "save_request", Original: "save_request", ServerIndex: -1}, `{"collection":"Core","name":"`+name+`","url":"https://x.test"}`, "c"); isError {
+		t.Fatal(text)
+	}
+}
+
+func TestTheInAppAgentsWritesAreReportedAsItsOwn(t *testing.T) {
+	app, root := appWorkspaceForTest(t)
+	inAppAgentSaves(t, root, "Orders")
+	changed, reason := app.workspaceChangedOutside()
+	if !changed || reason != workspaceAgentChangeNote {
+		t.Fatalf("changed=%v reason=%q", changed, reason)
+	}
+
+	if app.LoadRequestStore() == "" {
+		t.Fatal("reload failed")
+	}
+	inAppAgentSaves(t, root, "Invoices")
+	agentAddsRequest(t, root, "Refunds")
+	if changed, reason := app.workspaceChangedOutside(); !changed || reason != workspaceExternalChangeNote {
+		t.Fatalf("a change from another process mixed in is external: changed=%v reason=%q", changed, reason)
+	}
+}
+
+func TestAnAppSaveOverAnAgentWriteKeepsItAndSaysWhoChangedIt(t *testing.T) {
+	app, root := appWorkspaceForTest(t)
+	inAppAgentSaves(t, root, "Orders")
+	var reasons []string
+	edited := strings.Replace(kurloSaveFlowPayload("https://api.example.test", "secret-token", []string{"req-main"}, ""), `"name":"Main request"`, `"name":"Main request edited"`, 1)
+	before, external, err := workspaceDisk.externalChanges(root)
+	if err != nil || len(external) == 0 {
+		t.Fatalf("external = %v, %v", external, err)
+	}
+	_ = before
+	reasons = append(reasons, workspaceDisk.changeReason(root, external))
+	if result := app.SaveRequestStoreWithError(edited); !result.Ok {
+		t.Fatal(result.Error)
+	}
+	if reasons[0] != workspaceAgentChangeNote {
+		t.Fatalf("reason = %q", reasons[0])
+	}
+	names := loadedRequestNames(t, app)
+	if !names["Orders"] || !names["Main request edited"] {
+		t.Fatalf("names = %v", names)
+	}
+}
+
+func TestSwitchingToTheLocalStoreKeepsAgentWritesThere(t *testing.T) {
+	app, localRoot := appWorkspaceForTest(t)
+	folder := app.CreateLocalWorkspaceRoot(t.TempDir(), "Folder", "empty")
+	if !folder.Ok {
+		t.Fatalf("open folder workspace: %s", folder.Error)
+	}
+	if result := app.SaveRequestStoreWithError(kurloSaveFlowPayload("https://folder.example.test", "secret-token", []string{"req-main"}, "")); !result.Ok {
+		t.Fatalf("save in folder workspace: %s", result.Error)
+	}
+	if switched := app.UseLocalWorkspaceStore(); !switched.Ok || !sameWorkspaceRoot(switched.Root, localRoot) {
+		t.Fatalf("switch to local store: %+v", switched)
+	}
+
+	agentAddsRequest(t, localRoot, "Orders")
+	if changed, _ := app.workspaceChangedOutside(); !changed {
+		t.Fatal("the app should notice the agent's write in the store it switched to")
+	}
+	if result := app.SaveRequestStoreWithError(kurloSaveFlowPayload("https://api.example.test", "secret-token", []string{"req-main"}, "")); !result.Ok {
+		t.Fatalf("save with stale memory: %s", result.Error)
+	}
+	if names := loadedRequestNames(t, app); !names["Orders"] {
+		t.Fatalf("the app's save dropped the request the agent added after the switch: %v", names)
+	}
+}
+
+func TestAgentTurnTracksTheStoreItWritesTo(t *testing.T) {
+	_, root := appWorkspaceForTest(t)
+	workspaceDisk.mu.Lock()
+	workspaceDisk.root, workspaceDisk.known = filepath.Join(t.TempDir(), "elsewhere"), workspaceSnapshot{}
+	workspaceDisk.mu.Unlock()
+	workspaceDisk.ensureTracking(root)
+	if tracked := workspaceDisk.trackedRoot(); !sameWorkspaceRoot(tracked, root) {
+		t.Fatalf("tracked %q, want %q", tracked, root)
+	}
 }

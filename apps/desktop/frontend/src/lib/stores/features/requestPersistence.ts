@@ -56,7 +56,7 @@ type RequestPersistenceHost = {
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: PersistRequestStore;
   persistRequestStoreView: (activeId?: string, openIds?: string[], workspaceId?: string) => Promise<boolean>;
-  persistWorkspaceNow: () => Promise<void>;
+  persistWorkspaceNow: () => Promise<boolean>;
   pruneHistory: (history: RequestHistoryEntry[]) => RequestHistoryEntry[];
   recordSavedRequestSnapshots: (requestsForStore: SavedRequest[]) => void;
   refreshPendingExternalWorkspaceChangeIfClean: () => Promise<boolean>;

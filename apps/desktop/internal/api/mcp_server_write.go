@@ -77,26 +77,6 @@ func (st *mcpStore) save() error {
 	return writeFilesystemWorkspaceStore(st.root, workspaces, collections, requests, environments, cookies, nil)
 }
 
-func (s *mcpServer) mutate(change func(st *mcpStore) (func() any, error)) (any, error) {
-	unlock, err := lockWorkspaceWrites(s.opts.workspace)
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-	st, err := loadMCPStore(s.opts.workspace)
-	if err != nil {
-		return nil, err
-	}
-	result, err := change(st)
-	if err != nil {
-		return nil, err
-	}
-	if err := st.save(); err != nil {
-		return nil, err
-	}
-	return result(), nil
-}
-
 func mcpFindByName(items []map[string]any, ref, kind string) (map[string]any, error) {
 	ref = strings.TrimSpace(ref)
 	for _, item := range items {
@@ -279,7 +259,7 @@ func mcpEnsureFolder(collection map[string]any, folder []string) {
 	collection["folderPaths"] = out
 }
 
-func (s *mcpServer) toolCreateCollection(_ context.Context, arguments json.RawMessage) (any, error) {
+func (s *mcpServer) toolCreateCollection(ctx context.Context, arguments json.RawMessage) (any, error) {
 	var args struct {
 		Name        string `json:"name"`
 		Workspace   string `json:"workspace"`
@@ -292,7 +272,7 @@ func (s *mcpServer) toolCreateCollection(_ context.Context, arguments json.RawMe
 	if name == "" {
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "name is required"}
 	}
-	return s.mutate(func(st *mcpStore) (func() any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
 		workspace, err := st.workspace(args.Workspace)
 		if err != nil {
 			return nil, err
@@ -448,12 +428,12 @@ type mcpSaveRequestArgs struct {
 	Notes            *string         `json:"notes"`
 }
 
-func (s *mcpServer) toolSaveRequest(_ context.Context, arguments json.RawMessage) (any, error) {
+func (s *mcpServer) toolSaveRequest(ctx context.Context, arguments json.RawMessage) (any, error) {
 	var args mcpSaveRequestArgs
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
 		return nil, err
 	}
-	return s.mutate(func(st *mcpStore) (func() any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
 		creating := strings.TrimSpace(args.Request) == ""
 		var request map[string]any
 		if creating {
@@ -694,14 +674,14 @@ func mcpDefaultRequestName(request map[string]any) string {
 	return strings.TrimSpace(method + " " + url)
 }
 
-func (s *mcpServer) toolDeleteRequest(_ context.Context, arguments json.RawMessage) (any, error) {
+func (s *mcpServer) toolDeleteRequest(ctx context.Context, arguments json.RawMessage) (any, error) {
 	var args struct {
 		Request string `json:"request"`
 	}
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
 		return nil, err
 	}
-	return s.mutate(func(st *mcpStore) (func() any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
 		request, _, err := st.request(args.Request)
 		if err != nil {
 			return nil, err
@@ -727,7 +707,7 @@ type mcpLastRun struct {
 
 var mcpSensitiveHeaders = map[string]bool{"set-cookie": true, "cookie": true, "authorization": true, "proxy-authorization": true}
 
-func (s *mcpServer) toolSaveExample(_ context.Context, arguments json.RawMessage) (any, error) {
+func (s *mcpServer) toolSaveExample(ctx context.Context, arguments json.RawMessage) (any, error) {
 	var args struct {
 		Request     string         `json:"request"`
 		Name        string         `json:"name"`
@@ -740,7 +720,7 @@ func (s *mcpServer) toolSaveExample(_ context.Context, arguments json.RawMessage
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
 		return nil, err
 	}
-	return s.mutate(func(st *mcpStore) (func() any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
 		request, saved, err := st.request(args.Request)
 		if err != nil {
 			return nil, err
@@ -957,7 +937,7 @@ func mcpPathTemplate(url string) string {
 	return "/"
 }
 
-func (s *mcpServer) toolSetVariable(_ context.Context, arguments json.RawMessage) (any, error) {
+func (s *mcpServer) toolSetVariable(ctx context.Context, arguments json.RawMessage) (any, error) {
 	var args struct {
 		Environment string  `json:"environment"`
 		Key         string  `json:"key"`
@@ -976,7 +956,7 @@ func (s *mcpServer) toolSetVariable(_ context.Context, arguments json.RawMessage
 	if envName == "" {
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "environment is required"}
 	}
-	return s.mutate(func(st *mcpStore) (func() any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
 		var environment map[string]any
 		for _, candidate := range st.environments {
 			if strings.EqualFold(strings.TrimSpace(stringValue(candidate, "name")), envName) {

@@ -164,6 +164,7 @@ type UiShellHost = {
   runActiveRequest: () => Promise<unknown>;
   runShortcut: (id: ShortcutId) => Promise<unknown>;
   showSidebarView: (view: SidebarView) => void;
+  openAgentTab: () => void;
   openEnvironmentPicker: () => void;
   copyActiveRequestCurl: () => Promise<unknown>;
   saveActiveRequest: () => Promise<unknown>;
@@ -474,6 +475,7 @@ export const uiShellFeature = {
     else if (id === 'go-collections') this.showSidebarView('collections');
     else if (id === 'go-environments') this.showSidebarView('environments');
     else if (id === 'go-history') this.showSidebarView('history');
+    else if (id === 'go-agent') this.showSidebarView('agent');
     else if (id === 'choose-environment') this.openEnvironmentPicker();
     else if (id === 'new-collection') await this.createCollection();
     else if (id === 'import-collection') await this.openPostmanImport();
@@ -484,6 +486,7 @@ export const uiShellFeature = {
   showSidebarView(this: UiShellHost, view: SidebarView) {
     this.sidebarView = view;
     this.sidebarHidden = false;
+    if (view === 'agent') this.openAgentTab();
   },
 
   openEnvironmentPicker(this: UiShellHost) {

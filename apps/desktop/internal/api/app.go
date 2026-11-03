@@ -40,6 +40,9 @@ type App struct {
 	binaryBodies   *binaryResponseCache
 	mcpSessions    *mcpSessionRegistry
 	loadRuns       loadRunManager
+	agentOnce      sync.Once
+	agent          *agentRuntime
+	agentEmit      aiEmitter
 }
 
 type SaveRequestStoreResult struct {
@@ -97,6 +100,12 @@ func (a *App) OpenLogFolder() string {
 }
 
 func (a *App) Shutdown(_ context.Context) {
+	a.CancelCodexLogin()
+	a.requestMu.Lock()
+	for _, pending := range a.requestCancels {
+		pending.cancel()
+	}
+	a.requestMu.Unlock()
 	defer CloseLogFile()
 	if a.ws != nil {
 		a.ws.disconnectAll()
@@ -310,10 +319,11 @@ func (a *App) saveRequestStorePayload(payload string) error {
 	if len(external) == 0 {
 		return nil
 	}
+	reason := workspaceDisk.changeReason(root, external)
 	if err := reapplyExternalChanges(root, before, external); err != nil {
 		return err
 	}
-	a.emitWorkspaceChanged(workspaceExternalChangeNote)
+	a.emitWorkspaceChanged(reason)
 	return nil
 }
 

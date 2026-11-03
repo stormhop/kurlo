@@ -1,7 +1,8 @@
 import { readWorkspaceYAMLFile, writeWorkspaceYAMLFile } from '../../backend';
+import { AGENT_WORKSPACE_CHANGE } from '../../agent';
 import type { WorkspaceDiagnostic, WorkspaceOpenResult } from '../../backend';
 import { filesystemNameFromName } from '../../normalizers';
-import type { RequestTab, RequestType, ResponseTab, ScriptTab, Workspace } from '../../types/models';
+import type { RequestTab, RequestType, ResponseTab, SavedRequest, ScriptTab, Workspace } from '../../types/models';
 import type { TopView } from '../ui';
 
 type WorkspaceDiagnosticsHost = {
@@ -39,12 +40,18 @@ type WorkspaceDiagnosticsHost = {
   externalWorkspacePendingMessage: (action?: string) => string;
   hasUnsavedDrafts: () => boolean;
   hasUnsavedRequestChanges: () => boolean;
+  snapshotActiveRequest: (options?: { forPersistence?: boolean }) => SavedRequest;
+  draftRequestIds: Set<string>;
+  requests: SavedRequest[];
   handleExternalWorkspaceChange: (reason: string) => Promise<void>;
+  reloadKeepingDrafts: (reason: string) => Promise<void>;
+  openRequestIds: string[];
+  switchRequest: (id: string) => Promise<void>;
   loadRequestWorkspace: (rawOverride?: string, diagnosticsOverride?: WorkspaceDiagnostic[]) => Promise<void>;
   markExternalWorkspaceChangePending: (reason: string) => void;
   openGitTab: (refresh?: boolean) => void;
   refreshPendingExternalWorkspaceChangeIfClean: () => Promise<boolean>;
-  reloadWorkspaceAfterExternalChange: (reason: string) => Promise<void>;
+  reloadWorkspaceAfterExternalChange: (reason: string, quiet?: boolean) => Promise<void>;
   showExternalWorkspacePendingToast: (action?: string) => void;
   showWorkspaceBlockedToast: (action?: string, workspaceId?: string) => void;
   workspaceBlockingDiagnosticsFor: (workspaceId: string) => WorkspaceDiagnostic[];
@@ -300,6 +307,7 @@ export const workspaceDiagnosticsFeature = {
   },
 
   externalWorkspacePendingMessage(this: WorkspaceDiagnosticsHost, action = 'Workspace editing') {
+    if (this.externalWorkspaceChangeReason === AGENT_WORKSPACE_CHANGE) return `${action} is paused: the agent changed the workspace. Save or discard your unsaved edits to load its changes.`;
     const friendly = this.externalWorkspaceChangeReason ? ` (${this.externalWorkspaceChangeReason})` : '';
     return `${action} is paused because workspace changed on disk${friendly}. Discard local unsaved edits to refresh before writing again.`;
   },
@@ -330,7 +338,7 @@ export const workspaceDiagnosticsFeature = {
     return true;
   },
 
-  async reloadWorkspaceAfterExternalChange(this: WorkspaceDiagnosticsHost, reason: string) {
+  async reloadWorkspaceAfterExternalChange(this: WorkspaceDiagnosticsHost, reason: string, quiet = false) {
     const view = { id: this.activeRequestId, requestType: this.requestType, requestTab: this.requestTab, scriptTab: this.scriptTab, responseTab: this.responseTab };
     this.requestStoreLoaded = false;
     await this.loadRequestWorkspace();
@@ -340,6 +348,7 @@ export const workspaceDiagnosticsFeature = {
       this.responseTab = view.responseTab;
     }
     const friendly = reason ? ` (${reason})` : '';
+    if (quiet && !this.workspaceDiagnostics.length) return;
     if (this.workspaceDiagnostics.length) {
       this.collectionImportToast = `Workspace refreshed${friendly}; ${this.workspaceDiagnostics.length} YAML error${this.workspaceDiagnostics.length === 1 ? '' : 's'} found.`;
       setTimeout(() => (this.collectionImportToast = ''), 6000);
@@ -349,8 +358,30 @@ export const workspaceDiagnosticsFeature = {
     }
   },
 
+  async reloadKeepingDrafts(this: WorkspaceDiagnosticsHost, reason: string) {
+    const activeId = this.activeRequestId;
+    const openIds = [...this.openRequestIds];
+    const drafts = this.requests
+      .filter(request => request.isDraft || this.draftRequestIds.has(request.id))
+      .map(request => request.id === activeId ? this.snapshotActiveRequest({ forPersistence: true }) : request);
+    await this.reloadWorkspaceAfterExternalChange(reason, true);
+    const known = new Set(this.requests.map(request => request.id));
+    const kept = drafts.filter(draft => !known.has(draft.id));
+    if (!kept.length) return;
+    this.requests = [...this.requests, ...kept];
+    this.draftRequestIds = new Set([...this.draftRequestIds, ...kept.map(draft => draft.id)]);
+    const ids = new Set(this.requests.map(request => request.id));
+    this.openRequestIds = [...new Set([...openIds.filter(id => ids.has(id)), ...this.openRequestIds])];
+    if (kept.some(draft => draft.id === activeId)) await this.switchRequest(activeId);
+  },
+
   async handleExternalWorkspaceChange(this: WorkspaceDiagnosticsHost, reason: string) {
     if (this.gitLoading || this.gitAction) return;
+    if (reason === AGENT_WORKSPACE_CHANGE && !this.hasUnsavedRequestChanges()) {
+      this.clearExternalWorkspaceChangePending();
+      await this.reloadKeepingDrafts(reason);
+      return;
+    }
     if (this.hasUnsavedDrafts() || this.hasUnsavedRequestChanges()) {
       this.markExternalWorkspaceChangePending(reason);
       return;

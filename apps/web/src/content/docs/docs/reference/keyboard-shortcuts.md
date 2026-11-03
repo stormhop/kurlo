@@ -13,7 +13,7 @@ Every shortcut is rebindable from **Settings → Shortcuts**. Click any shortcut
 
 | Shortcut | Action |
 |----------|--------|
-| `Cmd/Ctrl K` | Command palette — search saved requests and run commands |
+| `Cmd/Ctrl K` | Command palette — search saved requests and agent chats, and run commands |
 | `Cmd/Ctrl ,` | Open settings |
 | `Cmd/Ctrl Backslash` | Toggle sidebar |
 | `Alt Cmd/Ctrl Backslash` | Toggle right sidebar / code snippet panel |
@@ -25,6 +25,7 @@ Every shortcut is rebindable from **Settings → Shortcuts**. Click any shortcut
 | `Alt Cmd/Ctrl 1` | Show collections in the sidebar |
 | `Alt Cmd/Ctrl 2` | Show environments in the sidebar |
 | `Alt Cmd/Ctrl 3` | Show history in the sidebar |
+| `Alt Cmd/Ctrl 4` | Show the agent |
 | `Alt Cmd/Ctrl E` | Choose the environment |
 | `Shift Cmd/Ctrl N` | New collection |
 | `Cmd/Ctrl O` | Import a collection |

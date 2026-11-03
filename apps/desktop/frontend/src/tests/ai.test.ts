@@ -456,3 +456,28 @@ describe('mcp request serialization', () => {
     expect(built.mcpArguments).toBe('{"city":"Lisbon"}');
   });
 });
+
+
+describe('provider connection errors', () => {
+  it.each([
+    'account/read: workspace routing discovery failed',
+    'Post "https://example.test": dial tcp: no such host',
+    'TypeError: Failed to fetch',
+    'stream disconnected before completion: error sending request',
+    'context deadline exceeded',
+  ])('explains a connection failure: %s', text => {
+    expect(aiErrorView(text)).toMatchObject({ title: 'Could not reach the provider', hint: expect.stringContaining('internet connection') });
+  });
+
+  it.each([
+    '403 Forbidden: {"error":{"code":"unsupported_country_region_territory"}}',
+    'This service is not available in your region',
+  ])('explains regional restrictions: %s', text => {
+    expect(aiErrorView(text)).toMatchObject({ title: 'Access restricted by the provider', hint: expect.stringContaining('another connection') });
+  });
+
+  it('keeps permission failures separate from regional restrictions', () => {
+    expect(aiErrorView('403 Forbidden: model access denied')).toMatchObject({ title: 'The provider returned an error', status: '403 Forbidden' });
+    expect(aiErrorView('401 Unauthorized: invalid key')).toMatchObject({ title: 'Sign-in required' });
+  });
+});

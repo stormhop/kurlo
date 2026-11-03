@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { UpdateInfo } from '../backend';
+  import type { AgentChatSummary, UpdateInfo } from '../backend';
+  import { agentStore, codexAgentStore, claudeAgentStore, agentModeFor, agentNavigation, agentStoreFor } from '../stores/agent.svelte';
   import type { SavedRequest, ShortcutId } from '../types/models';
   import { requestSupportsCurl, requestTabLabel } from '../utils';
   import { buildPaletteCommands } from '../commandPalette';
@@ -10,6 +11,19 @@
   import FindReplaceModal from './FindReplaceModal.svelte';
   import MissingSecretsModal from './MissingSecretsModal.svelte';
   import WorkspaceYAMLEditor from './WorkspaceYAMLEditor.svelte';
+
+  $effect(() => {
+    if (!vm.globalSearchOpen) return;
+    void agentStore.refreshChats();
+    void codexAgentStore.refreshChats();
+    void claudeAgentStore.refreshChats();
+  });
+
+  function openChat(chat: AgentChatSummary) {
+    vm.openAgentTab();
+    agentNavigation.mode = agentModeFor(chat.driver);
+    void agentStoreFor(agentNavigation.mode).openChat(chat.id);
+  }
 
   type Props = {
     startupUpdateInfo: UpdateInfo | null;
@@ -147,6 +161,8 @@
       bind:query={vm.globalSearchQuery}
       results={vm.globalSearchResults}
       commands={paletteCommands}
+      chats={[...agentStore.chats, ...codexAgentStore.chats, ...claudeAgentStore.chats].sort((a, b) => b.updatedAt - a.updatedAt)}
+      onOpenChat={openChat}
       shortcutCombo={(id: ShortcutId) => vm.shortcutCombo(id)}
       activeRequestId={vm.activeRequestId}
       {requestTabLabel}

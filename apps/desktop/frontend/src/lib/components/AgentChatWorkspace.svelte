@@ -1,0 +1,1673 @@
+<script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
+  import { autoSizeTextarea } from '../textareaSizing';
+  import { agentEffortChoice, agentEffortToStore } from '../agent';
+  import { onMount, tick } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
+  import VirtualAgentHistory from './VirtualAgentHistory.svelte';
+  import Markdown from './Markdown.svelte';
+  import Select from './Select.svelte';
+  import AgentApprovalCard from './AgentApprovalCard.svelte';
+  import AgentPicker from './AgentPicker.svelte';
+  import { vm } from '../stores/app.svelte';
+  import { agentNavigation, agentStore as defaultAgentStore, toggleAgentDetails, type AgentStore } from '../stores/agent.svelte';
+  import { codexConnectionStore } from '../stores/codex.svelte';
+  import { claudeConnectionStore } from '../stores/claude.svelte';
+  import { aiConnectionsStore } from '../stores/aiConnections.svelte';
+  import { startOpenRouterConnect, type AgentApproval, type AiBlock } from '../backend';
+  import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiErrorView, aiConnectionProblem, type AiStepView } from '../stores/features/ai';
+  import { AGENT_STARTERS, AGENT_TEMPLATES, AGENT_WRITE_TOOLS, agentEffortLabel, agentStepSummary, agentTurnSegments, agentContextPercent, agentQuotaWindows, agentFindRequest, agentTemplatePlaceholder, agentToolLabel, agentToolTarget, agentTurnAnswer, agentTurnsFromMessages, type AgentTemplate, type AgentToolTarget, type AgentTurnView } from '../agent';
+  import { clipboardSet } from '../backend';
+
+  let { workspaceBlocked = false, agentStore = defaultAgentStore, codexReady = false }: { workspaceBlocked?: boolean; agentStore?: AgentStore; codexReady?: boolean } = $props();
+
+  let scroller = $state<HTMLDivElement>();
+  let workspaceElement = $state<HTMLDivElement>();
+  let detailsCover = $state(false);
+  let detailsPanel = $state<HTMLElement>();
+  let stickToBottom = $state(true);
+  let retrying = $state(false);
+  let copiedKey = $state('');
+  let templatesOpen = $state(false);
+  let composerInput = $state<HTMLTextAreaElement>();
+  let templatesMenu = $state<HTMLDivElement>();
+  let titleDraft = $state('');
+  let titleError = $state('');
+  let titleInput = $state<HTMLInputElement>();
+  let chatMenuOpen = $state(false);
+  let lastChatId = '';
+  const openTools = new SvelteSet<string>();
+  const openThinking = new SvelteSet<string>();
+  const NO_AUTOCORRECT: Record<string, string> = { autocorrect: 'off' };
+
+  const connections = $derived(aiConnectionsStore.list);
+  const needsConnection = $derived(!agentStore.driver && aiConnectionsStore.loaded && codexConnectionStore.loaded && connections.length === 0 && !codexReady);
+  const starters = AGENT_STARTERS.map(id => AGENT_TEMPLATES.find(template => template.id === id)).filter((template): template is AgentTemplate => Boolean(template));
+  const starterLabels: Record<string, string> = { debug: 'Explain failure', check: 'Check collection', tests: 'Write tests', cover: 'Cover endpoint' };
+  const persisted = $derived<AgentTurnView[]>(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId ? agentTurnsFromMessages(agentStore.activeChat.messages, agentStore.activeChat.id, agentStore.activeChat.messageOffset ?? 0) : []);
+  const live = $derived(agentStore.liveInActiveChat ? agentStore.live : null);
+  const turns = $derived.by<Array<AgentTurnView & { live: boolean }>>(() => {
+    const out = persisted.map(turn => ({ ...turn, live: false }));
+    if (live) out.push({ id: live.id, prompt: live.prompt, steps: live.steps, live: true });
+    return out;
+  });
+  const notes = $derived(agentStore.notes && agentStore.notes.chatId === agentStore.activeChatId ? agentStore.notes : null);
+  const lastPersisted = $derived(persisted.at(-1) ?? null);
+  const canRetry = $derived(!agentStore.running && Boolean((lastPersisted && (!agentTurnAnswer(lastPersisted.steps) || notes?.error)) || (notes?.error && agentStore.draft.trim())));
+  const approvals = $derived(agentStore.activeApprovals);
+  const chatLoaded = $derived(Boolean(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId));
+  const chatSaved = $derived(Boolean(agentStore.activeChatId));
+  const title = $derived(chatLoaded ? agentStore.activeChat?.title ?? '' : agentStore.chats.find(chat => chat.id === agentStore.activeChatId)?.title ?? '');
+  const usage = $derived(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId ? agentStore.usage : null);
+  const liveContext = $derived(agentStore.running && agentStore.context?.chatId === agentStore.activeChatId ? agentStore.context : null);
+  const driverModels = $derived(agentStore.driver === 'codex' ? codexConnectionStore.status.models : agentStore.driver === 'claude-code' ? claudeConnectionStore.status.models : []);
+  const driverModelId = $derived(agentStore.driver === 'codex' ? codexConnectionStore.status.model : agentStore.driver === 'claude-code' ? claudeConnectionStore.status.model : '');
+  const savedContext = $derived(agentStore.driver === 'claude-code' || agentStore.activeChat?.model === (agentStore.model || driverModelId) ? agentStore.activeChat : null);
+  const contextTokens = $derived(liveContext?.tokens ?? savedContext?.contextTokens ?? 0);
+  const contextWindow = $derived(liveContext?.window ?? savedContext?.contextWindow ?? 0);
+  const contextPercent = $derived(agentContextPercent(contextTokens, contextWindow));
+  const checkingCodex = $derived(agentStore.driver === 'codex' && codexConnectionStore.checking);
+  const quotaWindows = $derived(agentQuotaWindows((agentStore.driver === 'codex' ? codexConnectionStore.status.rateLimits : agentStore.driver === 'claude-code' ? claudeConnectionStore.status.rateLimits : []) ?? []));
+  const planName = $derived(agentStore.driver === 'claude-code' ? 'Claude' : 'Codex');
+  const headerAgent = $derived.by(() => {
+    if (agentStore.driver === 'claude-code') {
+      const id = agentStore.activeChat?.model || agentStore.model || claudeConnectionStore.status.model;
+      const name = id ? claudeConnectionStore.modelName(id) : '';
+      return name ? `Claude Code · ${name}` : 'Claude Code';
+    }
+    if (agentStore.driver === 'codex') {
+      const id = agentStore.activeChat?.model || agentStore.model || codexConnectionStore.status.model;
+      const name = codexConnectionStore.status.models.find(model => model.id === id)?.name || id;
+      return name ? `Codex · ${name}` : 'Codex';
+    }
+    const connection = connections.find(item => item.id === (agentStore.activeChat?.connectionId || agentStore.connectionId)) ?? aiConnectionsStore.defaultConnection;
+    const chosen = (agentStore.activeChat?.id === agentStore.activeChatId ? agentStore.activeChat?.model : '') || agentStore.model || connection?.model;
+    return connection ? `${connection.label} · ${chosen || 'default model'}` : 'Kurlo agent';
+  });
+  const environmentProtected = $derived(vm.activeWorkspaceEnvironments.some(environment => environment.name === agentStore.environment && environment.protected));
+  const contextRuns = $derived.by(() => turns.flatMap(turn => turn.steps.flatMap(step => step.blocks.filter(block => block.type === 'tool_use' && (block.name === 'run_request' || block.name === 'send_request')).flatMap(block => {
+    const result = step.toolResults.find(item => item.id === block.id);
+    if (!result) return [];
+    const summary = agentStepSummary(block, result);
+    return [{ method: summary.detail.split(' ')[0] || 'REQ', name: summary.target || summary.detail || agentToolLabel(block.name), status: summary.status }];
+  }))).slice(-6));
+  const contextChanges = $derived.by(() => {
+    const waiting = approvals.flatMap(approval => approval.kind === 'write' && approval.changes.length ? approval.changes.map(change => ({ name: change.path, label: '', waiting: true })) : [{ name: approval.tool, label: '', waiting: true }]);
+    const done = turns.flatMap(turn => turn.steps.flatMap(step => step.blocks.filter(block => block.type === 'tool_use' && AGENT_WRITE_TOOLS.includes(block.name ?? '')).flatMap(block => {
+      const result = step.toolResults.find(item => item.id === block.id);
+      if (!result || result.isError) return [];
+      const summary = agentStepSummary(block, result);
+      return [{ name: summary.target || agentToolLabel(block.name), label: agentToolLabel(block.name).toLowerCase(), waiting: false }];
+    })));
+    return [...done.slice(-6), ...waiting];
+  });
+  const tightestQuota = $derived(quotaWindows.reduce<(typeof quotaWindows)[number] | null>((low, window) => !low || window.remaining < low.remaining ? window : low, null));
+  const selectedCodexDefaultEffort = $derived(driverModels.find(model => model.id === (agentStore.activeChat?.model || agentStore.model || driverModelId))?.defaultEffort ?? '');
+  const effortModel = $derived(driverModels.find(model => model.id === (agentStore.model || driverModelId)));
+  const effortValues = $derived(effortModel?.efforts ?? []);
+  const effortOptions = $derived(effortValues.map(value => ({ value, label: agentEffortLabel(value) })));
+  const effortChoice = $derived(agentEffortChoice(agentStore.effort, effortValues, effortModel?.defaultEffort ?? ''));
+  const runningElsewhere = $derived(agentStore.running && !agentStore.liveInActiveChat);
+
+  const collectionOptions = $derived([
+    { value: '', label: 'Any collection' },
+    ...vm.activeWorkspaceCollections().map(collection => ({ value: collection.name, label: collection.name })),
+  ]);
+  const environmentOptions = $derived([
+    { value: '', label: 'No environment' },
+    ...vm.activeWorkspaceEnvironments.map(environment => ({ value: environment.name, label: environment.protected ? `${environment.name} (protected)` : environment.name })),
+  ]);
+  $effect(() => {
+    agentStore.init();
+  });
+
+  onMount(() => {
+    void aiConnectionsStore.refresh();
+    if (!agentStore.chatsLoaded) void agentStore.refreshChats();
+    const observer = new ResizeObserver(() => {
+      if (!workspaceElement) return;
+      detailsCover = workspaceElement.clientWidth < 44 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+    });
+    if (workspaceElement) observer.observe(workspaceElement);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    if (!agentNavigation.detailsOpen || !detailsCover) return;
+    void tick().then(() => detailsPanel?.querySelector<HTMLButtonElement>('.agent-details-close')?.focus());
+  });
+
+  function escapeKey(node: HTMLElement, handler: (event: KeyboardEvent) => void) {
+    node.addEventListener('keydown', handler);
+    return { destroy: () => node.removeEventListener('keydown', handler) };
+  }
+
+  function onDetailsKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    void closeDetails();
+  }
+
+  async function closeDetails() {
+    if (!agentNavigation.detailsOpen) return;
+    toggleAgentDetails();
+    await tick();
+    document.querySelector<HTMLButtonElement>('[aria-label="Toggle chat details"]')?.focus();
+  }
+
+  $effect(() => {
+    if (agentStore.driver) return;
+    if (agentStore.connectionId && connections.some(connection => connection.id === agentStore.connectionId)) return;
+    const fallback = aiConnectionsStore.defaultConnection;
+    if (fallback && agentStore.connectionId !== fallback.id) agentStore.connectionId = fallback.id;
+  });
+
+  $effect(() => {
+    titleDraft = title;
+    titleError = '';
+  });
+
+  $effect(() => {
+    if (agentStore.activeChatId === lastChatId) return;
+    lastChatId = agentStore.activeChatId;
+    openTools.clear();
+    openThinking.clear();
+    copiedKey = '';
+    stickToBottom = true;
+  });
+
+
+  function onScroll() {
+    if (!scroller) return;
+    stickToBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 48;
+    if (!stickToBottom && scroller.scrollTop < 160 && !agentStore.historyError) void agentStore.loadEarlier();
+  }
+
+  function prettyJSON(text: string | undefined) {
+    const value = (text ?? '').trim();
+    if (!value) return '{}';
+    try {
+      return JSON.stringify(JSON.parse(value), null, 2);
+    } catch {
+      return value;
+    }
+  }
+
+  function resultFor(step: AiStepView, block: AiBlock) {
+    return step.toolResults.find(result => result.id === block.id);
+  }
+
+  function approvalFor(block: AiBlock): AgentApproval | undefined {
+    return approvals.find(approval => approval.toolUseId && approval.toolUseId === block.id);
+  }
+
+  function toggle(set: SvelteSet<string>, key: string) {
+    if (set.has(key)) set.delete(key);
+    else set.add(key);
+  }
+
+  function savedRequests() {
+    return vm.requests.filter(request => !request.isDraft).map(request => ({
+      id: request.id,
+      name: request.name ?? '',
+      path: [vm.collectionNameById(request.collectionId), ...(request.folderPath ?? []), request.name ?? ''].filter(Boolean).join('/'),
+    }));
+  }
+
+  function targetLabel(target: AgentToolTarget): string {
+    if (target.kind === 'history') return 'Open entry';
+    if (target.kind === 'environment') return 'Open environment';
+    return 'Open request';
+  }
+
+  function canOpen(target: AgentToolTarget): boolean {
+    if (target.kind === 'history') return vm.requestHistory.some(entry => entry.id === target.id);
+    if (target.kind === 'environment') return vm.activeWorkspaceEnvironments.some(environment => environment.name.toLowerCase() === target.name.toLowerCase());
+    return Boolean(agentFindRequest(savedRequests(), target.ref));
+  }
+
+  function openTarget(target: AgentToolTarget) {
+    if (target.kind === 'history') {
+      void vm.openHistoryDetail(target.id);
+      return;
+    }
+    if (target.kind === 'environment') {
+      const environment = vm.activeWorkspaceEnvironments.find(candidate => candidate.name.toLowerCase() === target.name.toLowerCase());
+      if (environment) void vm.openEnvironment(environment.id);
+      return;
+    }
+    const request = agentFindRequest(savedRequests(), target.ref);
+    if (request) void vm.switchRequest(request.id);
+  }
+
+  async function send() {
+    if (!agentStore.draft.trim() || agentStore.running) return;
+    stickToBottom = true;
+    await agentStore.send();
+  }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (!aiComposerSends(event)) return;
+    event.preventDefault();
+    void send();
+  }
+
+  async function connectOpenRouter() {
+    await startOpenRouterConnect();
+    vm.openSettings('ai');
+  }
+
+  function openConnectionSettings(intent: '' | 'key' | 'local') {
+    aiConnectionsStore.intent = intent;
+    vm.openSettings('ai');
+  }
+
+  async function copyText(key: string, text: string) {
+    if (!text) return;
+    await clipboardSet(text);
+    copiedKey = key;
+    setTimeout(() => { if (copiedKey === key) copiedKey = ''; }, 1500);
+  }
+
+  async function commitTitle() {
+    const id = agentStore.activeChat?.id;
+    if (!id || titleDraft.trim() === title.trim()) {
+      titleDraft = title;
+      return;
+    }
+    titleError = await agentStore.rename(id, titleDraft);
+    if (titleError) titleDraft = title;
+  }
+
+  function onTitleKeydown(event: KeyboardEvent) {
+    const input = event.currentTarget as HTMLInputElement;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      input.blur();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      titleDraft = title;
+      input.blur();
+    }
+  }
+
+  async function toggleTemplates() {
+    templatesOpen = !templatesOpen;
+    if (!templatesOpen) return;
+    await tick();
+    templatesMenu?.querySelector<HTMLButtonElement>('.menu-item')?.focus();
+  }
+
+  async function useTemplate(template: AgentTemplate) {
+    templatesOpen = false;
+    agentStore.draft = template.text;
+    await tick();
+    if (!composerInput) return;
+    composerInput.focus();
+    const range = agentTemplatePlaceholder(template.text);
+    if (range) composerInput.setSelectionRange(range.start, range.end);
+    else composerInput.setSelectionRange(template.text.length, template.text.length);
+  }
+
+  function onTemplatesKeydown(event: KeyboardEvent) {
+    const items = Array.from(templatesMenu?.querySelectorAll<HTMLButtonElement>('.menu-item') ?? []);
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      templatesOpen = false;
+      composerInput?.focus();
+    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      event.stopPropagation();
+      const next = event.key === 'ArrowDown' ? (index + 1) % items.length : (index - 1 + items.length) % items.length;
+      items[next]?.focus();
+    }
+  }
+
+  function onWindowPointerDown(event: PointerEvent) {
+    if (chatMenuOpen && !(event.target instanceof Element && event.target.closest('.agent-header-menu'))) chatMenuOpen = false;
+    if (!templatesOpen) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('.agent-templates-menu, .agent-templates-btn')) return;
+    templatesOpen = false;
+  }
+
+  async function retry() {
+    if (retrying || checkingCodex) return;
+    stickToBottom = true;
+    const store = agentStore;
+    const workspaceId = store.workspaceId;
+    const chatId = store.activeChatId;
+    retrying = true;
+    try {
+      if (store.driver === 'codex') {
+        await codexConnectionStore.refresh();
+        if (store !== agentStore || store.workspaceId !== workspaceId || store.activeChatId !== chatId) return;
+        if (codexConnectionStore.status.error) {
+          store.notes = { chatId, error: codexConnectionStore.status.error, warnings: [] };
+          return;
+        }
+      }
+      await store.retry();
+    } finally {
+      retrying = false;
+    }
+  }
+
+  function formatCost(value: number) {
+    return value < 0.01 ? '<$0.01' : `$${value.toFixed(2)}`;
+  }
+
+  function formatTokens(value: number) {
+    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+    return value >= 10000 ? `${(value / 1000).toFixed(value >= 100000 ? 0 : 1)}k` : value.toLocaleString('en-US');
+  }
+</script>
+
+<svelte:window onpointerdown={onWindowPointerDown} />
+
+{#snippet copyButton(key: string, text: string, label: string)}
+  <button class="btn btn-ghost btn-icon btn-xs agent-copy" type="button" onclick={() => void copyText(key, text)} aria-label={copiedKey === key ? 'Copied' : label}>
+    {#if copiedKey === key}
+      <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5 5 9l4.5-6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    {:else}
+      <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="3.75" y="3.75" width="6.5" height="6.5" rx="1.25" stroke="currentColor" stroke-width="1.2"/><path d="M8.25 2.5v-.25c0-.55-.45-1-1-1h-4.5c-.55 0-1 .45-1 1v4.5c0 .55.45 1 1 1H3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+    {/if}
+  </button>
+{/snippet}
+
+
+{#snippet sparkle(size: string)}
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 13.6 8a2 2 0 0 0 1.4 1.4l4.5 1.6-4.5 1.6a2 2 0 0 0-1.4 1.4L12 18.5 10.4 14A2 2 0 0 0 9 12.6L4.5 11 9 9.4A2 2 0 0 0 10.4 8z"/><path d="M18.5 3v3M17 4.5h3"/></svg>
+{/snippet}
+
+{#snippet starterIcon(id: string)}
+  <svg width="1rem" height="1rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    {#if id === 'check'}<path d="M7 5l12 7-12 7z"/>
+    {:else if id === 'tests'}<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 12l2 2 4-4"/>
+    {:else if id === 'cover'}<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/>
+    {:else}<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>{/if}
+  </svg>
+{/snippet}
+
+{#snippet errorCard(text: string)}
+  {@const view = aiErrorView(text)}
+  <div class="agent-error" role="alert">
+    <strong>{view.title}</strong>
+    {#if view.status}<span class="agent-error-status">{view.status}</span>{/if}
+    {#if view.message}<div class="agent-error-message"><Markdown source={view.message} compact /></div>{/if}
+    {#if view.hint}<span class="agent-error-hint">{view.hint}</span>{/if}
+    {#if aiConnectionProblem(text)}<details><summary>Technical details</summary><div class="agent-error-message"><Markdown source={text} compact /></div></details>{/if}
+  </div>
+{/snippet}
+
+<div class="agent-workspace" bind:this={workspaceElement}>
+  {#if needsConnection}
+    <div class="agent-onboarding">
+      <h2 class="agent-onboarding-title">Connect a model to start</h2>
+      <p class="agent-onboarding-text">The agent runs on your own key or a model on this computer. It reads and runs your requests, explains failures and edits the collection, and asks before it sends anything that changes data or writes a file.</p>
+      <div class="agent-onboarding-cards">
+        <button class="option-card agent-onboarding-card" type="button" onclick={connectOpenRouter}>
+          <strong>Connect OpenRouter</strong>
+          <span>Sign in once in the browser. One account gives you Claude, GPT and hundreds of other models.</span>
+        </button>
+        <button class="option-card agent-onboarding-card" type="button" onclick={() => openConnectionSettings('key')}>
+          <strong>Your API key</strong>
+          <span>Paste an Anthropic, OpenAI or other compatible key. It is kept in the system keychain.</span>
+        </button>
+        <button class="option-card agent-onboarding-card" type="button" onclick={() => openConnectionSettings('local')}>
+          <strong>Local model</strong>
+          <span>Use Ollama or LM Studio. Nothing leaves this computer; small models are weak at tool calls.</span>
+        </button>
+        <button class="option-card agent-onboarding-card" type="button" onclick={() => openConnectionSettings('')}>
+          <strong>Codex on this computer</strong>
+          <span>Use the Codex CLI with your ChatGPT plan. Kurlo connects it to this workspace.</span>
+        </button>
+      </div>
+    </div>
+  {:else}
+    {#if chatSaved}
+      <div class="agent-header">
+        <input
+          class="request-title-input agent-title-input"
+          bind:value={titleDraft}
+          bind:this={titleInput}
+          placeholder="Untitled chat"
+          spellcheck="false"
+          maxlength="120"
+          aria-label="Chat name"
+          aria-invalid={titleError ? 'true' : undefined}
+          onblur={() => void commitTitle()}
+          onkeydown={onTitleKeydown}
+          disabled={workspaceBlocked}
+        />
+        {#if titleError}<span class="agent-title-error" role="alert">{titleError}</span>{/if}
+        <div class="agent-header-menu">
+          <button class="btn btn-ghost btn-icon btn-sm agent-header-menu-btn" type="button" aria-label="Chat actions" aria-haspopup="menu" aria-expanded={chatMenuOpen} onclick={() => (chatMenuOpen = !chatMenuOpen)} disabled={workspaceBlocked}>
+            <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="12.5" cy="8" r="1.2"/></svg>
+          </button>
+          {#if chatMenuOpen}
+            <div class="menu agent-header-dropdown" role="menu" aria-label="Chat actions">
+              <button class="menu-item" type="button" role="menuitem" onclick={() => { chatMenuOpen = false; titleInput?.focus(); titleInput?.select(); }}>Rename</button>
+              <div class="menu-separator" role="separator"></div>
+              <button class="menu-item danger" type="button" role="menuitem" disabled={agentStore.running && agentStore.liveChatId === agentStore.activeChatId} onclick={() => { chatMenuOpen = false; if (agentStore.activeChat) void agentStore.remove(agentStore.activeChat.id); }}>Delete chat</button>
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
+
+    <div class="agent-body">
+      <div class="agent-main" class:covered={agentNavigation.detailsOpen && detailsCover}>
+        <div class="agent-chat" bind:this={scroller}>
+          {#if agentStore.loadError}
+            {@render errorCard(agentStore.loadError)}
+          {:else if !turns.length && !agentStore.activeChatId}
+            <div class="agent-empty">
+              <span class="agent-empty-icon" aria-hidden="true">{@render sparkle('1.375rem')}</span>
+              <h2 class="agent-empty-title">What should we check?</h2>
+              <p class="agent-empty-text">The agent sees the requests, collections and environments in this workspace.</p>
+              <div class="agent-empty-rules">
+                <span><svg width="0.875rem" height="0.875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true" class="agent-rule-ok"><path d="M2.5 6.5 5 9l4.5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Reads and GET requests run on their own</span>
+                <span><svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true" class="agent-rule-wait"><path d="M8 1.75 2.75 4v3.6c0 3.2 2.2 5.7 5.25 6.65 3.05-.95 5.25-3.45 5.25-6.65V4L8 1.75Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>Changes to data or files wait for you</span>
+              </div>
+              <div class="agent-starters">
+                {#each starters as template (template.id)}
+                  <button class="option-card agent-starter" type="button" aria-label={template.title} onclick={() => void useTemplate(template)} disabled={workspaceBlocked}>
+                    <span class="agent-starter-icon" aria-hidden="true">{@render starterIcon(template.id)}</span>
+                    <span class="agent-starter-copy">
+                      <span class="agent-starter-title agent-starter-title-full">{template.title}</span>
+                      <span class="agent-starter-title agent-starter-title-short" aria-hidden="true">{starterLabels[template.id]}</span>
+                      <span class="agent-starter-text">{template.summary}</span>
+                    </span>
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/if}
+
+          {#if agentStore.activeChat?.messageOffset}
+            <button class="btn btn-ghost btn-sm agent-earlier" type="button" disabled={agentStore.loadingEarlier} onclick={() => { stickToBottom = false; void agentStore.loadEarlier(); }}>{agentStore.loadingEarlier ? 'Loading earlier messages…' : 'Load earlier messages'}</button>
+          {/if}
+          {#if agentStore.historyError}<div class="agent-note" role="alert">{agentStore.historyError}</div>{/if}
+          {#key `${agentStore.workspaceId}:${agentStore.activeChatId}`}
+          <VirtualAgentHistory items={turns} {scroller} follow={stickToBottom} {onScroll}>
+            {#snippet children(turn)}
+            <div class="agent-turn">
+              {#if turn.prompt}
+                <div class="agent-user-row">
+                  <div class="agent-message-actions">{@render copyButton(`${turn.id}:prompt`, turn.prompt, 'Copy message')}</div>
+                  <div class="agent-user">{turn.prompt}</div>
+                </div>
+              {/if}
+              {#each agentTurnSegments(turn.steps) as segment, segmentIndex (segmentIndex)}
+                {#if segment.kind === 'error'}
+                  {@render errorCard(segment.error)}
+                {:else if segment.kind === 'block' && segment.block.type === 'thinking'}
+                  {@const key = `${turn.id}:${segment.step.index}:${segment.blockIndex}`}
+                  <div>
+                    <button class="btn btn-ghost btn-sm agent-step-toggle" type="button" aria-expanded={openThinking.has(key)} onclick={() => toggle(openThinking, key)}>
+                      <svg class:open={openThinking.has(key)} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      Thinking
+                    </button>
+                    {#if openThinking.has(key)}<div class="agent-thinking">{segment.block.text}</div>{/if}
+                  </div>
+                {:else if segment.kind === 'block'}
+                  <div class="agent-text"><Markdown source={segment.block.text ?? ''} compact live={turn.live && !segment.step.done} /></div>
+                {:else if segment.kind === 'tools'}
+                  <div class="agent-steps">
+                    {#each segment.items as item (`${item.step.index}:${item.block.id ?? item.blockIndex}`)}
+                      {@const result = resultFor(item.step, item.block)}
+                      {@const key = `${turn.id}:${item.step.index}:${item.block.id ?? item.blockIndex}`}
+                      {@const target = item.step.done ? agentToolTarget(item.block, result) : null}
+                      {@const approval = turn.live ? approvalFor(item.block) : undefined}
+                      {@const summary = agentStepSummary(item.block, result)}
+                      <div class="agent-tool" class:agent-tool-error={result?.isError}>
+                        <div class="agent-tool-row">
+                          <button class="agent-tool-toggle" type="button" aria-expanded={openTools.has(key)} onclick={() => toggle(openTools, key)}>
+                            {#if result?.isError}
+                              <span class="agent-tool-state agent-tool-failed" role="img" aria-label="Failed"><svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+                            {:else if result}
+                              <span class="agent-tool-state agent-tool-done" role="img" aria-label="Done"><svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                            {:else if approval}
+                              <span class="agent-tool-state agent-tool-waiting" role="img" aria-label="Waiting for you"><svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.75 2.75 4v3.6c0 3.2 2.2 5.7 5.25 6.65 3.05-.95 5.25-3.45 5.25-6.65V4L8 1.75Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+                            {:else if turn.live}
+                              <span class="agent-tool-state" role="img" aria-label="Running"><span class="spinner spinner-inline"></span></span>
+                            {:else}
+                              <span class="agent-tool-state" aria-hidden="true"></span>
+                            {/if}
+                            <span class="agent-tool-label">{agentToolLabel(item.block.name)}</span>
+                            {#if summary.target}<span class="agent-tool-target">{summary.target}</span>{/if}
+                            <span class="agent-tool-name">{summary.detail || item.block.name}</span>
+                            {#if summary.status}<span class="agent-tool-status" class:ok={summary.status < 300} class:warn={summary.status >= 300 && summary.status < 500} class:bad={summary.status >= 500}>{summary.status}</span>{/if}
+                            {#if summary.durationMs}<span class="agent-tool-time">{summary.durationMs} ms</span>{/if}
+                            <svg class="agent-tool-chevron" class:open={openTools.has(key)} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          </button>
+                          {#if target && canOpen(target)}
+                            <button class="btn-link agent-tool-open" type="button" onclick={() => openTarget(target)}>{targetLabel(target)}</button>
+                          {/if}
+                        </div>
+                        {#if openTools.has(key)}
+                          <pre class="agent-tool-body">{item.step.done ? prettyJSON(item.block.input) : (item.block.input || '')}</pre>
+                          {#if result}<pre class="agent-tool-body agent-tool-result">{result.text}</pre>{/if}
+                        {/if}
+                        {#if approval}
+                          <div class="agent-tool-approval"><AgentApprovalCard {approval} onAnswer={(decision) => agentStore.answer(approval.id, decision)} /></div>
+                        {/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              {/each}
+              {#if turn.live && !agentStore.compacting && !turn.steps.some(step => step.blocks.length)}
+                <div class="agent-waiting"><span class="spinner spinner-inline"></span>Thinking…</div>
+              {/if}
+              {#if !turn.live && agentTurnAnswer(turn.steps)}
+                <div class="agent-message-actions agent-answer-actions">{@render copyButton(`${turn.id}:answer`, agentTurnAnswer(turn.steps), 'Copy answer')}</div>
+              {/if}
+            </div>
+            {/snippet}
+          </VirtualAgentHistory>
+          {/key}
+
+          {#each approvals.filter(approval => !approval.toolUseId || !live || !live.steps.some(step => step.blocks.some(block => block.id === approval.toolUseId))) as approval (approval.id)}
+            <AgentApprovalCard {approval} onAnswer={(decision) => agentStore.answer(approval.id, decision)} />
+          {/each}
+
+          {#if notes && !agentStore.running}
+            {#if notes.error}{@render errorCard(notes.error)}{/if}
+            {#each notes.warnings as warning, index (index)}
+              <div class="agent-note" role="status">{warning}</div>
+            {/each}
+          {/if}
+          {#if canRetry}
+            <div class="agent-turn-actions">
+              <button class="btn btn-secondary btn-sm" type="button" onclick={() => void retry()} disabled={workspaceBlocked || retrying || checkingCodex}>{checkingCodex ? 'Connecting…' : agentStore.driver === 'codex' && notes?.error ? 'Reconnect and retry' : 'Retry'}</button>
+            </div>
+          {/if}
+        </div>
+
+        <div class="agent-composer">
+          {#if runningElsewhere}
+            <div class="agent-note" role="status">The agent is working in another chat. You can send here when it finishes.</div>
+          {:else if agentStore.compacting && agentStore.liveInActiveChat}
+            <div class="agent-status" role="status"><span class="spinner spinner-inline"></span>Compacting context…</div>
+          {:else if approvals.length && agentStore.liveInActiveChat}
+            <div class="agent-status agent-status-wait" role="status"><span class="agent-status-dot"></span>{agentStore.driver === 'codex' ? 'Codex' : agentStore.driver === 'claude-code' ? 'Claude Code' : 'The agent'} is waiting for your approval</div>
+          {/if}
+          <div class="agent-composer-box" class:disabled={workspaceBlocked}>
+            <textarea
+              class="agent-input"
+              rows="1"
+              placeholder="Ask to run, explain or change something"
+              aria-label="Message the agent"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              {...NO_AUTOCORRECT}
+              maxlength={AI_PROMPT_MAX_CHARS}
+              bind:this={composerInput}
+              bind:value={agentStore.draft}
+              use:autoSizeTextarea={agentStore.draft}
+              onkeydown={onKeydown}
+              disabled={workspaceBlocked}
+            ></textarea>
+            <div class="agent-composer-bar">
+              <div class="agent-composer-context">
+                <span class="agent-composer-chip">
+                  <Select value={agentStore.collection} options={collectionOptions} className="agent-chip" ariaLabel="Collection" disabled={agentStore.running} onChange={(value) => (agentStore.collection = value)} />
+                </span>
+                <span class="agent-composer-chip">
+                  <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
+                </span>
+                <div class="agent-templates">
+                  <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Templates" aria-haspopup="menu" aria-expanded={templatesOpen} onclick={() => void toggleTemplates()} disabled={workspaceBlocked}>
+                    <svg width="0.875rem" height="0.875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2.75h8M2 6h8M2 9.25h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                  </button>
+                  {#if templatesOpen}
+                    <div class="menu agent-templates-menu" role="menu" tabindex="-1" aria-label="Templates" bind:this={templatesMenu} onkeydown={onTemplatesKeydown}>
+                      {#each AGENT_TEMPLATES as template (template.id)}
+                        <button class="menu-item agent-template" type="button" role="menuitem" onclick={() => void useTemplate(template)}>
+                          <span class="agent-template-title">{template.title}</span>
+                          <span class="agent-template-text">{template.text}</span>
+                        </button>
+                      {/each}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+              <div class="agent-composer-actions">
+                <AgentPicker disabled={agentStore.running || workspaceBlocked} />
+                {#if agentStore.driver && effortOptions.length}
+                  <Select value={effortChoice} options={effortOptions} className="agent-effort" ariaLabel="Effort" disabled={agentStore.running || workspaceBlocked} onChange={value => (agentStore.effort = agentEffortToStore(value, effortModel?.defaultEffort ?? ''))} />
+                {/if}
+                {#if agentStore.liveInActiveChat && agentStore.running}
+                  <button class="btn btn-secondary btn-icon agent-stop" type="button" onclick={() => void agentStore.stop()} aria-label="Stop the agent">
+                    <svg width="0.625rem" height="0.625rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="1.25" fill="currentColor"/></svg>
+                  </button>
+                {:else}
+                  <button class="btn btn-primary btn-icon agent-send" type="button" onclick={send} disabled={workspaceBlocked || agentStore.running || !agentStore.draft.trim()} aria-label="Send">
+                    <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 12V2M2.5 6.5L7 2l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                {/if}
+              </div>
+            </div>
+          </div>
+          <div class="agent-session-status">
+            {#if usage && (usage.input || usage.output)}
+              <span class="agent-usage" aria-label={`${usage.input.toLocaleString('en-US')} input and ${usage.output.toLocaleString('en-US')} output tokens in this chat`}>
+                {formatTokens(usage.input + usage.cacheRead + usage.cacheWrite)} in · {formatTokens(usage.output)} out
+              </span>
+            {/if}
+            {#if agentStore.driver && tightestQuota}
+              <button class="btn-link agent-plan-mini" class:low={tightestQuota.remaining < 30} type="button" onclick={toggleAgentDetails} aria-label={`${planName} plan: ${tightestQuota.remaining}% left in the ${tightestQuota.duration} window. Show chat details`}>Plan {tightestQuota.remaining}% left</button>
+            {/if}
+            <span class="agent-composer-hint" aria-hidden="true"><kbd>↵</kbd> send · <kbd>⇧↵</kbd> new line</span>
+          </div>
+        </div>
+      </div>
+
+      {#if agentNavigation.detailsOpen}
+        <aside class="agent-context-panel" class:cover={detailsCover} aria-label="Chat details" tabindex="-1" bind:this={detailsPanel} use:escapeKey={onDetailsKeydown}>
+          <div class="agent-details-head">
+            <span>Chat details</span>
+            <button class="btn btn-ghost btn-icon btn-sm agent-details-close" type="button" aria-label="Close chat details" onclick={closeDetails}>
+              <AddCloseIcon />
+            </button>
+          </div>
+          <section class="agent-context-section">
+            <h3 class="agent-context-label">Context</h3>
+            <div class="agent-kv"><span>Collection</span><span>{agentStore.collection || 'Any'}</span></div>
+            <div class="agent-kv"><span>Environment</span><span>{agentStore.environment || 'None'}{#if environmentProtected}<svg class="agent-kv-lock" width="0.6875rem" height="0.6875rem" viewBox="0 0 16 16" fill="none" aria-label="Protected" role="img"><rect x="3.5" y="7" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.4"/></svg>{/if}</span></div>
+            <div class="agent-kv"><span>Agent</span><span>{headerAgent}</span></div>
+            {#if agentStore.driver}<div class="agent-kv"><span>Effort</span><span>{agentEffortLabel(agentStore.effort || selectedCodexDefaultEffort)}</span></div>{/if}
+          </section>
+
+          {#if usage && (usage.input || usage.output)}
+            <section class="agent-context-section">
+              <h3 class="agent-context-label">Usage</h3>
+              <div class="agent-kv"><span>Input</span><span>{usage.input.toLocaleString('en-US')}</span></div>
+              {#if usage.cacheRead || usage.cacheWrite}<div class="agent-kv"><span>Cached</span><span>{(usage.cacheRead + usage.cacheWrite).toLocaleString('en-US')}</span></div>{/if}
+              <div class="agent-kv"><span>Output</span><span>{usage.output.toLocaleString('en-US')}</span></div>
+              {#if usage.reasoning}<div class="agent-kv"><span>Reasoning</span><span>{usage.reasoning.toLocaleString('en-US')}</span></div>{/if}
+              {#if usage.cost}<div class="agent-kv"><span>Cost at API prices</span><span>{formatCost(usage.cost)}</span></div>{/if}
+              {#if agentStore.driver && contextPercent !== null}
+                <div class="agent-context agent-detail-meter" aria-label="Last reported context">
+                  <span class="agent-detail-meter-head"><span>Context (last request)</span><span>{contextPercent}%</span></span>
+                  <span class="agent-quota-bar agent-quota-bar-wide" aria-hidden="true"><span class="agent-quota-fill" style:width={`${contextPercent}%`}></span></span>
+                  <span class="agent-detail-meter-note">{formatTokens(contextTokens)} / {formatTokens(contextWindow)} tokens</span>
+                </div>
+              {/if}
+            </section>
+          {/if}
+
+          {#if agentStore.driver && quotaWindows.length}
+            <section class="agent-context-section agent-limits">
+              <h3 class="agent-context-label">{planName} plan</h3>
+              {#each quotaWindows as window, index (`${window.label}:${index}`)}
+                <div class="agent-detail-meter">
+                  <span class="agent-detail-meter-head"><span>{window.duration === '5h' ? '5-hour window' : window.duration === '7d' ? 'Weekly' : window.label}</span><span>{window.remaining}% left</span></span>
+                  <span class="agent-quota-bar agent-quota-bar-wide" aria-hidden="true"><span class="agent-quota-fill" class:low={window.remaining < 30} style:width={`${window.remaining}%`}></span></span>
+                  {#if window.resetsAt > 0}<span class="agent-detail-meter-note agent-limit-resets">resets {new Date(window.resetsAt * 1000).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>{/if}
+                </div>
+              {/each}
+              <p class="agent-detail-note">Shared with your other {agentStore.driver === 'claude-code' ? 'Claude Code' : 'Codex'} sessions.</p>
+            </section>
+          {/if}
+
+          {#if contextChanges.length}
+            <section class="agent-context-section">
+              <h3 class="agent-context-label">Changes</h3>
+              {#each contextChanges as change, index (index)}
+                <div class="agent-context-item"><span class="agent-dot" class:wait={change.waiting}></span><span class="agent-context-item-name">{change.name}</span><span class="agent-context-item-meta" class:wait={change.waiting}>{change.waiting ? 'waiting' : change.label}</span></div>
+              {/each}
+            </section>
+          {/if}
+
+          {#if contextRuns.length}
+            <section class="agent-context-section">
+              <h3 class="agent-context-label">Runs</h3>
+              {#each contextRuns as run, index (index)}
+                <div class="agent-context-item"><span class="agent-context-method">{run.method}</span><span class="agent-context-item-name">{run.name}</span>{#if run.status}<span class="agent-tool-status" class:ok={run.status < 300} class:warn={run.status >= 300 && run.status < 500} class:bad={run.status >= 500}>{run.status}</span>{/if}</div>
+              {/each}
+            </section>
+          {/if}
+        </aside>
+      {/if}
+    </div>
+{/if}
+</div>
+
+<style>
+  .agent-workspace {
+    position: relative;
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg);
+    container: agent / inline-size;
+  }
+  .agent-header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 3.25rem;
+    padding: 0 var(--space-6);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .agent-header .agent-title-input {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    margin-left: calc(var(--space-1-5) * -1);
+    font-size: var(--text-title);
+    font-weight: var(--weight-semibold);
+  }
+  .agent-title-error {
+    color: var(--danger);
+    font-size: var(--text-caption);
+  }
+  .agent-header-menu {
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .agent-header-dropdown {
+    position: absolute;
+    top: calc(100% + var(--space-1));
+    right: 0;
+    z-index: 140;
+    min-width: 11rem;
+  }
+  .agent-body {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+  }
+  .agent-main {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    container: agent-main / inline-size;
+    --agent-column: 47.5rem;
+    --agent-gutter: max(var(--space-6), calc((100% - var(--agent-column)) / 2));
+  }
+  .agent-usage {
+    flex: 0 0 auto;
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .agent-chat {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overflow-anchor: none;
+    padding: var(--space-6) var(--agent-gutter) var(--space-4);
+  }
+  .agent-empty {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    max-width: 40rem;
+    margin: auto;
+    padding: var(--space-4) 0;
+    text-align: center;
+  }
+
+  .agent-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: var(--radius-lg);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .agent-empty-title {
+    margin: 0;
+    color: var(--text);
+    font-size: var(--text-heading);
+    font-weight: var(--weight-semibold);
+    letter-spacing: -0.01em;
+  }
+  .agent-empty-text {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-label);
+  }
+  .agent-empty-rules {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-1) var(--space-4);
+    color: var(--text-3);
+    font-size: var(--text-caption);
+  }
+  .agent-empty-rules span {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+  }
+  .agent-rule-ok {
+    color: var(--s2xx);
+  }
+  .agent-rule-wait {
+    color: var(--s4xx);
+  }
+  .agent-starters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+    gap: var(--space-2);
+    width: 100%;
+    margin-top: var(--space-3);
+  }
+
+  .agent-starter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2-5);
+    min-width: 0;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+    text-align: left;
+  }
+
+  .agent-starter:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    background: color-mix(in srgb, var(--accent) 3%, var(--bg));
+  }
+  .agent-starter:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: 1px;
+  }
+  .agent-starter:disabled {
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
+  }
+  .agent-starter-icon {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: var(--radius-md);
+    background: var(--elevated);
+    color: var(--text-2);
+  }
+
+  .agent-starter-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-width: 0;
+  }
+
+  .agent-starter-title {
+    overflow: hidden;
+    color: var(--text);
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-starter-text {
+    overflow: hidden;
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-starter-title-short {
+    display: none;
+  }
+  .agent-turn {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-width: 0;
+  }
+  .agent-user-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: var(--space-1-5);
+  }
+  .agent-user {
+    min-width: 0;
+    max-width: 80%;
+    padding: var(--space-2-5) var(--space-3);
+    border-radius: var(--radius-xl) var(--radius-xl) var(--radius-sm) var(--radius-xl);
+    background: var(--elevated);
+    color: var(--text);
+    font-size: var(--text-title);
+    line-height: var(--leading-relaxed);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    -webkit-user-select: text;
+    user-select: text;
+    cursor: text;
+  }
+  .agent-message-actions {
+    display: flex;
+    opacity: 0;
+    transition: opacity var(--dur-fast);
+  }
+  .agent-user-row:hover .agent-message-actions,
+  .agent-turn:hover .agent-answer-actions,
+  .agent-message-actions:focus-within {
+    opacity: 1;
+  }
+  .agent-copy {
+    color: var(--text-3);
+  }
+  .agent-copy:hover:not(:disabled) {
+    color: var(--text);
+  }
+  .agent-text {
+    min-width: 0;
+    font-size: var(--text-title);
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .agent-step-toggle {
+    gap: var(--space-1-5);
+    color: var(--text-2);
+  }
+  .agent-step-toggle svg {
+    flex: 0 0 auto;
+    color: var(--text-3);
+    transition: transform var(--dur-fast);
+  }
+  .agent-step-toggle svg.open {
+    transform: rotate(90deg);
+  }
+  .agent-thinking {
+    margin-top: var(--space-1-5);
+    padding-left: var(--space-3);
+    border-left: 1px solid var(--border);
+    color: var(--text-2);
+    font-size: var(--text-label);
+    line-height: var(--leading-relaxed);
+    white-space: pre-wrap;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .agent-steps {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+  }
+  .agent-tool {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .agent-tool + .agent-tool {
+    border-top: 1px solid var(--border-subtle);
+  }
+  .agent-tool-row {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .agent-tool-toggle {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    min-height: 2.25rem;
+    padding: var(--space-1-5) var(--space-3);
+    border: none;
+    border-radius: var(--radius-lg);
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-body);
+    text-align: left;
+    cursor: pointer;
+  }
+  .agent-tool-toggle:hover {
+    background: var(--hover);
+  }
+  .agent-tool-toggle:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: -2px;
+  }
+  .agent-tool-state {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    color: var(--text-3);
+  }
+  .agent-tool-done {
+    color: var(--s2xx);
+  }
+  .agent-tool-failed {
+    color: var(--danger);
+  }
+  .agent-tool-waiting {
+    color: var(--accent);
+  }
+  .agent-tool-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+  .agent-tool-target {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    font-weight: var(--weight-medium);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agent-tool-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agent-tool-status {
+    flex: 0 0 auto;
+    padding: 0 var(--space-1-5);
+    border-radius: var(--radius-sm);
+    background: var(--elevated);
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    line-height: 1.6;
+  }
+  .agent-tool-status.ok {
+    background: color-mix(in srgb, var(--s2xx) 14%, transparent);
+    color: var(--s2xx);
+  }
+  .agent-tool-status.warn {
+    background: color-mix(in srgb, var(--s4xx) 16%, transparent);
+    color: var(--s4xx);
+  }
+  .agent-tool-status.bad {
+    background: color-mix(in srgb, var(--s5xx) 14%, transparent);
+    color: var(--s5xx);
+  }
+  .agent-tool-time {
+    flex: 0 0 auto;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+  }
+  .agent-tool-chevron {
+    flex: 0 0 auto;
+    color: var(--text-3);
+    transition: transform var(--dur-fast);
+  }
+  .agent-tool-chevron.open {
+    transform: rotate(90deg);
+  }
+  .agent-tool-open {
+    flex: 0 0 auto;
+    margin: 0 var(--space-3) 0 var(--space-1);
+    font-size: var(--text-caption);
+  }
+  .agent-tool-body {
+    margin: 0 var(--space-3) var(--space-2-5) calc(var(--space-3) + 1rem + var(--space-2));
+    max-height: 18rem;
+    overflow: auto;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-code);
+    line-height: var(--leading-relaxed);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .agent-tool-result {
+    color: var(--text);
+  }
+  .agent-tool-approval {
+    padding: 0 var(--space-3) var(--space-3);
+  }
+  .agent-waiting {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-3);
+    font-size: var(--text-label);
+  }
+  .agent-error {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-2);
+    padding: var(--space-2-5) var(--space-3);
+    border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    color: var(--text);
+    font-size: var(--text-label);
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .agent-error strong {
+    font-weight: var(--weight-semibold);
+  }
+  .agent-error-status {
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+  }
+  .agent-error-message {
+    flex: 1 1 100%;
+    min-width: 0;
+    color: var(--text-2);
+  }
+  .agent-error-hint {
+    flex: 1 1 100%;
+    color: var(--text-3);
+    font-size: var(--text-caption);
+  }
+  .agent-note {
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    color: var(--text-2);
+    font-size: var(--text-label);
+  }
+  .agent-composer {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: var(--space-2);
+    min-width: 0;
+    padding: var(--space-2) var(--agent-gutter) var(--space-3);
+  }
+  .agent-status {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 0 var(--space-1);
+    font-size: var(--text-label);
+  }
+  .agent-status-wait {
+    color: var(--s4xx);
+  }
+  .agent-status-dot {
+    flex: 0 0 auto;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: currentColor;
+  }
+  .agent-composer-box {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: var(--bg);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  }
+  .agent-composer-box:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  }
+  .agent-composer-box.disabled {
+    opacity: var(--opacity-disabled);
+  }
+  .agent-input {
+    min-height: calc(var(--text-body) * var(--leading-normal) + var(--space-3) * 2);
+    max-height: clamp(3rem, 20vh, 12rem);
+    min-width: 0;
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: var(--text-body);
+    line-height: var(--leading-normal);
+    resize: none;
+    scrollbar-gutter: stable;
+  }
+  .agent-input::placeholder {
+    color: var(--text-3);
+  }
+  .agent-composer-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-2);
+    min-width: 0;
+    padding: 0 var(--space-2) var(--space-2);
+  }
+
+  .agent-composer-context {
+    display: flex;
+    flex: 1 1 10rem;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .agent-composer-chip {
+    display: inline-flex;
+    flex: 0 1 auto;
+    min-width: 2.5rem;
+    max-width: 11rem;
+  }
+
+  .agent-composer-chip :global(.agent-chip) {
+    min-width: 0;
+    width: 100%;
+  }
+  .agent-composer-chip :global(.agent-chip .app-select-trigger) {
+    height: var(--control-md);
+    max-width: 100%;
+    width: 100%;
+    padding: 0 var(--space-2);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-2);
+    font-size: var(--text-label);
+  }
+  .agent-composer-chip :global(.agent-chip .app-select-trigger > span) {
+    flex: 1 1 auto;
+    text-align: left;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .agent-composer :global(.agent-chip .app-select-check) {
+    display: none;
+  }
+  .agent-composer :global(.agent-effort .app-select-trigger) {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    height: var(--control-md);
+    padding: 0 var(--space-2);
+    border-color: transparent;
+    background: transparent;
+    font-size: var(--text-label);
+  }
+  .agent-composer :global(.agent-effort) {
+    flex: 0 0 auto;
+    min-width: 0;
+    max-width: 7rem;
+  }
+  .agent-composer :global(.agent-effort .app-select-trigger > span) {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .agent-composer-actions {
+    display: flex;
+    flex: 0 1 18rem;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-1);
+    min-width: 0;
+    margin-left: auto;
+  }
+  .agent-composer-chip :global(.agent-chip .app-select-trigger:hover:not(:disabled)),
+  .agent-composer :global(.agent-effort .app-select-trigger:hover:not(:disabled)) {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .agent-composer-actions :global(.agent-picker) {
+    flex: 0 1 auto;
+    max-width: 16rem;
+  }
+  .agent-composer-actions :global(.agent-picker-trigger) {
+    height: var(--control-md);
+    border-color: transparent;
+    background: transparent;
+  }
+  .agent-composer-actions :global(.agent-picker-trigger:hover:not(:disabled)) {
+    background: var(--hover);
+  }
+  .agent-send,
+  .agent-stop {
+    flex: 0 0 auto;
+    width: var(--control-md);
+    height: var(--control-md);
+    border-radius: var(--radius-full);
+  }
+
+  .agent-templates {
+    flex: 0 0 auto;
+  }
+
+  .agent-templates-btn {
+    color: var(--text-2);
+  }
+
+  .agent-templates-menu {
+    position: absolute;
+    bottom: calc(100% + var(--space-1));
+    left: 0;
+    z-index: 140;
+    width: min(26rem, 100%);
+    max-height: min(24rem, 50vh);
+    overflow-y: auto;
+  }
+  .agent-template {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-0-5);
+    width: 100%;
+    height: auto;
+    padding-top: var(--space-1-5);
+    padding-bottom: var(--space-1-5);
+    white-space: normal;
+    text-align: left;
+  }
+  .agent-template-title {
+    color: var(--text);
+  }
+  .agent-template-text {
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
+  }
+  .agent-composer-hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agent-composer-hint kbd {
+    font-family: var(--font-mono);
+  }
+  .agent-session-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); padding: 0 var(--space-1); color: var(--text-3); font-size: var(--text-caption); font-variant-numeric: tabular-nums; }
+  .agent-plan-mini { color: var(--text-3); font-size: var(--text-caption); text-decoration: none; }
+  .agent-plan-mini:hover { color: var(--text); }
+  .agent-plan-mini.low { color: var(--s4xx); }
+  .agent-quota-bar { display: inline-block; width: 3rem; height: 0.25rem; overflow: hidden; border-radius: var(--radius-full); background: var(--border-subtle); }
+  .agent-quota-bar-wide { display: block; width: 100%; height: 0.375rem; }
+  .agent-quota-fill { display: block; height: 100%; background: var(--accent); }
+  .agent-quota-fill.low { background: var(--s4xx); }
+  .agent-detail-meter { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--text-label); }
+  .agent-detail-meter-head { display: flex; justify-content: space-between; gap: var(--space-2); color: var(--text-3); }
+  .agent-detail-meter-head > span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+  .agent-detail-meter-note { color: var(--text-3); font-size: var(--text-caption); }
+  .agent-detail-note { margin: 0; color: var(--text-3); font-size: var(--text-caption); }
+  .agent-send:disabled {
+    background: var(--elevated);
+    color: var(--text-3);
+    opacity: 1;
+  }
+  .agent-turn-actions {
+    display: flex;
+    gap: var(--space-1-5);
+  }
+  .agent-earlier {
+    align-self: center;
+    color: var(--text-2);
+  }
+  .agent-context-panel {
+    display: flex;
+    flex: 0 0 16rem;
+    flex-direction: column;
+    gap: var(--space-5);
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--space-4);
+    border-left: 1px solid var(--border-subtle);
+    background: var(--bg);
+  }
+  .agent-context-panel:focus {
+    outline: none;
+  }
+  .agent-context-panel.cover {
+    flex: 1 1 auto;
+    border-left: none;
+  }
+  .agent-main.covered {
+    display: none;
+  }
+
+
+  .agent-details-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text);
+    font-size: var(--text-body);
+    font-weight: var(--weight-semibold);
+  }
+
+
+  .agent-context-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .agent-context-label {
+    margin: 0;
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .agent-kv {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: var(--text-label);
+  }
+  .agent-kv > span:first-child {
+    flex: 0 0 auto;
+    color: var(--text-3);
+  }
+  .agent-kv > span:last-child {
+    min-width: 0;
+    color: var(--text);
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .agent-kv-lock {
+    margin-left: var(--space-1);
+    color: var(--s4xx);
+    vertical-align: -0.0625rem;
+  }
+  .agent-context-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    font-size: var(--text-label);
+  }
+  .agent-context-item-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .agent-context-item-meta {
+    flex: 0 0 auto;
+    color: var(--text-3);
+  }
+  .agent-context-item-meta.wait {
+    color: var(--s4xx);
+  }
+  .agent-dot {
+    flex: 0 0 auto;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: var(--radius-full);
+    background: var(--s2xx);
+  }
+  .agent-dot.wait {
+    background: var(--s4xx);
+  }
+  .agent-context-method {
+    flex: 0 0 auto;
+    color: var(--get);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+    font-weight: var(--weight-medium);
+  }
+  .agent-context-quota {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--text-2);
+    font-size: var(--text-label);
+    font-variant-numeric: tabular-nums;
+  }
+  .agent-onboarding {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    width: min(44rem, calc(100% - var(--space-8)));
+    margin: auto;
+  }
+  .agent-onboarding-title {
+    margin: 0;
+    color: var(--text);
+    font-size: var(--text-title);
+    font-weight: var(--weight-semibold);
+  }
+  .agent-onboarding-text {
+    margin: 0;
+    color: var(--text-2);
+    font-size: var(--text-label);
+    line-height: var(--leading-relaxed);
+  }
+  .agent-onboarding-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: var(--space-2-5);
+    margin-top: var(--space-2);
+  }
+  .agent-onboarding-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1-5);
+    padding: var(--space-3);
+  }
+  .agent-onboarding-card strong {
+    color: var(--text);
+    font-size: var(--text-body);
+    font-weight: var(--weight-medium);
+  }
+  .agent-onboarding-card span {
+    color: var(--text-2);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
+  }
+  @container agent (max-width: 36rem) {
+    .agent-header {
+      min-height: 2.75rem;
+      gap: var(--space-2);
+      padding-inline: var(--space-3);
+    }
+  }
+  @container agent-main (max-width: 40rem) {
+    .agent-chat {
+      padding: var(--space-4) var(--space-3) var(--space-3);
+    }
+    .agent-composer {
+      padding: var(--space-2) var(--space-3) var(--space-3);
+    }
+  }
+  @container agent-main (max-width: 30rem) {
+    .agent-starters {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .agent-starter {
+      justify-content: center;
+      min-height: 2.25rem;
+      text-align: center;
+    }
+    .agent-starter-title-short {
+      display: block;
+    }
+    .agent-starter-text,
+    .agent-starter-title-full,
+    .agent-starter-icon,
+    .agent-composer-hint,
+    .agent-tool-time {
+      display: none;
+    }
+    .agent-composer-chip {
+      max-width: 7rem;
+    }
+  }
+  @media (max-height: 44rem) {
+    .agent-starter-text {
+      display: none;
+    }
+  }
+  @media (max-height: 36rem) {
+    .agent-empty {
+      padding-block: var(--space-2);
+    }
+    .agent-empty-icon,
+    .agent-empty-rules {
+      display: none;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .agent-step-toggle svg,
+    .agent-tool-chevron {
+      transition: none;
+    }
+  }
+</style>

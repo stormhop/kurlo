@@ -24,6 +24,11 @@ const aiMaxSteps = 50
 
 type aiEmitter func(name string, payload any)
 
+type aiLocalTools interface {
+	tools() []aiTool
+	call(ctx context.Context, tool aiTool, input, toolUseID string) (string, bool)
+}
+
 type aiRunner struct {
 	ctx      context.Context
 	req      model.AiRequest
@@ -31,6 +36,7 @@ type aiRunner struct {
 	emit     aiEmitter
 	send     func(ctx context.Context, req model.HttpRequest, sink responseBodySinkFactory) model.HttpResponse
 	mcp      func(req model.HttpRequest) model.McpResponse
+	local    aiLocalTools
 	now      func() time.Time
 
 	bodyFixes map[string]bool
@@ -508,6 +514,9 @@ func (r *aiRunner) discoverTools() ([]aiTool, []string) {
 			cursor = resp.NextCursor
 		}
 	}
+	if r.local != nil {
+		tools = append(tools, r.local.tools()...)
+	}
 	return aiAssignToolNames(tools), warnings
 }
 
@@ -532,7 +541,7 @@ func (r *aiRunner) callTools(stepIndex int, blocks []model.AiBlock, tools []aiTo
 			result.IsError = true
 		default:
 			result.Server = tool.Server
-			result.Text, result.IsError = r.callTool(tool, block.Input)
+			result.Text, result.IsError = r.callTool(tool, block)
 		}
 		results = append(results, result)
 		r.publish("ai:tool", model.AiToolResultEvent{SessionID: r.sessionID(), TurnID: r.req.TurnID, Step: stepIndex, Block: result})
@@ -540,10 +549,17 @@ func (r *aiRunner) callTools(stepIndex int, blocks []model.AiBlock, tools []aiTo
 	return results
 }
 
-func (r *aiRunner) callTool(tool aiTool, input string) (string, bool) {
+func (r *aiRunner) callTool(tool aiTool, block model.AiBlock) (string, bool) {
+	input := block.Input
 	arguments := string(aiInputObject(input))
 	if strings.TrimSpace(input) != "" && !json.Valid([]byte(strings.TrimSpace(input))) {
 		return "The tool arguments are not valid JSON: " + input, true
+	}
+	if tool.ServerIndex < 0 {
+		if r.local == nil {
+			return fmt.Sprintf("No tool named %s is available.", block.Name), true
+		}
+		return r.local.call(r.ctx, tool, input, block.ID)
 	}
 	server := r.req.ToolServers[tool.ServerIndex]
 	callReq := server.Request

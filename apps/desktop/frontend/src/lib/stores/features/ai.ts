@@ -64,17 +64,17 @@ export type AiTurn = {
   error: string;
 };
 
-type AiDelta = { sessionId: string; step: number; index: number; type: string; text?: string; id?: string; name?: string; input?: string };
+export type AiDelta = { sessionId: string; step: number; index: number; type: string; text?: string; id?: string; name?: string; input?: string };
 
 export function emptyAiUsage(): AiUsage {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
 }
 
-function emptyStepView(index: number): AiStepView {
+export function emptyStepView(index: number): AiStepView {
   return { index, blocks: [], toolResults: [], stopReason: '', rawStopReason: '', model: '', usage: emptyAiUsage(), hasUsage: false, firstTokenMs: 0, durationMs: 0, error: '', done: false };
 }
 
-function stepViewFrom(step: AiStep): AiStepView {
+export function stepViewFrom(step: AiStep): AiStepView {
   return {
     index: step.index,
     blocks: step.blocks ?? [],
@@ -504,8 +504,19 @@ const AI_STATUS_HINTS: Record<number, string> = {
   429: 'The provider is limiting requests. Wait a moment and send again.',
 };
 
+export function aiConnectionProblem(text: string): 'region' | 'network' | 'auth' | '' {
+  if (/unsupported_country|country.{0,30}(not supported|unsupported|restricted|blocked)|region.{0,30}(not supported|unsupported|restricted|blocked)|not available in your (country|region|location)/i.test(text)) return 'region';
+  if (/workspace routing discovery failed|failed to fetch|fetch failed|network(?: error| request failed| is unreachable)|no such host|dial tcp|connection (?:refused|reset|closed)|ECONN(?:REFUSED|RESET)|ENOTFOUND|ENETUNREACH|EHOSTUNREACH|EAI_AGAIN|socket hang up|unexpected EOF|context deadline exceeded|(?:connection|request|TLS handshake|i\/o) (?:timed out|timeout)|stream disconnected|error sending request/i.test(text)) return 'network';
+  if (/\b401\b|token.{0,25}(expired|revoked)|(?:authentication|refresh token).{0,25}failed|unauthorized/i.test(text)) return 'auth';
+  return '';
+}
+
 export function aiErrorView(text: string): AiErrorView {
   const value = text.trim();
+  const problem = aiConnectionProblem(value);
+  if (problem === 'region') return { title: 'Access restricted by the provider', status: '', message: 'The provider does not allow access from your current country or region.', hint: 'Check the provider’s supported locations or choose another connection. Retry after access is restored.' };
+  if (problem === 'network') return { title: 'Could not reach the provider', status: '', message: 'The connection failed. Your network or the provider may be temporarily unavailable.', hint: 'Check your internet connection and proxy settings, then try again.' };
+  if (problem === 'auth') return { title: 'Sign-in required', status: '', message: 'The provider could not authenticate this connection.', hint: 'Sign in again for Codex, or check your API key in the connection settings, then retry.' };
   const match = /^(\d{3})((?: [^:\n]+)?)(?::\s*([\s\S]*))?$/.exec(value);
   if (!match) return { title: 'The request failed', status: '', message: value, hint: '' };
   const code = Number(match[1]);

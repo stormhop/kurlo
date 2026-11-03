@@ -706,6 +706,7 @@ func (a *App) UseLocalWorkspaceStore() WorkspaceOpenResult {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root), Diagnostics: diagnostics}
 	}
+	trackOpenedWorkspace(root)
 	secrets := map[string]string{}
 	if localStore, _, err := loadLocalRequestStore(requestStorePath()); err == nil {
 		secrets = stringMap(localStore["secrets"])
@@ -950,6 +951,7 @@ func (a *App) openWorkspaceRootOpts(path string, ensureGitignore bool) Workspace
 			gitStatus = gitStatusForWorkspace(root)
 		}
 	}
+	trackOpenedWorkspace(root)
 	secrets := map[string]string{}
 	if localStore, _, err := loadLocalRequestStore(requestStorePath()); err == nil {
 		secrets = stringMap(localStore["secrets"])
@@ -980,6 +982,7 @@ func (a *App) openLocalWorkspaceRoot(path string) WorkspaceOpenResult {
 	if err != nil {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root), Diagnostics: diagnostics}
 	}
+	trackOpenedWorkspace(root)
 	secrets := map[string]string{}
 	if localStore, _, err := loadLocalRequestStore(requestStorePath()); err == nil {
 		secrets = stringMap(localStore["secrets"])

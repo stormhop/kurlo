@@ -68,11 +68,12 @@ type AiRequest struct {
 }
 
 type AiUsage struct {
-	Input      int `json:"input"`
-	Output     int `json:"output"`
-	CacheRead  int `json:"cacheRead"`
-	CacheWrite int `json:"cacheWrite"`
-	Reasoning  int `json:"reasoning"`
+	Input      int     `json:"input"`
+	Output     int     `json:"output"`
+	CacheRead  int     `json:"cacheRead"`
+	CacheWrite int     `json:"cacheWrite"`
+	Reasoning  int     `json:"reasoning"`
+	Cost       float64 `json:"cost,omitempty"`
 }
 
 func (u *AiUsage) Add(other AiUsage) {
@@ -81,6 +82,7 @@ func (u *AiUsage) Add(other AiUsage) {
 	u.CacheRead += other.CacheRead
 	u.CacheWrite += other.CacheWrite
 	u.Reasoning += other.Reasoning
+	u.Cost += other.Cost
 }
 
 type AiStep struct {

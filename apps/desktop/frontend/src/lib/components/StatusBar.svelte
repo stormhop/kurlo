@@ -1,4 +1,6 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
+  import { agentNavigation, toggleAgentDetails } from '../stores/agent.svelte';
   import { kurloChangedFiles } from '../gitFiles';
   import { vm } from '../stores/app.svelte';
   import { openExternalURL } from '../externalLinks';
@@ -115,7 +117,6 @@
       class:missing={workspaceMissing}
       type="button"
       onclick={onOpenGit}
-      title={storageTitle}
       aria-label="Open Git and storage status"
     >
       {#if gitStatus.isRepo}
@@ -134,21 +135,22 @@
       <span class="storage-status-main">{storageLabel}</span>
       {#if gitStatus.isRepo}
         {#if gitStatus.operation}
-          <span class="storage-flag warn" title={`A ${gitStatus.operation} is in progress`}>{gitStatus.operation}</span>
+          <span class="storage-flag warn">{gitStatus.operation}</span>
         {/if}
         {#if upstreamGone}
-          <span class="storage-flag warn" title={upstreamLabel ? `${upstreamLabel} no longer exists on the remote` : 'Tracked remote branch no longer exists'}>gone</span>
+          <span class="storage-flag warn">gone</span>
         {/if}
         {#if gitStatus.ahead > 0 || gitStatus.behind > 0}
-          <span class="storage-sync" title={[gitStatus.ahead ? `${gitStatus.ahead} commit${gitStatus.ahead === 1 ? '' : 's'} to push` : '', gitStatus.behind ? `${gitStatus.behind} to pull` : ''].filter(Boolean).join(' · ')}>
-            {#if gitStatus.ahead > 0}<span>↑{gitStatus.ahead}</span>{/if}
-            {#if gitStatus.behind > 0}<span>↓{gitStatus.behind}</span>{/if}
+          <span class="storage-sync">
+            {#if gitStatus.ahead > 0}<span aria-hidden="true">↑{gitStatus.ahead}</span>{/if}
+            {#if gitStatus.behind > 0}<span aria-hidden="true">↓{gitStatus.behind}</span>{/if}
+            <span class="sr-only">{[gitStatus.ahead ? `${gitStatus.ahead} commit${gitStatus.ahead === 1 ? '' : 's'} to push` : '', gitStatus.behind ? `${gitStatus.behind} to pull` : ''].filter(Boolean).join(' · ')}</span>
           </span>
         {/if}
         {#if changeCount > 0}
           <span class="storage-change-count"><span class="storage-change-dot" aria-hidden="true"></span>{changeCount} changed</span>
         {:else}
-          <span class="storage-clean" title="No unsaved Kurlo changes in Git" aria-label="No changes">
+          <span class="storage-clean" aria-label="No changes">
             <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5l3 3 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
         {/if}
@@ -161,16 +163,14 @@
   <div class="status-bar-right">
     {#if vm.starPromptVisible}
       <span class="star-prompt">
-        <button class="btn btn-ghost btn-xs star-prompt-btn" type="button" onclick={starKurlo} title="Kurlo is free and open source; a star helps other people find it">
+        <button class="btn btn-ghost btn-xs star-prompt-btn" type="button" onclick={starKurlo}>
           <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M8 1.6l1.95 3.95 4.35.63-3.15 3.07.74 4.33L8 11.53l-3.89 2.05.74-4.33L1.7 6.18l4.35-.63L8 1.6z" fill="currentColor"/>
           </svg>
           <span>Star on GitHub</span>
         </button>
-        <button class="btn btn-ghost btn-icon btn-xs star-prompt-close" type="button" onclick={() => vm.closeStarPrompt()} title="Don't show again" aria-label="Hide the GitHub star prompt">
-          <svg width="0.5625rem" height="0.5625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 2l6 6M8 2L2 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
+        <button class="btn btn-ghost btn-icon btn-xs star-prompt-close" type="button" onclick={() => vm.closeStarPrompt()} aria-label="Hide the GitHub star prompt">
+          <AddCloseIcon />
         </button>
       </span>
     {/if}
@@ -178,7 +178,6 @@
       class="btn btn-ghost btn-icon btn-xs layout-btn github-link-btn"
       type="button"
       onclick={() => openExternalURL(KURLO_UPDATES_URL)}
-      title="Kurlo updates and releases"
       aria-label="Open Kurlo updates on GitHub"
     >
       <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -230,7 +229,6 @@
         class:active={themeMenuOpen}
         type="button"
         onclick={() => (themeMenuOpen = !themeMenuOpen)}
-        title="Switch theme"
         aria-label="Switch theme"
         aria-haspopup="menu"
         aria-expanded={themeMenuOpen}
@@ -248,7 +246,6 @@
         class="version-pill"
         type="button"
         onclick={() => onOpenAbout?.()}
-        title="Open About"
         aria-label={`Kurlo version ${appVersion} — click to open About`}
       >
         v{appVersion}
@@ -259,7 +256,6 @@
       class:active={!sidebarHidden}
       type="button"
       onclick={onToggleSidebar}
-      title={`Toggle sidebar (${toggleSidebarShortcut})`}
       aria-label="Toggle sidebar"
     >
       <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -273,7 +269,6 @@
         type="button"
         onclick={() => vm.setResponseLayout(responseOnRight ? 'below' : 'right')}
         disabled={responseRightTooNarrow}
-        title={responseOnRight ? 'Show the response below the request' : responseRightTooNarrow ? `The editor is too narrow to show the response beside the request (it needs ${RESPONSE_RIGHT_CHOSEN_MIN_WIDTH} px)` : 'Show the response beside the request'}
         aria-label={responseOnRight ? 'Show the response below the request' : 'Show the response beside the request'}
       >
         <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -286,13 +281,27 @@
         </svg>
       </button>
     {/if}
+    {#if topView === 'agent'}
+      <button
+        class="btn btn-ghost btn-icon btn-xs layout-btn"
+        class:active={agentNavigation.detailsOpen}
+        type="button"
+        onclick={toggleAgentDetails}
+        aria-label="Toggle chat details"
+        aria-pressed={agentNavigation.detailsOpen}
+      >
+        <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.2"/>
+          <line x1="9" y1="1" x2="9" y2="13" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </button>
+    {/if}
     {#if codePanelAvailable}
       <button
         class="btn btn-ghost btn-icon btn-xs layout-btn"
         class:active={codePanelOpen}
         type="button"
         onclick={onToggleCodePanel}
-        title="Toggle code snippet panel"
         aria-label="Toggle code snippet panel"
       >
         <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">

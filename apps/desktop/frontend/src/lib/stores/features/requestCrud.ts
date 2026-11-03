@@ -82,6 +82,7 @@ type RequestCrudHost = {
   closeCollectionRunnerTab: () => void;
   closeCollectionSettingsTab: () => void;
   closeLoadTestTab: () => Promise<void>;
+  closeAgentTab: () => void;
   closeFloatingMenus: () => void;
   closeGitTab: () => void;
   closeHistoryDetail: () => void;
@@ -179,7 +180,7 @@ export const requestCrudFeature = {
     host.dirtyRequestIdList;
     const collectionIds = new Set(host.collections.filter(collection => collection.workspaceId === host.activeWorkspaceId).map(collection => collection.id));
     const query = host.sidebarSearch.trim().toLowerCase();
-    return host.requestsForDisplay().filter(request => !request.isDraft && request.isPinned && collectionIds.has(request.collectionId) && requestMatchesSidebarQuery(request, query));
+    return host.requests.filter(request => !request.isDraft && request.isPinned && collectionIds.has(request.collectionId) && requestMatchesSidebarQuery(request, query));
   },
 
   requestsForDisplay(this: RequestCrudHost): SavedRequest[] {
@@ -651,6 +652,8 @@ export const requestCrudFeature = {
       this.closeGitTab();
     } else if (this.topView === 'history') {
       this.closeHistoryDetail();
+    } else if (this.topView === 'agent') {
+      this.closeAgentTab();
     }
   },
 

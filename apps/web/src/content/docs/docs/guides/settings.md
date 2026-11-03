@@ -3,9 +3,9 @@ title: App settings
 description: Configure saving, scripts, themes, proxying, shortcuts, updates, support, and local data handling.
 ---
 
-Open app settings from the gear at the bottom of the activity rail — the strip of icons on the far left — or with the **Settings** keyboard shortcut. The search field filters the settings navigation and the cards shown on the General tab.
+Open app settings from the gear at the bottom of the activity rail — the strip of icons on the far left — or with the **Settings** keyboard shortcut. Every page has the same layout: a title and a line on what it covers, then settings grouped in boxes, each row with its name and description on the left and its control on the right. The search field filters the settings navigation and the groups shown on the General page.
 
-![Kurlo General settings with save mode, script engine, and advanced data controls](../../../../assets/screenshots/settings-general.png)
+![Kurlo General settings with saving, launch screen, script engine, default location and data rows](../../../../assets/screenshots/settings-general.png)
 
 App settings are different from the settings attached to API data:
 
@@ -21,7 +21,7 @@ See [Collection defaults](/docs/guides/collection-defaults/) and [Per-request se
 
 ### Saving
 
-Choose one of two modes:
+Under **Editing**, the **Saving** row switches between two modes:
 
 - **Autosave** saves request and collection edits automatically.
 - **Manual save** keeps edits dirty until you click **Save** or use the save shortcut. A dot on the request tab marks unsaved work.
@@ -30,7 +30,7 @@ In manual-save mode, an all-data export contains the last saved version of each 
 
 ### On launch
 
-Choose the screen Kurlo opens on:
+The **On launch** list chooses the screen Kurlo opens on; the row describes the current choice:
 
 | Option | What you see |
 |--------|--------------|
@@ -42,7 +42,7 @@ Your open tabs come back in every mode; only the screen in front changes. A work
 
 ### Script engine
 
-Choose **JavaScript** for Postman-style scripts or **Tengo** for the legacy lightweight engine. The selection controls which script fields Kurlo displays and runs.
+Under **Scripts**, choose **JavaScript** for Postman-style scripts or **Tengo** for the legacy lightweight engine. The selection controls which script fields Kurlo displays and runs.
 
 Each request and collection keeps separate JavaScript and Tengo source. Switching engines does not delete the script stored for the other engine.
 
@@ -52,14 +52,14 @@ See [Scripting](/docs/guides/scripting/) for runtime behavior and examples.
 
 ### Default location
 
-The default location is the starting directory for:
+Under **Files**, type a path or click **Browse**; Kurlo saves it when you leave the field, press `Enter` or click **Save**. The default location is the starting directory for:
 
 - New folder-backed workspaces.
 - Collection exports that ask for a destination folder.
 
 Changing it does not move existing workspaces or repositories.
 
-### Advanced data
+### Data
 
 **Export all data** creates a Kurlo-to-Kurlo JSON backup. **Import all data** replaces the current local profile after confirmation.
 
@@ -67,7 +67,7 @@ Read [Backup & recovery](/docs/guides/backup-recovery/) before using the import 
 
 ## Theme
 
-Choose **Light**, **Dark**, or **System**, then select separate light and dark variants. Each variant is shown as a miniature of Kurlo in its own colours — sidebar, request bar, a table and a highlighted response — so you can compare them before switching. System mode follows the operating-system appearance and uses the matching selected variant.
+The **Mode** row chooses **Light**, **Dark**, or **System**, then select separate light and dark variants. Each variant is shown as a miniature of Kurlo in its own colours — sidebar, request bar, a table and a highlighted response — so you can compare them before switching. System mode follows the operating-system appearance and uses the matching selected variant.
 
 ![Theme settings with appearance and variant controls](../../../../assets/screenshots/settings-theme.png)
 
@@ -77,15 +77,17 @@ To make the whole interface larger or smaller, use zoom rather than a setting: `
 
 ## Proxy
 
-The Proxy tab configures the fallback used across requests on this device. Request and collection proxy URLs can override it.
+The Proxy page configures the fallback used across requests on this device. Request and collection proxy URLs can override it. Choose **Off**, **On** or **System** in the first row; with **On**, the **Server** group (protocol, address and port, bypass list) and the **Authentication** group appear below.
 
 See [Proxy configuration](/docs/guides/proxy/) for precedence, authentication, bypass rules, and the difference between Off, On, and System modes.
 
 ## AI
 
+The AI page has three groups. **Your agents** connects an installed Codex CLI using its own account: its row shows the connection state, the signed-in account and CLI version, the model (changing it saves at once) and **Remove connection**; once connected, bars show how much of the plan's 5-hour and weekly limits is left and when each resets. **Executable** below opens the path to the CLI with **Check again** and **Choose executable**; see [Local agents](/docs/guides/agent/#local-agents). **Kurlo agent** lists the model connections used by the built-in agent and AI requests, and **Add another connection** offers the three ways to add one.
+
 The AI tab keeps the models that Kurlo's own AI features use. AI requests are separate: each one keeps its own base URL and key, so it can point at any provider or gateway you are testing.
 
-![AI settings with a saved Anthropic connection and the three ways to add another](../../../../assets/screenshots/settings-ai.png)
+![AI settings with Codex, a saved Anthropic connection and the three ways to add another](../../../../assets/screenshots/settings-ai.png)
 
 There are three ways to connect a model:
 
@@ -95,13 +97,13 @@ There are three ways to connect a model:
 
 Model lists open with a search field: type part of a name, use the arrow keys and press `Enter`. **Recommended** marks models that handle tool calls well, and **No tools** marks models whose provider reports no tool support.
 
-Kurlo keeps up to ten connections. The first one becomes the default; **Make default** changes it. The model next to a connection opens its model list, and **Remove** (click twice) deletes the connection and its key. An AI request whose provider is **Kurlo connection** uses the default connection.
+Kurlo keeps up to ten connections. The first one becomes the default; **Make default** changes it. The model next to a connection opens its model list, and **Remove** (click twice) deletes the connection and its key. An AI request whose provider is **Kurlo connection** uses the default connection, and the [agent](/docs/guides/agent/) starts new chats with it.
 
 Keys are encrypted with the same key as the local profile, which Kurlo keeps in the system keychain, and are stored in `preferences.json`. They are never written to workspace YAML or shown in the interface: a connection shows only a hint such as `sk-ant-…XYZ`, and when a provider repeats the key in an error, Kurlo shows `[your key]` instead. Checking a key and listing models use the system proxy environment variables, not the proxy configured in Kurlo.
 
 ## Shortcuts
 
-Click a command and press the desired key combination. Individual shortcuts and the complete set can be reset to their defaults.
+Shortcuts are grouped by area. Click a combination and press the new one; the line under the title says what Kurlo is waiting for. Individual shortcuts and the complete set can be reset to their defaults.
 
 The current command list and default bindings are documented in [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
 

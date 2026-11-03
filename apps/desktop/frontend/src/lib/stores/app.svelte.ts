@@ -5,6 +5,7 @@ import {
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
   emptyLoadRunState,
 } from '../backend';
+import { agentStore, codexAgentStore, claudeAgentStore } from './agent.svelte';
 import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../backend';
 import { EMPTY_COOKIE_SYNC_STATUS, EMPTY_MOCK_SERVER_STATUS } from '../wire';
 import { DEFAULT_MOCK_PORT } from '../mockRoutes';
@@ -94,8 +95,8 @@ import { workspaceDiagnosticsFeature } from './features/workspaceDiagnostics';
 
 const SIDEBAR_DEFAULT_WIDTH = 280;
 const TOP_VIEW_STORAGE_KEY = 'kurlo.topView.v1';
-const TOP_VIEW_VALUES: TopView[] = ['overview', 'request', 'environment', 'git', 'runner', 'collection'];
-const SIDEBAR_VIEW_VALUES: SidebarView[] = ['collections', 'environments', 'history'];
+const TOP_VIEW_VALUES: TopView[] = ['overview', 'request', 'environment', 'git', 'runner', 'collection', 'agent'];
+const SIDEBAR_VIEW_VALUES: SidebarView[] = ['collections', 'environments', 'history', 'agent'];
 const INITIAL_BODY_DEFAULTS = requestBodyDefaultsFor('http');
 
 type ImportSource = 'bruno' | 'postman' | 'insomnia' | 'openapi' | 'har';
@@ -257,6 +258,8 @@ class AppVM {
   mockServerLog = $state<MockRequestLog[]>([]);
   mockServerError = $state('');
   mockServerTabOpen = $state(false);
+  agentTabOpen = $state(false);
+  agentReturnSidebar: Exclude<SidebarView, 'agent'> = 'collections';
   mockServerRunningSignature = $state('');
   mockServerReloadTimer: ReturnType<typeof setTimeout> | null = null;
   declare mockServerTargetCollectionId: typeof mockServerFeature.mockServerTargetCollectionId;
@@ -959,6 +962,7 @@ class AppVM {
   declare refreshPendingExternalWorkspaceChangeIfClean: typeof workspaceDiagnosticsFeature.refreshPendingExternalWorkspaceChangeIfClean;
   declare reloadWorkspaceAfterExternalChange: typeof workspaceDiagnosticsFeature.reloadWorkspaceAfterExternalChange;
   declare handleExternalWorkspaceChange: typeof workspaceDiagnosticsFeature.handleExternalWorkspaceChange;
+  declare reloadKeepingDrafts: typeof workspaceDiagnosticsFeature.reloadKeepingDrafts;
 
   declare defaultCollectionForWorkspace: typeof workspaceFeature.defaultCollectionForWorkspace;
   declare workspaceIdForCollection: typeof workspaceFeature.workspaceIdForCollection;
@@ -1475,12 +1479,12 @@ class AppVM {
     }, 450);
   }
   async persistWorkspaceNow() {
-    if (this.workspaceBlocked) return;
+    if (this.workspaceBlocked) return false;
     if (this.workspacePersistTimer) {
       clearTimeout(this.workspacePersistTimer);
       this.workspacePersistTimer = null;
     }
-    await this.persistRequestStore(
+    return this.persistRequestStore(
       this.requests,
       this.activeRequestId,
       this.openRequestIds,
@@ -1626,6 +1630,7 @@ class AppVM {
     if (launchTopView) {
       if (savedTopViewState?.sidebarView) this.sidebarView = savedTopViewState.sidebarView;
       this.topView = launchTopView;
+      this.syncAgentSidebar();
     } else {
       this.restoreTopViewState(savedTopViewState);
     }
@@ -1633,6 +1638,9 @@ class AppVM {
   }
 
   async applyWorkspaceOpenResult(result: WorkspaceOpenResult, successMessage: string) {
+    agentStore.reset();
+    codexAgentStore.reset();
+    claudeAgentStore.reset();
     this.gitOutput = result.output ?? '';
     this.gitStatus = normalizeGitStatus(result.git);
     this.workspaceDiagnostics = normalizeWorkspaceDiagnostics(result.diagnostics);
@@ -1868,12 +1876,33 @@ class AppVM {
       this.topViewStateLoaded = true;
     } catch {}
   }
+  openAgentTab() {
+    this.closeFloatingMenus();
+    this.agentTabOpen = true;
+    this.topView = 'agent';
+    this.syncAgentSidebar();
+  }
+  closeAgentTab() {
+    this.agentTabOpen = false;
+    if (this.topView === 'agent') this.topView = this.activeRequestId ? 'request' : 'overview';
+    this.syncAgentSidebar();
+  }
+  syncAgentSidebar() {
+    if (this.topView === 'agent') {
+      if (this.sidebarView !== 'agent') {
+        this.agentReturnSidebar = this.sidebarView;
+        this.sidebarView = 'agent';
+      }
+      return;
+    }
+    if (this.sidebarView === 'agent') this.sidebarView = this.agentReturnSidebar;
+  }
   restoreTopViewState(state: TopViewState | null) {
     if (!state) {
       if (this.activeRequestId) this.topView = 'request';
       return;
     }
-    if (state.sidebarView) this.sidebarView = state.sidebarView;
+    if (state.sidebarView) this.sidebarView = state.sidebarView === 'agent' && state.topView !== 'agent' ? 'collections' : state.sidebarView;
     if (this.workspaceBlocked && state.topView !== 'overview' && state.topView !== 'git') {
       this.topView = 'overview';
       return;
@@ -1881,6 +1910,11 @@ class AppVM {
     if (state.topView === 'git') {
       this.gitWorkspaceOpen = true;
       this.topView = 'git';
+      return;
+    }
+    if (state.topView === 'agent') {
+      this.agentTabOpen = true;
+      this.topView = 'agent';
       return;
     }
     if (state.topView === 'runner') {

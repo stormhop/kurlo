@@ -365,6 +365,10 @@ func resolveKurloAiRequest(req model.AiRequest) (model.AiRequest, string, error)
 	if err != nil {
 		return req, "", err
 	}
+	return resolveAiConnectionRequest(req, connection)
+}
+
+func resolveAiConnectionRequest(req model.AiRequest, connection savedAiConnection) (model.AiRequest, string, error) {
 	key, err := savedAiConnectionKey(connection)
 	if err != nil {
 		return req, "", err
