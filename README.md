@@ -11,7 +11,7 @@ No account, no paid plan, no telemetry. Collections live as YAML in your Git rep
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/stormhop/kurlo/releases/latest)
 
-**[Download](https://github.com/stormhop/kurlo/releases/latest)** · [Website](https://kurlo.dev/) · [Docs](https://kurlo.dev/docs/getting-started/installation/) · [MCP server](https://kurlo.dev/mcp/) · [Compare](https://kurlo.dev/vs/postman/)
+**[Download](https://github.com/stormhop/kurlo/releases/latest)** · [Website](https://kurlo.dev/) · [Docs](https://kurlo.dev/docs/getting-started/installation/) · [Agent mode](https://kurlo.dev/agent/) · [MCP server](https://kurlo.dev/mcp/) · [Compare](https://kurlo.dev/vs/postman/)
 
 </div>
 

@@ -4,7 +4,7 @@ import Default from '@astrojs/starlight/components/Footer.astro';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 const columns = [
-  { title: 'Kurlo', links: [['Home', base], ['Download', `${base}download/`], ['MCP', `${base}mcp/`], ['Changelog', `${base}changelog/`], ['Privacy', `${base}privacy/`]] },
+  { title: 'Kurlo', links: [['Home', base], ['Download', `${base}download/`], ['Agent mode', `${base}agent/`], ['MCP', `${base}mcp/`], ['Changelog', `${base}changelog/`], ['Privacy', `${base}privacy/`]] },
   { title: 'Compare', links: [['vs Postman', `${base}vs/postman/`], ['vs Insomnia', `${base}vs/insomnia/`], ['vs Bruno', `${base}vs/bruno/`]] },
   { title: 'Source', links: [['GitHub', 'https://github.com/stormhop/kurlo'], ['Report an issue', 'https://github.com/stormhop/kurlo/issues'], ['npm', 'https://www.npmjs.com/package/@kurlo/cli']] },
 ];

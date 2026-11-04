@@ -1,0 +1,162 @@
+---
+import AgentIcon from './AgentIcon.astro';
+
+const agents = [
+  { id: 'kurlo', name: 'Kurlo agent', note: 'Any model: OpenRouter, your own key, or Ollama and LM Studio on this machine.', model: 'llama3.3 · Ollama', meter: 'Local model · free', pct: 100 },
+  { id: 'claude', name: 'Claude Code', note: 'The CLI you already use, signed in with your Claude plan.', model: 'Opus 5.5 · High', meter: 'Claude plan · 5-hour window 82% left', pct: 82 },
+  { id: 'codex', name: 'Codex', note: 'The CLI you already use, signed in with your ChatGPT plan.', model: 'Codex · High', meter: 'Codex plan · 5-hour window 70% left', pct: 70 },
+];
+---
+
+<div class="k-a3-stage" data-a3>
+  <div class="k-a3-pick" role="radiogroup" aria-label="Agent">
+    <p class="k-a3-pick-label">Pick who answers</p>
+    {agents.map((agent, i) => (
+      <button type="button" role="radio" class={i === 1 ? 'on' : ''} aria-checked={i === 1 ? 'true' : 'false'} data-agent={agent.id} data-model={agent.model} data-meter={agent.meter} data-pct={agent.pct} data-name={agent.name}>
+        <span class={`k-a3-glyph g-${agent.id}`} aria-hidden="true"><AgentIcon id={agent.id as 'kurlo' | 'claude' | 'codex'} /></span>
+        <span class="k-a3-pick-copy"><b>{agent.name}</b><small>{agent.note}</small></span>
+      </button>
+    ))}
+    <p class="k-a3-pick-foot">One chat list for all three. Switch per chat.</p>
+  </div>
+
+  <div class="k-a3-win" aria-label="Example Agent mode chat">
+    <div class="k-app-bar"><i></i><i></i><i></i><span>Kurlo — Agent</span></div>
+    <div class="k-a3-chathead">
+      <b>Why does Cancel order fail?</b>
+      <span class="k-a3-who"><span class="k-a3-glyph g-claude" data-a3-glyph aria-hidden="true"><AgentIcon id="claude" /></span><span data-a3-model>Claude Code · Opus 5.5 · High</span></span>
+    </div>
+    <div class="k-a3-log" data-a3-log aria-live="polite">
+      <p class="k-a3-me" data-step="1">Cancel order keeps failing. Fix the test if the API is right.</p>
+      <ol class="k-a3-tools" data-step="2">
+        <li><b class="ok">✓</b>Read a request <strong>Shop API/Orders/Cancel order</strong> <code>DELETE</code></li>
+        <li><b class="ok">✓</b>Ran a request <strong>DELETE /orders/41</strong> <span class="bad">409</span> <span class="dim">51 ms</span></li>
+      </ol>
+      <p class="k-a3-say" data-step="3">Order 41 has already shipped, so the API answers <code>409 Conflict</code>. That’s by design; the test expects <code>204</code>. I’ll test for the conflict instead.</p>
+      <div class="k-a3-ask" data-step="4" data-a3-ask>
+        <div class="k-a3-ask-head"><span><b>⛉</b> Change 1 file?</span><code>save_request</code></div>
+        <div class="k-a3-diff">
+          <p class="dim">requests/Cancel-order.yml</p>
+<pre><span class="ctx">    testScriptJs: |</span>
+<span class="del">-       pm.test("status is 204", () =&gt; pm.response.to.have.status(204))</span>
+<span class="add">+       pm.test("refuses shipped orders", () =&gt; &#123;</span>
+<span class="add">+           pm.response.to.have.status(409)</span>
+<span class="add">+           pm.expect(pm.response.json().error).to.eql("order_shipped")</span>
+<span class="add">+       &#125;)</span></pre>
+        </div>
+        <div class="k-a3-ask-foot" data-a3-buttons>
+          <button type="button" class="k-a3-apply" data-a3-apply>Apply</button>
+          <button type="button" data-a3-apply>Allow for this chat</button>
+          <button type="button" class="k-a3-ghost" data-a3-reject>Reject</button>
+        </div>
+      </div>
+      <ol class="k-a3-tools" data-step="5" data-a3-after hidden>
+        <li><b class="ok">✓</b>Saved a request <strong>Cancel order</strong> <code>save_request</code></li>
+        <li><b class="ok">✓</b>Ran a request <strong>DELETE /orders/41</strong> <span class="dim">409</span> <span class="ok">tests 2/2</span></li>
+      </ol>
+      <p class="k-a3-say" data-a3-done hidden>Done. Cancel order now checks for <code>409</code> and passes.</p>
+      <p class="k-a3-say dim" data-a3-nope hidden>Rejected. Nothing was written.</p>
+    </div>
+    <div class="k-a3-wait" data-a3-wait hidden><i></i>The agent is waiting for your approval</div>
+    <div class="k-a3-box">
+      <p>Ask to run, explain or change something</p>
+      <div class="k-a3-box-row">
+        <span class="k-a3-chip">Shop API</span>
+        <span class="k-a3-chip">Staging</span>
+        <span class="k-a3-chip k-a3-chip-flat">Templates</span>
+        <span class="k-a3-meter"><span data-a3-meter>Claude plan · 5-hour window 82% left</span><i><i data-a3-bar style="--p:82%"></i></i></span>
+      </div>
+    </div>
+    <button type="button" class="k-a3-replay" data-a3-replay hidden>Play it again</button>
+  </div>
+</div>
+
+<script is:inline>
+  (() => {
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const stage = document.querySelector('[data-a3]');
+    if (stage) {
+      const picks = [...stage.querySelectorAll('[data-agent]')];
+      const model = stage.querySelector('[data-a3-model]');
+      const glyph = stage.querySelector('[data-a3-glyph]');
+      const meter = stage.querySelector('[data-a3-meter]');
+      const bar = stage.querySelector('[data-a3-bar]');
+      const log = stage.querySelector('[data-a3-log]');
+      const ask = stage.querySelector('[data-a3-ask]');
+      const wait = stage.querySelector('[data-a3-wait]');
+      const after = stage.querySelector('[data-a3-after]');
+      const done = stage.querySelector('[data-a3-done]');
+      const nope = stage.querySelector('[data-a3-nope]');
+      const replay = stage.querySelector('[data-a3-replay]');
+      const steps = [...log.querySelectorAll('[data-step]')].filter(el => !el.hidden);
+      let timers = [];
+      const later = (fn, ms) => timers.push(setTimeout(fn, still ? 0 : ms));
+
+      const pick = button => {
+        picks.forEach(b => {
+          const on = b === button;
+          b.classList.toggle('on', on);
+          b.setAttribute('aria-checked', on ? 'true' : 'false');
+          b.tabIndex = on ? 0 : -1;
+        });
+        const source = button.querySelector('.k-a3-glyph');
+        glyph.className = source.className;
+        glyph.innerHTML = source.innerHTML;
+        model.textContent = `${button.dataset.name} · ${button.dataset.model}`;
+        meter.textContent = button.dataset.meter;
+        bar.style.setProperty('--p', `${button.dataset.pct}%`);
+      };
+      picks.forEach((button, i) => {
+        button.addEventListener('click', () => pick(button));
+        button.addEventListener('keydown', event => {
+          const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+          if (!step) return;
+          event.preventDefault();
+          const next = picks[(i + step + picks.length) % picks.length];
+          pick(next);
+          next.focus();
+        });
+      });
+      pick(picks.find(b => b.classList.contains('on')));
+
+      const reveal = el => { el.hidden = false; requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in'))); };
+      const play = () => {
+        timers.forEach(clearTimeout);
+        timers = [];
+        log.classList.add('k-a3-play');
+        steps.forEach(el => el.classList.remove('in'));
+        [after, done, nope].forEach(el => { el.hidden = true; el.classList.remove('in'); });
+        ask.classList.remove('done');
+        wait.hidden = true;
+        replay.hidden = true;
+        steps.forEach((el, i) => later(() => reveal(el), 300 + i * 900));
+        later(() => { wait.hidden = false; }, 300 + steps.length * 900);
+      };
+      const finish = applied => {
+        if (ask.classList.contains('done')) return;
+        ask.classList.add('done');
+        wait.hidden = true;
+        if (applied) {
+          reveal(after);
+          later(() => reveal(done), 700);
+        } else {
+          reveal(nope);
+        }
+        later(() => { replay.hidden = false; }, 900);
+      };
+      stage.querySelectorAll('[data-a3-apply]').forEach(b => b.addEventListener('click', () => finish(true)));
+      stage.querySelector('[data-a3-reject]').addEventListener('click', () => finish(false));
+      replay.addEventListener('click', play);
+
+      if (still || !('IntersectionObserver' in window)) {
+        wait.hidden = false;
+      } else {
+        log.classList.add('k-a3-play');
+        const seen = new IntersectionObserver(entries => {
+          if (entries.some(e => e.isIntersecting)) { seen.disconnect(); play(); }
+        }, { threshold: 0.35 });
+        seen.observe(log);
+      }
+    }
+  })();
+</script>
