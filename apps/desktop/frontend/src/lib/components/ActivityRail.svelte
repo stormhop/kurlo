@@ -14,6 +14,7 @@
     openCookieJar,
     openSettings,
     openAgent,
+    agentNew = false,
   }: {
     sidebarView: SidebarView;
     sidebarHidden: boolean;
@@ -26,6 +27,7 @@
     openCookieJar: () => void;
     openSettings: (tab?: SettingsTab) => void;
     openAgent: () => void;
+    agentNew?: boolean;
   } = $props();
 
   function showSidebarView(view: SidebarView) {
@@ -59,6 +61,7 @@
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 3.5 13.6 8a2 2 0 0 0 1.4 1.4l4.5 1.6-4.5 1.6a2 2 0 0 0-1.4 1.4L12 18.5 10.4 14A2 2 0 0 0 9 12.6L4.5 11 9 9.4A2 2 0 0 0 10.4 8z"/><path d="M18.5 3v3M17 4.5h3"/>
       </svg>
+      {#if agentNew}<span class="activity-rail-dot activity-rail-dot-new" aria-hidden="true"></span>{/if}
     </button>
   </div>
 
@@ -201,6 +204,10 @@
     border: 1.5px solid var(--surface);
     border-radius: 50%;
     background: var(--s2xx);
+  }
+
+  .activity-rail-dot-new {
+    background: var(--accent);
   }
 
   .activity-rail-count {

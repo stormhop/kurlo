@@ -9,6 +9,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Meet Agent mode.** The first launch after updating from 2.x to 3.0 shows a short introduction to Agent mode instead of the long list of changes: the Kurlo agent, Claude Code and Codex, with **Try Agent mode** to open the Agent tab and **All changes** for the release notes. It appears once. Until the Agent tab is opened for the first time, its icon in the activity bar carries a blue dot, for new installs too.
+
 - **Claude Code in Agent Mode.** Connect the installed Claude Code CLI in **Settings → AI** the same way as Codex: Kurlo shows the CLI version and the signed-in account and plan (or API key / cloud provider), starts the official Claude sign-in if needed, and **Use this account** saves the connection with the chosen model; **Reconnect**, **Remove connection** and a custom executable path work as for Codex. Pick Claude Code and a model by its full name (Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5; the CLI's own default is preselected and marked) and an effort from Low to Max, with High preselected and always passed to the CLI, so the menu shows the level actually used, continue native sessions, and review workspace changes with Kurlo’s approval controls. Chat details show token usage, the cost at API prices, the last request's context against the model's window, and the Claude plan's 5-hour and weekly limits, which also appear as bars in Settings as soon as the connection is checked (read with the CLI's own `/usage`, which uses no tokens); a failed turn shows the CLI's reason, such as a model that needs usage credits.
 
 - **Rename environments from their names.** Edit the environment name directly in the editor, or double-click it in the sidebar. **Rename** focuses the name field; Enter or leaving the field saves, and Escape cancels.
@@ -54,6 +56,8 @@ All notable changes to Kurlo are documented here. This project follows
 - **Private agent tool channel.** The local MCP server the Claude Code agent talks to during a turn now requires a random per-turn token, and its address reaches the CLI through a temporary file readable only by your account instead of the process arguments, which any local user can read.
 
 - **Owner-only variable exports.** `kurlo run --export-environment` and `--export-globals` write owner-only files on Unix, including when replacing an earlier export.
+
+- **What's new dialog and update flow.** The dialog closes with Escape, and its release notes link handles versions written with a leading "v". Blocked browser storage no longer breaks the update check, the automatic install or the first launch, and the manual install link opens in a fully isolated tab.
 
 - **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
 

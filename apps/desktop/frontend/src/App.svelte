@@ -4,7 +4,7 @@
   import { getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
   import type { MockRequestLog, OAuth2DevicePrompt, UpdateInfo } from './lib/backend';
   import { hasReleaseNotes } from 'virtual:kurlo-changelog-meta';
-  import { isReleaseVersion, latestReleaseNotes, releaseNotesFor, shouldShowWhatsNew, type ChangelogSection } from './lib/whatsNew';
+  import { isReleaseVersion, latestReleaseNotes, normalizeVersion, releaseNotesFor, shouldShowWhatsNew, shouldSpotlightAgentMode, type ChangelogSection } from './lib/whatsNew';
   import WhatsNewModal from './lib/components/WhatsNewModal.svelte';
   import UpdateBanner from './lib/components/UpdateBanner.svelte';
   import { vm } from './lib/stores/app.svelte';
@@ -51,8 +51,42 @@
   const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
   const UPDATE_READY_KEY = 'kurlo:update-ready';
   const LAST_SEEN_VERSION_KEY = 'kurlo:last-seen-version';
+  const AGENT_SEEN_KEY = 'kurlo:agent-seen';
 
   let whatsNewSection = $state<ChangelogSection | null>(null);
+  let whatsNewSpotlight = $state(false);
+  let agentSeen = $state(readAgentSeen());
+
+  function readAgentSeen() {
+    try {
+      return localStorage.getItem(AGENT_SEEN_KEY) === '1';
+    } catch {
+      return true;
+    }
+  }
+
+  function readStoredFlag(key: string) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeStoredValue(key: string, value: string | null) {
+    try {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    } catch {}
+  }
+
+  $effect(() => {
+    if (vm.topView !== 'agent' || agentSeen) return;
+    agentSeen = true;
+    try {
+      localStorage.setItem(AGENT_SEEN_KEY, '1');
+    } catch {  }
+  });
 
   async function loadChangelog(): Promise<string> {
     return (await import('virtual:kurlo-changelog')).default;
@@ -65,10 +99,12 @@
     } catch {
       return;
     }
-    const mayShow = shouldShowWhatsNew(version, lastSeen, hasReleaseNotes);
-    if (mayShow) {
-      const section = releaseNotesFor(await loadChangelog(), version);
+    const spotlight = shouldSpotlightAgentMode(version, lastSeen);
+    if (spotlight || shouldShowWhatsNew(version, lastSeen, hasReleaseNotes)) {
+      const notes = hasReleaseNotes ? releaseNotesFor(await loadChangelog(), version) : null;
+      const section = notes ?? (spotlight ? { version: normalizeVersion(version), date: '', body: '' } : null);
       if (!section) return;
+      whatsNewSpotlight = spotlight;
       whatsNewSection = section;
     }
     if (isReleaseVersion(version)) {
@@ -80,10 +116,17 @@
 
   function dismissWhatsNew() {
     whatsNewSection = null;
+    whatsNewSpotlight = false;
+  }
+
+  function tryAgentMode() {
+    dismissWhatsNew();
+    vm.openAgentTab();
   }
 
   async function showWhatsNew() {
     const markdown = await loadChangelog();
+    whatsNewSpotlight = false;
     whatsNewSection = releaseNotesFor(markdown, vm.appVersion) ?? latestReleaseNotes(markdown);
   }
 
@@ -101,7 +144,7 @@
 
   let updateInfo = $state<UpdateInfo | null>(null);
   let updateReady = $state(false);
-  let autoUpdateInstall = $state(localStorage.getItem(AUTO_UPDATE_INSTALL_KEY) === 'true');
+  let autoUpdateInstall = $state(readStoredFlag(AUTO_UPDATE_INSTALL_KEY) === 'true');
   let autoUpdateInstalling = $state(false);
   let updateCheckTimer: ReturnType<typeof setTimeout> | null = null;
   let destroyed = false;
@@ -137,7 +180,7 @@
 
   function setAutoUpdateInstall(value: boolean) {
     autoUpdateInstall = value;
-    localStorage.setItem(AUTO_UPDATE_INSTALL_KEY, value ? 'true' : 'false');
+    writeStoredValue(AUTO_UPDATE_INSTALL_KEY, value ? 'true' : 'false');
   }
 
   function markUpdateReady(info: UpdateInfo) {
@@ -146,18 +189,18 @@
   }
 
   function syncUpdateReadyForVersion(version: string): boolean {
-    const pendingReadyVersion = localStorage.getItem(UPDATE_READY_KEY);
+    const pendingReadyVersion = readStoredFlag(UPDATE_READY_KEY);
     if (!pendingReadyVersion) {
       updateReady = false;
       return false;
     }
     if (pendingReadyVersion === version) {
-      localStorage.removeItem(UPDATE_READY_KEY);
+      writeStoredValue(UPDATE_READY_KEY, null);
       updateReady = false;
       return false;
     }
     if (!isPendingVersionNewer(pendingReadyVersion, version)) {
-      localStorage.removeItem(UPDATE_READY_KEY);
+      writeStoredValue(UPDATE_READY_KEY, null);
       updateReady = false;
       return false;
     }
@@ -181,7 +224,7 @@
   }
 
   async function installUpdateAutomatically(info: UpdateInfo): Promise<boolean> {
-    if (info.manualInstallUrl || !autoUpdateInstall || autoUpdateInstalling || localStorage.getItem(UPDATE_READY_KEY)) return false;
+    if (info.manualInstallUrl || !autoUpdateInstall || autoUpdateInstalling || readStoredFlag(UPDATE_READY_KEY)) return false;
     autoUpdateInstalling = true;
     try {
       const err = await applyUpdate(info);
@@ -189,7 +232,7 @@
         console.warn('Auto-update install failed:', err);
         return false;
       }
-      localStorage.setItem(UPDATE_READY_KEY, info.version);
+      writeStoredValue(UPDATE_READY_KEY, info.version);
       updateReady = true;
       return true;
     } catch (err) {
@@ -201,15 +244,11 @@
   }
 
   function downloadPackagedUpdate(info: UpdateInfo) {
-    if (window.runtime?.BrowserOpenURL) {
-      window.runtime.BrowserOpenURL(info.manualInstallUrl);
-    } else {
-      window.open(info.manualInstallUrl, '_blank');
-    }
+    openExternalURL(info.manualInstallUrl);
   }
 
   function restartForInstalledUpdate() {
-    localStorage.removeItem(UPDATE_READY_KEY);
+    writeStoredValue(UPDATE_READY_KEY, null);
     void restartApp();
   }
 
@@ -455,7 +494,7 @@
 />
 
 {#if whatsNewSection}
-  <WhatsNewModal section={whatsNewSection} onDismiss={dismissWhatsNew} />
+  <WhatsNewModal section={whatsNewSection} onDismiss={dismissWhatsNew} spotlight={whatsNewSpotlight} onTryAgent={tryAgentMode} />
 {/if}
 
 <main
@@ -488,6 +527,7 @@
     openCookieJar={vm.openCookieJar}
     openSettings={vm.openSettings}
     openAgent={() => vm.openAgentTab()}
+    agentNew={!agentSeen}
   />
 
   <Sidebar

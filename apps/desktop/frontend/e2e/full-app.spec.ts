@@ -132,6 +132,7 @@ async function tourPause(page: Page, label: string) {
 async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 'browser/e2e', docsMode = Boolean(docsScreenshotDir), storeOverride: Record<string, unknown> | null = null) {
   await page.addInitScript(({ largeResponseBody, runtime, docsMode, storeOverride }) => {
     localStorage.clear();
+    localStorage.setItem('kurlo:agent-seen', '1');
 
     const emptyGitStatus = {
       isRepo: false,
@@ -2586,6 +2587,44 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.waitForTimeout(500);
     await expect(whatsNew).toHaveCount(0);
     expect(changelogRequests).toEqual([]);
+  });
+
+  test('introduces Agent mode once after an update to 3.0 and marks the Agent button until it is opened', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('kurlo-e2e-agent-mode')) {
+        sessionStorage.setItem('kurlo-e2e-agent-mode', '1');
+        localStorage.setItem('kurlo:last-seen-version', '2.6.1');
+        localStorage.removeItem('kurlo:agent-seen');
+      } else {
+        localStorage.setItem('kurlo:last-seen-version', '3.0.0');
+      }
+      const app = (window as any).go.api.App;
+      app.AppInfo = async () => ({ name: 'Kurlo', version: '3.0.0', runtime: 'browser/e2e', goVersion: 'e2e' });
+    });
+    await page.goto('/');
+
+    const spotlight = page.getByRole('dialog', { name: 'Meet Agent mode' });
+    await expect(spotlight).toBeVisible();
+    await expect(spotlight).toContainText('New in Kurlo 3.0.0');
+    for (const agent of ['Kurlo agent', 'Claude Code', 'Codex']) await expect(spotlight.getByRole('listitem').filter({ hasText: agent })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /What's new in Kurlo/ })).toHaveCount(0);
+    const newDot = page.getByRole('button', { name: 'Agent', exact: true }).locator('.activity-rail-dot-new');
+    await expect(newDot).toBeVisible();
+    await captureDocsScreenshot(page, 'agent-spotlight');
+
+    await spotlight.getByRole('button', { name: 'Try Agent mode' }).click();
+    await expect(spotlight).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Agent', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(newDot).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('kurlo:agent-seen'))).toBe('1');
+    expect(await page.evaluate(() => localStorage.getItem('kurlo:last-seen-version'))).toBe('3.0.0');
+
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Agent', exact: true })).toBeVisible();
+    await page.waitForTimeout(500);
+    await expect(spotlight).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: /What's new in Kurlo/ })).toHaveCount(0);
   });
 
   test('opens the full release notes in the system browser', async ({ page }) => {
