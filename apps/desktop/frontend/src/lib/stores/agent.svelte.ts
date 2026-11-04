@@ -55,7 +55,7 @@ export class AgentStore {
   loadingEarlier = $state(false);
   compacting = $state(false);
   private historyRequest = 0;
-  private chatLoads = new Map<string, symbol>();
+  private chatLoads = new SvelteMap<string, symbol>();
   workspaceId = $state('');
 
   private composer = $state(Symbol());
