@@ -43,6 +43,7 @@ type AgentApprovalClosed struct {
 }
 
 type AgentChatSummary struct {
+	ArchivedAt  int64  `json:"archivedAt,omitempty"`
 	WorkspaceID string `json:"workspaceId"`
 	Driver      string `json:"driver,omitempty"`
 	ID          string `json:"id"`
@@ -52,6 +53,7 @@ type AgentChatSummary struct {
 }
 
 type AgentChat struct {
+	ArchivedAt       int64       `json:"archivedAt,omitempty"`
 	MessageOffset    int         `json:"messageOffset,omitempty"`
 	MessageCount     int         `json:"messageCount,omitempty"`
 	WorkspaceID      string      `json:"workspaceId"`

@@ -91,9 +91,17 @@ export function stepViewFrom(step: AiStep): AiStepView {
   };
 }
 
+const MAX_AI_STEP_INDEX = 1000;
+const MAX_AI_BLOCK_INDEX = 1000;
+
+export function isAiStepIndex(index: number): boolean {
+  return Number.isInteger(index) && index >= 0 && index <= MAX_AI_STEP_INDEX;
+}
+
 export function applyAiDeltas(turn: AiTurn, deltas: AiDelta[]): AiTurn {
   const steps = turn.steps.slice();
   for (const delta of deltas) {
+    if (!isAiStepIndex(delta.step) || !Number.isInteger(delta.index) || delta.index < 0 || delta.index > MAX_AI_BLOCK_INDEX) continue;
     while (steps.length <= delta.step) steps.push(emptyStepView(steps.length));
     const step = { ...steps[delta.step], blocks: steps[delta.step].blocks.slice() };
     while (step.blocks.length <= delta.index) step.blocks.push({ type: '' });
@@ -463,7 +471,7 @@ export const aiFeature = {
     runtime.EventsOn('ai:step', (payload: { sessionId: string; turnId?: string; step: AiStep }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
-      if (!turn || turn.status !== 'streaming') return;
+      if (!turn || turn.status !== 'streaming' || !isAiStepIndex(payload.step.index)) return;
       if (payload.turnId && payload.turnId !== turn.id) return;
       this.updateAiTurn(payload.sessionId, turn.id, current => {
         const steps = current.steps.slice();
@@ -475,7 +483,7 @@ export const aiFeature = {
     runtime.EventsOn('ai:tool', (payload: { sessionId: string; turnId?: string; step: number; block: AiBlock }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
-      if (!turn || turn.status !== 'streaming') return;
+      if (!turn || turn.status !== 'streaming' || !isAiStepIndex(payload.step)) return;
       if (payload.turnId && payload.turnId !== turn.id) return;
       this.updateAiTurn(payload.sessionId, turn.id, current => {
         const steps = current.steps.slice();

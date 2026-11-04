@@ -7,6 +7,7 @@
   import VirtualAgentHistory from './VirtualAgentHistory.svelte';
   import Markdown from './Markdown.svelte';
   import Select from './Select.svelte';
+  import { focusFirstMenuItem, handleMenuKeydown } from '../menuKeyboard';
   import AgentApprovalCard from './AgentApprovalCard.svelte';
   import AgentPicker from './AgentPicker.svelte';
   import { vm } from '../stores/app.svelte';
@@ -33,8 +34,12 @@
   let templatesMenu = $state<HTMLDivElement>();
   let titleDraft = $state('');
   let titleError = $state('');
+  let deleteError = $state('');
   let titleInput = $state<HTMLInputElement>();
   let chatMenuOpen = $state(false);
+  let chatMenu = $state<HTMLDivElement>();
+  let chatMenuTrigger = $state<HTMLButtonElement>();
+  let history = $state<{ captureAnchor: () => void }>();
   let lastChatId = '';
   const openTools = new SvelteSet<string>();
   const openThinking = new SvelteSet<string>();
@@ -44,16 +49,20 @@
   const needsConnection = $derived(!agentStore.driver && aiConnectionsStore.loaded && codexConnectionStore.loaded && connections.length === 0 && !codexReady);
   const starters = AGENT_STARTERS.map(id => AGENT_TEMPLATES.find(template => template.id === id)).filter((template): template is AgentTemplate => Boolean(template));
   const starterLabels: Record<string, string> = { debug: 'Explain failure', check: 'Check collection', tests: 'Write tests', cover: 'Cover endpoint' };
-  const persisted = $derived<AgentTurnView[]>(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId ? agentTurnsFromMessages(agentStore.activeChat.messages, agentStore.activeChat.id, agentStore.activeChat.messageOffset ?? 0) : []);
+  const persisted = $derived<AgentTurnView[]>(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId ? agentTurnsFromMessages(agentStore.activeChat.messages, '', agentStore.activeChat.messageOffset ?? 0) : []);
   const live = $derived(agentStore.liveInActiveChat ? agentStore.live : null);
   const turns = $derived.by<Array<AgentTurnView & { live: boolean }>>(() => {
     const out = persisted.map(turn => ({ ...turn, live: false }));
-    if (live) out.push({ id: live.id, prompt: live.prompt, steps: live.steps, live: true });
+    const chat = chatLoaded ? agentStore.activeChat : null;
+    const nextMessage = chat?.messageCount ?? (chat?.messageOffset ?? 0) + (chat?.messages.length ?? 0);
+    if (live) out.push({ id: `:${nextMessage}`, prompt: live.prompt, steps: live.steps, live: true });
     return out;
   });
   const notes = $derived(agentStore.notes && agentStore.notes.chatId === agentStore.activeChatId ? agentStore.notes : null);
   const lastPersisted = $derived(persisted.at(-1) ?? null);
-  const canRetry = $derived(!agentStore.running && Boolean((lastPersisted && (!agentTurnAnswer(lastPersisted.steps) || notes?.error)) || (notes?.error && agentStore.draft.trim())));
+  const activeSummary = $derived(agentStore.chats.find(chat => chat.id === agentStore.activeChatId));
+  const archived = $derived(Boolean(activeSummary ? activeSummary.archivedAt : (agentStore.activeChat?.id === agentStore.activeChatId && agentStore.activeChat?.archivedAt)));
+  const canRetry = $derived(!archived && !agentStore.running && Boolean((lastPersisted && (!agentTurnAnswer(lastPersisted.steps) || notes?.error)) || (notes?.error && agentStore.draft.trim())));
   const approvals = $derived(agentStore.activeApprovals);
   const chatLoaded = $derived(Boolean(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId));
   const chatSaved = $derived(Boolean(agentStore.activeChatId));
@@ -170,13 +179,35 @@
 
   $effect(() => {
     if (agentStore.activeChatId === lastChatId) return;
+    const assignedLiveChat = !lastChatId && agentStore.liveInActiveChat;
     lastChatId = agentStore.activeChatId;
+    chatMenuOpen = false;
+    if (assignedLiveChat) return;
+    deleteError = '';
     openTools.clear();
     openThinking.clear();
     copiedKey = '';
     stickToBottom = true;
   });
 
+
+  function loadEarlier() {
+    history?.captureAnchor();
+    stickToBottom = false;
+    void agentStore.loadEarlier();
+  }
+
+  async function toggleChatMenu() {
+    chatMenuOpen = !chatMenuOpen;
+    if (!chatMenuOpen) return;
+    await tick();
+    focusFirstMenuItem(chatMenu);
+  }
+
+  function closeChatMenu() {
+    chatMenuOpen = false;
+    chatMenuTrigger?.focus();
+  }
 
   function onScroll() {
     if (!scroller) return;
@@ -280,6 +311,19 @@
     if (titleError) titleDraft = title;
   }
 
+  async function deleteActiveChat() {
+    chatMenuOpen = false;
+    deleteError = '';
+    const store = agentStore;
+    const id = store.activeChat?.id;
+    if (!id) return;
+    try {
+      await store.remove(id);
+    } catch (error) {
+      if (store === agentStore && id === store.activeChatId) deleteError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
   function onTitleKeydown(event: KeyboardEvent) {
     const input = event.currentTarget as HTMLInputElement;
     if (event.key === 'Enter') {
@@ -296,7 +340,7 @@
     templatesOpen = !templatesOpen;
     if (!templatesOpen) return;
     await tick();
-    templatesMenu?.querySelector<HTMLButtonElement>('.menu-item')?.focus();
+    focusFirstMenuItem(templatesMenu);
   }
 
   async function useTemplate(template: AgentTemplate) {
@@ -311,27 +355,19 @@
   }
 
   function onTemplatesKeydown(event: KeyboardEvent) {
-    const items = Array.from(templatesMenu?.querySelectorAll<HTMLButtonElement>('.menu-item') ?? []);
-    const index = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
+    handleMenuKeydown(event, () => {
       templatesOpen = false;
       composerInput?.focus();
-    } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      event.stopPropagation();
-      const next = event.key === 'ArrowDown' ? (index + 1) % items.length : (index - 1 + items.length) % items.length;
-      items[next]?.focus();
-    }
+    });
   }
 
   function onWindowPointerDown(event: PointerEvent) {
-    if (chatMenuOpen && !(event.target instanceof Element && event.target.closest('.agent-header-menu'))) chatMenuOpen = false;
+    if (chatMenuOpen && !(event.target instanceof Element && event.target.closest('.agent-header-menu'))) closeChatMenu();
     if (!templatesOpen) return;
     const target = event.target;
     if (target instanceof Element && target.closest('.agent-templates-menu, .agent-templates-btn')) return;
     templatesOpen = false;
+    composerInput?.focus();
   }
 
   async function retry() {
@@ -404,7 +440,7 @@
 {/snippet}
 
 <div class="agent-workspace" bind:this={workspaceElement}>
-  {#if needsConnection}
+  {#if needsConnection && !archived}
     <div class="agent-onboarding">
       <h2 class="agent-onboarding-title">Connect a model to start</h2>
       <p class="agent-onboarding-text">The agent runs on your own key or a model on this computer. It reads and runs your requests, explains failures and edits the collection, and asks before it sends anything that changes data or writes a file.</p>
@@ -442,17 +478,20 @@
           onblur={() => void commitTitle()}
           onkeydown={onTitleKeydown}
           disabled={workspaceBlocked}
+          readonly={archived}
         />
-        {#if titleError}<span class="agent-title-error" role="alert">{titleError}</span>{/if}
+        {#if titleError || deleteError}<span class="agent-title-error" role="alert">{titleError || deleteError}</span>{/if}
         <div class="agent-header-menu">
-          <button class="btn btn-ghost btn-icon btn-sm agent-header-menu-btn" type="button" aria-label="Chat actions" aria-haspopup="menu" aria-expanded={chatMenuOpen} onclick={() => (chatMenuOpen = !chatMenuOpen)} disabled={workspaceBlocked}>
+          <button class="btn btn-ghost btn-icon btn-sm agent-header-menu-btn" type="button" aria-label="Chat actions" aria-haspopup="menu" aria-expanded={chatMenuOpen} bind:this={chatMenuTrigger} onclick={() => void toggleChatMenu()} disabled={workspaceBlocked}>
             <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="12.5" cy="8" r="1.2"/></svg>
           </button>
           {#if chatMenuOpen}
-            <div class="menu agent-header-dropdown" role="menu" aria-label="Chat actions">
-              <button class="menu-item" type="button" role="menuitem" onclick={() => { chatMenuOpen = false; titleInput?.focus(); titleInput?.select(); }}>Rename</button>
-              <div class="menu-separator" role="separator"></div>
-              <button class="menu-item danger" type="button" role="menuitem" disabled={agentStore.running && agentStore.liveChatId === agentStore.activeChatId} onclick={() => { chatMenuOpen = false; if (agentStore.activeChat) void agentStore.remove(agentStore.activeChat.id); }}>Delete chat</button>
+            <div class="menu agent-header-dropdown" role="menu" tabindex="-1" aria-label="Chat actions" bind:this={chatMenu} onkeydown={(event) => handleMenuKeydown(event, closeChatMenu)}>
+              {#if !archived}
+                <button class="menu-item" type="button" role="menuitem" onclick={() => { chatMenuOpen = false; titleInput?.focus(); titleInput?.select(); }}>Rename</button>
+                <div class="menu-separator" role="separator"></div>
+              {/if}
+              <button class="menu-item danger" type="button" role="menuitem" disabled={agentStore.running && agentStore.liveChatId === agentStore.activeChatId} onclick={() => void deleteActiveChat()}>Delete chat</button>
             </div>
           {/if}
         </div>
@@ -489,11 +528,11 @@
           {/if}
 
           {#if agentStore.activeChat?.messageOffset}
-            <button class="btn btn-ghost btn-sm agent-earlier" type="button" disabled={agentStore.loadingEarlier} onclick={() => { stickToBottom = false; void agentStore.loadEarlier(); }}>{agentStore.loadingEarlier ? 'Loading earlier messages…' : 'Load earlier messages'}</button>
+            <button class="btn btn-ghost btn-sm agent-earlier" type="button" disabled={agentStore.loadingEarlier} onclick={loadEarlier}>{agentStore.loadingEarlier ? 'Loading earlier messages…' : 'Load earlier messages'}</button>
           {/if}
           {#if agentStore.historyError}<div class="agent-note" role="alert">{agentStore.historyError}</div>{/if}
           {#key `${agentStore.workspaceId}:${agentStore.activeChatId}`}
-          <VirtualAgentHistory items={turns} {scroller} follow={stickToBottom} {onScroll}>
+          <VirtualAgentHistory bind:this={history} items={turns} {scroller} follow={stickToBottom} {onScroll}>
             {#snippet children(turn)}
             <div class="agent-turn">
               {#if turn.prompt}
@@ -518,9 +557,9 @@
                   <div class="agent-text"><Markdown source={segment.block.text ?? ''} compact live={turn.live && !segment.step.done} /></div>
                 {:else if segment.kind === 'tools'}
                   <div class="agent-steps">
-                    {#each segment.items as item (`${item.step.index}:${item.block.id ?? item.blockIndex}`)}
+                    {#each segment.items as item (`${item.step.index}:${item.blockIndex}`)}
                       {@const result = resultFor(item.step, item.block)}
-                      {@const key = `${turn.id}:${item.step.index}:${item.block.id ?? item.blockIndex}`}
+                      {@const key = `${turn.id}:${item.step.index}:${item.blockIndex}`}
                       {@const target = item.step.done ? agentToolTarget(item.block, result) : null}
                       {@const approval = turn.live ? approvalFor(item.block) : undefined}
                       {@const summary = agentStepSummary(item.block, result)}
@@ -589,84 +628,88 @@
           {/if}
         </div>
 
-        <div class="agent-composer">
-          {#if runningElsewhere}
-            <div class="agent-note" role="status">The agent is working in another chat. You can send here when it finishes.</div>
-          {:else if agentStore.compacting && agentStore.liveInActiveChat}
-            <div class="agent-status" role="status"><span class="spinner spinner-inline"></span>Compacting context…</div>
-          {:else if approvals.length && agentStore.liveInActiveChat}
-            <div class="agent-status agent-status-wait" role="status"><span class="agent-status-dot"></span>{agentStore.driver === 'codex' ? 'Codex' : agentStore.driver === 'claude-code' ? 'Claude Code' : 'The agent'} is waiting for your approval</div>
-          {/if}
-          <div class="agent-composer-box" class:disabled={workspaceBlocked}>
-            <textarea
-              class="agent-input"
-              rows="1"
-              placeholder="Ask to run, explain or change something"
-              aria-label="Message the agent"
-              autocomplete="off"
-              autocapitalize="off"
-              spellcheck="false"
-              {...NO_AUTOCORRECT}
-              maxlength={AI_PROMPT_MAX_CHARS}
-              bind:this={composerInput}
-              bind:value={agentStore.draft}
-              use:autoSizeTextarea={agentStore.draft}
-              onkeydown={onKeydown}
-              disabled={workspaceBlocked}
-            ></textarea>
-            <div class="agent-composer-bar">
-              <div class="agent-composer-context">
-                <span class="agent-composer-chip">
-                  <Select value={agentStore.collection} options={collectionOptions} className="agent-chip" ariaLabel="Collection" disabled={agentStore.running} onChange={(value) => (agentStore.collection = value)} />
-                </span>
-                <span class="agent-composer-chip">
-                  <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
-                </span>
-                <div class="agent-templates">
-                  <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Templates" aria-haspopup="menu" aria-expanded={templatesOpen} onclick={() => void toggleTemplates()} disabled={workspaceBlocked}>
-                    <svg width="0.875rem" height="0.875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2.75h8M2 6h8M2 9.25h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                  </button>
-                  {#if templatesOpen}
-                    <div class="menu agent-templates-menu" role="menu" tabindex="-1" aria-label="Templates" bind:this={templatesMenu} onkeydown={onTemplatesKeydown}>
-                      {#each AGENT_TEMPLATES as template (template.id)}
-                        <button class="menu-item agent-template" type="button" role="menuitem" onclick={() => void useTemplate(template)}>
-                          <span class="agent-template-title">{template.title}</span>
-                          <span class="agent-template-text">{template.text}</span>
-                        </button>
-                      {/each}
-                    </div>
+        {#if archived}
+          <div class="agent-composer"><div class="agent-note" role="status">Archived chat. Restore it from the chat menu to continue.</div></div>
+        {:else}
+          <div class="agent-composer">
+            {#if runningElsewhere}
+              <div class="agent-note" role="status">The agent is working in another chat. You can send here when it finishes.</div>
+            {:else if agentStore.compacting && agentStore.liveInActiveChat}
+              <div class="agent-status" role="status"><span class="spinner spinner-inline"></span>Compacting context…</div>
+            {:else if approvals.length && agentStore.liveInActiveChat}
+              <div class="agent-status agent-status-wait" role="status"><span class="agent-status-dot"></span>{agentStore.driver === 'codex' ? 'Codex' : agentStore.driver === 'claude-code' ? 'Claude Code' : 'The agent'} is waiting for your approval</div>
+            {/if}
+            <div class="agent-composer-box" class:disabled={workspaceBlocked}>
+              <textarea
+                class="agent-input"
+                rows="1"
+                placeholder="Ask to run, explain or change something"
+                aria-label="Message the agent"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                {...NO_AUTOCORRECT}
+                maxlength={AI_PROMPT_MAX_CHARS}
+                bind:this={composerInput}
+                bind:value={agentStore.draft}
+                use:autoSizeTextarea={agentStore.draft}
+                onkeydown={onKeydown}
+                disabled={workspaceBlocked}
+              ></textarea>
+              <div class="agent-composer-bar">
+                <div class="agent-composer-context">
+                  <span class="agent-composer-chip">
+                    <Select value={agentStore.collection} options={collectionOptions} className="agent-chip" ariaLabel="Collection" disabled={agentStore.running} onChange={(value) => (agentStore.collection = value)} />
+                  </span>
+                  <span class="agent-composer-chip">
+                    <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
+                  </span>
+                  <div class="agent-templates">
+                    <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Templates" aria-haspopup="menu" aria-expanded={templatesOpen} onclick={() => void toggleTemplates()} disabled={workspaceBlocked}>
+                      <svg width="0.875rem" height="0.875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2.75h8M2 6h8M2 9.25h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </button>
+                    {#if templatesOpen}
+                      <div class="menu agent-templates-menu" role="menu" tabindex="-1" aria-label="Templates" bind:this={templatesMenu} onkeydown={onTemplatesKeydown}>
+                        {#each AGENT_TEMPLATES as template (template.id)}
+                          <button class="menu-item agent-template" type="button" role="menuitem" onclick={() => void useTemplate(template)}>
+                            <span class="agent-template-title">{template.title}</span>
+                            <span class="agent-template-text">{template.text}</span>
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
+                  </div>
+                </div>
+                <div class="agent-composer-actions">
+                  <AgentPicker disabled={agentStore.running || workspaceBlocked} />
+                  {#if agentStore.driver && effortOptions.length}
+                    <Select value={effortChoice} options={effortOptions} className="agent-effort" ariaLabel="Effort" disabled={agentStore.running || workspaceBlocked} onChange={value => (agentStore.effort = agentEffortToStore(value, effortModel?.defaultEffort ?? ''))} />
+                  {/if}
+                  {#if agentStore.liveInActiveChat && agentStore.running}
+                    <button class="btn btn-secondary btn-icon agent-stop" type="button" onclick={() => void agentStore.stop()} aria-label="Stop the agent">
+                      <svg width="0.625rem" height="0.625rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="1.25" fill="currentColor"/></svg>
+                    </button>
+                  {:else}
+                    <button class="btn btn-primary btn-icon agent-send" type="button" onclick={send} disabled={workspaceBlocked || agentStore.running || !agentStore.draft.trim()} aria-label="Send">
+                      <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 12V2M2.5 6.5L7 2l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
                   {/if}
                 </div>
               </div>
-              <div class="agent-composer-actions">
-                <AgentPicker disabled={agentStore.running || workspaceBlocked} />
-                {#if agentStore.driver && effortOptions.length}
-                  <Select value={effortChoice} options={effortOptions} className="agent-effort" ariaLabel="Effort" disabled={agentStore.running || workspaceBlocked} onChange={value => (agentStore.effort = agentEffortToStore(value, effortModel?.defaultEffort ?? ''))} />
-                {/if}
-                {#if agentStore.liveInActiveChat && agentStore.running}
-                  <button class="btn btn-secondary btn-icon agent-stop" type="button" onclick={() => void agentStore.stop()} aria-label="Stop the agent">
-                    <svg width="0.625rem" height="0.625rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="1.25" fill="currentColor"/></svg>
-                  </button>
-                {:else}
-                  <button class="btn btn-primary btn-icon agent-send" type="button" onclick={send} disabled={workspaceBlocked || agentStore.running || !agentStore.draft.trim()} aria-label="Send">
-                    <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M7 12V2M2.5 6.5L7 2l4.5 4.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  </button>
-                {/if}
-              </div>
+            </div>
+            <div class="agent-session-status">
+              {#if usage && (usage.input || usage.output)}
+                <span class="agent-usage" aria-label={`${usage.input.toLocaleString('en-US')} input and ${usage.output.toLocaleString('en-US')} output tokens in this chat`}>
+                  {formatTokens(usage.input + usage.cacheRead + usage.cacheWrite)} in · {formatTokens(usage.output)} out
+                </span>
+              {/if}
+              {#if agentStore.driver && tightestQuota}
+                <button class="btn-link agent-plan-mini" class:low={tightestQuota.remaining < 30} type="button" onclick={toggleAgentDetails} aria-label={`${planName} plan: ${tightestQuota.remaining}% left in the ${tightestQuota.duration} window. Show chat details`}>Plan {tightestQuota.remaining}% left</button>
+              {/if}
+              <span class="agent-composer-hint" aria-hidden="true"><kbd>↵</kbd> send · <kbd>⇧↵</kbd> new line</span>
             </div>
           </div>
-          <div class="agent-session-status">
-            {#if usage && (usage.input || usage.output)}
-              <span class="agent-usage" aria-label={`${usage.input.toLocaleString('en-US')} input and ${usage.output.toLocaleString('en-US')} output tokens in this chat`}>
-                {formatTokens(usage.input + usage.cacheRead + usage.cacheWrite)} in · {formatTokens(usage.output)} out
-              </span>
-            {/if}
-            {#if agentStore.driver && tightestQuota}
-              <button class="btn-link agent-plan-mini" class:low={tightestQuota.remaining < 30} type="button" onclick={toggleAgentDetails} aria-label={`${planName} plan: ${tightestQuota.remaining}% left in the ${tightestQuota.duration} window. Show chat details`}>Plan {tightestQuota.remaining}% left</button>
-            {/if}
-            <span class="agent-composer-hint" aria-hidden="true"><kbd>↵</kbd> send · <kbd>⇧↵</kbd> new line</span>
-          </div>
-        </div>
+        {/if}
       </div>
 
       {#if agentNavigation.detailsOpen}

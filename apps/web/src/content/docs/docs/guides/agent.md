@@ -94,9 +94,15 @@ Nothing is written while the card waits, and Kurlo keeps saving your own edits i
 
 ## Chats and the activity log
 
-Chats are kept on this computer in Kurlo's profile, encrypted like the [request history](/docs/guides/history/), and not in the workspace files, so they never end up in Git. Each chat belongs to the workspace selected in the top bar when you start it. Switching workspaces shows that workspace's chats and restores its open chat, selected agent and unsent draft when you return. A new chat is named after its first message; rename it by clicking its name in the header, double-clicking it in the sidebar, pressing `F2`, or choosing **Rename** in its **•••** menu, where **Delete** removes it. A chat is kept for 90 days after its last message, up to 200 chats.
+Chats are kept on this computer in Kurlo's profile, encrypted like the [request history](/docs/guides/history/), and not in the workspace files, so they never end up in Git. Each chat belongs to the workspace selected in the top bar when you start it. Switching workspaces shows that workspace's chats and restores its open chat, selected agent and unsent draft when you return. A new chat is named after its first message; rename it by clicking its name in the header, double-clicking it in the sidebar, pressing `F2`, or choosing **Rename** in its **•••** menu, where **Delete** removes it. Kurlo keeps up to 200 unarchived chats across the local profile and removes them after 90 days of inactivity.
 
-Use `Cmd/Ctrl K` to find a chat by its name alongside requests and commands. **Chats in this workspace** includes both agents' chats from the selected workspace. Selecting a result opens its agent and chat. Prefix the query with `>` to search commands only.
+Use `Cmd/Ctrl K` to find a chat by its name alongside requests and commands. **Chats in this workspace** includes unarchived chats from the selected workspace. Selecting a result opens its agent and chat. Prefix the query with `>` to search commands only.
+
+To keep a chat, choose **Archive** from its **•••** menu in the sidebar. Open **Archived** to read saved chats for the current workspace. Archived chats stay encrypted and are kept until you delete them. Choose **Restore** in the chat menu to move a chat back to **Chats** and continue it. For Codex and Claude Code, continuing also requires the original session to be available in the connected agent.
+
+![An archived Agent Mode chat with Restore, Export as Markdown and Delete in its menu](../../../../assets/screenshots/agent-chat-archive.png)
+
+Choose **Export as Markdown…** in either list to save the full stored conversation, including saved tool calls and results. Review the warning and choose where to save the file. The Markdown copy is unencrypted and can contain sensitive information.
 
 Every tool call, by the agent or by an assistant connected through `kurlo mcp`, is also written to a local activity log with the files it changed, before and after. The log is encrypted, kept for 30 days, and stores arguments and results with secrets masked.
 

@@ -25,7 +25,12 @@
     if (busy) return;
     busy = true;
     error = '';
-    try { await onAnswer(decision); } catch (cause) { error = cause instanceof Error ? cause.message : String(cause); } finally { busy = false; }
+    try {
+      await onAnswer(decision);
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : String(cause);
+      busy = false;
+    }
   }
 </script>
 

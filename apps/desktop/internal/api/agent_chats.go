@@ -96,6 +96,7 @@ func readAgentChat(id string) (model.AgentChat, error) {
 }
 
 type agentChatIndexEntry struct {
+	ArchivedAt  int64  `json:"archivedAt,omitempty"`
 	WorkspaceID string `json:"workspaceId"`
 	Driver      string `json:"driver,omitempty"`
 	ID          string `json:"id"`
@@ -110,7 +111,11 @@ func agentChatIndexPath() string {
 }
 
 func agentChatIndexEntryOf(chat model.AgentChat) agentChatIndexEntry {
-	return agentChatIndexEntry{WorkspaceID: chat.WorkspaceID, Driver: chat.Driver, ID: chat.ID, Title: chat.Title, Workspace: chat.Workspace, CreatedAt: chat.CreatedAt, UpdatedAt: chat.UpdatedAt}
+	return agentChatIndexEntry{ArchivedAt: chat.ArchivedAt, WorkspaceID: chat.WorkspaceID, Driver: chat.Driver, ID: chat.ID, Title: chat.Title, Workspace: chat.Workspace, CreatedAt: chat.CreatedAt, UpdatedAt: chat.UpdatedAt}
+}
+
+func (entry agentChatIndexEntry) summary() model.AgentChatSummary {
+	return model.AgentChatSummary{ArchivedAt: entry.ArchivedAt, WorkspaceID: entry.WorkspaceID, Driver: entry.Driver, ID: entry.ID, Title: entry.Title, CreatedAt: entry.CreatedAt, UpdatedAt: entry.UpdatedAt}
 }
 
 func readAgentChatIndex() (map[string]agentChatIndexEntry, error) {
@@ -210,7 +215,7 @@ func compactStoredAgentMessages(messages []model.AiMessage) []model.AiMessage {
 	return out
 }
 
-func writeAgentChat(chat model.AgentChat) error {
+func writeAgentChatFile(chat model.AgentChat) error {
 	path, err := agentChatPath(chat.ID)
 	if err != nil {
 		return err
@@ -219,7 +224,6 @@ func writeAgentChat(chat model.AgentChat) error {
 		return err
 	}
 	chat = normalizeAgentChat(chat)
-	chat.Messages = compactStoredAgentMessages(chat.Messages)
 	payload, err := json.Marshal(chat)
 	if err != nil {
 		return err
@@ -228,7 +232,12 @@ func writeAgentChat(chat model.AgentChat) error {
 	if err != nil {
 		return err
 	}
-	if err := writeFileAtomic(path, encrypted); err != nil {
+	return writeFileAtomic(path, encrypted)
+}
+
+func writeAgentChat(chat model.AgentChat) error {
+	chat.Messages = compactStoredAgentMessages(chat.Messages)
+	if err := writeAgentChatFile(chat); err != nil {
 		return err
 	}
 	index, err := loadAgentChatIndex()
@@ -258,6 +267,9 @@ func updateAgentChat(id string, change func(chat *model.AgentChat)) (model.Agent
 			return chat, fmt.Errorf("chat %s was deleted", id)
 		}
 		return chat, err
+	}
+	if chat.ArchivedAt != 0 {
+		return chat, errors.New("Restore this chat before sending a message.")
 	}
 	change(&chat)
 	chat.UpdatedAt = time.Now().UnixMilli()
@@ -289,8 +301,9 @@ func listAgentChats(workspace string, now time.Time) ([]model.AgentChatSummary, 
 	cutoff := now.Add(-agentChatRetention).UnixMilli()
 	summaries := []model.AgentChatSummary{}
 	removed := false
-	for position, entry := range entries {
-		if entry.UpdatedAt < cutoff || position >= agentChatMaxCount {
+	active := 0
+	for _, entry := range entries {
+		if entry.ArchivedAt == 0 && (entry.UpdatedAt < cutoff || active >= agentChatMaxCount) {
 			if path, err := agentChatPath(entry.ID); err == nil {
 				_ = os.Remove(path)
 			}
@@ -298,8 +311,11 @@ func listAgentChats(workspace string, now time.Time) ([]model.AgentChatSummary, 
 			removed = true
 			continue
 		}
+		if entry.ArchivedAt == 0 {
+			active++
+		}
 		if entry.Workspace == workspace {
-			summaries = append(summaries, model.AgentChatSummary{WorkspaceID: entry.WorkspaceID, Driver: entry.Driver, ID: entry.ID, Title: entry.Title, CreatedAt: entry.CreatedAt, UpdatedAt: entry.UpdatedAt})
+			summaries = append(summaries, entry.summary())
 		}
 	}
 	if removed {
@@ -344,6 +360,9 @@ func renameAgentChat(id, title string) (model.AgentChat, error) {
 			return chat, fmt.Errorf("chat %s was deleted", id)
 		}
 		return chat, err
+	}
+	if chat.ArchivedAt != 0 {
+		return chat, errors.New("Restore this chat before renaming it.")
 	}
 	chat.Title = title
 	return chat, writeAgentChat(chat)

@@ -2,6 +2,7 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import AgentGlyph from './AgentGlyph.svelte';
   import { onMount, tick } from 'svelte';
+  import { focusFirstMenuItem, handleMenuKeydown } from '../menuKeyboard';
   import MenuIcon from './MenuIcon.svelte';
   import KurloGlyph from './KurloGlyph.svelte';
   import { claudeConnectionStore as claude } from '../stores/claude.svelte';
@@ -9,22 +10,29 @@
   import { aiConnectionsStore } from '../stores/aiConnections.svelte';
   import { agentStore as kurloAgentStore, codexAgentStore, claudeAgentStore, agentNavigation, agentModeFor, agentStoreFor } from '../stores/agent.svelte';
   import { agentChatGroups, agentFilterChats } from '../agent';
-  import type { AgentChatSummary } from '../backend';
+  import { exportAgentChat, type AgentChatSummary } from '../backend';
   import { vm } from '../stores/app.svelte';
 
   let { workspaceBlocked = false }: { workspaceBlocked?: boolean } = $props();
 
   let menuChatId = $state('');
+  let chatMenu = $state<HTMLDivElement>();
+  let chatMenuTrigger: HTMLElement | null = null;
   let renamingId = $state('');
   let renameValue = $state('');
   let renameError = $state('');
+  let actionError = $state('');
+  let archived = $state(false);
+  let actionPending = $state(false);
+  let chatLists: HTMLDivElement;
   let query = $state('');
   let renameInput = $state<HTMLInputElement>();
   const agentStore = $derived(agentStoreFor(agentNavigation.mode));
   const agentReady = $derived(aiConnectionsStore.list.length > 0 || claude.usable || !claude.loaded || (codexConnectionStore.status.connected && codexConnectionStore.status.authenticated) || !aiConnectionsStore.loaded || !codexConnectionStore.loaded);
   const allChats = $derived([...kurloAgentStore.chats, ...codexAgentStore.chats, ...claudeAgentStore.chats]);
   const loaded = $derived(kurloAgentStore.chatsLoaded && codexAgentStore.chatsLoaded && claudeAgentStore.chatsLoaded);
-  const groups = $derived(agentChatGroups(agentFilterChats(allChats, query)));
+  const visibleChats = $derived(allChats.filter(chat => Boolean(chat.archivedAt) === archived));
+  const groups = $derived(agentChatGroups(agentFilterChats(visibleChats, query)));
 
   function storeOf(chat: AgentChatSummary) {
     return agentStoreFor(agentModeFor(chat.driver));
@@ -57,14 +65,24 @@
   }
 
   function newChat() {
+    archived = false;
     vm.openAgentTab();
     agentStore.newChat();
     setTimeout(() => document.querySelector<HTMLTextAreaElement>('.agent-composer textarea')?.focus(), 0);
   }
 
-  function toggleMenu(id: string, event: MouseEvent) {
+  async function toggleMenu(id: string, event: MouseEvent) {
     event.stopPropagation();
+    chatMenuTrigger = event.currentTarget as HTMLElement;
     menuChatId = menuChatId === id ? '' : id;
+    if (!menuChatId) return;
+    await tick();
+    if (menuChatId === id) focusFirstMenuItem(chatMenu);
+  }
+
+  function closeChatMenu() {
+    menuChatId = '';
+    chatMenuTrigger?.focus();
   }
 
   async function startRename(id: string, title: string) {
@@ -95,6 +113,47 @@
     renamingId = '';
   }
 
+  async function removeChat(chat: AgentChatSummary) {
+    menuChatId = '';
+    actionError = '';
+    try {
+      await storeOf(chat).remove(chat.id);
+    } catch (error) {
+      actionError = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async function toggleArchived(chat: AgentChatSummary) {
+    closeChatMenu();
+    actionError = '';
+    actionPending = true;
+    try {
+      await storeOf(chat).setArchived(chat.id, !chat.archivedAt);
+      if (chat.archivedAt) archived = false;
+      await tick();
+      chatLists?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus();
+    } catch (error) {
+      actionError = error instanceof Error ? error.message : String(error);
+    } finally {
+      actionPending = false;
+    }
+  }
+
+  async function exportChat(chat: AgentChatSummary) {
+    closeChatMenu();
+    actionError = '';
+    actionPending = true;
+    try {
+      if (await vm.openConfirmDialog('Export chat as Markdown', 'The Markdown file is unencrypted and may contain sensitive information from messages and tool results.', 'Export')) {
+        await exportAgentChat(chat.id, chat.workspaceId);
+      }
+    } catch (error) {
+      actionError = error instanceof Error ? error.message : String(error);
+    } finally {
+      actionPending = false;
+    }
+  }
+
   function onRenameKeydown(event: KeyboardEvent) {
     event.stopPropagation();
     if (event.key === 'Enter') {
@@ -117,7 +176,7 @@
     if (!menuChatId) return;
     const target = event.target;
     if (target instanceof Element && target.closest('.agent-chat-menu, .agent-chat-menu-btn')) return;
-    menuChatId = '';
+    closeChatMenu();
   }
 </script>
 
@@ -125,14 +184,19 @@
 
 <div class="history-panel agent-sidebar">
   <div class="agent-sidebar-head">
-    <span class="agent-sidebar-title">Chats</span>
+    <div class="agent-chat-lists" bind:this={chatLists} role="group" aria-label="Chat lists">
+      <button class="btn btn-xs {archived ? 'btn-ghost' : 'btn-secondary'}" type="button" aria-pressed={!archived} onclick={() => { archived = false; menuChatId = ''; }}>Chats</button>
+      <button class="btn btn-xs {archived ? 'btn-secondary' : 'btn-ghost'}" type="button" aria-pressed={archived} onclick={() => { archived = true; menuChatId = ''; }}>Archived</button>
+    </div>
     <button class="btn btn-secondary btn-xs agent-new-chat" type="button" onclick={newChat} disabled={workspaceBlocked || !agentReady} aria-label="New chat">
       <AddCloseIcon add />
       New
     </button>
   </div>
 
-  {#if allChats.length > 0}
+  {#if actionError}<div class="agent-delete-error" role="alert">{actionError}</div>{/if}
+
+  {#if visibleChats.length > 0}
     <div class="field field-md field-wrap sidebar-search">
       <svg width="0.75rem" height="0.75rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
         <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
@@ -170,8 +234,8 @@
                 class="history-entry-main agent-chat-main"
                 type="button"
                 onclick={() => openChat(chat)}
-                ondblclick={() => void startRename(chat.id, chat.title)}
-                onkeydown={(event) => onRowKeydown(event, chat.id, chat.title)}
+                ondblclick={() => { if (!archived) void startRename(chat.id, chat.title); }}
+                onkeydown={(event) => { if (!archived) onRowKeydown(event, chat.id, chat.title); }}
                
                 aria-current={isActive(chat) ? 'page' : undefined}
                 disabled={workspaceBlocked}
@@ -190,14 +254,18 @@
                   <span class="agent-chat-time">{chatTime(chat.updatedAt, group.label)}</span>
                 {/if}
               </button>
-              <button class="btn btn-ghost btn-icon btn-xs history-entry-menu-btn agent-chat-menu-btn" type="button" onclick={(event) => toggleMenu(chat.id, event)} aria-label="Chat menu" aria-haspopup="menu" aria-expanded={menuChatId === chat.id} disabled={workspaceBlocked}>
+              <button class="btn btn-ghost btn-icon btn-xs history-entry-menu-btn agent-chat-menu-btn" type="button" onclick={(event) => void toggleMenu(chat.id, event)} aria-label="Chat menu" aria-haspopup="menu" aria-expanded={menuChatId === chat.id} disabled={workspaceBlocked}>
                 <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3" cy="8" r="1.25"/><circle cx="8" cy="8" r="1.25"/><circle cx="13" cy="8" r="1.25"/></svg>
               </button>
               {#if menuChatId === chat.id}
-                <div class="menu request-menu history-entry-menu agent-chat-menu">
-                  <button class="menu-item" type="button" onclick={() => void startRename(chat.id, chat.title)}><MenuIcon name="rename" />Rename</button>
+                <div class="menu request-menu history-entry-menu agent-chat-menu" role="menu" aria-label="Chat menu" tabindex="-1" bind:this={chatMenu} onkeydown={(event) => handleMenuKeydown(event, closeChatMenu)}>
+                  {#if !archived}
+                      <button class="menu-item" type="button" role="menuitem" onclick={() => void startRename(chat.id, chat.title)}><MenuIcon name="rename" />Rename</button>
+                  {/if}
+                  <button class="menu-item" type="button" role="menuitem" onclick={() => void toggleArchived(chat)} disabled={actionPending || (chatStore.running && chatStore.liveChatId === chat.id)}><MenuIcon name={archived ? 'restore' : 'archive'} />{archived ? 'Restore' : 'Archive'}</button>
+                  <button class="menu-item" type="button" role="menuitem" onclick={() => void exportChat(chat)} disabled={actionPending}><MenuIcon name="export" />Export as Markdown…</button>
                   <div class="menu-separator" role="separator"></div>
-                  <button class="menu-item danger" type="button" onclick={() => { menuChatId = ''; void chatStore.remove(chat.id); }} disabled={chatStore.running && chatStore.liveChatId === chat.id}><MenuIcon name="trash" />Delete</button>
+                  <button class="menu-item danger" type="button" role="menuitem" onclick={() => void removeChat(chat)} disabled={chatStore.running && chatStore.liveChatId === chat.id}><MenuIcon name="trash" />Delete</button>
                 </div>
               {/if}
             {/if}
@@ -205,15 +273,15 @@
         {/each}
       {/each}
     </div>
-  {:else if allChats.length > 0}
+  {:else if visibleChats.length > 0}
     <div class="empty-state history-empty">
       <span class="empty-state-title">No chat matches this filter.</span>
       <button class="btn btn-secondary" type="button" onclick={() => (query = '')}>Clear filter</button>
     </div>
   {:else if loaded}
     <div class="empty-state history-empty">
-      <span class="empty-state-title">No chats yet.</span>
-      <small class="empty-state-text">Ask the agent to run requests, explain failures or add tests. Chats stay on this computer.</small>
+      <span class="empty-state-title">{archived ? 'No archived chats.' : 'No chats yet.'}</span>
+      {#if !archived}<small class="empty-state-text">Ask the agent to run requests, explain failures or add tests. Chats stay on this computer.</small>{/if}
     </div>
   {/if}
 </div>
@@ -227,10 +295,9 @@
     min-height: 1.75rem;
     padding: 0 var(--space-0-5) 0 var(--space-1-5);
   }
-  .agent-sidebar-title {
-    color: var(--text);
-    font-size: var(--text-body);
-    font-weight: var(--weight-semibold);
+  .agent-chat-lists {
+    display: flex;
+    gap: var(--space-1);
   }
   .agent-new-chat {
     gap: var(--space-1);
@@ -322,7 +389,10 @@
   .agent-rename-input {
     width: 100%;
   }
-  .agent-rename-error {
+  .agent-delete-error {
+    padding: 0 var(--space-1-5);
+  }
+  .agent-rename-error, .agent-delete-error {
     color: var(--danger);
     font-size: var(--text-caption);
   }

@@ -162,6 +162,10 @@ export function DiscoverLocalAiServers() {
   return window['go']['api']['App']['DiscoverLocalAiServers']();
 }
 
+export function ExportAgentChat(arg1, arg2) {
+  return window['go']['api']['App']['ExportAgentChat'](arg1, arg2);
+}
+
 export function ExportLoadTestK6(arg1, arg2) {
   return window['go']['api']['App']['ExportLoadTestK6'](arg1, arg2);
 }
@@ -580,6 +584,10 @@ export function SendRequestToFile(arg1, arg2) {
 
 export function SetAgentActivityEnabled(arg1) {
   return window['go']['api']['App']['SetAgentActivityEnabled'](arg1);
+}
+
+export function SetAgentChatArchived(arg1, arg2, arg3) {
+  return window['go']['api']['App']['SetAgentChatArchived'](arg1, arg2, arg3);
 }
 
 export function SetAppThemeBackground(arg1, arg2) {

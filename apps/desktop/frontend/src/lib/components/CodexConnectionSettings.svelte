@@ -56,7 +56,9 @@
   async function disconnect() {
     const result = await removeCodexConnection();
     if (!result.ok) { error = result.error ?? 'Could not remove the connection.'; return; }
-    codexConnectionStore.apply({ ...status, connected: false });
+    codexConnectionStore.apply({ ...status, connected: false, rateLimits: [] });
+    model = '';
+    await codexConnectionStore.refresh(path || status.path);
   }
 
   $effect(() => {

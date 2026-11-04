@@ -49,7 +49,9 @@
   async function disconnect() {
     const result = await removeClaudeCodeConnection();
     if (!result.ok) { error = result.error ?? 'Could not remove the connection.'; return; }
-    claude.apply({ ...status, connected: false });
+    claude.apply({ ...status, connected: false, rateLimits: [] });
+    model = '';
+    await claude.refresh(path || status.path);
   }
 </script>
 

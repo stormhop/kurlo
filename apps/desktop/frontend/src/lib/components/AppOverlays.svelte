@@ -161,7 +161,7 @@
       bind:query={vm.globalSearchQuery}
       results={vm.globalSearchResults}
       commands={paletteCommands}
-      chats={[...agentStore.chats, ...codexAgentStore.chats, ...claudeAgentStore.chats].sort((a, b) => b.updatedAt - a.updatedAt)}
+      chats={[...agentStore.chats, ...codexAgentStore.chats, ...claudeAgentStore.chats].filter(chat => !chat.archivedAt).sort((a, b) => b.updatedAt - a.updatedAt)}
       onOpenChat={openChat}
       shortcutCombo={(id: ShortcutId) => vm.shortcutCombo(id)}
       activeRequestId={vm.activeRequestId}

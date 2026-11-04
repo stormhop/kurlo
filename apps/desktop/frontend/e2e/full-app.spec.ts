@@ -6744,7 +6744,19 @@ test.describe('Agent', () => {
         { name: 'cover_endpoint', title: 'Cover one endpoint', description: 'Add a request with tests.', arguments: [{ name: 'endpoint', description: '', required: true }] },
         { name: 'check_collection', title: 'Run and check a collection', description: 'Run a collection and explain failures.', arguments: [] },
       ]);
-      app.AgentChats = async (workspaceId: string) => chats.filter(chat => chat.workspaceId === workspaceId).map(chat => ({ id: chat.id, title: chat.title, workspaceId: chat.workspaceId, createdAt: chat.createdAt, updatedAt: chat.updatedAt }));
+      const summary = (chat: Record<string, unknown>) => ({ id: chat.id, title: chat.title, workspaceId: chat.workspaceId, createdAt: chat.createdAt, updatedAt: chat.updatedAt, archivedAt: chat.archivedAt });
+      app.AgentChats = async (workspaceId: string) => chats.filter(chat => chat.workspaceId === workspaceId).map(summary);
+      app.SetAgentChatArchived = async (id: string, workspaceId: string, archived: boolean) => {
+        const chat = chats.find(item => item.id === id && item.workspaceId === workspaceId);
+        if (!chat) throw new Error('Chat not found');
+        chat.archivedAt = archived ? Date.now() : undefined;
+        if (!archived) chat.updatedAt = Date.now();
+        return summary(chat);
+      };
+      app.ExportAgentChat = async (id: string, workspaceId: string) => {
+        e2e.agentExport = { id, workspaceId };
+        return '/tmp/agent-chat.md';
+      };
       app.AgentChat = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
       app.AgentPendingApprovals = async () => [];
       const renames: unknown[] = [];
@@ -7287,8 +7299,33 @@ test.describe('Agent', () => {
     await expect(page.locator('.agent-turn').nth(1)).toHaveCSS('border-top-width', '0px');
     await page.screenshot({ path: join(tmpdir(), `kurlo-agent-no-dividers-${testInfo.project.name}.png`), animations: 'disabled' });
 
+    const sidebar = page.locator('.agent-sidebar');
+    const rowMenu = sidebar.getByRole('button', { name: 'Chat menu' });
+    await rowMenu.click({ force: true });
+    await expect(sidebar.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(sidebar.getByRole('menuitem', { name: 'Archive', exact: true })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(sidebar).toContainText('No chats yet.');
+    await sidebar.getByRole('button', { name: 'Archived', exact: true }).click();
+    await sidebar.locator('.agent-chat-main').click();
+    await expect(workspace).toContainText('Archived chat. Restore it from the chat menu to continue.');
+    await expect(composer).toHaveCount(0);
+    await expect(page.locator('.agent-user')).toHaveCount(2);
+    await rowMenu.click({ force: true });
+    await captureDocsScreenshot(page, 'agent-chat-archive');
+    await sidebar.getByRole('menuitem', { name: 'Export as Markdown…' }).click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export chat as Markdown' });
+    await expect(exportDialog).toContainText('unencrypted');
+    await exportDialog.getByRole('button', { name: 'Export', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E as unknown as { agentExport: unknown }).agentExport)).toEqual({ id: 'chat-1', workspaceId: 'workspace-e2e' });
+    await rowMenu.click({ force: true });
+    await sidebar.getByRole('menuitem', { name: 'Restore' }).click();
+    await expect(sidebar.getByRole('button', { name: 'Chats', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(composer).toBeVisible();
+
     await page.locator('.agent-chat-menu-btn').click({ force: true });
-    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
     await expect(page.locator('.agent-chat-main')).toHaveCount(0);
     await expect(workspace).toContainText('What should we check?');
   });
@@ -7325,9 +7362,15 @@ test.describe('Codex agent connection', () => {
       app.CodexStatus = async () => structuredClone(status);
       app.AiConnections = async () => ({ connections: [] });
       app.ConnectCodex = async () => { status.connected = true; return structuredClone(status); };
-      app.RemoveCodexConnection = async () => { status.connected = false; return { ok: true }; };
+      app.RemoveCodexConnection = async () => { status.connected = false; status.account = 'refreshed@example.test · plus'; return { ok: true }; };
       app.AgentChats = async (workspaceId: string) => structuredClone(chats.filter(chat => chat.workspaceId === workspaceId));
       app.AgentChat = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
+      app.SetAgentChatArchived = async (id: string, workspaceId: string, archived: boolean) => {
+        const chat = chats.find(item => item.id === id && item.workspaceId === workspaceId);
+        if (!chat) throw new Error('Chat not found');
+        chat.archivedAt = archived ? Date.now() : undefined;
+        return structuredClone(chat);
+      };
       app.AgentPendingApprovals = async () => [];
       app.SendAgentMessage = async (input: Record<string, string>) => {
         e2e.codexSent = input;
@@ -7452,9 +7495,19 @@ test.describe('Codex agent connection', () => {
     await picker.click();
     await page.getByRole('button', { name: 'Manage connections', exact: true }).click();
     await connection.getByRole('button', { name: 'Remove connection', exact: true }).click();
+    await expect(connection).toContainText('Signed in: refreshed@example.test · plus');
     await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Close settings' }).click();
     await expect(page.locator('.agent-workspace')).toContainText('Connect a model to start');
+    const codexRow = sidebar.locator('.agent-chat').filter({ hasText: 'Check collection' });
+    await codexRow.getByRole('button', { name: 'Chat menu' }).click({ force: true });
+    await codexRow.getByRole('menuitem', { name: 'Archive', exact: true }).click();
+    await expect(codexRow).toHaveCount(0);
+    await sidebar.getByRole('button', { name: 'Archived', exact: true }).click();
+    await codexRow.locator('.agent-chat-main').click();
+    await expect(page.locator('.agent-text')).toContainText('Codex checked the collection.');
+    await expect(page.locator('.agent-workspace')).toContainText('Archived chat. Restore it from the chat menu to continue.');
+
     await expect(page.locator('[title]:not(iframe)')).toHaveCount(0);
   });
   test('guides installation and completes sign-in through the CLI', async ({ page }) => {
@@ -7677,6 +7730,21 @@ test('pages and virtualizes a long Codex chat while preserving the reading posit
   await expect(page.locator('.agent-text').last()).toContainText('Answer 9999');
 });
 
+test('keeps the viewport when loading earlier history with the keyboard', async ({ page }) => {
+  await installLongAgentHistory(page);
+  const button = page.getByRole('button', { name: 'Load earlier messages', exact: true });
+  const anchor = await visibleHistoryAnchor(page);
+  await button.evaluate(element => {
+    element.focus({ preventScroll: true });
+  });
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => (window.__kurloE2E as unknown as { historyRequests: unknown[] }).historyRequests.length)).toBe(2);
+  await expect.poll(async () => {
+    const current = await visibleHistoryAnchor(page);
+    return current.id === anchor.id ? Math.abs(current.top - anchor.top) : Infinity;
+  }).toBeLessThan(2);
+});
+
 test('keeps paged history failures and delayed pages separate from another chat', async ({ page }) => {
   await installLongAgentHistory(page);
   await page.evaluate(() => { (window.__kurloE2E as unknown as Record<string, unknown>).failEarlier = true; });
@@ -7708,7 +7776,21 @@ test('shows Codex compaction, ignores unrelated events and does not jump during 
   await emitCompaction(true);
   await expect(page.getByText('Compacting context…', { exact: true })).toBeVisible();
   await page.screenshot({ path: join(tmpdir(), `kurlo-codex-compacting-${testInfo.project.name}.png`), animations: 'disabled' });
-  await page.locator('.agent-main > .agent-chat').evaluate(element => { element.scrollTop -= 1600; });
+  const chat = page.locator('.agent-main > .agent-chat');
+  const movement = await chat.evaluate(async element => {
+    const e2e = window.__kurloE2E as unknown as { emit: (name: string, payload: unknown) => void; longInput: { turnId: string } };
+    const holdScroll = (event: Event) => event.stopImmediatePropagation();
+    element.addEventListener('scroll', holdScroll, true);
+    element.scrollTop -= 1600;
+    const expected = element.scrollTop;
+    e2e.emit('ai:deltas', { sessionId: 'long-history', turnId: e2e.longInput.turnId, deltas: [{ step: 0, index: 0, type: 'text', text: 'Updated before the scroll handler. '.repeat(200) }] });
+    for (let frame = 0; frame < 4; frame++) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const difference = Math.abs(element.scrollTop - expected);
+    element.removeEventListener('scroll', holdScroll, true);
+    element.dispatchEvent(new Event('scroll'));
+    return difference;
+  });
+  expect(movement).toBeLessThan(2);
   const anchor = await visibleHistoryAnchor(page);
   await page.evaluate(() => {
     const e2e = window.__kurloE2E as unknown as { emit: (name: string, payload: unknown) => void; longInput: { turnId: string } };
@@ -7725,6 +7807,29 @@ test('shows Codex compaction, ignores unrelated events and does not jump during 
   await expect(page.getByText('Compacting context…', { exact: true })).toHaveCount(0);
   await page.locator('.agent-main > .agent-chat').evaluate(element => { element.scrollTop = element.scrollHeight; });
   await expect(page.locator('.agent-text').last()).toContainText('New answer finished');
+});
+
+test('keeps the running Codex chat visible after a disconnected status refresh', async ({ page }) => {
+  await installLongAgentHistory(page);
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  await composer.fill('Keep this Codex turn visible');
+  await composer.press('Enter');
+  const stop = page.getByRole('button', { name: 'Stop the agent' });
+  await expect(stop).toBeVisible();
+  await page.evaluate(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    app.CodexStatus = async () => ({ connected: false, installed: true, authenticated: true, path: '/test/codex', models: [] });
+  });
+  await page.getByLabel('Settings', { exact: true }).click();
+  await page.getByRole('tab', { name: 'AI', exact: true }).click();
+  const connection = page.getByRole('region', { name: 'Codex connection' });
+  await connection.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await expect(connection.getByRole('button', { name: 'Remove connection' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await expect(stop).toBeVisible();
+  await expect(page.getByText('Keep this Codex turn visible', { exact: true })).toBeVisible();
+  await page.evaluate(() => (window.__kurloE2E as unknown as { finishLongTurn: () => void }).finishLongTurn());
+  await expect(stop).toHaveCount(0);
 });
 
 for (const connected of [true, false]) {
@@ -7947,8 +8052,10 @@ test('retries a failed approval response without leaving disabled approval butto
     app.AnswerAgentApproval = async () => {
       answers++;
       if (answers === 1) throw new Error('Decision could not be delivered. Try again.');
-      e2e.emit('agent:approval-closed', { id: 'waiting', chatId: 'waiting-chat', decision: 'allow' });
-      release?.();
+      e2e.closeAcceptedApproval = () => {
+        e2e.emit('agent:approval-closed', { id: 'waiting', chatId: 'waiting-chat', decision: 'allow' });
+        release?.();
+      };
       return { ok: true };
     };
     app.SendAgentMessage = async (input: Record<string, string>) => {
@@ -7972,6 +8079,8 @@ test('retries a failed approval response without leaving disabled approval butto
   await page.screenshot({ path: join(tmpdir(), `kurlo-approval-retry-${testInfo.project.name}.png`), animations: 'disabled' });
   await approval.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(approval).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeVisible();
+  await page.evaluate(() => (window.__kurloE2E as unknown as { closeAcceptedApproval: () => void }).closeAcceptedApproval());
   await expect(page.getByRole('button', { name: 'Stop the agent' })).toHaveCount(0);
 });
 
@@ -7981,20 +8090,21 @@ test('connects Claude Code like Codex and sends a workspace chat', async ({ page
     const app = window.go!.api!.App as Record<string, unknown>;
     app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
     let signedIn = false;
+    let account = 'dev@example.com · pro';
     let connected = false;
     let savedModel = 'claude-opus-5-5';
     let finishSignIn: () => void;
     const efforts = ['low', 'medium', 'high', 'xhigh', 'max'];
     const models = [{ id: 'claude-opus-5-5', name: 'Opus 5.5', recommended: true, efforts, defaultEffort: 'high' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', efforts, defaultEffort: 'high' }];
     const rateLimits = [{ limitId: 'claude', limitName: 'Claude', primary: { usedPercent: 23, windowDurationMins: 300, resetsAt: 4102444800 }, secondary: { usedPercent: 61, windowDurationMins: 10080, resetsAt: 4102444800 } }];
-    const status = () => ({ installed: true, connected, authenticated: signedIn, path: '/test/claude', version: '2.1.0 (Claude Code)', account: signedIn ? 'dev@example.com · pro' : '', authMethod: signedIn ? 'subscription' : '', model: savedModel, models, defaultModel: 'claude-opus-5-5', ...(connected ? { rateLimits } : {}) });
+    const status = () => ({ installed: true, connected, authenticated: signedIn, path: '/test/claude', version: '2.1.0 (Claude Code)', account: signedIn ? account : '', authMethod: signedIn ? 'subscription' : '', model: savedModel, models, defaultModel: 'claude-opus-5-5', ...(connected ? { rateLimits } : {}) });
     app.ClaudeCodeStatus = async () => status();
     app.ConnectClaudeCode = async (input: { model: string }) => {
       connected = true;
       savedModel = input.model || savedModel;
       return status();
     };
-    app.RemoveClaudeCodeConnection = async () => { connected = false; return { ok: true }; };
+    app.RemoveClaudeCodeConnection = async () => { connected = false; account = 'refreshed@example.test · pro'; return { ok: true }; };
     app.SignInClaudeCode = async () => {
       await new Promise<void>(resolve => { finishSignIn = resolve; });
       signedIn = true;
@@ -8071,4 +8181,185 @@ test('connects Claude Code like Codex and sends a workspace chat', async ({ page
   await expect(details.locator('.agent-limits')).toContainText('39% left');
   await expect(details).toContainText('Shared with your other Claude Code sessions.');
   await page.screenshot({ path: join(tmpdir(), `kurlo-claude-chat-${testInfo.project.name}.png`), animations: 'disabled' });
+  await picker.click();
+  await page.getByRole('button', { name: 'Manage connections', exact: true }).click();
+  await connection.getByRole('button', { name: 'Remove connection', exact: true }).click();
+  await expect(connection).toContainText('Signed in: refreshed@example.test · pro');
+  await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeVisible();
+  await expect(connection.getByLabel('Claude plan limits')).toHaveCount(0);
+});
+
+test('keeps streaming chat history and restores failed drafts only in their original chat', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+    const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, cost: 0 };
+    const base = { workspaceId: 'workspace-e2e', model: 'test-model', connectionId: 'c1', collection: '', environment: '', createdAt: Date.now(), updatedAt: Date.now(), usage, allowedTools: [] };
+    const user = (text: string): { role: string; blocks: Array<Record<string, string>> } => ({ role: 'user', blocks: [{ type: 'text', text }] });
+    const thinking = { type: 'thinking', text: 'Working through the request.' };
+    const tool = { type: 'tool_use', id: 'tool-1', name: 'list_requests', input: '{"scope":"test"}' };
+    const first = { ...base, id: 'first', title: 'First chat', messages: [user('Existing history')] };
+    const other = { ...base, id: 'other', title: 'Other chat', messages: [user('Other history')] };
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    app.AgentChats = async () => [first, other];
+    app.AgentChatPage = async (id: string) => structuredClone(id === 'first' ? first : other);
+    app.AgentPendingApprovals = async () => [];
+    app.SendAgentMessage = async (input: { text: string; turnId: string }) => {
+      if (input.text === 'Streaming prompt') {
+        const emit = e2e.emit as (name: string, payload: unknown) => void;
+        emit('ai:deltas', { sessionId: 'first', turnId: input.turnId, deltas: [{ ...thinking, step: 0, index: 0 }, { ...tool, step: 0, index: 1 }] });
+      }
+      if (input.text === 'Streaming prompt' || input.text === 'Saved before failure') first.messages.push(user(input.text));
+      const outcome = await new Promise<string>(resolve => { e2e.finishAgentSend = resolve; });
+      if (outcome === 'reject') throw new Error('The bridge rejected the send.');
+      if (outcome === 'saved-error') return { chat: structuredClone(first), error: 'The agent stopped after saving.' };
+      if (outcome === 'unsaved') return { chat: structuredClone(first), error: 'The prompt could not be saved.' };
+      if (outcome === 'no-chat') return { error: 'The chat could not be created.' };
+      first.messages.push({ role: 'assistant', blocks: [thinking, tool] });
+      return { chat: structuredClone(first) };
+    };
+  });
+  const finish = (outcome: string) => page.evaluate(value => {
+    (window.__kurloE2E as unknown as { finishAgentSend: (result: string) => void }).finishAgentSend(value);
+  }, outcome);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const sidebar = page.locator('.agent-sidebar');
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  const stop = page.getByRole('button', { name: 'Stop the agent' });
+  const first = sidebar.getByRole('button', { name: /First chat/ });
+  const other = sidebar.getByRole('button', { name: /Other chat/ });
+  await first.click();
+  await expect(page.getByText('Existing history', { exact: true })).toBeVisible();
+  await composer.fill('Streaming prompt');
+  await composer.press('Enter');
+  await expect(stop).toBeVisible();
+  await other.click();
+  await expect(page.getByText('Other history', { exact: true })).toBeVisible();
+  await first.click();
+  await expect(page.getByText('Existing history', { exact: true })).toBeVisible();
+  await expect(page.getByText('Streaming prompt', { exact: true })).toHaveCount(1);
+  await expect(page.getByText('Other history', { exact: true })).toHaveCount(0);
+  await page.locator('.agent-step-toggle').click();
+  await page.locator('.agent-tool-toggle').click();
+  await finish('saved');
+  await expect(stop).toHaveCount(0);
+  await expect(page.locator('.agent-step-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.agent-tool-toggle')).toHaveAttribute('aria-expanded', 'true');
+
+  for (const outcome of ['reject', 'unsaved']) {
+    await composer.fill('Retry this prompt');
+    await composer.press('Enter');
+    await expect(stop).toBeVisible();
+    await finish(outcome);
+    await expect(composer).toHaveValue('Retry this prompt');
+  }
+
+  await composer.fill('Saved before failure');
+  await composer.press('Enter');
+  await expect(stop).toBeVisible();
+  await finish('saved-error');
+  await expect(stop).toHaveCount(0);
+  await expect(page.getByText('Saved before failure', { exact: true })).toHaveCount(1);
+  await expect(composer).toHaveValue('');
+
+  await sidebar.getByRole('button', { name: 'New chat', exact: true }).click();
+  await composer.fill('Keep out of other chat');
+  await composer.press('Enter');
+  await expect(stop).toBeVisible();
+  await other.click();
+  await expect(page.getByText('Other history', { exact: true })).toBeVisible();
+  await finish('no-chat');
+  await expect(composer).toBeEnabled();
+  await expect(composer).toHaveValue('');
+});
+
+test('shows a failed chat deletion in the agent sidebar', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const chat = { id: 'locked-chat', workspaceId: 'workspace-e2e', title: 'Locked chat', createdAt: Date.now(), updatedAt: Date.now(), model: 'test-model', connectionId: 'c1', messages: [] };
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    app.AgentChats = async () => [chat];
+    app.AgentChatPage = async () => chat;
+    app.AgentPendingApprovals = async () => [];
+    app.DeleteAgentChat = async () => ({ ok: false, error: 'Chat storage is read-only.' });
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const sidebar = page.locator('.agent-sidebar');
+  const row = sidebar.locator('.agent-chat').filter({ hasText: 'Locked chat' });
+  await row.hover();
+  const trigger = row.getByRole('button', { name: 'Chat menu' });
+  await trigger.press('Enter');
+  const menu = row.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeFocused();
+  await sidebar.screenshot({ path: join(tmpdir(), 'kurlo-agent-sidebar-menu.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.press('Enter');
+  await menu.getByRole('menuitem', { name: 'Delete' }).click();
+  await expect(sidebar.getByRole('alert')).toHaveText('Chat storage is read-only.');
+  await expect(row).toBeVisible();
+  await sidebar.screenshot({ path: join(tmpdir(), 'kurlo-agent-delete-error.png'), animations: 'disabled' });
+  await row.getByRole('button', { name: /Locked chat/ }).click();
+  const headerTrigger = page.getByRole('button', { name: 'Chat actions' });
+  await headerTrigger.press('Enter');
+  await expect(page.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
+  await page.locator('.agent-workspace').screenshot({ path: join(tmpdir(), 'kurlo-agent-header-menu.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu', { name: 'Chat actions' })).toHaveCount(0);
+  await expect(headerTrigger).toBeFocused();
+  await headerTrigger.press('Enter');
+  await page.getByRole('menuitem', { name: 'Delete chat' }).click();
+  await expect(page.locator('.agent-header').getByRole('alert')).toHaveText('Chat storage is read-only.');
+  await page.locator('.agent-header').screenshot({ path: join(tmpdir(), 'kurlo-agent-header-delete-error.png'), animations: 'disabled' });
+});
+
+test('restores the selected agent when reopening a workspace', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    app.CodexStatus = async () => ({ installed: true, connected: true, authenticated: true, path: '/test/codex', model: 'codex-test', models: [{ id: 'codex-test', name: 'Codex test' }] });
+    let opens = 0;
+    app.OpenWorkspaceRoot = async () => {
+      const id = ++opens === 1 ? 'second-workspace' : 'workspace-e2e';
+      return {
+        ok: true,
+        root: '/exports',
+        payload: JSON.stringify({ workspaces: [{ id, name: id }], activeWorkspaceId: id }),
+      };
+    };
+  });
+
+  await page.goto('/');
+  const agent = page.getByRole('button', { name: 'Agent', exact: true });
+  const picker = page.getByRole('button', { name: /^Agent:/ });
+  const openWorkspace = async () => {
+    await page.getByLabel('Open Git and storage status').click();
+    await page.getByRole('button', { name: /Open existing repo/ }).click();
+    await expect(page.getByRole('button', { name: /Open existing repo/ })).toBeEnabled();
+    await agent.click();
+  };
+  await agent.click();
+  await picker.click();
+  await page.getByRole('radio', { name: /^Codex/ }).click();
+  await page.getByRole('radio', { name: /^Codex test/ }).click();
+  await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+
+  await openWorkspace();
+  await picker.click();
+  await page.getByRole('radio', { name: /^Test API/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(picker).toHaveAccessibleName('Agent: Kurlo agent · test-model');
+
+  await openWorkspace();
+  await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
 });

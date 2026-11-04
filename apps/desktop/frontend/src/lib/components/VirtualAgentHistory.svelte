@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends { id: string }">
-  import { tick, untrack, type Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { virtualOffsets, virtualIndex, virtualRange } from '../agentHistory';
 
@@ -11,8 +11,9 @@
   const offsets = $derived(virtualOffsets(items.map(item => item.id), heights));
   const range = $derived(virtualRange(offsets, top, height));
   let anchor: { id: string; y: number } | null = null;
-  let revision = 0;
+  let observedScrollTop = 0;
   let programmedScroll: number | null = null;
+  let lastFollow: boolean | null = null;
 
   $effect(() => {
     const ids = new Set(items.map(item => item.id));
@@ -32,6 +33,12 @@
       const index = virtualIndex(offsets, top);
       if (items[index]) anchor = { id: items[index].id, y: offsets[index] - top };
     }
+  }
+
+  export function captureAnchor() {
+    if (!scroller) return;
+    observedScrollTop = scroller.scrollTop;
+    viewport(true);
   }
 
   function measure(node: HTMLDivElement, id: string) {
@@ -54,7 +61,9 @@
     if (!target || !list) return;
     const observer = new ResizeObserver(() => viewport());
     observer.observe(target);
+    observedScrollTop = target.scrollTop;
     const scroll = () => {
+      observedScrollTop = target.scrollTop;
       const own = programmedScroll !== null && Math.abs(target.scrollTop - programmedScroll) < 1;
       programmedScroll = null;
       viewport(!own);
@@ -69,33 +78,33 @@
     const layout = offsets;
     const current = items;
     const target = scroller;
-    const following = follow;
+    const wasFollowing = lastFollow ?? follow;
     const saved = anchor;
-    const version = ++revision;
-    let cancelled = false;
-    void tick().then(() => {
-      if (cancelled || !target || version !== revision) return;
-      if (following) target.scrollTop = target.scrollHeight;
+    lastFollow = follow;
+    if (!target || !list) return;
+    untrack(() => {
+      if ((wasFollowing && !follow) || target.scrollTop < observedScrollTop - 0.5) return;
+      if (follow) target.scrollTop = target.scrollHeight;
       else if (saved) {
         const index = current.findIndex(item => item.id === saved.id);
         if (index >= 0) target.scrollTop = listTop() + layout[index] - saved.y;
       }
-      programmedScroll = target.scrollTop;
+      observedScrollTop = target.scrollTop;
+      programmedScroll = observedScrollTop;
       viewport();
     });
-    return () => { cancelled = true; };
   });
 </script>
 
-<div class="virtual-agent-history" bind:this={list} style:padding-top={`${offsets[range.start] ?? 0}px`} style:padding-bottom={`${(offsets.at(-1) ?? 0) - (offsets[range.end] ?? 0)}px`}>
-  {#each items.slice(range.start, range.end) as item (item.id)}
-    <div class="virtual-agent-row" use:measure={item.id} data-turn-id={item.id}>
+<div class="virtual-agent-history" bind:this={list} style:height={`${offsets.at(-1) ?? 0}px`}>
+  {#each items.slice(range.start, range.end) as item, index (item.id)}
+    <div class="virtual-agent-row" style:top={`${offsets[range.start + index] ?? 0}px`} use:measure={item.id} data-turn-id={item.id}>
       {@render children(item)}
     </div>
   {/each}
 </div>
 
 <style>
-  .virtual-agent-history { flex: 0 0 auto; min-width: 0; overflow-anchor: none; }
-  .virtual-agent-row { display: flow-root; min-width: 0; padding-bottom: calc(var(--space-4) + var(--space-5)); }
+  .virtual-agent-history { position: relative; flex: 0 0 auto; min-width: 0; overflow-anchor: none; }
+  .virtual-agent-row { position: absolute; left: 0; right: 0; padding-bottom: calc(var(--space-4) + var(--space-5)); }
 </style>

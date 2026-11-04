@@ -243,6 +243,18 @@ describe('ai streaming', () => {
     expect(current.steps[0].blocks[1]).toMatchObject({ type: 'tool_use', id: 'c1', name: 'get_weather', input: '{"city":"Lisbon"}' });
   });
 
+  it('ignores invalid stream indices and keeps valid deltas from the same batch', () => {
+    const valid = { sessionId: 'r', step: 0, index: 0, type: 'text', text: 'OK' };
+    const invalid = [-1, 0.5, NaN, Infinity, 1001];
+    const current = applyAiDeltas(turn(), [
+      ...invalid.map(step => ({ ...valid, step })),
+      ...invalid.map(index => ({ ...valid, index })),
+      valid,
+    ]);
+    expect(current.steps).toHaveLength(1);
+    expect(current.steps[0].blocks).toEqual([{ type: 'text', text: 'OK' }]);
+  });
+
   it('carries finished turns into the next request and skips failed ones', () => {
     const done = turn({
       id: 'a', prompt: 'First', status: 'done',

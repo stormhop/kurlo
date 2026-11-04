@@ -996,6 +996,7 @@ export namespace model {
 		}
 	}
 	export class AgentChat {
+	    archivedAt?: number;
 	    messageOffset?: number;
 	    messageCount?: number;
 	    workspaceId: string;
@@ -1023,6 +1024,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.archivedAt = source["archivedAt"];
 	        this.messageOffset = source["messageOffset"];
 	        this.messageCount = source["messageCount"];
 	        this.workspaceId = source["workspaceId"];
@@ -1064,6 +1066,7 @@ export namespace model {
 		}
 	}
 	export class AgentChatSummary {
+	    archivedAt?: number;
 	    workspaceId: string;
 	    driver?: string;
 	    id: string;
@@ -1077,6 +1080,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.archivedAt = source["archivedAt"];
 	        this.workspaceId = source["workspaceId"];
 	        this.driver = source["driver"];
 	        this.id = source["id"];

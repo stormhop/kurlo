@@ -776,6 +776,18 @@ export async function deleteAgentChat(id: string): Promise<AgentResult> {
   return (await window.go?.api?.App?.DeleteAgentChat?.(id)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
 }
 
+export async function setAgentChatArchived(id: string, workspaceId: string, archived: boolean): Promise<AgentChatSummary> {
+  const app = window.go?.api?.App;
+  if (!app?.SetAgentChatArchived) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.SetAgentChatArchived(id, workspaceId, archived);
+}
+
+export async function exportAgentChat(id: string, workspaceId: string): Promise<string> {
+  const app = window.go?.api?.App;
+  if (!app?.ExportAgentChat) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.ExportAgentChat(id, workspaceId);
+}
+
 export async function renameAgentChat(id: string, title: string): Promise<AgentResult> {
   return (await window.go?.api?.App?.RenameAgentChat?.(id, title)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
 }

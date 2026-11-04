@@ -14,6 +14,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **Archive and export Agent Mode chats.** Keep chats beyond the usual retention limits or save a Markdown copy. See [Chats and the activity log](/docs/guides/agent/#chats-and-the-activity-log).
+
 - **Meet Agent mode.** Updating from 2.x shows a one-time introduction to Agent mode with **Try Agent mode**, and a dot marks the Agent icon until you open it. See [What's new](/docs/guides/settings/#whats-new).
 
 - **Claude Code in Agent Mode.** Connect the installed Claude Code CLI in **Settings → AI** the same way as Codex: Kurlo shows the CLI version and the signed-in account and plan (or API key / cloud provider), starts the official Claude sign-in if needed, and **Use this account** saves the connection with the chosen model; **Reconnect**, **Remove connection** and a custom executable path work as for Codex. Pick Claude Code and a model by its full name (Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5; the CLI's own default is preselected and marked) and an effort from Low to Max, with High preselected and always passed to the CLI, so the menu shows the level actually used, continue native sessions, and review workspace changes with Kurlo’s approval controls. Chat details show token usage, the cost at API prices, the last request's context against the model's window, and the Claude plan's 5-hour and weekly limits, which also appear as bars in Settings as soon as the connection is checked (read with the CLI's own `/usage`, which uses no tokens); a failed turn shows the CLI's reason, such as a model that needs usage credits.
@@ -57,9 +59,17 @@ This page summarizes the notable-change log maintained in the source repository.
 
 - **Private agent tool channel.** The local MCP server the Claude Code agent talks to during a turn requires a random per-turn token, and its address reaches the CLI through a temporary file readable only by your account.
 
+- **Smooth agent chat rendering.** Model output with long runs of `[`, `*` or backticks renders faster while it streams, including in long links and code spans.
+
 - **Owner-only variable exports.** `kurlo run --export-environment` and `--export-globals` write owner-only files on Unix, including when replacing an earlier export.
 
 - **What's new dialog and update flow.** The dialog closes with Escape, and blocked browser storage no longer breaks the update check or the automatic install.
+
+- **Agent chat menus.** Closing a menu by clicking outside returns focus to its button, Home and End jump to the first and last item, and deleting a chat clears its pending approvals. Invalid step and block indices in streaming events are ignored.
+
+- **Agent chat controls.** Chat menus support arrow keys and Escape. Loading earlier messages and receiving streamed updates preserve the reading position. Expanded tool and thinking details stay open when a turn finishes. A running Codex chat stays visible during a connection refresh, and approval decisions can be retried after a failure.
+
+- **Agent chat reliability.** Reopening a streaming chat shows the prompt once. Failed sends restore unsaved prompts to their original chat, and failed deletes show an error. Removing a local agent connection refreshes its status, and reopening a workspace restores its selected agent mode.
 
 - **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
 

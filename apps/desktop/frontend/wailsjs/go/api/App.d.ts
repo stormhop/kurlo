@@ -83,6 +83,8 @@ export function DiagnosticsReport():Promise<string>;
 
 export function DiscoverLocalAiServers():Promise<model.AiLocalDiscovery>;
 
+export function ExportAgentChat(arg1:string,arg2:string):Promise<string>;
+
 export function ExportLoadTestK6(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
 
 export function ExportLoadTestK6Files(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
@@ -292,6 +294,8 @@ export function SendRequest(arg1:model.HttpRequest):Promise<model.HttpResponse>;
 export function SendRequestToFile(arg1:model.HttpRequest,arg2:string):Promise<api.DownloadResult>;
 
 export function SetAgentActivityEnabled(arg1:boolean):Promise<model.AgentResult>;
+
+export function SetAgentChatArchived(arg1:string,arg2:string,arg3:boolean):Promise<model.AgentChatSummary>;
 
 export function SetAppThemeBackground(arg1:string,arg2:string):Promise<void>;
 

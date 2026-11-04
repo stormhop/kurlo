@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import AgentChatWorkspace from './AgentChatWorkspace.svelte';
-  import { agentNavigation, agentStoreFor, switchAgent } from '../stores/agent.svelte';
+  import { agentNavigation, agentStoreFor, codexAgentStore, switchAgent } from '../stores/agent.svelte';
   import { claudeConnectionStore as claude } from '../stores/claude.svelte';
   import { codexConnectionStore } from '../stores/codex.svelte';
   import { aiConnectionsStore } from '../stores/aiConnections.svelte';
@@ -9,6 +9,7 @@
   let { workspaceBlocked = false }: { workspaceBlocked?: boolean } = $props();
 
   const codexReady = $derived(codexConnectionStore.status.connected);
+  const codexChatArchived = $derived(codexAgentStore.chats.some(chat => chat.id === codexAgentStore.activeChatId && chat.archivedAt));
   const store = $derived(agentStoreFor(agentNavigation.mode));
 
   onMount(() => {
@@ -18,7 +19,7 @@
 
   $effect(() => {
     if (!codexConnectionStore.loaded || codexConnectionStore.checking) return;
-    if (agentNavigation.mode === 'external' && !codexReady) switchAgent('kurlo');
+    if (agentNavigation.mode === 'external' && !codexReady && !codexAgentStore.running && !codexChatArchived) switchAgent('kurlo');
     else if (agentNavigation.mode === 'kurlo' && aiConnectionsStore.loaded && !aiConnectionsStore.list.length && !store.activeChatId) {
       if (codexReady) switchAgent('external');
       else if (claude.usable) switchAgent('claude');

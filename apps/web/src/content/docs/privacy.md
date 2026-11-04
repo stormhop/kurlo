@@ -27,7 +27,7 @@ Inside that directory you may find:
 - `request-store.key` — a base64-encoded recovery copy of the encryption key, written with owner-only `0600` permissions.
 - `request-store.key.dpapi` — an additional Windows DPAPI-protected key copy.
 - `preferences.json` — the configured default workspace location, cookie sync settings, and [AI connections](/docs/guides/settings/#ai) with their keys encrypted by the request-store key. Other UI preferences are stored by the desktop WebView.
-- `agent-chats/` — [agent](/docs/guides/agent/) chats, one encrypted file per chat, kept for 90 days.
+- `agent-chats/` — [agent](/docs/guides/agent/) chats, one encrypted file per chat. Kurlo keeps up to 200 unarchived chats across the local profile for up to 90 days of inactivity. Archived chats are kept until you delete them. Markdown exports are unencrypted files saved at a location you choose.
 - `agent-activity/` — the encrypted log of tool calls made by the agent and by assistants connected through `kurlo mcp`, with the files they changed, kept for 30 days.
 - `workspaces/` — the default folder-backed YAML workspace location.
 
