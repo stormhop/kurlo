@@ -231,17 +231,16 @@ func streamClaudeTurn(ctx context.Context, path string, bridge *agentToolBridge,
 		return err.Error()
 	}
 	defer closeMCP()
-	config, err := json.Marshal(map[string]any{"mcpServers": map[string]any{
-		"kurlo": map[string]string{"type": "http", "url": url},
-	}})
-	if err != nil {
-		return err.Error()
-	}
 	dir := filepath.Join(requestStoreDir(), "claude-agent")
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err.Error()
 	}
-	args := claudeTurnArgs(string(config), chat.ExternalThreadID)
+	configPath, err := writeClaudeMCPConfig(dir, url)
+	if err != nil {
+		return err.Error()
+	}
+	defer os.Remove(configPath)
+	args := claudeTurnArgs(configPath, chat.ExternalThreadID)
 	if name := claudeModelArg(chat.Model); name != "" {
 		args = append(args, "--model", name)
 	}

@@ -32,7 +32,7 @@ fi
 for arg in "$@"; do
   if [ "$arg" = "--no-session-persistence" ]; then
     cat >/dev/null
-    printf '%s\n' '{"type":"system","subtype":"init","model":"claude-sonnet-5-5"}' '{"type":"assistant","message":{"model":"<synthetic>","content":[{"type":"text","text":"Current session: 12% used · resets 3pm\nCurrent week (all models): 50% used · resets Jan 2 at 11am"}]}}' '{"type":"result","subtype":"success","result":""}'
+    printf '%s\n' '{"type":"system","subtype":"init","model":"claude-sonnet-5-5"}' '{"type":"assistant","message":{"model":"<synthetic>","content":[{"type":"text","text":"Current session: 12% used\nCurrent week (all models): 50% used"}]}}' '{"type":"result","subtype":"success","result":""}'
     exit 0
   fi
 done
@@ -72,8 +72,12 @@ printf '%s\n' '{"type":"system","subtype":"init","session_id":"claude-session","
 		t.Fatalf("unconnected Claude Code should be rejected, got %+v", blocked)
 	}
 	status := app.ClaudeCodeStatus("")
-	if !status.Installed || !status.Authenticated || status.Connected || status.Account != "dev@example.com · pro" || status.AuthMethod != "subscription" || status.Version != "2.1.0 (Claude Code)" || status.Model != "claude-sonnet-5-5" || status.DefaultModel != "claude-sonnet-5-5" || len(status.Models) != 4 || len(status.RateLimits) != 1 || status.RateLimits[0].Primary.UsedPercent != 12 || status.RateLimits[0].Secondary.UsedPercent != 50 {
+	if !status.Installed || !status.Authenticated || status.Connected || status.Account != "dev@example.com · pro" || status.AuthMethod != "subscription" || status.Version != "2.1.0 (Claude Code)" || status.Model != "claude-sonnet-5-5" || status.DefaultModel != "claude-sonnet-5-5" || len(status.Models) != 4 || len(status.RateLimits) != 1 {
 		t.Fatalf("unexpected status before connect: %+v", status)
+	}
+	usageLimits := status.RateLimits[0]
+	if usageLimits.Primary == nil || usageLimits.Primary.UsedPercent != 12 || usageLimits.Secondary == nil || usageLimits.Secondary.UsedPercent != 50 {
+		t.Fatalf("unexpected usage limits before connect: primary=%+v secondary=%+v", usageLimits.Primary, usageLimits.Secondary)
 	}
 	if bad := app.ConnectClaudeCode(model.ClaudeConnection{Model: "gpt-5"}); bad.Error == "" || bad.Connected {
 		t.Fatalf("unknown model should be rejected: %+v", bad)

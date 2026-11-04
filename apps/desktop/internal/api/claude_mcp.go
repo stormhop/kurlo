@@ -2,9 +2,15 @@ package api
 
 import (
 	"context"
+	crand "crypto/rand"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +22,12 @@ func startClaudeMCP(ctx context.Context, bridge *agentToolBridge) (string, func(
 	if err != nil {
 		return "", nil, err
 	}
+	token := make([]byte, 24)
+	if _, err := crand.Read(token); err != nil {
+		_ = listener.Close()
+		return "", nil, err
+	}
+	hexToken := hex.EncodeToString(token)
 	ctx, cancel := context.WithCancel(ctx)
 	path := "/mcp/" + uuid.NewString()
 	handler := claudeMCPHandler(bridge)
@@ -24,7 +36,7 @@ func startClaudeMCP(ctx context.Context, bridge *agentToolBridge) (string, func(
 		ReadTimeout:       10 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != path {
+			if r.URL.Path != path || !claudeMCPAuthorized(r, hexToken) {
 				http.NotFound(w, r)
 				return
 			}
@@ -41,10 +53,34 @@ func startClaudeMCP(ctx context.Context, bridge *agentToolBridge) (string, func(
 	}
 	stop := context.AfterFunc(ctx, closeServer)
 	go func() { _ = server.Serve(listener) }()
-	return "http://" + listener.Addr().String() + path, func() {
+	return "http://" + listener.Addr().String() + path + "?token=" + hexToken, func() {
 		stop()
 		closeServer()
 	}, nil
+}
+
+func claudeMCPAuthorized(r *http.Request, hexToken string) bool {
+	given := r.URL.Query().Get("token")
+	if given == "" {
+		if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+			given = strings.TrimPrefix(auth, "Bearer ")
+		}
+	}
+	return subtle.ConstantTimeCompare([]byte(given), []byte(hexToken)) == 1
+}
+
+func writeClaudeMCPConfig(dir, url string) (string, error) {
+	config, err := json.Marshal(map[string]any{"mcpServers": map[string]any{
+		"kurlo": map[string]string{"type": "http", "url": url},
+	}})
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, "mcp-config-"+uuid.NewString()+".json")
+	if err := os.WriteFile(path, config, 0600); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func claudeMCPHandler(bridge *agentToolBridge) http.Handler {

@@ -51,6 +51,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Private agent tool channel.** The local MCP server the Claude Code agent talks to during a turn now requires a random per-turn token, and its address reaches the CLI through a temporary file readable only by your account instead of the process arguments, which any local user can read.
+
 - **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
 
 - **Agent turns release resources and stop reliably.** Completed turns release cached tool bridges. Stop works before the first reply and targets its own turn; late events cannot reopen approval cards. Unanswered approvals stop the whole turn after 30 minutes without resuming the model, and a failed decision can be retried. Codex stops after five minutes without progress (paused while approval is pending), ends on a CLI crash and limits tool loops to 50 calls. CLI cancellation also terminates its process tree. Background workspace snapshots keep only the latest history page.
