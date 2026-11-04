@@ -55,6 +55,7 @@ export class AgentStore {
   loadingEarlier = $state(false);
   compacting = $state(false);
   private historyRequest = 0;
+  private chatLoads = new Map<string, symbol>();
   workspaceId = $state('');
 
   private composer = $state(Symbol());
@@ -224,6 +225,7 @@ export class AgentStore {
 
   newChat() {
     this.composer = Symbol();
+    this.chatLoads.delete(this.workspaceId);
     this.historyRequest++;
     this.loadingEarlier = false;
     this.historyError = '';
@@ -240,7 +242,9 @@ export class AgentStore {
     const generation = this.generation;
     const collectionNames = this.collectionNames;
     const environmentNames = this.environmentNames;
-    const request = ++this.historyRequest;
+    const request = Symbol();
+    this.chatLoads.set(workspaceId, request);
+    this.historyRequest++;
     this.loadingEarlier = false;
     this.historyError = '';
     this.activeChatId = id;
@@ -253,7 +257,7 @@ export class AgentStore {
     }
     try {
       const chat = reopeningLive ? this.liveHistory : await agentChatPage(id);
-      if (!chat || request !== this.historyRequest) return;
+      if (!chat || this.chatLoads.get(workspaceId) !== request) return;
       if (chat.workspaceId !== workspaceId) throw new Error('This chat belongs to another workspace.');
       this.updateView(workspaceId, generation, view => {
         if (view.activeChatId !== id) return;
@@ -270,12 +274,14 @@ export class AgentStore {
       const known = this.approvals.map(approval => approval.id);
       this.approvals = [...this.approvals, ...pending.filter(approval => !known.includes(approval.id))];
     } catch (error) {
-      if (request !== this.historyRequest) return;
+      if (this.chatLoads.get(workspaceId) !== request) return;
       this.updateView(workspaceId, generation, view => {
         if (view.activeChatId !== id) return;
         view.activeChat = null;
         view.loadError = error instanceof Error ? error.message : String(error);
       });
+    } finally {
+      if (this.chatLoads.get(workspaceId) === request) this.chatLoads.delete(workspaceId);
     }
   }
 
@@ -311,6 +317,7 @@ export class AgentStore {
     const generation = this.generation;
     const history = this.activeChat?.id === chatId ? this.activeChat : null;
     const messageCount = chatMessageCount(history);
+    this.chatLoads.delete(workspaceId);
     this.historyRequest++;
     this.loadingEarlier = false;
     const turn: AiTurn = { id: newTurnId(), prompt, startedAt: Date.now(), status: 'streaming', steps: [], response: null, error: '' };
@@ -441,6 +448,7 @@ export class AgentStore {
     if (!this.driver && this.workspaceId) workspaceModes.set(this.workspaceId, agentNavigation.mode);
     this.workspaceId = '';
     this.views.clear();
+    this.chatLoads.clear();
     this.compacting = false;
     this.live = null;
     this.liveChatId = '';

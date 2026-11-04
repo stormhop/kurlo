@@ -57,6 +57,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Agent Mode chat history.** Chats that finish loading in the background show their history when you return to their workspace.
+
 - **Private agent tool channel.** The local MCP server the Claude Code agent talks to during a turn requires a random per-turn token, and its address reaches the CLI through a temporary file readable only by your account.
 
 - **Smooth agent chat rendering.** Model output with long runs of `[`, `*` or backticks renders faster while it streams, including in long links and code spans.
