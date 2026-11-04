@@ -157,6 +157,10 @@ func writeFileAtomicMode(path string, data []byte, mode os.FileMode) error {
 	if existing, err := os.ReadFile(path); err == nil && string(existing) == string(data) {
 		return nil
 	}
+	return replaceFileAtomicMode(path, data, mode)
+}
+
+func replaceFileAtomicMode(path string, data []byte, mode os.FileMode) error {
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".kurlo-*.tmp")
 	if err != nil {
 		return err

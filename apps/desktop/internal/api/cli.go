@@ -632,7 +632,7 @@ func writeVariableExport(path, name string, values map[string]string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	return replaceFileAtomicMode(path, append(data, '\n'), 0o600)
 }
 
 func runReporters(opts cliOptions, results []cliRunResult, elapsed time.Duration) error {
