@@ -6543,7 +6543,7 @@ test.describe('Send races', () => {
   });
 });
 
-test.describe('Scale', () => {
+test.describe('Scale', { tag: '@scale' }, () => {
   test('stays responsive with ten thousand requests, 200-deep folders and unicode names', async ({ page }) => {
     test.setTimeout(180_000);
     await installKurloBridge(page);
