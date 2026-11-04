@@ -8297,7 +8297,7 @@ test('shows a failed chat deletion in the agent sidebar', async ({ page }) => {
   await trigger.press('Enter');
   const menu = row.getByRole('menu');
   await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
-  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('End');
   await expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeFocused();
   await sidebar.screenshot({ path: join(tmpdir(), 'kurlo-agent-sidebar-menu.png'), animations: 'disabled' });
   await page.keyboard.press('Escape');
