@@ -26,6 +26,11 @@ func agentWorkspaceSummary(s *mcpServer) []string {
 		counts[req.CollectionID]++
 	}
 	var lines []string
+	if s.opts.workspaceID != "" {
+		if st, err := s.loadStore(); err == nil && len(st.workspaces) == 1 {
+			lines = append(lines, "- Workspace: "+stringValue(st.workspaces[0], "name")+". Only this workspace is available to you; other workspaces in the same folder are not.")
+		}
+	}
 	if len(ws.collections) == 0 {
 		lines = append(lines, "- Collections: none yet.")
 	} else {
@@ -70,6 +75,7 @@ func agentSystemPrompt(s *mcpServer, chat model.AgentChat) string {
 		"- Never point an environment at production unless the user asks for it.",
 		"- When a request fails, find out why with diagnose_last_failure, get_history_entry or the test results before you guess.",
 		"- Keep answers short. After a change, say what changed and in which request or environment.",
+		"- Git: git_status, git_diff and pull_request_url run at once. Creating a branch and committing wait for approval. Call git_push only when the user asked to push in this chat; never push on your own.",
 		"",
 		"Workspace:",
 	}
@@ -79,6 +85,13 @@ func agentSystemPrompt(s *mcpServer, chat model.AgentChat) string {
 	}
 	if env := strings.TrimSpace(chat.Environment); env != "" {
 		lines = append(lines, "- The user chose the environment "+env+": tool calls use it unless they name another.")
+	}
+	if chat.OwnBranch {
+		branch := strings.TrimSpace(chat.Branch)
+		if branch == "" {
+			branch = agentBranchName(chat.ID, chat.Title)
+		}
+		lines = append(lines, "- The user turned on the agent branch: Kurlo commits every approved change to "+branch+" on its own, so do not call git_commit for those changes. Offer pull_request_url once the work is pushed.")
 	}
 	lines = append(lines, "", "Common tasks:")
 	for _, task := range agentCommonTasks {

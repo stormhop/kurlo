@@ -42,6 +42,7 @@ const (
 
 type mcpServerOptions struct {
 	workspace        string
+	workspaceID      string
 	env              string
 	timeoutMs        int
 	insecure         bool
@@ -61,10 +62,13 @@ type mcpServer struct {
 	session  map[string]*mcpSessionScope
 	lastRuns map[string]mcpLastRun
 
-	clientMu sync.Mutex
-	client   string
-	chatID   string
-	onWrite  func(root string, changes []model.AgentFileChange)
+	clientMu            sync.Mutex
+	client              string
+	chatID              string
+	openOAuthBrowser    func(string) error
+	onOAuthDevicePrompt func(model.OAuth2DevicePrompt)
+	onWrite             func(root string, changes []model.AgentFileChange)
+	afterWrite          func(tool string, record *mcpCallRecord) string
 
 	pendingMu sync.Mutex
 	pending   map[string]context.CancelFunc
@@ -340,7 +344,8 @@ func (s *mcpServer) instructions() string {
 		"- Secrets are sent but shown as [secret]. Protected environments cannot be used here: ask the user to run those requests in Kurlo.",
 	}
 	if !s.opts.readOnly {
-		lines = append(lines, "- create_collection, save_request, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*, or let generate_tests write them from a response. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")
+		lines = append(lines, "- create_collection, save_request, patch_request, apply_changes, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*, or let generate_tests write them from a response. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")
+		lines = append(lines, "- git_status and git_diff show uncommitted workspace changes; git_commit commits only workspace files. Call git_push only when the user asked to push, then offer pull_request_url.")
 	}
 	if s.opts.env != "" {
 		lines = append(lines, "- Calls that do not name an environment use "+s.opts.env+".")
@@ -419,9 +424,17 @@ func mcpServerTools(readOnly bool) []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"request": map[string]any{"type": "string", "description": "Request id, path (Collection/Folder/Name) or name."},
+					"format":  map[string]any{"type": "string", "enum": []string{"summary", "yaml"}, "description": "Use yaml for the workspace document, including protocol-specific fields. Defaults to summary."},
 				},
 				"required": []string{"request"},
 			},
+			"annotations": readOnlyTool,
+		},
+		{
+			"name":        "list_globals",
+			"title":       "List local profile globals",
+			"description": "Read global variables from the active Kurlo profile. Secret values are hidden.",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 			"annotations": readOnlyTool,
 		},
 		{
@@ -491,11 +504,22 @@ func mcpServerTools(readOnly bool) []map[string]any {
 			"annotations": network,
 		},
 	}
+	tools = append(tools, map[string]any{
+		"name":        "authorize_oauth2",
+		"title":       "Authorize a saved OAuth 2.0 request",
+		"description": "Use the saved OAuth configuration to authorize a request for this Agent Mode turn or external MCP connection. Browser and device sign-in require the user. Tokens are kept in memory and are never returned.",
+		"inputSchema": map[string]any{"type": "object", "properties": map[string]any{
+			"request":     map[string]any{"type": "string", "description": "Saved request id or path."},
+			"environment": environment,
+		}, "required": []string{"request"}},
+		"annotations": network,
+	})
 	tools = append(append(tools, mcpServerHistoryTools()...), mcpDiagnoseTool())
 	if readOnly {
-		return tools
+		return append(tools, mcpGitTools(true)...)
 	}
-	return append(append(tools, mcpServerWriteTools()...), mcpGenerateTestsTool())
+	tools = append(append(tools, mcpServerWriteTools()...), mcpGenerateTestsTool())
+	return append(tools, mcpGitTools(false)...)
 }
 
 func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[string]any, error) {
@@ -526,8 +550,12 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolGetRequest
 	case "list_environments":
 		run = s.toolListEnvironments
+	case "list_globals":
+		run = s.toolListGlobals
 	case "run_request":
 		run = s.toolRunRequest
+	case "authorize_oauth2":
+		run = s.toolAuthorizeOAuth2
 	case "run_collection":
 		run = s.toolRunCollection
 	case "send_request":
@@ -542,6 +570,10 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolCreateCollection
 	case "save_request":
 		run = s.toolSaveRequest
+	case "patch_request":
+		run = s.toolPatchRequest
+	case "apply_changes":
+		run = s.toolApplyChanges
 	case "delete_request":
 		run = s.toolDeleteRequest
 	case "save_example":
@@ -550,10 +582,22 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolSetVariable
 	case "generate_tests":
 		run = s.toolGenerateTests
+	case "git_status":
+		run = s.toolGitStatus
+	case "git_diff":
+		run = s.toolGitDiff
+	case "pull_request_url":
+		run = s.toolPullRequestURL
+	case "git_create_branch":
+		run = s.toolGitCreateBranch
+	case "git_commit":
+		run = s.toolGitCommit
+	case "git_push":
+		run = s.toolGitPush
 	default:
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "unknown tool: " + call.Name}
 	}
-	if s.opts.readOnly && mcpWriteToolNames[call.Name] {
+	if s.opts.readOnly && (mcpWriteToolNames[call.Name] || mcpGitWriteToolNames[call.Name]) {
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: call.Name + " is not available: this server was started with --read-only"}
 	}
 
@@ -582,6 +626,13 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 	result, err := mcpToolValue(value)
 	if err != nil {
 		return nil, err
+	}
+	if s.afterWrite != nil && len(record.changes) > 0 {
+		if note := s.afterWrite(call.Name, record); note != "" {
+			if content, ok := result["content"].([]map[string]any); ok {
+				result["content"] = append(content, map[string]any{"type": "text", "text": note})
+			}
+		}
 	}
 	s.logCall(call.Name, arguments, record, result, nil)
 	return result, nil
@@ -661,6 +712,17 @@ type mcpWorkspace struct {
 	environments []cliEnvironment
 }
 
+func (s *mcpServer) loadStore() (*mcpStore, error) {
+	st, err := loadMCPStore(s.opts.workspace)
+	if err != nil {
+		return nil, err
+	}
+	if err := st.scope(s.opts.workspaceID); err != nil {
+		return nil, err
+	}
+	return st, nil
+}
+
 func (s *mcpServer) loadWorkspace() (mcpWorkspace, error) {
 	secrets := map[string]string{}
 	if s.opts.loadAppSecrets {
@@ -671,6 +733,31 @@ func (s *mcpServer) loadWorkspace() (mcpWorkspace, error) {
 	_, collections, requests, environments, err := loadCLIWorkspaceWithSecrets(s.opts.workspace, secrets)
 	if err != nil {
 		return mcpWorkspace{}, err
+	}
+	if id := s.opts.workspaceID; id != "" {
+		scoped := collections[:0]
+		inScope := map[string]bool{}
+		for _, collection := range collections {
+			if collection.WorkspaceID == id {
+				scoped = append(scoped, collection)
+				inScope[collection.ID] = true
+			}
+		}
+		collections = scoped
+		scopedEnvironments := environments[:0]
+		for _, env := range environments {
+			if env.WorkspaceID == id {
+				scopedEnvironments = append(scopedEnvironments, env)
+			}
+		}
+		environments = scopedEnvironments
+		scopedRequests := requests[:0]
+		for _, req := range requests {
+			if inScope[req.CollectionID] {
+				scopedRequests = append(scopedRequests, req)
+			}
+		}
+		requests = scopedRequests
 	}
 	saved := requests[:0]
 	for _, req := range requests {
@@ -832,9 +919,17 @@ func mcpEnabledRows(rows []cliKV) []mcpKeyValue {
 func (s *mcpServer) toolGetRequest(_ context.Context, arguments json.RawMessage) (any, error) {
 	var args struct {
 		Request string `json:"request"`
+		Format  string `json:"format"`
 	}
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
 		return nil, err
+	}
+	switch args.Format {
+	case "yaml":
+		return s.getMCPRequestDocument(args.Request)
+	case "", "summary":
+	default:
+		return nil, fmt.Errorf("format must be summary or yaml")
 	}
 	ws, err := s.loadWorkspace()
 	if err != nil {
@@ -990,7 +1085,8 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 	if env, ok := findEnvironment(ws.environments, envName); ok && env.Protected {
 		return nil, fmt.Errorf("environment %s is protected: Kurlo does not send requests with it for AI agents; ask the user to run this in the app, or use another environment", env.Name)
 	}
-	values, secrets, err := resolveCLIValues(cliOptions{env: envName}, ws.collections, ws.environments, nil)
+	globals, globalSecrets := mcpGlobalValues(s.opts.workspace, s.opts.loadAppSecrets)
+	values, secrets, err := resolveCLIValues(cliOptions{env: envName}, ws.collections, ws.environments, globals)
 	if err != nil {
 		return nil, err
 	}
@@ -1009,7 +1105,8 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 	}
 	sm := state.New()
 	sm.SetEnvironment(values)
-	return &mcpRunContext{envName: envName, values: values, secrets: secrets, sm: sm}, nil
+	sm.SetVariables(globals)
+	return &mcpRunContext{envName: envName, values: values, secrets: append(secrets, globalSecrets...), sm: sm}, nil
 }
 
 func (s *mcpServer) runOptions() cliOptions {
@@ -1023,6 +1120,12 @@ func (s *mcpServer) runOptions() cliOptions {
 
 func (s *mcpServer) execute(ctx context.Context, run *mcpRunContext, req cliSavedRequest) (cliRunResult, model.HttpResponse) {
 	result, resp := executeCLIRequest(ctx, run.sm, s.jars, s.cache, s.tokens, req, 1, nil, s.runOptions(), run.secrets)
+	run.secrets = append(run.secrets, result.secrets...)
+	for _, logs := range [][]string{resp.PreRequestResult.Logs, resp.TestResult.Logs} {
+		for _, line := range logs {
+			result.Logs = append(result.Logs, redactSecrets(line, run.secrets))
+		}
+	}
 	if len(resp.CollectionVariableUpdates) > 0 || len(resp.CollectionVariablesRemoved) > 0 {
 		values := run.sm.GetEnvironment()
 		for key, value := range resp.CollectionVariableUpdates {
@@ -1185,9 +1288,7 @@ func mcpOutcome(label string, run *mcpRunContext, result cliRunResult, resp mode
 		test.Error = redactSecrets(test.Error, secrets)
 		outcome.Tests = append(outcome.Tests, test)
 	}
-	for _, log := range append(append([]string{}, resp.PreRequestResult.Logs...), resp.TestResult.Logs...) {
-		outcome.Logs = append(outcome.Logs, redactSecrets(log, secrets))
-	}
+	outcome.Logs = result.Logs
 	for _, warning := range resp.Warnings {
 		outcome.Warnings = append(outcome.Warnings, redactSecrets(warning, secrets))
 	}

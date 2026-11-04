@@ -85,6 +85,9 @@ In **Chat details**, **Context (last request)** compares the last reported reque
 | Run a request, a collection or a one-off call that only sends `GET`, `HEAD` or `OPTIONS` | Runs at once |
 | Send any other method, such as `POST` or `DELETE` | Asks first, showing the call |
 | Change the workspace: save or delete a request, save an example, set a variable, create a collection, write tests | Asks first, showing the change file by file |
+| Read the Git status or diff of the workspace, or build a pull request link | Runs at once |
+| Create a Git branch or commit workspace files | Asks first; a commit shows the files it includes |
+| Push the current branch | Asks every time, and only when you asked it to push |
 
 An approval card shows the exact lines that would change in each YAML file. **Apply** writes them, **Reject** tells the agent no and it asks what you want instead, and **Allow for this chat** applies this change and lets the same tool run without asking for the rest of the chat.
 
@@ -92,9 +95,19 @@ An approval card shows the exact lines that would change in each YAML file. **Ap
 
 Nothing is written while the card waits, and Kurlo keeps saving your own edits in the meantime. If you change one of those files before you click **Apply**, the change is dropped and the agent is told to try again, so it never overwrites your edit. The agent never writes a secret into the workspace: it uses a `{{variable}}` and asks you to set the value. Secret values reach it only as `[secret]`.
 
+## Git
+
+Git works on the whole folder, not on one workspace: when a folder holds several workspaces, a branch or commit made from one chat applies to all of them, and **Chat details → Git** says so. When the workspace is in a Git repository, the agent can check `git status` and the diff of the workspace files, create a branch, commit and push. Creating a branch and committing wait for your approval; a commit card lists every file with its diff and a **Commit** button. A push asks every time, even after **Allow for this chat**, and the agent pushes only when you ask it to. Only Kurlo workspace files are ever committed: other files in the repository are left alone.
+
+To keep the agent's work apart from yours, turn on **Branch** in the message box before you send. Kurlo then commits each change you approve to a branch of its own, named after the chat, such as `kurlo-agent/cover-orders-1a2b3c`. The branch is created from the current commit on the first change and the workspace switches to it, so uncommitted edits you had in a file the agent changes go into that commit too. A change you reject is not committed. **Chat details → Git** shows the current branch and the agent branch.
+
+![Agent Mode chat with Branch on in the message box and the Git section in Chat details](../../../../assets/screenshots/agent-git.png)
+
+**Open pull request** in **Chat details** opens the page that starts a pull request for the current branch on GitHub, or a merge request on GitLab and Bitbucket, against the remote's default branch. Push the branch first. Kurlo builds the link from the remote URL and sends nothing; for other hosts it says it cannot build one.
+
 ## Chats and the activity log
 
-Chats are kept on this computer in Kurlo's profile, encrypted like the [request history](/docs/guides/history/), and not in the workspace files, so they never end up in Git. Each chat belongs to the workspace selected in the top bar when you start it. Switching workspaces shows that workspace's chats and restores its open chat, selected agent and unsent draft when you return. A new chat is named after its first message; rename it by clicking its name in the header, double-clicking it in the sidebar, pressing `F2`, or choosing **Rename** in its **•••** menu, where **Delete** removes it. Kurlo keeps up to 200 unarchived chats across the local profile and removes them after 90 days of inactivity.
+Chats are kept on this computer in Kurlo's profile, encrypted like the [request history](/docs/guides/history/), and not in the workspace files, so they never end up in Git. Each chat belongs to the workspace selected in the top bar when you start it. The agent in that chat sees and changes only that workspace: its collections, requests and environments. Other workspaces in the same folder are out of its reach, and new collections and environments go into the chat's workspace. Switching workspaces shows that workspace's chats and restores its open chat, selected agent and unsent draft when you return. A new chat is named after its first message; rename it by clicking its name in the header, double-clicking it in the sidebar, pressing `F2`, or choosing **Rename** in its **•••** menu, where **Delete** removes it. Kurlo keeps up to 200 unarchived chats across the local profile and removes them after 90 days of inactivity.
 
 Use `Cmd/Ctrl K` to find a chat by its name alongside requests and commands. **Chats in this workspace** includes unarchived chats from the selected workspace. Selecting a result opens its agent and chat. Prefix the query with `>` to search commands only.
 
@@ -104,7 +117,15 @@ To keep a chat, choose **Archive** from its **•••** menu in the sidebar. O
 
 Choose **Export as Markdown…** in either list to save the full stored conversation, including saved tool calls and results. Review the warning and choose where to save the file. The Markdown copy is unencrypted and can contain sensitive information.
 
-Every tool call, by the agent or by an assistant connected through `kurlo mcp`, is also written to a local activity log with the files it changed, before and after. The log is encrypted, kept for 30 days, and stores arguments and results with secrets masked.
+### Agent activity
+
+Every tool call, by the Kurlo agent, Codex, Claude Code or an assistant connected through `kurlo mcp`, is also written to a local activity log with the files it changed, before and after. Open **Activity** at the top of the agent sidebar to see it. It shows the calls made in the workspace selected in the top bar; choose **All workspaces** to see calls from every workspace and folder, each marked with where it happened. A call from a `kurlo mcp` client belongs to the workspace whose files it changed; a call that only read belongs to none and shows only under **All workspaces**. Calls are listed newest first under **Today**, **Yesterday** and **Earlier**; search by tool, file, branch or commit, or narrow the list to one client and to the last 24 hours or 7 days. A grey dot marks a declined or restored call, a red one an error.
+
+Select a call to see its client, time, arguments and result, the branch and commit it made, and the diff of each file it changed. **Restore** puts a file back to its version from before the call, and **Restore all** does it for every file of the call. Kurlo refuses when the file has changed since, so it never overwrites later work; restore that file from Git instead. Files over 512 KB are listed without their content and cannot be restored here. **Open chat** opens the chat the call came from when that chat is in the current workspace; for a call from another workspace, switch to that workspace in the top bar first.
+
+![Agent activity with a save_request call, its branch and commit, and the diff of the request file](../../../../assets/screenshots/agent-activity.png)
+
+The log is encrypted, kept for 30 days or 2,000 calls, and stores arguments and results with secrets masked and cut at 16 KB. Turn off **Record activity** to stop logging new calls, and **Clear…** deletes the whole log.
 
 ## Limits
 

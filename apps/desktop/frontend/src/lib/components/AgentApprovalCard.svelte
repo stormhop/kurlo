@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { AgentApproval, AgentFileChange } from '../backend';
-  import { agentApprovalArguments, agentApprovalTitle, agentChangeSummary } from '../agent';
-  import { collapseUnchanged, diffResponseBodies } from '../responseDiff';
+  import type { AgentApproval } from '../backend';
+  import { agentApprovalAction, agentApprovalArguments, agentApprovalTitle } from '../agent';
+  import AgentFileDiff from './AgentFileDiff.svelte';
 
   let {
     approval,
@@ -15,11 +15,7 @@
   let error = $state('');
   let showArgs = $state(false);
   const write = $derived(approval.kind === 'write');
-
-  function diffOf(change: AgentFileChange) {
-    const diff = diffResponseBodies(change.before ?? '', change.after ?? '');
-    return { diff, chunks: collapseUnchanged(diff.lines, 2) };
-  }
+  const external = $derived(approval.kind === 'external');
 
   async function answer(decision: 'allow' | 'allow_chat' | 'reject') {
     if (busy) return;
@@ -47,31 +43,7 @@
   {#if write && approval.changes.length}
     <div class="agent-approval-files">
       {#each approval.changes as change (change.path)}
-        <div class="agent-diff">
-          <div class="agent-diff-head">
-            <span class="agent-diff-path">{change.path}</span>
-            <span class="agent-diff-kind">{agentChangeSummary(change)}</span>
-          </div>
-          {#if change.tooLarge}
-            <div class="agent-diff-note">The file is too large to show here.</div>
-          {:else}
-            {@const view = diffOf(change)}
-            <div class="agent-diff-body" role="table" aria-label={`Changes in ${change.path}`}>
-              {#each view.chunks as chunk, chunkIndex (chunkIndex)}
-                {#if chunk.kind === 'gap'}
-                  <div class="agent-diff-gap" role="row">{chunk.count} unchanged {chunk.count === 1 ? 'line' : 'lines'}</div>
-                {:else}
-                  {#each chunk.lines as line, lineIndex (lineIndex)}
-                    <div class="agent-diff-line agent-diff-{line.kind}" role="row">
-                      <span class="agent-diff-sign" aria-hidden="true">{line.kind === 'added' ? '+' : line.kind === 'removed' ? '−' : ' '}</span>
-                      <span class="agent-diff-text">{line.text || ' '}</span>
-                    </div>
-                  {/each}
-                {/if}
-              {/each}
-            </div>
-          {/if}
-        </div>
+        <AgentFileDiff {change} />
       {/each}
     </div>
   {:else}
@@ -87,8 +59,10 @@
   <p class="agent-approval-reason">This turn stops after 30 minutes without a response.</p>
   {#if error}<p class="agent-approval-error" role="alert">{error}</p>{/if}
   <div class="agent-approval-actions">
-    <button class="btn btn-primary btn-sm" type="button" onclick={() => answer('allow')} disabled={busy}>{write ? 'Apply' : 'Send'}</button>
-    <button class="btn btn-secondary btn-sm" type="button" onclick={() => answer('allow_chat')} disabled={busy}>Allow for this chat</button>
+    <button class="btn btn-primary btn-sm" type="button" onclick={() => answer('allow')} disabled={busy}>{agentApprovalAction(approval)}</button>
+    {#if !external && approval.tool !== 'apply_changes' && approval.tool !== 'git_push'}
+      <button class="btn btn-secondary btn-sm" type="button" onclick={() => answer('allow_chat')} disabled={busy}>Allow for this chat</button>
+    {/if}
     <button class="btn btn-ghost btn-sm" type="button" onclick={() => answer('reject')} disabled={busy}>Reject</button>
   </div>
 </div>
@@ -150,84 +124,6 @@
     flex-direction: column;
     gap: var(--space-2);
     margin-block: var(--space-2-5);
-  }
-  .agent-diff {
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    background: var(--bg);
-    overflow: hidden;
-  }
-  .agent-diff-head {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding: var(--space-1-5) var(--space-2-5);
-    border-bottom: 1px solid var(--border-subtle);
-    font-size: var(--text-caption);
-  }
-  .agent-diff-path {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--text);
-    font-family: var(--font-mono);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    direction: rtl;
-    text-align: left;
-  }
-  .agent-diff-kind {
-    flex: 0 0 auto;
-    margin-left: auto;
-    color: var(--text-3);
-  }
-  .agent-diff-body {
-    max-height: 18rem;
-    overflow: auto;
-    padding: var(--space-1) 0;
-    font-family: var(--font-mono);
-    font-size: var(--text-code);
-    line-height: var(--leading-relaxed);
-    -webkit-user-select: text;
-    user-select: text;
-  }
-  .agent-diff-line {
-    display: grid;
-    grid-template-columns: 1.25rem minmax(0, 1fr);
-    padding-right: var(--space-2-5);
-  }
-  .agent-diff-sign {
-    color: var(--text-3);
-    text-align: center;
-  }
-  .agent-diff-text {
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    color: var(--text-2);
-  }
-  .agent-diff-added {
-    background: color-mix(in srgb, var(--s2xx) 12%, transparent);
-  }
-  .agent-diff-added .agent-diff-sign,
-  .agent-diff-added .agent-diff-text {
-    color: var(--text);
-  }
-  .agent-diff-removed {
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
-  }
-  .agent-diff-removed .agent-diff-sign,
-  .agent-diff-removed .agent-diff-text {
-    color: var(--text);
-  }
-  .agent-diff-gap {
-    padding: var(--space-0-5) var(--space-2-5);
-    color: var(--text-3);
-    font-family: var(--font-ui);
-    font-size: var(--text-caption);
-  }
-  .agent-diff-note {
-    padding: var(--space-2) var(--space-2-5);
-    color: var(--text-3);
-    font-size: var(--text-caption);
   }
   .agent-approval-args-toggle {
     align-self: flex-start;

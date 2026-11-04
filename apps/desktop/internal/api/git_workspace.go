@@ -235,6 +235,28 @@ func (a *App) GitOutgoingChanges() GitDiffResult {
 	return gitOutgoingChangesForWorkspace(fileWorkspaceStorePath())
 }
 
+type GitPullRequestResult struct {
+	URL    string `json:"url"`
+	Branch string `json:"branch"`
+	Base   string `json:"base"`
+	Error  string `json:"error,omitempty"`
+}
+
+func (a *App) GitPullRequestURL() GitPullRequestResult {
+	status := gitStatusForWorkspace(fileWorkspaceStorePath())
+	out := GitPullRequestResult{Branch: status.Branch}
+	if status.IsRepo && status.Root != "" {
+		out.Base = gitDefaultBaseBranch(status.Root, gitPushRemote(status))
+	}
+	link, err := gitPullRequestLink(status, out.Base)
+	if err != nil {
+		out.Error = err.Error()
+		return out
+	}
+	out.URL = link
+	return out
+}
+
 func (a *App) GitCommitLog(limit int) GitLogResult {
 	gitOperationMu.RLock()
 	defer gitOperationMu.RUnlock()

@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const agentCancelPrefix = "agent:"
@@ -40,13 +41,15 @@ type agentPendingApproval struct {
 }
 
 type agentRuntime struct {
-	mu               sync.Mutex
-	bridges          map[string]*agentToolBridge
-	running          map[string]bool
-	approvals        map[string]*agentPendingApproval
-	codexLogin       *codexLogin
-	approvalTimeout  time.Duration
-	codexIdleTimeout time.Duration
+	openOAuthBrowser    func(string) error
+	onOAuthDevicePrompt func(model.OAuth2DevicePrompt)
+	mu                  sync.Mutex
+	bridges             map[string]*agentToolBridge
+	running             map[string]bool
+	approvals           map[string]*agentPendingApproval
+	codexLogin          *codexLogin
+	approvalTimeout     time.Duration
+	codexIdleTimeout    time.Duration
 }
 
 func newAgentRuntime() *agentRuntime {
@@ -83,9 +86,16 @@ func (rt *agentRuntime) bridge(chat model.AgentChat, root string) *agentToolBrid
 	if bridge == nil || !sameWorkspaceRoot(bridge.server.opts.workspace, root) {
 		bridge = newAgentToolBridge(mcpServerOptions{workspace: root, loadAppSecrets: true}, chat.ID, chat.AllowedTools)
 		bridge.server.onWrite = noteAgentWorkspaceWrite
+		bridge.server.openOAuthBrowser = rt.openOAuthBrowser
+		bridge.server.onOAuthDevicePrompt = rt.onOAuthDevicePrompt
 		rt.bridges[chat.ID] = bridge
 	}
 	bridge.server.opts.env = strings.TrimSpace(chat.Environment)
+	bridge.server.opts.workspaceID = strings.TrimSpace(chat.WorkspaceID)
+	chatID := chat.ID
+	bridge.setChat(chat, func(branch string) {
+		_, _ = updateAgentChat(chatID, func(saved *model.AgentChat) { saved.Branch = branch })
+	})
 	return bridge
 }
 
@@ -313,6 +323,18 @@ func (a *App) agentRuntime() *agentRuntime {
 		if a.agent == nil {
 			a.agent = newAgentRuntime()
 		}
+		if a.ctx != nil {
+			a.agent.openOAuthBrowser = a.openAuthorizeURL
+			a.agent.onOAuthDevicePrompt = func(prompt model.OAuth2DevicePrompt) {
+				go func() {
+					_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+						Type:    runtime.InfoDialog,
+						Title:   "OAuth 2.0 device sign-in",
+						Message: fmt.Sprintf("Enter the code %s at %s to authorize the agent request.", prompt.UserCode, prompt.VerificationURI),
+					})
+				}()
+			}
+		}
 	})
 	return a.agent
 }
@@ -402,6 +424,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 		chat.Environment = strings.TrimSpace(input.Environment)
 		chat.ConnectionID = strings.TrimSpace(input.ConnectionID)
 		chat.Model = strings.TrimSpace(input.Model)
+		chat.OwnBranch = input.OwnBranch
 	}
 
 	var chat model.AgentChat

@@ -123,7 +123,7 @@ export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'met
 export type ScriptTab = 'pre-request' | 'tests';
 export type ResponseTab = 'body' | 'preview' | 'headers' | 'test-results' | 'timeline' | 'diff';
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
-export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'oauth2' | 'oauth1' | 'aws' | 'digest';
+export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'oauth2' | 'oauth1' | 'aws' | 'digest' | 'ntlm';
 export type SidebarView = 'collections' | 'environments' | 'history' | 'agent';
 export type ShortcutId =
   | 'close-tab' | 'force-close-tab' | 'next-tab' | 'previous-tab'

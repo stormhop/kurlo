@@ -1049,6 +1049,10 @@ func buildHTTPClient(req model.HttpRequest, jar http.CookieJar, timeout time.Dur
 
 func buildHTTPRoundTripper(req model.HttpRequest, transport *http.Transport) http.RoundTripper {
 	var roundTripper http.RoundTripper = transport
+	if req.Auth.Type == "ntlm" && req.Auth.Username != "" {
+		source, _ := url.Parse(normalizeRequestURL(req.URL))
+		return auth.NewNTLMTransport(transport, source, req.Auth.Username, req.Auth.Password)
+	}
 	if req.Auth.Type == "digest" && req.Auth.Username != "" {
 		digest := auth.NewDigestTransport(req.Auth.Username, req.Auth.Password, transport)
 		source, _ := url.Parse(normalizeRequestURL(req.URL))

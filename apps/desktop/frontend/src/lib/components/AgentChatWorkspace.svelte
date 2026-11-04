@@ -15,7 +15,8 @@
   import { codexConnectionStore } from '../stores/codex.svelte';
   import { claudeConnectionStore } from '../stores/claude.svelte';
   import { aiConnectionsStore } from '../stores/aiConnections.svelte';
-  import { startOpenRouterConnect, type AgentApproval, type AiBlock } from '../backend';
+  import { gitPullRequestUrl, startOpenRouterConnect, type AgentApproval, type AiBlock } from '../backend';
+  import { openExternalURL } from '../externalLinks';
   import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiErrorView, aiConnectionProblem, type AiStepView } from '../stores/features/ai';
   import { AGENT_STARTERS, AGENT_TEMPLATES, AGENT_WRITE_TOOLS, agentEffortLabel, agentStepSummary, agentTurnSegments, agentContextPercent, agentQuotaWindows, agentFindRequest, agentTemplatePlaceholder, agentToolLabel, agentToolTarget, agentTurnAnswer, agentTurnsFromMessages, type AgentTemplate, type AgentToolTarget, type AgentTurnView } from '../agent';
   import { clipboardSet } from '../backend';
@@ -25,6 +26,27 @@
   let scroller = $state<HTMLDivElement>();
   let workspaceElement = $state<HTMLDivElement>();
   let detailsCover = $state(false);
+  let pullRequestBusy = $state(false);
+  let pullRequestError = $state('');
+  let wasRunning = false;
+
+  async function openPullRequest() {
+    pullRequestBusy = true;
+    pullRequestError = '';
+    try {
+      const result = await gitPullRequestUrl();
+      if (result.url) openExternalURL(result.url);
+      else pullRequestError = result.error || 'Kurlo could not build a pull request link.';
+    } finally {
+      pullRequestBusy = false;
+    }
+  }
+
+  $effect(() => {
+    const running = agentStore.running;
+    if (wasRunning && !running) void vm.refreshGitQuietly();
+    wasRunning = running;
+  });
   let detailsPanel = $state<HTMLElement>();
   let stickToBottom = $state(true);
   let retrying = $state(false);
@@ -664,6 +686,12 @@
                   <span class="agent-composer-chip">
                     <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
                   </span>
+                  {#if vm.gitStatus.isRepo}
+                    <button class="btn btn-ghost btn-sm agent-branch-toggle" class:on={agentStore.ownBranch} type="button" aria-pressed={agentStore.ownBranch} aria-label="Agent branch" disabled={agentStore.running || workspaceBlocked} onclick={() => (agentStore.ownBranch = !agentStore.ownBranch)}>
+                      <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><circle cx="4.5" cy="12.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><circle cx="11.5" cy="5.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 5.25v5.5M11.5 7.25c0 2.5-2 3-5.5 3.75" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                      Branch
+                    </button>
+                  {/if}
                   <div class="agent-templates">
                     <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Templates" aria-haspopup="menu" aria-expanded={templatesOpen} onclick={() => void toggleTemplates()} disabled={workspaceBlocked}>
                       <svg width="0.875rem" height="0.875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2.75h8M2 6h8M2 9.25h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -727,6 +755,18 @@
             <div class="agent-kv"><span>Agent</span><span>{headerAgent}</span></div>
             {#if agentStore.driver}<div class="agent-kv"><span>Effort</span><span>{agentEffortLabel(agentStore.effort || selectedCodexDefaultEffort)}</span></div>{/if}
           </section>
+
+          {#if vm.gitStatus.isRepo}
+            <section class="agent-context-section" aria-label="Git">
+              <h3 class="agent-context-label">Git</h3>
+              <div class="agent-kv"><span>Current branch</span><span class="agent-kv-mono">{vm.gitStatus.branch || 'None'}</span></div>
+              <div class="agent-kv"><span>Agent branch</span><span class:agent-kv-mono={agentStore.ownBranch && Boolean(agentStore.activeChat?.branch)}>{agentStore.ownBranch ? agentStore.activeChat?.branch || 'Created on the first change' : 'Off'}</span></div>
+              <p class="agent-detail-note">{agentStore.ownBranch ? 'Each change you approve is committed to the agent branch. Pushing still needs your approval.' : 'Turn on Branch in the message box to commit each approved change to a branch of its own.'}</p>
+              {#if vm.workspaces.length > 1}<p class="agent-detail-note">Git works on the whole folder: a branch switch or commit here also applies to its other {vm.workspaces.length - 1} {vm.workspaces.length === 2 ? 'workspace' : 'workspaces'}.</p>{/if}
+              <button class="btn btn-secondary btn-sm agent-pull-request" type="button" onclick={() => void openPullRequest()} disabled={pullRequestBusy}>Open pull request</button>
+              {#if pullRequestError}<p class="agent-detail-note agent-detail-error" role="alert">{pullRequestError}</p>{/if}
+            </section>
+          {/if}
 
           {#if usage && (usage.input || usage.output)}
             <section class="agent-context-section">
@@ -1522,6 +1562,25 @@
   }
 
 
+  .agent-branch-toggle {
+    gap: var(--space-1);
+    color: var(--text-3);
+  }
+  .agent-branch-toggle.on {
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  .agent-kv-mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-code);
+    overflow-wrap: anywhere;
+  }
+  .agent-pull-request {
+    align-self: flex-start;
+  }
+  .agent-detail-note.agent-detail-error {
+    color: var(--danger);
+  }
   .agent-details-head {
     display: flex;
     justify-content: space-between;

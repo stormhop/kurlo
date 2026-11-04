@@ -14,6 +14,12 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **Agent activity and Git in Agent Mode.** Review every agent and MCP tool call under **Activity** in the agent sidebar and restore the files a call changed. The agent can check Git status and diffs, commit and push with your approval, commit each approved change to a branch of its own, and open a pull request link. The agent works only in the chat's workspace, and **Activity** shows that workspace with **All workspaces** for the rest. See [Git](/docs/guides/agent/#git) and [Agent activity](/docs/guides/agent/#agent-activity).
+
+- **NTLM and OAuth 2.0 sign-in.** Use NTLMv2 on HTTP requests and authorize saved OAuth 2.0 requests in Agent Mode or through MCP.
+
+- **Workspace YAML and batch edits.** Save any request type, patch request fields and review workspace and local global edits together. See [Writing to the workspace](/docs/guides/mcp-server/#writing-to-the-workspace).
+
 - **Archive and export Agent Mode chats.** Keep chats beyond the usual retention limits or save a Markdown copy. See [Chats and the activity log](/docs/guides/agent/#chats-and-the-activity-log).
 
 - **Meet Agent mode.** Updating from 2.x shows a one-time introduction to Agent mode with **Try Agent mode**, and a dot marks the Agent icon until you open it. See [What's new](/docs/guides/settings/#whats-new).
@@ -56,6 +62,8 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Agent composer.** One agent picker beside the message box chooses the agent and model; a separate menu chooses effort; chips choose the collection and environment. Usage is below it, with local-agent limits as bars and the last reported context size. An empty chat offers four starting tasks.
 
 ### Fixed
+
+- **AI requests in Git workspaces.** Workspace YAML accepts provider strings, so requests using the default Kurlo connection or a custom provider can load.
 
 - **Agent Mode chat history.** Chats that finish loading in the background show their history when you return to their workspace.
 

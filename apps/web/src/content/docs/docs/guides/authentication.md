@@ -1,6 +1,6 @@
 ---
 title: Authentication
-description: Configure Bearer, Basic, Digest, API Key, OAuth 1.0, OAuth 2.0, and AWS Signature v4 auth.
+description: Configure Bearer, Basic, Digest, NTLM, API Key, OAuth 1.0, OAuth 2.0, and AWS Signature v4 auth.
 ---
 
 Auth is configured per request on the **Auth** tab. Collections can also define default auth; requests set to **Inherit auth** use the collection default, while requests with an explicit auth type override it.
@@ -22,6 +22,12 @@ Kurlo sends the first request unauthenticated, parses the `WWW-Authenticate` hea
 Supported algorithms (RFC 7616): `MD5`, `SHA-256`, `SHA-512-256`, and their `-sess` session variants. Kurlo echoes the algorithm token back exactly as the server named it. Both `qop=auth` and `qop=auth-int` work — when a server offers both, plain `auth` is used so the body never has to be buffered. Servers that advertise `userhash=true` get a hashed username. A challenge with no `qop` falls back to the legacy RFC 2069 form.
 
 `qop=auth-int` signs the entity body, so the whole body has to be hashed before the request goes out; a body over 32 MB, or one that cannot be re-read, fails with a clear message instead.
+
+## NTLM
+
+Choose **NTLM** in the Auth tab of an HTTP, GraphQL or SSE request. Enter a username such as `DOMAIN\user` or `user@example.com`, then enter the password or reference an environment variable such as `{{ntlmPassword}}`. Kurlo negotiates NTLMv2 over one HTTP/1.1 connection and keeps the credentials scoped to the request origin.
+
+![An HTTP request configured for NTLM with a password variable](../../../../assets/screenshots/auth-ntlm.png)
 
 ## API Key
 

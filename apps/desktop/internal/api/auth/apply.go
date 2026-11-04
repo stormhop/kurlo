@@ -17,9 +17,9 @@ func Apply(req *http.Request, cfg model.AuthConfig) error {
 		}
 	case "basic":
 		req.SetBasicAuth(cfg.Username, cfg.Password)
-	case "digest":
+	case "digest", "ntlm":
 		if cfg.Username == "" {
-			return fmt.Errorf("digest auth requires a username")
+			return fmt.Errorf("%s auth requires a username", cfg.Type)
 		}
 	case "apikey":
 		if cfg.KeyIn == "header" && cfg.KeyName != "" {

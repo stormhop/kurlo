@@ -9,6 +9,18 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Agent activity screen.** **Activity** in the agent sidebar lists every tool call made by the Kurlo agent, Codex, Claude Code or an MCP client, newest first, with search and filters by client and period. A call shows its arguments, result, branch and commit, and the diff of every file it changed; **Restore** and **Restore all** put files back to their version before the call and refuse when a file has changed since. **Record activity** turns logging off and **Clear…** deletes the log. The list shows the workspace selected in the top bar; **All workspaces** shows the rest, marked with their workspace, and **Open chat** appears only for chats of the current workspace.
+
+- **The agent works in its chat's workspace.** When a folder holds several workspaces, the Kurlo agent, Codex and Claude Code see and change only the collections, requests and environments of the workspace the chat belongs to; new collections and environments go there, other workspaces' files stay untouched, and the system prompt names the workspace. Activity entries record their workspace; `kurlo mcp` calls are assigned by the files they change. **Chat details → Git** notes that Git applies to the whole folder.
+
+- **Git tools for agents.** `git_status`, `git_diff` and `pull_request_url` run without asking; `git_create_branch` and `git_commit` ask first, with the files and diff of a commit; `git_push` asks every time and is never allowed for the whole chat. Only Kurlo workspace files are committed. The tools are also available to assistants through `kurlo mcp`; `--read-only` leaves out the ones that change the repository.
+
+- **Agent branch.** **Branch** in the agent's message box commits each approved change to a branch of its own, `kurlo-agent/<chat>-<id>`, created from the current commit on the first change. **Chat details → Git** shows the current and agent branch and **Open pull request** opens a pull or merge request page on GitHub, GitLab or Bitbucket.
+
+- **NTLM and OAuth 2.0 sign-in.** Use NTLMv2 on HTTP requests and authorize saved OAuth 2.0 requests in Agent Mode or through MCP.
+
+- **Edit workspace requests and apply batches in Agent Mode.** Save requests of every supported type with workspace YAML, patch individual fields, and review a batch of request, collection, folder, environment, global or example edits in one diff.
+
 - **Archive and export Agent Mode chats.** Keep selected chats in an encrypted local archive beyond the 90-day and 200-chat limits, restore them to the chat list, or save the full stored conversation as Markdown.
 
 - **Meet Agent mode.** The first launch after updating from 2.x to 3.0 shows a short introduction to Agent mode instead of the long list of changes: the Kurlo agent, Claude Code and Codex, with **Try Agent mode** to open the Agent tab and **All changes** for the release notes. It appears once. Until the Agent tab is opened for the first time, its icon in the activity bar carries a blue dot, for new installs too.
@@ -54,6 +66,8 @@ All notable changes to Kurlo are documented here. This project follows
 - **Agent chat controls stay beside the message.** The agent and model are chosen in one picker in the composer, effort in a separate menu, and the collection and environment in chips beside them. Token usage appears below it; local agents also show account quota windows as bars and the last reported request size relative to the context window, without treating cumulative token usage as context occupancy.
 
 ### Fixed
+
+- **AI requests in Git workspaces.** Workspace YAML accepts provider strings, so requests using the default Kurlo connection or a custom provider can load.
 
 - **Restore Agent Mode chat history after switching workspaces.** A chat that finishes loading in the background is ready when you return to its workspace.
 

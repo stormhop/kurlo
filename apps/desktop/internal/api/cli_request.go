@@ -31,6 +31,8 @@ type cliAuth struct {
 	OAuth2Token               string `json:"oauth2Token"`
 	OAuth2TokenURL            string `json:"oauth2TokenURL"`
 	OAuth2AuthURL             string `json:"oauth2AuthURL"`
+	OAuth2RedirectURL         string `json:"oauth2RedirectURL"`
+	OAuth2UsePKCE             bool   `json:"oauth2UsePKCE"`
 	OAuth2DeviceAuthURL       string `json:"oauth2DeviceAuthURL"`
 	OAuth2ClientID            string `json:"oauth2ClientID"`
 	OAuth2Secret              string `json:"oauth2Secret"`
@@ -299,6 +301,8 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 			OAuth2GrantType:           req.Auth.OAuth2GrantType,
 			OAuth2TokenURL:            req.Auth.OAuth2TokenURL,
 			OAuth2AuthURL:             req.Auth.OAuth2AuthURL,
+			OAuth2RedirectURL:         req.Auth.OAuth2RedirectURL,
+			OAuth2UsePKCE:             req.Auth.OAuth2UsePKCE,
 			OAuth2DeviceAuthURL:       req.Auth.OAuth2DeviceAuthURL,
 			OAuth2ClientID:            req.Auth.OAuth2ClientID,
 			OAuth2Secret:              req.Auth.OAuth2Secret,

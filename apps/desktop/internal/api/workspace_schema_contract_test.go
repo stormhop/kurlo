@@ -29,6 +29,9 @@ func compileWorkspaceSchemaForTest(t *testing.T) *jsonschema.Schema {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !bytes.Equal(data, workspaceFileContract) {
+		t.Fatal("the embedded workspace schema differs from the public contract")
+	}
 	document, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
 	if err != nil {
 		t.Fatalf("schema is not JSON: %v", err)
@@ -98,6 +101,9 @@ func richWorkspacePayloadForTest(t *testing.T) string {
 		variant("sio", "socketio", "GET", map[string]any{"url": "https://sio.example.test", "sioEventName": "ping", "sioAck": true, "sioEvents": []any{row(4, "pong", "")}, "sioArgs": []any{map[string]any{"id": "1", "content": "{}", "bodyType": "json", "encoding": "base64"}}}),
 		variant("rpc", "grpc", "POST", map[string]any{"url": "grpc.example.test:443", "grpcMethod": "pkg.Service/Call", "grpcMetadata": []any{row(5, "x-id", "1")}, "requestTab": "service"}),
 		variant("tools", "mcp", "POST", map[string]any{"url": "https://mcp.example.test", "mcpMethod": "tools/call", "mcpName": "search", "mcpArguments": "{}"}),
+	}
+	for _, provider := range []string{"kurlo", "custom-provider"} {
+		requests = append(requests, variant("ai-"+provider, "ai", "POST", map[string]any{"aiProvider": provider}))
 	}
 	store["requests"] = requests
 	collection := mapSlice(store["collections"])[0]

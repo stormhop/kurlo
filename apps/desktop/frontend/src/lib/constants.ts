@@ -136,6 +136,7 @@ export const AUTH_OPTIONS: { value: AuthType; label: string }[] = [
   { value: 'bearer', label: 'Bearer token' },
   { value: 'basic', label: 'Basic auth' },
   { value: 'digest', label: 'Digest auth' },
+  { value: 'ntlm', label: 'NTLM' },
   { value: 'apikey', label: 'API key' },
   { value: 'oauth1', label: 'OAuth 1.0' },
   { value: 'oauth2', label: 'OAuth 2.0' },

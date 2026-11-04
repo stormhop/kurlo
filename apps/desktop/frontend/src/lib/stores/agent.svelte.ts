@@ -17,6 +17,7 @@ type WorkspaceChatView = {
   composer: symbol;
   collection: string;
   environment: string;
+  ownBranch: boolean;
   connectionId: string;
   model: string;
   effort: string;
@@ -48,6 +49,7 @@ export class AgentStore {
   notes = $state<AgentNotes | null>(null);
   collection = $state('');
   environment = $state('');
+  ownBranch = $state(false);
   connectionId = $state('');
   draft = $state('');
   loadError = $state('');
@@ -100,7 +102,7 @@ export class AgentStore {
   private captureView(trimHistory = false): WorkspaceChatView {
     return {
       activeChatId: this.activeChatId, activeChat: trimHistory && this.activeChat ? agentHistoryPage(this.activeChat) : this.activeChat, draft: this.draft, composer: this.composer,
-      collection: this.collection, environment: this.environment, connectionId: this.connectionId,
+      collection: this.collection, environment: this.environment, ownBranch: this.ownBranch, connectionId: this.connectionId,
       model: this.model, effort: this.effort, context: this.context, notes: this.notes, loadError: this.loadError,
     };
   }
@@ -112,6 +114,7 @@ export class AgentStore {
     this.composer = view.composer;
     this.collection = view.collection;
     this.environment = view.environment;
+    this.ownBranch = view.ownBranch;
     this.connectionId = view.connectionId;
     this.model = view.model;
     this.effort = view.effort;
@@ -224,6 +227,7 @@ export class AgentStore {
   }
 
   newChat() {
+    agentNavigation.activity = false;
     this.composer = Symbol();
     this.chatLoads.delete(this.workspaceId);
     this.historyRequest++;
@@ -237,6 +241,7 @@ export class AgentStore {
   }
 
   async openChat(id: string) {
+    agentNavigation.activity = false;
     if (!id) return this.newChat();
     const workspaceId = this.workspaceId;
     const generation = this.generation;
@@ -266,6 +271,7 @@ export class AgentStore {
         view.effort = chat.effort ?? '';
         view.collection = (this.workspaceId === workspaceId ? this.collectionNames : collectionNames).includes(chat.collection) ? chat.collection : '';
         view.environment = (this.workspaceId === workspaceId ? this.environmentNames : environmentNames).includes(chat.environment) ? chat.environment : '';
+        view.ownBranch = Boolean(chat.ownBranch);
         if (chat.connectionId) view.connectionId = chat.connectionId;
       });
       if (reopeningLive) return;
@@ -339,6 +345,7 @@ export class AgentStore {
         text: prompt,
         collection: this.collection,
         environment: this.environment,
+        ownBranch: this.ownBranch,
         connectionId: this.connectionId,
         model: this.model,
         ...(this.driver ? { driver: this.driver, effort: this.effort } : {}),
@@ -483,7 +490,7 @@ function savedAgentDetails(): boolean {
   }
 }
 
-export const agentNavigation = $state({ mode: 'kurlo' as AgentMode, detailsOpen: savedAgentDetails() });
+export const agentNavigation = $state({ mode: 'kurlo' as AgentMode, detailsOpen: savedAgentDetails(), activity: false });
 
 const workspaceModes = new SvelteMap<string, AgentMode>();
 

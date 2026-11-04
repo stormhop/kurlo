@@ -180,6 +180,7 @@ func TestCodexRunsApprovedToolsAndResumesItsOwnChat(t *testing.T) {
 	t.Setenv("KURLO_CODEX_CAPTURE", capture)
 	root := fileWorkspaceStorePath()
 	copyWorkspaceTo(t, agentTestWorkspace(t, "http://127.0.0.1:1"), root)
+	shop := fixtureWorkspaceID(t, root)
 	approvals := 0
 	app.agentEmit = func(name string, payload any) {
 		if name == "agent:compaction" {
@@ -192,7 +193,7 @@ func TestCodexRunsApprovedToolsAndResumesItsOwnChat(t *testing.T) {
 			go app.AnswerAgentApproval(id, model.AgentApprovalAllow)
 		}
 	}
-	turn := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: "shop", Driver: "codex", Text: "Set region", Environment: "Local", Collection: "Smoke"})
+	turn := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: shop, Driver: "codex", Text: "Set region", Environment: "Local", Collection: "Smoke"})
 	if turn.Error != "" || turn.Text != "Done." || turn.Chat.ExternalThreadID != "thread-1" || turn.Chat.Driver != "codex" || approvals != 1 {
 		t.Fatalf("turn=%+v approvals=%d", turn, approvals)
 	}
@@ -205,7 +206,7 @@ func TestCodexRunsApprovedToolsAndResumesItsOwnChat(t *testing.T) {
 	if !strings.Contains(readWorkspaceFile(t, root, "workspaces/Demo/environments/Local.yml"), "region") {
 		t.Fatal("approved tool did not write")
 	}
-	next := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: "shop", Driver: "codex", ChatID: turn.Chat.ID, Text: "Continue", Environment: "Local"})
+	next := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: shop, Driver: "codex", ChatID: turn.Chat.ID, Text: "Continue", Environment: "Local"})
 	if next.Error != "" {
 		t.Fatal(next.Error)
 	}
@@ -264,7 +265,7 @@ func TestCodexRunsApprovedToolsAndResumesItsOwnChat(t *testing.T) {
 	if !started || !resumed {
 		t.Fatalf("start=%v resume=%v", started, resumed)
 	}
-	chats := app.AgentChats("shop")
+	chats := app.AgentChats(shop)
 	if len(chats) != 1 || chats[0].Driver != "codex" {
 		t.Fatalf("summaries=%+v", chats)
 	}

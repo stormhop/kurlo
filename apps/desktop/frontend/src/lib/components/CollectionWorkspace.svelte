@@ -458,7 +458,7 @@
               {#if auth.type === 'bearer'}
                 <label class="field-label" for="collection-bearer-token">Token</label>
                 <input id="collection-bearer-token" class="field field-input field-mono" type="password" bind:value={auth.bearerToken} placeholder="Bearer token" spellcheck="false" />
-              {:else if auth.type === 'basic' || auth.type === 'digest'}
+              {:else if auth.type === 'basic' || auth.type === 'digest' || auth.type === 'ntlm'}
                 <label class="field-label" for="collection-auth-user">Username</label>
                 <input id="collection-auth-user" class="field field-input" bind:value={auth.basicUser} spellcheck="false" />
                 <label class="field-label" for="collection-auth-pass">Password</label>

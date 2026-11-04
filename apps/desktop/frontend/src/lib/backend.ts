@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  McpResponse, AiRequest, AiResponse, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -794,6 +794,38 @@ export async function renameAgentChat(id: string, title: string): Promise<AgentR
 
 export async function answerAgentApproval(id: string, decision: 'allow' | 'allow_chat' | 'reject'): Promise<AgentResult> {
   return (await window.go?.api?.App?.AnswerAgentApproval?.(id, decision)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function agentActivity(filter: Partial<AgentActivityFilter> = {}): Promise<AgentActivityList> {
+  const app = window.go?.api?.App;
+  if (!app?.AgentActivity) return { entries: [], enabled: true, error: AGENT_DESKTOP_ONLY };
+  return app.AgentActivity({ workspaceId: '', allWorkspaces: false, client: '', tool: '', since: 0, until: 0, limit: 0, ...filter });
+}
+
+export async function agentActivityEntry(id: string): Promise<AgentActivityEntry> {
+  const app = window.go?.api?.App;
+  if (!app?.AgentActivityEntry) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.AgentActivityEntry(id);
+}
+
+export async function revertAgentActivity(id: string, path = ''): Promise<AgentActivityEntry> {
+  const app = window.go?.api?.App;
+  if (!app?.RevertAgentActivity) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.RevertAgentActivity(id, path);
+}
+
+export async function setAgentActivityEnabled(enabled: boolean): Promise<AgentResult> {
+  return (await window.go?.api?.App?.SetAgentActivityEnabled?.(enabled)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function clearAgentActivity(): Promise<AgentResult> {
+  return (await window.go?.api?.App?.ClearAgentActivity?.()) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function gitPullRequestUrl(): Promise<GitPullRequestResult> {
+  const app = window.go?.api?.App;
+  if (!app?.GitPullRequestURL) return { url: '', branch: '', base: '', error: 'Pull request links are only available in the desktop app.' };
+  return app.GitPullRequestURL();
 }
 
 export async function agentPendingApprovals(chatId: string): Promise<AgentApproval[]> {

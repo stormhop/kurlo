@@ -57,6 +57,8 @@ describe('agent chat view', () => {
     expect(agentApprovalTitle({ ...base, changes: [{ path: 'a.yml', after: 'x' }] })).toBe('Change 1 file?');
     expect(agentApprovalTitle({ ...base, changes: [{ path: 'a.yml' }, { path: 'b.yml' }] })).toBe('Change 2 files?');
     expect(agentApprovalTitle({ ...base, kind: 'run', tool: 'send_request' })).toBe('Send this request?');
+    expect(agentApprovalTitle({ ...base, tool: 'apply_changes' })).toBe('Apply these changes?');
+    expect(agentApprovalTitle({ ...base, kind: 'external', tool: 'authorize_oauth2' })).toBe('Authorize this request?');
     expect(agentChangeSummary({ path: 'a', after: 'x' })).toBe('new file');
     expect(agentChangeSummary({ path: 'a', before: 'x' })).toBe('deleted');
     expect(agentChangeSummary({ path: 'a', before: 'x', after: 'y' })).toBe('changed');

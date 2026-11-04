@@ -225,9 +225,9 @@ request:
 | `rawBodyType` | `text`, `json`, `html`, or `xml`. |
 | `preRequestScript`, `testScript` | Legacy Tengo scripts. |
 | `preRequestScriptJs`, `testScriptJs` | JavaScript pre-request/test scripts. |
-| `auth.type` | `inherit`, `none`, `bearer`, `basic`, `apikey`, `oauth1`, `oauth2`, `aws`, or `digest`. |
+| `auth.type` | `inherit`, `none`, `bearer`, `basic`, `apikey`, `oauth1`, `oauth2`, `aws`, `digest`, or `ntlm`. NTLM uses `basicUser` and `basicPass`. |
 | `auth.oauth1ConsumerKey`, `auth.oauth1SignatureMethod`, `auth.oauth1AddTo`, `auth.oauth1Realm`, `auth.oauth1Callback`, `auth.oauth1Verifier`, `auth.oauth1Version`, `auth.oauth1Timestamp`, `auth.oauth1Nonce`, `auth.oauth1IncludeBodyHash`, `auth.oauth1AddEmptyParams` | OAuth 1.0 settings. `oauth1SignatureMethod` is `HMAC-SHA1` (default), `HMAC-SHA256`, `HMAC-SHA512`, `RSA-SHA1`, `RSA-SHA256`, `RSA-SHA512` or `PLAINTEXT`; `oauth1AddTo` is `header` (default), `query` or `body`. An empty timestamp or nonce is generated on every send. |
-| `auth.oauth2GrantType`, `auth.oauth2AuthURL`, `auth.oauth2TokenURL`, `auth.oauth2ClientID`, `auth.oauth2Scope`, `auth.oauth2TokenExpiry`, `auth.oauth2UsePKCE` | OAuth 2.0 grant metadata. `oauth2GrantType` is `client_credentials` or `authorization_code`; Authorization Code can use PKCE. |
+| `auth.oauth2GrantType`, `auth.oauth2AuthURL`, `auth.oauth2TokenURL`, `auth.oauth2ClientID`, `auth.oauth2Scope`, `auth.oauth2TokenExpiry`, `auth.oauth2UsePKCE` | OAuth 2.0 grant metadata. `oauth2GrantType` is `client_credentials`, `authorization_code`, `password`, or `device_code`. Authorization Code can use PKCE. |
 | `settings` | Request transport settings. Unknown settings must be preserved by third-party tools. |
 | `settingsOverrides` | Per-request override markers for inherited collection defaults. |
 

@@ -6,6 +6,7 @@ toolchain go1.26.10
 
 require (
 	aead.dev/minisign v0.3.0
+	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/andybalholm/brotli v1.2.6
 	github.com/d5/tengo/v2 v2.17.0

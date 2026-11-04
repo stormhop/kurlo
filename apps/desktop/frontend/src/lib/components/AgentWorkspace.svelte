@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import AgentChatWorkspace from './AgentChatWorkspace.svelte';
+  import AgentActivityView from './AgentActivityView.svelte';
   import { agentNavigation, agentStoreFor, codexAgentStore, switchAgent } from '../stores/agent.svelte';
   import { claudeConnectionStore as claude } from '../stores/claude.svelte';
   import { codexConnectionStore } from '../stores/codex.svelte';
@@ -28,7 +29,11 @@
 </script>
 
 <div class="agent-mode-workspace">
-  <AgentChatWorkspace {workspaceBlocked} agentStore={store} codexReady={codexReady || claude.usable} />
+  {#if agentNavigation.activity}
+    <AgentActivityView />
+  {:else}
+    <AgentChatWorkspace {workspaceBlocked} agentStore={store} codexReady={codexReady || claude.usable} />
+  {/if}
 </div>
 
 <style>

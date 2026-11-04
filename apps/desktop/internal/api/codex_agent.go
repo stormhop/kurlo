@@ -94,6 +94,7 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 	chat.Effort = strings.TrimSpace(input.Effort)
 	chat.Collection = strings.TrimSpace(input.Collection)
 	chat.Environment = strings.TrimSpace(input.Environment)
+	chat.OwnBranch = input.OwnBranch
 	if input.Model != "" {
 		if chat.Model != strings.TrimSpace(input.Model) {
 			chat.ContextTokens = 0

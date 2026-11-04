@@ -4,10 +4,41 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"gopkg.in/yaml.v3"
 )
+
+func activityWorkspaceID(root string, changes []model.AgentFileChange) string {
+	found := ""
+	for _, change := range changes {
+		parts := strings.Split(path.Clean(filepath.ToSlash(change.Path)), "/")
+		if len(parts) < 3 || parts[0] != fileStoreWorkspacesDir {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(root, fileStoreWorkspacesDir, parts[1], fileStoreRootFileName))
+		if err != nil {
+			continue
+		}
+		var doc struct {
+			Workspace struct {
+				ID string `yaml:"id"`
+			} `yaml:"workspace"`
+		}
+		if yaml.Unmarshal(data, &doc) != nil || doc.Workspace.ID == "" {
+			continue
+		}
+		if found != "" && found != doc.Workspace.ID {
+			return ""
+		}
+		found = doc.Workspace.ID
+	}
+	return found
+}
 
 type mcpGateFunc func(tool string, arguments json.RawMessage) error
 
@@ -111,8 +142,12 @@ func (s *mcpServer) logCall(tool string, arguments json.RawMessage, record *mcpC
 	for _, change := range record.changes {
 		entry.Files = append(entry.Files, change.Path)
 	}
-	if len(record.changes) > 0 {
-		entry.Workspace = s.opts.workspace
+	entry.Workspace = s.opts.workspace
+	entry.WorkspaceID = s.opts.workspaceID
+	if entry.WorkspaceID == "" {
+		entry.WorkspaceID = activityWorkspaceID(s.opts.workspace, record.changes)
 	}
+	entry.Commit = record.commit
+	entry.Branch = record.branch
 	_ = writeAgentActivity(entry)
 }

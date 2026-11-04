@@ -151,6 +151,8 @@ export function GitOutgoingChanges():Promise<api.GitDiffResult>;
 
 export function GitPullBranch(arg1:string):Promise<api.GitOperationResult>;
 
+export function GitPullRequestURL():Promise<api.GitPullRequestResult>;
+
 export function GitPullWorkspace():Promise<api.WorkspaceOpenResult>;
 
 export function GitPullWorkspaceWithStrategy(arg1:string):Promise<api.WorkspaceOpenResult>;

@@ -11,6 +11,7 @@ import (
 	goruntime "runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
@@ -24,25 +25,26 @@ var appVersion = "dev"
 const maxTextFileReadSize = 100 * 1024 * 1024
 
 type App struct {
-	ctx            context.Context
-	quit           *quitGate
-	requestMu      sync.Mutex
-	requestSeq     uint64
-	requestCancels map[string]requestCancel
-	state          *state.Manager
-	cookieJars     *cookieJarRegistry
-	preflightCache *preflightCache
-	sse            *sseManager
-	ws             *websocketManager
-	sio            *socketIOManager
-	mock           *mockServer
-	cookieSync     *cookieSyncServer
-	binaryBodies   *binaryResponseCache
-	mcpSessions    *mcpSessionRegistry
-	loadRuns       loadRunManager
-	agentOnce      sync.Once
-	agent          *agentRuntime
-	agentEmit      aiEmitter
+	ctx             context.Context
+	quit            *quitGate
+	requestMu       sync.Mutex
+	requestSeq      uint64
+	requestCancels  map[string]requestCancel
+	state           *state.Manager
+	cookieJars      *cookieJarRegistry
+	preflightCache  *preflightCache
+	sse             *sseManager
+	ws              *websocketManager
+	sio             *socketIOManager
+	mock            *mockServer
+	cookieSync      *cookieSyncServer
+	binaryBodies    *binaryResponseCache
+	mcpSessions     *mcpSessionRegistry
+	loadRuns        loadRunManager
+	agentOnce       sync.Once
+	agent           *agentRuntime
+	agentEmit       aiEmitter
+	globalsRevision atomic.Pointer[string]
 }
 
 type SaveRequestStoreResult struct {
@@ -266,6 +268,8 @@ func (a *App) LoadRequestStore() string {
 	if err != nil {
 		return ""
 	}
+	revision := profileGlobalsRevision(payload)
+	a.globalsRevision.Store(&revision)
 	return payload
 }
 
@@ -308,6 +312,9 @@ func (a *App) saveRequestStorePayload(payload string) error {
 		return err
 	}
 	defer unlock()
+	if seen := a.globalsRevision.Load(); seen != nil && *seen != currentProfileGlobalsRevision() {
+		return fmt.Errorf("global variables changed outside the editor; reload the workspace before saving")
+	}
 	before, external, err := workspaceDisk.externalChanges(root)
 	if err != nil {
 		return err

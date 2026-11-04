@@ -123,6 +123,10 @@ func TestAgentPolicyAsksOnlyForUnsafeMethodsAndWrites(t *testing.T) {
 		{"send_request", `{"method":"options","url":"http://example.test"}`, model.AgentToolRun, false},
 		{"send_request", `{"method":"DELETE","url":"http://example.test"}`, model.AgentToolRun, true},
 		{"save_request", `{"name":"x"}`, model.AgentToolWrite, true},
+		{"patch_request", `{"request":"x","patch":{"name":"y"}}`, model.AgentToolWrite, true},
+		{"apply_changes", `{"operations":[]}`, model.AgentToolWrite, true},
+		{"list_globals", `{}`, model.AgentToolRead, false},
+		{"authorize_oauth2", `{"request":"x"}`, model.AgentToolExternal, true},
 		{"set_variable", `{"key":"x","value":"y"}`, model.AgentToolWrite, true},
 		{"generate_tests", `{"request":"Smoke/Ok"}`, model.AgentToolWrite, true},
 	}
@@ -479,6 +483,7 @@ func TestSendAgentMessageRunsToolsAsksAndKeepsTheChat(t *testing.T) {
 	t.Cleanup(httpTransports.closeAll)
 	root := fileWorkspaceStorePath()
 	copyWorkspaceTo(t, agentTestWorkspace(t, "http://127.0.0.1:1"), root)
+	shop := fixtureWorkspaceID(t, root)
 
 	llm := newAiTestServer(t,
 		sseScript{events: []string{
@@ -514,7 +519,7 @@ func TestSendAgentMessageRunsToolsAsksAndKeepsTheChat(t *testing.T) {
 		}
 	}
 
-	turn := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: "shop", Text: "Set   the region\nto eu", Collection: "Smoke", Environment: "Local"})
+	turn := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: shop, Text: "Set   the region\nto eu", Collection: "Smoke", Environment: "Local"})
 	if turn.Error != "" {
 		t.Fatalf("turn error %q", turn.Error)
 	}
@@ -549,10 +554,10 @@ func TestSendAgentMessageRunsToolsAsksAndKeepsTheChat(t *testing.T) {
 	}
 
 	chat := turn.Chat
-	if chat.WorkspaceID != "shop" || chat.ID == "" || chat.Title != "Set the region to eu" || chat.Collection != "Smoke" || chat.Environment != "Local" || len(chat.Messages) != 6 || chat.Usage.Input != 10 {
+	if chat.WorkspaceID != shop || chat.ID == "" || chat.Title != "Set the region to eu" || chat.Collection != "Smoke" || chat.Environment != "Local" || len(chat.Messages) != 6 || chat.Usage.Input != 10 {
 		t.Fatalf("chat = %+v", chat)
 	}
-	if summaries := app.AgentChats("shop"); len(summaries) != 1 || summaries[0].ID != chat.ID {
+	if summaries := app.AgentChats(shop); len(summaries) != 1 || summaries[0].ID != chat.ID {
 		t.Fatalf("summaries = %+v", summaries)
 	}
 	raw, _ := os.ReadFile(filepath.Join(agentChatsDir(), chat.ID+".json"))
@@ -560,7 +565,7 @@ func TestSendAgentMessageRunsToolsAsksAndKeepsTheChat(t *testing.T) {
 		t.Fatal("chats must be stored encrypted")
 	}
 
-	second := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: "shop", ChatID: chat.ID, Text: "Thanks", Collection: "Smoke", Environment: "Local"})
+	second := app.SendAgentMessage(model.AgentSendInput{WorkspaceID: shop, ChatID: chat.ID, Text: "Thanks", Collection: "Smoke", Environment: "Local"})
 	if second.Error != "" || second.Text != "You are welcome." || len(second.Chat.Messages) != 8 {
 		t.Fatalf("second turn = %q %q %d", second.Error, second.Text, len(second.Chat.Messages))
 	}
@@ -573,8 +578,8 @@ func TestSendAgentMessageRunsToolsAsksAndKeepsTheChat(t *testing.T) {
 		t.Fatalf("activity = %+v", activity)
 	}
 
-	if result := app.DeleteAgentChat(chat.ID); !result.Ok || len(app.AgentChats("shop")) != 0 {
-		t.Fatalf("delete = %+v chats=%d", result, len(app.AgentChats("shop")))
+	if result := app.DeleteAgentChat(chat.ID); !result.Ok || len(app.AgentChats(shop)) != 0 {
+		t.Fatalf("delete = %+v chats=%d", result, len(app.AgentChats(shop)))
 	}
 	if _, err := app.AgentChat(chat.ID); err == nil {
 		t.Fatal("a deleted chat must be gone")

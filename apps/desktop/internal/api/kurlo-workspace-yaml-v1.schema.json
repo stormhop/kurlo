@@ -1,0 +1,611 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kurlo.dev/schemas/kurlo-workspace-yaml-v1.schema.json",
+  "title": "Kurlo Workspace YAML v1",
+  "description": "Public contract for Kurlo workspace YAML files stored with path layout yaml-filesystem-names.v1.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/definitions/rootFile" },
+    { "$ref": "#/definitions/workspaceFile" },
+    { "$ref": "#/definitions/collectionFile" },
+    { "$ref": "#/definitions/requestFile" },
+    { "$ref": "#/definitions/environmentFile" },
+    { "$ref": "#/definitions/exampleFile" },
+    { "$ref": "#/definitions/loadTestFile" }
+  ],
+  "definitions": {
+    "fileVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "filesystemName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "description": "Stable Git path segment. It must not contain slashes."
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "kvRow": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string" }
+          ]
+        },
+        "enabled": { "type": "boolean" },
+        "key": { "type": "string" },
+        "value": {
+          "type": "string",
+          "description": "May be a kurlo secret placeholder such as {{kurloSecret:request:req-main:auth:bearerToken}}."
+        },
+        "description": { "type": "string" },
+        "isFile": { "type": "boolean" },
+        "fileName": { "type": "string" },
+        "secret": { "type": "boolean" }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["inherit", "none", "bearer", "basic", "apikey", "oauth1", "oauth2", "aws", "digest", "ntlm"]
+        },
+        "bearerToken": { "type": "string" },
+        "basicUser": { "type": "string" },
+        "basicPass": { "type": "string" },
+        "apiKeyName": { "type": "string" },
+        "apiKeyValue": { "type": "string" },
+        "apiKeyIn": { "type": "string", "enum": ["header", "query"] },
+        "oauth2GrantType": { "type": "string", "enum": ["client_credentials", "authorization_code", "password", "device_code"] },
+        "oauth2AuthURL": { "type": "string" },
+        "oauth2TokenURL": { "type": "string" },
+        "oauth2ClientID": { "type": "string" },
+        "oauth2Secret": { "type": "string" },
+        "oauth2Scope": { "type": "string" },
+        "oauth2Token": { "type": "string" },
+        "oauth2RefreshToken": { "type": "string" },
+        "oauth2TokenExpiry": { "type": "number", "minimum": 0 },
+        "oauth2UsePKCE": { "type": "boolean" },
+        "awsAccessKey": { "type": "string" },
+        "awsSecretKey": { "type": "string" },
+        "awsRegion": { "type": "string" },
+        "awsService": { "type": "string" },
+        "oauth1ConsumerKey": { "type": "string" },
+        "oauth1ConsumerSecret": { "type": "string" },
+        "oauth1Token": { "type": "string" },
+        "oauth1TokenSecret": { "type": "string" },
+        "oauth1SignatureMethod": { "type": "string", "enum": ["HMAC-SHA1", "HMAC-SHA256", "HMAC-SHA512", "RSA-SHA1", "RSA-SHA256", "RSA-SHA512", "PLAINTEXT"] },
+        "oauth1PrivateKey": { "type": "string" },
+        "oauth1Realm": { "type": "string" },
+        "oauth1Callback": { "type": "string" },
+        "oauth1Verifier": { "type": "string" },
+        "oauth1Timestamp": { "type": "string" },
+        "oauth1Nonce": { "type": "string" },
+        "oauth1Version": { "type": "string" },
+        "oauth1AddTo": { "type": "string", "enum": ["header", "query", "body"] },
+        "oauth1IncludeBodyHash": { "type": "boolean" },
+        "oauth1AddEmptyParams": { "type": "boolean" }
+      }
+    },
+    "requestSettings": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "httpVersion": { "type": "string", "enum": ["auto", "1.1", "2"] },
+        "enableSSLVerification": { "type": "boolean" },
+        "followRedirects": { "type": "boolean" },
+        "followOriginalMethod": { "type": "boolean" },
+        "followAuthorizationHeader": { "type": "boolean" },
+        "removeRefererHeader": { "type": "boolean" },
+        "encodeUrlAutomatically": { "type": "boolean" },
+        "disableCookieJar": { "type": "boolean" },
+        "maxRedirects": { "type": "integer", "minimum": 0 },
+        "timeoutMs": { "type": "integer", "minimum": 0 },
+        "proxyUrl": { "type": "string" },
+        "clientCertPath": { "type": "string" },
+        "clientKeyPath": { "type": "string" },
+        "clientKeyPassword": { "type": "string" },
+        "browserEmulation": { "type": "boolean" },
+        "browserOrigin": { "type": "string" },
+        "browserWithCredentials": { "type": "boolean" },
+        "browserEnforceCORS": { "type": "boolean" },
+        "browserEnforceCSP": { "type": "boolean" },
+        "browserCSP": { "type": "string" },
+        "wsHandshakeTimeoutMs": { "type": "integer", "minimum": 0 },
+        "wsReconnectAttempts": { "type": "integer", "minimum": 0 },
+        "wsReconnectIntervalMs": { "type": "integer", "minimum": 0 },
+        "wsMaxMessageSizeMb": { "type": "integer", "minimum": 1 },
+        "sioClientVersion": { "type": "string", "enum": ["v2", "v3"] },
+        "sioPath": { "type": "string" },
+        "sioNamespace": { "type": "string" },
+        "grpcUseTls": { "type": "boolean" },
+        "grpcUseReflection": { "type": "boolean" },
+        "grpcServerName": { "type": "string" },
+        "grpcIncludeDefaultValues": { "type": "boolean" },
+        "grpcMaxResponseMessageSizeMb": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "sioArg": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "content": { "type": "string" },
+        "bodyType": { "type": "string", "enum": ["text", "json", "html", "xml", "binary"] },
+        "encoding": { "type": "string", "enum": ["base64", "hex"] }
+      }
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "name": { "type": "string" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "description": { "type": "string" }
+      }
+    },
+    "collection": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "workspaceId": { "$ref": "#/definitions/id" },
+        "name": { "type": "string" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "description": { "type": "string" },
+        "collapsed": { "type": "boolean" },
+        "folderPaths": {
+          "type": "array",
+          "description": "Persisted empty and non-empty collection folder paths. Each nested array contains UI display names.",
+          "items": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "defaults": { "$ref": "#/definitions/collectionDefaults" }
+      }
+    },
+    "collectionDefaults": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "headers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "variables": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "auth": { "$ref": "#/definitions/auth" },
+        "preRequestScript": { "type": "string" },
+        "testScript": { "type": "string" },
+        "preRequestScriptJs": { "type": "string" },
+        "testScriptJs": { "type": "string" },
+        "settings": { "$ref": "#/definitions/requestSettings" }
+      }
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "name": { "type": "string" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "nameAuto": { "type": "boolean" },
+        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "mcp", "ai"] },
+        "isDraft": { "type": "boolean" },
+        "isPinned": { "type": "boolean" },
+        "collectionId": { "$ref": "#/definitions/id" },
+        "folderPath": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "SSE"] },
+        "url": { "type": "string" },
+        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
+        "params": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "pathParams": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "headers": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "auth": { "$ref": "#/definitions/auth" },
+        "bodyType": { "type": "string", "enum": ["none", "json", "text", "xml", "html", "form", "urlencoded", "binary", "graphql"] },
+        "rawBodyType": { "type": "string", "enum": ["text", "json", "html", "xml"] },
+        "bodyContent": { "type": "string" },
+        "bodyFilePath": { "type": "string" },
+        "bodyFileName": { "type": "string" },
+        "formRows": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "graphqlSchema": { "type": "string" },
+        "preRequestScript": { "type": "string" },
+        "testScript": { "type": "string" },
+        "preRequestScriptJs": { "type": "string" },
+        "testScriptJs": { "type": "string" },
+        "requestNotes": { "type": "string" },
+        "settings": { "$ref": "#/definitions/requestSettings" },
+        "settingsOverrides": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "sioEvents": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "sioEventName": { "type": "string" },
+        "sioArgs": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/sioArg" }
+        },
+        "sioAck": { "type": "boolean" },
+        "grpcMethod": { "type": "string" },
+        "grpcMetadata": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "grpcUseReflection": { "type": "boolean" },
+        "grpcProtoFilePath": { "type": "string" },
+        "grpcProtoFileName": { "type": "string" },
+        "grpcProtoImportPaths": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "mcpMethod": { "type": "string" },
+        "mcpName": { "type": "string" },
+        "mcpArguments": { "type": "string" },
+        "mcpProtocolVersion": { "type": "string" },
+        "aiProvider": { "type": "string" },
+        "aiModel": { "type": "string" },
+        "aiSystem": { "type": "string", "maxLength": 50000 },
+        "aiPrompt": { "type": "string", "maxLength": 200000 },
+        "aiTemperature": { "type": "string" },
+        "aiTopP": { "type": "string" },
+        "aiMaxTokens": { "type": "string" },
+        "aiMaxSteps": { "type": "string" },
+        "aiIdleTimeoutSec": { "type": "string" },
+        "aiThinking": { "type": "string", "enum": ["", "summarized"] },
+        "aiStream": { "type": "boolean" },
+        "aiToolRequestIds": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/id" }
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "workspaceId": { "$ref": "#/definitions/id" },
+        "name": { "type": "string" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "protected": { "type": "boolean" },
+        "values": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        }
+      }
+    },
+    "rootFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "format", "workspaceOrder"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "format": { "type": "string", "const": "kurlo.workspace.yaml.v1" },
+        "workspaceOrder": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/id" }
+        }
+      }
+    },
+    "workspaceFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "workspace"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "workspace": { "$ref": "#/definitions/workspace" },
+        "collectionOrder": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/id" }
+        },
+        "cookies": {
+          "type": "array",
+          "description": "Cookies kept for this workspace. Values that are secrets are stored as {{kurloSecret:...}} placeholders.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "value": { "type": "string" },
+              "domain": { "type": "string" },
+              "path": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "collectionFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "collection"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "collection": { "$ref": "#/definitions/collection" },
+        "requestOrder": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/id" }
+        }
+      }
+    },
+    "requestFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "request"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "request": { "$ref": "#/definitions/request" }
+      }
+    },
+    "environmentFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "environment"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "environment": { "$ref": "#/definitions/environment" }
+      }
+    },
+    "example": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "description": "A saved response paired with the request snapshot that produced it. Stored under collections/<collection>/examples/<request filesystemName>/, one file per example, with the response body inside it.",
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "requestId": {
+          "$ref": "#/definitions/id",
+          "description": "The request this example belongs to. The directory name locates it; this re-links it when the request file is renamed."
+        },
+        "name": { "type": "string" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "source": {
+          "type": "string",
+          "enum": ["captured", "manual", "openapi", "postman"]
+        },
+        "notes": { "type": "string" },
+        "snapshot": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "The request as it was when the response came back. Kept whole because the request itself may change afterwards.",
+          "properties": {
+            "method": { "type": "string" },
+            "url": { "type": "string" },
+            "params": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } },
+            "headers": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } },
+            "bodyType": { "type": "string" },
+            "bodyContent": { "type": "string" }
+          }
+        },
+        "response": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["statusCode"],
+          "properties": {
+            "statusCode": { "type": "integer" },
+            "status": { "type": "string" },
+            "headers": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } },
+            "bodyMediaType": { "type": "string" },
+            "body": { "type": "string", "description": "The response body, stored byte for byte." },
+            "bodyFile": {
+              "type": "string",
+              "description": "Older layout: plain file name of the body, in the same directory as this file. Read on load and replaced by body on the next save. A path separator is refused.",
+              "pattern": "^[^/\\\\]+$"
+            },
+            "durationMs": { "type": "number", "minimum": 0 }
+          }
+        },
+        "match": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "How a mock server would select this example. Recorded from the start so serving examples needs no workspace migration.",
+          "properties": {
+            "pathTemplate": { "type": "string" },
+            "query": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "exampleFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "example"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "example": { "$ref": "#/definitions/example" }
+      }
+    },
+    "loadTestDuration": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Milliseconds."
+    },
+    "loadExecutor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "description": "How load is applied. constant-vus and ramping-vus loop a number of virtual users through the flow; constant-arrival-rate and ramping-arrival-rate start iterations at a fixed rate however slow the server gets.",
+      "properties": {
+        "type": { "type": "string", "enum": ["constant-vus", "ramping-vus", "constant-arrival-rate", "ramping-arrival-rate"] },
+        "vus": { "type": "integer", "minimum": 0 },
+        "durationMs": { "$ref": "#/definitions/loadTestDuration" },
+        "stages": {
+          "type": "array",
+          "description": "ramping-vus: target is virtual users. ramping-arrival-rate: target is iterations per time unit.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["durationMs", "target"],
+            "properties": {
+              "durationMs": { "$ref": "#/definitions/loadTestDuration" },
+              "target": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "rate": { "type": "integer", "minimum": 0, "description": "Iterations started per time unit." },
+        "timeUnitMs": { "$ref": "#/definitions/loadTestDuration", "description": "Defaults to 1000." },
+        "preAllocatedVUs": { "type": "integer", "minimum": 0 },
+        "maxVUs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "loadStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "requestId"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "requestId": { "$ref": "#/definitions/id", "description": "An HTTP or GraphQL request in the same collection." },
+        "name": { "type": "string", "description": "Name used to tag the step in results." },
+        "once": { "type": "boolean", "description": "Run once per virtual user, for example to log in." },
+        "extract": {
+          "type": "array",
+          "description": "Values saved from the response for later steps, used as {{var}}.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["var", "from", "path"],
+            "properties": {
+              "var": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+              "from": { "type": "string", "enum": ["json", "header", "regex"] },
+              "path": { "type": "string", "description": "json: a path such as $.items[0].id. header: the header name. regex: a pattern with one ( ) group." }
+            }
+          }
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["status", "jsonExists", "bodyContains"] },
+              "path": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        },
+        "thinkTimeMs": { "$ref": "#/definitions/loadTestDuration", "description": "Wait after the step." },
+        "thinkJitterMs": { "$ref": "#/definitions/loadTestDuration", "description": "Random extra wait added to thinkTimeMs." }
+      }
+    },
+    "loadTest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "description": "A load test built from requests in this collection. Stored under collections/<collection>/loadtests/, one file per load test.",
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "name": { "type": "string" },
+        "filesystemName": { "$ref": "#/definitions/filesystemName" },
+        "scenarios": {
+          "type": "array",
+          "description": "The flow the virtual users run. Kurlo uses exactly one.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "executor"],
+            "properties": {
+              "id": { "$ref": "#/definitions/id" },
+              "name": { "type": "string" },
+              "executor": { "$ref": "#/definitions/loadExecutor" },
+              "steps": { "type": "array", "items": { "$ref": "#/definitions/loadStep" } }
+            }
+          }
+        },
+        "thresholds": {
+          "type": "array",
+          "description": "Pass criteria. The run fails when any of them is not met.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["metric", "stat", "op", "value"],
+            "properties": {
+              "metric": { "type": "string", "enum": ["http_req_duration", "http_req_failed", "checks"] },
+              "stat": { "type": "string", "enum": ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "rate"] },
+              "op": { "type": "string", "enum": ["<", "<=", ">", ">="] },
+              "value": { "type": "number", "minimum": 0, "description": "Milliseconds for http_req_duration, a fraction from 0 to 1 for rate." },
+              "step": { "$ref": "#/definitions/id", "description": "Limit the threshold to one step, by its id." },
+              "abortOnFail": { "type": "boolean", "description": "Stop the test as soon as the threshold fails." }
+            }
+          }
+        },
+        "data": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "mode"],
+          "properties": {
+            "path": { "type": "string", "description": "CSV or JSON file, relative to the workspace folder." },
+            "mode": { "type": "string", "enum": ["per-vu", "per-iteration", "random"] }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "environment": { "type": "string", "description": "Environment used when the test runs." },
+            "insecure": { "type": "boolean", "description": "Skip TLS certificate checks." },
+            "timeoutMs": { "$ref": "#/definitions/loadTestDuration", "description": "Request timeout." }
+          }
+        }
+      }
+    },
+    "loadTestFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "loadTest"],
+      "properties": {
+        "version": { "$ref": "#/definitions/fileVersion" },
+        "order": { "$ref": "#/definitions/order" },
+        "loadTest": { "$ref": "#/definitions/loadTest" }
+      }
+    }
+  },
+  "x-kurlo-format": "kurlo.workspace.yaml.v1",
+  "x-kurlo-path-layout": "yaml-filesystem-names.v1",
+  "x-kurlo-storage-kind": "workspace-yaml"
+}

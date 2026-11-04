@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -192,6 +193,8 @@ func listAgentActivity(filter model.AgentActivityFilter) ([]model.AgentActivityS
 		limit = agentActivityDefaultLimit
 	}
 	out := []model.AgentActivitySummary{}
+	currentRoot := agentWorkspaceKey(fileWorkspaceStorePath())
+	names := activityWorkspaceNames{}
 	for _, id := range ids {
 		at := agentActivityTime(id)
 		if filter.Until > 0 && at > filter.Until {
@@ -203,6 +206,13 @@ func listAgentActivity(filter model.AgentActivityFilter) ([]model.AgentActivityS
 		entry, err := readAgentActivity(id)
 		if err != nil {
 			continue
+		}
+		entry.Here = filter.WorkspaceID != "" && entry.WorkspaceID == filter.WorkspaceID && entry.Workspace != "" && agentWorkspaceKey(entry.Workspace) == currentRoot
+		if !filter.AllWorkspaces && filter.WorkspaceID != "" && !entry.Here {
+			continue
+		}
+		if !entry.Here {
+			entry.WorkspaceName = names.lookup(entry.Workspace, entry.WorkspaceID)
 		}
 		if filter.Client != "" && !strings.EqualFold(entry.Client, filter.Client) {
 			continue
@@ -226,7 +236,7 @@ func revertAgentActivity(id, path string) (model.AgentActivityEntry, error) {
 		return entry, err
 	}
 	root := entry.Workspace
-	if strings.TrimSpace(root) == "" {
+	if strings.TrimSpace(root) == "" || len(entry.Changes) == 0 {
 		return entry, errors.New("this activity did not change any files")
 	}
 	unlock, err := lockWorkspaceWrites(root)
@@ -295,6 +305,40 @@ func revertAgentActivity(id, path string) (model.AgentActivityEntry, error) {
 		return entry, err
 	}
 	return entry, writeFileAtomic(activityPath, encrypted)
+}
+
+type activityWorkspaceNames map[string]map[string]string
+
+func (n activityWorkspaceNames) lookup(root, workspaceID string) string {
+	if root == "" || workspaceID == "" {
+		return ""
+	}
+	key := agentWorkspaceKey(root)
+	byID, ok := n[key]
+	if !ok {
+		byID = map[string]string{}
+		dirs, _ := os.ReadDir(filepath.Join(root, fileStoreWorkspacesDir))
+		for _, dir := range dirs {
+			if !dir.IsDir() {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(root, fileStoreWorkspacesDir, dir.Name(), fileStoreRootFileName))
+			if err != nil {
+				continue
+			}
+			var doc struct {
+				Workspace struct {
+					ID   string `yaml:"id"`
+					Name string `yaml:"name"`
+				} `yaml:"workspace"`
+			}
+			if yaml.Unmarshal(data, &doc) == nil && doc.Workspace.ID != "" {
+				byID[doc.Workspace.ID] = doc.Workspace.Name
+			}
+		}
+		n[key] = byID
+	}
+	return byID[workspaceID]
 }
 
 func (a *App) AgentActivity(filter model.AgentActivityFilter) model.AgentActivityList {

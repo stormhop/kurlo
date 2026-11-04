@@ -193,6 +193,12 @@ export function agentToolLabel(name: string | undefined): string {
     case 'save_example': return 'Saved an example';
     case 'set_variable': return 'Set a variable';
     case 'generate_tests': return 'Generated tests';
+    case 'git_status': return 'Checked Git status';
+    case 'git_diff': return 'Read the Git diff';
+    case 'git_create_branch': return 'Created a branch';
+    case 'git_commit': return 'Committed changes';
+    case 'git_push': return 'Pushed the branch';
+    case 'pull_request_url': return 'Built a pull request link';
     default: return name ?? 'Tool';
   }
 }
@@ -205,10 +211,23 @@ export function agentChangeSummary(change: AgentFileChange): string {
 }
 
 export function agentApprovalTitle(approval: AgentApproval): string {
+  if (approval.tool === 'git_push') return 'Push this branch?';
+  if (approval.tool === 'git_create_branch') return 'Create this branch?';
+  if (approval.tool === 'git_commit') return approval.changes.length === 1 ? 'Commit 1 file?' : `Commit ${approval.changes.length} files?`;
+  if (approval.kind === 'external') return 'Authorize this request?';
+  if (approval.tool === 'apply_changes') return 'Apply these changes?';
   if (approval.kind === 'write') {
     return approval.changes.length === 1 ? 'Change 1 file?' : `Change ${approval.changes.length} files?`;
   }
   return 'Send this request?';
+}
+
+export function agentApprovalAction(approval: AgentApproval): string {
+  if (approval.tool === 'git_push') return 'Push';
+  if (approval.tool === 'git_create_branch') return 'Create branch';
+  if (approval.tool === 'git_commit') return 'Commit';
+  if (approval.kind === 'write') return 'Apply';
+  return approval.kind === 'external' ? 'Authorize' : 'Send';
 }
 
 export function agentApprovalArguments(approval: AgentApproval): string {

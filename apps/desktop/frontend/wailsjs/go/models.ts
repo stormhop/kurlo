@@ -507,6 +507,24 @@ export namespace api {
 		    return a;
 		}
 	}
+	export class GitPullRequestResult {
+	    url: string;
+	    branch: string;
+	    base: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GitPullRequestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.branch = source["branch"];
+	        this.base = source["base"];
+	        this.error = source["error"];
+	    }
+	}
 	
 	
 	export class GitTokenInfoResult {
@@ -739,6 +757,11 @@ export namespace model {
 	    files: string[];
 	    reverted: boolean;
 	    workspace: string;
+	    workspaceId?: string;
+	    here?: boolean;
+	    workspaceName?: string;
+	    commit?: string;
+	    branch?: string;
 	    arguments: string;
 	    result: string;
 	    changes: AgentFileChange[];
@@ -759,6 +782,11 @@ export namespace model {
 	        this.files = source["files"];
 	        this.reverted = source["reverted"];
 	        this.workspace = source["workspace"];
+	        this.workspaceId = source["workspaceId"];
+	        this.here = source["here"];
+	        this.workspaceName = source["workspaceName"];
+	        this.commit = source["commit"];
+	        this.branch = source["branch"];
 	        this.arguments = source["arguments"];
 	        this.result = source["result"];
 	        this.changes = this.convertValues(source["changes"], AgentFileChange);
@@ -783,6 +811,8 @@ export namespace model {
 		}
 	}
 	export class AgentActivityFilter {
+	    workspaceId: string;
+	    allWorkspaces: boolean;
 	    client: string;
 	    tool: string;
 	    since: number;
@@ -795,6 +825,8 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.workspaceId = source["workspaceId"];
+	        this.allWorkspaces = source["allWorkspaces"];
 	        this.client = source["client"];
 	        this.tool = source["tool"];
 	        this.since = source["since"];
@@ -813,6 +845,11 @@ export namespace model {
 	    files: string[];
 	    reverted: boolean;
 	    workspace: string;
+	    workspaceId?: string;
+	    here?: boolean;
+	    workspaceName?: string;
+	    commit?: string;
+	    branch?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentActivitySummary(source);
@@ -830,6 +867,11 @@ export namespace model {
 	        this.files = source["files"];
 	        this.reverted = source["reverted"];
 	        this.workspace = source["workspace"];
+	        this.workspaceId = source["workspaceId"];
+	        this.here = source["here"];
+	        this.workspaceName = source["workspaceName"];
+	        this.commit = source["commit"];
+	        this.branch = source["branch"];
 	    }
 	}
 	export class AgentActivityList {
@@ -1017,6 +1059,8 @@ export namespace model {
 	    messages: AiMessage[];
 	    usage: AiUsage;
 	    allowedTools: string[];
+	    ownBranch?: boolean;
+	    branch?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentChat(source);
@@ -1045,6 +1089,8 @@ export namespace model {
 	        this.messages = this.convertValues(source["messages"], AiMessage);
 	        this.usage = this.convertValues(source["usage"], AiUsage);
 	        this.allowedTools = source["allowedTools"];
+	        this.ownBranch = source["ownBranch"];
+	        this.branch = source["branch"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1115,6 +1161,7 @@ export namespace model {
 	    environment: string;
 	    connectionId: string;
 	    model: string;
+	    ownBranch?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentSendInput(source);
@@ -1132,6 +1179,7 @@ export namespace model {
 	        this.environment = source["environment"];
 	        this.connectionId = source["connectionId"];
 	        this.model = source["model"];
+	        this.ownBranch = source["ownBranch"];
 	    }
 	}
 	export class TimelineEvent {

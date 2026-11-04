@@ -298,6 +298,10 @@ export function GitPullBranch(arg1) {
   return window['go']['api']['App']['GitPullBranch'](arg1);
 }
 
+export function GitPullRequestURL() {
+  return window['go']['api']['App']['GitPullRequestURL']();
+}
+
 export function GitPullWorkspace() {
   return window['go']['api']['App']['GitPullWorkspace']();
 }

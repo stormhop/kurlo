@@ -20,9 +20,13 @@ var agentReadTools = map[string]bool{
 	"list_requests":         true,
 	"get_request":           true,
 	"list_environments":     true,
+	"list_globals":          true,
 	"list_history":          true,
 	"get_history_entry":     true,
 	"diagnose_last_failure": true,
+	"git_status":            true,
+	"git_diff":              true,
+	"pull_request_url":      true,
 }
 
 var agentRunTools = map[string]bool{
@@ -36,6 +40,7 @@ type agentDecision struct {
 	ask     bool
 	reason  string
 	methods []string
+	changes []model.AgentFileChange
 }
 
 func agentSafeMethod(method string) bool {
@@ -125,8 +130,12 @@ func agentRunMethods(s *mcpServer, tool string, arguments json.RawMessage) ([]st
 
 func agentDecide(s *mcpServer, tool string, arguments json.RawMessage) agentDecision {
 	switch {
+	case tool == "authorize_oauth2":
+		return agentDecision{kind: model.AgentToolExternal, ask: true, reason: "Contacts the configured OAuth provider and may open a sign-in page."}
 	case agentReadTools[tool]:
 		return agentDecision{kind: model.AgentToolRead}
+	case mcpGitWriteToolNames[tool]:
+		return agentDecideGit(s, tool, arguments)
 	case agentRunTools[tool], tool == "generate_tests":
 		kind := model.AgentToolRun
 		if tool == "generate_tests" {
@@ -152,9 +161,13 @@ type agentToolBridge struct {
 	approve agentApprover
 	onAllow func(tool string)
 
-	mu      sync.Mutex
-	allowed map[string]bool
-	turnID  string
+	mu        sync.Mutex
+	allowed   map[string]bool
+	turnID    string
+	ownBranch bool
+	branch    string
+	chatTitle string
+	onBranch  func(branch string)
 }
 
 func newAgentToolBridge(opts mcpServerOptions, chatID string, allowed []string) *agentToolBridge {
@@ -165,10 +178,108 @@ func newAgentToolBridge(opts mcpServerOptions, chatID string, allowed []string) 
 	for _, tool := range allowed {
 		bridge.allowed[tool] = true
 	}
+	server.afterWrite = bridge.commitOwnBranch
 	return bridge
 }
 
+func (b *agentToolBridge) setChat(chat model.AgentChat, onBranch func(string)) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.onBranch = onBranch
+	b.ownBranch = chat.OwnBranch
+	b.chatTitle = chat.Title
+	if chat.Branch != "" {
+		b.branch = chat.Branch
+	}
+}
+
+func (b *agentToolBridge) commitOwnBranch(tool string, record *mcpCallRecord) string {
+	b.mu.Lock()
+	enabled := b.ownBranch
+	branch := b.branch
+	title := b.chatTitle
+	b.mu.Unlock()
+	if !enabled {
+		return ""
+	}
+	if branch == "" {
+		branch = agentBranchName(b.chatID, title)
+	}
+	root := b.server.opts.workspace
+	gitOperationMu.Lock()
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		gitOperationMu.Unlock()
+		return "Not committed to the agent branch: " + err.Error()
+	}
+	result, err := commitAgentChanges(root, branch, tool, title, record.changes)
+	unlock()
+	gitOperationMu.Unlock()
+	if err != nil {
+		return "Not committed to the agent branch: " + err.Error()
+	}
+	if result.Commit == "" {
+		return ""
+	}
+	record.commit = result.Commit
+	record.branch = result.Branch
+	b.mu.Lock()
+	changed := b.branch != result.Branch
+	b.branch = result.Branch
+	onBranch := b.onBranch
+	b.mu.Unlock()
+	if changed && onBranch != nil {
+		onBranch(result.Branch)
+	}
+	return fmt.Sprintf("Committed as %s on branch %s.", result.Commit, result.Branch)
+}
+
+func agentAllowsChatApproval(tool string) bool {
+	return tool != "apply_changes" && tool != "authorize_oauth2" && tool != "git_push"
+}
+
+func agentDecideGit(s *mcpServer, tool string, arguments json.RawMessage) agentDecision {
+	status := gitStatusForWorkspace(s.opts.workspace)
+	branch := defaultString(strings.TrimSpace(status.Branch), "the current branch")
+	switch tool {
+	case "git_create_branch":
+		var args struct {
+			Name string `json:"name"`
+		}
+		_ = json.Unmarshal(arguments, &args)
+		return agentDecision{kind: model.AgentToolWrite, ask: true, reason: fmt.Sprintf("Creates branch %s from %s and switches the workspace to it.", strings.TrimSpace(args.Name), branch)}
+	case "git_commit":
+		var args struct {
+			Message string   `json:"message"`
+			Paths   []string `json:"paths"`
+		}
+		_ = json.Unmarshal(arguments, &args)
+		changes, err := gitCommitPreview(s.opts.workspace, args.Paths)
+		if err != nil {
+			return agentDecision{kind: model.AgentToolWrite, ask: true, reason: fmt.Sprintf("Commits workspace files on %s.", branch)}
+		}
+		subject, _, _ := strings.Cut(strings.TrimSpace(args.Message), "\n")
+		return agentDecision{kind: model.AgentToolWrite, ask: true, changes: changes, reason: fmt.Sprintf("Commits %d %s on %s: %s", len(changes), agentPlural(len(changes), "file", "files"), branch, subject)}
+	}
+	var args struct {
+		Remote string `json:"remote"`
+	}
+	_ = json.Unmarshal(arguments, &args)
+	remote := defaultString(strings.TrimSpace(args.Remote), gitPushRemote(status))
+	return agentDecision{kind: model.AgentToolExternal, ask: true, reason: fmt.Sprintf("Pushes %s to %s. Everyone with access to %s sees these commits.", branch, remote, remote)}
+}
+
+func agentPlural(count int, one, many string) string {
+	if count == 1 {
+		return one
+	}
+	return many
+}
+
 func (b *agentToolBridge) isAllowed(tool string) bool {
+	if !agentAllowsChatApproval(tool) {
+		return false
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.allowed[tool]
@@ -229,7 +340,9 @@ func (b *agentToolBridge) ask(ctx context.Context, approval model.AgentApproval)
 	}
 	switch decision {
 	case model.AgentApprovalAllowChat:
-		b.allow(approval.Tool)
+		if agentAllowsChatApproval(approval.Tool) {
+			b.allow(approval.Tool)
+		}
 		return nil
 	case model.AgentApprovalAllow:
 		return nil
@@ -255,18 +368,20 @@ func (b *agentToolBridge) call(ctx context.Context, tool aiTool, input, toolUseI
 			return nil
 		}
 		decision := agentDecide(b.server, name, args)
-		if !decision.ask || (decision.kind == model.AgentToolWrite && len(decision.methods) == 0) {
+		if !decision.ask || (decision.kind == model.AgentToolWrite && len(decision.methods) == 0 && mcpWriteToolNames[name]) {
 			return nil
 		}
 		gated = true
-		return b.ask(ctx, model.AgentApproval{ToolUseID: toolUseID, Tool: name, Kind: decision.kind, Arguments: string(args), Reason: decision.reason})
+		return b.ask(ctx, model.AgentApproval{ToolUseID: toolUseID, Tool: name, Kind: decision.kind, Arguments: string(args), Reason: decision.reason, Changes: decision.changes})
 	})
 	ctx = withMcpReview(ctx, func(changes []model.AgentFileChange) error {
 		if b.isAllowed(tool.Original) {
 			return nil
 		}
 		reason := "Changes the workspace files."
-		if gated {
+		if tool.Original == "apply_changes" {
+			reason = "Review all changes in this batch."
+		} else if gated {
 			reason = "Writes these changes to the workspace files."
 		}
 		return b.ask(ctx, model.AgentApproval{ToolUseID: toolUseID, Tool: tool.Original, Kind: model.AgentToolWrite, Arguments: string(arguments), Reason: reason, Changes: changes})

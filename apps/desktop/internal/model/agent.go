@@ -3,9 +3,10 @@ package model
 const (
 	AgentClientName = "Kurlo agent"
 
-	AgentToolRead  = "read"
-	AgentToolRun   = "run"
-	AgentToolWrite = "write"
+	AgentToolRead     = "read"
+	AgentToolRun      = "run"
+	AgentToolWrite    = "write"
+	AgentToolExternal = "external"
 
 	AgentApprovalAllow     = "allow"
 	AgentApprovalAllowChat = "allow_chat"
@@ -74,6 +75,8 @@ type AgentChat struct {
 	Messages         []AiMessage `json:"messages"`
 	Usage            AiUsage     `json:"usage"`
 	AllowedTools     []string    `json:"allowedTools"`
+	OwnBranch        bool        `json:"ownBranch,omitempty"`
+	Branch           string      `json:"branch,omitempty"`
 }
 
 type AgentSendInput struct {
@@ -87,6 +90,7 @@ type AgentSendInput struct {
 	Environment  string `json:"environment"`
 	ConnectionID string `json:"connectionId"`
 	Model        string `json:"model"`
+	OwnBranch    bool   `json:"ownBranch,omitempty"`
 }
 
 type AgentTurn struct {
@@ -101,16 +105,21 @@ type AgentTurn struct {
 }
 
 type AgentActivitySummary struct {
-	ID        string   `json:"id"`
-	Time      int64    `json:"time"`
-	Client    string   `json:"client"`
-	ChatID    string   `json:"chatId,omitempty"`
-	Tool      string   `json:"tool"`
-	Status    string   `json:"status"`
-	Error     string   `json:"error,omitempty"`
-	Files     []string `json:"files"`
-	Reverted  bool     `json:"reverted"`
-	Workspace string   `json:"workspace"`
+	ID            string   `json:"id"`
+	Time          int64    `json:"time"`
+	Client        string   `json:"client"`
+	ChatID        string   `json:"chatId,omitempty"`
+	Tool          string   `json:"tool"`
+	Status        string   `json:"status"`
+	Error         string   `json:"error,omitempty"`
+	Files         []string `json:"files"`
+	Reverted      bool     `json:"reverted"`
+	Workspace     string   `json:"workspace"`
+	WorkspaceID   string   `json:"workspaceId,omitempty"`
+	Here          bool     `json:"here,omitempty"`
+	WorkspaceName string   `json:"workspaceName,omitempty"`
+	Commit        string   `json:"commit,omitempty"`
+	Branch        string   `json:"branch,omitempty"`
 }
 
 type AgentActivityEntry struct {
@@ -121,11 +130,13 @@ type AgentActivityEntry struct {
 }
 
 type AgentActivityFilter struct {
-	Client string `json:"client"`
-	Tool   string `json:"tool"`
-	Since  int64  `json:"since"`
-	Until  int64  `json:"until"`
-	Limit  int    `json:"limit"`
+	WorkspaceID   string `json:"workspaceId"`
+	AllWorkspaces bool   `json:"allWorkspaces"`
+	Client        string `json:"client"`
+	Tool          string `json:"tool"`
+	Since         int64  `json:"since"`
+	Until         int64  `json:"until"`
+	Limit         int    `json:"limit"`
 }
 
 type AgentActivityList struct {

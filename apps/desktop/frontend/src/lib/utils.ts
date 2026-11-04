@@ -377,7 +377,7 @@ export function inheritAuthState() {
 export function authStateHasData(auth: SavedRequest['auth'], type: AuthType = auth.type) {
   const has = (...values: string[]) => values.some(value => Boolean(value.trim()));
   if (type === 'bearer') return has(auth.bearerToken);
-  if (type === 'basic' || type === 'digest') return has(auth.basicUser, auth.basicPass);
+  if (type === 'basic' || type === 'digest' || type === 'ntlm') return has(auth.basicUser, auth.basicPass);
   if (type === 'apikey') return has(auth.apiKeyValue) || auth.apiKeyName.trim() !== 'X-API-Key' || auth.apiKeyIn !== 'header';
   if (type === 'oauth2') {
     return has(

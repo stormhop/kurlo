@@ -20,6 +20,8 @@ import (
 var mcpWriteToolNames = map[string]bool{
 	"create_collection": true,
 	"save_request":      true,
+	"patch_request":     true,
+	"apply_changes":     true,
 	"delete_request":    true,
 	"save_example":      true,
 	"set_variable":      true,
@@ -27,6 +29,9 @@ var mcpWriteToolNames = map[string]bool{
 }
 
 type mcpStore struct {
+	hidden       mcpHiddenStore
+	batch        bool
+	globals      *mcpGlobalsEdit
 	root         string
 	workspaces   []map[string]any
 	collections  []map[string]any
@@ -49,12 +54,53 @@ func loadMCPStore(root string) (*mcpStore, error) {
 	return &mcpStore{root: root, workspaces: workspaces, collections: collections, requests: requests, environments: environments, cookies: cookies}, nil
 }
 
+type mcpHiddenStore struct {
+	workspaces   []map[string]any
+	collections  []map[string]any
+	requests     []map[string]any
+	environments []map[string]any
+}
+
+func (st *mcpStore) scope(workspaceID string) error {
+	if workspaceID == "" {
+		return nil
+	}
+	found := false
+	for _, workspace := range st.workspaces {
+		found = found || stringValue(workspace, "id") == workspaceID
+	}
+	if !found {
+		return fmt.Errorf("the workspace this chat belongs to is no longer in %s; open the chat's workspace in Kurlo", st.root)
+	}
+	keep := func(items []map[string]any, inScope func(map[string]any) bool) (visible, hidden []map[string]any) {
+		for _, item := range items {
+			if inScope(item) {
+				visible = append(visible, item)
+			} else {
+				hidden = append(hidden, item)
+			}
+		}
+		return visible, hidden
+	}
+	byWorkspace := func(item map[string]any) bool { return stringValue(item, "workspaceId") == workspaceID }
+	st.workspaces, st.hidden.workspaces = keep(st.workspaces, func(item map[string]any) bool { return stringValue(item, "id") == workspaceID })
+	st.collections, st.hidden.collections = keep(st.collections, byWorkspace)
+	collections := entityIDSet(st.collections)
+	st.requests, st.hidden.requests = keep(st.requests, func(item map[string]any) bool { return collections[stringValue(item, "collectionId")] })
+	st.environments, st.hidden.environments = keep(st.environments, byWorkspace)
+	return nil
+}
+
 func (st *mcpStore) save() error {
+	workspacesAll := append(append([]map[string]any{}, st.workspaces...), st.hidden.workspaces...)
+	collectionsAll := append(append([]map[string]any{}, st.collections...), st.hidden.collections...)
+	requestsAll := append(append([]map[string]any{}, st.requests...), st.hidden.requests...)
+	environmentsAll := append(append([]map[string]any{}, st.environments...), st.hidden.environments...)
 	store := map[string]any{
-		"workspaces":   st.workspaces,
-		"collections":  st.collections,
-		"requests":     st.requests,
-		"environments": st.environments,
+		"workspaces":   workspacesAll,
+		"collections":  collectionsAll,
+		"requests":     requestsAll,
+		"environments": environmentsAll,
 	}
 	if err := validateWorkspaceStorePayload(store); err != nil {
 		return err
@@ -63,14 +109,14 @@ func (st *mcpStore) save() error {
 	if err != nil {
 		return err
 	}
-	ensureStoreFilesystemNames(st.workspaces, st.collections, st.requests, st.environments, disk, false)
+	ensureStoreFilesystemNames(workspacesAll, collectionsAll, requestsAll, environmentsAll, disk, false)
 	existing := map[string]string{}
 	secrets := map[string]string{}
-	requests := sanitizeRequestsForFilesystem(st.requests, existing, secrets)
-	environments := sanitizeEnvironmentsForFilesystem(st.environments, existing, secrets)
-	workspaces := sanitizeWorkspacesForFilesystem(st.workspaces)
-	collections := sanitizeCollectionsForFilesystem(st.collections, existing, secrets)
-	cookies := sanitizeWorkspaceCookiesForFilesystem(st.cookies, entityIDSet(st.workspaces), existing, secrets)
+	requests := sanitizeRequestsForFilesystem(requestsAll, existing, secrets)
+	environments := sanitizeEnvironmentsForFilesystem(environmentsAll, existing, secrets)
+	workspaces := sanitizeWorkspacesForFilesystem(workspacesAll)
+	collections := sanitizeCollectionsForFilesystem(collectionsAll, existing, secrets)
+	cookies := sanitizeWorkspaceCookiesForFilesystem(st.cookies, entityIDSet(workspacesAll), existing, secrets)
 	if len(secrets) > 0 {
 		return fmt.Errorf("secret values cannot be written through MCP; put the value in an environment variable marked secret in Kurlo and reference it as {{name}}")
 	}
@@ -260,6 +306,12 @@ func mcpEnsureFolder(collection map[string]any, folder []string) {
 }
 
 func (s *mcpServer) toolCreateCollection(ctx context.Context, arguments json.RawMessage) (any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
+		return editCreateCollection(st, arguments)
+	})
+}
+
+func editCreateCollection(st *mcpStore, arguments json.RawMessage) (func() any, error) {
 	var args struct {
 		Name        string `json:"name"`
 		Workspace   string `json:"workspace"`
@@ -272,36 +324,34 @@ func (s *mcpServer) toolCreateCollection(ctx context.Context, arguments json.Raw
 	if name == "" {
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "name is required"}
 	}
-	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
-		workspace, err := st.workspace(args.Workspace)
-		if err != nil {
-			return nil, err
+	workspace, err := st.workspace(args.Workspace)
+	if err != nil {
+		return nil, err
+	}
+	workspaceID := stringValue(workspace, "id")
+	for _, existing := range st.collections {
+		if stringValue(existing, "workspaceId") == workspaceID && strings.EqualFold(strings.TrimSpace(stringValue(existing, "name")), name) {
+			return nil, fmt.Errorf("a collection named %q already exists (id %s)", stringValue(existing, "name"), stringValue(existing, "id"))
 		}
-		workspaceID := stringValue(workspace, "id")
-		for _, existing := range st.collections {
-			if stringValue(existing, "workspaceId") == workspaceID && strings.EqualFold(strings.TrimSpace(stringValue(existing, "name")), name) {
-				return nil, fmt.Errorf("a collection named %q already exists (id %s)", stringValue(existing, "name"), stringValue(existing, "id"))
-			}
+	}
+	collection := map[string]any{
+		"id":          "collection-" + uuid.NewString(),
+		"workspaceId": workspaceID,
+		"name":        name,
+		"description": args.Description,
+		"collapsed":   false,
+		"folderPaths": []any{},
+		"defaults":    map[string]any{},
+	}
+	st.collections = append(st.collections, collection)
+	return func() any {
+		return map[string]any{
+			"id":        stringValue(collection, "id"),
+			"name":      name,
+			"workspace": stringValue(workspace, "name"),
+			"file":      path.Join(st.collectionDir(collection), fileStoreCollection),
 		}
-		collection := map[string]any{
-			"id":          "collection-" + uuid.NewString(),
-			"workspaceId": workspaceID,
-			"name":        name,
-			"description": args.Description,
-			"collapsed":   false,
-			"folderPaths": []any{},
-			"defaults":    map[string]any{},
-		}
-		st.collections = append(st.collections, collection)
-		return func() any {
-			return map[string]any{
-				"id":        stringValue(collection, "id"),
-				"name":      name,
-				"workspace": stringValue(workspace, "name"),
-				"file":      path.Join(st.collectionDir(collection), fileStoreCollection),
-			}
-		}, nil
-	})
+	}, nil
 }
 
 type mcpRowArg struct {
@@ -407,6 +457,7 @@ func mcpAuth(arg mcpAuthArg) (map[string]any, error) {
 var mcpRawBodyTypes = map[string]bool{"json": true, "text": true, "xml": true, "html": true}
 
 type mcpSaveRequestArgs struct {
+	YAML             *string         `json:"yaml"`
 	Request          string          `json:"request"`
 	Collection       *string         `json:"collection"`
 	Folder           *string         `json:"folder"`
@@ -434,78 +485,85 @@ func (s *mcpServer) toolSaveRequest(ctx context.Context, arguments json.RawMessa
 		return nil, err
 	}
 	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
-		creating := strings.TrimSpace(args.Request) == ""
-		var request map[string]any
-		if creating {
-			if args.URL == nil || strings.TrimSpace(*args.URL) == "" {
-				return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "url is required for a new request"}
-			}
-			collectionRef := ""
-			if args.Collection != nil {
-				collectionRef = *args.Collection
-			}
-			collection, err := st.collection(collectionRef)
-			if err != nil {
-				return nil, err
-			}
-			request = map[string]any{
-				"id":           uuid.NewString(),
-				"requestType":  "http",
-				"collectionId": stringValue(collection, "id"),
-				"folderPath":   []any{},
-				"method":       "GET",
-				"auth":         map[string]any{"type": "inherit"},
-				"bodyType":     "none",
-				"bodyContent":  "",
-				"params":       []any{},
-				"headers":      []any{},
-				"formRows":     []any{},
-			}
-		} else {
-			found, _, err := st.request(args.Request)
-			if err != nil {
-				return nil, err
-			}
-			request = found
-			if args.Collection != nil {
-				collection, err := st.collection(*args.Collection)
-				if err != nil {
-					return nil, err
-				}
-				request["collectionId"] = stringValue(collection, "id")
-			}
+		return mcpSaveRequest(st, args)
+	})
+}
+
+func mcpSaveRequest(st *mcpStore, args mcpSaveRequestArgs) (func() any, error) {
+	if args.YAML != nil {
+		return st.editRequestDocument(args)
+	}
+	creating := strings.TrimSpace(args.Request) == ""
+	var request map[string]any
+	if creating {
+		if args.URL == nil || strings.TrimSpace(*args.URL) == "" {
+			return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "url is required for a new request"}
 		}
-		if err := mcpApplyRequestArgs(request, args); err != nil {
+		collectionRef := ""
+		if args.Collection != nil {
+			collectionRef = *args.Collection
+		}
+		collection, err := st.collection(collectionRef)
+		if err != nil {
 			return nil, err
 		}
-		if args.Folder != nil {
-			folder := mcpSplitFolder(*args.Folder)
-			segments := make([]any, 0, len(folder))
-			for _, segment := range folder {
-				segments = append(segments, segment)
+		request = map[string]any{
+			"id":           uuid.NewString(),
+			"requestType":  "http",
+			"collectionId": stringValue(collection, "id"),
+			"folderPath":   []any{},
+			"method":       "GET",
+			"auth":         map[string]any{"type": "inherit"},
+			"bodyType":     "none",
+			"bodyContent":  "",
+			"params":       []any{},
+			"headers":      []any{},
+			"formRows":     []any{},
+		}
+	} else {
+		found, _, err := st.request(args.Request)
+		if err != nil {
+			return nil, err
+		}
+		request = found
+		if args.Collection != nil {
+			collection, err := st.collection(*args.Collection)
+			if err != nil {
+				return nil, err
 			}
-			request["folderPath"] = segments
+			request["collectionId"] = stringValue(collection, "id")
 		}
-		collection := st.collectionByID(stringValue(request, "collectionId"))
-		if collection == nil {
-			return nil, fmt.Errorf("the request's collection no longer exists")
+	}
+	if err := mcpApplyRequestArgs(request, args); err != nil {
+		return nil, err
+	}
+	if args.Folder != nil {
+		folder := mcpSplitFolder(*args.Folder)
+		segments := make([]any, 0, len(folder))
+		for _, segment := range folder {
+			segments = append(segments, segment)
 		}
-		mcpEnsureFolder(collection, mcpFolderPath(request["folderPath"]))
-		if strings.TrimSpace(stringValue(request, "name")) == "" {
-			request["name"] = mcpDefaultRequestName(request)
+		request["folderPath"] = segments
+	}
+	collection := st.collectionByID(stringValue(request, "collectionId"))
+	if collection == nil {
+		return nil, fmt.Errorf("the request's collection no longer exists")
+	}
+	mcpEnsureFolder(collection, mcpFolderPath(request["folderPath"]))
+	if strings.TrimSpace(stringValue(request, "name")) == "" {
+		request["name"] = mcpDefaultRequestName(request)
+	}
+	if creating {
+		st.requests = append(st.requests, request)
+	}
+	return func() any {
+		return map[string]any{
+			"id":      stringValue(request, "id"),
+			"path":    st.requestPath(request),
+			"created": creating,
+			"file":    st.requestFile(request),
 		}
-		if creating {
-			st.requests = append(st.requests, request)
-		}
-		return func() any {
-			return map[string]any{
-				"id":      stringValue(request, "id"),
-				"path":    st.requestPath(request),
-				"created": creating,
-				"file":    st.requestFile(request),
-			}
-		}, nil
-	})
+	}, nil
 }
 
 func mcpApplyRequestArgs(request map[string]any, args mcpSaveRequestArgs) error {
@@ -675,28 +733,32 @@ func mcpDefaultRequestName(request map[string]any) string {
 }
 
 func (s *mcpServer) toolDeleteRequest(ctx context.Context, arguments json.RawMessage) (any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
+		return mcpDeleteRequest(st, arguments)
+	})
+}
+
+func mcpDeleteRequest(st *mcpStore, arguments json.RawMessage) (func() any, error) {
 	var args struct {
 		Request string `json:"request"`
 	}
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
 		return nil, err
 	}
-	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
-		request, _, err := st.request(args.Request)
-		if err != nil {
-			return nil, err
+	request, _, err := st.request(args.Request)
+	if err != nil {
+		return nil, err
+	}
+	id := stringValue(request, "id")
+	result := map[string]any{"deleted": st.requestPath(request), "id": id, "file": st.requestFile(request)}
+	kept := st.requests[:0]
+	for _, item := range st.requests {
+		if stringValue(item, "id") != id {
+			kept = append(kept, item)
 		}
-		id := stringValue(request, "id")
-		result := map[string]any{"deleted": st.requestPath(request), "id": id, "file": st.requestFile(request)}
-		kept := st.requests[:0]
-		for _, item := range st.requests {
-			if stringValue(item, "id") != id {
-				kept = append(kept, item)
-			}
-		}
-		st.requests = kept
-		return func() any { return result }, nil
-	})
+	}
+	st.requests = kept
+	return func() any { return result }, nil
 }
 
 type mcpLastRun struct {
@@ -708,6 +770,12 @@ type mcpLastRun struct {
 var mcpSensitiveHeaders = map[string]bool{"set-cookie": true, "cookie": true, "authorization": true, "proxy-authorization": true}
 
 func (s *mcpServer) toolSaveExample(ctx context.Context, arguments json.RawMessage) (any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
+		return s.editSaveExample(st, arguments)
+	})
+}
+
+func (s *mcpServer) editSaveExample(st *mcpStore, arguments json.RawMessage) (func() any, error) {
 	var args struct {
 		Request     string         `json:"request"`
 		Name        string         `json:"name"`
@@ -720,37 +788,35 @@ func (s *mcpServer) toolSaveExample(ctx context.Context, arguments json.RawMessa
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
 		return nil, err
 	}
-	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
-		request, saved, err := st.request(args.Request)
-		if err != nil {
-			return nil, err
+	request, saved, err := st.request(args.Request)
+	if err != nil {
+		return nil, err
+	}
+	var response map[string]any
+	source := "manual"
+	if args.Status == 0 && args.Body == nil {
+		last, ok := s.lastRuns[saved.ID]
+		if !ok {
+			return nil, fmt.Errorf("%s has not been run in this session; call run_request first, or pass status and body", mcpRequestPath(saved))
 		}
-		var response map[string]any
-		source := "manual"
-		if args.Status == 0 && args.Body == nil {
-			last, ok := s.lastRuns[saved.ID]
-			if !ok {
-				return nil, fmt.Errorf("%s has not been run in this session; call run_request first, or pass status and body", mcpRequestPath(saved))
-			}
-			if last.response.StatusCode == 0 {
-				return nil, fmt.Errorf("the last run of %s got no response to save", mcpRequestPath(saved))
-			}
-			response = mcpExampleResponse(last.response, last.secrets)
-			source = "captured"
-		} else {
-			response = mcpManualExampleResponse(args.Status, args.Body.ptr(), args.Headers, args.ContentType)
+		if last.response.StatusCode == 0 {
+			return nil, fmt.Errorf("the last run of %s got no response to save", mcpRequestPath(saved))
 		}
-		example := mcpAddExample(request, response, args.Name, args.Notes, source)
-		return func() any {
-			return map[string]any{
-				"request": st.requestPath(request),
-				"example": example["name"],
-				"id":      stringValue(example, "id"),
-				"status":  response["statusCode"],
-				"source":  source,
-			}
-		}, nil
-	})
+		response = mcpExampleResponse(last.response, last.secrets)
+		source = "captured"
+	} else {
+		response = mcpManualExampleResponse(args.Status, args.Body.ptr(), args.Headers, args.ContentType)
+	}
+	example := mcpAddExample(request, response, args.Name, args.Notes, source)
+	return func() any {
+		return map[string]any{
+			"request": st.requestPath(request),
+			"example": example["name"],
+			"id":      stringValue(example, "id"),
+			"status":  response["statusCode"],
+			"source":  source,
+		}
+	}, nil
 }
 
 func mcpAddExample(request, response map[string]any, name, notes, source string) map[string]any {
@@ -938,6 +1004,12 @@ func mcpPathTemplate(url string) string {
 }
 
 func (s *mcpServer) toolSetVariable(ctx context.Context, arguments json.RawMessage) (any, error) {
+	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
+		return s.editSetVariable(st, arguments)
+	})
+}
+
+func (s *mcpServer) editSetVariable(st *mcpStore, arguments json.RawMessage) (func() any, error) {
 	var args struct {
 		Environment string  `json:"environment"`
 		Key         string  `json:"key"`
@@ -956,101 +1028,99 @@ func (s *mcpServer) toolSetVariable(ctx context.Context, arguments json.RawMessa
 	if envName == "" {
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "environment is required"}
 	}
-	return s.mutate(ctx, func(st *mcpStore) (func() any, error) {
-		var environment map[string]any
-		for _, candidate := range st.environments {
-			if strings.EqualFold(strings.TrimSpace(stringValue(candidate, "name")), envName) {
-				if environment != nil {
-					return nil, fmt.Errorf("more than one environment is named %q", envName)
-				}
-				environment = candidate
+	var environment map[string]any
+	for _, candidate := range st.environments {
+		if strings.EqualFold(strings.TrimSpace(stringValue(candidate, "name")), envName) {
+			if environment != nil {
+				return nil, fmt.Errorf("more than one environment is named %q", envName)
 			}
+			environment = candidate
 		}
-		created := false
-		if environment == nil {
-			workspace, err := st.workspace(args.Workspace)
-			if err != nil {
-				return nil, err
-			}
-			environment = map[string]any{
-				"id":          "environment-" + uuid.NewString(),
-				"workspaceId": stringValue(workspace, "id"),
-				"name":        envName,
-				"values":      []any{},
-			}
-			st.environments = append(st.environments, environment)
-			created = true
+	}
+	created := false
+	if environment == nil {
+		workspace, err := st.workspace(args.Workspace)
+		if err != nil {
+			return nil, err
 		}
-		if boolValue(environment["protected"]) {
-			return nil, fmt.Errorf("environment %s is protected; change its variables in Kurlo", stringValue(environment, "name"))
+		environment = map[string]any{
+			"id":          "environment-" + uuid.NewString(),
+			"workspaceId": stringValue(workspace, "id"),
+			"name":        envName,
+			"values":      []any{},
 		}
-		ancestors := rawEnvironmentAncestors(st.environments, environment)
+		st.environments = append(st.environments, environment)
+		created = true
+	}
+	if boolValue(environment["protected"]) {
+		return nil, fmt.Errorf("environment %s is protected; change its variables in Kurlo", stringValue(environment, "name"))
+	}
+	ancestors := rawEnvironmentAncestors(st.environments, environment)
+	for _, ancestor := range ancestors {
+		if boolValue(ancestor["protected"]) {
+			return nil, fmt.Errorf("environment %s inherits from the protected environment %s; change its variables in Kurlo", stringValue(environment, "name"), stringValue(ancestor, "name"))
+		}
+	}
+	if _, own := rawEnvironmentRow(environment, key); !own {
 		for _, ancestor := range ancestors {
-			if boolValue(ancestor["protected"]) {
-				return nil, fmt.Errorf("environment %s inherits from the protected environment %s; change its variables in Kurlo", stringValue(environment, "name"), stringValue(ancestor, "name"))
-			}
-		}
-		if _, own := rawEnvironmentRow(environment, key); !own {
-			for _, ancestor := range ancestors {
-				if row, ok := rawEnvironmentRow(ancestor, key); ok {
-					if boolValue(row["secret"]) {
-						return nil, fmt.Errorf("%s in %s comes from %s and is a secret; change it in Kurlo", key, stringValue(environment, "name"), stringValue(ancestor, "name"))
-					}
-					break
+			if row, ok := rawEnvironmentRow(ancestor, key); ok {
+				if boolValue(row["secret"]) {
+					return nil, fmt.Errorf("%s in %s comes from %s and is a secret; change it in Kurlo", key, stringValue(environment, "name"), stringValue(ancestor, "name"))
 				}
+				break
 			}
 		}
-		rows, _ := environment["values"].([]any)
-		var target map[string]any
-		maxID := 0
-		for _, raw := range rows {
-			row, ok := raw.(map[string]any)
-			if !ok {
-				continue
-			}
-			if id, err := strconv.Atoi(rowIDValue(row)); err == nil && id > maxID {
-				maxID = id
-			}
-			if strings.TrimSpace(stringValue(row, "key")) == key {
-				target = row
-			}
+	}
+	rows, _ := environment["values"].([]any)
+	var target map[string]any
+	maxID := 0
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok {
+			continue
 		}
-		previous := ""
-		if target != nil {
-			if boolValue(target["secret"]) {
-				return nil, fmt.Errorf("%s in %s is a secret; change it in Kurlo", key, stringValue(environment, "name"))
-			}
-			previous = stringValue(target, "value")
-			target["value"] = args.Value
-			target["enabled"] = true
-		} else {
-			target = map[string]any{"id": maxID + 1, "enabled": true, "key": key, "value": args.Value, "description": ""}
-			rows = append(rows, target)
-			environment["values"] = rows
+		if id, err := strconv.Atoi(rowIDValue(row)); err == nil && id > maxID {
+			maxID = id
 		}
-		if args.Description != nil {
-			target["description"] = *args.Description
+		if strings.TrimSpace(stringValue(row, "key")) == key {
+			target = row
 		}
+	}
+	previous := ""
+	if target != nil {
+		if boolValue(target["secret"]) {
+			return nil, fmt.Errorf("%s in %s is a secret; change it in Kurlo", key, stringValue(environment, "name"))
+		}
+		previous = stringValue(target, "value")
+		target["value"] = args.Value
+		target["enabled"] = true
+	} else {
+		target = map[string]any{"id": maxID + 1, "enabled": true, "key": key, "value": args.Value, "description": ""}
+		rows = append(rows, target)
+		environment["values"] = rows
+	}
+	if args.Description != nil {
+		target["description"] = *args.Description
+	}
+	return func() any {
 		if scope := s.session[strings.ToLower(strings.TrimSpace(stringValue(environment, "name")))]; scope != nil {
 			delete(scope.set, key)
 			delete(scope.removed, key)
 		}
-		return func() any {
-			result := map[string]any{
-				"environment": stringValue(environment, "name"),
-				"key":         key,
-				"value":       args.Value,
-				"file":        path.Join(fileStoreWorkspacesDir, stringValue(st.workspaceByID(stringValue(environment, "workspaceId")), filesystemNameField), fileStoreEnvironmentsDir, stringValue(environment, filesystemNameField)+fileStoreYAMLExt),
-			}
-			if created {
-				result["createdEnvironment"] = true
-			}
-			if previous != "" {
-				result["previousValue"] = previous
-			}
-			return result
-		}, nil
-	})
+		result := map[string]any{
+			"environment": stringValue(environment, "name"),
+			"key":         key,
+			"value":       args.Value,
+			"file":        path.Join(fileStoreWorkspacesDir, stringValue(st.workspaceByID(stringValue(environment, "workspaceId")), filesystemNameField), fileStoreEnvironmentsDir, stringValue(environment, filesystemNameField)+fileStoreYAMLExt),
+		}
+		if created {
+			result["createdEnvironment"] = true
+		}
+		if previous != "" {
+			result["previousValue"] = previous
+		}
+		return result
+	}, nil
 }
 
 func mcpServerWriteTools() []map[string]any {
@@ -1096,13 +1166,14 @@ func mcpServerWriteTools() []map[string]any {
 		{
 			"name":  "save_request",
 			"title": "Create or change a saved request",
-			"description": "Create a saved HTTP or GraphQL request, or change one. Without request it creates a new one; with request (id or path) it changes that one, and only the fields you pass are changed. " +
+			"description": "Save a request of any supported type with a versioned workspace YAML document. For HTTP and GraphQL you can also pass the individual fields. Without request it creates a new one; with request (id or path) it changes that one, and only the fields you pass are changed. " +
 				"params, headers and form replace the whole list. Use {{variables}} for anything that differs per environment, such as {{baseUrl}}. " +
 				"Secrets are never written: auth tokens and passwords must be {{variable}} references. Test scripts are JavaScript with the Postman pm.* API, for example pm.test(\"status is 200\", () => pm.response.to.have.status(200)).",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
 					"request":       str("Id or path (Collection/Folder/Name) of the request to change. Omit to create one."),
+					"yaml":          str("A version: 1 workspace YAML document with a request mapping. Use workspace field names such as requestType, folderPath and bodyContent."),
 					"collection":    str("Collection to create the request in, or to move it to. Optional when there is only one."),
 					"folder":        str("Folder path inside the collection, slash-separated, for example Users/Admin. An empty string moves the request to the top."),
 					"name":          str("Request name. Defaults to the method and path."),
@@ -1137,6 +1208,37 @@ func mcpServerWriteTools() []map[string]any {
 				},
 			},
 			"annotations": write,
+		},
+		{
+			"name":        "patch_request",
+			"title":       "Patch a saved request",
+			"description": "Apply a JSON Merge Patch using workspace YAML request fields. Objects merge, arrays replace, and null removes a field.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"request": str("Request id or path."),
+					"patch":   map[string]any{"type": "object"},
+				},
+				"required": []string{"request", "patch"},
+			},
+			"annotations": write,
+		},
+		{
+			"name":        "apply_changes",
+			"title":       "Apply a batch of workspace edits",
+			"description": "Apply ordered workspace edits in one review. No edits are saved if an operation fails validation. Supports create_collection, save_request, patch_request, delete_request, save_example, set_variable, duplicate_request (request, optional patch), patch_collection (collection, patch for defaults, folderPaths, folderDefaults, name or description), patch_example (request, example, patch) delete_example (request, example), move_folder and duplicate_folder (collection, from, to, optional targetCollection), duplicate_collection (collection, optional name), create_environment (workspace, name, optional patch), patch_environment (environment, patch) delete_environment (environment), and edit_global (key with value, a new name, or delete: true). References may use names, paths or ids.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"operations": map[string]any{"type": "array", "minItems": 1, "maxItems": 50, "items": map[string]any{
+						"type":       "object",
+						"properties": map[string]any{"tool": str("Workspace operation name."), "arguments": map[string]any{"type": "object"}},
+						"required":   []string{"tool", "arguments"},
+					}},
+				},
+				"required": []string{"operations"},
+			},
+			"annotations": destructive,
 		},
 		{
 			"name":        "delete_request",

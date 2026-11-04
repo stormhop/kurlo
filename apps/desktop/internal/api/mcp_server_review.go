@@ -21,6 +21,8 @@ type mcpReviewKey struct{}
 
 type mcpCallRecord struct {
 	changes []model.AgentFileChange
+	commit  string
+	branch  string
 }
 
 type mcpCallRecordKey struct{}
@@ -136,22 +138,46 @@ func applyWorkspaceFiles(root string, before, after map[string][]byte) error {
 			return fmt.Errorf("%s changed while waiting for approval, so nothing was written; try again", change.Path)
 		}
 	}
-	for _, change := range changed {
-		target := filepath.Join(root, filepath.FromSlash(change.Path))
-		data, keep := after[change.Path]
-		if !keep {
-			if err := os.Remove(target); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return err
+	for i, change := range changed {
+		if err := writeMCPWorkspaceFile(root, change.Path, after); err != nil {
+			for _, applied := range changed[:i+1] {
+				err = errors.Join(err, writeMCPWorkspaceFile(root, applied.Path, before))
 			}
-			removeEmptyWorkspaceDirs(root, filepath.Dir(target))
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return err
 		}
-		if err := writeTextFileAtomic(target, data); err != nil {
-			return err
+	}
+	for _, change := range changed {
+		if _, keep := after[change.Path]; !keep {
+			removeEmptyWorkspaceDirs(root, filepath.Dir(filepath.Join(root, filepath.FromSlash(change.Path))))
 		}
+	}
+	return nil
+}
+
+func writeMCPWorkspaceFile(root, rel string, files map[string][]byte) error {
+	parts := strings.Split(rel, "/")
+	for _, part := range parts {
+		if part == "." || part == ".." || part == "" {
+			return fmt.Errorf("invalid workspace file path: %s", rel)
+		}
+	}
+	target := filepath.Join(root, filepath.FromSlash(rel))
+	data, keep := files[rel]
+	if _, err := ensureManagedWorkspaceDir(root, parts[:len(parts)-1]...); err != nil {
+		return err
+	}
+	info, err := os.Lstat(target)
+	if err == nil && !info.Mode().IsRegular() {
+		return fmt.Errorf("refusing to replace a non-regular workspace file: %s", rel)
+	}
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if keep {
+		return writeTextFileAtomic(target, data)
+	}
+	if err == nil {
+		return os.Remove(target)
 	}
 	return nil
 }
@@ -181,7 +207,7 @@ func (s *mcpServer) mutate(ctx context.Context, change func(st *mcpStore) (func(
 			unlock()
 		}
 	}()
-	st, err := loadMCPStore(root)
+	st, err := s.loadStore()
 	if err != nil {
 		return nil, err
 	}
@@ -194,13 +220,14 @@ func (s *mcpServer) mutate(ctx context.Context, change func(st *mcpStore) (func(
 		return nil, err
 	}
 	var after map[string][]byte
-	if review := mcpReviewFrom(ctx); review != nil {
+	profileChanges := st.globals.change()
+	if review := mcpReviewFrom(ctx); review != nil || st.batch {
 		staged, err := stageMCPStore(st, before)
 		if err != nil {
 			return nil, err
 		}
-		changes := diffWorkspaceFiles(before, staged)
-		if len(changes) > 0 {
+		changes := append(diffWorkspaceFiles(before, staged), profileChanges...)
+		if review != nil && len(changes) > 0 {
 			unlock()
 			unlock = nil
 			if err := review(changes); err != nil {
@@ -209,8 +236,26 @@ func (s *mcpServer) mutate(ctx context.Context, change func(st *mcpStore) (func(
 			if unlock, err = lockWorkspaceWrites(root); err != nil {
 				return nil, err
 			}
-			if err := applyWorkspaceFiles(root, before, staged); err != nil {
+		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		var beforeProfile, profile string
+		if len(profileChanges) > 0 {
+			beforeProfile, profile, err = st.globals.updatedProfile(root)
+			if err != nil {
 				return nil, err
+			}
+		}
+		if err := applyWorkspaceFiles(root, before, staged); err != nil {
+			return nil, err
+		}
+		if profile != "" {
+			if err := saveRequestStorePayload(requestStorePath(), profile); err != nil {
+				if currentProfileGlobalsRevision() == profileGlobalsRevision(profile) {
+					err = errors.Join(err, saveRequestStorePayload(requestStorePath(), beforeProfile))
+				}
+				return nil, errors.Join(err, applyWorkspaceFiles(root, staged, before))
 			}
 		}
 		after = staged

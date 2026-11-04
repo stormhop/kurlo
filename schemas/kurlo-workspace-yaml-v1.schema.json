@@ -61,7 +61,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["inherit", "none", "bearer", "basic", "apikey", "oauth1", "oauth2", "aws", "digest"]
+          "enum": ["inherit", "none", "bearer", "basic", "apikey", "oauth1", "oauth2", "aws", "digest", "ntlm"]
         },
         "bearerToken": { "type": "string" },
         "basicUser": { "type": "string" },
@@ -280,7 +280,7 @@
         "mcpName": { "type": "string" },
         "mcpArguments": { "type": "string" },
         "mcpProtocolVersion": { "type": "string" },
-        "aiProvider": { "type": "string", "enum": ["openai", "anthropic"] },
+        "aiProvider": { "type": "string" },
         "aiModel": { "type": "string" },
         "aiSystem": { "type": "string", "maxLength": 50000 },
         "aiPrompt": { "type": "string", "maxLength": 200000 },

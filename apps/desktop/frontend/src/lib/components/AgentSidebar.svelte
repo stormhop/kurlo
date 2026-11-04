@@ -12,6 +12,8 @@
   import { agentChatGroups, agentFilterChats } from '../agent';
   import { exportAgentChat, type AgentChatSummary } from '../backend';
   import { vm } from '../stores/app.svelte';
+  import AgentActivityList from './AgentActivityList.svelte';
+  import { agentActivityStore } from '../stores/agentActivity.svelte';
 
   let { workspaceBlocked = false }: { workspaceBlocked?: boolean } = $props();
 
@@ -42,6 +44,14 @@
     return agentModeFor(chat.driver) === agentNavigation.mode && chat.id === agentStore.activeChatId;
   }
 
+  $effect(() => {
+    const workspaceId = vm.activeWorkspaceId;
+    if (agentNavigation.activity && workspaceId !== agentActivityStore.workspaceId) {
+      agentActivityStore.deselect();
+      void agentActivityStore.refresh(workspaceId);
+    }
+  });
+
   onMount(() => {
     kurloAgentStore.init();
     codexAgentStore.init();
@@ -57,8 +67,19 @@
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
+  function showList(view: 'chats' | 'archived' | 'activity') {
+    menuChatId = '';
+    archived = view === 'archived';
+    agentNavigation.activity = view === 'activity';
+    if (view === 'activity') {
+      vm.openAgentTab();
+      void agentActivityStore.refresh(vm.activeWorkspaceId);
+    }
+  }
+
   function openChat(chat: AgentChatSummary) {
     menuChatId = '';
+    agentNavigation.activity = false;
     vm.openAgentTab();
     agentNavigation.mode = agentModeFor(chat.driver);
     void storeOf(chat).openChat(chat.id);
@@ -66,6 +87,7 @@
 
   function newChat() {
     archived = false;
+    agentNavigation.activity = false;
     vm.openAgentTab();
     agentStore.newChat();
     setTimeout(() => document.querySelector<HTMLTextAreaElement>('.agent-composer textarea')?.focus(), 0);
@@ -185,8 +207,9 @@
 <div class="history-panel agent-sidebar">
   <div class="agent-sidebar-head">
     <div class="agent-chat-lists" bind:this={chatLists} role="group" aria-label="Chat lists">
-      <button class="btn btn-xs {archived ? 'btn-ghost' : 'btn-secondary'}" type="button" aria-pressed={!archived} onclick={() => { archived = false; menuChatId = ''; }}>Chats</button>
-      <button class="btn btn-xs {archived ? 'btn-secondary' : 'btn-ghost'}" type="button" aria-pressed={archived} onclick={() => { archived = true; menuChatId = ''; }}>Archived</button>
+      <button class="btn btn-xs {!archived && !agentNavigation.activity ? 'btn-secondary' : 'btn-ghost'}" type="button" aria-pressed={!archived && !agentNavigation.activity} onclick={() => showList('chats')}>Chats</button>
+      <button class="btn btn-xs {archived && !agentNavigation.activity ? 'btn-secondary' : 'btn-ghost'}" type="button" aria-pressed={archived && !agentNavigation.activity} onclick={() => showList('archived')}>Archived</button>
+      <button class="btn btn-xs {agentNavigation.activity ? 'btn-secondary' : 'btn-ghost'}" type="button" aria-pressed={agentNavigation.activity} onclick={() => showList('activity')}>Activity</button>
     </div>
     <button class="btn btn-secondary btn-xs agent-new-chat" type="button" onclick={newChat} disabled={workspaceBlocked || !agentReady} aria-label="New chat">
       <AddCloseIcon add />
@@ -196,6 +219,9 @@
 
   {#if actionError}<div class="agent-delete-error" role="alert">{actionError}</div>{/if}
 
+  {#if agentNavigation.activity}
+    <AgentActivityList />
+  {:else}
   {#if visibleChats.length > 0}
     <div class="field field-md field-wrap sidebar-search">
       <svg width="0.75rem" height="0.75rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
@@ -283,6 +309,7 @@
       <span class="empty-state-title">{archived ? 'No archived chats.' : 'No chats yet.'}</span>
       {#if !archived}<small class="empty-state-text">Ask the agent to run requests, explain failures or add tests. Chats stay on this computer.</small>{/if}
     </div>
+  {/if}
   {/if}
 </div>
 

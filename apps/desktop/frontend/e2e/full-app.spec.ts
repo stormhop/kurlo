@@ -1603,6 +1603,28 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expectIconSize('Close cookie jar');
   });
 
+  test('sets NTLM auth on an HTTP request', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Corporate API');
+    await collectionRow(page, 'Corporate API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Corporate API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.example.test/orders');
+    await chooseRequestSection(page, 'Authorization');
+    await page.getByLabel('Auth Type').click();
+    await page.getByRole('button', { name: 'NTLM', exact: true }).click();
+    await page.getByLabel('Username').fill('EXAMPLE\\api-user');
+    await page.getByLabel('Password').fill('{{ntlmPassword}}');
+    await captureDocsScreenshot(page, 'auth-ntlm');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1))).toMatchObject({
+      auth: { type: 'ntlm', username: 'EXAMPLE\\api-user', password: '{{ntlmPassword}}' },
+    });
+  });
+
   test('full click-through flow: environment, collection, requests, send, history, runner, report', async ({ page }) => {
     if (docsScreenshotDir) {
       await mkdir(docsScreenshotDir, { recursive: true });
@@ -6786,8 +6808,10 @@ test.describe('Agent', () => {
         const turnId = input.turnId;
         const listCall = { type: 'tool_use', id: 'call_1', name: 'get_request', input: '{"request":"Shop API/Orders/List orders"}' };
         const listResult = { type: 'tool_result', id: 'call_1', name: 'get_request', server: 'Kurlo', text: '{"id":"req-orders","method":"GET"}' };
-        const saveCall = { type: 'tool_use', id: 'call_2', name: 'save_request', input: '{"collection":"Shop API","name":"List orders","testScript":"pm.test(\\"status is 200\\")"}' };
-        const saveResult = { type: 'tool_result', id: 'call_2', name: 'save_request', server: 'Kurlo', text: '{"id":"req-orders","path":"Shop API/Orders/List orders","created":false}' };
+        const batch = input.text === 'Review batch changes';
+        const writeTool = batch ? 'apply_changes' : 'save_request';
+        const saveCall = { type: 'tool_use', id: 'call_2', name: writeTool, input: '{"collection":"Shop API","name":"List orders","testScript":"pm.test(\\"status is 200\\")"}' };
+        const saveResult = { type: 'tool_result', id: 'call_2', name: writeTool, server: 'Kurlo', text: '{"id":"req-orders","path":"Shop API/Orders/List orders","created":false}' };
         const finalText = 'Added a **status is 200** test to List orders.';
         e2e.emit('ai:deltas', { sessionId, turnId, deltas: [
           { sessionId, step: 0, index: 0, type: 'text', text: 'Let me look at the request first.' },
@@ -6798,9 +6822,11 @@ test.describe('Agent', () => {
         e2e.emit('ai:step', { sessionId, turnId, step: { index: 1, blocks: [saveCall], toolResults: [], stopReason: 'tool_use', model: 'claude-sonnet-4-5', usage: usage(1100, 60), hasUsage: true, http: { statusCode: 200, status: '200 OK', headers: [] } } });
         const before = 'version: 1\nrequest:\n    id: req-orders\n    name: List orders\n    url: \'{{baseUrl}}/orders\'\n';
         const after = before + '    testScriptJs: |\n        pm.test("status is 200", () => pm.response.to.have.status(200))\n';
+        const changes = [{ path: 'workspaces/Main/collections/Shop-API/requests/List-orders.yml', before, after }];
+        if (batch) changes.push({ path: 'Profile globals', before: '[]', after: '[\n  { "key": "baseUrl", "value": "https://example.test" }\n]' });
         await new Promise<void>(resolve => {
           release = resolve;
-          e2e.emit('agent:approval', { id: 'approval-1', chatId: sessionId, turnId, toolUseId: 'call_2', tool: 'save_request', kind: 'write', arguments: saveCall.input, reason: 'Changes the workspace files.', changes: [{ path: 'workspaces/Main/collections/Shop-API/requests/List-orders.yml', before, after }] });
+          e2e.emit('agent:approval', { id: 'approval-1', chatId: sessionId, turnId, toolUseId: 'call_2', tool: writeTool, kind: 'write', arguments: saveCall.input, reason: batch ? 'Review all changes in this batch.' : 'Changes the workspace files.', changes });
         });
         e2e.emit('ai:tool', { sessionId, turnId, step: 1, block: saveResult });
         e2e.emit('ai:step', { sessionId, turnId, step: { index: 2, blocks: [{ type: 'text', text: finalText }], toolResults: [], stopReason: 'end_turn', model: 'claude-sonnet-4-5', usage: usage(1300, 30), hasUsage: true, http: { statusCode: 200, status: '200 OK', headers: [] } } });
@@ -7104,6 +7130,142 @@ test.describe('Agent', () => {
       }
     });
   }
+
+  test('reviews an Agent Mode batch with one Apply button', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await composer.fill('Review batch changes');
+    await composer.press('Enter');
+    const approval = page.getByRole('group', { name: 'Apply these changes?' });
+    await expect(approval).toContainText('List-orders.yml');
+    await expect(approval).toContainText('Profile globals');
+    await expect(approval.getByRole('button', { name: 'Allow for this chat' })).toHaveCount(0);
+    await captureDocsScreenshot(page, 'agent-apply-changes');
+    await approval.getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(approval).toHaveCount(0);
+  });
+
+  test('shows agent activity, restores a file and commits on an agent branch', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      e2e.gitStatusOverride = { isRepo: true, workspaceRoot: '/e2e', root: '/e2e', branch: 'main', head: '1a2b3c4', clean: true, files: [], remotes: ['origin'], pushRemote: 'origin' };
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const now = Date.now();
+      const path = 'workspaces/Main/collections/Shop-API/requests/List-orders.yml';
+      const before = "version: 1\nrequest:\n    id: req-orders\n    name: List orders\n    url: '{{baseUrl}}/orders'\n";
+      const after = before + '    testScriptJs: |\n        pm.test("status is 200", () => pm.response.to.have.status(200))\n';
+      const summaries = [
+        { id: '0001-save', time: now - 5 * 60_000, client: 'Kurlo agent', chatId: 'chat-1', tool: 'save_request', status: 'ok', files: [path], reverted: false, workspace: '/e2e', commit: '4e1c9b2', branch: 'kurlo-agent/add-a-status-test-chat1' },
+        { id: '0002-run', time: now - 8 * 60_000, client: 'Kurlo agent', chatId: 'chat-1', tool: 'run_request', status: 'ok', files: [], reverted: false, workspace: '' },
+        { id: '0003-list', time: now - 40 * 60_000, client: 'Claude Code', tool: 'list_requests', status: 'ok', files: [], reverted: false, workspace: '' },
+        { id: '0004-push', time: now - 2 * 60 * 60_000, client: 'Kurlo agent', chatId: 'chat-1', tool: 'git_push', status: 'declined', error: 'The user declined this call, so it did not run.', files: [], reverted: false, workspace: '' },
+      ];
+      const details: Record<string, Record<string, unknown>> = {
+        '0001-save': { ...summaries[0], arguments: '{"collection":"Shop API","name":"List orders","testScript":"pm.test(\\"status is 200\\")"}', result: '{"id":"req-orders","path":"Shop API/Orders/List orders","created":false}\nCommitted as 4e1c9b2 on branch kurlo-agent/add-a-status-test-chat1.', changes: [{ path, before, after }] },
+      };
+      const reverts: unknown[] = [];
+      const enabled: boolean[] = [];
+      e2e.activityReverts = reverts;
+      e2e.activityEnabled = enabled;
+      e2e.pullRequestCalls = 0;
+      const elsewhere = { id: '0005-other', time: now - 20 * 60_000, client: 'Kurlo agent', chatId: 'chat-9', tool: 'save_request', status: 'ok', files: ['workspaces/Billing-team/collections/Billing/requests/List-invoices.yml'], reverted: false, workspace: '/e2e', workspaceId: 'workspace-billing', workspaceName: 'Billing team' };
+      const filters: unknown[] = [];
+      e2e.activityFilters = filters;
+      app.AgentActivity = async (filter: { workspaceId: string; allWorkspaces: boolean }) => {
+        filters.push(structuredClone(filter));
+        const mine = summaries.map(entry => ({ ...entry, here: true, workspaceId: filter.workspaceId }));
+        const entries = filter.allWorkspaces ? [...mine, elsewhere].sort((a, b) => b.time - a.time) : mine;
+        return { entries: structuredClone(entries), enabled: enabled.at(-1) ?? true };
+      };
+      details['0005-other'] = { ...elsewhere, arguments: '{}', result: '', changes: [] };
+      app.AgentActivityEntry = async (id: string) => structuredClone(details[id] ?? { ...summaries.find(entry => entry.id === id), arguments: '{}', result: '', changes: [] });
+      app.RevertAgentActivity = async (id: string, file: string) => {
+        reverts.push([id, file]);
+        const entry = details[id];
+        (entry.changes as Array<Record<string, unknown>>).forEach(change => { change.reverted = true; });
+        entry.reverted = true;
+        summaries.find(item => item.id === id)!.reverted = true;
+        return structuredClone(entry);
+      };
+      app.SetAgentActivityEnabled = async (value: boolean) => { enabled.push(value); return { ok: true }; };
+      app.GitPullRequestURL = async () => {
+        e2e.pullRequestCalls = (e2e.pullRequestCalls as number) + 1;
+        return { url: '', branch: 'main', base: 'main', error: 'The current branch is main, the branch to merge into. Create a branch for the changes first.' };
+      };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+
+    const branch = page.getByRole('button', { name: 'Agent branch' });
+    await expect(branch).toHaveAttribute('aria-pressed', 'false');
+    await branch.click();
+    await expect(branch).toHaveAttribute('aria-pressed', 'true');
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await composer.fill('Add a status test');
+    await composer.press('Enter');
+    await page.getByRole('group', { name: 'Change 1 file?' }).getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(page.getByText('status is 200').first()).toBeVisible();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { agentSent: Array<{ ownBranch?: boolean }> }).agentSent[0].ownBranch)).toBe(true);
+
+    if (!(await page.getByRole('complementary', { name: 'Chat details' }).isVisible())) await page.getByRole('button', { name: 'Toggle chat details' }).click();
+    const git = page.getByRole('region', { name: 'Git' });
+    await expect(git).toContainText('Current branch');
+    await expect(git).toContainText('Each change you approve is committed to the agent branch.');
+    await captureDocsScreenshot(page, 'agent-git');
+    await git.getByRole('button', { name: 'Open pull request' }).click();
+    await expect(git.getByRole('alert')).toContainText('Create a branch for the changes first.');
+
+    await page.getByRole('button', { name: 'Activity', exact: true }).click();
+    const list = page.getByRole('list', { name: 'Agent activity' });
+    await expect(list.getByRole('listitem')).toHaveCount(4);
+    await expect(page.getByRole('heading', { name: 'See what agents did' })).toBeVisible();
+    await page.getByRole('button', { name: /^Client:/ }).click();
+    await page.getByRole('option', { name: 'Claude Code' }).click();
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await page.getByRole('button', { name: /^Client:/ }).click();
+    await page.getByRole('option', { name: 'All clients' }).click();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { activityFilters: Array<{ workspaceId: string; allWorkspaces: boolean }> }).activityFilters.at(-1))).toMatchObject({ workspaceId: 'workspace-e2e', allWorkspaces: false });
+    await page.getByRole('button', { name: /^Workspaces:/ }).click();
+    await page.getByRole('option', { name: 'All workspaces' }).click();
+    await expect(list.getByRole('listitem')).toHaveCount(5);
+    await expect(list).toContainText('Billing team · Kurlo agent · 1 file');
+    await list.getByRole('button', { name: /Billing team/ }).click();
+    await expect(page.getByText('The chat is in the workspace Billing team.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open chat' })).toHaveCount(0);
+    await page.getByRole('button', { name: /^Workspaces:/ }).click();
+    await page.getByRole('option', { name: 'This workspace' }).click();
+    await expect(list.getByRole('listitem')).toHaveCount(4);
+    await page.getByLabel('Filter activity').fill('push');
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await list.getByRole('button', { name: /git_push/ }).click();
+    await expect(page.getByText('The user declined this call, so it did not run.')).toBeVisible();
+    await page.getByLabel('Filter activity').fill('');
+
+    await list.getByRole('button', { name: /save_request/ }).click();
+    await expect(page.getByText('kurlo-agent/add-a-status-test-chat1', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table', { name: /Changes in .*List-orders\.yml/ })).toContainText('status is 200');
+    await expect(page.locator('[title]:not(iframe)')).toHaveCount(0);
+    await captureDocsScreenshot(page, 'agent-activity');
+    await page.getByRole('button', { name: /^Restore workspaces/ }).click();
+    await expect(page.locator('.agent-activity-badge')).toHaveText('Restored');
+    await expect(page.getByRole('button', { name: /^Restore workspaces/ })).toHaveCount(0);
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { activityReverts: unknown[] }).activityReverts)).toEqual([['0001-save', 'workspaces/Main/collections/Shop-API/requests/List-orders.yml']]);
+
+    await page.locator('.agent-activity-record input[type="checkbox"]').uncheck({ force: true });
+    await expect(page.getByText('Recording is off.')).toBeVisible();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { activityEnabled: boolean[] }).activityEnabled)).toEqual([false]);
+
+    await page.getByRole('button', { name: 'Open chat' }).click();
+    await expect(page.getByRole('textbox', { name: 'Message the agent' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chats', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
 
   test('runs tools, asks before writing with a diff and keeps the chat in the sidebar', async ({ page }, testInfo) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);

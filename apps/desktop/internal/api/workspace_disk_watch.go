@@ -328,11 +328,19 @@ func (t *workspaceDiskTracker) markAnnounced(root string) {
 func (a *App) watchWorkspaceDisk(ctx context.Context) {
 	ticker := time.NewTicker(workspaceDiskPollInterval)
 	defer ticker.Stop()
+	var announcedGlobals string
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			if seen := a.globalsRevision.Load(); seen != nil {
+				revision := currentProfileGlobalsRevision()
+				if revision != "" && revision != *seen && revision != announcedGlobals {
+					announcedGlobals = revision
+					a.emitWorkspaceChanged(workspaceAgentChangeNote)
+				}
+			}
 			if changed, reason := a.workspaceChangedOutside(); changed {
 				a.emitWorkspaceChanged(reason)
 			}
