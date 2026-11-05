@@ -76,6 +76,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **No crash right after the first request is sent.** The response panel could restart its waiting timer in a loop when a request started, which sometimes ended in the fatal error screen.
+
 - **Resizable chat name field.** The field grows to fit the name up to a limit, then scrolls horizontally while you edit.
 
 - **Scrollbar tracks blend into their panels.** Desktop scrollbars use transparent tracks and inset, rounded handles across the app.

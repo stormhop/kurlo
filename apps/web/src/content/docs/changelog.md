@@ -72,6 +72,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Sending a request.** Fixed a rare crash to the error screen right after the first request was sent.
+
 - **Agent chat names.** The rename field grows with the name and scrolls horizontally once it reaches its width limit.
 
 - **Desktop scrollbars.** Transparent tracks and inset handles keep scrollbars from ending in a visible strip at panel edges.

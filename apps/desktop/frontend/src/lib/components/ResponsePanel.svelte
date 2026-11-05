@@ -119,8 +119,9 @@
 
   $effect(() => {
     if (!loading || response) return;
-    waitingSince = performance.now();
-    waitingNow = waitingSince;
+    const startedAt = performance.now();
+    waitingSince = startedAt;
+    waitingNow = startedAt;
     const timer = setInterval(() => { waitingNow = performance.now(); }, 100);
     return () => clearInterval(timer);
   });
