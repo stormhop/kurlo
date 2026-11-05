@@ -622,7 +622,7 @@
             <div class="agent-turn">
               {#if turn.attachments.length}
                 <ul class="agent-message-files" aria-label="Attachments">
-                  {#each turn.attachments as file}
+                  {#each turn.attachments as file, index (file.id || `${index}:${file.name}`)}
                     <li class="agent-message-file">
                       {#if file.preview || (file.id && file.mediaType)}
                         <button class="btn btn-secondary agent-file-button" class:agent-image-file={file.preview} type="button" aria-label={`Open ${file.name}`} onclick={() => (openAttachment = file)}>
