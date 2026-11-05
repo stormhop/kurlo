@@ -1513,11 +1513,7 @@ func (s *mcpServer) toolRunCollection(ctx context.Context, arguments json.RawMes
 		}
 		iterations = len(rows)
 	} else if args.DataFile != "" {
-		file, err := mcpWorkspaceFile(s.opts.workspace, args.DataFile)
-		if err != nil {
-			return nil, err
-		}
-		rows, err = loadDataFile(file)
+		rows, err = readMCPRunData(s.opts.workspace, args.DataFile)
 		if err != nil {
 			return nil, err
 		}

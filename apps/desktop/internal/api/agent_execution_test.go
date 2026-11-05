@@ -112,6 +112,24 @@ func TestAgentExecutionRunnerAndDiagnostics(t *testing.T) {
 	}
 }
 
+func TestMCPRunDataRejectsSymlinkDirectories(t *testing.T) {
+	requireSymlinks(t)
+	root := t.TempDir()
+	dataDir := filepath.Join(root, "data")
+	if err := os.Mkdir(dataDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "rows.csv"), []byte("name\nfirst\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("data", filepath.Join(root, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readMCPRunData(root, "linked/rows.csv"); err == nil || !strings.Contains(err.Error(), "symbolic links") {
+		t.Fatalf("reading data through a symlink: %v", err)
+	}
+}
+
 func TestAgentExecutionLiveSessions(t *testing.T) {
 	useTempConfigDir(t, t.TempDir())
 	wsClosed := make(chan struct{})

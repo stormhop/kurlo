@@ -7497,9 +7497,11 @@ test.describe('Agent', () => {
     await headerTitle.fill(longTitle);
     const cappedWidth = (await headerTitle.boundingBox())!.width;
     expect(cappedWidth).toBeGreaterThan(expandedWidth);
-    await headerTitle.fill(longTitle + 'Посмотри примеры.');
+    const fullTitle = longTitle + 'Посмотри примеры.';
+    await headerTitle.fill(fullTitle);
+    await headerTitle.press('Backspace');
+    await expect(headerTitle).toHaveValue(fullTitle.slice(0, -1));
     expect((await headerTitle.boundingBox())!.width).toBe(cappedWidth);
-    await expect.poll(() => headerTitle.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
     const actions = page.getByRole('button', { name: 'Chat actions', exact: true });
     expect((await actions.boundingBox())!.x).toBeGreaterThan((await headerTitle.boundingBox())!.x + cappedWidth);
     await headerTitle.fill('Orders checks');

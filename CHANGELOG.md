@@ -76,6 +76,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Workspace data files in Agent Mode.** Collection runs read CSV and JSON files within the workspace folder and reject symbolic links in the path.
+
 - **No crash right after the first request is sent.** The response panel could restart its waiting timer in a loop when a request started, which sometimes ended in the fatal error screen.
 
 - **Resizable chat name field.** The field grows to fit the name up to a limit, then scrolls horizontally while you edit.

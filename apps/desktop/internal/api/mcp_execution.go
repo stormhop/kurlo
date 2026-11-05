@@ -225,19 +225,21 @@ func executionToolDefinitions(readOnly, live bool) []map[string]any {
 	return definitions
 }
 
-func mcpWorkspaceFile(root, path string) (string, error) {
-	path, err := safeRepoRelativeFilePath(root, path)
+func readMCPRunData(directory, path string) ([]map[string]string, error) {
+	name, err := cleanGitRelativePath(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	info, err := os.Stat(path)
+	root, err := os.OpenRoot(directory)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Size() > 16<<20 {
-		return "", fmt.Errorf("data file must be a regular file of at most 16 MiB")
+	defer root.Close()
+	data, err := readKnowledgeRoot(root, name, 16<<20)
+	if err != nil {
+		return nil, fmt.Errorf("data file: %w", err)
 	}
-	return path, nil
+	return parseCLIData(string(data), name)
 }
 
 func (ws mcpWorkspace) withDefaults(req cliSavedRequest) cliSavedRequest {

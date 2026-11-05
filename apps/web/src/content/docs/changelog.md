@@ -72,6 +72,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Workspace data files in Agent Mode.** Collection runs read CSV and JSON files within the workspace folder and reject symbolic links in the path.
+
 - **Sending a request.** Fixed a rare crash to the error screen right after the first request was sent.
 
 - **Agent chat names.** The rename field grows with the name and scrolls horizontally once it reaches its width limit.

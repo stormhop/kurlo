@@ -71,7 +71,7 @@ func flattenedCLIEnvironmentRows(chain []cliEnvironment) []cliKV {
 			inherited[key] = row
 		}
 	}
-	rows := make([]cliKV, 0, len(order)+len(chain[0].Values))
+	rows := make([]cliKV, 0, len(order))
 	for _, key := range order {
 		rows = append(rows, inherited[key])
 	}
