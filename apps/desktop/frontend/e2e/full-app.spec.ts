@@ -7413,7 +7413,22 @@ test.describe('Agent', () => {
     await expect(chatRow).toContainText('Orders tests');
     const headerTitle = page.getByRole('textbox', { name: 'Chat name' });
     await expect(headerTitle).toHaveValue('Orders tests');
+    const compactWidth = (await headerTitle.boundingBox())!.width;
+    await headerTitle.fill('Что видишь в коллекции и как устроены запросы?');
+    const expandedWidth = (await headerTitle.boundingBox())!.width;
+    expect(expandedWidth).toBeGreaterThan(compactWidth);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-rename-${testInfo.project.name}.png`), animations: 'disabled' });
+    const longTitle = 'Что видишь в коллекции и как устроены запросы? '.repeat(2);
+    await headerTitle.fill(longTitle);
+    const cappedWidth = (await headerTitle.boundingBox())!.width;
+    expect(cappedWidth).toBeGreaterThan(expandedWidth);
+    await headerTitle.fill(longTitle + 'Посмотри примеры.');
+    expect((await headerTitle.boundingBox())!.width).toBe(cappedWidth);
+    await expect.poll(() => headerTitle.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
+    const actions = page.getByRole('button', { name: 'Chat actions', exact: true });
+    expect((await actions.boundingBox())!.x).toBeGreaterThan((await headerTitle.boundingBox())!.x + cappedWidth);
     await headerTitle.fill('Orders checks');
+    expect((await headerTitle.boundingBox())!.width).toBeLessThan(expandedWidth);
     await headerTitle.press('Enter');
     await expect(chatRow).toContainText('Orders checks');
     const renamed = await page.evaluate(() => (window.__kurloE2E as unknown as { agentRenames: unknown[] }).agentRenames);
@@ -7860,8 +7875,20 @@ async function visibleHistoryAnchor(page: Page) {
 }
 
 test('pages and virtualizes a long Codex chat while preserving the reading position', async ({ page }, testInfo) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
   await installLongAgentHistory(page);
   const chat = page.locator('.agent-main > .agent-chat');
+  await expect.poll(() => chat.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0);
+  if (testInfo.project.name === 'chromium') {
+    const scrollbar = await chat.evaluate(element => ({
+      nativeWidth: getComputedStyle(element).scrollbarWidth,
+      track: getComputedStyle(element, '::-webkit-scrollbar-track').backgroundColor,
+      thumb: getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor,
+    }));
+    expect(scrollbar.nativeWidth).toBe('auto');
+    expect(scrollbar.track).toBe('rgba(0, 0, 0, 0)');
+    expect(scrollbar.thumb).not.toBe(scrollbar.track);
+  }
   const rows = page.locator('.virtual-agent-row');
   expect(await rows.count()).toBeLessThan(20);
   for (let index = 0; index < 4; index++) {
@@ -8201,7 +8228,7 @@ for (const driver of ['', 'codex']) {
   });
 }
 
-test('retries a failed approval response without leaving disabled approval buttons', async ({ page }, testInfo) => {
+test('requires a fresh cookie jar approval and retries a failed response', async ({ page }, testInfo) => {
   await installKurloBridge(page);
   await page.addInitScript(() => {
     const app = window.go!.api!.App as Record<string, unknown>;
@@ -8223,23 +8250,25 @@ test('retries a failed approval response without leaving disabled approval butto
     app.SendAgentMessage = async (input: Record<string, string>) => {
       await new Promise<void>(resolve => {
         release = resolve;
-        e2e.emit('agent:approval', { id: 'waiting', chatId: 'waiting-chat', turnId: input.turnId, tool: 'save_request', kind: 'write', arguments: '{}', reason: 'Changes files.', changes: [] });
+        e2e.emit('agent:approval', { id: 'waiting', chatId: 'waiting-chat', turnId: input.turnId, tool: 'clear_cookie_jar', kind: 'write', arguments: '{}', reason: 'Clears all cookies in the selected workspace jar. This can sign you out.', changes: [] });
       });
       return { text: 'Done', messages: [], steps: [], warnings: [] };
     };
   });
   await page.goto('/');
   await page.getByRole('button', { name: 'Agent', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Message the agent' }).fill('Write a request');
+  await page.getByRole('textbox', { name: 'Message the agent' }).fill('Clear the cookie jar');
   await page.getByRole('textbox', { name: 'Message the agent' }).press('Enter');
   const approval = page.locator('.agent-approval');
   await expect(approval).toBeVisible();
-  await approval.getByRole('button', { name: 'Apply', exact: true }).click();
+  await expect(approval.getByText('Clear the cookie jar?', { exact: true })).toBeVisible();
+  await expect(approval.getByRole('button', { name: 'Allow for this chat' })).toHaveCount(0);
+  await approval.getByRole('button', { name: 'Clear cookies', exact: true }).click();
   await expect(approval.getByRole('alert')).toHaveText('Decision could not be delivered. Try again.');
-  await expect(approval.getByRole('button', { name: 'Apply', exact: true })).toBeEnabled();
+  await expect(approval.getByRole('button', { name: 'Clear cookies', exact: true })).toBeEnabled();
   await expect(approval).toContainText('30 minutes');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-approval-retry-${testInfo.project.name}.png`), animations: 'disabled' });
-  await approval.getByRole('button', { name: 'Apply', exact: true }).click();
+  await page.screenshot({ path: join(tmpdir(), `kurlo-cookie-approval-${testInfo.project.name}.png`), animations: 'disabled' });
+  await approval.getByRole('button', { name: 'Clear cookies', exact: true }).click();
   await expect(approval).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeVisible();
   await page.evaluate(() => (window.__kurloE2E as unknown as { closeAcceptedApproval: () => void }).closeAcceptedApproval());
@@ -8524,4 +8553,129 @@ test('restores the selected agent when reopening a workspace', async ({ page }) 
 
   await openWorkspace();
   await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+});
+
+test('connects project context and drops files onto an agent message', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    let savedChat: Record<string, unknown> | undefined;
+    const originals: Record<string, string> = { 'spec': 'openapi: 3.1.0' };
+    app.AgentChats = async () => savedChat ? [savedChat] : [];
+    app.AgentChatPage = async () => savedChat;
+    app.AgentAttachmentData = async (chatId: string, workspaceId: string, id: string) => {
+      if (chatId !== 'source-chat' || workspaceId !== 'workspace-e2e' || !(id in originals)) throw new Error('Attachment missing');
+      return originals[id];
+    };
+    app.CodexStatus = async () => ({ connected: false, installed: false, authenticated: false, models: [] });
+    app.OpenDirectoryDialog = async () => '/source/pet-store';
+    app.OpenFileDialog = async () => '/data/openapi.yaml';
+    window.runtime!.OnFileDrop = (callback, useDropTarget) => {
+      e2e.dropAgentFiles = callback;
+      e2e.agentDropTargetEnabled = useDropTarget;
+    };
+    window.runtime!.OnFileDropOff = () => { delete e2e.dropAgentFiles; };
+    app.SendAgentMessage = async (input: Record<string, unknown>) => {
+      e2e.knowledgeInput = input;
+      const canvas = document.createElement('canvas');
+      canvas.width = 720;
+      canvas.height = 420;
+      const image = canvas.getContext('2d')!;
+      image.scale(3, 3);
+      image.fillStyle = '#20242b';
+      image.fillRect(0, 0, 240, 140);
+      image.font = '18px monospace';
+      image.fillStyle = '#78dfac';
+      image.fillText('200 OK', 16, 34);
+      image.fillStyle = '#f1f4f8';
+      image.fillText('{ "pet": "Mochi" }', 16, 68);
+      const thumbnail = document.createElement('canvas');
+      thumbnail.width = 240;
+      thumbnail.height = 140;
+      thumbnail.getContext('2d')!.drawImage(canvas, 0, 0, thumbnail.width, thumbnail.height);
+      originals.screenshot = canvas.toDataURL('image/png');
+      originals.icon = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect x="8" y="8" width="80" height="80" rx="16" fill="#35404e"/><path d="M48 66c-15-10-24-19-24-29 0-16 19-20 24-7 5-13 24-9 24 7 0 10-9 19-24 29Z" fill="#7bdca9"/></svg>');
+      const attachments = [
+        { name: 'openapi.yaml', id: 'spec', mediaType: 'text/plain' },
+        { name: 'screenshot.png', id: 'screenshot', mediaType: 'image/png', preview: thumbnail.toDataURL('image/jpeg') },
+        { name: 'icon.svg', id: 'icon', mediaType: 'image/svg+xml', preview: originals.icon },
+      ];
+      (e2e.emit as (name: string, payload: unknown) => void)('ai:deltas', { sessionId: 'source-chat', turnId: input.turnId, deltas: [], attachments });
+      await new Promise<void>(resolve => { e2e.finishAttachmentTurn = resolve; });
+      const messages = [{ role: 'user', blocks: [{ type: 'text', text: input.text }], attachments }, { role: 'assistant', blocks: [{ type: 'text', text: 'I found the pet routes.' }] }];
+      savedChat = { ...input, id: 'source-chat', title: 'Review the pet routes', messages, allowedTools: [], createdAt: Date.now(), updatedAt: Date.now() };
+      return { chat: savedChat, messages, steps: [], warnings: [], text: 'I found the pet routes.' };
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Connect project folder' }).click();
+  await page.getByRole('button', { name: 'Attach file', exact: true }).click();
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  await composer.evaluate(input => {
+    const bridge = window.__kurloE2E as unknown as {
+      dropAgentFiles: (x: number, y: number, paths: string[]) => void;
+      agentDropTargetEnabled: boolean;
+    };
+    if (!bridge.agentDropTargetEnabled || getComputedStyle(input).getPropertyValue('--wails-drop-target').trim() !== 'drop') {
+      throw new Error('The agent composer is not registered as a file drop target.');
+    }
+    const { left, top } = input.getBoundingClientRect();
+    bridge.dropAgentFiles(0, 0, ['/data/outside.txt']);
+    bridge.dropAgentFiles(left + 10, top + 10, ['/data/screenshot.png', '/data/openapi.yaml', '/data/rows.csv', '/data/icon.svg']);
+  });
+  await expect(page.getByRole('button', { name: 'Remove attachment outside.txt' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Remove attachment rows.csv' })).toBeVisible();
+  await page.getByRole('button', { name: 'Remove attachment rows.csv' }).click();
+  await expect(page.getByRole('button', { name: 'Disconnect project pet-store' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove attachment openapi.yaml' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove attachment screenshot.png' })).toBeVisible();
+  await composer.fill('Review the pet routes');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-context-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  const bubble = page.locator('.agent-user');
+  const files = page.getByRole('list', { name: 'Attachments' });
+  const preview = files.getByRole('img', { name: 'Preview of screenshot.png' });
+  await expect(preview).toBeVisible();
+  await expect.poll(() => preview.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(240);
+  await expect(files.getByText('openapi.yaml')).toBeVisible();
+  await expect(files.getByRole('img', { name: 'Preview of icon.svg' })).toBeVisible();
+  await expect(bubble).toHaveText('Review the pet routes');
+  const fileBox = (await files.boundingBox())!;
+  expect(fileBox.y + fileBox.height).toBeLessThan((await bubble.boundingBox())!.y);
+  await expect(page.getByRole('button', { name: 'Remove attachment screenshot.png' })).toHaveCount(0);
+  await page.evaluate(() => (window.__kurloE2E as unknown as { finishAttachmentTurn: () => void }).finishAttachmentTurn());
+  await expect(page.getByText('I found the pet routes.', { exact: true })).toBeVisible();
+  const input = await page.evaluate(() => (window.__kurloE2E as unknown as { knowledgeInput: Record<string, unknown> }).knowledgeInput);
+  expect(input.projectRoot).toBe('/source/pet-store');
+  expect(input.attachments).toEqual(['/data/openapi.yaml', '/data/screenshot.png', '/data/icon.svg']);
+  await expect(page.getByRole('button', { name: 'Remove attachment openapi.yaml' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Disconnect project pet-store' })).toBeVisible();
+  await page.getByRole('button', { name: 'New chat', exact: true }).click();
+  await page.locator('.agent-sidebar').getByRole('button', { name: /Review the pet routes/ }).click();
+  await expect(preview).toBeVisible();
+  await expect(bubble).toHaveText('Review the pet routes');
+  await captureDocsScreenshot(page, 'agent-context');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-attachments-${testInfo.project.name}.png`), animations: 'disabled' });
+  const openImage = files.getByRole('button', { name: 'Open screenshot.png' });
+  await openImage.click();
+  const viewer = page.getByRole('dialog', { name: 'screenshot.png' });
+  const image = viewer.getByRole('img', { name: 'screenshot.png' });
+  await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(720);
+  const fitted = (await image.boundingBox())!.width;
+  await viewer.getByRole('button', { name: 'Zoom in' }).click();
+  await expect.poll(async () => (await image.boundingBox())!.width).toBeGreaterThan(fitted);
+  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-attachment-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
+  await expect(openImage).toBeFocused();
+  await files.getByRole('button', { name: 'Open icon.svg' }).click();
+  const svg = page.getByRole('dialog', { name: 'icon.svg' }).getByRole('img', { name: 'icon.svg' });
+  await expect.poll(() => svg.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
+  await files.getByRole('button', { name: 'Open openapi.yaml' }).click();
+  await expect(page.getByRole('dialog', { name: 'openapi.yaml' }).getByRole('region', { name: 'File contents' })).toHaveText('openapi: 3.1.0');
 });

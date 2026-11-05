@@ -69,6 +69,34 @@ A saved chat has its name at the top, with a **•••** menu to rename or del
 
 ![Agent chat that read a request, saved a test and summarised the change](../../../../assets/screenshots/agent-chat.png)
 
+## Running requests and tests
+
+Name a saved request, folder or collection in the chat. The agent can run HTTP, GraphQL, unary gRPC, MCP and AI requests. For an MCP endpoint, ask it to list available tools or call one with specific arguments. HTTP results include timings, redirect hops and the negotiated TLS details when available.
+
+For WebSocket, Socket.IO, SSE or streaming gRPC, ask the agent to connect, exchange messages and report what it receives. SSE only receives events. A server-streaming gRPC call sends its saved message when it opens. For client-streaming and bidirectional gRPC, ask the agent to send each message and finish sending when ready. **Stop** and the end of the turn close the connections.
+
+For a collection run, name the number of iterations, a delay between requests and whether to stop at the first failure. To use test data, put a CSV or JSON file in the workspace and give the agent its relative path. Each row drives one iteration. The agent reports per-request results, assertions, skips and elapsed time.
+
+Ask the agent to save a load test and run it with the installed k6. The run continues in the background. Ask for its progress, summary or a comparison with an earlier run of the same test or another saved test. To serve saved examples, ask it to start a mock for a collection and inspect the request log. The mock stays up until you or the agent stops it.
+
+Ask for cookies that apply to a domain to see their names, paths, expiry and flags. Clearing the workspace's jar requires a fresh approval each time.
+
+## Project folders, files and imports
+
+Use the folder button in the message box to connect a source directory. The connection is saved with the chat when you send a message. The agent can list files, search for text and read lines inside that directory. Project access skips symlinks, hidden configuration and common credential files. Remove the **Project** chip and send a message to disconnect it.
+
+Ask the agent to find the routes in the project and sync your collection, or ask it to cover one endpoint such as `POST /pets`. It can use the source to build a request, example and tests. Workspace changes go through the usual approval card.
+
+Drop files onto the message box or use **Attach file** to add a specification, proto, CSV, text file or image to the next message. Ask the agent to import an attached OpenAPI file, read a proto or run a collection with attached CSV or JSON data. PNG, JPEG and WebP go to the selected model as images. The agent reads SVG as source text. Attach the file again to use it in another turn.
+
+Click a file above a sent message to open it. For images, use **+** or **−** to zoom and **Fit** to return to the initial view. Kurlo keeps an encrypted local copy with the chat so you can open the file after moving or deleting the source.
+
+![Agent Mode message with an OpenAPI file, screenshot and SVG above the message](../../../../assets/screenshots/agent-context.png)
+
+Ask for an import from a file in the connected folder, an attachment, a pasted cURL command or an OpenAPI URL. The agent previews the changes before showing **Apply this import?** with the YAML diff. Approve to write the files or reject to leave the workspace as it was. The same Go importers work through the MCP server without a desktop window. [MCP import tools](/docs/guides/mcp-server/#import-requests-and-read-project-source)
+
+You can also ask the agent to read or update the Markdown docs of a request or collection, or generate a code snippet for an HTTP or GraphQL request. Give the request name and your language, for example, “Show me the Python snippet for Get pet.”
+
 ## Usage, context and limits
 
 Below the message box, input and output token counts show usage recorded for this chat. Codex can also report account quota windows and the context window size. Codex stops a turn after five minutes without progress, excluding time spent waiting for your confirmation, and after 50 tool calls. It manages its model context through the CLI and can compact it automatically; Kurlo shows **Compacting context…** while this happens. Compaction changes what the model retains in its working context, while the conversation remains available in Kurlo.
@@ -84,7 +112,13 @@ In **Chat details**, **Context (last request)** compares the last reported reque
 | List or read requests, environments or history, or diagnose a failure | Runs at once |
 | Run a request, a collection or a one-off call that only sends `GET`, `HEAD` or `OPTIONS` | Runs at once |
 | Send any other method, such as `POST` or `DELETE` | Asks first, showing the call |
-| Change the workspace: save or delete a request, save an example, set a variable, create a collection, write tests | Asks first, showing the change file by file |
+| Run a saved unary gRPC, MCP or AI request, or open a live connection | Asks before contacting the configured server |
+| Send a live message or start or stop the mock server | Asks first |
+| Start k6 or clear the cookie jar | Asks every time |
+| Fetch an OpenAPI URL | Asks before fetching |
+| Apply an import or edit Markdown docs | Shows the YAML diff for approval |
+| Check k6 progress, compare results, read the mock log or list cookie metadata | Runs at once |
+| Change the workspace: save or delete a request, save an example, set a variable, create a collection, write tests or save a load test | Asks first, showing the change file by file |
 | Read the Git status or diff of the workspace, or build a pull request link | Runs at once |
 | Create a Git branch or commit workspace files | Asks first; a commit shows the files it includes |
 | Push the current branch | Asks every time, and only when you asked it to push |
@@ -129,7 +163,7 @@ The log is encrypted, kept for 30 days or 2,000 calls, and stores arguments and 
 
 ## Limits
 
-- The agent sees the workspace, its environments and Kurlo's history. It cannot read your project's source code; use [`kurlo mcp`](/docs/guides/mcp-server/) from a coding assistant for that.
+- The agent sees the workspace, its environments and Kurlo's history. Source access is limited to the read-only folder you connect to the chat.
 - One turn runs at a time across chats, and a turn stops after 50 model steps.
 - For the Kurlo agent using an API connection, the model gets the last two exchanges in full. Tool results from earlier ones are shortened, and when a chat outgrows about 400,000 characters its oldest exchanges are left out; the agent is told so and asks if you refer to them. Very large tool results are kept in the chat up to 64 KB.
 - Small local models often call tools badly. Models marked **Recommended** in Settings → AI handle them well.

@@ -9,17 +9,18 @@
   import Select from './Select.svelte';
   import { focusFirstMenuItem, handleMenuKeydown } from '../menuKeyboard';
   import AgentApprovalCard from './AgentApprovalCard.svelte';
+  import AgentAttachmentViewer from './AgentAttachmentViewer.svelte';
   import AgentPicker from './AgentPicker.svelte';
   import { vm } from '../stores/app.svelte';
   import { agentNavigation, agentStore as defaultAgentStore, toggleAgentDetails, type AgentStore } from '../stores/agent.svelte';
   import { codexConnectionStore } from '../stores/codex.svelte';
   import { claudeConnectionStore } from '../stores/claude.svelte';
   import { aiConnectionsStore } from '../stores/aiConnections.svelte';
-  import { gitPullRequestUrl, startOpenRouterConnect, type AgentApproval, type AiBlock } from '../backend';
+  import { gitPullRequestUrl, startOpenRouterConnect, type AgentApproval, type AgentAttachment, type AiBlock } from '../backend';
   import { openExternalURL } from '../externalLinks';
   import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiErrorView, aiConnectionProblem, type AiStepView } from '../stores/features/ai';
   import { AGENT_STARTERS, AGENT_TEMPLATES, AGENT_WRITE_TOOLS, agentEffortLabel, agentStepSummary, agentTurnSegments, agentContextPercent, agentQuotaWindows, agentFindRequest, agentTemplatePlaceholder, agentToolLabel, agentToolTarget, agentTurnAnswer, agentTurnsFromMessages, type AgentTemplate, type AgentToolTarget, type AgentTurnView } from '../agent';
-  import { clipboardSet } from '../backend';
+  import { clipboardSet, openDirectoryDialog, openFileDialog } from '../backend';
 
   let { workspaceBlocked = false, agentStore = defaultAgentStore, codexReady = false }: { workspaceBlocked?: boolean; agentStore?: AgentStore; codexReady?: boolean } = $props();
 
@@ -53,8 +54,26 @@
   let copiedKey = $state('');
   let templatesOpen = $state(false);
   let composerInput = $state<HTMLTextAreaElement>();
+  let composerBox = $state<HTMLDivElement>();
+  let selectingContext = $state(false);
+  const attachmentLimit = 4;
+  const attachmentDisabled = $derived(workspaceBlocked || agentStore.running || selectingContext);
+
+  $effect(() => {
+    const box = composerBox;
+    const runtime = window.runtime;
+    if (!box || !runtime?.OnFileDrop) return;
+    runtime.OnFileDrop((x, y, paths) => {
+      if (attachmentDisabled || !box.contains(document.elementFromPoint(x, y))) return;
+      addAttachments(paths);
+    }, true);
+    return () => runtime.OnFileDropOff?.();
+  });
   let templatesMenu = $state<HTMLDivElement>();
   let titleDraft = $state('');
+  const titlePlaceholder = 'Untitled chat';
+  let attachmentError = $state('');
+  let openAttachment = $state<AgentAttachment>();
   let titleError = $state('');
   let deleteError = $state('');
   let titleInput = $state<HTMLInputElement>();
@@ -73,11 +92,12 @@
   const starterLabels: Record<string, string> = { debug: 'Explain failure', check: 'Check collection', tests: 'Write tests', cover: 'Cover endpoint' };
   const persisted = $derived<AgentTurnView[]>(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId ? agentTurnsFromMessages(agentStore.activeChat.messages, '', agentStore.activeChat.messageOffset ?? 0) : []);
   const live = $derived(agentStore.liveInActiveChat ? agentStore.live : null);
+  const draftAttachments = $derived(live && agentStore.liveAttachments.length ? [] : agentStore.attachmentPaths);
   const turns = $derived.by<Array<AgentTurnView & { live: boolean }>>(() => {
     const out = persisted.map(turn => ({ ...turn, live: false }));
     const chat = chatLoaded ? agentStore.activeChat : null;
     const nextMessage = chat?.messageCount ?? (chat?.messageOffset ?? 0) + (chat?.messages.length ?? 0);
-    if (live) out.push({ id: `:${nextMessage}`, prompt: live.prompt, steps: live.steps, live: true });
+    if (live) out.push({ id: `:${nextMessage}`, prompt: live.prompt, attachments: agentStore.liveAttachments, steps: live.steps, live: true });
     return out;
   });
   const notes = $derived(agentStore.notes && agentStore.notes.chatId === agentStore.activeChatId ? agentStore.notes : null);
@@ -205,6 +225,7 @@
     lastChatId = agentStore.activeChatId;
     chatMenuOpen = false;
     if (assignedLiveChat) return;
+    openAttachment = undefined;
     deleteError = '';
     openTools.clear();
     openThinking.clear();
@@ -292,6 +313,45 @@
     }
     const request = agentFindRequest(savedRequests(), target.ref);
     if (request) void vm.switchRequest(request.id);
+  }
+
+  function contextName(path: string) {
+    return path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+  }
+
+  function addAttachments(paths: string[]) {
+    const attachments = [...new Set([...agentStore.attachmentPaths, ...paths.filter(Boolean)])];
+    agentStore.attachmentPaths = attachments.slice(0, attachmentLimit);
+    attachmentError = attachments.length > attachmentLimit ? 'Attach up to four files per message.' : '';
+  }
+
+  function removeAttachment(file: string) {
+    agentStore.attachmentPaths = agentStore.attachmentPaths.filter(path => path !== file);
+    attachmentError = '';
+  }
+
+  async function chooseAgentContext(kind: 'project' | 'file') {
+    if (selectingContext) return;
+    const store = agentStore;
+    const workspaceId = store.workspaceId;
+    const chatId = store.activeChatId;
+    selectingContext = true;
+    attachmentError = '';
+    try {
+      const selected = kind === 'project'
+        ? await openDirectoryDialog('Connect a read-only project folder', store.projectRoot)
+        : await openFileDialog('Attach a file to this message');
+      if (!selected || store !== agentStore || store.workspaceId !== workspaceId || store.activeChatId !== chatId) return;
+      if (kind === 'project') {
+        store.projectRoot = selected;
+      } else {
+        addAttachments([selected]);
+      }
+    } catch (error) {
+      attachmentError = error instanceof Error ? error.message : String(error);
+    } finally {
+      selectingContext = false;
+    }
   }
 
   async function send() {
@@ -488,20 +548,23 @@
   {:else}
     {#if chatSaved}
       <div class="agent-header">
-        <input
-          class="request-title-input agent-title-input"
-          bind:value={titleDraft}
-          bind:this={titleInput}
-          placeholder="Untitled chat"
-          spellcheck="false"
-          maxlength="120"
-          aria-label="Chat name"
-          aria-invalid={titleError ? 'true' : undefined}
-          onblur={() => void commitTitle()}
-          onkeydown={onTitleKeydown}
-          disabled={workspaceBlocked}
-          readonly={archived}
-        />
+        <div class="agent-title-field">
+          <span class="request-title-input agent-title-measure" aria-hidden="true">{titleDraft || titlePlaceholder}{'\u00a0'}</span>
+          <input
+            class="request-title-input agent-title-input"
+            bind:value={titleDraft}
+            bind:this={titleInput}
+            placeholder={titlePlaceholder}
+            spellcheck="false"
+            maxlength="120"
+            aria-label="Chat name"
+            aria-invalid={titleError ? 'true' : undefined}
+            onblur={() => void commitTitle()}
+            onkeydown={onTitleKeydown}
+            disabled={workspaceBlocked}
+            readonly={archived}
+          />
+        </div>
         {#if titleError || deleteError}<span class="agent-title-error" role="alert">{titleError || deleteError}</span>{/if}
         <div class="agent-header-menu">
           <button class="btn btn-ghost btn-icon btn-sm agent-header-menu-btn" type="button" aria-label="Chat actions" aria-haspopup="menu" aria-expanded={chatMenuOpen} bind:this={chatMenuTrigger} onclick={() => void toggleChatMenu()} disabled={workspaceBlocked}>
@@ -557,6 +620,25 @@
           <VirtualAgentHistory bind:this={history} items={turns} {scroller} follow={stickToBottom} {onScroll}>
             {#snippet children(turn)}
             <div class="agent-turn">
+              {#if turn.attachments.length}
+                <ul class="agent-message-files" aria-label="Attachments">
+                  {#each turn.attachments as file}
+                    <li class="agent-message-file">
+                      {#if file.preview || (file.id && file.mediaType)}
+                        <button class="btn btn-secondary agent-file-button" class:agent-image-file={file.preview} type="button" aria-label={`Open ${file.name}`} onclick={() => (openAttachment = file)}>
+                          {#if file.preview}
+                            <img src={file.preview} alt={`Preview of ${file.name}`} draggable="false" class:vector={file.mediaType === 'image/svg+xml'} />
+                          {:else}
+                            {@render attachmentName(file.name)}
+                          {/if}
+                        </button>
+                      {:else}
+                        <div class="agent-file-label">{@render attachmentName(file.name)}</div>
+                      {/if}
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
               {#if turn.prompt}
                 <div class="agent-user-row">
                   <div class="agent-message-actions">{@render copyButton(`${turn.id}:prompt`, turn.prompt, 'Copy message')}</div>
@@ -661,7 +743,7 @@
             {:else if approvals.length && agentStore.liveInActiveChat}
               <div class="agent-status agent-status-wait" role="status"><span class="agent-status-dot"></span>{agentStore.driver === 'codex' ? 'Codex' : agentStore.driver === 'claude-code' ? 'Claude Code' : 'The agent'} is waiting for your approval</div>
             {/if}
-            <div class="agent-composer-box" class:disabled={workspaceBlocked}>
+            <div class="agent-composer-box" class:disabled={workspaceBlocked} bind:this={composerBox} style:--wails-drop-target={attachmentDisabled ? 'none' : 'drop'}>
               <textarea
                 class="agent-input"
                 rows="1"
@@ -678,6 +760,21 @@
                 onkeydown={onKeydown}
                 disabled={workspaceBlocked}
               ></textarea>
+              {#if agentStore.projectRoot || draftAttachments.length}
+                <div class="agent-context-files" aria-label="Project and attachments">
+                  {#if agentStore.projectRoot}
+                    <button class="btn btn-secondary btn-sm agent-context-file" type="button" aria-label={`Disconnect project ${contextName(agentStore.projectRoot)}`} disabled={agentStore.running || workspaceBlocked} onclick={() => (agentStore.projectRoot = '')}>
+                      <span>Project · {contextName(agentStore.projectRoot)}</span><span aria-hidden="true">×</span>
+                    </button>
+                  {/if}
+                  {#each draftAttachments as file (file)}
+                    <button class="btn btn-secondary btn-sm agent-context-file" type="button" aria-label={`Remove attachment ${contextName(file)}`} disabled={agentStore.running || workspaceBlocked} onclick={() => removeAttachment(file)}>
+                      <span>{contextName(file)}</span><span aria-hidden="true">×</span>
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+              {#if attachmentError}<div class="agent-note" role="alert">{attachmentError}</div>{/if}
               <div class="agent-composer-bar">
                 <div class="agent-composer-context">
                   <span class="agent-composer-chip">
@@ -692,6 +789,12 @@
                       Branch
                     </button>
                   {/if}
+                  <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Connect project folder" disabled={workspaceBlocked || agentStore.running || selectingContext} onclick={() => void chooseAgentContext('project')}>
+                    <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.75 4A1.25 1.25 0 0 1 3 2.75h3L7.5 4H13a1.25 1.25 0 0 1 1.25 1.25V12A1.25 1.25 0 0 1 13 13.25H3A1.25 1.25 0 0 1 1.75 12V4Z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/></svg>
+                  </button>
+                  <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Attach file" disabled={attachmentDisabled || agentStore.attachmentPaths.length >= attachmentLimit} onclick={() => void chooseAgentContext('file')}>
+                    <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 8.5 3.5-3.6a1.5 1.5 0 0 1 2.1 2.1L7 11.7a2.6 2.6 0 0 1-3.7-3.7l5-5" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/></svg>
+                  </button>
                   <div class="agent-templates">
                     <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Templates" aria-haspopup="menu" aria-expanded={templatesOpen} onclick={() => void toggleTemplates()} disabled={workspaceBlocked}>
                       <svg width="0.875rem" height="0.875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 2.75h8M2 6h8M2 9.25h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -823,6 +926,15 @@
 {/if}
 </div>
 
+{#snippet attachmentName(name: string)}
+  <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 2h5l3 3v9H4zM9 2v3h3" stroke="currentColor" stroke-linejoin="round"/></svg>
+  <span>{name}</span>
+{/snippet}
+
+{#if openAttachment}
+  <AgentAttachmentViewer file={openAttachment} chatId={agentStore.activeChatId} workspaceId={agentStore.workspaceId} onClose={() => (openAttachment = undefined)} />
+{/if}
+
 <style>
   .agent-workspace {
     position: relative;
@@ -843,14 +955,30 @@
     padding: 0 var(--space-6);
     border-bottom: 1px solid var(--border-subtle);
   }
-  .agent-header .agent-title-input {
-    flex: 1 1 auto;
-    width: auto;
-    max-width: none;
+  .agent-title-field {
+    position: relative;
     min-width: 0;
+    max-width: 32rem;
     margin-left: calc(var(--space-1-5) * -1);
+  }
+  .agent-title-field .request-title-input {
+    max-width: none;
     font-size: var(--text-title);
     font-weight: var(--weight-semibold);
+  }
+  .agent-title-field .agent-title-measure {
+    display: block;
+    width: auto;
+    visibility: hidden;
+    white-space: pre;
+  }
+  .agent-title-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+  .agent-title-input:focus {
+    text-overflow: clip;
   }
   .agent-title-error {
     color: var(--danger);
@@ -859,6 +987,7 @@
   .agent-header-menu {
     position: relative;
     flex: 0 0 auto;
+    margin-inline-start: auto;
   }
   .agent-header-dropdown {
     position: absolute;
@@ -1053,6 +1182,62 @@
     -webkit-user-select: text;
     user-select: text;
     cursor: text;
+  }
+  .agent-message-files {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: flex-end;
+    align-self: flex-end;
+    max-width: 100%;
+    gap: var(--space-2);
+    list-style: none;
+  }
+  .agent-message-file {
+    min-width: 0;
+    max-width: min(100%, 16rem);
+  }
+  .agent-file-button, .agent-file-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    padding: var(--space-1-5) var(--space-2);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg);
+    color: var(--text-2);
+    font-size: var(--text-label);
+  }
+  .agent-image-file {
+    width: 6rem;
+    height: 6rem;
+    padding: 0;
+    cursor: zoom-in;
+  }
+  .agent-image-file:hover:not(:disabled) {
+    border-color: var(--text-3);
+  }
+  .agent-image-file img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .agent-image-file img.vector {
+    padding: var(--space-3);
+    object-fit: contain;
+  }
+  .agent-file-button svg, .agent-file-label svg {
+    flex: 0 0 auto;
+  }
+  .agent-file-button span, .agent-file-label span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .agent-message-actions {
     display: flex;
@@ -1336,6 +1521,9 @@
   .agent-composer-box:focus-within {
     border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   }
+  .agent-composer-box:global(.wails-drop-target-active) {
+    border-color: var(--accent);
+  }
   .agent-composer-box.disabled {
     opacity: var(--opacity-disabled);
   }
@@ -1358,6 +1546,24 @@
   .agent-input::placeholder {
     color: var(--text-3);
   }
+  .agent-context-files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    padding: 0 var(--space-2) var(--space-1);
+  }
+
+  .agent-context-file {
+    gap: var(--space-1);
+    max-width: 100%;
+  }
+
+  .agent-context-file span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .agent-composer-bar {
     display: flex;
     flex-wrap: wrap;

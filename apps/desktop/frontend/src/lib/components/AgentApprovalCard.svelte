@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { AgentApproval } from '../backend';
-  import { agentApprovalAction, agentApprovalArguments, agentApprovalTitle } from '../agent';
+  import { agentAllowsChatApproval, agentApprovalAction, agentApprovalArguments, agentApprovalTitle } from '../agent';
   import AgentFileDiff from './AgentFileDiff.svelte';
 
   let {
@@ -15,7 +15,6 @@
   let error = $state('');
   let showArgs = $state(false);
   const write = $derived(approval.kind === 'write');
-  const external = $derived(approval.kind === 'external');
 
   async function answer(decision: 'allow' | 'allow_chat' | 'reject') {
     if (busy) return;
@@ -60,7 +59,7 @@
   {#if error}<p class="agent-approval-error" role="alert">{error}</p>{/if}
   <div class="agent-approval-actions">
     <button class="btn btn-primary btn-sm" type="button" onclick={() => answer('allow')} disabled={busy}>{agentApprovalAction(approval)}</button>
-    {#if !external && approval.tool !== 'apply_changes' && approval.tool !== 'git_push'}
+    {#if agentAllowsChatApproval(approval)}
       <button class="btn btn-secondary btn-sm" type="button" onclick={() => answer('allow_chat')} disabled={busy}>Allow for this chat</button>
     {/if}
     <button class="btn btn-ghost btn-sm" type="button" onclick={() => answer('reject')} disabled={busy}>Reject</button>

@@ -9,6 +9,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Drag and drop attachments in Agent Mode.** Drop files onto the message box to attach them to your next message.
+
+- **Project context and imports in Agent Mode.** Connect a read-only source folder, attach a specification, proto, CSV or screenshot, and ask the agent to cover an endpoint from the code. Preview and approve YAML imports from OpenAPI, Swagger, Postman, Insomnia, HAR and cURL. Read or edit saved Markdown docs and generate HTTP request snippets. Imports and project tools also work through `kurlo mcp`.
+
+- **Run more from Agent Mode.** Open WebSocket, Socket.IO, SSE and gRPC streams, send and read messages, and close connections with **Stop** or when the turn ends. Run saved unary gRPC, MCP and AI requests. Run collections with iterations, CSV or JSON data, a delay and stop on failure. Save load tests, run k6 in the background and compare completed runs. Start a localhost mock from saved examples, inspect its log, and check request timings, redirects, TLS and cookie metadata. Clearing the cookie jar always asks first.
+
 - **Agent activity screen.** **Activity** in the agent sidebar lists every tool call made by the Kurlo agent, Codex, Claude Code or an MCP client, newest first, with search and filters by client and period. A call shows its arguments, result, branch and commit, and the diff of every file it changed; **Restore** and **Restore all** put files back to their version before the call and refuse when a file has changed since. **Record activity** turns logging off and **Clear…** deletes the log. The list shows the workspace selected in the top bar; **All workspaces** shows the rest, marked with their workspace, and **Open chat** appears only for chats of the current workspace.
 
 - **The agent works in its chat's workspace.** When a folder holds several workspaces, the Kurlo agent, Codex and Claude Code see and change only the collections, requests and environments of the workspace the chat belongs to; new collections and environments go there, other workspaces' files stay untouched, and the system prompt names the workspace. Activity entries record their workspace; `kurlo mcp` calls are assigned by the files they change. **Chat details → Git** notes that Git applies to the whole folder.
@@ -67,7 +73,11 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Resizable chat name field.** The field grows to fit the name up to a limit, then scrolls horizontally while you edit.
+
 - **Scrollbar tracks blend into their panels.** Desktop scrollbars use transparent tracks and inset, rounded handles across the app.
+
+- **Open and zoom in on Agent Mode attachments.** Image thumbnails and file buttons appear above the message. Open the saved original even if you delete the source file. Kurlo keeps an encrypted local copy with the chat. SVGs open in the viewer, and the agent can read their source.
 
 - **AI requests in Git workspaces.** Workspace YAML accepts provider strings, so requests using the default Kurlo connection or a custom provider can load.
 

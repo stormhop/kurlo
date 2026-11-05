@@ -1,7 +1,7 @@
 import {
   agentChatPage, agentChats, agentPendingApprovals, answerAgentApproval, deleteAgentChat,
   onAgentEvent, renameAgentChat, sendAgentMessage, setAgentChatArchived, stopAgent,
-  type AgentContext, type AgentApproval, type AgentApprovalClosed, type AgentChat, type AgentChatSummary,
+  type AgentContext, type AgentApproval, type AgentApprovalClosed, type AgentAttachment, type AgentChat, type AgentChatSummary,
   type AiBlock, type AiStep, type AiUsage,
 } from '../backend';
 import { agentHistoryPage, mergeAgentHistory } from '../agentHistory';
@@ -15,6 +15,8 @@ type WorkspaceChatView = {
   activeChat: AgentChat | null;
   draft: string;
   composer: symbol;
+  projectRoot: string;
+  attachmentPaths: string[];
   collection: string;
   environment: string;
   ownBranch: boolean;
@@ -44,6 +46,7 @@ export class AgentStore {
   activeChatId = $state('');
   activeChat = $state<AgentChat | null>(null);
   live = $state<AiTurn | null>(null);
+  liveAttachments = $state<AgentAttachment[]>([]);
   liveChatId = $state('');
   approvals = $state<AgentApproval[]>([]);
   notes = $state<AgentNotes | null>(null);
@@ -52,6 +55,8 @@ export class AgentStore {
   ownBranch = $state(false);
   connectionId = $state('');
   draft = $state('');
+  projectRoot = $state('');
+  attachmentPaths = $state<string[]>([]);
   loadError = $state('');
   historyError = $state('');
   loadingEarlier = $state(false);
@@ -103,6 +108,7 @@ export class AgentStore {
     return {
       activeChatId: this.activeChatId, activeChat: trimHistory && this.activeChat ? agentHistoryPage(this.activeChat) : this.activeChat, draft: this.draft, composer: this.composer,
       collection: this.collection, environment: this.environment, ownBranch: this.ownBranch, connectionId: this.connectionId,
+      projectRoot: this.projectRoot, attachmentPaths: [...this.attachmentPaths],
       model: this.model, effort: this.effort, context: this.context, notes: this.notes, loadError: this.loadError,
     };
   }
@@ -112,6 +118,8 @@ export class AgentStore {
     this.activeChat = view.activeChat;
     this.draft = view.draft;
     this.composer = view.composer;
+    this.projectRoot = view.projectRoot;
+    this.attachmentPaths = view.attachmentPaths;
     this.collection = view.collection;
     this.environment = view.environment;
     this.ownBranch = view.ownBranch;
@@ -153,9 +161,10 @@ export class AgentStore {
   init() {
     if (this.listening) return;
     this.listening = true;
-    onAgentEvent<{ sessionId: string; turnId?: string; deltas: AiDelta[] }>('ai:deltas', payload => {
-      if (!this.matches(payload.sessionId, payload.turnId) || !payload.deltas?.length) return;
-      this.updateLive(turn => applyAiDeltas(turn, payload.deltas));
+    onAgentEvent<{ sessionId: string; turnId?: string; deltas: AiDelta[]; attachments?: AgentAttachment[] }>('ai:deltas', payload => {
+      if (!this.matches(payload.sessionId, payload.turnId)) return;
+      if (payload.attachments) this.liveAttachments = payload.attachments;
+      if (payload.deltas?.length) this.updateLive(turn => applyAiDeltas(turn, payload.deltas));
     });
     onAgentEvent<{ sessionId: string; turnId?: string; step: AiStep }>('ai:step', payload => {
       if (!this.matches(payload.sessionId, payload.turnId) || !isAiStepIndex(payload.step.index)) return;
@@ -236,6 +245,8 @@ export class AgentStore {
     this.context = null;
     this.activeChatId = '';
     this.activeChat = null;
+    this.projectRoot = '';
+    this.attachmentPaths = [];
     this.notes = null;
     this.loadError = '';
   }
@@ -252,6 +263,10 @@ export class AgentStore {
     this.historyRequest++;
     this.loadingEarlier = false;
     this.historyError = '';
+    if (this.activeChatId !== id) {
+      this.projectRoot = '';
+      this.attachmentPaths = [];
+    }
     this.activeChatId = id;
     this.notes = this.notes?.chatId === id ? this.notes : null;
     this.loadError = '';
@@ -267,6 +282,7 @@ export class AgentStore {
       this.updateView(workspaceId, generation, view => {
         if (view.activeChatId !== id) return;
         view.activeChat = chat;
+        view.projectRoot = chat.projectRoot ?? '';
         view.model = chat.model;
         view.effort = chat.effort ?? '';
         view.collection = (this.workspaceId === workspaceId ? this.collectionNames : collectionNames).includes(chat.collection) ? chat.collection : '';
@@ -331,6 +347,7 @@ export class AgentStore {
     this.stopRequested = '';
     this.compacting = false;
     this.live = turn;
+    this.liveAttachments = [];
     this.liveChatId = chatId;
     this.liveHistory = history;
     this.liveComposer = composer;
@@ -343,6 +360,8 @@ export class AgentStore {
         workspaceId,
         turnId: turn.id,
         text: prompt,
+        ...(this.projectRoot || history?.projectRoot ? { projectRoot: this.projectRoot } : {}),
+        ...(this.attachmentPaths.length ? { attachments: [...this.attachmentPaths] } : {}),
         collection: this.collection,
         environment: this.environment,
         ownBranch: this.ownBranch,
@@ -359,6 +378,7 @@ export class AgentStore {
         if (originalChat && result.chat?.id && result.chat.workspaceId === workspaceId) {
           view.activeChatId = result.chat.id;
           view.activeChat = mergeAgentHistory(view.activeChat, result.chat);
+          if (!result.error) view.attachmentPaths = [];
         }
         view.notes = { chatId: resultChatId, error: stopped ? '' : (result.error ?? ''), warnings: result.warnings ?? [] };
         if (originalChat && result.error && !stopped && !view.draft && chatMessageCount(result.chat) <= messageCount) view.draft = text;
@@ -374,6 +394,7 @@ export class AgentStore {
       if (this.live?.id === turn.id) {
         this.compacting = false;
         this.live = null;
+        this.liveAttachments = [];
         this.liveChatId = '';
         this.liveWorkspaceId = '';
         this.liveContext = null;

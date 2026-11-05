@@ -71,6 +71,17 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 	if err != nil {
 		return agentTurnError(model.AgentChat{}, err.Error())
 	}
+	files, err := loadAgentAttachments(input.Attachments)
+	if err != nil {
+		return agentTurnError(model.AgentChat{}, err.Error())
+	}
+	var projectRoot string
+	if input.ProjectRoot != nil {
+		projectRoot, err = agentProjectRoot(*input.ProjectRoot)
+		if err != nil {
+			return agentTurnError(model.AgentChat{}, err.Error())
+		}
+	}
 	root := fileWorkspaceStorePath()
 	workspaceDisk.ensureTracking(root)
 	chat := model.AgentChat{ID: strings.TrimSpace(input.ChatID), Driver: input.Driver, Workspace: agentWorkspaceKey(root), WorkspaceID: strings.TrimSpace(input.WorkspaceID)}
@@ -91,6 +102,11 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 		return agentTurnError(chat, "An agent is still working.")
 	}
 	defer rt.end(chat.ID)
+	if input.ProjectRoot != nil {
+		chat.ProjectRoot = projectRoot
+	}
+	userMessage := newAgentUserMessage(text, files)
+	text = agentAttachmentPrompt(text, userMessage.Attachments)
 	chat.Effort = strings.TrimSpace(input.Effort)
 	chat.Collection = strings.TrimSpace(input.Collection)
 	chat.Environment = strings.TrimSpace(input.Environment)
@@ -105,12 +121,12 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 	if chat.Model == "" || (input.Driver == "claude-code" && !claudeKnownModel(chat.Model)) {
 		chat.Model = connection.Model
 	}
-	chat.Messages = append(chat.Messages, model.AiMessage{Role: "user", Blocks: []model.AiBlock{{Type: model.AiBlockText, Text: text}}})
+	chat.Messages = append(chat.Messages, userMessage)
 	if input.ChatID == "" {
-		chat, err = createAgentChat(chat)
+		chat, err = createAgentChat(chat, files...)
 	} else {
 		snapshot := chat
-		chat, err = updateAgentChat(chat.ID, func(target *model.AgentChat) { *target = snapshot })
+		chat, err = updateAgentChat(chat.ID, func(target *model.AgentChat) { *target = snapshot }, files...)
 	}
 	if err != nil {
 		return agentTurnError(chat, err.Error())
@@ -133,10 +149,11 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 	seq := a.registerRequestCancel(key, stop)
 	defer func() { stop(); a.unregisterRequestCancel(key, seq) }()
 	if emit != nil {
-		emit("ai:deltas", model.AiDeltaBatch{SessionID: chat.ID, TurnID: turnID, Deltas: []model.AiDeltaEvent{}})
+		emit("ai:deltas", model.AiDeltaBatch{SessionID: chat.ID, TurnID: turnID, Deltas: []model.AiDeltaEvent{}, Attachments: userMessage.Attachments})
 	}
 
 	bridge := rt.bridge(chat, root)
+	bridge.server.attachments = files
 	bridge.server.clientMu.Lock()
 	bridge.server.client = "Codex via Kurlo"
 	if input.Driver == "claude-code" {
@@ -144,6 +161,8 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 	}
 	bridge.server.clientMu.Unlock()
 	bridge.setTurn(turnID)
+	bridge.server.live = newAgentLiveSessions(ctx, bridge.server.jars)
+	defer bridge.server.live.close()
 	bridge.approve = rt.approve(emit, cancel)
 	bridge.onAllow = func(tool string) {
 		_, _ = updateAgentChat(chat.ID, func(saved *model.AgentChat) {
@@ -271,7 +290,11 @@ func runCodexTurn(ctx context.Context, client *codexClient, bridge *agentToolBri
 			ID string `json:"id"`
 		} `json:"turn"`
 	}
-	params := map[string]any{"threadId": chat.ExternalThreadID, "model": chat.Model, "input": []map[string]any{{"type": "text", "text": text}}, "approvalPolicy": "never", "sandboxPolicy": map[string]any{"type": "readOnly"}}
+	input := []map[string]any{{"type": "text", "text": text}}
+	for _, image := range agentImageBlocks(bridge.server.attachments) {
+		input = append(input, map[string]any{"type": "image", "url": agentImageURL(image)})
+	}
+	params := map[string]any{"threadId": chat.ExternalThreadID, "model": chat.Model, "input": input, "approvalPolicy": "never", "sandboxPolicy": map[string]any{"type": "readOnly"}}
 	if effort != "" {
 		params["effort"] = effort
 	}

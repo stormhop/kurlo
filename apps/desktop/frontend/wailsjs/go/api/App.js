@@ -14,6 +14,10 @@ export function AgentActivityEntry(arg1) {
   return window['go']['api']['App']['AgentActivityEntry'](arg1);
 }
 
+export function AgentAttachmentData(arg1, arg2, arg3) {
+  return window['go']['api']['App']['AgentAttachmentData'](arg1, arg2, arg3);
+}
+
 export function AgentChat(arg1) {
   return window['go']['api']['App']['AgentChat'](arg1);
 }

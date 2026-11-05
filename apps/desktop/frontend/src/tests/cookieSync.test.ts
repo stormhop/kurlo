@@ -206,6 +206,23 @@ describe('cookie sync bridge', () => {
     delete (globalThis as unknown as { window?: unknown }).window;
   });
 
+  it('refreshes and persists the workspace jar cleared by the agent', () => {
+    const handlers: Record<string, (payload: unknown) => void> = {};
+    vi.stubGlobal('window', { runtime: {
+      EventsOn: (event: string, callback: (payload: unknown) => void) => {
+        handlers[event] = callback;
+      },
+    } });
+    try {
+      const vm = host();
+      vm.initCookieSyncListeners();
+      handlers['cookies:jar-changed']('workspace-from-chat');
+      expect(vm.refreshCookieJar).toHaveBeenCalledWith(true, true, 'workspace-from-chat');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reads the jar once for a burst of pushes', async () => {
     vi.useFakeTimers();
     const handlers: Record<string, (payload: unknown) => void> = {};

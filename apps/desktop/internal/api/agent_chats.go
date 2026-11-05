@@ -210,7 +210,8 @@ func compactStoredAgentMessages(messages []model.AiMessage) []model.AiMessage {
 			}
 			blocks[j] = block
 		}
-		out[i] = model.AiMessage{Role: message.Role, Blocks: blocks}
+		message.Blocks = blocks
+		out[i] = message
 	}
 	return out
 }
@@ -235,9 +236,14 @@ func writeAgentChatFile(chat model.AgentChat) error {
 	return writeFileAtomic(path, encrypted)
 }
 
-func writeAgentChat(chat model.AgentChat) error {
+func writeAgentChat(chat model.AgentChat, files ...agentAttachment) error {
 	chat.Messages = compactStoredAgentMessages(chat.Messages)
+	rollback, err := storeAgentAttachmentFiles(chat.ID, files)
+	if err != nil {
+		return err
+	}
 	if err := writeAgentChatFile(chat); err != nil {
+		rollback()
 		return err
 	}
 	index, err := loadAgentChatIndex()
@@ -258,7 +264,7 @@ func loadAgentChat(id string) (model.AgentChat, error) {
 	return chat, err
 }
 
-func updateAgentChat(id string, change func(chat *model.AgentChat)) (model.AgentChat, error) {
+func updateAgentChat(id string, change func(chat *model.AgentChat), files ...agentAttachment) (model.AgentChat, error) {
 	agentChatsMu.Lock()
 	defer agentChatsMu.Unlock()
 	chat, err := readAgentChat(id)
@@ -273,17 +279,17 @@ func updateAgentChat(id string, change func(chat *model.AgentChat)) (model.Agent
 	}
 	change(&chat)
 	chat.UpdatedAt = time.Now().UnixMilli()
-	return chat, writeAgentChat(chat)
+	return chat, writeAgentChat(chat, files...)
 }
 
-func createAgentChat(chat model.AgentChat) (model.AgentChat, error) {
+func createAgentChat(chat model.AgentChat, files ...agentAttachment) (model.AgentChat, error) {
 	agentChatsMu.Lock()
 	defer agentChatsMu.Unlock()
 	now := time.Now().UnixMilli()
 	chat.CreatedAt = now
 	chat.UpdatedAt = now
 	chat = normalizeAgentChat(chat)
-	return chat, writeAgentChat(chat)
+	return chat, writeAgentChat(chat, files...)
 }
 
 func listAgentChats(workspace string, now time.Time) ([]model.AgentChatSummary, error) {
@@ -304,8 +310,8 @@ func listAgentChats(workspace string, now time.Time) ([]model.AgentChatSummary, 
 	active := 0
 	for _, entry := range entries {
 		if entry.ArchivedAt == 0 && (entry.UpdatedAt < cutoff || active >= agentChatMaxCount) {
-			if path, err := agentChatPath(entry.ID); err == nil {
-				_ = os.Remove(path)
+			if err := removeAgentChatFiles(entry.ID); err != nil {
+				continue
 			}
 			delete(index, entry.ID)
 			removed = true
@@ -329,11 +335,7 @@ func listAgentChats(workspace string, now time.Time) ([]model.AgentChatSummary, 
 func deleteAgentChat(id string) error {
 	agentChatsMu.Lock()
 	defer agentChatsMu.Unlock()
-	path, err := agentChatPath(id)
-	if err != nil {
-		return err
-	}
-	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := removeAgentChatFiles(id); err != nil {
 		return err
 	}
 	index, err := loadAgentChatIndex()
@@ -342,6 +344,17 @@ func deleteAgentChat(id string) error {
 	}
 	delete(index, id)
 	return writeAgentChatIndex(index)
+}
+
+func removeAgentChatFiles(id string) error {
+	path, err := agentChatPath(id)
+	if err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return os.RemoveAll(path + ".attachments")
 }
 
 func renameAgentChat(id, title string) (model.AgentChat, error) {
@@ -385,7 +398,11 @@ func agentChatPage(chat model.AgentChat, before int) model.AgentChat {
 			}
 		}
 	}
-	chat.Messages = chat.Messages[start:end]
+	messages := make([]model.AiMessage, 0, end-start)
+	for _, message := range chat.Messages[start:end] {
+		messages = append(messages, agentDisplayMessage(message))
+	}
+	chat.Messages = messages
 	chat.MessageOffset = start
 	chat.MessageCount = total
 	return normalizeAgentChat(chat)

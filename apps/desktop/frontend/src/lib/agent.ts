@@ -1,4 +1,4 @@
-import type { CodexRateLimit, AgentApproval, AgentChatSummary, AgentFileChange, AiBlock, AiMessage } from './wire';
+import type { CodexRateLimit, AgentApproval, AgentAttachment, AgentChatSummary, AgentFileChange, AiBlock, AiMessage } from './wire';
 import { emptyStepView, type AiStepView } from './stores/features/ai';
 
 export const AGENT_WORKSPACE_CHANGE = 'changed by the Kurlo agent';
@@ -46,6 +46,7 @@ export function agentTemplatePlaceholder(text: string): { start: number; end: nu
 export type AgentTurnView = {
   id: string;
   prompt: string;
+  attachments: AgentAttachment[];
   steps: AiStepView[];
 };
 
@@ -56,12 +57,12 @@ export function agentTurnsFromMessages(messages: AiMessage[], chatId = '', messa
     const blocks = message.blocks ?? [];
     if (message.role === 'user') {
       const prompt = blocks.filter(block => block.type === 'text').map(block => block.text ?? '').join('\n');
-      current = { id: `${chatId}:${messageOffset + messageIndex}`, prompt, steps: [] };
+      current = { id: `${chatId}:${messageOffset + messageIndex}`, prompt, attachments: message.attachments ?? [], steps: [] };
       turns.push(current);
       continue;
     }
     if (!current) {
-      current = { id: `${chatId}:${messageOffset + messageIndex}`, prompt: '', steps: [] };
+      current = { id: `${chatId}:${messageOffset + messageIndex}`, prompt: '', attachments: [], steps: [] };
       turns.push(current);
     }
     if (message.role === 'assistant') {
@@ -179,11 +180,40 @@ export function agentFindRequest(requests: AgentRequestRef[], ref: string): Agen
 export function agentToolLabel(name: string | undefined): string {
   switch (name) {
     case 'list_requests': return 'Listed requests';
+    case 'import_preview': return 'Previewed an import';
+    case 'import_apply': return 'Imported requests';
+    case 'list_files': return 'Listed project files';
+    case 'read_file': return 'Read a project file';
+    case 'search_code': return 'Searched project code';
+    case 'read_attachment': return 'Read an attachment';
+    case 'get_docs': return 'Read documentation';
+    case 'save_docs': return 'Saved documentation';
+    case 'code_snippet': return 'Generated a code snippet';
+    case 'sync_collection': return 'Planned a collection sync';
+    case 'cover_endpoint': return 'Planned endpoint coverage';
     case 'get_request': return 'Read a request';
     case 'list_environments': return 'Listed environments';
     case 'run_request': return 'Ran a request';
     case 'run_collection': return 'Ran a collection';
     case 'send_request': return 'Sent a request';
+    case 'open_session': return 'Opened a connection';
+    case 'send_message': return 'Sent a message';
+    case 'read_messages': return 'Read session messages';
+    case 'close_session': return 'Closed a connection';
+    case 'list_load_tests': return 'Listed load tests';
+    case 'list_load_runs': return 'Listed k6 runs';
+    case 'get_load_test': return 'Read a load test';
+    case 'save_load_test': return 'Saved a load test';
+    case 'start_load_test': return 'Started k6';
+    case 'stop_load_test': return 'Stopped k6';
+    case 'load_test_status': return 'Checked k6 progress';
+    case 'load_test_result': return 'Read a k6 result';
+    case 'compare_load_runs': return 'Compared k6 runs';
+    case 'start_mock_server': return 'Started the mock server';
+    case 'stop_mock_server': return 'Stopped the mock server';
+    case 'mock_server_log': return 'Read the mock log';
+    case 'list_cookies': return 'Listed cookies';
+    case 'clear_cookie_jar': return 'Cleared the cookie jar';
     case 'list_history': return 'Read the history';
     case 'get_history_entry': return 'Read a history entry';
     case 'diagnose_last_failure': return 'Diagnosed a failure';
@@ -214,6 +244,16 @@ export function agentApprovalTitle(approval: AgentApproval): string {
   if (approval.tool === 'git_push') return 'Push this branch?';
   if (approval.tool === 'git_create_branch') return 'Create this branch?';
   if (approval.tool === 'git_commit') return approval.changes.length === 1 ? 'Commit 1 file?' : `Commit ${approval.changes.length} files?`;
+  if (approval.tool === 'import_apply') return 'Apply this import?';
+  if (approval.tool === 'import_preview') return 'Fetch the OpenAPI document?';
+  if (approval.tool === 'clear_cookie_jar') return 'Clear the cookie jar?';
+  if (approval.tool === 'start_load_test') return 'Start this load test?';
+  if (approval.tool === 'stop_load_test') return 'Stop this load test?';
+  if (approval.tool === 'start_mock_server') return 'Start the mock server?';
+  if (approval.tool === 'stop_mock_server') return 'Stop the mock server?';
+  if (approval.tool === 'open_session') return 'Open this connection?';
+  if (approval.tool === 'send_message') return 'Send this message?';
+  if (approval.tool === 'run_request' && approval.kind === 'external') return 'Run this request?';
   if (approval.kind === 'external') return 'Authorize this request?';
   if (approval.tool === 'apply_changes') return 'Apply these changes?';
   if (approval.kind === 'write') {
@@ -222,10 +262,20 @@ export function agentApprovalTitle(approval: AgentApproval): string {
   return 'Send this request?';
 }
 
+export function agentAllowsChatApproval(approval: AgentApproval): boolean {
+  return approval.kind !== 'external' && !['apply_changes', 'git_push', 'clear_cookie_jar', 'start_load_test', 'import_apply'].includes(approval.tool);
+}
+
 export function agentApprovalAction(approval: AgentApproval): string {
   if (approval.tool === 'git_push') return 'Push';
   if (approval.tool === 'git_create_branch') return 'Create branch';
   if (approval.tool === 'git_commit') return 'Commit';
+  if (approval.tool === 'import_preview') return 'Fetch';
+  if (approval.tool === 'clear_cookie_jar') return 'Clear cookies';
+  if (approval.tool === 'start_load_test' || approval.tool === 'start_mock_server') return 'Start';
+  if (approval.tool === 'stop_load_test' || approval.tool === 'stop_mock_server') return 'Stop';
+  if (approval.tool === 'open_session') return 'Connect';
+  if (approval.tool === 'run_request' && approval.kind === 'external') return 'Run';
   if (approval.kind === 'write') return 'Apply';
   return approval.kind === 'external' ? 'Authorize' : 'Send';
 }
@@ -292,4 +342,4 @@ export function agentTurnSegments<T extends { blocks: AiBlock[]; error?: string 
   return segments;
 }
 
-export const AGENT_WRITE_TOOLS = ['save_request', 'delete_request', 'save_example', 'set_variable', 'create_collection', 'generate_tests'];
+export const AGENT_WRITE_TOOLS = ['save_request', 'delete_request', 'save_example', 'set_variable', 'create_collection', 'generate_tests', 'save_docs', 'import_apply'];

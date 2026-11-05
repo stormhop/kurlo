@@ -955,6 +955,24 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class AgentAttachment {
+	    name: string;
+	    id?: string;
+	    mediaType?: string;
+	    preview?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentAttachment(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.id = source["id"];
+	        this.mediaType = source["mediaType"];
+	        this.preview = source["preview"];
+	    }
+	}
 	export class AiUsage {
 	    input: number;
 	    output: number;
@@ -978,6 +996,7 @@ export namespace model {
 	    }
 	}
 	export class AiBlock {
+	    mediaType?: string;
 	    type: string;
 	    text?: string;
 	    id?: string;
@@ -994,6 +1013,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mediaType = source["mediaType"];
 	        this.type = source["type"];
 	        this.text = source["text"];
 	        this.id = source["id"];
@@ -1008,6 +1028,7 @@ export namespace model {
 	export class AiMessage {
 	    role: string;
 	    blocks: AiBlock[];
+	    attachments?: AgentAttachment[];
 	
 	    static createFrom(source: any = {}) {
 	        return new AiMessage(source);
@@ -1017,6 +1038,7 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.role = source["role"];
 	        this.blocks = this.convertValues(source["blocks"], AiBlock);
+	        this.attachments = this.convertValues(source["attachments"], AgentAttachment);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1038,6 +1060,7 @@ export namespace model {
 		}
 	}
 	export class AgentChat {
+	    projectRoot?: string;
 	    archivedAt?: number;
 	    messageOffset?: number;
 	    messageCount?: number;
@@ -1068,6 +1091,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
 	        this.archivedAt = source["archivedAt"];
 	        this.messageOffset = source["messageOffset"];
 	        this.messageCount = source["messageCount"];
@@ -1151,6 +1175,8 @@ export namespace model {
 	    }
 	}
 	export class AgentSendInput {
+	    projectRoot?: string;
+	    attachments?: string[];
 	    workspaceId: string;
 	    effort?: string;
 	    driver?: string;
@@ -1169,6 +1195,8 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.projectRoot = source["projectRoot"];
+	        this.attachments = source["attachments"];
 	        this.workspaceId = source["workspaceId"];
 	        this.effort = source["effort"];
 	        this.driver = source["driver"];

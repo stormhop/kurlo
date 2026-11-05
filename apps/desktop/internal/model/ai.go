@@ -6,6 +6,7 @@ const (
 	AiProviderKurlo     = "kurlo"
 
 	AiBlockText       = "text"
+	AiBlockImage      = "image"
 	AiBlockThinking   = "thinking"
 	AiBlockRedacted   = "redacted_thinking"
 	AiBlockToolUse    = "tool_use"
@@ -39,6 +40,7 @@ type AiToolServer struct {
 }
 
 type AiBlock struct {
+	MediaType string `json:"mediaType,omitempty"`
 	Type      string `json:"type"`
 	Text      string `json:"text,omitempty"`
 	ID        string `json:"id,omitempty"`
@@ -51,8 +53,9 @@ type AiBlock struct {
 }
 
 type AiMessage struct {
-	Role   string    `json:"role"`
-	Blocks []AiBlock `json:"blocks"`
+	Role        string            `json:"role"`
+	Blocks      []AiBlock         `json:"blocks"`
+	Attachments []AgentAttachment `json:"attachments,omitempty"`
 }
 
 type AiRequest struct {
@@ -137,9 +140,10 @@ type AiDeltaEvent struct {
 }
 
 type AiDeltaBatch struct {
-	SessionID string         `json:"sessionId"`
-	TurnID    string         `json:"turnId,omitempty"`
-	Deltas    []AiDeltaEvent `json:"deltas"`
+	SessionID   string            `json:"sessionId"`
+	TurnID      string            `json:"turnId,omitempty"`
+	Deltas      []AiDeltaEvent    `json:"deltas"`
+	Attachments []AgentAttachment `json:"attachments,omitempty"`
 }
 
 type AiStepEvent struct {

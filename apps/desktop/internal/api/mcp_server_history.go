@@ -296,10 +296,11 @@ func (s *mcpServer) toolGetHistoryEntry(_ context.Context, arguments json.RawMes
 
 func mcpHistoryResponse(resp model.HttpResponse, entry mcpStoredHistoryEntry, secrets []string, bodyLimit int) map[string]any {
 	out := map[string]any{
-		"status":     resp.StatusCode,
-		"statusText": resp.Status,
-		"durationMs": resp.Duration,
-		"size":       resp.Size,
+		"status":      resp.StatusCode,
+		"statusText":  resp.Status,
+		"durationMs":  resp.Duration,
+		"diagnostics": mcpDiagnostics(resp, secrets),
+		"size":        resp.Size,
 	}
 	if resp.Error != "" {
 		out["error"] = redactSecrets(resp.Error, secrets)

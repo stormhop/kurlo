@@ -122,7 +122,7 @@ func claudeMCPHandler(bridge *agentToolBridge) http.Handler {
 			reply["result"] = map[string]any{}
 		case "tools/list":
 			reply["result"] = map[string]any{
-				"tools": mcpServerTools(bridge.server.opts.readOnly), "ttlMs": mcpServerListTTLMs, "cacheScope": "private",
+				"tools": bridge.toolDefinitions(), "ttlMs": mcpServerListTTLMs, "cacheScope": "private",
 			}
 		case "tools/call":
 			var params struct {

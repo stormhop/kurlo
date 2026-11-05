@@ -81,7 +81,8 @@ func agentChatMarkdown(chat model.AgentChat) string {
 		driver = "Claude Code"
 	}
 	fmt.Fprintf(&out, "# %s\n\n- Agent: %s\n- Created: %s\n- Updated: %s\n", title, driver, time.UnixMilli(chat.CreatedAt).UTC().Format(time.RFC3339), time.UnixMilli(chat.UpdatedAt).UTC().Format(time.RFC3339))
-	for _, message := range chat.Messages {
+	for _, stored := range chat.Messages {
+		message := agentDisplayMessage(stored)
 		speaker := "Assistant"
 		if message.Role == "user" {
 			speaker = "User"
@@ -104,6 +105,13 @@ func agentChatMarkdown(chat model.AgentChat) string {
 				}
 				writeAgentMarkdownBlock(&out, label, block.Text)
 			}
+		}
+		if len(message.Attachments) > 0 {
+			names := make([]string, 0, len(message.Attachments))
+			for _, attachment := range message.Attachments {
+				names = append(names, attachment.Name)
+			}
+			writeAgentMarkdownBlock(&out, "Attachments", strings.Join(names, "\n"))
 		}
 	}
 	return out.String()

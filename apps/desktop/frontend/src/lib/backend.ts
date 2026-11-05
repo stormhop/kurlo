@@ -766,6 +766,12 @@ export async function agentChatPage(id: string, before = -1): Promise<AgentChat>
   return agentHistoryPage(await agentChat(id), before);
 }
 
+export async function agentAttachmentData(chatId: string, workspaceId: string, attachmentId: string): Promise<string> {
+  const app = window.go?.api?.App;
+  if (!app?.AgentAttachmentData) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.AgentAttachmentData(chatId, workspaceId, attachmentId);
+}
+
 export async function agentChat(id: string): Promise<AgentChat> {
   const app = window.go?.api?.App;
   if (!app?.AgentChat) throw new Error(AGENT_DESKTOP_ONLY);

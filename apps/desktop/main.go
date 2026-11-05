@@ -78,6 +78,7 @@ func buildAppOptions(app *api.App, frontendAssets embed.FS) *options.App {
 		AssetServer: &assetserver.Options{
 			Assets: frontendAssets,
 		},
+		DragAndDrop:      &options.DragAndDrop{EnableFileDrop: true},
 		BackgroundColour: options.NewRGBA(bgR, bgG, bgB, bgA),
 		Menu:             buildMenu(app),
 		OnStartup:        app.Startup,

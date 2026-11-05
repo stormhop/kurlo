@@ -117,6 +117,11 @@ func anthropicHasUnsignedThinking(blocks []model.AiBlock) bool {
 
 func anthropicContentFor(role string, block model.AiBlock) anthropicContent {
 	switch block.Type {
+	case model.AiBlockImage:
+		if role != "user" || block.Data == "" {
+			return nil
+		}
+		return anthropicContent{"type": "image", "source": map[string]string{"type": "base64", "media_type": block.MediaType, "data": block.Data}}
 	case model.AiBlockText:
 		if block.Text == "" {
 			return nil

@@ -41,6 +41,7 @@ const (
 )
 
 type mcpServerOptions struct {
+	projectRoot      string
 	workspace        string
 	workspaceID      string
 	env              string
@@ -52,15 +53,20 @@ type mcpServerOptions struct {
 }
 
 type mcpServer struct {
-	opts     mcpServerOptions
-	out      io.Writer
-	writeMu  sync.Mutex
-	runMu    sync.Mutex
-	jars     *cookieJarRegistry
-	cache    *preflightCache
-	tokens   *oauth2TokenCache
-	session  map[string]*mcpSessionScope
-	lastRuns map[string]mcpLastRun
+	importPlan       *mcpImportPlan
+	attachments      []agentAttachment
+	executionApp     *App
+	protocolSessions *mcpSessionRegistry
+	live             *agentLiveSessions
+	opts             mcpServerOptions
+	out              io.Writer
+	writeMu          sync.Mutex
+	runMu            sync.Mutex
+	jars             *cookieJarRegistry
+	cache            *preflightCache
+	tokens           *oauth2TokenCache
+	session          map[string]*mcpSessionScope
+	lastRuns         map[string]mcpLastRun
 
 	clientMu            sync.Mutex
 	client              string
@@ -121,6 +127,7 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 	fs := flag.NewFlagSet("kurlo mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var opts mcpServerOptions
+	fs.StringVar(&opts.projectRoot, "project-root", "", "read-only source directory for project and import tools")
 	fs.StringVar(&opts.env, "env", "", "environment to use when a tool call does not name one")
 	fs.IntVar(&opts.timeoutMs, "timeout", 0, "per-request timeout in milliseconds (overrides request settings)")
 	fs.BoolVar(&opts.insecure, "insecure", false, "disable TLS certificate verification for every request")
@@ -155,26 +162,44 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 	if opts.workspace == "" {
 		opts.workspace = appRoot
 	}
+	if opts.projectRoot != "" {
+		if !filepath.IsAbs(opts.projectRoot) {
+			if base := os.Getenv("CLAUDE_PROJECT_DIR"); base != "" {
+				opts.projectRoot = filepath.Join(base, opts.projectRoot)
+			}
+		}
+		root, err := agentProjectRoot(opts.projectRoot)
+		if err != nil {
+			return opts, err
+		}
+		opts.projectRoot = root
+	}
 	opts.loadAppSecrets = sameWorkspaceRoot(opts.workspace, appRoot)
 	return opts, nil
 }
 
 func newMCPServer(opts mcpServerOptions, out io.Writer) *mcpServer {
 	return &mcpServer{
-		opts:     opts,
-		out:      out,
-		jars:     newCookieJarRegistry(),
-		cache:    newPreflightCache(),
-		tokens:   newOAuth2TokenCache(),
-		session:  map[string]*mcpSessionScope{},
-		lastRuns: map[string]mcpLastRun{},
-		pending:  map[string]context.CancelFunc{},
+		opts:             opts,
+		executionApp:     NewApp(),
+		protocolSessions: newMCPSessionRegistry(),
+		out:              out,
+		jars:             newCookieJarRegistry(),
+		cache:            newPreflightCache(),
+		tokens:           newOAuth2TokenCache(),
+		session:          map[string]*mcpSessionScope{},
+		lastRuns:         map[string]mcpLastRun{},
+		pending:          map[string]context.CancelFunc{},
 	}
 }
 
 func (s *mcpServer) serve(in io.Reader) error {
 	reader := bufio.NewReaderSize(in, 64*1024)
-	defer s.inflight.Wait()
+	defer func() {
+		s.inflight.Wait()
+		s.executionApp.stopLoadRunForShutdown()
+		s.executionApp.StopMockServer()
+	}()
 	for {
 		line, err := reader.ReadBytes('\n')
 		if trimmed := bytes.TrimSpace(line); len(trimmed) > 0 {
@@ -339,12 +364,14 @@ func (s *mcpServer) instructions() string {
 		"Kurlo is an API client. These tools work on the Kurlo workspace at " + s.opts.workspace + ": its saved requests, collections and environments.",
 		"- list_requests, get_request and list_environments show what is saved. run_request sends a saved request with its auth, scripts and tests, run_collection runs a collection or folder, and send_request sends a one-off call that can use {{variables}}.",
 		"- When the user mentions a request they just sent or a response they saw in Kurlo, call get_history_entry: with no arguments it returns the last request sent from the app. list_history finds older ones. When one failed, diagnose_last_failure says why.",
-		"- Values scripts set carry over to later calls, so run a login request first. unresolvedVariables names the {{variables}} nothing set.",
+		"- Values scripts set carry over to later calls. unresolvedVariables names missing {{variables}}.",
+		"- import_preview shows the YAML diff. Use --project-root to enable read-only source tools.",
 		"- browserOrigin on run_request or send_request checks CORS the way a browser on that origin would.",
 		"- Secrets are sent but shown as [secret]. Protected environments cannot be used here: ask the user to run those requests in Kurlo.",
 	}
 	if !s.opts.readOnly {
 		lines = append(lines, "- create_collection, save_request, patch_request, apply_changes, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*, or let generate_tests write them from a response. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")
+		lines = append(lines, "- Apply imports with import_apply after reviewing the diff.")
 		lines = append(lines, "- git_status and git_diff show uncommitted workspace changes; git_commit commits only workspace files. Call git_push only when the user asked to push, then offer pull_request_url.")
 	}
 	if s.opts.env != "" {
@@ -447,7 +474,7 @@ func mcpServerTools(readOnly bool) []map[string]any {
 		{
 			"name":        "run_request",
 			"title":       "Run a saved request",
-			"description": "Send one saved HTTP or GraphQL request with its collection defaults, auth and scripts, and return the status, headers, body, timings and test results.",
+			"description": "Send one saved HTTP, GraphQL, unary gRPC, MCP or AI request. Use open_session in Agent Mode for live connections.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -457,6 +484,10 @@ func mcpServerTools(readOnly bool) []map[string]any {
 					"maxBodyBytes":       maxBody,
 					"browserOrigin":      browserOrigin,
 					"browserCredentials": browserCredentials,
+					"mcpMethod":          map[string]any{"type": "string", "enum": []string{"tools/list", "tools/call"}, "description": "Override the saved MCP operation."},
+					"mcpName":            map[string]any{"type": "string", "description": "Tool name for tools/call."},
+					"mcpArguments":       map[string]any{"type": "object", "description": "Arguments for tools/call."},
+					"mcpCursor":          map[string]any{"type": "string", "description": "Pagination cursor from tools/list."},
 				},
 				"required": []string{"request"},
 			},
@@ -465,15 +496,19 @@ func mcpServerTools(readOnly bool) []map[string]any {
 		{
 			"name":        "run_collection",
 			"title":       "Run a collection",
-			"description": "Run the HTTP and GraphQL requests of a collection or folder in order, with their test scripts, and return a pass/fail summary per request. Realtime requests are skipped. Reports progress after each request when the call carries a progressToken.",
+			"description": "Run the HTTP, GraphQL and unary gRPC requests of a collection or folder in order, with their test scripts, and return a pass/fail summary per request. Live, MCP and AI requests are skipped. Reports progress after each request when the call carries a progressToken.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"collection":  map[string]any{"type": "string", "description": "Collection name. Omit to run every collection."},
-					"folder":      map[string]any{"type": "string", "description": "Only run requests under this folder path (slash-separated)."},
-					"environment": environment,
-					"variables":   variables,
-					"failFast":    map[string]any{"type": "boolean", "description": "Stop at the first failing request."},
+					"collection":     map[string]any{"type": "string", "description": "Collection name. Omit to run every collection."},
+					"folder":         map[string]any{"type": "string", "description": "Only run requests under this folder path (slash-separated)."},
+					"environment":    environment,
+					"variables":      variables,
+					"failFast":       map[string]any{"type": "boolean", "description": "Stop at the first failing request."},
+					"iterations":     map[string]any{"type": "integer", "minimum": 1, "description": "Number of iterations, defaults to one."},
+					"dataFile":       map[string]any{"type": "string", "description": "CSV or JSON file relative to the workspace root. Runs one iteration per row."},
+					"dataAttachment": map[string]any{"type": "string", "description": "CSV or JSON attachment ID in Agent Mode. Runs one iteration per row."},
+					"delayMs":        map[string]any{"type": "integer", "minimum": 0, "description": "Delay between requests in milliseconds."},
 				},
 			},
 			"annotations": network,
@@ -515,6 +550,7 @@ func mcpServerTools(readOnly bool) []map[string]any {
 		"annotations": network,
 	})
 	tools = append(append(tools, mcpServerHistoryTools()...), mcpDiagnoseTool())
+	tools = append(tools, executionToolDefinitions(readOnly, false)...)
 	if readOnly {
 		return append(tools, mcpGitTools(true)...)
 	}
@@ -595,7 +631,14 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 	case "git_push":
 		run = s.toolGitPush
 	default:
-		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "unknown tool: " + call.Name}
+		tool, ok := executionTools[call.Name]
+		if !ok || (tool.live && s.live == nil) {
+			return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "unknown tool: " + call.Name}
+		}
+		if tool.write && s.opts.readOnly {
+			return nil, &mcpServerError{code: mcpRPCInvalidParams, message: call.Name + " is not available: this server was started with --read-only"}
+		}
+		run = func(ctx context.Context, args json.RawMessage) (any, error) { return tool.run(s, ctx, args) }
 	}
 	if s.opts.readOnly && (mcpWriteToolNames[call.Name] || mcpGitWriteToolNames[call.Name]) {
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: call.Name + " is not available: this server was started with --read-only"}
@@ -1090,6 +1133,13 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 	if err != nil {
 		return nil, err
 	}
+	for _, collection := range ws.collections {
+		for _, row := range collection.Defaults.Variables {
+			if row.Enabled && row.Secret {
+				secrets = append(secrets, row.Value)
+			}
+		}
+	}
 	if scope := s.session[strings.ToLower(envName)]; scope != nil {
 		for key := range scope.removed {
 			delete(values, key)
@@ -1119,24 +1169,32 @@ func (s *mcpServer) runOptions() cliOptions {
 }
 
 func (s *mcpServer) execute(ctx context.Context, run *mcpRunContext, req cliSavedRequest) (cliRunResult, model.HttpResponse) {
-	result, resp := executeCLIRequest(ctx, run.sm, s.jars, s.cache, s.tokens, req, 1, nil, s.runOptions(), run.secrets)
+	return s.executeIteration(ctx, run, req, 1, nil, s.runOptions())
+}
+
+func (s *mcpServer) executeIteration(ctx context.Context, run *mcpRunContext, req cliSavedRequest, iteration int, data map[string]string, opts cliOptions) (cliRunResult, model.HttpResponse) {
+	result, resp := executeCLIRequest(ctx, run.sm, s.jars, s.cache, s.tokens, req, iteration, data, opts, run.secrets)
 	run.secrets = append(run.secrets, result.secrets...)
 	for _, logs := range [][]string{resp.PreRequestResult.Logs, resp.TestResult.Logs} {
 		for _, line := range logs {
 			result.Logs = append(result.Logs, redactSecrets(line, run.secrets))
 		}
 	}
-	if len(resp.CollectionVariableUpdates) > 0 || len(resp.CollectionVariablesRemoved) > 0 {
+	s.applyCollectionUpdates(run, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
+	return result, resp
+}
+
+func (s *mcpServer) applyCollectionUpdates(run *mcpRunContext, updates map[string]string, removed []string) {
+	if len(updates) > 0 || len(removed) > 0 {
 		values := run.sm.GetEnvironment()
-		for key, value := range resp.CollectionVariableUpdates {
+		for key, value := range updates {
 			values[key] = value
 		}
-		for _, key := range resp.CollectionVariablesRemoved {
+		for _, key := range removed {
 			delete(values, key)
 		}
 		run.sm.SetEnvironment(values)
 	}
-	return result, resp
 }
 
 func (s *mcpServer) remember(run *mcpRunContext) []string {
@@ -1175,28 +1233,29 @@ type mcpHeader struct {
 }
 
 type mcpRequestOutcome struct {
-	Request          string          `json:"request"`
-	Method           string          `json:"method"`
-	URL              string          `json:"url"`
-	Environment      string          `json:"environment,omitempty"`
-	Status           int             `json:"status,omitempty"`
-	StatusText       string          `json:"statusText,omitempty"`
-	DurationMs       int64           `json:"durationMs"`
-	Size             int64           `json:"size"`
-	Headers          []mcpHeader     `json:"headers,omitempty"`
-	Body             string          `json:"body,omitempty"`
-	BodyTruncated    bool            `json:"bodyTruncated,omitempty"`
-	BodyOmitted      string          `json:"bodyOmitted,omitempty"`
-	Tests            []cliTestResult `json:"tests,omitempty"`
-	TestsPassed      int             `json:"testsPassed"`
-	TestsTotal       int             `json:"testsTotal"`
-	Logs             []string        `json:"logs,omitempty"`
-	Warnings         []string        `json:"warnings,omitempty"`
-	Error            string          `json:"error,omitempty"`
-	Skipped          bool            `json:"skipped,omitempty"`
-	SkipReason       string          `json:"skipReason,omitempty"`
-	VariablesChanged []string        `json:"variablesChanged,omitempty"`
-	Unresolved       []string        `json:"unresolvedVariables,omitempty"`
+	Request          string                `json:"request"`
+	Diagnostics      mcpRequestDiagnostics `json:"diagnostics"`
+	Method           string                `json:"method"`
+	URL              string                `json:"url"`
+	Environment      string                `json:"environment,omitempty"`
+	Status           int                   `json:"status,omitempty"`
+	StatusText       string                `json:"statusText,omitempty"`
+	DurationMs       int64                 `json:"durationMs"`
+	Size             int64                 `json:"size"`
+	Headers          []mcpHeader           `json:"headers,omitempty"`
+	Body             string                `json:"body,omitempty"`
+	BodyTruncated    bool                  `json:"bodyTruncated,omitempty"`
+	BodyOmitted      string                `json:"bodyOmitted,omitempty"`
+	Tests            []cliTestResult       `json:"tests,omitempty"`
+	TestsPassed      int                   `json:"testsPassed"`
+	TestsTotal       int                   `json:"testsTotal"`
+	Logs             []string              `json:"logs,omitempty"`
+	Warnings         []string              `json:"warnings,omitempty"`
+	Error            string                `json:"error,omitempty"`
+	Skipped          bool                  `json:"skipped,omitempty"`
+	SkipReason       string                `json:"skipReason,omitempty"`
+	VariablesChanged []string              `json:"variablesChanged,omitempty"`
+	Unresolved       []string              `json:"unresolvedVariables,omitempty"`
 }
 
 var mcpVariableRe = regexp.MustCompile(`\{\{\s*([^{}$\s][^{}]*?)\s*\}\}`)
@@ -1262,6 +1321,7 @@ func mcpOutcome(label string, run *mcpRunContext, result cliRunResult, resp mode
 	secrets := run.secrets
 	outcome := mcpRequestOutcome{
 		Request:     label,
+		Diagnostics: mcpDiagnostics(resp, secrets),
 		Method:      result.Method,
 		URL:         redactSecrets(result.URL, secrets),
 		Environment: run.envName,
@@ -1275,8 +1335,8 @@ func mcpOutcome(label string, run *mcpRunContext, result cliRunResult, resp mode
 		Skipped:     result.Skipped,
 		SkipReason:  result.SkipReason,
 	}
-	for _, header := range resp.Headers {
-		outcome.Headers = append(outcome.Headers, mcpHeader{Name: header.Key, Value: redactSecrets(header.Value, secrets)})
+	for _, header := range mcpSafeHeaders(resp.Headers, secrets) {
+		outcome.Headers = append(outcome.Headers, mcpHeader{Name: header.Key, Value: header.Value})
 	}
 	if resp.BodyIsBinary {
 		kind := defaultString(resp.BodySniffedType, headerLookup(resp.Headers, "Content-Type"))
@@ -1301,6 +1361,7 @@ func (s *mcpServer) toolRunRequest(ctx context.Context, arguments json.RawMessag
 		Environment  string         `json:"environment"`
 		Variables    map[string]any `json:"variables"`
 		MaxBodyBytes int            `json:"maxBodyBytes"`
+		mcpProtocolArgs
 		mcpBrowserArgs
 	}
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
@@ -1314,19 +1375,14 @@ func (s *mcpServer) toolRunRequest(ctx context.Context, arguments json.RawMessag
 	if err != nil {
 		return nil, err
 	}
-	if !cliRunnable(req) {
-		return nil, fmt.Errorf("%s is a %s request; only HTTP and GraphQL requests can be run here", mcpRequestPath(req), mcpRequestType(req))
-	}
-	for i := range ws.collections {
-		if ws.collections[i].ID == req.CollectionID {
-			req = applyCollectionDefaults(req, &ws.collections[i])
-			break
-		}
-	}
+	req = ws.withDefaults(req)
 	req = args.apply(req)
-	run, err := s.prepareRun(ws, args.Environment, args.Variables)
+	run, err := s.prepareRun(ws.forRequest(req), args.Environment, args.Variables)
 	if err != nil {
 		return nil, err
+	}
+	if !cliRunnable(req) {
+		return s.runSavedProtocol(ctx, ws, run, req, args.mcpProtocolArgs, mcpBodyLimit(args.MaxBodyBytes))
 	}
 	result, resp := s.execute(ctx, run, req)
 	s.lastRuns[req.ID] = mcpLastRun{request: req, response: resp, secrets: run.secrets}
@@ -1359,6 +1415,7 @@ func (s *mcpServer) toolSendRequest(ctx context.Context, arguments json.RawMessa
 	}
 	req := cliSavedRequest{
 		RequestType: "http",
+		WorkspaceID: s.opts.workspaceID,
 		Method:      strings.ToUpper(defaultString(strings.TrimSpace(args.Method), "GET")),
 		URL:         args.URL,
 		BodyType:    "none",
@@ -1399,11 +1456,15 @@ type mcpCollectionRun struct {
 
 func (s *mcpServer) toolRunCollection(ctx context.Context, arguments json.RawMessage) (any, error) {
 	var args struct {
-		Collection  string         `json:"collection"`
-		Folder      string         `json:"folder"`
-		Environment string         `json:"environment"`
-		Variables   map[string]any `json:"variables"`
-		FailFast    bool           `json:"failFast"`
+		Collection     string         `json:"collection"`
+		Folder         string         `json:"folder"`
+		Environment    string         `json:"environment"`
+		Variables      map[string]any `json:"variables"`
+		FailFast       bool           `json:"failFast"`
+		Iterations     int            `json:"iterations"`
+		DelayMs        int            `json:"delayMs"`
+		DataFile       string         `json:"dataFile"`
+		DataAttachment string         `json:"dataAttachment"`
 	}
 	if err := mcpDecodeArguments(arguments, &args); err != nil {
 		return nil, err
@@ -1418,35 +1479,91 @@ func (s *mcpServer) toolRunCollection(ctx context.Context, arguments json.RawMes
 			selection.folder = append(selection.folder, segment)
 		}
 	}
-	selected := selectCLIRequests(ws.requests, selection)
+	selected := selectRequestsForRun(ws.requests, selection, mcpRunnerRunnable)
 	if len(selected) == 0 {
 		return nil, fmt.Errorf("no runnable requests matched; call list_requests to see the collections")
 	}
-	collectionsByID := make(map[string]*cliCollection, len(ws.collections))
-	for i := range ws.collections {
-		collectionsByID[ws.collections[i].ID] = &ws.collections[i]
+	for i, req := range selected {
+		selected[i] = ws.withDefaults(req)
 	}
 	run, err := s.prepareRun(ws, args.Environment, args.Variables)
 	if err != nil {
 		return nil, err
 	}
-
+	if args.Iterations < 0 || args.DelayMs < 0 || args.DelayMs > 3600000 {
+		return nil, fmt.Errorf("iterations must be positive and delayMs must be between 0 and 3600000")
+	}
+	iterations := max(1, args.Iterations)
+	var rows []map[string]string
+	if args.DataAttachment != "" {
+		if args.DataFile != "" {
+			return nil, fmt.Errorf("use either dataFile or dataAttachment")
+		}
+		attached, err := s.attachment(args.DataAttachment)
+		if err != nil {
+			return nil, err
+		}
+		ext := strings.ToLower(filepath.Ext(attached.name))
+		if ext != ".csv" && ext != ".json" {
+			return nil, fmt.Errorf("attach a CSV or JSON data file")
+		}
+		rows, err = parseCLIData(string(attached.data), attached.name)
+		if err != nil {
+			return nil, err
+		}
+		iterations = len(rows)
+	} else if args.DataFile != "" {
+		file, err := mcpWorkspaceFile(s.opts.workspace, args.DataFile)
+		if err != nil {
+			return nil, err
+		}
+		rows, err = loadDataFile(file)
+		if err != nil {
+			return nil, err
+		}
+		iterations = len(rows)
+	}
+	if iterations > 10000/len(selected) {
+		return nil, fmt.Errorf("a collection run can send at most 10000 requests")
+	}
+	opts := s.runOptions()
+	opts.iterationCount = iterations
 	start := time.Now()
 	results := make([]cliRunResult, 0, len(selected))
-	for _, req := range selected {
-		if ctx.Err() != nil {
-			break
+runLoop:
+	for iteration := 1; iteration <= iterations; iteration++ {
+		var row map[string]string
+		if len(rows) > 0 {
+			row = rows[iteration-1]
 		}
-		result, _ := s.execute(ctx, run, applyCollectionDefaults(req, collectionsByID[req.CollectionID]))
-		result.URL = redactSecrets(result.URL, run.secrets)
-		result.Error = redactSecrets(result.Error, run.secrets)
-		for i := range result.Tests {
-			result.Tests[i].Error = redactSecrets(result.Tests[i].Error, run.secrets)
-		}
-		results = append(results, result)
-		s.progress(ctx, len(results), len(selected), mcpProgressMessage(result))
-		if args.FailFast && result.failed() {
-			break
+		for _, req := range selected {
+			if len(results) > 0 && args.DelayMs > 0 {
+				timer := time.NewTimer(time.Duration(args.DelayMs) * time.Millisecond)
+				select {
+				case <-ctx.Done():
+				case <-timer.C:
+				}
+				timer.Stop()
+			}
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			var result cliRunResult
+			if mcpRequestType(req) == "grpc" {
+				result = s.executeGrpcIteration(ctx, run, req, grpcRunIteration{index: iteration, count: iterations, data: row})
+			} else {
+				result, _ = s.executeIteration(ctx, run, req, iteration, row, opts)
+			}
+			result.URL = redactSecrets(result.URL, run.secrets)
+			result.Error = redactSecrets(result.Error, run.secrets)
+			for i := range result.Tests {
+				result.Tests[i].Error = redactSecrets(result.Tests[i].Error, run.secrets)
+			}
+			results = append(results, result)
+			s.progress(ctx, len(results), iterations*len(selected), mcpProgressMessage(result))
+			if args.FailFast && result.failed() {
+				break runLoop
+			}
 		}
 	}
 
@@ -1461,6 +1578,8 @@ func (s *mcpServer) toolRunCollection(ctx context.Context, arguments json.RawMes
 		Environment: run.envName,
 		Summary: map[string]any{
 			"requests":         summary.requests,
+			"iterations":       iterations,
+			"stoppedEarly":     len(results) < iterations*len(selected),
 			"passed":           summary.passed,
 			"failed":           summary.failed,
 			"skipped":          skipped,

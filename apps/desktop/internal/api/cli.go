@@ -409,9 +409,13 @@ func headerLookup(headers []model.KeyValue, key string) string {
 }
 
 func selectCLIRequests(requests []cliSavedRequest, opts cliOptions) []cliSavedRequest {
+	return selectRequestsForRun(requests, opts, cliRunnable)
+}
+
+func selectRequestsForRun(requests []cliSavedRequest, opts cliOptions, runnable func(cliSavedRequest) bool) []cliSavedRequest {
 	selected := make([]cliSavedRequest, 0, len(requests))
 	for _, req := range requests {
-		if !cliRunnable(req) {
+		if !runnable(req) {
 			continue
 		}
 		if opts.collection != "" && !strings.EqualFold(strings.TrimSpace(req.Collection), strings.TrimSpace(opts.collection)) {

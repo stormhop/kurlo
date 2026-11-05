@@ -99,17 +99,27 @@ func openAIMessages(system string, messages []model.AiMessage) []map[string]any 
 			out = append(out, entry)
 		default:
 			var text []string
+			var images []map[string]any
 			for _, block := range message.Blocks {
 				switch block.Type {
 				case model.AiBlockToolResult:
 					out = append(out, map[string]any{"role": "tool", "tool_call_id": block.ID, "content": block.Text})
+				case model.AiBlockImage:
+					if block.Data != "" {
+						images = append(images, map[string]any{"type": "image_url", "image_url": map[string]string{"url": agentImageURL(block)}})
+					}
 				case model.AiBlockText:
 					if block.Text != "" {
 						text = append(text, block.Text)
 					}
 				}
 			}
-			if len(text) > 0 {
+			if len(images) > 0 {
+				if len(text) > 0 {
+					images = append([]map[string]any{{"type": "text", "text": strings.Join(text, "\n\n")}}, images...)
+				}
+				out = append(out, map[string]any{"role": "user", "content": images})
+			} else if len(text) > 0 {
 				out = append(out, map[string]any{"role": "user", "content": strings.Join(text, "\n\n")})
 			}
 		}

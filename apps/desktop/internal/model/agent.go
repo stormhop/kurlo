@@ -54,6 +54,7 @@ type AgentChatSummary struct {
 }
 
 type AgentChat struct {
+	ProjectRoot      string      `json:"projectRoot,omitempty"`
 	ArchivedAt       int64       `json:"archivedAt,omitempty"`
 	MessageOffset    int         `json:"messageOffset,omitempty"`
 	MessageCount     int         `json:"messageCount,omitempty"`
@@ -79,18 +80,27 @@ type AgentChat struct {
 	Branch           string      `json:"branch,omitempty"`
 }
 
+type AgentAttachment struct {
+	Name      string `json:"name"`
+	ID        string `json:"id,omitempty"`
+	MediaType string `json:"mediaType,omitempty"`
+	Preview   string `json:"preview,omitempty"`
+}
+
 type AgentSendInput struct {
-	WorkspaceID  string `json:"workspaceId"`
-	Effort       string `json:"effort,omitempty"`
-	Driver       string `json:"driver,omitempty"`
-	ChatID       string `json:"chatId"`
-	TurnID       string `json:"turnId"`
-	Text         string `json:"text"`
-	Collection   string `json:"collection"`
-	Environment  string `json:"environment"`
-	ConnectionID string `json:"connectionId"`
-	Model        string `json:"model"`
-	OwnBranch    bool   `json:"ownBranch,omitempty"`
+	ProjectRoot  *string  `json:"projectRoot,omitempty"`
+	Attachments  []string `json:"attachments,omitempty"`
+	WorkspaceID  string   `json:"workspaceId"`
+	Effort       string   `json:"effort,omitempty"`
+	Driver       string   `json:"driver,omitempty"`
+	ChatID       string   `json:"chatId"`
+	TurnID       string   `json:"turnId"`
+	Text         string   `json:"text"`
+	Collection   string   `json:"collection"`
+	Environment  string   `json:"environment"`
+	ConnectionID string   `json:"connectionId"`
+	Model        string   `json:"model"`
+	OwnBranch    bool     `json:"ownBranch,omitempty"`
 }
 
 type AgentTurn struct {

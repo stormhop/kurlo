@@ -52,6 +52,12 @@ func agentSafeMethod(method string) bool {
 }
 
 func agentRequestMethod(req cliSavedRequest) string {
+	if isGraphQLRequest(req) {
+		return http.MethodPost
+	}
+	if mcpRequestType(req) == "grpc" {
+		return "GRPC"
+	}
 	method := strings.ToUpper(strings.TrimSpace(req.Method))
 	if method == "" {
 		return http.MethodGet
@@ -102,6 +108,10 @@ func agentRunMethods(s *mcpServer, tool string, arguments json.RawMessage) ([]st
 		if err != nil {
 			return nil, nil
 		}
+		switch mcpRequestType(req) {
+		case "grpc", "mcp", "ai":
+			return []string{strings.ToUpper(mcpRequestType(req))}, nil
+		}
 		return []string{agentRequestMethod(req)}, nil
 	case "run_collection":
 		var args struct {
@@ -120,7 +130,7 @@ func agentRunMethods(s *mcpServer, tool string, arguments json.RawMessage) ([]st
 			}
 		}
 		var methods []string
-		for _, req := range selectCLIRequests(ws.requests, selection) {
+		for _, req := range selectRequestsForRun(ws.requests, selection, mcpRunnerRunnable) {
 			methods = append(methods, agentRequestMethod(req))
 		}
 		return methods, nil
@@ -129,6 +139,16 @@ func agentRunMethods(s *mcpServer, tool string, arguments json.RawMessage) ([]st
 }
 
 func agentDecide(s *mcpServer, tool string, arguments json.RawMessage) agentDecision {
+	if tool == "import_preview" {
+		var args mcpImportArgs
+		_ = json.Unmarshal(arguments, &args)
+		if args.ImportID == "" && args.URL != "" {
+			return agentDecision{kind: model.AgentToolExternal, ask: true, reason: "Fetches the OpenAPI document from the supplied URL."}
+		}
+	}
+	if entry, ok := executionTools[tool]; ok {
+		return agentDecision{kind: entry.kind, ask: entry.reason != "", reason: entry.reason}
+	}
 	switch {
 	case tool == "authorize_oauth2":
 		return agentDecision{kind: model.AgentToolExternal, ask: true, reason: "Contacts the configured OAuth provider and may open a sign-in page."}
@@ -144,6 +164,12 @@ func agentDecide(s *mcpServer, tool string, arguments json.RawMessage) agentDeci
 		methods, err := agentRunMethods(s, tool, arguments)
 		if err != nil {
 			return agentDecision{kind: kind, ask: true, reason: "Kurlo could not read the workspace to check which methods this call sends."}
+		}
+		if tool == "run_request" && len(methods) == 1 {
+			switch methods[0] {
+			case "AI", "MCP", "GRPC":
+				return agentDecision{kind: model.AgentToolExternal, ask: true, reason: fmt.Sprintf("Runs the saved %s request and contacts its configured server.", methods[0])}
+			}
 		}
 		if unsafe := agentUnsafeMethods(methods); len(unsafe) > 0 {
 			return agentDecision{kind: kind, ask: true, methods: unsafe, reason: fmt.Sprintf("Sends %s requests, which can change data on the server.", strings.Join(unsafe, ", "))}
@@ -235,7 +261,7 @@ func (b *agentToolBridge) commitOwnBranch(tool string, record *mcpCallRecord) st
 }
 
 func agentAllowsChatApproval(tool string) bool {
-	return tool != "apply_changes" && tool != "authorize_oauth2" && tool != "git_push"
+	return tool != "apply_changes" && tool != "authorize_oauth2" && tool != "git_push" && tool != "clear_cookie_jar" && tool != "start_load_test" && tool != "open_session" && tool != "import_apply" && tool != "import_preview"
 }
 
 func agentDecideGit(s *mcpServer, tool string, arguments json.RawMessage) agentDecision {
@@ -306,8 +332,12 @@ func (b *agentToolBridge) currentTurn() string {
 	return b.turnID
 }
 
+func (b *agentToolBridge) toolDefinitions() []map[string]any {
+	return append(mcpServerTools(b.server.opts.readOnly), executionToolDefinitions(b.server.opts.readOnly, true)...)
+}
+
 func (b *agentToolBridge) tools() []aiTool {
-	definitions := mcpServerTools(b.server.opts.readOnly)
+	definitions := b.toolDefinitions()
 	tools := make([]aiTool, 0, len(definitions))
 	for _, definition := range definitions {
 		name, _ := definition["name"].(string)
@@ -340,7 +370,7 @@ func (b *agentToolBridge) ask(ctx context.Context, approval model.AgentApproval)
 	}
 	switch decision {
 	case model.AgentApprovalAllowChat:
-		if agentAllowsChatApproval(approval.Tool) {
+		if approval.Kind != model.AgentToolExternal && agentAllowsChatApproval(approval.Tool) {
 			b.allow(approval.Tool)
 		}
 		return nil
@@ -364,10 +394,13 @@ func (b *agentToolBridge) call(ctx context.Context, tool aiTool, input, toolUseI
 	}
 	gated := false
 	ctx = withMcpGate(ctx, func(name string, args json.RawMessage) error {
-		if b.isAllowed(name) {
+		if name != "run_request" && b.isAllowed(name) {
 			return nil
 		}
 		decision := agentDecide(b.server, name, args)
+		if name == "run_request" && decision.kind != model.AgentToolExternal && b.isAllowed(name) {
+			return nil
+		}
 		if !decision.ask || (decision.kind == model.AgentToolWrite && len(decision.methods) == 0 && mcpWriteToolNames[name]) {
 			return nil
 		}
@@ -379,7 +412,7 @@ func (b *agentToolBridge) call(ctx context.Context, tool aiTool, input, toolUseI
 			return nil
 		}
 		reason := "Changes the workspace files."
-		if tool.Original == "apply_changes" {
+		if tool.Original == "apply_changes" || tool.Original == "import_apply" {
 			reason = "Review all changes in this batch."
 		} else if gated {
 			reason = "Writes these changes to the workspace files."

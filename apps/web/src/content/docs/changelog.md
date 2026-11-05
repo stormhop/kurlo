@@ -14,6 +14,12 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **Drag and drop attachments in Agent Mode.** Drop files onto the message box to attach them to your next message.
+
+- **Project context and imports in Agent Mode.** Connect a read-only source folder, attach files or screenshots, preview imports before applying them, and ask the agent to edit Markdown docs or generate a snippet. See [Project folders, files and imports](/docs/guides/agent/#project-folders-files-and-imports).
+
+- **Run more from Agent Mode.** Work with live connections, unary gRPC, MCP and AI requests. Run collections with test data, compare k6 runs, start example-backed mocks and diagnose timing, redirects, TLS and cookies. See [Running requests and tests](/docs/guides/agent/#running-requests-and-tests).
+
 - **Agent activity and Git in Agent Mode.** Review every agent and MCP tool call under **Activity** in the agent sidebar and restore the files a call changed. The agent can check Git status and diffs, commit and push with your approval, commit each approved change to a branch of its own, and open a pull request link. The agent works only in the chat's workspace, and **Activity** shows that workspace with **All workspaces** for the rest. See [Git](/docs/guides/agent/#git) and [Agent activity](/docs/guides/agent/#agent-activity).
 
 - **NTLM and OAuth 2.0 sign-in.** Use NTLMv2 on HTTP requests and authorize saved OAuth 2.0 requests in Agent Mode or through MCP.
@@ -63,7 +69,11 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Agent chat names.** The rename field grows with the name and scrolls horizontally once it reaches its width limit.
+
 - **Desktop scrollbars.** Transparent tracks and inset handles keep scrollbars from ending in a visible strip at panel edges.
+
+- **Agent attachments.** Open files and zoom in on images above the message, including SVGs. Encrypted local copies stay available with the chat.
 
 - **AI requests in Git workspaces.** Workspace YAML accepts provider strings, so requests using the default Kurlo connection or a custom provider can load.
 

@@ -9,6 +9,8 @@ export function AgentActivity(arg1:model.AgentActivityFilter):Promise<model.Agen
 
 export function AgentActivityEntry(arg1:string):Promise<model.AgentActivityEntry>;
 
+export function AgentAttachmentData(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function AgentChat(arg1:string):Promise<model.AgentChat>;
 
 export function AgentChatPage(arg1:string,arg2:number):Promise<model.AgentChat>;

@@ -14,7 +14,11 @@ func loadDataFile(path string) ([]map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("data file: %w", err)
 	}
-	trimmed := strings.TrimSpace(string(data))
+	return parseCLIData(string(data), path)
+}
+
+func parseCLIData(data, path string) ([]map[string]string, error) {
+	trimmed := strings.TrimSpace(data)
 	if trimmed == "" {
 		return nil, fmt.Errorf("data file is empty")
 	}
@@ -24,7 +28,7 @@ func loadDataFile(path string) ([]map[string]string, error) {
 	if isJSON {
 		return parseJSONDataRows(trimmed)
 	}
-	return parseCSVDataRows(string(data))
+	return parseCSVDataRows(data)
 }
 
 func parseJSONDataRows(text string) ([]map[string]string, error) {

@@ -41,6 +41,7 @@ type agentPendingApproval struct {
 }
 
 type agentRuntime struct {
+	app                 *App
 	openOAuthBrowser    func(string) error
 	onOAuthDevicePrompt func(model.OAuth2DevicePrompt)
 	mu                  sync.Mutex
@@ -85,12 +86,21 @@ func (rt *agentRuntime) bridge(chat model.AgentChat, root string) *agentToolBrid
 	bridge := rt.bridges[chat.ID]
 	if bridge == nil || !sameWorkspaceRoot(bridge.server.opts.workspace, root) {
 		bridge = newAgentToolBridge(mcpServerOptions{workspace: root, loadAppSecrets: true}, chat.ID, chat.AllowedTools)
+		if rt.app != nil {
+			if rt.app.mock != nil {
+				bridge.server.executionApp = rt.app
+			}
+			if rt.app.cookieJars != nil {
+				bridge.server.jars = rt.app.cookieJars
+			}
+		}
 		bridge.server.onWrite = noteAgentWorkspaceWrite
 		bridge.server.openOAuthBrowser = rt.openOAuthBrowser
 		bridge.server.onOAuthDevicePrompt = rt.onOAuthDevicePrompt
 		rt.bridges[chat.ID] = bridge
 	}
 	bridge.server.opts.env = strings.TrimSpace(chat.Environment)
+	bridge.server.opts.projectRoot = chat.ProjectRoot
 	bridge.server.opts.workspaceID = strings.TrimSpace(chat.WorkspaceID)
 	chatID := chat.ID
 	bridge.setChat(chat, func(branch string) {
@@ -242,6 +252,11 @@ func agentHistoryForModel(messages []model.AiMessage) ([]model.AiMessage, bool) 
 	}
 	out := make([]model.AiMessage, 0, len(messages))
 	for index, message := range messages {
+		if message.Role == "user" && len(message.Attachments) > 0 && len(message.Blocks) == 1 && message.Blocks[0].Type == model.AiBlockText {
+			message.Blocks = append([]model.AiBlock(nil), message.Blocks...)
+			message.Blocks[0].Text = agentAttachmentPrompt(message.Blocks[0].Text, message.Attachments)
+			message.Attachments = nil
+		}
 		if index >= recent {
 			out = append(out, message)
 			continue
@@ -323,6 +338,7 @@ func (a *App) agentRuntime() *agentRuntime {
 		if a.agent == nil {
 			a.agent = newAgentRuntime()
 		}
+		a.agent.app = a
 		if a.ctx != nil {
 			a.agent.openOAuthBrowser = a.openAuthorizeURL
 			a.agent.onOAuthDevicePrompt = func(prompt model.OAuth2DevicePrompt) {
@@ -415,11 +431,25 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	if utf8.RuneCountInString(text) > model.AiMaxPromptChars {
 		return agentTurnError(model.AgentChat{}, fmt.Sprintf("The message is longer than %d characters. Shorten it before sending.", model.AiMaxPromptChars))
 	}
+	files, err := loadAgentAttachments(input.Attachments)
+	if err != nil {
+		return agentTurnError(model.AgentChat{}, err.Error())
+	}
+	var projectRoot string
+	if input.ProjectRoot != nil {
+		projectRoot, err = agentProjectRoot(*input.ProjectRoot)
+		if err != nil {
+			return agentTurnError(model.AgentChat{}, err.Error())
+		}
+	}
 	root := fileWorkspaceStorePath()
 	workspaceDisk.ensureTracking(root)
 	workspace := agentWorkspaceKey(root)
-	userMessage := model.AiMessage{Role: "user", Blocks: []model.AiBlock{{Type: model.AiBlockText, Text: text}}}
+	userMessage := newAgentUserMessage(text, files)
 	applyInput := func(chat *model.AgentChat) {
+		if input.ProjectRoot != nil {
+			chat.ProjectRoot = projectRoot
+		}
 		chat.Collection = strings.TrimSpace(input.Collection)
 		chat.Environment = strings.TrimSpace(input.Environment)
 		chat.ConnectionID = strings.TrimSpace(input.ConnectionID)
@@ -428,7 +458,6 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	}
 
 	var chat model.AgentChat
-	var err error
 	chatID := strings.TrimSpace(input.ChatID)
 	if chatID == "" {
 		chat = model.AgentChat{ID: uuid.NewString(), Title: agentChatTitle(text), Workspace: workspace, WorkspaceID: strings.TrimSpace(input.WorkspaceID)}
@@ -438,7 +467,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 			return agentTurnError(chat, "The agent is still working in this chat.")
 		}
 		defer a.agentRuntime().end(chat.ID)
-		if chat, err = createAgentChat(chat); err != nil {
+		if chat, err = createAgentChat(chat, files...); err != nil {
 			return agentTurnError(chat, "Kurlo could not save the chat: "+err.Error())
 		}
 	} else {
@@ -462,7 +491,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 				chat.Title = agentChatTitle(text)
 			}
 			chat.Messages = append(chat.Messages, userMessage)
-		}); err != nil {
+		}, files...); err != nil {
 			return agentTurnError(existing, "Kurlo could not save the chat: "+err.Error())
 		}
 	}
@@ -472,6 +501,10 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 		return agentTurnError(chat, err.Error())
 	}
 	history, dropped := agentHistoryForModel(chat.Messages)
+	if images := agentImageBlocks(files); len(images) > 0 && len(history) > 0 {
+		last := &history[len(history)-1]
+		last.Blocks = append(append([]model.AiBlock(nil), last.Blocks...), images...)
+	}
 	turnID := strings.TrimSpace(input.TurnID)
 	if turnID == "" {
 		turnID = uuid.NewString()
@@ -492,6 +525,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	rt := a.agentRuntime()
 	emit := a.agentEmitter()
 	bridge := rt.bridge(chat, root)
+	bridge.server.attachments = files
 	bridge.setTurn(turnID)
 	bridge.onAllow = func(tool string) {
 		_, _ = updateAgentChat(chat.ID, func(chat *model.AgentChat) {
@@ -513,6 +547,8 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 		baseCtx = a.ctx
 	}
 	ctx, cancel := context.WithCancelCause(baseCtx)
+	bridge.server.live = newAgentLiveSessions(ctx, bridge.server.jars)
+	defer bridge.server.live.close()
 	bridge.approve = rt.approve(emit, cancel)
 	stop := func() { cancel(context.Canceled) }
 	turnKey := agentTurnCancelPrefix + turnID
@@ -526,7 +562,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	}()
 
 	if emit != nil {
-		emit("ai:deltas", model.AiDeltaBatch{SessionID: chat.ID, TurnID: turnID, Deltas: []model.AiDeltaEvent{}})
+		emit("ai:deltas", model.AiDeltaBatch{SessionID: chat.ID, TurnID: turnID, Deltas: []model.AiDeltaEvent{}, Attachments: userMessage.Attachments})
 	}
 	runner := aiRunner{
 		ctx:      ctx,

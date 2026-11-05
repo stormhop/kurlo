@@ -99,12 +99,22 @@ The workspace is read again on every call, so a request you edit in the app is w
 | `list_requests` | Lists saved requests with their path (`Collection/Folder/Name`), id, protocol, method and URL. Can be filtered to one collection, and searched with `query`: every word has to appear in the path, method or URL, so `post orders` finds `POST /orders`. |
 | `get_request` | Shows how one request is defined: method, URL, query parameters, headers, body, auth type, scripts and browser settings, plus its saved [examples](/docs/guides/examples/) with their status, content type and body, so the assistant can compare a live response with the expected one. Credentials are left out. |
 | `list_environments` | Lists environments and their variables. Secret values are hidden. |
-| `run_request` | Sends one saved HTTP or GraphQL request with its collection defaults, auth and scripts. Returns the status, headers, body, timings, test results and script logs. |
-| `run_collection` | Runs a collection or folder in order with its test scripts and returns pass/fail per request. Realtime requests are skipped, as in `kurlo run`. When the call carries a `progressToken`, the server reports progress after every request. |
+| `run_request` | Sends a saved HTTP, GraphQL, unary gRPC, MCP or AI request. HTTP responses include timings, redirects and TLS details. For MCP, pass `mcpMethod` as `tools/list` or `tools/call`. Pass `mcpName` and `mcpArguments` to call a tool, and `mcpCursor` to read another page. |
+| `run_collection` | Runs HTTP, GraphQL and unary gRPC requests in order, with per-request results and assertions. Use `iterations`, `delayMs`, `failFast` and a workspace-relative CSV or JSON `dataFile`. A data file runs one iteration per row. Pass a `progressToken` for progress after each request. |
 | `send_request` | Sends an unsaved HTTP request. `{{variables}}` in the URL, headers and body are resolved from the environment. |
 | `list_history` | Lists the requests you recently sent from the Kurlo app, newest first, with status, timing and the saved request each came from. Can be searched, or narrowed to failures. |
 | `get_history_entry` | Shows one request you sent from the app and the response you got: status, headers, body, error, test results and script logs. Without an entry it shows the last one. |
 | `diagnose_last_failure` | Explains why a request sent from the app failed. See [When a request fails](#when-a-request-fails). |
+| `import_preview`, `import_apply` | Preview imported YAML, then confirm and apply that preview. |
+| `list_files`, `read_file`, `search_code` | List, read or search the read-only source folder supplied with `--project-root`. |
+| `get_docs`, `save_docs` | Read or replace Markdown docs for a saved request or collection. |
+| `code_snippet` | Generate a snippet in cURL, HTTPie, JavaScript, Node.js, Axios, Python, Go, Java, C#, PHP, Ruby, Swift, Kotlin or Rust. |
+| `sync_collection`, `cover_endpoint` | Get a workflow for using the connected source folder to update collection coverage. |
+| `list_load_tests`, `get_load_test`, `save_load_test` | List, read or save a collection's load tests. Omit the test ID to create a test, or keep it to replace its definition. |
+| `start_load_test`, `load_test_status`, `stop_load_test` | Start k6 in the background, inspect progress or stop the active run. |
+| `list_load_runs`, `load_test_result`, `compare_load_runs` | Find completed runs and compare their summaries by test ID and `startedAt` timestamp. |
+| `start_mock_server`, `mock_server_log`, `stop_mock_server` | Serve a collection's saved examples on localhost, check the recent request log or stop the server. |
+| `list_cookies`, `clear_cookie_jar` | Inspect cookie metadata for a domain or clear the jar used by this MCP connection. |
 | `create_collection` | Creates an empty collection. |
 | `save_request` | Creates or edits any supported request type using workspace YAML. The HTTP and GraphQL shorthand is also available. |
 | `patch_request` | Changes individual fields of a saved request with JSON Merge Patch. |
@@ -124,7 +134,17 @@ The workspace is read again on every call, so a request you edit in the app is w
 
 A request can be named by its id, its full path, or just its name when that name is unique. When a name matches more than one request, the tool lists the matches with their ids so the assistant can pick one.
 
-Every run accepts an `environment` and a `variables` object of overrides for that call. `run_request` and `send_request` return up to 64 KB of the response body by default. An assistant can ask for up to 1 MB with `maxBodyBytes`. Binary bodies are described but not included.
+Request and collection runs accept an `environment` and a `variables` object of overrides for that call. `run_request` and `send_request` return up to 64 KB of the response body by default. An assistant can ask for up to 1 MB with `maxBodyBytes`. Binary bodies are described but not included.
+
+Live connection tools are available in the desktop app’s [Agent Mode](/docs/guides/agent/#running-requests-and-tests). A mock or k6 run started through `kurlo mcp` belongs to that process and stops when it exits. The cookie jar is local to the process.
+
+## Import requests and read project source
+
+Start the server with `kurlo mcp /path/to/kurlo-workspace --project-root /path/to/source`. Source paths for `list_files`, `read_file` and `search_code` are relative to the connected folder. The server skips symlinks, hidden configuration, credential files and common dependency and build directories. These tools only read the source. Workspace tools still operate on the Kurlo workspace supplied separately.
+
+Call `import_preview` with a relative `file`, pasted `content` or an OpenAPI `url`. A file path is relative to the source folder when supplied and otherwise to the Kurlo workspace. OpenAPI and Swagger, Postman, Insomnia, HAR and cURL are supported. Format detection is automatic, or you can pass `format` explicitly. For a spec with external references, bundle it into one file before importing.
+
+The preview reports the intended collection, requests and environments and shows the YAML diff. Omit `collection` to create a collection, or supply its name or ID to append requests. Pass `workspace` when the Kurlo folder contains multiple workspaces and you are creating a collection. If the diff spans several pages, call `import_preview` again with the `importId` and `nextOffset` as `offset`. Review the result and pass its `importId` and `confirm: true` to `import_apply`. A file changed since the preview requires a new preview. Agent Mode asks you to approve the diff in the chat.
 
 ## Prompts
 
@@ -136,7 +156,7 @@ The server also offers three [prompts](https://modelcontextprotocol.io/specifica
 | `cover_endpoint` | `endpoint` (required), `collection` | Does the same for one endpoint, such as `POST /orders`, and also saves its main error responses as examples. |
 | `debug_last_failure` | `entry` | Calls `diagnose_last_failure`, explains the cause and proposes a fix, which it applies only after you agree. |
 
-Requests are saved with `{{baseUrl}}` in the URL, so the address lives in an environment, not in each request. When no environment sets it, the prompts tell the assistant to look for it in the project (`.env`, `docker-compose.yml`, launch settings, the README) and to ask you before calling `set_variable`, and never to point an environment at production. With `--read-only` only `debug_last_failure` is offered.
+Requests are saved with `{{baseUrl}}` in the URL, so the address lives in an environment, not in each request. When no environment sets it, the prompts tell the assistant to look for it in the project (`docker-compose.yml`, launch settings, the README) and to ask you before calling `set_variable`, and never to point an environment at production. With `--read-only` only `debug_last_failure` is offered.
 
 ## Tests from a response
 
@@ -230,7 +250,7 @@ Start the server with `--read-only` to offer only the tools that read and run. T
 
 ## Protected environments
 
-Mark an environment **Protect from AI agents** in its ⋯ menu in the app, and `kurlo mcp` refuses every call that would use it: `run_request`, `run_collection` and `send_request` with that environment, and edits to it through `set_variable` or `apply_changes`. The assistant is told to ask you to run the request in the app instead. Use it for production and anything else an assistant should not reach by picking the wrong environment.
+Mark an environment **Protect from AI agents** in its ⋯ menu in the app, and `kurlo mcp` refuses every call that would use it: `run_request`, `run_collection`, `send_request` and `start_load_test` with that environment, and edits to it through `set_variable` or `apply_changes`. The assistant is told to ask you to run the request in the app instead. Use it for production and anything else an assistant should not reach by picking the wrong environment.
 
 The mark is saved in the environment's file as `protected: true`, so in a Git-backed workspace it applies to everyone on the team. `list_environments` shows it. An environment that [inherits](/docs/guides/environments/#inheriting-from-another-environment) from a protected one is protected too; `list_environments` names its parent under `inherits` and lists the variables it inherits.
 
@@ -266,7 +286,8 @@ Environment variables marked secret are used when requests are sent, but they ar
 | `--timeout MS` | Per-request timeout, overriding request settings. |
 | `--insecure`, `-k` | Turn off TLS certificate verification for every request. |
 | `--allow-send-request` | Let scripts call `pm.sendRequest`. Off by default, as in `kurlo run`. |
-| `--read-only` | Offer only the tools that read and run; never change workspace files. |
+| `--project-root <path>` | Connect a read-only source folder for project tools and file imports. |
+| `--read-only` | Offer only the tools that read and run. |
 
 ## Docs for agents
 

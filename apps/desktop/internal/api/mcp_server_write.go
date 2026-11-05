@@ -18,7 +18,10 @@ import (
 )
 
 var mcpWriteToolNames = map[string]bool{
+	"import_apply":      true,
+	"save_docs":         true,
 	"create_collection": true,
+	"save_load_test":    true,
 	"save_request":      true,
 	"patch_request":     true,
 	"apply_changes":     true,

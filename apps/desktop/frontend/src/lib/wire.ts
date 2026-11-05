@@ -70,6 +70,7 @@ export type ClaudeStatus = Wire<model.ClaudeStatus>;
 export type ClaudeConnection = Wire<model.ClaudeConnection>;
 export type AgentChat = Wire<model.AgentChat>;
 export type AgentChatSummary = Wire<model.AgentChatSummary>;
+export type AgentAttachment = Wire<model.AgentAttachment>;
 export type AgentSendInput = Wire<model.AgentSendInput>;
 export type AgentTurnResult = Wire<model.AgentTurn>;
 export type AgentApproval = Wire<model.AgentApproval>;
@@ -169,6 +170,8 @@ export type GrpcDoneEvent = {
 
 export type RuntimeBridge = {
   EventsOn?: <T = unknown>(eventName: string, callback: (payload: T) => void) => () => void;
+  OnFileDrop?: (callback: (x: number, y: number, paths: string[]) => void, useDropTarget: boolean) => void;
+  OnFileDropOff?: () => void;
   BrowserOpenURL?: (url: string) => void;
   WindowMinimise?: () => void | Promise<void>;
   WindowToggleMaximise?: () => void | Promise<void>;

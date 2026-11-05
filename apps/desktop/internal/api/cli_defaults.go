@@ -11,6 +11,7 @@ func applyCollectionDefaults(req cliSavedRequest, collection *cliCollection) cli
 		}
 		return req
 	}
+	req.WorkspaceID = collection.WorkspaceID
 	defaults := collection.Defaults
 	folders := folderDefaultsChain(collection, req.FolderPath)
 

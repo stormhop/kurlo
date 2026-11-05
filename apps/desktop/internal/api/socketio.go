@@ -55,6 +55,7 @@ type socketIOSession struct {
 }
 
 type socketIOCallbacks struct {
+	onDone      func()
 	onOpen      func(model.SocketIOOpenEvent)
 	onEvent     func(model.SocketIOMessage)
 	onClose     func(model.SocketIOCloseEvent)
@@ -114,6 +115,9 @@ func (m *socketIOManager) connectWithCallbacks(appCtx context.Context, sessionID
 	m.mu.Unlock()
 
 	go func() {
+		if callbacks.onDone != nil {
+			defer callbacks.onDone()
+		}
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("kurlo: Socket.IO session %s panicked: %v", sessionID, r)
