@@ -142,6 +142,12 @@
   overscroll-behavior: none;
 }
 
+@supports (hanging-punctuation: first) {
+  .collection-list {
+    overflow-y: scroll;
+  }
+}
+
 .sidebar-virtual-spacer {
   flex: 0 0 auto;
   pointer-events: none;
@@ -739,6 +745,12 @@
   overscroll-behavior: none;
 }
 
+@supports (hanging-punctuation: first) {
+  .history-list {
+    overflow-y: scroll;
+  }
+}
+
 .history-day {
   display: flex;
   flex-direction: column;
@@ -856,6 +868,12 @@
   scrollbar-gutter: stable;
   margin-right: calc(var(--space-2) * -1);
   padding-right: var(--space-3);
+}
+
+@supports (hanging-punctuation: first) {
+  .environment-list {
+    overflow-y: scroll;
+  }
 }
 
 .environment-none-item,

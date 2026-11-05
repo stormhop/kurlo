@@ -849,6 +849,12 @@ textarea.url-input {
   padding: var(--space-1) var(--space-3) var(--space-1) 0;
 }
 
+@supports (hanging-punctuation: first) {
+  .tab-content {
+    overflow-y: scroll;
+  }
+}
+
 .tab-content {
   position: relative;
 }
@@ -1388,6 +1394,12 @@ textarea.url-input {
   padding: var(--space-2);
   overflow: auto;
   scrollbar-gutter: stable;
+}
+
+@supports (hanging-punctuation: first) {
+  .graphql-explorer-list {
+    overflow-y: scroll;
+  }
 }
 
 .graphql-explorer-field {
@@ -1937,6 +1949,12 @@ textarea.url-input {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+@supports (hanging-punctuation: first) {
+  .test-results-panel {
+    overflow-y: scroll;
+  }
 }
 
 .script-result-block {

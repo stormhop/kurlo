@@ -1424,7 +1424,15 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect.poll(async () => compactKvTable.evaluate((table) => {
       const tabContent = table.closest<HTMLElement>('.tab-content');
       if (!tabContent) return false;
-      const scrollbarColor = getComputedStyle(tabContent).scrollbarColor;
+      const style = getComputedStyle(tabContent);
+      if (CSS.supports('selector(::-webkit-scrollbar)')) {
+        const thumb = getComputedStyle(tabContent, '::-webkit-scrollbar-thumb').backgroundColor;
+        return (style.scrollbarColor === undefined || style.scrollbarColor === 'auto')
+          && style.getPropertyValue('--scroll-thumb').trim() !== ''
+          && thumb !== '' && thumb !== 'rgba(0, 0, 0, 0)'
+          && !thumb.includes('rgb(206, 212, 218)');
+      }
+      const scrollbarColor = style.scrollbarColor;
       if (scrollbarColor === undefined) return true;
       return scrollbarColor !== 'auto'
         && scrollbarColor !== ''

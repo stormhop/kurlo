@@ -808,6 +808,12 @@
     overscroll-behavior: none;
     scrollbar-gutter: stable both-edges;
   }
+
+  @supports (hanging-punctuation: first) {
+    :global(.cm-wrap.fill .cm-scroller) {
+      overflow-y: scroll;
+    }
+  }
   :global(.cm-wrap .cm-editor.cm-focused) {
     outline: none;
   }

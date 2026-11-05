@@ -131,6 +131,12 @@
   color: var(--text);
 }
 
+@supports (hanging-punctuation: first) {
+  .response-body-viewer {
+    overflow-y: scroll;
+  }
+}
+
 .response-body {
   padding: var(--space-4) var(--space-5);
   white-space: pre-wrap;

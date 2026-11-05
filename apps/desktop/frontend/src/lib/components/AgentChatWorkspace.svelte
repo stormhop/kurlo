@@ -1543,6 +1543,12 @@
     resize: none;
     scrollbar-gutter: stable;
   }
+
+  @supports (hanging-punctuation: first) {
+    .agent-input {
+      overflow-y: scroll;
+    }
+  }
   .agent-input::placeholder {
     color: var(--text-3);
   }

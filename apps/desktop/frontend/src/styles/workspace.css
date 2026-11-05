@@ -644,6 +644,12 @@
   background: var(--bg);
 }
 
+@supports (hanging-punctuation: first) {
+  .workspace-overview {
+    overflow-y: scroll;
+  }
+}
+
 .workspace-overview-header {
   display: flex;
   justify-content: space-between;
@@ -968,6 +974,12 @@
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
+}
+
+@supports (hanging-punctuation: first) {
+  .git-content {
+    overflow-y: scroll;
+  }
 }
 
 .git-toolbar {
@@ -3324,6 +3336,12 @@
   background: var(--bg);
 }
 
+@supports (hanging-punctuation: first) {
+  .environment-workspace {
+    overflow-y: scroll;
+  }
+}
+
 .environment-workspace-head {
   display: flex;
   justify-content: space-between;
@@ -3454,6 +3472,12 @@
   overflow: auto;
   scrollbar-gutter: stable;
   background: var(--bg);
+}
+
+@supports (hanging-punctuation: first) {
+  .collection-workspace {
+    overflow-y: scroll;
+  }
 }
 
 .collection-workspace-head {
@@ -3863,6 +3887,12 @@
     border-bottom: none;
     overflow: auto;
     scrollbar-gutter: stable;
+  }
+
+  @supports (hanging-punctuation: first) {
+    .collection-runner-config {
+      overflow-y: scroll;
+    }
   }
   .collection-runner-title {
     gap: var(--space-2-5);
