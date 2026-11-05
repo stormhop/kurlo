@@ -14,6 +14,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **Zoom in Settings.** **Settings → Appearance** has a **Zoom** row with −, + and **Reset**. See [Appearance](/docs/guides/settings/#appearance).
+
 - **Drag and drop attachments in Agent Mode.** Drop files onto the message box to attach them to your next message.
 
 - **Project context and imports in Agent Mode.** Connect a read-only source folder, attach files or screenshots, preview imports before applying them, and ask the agent to edit Markdown docs or generate a snippet. See [Project folders, files and imports](/docs/guides/agent/#project-folders-files-and-imports).
@@ -48,6 +50,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Changed
 
+- **Linux window without the system title bar.** Kurlo draws its own title bar on Linux, like on Windows, and drops the GTK menu bar. `Ctrl Q` quits and zoom is in **Settings → Appearance**.
 - **Cookie jar redesign.** Domains on the left, cookies in a table with expiry and flags, and an editor with **Fields** and **Raw** modes. The **Sync** tab uses Settings-style cards. See [Managing cookies](/docs/guides/cookies/#managing-cookies).
 - **Faster test runs.** Browser tests run in parallel with a bounded worker count; documentation screenshots, profiling and interactive slow runs stay serial. `make check` runs independent checks concurrently, and focused, watch, failed-only and full test commands are available from the repository root.
 

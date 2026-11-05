@@ -1953,3 +1953,31 @@ button.settings-row:focus-visible {
   font-size: var(--text-caption);
 }
 
+
+.zoom-desc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.zoom-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.zoom-stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.zoom-value {
+  min-width: 3rem;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}

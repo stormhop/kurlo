@@ -26,6 +26,7 @@
   import ThemePreview from './ThemePreview.svelte';
   import AboutNight from './AboutNight.svelte';
   import { friendlyUpdateError } from '../updateErrors';
+  import { DEFAULT_UI_SCALE, UI_SCALE_STEPS, uiScale } from '../uiScale';
 
   let diagnosticsCopied = $state(false);
   let diagnosticsError = $state('');
@@ -76,7 +77,7 @@
 
   const NAV_ITEMS: SettingsNavItem[] = [
     { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave manual save default location workspace collection folder data export import backup script engine javascript tengo' },
-    { id: 'theme', label: 'Theme', keywords: 'theme appearance dark light system color scheme' },
+    { id: 'theme', label: 'Appearance', keywords: 'appearance theme dark light system color scheme zoom scale size interface text font bigger smaller' },
     { id: 'proxy', label: 'Proxy', keywords: 'proxy http https socks5 system bypass network hostname port credentials' },
     { id: 'ai', label: 'AI', keywords: 'ai agent model llm openrouter anthropic claude openai gpt key api byok ollama lm studio local connection' },
     { id: 'shortcuts', label: 'Shortcuts', keywords: 'shortcuts keybindings keyboard hotkeys' },
@@ -519,7 +520,7 @@
 
       {#if settingsTab === 'theme'}
         <div class="settings-body settings-theme" id="settings-panel-theme" role="tabpanel">
-          {@render pageHead('Theme', 'Light, dark or following the system, with a palette for each.')}
+          {@render pageHead('Appearance', 'Interface size, and a light, dark or system theme with a palette for each.')}
           <section class="settings-block">
             <div class="settings-group">
               <div class="settings-row">
@@ -542,6 +543,31 @@
                     <span>System</span>
                   </button>
                   </div>
+                </div>
+              </div>
+              <div class="settings-row zoom-row">
+                <div class="settings-row-text">
+                  <span class="settings-row-title">Zoom</span>
+                  <span class="settings-row-desc zoom-desc">
+                    <span>Size of text and controls.</span>
+                    <span class="zoom-keys">
+                      <Keycaps combo={shortcutCombo('zoom-in')} runtime={appRuntime} />
+                      <Keycaps combo={shortcutCombo('zoom-out')} runtime={appRuntime} />
+                      <Keycaps combo={shortcutCombo('zoom-reset')} runtime={appRuntime} />
+                    </span>
+                  </span>
+                </div>
+                <div class="settings-row-control">
+                  <div class="zoom-stepper" role="group" aria-label="Zoom">
+                    <button class="btn btn-secondary btn-icon btn-sm" type="button" aria-label="Zoom out" disabled={$uiScale <= UI_SCALE_STEPS[0]} onclick={() => vm.zoomOut()}>
+                      <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                    </button>
+                    <output class="zoom-value" aria-live="polite">{Math.round($uiScale * 100)}%</output>
+                    <button class="btn btn-secondary btn-icon btn-sm" type="button" aria-label="Zoom in" disabled={$uiScale >= UI_SCALE_STEPS[UI_SCALE_STEPS.length - 1]} onclick={() => vm.zoomIn()}>
+                      <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6h7M6 2.5v7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                    </button>
+                  </div>
+                  <button class="btn btn-ghost btn-sm" type="button" disabled={$uiScale === DEFAULT_UI_SCALE} onclick={() => vm.resetZoom()}>Reset</button>
                 </div>
               </div>
             </div>

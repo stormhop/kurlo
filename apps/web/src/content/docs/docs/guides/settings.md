@@ -11,7 +11,7 @@ App settings are different from the settings attached to API data:
 
 | Scope | Where to edit | What it affects |
 |-------|---------------|-----------------|
-| App | Activity rail -> gear | Kurlo on this device: saving mode, theme, global proxy, shortcuts, updates, and local preferences. |
+| App | Activity rail -> gear | Kurlo on this device: saving mode, theme and zoom, global proxy, shortcuts, updates, and local preferences. |
 | Collection | Collection menu -> Settings | Defaults applied to requests in that collection. |
 | Request | Open request -> Settings tab | Transport and protocol behavior for one request. |
 
@@ -65,7 +65,7 @@ Changing it does not move existing workspaces or repositories.
 
 Read [Backup & recovery](/docs/guides/backup-recovery/) before using the import action.
 
-## Theme
+## Appearance
 
 The **Mode** row chooses **Light**, **Dark**, or **System**, then select separate light and dark variants. Each variant is shown as a miniature of Kurlo in its own colours — sidebar, request bar, a table and a highlighted response — so you can compare them before switching. System mode follows the operating-system appearance and uses the matching selected variant.
 
@@ -73,7 +73,9 @@ The **Mode** row chooses **Light**, **Dark**, or **System**, then select separat
 
 Theme preferences apply only to Kurlo's UI; they do not change generated code, request headers, or response rendering.
 
-To make the whole interface larger or smaller, use zoom rather than a setting: `Cmd/Ctrl =` and `Cmd/Ctrl -` step from 80% to 150%, `Cmd/Ctrl 0` returns to 100%. On macOS the same commands are in the **View** menu, and the command palette has **Zoom in**, **Zoom out** and **Reset zoom**. The size is stored on this device.
+The **Zoom** row makes the whole interface larger or smaller: **−** and **+** step from 80% to 150% and **Reset** returns to 100%. The same steps are on `Cmd/Ctrl =`, `Cmd/Ctrl -` and `Cmd/Ctrl 0`, in the command palette as **Zoom in**, **Zoom out** and **Reset zoom**, and on macOS in the **View** menu. The size is stored on this device.
+
+On Windows and Linux Kurlo draws its own title bar: drag the top bar to move the window, double-click it to maximize, and use the buttons on the right to minimize, maximize or close. On Linux `Ctrl Q` quits.
 
 ## Proxy
 

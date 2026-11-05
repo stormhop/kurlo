@@ -672,31 +672,31 @@ html, body, #app {
   display: none;
 }
 
-:root[data-platform="windows"] .titlebar-drag-region {
+:root:is([data-platform="windows"], [data-platform="linux"]) .titlebar-drag-region {
   --wails-draggable: drag;
 }
 
-:root[data-platform="windows"] .workspace-searchbar button,
-:root[data-platform="windows"] .workspace-searchbar input,
-:root[data-platform="windows"] .workspace-searchbar a,
-:root[data-platform="windows"] .workspace-searchbar select,
-:root[data-platform="windows"] .workspace-searchbar-left > .workspace-switcher,
-:root[data-platform="windows"] .global-search,
-:root[data-platform="windows"] .saved-request-tab,
-:root[data-platform="windows"] .environment-switcher,
-:root[data-platform="windows"] .win-controls,
-:root[data-platform="windows"] .win-control {
+:root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar button,
+:root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar input,
+:root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar a,
+:root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar select,
+:root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar-left > .workspace-switcher,
+:root:is([data-platform="windows"], [data-platform="linux"]) .global-search,
+:root:is([data-platform="windows"], [data-platform="linux"]) .saved-request-tab,
+:root:is([data-platform="windows"], [data-platform="linux"]) .environment-switcher,
+:root:is([data-platform="windows"], [data-platform="linux"]) .win-controls,
+:root:is([data-platform="windows"], [data-platform="linux"]) .win-control {
   --wails-draggable: no-drag;
 }
 
-:root[data-platform="windows"] .win-controls {
+:root:is([data-platform="windows"], [data-platform="linux"]) .win-controls {
   display: flex;
   align-items: stretch;
   height: 2.75rem;
   margin: 0 calc(var(--space-2-5) * -1) 0 var(--space-1-5);
 }
 
-:root[data-platform="windows"] .win-control {
+:root:is([data-platform="windows"], [data-platform="linux"]) .win-control {
   display: grid;
   place-items: center;
   width: 2.875rem;
@@ -707,19 +707,28 @@ html, body, #app {
   transition: background var(--dur-fast) ease, color var(--dur-fast) ease;
 }
 
-:root[data-platform="windows"] .win-control:hover {
+:root:is([data-platform="windows"], [data-platform="linux"]) .win-control:hover {
   background: var(--hover);
   color: var(--text);
 }
 
-:root[data-platform="windows"] .win-close:hover {
+:root:is([data-platform="windows"], [data-platform="linux"]) .win-close:hover {
   background: #e81123;
   color: #fff;
 }
 
-:root[data-platform="windows"] .win-control:focus-visible {
+:root:is([data-platform="windows"], [data-platform="linux"]) .win-control:focus-visible {
   outline: none;
   background: var(--hover);
+}
+
+:root[data-platform="linux"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  border: 1px solid var(--border);
+  pointer-events: none;
 }
 
 body { font-size: var(--text-body); }

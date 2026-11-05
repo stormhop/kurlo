@@ -1083,6 +1083,7 @@ export default function () {
       WindowIsMaximised: async () => false,
       WindowMinimise: async () => {},
       WindowToggleMaximise: async () => {},
+      Quit: () => { state.calls.push('runtime:Quit'); },
       WindowSetLightTheme: async () => {},
       WindowSetDarkTheme: async () => {},
       WindowSetBackgroundColour: async () => {},
@@ -2072,7 +2073,7 @@ test.describe('Kurlo desktop browser E2E', () => {
         await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
         await captureDocsScreenshot(page, 'settings-general');
       } catch (err) { console.log('docs screenshot settings-general skipped:', err); }
-      try { await page.getByRole('tab', { name: 'Theme', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-theme'); } catch (err) { console.log('docs screenshot settings-theme skipped:', err); }
+      try { await page.getByRole('tab', { name: 'Appearance', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-theme'); } catch (err) { console.log('docs screenshot settings-theme skipped:', err); }
       try { await page.getByRole('tab', { name: 'Shortcuts', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-shortcuts'); } catch (err) { console.log('docs screenshot settings-shortcuts skipped:', err); }
       try { await page.getByRole('tab', { name: 'About', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-updates-dev'); } catch (err) { console.log('docs screenshot settings-updates-dev skipped:', err); }
       try { await page.getByRole('tab', { name: 'About', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-about'); } catch (err) { console.log('docs screenshot settings-about skipped:', err); }
@@ -2354,7 +2355,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(viewer).toBeVisible();
 
     await page.getByLabel('Settings', { exact: true }).click();
-    const settingsTheme = page.getByRole('tab', { name: 'Theme', exact: true });
+    const settingsTheme = page.getByRole('tab', { name: 'Appearance', exact: true });
     await settingsTheme.click();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('tab', { name: 'Proxy', exact: true })).toHaveAttribute('aria-selected', 'true');
@@ -5831,6 +5832,40 @@ test.describe('Interface size', () => {
     expect(await page.evaluate(() => localStorage.getItem('kurlo.uiScale.v1'))).toBeNull();
   });
 
+  test('zooms from Appearance settings', async ({ page }, testInfo) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
+    const zoom = page.getByRole('group', { name: 'Zoom' });
+    const reset = page.locator('.zoom-row').getByRole('button', { name: 'Reset' });
+    await expect(zoom.locator('output')).toHaveText('100%');
+    await expect(reset).toBeDisabled();
+
+    await zoom.getByRole('button', { name: 'Zoom in' }).click();
+    await expect(zoom.locator('output')).toHaveText('110%');
+    await expect.poll(() => rootFontSize(page)).toBe('17.6px');
+    expect(await page.evaluate(() => localStorage.getItem('kurlo.uiScale.v1'))).toBe('1.1');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-settings-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
+
+    await page.keyboard.press('Control+=');
+    await expect(zoom.locator('output')).toHaveText('125%');
+
+    for (let i = 0; i < 6; i++) {
+      const out = zoom.getByRole('button', { name: 'Zoom out' });
+      if (await out.isDisabled()) break;
+      await out.click();
+    }
+    await expect(zoom.locator('output')).toHaveText('80%');
+    await expect(zoom.getByRole('button', { name: 'Zoom out' })).toBeDisabled();
+
+    await reset.click();
+    await expect(zoom.locator('output')).toHaveText('100%');
+    await expect.poll(() => rootFontSize(page)).toBe('16px');
+    expect(await page.evaluate(() => localStorage.getItem('kurlo.uiScale.v1'))).toBeNull();
+  });
+
   test('starts at the saved size', async ({ page }) => {
     await installKurloBridge(page);
     await page.addInitScript(() => localStorage.setItem('kurlo.uiScale.v1', '1.25'));
@@ -5838,6 +5873,38 @@ test.describe('Interface size', () => {
     await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
     expect(await rootFontSize(page)).toBe('20px');
     await expect.poll(() => sidebarWidth(page)).toBe(350);
+  });
+});
+
+test.describe('Window title bar', () => {
+  for (const [runtime, ownControls] of [['linux/e2e', true], ['windows/e2e', true], ['darwin/e2e', false]] as const) {
+    test(`${ownControls ? 'draws' : 'leaves'} the window buttons on ${runtime.split('/')[0]}`, async ({ page }, testInfo) => {
+      await installKurloBridge(page, '', runtime);
+      await page.goto('/');
+      await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset.platform)).toBe(runtime.split('/')[0]);
+      const minimise = page.getByRole('button', { name: 'Minimize' });
+      if (ownControls) {
+        await expect(minimise).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Maximize' })).toBeVisible();
+        expect(await page.locator('.titlebar-drag-region').first().evaluate(el => getComputedStyle(el).getPropertyValue('--wails-draggable').trim())).toBe('drag');
+        await page.screenshot({ path: join(tmpdir(), `kurlo-titlebar-${runtime.split('/')[0]}-${testInfo.project.name}.png`), animations: 'disabled' });
+      } else {
+        await expect(minimise).toBeHidden();
+      }
+    });
+  }
+
+  test('quits with Ctrl+Q on Linux only', async ({ page }) => {
+    for (const runtime of ['linux/e2e', 'windows/e2e']) {
+      await installKurloBridge(page, '', runtime);
+      await page.goto('/');
+      await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset.platform)).toBe(runtime.split('/')[0]);
+      await page.keyboard.press('Control+q');
+      const calls = await page.evaluate(() => window.__kurloE2E.calls as string[]);
+      expect(calls.includes('runtime:Quit')).toBe(runtime === 'linux/e2e');
+    }
   });
 });
 

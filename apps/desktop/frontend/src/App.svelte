@@ -28,7 +28,7 @@
   import HistoryDetail from './lib/components/HistoryDetail.svelte';
   import AgentWorkspace from './lib/components/AgentWorkspace.svelte';
   import { METHODS, REQUEST_TYPES, DEFAULT_WORKSPACE, RAW_BODY_TYPES } from './lib/constants';
-  import { installTitlebarDoubleClickHandler } from './lib/windowControls';
+  import { installQuitShortcut, installTitlebarDoubleClickHandler } from './lib/windowControls';
   import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
   import type { SnippetLanguage } from './lib/stores/ui';
   import type { ResponseTab } from './lib/types/models';
@@ -323,6 +323,7 @@
 
   onMount(() => {
     const uninstallTitlebarDoubleClick = installTitlebarDoubleClickHandler();
+    let uninstallQuitShortcut = () => {};
     const offBeforeQuit = window.runtime?.EventsOn?.('kurlo:before-quit', () => {
       void ackQuit();
       void vm.reviewDraftsBeforeQuit();
@@ -416,6 +417,7 @@
       vm.appRuntime = info.runtime;
       vm.appVersion = info.version;
       setRuntimePlatform(info.runtime);
+      if (!destroyed) uninstallQuitShortcut = installQuitShortcut(document.documentElement.dataset.platform ?? '');
       const updatePendingRestart = syncUpdateReadyForVersion(info.version);
       void checkWhatsNew(info.version);
 
@@ -443,6 +445,7 @@
         updateCheckTimer = null;
       }
       uninstallTitlebarDoubleClick();
+      uninstallQuitShortcut();
       offBeforeQuit?.();
       offMockRequest?.();
       offZoom?.();

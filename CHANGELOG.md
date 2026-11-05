@@ -9,6 +9,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Zoom in Settings.** **Settings → Appearance** (renamed from Theme) has a **Zoom** row with −, + and **Reset** that steps the interface from 80% to 150% and lists the zoom shortcuts. The size is stored on this device. Windows and Linux have no View menu, so this was only reachable from the keyboard there.
+
 - **Drag and drop attachments in Agent Mode.** Drop files onto the message box to attach them to your next message.
 
 - **Project context and imports in Agent Mode.** Connect a read-only source folder, attach a specification, proto, CSV or screenshot, and ask the agent to cover an endpoint from the code. Preview and approve YAML imports from OpenAPI, Swagger, Postman, Insomnia, HAR and cURL. Read or edit saved Markdown docs and generate HTTP request snippets. Imports and project tools also work through `kurlo mcp`.
@@ -51,6 +53,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
+- **Linux window without the system title bar.** On Linux Kurlo draws its own title bar like on Windows: the top bar drags the window, a double click maximizes it, and minimize, maximize and close sit on the right. The GTK title bar and the Kurlo / View menu bar are gone, so the app gains two rows of space. The window still resizes from its edges, `Ctrl Q` quits, and zoom is in **Settings → Appearance** and on `Ctrl =`, `Ctrl -` and `Ctrl 0`.
 - **Cookie jar redesign.** The Cookies window now matches Settings: domains in a filterable list on the left, the selected domain's cookies in a table with value, path, expiry and flags, and expired cookies struck through. Clicking a row opens an editor below the table with **Fields** (name, value, path, expires, SameSite, HttpOnly, Secure, include subdomains) and **Raw** for pasting a `Set-Cookie` string; `Cmd/Ctrl Enter` saves. Domains holding a cookie without a value are marked. Opening the window no longer adds the open request's domain as an empty entry; an empty jar offers to add a cookie for it instead. The **Sync** tab is laid out as Settings cards with a switch to turn sync on, and the manual pairing code stays hidden until **Show code**.
 - **Faster test runs.** Browser tests run in parallel with a bounded worker count; documentation screenshots, profiling and interactive slow runs stay serial. `make check` runs independent checks concurrently, and focused, watch, failed-only and full test commands are available from the repository root.
 
