@@ -63,6 +63,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Desktop scrollbars.** Transparent tracks and inset handles keep scrollbars from ending in a visible strip at panel edges.
+
 - **AI requests in Git workspaces.** Workspace YAML accepts provider strings, so requests using the default Kurlo connection or a custom provider can load.
 
 - **Agent Mode chat history.** Chats that finish loading in the background show their history when you return to their workspace.

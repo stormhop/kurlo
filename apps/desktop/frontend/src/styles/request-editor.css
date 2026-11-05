@@ -705,8 +705,6 @@ textarea.url-input {
 
 .request-editor {
   container: editor / inline-size;
-  --request-scroll-thumb: color-mix(in srgb, var(--text-3) 78%, transparent);
-  --request-scroll-thumb-hover: color-mix(in srgb, var(--text-2) 88%, transparent);
   flex-shrink: 0;
   background: var(--bg);
   display: flex;
@@ -841,12 +839,13 @@ textarea.url-input {
 }
 
 .tab-content {
+  --scroll-thumb: color-mix(in srgb, var(--text-3) 78%, transparent);
+  --scroll-thumb-hover: color-mix(in srgb, var(--text-2) 88%, transparent);
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: none;
   scrollbar-gutter: stable;
-  scrollbar-color: var(--request-scroll-thumb) transparent;
   padding: var(--space-1) var(--space-3) var(--space-1) 0;
 }
 
@@ -877,29 +876,6 @@ textarea.url-input {
 
 .tab-content > .request-section-bar + .bulk-edit {
   padding-top: var(--space-10);
-}
-
-.tab-content::-webkit-scrollbar {
-  width: 0.5rem;
-  height: 0.5rem;
-}
-
-.tab-content::-webkit-scrollbar-track,
-.tab-content::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-.tab-content::-webkit-scrollbar-thumb {
-  min-height: 2.625rem;
-  border: 2px solid transparent;
-  border-radius: var(--radius-full);
-  background: var(--request-scroll-thumb);
-  background-clip: padding-box;
-}
-
-.tab-content::-webkit-scrollbar-thumb:hover {
-  background: var(--request-scroll-thumb-hover);
-  background-clip: padding-box;
 }
 
 .kv-table { width: 100%; }

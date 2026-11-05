@@ -67,6 +67,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Scrollbar tracks blend into their panels.** Desktop scrollbars use transparent tracks and inset, rounded handles across the app.
+
 - **AI requests in Git workspaces.** Workspace YAML accepts provider strings, so requests using the default Kurlo connection or a custom provider can load.
 
 - **Restore Agent Mode chat history after switching workspaces.** A chat that finishes loading in the background is ready when you return to its workspace.

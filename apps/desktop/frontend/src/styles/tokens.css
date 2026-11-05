@@ -522,15 +522,20 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scroll-thumb) transparent;
   overscroll-behavior: none;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
 }
 
 @media not all and (pointer: coarse) {
   *::-webkit-scrollbar {
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 0.625rem;
+    height: 0.625rem;
   }
 
   *::-webkit-scrollbar-track,
@@ -540,10 +545,19 @@
 
   *::-webkit-scrollbar-thumb {
     min-height: 2.625rem;
-    border: 2px solid transparent;
-    border-radius: var(--radius-xl);
+    min-width: 2.625rem;
+    border: 0.125rem solid transparent;
+    border-radius: var(--radius-full);
     background-color: var(--scroll-thumb);
     background-clip: padding-box;
+  }
+
+  *::-webkit-scrollbar-track:vertical {
+    margin: var(--space-1) 0;
+  }
+
+  *::-webkit-scrollbar-track:horizontal {
+    margin: 0 var(--space-1);
   }
 
   *::-webkit-scrollbar-thumb:hover {
