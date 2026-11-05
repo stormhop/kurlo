@@ -5,8 +5,10 @@ Unicode true
 
 !include /CHARSET=UTF8 "wails_tools.nsh"
 
-VIProductVersion "${INFO_PRODUCTVERSION}.0"
-VIFileVersion    "${INFO_PRODUCTVERSION}.0"
+!searchparse /noerrors "${INFO_PRODUCTVERSION}-" "" INFO_PRODUCTVERSION_NUMERIC "-"
+
+VIProductVersion "${INFO_PRODUCTVERSION_NUMERIC}.0"
+VIFileVersion    "${INFO_PRODUCTVERSION_NUMERIC}.0"
 
 VIAddVersionKey "CompanyName"     "${INFO_COMPANYNAME}"
 VIAddVersionKey "FileDescription" "${INFO_PRODUCTNAME} Installer"
