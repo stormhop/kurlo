@@ -32,6 +32,7 @@ type AiSettings struct {
 	Stream         bool     `json:"stream"`
 	Thinking       string   `json:"thinking,omitempty"`
 	IdleTimeoutSec int      `json:"idleTimeoutSec,omitempty"`
+	CachePrompt    bool     `json:"cachePrompt,omitempty"`
 }
 
 type AiToolServer struct {

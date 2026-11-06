@@ -14,6 +14,20 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **The agent's loop.** Agent chats run at the same time, reading tools of one step run together, long turns stay inside the model's context window, and Chat details show the cost and context of a chat. See [Usage, context and limits](/docs/guides/agent/#usage-context-and-limits).
+
+- **Permissions, trusted hosts and sandbox environments for the agent.** Choose Ask always, Ask for changes or Auto per chat next to the model, trust hosts or mark an environment as a sandbox, and set a token or request budget. See [What it may do without asking](/docs/guides/agent/#what-it-may-do-without-asking).
+
+- **Plans before multi-step tasks.** An approved plan lets exactly its listed calls run without asking.
+
+- **Team notes in kurlo-agent.md.** Conventions and templates the agent follows, shared through Git. See [Team notes](/docs/guides/agent/#team-notes-in-kurlo-agentmd).
+
+- **MCP servers for the agent.** Connect GitHub, Jira or any HTTP or stdio MCP server in Settings → AI. See [MCP servers for the agent](/docs/guides/agent/#mcp-servers-for-the-agent).
+
+- **Folding sections in Chat details and Settings → AI.** Closed parts show a short summary.
+
+- **Edit and branch agent messages.** Edit a sent message or continue from it in a new chat.
+
 - **Zoom in Settings.** **Settings → Appearance** has a **Zoom** row with −, + and **Reset**. See [Appearance](/docs/guides/settings/#appearance).
 
 - **Drag and drop attachments in Agent Mode.** Drop files onto the message box to attach them to your next message.

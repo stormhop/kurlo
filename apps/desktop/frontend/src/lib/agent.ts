@@ -45,6 +45,7 @@ export function agentTemplatePlaceholder(text: string): { start: number; end: nu
 
 export type AgentTurnView = {
   id: string;
+  messageIndex?: number;
   prompt: string;
   attachments: AgentAttachment[];
   steps: AiStepView[];
@@ -57,7 +58,7 @@ export function agentTurnsFromMessages(messages: AiMessage[], chatId = '', messa
     const blocks = message.blocks ?? [];
     if (message.role === 'user') {
       const prompt = blocks.filter(block => block.type === 'text').map(block => block.text ?? '').join('\n');
-      current = { id: `${chatId}:${messageOffset + messageIndex}`, prompt, attachments: message.attachments ?? [], steps: [] };
+      current = { id: `${chatId}:${messageOffset + messageIndex}`, messageIndex: messageOffset + messageIndex, prompt, attachments: message.attachments ?? [], steps: [] };
       turns.push(current);
       continue;
     }
@@ -229,7 +230,9 @@ export function agentToolLabel(name: string | undefined): string {
     case 'git_commit': return 'Committed changes';
     case 'git_push': return 'Pushed the branch';
     case 'pull_request_url': return 'Built a pull request link';
-    default: return name ?? 'Tool';
+    case 'propose_plan': return 'Proposed a plan';
+    case 'update_agent_notes': return 'Updated kurlo-agent.md';
+    default: return name?.includes('__') ? `Called ${name.replace('__', ' · ')}` : name ?? 'Tool';
   }
 }
 
@@ -241,6 +244,9 @@ export function agentChangeSummary(change: AgentFileChange): string {
 }
 
 export function agentApprovalTitle(approval: AgentApproval): string {
+  if (approval.plan) return 'Follow this plan?';
+  if (approval.tool === 'update_agent_notes') return 'Update kurlo-agent.md?';
+  if (approval.external) return `Call ${approval.tool.split('.').slice(1).join('.')} on ${approval.tool.split('.')[0]}?`;
   if (approval.tool === 'git_push') return 'Push this branch?';
   if (approval.tool === 'git_create_branch') return 'Create this branch?';
   if (approval.tool === 'git_commit') return approval.changes.length === 1 ? 'Commit 1 file?' : `Commit ${approval.changes.length} files?`;
@@ -263,10 +269,13 @@ export function agentApprovalTitle(approval: AgentApproval): string {
 }
 
 export function agentAllowsChatApproval(approval: AgentApproval): boolean {
-  return approval.kind !== 'external' && !['apply_changes', 'git_push', 'clear_cookie_jar', 'start_load_test', 'import_apply'].includes(approval.tool);
+  if (approval.external) return true;
+  return approval.kind !== 'external' && !['propose_plan', 'update_agent_notes', 'apply_changes', 'git_push', 'clear_cookie_jar', 'start_load_test', 'import_apply'].includes(approval.tool);
 }
 
 export function agentApprovalAction(approval: AgentApproval): string {
+  if (approval.plan) return 'Approve plan';
+  if (approval.external) return 'Call';
   if (approval.tool === 'git_push') return 'Push';
   if (approval.tool === 'git_create_branch') return 'Create branch';
   if (approval.tool === 'git_commit') return 'Commit';

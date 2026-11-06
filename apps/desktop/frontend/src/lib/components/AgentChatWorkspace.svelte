@@ -7,6 +7,7 @@
   import VirtualAgentHistory from './VirtualAgentHistory.svelte';
   import Markdown from './Markdown.svelte';
   import Select from './Select.svelte';
+  import Disclosure from './Disclosure.svelte';
   import { focusFirstMenuItem, handleMenuKeydown } from '../menuKeyboard';
   import AgentApprovalCard from './AgentApprovalCard.svelte';
   import AgentAttachmentViewer from './AgentAttachmentViewer.svelte';
@@ -20,7 +21,7 @@
   import { openExternalURL } from '../externalLinks';
   import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiErrorView, aiConnectionProblem, type AiStepView } from '../stores/features/ai';
   import { AGENT_STARTERS, AGENT_TEMPLATES, AGENT_WRITE_TOOLS, agentEffortLabel, agentStepSummary, agentTurnSegments, agentContextPercent, agentQuotaWindows, agentFindRequest, agentTemplatePlaceholder, agentToolLabel, agentToolTarget, agentTurnAnswer, agentTurnsFromMessages, type AgentTemplate, type AgentToolTarget, type AgentTurnView } from '../agent';
-  import { clipboardSet, openDirectoryDialog, openFileDialog } from '../backend';
+  import { agentWorkspaceNotes, clipboardSet, openDirectoryDialog, openFileDialog } from '../backend';
 
   let { workspaceBlocked = false, agentStore = defaultAgentStore, codexReady = false }: { workspaceBlocked?: boolean; agentStore?: AgentStore; codexReady?: boolean } = $props();
 
@@ -70,16 +71,90 @@
     return () => runtime.OnFileDropOff?.();
   });
   let templatesMenu = $state<HTMLDivElement>();
+  let composerContext = $state<HTMLDivElement>();
+  let composerActions = $state<HTMLDivElement>();
+  let composerBar = $state<HTMLDivElement>();
+  let composerCompact = $state(false);
+  let composerTight = $state(false);
+  let contextMin = $state(0);
+  let compactNeed = 0;
+
+  function contentWidth(container: HTMLElement): number {
+    const items = ([...container.children] as HTMLElement[]).filter(item => getComputedStyle(item).position !== 'absolute');
+    const gap = Number.parseFloat(getComputedStyle(container).columnGap) || 0;
+    return items.reduce((total, item) => total + item.getBoundingClientRect().width, 0) + gap * Math.max(0, items.length - 1);
+  }
+
+  function labelDeficit(chip: HTMLElement): number {
+    const label = chip.querySelector<HTMLElement>('.app-select-trigger > span');
+    if (!label) return 0;
+    const width = chip.getBoundingClientRect().width;
+    const natural = Math.min(width - label.clientWidth + label.scrollWidth, Number.parseFloat(getComputedStyle(chip).maxWidth) || Infinity);
+    return Math.max(0, natural - width);
+  }
+
+  function measureComposer() {
+    const bar = composerBar;
+    const context = composerContext;
+    const actions = composerActions;
+    if (!bar || !context || !actions) return;
+    if (composerCompact) {
+      if (bar.clientWidth >= compactNeed) {
+        composerCompact = false;
+        composerTight = false;
+        contextMin = 0;
+        return;
+      }
+      const next = Math.ceil(contentWidth(context));
+      if (Math.abs(next - contextMin) > 1) {
+        contextMin = next;
+        void tick().then(measureComposer);
+      }
+      const style = getComputedStyle(bar);
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const inner = bar.clientWidth - (Number.parseFloat(style.paddingLeft) || 0) - (Number.parseFloat(style.paddingRight) || 0);
+      const picker = actions.querySelector<HTMLElement>('.agent-picker');
+      const actionsMin = contentWidth(actions) - (picker ? picker.getBoundingClientRect().width - 4 * rem : 0);
+      const tight = next + actionsMin + (Number.parseFloat(style.columnGap) || 0) > inner + 1;
+      if (tight !== composerTight) composerTight = tight;
+      return;
+    }
+    let deficit = 0;
+    for (const chip of bar.querySelectorAll<HTMLElement>('.agent-composer-chip')) deficit += labelDeficit(chip);
+    deficit += Math.max(0, contentWidth(context) - context.clientWidth);
+    deficit += Math.max(0, contentWidth(actions) - actions.clientWidth);
+    if (deficit > 1) {
+      compactNeed = bar.clientWidth + deficit;
+      composerCompact = true;
+      void tick().then(measureComposer);
+    }
+  }
+
+  $effect(() => {
+    const bar = composerBar;
+    if (!bar) return;
+    const observer = new ResizeObserver(() => measureComposer());
+    observer.observe(bar);
+    return () => observer.disconnect();
+  });
+
+  $effect(() => {
+    void collectionLabel;
+    void environmentLabel;
+    void modeLabel;
+    void vm.gitStatus.isRepo;
+    void agentStore.driver;
+    composerCompact = false;
+    composerTight = false;
+    contextMin = 0;
+    void tick().then(measureComposer);
+  });
   let titleDraft = $state('');
   const titlePlaceholder = 'Untitled chat';
   let attachmentError = $state('');
   let openAttachment = $state<AgentAttachment>();
   let titleError = $state('');
-  let deleteError = $state('');
   let titleInput = $state<HTMLInputElement>();
-  let chatMenuOpen = $state(false);
-  let chatMenu = $state<HTMLDivElement>();
-  let chatMenuTrigger = $state<HTMLButtonElement>();
   let history = $state<{ captureAnchor: () => void }>();
   let lastChatId = '';
   const openTools = new SvelteSet<string>();
@@ -159,6 +234,47 @@
   const effortOptions = $derived(effortValues.map(value => ({ value, label: agentEffortLabel(value) })));
   const effortChoice = $derived(agentEffortChoice(agentStore.effort, effortValues, effortModel?.defaultEffort ?? ''));
   const runningElsewhere = $derived(agentStore.running && !agentStore.liveInActiveChat);
+  const modeOptions = [
+    { value: 'ask', label: 'Ask always' },
+    { value: '', label: 'Ask for changes' },
+    { value: 'auto', label: 'Auto' },
+  ];
+  const AGENT_BUDGET_MAX_TOKENS = 1_000_000_000;
+  const AGENT_BUDGET_MAX_REQUESTS = 100_000;
+  const modeLabel = $derived(modeOptions.find(option => option.value === agentStore.mode)?.label ?? 'Ask for changes');
+  const requestsSent = $derived(agentStore.activeChat?.id === agentStore.activeChatId ? agentStore.activeChat?.requestsSent ?? 0 : 0);
+  const contextSummary = $derived(`${agentStore.collection || 'Any collection'} · ${agentStore.environment || 'No environment'}`);
+  const permissionsSummary = $derived(agentStore.mode === 'ask' ? modeLabel : `${modeLabel} · ${agentStore.allowedHosts.length} ${agentStore.allowedHosts.length === 1 ? 'host' : 'hosts'}`);
+  const budgetSummary = $derived.by(() => {
+    const parts: string[] = [];
+    if (agentStore.budgetTokens) parts.push(`${formatTokens(chatTokens)} / ${formatTokens(agentStore.budgetTokens)}`);
+    if (agentStore.budgetRequests) parts.push(`${requestsSent} / ${agentStore.budgetRequests} req`);
+    return parts.join(' · ') || 'No limit';
+  });
+  const gitSummary = $derived(agentStore.ownBranch ? `${vm.gitStatus.branch || 'None'} · agent branch` : vm.gitStatus.branch || 'None');
+  const usageSummary = $derived(usage ? [`${formatTokens(usage.input + usage.output + usage.cacheRead + usage.cacheWrite)} tokens`, usage.cost ? formatCost(usage.cost) : ''].filter(Boolean).join(' · ') : '');
+  const changesSummary = $derived.by(() => {
+    const waiting = contextChanges.filter(change => change.waiting).length;
+    return waiting ? `${waiting} waiting` : String(contextChanges.length);
+  });
+  function digitsOnly(event: Event & { currentTarget: HTMLInputElement }) {
+    const clean = event.currentTarget.value.replace(/\D+/g, '');
+    if (clean !== event.currentTarget.value) event.currentTarget.value = clean;
+  }
+  const modeNote = $derived(agentStore.mode === 'ask'
+    ? 'Only reading runs on its own. Every request and change waits for you.'
+    : agentStore.mode === 'auto'
+      ? 'Requests and workspace changes run on their own. Unsafe requests to other hosts and git push still wait for you.'
+      : 'Reads and GET requests run on their own. Changes and unsafe requests wait for you.');
+  let hostsDraft = $derived(agentStore.allowedHosts.join(', '));
+  function commitHosts() {
+    agentStore.allowedHosts = hostsDraft.split(/[\s,]+/).map(host => host.trim()).filter(Boolean);
+  }
+  function budgetValue(value: string, limit: number): number {
+    const parsed = Number.parseInt(value.replace(/\D+/g, ''), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, limit) : 0;
+  }
+  const chatTokens = $derived(usage ? usage.input + usage.output + usage.cacheRead + usage.cacheWrite : 0);
 
   const collectionOptions = $derived([
     { value: '', label: 'Any collection' },
@@ -168,6 +284,8 @@
     { value: '', label: 'No environment' },
     ...vm.activeWorkspaceEnvironments.map(environment => ({ value: environment.name, label: environment.protected ? `${environment.name} (protected)` : environment.name })),
   ]);
+  const collectionLabel = $derived(collectionOptions.find(option => option.value === agentStore.collection)?.label ?? agentStore.collection);
+  const environmentLabel = $derived(environmentOptions.find(option => option.value === agentStore.environment)?.label ?? agentStore.environment);
   $effect(() => {
     agentStore.init();
   });
@@ -223,10 +341,8 @@
     if (agentStore.activeChatId === lastChatId) return;
     const assignedLiveChat = !lastChatId && agentStore.liveInActiveChat;
     lastChatId = agentStore.activeChatId;
-    chatMenuOpen = false;
     if (assignedLiveChat) return;
     openAttachment = undefined;
-    deleteError = '';
     openTools.clear();
     openThinking.clear();
     copiedKey = '';
@@ -238,18 +354,6 @@
     history?.captureAnchor();
     stickToBottom = false;
     void agentStore.loadEarlier();
-  }
-
-  async function toggleChatMenu() {
-    chatMenuOpen = !chatMenuOpen;
-    if (!chatMenuOpen) return;
-    await tick();
-    focusFirstMenuItem(chatMenu);
-  }
-
-  function closeChatMenu() {
-    chatMenuOpen = false;
-    chatMenuTrigger?.focus();
   }
 
   function onScroll() {
@@ -393,18 +497,7 @@
     if (titleError) titleDraft = title;
   }
 
-  async function deleteActiveChat() {
-    chatMenuOpen = false;
-    deleteError = '';
-    const store = agentStore;
-    const id = store.activeChat?.id;
-    if (!id) return;
-    try {
-      await store.remove(id);
-    } catch (error) {
-      if (store === agentStore && id === store.activeChatId) deleteError = error instanceof Error ? error.message : String(error);
-    }
-  }
+
 
   function onTitleKeydown(event: KeyboardEvent) {
     const input = event.currentTarget as HTMLInputElement;
@@ -418,9 +511,36 @@
     }
   }
 
+  let workspaceTemplates = $state<AgentTemplate[]>([]);
+  let branching = $state(false);
+  let branchError = $state('');
+
+  async function editMessage(index: number, text: string) {
+    agentStore.startEdit(index, text);
+    await tick();
+    composerInput?.focus();
+    composerInput?.setSelectionRange(text.length, text.length);
+  }
+
+  async function branchFrom(index: number, text: string) {
+    branching = true;
+    branchError = await agentStore.branchFrom(index, text);
+    branching = false;
+    if (!branchError) {
+      await tick();
+      composerInput?.focus();
+    }
+  }
+
   async function toggleTemplates() {
     templatesOpen = !templatesOpen;
     if (!templatesOpen) return;
+    try {
+      const notes = await agentWorkspaceNotes();
+      workspaceTemplates = notes.templates.map((template, index) => ({ id: `workspace:${index}`, title: template.title, summary: '', text: template.text }));
+    } catch {
+      workspaceTemplates = [];
+    }
     await tick();
     focusFirstMenuItem(templatesMenu);
   }
@@ -444,7 +564,6 @@
   }
 
   function onWindowPointerDown(event: PointerEvent) {
-    if (chatMenuOpen && !(event.target instanceof Element && event.target.closest('.agent-header-menu'))) closeChatMenu();
     if (!templatesOpen) return;
     const target = event.target;
     if (target instanceof Element && target.closest('.agent-templates-menu, .agent-templates-btn')) return;
@@ -565,21 +684,7 @@
             readonly={archived}
           />
         </div>
-        {#if titleError || deleteError}<span class="agent-title-error" role="alert">{titleError || deleteError}</span>{/if}
-        <div class="agent-header-menu">
-          <button class="btn btn-ghost btn-icon btn-sm agent-header-menu-btn" type="button" aria-label="Chat actions" aria-haspopup="menu" aria-expanded={chatMenuOpen} bind:this={chatMenuTrigger} onclick={() => void toggleChatMenu()} disabled={workspaceBlocked}>
-            <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="12.5" cy="8" r="1.2"/></svg>
-          </button>
-          {#if chatMenuOpen}
-            <div class="menu agent-header-dropdown" role="menu" tabindex="-1" aria-label="Chat actions" bind:this={chatMenu} onkeydown={(event) => handleMenuKeydown(event, closeChatMenu)}>
-              {#if !archived}
-                <button class="menu-item" type="button" role="menuitem" onclick={() => { chatMenuOpen = false; titleInput?.focus(); titleInput?.select(); }}>Rename</button>
-                <div class="menu-separator" role="separator"></div>
-              {/if}
-              <button class="menu-item danger" type="button" role="menuitem" disabled={agentStore.running && agentStore.liveChatId === agentStore.activeChatId} onclick={() => void deleteActiveChat()}>Delete chat</button>
-            </div>
-          {/if}
-        </div>
+        {#if titleError}<span class="agent-title-error" role="alert">{titleError}</span>{/if}
       </div>
     {/if}
 
@@ -640,8 +745,19 @@
                 </ul>
               {/if}
               {#if turn.prompt}
-                <div class="agent-user-row">
-                  <div class="agent-message-actions">{@render copyButton(`${turn.id}:prompt`, turn.prompt, 'Copy message')}</div>
+                <div class="agent-user-row" class:editing={agentStore.editing !== null && turn.messageIndex !== undefined && agentStore.editing.index === turn.messageIndex}>
+                  <div class="agent-message-actions">
+                    {#if !turn.live && !agentStore.driver && !archived && turn.messageIndex !== undefined}
+                      {@const index = turn.messageIndex}
+                      <button class="btn btn-ghost btn-icon btn-sm agent-copy" type="button" aria-label="Edit message" disabled={agentStore.running} onclick={() => void editMessage(index, turn.prompt)}>
+                        <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10.5 2.75 13.25 5.5 5.75 13H3v-2.75l7.5-7.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                      </button>
+                      <button class="btn btn-ghost btn-icon btn-sm agent-copy" type="button" aria-label="Branch from here" disabled={agentStore.running || branching} onclick={() => void branchFrom(index, turn.prompt)}>
+                        <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><circle cx="4.5" cy="12.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><circle cx="11.5" cy="5.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 5.25v5.5M11.5 7.25c0 2.5-2 3-5.5 3.75" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                      </button>
+                    {/if}
+                    {@render copyButton(`${turn.id}:prompt`, turn.prompt, 'Copy message')}
+                  </div>
                   <div class="agent-user">{turn.prompt}</div>
                 </div>
               {/if}
@@ -775,18 +891,27 @@
                 </div>
               {/if}
               {#if attachmentError}<div class="agent-note" role="alert">{attachmentError}</div>{/if}
-              <div class="agent-composer-bar">
-                <div class="agent-composer-context">
-                  <span class="agent-composer-chip">
+              {#if branchError}<div class="agent-note" role="alert">{branchError}</div>{/if}
+              {#if agentStore.editing}
+                <div class="agent-edit-note" role="status">
+                  <span>Editing an earlier message. Sending replaces it and everything after it.</span>
+                  <button class="btn-link" type="button" onclick={() => agentStore.cancelEdit()}>Cancel</button>
+                </div>
+              {/if}
+              <div class="agent-composer-bar" class:compact={composerCompact} class:tight={composerTight} bind:this={composerBar}>
+                <div class="agent-composer-context" bind:this={composerContext} style:min-width={composerCompact && contextMin ? `${contextMin}px` : undefined}>
+                  <span class="agent-composer-chip" class:compact={composerCompact}>
+                    <svg class="agent-composer-chip-icon" width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>
                     <Select value={agentStore.collection} options={collectionOptions} className="agent-chip" ariaLabel="Collection" disabled={agentStore.running} onChange={(value) => (agentStore.collection = value)} />
                   </span>
-                  <span class="agent-composer-chip">
+                  <span class="agent-composer-chip" class:compact={composerCompact}>
+                    <svg class="agent-composer-chip-icon" width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
                     <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
                   </span>
                   {#if vm.gitStatus.isRepo}
                     <button class="btn btn-ghost btn-sm agent-branch-toggle" class:on={agentStore.ownBranch} type="button" aria-pressed={agentStore.ownBranch} aria-label="Agent branch" disabled={agentStore.running || workspaceBlocked} onclick={() => (agentStore.ownBranch = !agentStore.ownBranch)}>
                       <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><circle cx="4.5" cy="12.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><circle cx="11.5" cy="5.5" r="1.75" stroke="currentColor" stroke-width="1.4"/><path d="M4.5 5.25v5.5M11.5 7.25c0 2.5-2 3-5.5 3.75" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-                      Branch
+                      <span class="agent-branch-label">Branch</span>
                     </button>
                   {/if}
                   <button class="btn btn-ghost btn-icon btn-sm agent-templates-btn" type="button" aria-label="Connect project folder" disabled={workspaceBlocked || agentStore.running || selectingContext} onclick={() => void chooseAgentContext('project')}>
@@ -801,6 +926,16 @@
                     </button>
                     {#if templatesOpen}
                       <div class="menu agent-templates-menu" role="menu" tabindex="-1" aria-label="Templates" bind:this={templatesMenu} onkeydown={onTemplatesKeydown}>
+                        {#if workspaceTemplates.length}
+                          <div class="menu-section-label agent-template-group" role="presentation">From kurlo-agent.md</div>
+                          {#each workspaceTemplates as template (template.id)}
+                            <button class="menu-item agent-template" type="button" role="menuitem" onclick={() => void useTemplate(template)}>
+                              <span class="agent-template-title">{template.title}</span>
+                              <span class="agent-template-text">{template.text}</span>
+                            </button>
+                          {/each}
+                          <div class="menu-section-label agent-template-group" role="presentation">Built in</div>
+                        {/if}
                         {#each AGENT_TEMPLATES as template (template.id)}
                           <button class="menu-item agent-template" type="button" role="menuitem" onclick={() => void useTemplate(template)}>
                             <span class="agent-template-title">{template.title}</span>
@@ -811,7 +946,13 @@
                     {/if}
                   </div>
                 </div>
-                <div class="agent-composer-actions">
+                <div class="agent-composer-actions" bind:this={composerActions}>
+                  {#if !agentStore.driver}
+                    <span class="agent-composer-chip agent-mode-chip" class:compact={composerCompact}>
+                      <svg class="agent-composer-chip-icon" width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.75 2.75 4v3.6c0 3.2 2.2 5.7 5.25 6.65 3.05-.95 5.25-3.45 5.25-6.65V4L8 1.75Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                      <Select value={agentStore.mode} options={modeOptions} className="agent-chip" ariaLabel="Approvals" disabled={agentStore.running || workspaceBlocked} onChange={value => (agentStore.mode = value)} />
+                    </span>
+                  {/if}
                   <AgentPicker disabled={agentStore.running || workspaceBlocked} />
                   {#if agentStore.driver && effortOptions.length}
                     <Select value={effortChoice} options={effortOptions} className="agent-effort" ariaLabel="Effort" disabled={agentStore.running || workspaceBlocked} onChange={value => (agentStore.effort = agentEffortToStore(value, effortModel?.defaultEffort ?? ''))} />
@@ -851,74 +992,95 @@
               <AddCloseIcon />
             </button>
           </div>
-          <section class="agent-context-section">
-            <h3 class="agent-context-label">Context</h3>
+          <Disclosure title="Context" summary={contextSummary} storageKey="agent-details-context">
             <div class="agent-kv"><span>Collection</span><span>{agentStore.collection || 'Any'}</span></div>
             <div class="agent-kv"><span>Environment</span><span>{agentStore.environment || 'None'}{#if environmentProtected}<svg class="agent-kv-lock" width="0.6875rem" height="0.6875rem" viewBox="0 0 16 16" fill="none" aria-label="Protected" role="img"><rect x="3.5" y="7" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.4"/></svg>{/if}</span></div>
             <div class="agent-kv"><span>Agent</span><span>{headerAgent}</span></div>
             {#if agentStore.driver}<div class="agent-kv"><span>Effort</span><span>{agentEffortLabel(agentStore.effort || selectedCodexDefaultEffort)}</span></div>{/if}
-          </section>
+          </Disclosure>
+
+          {#if !agentStore.driver}
+            <Disclosure title="Permissions" summary={permissionsSummary} storageKey="agent-details-permissions">
+              <p class="agent-detail-note">{modeNote} Change it next to the model in the message box.</p>
+              <label class="agent-detail-field agent-detail-stack">
+                <span>Trusted hosts</span>
+                <input class="field field-sm" type="text" value={hostsDraft} placeholder="localhost, *.staging.example.com" spellcheck="false" aria-label="Trusted hosts" disabled={agentStore.running || agentStore.mode === 'ask'} oninput={event => (hostsDraft = event.currentTarget.value)} onchange={commitHosts} />
+              </label>
+              <p class="agent-detail-note">POST, PUT, PATCH and DELETE to these hosts, and any request in a sandbox environment, run without asking.</p>
+            </Disclosure>
+            <Disclosure title="Budget" summary={budgetSummary} storageKey="agent-details-budget">
+              <label class="agent-detail-field">
+                <span>Tokens</span>
+                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="13" value={agentStore.budgetTokens ? String(agentStore.budgetTokens) : ''} placeholder="No limit" aria-label="Token budget" disabled={agentStore.running} oninput={digitsOnly} onchange={event => { agentStore.budgetTokens = budgetValue(event.currentTarget.value, AGENT_BUDGET_MAX_TOKENS); event.currentTarget.value = agentStore.budgetTokens ? String(agentStore.budgetTokens) : ''; }} />
+              </label>
+              <label class="agent-detail-field">
+                <span>Sent requests</span>
+                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="7" value={agentStore.budgetRequests ? String(agentStore.budgetRequests) : ''} placeholder="No limit" aria-label="Request budget" disabled={agentStore.running} oninput={digitsOnly} onchange={event => { agentStore.budgetRequests = budgetValue(event.currentTarget.value, AGENT_BUDGET_MAX_REQUESTS); event.currentTarget.value = agentStore.budgetRequests ? String(agentStore.budgetRequests) : ''; }} />
+              </label>
+              {#if agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId}
+                <div class="agent-kv"><span>Used</span><span>{formatTokens(chatTokens)} tokens · {requestsSent} {requestsSent === 1 ? 'request' : 'requests'}</span></div>
+              {/if}
+              <p class="agent-detail-note">The agent stops when the chat reaches either limit, up to {AGENT_BUDGET_MAX_TOKENS.toLocaleString('en-US')} tokens or {AGENT_BUDGET_MAX_REQUESTS.toLocaleString('en-US')} requests. Changes apply from your next message.</p>
+            </Disclosure>
+          {/if}
 
           {#if vm.gitStatus.isRepo}
-            <section class="agent-context-section" aria-label="Git">
-              <h3 class="agent-context-label">Git</h3>
+            <Disclosure title="Git" summary={gitSummary} storageKey="agent-details-git">
               <div class="agent-kv"><span>Current branch</span><span class="agent-kv-mono">{vm.gitStatus.branch || 'None'}</span></div>
               <div class="agent-kv"><span>Agent branch</span><span class:agent-kv-mono={agentStore.ownBranch && Boolean(agentStore.activeChat?.branch)}>{agentStore.ownBranch ? agentStore.activeChat?.branch || 'Created on the first change' : 'Off'}</span></div>
               <p class="agent-detail-note">{agentStore.ownBranch ? 'Each change you approve is committed to the agent branch. Pushing still needs your approval.' : 'Turn on Branch in the message box to commit each approved change to a branch of its own.'}</p>
               {#if vm.workspaces.length > 1}<p class="agent-detail-note">Git works on the whole folder: a branch switch or commit here also applies to its other {vm.workspaces.length - 1} {vm.workspaces.length === 2 ? 'workspace' : 'workspaces'}.</p>{/if}
               <button class="btn btn-secondary btn-sm agent-pull-request" type="button" onclick={() => void openPullRequest()} disabled={pullRequestBusy}>Open pull request</button>
               {#if pullRequestError}<p class="agent-detail-note agent-detail-error" role="alert">{pullRequestError}</p>{/if}
-            </section>
+            </Disclosure>
           {/if}
 
           {#if usage && (usage.input || usage.output)}
-            <section class="agent-context-section">
-              <h3 class="agent-context-label">Usage</h3>
+            <Disclosure title="Usage" summary={usageSummary} storageKey="agent-details-usage" defaultOpen>
               <div class="agent-kv"><span>Input</span><span>{usage.input.toLocaleString('en-US')}</span></div>
               {#if usage.cacheRead || usage.cacheWrite}<div class="agent-kv"><span>Cached</span><span>{(usage.cacheRead + usage.cacheWrite).toLocaleString('en-US')}</span></div>{/if}
               <div class="agent-kv"><span>Output</span><span>{usage.output.toLocaleString('en-US')}</span></div>
               {#if usage.reasoning}<div class="agent-kv"><span>Reasoning</span><span>{usage.reasoning.toLocaleString('en-US')}</span></div>{/if}
               {#if usage.cost}<div class="agent-kv"><span>Cost at API prices</span><span>{formatCost(usage.cost)}</span></div>{/if}
-              {#if agentStore.driver && contextPercent !== null}
+              {#if contextPercent !== null}
                 <div class="agent-context agent-detail-meter" aria-label="Last reported context">
                   <span class="agent-detail-meter-head"><span>Context (last request)</span><span>{contextPercent}%</span></span>
                   <span class="agent-quota-bar agent-quota-bar-wide" aria-hidden="true"><span class="agent-quota-fill" style:width={`${contextPercent}%`}></span></span>
                   <span class="agent-detail-meter-note">{formatTokens(contextTokens)} / {formatTokens(contextWindow)} tokens</span>
                 </div>
               {/if}
-            </section>
+            </Disclosure>
           {/if}
 
           {#if agentStore.driver && quotaWindows.length}
-            <section class="agent-context-section agent-limits">
-              <h3 class="agent-context-label">{planName} plan</h3>
-              {#each quotaWindows as window, index (`${window.label}:${index}`)}
-                <div class="agent-detail-meter">
-                  <span class="agent-detail-meter-head"><span>{window.duration === '5h' ? '5-hour window' : window.duration === '7d' ? 'Weekly' : window.label}</span><span>{window.remaining}% left</span></span>
-                  <span class="agent-quota-bar agent-quota-bar-wide" aria-hidden="true"><span class="agent-quota-fill" class:low={window.remaining < 30} style:width={`${window.remaining}%`}></span></span>
-                  {#if window.resetsAt > 0}<span class="agent-detail-meter-note agent-limit-resets">resets {new Date(window.resetsAt * 1000).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>{/if}
-                </div>
-              {/each}
+            <Disclosure title={`${planName} plan`} summary={tightestQuota ? `${tightestQuota.remaining}% left` : ''} storageKey="agent-details-plan" defaultOpen>
+              <div class="agent-limits">
+                {#each quotaWindows as window, index (`${window.label}:${index}`)}
+                  <div class="agent-detail-meter">
+                    <span class="agent-detail-meter-head"><span>{window.duration === '5h' ? '5-hour window' : window.duration === '7d' ? 'Weekly' : window.label}</span><span>{window.remaining}% left</span></span>
+                    <span class="agent-quota-bar agent-quota-bar-wide" aria-hidden="true"><span class="agent-quota-fill" class:low={window.remaining < 30} style:width={`${window.remaining}%`}></span></span>
+                    {#if window.resetsAt > 0}<span class="agent-detail-meter-note agent-limit-resets">resets {new Date(window.resetsAt * 1000).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>{/if}
+                  </div>
+                {/each}
+              </div>
               <p class="agent-detail-note">Shared with your other {agentStore.driver === 'claude-code' ? 'Claude Code' : 'Codex'} sessions.</p>
-            </section>
+            </Disclosure>
           {/if}
 
           {#if contextChanges.length}
-            <section class="agent-context-section">
-              <h3 class="agent-context-label">Changes</h3>
+            <Disclosure title="Changes" summary={changesSummary} storageKey="agent-details-changes" defaultOpen>
               {#each contextChanges as change, index (index)}
                 <div class="agent-context-item"><span class="agent-dot" class:wait={change.waiting}></span><span class="agent-context-item-name">{change.name}</span><span class="agent-context-item-meta" class:wait={change.waiting}>{change.waiting ? 'waiting' : change.label}</span></div>
               {/each}
-            </section>
+            </Disclosure>
           {/if}
 
           {#if contextRuns.length}
-            <section class="agent-context-section">
-              <h3 class="agent-context-label">Runs</h3>
+            <Disclosure title="Runs" summary={String(contextRuns.length)} storageKey="agent-details-runs">
               {#each contextRuns as run, index (index)}
                 <div class="agent-context-item"><span class="agent-context-method">{run.method}</span><span class="agent-context-item-name">{run.name}</span>{#if run.status}<span class="agent-tool-status" class:ok={run.status < 300} class:warn={run.status >= 300 && run.status < 500} class:bad={run.status >= 500}>{run.status}</span>{/if}</div>
               {/each}
-            </section>
+            </Disclosure>
           {/if}
         </aside>
       {/if}
@@ -983,18 +1145,6 @@
   .agent-title-error {
     color: var(--danger);
     font-size: var(--text-caption);
-  }
-  .agent-header-menu {
-    position: relative;
-    flex: 0 0 auto;
-    margin-inline-start: auto;
-  }
-  .agent-header-dropdown {
-    position: absolute;
-    top: calc(100% + var(--space-1));
-    right: 0;
-    z-index: 140;
-    min-width: 11rem;
   }
   .agent-body {
     display: flex;
@@ -1161,6 +1311,24 @@
     flex-direction: column;
     gap: var(--space-3);
     min-width: 0;
+  }
+  .agent-template-group {
+    padding: var(--space-1-5) var(--space-2) var(--space-0-5);
+    color: var(--text-3);
+    font-size: var(--text-caption);
+  }
+  .agent-edit-note {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    margin: var(--space-2) var(--space-3) 0;
+    color: var(--text-2);
+    font-size: var(--text-label);
+  }
+  .agent-user-row.editing .agent-user {
+    outline: 1px dashed var(--accent);
+    outline-offset: 2px;
   }
   .agent-user-row {
     display: flex;
@@ -1572,7 +1740,7 @@
 
   .agent-composer-bar {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: var(--space-1) var(--space-2);
     min-width: 0;
@@ -1588,10 +1756,38 @@
   }
 
   .agent-composer-chip {
+    position: relative;
     display: inline-flex;
     flex: 0 1 auto;
     min-width: 2.5rem;
     max-width: 11rem;
+  }
+  .agent-composer-chip-icon {
+    display: none;
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: var(--space-2);
+    color: var(--text-2);
+    pointer-events: none;
+    transform: translateY(-50%);
+  }
+  .agent-composer-chip.compact {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .agent-composer-chip.compact .agent-composer-chip-icon {
+    display: block;
+  }
+  .agent-composer-chip.compact:hover .agent-composer-chip-icon {
+    color: var(--text);
+  }
+  .agent-composer-chip.compact :global(.agent-chip .app-select-trigger) {
+    gap: 0;
+    padding-left: calc(var(--space-2) + 0.875rem + var(--space-1));
+  }
+  .agent-composer-chip.compact :global(.agent-chip .app-select-trigger > span) {
+    display: none;
   }
 
   .agent-composer-chip :global(.agent-chip) {
@@ -1634,6 +1830,15 @@
     min-width: 0;
     max-width: 7rem;
   }
+  .agent-composer-bar.compact .agent-branch-label {
+    display: none;
+  }
+  .agent-composer-bar.tight {
+    flex-wrap: wrap;
+  }
+  .agent-composer-bar.compact :global(.agent-picker) {
+    min-width: 4rem;
+  }
   .agent-composer :global(.agent-effort .app-select-trigger > span) {
     flex: 1 1 auto;
     min-width: 0;
@@ -1642,7 +1847,7 @@
   }
   .agent-composer-actions {
     display: flex;
-    flex: 0 1 18rem;
+    flex: 0 1 auto;
     align-items: center;
     justify-content: flex-end;
     gap: var(--space-1);
@@ -1737,6 +1942,30 @@
   .agent-detail-meter-head > span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
   .agent-detail-meter-note { color: var(--text-3); font-size: var(--text-caption); }
   .agent-detail-note { margin: 0; color: var(--text-3); font-size: var(--text-caption); }
+  .agent-detail-field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    font-size: var(--text-label);
+  }
+  .agent-detail-field > span {
+    flex: 0 0 auto;
+    color: var(--text-3);
+  }
+  .agent-detail-stack {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-1);
+  }
+  .agent-detail-field :global(.agent-detail-select) {
+    min-width: 0;
+    max-width: 10rem;
+  }
+  .agent-detail-number {
+    width: 7rem;
+    text-align: right;
+  }
   .agent-send:disabled {
     background: var(--elevated);
     color: var(--text-3);
@@ -1754,7 +1983,7 @@
     display: flex;
     flex: 0 0 16rem;
     flex-direction: column;
-    gap: var(--space-5);
+    gap: var(--space-3);
     min-width: 0;
     min-height: 0;
     overflow-y: auto;
@@ -1804,6 +2033,11 @@
   }
 
 
+  .agent-limits {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
   .agent-context-section {
     display: flex;
     flex-direction: column;
@@ -1959,9 +2193,6 @@
     .agent-composer-hint,
     .agent-tool-time {
       display: none;
-    }
-    .agent-composer-chip {
-      max-width: 7rem;
     }
   }
   @media (max-height: 44rem) {

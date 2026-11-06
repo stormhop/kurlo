@@ -264,7 +264,7 @@ func TestKnowledgeAttachmentsBecomeTurnToolsAndVisionContent(t *testing.T) {
 	if out := callExecutionTool(t, s, t.Context(), "read_attachment", map[string]any{"attachment": files[0].id}); !strings.Contains(out["text"].(string), "pet-1") {
 		t.Fatalf("attachment = %v", out)
 	}
-	history, _ := agentHistoryForModel([]model.AiMessage{newAgentUserMessage("Check it", files)})
+	history, _ := agentHistoryForModel([]model.AiMessage{newAgentUserMessage("Check it", files)}, 0)
 	msg := history[0]
 	msg.Blocks = append(msg.Blocks, agentImageBlocks(files)...)
 	if len(msg.Attachments) != 0 || !strings.Contains(msg.Blocks[0].Text, fmt.Sprintf("%q (attachment %s, available with read_attachment)", "rows.csv", files[0].id)) {

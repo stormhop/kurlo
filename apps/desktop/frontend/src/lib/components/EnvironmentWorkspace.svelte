@@ -14,6 +14,7 @@
     createEnvironment,
     renameEnvironment,
     setEnvironmentProtected = () => {},
+    setEnvironmentSandbox = () => {},
     setEnvironmentParent = () => {},
     deleteEnvironment,
     saveEnvironment,
@@ -39,6 +40,7 @@
     createEnvironment: () => void;
     renameEnvironment: (environmentId: string, name: string) => void | Promise<void>;
     setEnvironmentProtected?: (environmentId: string, isProtected: boolean) => void;
+    setEnvironmentSandbox?: (environmentId: string, sandbox: boolean) => void;
     setEnvironmentParent?: (environmentId: string, parentId: string) => void;
     deleteEnvironment: (environmentId: string) => void;
     saveEnvironment: () => void;
@@ -250,6 +252,8 @@
             <span class="env-protected"><MenuIcon name="lock" />Protected</span>
           {:else if protectedBy}
             <span class="env-protected"><MenuIcon name="lock" />Protected through {protectedBy.name}</span>
+          {:else if activeEnvironment.sandbox}
+            <span class="env-protected env-sandbox"><MenuIcon name="play" />Sandbox</span>
           {/if}
         </h1>
         <p>
@@ -270,6 +274,7 @@
             <div class="menu request-menu env-more-menu" role="menu">
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(focusName)}><MenuIcon name="rename" />Rename</button>
               <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.protected || protectedBy)} disabled={Boolean(protectedBy && !activeEnvironment.protected)} onclick={() => runMenuAction(() => setEnvironmentProtected(activeEnvironment.id, !activeEnvironment.protected))}><MenuIcon name="lock" />{activeEnvironment.protected ? 'Unprotect from AI agents' : 'Protect from AI agents'}</button>
+              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.sandbox)} disabled={Boolean(activeEnvironment.protected || protectedBy)} onclick={() => runMenuAction(() => setEnvironmentSandbox(activeEnvironment.id, !activeEnvironment.sandbox))}><MenuIcon name="play" />{activeEnvironment.sandbox ? 'Stop treating as a sandbox' : 'Sandbox for the agent'}</button>
               <div class="menu-separator" role="separator"></div>
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => importEnvFromFile(activeEnvironment.id))}><MenuIcon name="import" />Import .env</button>
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => exportEnvironment(activeEnvironment.id))}><MenuIcon name="export" />Export…</button>

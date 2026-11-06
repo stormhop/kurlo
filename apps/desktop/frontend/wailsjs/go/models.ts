@@ -909,7 +909,57 @@ export namespace model {
 		}
 	}
 	
+	export class AgentPlanCall {
+	    tool: string;
+	    target?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentPlanCall(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = source["tool"];
+	        this.target = source["target"];
+	    }
+	}
+	export class AgentPlan {
+	    summary: string;
+	    steps: string[];
+	    calls: AgentPlanCall[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentPlan(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.summary = source["summary"];
+	        this.steps = source["steps"];
+	        this.calls = this.convertValues(source["calls"], AgentPlanCall);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AgentApproval {
+	    plan?: AgentPlan;
+	    external?: boolean;
 	    id: string;
 	    chatId: string;
 	    turnId?: string;
@@ -926,6 +976,8 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.plan = this.convertValues(source["plan"], AgentPlan);
+	        this.external = source["external"];
 	        this.id = source["id"];
 	        this.chatId = source["chatId"];
 	        this.turnId = source["turnId"];
@@ -1084,6 +1136,11 @@ export namespace model {
 	    allowedTools: string[];
 	    ownBranch?: boolean;
 	    branch?: string;
+	    mode?: string;
+	    allowedHosts?: string[];
+	    budgetTokens?: number;
+	    budgetRequests?: number;
+	    requestsSent?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentChat(source);
@@ -1115,6 +1172,11 @@ export namespace model {
 	        this.allowedTools = source["allowedTools"];
 	        this.ownBranch = source["ownBranch"];
 	        this.branch = source["branch"];
+	        this.mode = source["mode"];
+	        this.allowedHosts = source["allowedHosts"];
+	        this.budgetTokens = source["budgetTokens"];
+	        this.budgetRequests = source["budgetRequests"];
+	        this.requestsSent = source["requestsSent"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1160,6 +1222,151 @@ export namespace model {
 	    }
 	}
 	
+	export class AgentMcpPair {
+	    key: string;
+	    value?: string;
+	    set?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentMcpPair(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.value = source["value"];
+	        this.set = source["set"];
+	    }
+	}
+	export class AgentMcpServer {
+	    id: string;
+	    name: string;
+	    kind: string;
+	    url?: string;
+	    command?: string;
+	    args: string[];
+	    headers: AgentMcpPair[];
+	    env: AgentMcpPair[];
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentMcpServer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.url = source["url"];
+	        this.command = source["command"];
+	        this.args = source["args"];
+	        this.headers = this.convertValues(source["headers"], AgentMcpPair);
+	        this.env = this.convertValues(source["env"], AgentMcpPair);
+	        this.enabled = source["enabled"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentMcpServersState {
+	    servers: AgentMcpServer[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentMcpServersState(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.servers = this.convertValues(source["servers"], AgentMcpServer);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentMcpToolInfo {
+	    name: string;
+	    description?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentMcpToolInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	    }
+	}
+	export class AgentMcpTestResult {
+	    ok: boolean;
+	    tools: AgentMcpToolInfo[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentMcpTestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.tools = this.convertValues(source["tools"], AgentMcpToolInfo);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
 	export class AgentResult {
 	    ok: boolean;
 	    error?: string;
@@ -1188,6 +1395,11 @@ export namespace model {
 	    connectionId: string;
 	    model: string;
 	    ownBranch?: boolean;
+	    editFrom?: number;
+	    mode?: string;
+	    allowedHosts?: string[];
+	    budgetTokens?: number;
+	    budgetRequests?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentSendInput(source);
@@ -1208,6 +1420,25 @@ export namespace model {
 	        this.connectionId = source["connectionId"];
 	        this.model = source["model"];
 	        this.ownBranch = source["ownBranch"];
+	        this.editFrom = source["editFrom"];
+	        this.mode = source["mode"];
+	        this.allowedHosts = source["allowedHosts"];
+	        this.budgetTokens = source["budgetTokens"];
+	        this.budgetRequests = source["budgetRequests"];
+	    }
+	}
+	export class AgentTemplate {
+	    title: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentTemplate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.text = source["text"];
 	    }
 	}
 	export class TimelineEvent {
@@ -1582,6 +1813,42 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class AgentWorkspaceNotes {
+	    path: string;
+	    exists: boolean;
+	    templates: AgentTemplate[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentWorkspaceNotes(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.exists = source["exists"];
+	        this.templates = this.convertValues(source["templates"], AgentTemplate);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class AiConnection {
 	    id: string;
@@ -1640,6 +1907,7 @@ export namespace model {
 	    name: string;
 	    recommended: boolean;
 	    weakTools: boolean;
+	    contextWindow?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AiConnectionModel(source);
@@ -1653,6 +1921,7 @@ export namespace model {
 	        this.name = source["name"];
 	        this.recommended = source["recommended"];
 	        this.weakTools = source["weakTools"];
+	        this.contextWindow = source["contextWindow"];
 	    }
 	}
 	export class AiConnectionTestResult {
@@ -1826,6 +2095,7 @@ export namespace model {
 	    stream: boolean;
 	    thinking?: string;
 	    idleTimeoutSec?: number;
+	    cachePrompt?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AiSettings(source);
@@ -1839,6 +2109,7 @@ export namespace model {
 	        this.stream = source["stream"];
 	        this.thinking = source["thinking"];
 	        this.idleTimeoutSec = source["idleTimeoutSec"];
+	        this.cachePrompt = source["cachePrompt"];
 	    }
 	}
 	export class GraphQLPayload {

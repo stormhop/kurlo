@@ -733,7 +733,7 @@ func TestAgentHistoryForModelTrimsOldTurns(t *testing.T) {
 	for _, prompt := range []string{"one", "two", "three"} {
 		messages = append(messages, turn(prompt, big)...)
 	}
-	out, dropped := agentHistoryForModel(messages)
+	out, dropped := agentHistoryForModel(messages, 0)
 	if dropped || len(out) != len(messages) {
 		t.Fatalf("len = %d dropped = %v", len(out), dropped)
 	}
@@ -755,16 +755,12 @@ func TestAgentHistoryForModelTrimsOldTurns(t *testing.T) {
 		long = append(long, turn(fmt.Sprintf("t%d", index), strings.Repeat("y", 1900))...)
 		long[len(long)-4].Blocks[0].Text = strings.Repeat("q", 20000)
 	}
-	cut, dropped := agentHistoryForModel(long)
+	cut, dropped := agentHistoryForModel(long, 0)
 	if !dropped || cut[0].Role != "user" || len(cut) >= len(long) || cut[len(cut)-1].Blocks[0].Text != "done" {
 		t.Fatalf("over the budget the oldest turns go: dropped=%v len=%d first=%s", dropped, len(cut), cut[0].Role)
 	}
-	total := 0
-	for _, message := range cut {
-		total += agentMessageRunes(message)
-	}
-	if total > agentHistoryBudgetRunes {
-		t.Fatalf("history is %d characters", total)
+	if total := agentMessagesTokens(cut); total > agentContextBudget(agentDefaultContextTokens) {
+		t.Fatalf("history is %d tokens", total)
 	}
 }
 

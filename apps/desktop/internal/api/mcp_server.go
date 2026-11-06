@@ -61,7 +61,7 @@ type mcpServer struct {
 	opts             mcpServerOptions
 	out              io.Writer
 	writeMu          sync.Mutex
-	runMu            sync.Mutex
+	runMu            sync.RWMutex
 	jars             *cookieJarRegistry
 	cache            *preflightCache
 	tokens           *oauth2TokenCache
@@ -644,8 +644,13 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		return nil, &mcpServerError{code: mcpRPCInvalidParams, message: call.Name + " is not available: this server was started with --read-only"}
 	}
 
-	s.runMu.Lock()
-	defer s.runMu.Unlock()
+	if mcpParallelTool(call.Name) {
+		s.runMu.RLock()
+		defer s.runMu.RUnlock()
+	} else {
+		s.runMu.Lock()
+		defer s.runMu.Unlock()
+	}
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}

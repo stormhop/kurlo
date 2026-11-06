@@ -8,7 +8,7 @@
   import WhatsNewModal from './lib/components/WhatsNewModal.svelte';
   import UpdateBanner from './lib/components/UpdateBanner.svelte';
   import { vm } from './lib/stores/app.svelte';
-  import { syncAgentWorkspace } from './lib/stores/agent.svelte';
+  import { agentNavigation, syncAgentWorkspace } from './lib/stores/agent.svelte';
   import { appLazyComponents as lazy } from './lib/stores/lazyComponents.svelte';
 
   import AppOverlays from './lib/components/AppOverlays.svelte';
@@ -18,8 +18,8 @@
   import RequestEditorTabs from './lib/components/RequestEditorTabs.svelte';
   import ActivityRail from './lib/components/ActivityRail.svelte';
   import { shortcutComboLabel, usesMacShortcutGlyphs } from './lib/stores/features/preferences';
-  import { responseRightMinWidth } from './lib/stores/features/uiShell';
-  import { rem, uiScale } from './lib/uiScale';
+  import { agentSidebarMaxWidth, responseRightMinWidth } from './lib/stores/features/uiShell';
+  import { rem, toLogicalPx, uiScale } from './lib/uiScale';
   import Sidebar from './lib/components/Sidebar.svelte';
   import StatusBar from './lib/components/StatusBar.svelte';
   import WorkspaceChrome from './lib/components/WorkspaceChrome.svelte';
@@ -150,6 +150,12 @@
   let destroyed = false;
   let focusedBeforeWindowBlur: HTMLElement | null = null;
   let codePanelAvailable = $derived(vm.codePanelAvailable);
+  let windowWidth = $state(window.innerWidth);
+  let agentDetailsDocked = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity && !vm.sidebarHidden);
+  let shownSidebarWidth = $derived(vm.sidebarHidden ? 0 : agentDetailsDocked ? Math.min(vm.sidebarWidth, agentSidebarMaxWidth(toLogicalPx(windowWidth))) : vm.sidebarWidth);
+  $effect(() => {
+    if (agentDetailsDocked && vm.sidebarWidth > shownSidebarWidth) vm.sidebarWidth = shownSidebarWidth;
+  });
   let sseSessionVisible = $derived(vm.sseSessionIsVisible());
   let requestSplitWidth = $state(0);
   let activeRequestLocation = $derived.by(() => {
@@ -462,6 +468,7 @@
 </script>
 
 <svelte:window
+  bind:innerWidth={windowWidth}
   on:keydown={vm.onKeydown}
   on:contextmenu={preventNativeContextMenu}
   on:mousedown={vm.onWindowMouseDown}
@@ -508,7 +515,7 @@
   class:resizing-code={vm.codePanelResizing}
   class:code-open={vm.codePanelOpen && codePanelAvailable}
   class:sidebar-hidden={vm.sidebarHidden}
-  style="--sidebar-w: {rem(vm.sidebarHidden ? 0 : vm.sidebarWidth)}; --code-requested-w: {rem(vm.codePanelOpen && codePanelAvailable ? vm.codePanelWidth : 0)}"
+  style="--sidebar-w: {rem(shownSidebarWidth)}; --code-requested-w: {rem(vm.codePanelOpen && codePanelAvailable ? vm.codePanelWidth : 0)}"
 >
   <input
     class="hidden-file-input"
@@ -788,6 +795,7 @@
         createEnvironment={vm.createEnvironment}
         renameEnvironment={vm.renameEnvironment}
         setEnvironmentProtected={vm.setEnvironmentProtected}
+        setEnvironmentSandbox={vm.setEnvironmentSandbox}
         setEnvironmentParent={vm.setEnvironmentParent}
         deleteEnvironment={vm.deleteEnvironment}
         saveEnvironment={vm.saveEnvironment}

@@ -307,6 +307,7 @@
         "name": { "type": "string" },
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "protected": { "type": "boolean" },
+        "sandbox": { "type": "boolean" },
         "values": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }

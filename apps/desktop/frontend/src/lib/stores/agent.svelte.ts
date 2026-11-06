@@ -1,5 +1,5 @@
 import {
-  agentChatPage, agentChats, agentPendingApprovals, answerAgentApproval, deleteAgentChat,
+  agentChatPage, agentChats, agentPendingApprovals, answerAgentApproval, branchAgentChat, deleteAgentChat,
   onAgentEvent, renameAgentChat, sendAgentMessage, setAgentChatArchived, stopAgent,
   type AgentContext, type AgentApproval, type AgentApprovalClosed, type AgentAttachment, type AgentChat, type AgentChatSummary,
   type AiBlock, type AiStep, type AiUsage,
@@ -9,6 +9,20 @@ import { SvelteMap } from 'svelte/reactivity';
 import { applyAiDeltas, emptyAiUsage, emptyStepView, isAiStepIndex, stepViewFrom, type AiDelta, type AiTurn } from './features/ai';
 
 export type AgentNotes = { chatId: string; error: string; warnings: string[] };
+
+type LiveTurn = {
+  turn: AiTurn;
+  chatId: string;
+  workspaceId: string;
+  composer: symbol;
+  history: AgentChat | null;
+  context: AgentContext | null;
+  attachments: AgentAttachment[];
+  compacting: boolean;
+  stopRequested: boolean;
+};
+
+export type AgentEditTarget = { index: number; text: string };
 
 type WorkspaceChatView = {
   activeChatId: string;
@@ -23,6 +37,11 @@ type WorkspaceChatView = {
   connectionId: string;
   model: string;
   effort: string;
+  mode: string;
+  allowedHosts: string[];
+  budgetTokens: number;
+  budgetRequests: number;
+  editing: AgentEditTarget | null;
   context: AgentContext | null;
   notes: AgentNotes | null;
   loadError: string;
@@ -30,6 +49,12 @@ type WorkspaceChatView = {
 
 function chatMessageCount(chat: AgentChat | null | undefined): number {
   return chat?.messageCount ?? (chat?.messageOffset ?? 0) + (chat?.messages?.length ?? 0);
+}
+
+export function agentChatBefore(chat: AgentChat, index: number): AgentChat {
+  const offset = chat.messageOffset ?? 0;
+  const keep = Math.max(0, index - offset);
+  return { ...chat, messages: chat.messages.slice(0, keep), messageCount: Math.min(chatMessageCount(chat), index) };
 }
 
 function newTurnId(): string {
@@ -45,14 +70,17 @@ export class AgentStore {
   chatsLoaded = $state(false);
   activeChatId = $state('');
   activeChat = $state<AgentChat | null>(null);
-  live = $state<AiTurn | null>(null);
-  liveAttachments = $state<AgentAttachment[]>([]);
-  liveChatId = $state('');
+  turns = new SvelteMap<string, LiveTurn>();
   approvals = $state<AgentApproval[]>([]);
   notes = $state<AgentNotes | null>(null);
   collection = $state('');
   environment = $state('');
   ownBranch = $state(false);
+  mode = $state('');
+  allowedHosts = $state<string[]>(['localhost', '127.0.0.1']);
+  budgetTokens = $state(0);
+  budgetRequests = $state(0);
+  editing = $state<AgentEditTarget | null>(null);
   connectionId = $state('');
   draft = $state('');
   projectRoot = $state('');
@@ -60,20 +88,14 @@ export class AgentStore {
   loadError = $state('');
   historyError = $state('');
   loadingEarlier = $state(false);
-  compacting = $state(false);
   private historyRequest = 0;
   private chatLoads = new SvelteMap<string, symbol>();
   workspaceId = $state('');
 
   private composer = $state(Symbol());
-  private liveComposer: symbol | null = null;
   private listening = false;
   private generation = 0;
   private refreshId = 0;
-  private stopRequested = '';
-  private liveWorkspaceId = '';
-  private liveHistory: AgentChat | null = null;
-  private liveContext: AgentContext | null = null;
   private views = new SvelteMap<string, WorkspaceChatView>();
   private collectionNames: string[] = [];
   private environmentNames: string[] = [];
@@ -95,7 +117,8 @@ export class AgentStore {
         this.collection = '';
         this.environment = activeEnvironment;
       }
-      if (this.liveWorkspaceId === workspaceId) this.context = this.liveContext;
+      const active = this.activeTurn;
+      if (active) this.context = active.context;
       this.chats = [];
       this.chatsLoaded = false;
       void this.refreshChats();
@@ -108,6 +131,7 @@ export class AgentStore {
     return {
       activeChatId: this.activeChatId, activeChat: trimHistory && this.activeChat ? agentHistoryPage(this.activeChat) : this.activeChat, draft: this.draft, composer: this.composer,
       collection: this.collection, environment: this.environment, ownBranch: this.ownBranch, connectionId: this.connectionId,
+      mode: this.mode, allowedHosts: [...this.allowedHosts], budgetTokens: this.budgetTokens, budgetRequests: this.budgetRequests, editing: this.editing,
       projectRoot: this.projectRoot, attachmentPaths: [...this.attachmentPaths],
       model: this.model, effort: this.effort, context: this.context, notes: this.notes, loadError: this.loadError,
     };
@@ -123,6 +147,11 @@ export class AgentStore {
     this.collection = view.collection;
     this.environment = view.environment;
     this.ownBranch = view.ownBranch;
+    this.mode = view.mode;
+    this.allowedHosts = view.allowedHosts;
+    this.budgetTokens = view.budgetTokens;
+    this.budgetRequests = view.budgetRequests;
+    this.editing = view.editing;
     this.connectionId = view.connectionId;
     this.model = view.model;
     this.effort = view.effort;
@@ -141,17 +170,52 @@ export class AgentStore {
     else this.views.set(workspaceId, { ...view, activeChat: view.activeChat ? agentHistoryPage(view.activeChat) : null });
   }
 
+  private get activeTurn(): LiveTurn | null {
+    for (const entry of this.turns.values()) {
+      if (entry.workspaceId !== this.workspaceId) continue;
+      if (this.activeChatId ? entry.chatId === this.activeChatId : !entry.chatId && entry.composer === this.composer) return entry;
+    }
+    return null;
+  }
+
+  get live(): AiTurn | null {
+    return this.activeTurn?.turn ?? null;
+  }
+
+  get liveAttachments(): AgentAttachment[] {
+    return this.activeTurn?.attachments ?? [];
+  }
+
+  get liveChatId(): string {
+    return this.activeTurn?.chatId ?? '';
+  }
+
+  get compacting(): boolean {
+    return this.activeTurn?.compacting ?? false;
+  }
+
+  get anyRunning(): boolean {
+    for (const entry of this.turns.values()) if (entry.turn.status === 'streaming') return true;
+    return false;
+  }
+
   get running(): boolean {
+    if (this.driver) return this.anyRunning;
     return this.live?.status === 'streaming';
   }
 
   get liveInActiveChat(): boolean {
-    return Boolean(this.live) && this.liveWorkspaceId === this.workspaceId && this.liveChatId === this.activeChatId &&
-      (Boolean(this.activeChatId) || this.composer === this.liveComposer);
+    return Boolean(this.activeTurn);
+  }
+
+  isRunning(chatId: string): boolean {
+    for (const entry of this.turns.values()) if (entry.chatId === chatId && entry.turn.status === 'streaming') return true;
+    return false;
   }
 
   get activeApprovals(): AgentApproval[] {
-    return this.approvals.filter(approval => approval.chatId === this.activeChatId || (!this.activeChatId && this.liveWorkspaceId === this.workspaceId && approval.turnId === this.live?.id));
+    const turnId = this.activeTurn?.turn.id;
+    return this.approvals.filter(approval => (this.activeChatId && approval.chatId === this.activeChatId) || (turnId && approval.turnId === turnId));
   }
 
   get usage(): AiUsage {
@@ -162,13 +226,15 @@ export class AgentStore {
     if (this.listening) return;
     this.listening = true;
     onAgentEvent<{ sessionId: string; turnId?: string; deltas: AiDelta[]; attachments?: AgentAttachment[] }>('ai:deltas', payload => {
-      if (!this.matches(payload.sessionId, payload.turnId)) return;
-      if (payload.attachments) this.liveAttachments = payload.attachments;
-      if (payload.deltas?.length) this.updateLive(turn => applyAiDeltas(turn, payload.deltas));
+      const entry = this.matches(payload.sessionId, payload.turnId);
+      if (!entry) return;
+      if (payload.attachments) this.updateEntry(entry, value => ({ ...value, attachments: payload.attachments ?? [] }));
+      if (payload.deltas?.length) this.updateLive(entry, turn => applyAiDeltas(turn, payload.deltas));
     });
     onAgentEvent<{ sessionId: string; turnId?: string; step: AiStep }>('ai:step', payload => {
-      if (!this.matches(payload.sessionId, payload.turnId) || !isAiStepIndex(payload.step.index)) return;
-      this.updateLive(turn => {
+      const entry = this.matches(payload.sessionId, payload.turnId);
+      if (!entry || !isAiStepIndex(payload.step.index)) return;
+      this.updateLive(entry, turn => {
         const steps = turn.steps.slice();
         while (steps.length <= payload.step.index) steps.push(emptyStepView(steps.length));
         steps[payload.step.index] = { ...stepViewFrom(payload.step), toolResults: steps[payload.step.index].toolResults };
@@ -176,8 +242,9 @@ export class AgentStore {
       });
     });
     onAgentEvent<{ sessionId: string; turnId?: string; step: number; block: AiBlock }>('ai:tool', payload => {
-      if (!this.matches(payload.sessionId, payload.turnId) || !isAiStepIndex(payload.step)) return;
-      this.updateLive(turn => {
+      const entry = this.matches(payload.sessionId, payload.turnId);
+      if (!entry || !isAiStepIndex(payload.step)) return;
+      this.updateLive(entry, turn => {
         const steps = turn.steps.slice();
         while (steps.length <= payload.step) steps.push(emptyStepView(steps.length));
         steps[payload.step] = { ...steps[payload.step], toolResults: [...steps[payload.step].toolResults, payload.block] };
@@ -185,13 +252,14 @@ export class AgentStore {
       });
     });
     onAgentEvent<{ chatId: string; turnId: string; active: boolean }>('agent:compaction', payload => {
-      if (!this.matches(payload.chatId, payload.turnId)) return;
-      this.compacting = payload.active;
+      const entry = this.matches(payload.chatId, payload.turnId);
+      if (entry) this.updateEntry(entry, value => ({ ...value, compacting: payload.active }));
     });
     onAgentEvent<AgentContext>('agent:context', context => {
-      if (!this.matches(context.chatId, context.turnId)) return;
-      this.liveContext = context;
-      if (this.liveWorkspaceId === this.workspaceId) this.context = context;
+      const entry = this.matches(context.chatId, context.turnId);
+      if (!entry) return;
+      this.updateEntry(entry, value => ({ ...value, context }));
+      if (this.activeTurn?.turn.id === entry.turn.id) this.context = context;
     });
     onAgentEvent<AgentApproval>('agent:approval', approval => {
       if (!this.matches(approval.chatId, approval.turnId)) return;
@@ -203,23 +271,31 @@ export class AgentStore {
     });
   }
 
-  private matches(sessionId: string, turnId?: string): boolean {
-    const live = this.live;
-    if (!live || live.status !== 'streaming' || !turnId || turnId !== live.id) return false;
-    if (this.liveChatId && sessionId && this.liveChatId !== sessionId) return false;
-    if (!this.liveChatId && sessionId) {
-      this.liveChatId = sessionId;
-      if (this.stopRequested === live.id) void stopAgent(sessionId, live.id);
-      this.updateView(this.liveWorkspaceId, this.generation, view => {
-        if (!view.activeChatId && view.composer === this.liveComposer) view.activeChatId = sessionId;
+  private matches(sessionId: string, turnId?: string): LiveTurn | null {
+    if (!turnId) return null;
+    const entry = this.turns.get(turnId);
+    if (!entry || entry.turn.status !== 'streaming') return null;
+    if (entry.chatId && sessionId && entry.chatId !== sessionId) return null;
+    if (!entry.chatId && sessionId) {
+      const assigned = { ...entry, chatId: sessionId };
+      this.turns.set(turnId, assigned);
+      if (entry.stopRequested) void stopAgent(sessionId, turnId);
+      this.updateView(entry.workspaceId, this.generation, view => {
+        if (!view.activeChatId && view.composer === entry.composer) view.activeChatId = sessionId;
       });
       void this.refreshChats();
+      return assigned;
     }
-    return true;
+    return entry;
   }
 
-  private updateLive(change: (turn: AiTurn) => AiTurn) {
-    if (this.live) this.live = change(this.live);
+  private updateEntry(entry: LiveTurn, change: (entry: LiveTurn) => LiveTurn) {
+    const current = this.turns.get(entry.turn.id);
+    if (current) this.turns.set(entry.turn.id, change(current));
+  }
+
+  private updateLive(entry: LiveTurn, change: (turn: AiTurn) => AiTurn) {
+    this.updateEntry(entry, value => ({ ...value, turn: change(value.turn) }));
   }
 
   async refreshChats() {
@@ -249,6 +325,7 @@ export class AgentStore {
     this.attachmentPaths = [];
     this.notes = null;
     this.loadError = '';
+    this.editing = null;
   }
 
   async openChat(id: string) {
@@ -270,13 +347,15 @@ export class AgentStore {
     this.activeChatId = id;
     this.notes = this.notes?.chatId === id ? this.notes : null;
     this.loadError = '';
-    const reopeningLive = this.running && this.liveWorkspaceId === workspaceId && this.liveChatId === id;
-    if (reopeningLive) {
-      this.activeChat = this.liveHistory;
-      this.context = this.liveContext;
+    const liveEntry = [...this.turns.values()].find(entry => entry.workspaceId === workspaceId && entry.chatId === id && entry.turn.status === 'streaming');
+    const reopeningLive = Boolean(liveEntry);
+    this.editing = null;
+    if (liveEntry) {
+      this.activeChat = liveEntry.history;
+      this.context = liveEntry.context;
     }
     try {
-      const chat = reopeningLive ? this.liveHistory : await agentChatPage(id);
+      const chat = liveEntry ? liveEntry.history : await agentChatPage(id);
       if (!chat || this.chatLoads.get(workspaceId) !== request) return;
       if (chat.workspaceId !== workspaceId) throw new Error('This chat belongs to another workspace.');
       this.updateView(workspaceId, generation, view => {
@@ -288,6 +367,10 @@ export class AgentStore {
         view.collection = (this.workspaceId === workspaceId ? this.collectionNames : collectionNames).includes(chat.collection) ? chat.collection : '';
         view.environment = (this.workspaceId === workspaceId ? this.environmentNames : environmentNames).includes(chat.environment) ? chat.environment : '';
         view.ownBranch = Boolean(chat.ownBranch);
+        view.mode = chat.mode ?? '';
+        view.allowedHosts = chat.allowedHosts ?? [];
+        view.budgetTokens = chat.budgetTokens ?? 0;
+        view.budgetRequests = chat.budgetRequests ?? 0;
         if (chat.connectionId) view.connectionId = chat.connectionId;
       });
       if (reopeningLive) return;
@@ -319,7 +402,8 @@ export class AgentStore {
       if (request !== this.historyRequest || this.workspaceId !== workspaceId || this.activeChatId !== chat.id || this.activeChat !== chat) return false;
       if (page.workspaceId !== workspaceId || page.id !== chat.id || (page.messageOffset ?? 0) >= chat.messageOffset || (page.messageOffset ?? 0) + page.messages.length !== chat.messageOffset) throw new Error('Could not load earlier messages. Try again.');
       this.activeChat = mergeAgentHistory(chat, page);
-      if (this.liveInActiveChat) this.liveHistory = this.activeChat;
+      const active = this.activeTurn;
+      if (active) this.updateEntry(active, value => ({ ...value, history: this.activeChat }));
       return true;
     } catch (error) {
       if (request === this.historyRequest) this.historyError = error instanceof Error ? error.message : String(error);
@@ -337,23 +421,18 @@ export class AgentStore {
     const composer = this.composer;
     const workspaceId = this.workspaceId;
     const generation = this.generation;
+    const editing = chatId ? this.editing : null;
+    this.editing = null;
     const history = this.activeChat?.id === chatId ? this.activeChat : null;
     const messageCount = chatMessageCount(history);
     this.chatLoads.delete(workspaceId);
     this.historyRequest++;
     this.loadingEarlier = false;
     const turn: AiTurn = { id: newTurnId(), prompt, startedAt: Date.now(), status: 'streaming', steps: [], response: null, error: '' };
+    if (editing && history) this.activeChat = agentChatBefore(history, editing.index);
     this.context = null;
-    this.stopRequested = '';
-    this.compacting = false;
-    this.live = turn;
-    this.liveAttachments = [];
-    this.liveChatId = chatId;
-    this.liveHistory = history;
-    this.liveComposer = composer;
-    this.liveWorkspaceId = workspaceId;
-    this.liveContext = null;
     this.notes = null;
+    this.turns.set(turn.id, { turn, chatId, workspaceId, composer, history: this.activeChat?.id === chatId ? this.activeChat : history, context: null, attachments: [], compacting: false, stopRequested: false });
     try {
       const result = await sendAgentMessage({
         chatId,
@@ -362,14 +441,19 @@ export class AgentStore {
         text: prompt,
         ...(this.projectRoot || history?.projectRoot ? { projectRoot: this.projectRoot } : {}),
         ...(this.attachmentPaths.length ? { attachments: [...this.attachmentPaths] } : {}),
+        ...(editing ? { editFrom: editing.index } : {}),
         collection: this.collection,
         environment: this.environment,
         ownBranch: this.ownBranch,
         connectionId: this.connectionId,
         model: this.model,
+        mode: this.mode,
+        allowedHosts: [...this.allowedHosts],
+        budgetTokens: this.budgetTokens,
+        budgetRequests: this.budgetRequests,
         ...(this.driver ? { driver: this.driver, effort: this.effort } : {}),
       });
-      const resultChatId = result.chat?.id || this.liveChatId || chatId;
+      const resultChatId = result.chat?.id || this.turns.get(turn.id)?.chatId || chatId;
       const stopped = /cancel/i.test(result.error ?? '');
       this.updateView(workspaceId, generation, view => {
         const originalChat = view.activeChatId
@@ -377,30 +461,22 @@ export class AgentStore {
           : !chatId && view.composer === composer;
         if (originalChat && result.chat?.id && result.chat.workspaceId === workspaceId) {
           view.activeChatId = result.chat.id;
-          view.activeChat = mergeAgentHistory(view.activeChat, result.chat);
+          view.activeChat = editing ? result.chat : mergeAgentHistory(view.activeChat, result.chat);
           if (!result.error) view.attachmentPaths = [];
         }
-        view.notes = { chatId: resultChatId, error: stopped ? '' : (result.error ?? ''), warnings: result.warnings ?? [] };
+        if (originalChat) view.notes = { chatId: resultChatId, error: stopped ? '' : (result.error ?? ''), warnings: result.warnings ?? [] };
         if (originalChat && result.error && !stopped && !view.draft && chatMessageCount(result.chat) <= messageCount) view.draft = text;
       });
     } catch (error) {
-      const failedChatId = this.liveChatId || chatId;
+      const failedChatId = this.turns.get(turn.id)?.chatId || chatId;
       this.updateView(workspaceId, generation, view => {
-        view.notes = { chatId: failedChatId, error: error instanceof Error ? error.message : String(error), warnings: [] };
         const originalChat = view.activeChatId ? view.activeChatId === failedChatId : !chatId && view.composer === composer;
-        if (originalChat && !view.draft) view.draft = text;
+        if (!originalChat) return;
+        view.notes = { chatId: failedChatId, error: error instanceof Error ? error.message : String(error), warnings: [] };
+        if (!view.draft) view.draft = text;
       });
     } finally {
-      if (this.live?.id === turn.id) {
-        this.compacting = false;
-        this.live = null;
-        this.liveAttachments = [];
-        this.liveChatId = '';
-        this.liveWorkspaceId = '';
-        this.liveContext = null;
-        this.liveHistory = null;
-        this.liveComposer = null;
-      }
+      this.turns.delete(turn.id);
       this.approvals = this.approvals.filter(approval => approval.turnId !== turn.id);
       void this.refreshChats();
     }
@@ -408,9 +484,35 @@ export class AgentStore {
   }
 
   async stop() {
-    const turnId = this.live?.id ?? '';
-    this.stopRequested = turnId;
-    await stopAgent(this.liveChatId || this.activeChatId, turnId);
+    const entry = this.activeTurn ?? (this.driver ? [...this.turns.values()][0] : undefined);
+    if (!entry) return;
+    this.updateEntry(entry, value => ({ ...value, stopRequested: true }));
+    await stopAgent(entry.chatId || this.activeChatId, entry.turn.id);
+  }
+
+  startEdit(index: number, text: string) {
+    if (this.running) return;
+    this.editing = { index, text };
+    this.draft = text;
+  }
+
+  cancelEdit() {
+    if (this.editing && this.draft === this.editing.text) this.draft = '';
+    this.editing = null;
+  }
+
+  async branchFrom(index: number, text: string): Promise<string> {
+    const chatId = this.activeChatId;
+    if (!chatId) return '';
+    try {
+      const chat = await branchAgentChat(chatId, this.workspaceId, index);
+      await this.refreshChats();
+      await this.openChat(chat.id);
+      this.draft = text;
+      return '';
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
   }
 
   async answer(id: string, decision: 'allow' | 'allow_chat' | 'reject') {
@@ -471,19 +573,13 @@ export class AgentStore {
   }
 
   reset() {
-    if (this.running) void this.stop();
+    for (const entry of this.turns.values()) void stopAgent(entry.chatId, entry.turn.id);
     this.generation++;
     if (!this.driver && this.workspaceId) workspaceModes.set(this.workspaceId, agentNavigation.mode);
     this.workspaceId = '';
     this.views.clear();
     this.chatLoads.clear();
-    this.compacting = false;
-    this.live = null;
-    this.liveChatId = '';
-    this.liveWorkspaceId = '';
-    this.liveContext = null;
-    this.liveHistory = null;
-    this.liveComposer = null;
+    this.turns.clear();
     this.collection = '';
     this.environment = '';
     this.draft = '';

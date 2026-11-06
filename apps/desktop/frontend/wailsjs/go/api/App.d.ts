@@ -17,7 +17,11 @@ export function AgentChatPage(arg1:string,arg2:number):Promise<model.AgentChat>;
 
 export function AgentChats(arg1:string):Promise<Array<model.AgentChatSummary>>;
 
+export function AgentMcpServers():Promise<model.AgentMcpServersState>;
+
 export function AgentPendingApprovals(arg1:string):Promise<Array<model.AgentApproval>>;
+
+export function AgentWorkspaceNotes():Promise<model.AgentWorkspaceNotes>;
 
 export function AiConnections():Promise<model.AiConnectionsState>;
 
@@ -32,6 +36,8 @@ export function ApproveCookieSyncPairing(arg1:string):Promise<model.CookieSyncSt
 export function AuthorizeOAuth2(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
 export function AuthorizeOAuth2Device(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
+
+export function BranchAgentChat(arg1:string,arg2:string,arg3:number):Promise<model.AgentChat>;
 
 export function CancelCodexLogin():Promise<void>;
 
@@ -74,6 +80,8 @@ export function CreateLocalWorkspaceRoot(arg1:string,arg2:string,arg3:string):Pr
 export function DefaultWorkspaceLocation():Promise<api.DefaultWorkspaceLocationResult>;
 
 export function DeleteAgentChat(arg1:string):Promise<model.AgentResult>;
+
+export function DeleteAgentMcpServer(arg1:string):Promise<model.AgentMcpServersState>;
 
 export function DeleteCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 
@@ -267,6 +275,8 @@ export function SSEConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
 
 export function SSEDisconnect(arg1:string):Promise<void>;
 
+export function SaveAgentMcpServer(arg1:model.AgentMcpServer):Promise<model.AgentMcpServersState>;
+
 export function SaveAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionsState>;
 
 export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
@@ -350,6 +360,8 @@ export function StopLoadRun():Promise<model.LoadRunState>;
 export function StopMockServer():Promise<model.MockServerStatus>;
 
 export function StoredHistoryResponseIDs():Promise<Array<string>>;
+
+export function TestAgentMcpServer(arg1:model.AgentMcpServer):Promise<model.AgentMcpTestResult>;
 
 export function TestAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionTestResult>;
 

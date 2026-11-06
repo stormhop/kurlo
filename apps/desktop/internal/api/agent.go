@@ -29,9 +29,8 @@ func agentContextError(ctx context.Context) string {
 }
 
 const (
-	agentFullTurns          = 2
-	agentOldToolResultRunes = 2000
-	agentHistoryBudgetRunes = 400_000
+	agentFullTurns           = 2
+	agentOldToolResultTokens = 500
 )
 
 type agentPendingApproval struct {
@@ -51,6 +50,7 @@ type agentRuntime struct {
 	codexLogin          *codexLogin
 	approvalTimeout     time.Duration
 	codexIdleTimeout    time.Duration
+	mcpClients          map[string]*agentMcpCached
 }
 
 func newAgentRuntime() *agentRuntime {
@@ -223,23 +223,19 @@ func agentCloseToolUses(messages []model.AiMessage) []model.AiMessage {
 	return append(messages, model.AiMessage{Role: "tool", Blocks: results})
 }
 
-func agentMessageRunes(message model.AiMessage) int {
-	total := 0
-	for _, block := range message.Blocks {
-		total += utf8.RuneCountInString(block.Text) + utf8.RuneCountInString(block.Input) + utf8.RuneCountInString(block.Data)
-	}
-	return total
-}
-
-func agentTrimText(text string, limit int) string {
-	if utf8.RuneCountInString(text) <= limit {
+func agentTrimText(text string, tokens int) string {
+	limit := tokens * 4
+	if len(text) <= limit {
 		return text
 	}
-	runes := []rune(text)
-	return string(runes[:limit]) + fmt.Sprintf("\n[trimmed: %d more characters from an earlier turn; call the tool again if you need them]", len(runes)-limit)
+	cut := limit
+	for cut > 0 && !utf8RuneStart(text[cut]) {
+		cut--
+	}
+	return text[:cut] + fmt.Sprintf("\n[trimmed: about %d more tokens from an earlier turn; call the tool again if you need them]", agentEstimateTokens(text[cut:]))
 }
 
-func agentHistoryForModel(messages []model.AiMessage) ([]model.AiMessage, bool) {
+func agentHistoryForModel(messages []model.AiMessage, budget int) ([]model.AiMessage, bool) {
 	var starts []int
 	for index, message := range messages {
 		if message.Role == "user" {
@@ -267,7 +263,7 @@ func agentHistoryForModel(messages []model.AiMessage) ([]model.AiMessage, bool) 
 			case model.AiBlockThinking, model.AiBlockRedacted:
 				continue
 			case model.AiBlockToolResult:
-				block.Text = agentTrimText(block.Text, agentOldToolResultRunes)
+				block.Text = agentTrimText(block.Text, agentOldToolResultTokens)
 			}
 			blocks = append(blocks, block)
 		}
@@ -276,12 +272,12 @@ func agentHistoryForModel(messages []model.AiMessage) ([]model.AiMessage, bool) 
 		}
 		out = append(out, model.AiMessage{Role: message.Role, Blocks: blocks})
 	}
-	total := 0
-	for _, message := range out {
-		total += agentMessageRunes(message)
+	if budget <= 0 {
+		budget = agentContextBudget(agentDefaultContextTokens)
 	}
+	total := agentMessagesTokens(out)
 	dropped := false
-	for total > agentHistoryBudgetRunes {
+	for total > budget {
 		next := -1
 		for index := 1; index < len(out); index++ {
 			if out[index].Role == "user" {
@@ -292,9 +288,7 @@ func agentHistoryForModel(messages []model.AiMessage) ([]model.AiMessage, bool) 
 		if next < 0 {
 			break
 		}
-		for _, message := range out[:next] {
-			total -= agentMessageRunes(message)
-		}
+		total -= agentMessagesTokens(out[:next])
 		out = out[next:]
 		dropped = true
 	}
@@ -455,6 +449,10 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 		chat.ConnectionID = strings.TrimSpace(input.ConnectionID)
 		chat.Model = strings.TrimSpace(input.Model)
 		chat.OwnBranch = input.OwnBranch
+		chat.Mode = agentNormalizeMode(input.Mode)
+		chat.AllowedHosts = agentNormalizeHosts(input.AllowedHosts)
+		chat.BudgetTokens = min(max(input.BudgetTokens, 0), agentBudgetMaxTokens)
+		chat.BudgetRequests = min(max(input.BudgetRequests, 0), agentBudgetMaxRequests)
 	}
 
 	var chat model.AgentChat
@@ -485,10 +483,18 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 			return agentTurnError(existing, "The agent is still working in this chat. Stop it or wait for it to finish.")
 		}
 		defer a.agentRuntime().end(chatID)
+		if input.EditFrom != nil {
+			if err := agentCheckEditIndex(existing, *input.EditFrom); err != nil {
+				return agentTurnError(existing, err.Error())
+			}
+		}
 		if chat, err = updateAgentChat(chatID, func(chat *model.AgentChat) {
 			applyInput(chat)
 			if chat.Title == "" {
 				chat.Title = agentChatTitle(text)
+			}
+			if input.EditFrom != nil && agentCheckEditIndex(*chat, *input.EditFrom) == nil {
+				chat.Messages = chat.Messages[:*input.EditFrom]
 			}
 			chat.Messages = append(chat.Messages, userMessage)
 		}, files...); err != nil {
@@ -500,10 +506,8 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	if err != nil {
 		return agentTurnError(chat, err.Error())
 	}
-	history, dropped := agentHistoryForModel(chat.Messages)
-	if images := agentImageBlocks(files); len(images) > 0 && len(history) > 0 {
-		last := &history[len(history)-1]
-		last.Blocks = append(append([]model.AiBlock(nil), last.Blocks...), images...)
+	if err := agentBudgetReached(chat); err != nil {
+		return agentTurnError(chat, err.Error())
 	}
 	turnID := strings.TrimSpace(input.TurnID)
 	if turnID == "" {
@@ -512,8 +516,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	req := model.AiRequest{
 		HTTP:     model.HttpRequest{RequestID: chat.ID, Method: "POST"},
 		Model:    chat.Model,
-		Messages: history,
-		Settings: model.AiSettings{Stream: true},
+		Settings: model.AiSettings{Stream: true, CachePrompt: true},
 		MaxSteps: aiMaxSteps,
 		TurnID:   turnID,
 	}
@@ -538,9 +541,18 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 		})
 	}
 	req.System = agentSystemPrompt(bridge.server, chat)
+	window := agentContextWindow(connection, req.HTTP.URL, req.Model)
+	fixed := agentEstimateTokens(req.System) + agentToolsTokens(bridge.tools())
+	history, dropped := agentHistoryForModel(chat.Messages, agentContextBudget(window)-fixed)
+	if images := agentImageBlocks(files); len(images) > 0 && len(history) > 0 {
+		last := &history[len(history)-1]
+		last.Blocks = append(append([]model.AiBlock(nil), last.Blocks...), images...)
+	}
+	req.Messages = history
 	if dropped {
 		req.System += "\n\nThe oldest messages of this chat were left out to fit the model's context. If the user refers to something you cannot see, ask them."
 	}
+	loop := &agentTurnLoop{chatID: chat.ID, turnID: turnID, window: window, budget: agentContextBudget(window), fixedTokens: fixed, priorUsage: chat.Usage, budgetLimit: chat.BudgetTokens, emit: emit}
 
 	baseCtx := context.Background()
 	if a.ctx != nil {
@@ -549,6 +561,13 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	ctx, cancel := context.WithCancelCause(baseCtx)
 	bridge.server.live = newAgentLiveSessions(ctx, bridge.server.jars)
 	defer bridge.server.live.close()
+	externalTools, externalDefs, externalWarnings := rt.externalTools(ctx)
+	bridge.setExternal(externalTools, externalDefs)
+	if len(externalDefs) > 0 {
+		extra := "\n\n" + agentExternalPrompt(externalDefs)
+		req.System += extra
+		loop.fixedTokens += agentEstimateTokens(extra) + agentToolsTokens(externalDefs)
+	}
 	bridge.approve = rt.approve(emit, cancel)
 	stop := func() { cancel(context.Canceled) }
 	turnKey := agentTurnCancelPrefix + turnID
@@ -572,10 +591,15 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 		send: func(stepCtx context.Context, prepared model.HttpRequest, sink responseBodySinkFactory) model.HttpResponse {
 			return sendRequestWithBodySink(stepCtx, prepared, a.state, a.cookieJars, a.preflightCache, sink)
 		},
-		local: bridge,
-		now:   time.Now,
+		local:   bridge,
+		now:     time.Now,
+		prepare: loop.prepare,
 	}
 	out := redactAiResponseKey(model.NormalizeAiResponse(runner.run()), key)
+	out.Warnings = append(externalWarnings, out.Warnings...)
+	if loop.compactions > 0 {
+		out.Warnings = append(out.Warnings, fmt.Sprintf("Kurlo shortened %d older tool %s in this turn to fit the model's context.", loop.compactions, agentPlural(loop.compactions, "result", "results")))
+	}
 	if ctx.Err() != nil {
 		out.Error = agentContextError(ctx)
 	}
@@ -583,6 +607,14 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	saved, saveErr := updateAgentChat(chat.ID, func(chat *model.AgentChat) {
 		chat.Messages = agentCloseToolUses(append(chat.Messages, out.Messages...))
 		chat.Usage.Add(out.Usage)
+		chat.RequestsSent += bridge.takeRequestsSent()
+		if loop.lastTokens > 0 {
+			chat.ContextTokens = int64(loop.lastTokens)
+		} else if last := len(out.Steps) - 1; last >= 0 && out.Steps[last].HasUsage {
+			usage := out.Steps[last].Usage
+			chat.ContextTokens = int64(usage.Input + usage.CacheRead + usage.CacheWrite)
+		}
+		chat.ContextWindow = int64(window)
 	})
 	if saveErr != nil {
 		saved = chat

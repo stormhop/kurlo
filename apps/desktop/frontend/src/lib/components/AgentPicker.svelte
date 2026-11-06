@@ -140,6 +140,7 @@
   function manage(intent: '' | 'key' = '') {
     close(false);
     aiConnectionsStore.intent = intent;
+    aiConnectionsStore.reveal = agentNavigation.mode === 'kurlo' ? 'kurlo' : 'agents';
     vm.openSettings('ai');
   }
 

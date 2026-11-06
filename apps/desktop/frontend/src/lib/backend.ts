@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -796,6 +796,32 @@ export async function exportAgentChat(id: string, workspaceId: string): Promise<
 
 export async function renameAgentChat(id: string, title: string): Promise<AgentResult> {
   return (await window.go?.api?.App?.RenameAgentChat?.(id, title)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function branchAgentChat(id: string, workspaceId: string, before: number): Promise<AgentChat> {
+  const app = window.go?.api?.App;
+  if (!app?.BranchAgentChat) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.BranchAgentChat(id, workspaceId, before);
+}
+
+export async function agentWorkspaceNotes(): Promise<AgentWorkspaceNotes> {
+  return (await window.go?.api?.App?.AgentWorkspaceNotes?.()) ?? { path: '', exists: false, templates: [] };
+}
+
+export async function agentMcpServers(): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.AgentMcpServers?.()) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function saveAgentMcpServer(server: AgentMcpServer): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.SaveAgentMcpServer?.(server)) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function deleteAgentMcpServer(id: string): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.DeleteAgentMcpServer?.(id)) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function testAgentMcpServer(server: AgentMcpServer): Promise<AgentMcpTestResult> {
+  return (await window.go?.api?.App?.TestAgentMcpServer?.(server)) ?? { ok: false, tools: [], error: AGENT_DESKTOP_ONLY };
 }
 
 export async function answerAgentApproval(id: string, decision: 'allow' | 'allow_chat' | 'reject'): Promise<AgentResult> {

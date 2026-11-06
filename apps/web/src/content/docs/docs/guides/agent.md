@@ -59,13 +59,15 @@ The agent picker at the right of the message box chooses the agent and model. Ch
 
 For Codex, a separate **Effort** menu sits beside the model picker. It offers the levels supported by the selected model. New chats keep your effort choice; switching to a model that does not support it uses that model's default.
 
-**Templates** in the message box offers ready requests: why the last request failed, run and check the collection, write tests for a request, cover an endpoint, and explain a request. Choosing one puts its text in the box with the part to fill in, such as `REQUEST NAME`, selected; edit it and press `Enter`.
+**Templates** in the message box offers ready requests: why the last request failed, run and check the collection, write tests for a request, cover an endpoint, and explain a request. Choosing one puts its text in the box with the part to fill in, such as `REQUEST NAME`, selected; edit it and press `Enter`. Templates your team keeps in [`kurlo-agent.md`](#team-notes-in-kurlo-agentmd) appear above the built-in ones under **From kurlo-agent.md**.
 
 ![Templates menu above the message box](../../../../assets/screenshots/agent-templates.png)
 
-The answer streams in as the agent works. The tool calls of a turn sit in one card, one line each, such as **Ran a request** or **Saved a request**, with a check when done, a cross when it failed and a shield while it waits for you; a run also shows the request line, status code and time. Click a line to see the arguments and the result, and click **Open request**, **Open entry** or **Open environment** to jump to what it touched. **Stop** ends the turn, including while the first response or a confirmation is pending. An unanswered confirmation stops the turn after 30 minutes; retry when you are ready. If sending your decision fails, the card keeps its buttons available to try again. Messages and answers can be selected and copied like any text; hovering one also shows a copy button, and **Retry** sends your last message again when a turn failed or stopped before answering. A long chat initially loads its latest 40 exchanges. Scroll to the top or click **Load earlier messages** to fetch another 40 without losing your reading position. Only messages near the viewport are rendered.
+The answer streams in as the agent works. The tool calls of a turn sit in one card, one line each, such as **Ran a request** or **Saved a request**, with a check when done, a cross when it failed and a shield while it waits for you; a run also shows the request line, status code and time. Click a line to see the arguments and the result, and click **Open request**, **Open entry** or **Open environment** to jump to what it touched. **Stop** ends the turn, including while the first response or a confirmation is pending. An unanswered confirmation stops the turn after 30 minutes; retry when you are ready. If sending your decision fails, the card keeps its buttons available to try again. Messages and answers can be selected and copied like any text; hovering one also shows a copy button, and **Retry** sends your last message again when a turn failed or stopped before answering. Hover a message you sent to **Edit message**: its text goes back into the box and sending replaces it and everything after it. **Branch from here** instead starts a new chat, named after this one with **(branch)**, that holds the conversation up to that message, so the original chat stays as it was. A long chat initially loads its latest 40 exchanges. Scroll to the top or click **Load earlier messages** to fetch another 40 without losing your reading position. Only messages near the viewport are rendered.
 
-A saved chat has its name at the top, with a **•••** menu to rename or delete it. **Chat details**, the panel button at the right of the status bar, opens a side panel with the chat's collection, environment, agent and effort, token usage and the last request's context size, the files the agent changed or wants to change, its recent runs with their status codes and, for Codex, each plan limit with its reset time. It sits beside the conversation; in a narrow window it takes the conversation's place until you close it with `Escape`, the close button or the status bar button. Kurlo remembers whether the panel is open.
+Each chat runs on its own: start a task, open another chat or **New**, and send there while the first one keeps working. A pulsing dot in the sidebar marks every chat that is working, and **Stop** in a chat stops only that chat's turn. Codex and Claude Code still run one turn at a time.
+
+A saved chat has its name at the top; click it to rename the chat. Archive, export and delete are in the chat's **•••** menu in the sidebar. **Chat details**, the panel button at the right of the status bar, opens a side panel with the chat's collection, environment, agent and effort, token usage and the last request's context size, the files the agent changed or wants to change, its recent runs with their status codes and, for Codex, each plan limit with its reset time. Each part of the panel folds: click its title to open or close it, and a closed part shows a short summary on the right, such as the collection and environment, the budget used or the token count and cost. Kurlo remembers which parts are open. It sits beside the conversation; in a narrow window it takes the conversation's place until you close it with `Escape`, the close button or the status bar button. Kurlo remembers whether the panel is open.
 
 ![Agent chat that read a request, saved a test and summarised the change](../../../../assets/screenshots/agent-chat.png)
 
@@ -103,9 +105,21 @@ Below the message box, input and output token counts show usage recorded for thi
 
 Below the message box, **Plan N% left** shows the tightest Codex quota window and turns amber below 30%; click it to open **Chat details**, which lists every window, such as the 5-hour and weekly ones, with a bar and its reset time. Click it to see reset times when available. These are account limits, shared with other Codex sessions, rather than a per-chat token budget. Kurlo updates them from the CLI's account snapshot and live notifications. Missing quota information is hidden.
 
+For the Kurlo agent, **Chat details** also shows the cost of the chat when the provider reports it (OpenRouter does) and the context of the last request against the model's window, which Kurlo takes from the provider's model list or assumes to be 128,000 tokens (32,000 for local models). Within one turn, when the conversation would take more than 70% of that window, Kurlo shortens the oldest tool results, keeps the last two in full and tells you how many it shortened; the saved chat keeps everything. With an Anthropic connection the stable start of every request, the instructions, tools and earlier messages, is marked for prompt caching, so later steps of a turn are read from the cache at a lower price.
+
+**Budget** in **Chat details** caps a chat, up to 1,000,000,000 tokens and 100,000 requests, by tokens, counted over the whole chat, and by sent requests, counted as every request the agent sends with `run_request`, `send_request`, `run_collection` or `generate_tests`. Leave a field empty for no limit. The agent stops when the chat reaches either one and tells you, and a call that would go over the request budget does not run. Raise the budget to continue.
+
 In **Chat details**, **Context (last request)** compares the last reported request's token count with the reported model window. It is a snapshot, not cumulative token usage or a prediction of the next request after compaction. The last reported snapshot is retained with the chat; if the CLI does not report a window, no percentage is invented.
 
 ## What it may do without asking
+
+**Approvals**, next to the model in the message box, sets how much the Kurlo agent asks in this chat:
+
+- **Ask always.** Only reading runs on its own. Every request, even a `GET`, and every change waits for you.
+- **Ask for changes.** The default, as in the table below.
+- **Auto.** Requests and changes to the workspace files run on their own. A `POST`, `PUT`, `PATCH` or `DELETE` to a host that is not trusted, starting k6, clearing cookies, OAuth sign-in and `git push` still wait for you.
+
+**Chat details → Permissions → Trusted hosts** lists hosts where `POST`, `PUT`, `PATCH` and `DELETE` run without asking, such as `localhost` or `*.staging.example.com`; new chats start with `localhost` and `127.0.0.1`. Kurlo resolves the request's URL with the chosen environment before it checks the host, and asks when the host contains a variable it cannot resolve. An environment marked as a [sandbox](/docs/guides/environments/#sandbox-environments-for-the-agent) lets every request sent with it run without asking. The settings are saved with the chat when you send a message.
 
 | The agent wants to | What happens |
 |--------------------|--------------|
@@ -123,11 +137,36 @@ In **Chat details**, **Context (last request)** compares the last reported reque
 | Create a Git branch or commit workspace files | Asks first; a commit shows the files it includes |
 | Push the current branch | Asks every time, and only when you asked it to push |
 
+Before a task with several changes the agent shows **Follow this plan?** with its steps and, under **Runs without asking again**, the exact calls it intends to make, each with its target such as a request path, a variable or a URL. **Approve plan** lets exactly those calls run without asking for the rest of the turn; a call listed without a target runs once. Anything else still waits for you, and `git push` never joins a plan.
+
 An approval card shows the exact lines that would change in each YAML file. **Apply** writes them, **Reject** tells the agent no and it asks what you want instead, and **Allow for this chat** applies this change and lets the same tool run without asking for the rest of the chat.
 
 ![Approval card with the diff of a request file that gains a test](../../../../assets/screenshots/agent-approval.png)
 
 Nothing is written while the card waits, and Kurlo keeps saving your own edits in the meantime. If you change one of those files before you click **Apply**, the change is dropped and the agent is told to try again, so it never overwrites your edit. The agent never writes a secret into the workspace: it uses a `{{variable}}` and asks you to set the value. Secret values reach it only as `[secret]`.
+
+## Team notes in kurlo-agent.md
+
+Keep conventions for the agent in `kurlo-agent.md` at the root of the workspace folder: which environment to use for tests, naming rules, tags, what never to touch. The file is plain Markdown and lives in Git with the workspace, so the whole team shares it. The Kurlo agent reads it at the start of every turn and follows it, without letting it override the rules on this page. When the agent learns a convention that is missing, it offers to add it; the change shows as a diff and always waits for your approval, even after **Allow for this chat**.
+
+Under a `## Templates` heading, each `### Title` with the text below it becomes a template in the message box:
+
+```markdown
+# Team notes
+
+Use the Staging environment for tests and tag smoke requests with `smoke`.
+
+## Templates
+
+### Smoke check
+Run the Smoke collection against Staging and explain every failure.
+```
+
+## MCP servers for the agent
+
+**Settings → AI → MCP servers for the agent** connects other MCP servers, such as GitHub, Jira, a database or your own service, to the Kurlo agent. Add an **HTTP** server with its URL and headers, or a **Local command** that Kurlo starts, such as `npx` with `-y` and `@modelcontextprotocol/server-github`, with its environment variables. **Test** connects and lists the tools. Header and environment values are encrypted on this computer; to keep a saved value when you edit a server, leave its line as `NAME=`.
+
+Each turn the agent sees the tools of every server that is on, named `server__tool`. Every call waits for your approval, showing the server, the tool and its arguments, unless you choose **Allow for this chat** or an approved plan lists it as `server.tool`. Answers from these servers are treated as data, not instructions. **Turn off** keeps a server without offering its tools. Calls appear in the [activity log](#agent-activity) under the server and tool name.
 
 ## Git
 
@@ -164,6 +203,6 @@ The log is encrypted, kept for 30 days or 2,000 calls, and stores arguments and 
 ## Limits
 
 - The agent sees the workspace, its environments and Kurlo's history. Source access is limited to the read-only folder you connect to the chat.
-- One turn runs at a time across chats, and a turn stops after 50 model steps.
-- For the Kurlo agent using an API connection, the model gets the last two exchanges in full. Tool results from earlier ones are shortened, and when a chat outgrows about 400,000 characters its oldest exchanges are left out; the agent is told so and asks if you refer to them. Very large tool results are kept in the chat up to 64 KB.
+- One turn runs at a time in each chat, and a turn stops after 50 model steps. Reading tools called in the same step run together.
+- For the Kurlo agent using an API connection, the model gets the last two exchanges in full. Tool results from earlier ones are shortened to about 500 tokens, and when the chat outgrows 70% of the model's context window its oldest exchanges are left out; the agent is told so and asks if you refer to them. Very large tool results are kept in the chat up to 64 KB.
 - Small local models often call tools badly. Models marked **Recommended** in Settings → AI handle them well.

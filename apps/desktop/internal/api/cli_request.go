@@ -222,6 +222,7 @@ type cliEnvironment struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Protected   bool    `json:"protected"`
+	Sandbox     bool    `json:"sandbox"`
 	ParentID    string  `json:"parentId"`
 	Parent      string  `json:"-"`
 	Values      []cliKV `json:"values"`

@@ -205,6 +205,7 @@ export type Collection = {
 export type Environment = {
   id: string; workspaceId: string; name: string; filesystemName: string; values: KVRow[];
   protected?: boolean;
+  sandbox?: boolean;
   parentId?: string;
 };
 export type ScriptEngine = 'js' | 'tengo';

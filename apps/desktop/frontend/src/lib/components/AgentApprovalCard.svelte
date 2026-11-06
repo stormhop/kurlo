@@ -39,7 +39,25 @@
   </div>
   {#if approval.reason}<p class="agent-approval-reason">{approval.reason}</p>{/if}
 
-  {#if write && approval.changes.length}
+  {#if approval.plan}
+    <ol class="agent-plan-steps">
+      {#each approval.plan.steps as step, index (index)}
+        <li>{step}</li>
+      {/each}
+    </ol>
+    {#if approval.plan.calls.length}
+      <div class="agent-plan-calls">
+        <span class="agent-plan-calls-label">Runs without asking again</span>
+        <ul>
+          {#each approval.plan.calls as call, index (index)}
+            <li><code>{call.tool}</code>{#if call.target}<span>{call.target}</span>{:else}<span class="agent-plan-once">once</span>{/if}</li>
+          {/each}
+        </ul>
+      </div>
+    {:else}
+      <p class="agent-approval-reason">Every change in this plan still waits for your approval.</p>
+    {/if}
+  {:else if write && approval.changes.length}
     <div class="agent-approval-files">
       {#each approval.changes as change (change.path)}
         <AgentFileDiff {change} />
@@ -67,6 +85,53 @@
 </div>
 
 <style>
+  .agent-plan-steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-block: var(--space-2) 0;
+    padding-left: var(--space-5);
+    color: var(--text);
+    font-size: var(--text-body);
+    line-height: var(--leading-normal);
+  }
+  .agent-plan-calls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin-top: var(--space-2);
+    padding: var(--space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+  .agent-plan-calls-label {
+    color: var(--text-3);
+    font-size: var(--text-caption);
+  }
+  .agent-plan-calls ul {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-0-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .agent-plan-calls li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1-5);
+    min-width: 0;
+    font-size: var(--text-label);
+    overflow-wrap: anywhere;
+  }
+  .agent-plan-calls code {
+    color: var(--text-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-caption);
+  }
+  .agent-plan-once {
+    color: var(--text-3);
+  }
   .agent-approval-error { color: var(--danger); font-size: var(--text-label); overflow-wrap: anywhere; }
   .agent-approval {
     display: flex;

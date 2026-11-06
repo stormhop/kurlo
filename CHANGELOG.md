@@ -9,6 +9,20 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **The agent's loop.** Chats in Agent Mode run at the same time: start a task in one chat and keep working in another, with a working dot on each busy chat. Reading tools called in one step run together. Long turns stay inside the model's context: Kurlo counts tokens instead of characters, takes the window from the provider's model list and shortens the oldest tool results of a turn when it would pass 70% of it. Anthropic connections use prompt caching, OpenRouter reports the cost of each step, and **Chat details** shows the cost and the context of the last request.
+
+- **Permissions, trusted hosts and sandbox environments for the agent.** **Approvals** next to the model in the message box chooses **Ask always**, **Ask for changes** or **Auto** per chat. **Trusted hosts** such as `localhost` or `*.staging.example.com` and environments marked **Sandbox for the agent** let `POST`, `PUT`, `PATCH` and `DELETE` run without asking; `git push`, k6, OAuth sign-in and clearing cookies always ask. **Budget** stops a chat at a number of tokens or sent requests.
+
+- **Plans before multi-step tasks.** The agent shows **Follow this plan?** with its steps and the exact calls it intends to make; **Approve plan** lets those calls, and nothing else, run without asking for the rest of the turn.
+
+- **Team notes in kurlo-agent.md.** The Kurlo agent reads `kurlo-agent.md` from the workspace folder every turn, follows its conventions and proposes additions as a diff you approve. Templates under `## Templates` appear in the message box.
+
+- **MCP servers for the agent.** **Settings → AI → MCP servers for the agent** connects HTTP servers and local commands over stdio, such as GitHub or Jira, with encrypted headers and environment variables and a **Test** button. Each call to them waits for approval unless allowed for the chat or listed in an approved plan.
+
+- **Folding sections in Chat details and Settings → AI.** Each part of **Chat details**, and **Your agents**, **Kurlo agent** and **MCP servers for the agent** in **Settings → AI**, folds with a click and shows a short summary while closed, such as the connected agents, the default connection or the token count and cost. Kurlo remembers which parts are open, and **Manage connections** opens the part you came from.
+
+- **Edit and branch agent messages.** Hover a sent message to **Edit message**, which replaces it and everything after it, or **Branch from here** to continue in a new chat with the conversation up to that point.
+
 - **Zoom in Settings.** **Settings → Appearance** (renamed from Theme) has a **Zoom** row with −, + and **Reset** that steps the interface from 80% to 150% and lists the zoom shortcuts. The size is stored on this device. Windows and Linux have no View menu, so this was only reachable from the keyboard there.
 
 - **Drag and drop attachments in Agent Mode.** Drop files onto the message box to attach them to your next message.

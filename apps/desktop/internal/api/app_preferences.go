@@ -17,6 +17,7 @@ type appPreferences struct {
 	CookieSync               *cookieSyncPreferences  `json:"cookieSync,omitempty"`
 	AiConnections            []savedAiConnection     `json:"aiConnections,omitempty"`
 	AgentActivityOff         bool                    `json:"agentActivityOff,omitempty"`
+	AgentMcpServers          []savedAgentMcpServer   `json:"agentMcpServers,omitempty"`
 	Codex                    *model.CodexConnection  `json:"codex,omitempty"`
 	Claude                   *model.ClaudeConnection `json:"claude,omitempty"`
 }

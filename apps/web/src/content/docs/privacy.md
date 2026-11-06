@@ -5,7 +5,7 @@ description: Kurlo is local-first. What stays on your machine, what leaves it, a
 
 Kurlo is a local-first desktop application. There is no Kurlo backend, account system, cloud sync, usage analytics, crash reporting, or telemetry. Network access occurs only for product features that require it, such as requests, Git operations, OAuth flows, schema introspection, and update checks.
 
-This page documents exactly what data Kurlo stores, where, how it's protected, and the few cases where the app talks to a network on your behalf.
+This page explains what the Kurlo app stores, when it connects to the network, and how kurlo.dev measures visits.
 
 None of it has to be taken on trust: Kurlo is open source under the MIT license, so every claim below can be checked against the code at [stormhop/kurlo](https://github.com/stormhop/kurlo), and the binaries can be reproduced from that source.
 

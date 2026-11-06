@@ -1,4 +1,8 @@
 <script lang="ts">
+  import AgentMcpSettings from './AgentMcpSettings.svelte';
+  import Disclosure from './Disclosure.svelte';
+  import { codexConnectionStore } from '../stores/codex.svelte';
+  import { claudeConnectionStore } from '../stores/claude.svelte';
   import { onMount, tick } from 'svelte';
   import Select from './Select.svelte';
   import ClaudeConnectionSettings from './ClaudeConnectionSettings.svelte';
@@ -41,6 +45,22 @@
   let listError = $state('');
   let loaded = $state(false);
   let addMode = $state<'none' | 'key' | 'local'>('none');
+  const revealed = aiConnectionsStore.reveal;
+  aiConnectionsStore.reveal = '';
+  const agentsSummary = $derived.by(() => {
+    const connected = [
+      codexConnectionStore.status.connected ? 'Codex' : '',
+      claudeConnectionStore.status.connected ? 'Claude Code' : '',
+    ].filter(Boolean);
+    if (connected.length) return `${connected.join(' · ')} connected`;
+    return codexConnectionStore.loaded && claudeConnectionStore.loaded ? 'Not connected' : 'Checking…';
+  });
+  const kurloSummary = $derived.by(() => {
+    if (!loaded) return '';
+    if (!connections.length) return 'No connections';
+    const fallback = connections.find(connection => connection.default) ?? connections[0];
+    return `${connections.length} ${connections.length === 1 ? 'connection' : 'connections'} · ${fallback.label}${fallback.model ? ` · ${fallback.model}` : ''}`;
+  });
 
   let openRouter = $state<OpenRouterConnectState>({ status: 'idle', authUrl: '' });
 
@@ -258,6 +278,8 @@
 
   onMount(() => {
     void refresh();
+    if (!codexConnectionStore.loaded) void codexConnectionStore.refresh();
+    if (!claudeConnectionStore.loaded) void claudeConnectionStore.refresh();
     const intent = aiConnectionsStore.intent;
     aiConnectionsStore.intent = '';
     if (intent) void openAdd(intent);
@@ -276,15 +298,13 @@
     </div>
   </header>
 
-  <section class="settings-block">
-    <h4 class="settings-group-label ai-your-agents-label">Your agents</h4>
+  <Disclosure title="Your agents" summary={agentsSummary} storageKey="settings-ai-agents" reveal={revealed === 'agents'} defaultOpen={codexConnectionStore.loaded && claudeConnectionStore.loaded && !codexConnectionStore.status.connected && !claudeConnectionStore.status.connected} variant="settings">
     <CodexConnectionSettings />
     <ClaudeConnectionSettings />
     <p class="settings-group-note">Agents on this computer run with their own account and reach this workspace through Kurlo's tools. Changes still wait for your approval.</p>
-  </section>
+  </Disclosure>
 
-  <section class="settings-block">
-    <h4 class="settings-group-label">Kurlo agent</h4>
+  <Disclosure title="Kurlo agent" summary={kurloSummary} storageKey="settings-ai-kurlo" reveal={revealed === 'kurlo'} defaultOpen={loaded && !connections.length} forceOpen={addMode !== 'none' || openRouter.status === 'waiting'} variant="settings">
     {#if listError}<p class="settings-group-note error" role="alert">{listError}</p>{/if}
     {#if loaded && connections.length}
       <ul class="settings-group ai-connection-list" aria-label="AI connections">
@@ -324,10 +344,7 @@
       </ul>
     {/if}
     <p class="settings-group-note">The Kurlo agent and AI requests run on these. Keys are encrypted with the key in your system keychain and never written to workspace files; AI requests can also keep their own URL and key.{#if connections.length}{' '}{connections.length} of {AI_CONNECTION_LIMIT} connections.{/if}</p>
-  </section>
-
-  <section class="settings-block">
-    <h4 class="settings-group-label">{connections.length ? 'Add another connection' : 'Connect a model'}</h4>
+    <h4 class="settings-group-label ai-add-label">{connections.length ? 'Add another connection' : 'Connect a model'}</h4>
     {#if atLimit}
       <p class="settings-group-note ai-limit" role="status">You have {AI_CONNECTION_LIMIT} connections, the most Kurlo keeps. Remove one to add another.</p>
     {:else}
@@ -451,12 +468,15 @@
         </div>
       </div>
     {/if}
-  </section>
+  </Disclosure>
+
+  <AgentMcpSettings />
 </div>
 
 <style>
   .ai-mono { font-family: var(--font-mono); font-size: var(--text-caption); }
   .ai-error { color: var(--danger); font-size: var(--text-label); line-height: 1.45; overflow-wrap: anywhere; }
+  .ai-add-label { margin-top: var(--space-3); }
   .ai-ok { color: var(--s2xx); font-size: var(--text-label); }
   .ai-waiting { display: inline-flex; align-items: center; gap: var(--space-1-5); font-size: var(--text-label); color: var(--text); }
   .ai-option-text { color: var(--text-2); font-size: var(--text-label); line-height: 1.5; }

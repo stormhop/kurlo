@@ -22,6 +22,15 @@ func openAIUsesCompletionTokens(base string) bool {
 	return strings.EqualFold(u.Hostname(), "api.openai.com")
 }
 
+func openAIIsOpenRouter(base string) bool {
+	u, err := url.Parse(strings.TrimSpace(base))
+	if err != nil {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "openrouter.ai" || strings.HasSuffix(host, ".openrouter.ai")
+}
+
 func (openAIProvider) build(req model.AiRequest, messages []model.AiMessage, tools []aiTool) ([]byte, []model.KeyValue, error) {
 	body := map[string]any{
 		"model":    req.Model,
@@ -30,6 +39,9 @@ func (openAIProvider) build(req model.AiRequest, messages []model.AiMessage, too
 	}
 	if req.Settings.Stream {
 		body["stream_options"] = map[string]any{"include_usage": true}
+	}
+	if openAIIsOpenRouter(req.HTTP.URL) {
+		body["usage"] = map[string]any{"include": true}
 	}
 	if req.Settings.MaxTokens > 0 {
 		if openAIUsesCompletionTokens(req.HTTP.URL) {
@@ -132,8 +144,9 @@ func (openAIProvider) decoder() aiStepDecoder {
 }
 
 type openAIUsage struct {
-	PromptTokens        int `json:"prompt_tokens"`
-	CompletionTokens    int `json:"completion_tokens"`
+	PromptTokens        int      `json:"prompt_tokens"`
+	CompletionTokens    int      `json:"completion_tokens"`
+	Cost                *float64 `json:"cost"`
 	PromptTokensDetails *struct {
 		CachedTokens int `json:"cached_tokens"`
 	} `json:"prompt_tokens_details"`
@@ -196,6 +209,9 @@ func (d *openAIDecoder) applyUsage(u *openAIUsage) {
 	d.usage.Output = u.CompletionTokens
 	if u.CompletionTokensDetails != nil {
 		d.usage.Reasoning = u.CompletionTokensDetails.ReasoningTokens
+	}
+	if u.Cost != nil {
+		d.usage.Cost = *u.Cost
 	}
 }
 

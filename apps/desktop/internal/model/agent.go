@@ -12,6 +12,10 @@ const (
 	AgentApprovalAllowChat = "allow_chat"
 	AgentApprovalReject    = "reject"
 
+	AgentModeAsk    = "ask"
+	AgentModeWrites = "writes"
+	AgentModeAuto   = "auto"
+
 	AgentActivityOK       = "ok"
 	AgentActivityError    = "error"
 	AgentActivityDeclined = "declined"
@@ -25,7 +29,66 @@ type AgentFileChange struct {
 	Reverted bool    `json:"reverted,omitempty"`
 }
 
+type AgentMcpPair struct {
+	Key   string `json:"key"`
+	Value string `json:"value,omitempty"`
+	Set   bool   `json:"set,omitempty"`
+}
+
+type AgentMcpServer struct {
+	ID      string         `json:"id"`
+	Name    string         `json:"name"`
+	Kind    string         `json:"kind"`
+	URL     string         `json:"url,omitempty"`
+	Command string         `json:"command,omitempty"`
+	Args    []string       `json:"args"`
+	Headers []AgentMcpPair `json:"headers"`
+	Env     []AgentMcpPair `json:"env"`
+	Enabled bool           `json:"enabled"`
+}
+
+type AgentMcpServersState struct {
+	Servers []AgentMcpServer `json:"servers"`
+	Error   string           `json:"error,omitempty"`
+}
+
+type AgentMcpToolInfo struct {
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+type AgentMcpTestResult struct {
+	OK    bool               `json:"ok"`
+	Tools []AgentMcpToolInfo `json:"tools"`
+	Error string             `json:"error,omitempty"`
+}
+
+type AgentTemplate struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
+}
+
+type AgentWorkspaceNotes struct {
+	Path      string          `json:"path"`
+	Exists    bool            `json:"exists"`
+	Templates []AgentTemplate `json:"templates"`
+	Error     string          `json:"error,omitempty"`
+}
+
+type AgentPlanCall struct {
+	Tool   string `json:"tool"`
+	Target string `json:"target,omitempty"`
+}
+
+type AgentPlan struct {
+	Summary string          `json:"summary"`
+	Steps   []string        `json:"steps"`
+	Calls   []AgentPlanCall `json:"calls"`
+}
+
 type AgentApproval struct {
+	Plan      *AgentPlan        `json:"plan,omitempty"`
+	External  bool              `json:"external,omitempty"`
 	ID        string            `json:"id"`
 	ChatID    string            `json:"chatId"`
 	TurnID    string            `json:"turnId,omitempty"`
@@ -78,6 +141,11 @@ type AgentChat struct {
 	AllowedTools     []string    `json:"allowedTools"`
 	OwnBranch        bool        `json:"ownBranch,omitempty"`
 	Branch           string      `json:"branch,omitempty"`
+	Mode             string      `json:"mode,omitempty"`
+	AllowedHosts     []string    `json:"allowedHosts,omitempty"`
+	BudgetTokens     int64       `json:"budgetTokens,omitempty"`
+	BudgetRequests   int         `json:"budgetRequests,omitempty"`
+	RequestsSent     int         `json:"requestsSent,omitempty"`
 }
 
 type AgentAttachment struct {
@@ -88,19 +156,24 @@ type AgentAttachment struct {
 }
 
 type AgentSendInput struct {
-	ProjectRoot  *string  `json:"projectRoot,omitempty"`
-	Attachments  []string `json:"attachments,omitempty"`
-	WorkspaceID  string   `json:"workspaceId"`
-	Effort       string   `json:"effort,omitempty"`
-	Driver       string   `json:"driver,omitempty"`
-	ChatID       string   `json:"chatId"`
-	TurnID       string   `json:"turnId"`
-	Text         string   `json:"text"`
-	Collection   string   `json:"collection"`
-	Environment  string   `json:"environment"`
-	ConnectionID string   `json:"connectionId"`
-	Model        string   `json:"model"`
-	OwnBranch    bool     `json:"ownBranch,omitempty"`
+	ProjectRoot    *string  `json:"projectRoot,omitempty"`
+	Attachments    []string `json:"attachments,omitempty"`
+	WorkspaceID    string   `json:"workspaceId"`
+	Effort         string   `json:"effort,omitempty"`
+	Driver         string   `json:"driver,omitempty"`
+	ChatID         string   `json:"chatId"`
+	TurnID         string   `json:"turnId"`
+	Text           string   `json:"text"`
+	Collection     string   `json:"collection"`
+	Environment    string   `json:"environment"`
+	ConnectionID   string   `json:"connectionId"`
+	Model          string   `json:"model"`
+	OwnBranch      bool     `json:"ownBranch,omitempty"`
+	EditFrom       *int     `json:"editFrom,omitempty"`
+	Mode           string   `json:"mode,omitempty"`
+	AllowedHosts   []string `json:"allowedHosts,omitempty"`
+	BudgetTokens   int64    `json:"budgetTokens,omitempty"`
+	BudgetRequests int      `json:"budgetRequests,omitempty"`
 }
 
 type AgentTurn struct {

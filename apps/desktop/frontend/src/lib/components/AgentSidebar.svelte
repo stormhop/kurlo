@@ -274,7 +274,7 @@
                 <span class="agent-chat-title">{chat.title || 'Untitled chat'}</span>
                 {#if chatStore.approvals.some(approval => approval.chatId === chat.id)}
                   <span class="agent-chat-waiting" role="img" aria-label="Waiting for you"></span>
-                {:else if chatStore.running && chatStore.liveChatId === chat.id}
+                {:else if chatStore.isRunning(chat.id)}
                   <span class="agent-chat-live" role="img" aria-label="Working"></span>
                 {:else}
                   <span class="agent-chat-time">{chatTime(chat.updatedAt, group.label)}</span>
@@ -288,10 +288,10 @@
                   {#if !archived}
                       <button class="menu-item" type="button" role="menuitem" onclick={() => void startRename(chat.id, chat.title)}><MenuIcon name="rename" />Rename</button>
                   {/if}
-                  <button class="menu-item" type="button" role="menuitem" onclick={() => void toggleArchived(chat)} disabled={actionPending || (chatStore.running && chatStore.liveChatId === chat.id)}><MenuIcon name={archived ? 'restore' : 'archive'} />{archived ? 'Restore' : 'Archive'}</button>
+                  <button class="menu-item" type="button" role="menuitem" onclick={() => void toggleArchived(chat)} disabled={actionPending || chatStore.isRunning(chat.id)}><MenuIcon name={archived ? 'restore' : 'archive'} />{archived ? 'Restore' : 'Archive'}</button>
                   <button class="menu-item" type="button" role="menuitem" onclick={() => void exportChat(chat)} disabled={actionPending}><MenuIcon name="export" />Export as Markdown…</button>
                   <div class="menu-separator" role="separator"></div>
-                  <button class="menu-item danger" type="button" role="menuitem" onclick={() => void removeChat(chat)} disabled={chatStore.running && chatStore.liveChatId === chat.id}><MenuIcon name="trash" />Delete</button>
+                  <button class="menu-item danger" type="button" role="menuitem" onclick={() => void removeChat(chat)} disabled={chatStore.isRunning(chat.id)}><MenuIcon name="trash" />Delete</button>
                 </div>
               {/if}
             {/if}

@@ -41,6 +41,20 @@ type agentDecision struct {
 	reason  string
 	methods []string
 	changes []model.AgentFileChange
+	trusted string
+	auto    bool
+}
+
+func mcpParallelTool(name string) bool {
+	if agentReadTools[name] {
+		return true
+	}
+	tool, ok := executionTools[name]
+	return ok && tool.kind == model.AgentToolRead && !tool.live && !tool.write && name != "import_preview"
+}
+
+func (b *agentToolBridge) parallel(name string) bool {
+	return mcpParallelTool(name)
 }
 
 func agentSafeMethod(method string) bool {
@@ -194,6 +208,15 @@ type agentToolBridge struct {
 	branch    string
 	chatTitle string
 	onBranch  func(branch string)
+
+	mode           string
+	hosts          []string
+	budgetRequests int
+	requestsBase   int
+	requestsSent   int
+	plan           []*agentPlanGrant
+	external       map[string]agentExternalTool
+	externalDefs   []aiTool
 }
 
 func newAgentToolBridge(opts mcpServerOptions, chatID string, allowed []string) *agentToolBridge {
@@ -214,6 +237,11 @@ func (b *agentToolBridge) setChat(chat model.AgentChat, onBranch func(string)) {
 	b.onBranch = onBranch
 	b.ownBranch = chat.OwnBranch
 	b.chatTitle = chat.Title
+	b.mode = agentNormalizeMode(chat.Mode)
+	b.hosts = agentNormalizeHosts(chat.AllowedHosts)
+	b.budgetRequests = chat.BudgetRequests
+	b.requestsBase = chat.RequestsSent
+	b.requestsSent = 0
 	if chat.Branch != "" {
 		b.branch = chat.Branch
 	}
@@ -261,7 +289,7 @@ func (b *agentToolBridge) commitOwnBranch(tool string, record *mcpCallRecord) st
 }
 
 func agentAllowsChatApproval(tool string) bool {
-	return tool != "apply_changes" && tool != "authorize_oauth2" && tool != "git_push" && tool != "clear_cookie_jar" && tool != "start_load_test" && tool != "open_session" && tool != "import_apply" && tool != "import_preview"
+	return tool != agentNotesTool && tool != agentPlanTool && tool != "apply_changes" && tool != "authorize_oauth2" && tool != "git_push" && tool != "clear_cookie_jar" && tool != "start_load_test" && tool != "open_session" && tool != "import_apply" && tool != "import_preview"
 }
 
 func agentDecideGit(s *mcpServer, tool string, arguments json.RawMessage) agentDecision {
@@ -320,9 +348,74 @@ func (b *agentToolBridge) allow(tool string) {
 	}
 }
 
+func (b *agentToolBridge) policy() (string, []string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.mode, append([]string(nil), b.hosts...)
+}
+
+func (b *agentToolBridge) takeRequestsSent() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	sent := b.requestsSent
+	b.requestsBase += sent
+	b.requestsSent = 0
+	return sent
+}
+
+func (b *agentToolBridge) reserveRequests(count int) error {
+	if count <= 0 {
+		return nil
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.budgetRequests > 0 && b.requestsBase+b.requestsSent+count > b.budgetRequests {
+		return &mcpDeclinedError{message: fmt.Sprintf("This chat reached its budget of %d sent requests (%d sent so far), so the call did not run. Tell the user; they can raise the budget in Chat details.", b.budgetRequests, b.requestsBase+b.requestsSent)}
+	}
+	b.requestsSent += count
+	return nil
+}
+
+func agentAutoWrites(tool string) bool {
+	return !agentNeverAuto[tool]
+}
+
+func (b *agentToolBridge) decide(name string, arguments json.RawMessage) agentDecision {
+	decision := agentDecide(b.server, name, arguments)
+	mode, hosts := b.policy()
+	if decision.ask && len(decision.methods) > 0 && mode != model.AgentModeAsk {
+		if trusted, reason := agentTrustedRun(b.server, name, arguments, hosts); trusted {
+			decision.methods = nil
+			decision.trusted = reason
+			if decision.kind == model.AgentToolRun {
+				decision.ask = false
+			}
+		}
+	}
+	switch mode {
+	case model.AgentModeAsk:
+		if decision.kind == model.AgentToolRun && !decision.ask {
+			decision.ask = true
+			decision.reason = "This chat asks before every request it sends."
+		}
+	case model.AgentModeAuto:
+		if decision.kind == model.AgentToolWrite && len(decision.methods) == 0 && agentAutoWrites(name) {
+			decision.ask = false
+			decision.auto = true
+		}
+	}
+	return decision
+}
+
+func (b *agentToolBridge) autoWrites(tool string) bool {
+	mode, _ := b.policy()
+	return mode == model.AgentModeAuto && agentAutoWrites(tool)
+}
+
 func (b *agentToolBridge) setTurn(turnID string) {
 	b.mu.Lock()
 	b.turnID = turnID
+	b.plan = nil
 	b.mu.Unlock()
 }
 
@@ -332,13 +425,59 @@ func (b *agentToolBridge) currentTurn() string {
 	return b.turnID
 }
 
+func agentRequestCount(s *mcpServer, tool string, arguments json.RawMessage) int {
+	switch tool {
+	case "send_request", "run_request":
+		return 1
+	case "generate_tests":
+		var args struct {
+			From string `json:"from"`
+		}
+		_ = json.Unmarshal(arguments, &args)
+		if strings.EqualFold(defaultString(strings.TrimSpace(args.From), "run"), "run") {
+			return 1
+		}
+	case "run_collection":
+		methods, _ := agentRunMethods(s, tool, arguments)
+		var args struct {
+			Iterations int `json:"iterations"`
+		}
+		_ = json.Unmarshal(arguments, &args)
+		return len(methods) * max(args.Iterations, 1)
+	}
+	return 0
+}
+
 func (b *agentToolBridge) toolDefinitions() []map[string]any {
-	return append(mcpServerTools(b.server.opts.readOnly), executionToolDefinitions(b.server.opts.readOnly, true)...)
+	definitions := append(mcpServerTools(b.server.opts.readOnly), executionToolDefinitions(b.server.opts.readOnly, true)...)
+	definitions = append(definitions, agentPlanDefinition())
+	if !b.server.opts.readOnly {
+		definitions = append(definitions, agentNotesDefinition())
+	}
+	return definitions
+}
+
+func (b *agentToolBridge) setExternal(tools map[string]agentExternalTool, defs []aiTool) {
+	b.mu.Lock()
+	b.external = tools
+	b.externalDefs = defs
+	b.mu.Unlock()
+}
+
+func (b *agentToolBridge) externalTool(original string) (agentExternalTool, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	tool, ok := b.external[original]
+	return tool, ok
 }
 
 func (b *agentToolBridge) tools() []aiTool {
 	definitions := b.toolDefinitions()
-	tools := make([]aiTool, 0, len(definitions))
+	b.mu.Lock()
+	external := append([]aiTool(nil), b.externalDefs...)
+	b.mu.Unlock()
+	tools := make([]aiTool, 0, len(definitions)+len(external))
+	tools = append(tools, external...)
 	for _, definition := range definitions {
 		name, _ := definition["name"].(string)
 		description, _ := definition["description"].(string)
@@ -370,7 +509,7 @@ func (b *agentToolBridge) ask(ctx context.Context, approval model.AgentApproval)
 	}
 	switch decision {
 	case model.AgentApprovalAllowChat:
-		if approval.Kind != model.AgentToolExternal && agentAllowsChatApproval(approval.Tool) {
+		if (approval.Kind != model.AgentToolExternal || approval.External) && agentAllowsChatApproval(approval.Tool) {
 			b.allow(approval.Tool)
 		}
 		return nil
@@ -387,28 +526,48 @@ func (b *agentToolBridge) ask(ctx context.Context, approval model.AgentApproval)
 }
 
 func (b *agentToolBridge) call(ctx context.Context, tool aiTool, input, toolUseID string) (string, bool) {
+	if external, ok := b.externalTool(tool.Original); ok && tool.Server != agentToolServer {
+		return b.callExternal(ctx, external, input, toolUseID)
+	}
+	switch tool.Original {
+	case agentPlanTool:
+		return b.proposePlan(ctx, input, toolUseID)
+	case agentNotesTool:
+		return b.updateAgentNotes(ctx, input, toolUseID)
+	}
 	arguments := aiInputObject(input)
 	params, err := json.Marshal(map[string]any{"name": tool.Original, "arguments": arguments})
 	if err != nil {
 		return err.Error(), true
 	}
 	gated := false
+	planned := false
 	ctx = withMcpGate(ctx, func(name string, args json.RawMessage) error {
 		if name != "run_request" && b.isAllowed(name) {
-			return nil
+			return b.reserveRequests(agentRequestCount(b.server, name, args))
 		}
-		decision := agentDecide(b.server, name, args)
+		decision := b.decide(name, args)
 		if name == "run_request" && decision.kind != model.AgentToolExternal && b.isAllowed(name) {
-			return nil
+			return b.reserveRequests(agentRequestCount(b.server, name, args))
 		}
 		if !decision.ask || (decision.kind == model.AgentToolWrite && len(decision.methods) == 0 && mcpWriteToolNames[name]) {
-			return nil
+			return b.reserveRequests(agentRequestCount(b.server, name, args))
+		}
+		if decision.kind != model.AgentToolExternal && b.planCovers(name, args) {
+			planned = true
+			return b.reserveRequests(agentRequestCount(b.server, name, args))
 		}
 		gated = true
-		return b.ask(ctx, model.AgentApproval{ToolUseID: toolUseID, Tool: name, Kind: decision.kind, Arguments: string(args), Reason: decision.reason, Changes: decision.changes})
+		if err := b.ask(ctx, model.AgentApproval{ToolUseID: toolUseID, Tool: name, Kind: decision.kind, Arguments: string(args), Reason: decision.reason, Changes: decision.changes}); err != nil {
+			return err
+		}
+		return b.reserveRequests(agentRequestCount(b.server, name, args))
 	})
 	ctx = withMcpReview(ctx, func(changes []model.AgentFileChange) error {
-		if b.isAllowed(tool.Original) {
+		if planned || b.isAllowed(tool.Original) || b.autoWrites(tool.Original) {
+			return nil
+		}
+		if !gated && b.planCovers(tool.Original, arguments) {
 			return nil
 		}
 		reason := "Changes the workspace files."

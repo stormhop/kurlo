@@ -30,8 +30,16 @@ export function AgentChats(arg1) {
   return window['go']['api']['App']['AgentChats'](arg1);
 }
 
+export function AgentMcpServers() {
+  return window['go']['api']['App']['AgentMcpServers']();
+}
+
 export function AgentPendingApprovals(arg1) {
   return window['go']['api']['App']['AgentPendingApprovals'](arg1);
+}
+
+export function AgentWorkspaceNotes() {
+  return window['go']['api']['App']['AgentWorkspaceNotes']();
 }
 
 export function AiConnections() {
@@ -60,6 +68,10 @@ export function AuthorizeOAuth2(arg1) {
 
 export function AuthorizeOAuth2Device(arg1) {
   return window['go']['api']['App']['AuthorizeOAuth2Device'](arg1);
+}
+
+export function BranchAgentChat(arg1, arg2, arg3) {
+  return window['go']['api']['App']['BranchAgentChat'](arg1, arg2, arg3);
 }
 
 export function CancelCodexLogin() {
@@ -144,6 +156,10 @@ export function DefaultWorkspaceLocation() {
 
 export function DeleteAgentChat(arg1) {
   return window['go']['api']['App']['DeleteAgentChat'](arg1);
+}
+
+export function DeleteAgentMcpServer(arg1) {
+  return window['go']['api']['App']['DeleteAgentMcpServer'](arg1);
 }
 
 export function DeleteCookie(arg1, arg2) {
@@ -530,6 +546,10 @@ export function SSEDisconnect(arg1) {
   return window['go']['api']['App']['SSEDisconnect'](arg1);
 }
 
+export function SaveAgentMcpServer(arg1) {
+  return window['go']['api']['App']['SaveAgentMcpServer'](arg1);
+}
+
 export function SaveAiConnection(arg1) {
   return window['go']['api']['App']['SaveAiConnection'](arg1);
 }
@@ -696,6 +716,10 @@ export function StopMockServer() {
 
 export function StoredHistoryResponseIDs() {
   return window['go']['api']['App']['StoredHistoryResponseIDs']();
+}
+
+export function TestAgentMcpServer(arg1) {
+  return window['go']['api']['App']['TestAgentMcpServer'](arg1);
 }
 
 export function TestAiConnection(arg1) {

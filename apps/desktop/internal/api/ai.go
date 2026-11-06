@@ -38,6 +38,7 @@ type aiRunner struct {
 	mcp      func(req model.HttpRequest) model.McpResponse
 	local    aiLocalTools
 	now      func() time.Time
+	prepare  func(index int, conversation []model.AiMessage, last model.AiStep) ([]model.AiMessage, error)
 
 	bodyFixes map[string]bool
 }
@@ -162,6 +163,14 @@ func (r *aiRunner) run() model.AiResponse {
 
 	conversation := append([]model.AiMessage{}, r.req.Messages...)
 	for index := 0; index < maxSteps; index++ {
+		if r.prepare != nil && index > 0 {
+			prepared, err := r.prepare(index, conversation, out.Steps[len(out.Steps)-1])
+			if err != nil {
+				out.Error = err.Error()
+				break
+			}
+			conversation = prepared
+		}
 		step := r.runStep(index, conversation, tools)
 		out.Steps = append(out.Steps, step)
 		out.Usage.Add(step.Usage)
@@ -520,16 +529,32 @@ func (r *aiRunner) discoverTools() ([]aiTool, []string) {
 	return aiAssignToolNames(tools), warnings
 }
 
+type aiParallelTools interface {
+	parallel(name string) bool
+}
+
+func (r *aiRunner) parallelTool(tool aiTool, ok bool) bool {
+	if !ok || tool.ServerIndex >= 0 {
+		return false
+	}
+	parallel, can := r.local.(aiParallelTools)
+	return can && parallel.parallel(tool.Original)
+}
+
 func (r *aiRunner) callTools(stepIndex int, blocks []model.AiBlock, tools []aiTool) []model.AiBlock {
 	byName := map[string]aiTool{}
 	for _, tool := range tools {
 		byName[tool.Name] = tool
 	}
-	var results []model.AiBlock
+	var uses []model.AiBlock
 	for _, block := range blocks {
-		if block.Type != model.AiBlockToolUse {
-			continue
+		if block.Type == model.AiBlockToolUse {
+			uses = append(uses, block)
 		}
+	}
+	results := make([]model.AiBlock, len(uses))
+	run := func(index int) {
+		block := uses[index]
 		result := model.AiBlock{Type: model.AiBlockToolResult, ID: block.ID, Name: block.Name}
 		tool, ok := byName[block.Name]
 		switch {
@@ -543,8 +568,42 @@ func (r *aiRunner) callTools(stepIndex int, blocks []model.AiBlock, tools []aiTo
 			result.Server = tool.Server
 			result.Text, result.IsError = r.callTool(tool, block)
 		}
-		results = append(results, result)
-		r.publish("ai:tool", model.AiToolResultEvent{SessionID: r.sessionID(), TurnID: r.req.TurnID, Step: stepIndex, Block: result})
+		results[index] = result
+	}
+	publish := func(index int) {
+		r.publish("ai:tool", model.AiToolResultEvent{SessionID: r.sessionID(), TurnID: r.req.TurnID, Step: stepIndex, Block: results[index]})
+	}
+	for start := 0; start < len(uses); {
+		tool, ok := byName[uses[start].Name]
+		end := start + 1
+		if r.parallelTool(tool, ok) {
+			for end < len(uses) {
+				next, nextOK := byName[uses[end].Name]
+				if !r.parallelTool(next, nextOK) {
+					break
+				}
+				end++
+			}
+		}
+		if end-start == 1 {
+			run(start)
+			publish(start)
+			start = end
+			continue
+		}
+		var wg sync.WaitGroup
+		for index := start; index < end; index++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+				run(index)
+			}(index)
+		}
+		wg.Wait()
+		for index := start; index < end; index++ {
+			publish(index)
+		}
+		start = end
 	}
 	return results
 }

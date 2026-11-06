@@ -214,6 +214,15 @@ export const environmentFeature = {
     });
     await this.persistRequestStore();
   },
+  async setEnvironmentSandbox(this: EnvironmentHost, environmentId: string, sandbox: boolean) {
+    if (!this.guardWorkspaceWritable('Environment changes')) return;
+    this.environments = this.environments.map(candidate => {
+      if (candidate.id !== environmentId) return candidate;
+      const { sandbox: _previous, ...rest } = candidate;
+      return sandbox ? { ...rest, sandbox: true } : rest;
+    });
+    await this.persistRequestStore();
+  },
   async setEnvironmentParent(this: EnvironmentHost, environmentId: string, parentId: string) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
     const environment = this.environments.find(candidate => candidate.id === environmentId);

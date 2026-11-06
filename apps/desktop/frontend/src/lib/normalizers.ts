@@ -177,7 +177,7 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
 }
 
 export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: string): Environment {
-    const input = sanitizeFields(raw, { strings: [...ENTITY_STRINGS, 'parentId'], booleans: ['protected'], arrays: ['values'] });
+    const input = sanitizeFields(raw, { strings: [...ENTITY_STRINGS, 'parentId'], booleans: ['protected', 'sandbox'], arrays: ['values'] });
     const id = input.id || newEntityId('environment');
     const parentId = input.parentId?.trim() ?? '';
     const name = input.name || 'Local';
@@ -188,6 +188,7 @@ export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: str
         filesystemName: filesystemNameFromName(input.filesystemName || name, id),
         values: restoreRows(input.values),
         ...(input.protected ? { protected: true } : {}),
+        ...(input.sandbox ? { sandbox: true } : {}),
         ...(parentId && parentId !== id ? { parentId } : {}),
     };
 }

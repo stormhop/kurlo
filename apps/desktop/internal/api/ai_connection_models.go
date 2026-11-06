@@ -147,6 +147,8 @@ type aiModelListEntry struct {
 	Name                string   `json:"name"`
 	DisplayName         string   `json:"display_name"`
 	SupportedParameters []string `json:"supported_parameters"`
+	ContextLength       int      `json:"context_length"`
+	MaxInputTokens      int      `json:"max_input_tokens"`
 }
 
 func parseAiConnectionModels(body []byte) ([]model.AiConnectionModel, error) {
@@ -177,11 +179,16 @@ func parseAiConnectionModels(body []byte) ([]model.AiConnectionModel, error) {
 			name = id
 		}
 		weak := entry.SupportedParameters != nil && !containsFold(entry.SupportedParameters, "tools")
+		window := entry.ContextLength
+		if window <= 0 {
+			window = entry.MaxInputTokens
+		}
 		models = append(models, model.AiConnectionModel{
-			ID:          id,
-			Name:        name,
-			Recommended: !weak && aiModelRecommended(id),
-			WeakTools:   weak,
+			ID:            id,
+			Name:          name,
+			Recommended:   !weak && aiModelRecommended(id),
+			WeakTools:     weak,
+			ContextWindow: window,
 		})
 	}
 	sortAiConnectionModels(models)
@@ -256,6 +263,7 @@ func listAiConnectionModelsRaw(ctx context.Context, client *http.Client, kind, b
 			markOllamaToolSupport(ctx, client, root, models)
 		}
 	}
+	rememberAiModelWindows(base, models)
 	return model.AiConnectionTestResult{OK: true, Models: models}
 }
 

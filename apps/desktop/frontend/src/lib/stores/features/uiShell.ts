@@ -60,6 +60,12 @@ export function readResponseLayout(): ResponseLayout {
   }
 }
 
+export const AGENT_DOCKED_MIN_WIDTH = 704;
+
+export function agentSidebarMaxWidth(viewportWidth: number): number {
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.floor(viewportWidth - ACTIVITY_RAIL_WIDTH - AGENT_DOCKED_MIN_WIDTH - 2)));
+}
+
 export function codePanelMaxWidth(viewportWidth: number, sidebarWidth: number): number {
   const availableWidth = Math.max(0, viewportWidth - ACTIVITY_RAIL_WIDTH - sidebarWidth);
   const balancedWidth = Math.floor(availableWidth / 2);

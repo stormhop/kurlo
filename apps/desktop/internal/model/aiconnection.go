@@ -47,6 +47,7 @@ type AiConnectionModel struct {
 	Name          string   `json:"name"`
 	Recommended   bool     `json:"recommended"`
 	WeakTools     bool     `json:"weakTools"`
+	ContextWindow int      `json:"contextWindow,omitempty"`
 }
 
 type AiConnectionTestResult struct {
