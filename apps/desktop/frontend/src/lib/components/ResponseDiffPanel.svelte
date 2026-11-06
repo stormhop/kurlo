@@ -43,7 +43,7 @@
   {:else}
     <div class="diff-bar">
       <div class="diff-bar-meta">
-        <span class="diff-side diff-side-before" title="Baseline">
+        <span class="diff-side diff-side-before">
           {baselineLabel} · {previous.statusCode}{#if previous.duration} · {previous.duration} ms{/if}
         </span>
         <span class="diff-arrow" aria-hidden="true">→</span>

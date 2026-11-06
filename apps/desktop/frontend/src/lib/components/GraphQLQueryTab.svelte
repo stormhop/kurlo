@@ -96,7 +96,6 @@
           <button
             class="graphql-explorer-field"
             type="button"
-            title={field.description || field.type}
             onclick={() => vm.applyGraphQLExplorerField(field)}
           >
             <span class="graphql-field-main">

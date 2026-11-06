@@ -66,4 +66,61 @@ describe('markdown', () => {
   it('keeps raw HTML as text', () => {
     expect(parseMarkdown('<img src=x onerror=alert(1)>')).toEqual([{ type: 'paragraph', children: [{ type: 'text', text: '<img src=x onerror=alert(1)>' }] }]);
   });
+
+  it('parses autolinks', () => {
+    expect(parseInline('<https://kurlo.dev/docs>')).toEqual([
+      { type: 'link', href: 'https://kurlo.dev/docs', children: [{ type: 'text', text: 'https://kurlo.dev/docs' }] },
+    ]);
+    expect(parseInline('<mailto:a@b.c>')).toEqual([
+      { type: 'link', href: 'mailto:a@b.c', children: [{ type: 'text', text: 'a@b.c' }] },
+    ]);
+    expect(parseInline('<not a link>')).toEqual([{ type: 'text', text: '<not a link>' }]);
+  });
+
+  it('preserves long unmatched delimiter runs as text', () => {
+    const brackets = '['.repeat(20000);
+    expect(parseInline(brackets)).toEqual([{ type: 'text', text: brackets }]);
+    const asterisks = '*'.repeat(20000);
+    expect(parseInline(asterisks)).toEqual([{ type: 'text', text: asterisks }]);
+    const ticks = '`'.repeat(1024);
+    expect(parseInline(ticks)).toEqual([{ type: 'text', text: ticks }]);
+  });
+
+  it('preserves long link labels, link destinations and inline images', () => {
+    const label = 'x'.repeat(1200);
+    const href = 'https://kurlo.dev/?q=' + 'y'.repeat(1200);
+    const src = 'data:image/png;base64,' + 'A'.repeat(1200);
+    expect(parseInline(`[${label}](${href})`)).toEqual([
+      { type: 'link', href, children: [{ type: 'text', text: label }] },
+    ]);
+    expect(parseInline(`![image](${src})`)).toEqual([{ type: 'image', src, alt: 'image' }]);
+  });
+
+  it('keeps escaped and nested link delimiters inside the label and destination', () => {
+    expect(parseInline('[a [b] \\] `[`](https://kurlo.dev/(a) "title")')).toEqual([
+      { type: 'link', href: 'https://kurlo.dev/(a)', children: [
+        { type: 'text', text: 'a [b] ] ' },
+        { type: 'code', text: '[' },
+      ] },
+    ]);
+  });
+
+  it('bounds inline nesting on deeply nested links', () => {
+    const count = 5000;
+    const text = '['.repeat(count) + 'x' + '](https://kurlo.dev)'.repeat(count);
+    let children = parseInline(text);
+    for (let depth = 0; depth < 64; depth++) {
+      const [link] = children;
+      if (link.type !== 'link') throw new Error('Expected a nested link');
+      children = link.children;
+    }
+    expect(children).toEqual([{ type: 'text', text: '['.repeat(count - 64) + 'x' + '](https://kurlo.dev)'.repeat(count - 64) }]);
+  });
+
+  it('preserves long code delimiters and emphasis spans', () => {
+    const ticks = '`'.repeat(513);
+    const text = 'x'.repeat(1200);
+    expect(parseInline(`${ticks}code${ticks}`)).toEqual([{ type: 'code', text: 'code' }]);
+    expect(parseInline(`*${text}*`)).toEqual([{ type: 'em', children: [{ type: 'text', text }] }]);
+  });
 });

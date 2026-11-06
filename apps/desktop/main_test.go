@@ -65,8 +65,42 @@ func TestOnlyMacOSHidesTheWindowOnClose(t *testing.T) {
 	}
 }
 
-func TestNonMacMenuOffersNoWayToHideTheWindow(t *testing.T) {
+func TestLinuxAndWindowsDrawTheirOwnTitleBar(t *testing.T) {
 	for _, goos := range []string{"linux", "windows"} {
+		if !framelessWindow(goos) {
+			t.Fatalf("expected %s to use the app's own title bar", goos)
+		}
+	}
+	if framelessWindow("darwin") {
+		t.Fatalf("expected macOS to keep its native traffic lights")
+	}
+}
+
+func TestLinuxHasNoMenuBar(t *testing.T) {
+	if got := buildMenuFor(api.NewApp(), "linux"); got != nil {
+		t.Fatalf("expected no GTK menu bar on Linux, got %d items", len(got.Items))
+	}
+}
+
+func TestMacMenuKeepsZoom(t *testing.T) {
+	var labels []string
+	for _, item := range buildMenuFor(api.NewApp(), "darwin").Items {
+		if item.SubMenu == nil {
+			continue
+		}
+		for _, sub := range item.SubMenu.Items {
+			labels = append(labels, sub.Label)
+		}
+	}
+	for _, want := range []string{"Zoom In", "Zoom Out", "Actual Size"} {
+		if !slices.Contains(labels, want) {
+			t.Fatalf("macOS menu lost %q: %v", want, labels)
+		}
+	}
+}
+
+func TestNonMacMenuOffersNoWayToHideTheWindow(t *testing.T) {
+	for _, goos := range []string{"windows"} {
 		var labels []string
 		var walk func(items []*menu.MenuItem)
 		walk = func(items []*menu.MenuItem) {

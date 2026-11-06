@@ -168,12 +168,11 @@
   {/if}
   {#each autoHeadersOpen ? vm.autoRequestHeaders : [] as header, eachIndex (eachIndex)}
     <div class="kv-row kv-row--auto" class:kv-row--overridden={header.overridden}>
-      <span class="kv-auto-badge" title="Added by Kurlo"><svg width="0.6875rem" height="0.6875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" stroke="currentColor" stroke-width="1.1"/><path d="M4 5.2V3.9a2 2 0 014 0v1.3" stroke="currentColor" stroke-width="1.1"/></svg><span class="sr-only">Added by Kurlo</span></span>
+      <span class="kv-auto-badge"><svg width="0.6875rem" height="0.6875rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" stroke="currentColor" stroke-width="1.1"/><path d="M4 5.2V3.9a2 2 0 014 0v1.3" stroke="currentColor" stroke-width="1.1"/></svg><span class="sr-only">Added by Kurlo</span></span>
       <span class="kv-cell kv-auto-key">{header.key}</span>
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <span
         class="kv-cell kv-auto-value kv-value-open"
-        title={header.value}
         ondblclick={(event) => maybeOpenAutoHeaderDetail(header, event)}
       >
         {header.value}

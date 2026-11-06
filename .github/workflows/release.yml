@@ -460,6 +460,7 @@ jobs:
   npm:
     name: Publish npm packages
     needs: publish
+    if: ${{ !contains(github.ref_name, '-') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -491,12 +492,10 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          tag=latest
-          case "$version" in *-*) tag=next ;; esac
           publish() {
             local dir="$1" out attempt
             for attempt in 1 2 3; do
-              if out="$(npm publish "./$dir" --access public --tag "$tag" 2>&1)"; then
+              if out="$(npm publish "./$dir" --access public --tag latest 2>&1)"; then
                 echo "$out"
                 return 0
               fi
@@ -522,6 +521,7 @@ jobs:
   mcp-registry:
     name: Publish to the MCP Registry
     needs: npm
+    if: ${{ !contains(github.ref_name, '-') }}
     uses: ./.github/workflows/mcp-registry.yml
     with:
       version: ${{ github.ref_name }}

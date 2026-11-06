@@ -6,6 +6,7 @@ import InstallButton from '../components/site/InstallButton.astro';
 import EndCta from '../components/site/EndCta.astro';
 import Rich from '../components/site/Rich.astro';
 import requestEditor from '../assets/screenshots/request-editor.png';
+import AgentDemo from '../components/site/AgentDemo.astro';
 import { structuredData } from '../../site.schema.mjs';
 import { GITHUB_SOURCE } from '../../site.constants.mjs';
 import { competitors } from '../lib/competitors';
@@ -16,8 +17,15 @@ const site = Astro.site ? new URL(base, Astro.site).toString() : base;
 const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
 
 const title = 'Kurlo — free, open-source API client and Postman alternative';
-const description = 'A free, open-source desktop API client and Postman alternative for HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE and MCP. Requests are YAML files in your repo, and your AI agent can run and edit them. No account, no cloud, no telemetry.';
-const terms = /(pm\.sendRequest|kurlo run|kurlo mcp|pm\.\*|\[secret\]|\.proto)/g;
+const description = 'A free, open-source desktop API client with Agent mode: the Kurlo agent with any model, Claude Code or Codex runs your requests, explains failures and writes tests, asking before every change. HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE, MCP and AI requests, saved as YAML in your repo. No account, no cloud, no telemetry.';
+const terms = /(pm\.sendRequest|pm\.response\.llm\(\)|kurlo run|kurlo mcp|pm\.\*|\[secret\]|\.proto|\bGET\b|\bHEAD\b|\bOPTIONS\b)/g;
+
+const promises = [
+  { title: 'Asks before it writes.', text: 'Every change shows the exact YAML lines to Apply, Reject or Allow for this chat. Anything but GET, HEAD or OPTIONS asks before it is sent.' },
+  { title: 'Never sees your tokens.', text: 'Secrets reach your API. The model gets [secret], whichever agent you pick.' },
+  { title: 'Stays out of production.', text: 'Mark an environment protected and no agent can send a thing with it.' },
+  { title: 'Keeps chats at home.', text: 'Chats are encrypted on this computer, never in your repo. Every tool call lands in an encrypted activity log.' },
+];
 
 const features = [
   {
@@ -28,11 +36,11 @@ const features = [
     visual: 'yaml',
   },
   {
-    title: 'Your agent can press Send.',
-    text: 'Kurlo is an MCP server too. Claude Code, Codex or Cursor runs your saved requests, writes new ones with tests, and reads the response you just got. Tokens reach your API, never the model.',
+    title: 'Or hand it to your terminal.',
+    text: 'Prefer to stay in Claude Code, Codex or Cursor? kurlo mcp gives them the same tools: run saved requests, write new ones with tests, read the response you just got. Tokens reach your API, never the model.',
     link: 'mcp/',
     plate: 'b',
-    visual: 'video',
+    visual: 'terminal',
   },
   {
     title: 'Find your API’s limits.',
@@ -42,70 +50,73 @@ const features = [
     visual: 'load',
   },
   {
-    title: 'Postman scripts, unchanged.',
-    text: 'Drop a Postman v2.1 export on the sidebar. Folders, auth, environments and saved responses come across, and the pm.* tests keep running. Nothing to rewrite.',
-    link: 'docs/getting-started/migrating/',
-    plate: 'c',
-    visual: 'script',
+    title: 'Talks to models, too.',
+    text: 'An AI request sends a prompt to OpenAI, Anthropic, OpenRouter, Groq, Ollama or LM Studio and streams the answer with its tool calls and tokens. Test it like any response with pm.response.llm().',
+    link: 'docs/guides/request-types/#ai',
+    plate: 'd',
+    visual: 'ai',
   },
   {
     title: 'Mock it before it exists.',
     text: 'Serve a collection’s saved examples on localhost while the real endpoint is still being built. No account, no request quota.',
     link: 'docs/guides/mock-server/',
-    plate: 'd',
+    plate: 'a',
     visual: 'mock',
   },
   {
     title: 'Same tests in CI.',
     text: 'kurlo run sends the same requests with the same scripts in your pipeline. A failing test fails the build.',
     link: 'docs/guides/cli-runner/',
-    plate: 'a',
+    plate: 'c',
     visual: 'ci',
+  },
+  {
+    title: 'Environments that inherit.',
+    text: 'Staging takes whatever it doesn’t set from Base. Every variable across every environment sits in one table, so the one missing from staging stands out.',
+    link: 'docs/guides/environments/#inheriting-from-another-environment',
+    plate: 'b',
+    visual: 'envs',
   },
   {
     title: 'Sees CORS before your users do.',
     text: 'Send a request the way a page on another origin would. The missing header shows up here, not in a bug report.',
     link: 'docs/guides/browser-security/',
-    plate: 'b',
+    plate: 'd',
     visual: 'cors',
   },
   {
-    title: 'Every environment, one table.',
-    text: 'Every variable across every environment side by side, so the one missing from staging stands out.',
-    link: 'docs/guides/environments/',
-    plate: 'c',
-    visual: 'envs',
-  },
-  {
     title: 'Speaks everything.',
-    text: 'HTTP/1.1 and 2, GraphQL with a schema explorer, gRPC, WebSocket, Socket.IO, SSE, and MCP servers you can call by hand.',
+    text: 'HTTP/1.1 and 2, GraphQL with a schema explorer, gRPC, WebSocket, Socket.IO, SSE, language models, and MCP servers you can call by hand.',
     link: 'docs/guides/request-types/',
-    plate: 'd',
+    plate: 'c',
     visual: 'protocols',
   },
 ];
 
 const also = [
+  { title: 'Postman moves in', text: 'Postman, Insomnia, Bruno, OpenAPI, HAR and cURL. pm.* tests keep running, nothing to rewrite.', link: 'docs/getting-started/migrating/' },
+  { title: 'Folders set the rules', text: 'Headers, auth, scripts and tests on a folder apply to every request inside it.', link: 'docs/guides/collection-defaults/#folder-defaults' },
+  { title: 'Finishes your URLs', text: 'Completes URLs from history and saved requests, and the next JSON key from your examples.', link: 'docs/guides/request-types/#suggestions-while-you-type' },
   { title: 'Auth, all of it', text: 'OAuth 2.0 with all four grants, PKCE and refresh, AWS SigV4, Digest, API keys and client certificates.', link: 'docs/guides/authentication/' },
-  { title: 'Moves in for you', text: 'Postman, Insomnia, Bruno, OpenAPI, HAR and cURL. The original files are never touched.', link: 'docs/getting-started/migrating/' },
   { title: 'Your browser’s cookies', text: 'An extension for Chrome, Edge, Brave and Firefox sends the session you are already signed into.', link: 'docs/guides/cookies/' },
   { title: 'Remembers', text: 'Every send with its response, kept for 14 days and reopenable in the editor.', link: 'docs/guides/history/' },
-  { title: 'Runs with data', text: 'A whole collection over a CSV or JSON data file, right in the app.', link: 'docs/guides/cli-runner/' },
+  { title: 'Runs with data', text: 'A whole collection over a CSV or JSON data file, right in the app.', link: 'docs/guides/collection-runner/' },
   { title: 'Saves to disk', text: 'Send and download writes a binary response straight to a file, byte for byte.' },
   { title: 'Keeps secrets home', text: 'In a shared repo, tokens are placeholders. The values live encrypted on your machine.', link: 'privacy/' },
-  { title: 'Fences off production', text: 'Mark an environment protected and your agent can’t send a thing with it.', link: 'docs/guides/mcp-server/' },
-  { title: 'Notices outside edits', text: 'Change a file in your editor, or let the agent do it, and the open app merges it in.' },
+  { title: 'Notices outside edits', text: 'Change a file in your editor, or let an agent do it, and the open app merges it in.' },
   { title: 'Tests your MCP server', text: 'Discover tools, call them with arguments from their schema and read the raw JSON-RPC.', link: 'mcp/' },
   { title: 'Locks the drawer', text: 'Local data is AES-256-GCM encrypted, with the key in Keychain, DPAPI or libsecret.', link: 'privacy/' },
-  { title: 'Updates itself', text: 'Checks for a signed release on launch. No usage data rides along.', link: 'privacy/' },
 ];
 
 const parts = [
+  { part: 'Agent mode', details: 'The Kurlo agent with any model, Claude Code and Codex. Every change asks first.', status: 'Yes', tone: 'yes' },
   { part: 'HTTP', details: '1.1 and 2, with proxies and client certificates.', status: 'Yes', tone: 'yes' },
   { part: 'GraphQL', details: 'Queries, variables and a schema explorer.', status: 'Yes', tone: 'yes' },
   { part: 'gRPC', details: 'Server reflection or your own .proto files.', status: 'Yes', tone: 'yes' },
   { part: 'Realtime', details: 'WebSocket, Socket.IO and SSE sessions.', status: 'Yes', tone: 'yes' },
+  { part: 'AI requests', details: 'OpenAI, Anthropic, OpenRouter, Groq, Ollama, LM Studio and any compatible API.', status: 'Yes', tone: 'yes' },
   { part: 'MCP servers', details: 'Streamable HTTP, every revision since 2025-03-26. The stdio transport is still to come.', status: 'Partly', tone: 'part' },
+  { part: 'Load tests', details: 'k6 under the hood: run locally, export a script or use the CLI.', status: 'Yes', tone: 'yes' },
   { part: 'Postman scripts', details: 'pm.*, pm.sendRequest, chai and CryptoJS.', status: 'Yes', tone: 'yes' },
   { part: 'Git', details: 'Clone, commit, pull and push without leaving the app.', status: 'Yes', tone: 'yes' },
   { part: 'Account', details: 'There is no Kurlo server to have one on.', status: 'None', tone: 'yes' },
@@ -115,6 +126,7 @@ const parts = [
 
 const faq = [
   { q: 'What does it cost?', a: 'Nothing. It’s open source under MIT. No paid tier, no seats, no catch.' },
+  { q: 'Does Agent mode cost extra?', a: 'Not from us. The Kurlo agent runs free on a local model or on your own key, and Claude Code and Codex use the plan you already have.', link: 'docs/guides/agent/' },
   { q: 'Do I need an account?', a: 'No. There is no Kurlo server, so there is nothing to sign in to.' },
   { q: 'What does it collect?', a: 'Nothing. On launch it asks GitHub whether a newer release exists, with no usage data in the request. Everything else goes only where you send it.', link: 'privacy/' },
   { q: 'Does my agent see my tokens?', a: 'No. Secrets reach your API, but the agent sees [secret]. Environments you protect are off limits to it entirely.', link: 'docs/guides/mcp-server/' },
@@ -133,13 +145,14 @@ const ldJson = structuredData({
 });
 ---
 
-<SiteLayout title={title} description={description} canonical={site} ldJson={ldJson} links={[{ label: 'Features', href: '#features' }, { label: 'MCP', href: href('mcp/') }, { label: 'Receipts', href: '#receipts' }, { label: 'Compare', href: '#compare' }]}>
+<SiteLayout title={title} description={description} canonical={site} ldJson={ldJson} links={[{ label: 'Agent mode', href: href('agent/') }, { label: 'Features', href: '#features' }, { label: 'MCP', href: href('mcp/') }, { label: 'Receipts', href: '#receipts' }, { label: 'Compare', href: '#compare' }]}>
   <section class="k-hero" data-hero aria-labelledby="hero-title">
     <Scene variant="dusk" bird />
     <p class="k-hint" data-hint aria-hidden="true">Click the sky <svg width="38" height="22" viewBox="0 0 38 22" fill="none"><path d="M2 4c10 0 22 2 32 14m0 0-1-8m1 8-8-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></p>
     <div class="k-hero-copy">
+      <a class="k-pill" href="#agent"><b>New</b><span>Kurlo 3.0: Agent mode, with Claude Code and Codex</span><i aria-hidden="true">→</i></a>
       <h1 id="hero-title"><span>Send</span><span>it.</span></h1>
-      <p class="k-lead">The open-source API client your AI agent can use. Postman’s scripts, YAML in your repo, no account.</p>
+      <p class="k-lead">The open-source API client with an agent inside. Bring any model, Claude Code or Codex. YAML in your repo, no account.</p>
       <div class="k-cta">
         <DownloadButton />
         <InstallButton />
@@ -147,6 +160,30 @@ const ldJson = structuredData({
       </div>
     </div>
     <p class="k-counter" data-counter hidden>Delivered <b data-count>0</b></p>
+  </section>
+
+  <section class="k-a3" id="agent" aria-labelledby="a3-title">
+    <div class="k-a3-in">
+      <div class="k-a3-head">
+        <p class="k-a3-badge"><span>New</span>Kurlo 3.0 is out</p>
+        <h2 class="k-a3-title" id="a3-title"><span>Kurlo <em>3.0</em></span><span>Agent mode.</span></h2>
+        <p class="k-a3-lead">Ask in plain words. It runs your requests, finds out why one failed and writes the missing test, right in your workspace. Use the Kurlo agent with any model, or the Claude Code and Codex you already pay for.</p>
+      </div>
+
+      <AgentDemo />
+
+      <ul class="k-a3-promises">
+        {promises.map(item => (
+          <li><h3>{item.title}</h3><p><Rich text={item.text} terms={terms} /></p></li>
+        ))}
+      </ul>
+
+      <div class="k-a3-cta">
+        <a class="k-a3-btn" href={href('agent/')}><b>Meet Agent mode</b><i aria-hidden="true">→</i></a>
+        <a class="k-source" href={href('docs/guides/agent/')}>Read the guide</a>
+        <a class="k-source" href={href('changelog/')}>Everything new in 3.0</a>
+      </div>
+    </div>
   </section>
 
   <section class="k-live" aria-labelledby="live-title">
@@ -189,7 +226,12 @@ const ldJson = structuredData({
     </div>
   </section>
 
-  <section class="k-features" id="features" aria-label="Features">
+  <section class="k-features" id="features" aria-labelledby="features-title">
+    <div class="k-features-head">
+      <p class="k-label">Everything around the request</p>
+      <h2 class="k-display" id="features-title">Not just Send.</h2>
+      <p class="k-sub">Load tests, mocks, models, CI and the browser’s rules, in the same app and the same YAML.</p>
+    </div>
     {features.map((feature, i) => (
       <article class={`k-feature ${i % 2 ? 'k-feature-flip' : ''}`}>
         <div class="k-feature-copy">
@@ -213,9 +255,19 @@ const ldJson = structuredData({
     <span class="k">testScriptJs</span>: <span class="f">pm.test</span>(<span class="s">"refunded"</span>, …)</pre>
             </figure>
           )}
-          {feature.visual === 'video' && (
-            <figure class="k-video">
-              <video src={href('media/agent-demo.mp4')} poster={href('media/agent-demo.jpg')} width="1600" height="1214" autoplay muted loop playsinline preload="metadata" data-motion aria-label="Claude Code adds tests to a Kurlo collection over MCP, finds that an order total ignores quantity, fixes the server and runs the collection again while the tests appear in Kurlo"></video>
+          {feature.visual === 'terminal' && (
+            <figure class="k-card">
+              <figcaption><span>~/shop-api</span><span>zsh</span></figcaption>
+<pre><span class="dim">$</span> npx -y @kurlo/cli mcp install
+Claude Code   <span class="ok">added</span>
+Codex         <span class="ok">added</span>
+Cursor        <span class="ok">added</span>
+
+<span class="dim">$</span> claude <span class="s">"run Orders, fix what fails"</span>
+<b class="ok">●</b> kurlo · run_collection
+  <span class="dim">⎿</span> 11 passed, <span class="err">1 failed</span>
+<b class="ok">●</b> kurlo · run_request <span class="dim">Create order</span>
+  <span class="dim">⎿</span> <span class="ok">201</span> · tests 3/3</pre>
             </figure>
           )}
           {feature.visual === 'load' && (
@@ -227,7 +279,7 @@ const ldJson = structuredData({
               <svg class="k-load-chart" viewBox="0 0 480 110" role="img" aria-label="Example load profile: ramp up to 50 virtual users, hold, then ramp down">
                 <path d="M0 100 L90 20 H350 L440 100 Z" fill="currentColor" opacity="0.15" />
                 <path d="M0 100 L90 20 H350 L440 100 H480" fill="none" stroke="currentColor" stroke-width="2" />
-                <text x="110" y="52" fill="currentColor" font-size="13">50 virtual users · ramp, hold, down</text>
+                <text x="220" y="66" text-anchor="middle" fill="currentColor" font-size="13">50 virtual users · ramp, hold, down</text>
               </svg>
               <div class="k-out">
                 <span class="dim">Example result · pass criteria</span>
@@ -236,18 +288,15 @@ const ldJson = structuredData({
               </div>
             </figure>
           )}
-          {feature.visual === 'script' && (
+          {feature.visual === 'ai' && (
             <figure class="k-card">
-              <figcaption><span>Login user · Tests</span><span>imported from Postman</span></figcaption>
-<pre><span class="f">pm.test</span>(<span class="s">"status is 200"</span>, () =&gt; &#123;
-  pm.response.to.have.status(200)
-&#125;)
-
-<span class="f">pm.test</span>(<span class="s">"returns a session"</span>, () =&gt; &#123;
-  const body = pm.response.json()
-  pm.environment.set(<span class="s">"token"</span>, body.token)
-&#125;)</pre>
-              <div class="k-out"><span><b class="ok">✓</b> status is 200</span><span><b class="ok">✓</b> returns a session</span></div>
+              <figcaption><span>Summarize order · AI</span><span>Anthropic · Haiku 5.5</span></figcaption>
+              <div class="k-chat">
+                <p class="k-chat-me">Summarize order 42 for the support team.</p>
+                <p class="k-chat-tool"><b class="ok">✓</b> get_order <span class="dim">&#123; "id": 42 &#125; · 38 ms</span></p>
+                <p class="k-chat-ai">Order 42: two pigeon mugs, paid €19.00, refunded today as damaged in transit.</p>
+              </div>
+              <div class="k-out"><span class="dim">412 in · 58 out · end_turn · 1.4 s</span><span><b class="ok">✓</b> mentions the refund</span></div>
             </figure>
           )}
           {feature.visual === 'mock' && (
@@ -284,21 +333,21 @@ const ldJson = structuredData({
           )}
           {feature.visual === 'envs' && (
             <figure class="k-card">
-              <figcaption><span>Environments</span><span>3 environments · 4 variables</span></figcaption>
+              <figcaption><span>Environments</span><span>Staging and Prod inherit from Base</span></figcaption>
               <table class="k-envs">
-                <thead><tr><th><span class="k-sr">Variable</span></th><th>Local</th><th>Staging</th><th>Prod</th></tr></thead>
+                <thead><tr><th><span class="k-sr">Variable</span></th><th>Base</th><th>Staging</th><th>Prod</th></tr></thead>
                 <tbody>
                   <tr><th>baseUrl</th><td>localhost:8080</td><td>stg.shop.dev</td><td>api.shop.dev</td></tr>
-                  <tr><th>orderId</th><td>42</td><td>42</td><td>—</td></tr>
+                  <tr><th>currency</th><td>EUR</td><td class="inh">EUR <i>Base</i></td><td class="inh">EUR <i>Base</i></td></tr>
                   <tr><th>token</th><td>••••••</td><td>••••••</td><td>••••••</td></tr>
-                  <tr><th>webhookUrl</th><td>localhost:9000</td><td class="miss">missing</td><td>hooks.shop.dev</td></tr>
+                  <tr><th>webhookUrl</th><td class="inh">—</td><td class="miss">missing</td><td>hooks.shop.dev</td></tr>
                 </tbody>
               </table>
             </figure>
           )}
           {feature.visual === 'protocols' && (
             <figure class="k-card">
-              <figcaption><span>Shop API</span><span>7 protocols</span></figcaption>
+              <figcaption><span>Shop API</span><span>8 protocols</span></figcaption>
               <ul class="k-protos">
                 <li><span class="p-get">GET</span>List orders</li>
                 <li><span class="p-gql">GQL</span>Order with items</li>
@@ -306,6 +355,7 @@ const ldJson = structuredData({
                 <li><span class="p-ws">WS</span>Order updates</li>
                 <li><span class="p-sio">SIO</span>Courier chat</li>
                 <li><span class="p-sse">SSE</span>Price feed</li>
+                <li><span class="p-ai">AI</span>Summarize order</li>
                 <li><span class="p-mcp">MCP</span>Support assistant</li>
               </ul>
             </figure>
@@ -413,7 +463,6 @@ const ldJson = structuredData({
     <script is:inline>
       (() => {
         const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (still) document.querySelectorAll('video[data-motion]').forEach(video => { video.removeAttribute('autoplay'); video.pause(); video.controls = true; });
 
         const requests = [
           { method: 'GET', name: 'List orders', url: '{{baseUrl}}/orders?status=paid', label: 'Params', req: 'status = paid\nlimit  = 20', code: 200, text: 'OK', ms: 42, size: '1.2 KB',

@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -116,6 +117,28 @@ func TestWriteVariableExportRoundTrips(t *testing.T) {
 	}
 	if values["a"] != "1" || values["b"] != "2" {
 		t.Fatalf("round-trip = %v", values)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0600 {
+			t.Fatalf("export mode: %v", info.Mode().Perm())
+		}
+		if err := os.Chmod(path, 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := writeVariableExport(path, "CI", values); err != nil {
+			t.Fatalf("overwrite: %v", err)
+		}
+		info, err = os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0600 {
+			t.Fatalf("overwritten export mode: %v", info.Mode().Perm())
+		}
 	}
 }
 

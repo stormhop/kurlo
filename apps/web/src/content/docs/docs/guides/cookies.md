@@ -5,9 +5,7 @@ description: How Kurlo stores, sends, edits, and disables cookies.
 
 Kurlo keeps a per-workspace cookie jar, similar to a browser. Cookies received from `Set-Cookie` are stored locally and attached to future matching requests unless that request disables the jar.
 
-![Cookie jar modal with an empty workspace](../../../../assets/screenshots/cookie-jar-empty.png)
-
-![Cookie jar modal with a saved domain cookie](../../../../assets/screenshots/cookie-jar-populated.png)
+![Cookie jar with the domain list and a table of saved cookies](../../../../assets/screenshots/cookie-jar-populated.png)
 
 ## How cookies are sent
 
@@ -29,20 +27,26 @@ Cookies are refreshed after normal sends and after Collection Runner runs.
 
 ## Managing cookies
 
-Open the cookie modal from the cookie icon at the bottom of the activity rail, on the far left of the window. You can:
+Open the cookie window from the cookie icon at the bottom of the activity rail, on the far left of the window. The **Manage** tab lists domains on the left and the selected domain's cookies on the right.
 
-- Filter by domain.
-- Add a domain manually.
-- Add or edit a raw cookie string.
-- Delete one cookie.
-- Delete all cookies for a domain.
-- Clear the entire jar.
+- **Find a domain** with the filter above the list. A dot next to a domain means one of its cookies has no value on this computer.
+- **Add a domain** with **+** next to the list heading; Kurlo opens a new cookie for it straight away. When the jar is empty, it offers to add a cookie for the domain of the open request.
+- **Read cookies at a glance.** The table shows each cookie's value, path, when it expires and its flags: HttpOnly, Secure, SameSite and Subdomains for cookies sent to subdomains as well. Expired cookies are struck through.
+- **Edit a cookie** by clicking its row. The editor opens under the table; `Cmd/Ctrl Enter` or **Save** stores the change.
+- **Delete** one cookie with the cross at the end of its row, every cookie of a domain with **Delete domain**, or the whole jar with **Clear all**. **Refresh** reloads the jar from disk.
 
-Raw cookie input accepts standard `Set-Cookie` style syntax:
+![Cookie editor with the Fields mode open](../../../../assets/screenshots/cookie-jar-editor.png)
+
+The editor has two modes:
+
+- **Fields** — name, value, path, expiry date, SameSite, HttpOnly, Secure and **Include subdomains**. Leave **Expires** empty for a session cookie.
+- **Raw** — the cookie as `Set-Cookie` text, for pasting from DevTools or a server log:
 
 ```text
 session=abc123; Path=/; Secure; HttpOnly; SameSite=Lax
 ```
+
+Switching modes carries the cookie across, and both follow the same rules: `SameSite=None` needs **Secure**, and a name cannot contain spaces, `=` or `;`. A `Domain=` attribute in Raw mode moves the cookie to that domain and makes it apply to subdomains.
 
 ## Disabling the jar for one request
 
@@ -58,16 +62,16 @@ This is useful when reproducing a production request exactly from a copied cURL 
 
 ## Sync cookies from your browser
 
-The **Sync Cookies** tab pairs Kurlo with a browser extension, so a session you already
+The **Sync** tab of the cookie window pairs Kurlo with a browser extension, so a session you already
 have in Chrome, Edge, Brave or Firefox is the session Kurlo sends with. It is the local
 answer to copying a `Cookie:` header out of DevTools after every login.
 
-![Sync Cookies tab waiting for a browser to connect](../../../../assets/screenshots/cookie-jar-sync.png)
+![Sync tab waiting for a browser to connect](../../../../assets/screenshots/cookie-jar-sync.png)
 
 Cookies flow one way — browser into Kurlo — and three separate gates stand in front of
 them:
 
-1. **The bridge has to be on.** *Turn on* opens a listener bound to `127.0.0.1` (port 3199
+1. **The bridge has to be on.** The switch at the top of the tab opens a listener bound to `127.0.0.1` (port 3199
    by default). Nothing listens until you ask for it.
 2. **You have to let the browser in.** The extension finds Kurlo by itself and asks to
    connect; Kurlo shows the request with a six-digit code and the extension shows the same
@@ -84,7 +88,7 @@ refused with an explanation rather than accepted and quietly ignored.
 
 ### Connecting a browser
 
-1. Turn on **Sync Cookies** in Kurlo.
+1. Turn on the switch at the top of the **Sync** tab in Kurlo.
 2. Under **Browser extension** in the same tab, pick **Chrome, Edge, Brave** or **Firefox**.
    Kurlo puts the extension in a folder and opens it. In Chrome, Edge or Brave, open
    `chrome://extensions`, turn on **Developer mode**, press **Load unpacked** and pick that
@@ -104,7 +108,7 @@ and `-firefox.zip`, for setting it up without the app.
 
 **Pair manually** in both places is the fallback for when discovery cannot work — a
 non-default port, say. The code it shows carries the port and the token, so treat it like a
-password.
+password. In Kurlo it sits under **Connection**, hidden until you press **Show code**.
 
 ### What a sync does to the jar
 
@@ -122,13 +126,13 @@ traffic are:
 
 A cookie you typed by hand for a synced domain is replaced by the browser's view of it.
 
-![Sync Cookies tab connected to Chrome, showing two allowlisted domains and recent activity](../../../../assets/screenshots/cookie-jar-sync-paired.png)
+![Sync tab connected to Chrome, showing two allowlisted domains and recent activity](../../../../assets/screenshots/cookie-jar-sync-paired.png)
 
 Cookies land in the jar of the workspace you have open, and follow you when you switch
 workspaces. The bridge closes when Kurlo quits and reopens on the next start if you left it
 on; the token is kept, so the browser reconnects on its own.
 
-**Disconnect it** mints a new token, which drops the browser immediately. Kurlo tells the
+**Disconnect** mints a new token, which drops the browser immediately. Kurlo tells the
 extension that this is what happened, so it drops its own token and asks to connect again
 rather than retrying with a key that no longer works. The extension's **Forget** does the
 same from the other side.

@@ -29,6 +29,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const grpcStreamingRequired = "This gRPC method streams; use open_session in Agent Mode."
+
+type grpcRunIteration struct {
+	index int
+	count int
+	data  map[string]string
+}
+
 type grpcCompositeSource struct {
 	reflection grpcurl.DescriptorSource
 	file       grpcurl.DescriptorSource
@@ -188,9 +196,14 @@ func (h *grpcInvokeHandler) emitEvent(eventName string, payload any) {
 }
 
 func sendGrpcRequest(requestCtx context.Context, req model.GrpcRequest, sm *state.Manager, emit grpcEventEmitter) model.GrpcResponse {
+	return sendGrpcRequestWith(requestCtx, req, sm, emit, doGrpcRequest, grpcRunIteration{})
+}
+
+func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *state.Manager, emit grpcEventEmitter, invoke func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse, iteration grpcRunIteration) model.GrpcResponse {
 	scope := beginScriptScope(sm, req.CollectionVariables)
 	ctx := scope.ctx
 	populateScriptGrpcRequestContext(ctx, req)
+	ctx.IterationData, ctx.Info.Iteration, ctx.Info.IterationCount = iteration.data, iteration.index, iteration.count
 	ctx.Send = newScriptSender(requestCtx, req.AllowSendRequest, model.HttpRequest{EnableSSLVerification: req.EnableSSLVerification})
 
 	var preResult model.ScriptResult
@@ -210,13 +223,14 @@ func sendGrpcRequest(requestCtx context.Context, req model.GrpcRequest, sm *stat
 		}
 	}
 
-	resp := doGrpcRequest(requestCtx, req, emit)
+	resp := invoke(requestCtx, req, emit)
 	resp.PreRequestResult = preResult
 
-	if req.TestScript != "" {
+	if req.TestScript != "" && resp.Error != grpcStreamingRequired {
 		testScope := beginScriptScope(sm, req.CollectionVariables)
 		testCtx := testScope.ctx
 		populateScriptGrpcRequestContext(testCtx, req)
+		testCtx.IterationData, testCtx.Info.Iteration, testCtx.Info.IterationCount = iteration.data, iteration.index, iteration.count
 		testCtx.Send = newScriptSender(requestCtx, req.AllowSendRequest, model.HttpRequest{EnableSSLVerification: req.EnableSSLVerification})
 		testCtx.Response = grpcResponseAsHTTP(resp)
 		resp.TestResult = script.RunTests(req.ScriptEngine, req.TestScript, testCtx)
@@ -230,6 +244,14 @@ func sendGrpcRequest(requestCtx context.Context, req model.GrpcRequest, sm *stat
 }
 
 func doGrpcRequest(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter) model.GrpcResponse {
+	return doGrpcRequestWithMode(ctx, req, emit, false)
+}
+
+func doUnaryGrpcRequest(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter) model.GrpcResponse {
+	return doGrpcRequestWithMode(ctx, req, emit, true)
+}
+
+func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter, unaryOnly bool) model.GrpcResponse {
 	start := time.Now()
 	resp := model.GrpcResponse{
 		Headers:  []model.KeyValue{},
@@ -258,6 +280,21 @@ func doGrpcRequest(ctx context.Context, req model.GrpcRequest, emit grpcEventEmi
 		resp.Duration = time.Since(start).Milliseconds()
 		resp.Error = err.Error()
 		return resp
+	}
+
+	if refClient != nil {
+		defer refClient.Reset()
+	}
+	if unaryOnly {
+		method, err := resolveGrpcMethod(source, req.FullMethod)
+		if err != nil {
+			resp.Error = err.Error()
+			return resp
+		}
+		if method.IsServerStreaming() || method.IsClientStreaming() {
+			resp.Error = grpcStreamingRequired
+			return resp
+		}
 	}
 
 	rawMessage := strings.TrimSpace(req.Message)
@@ -299,9 +336,6 @@ func doGrpcRequest(ctx context.Context, req model.GrpcRequest, emit grpcEventEmi
 		return nil
 	}
 	err = grpcurl.InvokeRPC(ctx, source, cc, normalizeGrpcMethodName(req.FullMethod), grpcMetadataHeaders(req), handler, nextRequest)
-	if refClient != nil {
-		refClient.Reset()
-	}
 	resp.Duration = time.Since(start).Milliseconds()
 	resp.Timestamp = time.Now().UnixMilli()
 	resp.Body = grpcResponseBody(resp.Messages)

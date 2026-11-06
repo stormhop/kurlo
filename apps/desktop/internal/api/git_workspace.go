@@ -235,6 +235,28 @@ func (a *App) GitOutgoingChanges() GitDiffResult {
 	return gitOutgoingChangesForWorkspace(fileWorkspaceStorePath())
 }
 
+type GitPullRequestResult struct {
+	URL    string `json:"url"`
+	Branch string `json:"branch"`
+	Base   string `json:"base"`
+	Error  string `json:"error,omitempty"`
+}
+
+func (a *App) GitPullRequestURL() GitPullRequestResult {
+	status := gitStatusForWorkspace(fileWorkspaceStorePath())
+	out := GitPullRequestResult{Branch: status.Branch}
+	if status.IsRepo && status.Root != "" {
+		out.Base = gitDefaultBaseBranch(status.Root, gitPushRemote(status))
+	}
+	link, err := gitPullRequestLink(status, out.Base)
+	if err != nil {
+		out.Error = err.Error()
+		return out
+	}
+	out.URL = link
+	return out
+}
+
 func (a *App) GitCommitLog(limit int) GitLogResult {
 	gitOperationMu.RLock()
 	defer gitOperationMu.RUnlock()
@@ -706,6 +728,7 @@ func (a *App) UseLocalWorkspaceStore() WorkspaceOpenResult {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root), Diagnostics: diagnostics}
 	}
+	trackOpenedWorkspace(root)
 	secrets := map[string]string{}
 	if localStore, _, err := loadLocalRequestStore(requestStorePath()); err == nil {
 		secrets = stringMap(localStore["secrets"])
@@ -950,6 +973,7 @@ func (a *App) openWorkspaceRootOpts(path string, ensureGitignore bool) Workspace
 			gitStatus = gitStatusForWorkspace(root)
 		}
 	}
+	trackOpenedWorkspace(root)
 	secrets := map[string]string{}
 	if localStore, _, err := loadLocalRequestStore(requestStorePath()); err == nil {
 		secrets = stringMap(localStore["secrets"])
@@ -980,6 +1004,7 @@ func (a *App) openLocalWorkspaceRoot(path string) WorkspaceOpenResult {
 	if err != nil {
 		return WorkspaceOpenResult{Ok: false, Root: root, Error: err.Error(), Git: localWorkspaceGitStatus(root), Diagnostics: diagnostics}
 	}
+	trackOpenedWorkspace(root)
 	secrets := map[string]string{}
 	if localStore, _, err := loadLocalRequestStore(requestStorePath()); err == nil {
 		secrets = stringMap(localStore["secrets"])

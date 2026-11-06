@@ -35,7 +35,7 @@ const readmeScreenshotPath = process.env.KURLO_README_SCREENSHOT ?? '';
 
 const DOCS_VIEWPORT = { width: 1200, height: 780 };
 const DOCS_CROP_PADDING = 26;
-const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai']);
+const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai', 'agent-approval']);
 
 async function docsDialogClip(page: Page) {
   const dialog = page.locator('[role="dialog"][aria-modal="true"]').first();
@@ -132,6 +132,9 @@ async function tourPause(page: Page, label: string) {
 async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 'browser/e2e', docsMode = Boolean(docsScreenshotDir), storeOverride: Record<string, unknown> | null = null) {
   await page.addInitScript(({ largeResponseBody, runtime, docsMode, storeOverride }) => {
     localStorage.clear();
+    localStorage.setItem('kurlo:agent-seen', '1');
+    localStorage.setItem('kurlo.disclosure.settings-ai-agents', '1');
+    localStorage.setItem('kurlo.disclosure.settings-ai-kurlo', '1');
 
     const emptyGitStatus = {
       isRepo: false,
@@ -887,7 +890,8 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
         return [];
       },
       UpsertCookie: async (workspaceId, cookie) => {
-        const next = [...(state.cookies[workspaceId] ?? []), cookie];
+        const same = (item) => item.name === cookie.name && item.domain === cookie.domain && item.path === cookie.path;
+        const next = [...(state.cookies[workspaceId] ?? []).filter(item => !same(item)), cookie];
         state.cookies[workspaceId] = next;
         return { cookies: next, error: '' };
       },
@@ -1081,6 +1085,7 @@ export default function () {
       WindowIsMaximised: async () => false,
       WindowMinimise: async () => {},
       WindowToggleMaximise: async () => {},
+      Quit: () => { state.calls.push('runtime:Quit'); },
       WindowSetLightTheme: async () => {},
       WindowSetDarkTheme: async () => {},
       WindowSetBackgroundColour: async () => {},
@@ -1421,7 +1426,15 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect.poll(async () => compactKvTable.evaluate((table) => {
       const tabContent = table.closest<HTMLElement>('.tab-content');
       if (!tabContent) return false;
-      const scrollbarColor = getComputedStyle(tabContent).scrollbarColor;
+      const style = getComputedStyle(tabContent);
+      if (CSS.supports('selector(::-webkit-scrollbar)')) {
+        const thumb = getComputedStyle(tabContent, '::-webkit-scrollbar-thumb').backgroundColor;
+        return (style.scrollbarColor === undefined || style.scrollbarColor === 'auto')
+          && style.getPropertyValue('--scroll-thumb').trim() !== ''
+          && thumb !== '' && thumb !== 'rgba(0, 0, 0, 0)'
+          && !thumb.includes('rgb(206, 212, 218)');
+      }
+      const scrollbarColor = style.scrollbarColor;
       if (scrollbarColor === undefined) return true;
       return scrollbarColor !== 'auto'
         && scrollbarColor !== ''
@@ -1543,7 +1556,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.getByLabel('Request name').fill('Cursor request');
     await page.getByLabel('Request name').press('Enter');
     await expect(page.locator('.win-controls')).toBeVisible();
-    await expect(page.locator('.save-btn:not(.revert-btn)').first()).toBeVisible();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.locator('.collection-request').filter({ hasText: 'Cursor request' })).toHaveCSS('cursor', 'default');
     await expect(page.locator('.saved-request-tab').filter({ hasText: 'Cursor request' }).getByRole('tab')).toHaveCSS('cursor', 'default');
 
@@ -1574,6 +1587,53 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.setViewportSize({ width: 1120, height: 800 });
     await expect(page.locator('.save-btn-label')).toBeHidden();
     await expectHeaderNotToOverlap();
+  });
+
+  test('add and close icons share a size and align in the tab bar', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    const expectIconSize = async (label: string, scope = page.locator('body')) => {
+      const icon = scope.getByRole('button', { name: label, exact: true }).locator('svg');
+      await expect(icon).toHaveCSS('width', '14px');
+      await expect(icon).toHaveCSS('height', '14px');
+    };
+
+    await page.getByLabel('New unsaved request').click();
+    await expectIconSize('Close tab', page.locator('.saved-request-tab.active'));
+    await expectIconSize('New unsaved request');
+    const addIcon = page.getByRole('button', { name: 'New unsaved request' }).locator('svg');
+    const closeIcon = page.locator('.saved-request-tab.active .tab-close svg');
+    const addBounds = (await addIcon.boundingBox())!;
+    const closeBounds = (await closeIcon.boundingBox())!;
+    expect(Math.abs(addBounds.y - closeBounds.y)).toBeLessThanOrEqual(1);
+    await page.getByLabel('Settings', { exact: true }).click();
+    await expectIconSize('Close settings');
+    await page.getByLabel('Close settings').click();
+    await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+    await expectIconSize('Close cookie jar');
+  });
+
+  test('sets NTLM auth on an HTTP request', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Corporate API');
+    await collectionRow(page, 'Corporate API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Corporate API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.example.test/orders');
+    await chooseRequestSection(page, 'Authorization');
+    await page.getByLabel('Auth Type').click();
+    await page.getByRole('button', { name: 'NTLM', exact: true }).click();
+    await page.getByLabel('Username').fill('EXAMPLE\\api-user');
+    await page.getByLabel('Password').fill('{{ntlmPassword}}');
+    await captureDocsScreenshot(page, 'auth-ntlm');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1))).toMatchObject({
+      auth: { type: 'ntlm', username: 'EXAMPLE\\api-user', password: '{{ntlmPassword}}' },
+    });
   });
 
   test('full click-through flow: environment, collection, requests, send, history, runner, report', async ({ page }) => {
@@ -1615,8 +1675,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     await envRows.nth(1).getByLabel('Environment variable key').fill('token');
     await envRows.nth(1).getByRole('button', { name: 'Default' }).click();
     await envRows.nth(1).getByLabel('Environment variable value').fill('secret-e2e-token');
-    await page.getByRole('button', { name: /^(Use environment|In use)$/ }).click();
-    await expect(page.getByRole('button', { name: 'In use', exact: true })).toBeVisible();
+    await expect(page.locator('.environment-select')).toContainText('Local Smoke');
+    await expect(page.locator('.environment-workspace').getByRole('button', { name: 'In use', exact: true })).toHaveCount(0);
     await tourPause(page, 'Environment created and activated');
     await waitForTransientToasts(page);
     await captureDocsScreenshot(page, 'environments-panel');
@@ -1734,6 +1794,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.locator('.settings-actions').getByRole('button', { name: 'Reset' }).click();
     for (let i = 0; i < dividerSteps; i += 1) await panelDivider.press('ArrowUp');
 
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.getByText('200 OK')).toBeVisible();
     await expectResponseTabsToFit(page);
@@ -1758,8 +1819,7 @@ test.describe('Kurlo desktop browser E2E', () => {
       try {
         await page.getByLabel('Settings', { exact: true }).click();
         await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
-        await page.locator('summary').filter({ hasText: 'Scripts' }).click();
-        await page.getByRole('button', { name: /Tengo/ }).click();
+        await page.getByRole('radio', { name: 'Tengo', exact: true }).click();
         await page.getByLabel('Close settings').click();
         await chooseRequestSection(page, 'Scripts');
         await page.locator('.script-section').getByRole('tab', { name: /^Pre-request/ }).click();
@@ -1770,8 +1830,7 @@ test.describe('Kurlo desktop browser E2E', () => {
         await captureDocsScreenshot(page, 'scripting-tengo');
         await page.getByLabel('Settings', { exact: true }).click();
         await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
-        await page.locator('summary').filter({ hasText: 'Scripts' }).click();
-        await page.getByRole('button', { name: /JavaScript/ }).click();
+        await page.getByRole('radio', { name: 'JavaScript', exact: true }).click();
         await page.getByLabel('Close settings').click();
         await page.locator('.script-section').getByRole('tab', { name: /^Tests/ }).click();
       } catch (err) { console.log('docs screenshot scripting-tengo skipped:', err); }
@@ -1835,11 +1894,12 @@ test.describe('Kurlo desktop browser E2E', () => {
     if (docsScreenshotDir) {
       try {
         await page.getByRole('button', { name: 'Cookies', exact: true }).click();
-        await page.getByPlaceholder('Type a domain name').fill('api.kurlo.test');
-        await page.getByRole('button', { name: 'Add domain' }).click();
-        await page.getByLabel('Raw cookie').fill('session=abc123; Path=/; Secure; HttpOnly; SameSite=Lax');
-        await page.locator('.cookie-raw-actions').getByRole('button', { name: 'Save' }).click();
-        await expect(page.locator('.cookie-domain-card')).toContainText('session');
+        const cookieModal = page.getByRole('dialog', { name: 'Cookies' });
+        await cookieModal.getByRole('button', { name: 'Add cookie for api.kurlo.test' }).click();
+        await cookieModal.getByRole('button', { name: 'Raw' }).click();
+        await cookieModal.getByLabel('Raw cookie').fill('session=abc123; Path=/; Secure; HttpOnly; SameSite=Lax');
+        await cookieModal.getByRole('button', { name: 'Save' }).click();
+        await expect(cookieModal.locator('.cookie-row')).toContainText('session');
         await captureDocsScreenshot(page, 'cookie-jar-populated');
         await page.getByLabel('Close cookie jar').click();
       } catch (err) {
@@ -2010,7 +2070,7 @@ test.describe('Kurlo desktop browser E2E', () => {
       } catch (err) { console.log('docs screenshot workspace-overview skipped:', err); }
       try {
         await page.locator('.global-search').click({ timeout: 4000 });
-        await expect(page.getByRole('dialog', { name: 'Search requests and commands' })).toBeVisible({ timeout: 4000 });
+        await expect(page.getByRole('dialog', { name: 'Search requests, chats and commands' })).toBeVisible({ timeout: 4000 });
         await captureDocsScreenshot(page, 'global-search');
         await page.keyboard.press('Escape');
       } catch (err) { console.log('docs screenshot global-search skipped:', err); }
@@ -2023,7 +2083,7 @@ test.describe('Kurlo desktop browser E2E', () => {
         await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
         await captureDocsScreenshot(page, 'settings-general');
       } catch (err) { console.log('docs screenshot settings-general skipped:', err); }
-      try { await page.getByRole('tab', { name: 'Theme', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-theme'); } catch (err) { console.log('docs screenshot settings-theme skipped:', err); }
+      try { await page.getByRole('tab', { name: 'Appearance', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-theme'); } catch (err) { console.log('docs screenshot settings-theme skipped:', err); }
       try { await page.getByRole('tab', { name: 'Shortcuts', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-shortcuts'); } catch (err) { console.log('docs screenshot settings-shortcuts skipped:', err); }
       try { await page.getByRole('tab', { name: 'About', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-updates-dev'); } catch (err) { console.log('docs screenshot settings-updates-dev skipped:', err); }
       try { await page.getByRole('tab', { name: 'About', exact: true }).click({ timeout: 4000 }); await captureDocsScreenshot(page, 'settings-about'); } catch (err) { console.log('docs screenshot settings-about skipped:', err); }
@@ -2036,7 +2096,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await captureDocsScreenshot(page, 'settings-proxy');
 
     await page.getByRole('tab', { name: 'General', exact: true }).click();
-    await page.locator('summary').filter({ hasText: 'Advanced data' }).click();
     await page.getByRole('button', { name: 'Export all data', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Export all data' })).toBeVisible();
     await captureDocsScreenshot(page, 'backup-export-warning');
@@ -2287,6 +2346,7 @@ test.describe('Kurlo desktop browser E2E', () => {
       await page.getByLabel('Request name').fill(name);
       await page.getByLabel('Request name').press('Enter');
       await page.getByLabel('Request URL').fill('https://api.kurlo.test/large-response');
+      await page.getByRole('button', { name: 'Save', exact: true }).click();
     }
     await page.locator('.collection-request').filter({ hasText: 'First' }).click();
     await page.getByRole('button', { name: 'Send', exact: true }).click();
@@ -2305,7 +2365,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(viewer).toBeVisible();
 
     await page.getByLabel('Settings', { exact: true }).click();
-    const settingsTheme = page.getByRole('tab', { name: 'Theme', exact: true });
+    const settingsTheme = page.getByRole('tab', { name: 'Appearance', exact: true });
     await settingsTheme.click();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('tab', { name: 'Proxy', exact: true })).toHaveAttribute('aria-selected', 'true');
@@ -2373,8 +2433,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.getByRole('dialog', { name: 'New request' })).toHaveCount(0);
     await expect(page.getByLabel('Method and protocol')).toHaveText('GET');
 
-    const palette = page.getByRole('dialog', { name: 'Search requests and commands' });
-    const input = palette.getByRole('combobox', { name: 'Search requests and commands' });
+    const palette = page.getByRole('dialog', { name: 'Search requests, chats and commands' });
+    const input = palette.getByRole('combobox', { name: 'Search requests, chats and commands' });
     await page.locator('.global-search').click();
     await input.fill('> new websocket');
     await expect(palette.getByRole('option').first()).toHaveAttribute('data-command-id', 'create-request-ws');
@@ -2413,7 +2473,7 @@ test.describe('Kurlo desktop browser E2E', () => {
       await expect(settings).toBeHidden();
       await expect(searchKeys).toHaveAttribute('aria-label', 'Ctrl+Alt+P');
       await page.keyboard.press('Control+Alt+P');
-      await expect(page.getByRole('dialog', { name: 'Search requests and commands' })).toBeVisible();
+      await expect(page.getByRole('dialog', { name: 'Search requests, chats and commands' })).toBeVisible();
       await page.keyboard.press('Escape');
     }
   });
@@ -2562,14 +2622,52 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(changelogRequests).toEqual([]);
   });
 
+  test('introduces Agent mode once after an update to 3.0 and marks the Agent button until it is opened', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      if (!sessionStorage.getItem('kurlo-e2e-agent-mode')) {
+        sessionStorage.setItem('kurlo-e2e-agent-mode', '1');
+        localStorage.setItem('kurlo:last-seen-version', '2.6.1');
+        localStorage.removeItem('kurlo:agent-seen');
+      } else {
+        localStorage.setItem('kurlo:last-seen-version', '3.0.0');
+      }
+      const app = (window as any).go.api.App;
+      app.AppInfo = async () => ({ name: 'Kurlo', version: '3.0.0', runtime: 'browser/e2e', goVersion: 'e2e' });
+    });
+    await page.goto('/');
+
+    const spotlight = page.getByRole('dialog', { name: 'Meet Agent mode' });
+    await expect(spotlight).toBeVisible();
+    await expect(spotlight).toContainText('New in Kurlo 3.0.0');
+    for (const agent of ['Kurlo agent', 'Claude Code', 'Codex']) await expect(spotlight.getByRole('listitem').filter({ hasText: agent })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /What's new in Kurlo/ })).toHaveCount(0);
+    const newDot = page.getByRole('button', { name: 'Agent', exact: true }).locator('.activity-rail-dot-new');
+    await expect(newDot).toBeVisible();
+    await captureDocsScreenshot(page, 'agent-spotlight');
+
+    await spotlight.getByRole('button', { name: 'Try Agent mode' }).click();
+    await expect(spotlight).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Agent', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(newDot).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('kurlo:agent-seen'))).toBe('1');
+    expect(await page.evaluate(() => localStorage.getItem('kurlo:last-seen-version'))).toBe('3.0.0');
+
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Agent', exact: true })).toBeVisible();
+    await page.waitForTimeout(500);
+    await expect(spotlight).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: /What's new in Kurlo/ })).toHaveCount(0);
+  });
+
   test('opens the full release notes in the system browser', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');
 
-    const palette = page.getByRole('dialog', { name: 'Search requests and commands' });
+    const palette = page.getByRole('dialog', { name: 'Search requests, chats and commands' });
     await page.locator('.global-search').click();
-    await palette.getByRole('combobox', { name: 'Search requests and commands' }).fill("> what's new");
-    await palette.getByRole('combobox', { name: 'Search requests and commands' }).press('Enter');
+    await palette.getByRole('combobox', { name: 'Search requests, chats and commands' }).fill("> what's new");
+    await palette.getByRole('combobox', { name: 'Search requests, chats and commands' }).press('Enter');
     const whatsNew = page.getByRole('dialog', { name: /What's new in Kurlo/ });
     await expect(whatsNew).toBeVisible();
     await whatsNew.getByRole('link', { name: 'Full release notes' }).click();
@@ -2586,8 +2684,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     await chooseRequestType(page, 'HTTP Request');
     await page.getByLabel('Request URL').fill('https://api.kurlo.test/users');
 
-    const palette = page.getByRole('dialog', { name: 'Search requests and commands' });
-    const input = palette.getByRole('combobox', { name: 'Search requests and commands' });
+    const palette = page.getByRole('dialog', { name: 'Search requests, chats and commands' });
+    const input = palette.getByRole('combobox', { name: 'Search requests, chats and commands' });
 
     await page.locator('.global-search').click();
     await expect(palette).toBeVisible();
@@ -2790,8 +2888,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     });
     await page.getByRole('tab', { name: 'Overview' }).click();
     await git.click();
-    await expect(git.locator('.storage-sync')).toHaveText('↑2 ↓1');
-    await expect(git.locator('.storage-sync')).toHaveAttribute('title', '2 commits to push · 1 to pull');
+    await expect(git.locator('.storage-sync [aria-hidden="true"]')).toHaveText(['↑2', '↓1']);
+    await expect(git.locator('.storage-sync .sr-only')).toHaveText('2 commits to push · 1 to pull');
     await expect(git.locator('.storage-change-count')).toHaveText('2 changed');
     await expect(git.locator('.storage-flag')).toHaveText(['merge', 'gone']);
     await git.screenshot({ path: join(tmpdir(), 'kurlo-status-git.png'), animations: 'disabled' });
@@ -3508,6 +3606,55 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(fit.right).toBeGreaterThanOrEqual(4);
   });
 
+  test('keeps a renamed request in the editor until it is saved', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-names', workspaceId: 'workspace-e2e', name: 'Names' }],
+      requests: [{ id: 'req-name', collectionId: 'col-names', name: 'Saved name', requestType: 'http', method: 'GET', url: 'https://example.test', auth: { type: 'none' } }],
+      activeId: 'req-name', openIds: ['req-name'],
+    });
+    await page.goto('/');
+    const row = page.locator('.collection-request .collection-title');
+    const name = page.getByRole('textbox', { name: 'Request name', exact: true });
+    await name.fill('Unsaved name');
+    await name.press('Enter');
+    await expect(row).toHaveText('Saved name');
+    await expect(page.getByRole('tab', { name: /Unsaved name/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Revert unsaved changes', exact: true }).click();
+    await expect(name).toHaveValue('Saved name');
+    await name.fill('Renamed request');
+    await name.press('Enter');
+    await expect(row).toHaveText('Saved name');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(row).toHaveText('Renamed request');
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.requests as Array<{ name: string }>)[0].name)).toBe('Renamed request');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-manual-name-${testInfo.project.name}.png`), animations: 'disabled' });
+  });
+
+  test('centres local storage in the status bar without clipping its text', async ({ page }, testInfo) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    const button = page.getByLabel('Open Git and storage status');
+    await expect(button).toContainText('Local storage');
+    await button.hover();
+    const layout = await button.evaluate(element => {
+      const bar = element.closest('.status-bar')!.getBoundingClientRect();
+      const button = element.getBoundingClientRect();
+      const label = element.querySelector('.storage-status-main')!;
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      const text = range.getBoundingClientRect();
+      const line = label.getBoundingClientRect();
+      const badge = element.querySelector('.storage-status-mode')!.getBoundingClientRect();
+      return { top: button.top - bar.top, bottom: bar.bottom - button.bottom, textTop: text.top - button.top, textBottom: button.bottom - text.bottom, offset: line.top + line.height / 2 - badge.top - badge.height / 2 };
+    });
+    expect(layout.top).toBeGreaterThanOrEqual(2);
+    expect(layout.bottom).toBeGreaterThanOrEqual(2);
+    expect(layout.textTop).toBeGreaterThanOrEqual(0);
+    expect(layout.textBottom).toBeGreaterThanOrEqual(0);
+    expect(Math.abs(layout.offset)).toBeLessThan(1);
+    await page.locator('.status-bar').screenshot({ path: join(tmpdir(), `kurlo-local-storage-${testInfo.project.name}.png`), animations: 'disabled' });
+  });
+
   test('keeps the branch name and change counters of the status bar on one baseline', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', true);
     await page.goto('/');
@@ -3626,7 +3773,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await captureDocsScreenshot(page, 'environment-matrix-inherited');
     await page.getByRole('radio', { name: 'Single' }).click();
 
-    await page.getByRole('button', { name: /^(Use environment|In use)$/ }).click();
+    await expect(page.locator('.environment-select')).toContainText('Staging');
     await page.getByLabel('New unsaved request').click();
     await chooseRequestType(page, 'HTTP Request');
     const url = page.getByLabel('Request URL');
@@ -3981,7 +4128,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.locator('.save-btn:not(.revert-btn)').first()).toBeDisabled();
     await page.getByLabel('Request name', { exact: true }).fill('стресс');
     await page.getByLabel('Request URL').fill('http://127.0.0.1:18080/work');
-    const request = page.locator('.collection-request-wrap').filter({ hasText: 'стресс' });
+    const request = page.locator('.collection-request-wrap').filter({ hasText: 'New Request' });
+    await expect(request).toBeVisible();
     await request.hover();
     await request.getByLabel('Request menu').click();
     await request.getByRole('button', { name: 'Load test this request' }).click();
@@ -4023,14 +4171,14 @@ test.describe('Kurlo desktop browser E2E', () => {
     });
     await page.locator('.collection-request-wrap').filter({ hasText: 'Field validation' }).click();
     const editor = page.locator('section[aria-label="Load test"]');
-    await editor.getByRole('button', { name: '+ Save a value' }).click();
+    await editor.getByRole('button', { name: 'Save a value' }).click();
     await expect(editor.getByLabel('Variable name')).toHaveAttribute('aria-invalid', 'true');
-    await editor.getByRole('button', { name: '+ Save a value' }).click();
+    await editor.getByRole('button', { name: 'Save a value' }).click();
     await editor.getByLabel('Variable name').nth(1).fill('token');
     await editor.getByRole('textbox', { name: 'Path', exact: true }).nth(1).fill('invalid');
     await expect(editor.getByRole('textbox', { name: 'Path', exact: true }).nth(1)).toHaveAttribute('aria-invalid', 'true');
-    await editor.getByRole('button', { name: '+ Add check' }).click();
-    await editor.getByRole('button', { name: '+ Add check' }).click();
+    await editor.getByRole('button', { name: 'Add check' }).click();
+    await editor.getByRole('button', { name: 'Add check' }).click();
     await editor.getByLabel('Expected value').nth(1).fill('999');
     await expect(editor.getByLabel('Expected value').nth(1)).toHaveAttribute('aria-invalid', 'true');
     await expect(editor.getByLabel('Expected value').first()).toHaveAttribute('aria-invalid', 'false');
@@ -4217,7 +4365,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     const editor = page.locator('section[aria-label="Load test"]');
     const tab = page.locator('.loadtest-tab');
     await expect(tab).toContainText('New load test');
-    await expect(tab).toHaveAttribute('title', 'Unsaved draft');
+    await expect(tab).toHaveClass(/unsaved/);
     await editor.getByLabel('Load test name').fill('Draft check');
     await expect(tab).toContainText('Draft check');
     await page.locator('.collection-request-wrap').filter({ hasText: 'List items' }).locator('.collection-request').click();
@@ -4290,7 +4438,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     const gaps = [actions.y - card.y, card.x + card.width - actions.x - actions.width, card.y + card.height - actions.y - actions.height];
     expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
     await editor.locator('.loadtest-step-card').screenshot({ path: join(tmpdir(), 'kurlo-load-step-actions.png'), animations: 'disabled' });
-    const add = editor.getByRole('button', { name: '+ Add request from collection' });
+    const add = editor.getByRole('button', { name: 'Add request from collection' });
     await add.click();
     const menu = editor.getByRole('menu', { name: 'Requests', exact: true });
     const assertContained = async (selector: string) => {
@@ -4439,11 +4587,11 @@ test.describe('Kurlo desktop browser E2E', () => {
 
     await editor.locator('.loadtest-step-main').first().click();
     await editor.getByRole('radio', { name: 'Once per user' }).click();
-    await editor.getByRole('button', { name: '+ Save a value' }).click();
+    await editor.getByRole('button', { name: 'Save a value' }).click();
     await editor.getByLabel('Variable name').fill('token');
     await editor.getByRole('textbox', { name: 'Path' }).fill('$.access_token');
 
-    await editor.getByRole('button', { name: '+ Add request from collection' }).click();
+    await editor.getByRole('button', { name: 'Add request from collection' }).click();
     await editor.getByRole('menuitem', { name: /List orders/ }).click();
     await expect(editor.locator('.loadtest-step-main')).toHaveCount(2);
     await editor.getByLabel('Wait', { exact: true }).fill('500ms');
@@ -5265,20 +5413,21 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.getByRole('button', { name: 'Cookies', exact: true }).click();
 
     const modal = page.getByRole('dialog', { name: 'Cookies' });
-    await modal.getByRole('tab', { name: /Sync cookies/i }).click();
+    await modal.getByRole('tab', { name: /^Sync/ }).click();
     await expect(modal.getByText('Cookie sync is off')).toBeVisible();
+    await expect(modal.getByRole('switch', { name: 'Cookie sync' })).not.toBeChecked();
 
-    await modal.getByRole('button', { name: 'Turn on' }).click();
+    await modal.locator('.cookie-sync-status .switch-track').click();
     await expect(modal.getByText('Waiting for a browser')).toBeVisible();
     await expect(modal.getByText(/install the extension and press Connect/)).toBeVisible();
     await captureDocsScreenshot(page, 'cookie-jar-sync');
 
-    const manualDisclosure = modal.locator('.cookie-sync-manual > summary');
-    await manualDisclosure.click();
+    await expect(modal.locator('.cookie-sync-code')).toHaveCount(0);
+    await modal.getByRole('button', { name: 'Show code' }).click();
     await expect(modal.locator('.cookie-sync-code')).toHaveText(/^kurlo-3199-/);
     await modal.getByRole('button', { name: 'Copy' }).click();
     await expect(modal.getByRole('button', { name: 'Copied' })).toBeVisible();
-    await manualDisclosure.click();
+    await modal.getByRole('button', { name: 'Hide' }).click();
 
     await modal.getByRole('button', { name: /Add api\.kurlo\.test from the open request/ }).click();
     await expect(modal.locator('.cookie-sync-chip')).toHaveText([/api\.kurlo\.test/]);
@@ -5366,15 +5515,15 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(modal.locator('.cookie-sync-chip.unreadable')).toHaveCount(1);
     await captureDocsScreenshot(page, 'cookie-jar-sync-paired');
 
-    await modal.getByRole('tab', { name: 'Manage cookies' }).click();
-    await expect(modal.locator('.cookie-domain-card')).toContainText('api.kurlo.test');
-    await expect(modal.locator('.cookie-domain-card')).toContainText('session');
+    await modal.getByRole('tab', { name: 'Manage' }).click();
+    await expect(modal.getByRole('button', { name: /^api\.kurlo\.test/ })).toHaveAttribute('aria-current', 'true');
+    await expect(modal.locator('.cookie-row')).toContainText('session');
 
-    await modal.getByRole('tab', { name: /Sync cookies/i }).click();
-    await modal.getByRole('button', { name: 'Disconnect it' }).click();
+    await modal.getByRole('tab', { name: /^Sync/ }).click();
+    await modal.getByRole('button', { name: 'Disconnect' }).click();
     await expect(modal.getByText('Waiting for a browser')).toBeVisible();
 
-    await modal.getByRole('button', { name: 'Turn off' }).click();
+    await modal.locator('.cookie-sync-status .switch-track').click();
     await expect(modal.getByText('Cookie sync is off')).toBeVisible();
     await expect(modal.locator('.cookie-sync-code')).toHaveCount(0);
   });
@@ -5398,6 +5547,31 @@ test.describe('Startup screen', () => {
     await expect(page.locator('.workspace-overview')).toHaveCount(0);
   });
 
+  for (const [startupView, agentOpen] of [['', false], ['restore', true]] as const) {
+    test(`keeps the chat list with the Agent tab after a session that ended in the agent${startupView ? ' (where you left off)' : ''}`, async ({ page }) => {
+      await installKurloBridge(page);
+      await page.addInitScript((view) => {
+        localStorage.setItem('kurlo.topView.v1', JSON.stringify({ topView: 'agent', sidebarView: 'agent' }));
+        if (view) localStorage.setItem('kurlo.startupView.v1', view);
+      }, startupView);
+      await page.goto('/');
+
+      if (agentOpen) {
+        await expect(page.locator('.agent-workspace')).toBeVisible();
+        await expect(page.getByRole('tab', { name: 'Agent', exact: true })).toHaveAttribute('aria-selected', 'true');
+        await expect(page.locator('.agent-sidebar')).toBeVisible();
+      } else {
+        await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+        await expect(page.locator('.collections-head').first()).toBeVisible();
+        await expect(page.locator('.agent-sidebar')).toHaveCount(0);
+        await page.getByRole('button', { name: 'Agent', exact: true }).click();
+        await expect(page.locator('.agent-sidebar')).toBeVisible();
+        await page.getByRole('button', { name: 'Close agent', exact: true }).click();
+        await expect(page.locator('.agent-sidebar')).toHaveCount(0);
+      }
+    });
+  }
+
   test('reopens the last screen when set to where you left off', async ({ page }) => {
     await installKurloBridge(page);
     await endLastSessionOnGit(page, 'restore');
@@ -5420,12 +5594,16 @@ test.describe('Startup screen', () => {
 
     await page.getByLabel('Settings', { exact: true }).click();
     await page.getByRole('tab', { name: 'General', exact: true }).click();
-    const card = page.locator('details.settings-card').filter({ hasText: 'On launch' });
-    await expect(card.locator('.settings-card-subtitle')).toHaveText('Request editor');
-    await card.locator('summary').click();
-    await card.getByRole('radio', { name: /Where you left off/ }).click();
-    await expect(card.getByRole('radio', { name: /Where you left off/ })).toHaveAttribute('aria-checked', 'true');
-    await expect(card.locator('.settings-card-subtitle')).toHaveText('Where you left off');
+    const panel = page.locator('#settings-panel-general');
+    const onLaunch = panel.getByRole('button', { name: /^On launch:/ });
+    await expect(onLaunch).toContainText('Request editor');
+    await expect(panel.getByText('Saving', { exact: true })).toBeVisible();
+    await expect(panel.getByRole('radio', { name: 'JavaScript', exact: true })).toBeVisible();
+    await expect(panel.getByRole('button', { name: 'Export all data', exact: true })).toBeVisible();
+    await onLaunch.click();
+    await page.getByRole('option', { name: 'Where you left off' }).click();
+    await expect(onLaunch).toContainText('Where you left off');
+    await expect(panel).toContainText('Reopens the last screen');
     expect(await page.evaluate(() => localStorage.getItem('kurlo.startupView.v1'))).toBe('restore');
   });
 
@@ -5457,7 +5635,7 @@ test.describe('Startup screen', () => {
     await page.getByLabel('Settings', { exact: true }).click();
     await page.getByRole('tab', { name: 'AI', exact: true }).click();
     const panel = page.locator('#settings-panel-ai');
-    await expect(panel.getByRole('status')).toContainText('You have 10 connections');
+    await expect(panel.getByRole('status').filter({ hasText: 'You have 10 connections' })).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Add key' })).toHaveCount(0);
     await expect(panel.getByRole('button', { name: 'Make default' })).toHaveCount(9);
 
@@ -5480,6 +5658,7 @@ test.describe('Startup screen', () => {
       const labels: Record<string, string> = { anthropic: 'Anthropic', openrouter: 'OpenRouter', openai: 'OpenAI', compatible: 'OpenAI-compatible', local: 'Local model' };
       const view = () => ({ connections: store.connections.map(connection => ({ ...connection, default: connection.id === store.connections[0]?.id })) });
       const app = window.go.api.App as Record<string, unknown>;
+      app.CodexStatus = async () => ({ installed: false, connected: false, authenticated: false, path: '', version: '', account: '', authType: '', model: '', models: [], authUrl: '', waiting: false });
       app.AiConnections = async () => view();
       app.SaveAiConnection = async (input: { id: string; kind: string; key: string; model: string; baseUrl: string }) => {
         store.saved.push({ ...input, key: input.key ? 'set' : '' });
@@ -5543,6 +5722,15 @@ test.describe('Startup screen', () => {
     expect(await page.evaluate(() => (window as unknown as { __aiStore: { saved: Array<{ kind: string; key: string; model: string }> } }).__aiStore.saved))
       .toEqual([expect.objectContaining({ kind: 'anthropic', key: 'set', model: 'claude-sonnet-4-5' })]);
     await expect(panel.getByText('Add another connection')).toBeVisible();
+    await expect(panel.getByText('Kurlo agent', { exact: true })).toBeVisible();
+    await expect(panel.getByText('Your agents', { exact: true })).toBeVisible();
+    const order = await panel.evaluate(element => {
+      const agents = element.querySelector('[aria-label="Your agents"] .disclosure-heading')!.getBoundingClientRect();
+      const list = element.querySelector('.ai-connection-list')!.getBoundingClientRect();
+      const options = element.querySelector('.ai-options')!.getBoundingClientRect();
+      return { agentsFirst: agents.bottom < list.top, optionsLast: list.bottom + 20 <= options.top };
+    });
+    expect(order).toEqual({ agentsFirst: true, optionsLast: true });
     await captureDocsScreenshot(page, 'settings-ai');
     await anthropic.getByRole('button', { name: /Model for/ }).click();
     await expect(page.getByRole('textbox', { name: 'Search models' })).toBeFocused();
@@ -5654,6 +5842,40 @@ test.describe('Interface size', () => {
     expect(await page.evaluate(() => localStorage.getItem('kurlo.uiScale.v1'))).toBeNull();
   });
 
+  test('zooms from Appearance settings', async ({ page }, testInfo) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
+    const zoom = page.getByRole('group', { name: 'Zoom' });
+    const reset = page.locator('.zoom-row').getByRole('button', { name: 'Reset' });
+    await expect(zoom.locator('output')).toHaveText('100%');
+    await expect(reset).toBeDisabled();
+
+    await zoom.getByRole('button', { name: 'Zoom in' }).click();
+    await expect(zoom.locator('output')).toHaveText('110%');
+    await expect.poll(() => rootFontSize(page)).toBe('17.6px');
+    expect(await page.evaluate(() => localStorage.getItem('kurlo.uiScale.v1'))).toBe('1.1');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-settings-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
+
+    await page.keyboard.press('Control+=');
+    await expect(zoom.locator('output')).toHaveText('125%');
+
+    for (let i = 0; i < 6; i++) {
+      const out = zoom.getByRole('button', { name: 'Zoom out' });
+      if (await out.isDisabled()) break;
+      await out.click();
+    }
+    await expect(zoom.locator('output')).toHaveText('80%');
+    await expect(zoom.getByRole('button', { name: 'Zoom out' })).toBeDisabled();
+
+    await reset.click();
+    await expect(zoom.locator('output')).toHaveText('100%');
+    await expect.poll(() => rootFontSize(page)).toBe('16px');
+    expect(await page.evaluate(() => localStorage.getItem('kurlo.uiScale.v1'))).toBeNull();
+  });
+
   test('starts at the saved size', async ({ page }) => {
     await installKurloBridge(page);
     await page.addInitScript(() => localStorage.setItem('kurlo.uiScale.v1', '1.25'));
@@ -5661,6 +5883,38 @@ test.describe('Interface size', () => {
     await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
     expect(await rootFontSize(page)).toBe('20px');
     await expect.poll(() => sidebarWidth(page)).toBe(350);
+  });
+});
+
+test.describe('Window title bar', () => {
+  for (const [runtime, ownControls] of [['linux/e2e', true], ['windows/e2e', true], ['darwin/e2e', false]] as const) {
+    test(`${ownControls ? 'draws' : 'leaves'} the window buttons on ${runtime.split('/')[0]}`, async ({ page }, testInfo) => {
+      await installKurloBridge(page, '', runtime);
+      await page.goto('/');
+      await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset.platform)).toBe(runtime.split('/')[0]);
+      const minimise = page.getByRole('button', { name: 'Minimize' });
+      if (ownControls) {
+        await expect(minimise).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Maximize' })).toBeVisible();
+        expect(await page.locator('.titlebar-drag-region').first().evaluate(el => getComputedStyle(el).getPropertyValue('--wails-draggable').trim())).toBe('drag');
+        await page.screenshot({ path: join(tmpdir(), `kurlo-titlebar-${runtime.split('/')[0]}-${testInfo.project.name}.png`), animations: 'disabled' });
+      } else {
+        await expect(minimise).toBeHidden();
+      }
+    });
+  }
+
+  test('quits with Ctrl+Q on Linux only', async ({ page }) => {
+    for (const runtime of ['linux/e2e', 'windows/e2e']) {
+      await installKurloBridge(page, '', runtime);
+      await page.goto('/');
+      await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.documentElement.dataset.platform)).toBe(runtime.split('/')[0]);
+      await page.keyboard.press('Control+q');
+      const calls = await page.evaluate(() => window.__kurloE2E.calls as string[]);
+      expect(calls.includes('runtime:Quit')).toBe(runtime === 'linux/e2e');
+    }
   });
 });
 
@@ -5904,7 +6158,7 @@ test.describe('Cookie sync extension', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Cookies', exact: true }).click();
     const modal = page.getByRole('dialog', { name: 'Cookies' });
-    await modal.getByRole('tab', { name: /Sync cookies/i }).click();
+    await modal.getByRole('tab', { name: /^Sync/ }).click();
 
     await modal.getByRole('button', { name: 'Chrome, Edge, Brave' }).click();
     await expect(modal.getByText('chrome://extensions')).toBeVisible();
@@ -5929,6 +6183,98 @@ test.describe('Cookie sync extension', () => {
       state.emit('cookies:synced', state.cookieSync);
     });
     await expect(modal.getByText('The extension is older than Kurlo')).toHaveCount(0);
+  });
+});
+
+test.describe('Cookie jar', () => {
+  test('manages cookies in a table with a fields and a raw editor', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/orders');
+    await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+    const modal = page.getByRole('dialog', { name: 'Cookies' });
+    const stored = () => page.evaluate(() => (window.__kurloE2E as any).cookies['workspace-e2e'] ?? []);
+
+    await expect(modal.getByText('No cookies yet')).toBeVisible();
+    await modal.getByRole('button', { name: 'Add cookie for api.kurlo.test' }).click();
+    const editor = modal.getByRole('form', { name: 'Cookie editor' });
+    await expect(editor.getByLabel('Name')).toBeFocused();
+    await editor.getByLabel('Name').fill('bad name');
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(editor.getByRole('alert')).toHaveText('Cookie name cannot contain "=", ";" or spaces.');
+
+    await editor.getByLabel('Name').fill('session');
+    await editor.getByLabel('Value').fill('abc');
+    await editor.getByLabel('HttpOnly').check();
+    await editor.getByLabel('Secure').check();
+    await editor.getByRole('button', { name: 'SameSite' }).click();
+    await page.getByRole('option', { name: 'Lax' }).click();
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(editor).toHaveCount(0);
+
+    const row = modal.locator('.cookie-row', { hasText: 'session' });
+    await expect(row).toContainText('abc');
+    await expect(row).toContainText('Session');
+    await expect(row.locator('.tag')).toHaveText(['HttpOnly', 'Secure', 'Lax']);
+    expect(await stored()).toEqual([expect.objectContaining({ name: 'session', value: 'abc', domain: 'api.kurlo.test', hostOnly: true, secure: true, httpOnly: true, sameSite: 'lax', session: true })]);
+
+    await modal.getByRole('button', { name: 'Edit cookie session' }).click();
+    await expect(editor.getByLabel('Value')).toHaveValue('abc');
+    await captureDocsScreenshot(page, 'cookie-jar-editor');
+    await editor.getByRole('button', { name: 'Raw' }).click();
+    await expect(editor.getByLabel('Raw cookie')).toHaveValue('session=abc; Path=/; Secure; HttpOnly; SameSite=Lax;');
+    await editor.getByLabel('Raw cookie').fill('session=xyz; Path=/; Domain=kurlo.test; Max-Age=3600; Secure; HttpOnly');
+    await editor.getByRole('button', { name: 'Fields' }).click();
+    await expect(editor.getByLabel('Value')).toHaveValue('xyz');
+    await expect(editor.getByLabel('Include subdomains')).toBeChecked();
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(editor).toHaveCount(0);
+
+    await expect(modal.getByRole('button', { name: /^kurlo\.test/ })).toHaveAttribute('aria-current', 'true');
+    const moved = modal.locator('.cookie-row', { hasText: 'session' });
+    await expect(moved).toContainText('xyz');
+    await expect(moved).toContainText('in 1 h');
+    await expect(moved.locator('.tag')).toHaveText(['HttpOnly', 'Secure', 'Subdomains']);
+    expect(await stored()).toEqual([expect.objectContaining({ name: 'session', value: 'xyz', domain: 'kurlo.test', hostOnly: false, session: false })]);
+
+    await page.evaluate(() => {
+      (window.__kurloE2E as any).cookies['workspace-e2e'].push({
+        name: 'refresh', value: '{{kurloSecret:cookie.refresh}}', domain: 'auth.kurlo.test', path: '/', expiresAt: 0, session: true,
+        secure: false, httpOnly: false, sameSite: '', hostOnly: true, createdAt: Date.now(), updatedAt: Date.now(),
+      });
+    });
+    await modal.getByRole('button', { name: 'Refresh' }).click();
+    const authDomain = modal.getByRole('button', { name: /^auth\.kurlo\.test/ });
+    await expect(authDomain.locator('.cookie-domain-warning')).toHaveCount(1);
+    await authDomain.click();
+    await expect(modal.locator('.cookie-row', { hasText: 'refresh' })).toContainText('no value');
+    await modal.getByRole('button', { name: 'Edit cookie refresh' }).click();
+    await expect(editor.getByText(/is not on this computer/)).toBeVisible();
+    await editor.getByRole('button', { name: 'Cancel' }).click();
+
+    await modal.getByLabel('Filter domains').fill('auth');
+    await expect(modal.locator('.cookie-domain-item')).toHaveCount(1);
+    await modal.getByLabel('Filter domains').fill('');
+
+    await modal.getByRole('button', { name: 'Add domain' }).click();
+    await modal.getByLabel('New domain').fill('https://Shop.Kurlo.test/cart');
+    await modal.getByLabel('New domain').press('Enter');
+    await expect(modal.getByRole('button', { name: /^shop\.kurlo\.test/ })).toHaveAttribute('aria-current', 'true');
+    await expect(editor.getByLabel('Name')).toHaveValue('Cookie_1');
+    await editor.getByRole('button', { name: 'Cancel' }).click();
+    await expect(modal.getByText('No cookies for shop.kurlo.test')).toBeVisible();
+    await modal.getByRole('button', { name: 'Delete domain' }).click();
+    await expect(modal.locator('.cookie-domain-item')).toHaveCount(2);
+
+    await modal.getByRole('button', { name: /^kurlo\.test/ }).click();
+    await modal.getByRole('button', { name: 'Delete cookie session' }).click();
+    await expect(modal.locator('.cookie-domain-item')).toHaveCount(1);
+    await modal.getByRole('button', { name: 'Clear all' }).click();
+    await expect(modal.getByText('No cookies yet')).toBeVisible();
+    expect(await stored()).toEqual([]);
   });
 });
 
@@ -5996,6 +6342,48 @@ test.describe('External workspace changes', () => {
     await expect(page.getByTestId('test-script-editor')).toContainText('added by an agent');
     await expect(page.locator('.request-editor-tabs-shell').getByRole('tab', { name: 'Scripts' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('tab', { name: /^Tests/ })).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
+test.describe('Agent workspace changes', () => {
+  test('load quietly and keep an unsaved draft', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const store = window.__kurloE2E.store as Record<string, unknown>;
+      store.collections = [{ id: 'collection-ext', workspaceId: 'workspace-e2e', name: 'Orders', filesystemName: 'Orders' }];
+      store.requests = [{ id: 'req-ext', name: 'Create order', collectionId: 'collection-ext', collection: 'Orders', folderPath: [], requestType: 'http', method: 'POST', url: 'https://api.example.test/orders' }];
+      store.activeId = 'req-ext';
+      store.openIds = ['req-ext'];
+    });
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.example.test/draft-in-progress');
+    await page.evaluate(() => {
+      const e2e = window.__kurloE2E as unknown as { store: { requests: Array<Record<string, unknown>> }; emit: (name: string, payload: unknown) => void };
+      const added = { id: 'req-agent', name: 'Added by agent', collectionId: 'collection-ext', collection: 'Orders', folderPath: [], requestType: 'http', method: 'GET', url: 'https://api.example.test/agent' };
+      e2e.store.requests.push(added);
+      const app = window.go!.api!.App as Record<string, (payload: string) => Promise<unknown>>;
+      const save = app.SaveRequestStoreWithError;
+      app.SaveRequestStoreWithError = async (payload: string) => {
+        const result = await save(payload);
+        if (!e2e.store.requests.some(request => request.id === added.id)) e2e.store.requests.push(added);
+        return result;
+      };
+      e2e.emit('kurlo:workspace-changed', 'changed by the Kurlo agent');
+    });
+    await expect(page.locator('.sidebar')).toContainText('Added by agent');
+    await expect(page.getByLabel('Request URL')).toHaveValue('https://api.example.test/draft-in-progress');
+    await expect(page.getByText(/Workspace refreshed|is paused/)).toHaveCount(0);
+    await expect(page.locator('.saved-request-tab-btn')).toHaveCount(3);
+    await expect(page.getByRole('tab', { name: /Create order/ })).toBeVisible();
+  });
+
+  test('still report a change made by another program', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.evaluate(() => window.__kurloE2E.emit('kurlo:workspace-changed', 'files changed outside Kurlo'));
+    await expect(page.getByText('Workspace refreshed (files changed outside Kurlo).')).toBeVisible();
   });
 });
 
@@ -6099,7 +6487,7 @@ test.describe('GraphQL explorer', () => {
     await page.goto('/');
 
     const rows = page.locator('.graphql-explorer-field');
-    await expect(rows.first()).toBeVisible();
+    await expect.poll(() => rows.count()).toBeGreaterThan(0);
     expect(await rows.count()).toBe(20);
     const layout = await rows.evaluateAll(buttons => buttons.map(button => {
       const box = button.getBoundingClientRect();
@@ -6254,7 +6642,7 @@ test.describe('Send races', () => {
   });
 });
 
-test.describe('Scale', () => {
+test.describe('Scale', { tag: '@scale' }, () => {
   test('stays responsive with ten thousand requests, 200-deep folders and unicode names', async ({ page }) => {
     test.setTimeout(180_000);
     await installKurloBridge(page);
@@ -6427,4 +6815,2291 @@ test.describe('UI locale', () => {
     await expect(whatsNew).not.toContainText(/октябр|сентябр|ноябр|г\./);
     await expect(whatsNew).toContainText(/(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}/);
   });
+});
+
+test.describe('Agent', () => {
+  const agentStore = {
+    collections: [{ id: 'col-shop', workspaceId: 'workspace-e2e', name: 'Shop API' }],
+    requests: [
+      { id: 'req-orders', collectionId: 'col-shop', collection: 'Shop API', folderPath: ['Orders'], name: 'List orders', requestType: 'http', method: 'GET', url: '{{baseUrl}}/orders', auth: { type: 'none' } },
+    ],
+    environments: [{ id: 'env-local', workspaceId: 'workspace-e2e', name: 'Local', values: [{ id: 1, key: 'baseUrl', value: 'http://localhost:8080', enabled: true }] }],
+  };
+
+  async function installAgentBridge(page: Page, connections: unknown[]) {
+    await page.addInitScript((connections) => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+      const usage = (input: number, output: number) => ({ input, output, cacheRead: 0, cacheWrite: 0, reasoning: 0 });
+      const chats: Array<Record<string, unknown>> = [];
+      const sent: unknown[] = [];
+      const answers: Array<{ id: string; decision: string }> = [];
+      let release: (() => void) | null = null;
+      e2e.agentSent = sent;
+      e2e.agentAnswers = answers;
+      app.AiConnections = async () => ({ connections });
+      app.AgentScenarios = async () => ([
+        { name: 'debug_last_failure', title: 'Why did my request fail?', description: 'Explain the last failure.', arguments: [] },
+        { name: 'cover_endpoint', title: 'Cover one endpoint', description: 'Add a request with tests.', arguments: [{ name: 'endpoint', description: '', required: true }] },
+        { name: 'check_collection', title: 'Run and check a collection', description: 'Run a collection and explain failures.', arguments: [] },
+      ]);
+      const summary = (chat: Record<string, unknown>) => ({ id: chat.id, title: chat.title, workspaceId: chat.workspaceId, createdAt: chat.createdAt, updatedAt: chat.updatedAt, archivedAt: chat.archivedAt });
+      app.AgentChats = async (workspaceId: string) => chats.filter(chat => chat.workspaceId === workspaceId).map(summary);
+      app.SetAgentChatArchived = async (id: string, workspaceId: string, archived: boolean) => {
+        const chat = chats.find(item => item.id === id && item.workspaceId === workspaceId);
+        if (!chat) throw new Error('Chat not found');
+        chat.archivedAt = archived ? Date.now() : undefined;
+        if (!archived) chat.updatedAt = Date.now();
+        return summary(chat);
+      };
+      app.ExportAgentChat = async (id: string, workspaceId: string) => {
+        e2e.agentExport = { id, workspaceId };
+        return '/tmp/agent-chat.md';
+      };
+      app.AgentChat = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
+      app.AgentPendingApprovals = async () => [];
+      const renames: unknown[] = [];
+      e2e.agentRenames = renames;
+      app.RenameAgentChat = async (id: string, title: string) => {
+        renames.push([id, title]);
+        const chat = chats.find(item => item.id === id);
+        if (chat) chat.title = title;
+        return { ok: true };
+      };
+      app.DeleteAgentChat = async (id: string) => {
+        const index = chats.findIndex(chat => chat.id === id);
+        if (index >= 0) chats.splice(index, 1);
+        return { ok: true };
+      };
+      app.AnswerAgentApproval = async (id: string, decision: string) => {
+        answers.push({ id, decision });
+        e2e.emit('agent:approval-closed', { id, chatId: 'chat-1', decision });
+        release?.();
+        return { ok: true };
+      };
+      app.TestAiConnection = async () => ({ ok: true, models: [{ id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', recommended: true, weakTools: false }, { id: 'claude-opus-4-1', name: 'Claude Opus 4.1', recommended: true, weakTools: false }] });
+      app.SaveAiConnection = async () => { e2e.aiConnectionSaves = ((e2e.aiConnectionSaves as number) ?? 0) + 1; return { connections }; };
+      app.SendAgentMessage = async (input: Record<string, string>) => {
+        sent.push(structuredClone(input));
+        const sessionId = 'chat-1';
+        const turnId = input.turnId;
+        const listCall = { type: 'tool_use', id: 'call_1', name: 'get_request', input: '{"request":"Shop API/Orders/List orders"}' };
+        const listResult = { type: 'tool_result', id: 'call_1', name: 'get_request', server: 'Kurlo', text: '{"id":"req-orders","method":"GET"}' };
+        const batch = input.text === 'Review batch changes';
+        const writeTool = batch ? 'apply_changes' : 'save_request';
+        const saveCall = { type: 'tool_use', id: 'call_2', name: writeTool, input: '{"collection":"Shop API","name":"List orders","testScript":"pm.test(\\"status is 200\\")"}' };
+        const saveResult = { type: 'tool_result', id: 'call_2', name: writeTool, server: 'Kurlo', text: '{"id":"req-orders","path":"Shop API/Orders/List orders","created":false}' };
+        const finalText = 'Added a **status is 200** test to List orders.';
+        e2e.emit('ai:deltas', { sessionId, turnId, deltas: [
+          { sessionId, step: 0, index: 0, type: 'text', text: 'Let me look at the request first.' },
+          { sessionId, step: 0, index: 1, type: 'tool_use', id: 'call_1', name: 'get_request', input: listCall.input },
+        ] });
+        e2e.emit('ai:step', { sessionId, turnId, step: { index: 0, blocks: [{ type: 'text', text: 'Let me look at the request first.' }, listCall], toolResults: [], stopReason: 'tool_use', model: 'claude-sonnet-4-5', usage: usage(900, 40), hasUsage: true, http: { statusCode: 200, status: '200 OK', headers: [] } } });
+        e2e.emit('ai:tool', { sessionId, turnId, step: 0, block: listResult });
+        e2e.emit('ai:step', { sessionId, turnId, step: { index: 1, blocks: [saveCall], toolResults: [], stopReason: 'tool_use', model: 'claude-sonnet-4-5', usage: usage(1100, 60), hasUsage: true, http: { statusCode: 200, status: '200 OK', headers: [] } } });
+        const before = 'version: 1\nrequest:\n    id: req-orders\n    name: List orders\n    url: \'{{baseUrl}}/orders\'\n';
+        const after = before + '    testScriptJs: |\n        pm.test("status is 200", () => pm.response.to.have.status(200))\n';
+        const changes = [{ path: 'workspaces/Main/collections/Shop-API/requests/List-orders.yml', before, after }];
+        if (batch) changes.push({ path: 'Profile globals', before: '[]', after: '[\n  { "key": "baseUrl", "value": "https://example.test" }\n]' });
+        await new Promise<void>(resolve => {
+          release = resolve;
+          e2e.emit('agent:approval', { id: 'approval-1', chatId: sessionId, turnId, toolUseId: 'call_2', tool: writeTool, kind: 'write', arguments: saveCall.input, reason: batch ? 'Review all changes in this batch.' : 'Changes the workspace files.', changes });
+        });
+        e2e.emit('ai:tool', { sessionId, turnId, step: 1, block: saveResult });
+        e2e.emit('ai:step', { sessionId, turnId, step: { index: 2, blocks: [{ type: 'text', text: finalText }], toolResults: [], stopReason: 'end_turn', model: 'claude-sonnet-4-5', usage: usage(1300, 30), hasUsage: true, http: { statusCode: 200, status: '200 OK', headers: [] } } });
+        const now = Date.now();
+        const existing = chats.find(chat => chat.id === sessionId);
+        const messages = [
+          ...((existing?.messages as unknown[]) ?? []),
+          { role: 'user', blocks: [{ type: 'text', text: input.text }] },
+          { role: 'assistant', blocks: [{ type: 'text', text: 'Let me look at the request first.' }, listCall] },
+          { role: 'tool', blocks: [listResult] },
+          { role: 'assistant', blocks: [saveCall] },
+          { role: 'tool', blocks: [saveResult] },
+          { role: 'assistant', blocks: [{ type: 'text', text: finalText }] },
+        ];
+        const chat = { id: sessionId, workspaceId: input.workspaceId, title: existing?.title ?? input.text.slice(0, 60), workspace: '/e2e', createdAt: existing?.createdAt ?? now, updatedAt: now, collection: input.collection, environment: input.environment, connectionId: input.connectionId, model: '', messages, usage: usage(3300, 130), allowedTools: [] };
+        if (existing) Object.assign(existing, chat);
+        else chats.push(chat);
+        return { chat: structuredClone(chat), messages: messages.slice(-6), steps: [], text: finalText, usage: usage(3300, 130), hasUsage: true, warnings: [] };
+      };
+    }, connections);
+  }
+
+  const connection = { id: 'c1', kind: 'anthropic', label: 'Anthropic', baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-5', hasKey: true, keyHint: 'sk-ant-…XYZ', default: true, provider: 'anthropic' };
+
+  for (const driver of ['', 'codex']) {
+    test(`keeps ${driver || 'Kurlo'} chat controls inside narrow and short windows`, async ({ page }, testInfo) => {
+      const collectionName = 'Orders and payments integration with a very long collection name';
+      const environmentName = 'Production staging environment with a very long name';
+      const modelName = 'A very long model name with extended context and reasoning';
+      await installKurloBridge(page, '', 'browser/e2e', false, {
+        ...agentStore,
+        collections: [{ ...agentStore.collections[0], name: collectionName }],
+        environments: [{ ...agentStore.environments[0], name: environmentName }],
+      });
+      await installAgentBridge(page, driver ? [] : [{ ...connection, model: modelName }]);
+      await page.addInitScript(({ driver, modelName }) => {
+        const app = window.go!.api!.App as Record<string, unknown>;
+        const usage = { input: 3000, output: 100, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+        if (driver) app.CodexStatus = async () => ({ installed: true, connected: true, authenticated: true, path: '/test/codex', account: 'Test account', model: modelName, models: [{ id: modelName, name: modelName, recommended: true, weakTools: false, efforts: ['low', 'medium', 'xhigh'], defaultEffort: 'xhigh' }] });
+        const chat = { id: 'long-chat', workspaceId: 'workspace-e2e', driver, title: 'A long saved conversation title that should leave room for its actions', collection: '', environment: '', model: modelName, messages: [{ role: 'user', blocks: [{ type: 'text', text: 'Explain this response' }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Response details\n\n' + 'A'.repeat(200) }, { type: 'tool_use', id: 'pending-write', name: 'save_request', input: '{}' }] }], usage, allowedTools: [], createdAt: Date.now(), updatedAt: Date.now() };
+        app.AgentChats = async (workspaceId: string) => workspaceId === chat.workspaceId ? [chat] : [];
+        app.AgentChat = async () => structuredClone(chat);
+        app.AgentPendingApprovals = async () => [{ id: 'narrow-approval', chatId: chat.id, toolUseId: 'pending-write', tool: 'save_request', kind: 'write', reason: 'Add tests to the selected request.', arguments: '{}', changes: [{ path: 'workspaces/Shop/collections/A-very-long-collection-name/requests/A-very-long-request-name.yml', before: 'name: Orders\n', after: 'name: Orders\ntestScriptJs: ' + 'x'.repeat(200) + '\n' }] }];
+      }, { driver, modelName });
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Agent', exact: true }).click();
+      const workspace = page.locator('.agent-workspace');
+      const main = workspace.locator('.agent-main');
+      const composer = page.getByRole('textbox', { name: 'Message the agent' });
+      const assertFits = async (scope: Locator, selectors: string) => {
+        const overflow = await scope.evaluate((element, selectors) => {
+          const bounds = element.getBoundingClientRect();
+          return [...element.querySelectorAll<HTMLElement>(selectors)].filter(item => {
+            const rect = item.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 && (rect.left < bounds.left - 1 || rect.right > bounds.right + 1 || rect.bottom > window.innerHeight + 1);
+          }).map(item => item.getAttribute('aria-label') || item.className);
+        }, selectors);
+        expect(overflow).toEqual([]);
+      };
+      await main.getByRole('button', { name: /^Collection:/ }).click();
+      await page.getByRole('option', { name: collectionName, exact: true }).click();
+      await main.getByRole('button', { name: /^Environment:/ }).click();
+      await page.getByRole('option', { name: environmentName, exact: true }).click();
+      for (const size of [{ width: 1120, height: 640 }, { width: 900, height: 540 }, { width: 760, height: 480 }, { width: 640, height: 420 }]) {
+        await page.setViewportSize(size);
+        await assertFits(main, '.agent-composer-box, .agent-composer-bar button, .agent-composer-bar .agent-picker-trigger');
+        const compactChip = main.locator('.agent-composer-chip.compact').first();
+        if (await compactChip.count()) {
+          await compactChip.hover();
+          await expect(compactChip.locator('.agent-composer-chip-icon')).toBeVisible();
+          expect(await compactChip.evaluate(chip => getComputedStyle(chip.querySelector('.agent-composer-chip-icon')!).zIndex)).toBe('1');
+          await compactChip.screenshot({ path: join(tmpdir(), `kurlo-chip-hover-${driver || 'kurlo'}-${size.width}.png`) });
+        }
+        const actionOverlap = await main.locator('.agent-composer-actions').evaluate(element => {
+          const buttons = [...element.querySelectorAll<HTMLButtonElement>('.agent-picker-trigger, .agent-effort .app-select-trigger, .agent-send')].map(button => button.getBoundingClientRect());
+          return buttons.slice(1).some((button, index) => button.left < buttons[index].right - 1);
+        });
+        expect(actionOverlap).toBe(false);
+        const barOverlap = await main.locator('.agent-composer-bar').evaluate(bar => {
+          const left = [...bar.querySelectorAll<HTMLElement>('.agent-composer-context > *')].map(item => item.getBoundingClientRect()).filter(rect => rect.width > 0);
+          const right = [...bar.querySelectorAll<HTMLElement>('.agent-composer-actions > *')].map(item => item.getBoundingClientRect()).filter(rect => rect.width > 0);
+          return left.some(a => right.some(b => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1));
+        });
+        expect(barOverlap).toBe(false);
+        const squeezed = await main.locator('.agent-composer-chip').evaluateAll(chips => chips.filter(chip => {
+          if (chip.classList.contains('compact')) return chip.querySelector('.agent-composer-chip-icon')!.getBoundingClientRect().width === 0;
+          const label = chip.querySelector<HTMLElement>('.app-select-trigger > span')!;
+          return chip.getBoundingClientRect().width < Number.parseFloat(getComputedStyle(chip).maxWidth) - 1 && label.scrollWidth > label.clientWidth + 1;
+        }).length);
+        expect(squeezed).toBe(0);
+        const overflow = await main.evaluate(element => element.scrollWidth - element.clientWidth);
+        expect(overflow).toBeLessThanOrEqual(1);
+        expect(await workspace.locator('.agent-chat').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+        await main.getByRole('button', { name: /^Agent:/ }).click();
+        const picker = page.getByRole('dialog', { name: 'Choose agent and model' });
+        await assertFits(main, '.agent-picker-panel');
+        expect((await picker.boundingBox())!.y).toBeGreaterThanOrEqual((await workspace.boundingBox())!.y - 1);
+        await page.keyboard.press('Escape');
+        await main.getByRole('button', { name: 'Templates', exact: true }).click();
+        await assertFits(main, '.agent-templates-menu');
+        await page.getByRole('menu', { name: 'Templates' }).getByRole('menuitem').first().click();
+        await expect(composer).not.toHaveValue('');
+        await composer.fill('');
+        await page.screenshot({ path: join(tmpdir(), `kurlo-narrow-${driver || 'kurlo'}-${size.width}-${testInfo.project.name}.png`), animations: 'disabled' });
+      }
+      await page.setViewportSize({ width: 900, height: 540 });
+      await page.locator('.agent-chat-main').click();
+      await expect(page.locator('.agent-approval')).toBeVisible();
+      expect((await page.locator('.agent-approval').boundingBox())!.height).toBeGreaterThan(120);
+      await page.locator('.agent-approval').getByRole('button', { name: 'Reject', exact: true }).scrollIntoViewIfNeeded();
+      await assertFits(workspace, '.agent-header input, .agent-header button, .agent-composer-box, .agent-approval button');
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.getByRole('button', { name: 'Toggle chat details' }).click();
+      const details = page.getByRole('complementary', { name: 'Chat details', exact: true });
+      await expect(details).toBeVisible();
+      expect(await page.getByRole('dialog').count()).toBe(0);
+      const docked = await workspace.evaluate(element => {
+        const main = element.querySelector('.agent-main')!.getBoundingClientRect();
+        const panel = element.querySelector('.agent-context-panel')!.getBoundingClientRect();
+        return { sideBySide: main.right <= panel.left + 1, mainWidth: main.width };
+      });
+      expect(docked.sideBySide).toBe(true);
+      expect(docked.mainWidth).toBeGreaterThan(400);
+      await page.screenshot({ path: join(tmpdir(), `kurlo-docked-details-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
+      await page.setViewportSize({ width: 900, height: 540 });
+      await expect(main).toBeHidden();
+      await expect(details).toBeVisible();
+      await expect(page.locator('.agent-details-scrim')).toHaveCount(0);
+      await page.getByRole('button', { name: 'Toggle chat details' }).click();
+      await page.getByRole('button', { name: 'Toggle chat details' }).click();
+      await expect(details.getByRole('button', { name: 'Close chat details' })).toBeFocused();
+      await page.screenshot({ path: join(tmpdir(), `kurlo-narrow-details-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
+      await page.keyboard.press('Escape');
+      await expect(details).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Toggle chat details' })).toBeFocused();
+      await page.getByRole('button', { name: 'Toggle chat details' }).click();
+      await page.setViewportSize({ width: 1600, height: 900 });
+      await expect(page.getByRole('complementary', { name: 'Chat details' })).toBeVisible();
+      await expect(page.locator('.agent-details-scrim')).toHaveCount(0);
+      await assertFits(main, '.agent-composer-box, .agent-composer-bar button');
+      await page.getByRole('button', { name: 'Close chat details' }).click();
+      await page.setViewportSize({ width: 1120, height: 620 });
+      await page.evaluate(() => { document.documentElement.style.fontSize = '20px'; });
+      await composer.fill('A long prompt that wraps. '.repeat(100));
+      await assertFits(main, '.agent-composer-box, .agent-composer-bar button');
+      await expect(composer).toHaveCSS('overflow-y', 'auto');
+      await page.screenshot({ path: join(tmpdir(), `kurlo-narrow-zoom-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
+    });
+  }
+
+  test('runs turns in two chats at once and keeps each chat its own controls', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+      const chats: Array<Record<string, unknown>> = [];
+      const releases: Record<string, () => void> = {};
+      const sent: unknown[] = [];
+      e2e.parallelSent = sent;
+      e2e.release = (id: string) => releases[id]?.();
+      const usage = { input: 10, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+      app.AgentChats = async () => chats.map(chat => ({ id: chat.id, title: chat.title, workspaceId: chat.workspaceId, createdAt: chat.createdAt, updatedAt: chat.updatedAt }));
+      app.AgentChat = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
+      app.AgentChatPage = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
+      app.SendAgentMessage = async (input: Record<string, unknown>) => {
+        sent.push(structuredClone(input));
+        const id = (input.chatId as string) || `chat-${chats.length + 1}`;
+        const now = Date.now();
+        let chat = chats.find(item => item.id === id);
+        if (!chat) {
+          chat = { id, workspaceId: input.workspaceId, title: input.text, createdAt: now, updatedAt: now, collection: '', environment: '', connectionId: 'c1', model: '', messages: [], usage, allowedTools: [] };
+          chats.push(chat);
+        }
+        e2e.emit('ai:deltas', { sessionId: id, turnId: input.turnId, deltas: [{ sessionId: id, step: 0, index: 0, type: 'text', text: `Working on ${input.text}` }] });
+        await new Promise<void>(resolve => { releases[id] = resolve; });
+        const messages = [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: `Done: ${input.text}` }] }];
+        (chat.messages as unknown[]).push(...messages);
+        chat.updatedAt = Date.now();
+        return { chat: structuredClone(chat), messages, steps: [], text: `Done: ${input.text}`, usage, hasUsage: true, warnings: [] };
+      };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await composer.fill('first task');
+    await composer.press('Enter');
+    await expect(page.getByText('Working on first task')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeVisible();
+    await page.locator('.agent-sidebar').getByRole('button', { name: /New/ }).first().click();
+    await expect(page.getByRole('button', { name: 'Stop the agent' })).toHaveCount(0);
+    await composer.fill('second task');
+    await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
+    await composer.press('Enter');
+    await expect(page.getByText('Working on second task')).toBeVisible();
+    await expect(page.locator('.agent-chat-live')).toHaveCount(2);
+    await page.evaluate(() => (window.__kurloE2E as unknown as { release: (id: string) => void }).release('chat-1'));
+    await expect(page.locator('.agent-chat-live')).toHaveCount(1);
+    await expect(page.getByText('Working on second task')).toBeVisible();
+    await page.evaluate(() => (window.__kurloE2E as unknown as { release: (id: string) => void }).release('chat-2'));
+    await expect(page.getByText('Done: second task')).toBeVisible();
+    await page.locator('.agent-sidebar').getByRole('button', { name: /first task/ }).click();
+    await expect(page.getByText('Done: first task')).toBeVisible();
+    expect(await page.evaluate(() => ((window.__kurloE2E as unknown as { parallelSent: unknown[] }).parallelSent).length)).toBe(2);
+  });
+
+  test('sends approval mode, trusted hosts and budgets and shows a plan for approval', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      localStorage.setItem('kurlo.agentDetails.v1', '1');
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+      const sent: unknown[] = [];
+      e2e.planSent = sent;
+      app.SendAgentMessage = async (input: Record<string, unknown>) => {
+        sent.push(structuredClone(input));
+        const sessionId = 'chat-plan';
+        const plan = { summary: 'Cover the orders endpoint.', steps: ['Save a request for POST /orders', 'Add a status test', 'Save the example'], calls: [{ tool: 'save_request', target: 'Shop API/Orders/Create order' }, { tool: 'send_request', target: 'http://localhost:8080/orders' }] };
+        await new Promise<void>(resolve => {
+          e2e.planRelease = resolve;
+          e2e.emit('agent:approval', { id: 'plan-1', chatId: sessionId, turnId: input.turnId, toolUseId: 'call_plan', tool: 'propose_plan', kind: 'write', arguments: JSON.stringify(plan), reason: plan.summary, changes: [], plan });
+        });
+        const chat = { id: sessionId, workspaceId: input.workspaceId, title: 'Plan', createdAt: Date.now(), updatedAt: Date.now(), collection: '', environment: '', connectionId: 'c1', model: '', messages: [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Planned.' }] }], usage: { input: 1200, output: 80, cacheRead: 300, cacheWrite: 0, reasoning: 0, cost: 0.0123 }, allowedTools: [], mode: input.mode, allowedHosts: input.allowedHosts, budgetTokens: input.budgetTokens, budgetRequests: input.budgetRequests, requestsSent: 2, contextTokens: 3000, contextWindow: 200000 };
+        return { chat, messages: chat.messages, steps: [], text: 'Planned.', usage: chat.usage, hasUsage: true, warnings: [] };
+      };
+      app.AnswerAgentApproval = async (id: string, decision: string) => {
+        e2e.planAnswer = { id, decision };
+        e2e.emit('agent:approval-closed', { id, chatId: 'chat-plan', decision });
+        (e2e.planRelease as () => void)?.();
+        return { ok: true };
+      };
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const details = page.getByRole('complementary', { name: 'Chat details', exact: true });
+    if (!(await details.isVisible())) await page.getByRole('button', { name: 'Toggle chat details' }).click();
+    await page.locator('.agent-composer').getByRole('button', { name: /^Approvals:/ }).click();
+    await page.getByRole('option', { name: 'Auto', exact: true }).click();
+    const permissions = details.getByRole('region', { name: 'Permissions' });
+    await expect(permissions.getByRole('button', { name: /Permissions/ })).toContainText('Auto · 2 hosts');
+    await permissions.getByRole('button', { name: /Permissions/ }).click();
+    await expect(permissions).toContainText('Requests and workspace changes run on their own');
+    const hosts = details.getByRole('textbox', { name: 'Trusted hosts' });
+    await expect(hosts).toHaveValue('localhost, 127.0.0.1');
+    await hosts.fill('localhost, *.staging.example.com');
+    await hosts.press('Tab');
+    await details.getByRole('region', { name: 'Budget' }).getByRole('button', { name: /Budget/ }).click();
+    const tokenBudget = details.getByRole('textbox', { name: 'Token budget' });
+    await tokenBudget.fill('3.213123131231231231');
+    await tokenBudget.press('Tab');
+    await expect(tokenBudget).toHaveValue('1000000000');
+    await tokenBudget.fill('200000');
+    await tokenBudget.press('Tab');
+    await details.getByRole('textbox', { name: 'Request budget' }).fill('25');
+    await details.getByRole('textbox', { name: 'Request budget' }).press('Tab');
+    await expect(details.getByRole('region', { name: 'Budget' }).getByRole('button', { name: /Budget/ })).toContainText('/ 200k');
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await composer.fill('Cover POST /orders');
+    await composer.press('Enter');
+    const card = page.locator('.agent-approval');
+    await expect(card).toContainText('Follow this plan?');
+    await expect(page.locator('.agent-user-row.editing')).toHaveCount(0);
+    await expect(card.locator('.agent-plan-steps li')).toHaveCount(3);
+    await expect(card).toContainText('Shop API/Orders/Create order');
+    await expect(card.getByRole('button', { name: 'Allow for this chat' })).toHaveCount(0);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-plan-${testInfo.project.name}.png`), animations: 'disabled' });
+    await card.getByRole('button', { name: 'Approve plan' }).click();
+    await expect(page.getByText('Planned.')).toBeVisible();
+    const input = await page.evaluate(() => ((window.__kurloE2E as unknown as { planSent: Array<Record<string, unknown>> }).planSent)[0]);
+    expect(input.mode).toBe('auto');
+    expect(input.allowedHosts).toEqual(['localhost', '*.staging.example.com']);
+    expect(input.budgetTokens).toBe(200000);
+    expect(input.budgetRequests).toBe(25);
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { planAnswer: unknown }).planAnswer)).toEqual({ id: 'plan-1', decision: 'allow' });
+    await expect(details).toContainText('2 requests');
+    await expect(details).toContainText('$0.01');
+    await expect(details.getByText('Context (last request)')).toBeVisible();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-permissions-${testInfo.project.name}.png`), animations: 'disabled' });
+  });
+
+  test('edits an earlier message and branches a chat from it', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      const usage = { input: 10, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+      const base = { workspaceId: 'workspace-e2e', createdAt: Date.now(), updatedAt: Date.now(), collection: '', environment: '', connectionId: 'c1', model: '', usage, allowedTools: [] };
+      const chats: Array<Record<string, unknown>> = [{ ...base, id: 'chat-edit', title: 'Two questions', messages: [
+        { role: 'user', blocks: [{ type: 'text', text: 'first question' }] },
+        { role: 'assistant', blocks: [{ type: 'text', text: 'first answer' }] },
+        { role: 'user', blocks: [{ type: 'text', text: 'second question' }] },
+        { role: 'assistant', blocks: [{ type: 'text', text: 'second answer' }] },
+      ] }];
+      const sent: Array<Record<string, unknown>> = [];
+      e2e.editSent = sent;
+      app.AgentChats = async () => chats.map(chat => ({ id: chat.id, title: chat.title, workspaceId: chat.workspaceId, createdAt: chat.createdAt, updatedAt: chat.updatedAt }));
+      app.AgentChat = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
+      app.AgentChatPage = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
+      app.BranchAgentChat = async (id: string, _workspaceId: string, before: number) => {
+        const source = chats.find(chat => chat.id === id)!;
+        const branch = { ...structuredClone(source), id: 'chat-branch', title: `${source.title} (branch)`, messages: structuredClone((source.messages as unknown[]).slice(0, before)) };
+        chats.push(branch);
+        e2e.branched = { id, before };
+        return structuredClone(branch);
+      };
+      app.SendAgentMessage = async (input: Record<string, unknown>) => {
+        sent.push(structuredClone(input));
+        const chat = chats.find(item => item.id === input.chatId)!;
+        const messages = chat.messages as unknown[];
+        if (typeof input.editFrom === 'number') messages.splice(input.editFrom);
+        const added = [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: `answer to ${input.text}` }] }];
+        messages.push(...added);
+        return { chat: structuredClone(chat), messages: added, steps: [], text: `answer to ${input.text}`, usage, hasUsage: true, warnings: [] };
+      };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await page.locator('.agent-sidebar').getByRole('button', { name: /Two questions/ }).click();
+    await expect(page.getByText('second answer')).toBeVisible();
+    const second = page.locator('.agent-user-row').filter({ hasText: 'second question' });
+    await second.hover();
+    await second.getByRole('button', { name: 'Edit message' }).click();
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await expect(composer).toHaveValue('second question');
+    await expect(page.locator('.agent-edit-note')).toContainText('Sending replaces it');
+    await composer.fill('second question, sharper');
+    await composer.press('Enter');
+    await expect(page.getByText('answer to second question, sharper')).toBeVisible();
+    await expect(page.getByText('second answer')).toHaveCount(0);
+    await expect(page.locator('.agent-edit-note')).toHaveCount(0);
+    const edit = await page.evaluate(() => ((window.__kurloE2E as unknown as { editSent: Array<Record<string, unknown>> }).editSent)[0]);
+    expect(edit.editFrom).toBe(2);
+    expect(edit.chatId).toBe('chat-edit');
+
+    const first = page.locator('.agent-user-row').filter({ hasText: 'first question' });
+    await first.hover();
+    await first.getByRole('button', { name: 'Branch from here' }).click();
+    await expect(composer).toHaveValue('first question');
+    await expect(page.locator('.agent-sidebar')).toContainText('Two questions (branch)');
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { branched: unknown }).branched)).toEqual({ id: 'chat-edit', before: 0 });
+    await expect(page.getByText('first answer')).toHaveCount(0);
+  });
+
+  test('adds an MCP server for the agent in Settings', async ({ page }, testInfo) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      localStorage.removeItem('kurlo.disclosure.settings-ai-agents');
+      localStorage.removeItem('kurlo.disclosure.settings-ai-kurlo');
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      let servers: Array<Record<string, unknown>> = [];
+      app.AiConnections = async () => ({ connections: [] });
+      app.AgentMcpServers = async () => ({ servers });
+      app.TestAgentMcpServer = async (server: Record<string, unknown>) => {
+        e2e.mcpTested = structuredClone(server);
+        return { ok: true, tools: [{ name: 'create_issue' }, { name: 'list_issues' }] };
+      };
+      app.SaveAgentMcpServer = async (server: Record<string, unknown>) => {
+        e2e.mcpSaved = structuredClone(server);
+        const saved = { ...server, id: 'mcp-1', headers: (server.headers as Array<{ key: string }>).map(pair => ({ key: pair.key, set: true })), env: [] };
+        servers = [saved];
+        return { servers };
+      };
+    });
+    await page.goto('/');
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'AI', exact: true }).click();
+    const section = page.getByRole('region', { name: 'MCP servers for the agent' });
+    await expect(section.getByRole('button', { name: /MCP servers for the agent/ })).toContainText('None');
+    await expect(page.getByRole('region', { name: 'Your agents' }).getByRole('button', { name: /Your agents/ })).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('region', { name: 'Kurlo agent' }).getByRole('button', { name: /Kurlo agent/ })).toContainText('No connections');
+    await page.getByRole('region', { name: 'Your agents' }).getByRole('button', { name: /Your agents/ }).click();
+    await expect(page.getByRole('region', { name: 'Codex connection' })).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Your agents' }).getByRole('button', { name: /Your agents/ })).toHaveAttribute('aria-expanded', 'false');
+    await section.getByRole('button', { name: /MCP servers for the agent/ }).click();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-mcp-list-${testInfo.project.name}.png`), animations: 'disabled' });
+    await section.getByRole('button', { name: 'Add MCP server' }).click();
+    await section.getByRole('textbox', { name: 'Name' }).fill('GitHub');
+    await section.getByRole('textbox', { name: 'URL' }).fill('https://api.githubcopilot.com/mcp/');
+    await section.getByRole('textbox', { name: 'Headers' }).fill('Authorization: Bearer ghp_test');
+    await section.getByRole('button', { name: 'Test' }).click();
+    await expect(section).toContainText('Connected. 2 tools available.');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-mcp-settings-${testInfo.project.name}.png`), animations: 'disabled' });
+    await section.getByRole('button', { name: 'Save' }).click();
+    await expect(section.getByRole('list', { name: 'Agent MCP servers' })).toContainText('GitHub');
+    await expect(section.getByRole('button', { name: /MCP servers for the agent/ })).toContainText('GitHub');
+    const saved = await page.evaluate(() => (window.__kurloE2E as unknown as { mcpSaved: Record<string, unknown> }).mcpSaved);
+    expect(saved).toMatchObject({ name: 'GitHub', kind: 'http', url: 'https://api.githubcopilot.com/mcp/', headers: [{ key: 'Authorization', value: 'Bearer ghp_test' }], enabled: true });
+  });
+
+  test('keeps the approval mode clear of the composer buttons at every width', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [{ ...connection, model: 'deepseek-v4-pro' }]);
+    await page.addInitScript(() => {
+      (window.__kurloE2E as unknown as { gitStatusOverride: Record<string, unknown> }).gitStatusOverride = { isRepo: true, workspaceRoot: '/e2e', root: '/e2e', branch: 'main2', clean: true, files: [], remotes: [], stashes: [] };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const main = page.locator('.agent-main');
+    await expect(main.getByRole('button', { name: 'Agent branch' })).toBeVisible();
+    for (let width = 640; width <= 1400; width += 40) {
+      await page.setViewportSize({ width, height: 700 });
+      await expect.poll(() => main.locator('.agent-composer-bar').evaluate(bar => {
+        const boxes = (selector: string) => [...bar.querySelectorAll<HTMLElement>(selector)].map(item => item.getBoundingClientRect()).filter(rect => rect.width > 0);
+        const left = boxes('.agent-composer-context > *');
+        const right = boxes('.agent-composer-actions > *');
+        const overlap = left.some(a => right.some(b => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1));
+        const actions = bar.querySelector('.agent-composer-actions')!.getBoundingClientRect();
+        const clipped = right.some(rect => rect.left < actions.left - 1 || rect.right > actions.right + 1);
+        const rows = new Set([...left, ...right].map(rect => Math.round(rect.top + rect.height / 2))).size;
+        return { overlap, clipped, rows: window.innerWidth >= 760 ? rows : 1 };
+      }), { message: `width ${width}`, timeout: 3000 }).toEqual({ overlap: false, clipped: false, rows: 1 });
+      if (width === 840 || width === 760) await page.locator('.agent-composer').screenshot({ path: join(tmpdir(), `kurlo-composer-${width}-${testInfo.project.name}.png`) });
+    }
+    await page.setViewportSize({ width: 1280, height: 700 });
+    await expect(main.locator('.agent-composer-chip.compact')).toHaveCount(0);
+    await expect(main.getByRole('button', { name: /^Collection:/ })).toContainText('Any collection');
+    await expect(main.getByRole('button', { name: /^Approvals:/ })).toContainText('Ask for changes');
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.locator('.agent-composer').screenshot({ path: join(tmpdir(), `kurlo-composer-mode-${testInfo.project.name}.png`) });
+  });
+
+  test('keeps the chat beside docked chat details when the sidebar is widened', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => localStorage.setItem('kurlo.agentDetails.v1', '1'));
+    await page.setViewportSize({ width: 1120, height: 700 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const details = page.getByRole('complementary', { name: 'Chat details', exact: true });
+    if (!(await details.isVisible())) await page.getByRole('button', { name: 'Toggle chat details' }).click();
+    await expect(details).toBeVisible();
+    const divider = page.getByRole('button', { name: 'Resize sidebar' });
+    const box = (await divider.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 400, box.y + 200, { steps: 8 });
+    await page.mouse.up();
+    await divider.focus();
+    await page.keyboard.press('ArrowRight');
+    const main = page.locator('.agent-main');
+    await expect(main).toBeVisible();
+    const layout = await page.locator('.agent-workspace').evaluate(element => {
+      const main = element.querySelector('.agent-main')!.getBoundingClientRect();
+      const panel = element.querySelector('.agent-context-panel')!.getBoundingClientRect();
+      return { sideBySide: main.right <= panel.left + 1, mainWidth: main.width, panelRight: panel.right };
+    });
+    expect(layout.sideBySide).toBe(true);
+    expect(layout.mainWidth).toBeGreaterThan(400);
+    expect(layout.panelRight).toBeLessThanOrEqual(1121);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-docked-sidebar-${testInfo.project.name}.png`), animations: 'disabled' });
+    await page.getByRole('button', { name: 'Close chat details' }).click();
+    const moved = (await divider.boundingBox())!;
+    await page.mouse.move(moved.x + moved.width / 2, moved.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(moved.x + 300, moved.y + 200, { steps: 8 });
+    await page.mouse.up();
+    expect((await page.locator('.sidebar').first().boundingBox())!.width).toBeGreaterThan(420);
+  });
+
+  for (const driver of ['', 'codex']) {
+    test(`scopes ${driver || 'Kurlo'} chats, drafts and late replies to the selected workspace`, async ({ page }) => {
+      await installKurloBridge(page, '', 'browser/e2e', false, {
+        ...agentStore,
+        workspaces: [{ id: 'workspace-e2e', name: 'Shop workspace' }, { id: 'workspace-other', name: 'Other workspace' }],
+        collections: [...agentStore.collections, { id: 'col-other', workspaceId: 'workspace-other', name: 'Other API' }],
+      });
+      await installAgentBridge(page, driver ? [] : [connection]);
+      await page.addInitScript(driver => {
+        const app = window.go!.api!.App as Record<string, unknown>;
+        const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+        const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+        const chats = [
+          { id: 'chat-shop', title: 'Shop chat', workspaceId: 'workspace-e2e' },
+          { id: 'chat-other', title: 'Other chat', workspaceId: 'workspace-other' },
+        ].map(chat => ({ ...chat, driver, workspace: '/e2e', createdAt: Date.now(), updatedAt: Date.now(), collection: '', environment: '', connectionId: 'c1', model: 'test-model', messages: [{ role: 'assistant', blocks: [{ type: 'text', text: `${chat.title} answer` }] }], usage, allowedTools: [] }));
+        if (driver) app.CodexStatus = async () => ({ installed: true, connected: true, authenticated: true, path: '/test/codex', account: 'Test account', model: 'test-model', models: [{ id: 'test-model', name: 'Test model', recommended: true, weakTools: false }] });
+        app.AgentChats = async (workspaceId: string) => {
+          const result = structuredClone(chats.filter(chat => chat.workspaceId === workspaceId));
+          if (e2e.delayChatList && workspaceId === 'workspace-e2e') {
+            e2e.delayChatList = false;
+            await new Promise<void>(resolve => { e2e.releaseChatList = resolve; });
+          }
+          return result;
+        };
+        app.AgentChat = async (id: string) => {
+          const result = structuredClone(chats.find(chat => chat.id === id));
+          if (e2e.delayChatLoad && id === 'chat-shop') {
+            e2e.delayChatLoad = false;
+            await new Promise<void>(resolve => { e2e.releaseChatLoad = resolve; });
+          }
+          return result;
+        };
+        app.SendAgentMessage = async (input: Record<string, string>) => {
+          e2e.scopedSend = input;
+          await new Promise<void>(resolve => { e2e.finishScopedTurn = resolve; });
+          const messages = [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Finished in Shop' }] }];
+          const chat = { ...chats[0], id: 'chat-new-shop', title: 'New in Shop', workspaceId: input.workspaceId, messages };
+          chats.push(chat);
+          e2e.emit('ai:deltas', { sessionId: chat.id, turnId: input.turnId, deltas: [{ step: 0, index: 0, type: 'text', text: 'Finished in Shop' }] });
+          return { chat, messages, steps: [], text: 'Finished in Shop', usage, hasUsage: true, warnings: [] };
+        };
+      }, driver);
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Agent', exact: true }).click();
+      const sidebar = page.locator('.agent-sidebar');
+      const composer = page.getByRole('textbox', { name: 'Message the agent' });
+      const switchWorkspace = async (name: string) => {
+        await page.getByRole('button', { name: 'Workspace switcher' }).click();
+        await page.locator('.workspace-menu-select').filter({ hasText: name }).click();
+        await page.getByRole('button', { name: 'Agent', exact: true }).click();
+      };
+      await expect(sidebar.locator('.agent-chat-title')).toHaveText(['Shop chat']);
+      await page.evaluate(() => { (window.__kurloE2E as unknown as Record<string, unknown>).delayChatLoad = true; });
+      await sidebar.getByRole('button', { name: /Shop chat/ }).click();
+      await expect.poll(() => page.evaluate(() => typeof (window.__kurloE2E as unknown as Record<string, unknown>).releaseChatLoad)).toBe('function');
+      await composer.fill('Shop draft');
+      await page.evaluate(() => { (window.__kurloE2E as unknown as Record<string, unknown>).delayChatList = true; });
+      await page.locator('.global-search').click();
+      await page.getByRole('combobox', { name: 'Search requests, chats and commands' }).fill('chat');
+      await expect(page.locator('[data-chat-id]')).toHaveAttribute('data-chat-id', 'chat-shop');
+      await page.keyboard.press('Escape');
+      await switchWorkspace('Other workspace');
+      await expect(sidebar.locator('.agent-chat-title')).toHaveText(['Other chat']);
+      await expect(composer).toHaveValue('');
+      await page.evaluate(() => ((window.__kurloE2E as unknown as Record<string, unknown>).releaseChatList as () => void)());
+      await page.evaluate(() => ((window.__kurloE2E as unknown as Record<string, unknown>).releaseChatLoad as () => void)());
+      await expect(sidebar.locator('.agent-chat-title')).toHaveText(['Other chat']);
+      await expect(page.locator('.agent-text')).toHaveCount(0);
+      await sidebar.getByRole('button', { name: /Other chat/ }).click();
+      await expect(page.locator('.agent-text')).toContainText('Other chat answer');
+      await composer.fill('Other draft');
+      await page.locator('.global-search').click();
+      const search = page.getByRole('combobox', { name: 'Search requests, chats and commands' });
+      await search.fill('Shop');
+      await expect(page.locator('[data-chat-id]')).toHaveCount(0);
+      await search.fill('Other chat');
+      await expect(page.locator('[data-chat-id]')).toHaveAttribute('data-chat-id', 'chat-other');
+      await search.press('Enter');
+      await expect(composer).toHaveValue('Other draft');
+      await switchWorkspace('Shop workspace');
+      await expect(composer).toHaveValue('Shop draft');
+      await expect(page.getByRole('textbox', { name: 'Chat name' })).toHaveValue('Shop chat');
+      await expect(page.locator('.agent-text')).toContainText('Shop chat answer');
+      await sidebar.getByRole('button', { name: 'New chat', exact: true }).click();
+      await composer.fill('Work in Shop');
+      await composer.press('Enter');
+      await expect.poll(() => page.evaluate(() => (window.__kurloE2E as unknown as { scopedSend?: Record<string, string> }).scopedSend?.workspaceId)).toBe('workspace-e2e');
+      await switchWorkspace('Other workspace');
+      await expect(composer).toHaveValue('Other draft');
+      await page.evaluate(() => ((window.__kurloE2E as unknown as Record<string, unknown>).finishScopedTurn as () => void)());
+      await expect(page.locator('.agent-text')).toHaveText('Other chat answer');
+      await expect(composer).toHaveValue('Other draft');
+      await expect(page.getByRole('textbox', { name: 'Chat name' })).toHaveValue('Other chat');
+      await expect(sidebar.locator('.agent-chat-title')).toHaveText(['Other chat']);
+      await switchWorkspace('Shop workspace');
+      await expect(page.getByRole('textbox', { name: 'Chat name' })).toHaveValue('New in Shop');
+      await expect(page.locator('.agent-text')).toContainText('Finished in Shop');
+      await expect(composer).toHaveValue('');
+    });
+  }
+
+  test('keeps agent collection and environment choices inside their workspace', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      ...agentStore,
+      workspaces: [{ id: 'workspace-e2e', name: 'Shop workspace' }, { id: 'workspace-other', name: 'Other workspace' }],
+      collections: [...agentStore.collections, { id: 'col-other', workspaceId: 'workspace-other', name: 'Other API' }],
+      environments: [...agentStore.environments, { id: 'env-other', workspaceId: 'workspace-other', name: 'Staging', values: [] }],
+    });
+    await installAgentBridge(page, [connection]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const collection = page.getByRole('button', { name: /^Collection:/ });
+    const environment = page.locator('.agent-composer').getByRole('button', { name: /^Environment:/ });
+    await collection.click();
+    await page.getByRole('option', { name: 'Shop API', exact: true }).click();
+    await environment.click();
+    await page.getByRole('option', { name: 'Local', exact: true }).click();
+    await page.getByRole('button', { name: 'Workspace switcher' }).click();
+    await page.locator('.workspace-menu-select').filter({ hasText: 'Other workspace' }).click();
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await expect(collection).toHaveAccessibleName('Collection: Any collection');
+    await expect(environment).toHaveAccessibleName('Environment: No environment');
+    await environment.click();
+    await expect(page.getByRole('option', { name: 'Local', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('option', { name: /No environment/ }).locator('.app-select-check')).toBeHidden();
+    await page.getByRole('option', { name: 'Staging', exact: true }).click();
+    await collection.click();
+    await page.getByRole('option', { name: 'Other API', exact: true }).click();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-workspace-${testInfo.project.name}.png`), animations: 'disabled' });
+    await page.getByRole('button', { name: 'Workspace switcher' }).click();
+    await page.locator('.workspace-menu-select').filter({ hasText: 'Shop workspace' }).click();
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await expect(collection).toHaveAccessibleName('Collection: Shop API');
+    await expect(environment).toHaveAccessibleName('Environment: Local');
+  });
+
+  for (const [runtime, shortcut] of [['darwin/e2e', 'Meta+w'], ['windows/e2e', 'Control+w'], ['linux/e2e', 'Control+w']]) {
+    test(`closes the agent tab with ${shortcut} on ${runtime}`, async ({ page }) => {
+      await installKurloBridge(page, '', runtime, false, agentStore);
+      await installAgentBridge(page, [connection]);
+      await page.addInitScript(() => {
+        const app = window.go!.api!.App as Record<string, unknown>;
+        app.CodexStatus = async () => ({ installed: true, connected: true, authenticated: true, path: '/test/codex', version: 'codex-cli test', account: 'Test account', authType: 'chatgpt', model: 'test-model', models: [{ id: 'test-model', name: 'Test model', recommended: true, weakTools: false }], authUrl: '', waiting: false });
+      });
+      await page.goto('/');
+      for (const mode of ['Kurlo agent', 'Codex']) {
+        await page.getByRole('button', { name: 'Agent', exact: true }).click();
+        const composer = page.getByRole('textbox', { name: 'Message the agent' });
+        if (mode === 'Codex') {
+          await page.getByRole('button', { name: /^Agent:/ }).click();
+          const pickerPanel = page.getByRole('dialog', { name: 'Choose agent and model' });
+          await pickerPanel.getByRole('radio', { name: /^Codex.*Ready$/ }).click();
+          await expect(pickerPanel).toBeVisible();
+          await expect(pickerPanel.getByRole('radio', { name: /^Codex.*Ready$/ })).toHaveAttribute('aria-checked', 'true');
+          await expect(page.getByRole('button', { name: /^Agent:/ })).toHaveAccessibleName(/^Agent: Codex · Test model/);
+          await pickerPanel.getByRole('radiogroup', { name: 'Codex model' }).getByRole('radio', { name: /Test model/ }).click();
+          await expect(page.getByRole('button', { name: /^Agent:/ })).toHaveAccessibleName(/^Agent: Codex · Test model/);
+          await expect(composer).toHaveValue('Draft for Kurlo agent');
+        }
+        await composer.fill(`Draft for ${mode}`);
+        await composer.press(shortcut);
+        await expect(page.getByRole('tab', { name: 'Agent', exact: true })).toHaveCount(0);
+        await expect(page.locator('.agent-sidebar')).toHaveCount(0);
+        await expect(page.getByLabel('Request URL')).toBeVisible();
+        await page.getByRole('button', { name: 'Agent', exact: true }).click();
+        await expect(page.getByRole('textbox', { name: 'Message the agent' })).toHaveValue(`Draft for ${mode}`);
+        await page.getByRole('button', { name: 'Close agent', exact: true }).click();
+      }
+    });
+  }
+
+  test('reviews an Agent Mode batch with one Apply button', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await composer.fill('Review batch changes');
+    await composer.press('Enter');
+    const approval = page.getByRole('group', { name: 'Apply these changes?' });
+    await expect(approval).toContainText('List-orders.yml');
+    await expect(approval).toContainText('Profile globals');
+    await expect(approval.getByRole('button', { name: 'Allow for this chat' })).toHaveCount(0);
+    await captureDocsScreenshot(page, 'agent-apply-changes');
+    await approval.getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(approval).toHaveCount(0);
+  });
+
+  test('shows agent activity, restores a file and commits on an agent branch', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      e2e.gitStatusOverride = { isRepo: true, workspaceRoot: '/e2e', root: '/e2e', branch: 'main', head: '1a2b3c4', clean: true, files: [], remotes: ['origin'], pushRemote: 'origin' };
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const now = Date.now();
+      const path = 'workspaces/Main/collections/Shop-API/requests/List-orders.yml';
+      const before = "version: 1\nrequest:\n    id: req-orders\n    name: List orders\n    url: '{{baseUrl}}/orders'\n";
+      const after = before + '    testScriptJs: |\n        pm.test("status is 200", () => pm.response.to.have.status(200))\n';
+      const summaries = [
+        { id: '0001-save', time: now - 5 * 60_000, client: 'Kurlo agent', chatId: 'chat-1', tool: 'save_request', status: 'ok', files: [path], reverted: false, workspace: '/e2e', commit: '4e1c9b2', branch: 'kurlo-agent/add-a-status-test-chat1' },
+        { id: '0002-run', time: now - 8 * 60_000, client: 'Kurlo agent', chatId: 'chat-1', tool: 'run_request', status: 'ok', files: [], reverted: false, workspace: '' },
+        { id: '0003-list', time: now - 40 * 60_000, client: 'Claude Code', tool: 'list_requests', status: 'ok', files: [], reverted: false, workspace: '' },
+        { id: '0004-push', time: now - 2 * 60 * 60_000, client: 'Kurlo agent', chatId: 'chat-1', tool: 'git_push', status: 'declined', error: 'The user declined this call, so it did not run.', files: [], reverted: false, workspace: '' },
+      ];
+      const details: Record<string, Record<string, unknown>> = {
+        '0001-save': { ...summaries[0], arguments: '{"collection":"Shop API","name":"List orders","testScript":"pm.test(\\"status is 200\\")"}', result: '{"id":"req-orders","path":"Shop API/Orders/List orders","created":false}\nCommitted as 4e1c9b2 on branch kurlo-agent/add-a-status-test-chat1.', changes: [{ path, before, after }] },
+      };
+      const reverts: unknown[] = [];
+      const enabled: boolean[] = [];
+      e2e.activityReverts = reverts;
+      e2e.activityEnabled = enabled;
+      e2e.pullRequestCalls = 0;
+      const elsewhere = { id: '0005-other', time: now - 20 * 60_000, client: 'Kurlo agent', chatId: 'chat-9', tool: 'save_request', status: 'ok', files: ['workspaces/Billing-team/collections/Billing/requests/List-invoices.yml'], reverted: false, workspace: '/e2e', workspaceId: 'workspace-billing', workspaceName: 'Billing team' };
+      const filters: unknown[] = [];
+      e2e.activityFilters = filters;
+      app.AgentActivity = async (filter: { workspaceId: string; allWorkspaces: boolean }) => {
+        filters.push(structuredClone(filter));
+        const mine = summaries.map(entry => ({ ...entry, here: true, workspaceId: filter.workspaceId }));
+        const entries = filter.allWorkspaces ? [...mine, elsewhere].sort((a, b) => b.time - a.time) : mine;
+        return { entries: structuredClone(entries), enabled: enabled.at(-1) ?? true };
+      };
+      details['0005-other'] = { ...elsewhere, arguments: '{}', result: '', changes: [] };
+      app.AgentActivityEntry = async (id: string) => structuredClone(details[id] ?? { ...summaries.find(entry => entry.id === id), arguments: '{}', result: '', changes: [] });
+      app.RevertAgentActivity = async (id: string, file: string) => {
+        reverts.push([id, file]);
+        const entry = details[id];
+        (entry.changes as Array<Record<string, unknown>>).forEach(change => { change.reverted = true; });
+        entry.reverted = true;
+        summaries.find(item => item.id === id)!.reverted = true;
+        return structuredClone(entry);
+      };
+      app.SetAgentActivityEnabled = async (value: boolean) => { enabled.push(value); return { ok: true }; };
+      app.GitPullRequestURL = async () => {
+        e2e.pullRequestCalls = (e2e.pullRequestCalls as number) + 1;
+        return { url: '', branch: 'main', base: 'main', error: 'The current branch is main, the branch to merge into. Create a branch for the changes first.' };
+      };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+
+    const branch = page.getByRole('button', { name: 'Agent branch' });
+    await expect(branch).toHaveAttribute('aria-pressed', 'false');
+    await branch.click();
+    await expect(branch).toHaveAttribute('aria-pressed', 'true');
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await composer.fill('Add a status test');
+    await composer.press('Enter');
+    await page.getByRole('group', { name: 'Change 1 file?' }).getByRole('button', { name: 'Apply', exact: true }).click();
+    await expect(page.getByText('status is 200').first()).toBeVisible();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { agentSent: Array<{ ownBranch?: boolean }> }).agentSent[0].ownBranch)).toBe(true);
+
+    if (!(await page.getByRole('complementary', { name: 'Chat details' }).isVisible())) await page.getByRole('button', { name: 'Toggle chat details' }).click();
+    const git = page.getByRole('region', { name: 'Git' });
+    await expect(git.getByRole('button', { name: /^Git/ })).toContainText('agent branch');
+    await git.getByRole('button', { name: /^Git/ }).click();
+    await expect(git).toContainText('Current branch');
+    await expect(git).toContainText('Each change you approve is committed to the agent branch.');
+    await captureDocsScreenshot(page, 'agent-git');
+    await git.getByRole('button', { name: 'Open pull request' }).click();
+    await expect(git.getByRole('alert')).toContainText('Create a branch for the changes first.');
+
+    await page.getByRole('button', { name: 'Activity', exact: true }).click();
+    const list = page.getByRole('list', { name: 'Agent activity' });
+    await expect(list.getByRole('listitem')).toHaveCount(4);
+    await expect(page.getByRole('heading', { name: 'See what agents did' })).toBeVisible();
+    await page.getByRole('button', { name: /^Client:/ }).click();
+    await page.getByRole('option', { name: 'Claude Code' }).click();
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await page.getByRole('button', { name: /^Client:/ }).click();
+    await page.getByRole('option', { name: 'All clients' }).click();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { activityFilters: Array<{ workspaceId: string; allWorkspaces: boolean }> }).activityFilters.at(-1))).toMatchObject({ workspaceId: 'workspace-e2e', allWorkspaces: false });
+    await page.getByRole('button', { name: /^Workspaces:/ }).click();
+    await page.getByRole('option', { name: 'All workspaces' }).click();
+    await expect(list.getByRole('listitem')).toHaveCount(5);
+    await expect(list).toContainText('Billing team · Kurlo agent · 1 file');
+    await list.getByRole('button', { name: /Billing team/ }).click();
+    await expect(page.getByText('The chat is in the workspace Billing team.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Open chat' })).toHaveCount(0);
+    await page.getByRole('button', { name: /^Workspaces:/ }).click();
+    await page.getByRole('option', { name: 'This workspace' }).click();
+    await expect(list.getByRole('listitem')).toHaveCount(4);
+    await page.getByLabel('Filter activity').fill('push');
+    await expect(list.getByRole('listitem')).toHaveCount(1);
+    await list.getByRole('button', { name: /git_push/ }).click();
+    await expect(page.getByText('The user declined this call, so it did not run.')).toBeVisible();
+    await page.getByLabel('Filter activity').fill('');
+
+    await list.getByRole('button', { name: /save_request/ }).click();
+    await expect(page.getByText('kurlo-agent/add-a-status-test-chat1', { exact: true })).toBeVisible();
+    await expect(page.getByRole('table', { name: /Changes in .*List-orders\.yml/ })).toContainText('status is 200');
+    await expect(page.locator('[title]:not(iframe)')).toHaveCount(0);
+    await captureDocsScreenshot(page, 'agent-activity');
+    await page.getByRole('button', { name: /^Restore workspaces/ }).click();
+    await expect(page.locator('.agent-activity-badge')).toHaveText('Restored');
+    await expect(page.getByRole('button', { name: /^Restore workspaces/ })).toHaveCount(0);
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { activityReverts: unknown[] }).activityReverts)).toEqual([['0001-save', 'workspaces/Main/collections/Shop-API/requests/List-orders.yml']]);
+
+    await page.locator('.agent-activity-record input[type="checkbox"]').uncheck({ force: true });
+    await expect(page.getByText('Recording is off.')).toBeVisible();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { activityEnabled: boolean[] }).activityEnabled)).toEqual([false]);
+
+    await page.getByRole('button', { name: 'Open chat' }).click();
+    await expect(page.getByRole('textbox', { name: 'Message the agent' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Chats', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('runs tools, asks before writing with a diff and keeps the chat in the sidebar', async ({ page }, testInfo) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await expect(page.getByRole('tab', { name: 'Agent', exact: true })).toHaveAttribute('aria-selected', 'true');
+    const workspace = page.locator('.agent-workspace');
+    await expect(workspace).toContainText('What should we check?');
+    await expect(page.locator('[title]:not(iframe)')).toHaveCount(0);
+    await expect(page.locator('.agent-sidebar')).toContainText('No chats yet.');
+    await expect(page.locator('.agent-sidebar').getByRole('button', { name: 'New chat' })).toBeVisible();
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    const emptyHeight = (await composer.boundingBox())!.height;
+    expect(emptyHeight).toBeLessThanOrEqual(48);
+    await composer.fill('First line\nSecond line\nThird line\nFourth line');
+    await expect.poll(async () => (await composer.boundingBox())!.height).toBeGreaterThan(emptyHeight);
+    await expect(composer).toHaveCSS('overflow-y', 'hidden');
+    await composer.press('Shift+Enter');
+    await expect(composer).toHaveValue('First line\nSecond line\nThird line\nFourth line\n');
+    await expect(page.locator('.agent-user')).toHaveCount(0);
+    await composer.fill(Array.from({ length: 40 }, (_, index) => `Line ${index + 1}`).join('\n'));
+    await expect(composer).toHaveCSS('overflow-y', 'auto');
+    expect((await composer.boundingBox())!.height).toBeLessThanOrEqual(192);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-long-prompt-${testInfo.project.name}.png`), animations: 'disabled' });
+    await composer.fill('A long prompt that wraps to another line. '.repeat(12));
+    await expect.poll(async () => (await composer.boundingBox())!.height).toBeGreaterThan(emptyHeight);
+    await expect(composer).toHaveCSS('overflow-y', 'hidden');
+    await composer.fill('');
+    await expect.poll(async () => (await composer.boundingBox())!.height).toBe(emptyHeight);
+    const picker = workspace.getByRole('button', { name: /^Agent:/ });
+    await expect(picker).toHaveAccessibleName('Agent: Kurlo agent · claude-sonnet-4-5');
+
+    await picker.click();
+    const pickerPanel = page.getByRole('dialog', { name: 'Choose agent and model' });
+    const connectionRadio = pickerPanel.getByRole('radio', { name: /^Anthropic/ });
+    await expect(connectionRadio).toHaveAttribute('aria-checked', 'true');
+    await expect(connectionRadio).toBeFocused();
+    const models = pickerPanel.getByRole('radiogroup', { name: 'Anthropic model' });
+    await expect(models.getByRole('radio')).toHaveCount(2);
+    await expect(models.getByRole('radio', { name: /Claude Sonnet 4\.5/ })).toHaveAttribute('aria-checked', 'true');
+    const menuBox = await pickerPanel.boundingBox();
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual((page.viewportSize()?.width ?? 0) - 4);
+    expect(menuBox!.y).toBeGreaterThanOrEqual(0);
+    await pickerPanel.getByRole('searchbox', { name: 'Search Anthropic models' }).fill('opus');
+    await expect(models.getByRole('radio')).toHaveCount(1);
+    await models.getByRole('radio', { name: /Claude Opus 4\.1/ }).click();
+    await expect(pickerPanel).toHaveCount(0);
+    await expect(picker).toHaveAccessibleName('Agent: Kurlo agent · claude-opus-4-1');
+    await picker.click();
+    await pickerPanel.getByRole('radiogroup', { name: 'Anthropic model' }).getByRole('radio', { name: /Claude Sonnet 4\.5/ }).click();
+    await expect(picker).toHaveAccessibleName('Agent: Kurlo agent · claude-sonnet-4-5');
+    await picker.click();
+    await pickerPanel.getByRole('radiogroup', { name: 'Anthropic model' }).getByRole('radio', { name: /Claude Opus 4\.1/ }).click();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { aiConnectionSaves?: number }).aiConnectionSaves ?? 0)).toBe(0);
+
+    const input = page.getByRole('textbox', { name: 'Message the agent' });
+    await workspace.getByRole('button', { name: /Run and check the collection/ }).click();
+    await expect(input).toHaveValue(/^Run the collection and explain every failure/);
+    await expect(input).toBeFocused();
+
+    await workspace.getByRole('button', { name: /^Collection:/ }).click();
+    await page.getByRole('option', { name: 'Shop API' }).click();
+    await workspace.getByRole('button', { name: /^Environment:/ }).click();
+    await page.getByRole('option', { name: 'Local' }).click();
+
+    await workspace.getByRole('button', { name: 'Templates' }).click();
+    const templates = page.getByRole('menu', { name: 'Templates' });
+    await expect(templates.getByRole('menuitem')).toHaveCount(5);
+    await expect(templates.getByRole('menuitem').first()).toBeFocused();
+    await captureDocsScreenshot(page, 'agent-templates');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(templates).toHaveCount(0);
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue(/Write tests for the request REQUEST NAME/);
+    expect(await input.evaluate((el: HTMLTextAreaElement) => el.value.slice(el.selectionStart, el.selectionEnd))).toBe('REQUEST NAME');
+    await input.fill('Add a status test to List orders');
+    const send = page.getByRole('button', { name: 'Send', exact: true });
+    await expect(send).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await input.press('Enter');
+
+    const approval = page.locator('.agent-approval');
+    await expect(approval).toBeVisible();
+    await expect(approval).toContainText('Change 1 file?');
+    await expect(approval.locator('.agent-diff-added')).toHaveCount(2);
+    await expect(approval.locator('.agent-diff-added').last()).toContainText('status is 200');
+    await expect(page.locator('.agent-tool-waiting')).toHaveAttribute('aria-label', 'Waiting for you');
+    await expect(page.locator('.agent-status-wait')).toContainText('is waiting for your approval');
+    await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeVisible();
+    await captureDocsScreenshot(page, 'agent-approval');
+
+    const sentInput = await page.evaluate(() => (window.__kurloE2E as unknown as { agentSent: Array<Record<string, string>> }).agentSent[0]);
+    expect(sentInput).toMatchObject({ chatId: '', text: 'Add a status test to List orders', collection: 'Shop API', environment: 'Local', connectionId: 'c1', model: 'claude-opus-4-1' });
+
+    await approval.getByRole('button', { name: 'Apply' }).click();
+    await expect(approval).toHaveCount(0);
+    await expect(page.locator('.agent-text').last()).toContainText('status is 200');
+    await expect(page.locator('.agent-text').last().locator('strong')).toHaveText('status is 200');
+    const answers = await page.evaluate(() => (window.__kurloE2E as unknown as { agentAnswers: unknown[] }).agentAnswers);
+    expect(answers).toEqual([{ id: 'approval-1', decision: 'allow' }]);
+    await expect(page.locator('.agent-tool-state').first()).toHaveAttribute('aria-label', 'Done');
+    await expect(page.locator('.agent-usage')).toContainText('3,300');
+    await expect(page.getByRole('button', { name: 'Send' })).toBeVisible();
+
+    await expect(page.locator('.agent-header')).not.toContainText('claude-sonnet-4-5');
+    const chatRow = page.locator('.agent-chat-main');
+    await expect(chatRow).toHaveCount(1);
+    await expect(chatRow).toContainText('Add a status test to List orders');
+    await expect(page.locator('.agent-chat-group')).toHaveText('Today');
+    const entry = page.locator('.agent-chat.active');
+    await entry.hover();
+    const chatMenu = entry.getByRole('button', { name: 'Chat menu' });
+    await expect(chatMenu).toBeVisible();
+    const rowBox = (await entry.boundingBox())!;
+    const menuBoxInRow = (await chatMenu.boundingBox())!;
+    expect(menuBoxInRow.x + menuBoxInRow.width).toBeLessThanOrEqual(rowBox.x + rowBox.width - 3);
+    expect(Math.abs(menuBoxInRow.y + menuBoxInRow.height / 2 - rowBox.y - rowBox.height / 2)).toBeLessThan(1);
+    await expect(entry).toHaveCSS('box-shadow', /inset/);
+    await chatMenu.click();
+    await expect(chatMenu).toHaveAttribute('aria-expanded', 'true');
+    await composer.click();
+    await expect(chatMenu).toHaveAttribute('aria-expanded', 'false');
+    await entry.hover();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-layout-${testInfo.project.name}.png`), animations: 'disabled' });
+    await captureDocsScreenshot(page, 'agent-chat');
+
+    await expect(page.locator('.agent-user')).toHaveCSS('-webkit-user-select', 'text');
+    await page.locator('.agent-user-row').hover();
+    await page.getByRole('button', { name: 'Copy message' }).click();
+    await expect(page.locator('.agent-user-row').getByRole('button', { name: 'Copied' })).toBeVisible();
+    await page.locator('.agent-turn').hover();
+    await page.getByRole('button', { name: 'Copy answer' }).click();
+    const copies = await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('clipboard:')));
+    expect(copies).toEqual([`clipboard:${'Add a status test to List orders'.length}`, `clipboard:${'Let me look at the request first.\n\nAdded a **status is 200** test to List orders.'.length}`]);
+
+    await chatRow.dblclick();
+    const rename = page.getByRole('textbox', { name: 'Rename chat' });
+    await expect(rename).toBeFocused();
+    await rename.fill('Orders tests');
+    await rename.press('Enter');
+    await expect(chatRow).toContainText('Orders tests');
+    const headerTitle = page.getByRole('textbox', { name: 'Chat name' });
+    await expect(headerTitle).toHaveValue('Orders tests');
+    const compactWidth = (await headerTitle.boundingBox())!.width;
+    await headerTitle.fill('Что видишь в коллекции и как устроены запросы?');
+    const expandedWidth = (await headerTitle.boundingBox())!.width;
+    expect(expandedWidth).toBeGreaterThan(compactWidth);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-rename-${testInfo.project.name}.png`), animations: 'disabled' });
+    const longTitle = 'Что видишь в коллекции и как устроены запросы? '.repeat(2);
+    await headerTitle.fill(longTitle);
+    const cappedWidth = (await headerTitle.boundingBox())!.width;
+    expect(cappedWidth).toBeGreaterThan(expandedWidth);
+    const fullTitle = longTitle + 'Посмотри примеры.';
+    await headerTitle.fill(fullTitle);
+    await headerTitle.press('Backspace');
+    await expect(headerTitle).toHaveValue(fullTitle.slice(0, -1));
+    expect((await headerTitle.boundingBox())!.width).toBe(cappedWidth);
+    await expect(page.getByRole('button', { name: 'Chat actions', exact: true })).toHaveCount(0);
+    await headerTitle.fill('Orders checks');
+    expect((await headerTitle.boundingBox())!.width).toBeLessThan(expandedWidth);
+    await headerTitle.press('Enter');
+    await expect(chatRow).toContainText('Orders checks');
+    const renamed = await page.evaluate(() => (window.__kurloE2E as unknown as { agentRenames: unknown[] }).agentRenames);
+    expect(renamed).toEqual([['chat-1', 'Orders tests'], ['chat-1', 'Orders checks']]);
+
+    await page.locator('.global-search').click();
+    const globalSearch = page.getByRole('dialog', { name: 'Search requests, chats and commands' });
+    const searchQuery = globalSearch.getByRole('combobox');
+    await searchQuery.fill('Orders');
+    await captureDocsScreenshot(page, 'global-search');
+    await searchQuery.fill('Orders checks');
+    await expect(globalSearch.locator('[data-chat-id]')).toHaveCount(1);
+    const chatTitleFits = await globalSearch.locator('[data-chat-id] .gsr-name').evaluate(element => element.scrollWidth <= element.clientWidth);
+    expect(chatTitleFits).toBe(true);
+    await expect(globalSearch).toContainText('Chats in this workspace');
+    await searchQuery.fill('> Orders checks');
+    await expect(globalSearch.locator('[data-chat-id]')).toHaveCount(0);
+    await searchQuery.fill('Orders checks');
+    await searchQuery.press('Enter');
+    await expect(globalSearch).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: 'Chat name' })).toHaveValue('Orders checks');
+
+    const filter = page.getByRole('textbox', { name: 'Filter chats' });
+    await filter.fill('nothing like it');
+    await expect(page.locator('.agent-sidebar')).toContainText('No chat matches this filter.');
+    await filter.fill('checks');
+    await expect(chatRow).toHaveCount(1);
+
+    await page.locator('.agent-tool-toggle').first().click();
+    await expect(page.locator('.agent-tool-body').first()).toContainText('Shop API/Orders/List orders');
+    await page.getByRole('button', { name: 'Open request' }).first().click();
+    await expect(page.getByRole('tab', { name: /List orders/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('.agent-sidebar')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Collections', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+    await page.getByRole('tab', { name: 'Agent', exact: true }).click();
+    await expect(page.locator('.agent-sidebar')).toBeVisible();
+    await input.fill('Thanks');
+    await input.press('Enter');
+    await expect(page.locator('.agent-approval')).toBeVisible();
+    const second = await page.evaluate(() => (window.__kurloE2E as unknown as { agentSent: Array<Record<string, string>> }).agentSent[1]);
+    expect(second).toMatchObject({ chatId: 'chat-1', text: 'Thanks' });
+    await page.locator('.agent-approval').getByRole('button', { name: 'Reject' }).click();
+    await expect(page.locator('.agent-user')).toHaveCount(2);
+    await expect(page.locator('.agent-turn').nth(1)).toHaveCSS('border-top-width', '0px');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-no-dividers-${testInfo.project.name}.png`), animations: 'disabled' });
+
+    const sidebar = page.locator('.agent-sidebar');
+    const rowMenu = sidebar.getByRole('button', { name: 'Chat menu' });
+    await rowMenu.click({ force: true });
+    await expect(sidebar.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(sidebar.getByRole('menuitem', { name: 'Archive', exact: true })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(sidebar).toContainText('No chats yet.');
+    await sidebar.getByRole('button', { name: 'Archived', exact: true }).click();
+    await sidebar.locator('.agent-chat-main').click();
+    await expect(workspace).toContainText('Archived chat. Restore it from the chat menu to continue.');
+    await expect(composer).toHaveCount(0);
+    await expect(page.locator('.agent-user')).toHaveCount(2);
+    await rowMenu.click({ force: true });
+    await captureDocsScreenshot(page, 'agent-chat-archive');
+    await sidebar.getByRole('menuitem', { name: 'Export as Markdown…' }).click();
+    const exportDialog = page.getByRole('dialog', { name: 'Export chat as Markdown' });
+    await expect(exportDialog).toContainText('unencrypted');
+    await exportDialog.getByRole('button', { name: 'Export', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E as unknown as { agentExport: unknown }).agentExport)).toEqual({ id: 'chat-1', workspaceId: 'workspace-e2e' });
+    await rowMenu.click({ force: true });
+    await sidebar.getByRole('menuitem', { name: 'Restore' }).click();
+    await expect(sidebar.getByRole('button', { name: 'Chats', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(composer).toBeVisible();
+
+    await page.locator('.agent-chat-menu-btn').click({ force: true });
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await expect(page.locator('.agent-chat-main')).toHaveCount(0);
+    await expect(workspace).toContainText('What should we check?');
+  });
+
+  test('offers four ways to connect a model when there is none', async ({ page }) => {
+    if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, []);
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const onboarding = page.locator('.agent-onboarding');
+    await expect(onboarding).toBeVisible();
+    await expect(onboarding.locator('.agent-onboarding-card')).toHaveCount(4);
+    await expect(page.locator('.agent-chat-new')).toHaveCount(0);
+    await expect(page.locator('.agent-sidebar').getByRole('button', { name: 'New chat' })).toBeDisabled();
+    await captureDocsScreenshot(page, 'agent-onboarding');
+    await onboarding.getByRole('button', { name: /Your API key/ }).click();
+    await expect(page.locator('#settings-panel-ai')).toBeVisible();
+    await expect(page.locator('#ai-key-value')).toBeFocused();
+  });
+});
+
+test.describe('Codex agent connection', () => {
+  test('connects an existing account and separates Codex chats from the Kurlo agent', async ({ page }, testInfo) => {
+    await page.setViewportSize(DOCS_VIEWPORT);
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+      const usage = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+      const status = { installed: true, connected: false, authenticated: true, path: '/usr/local/bin/codex', version: 'codex-cli 0.166.0', account: 'user@example.test · plus', authType: 'chatgpt', model: 'codex-test', models: [{ id: 'codex-test', name: 'Codex test', recommended: true, weakTools: false, efforts: ['low', 'medium', 'high', 'xhigh'], defaultEffort: 'medium' }, { id: 'small-test', name: 'Small test', recommended: false, weakTools: false, efforts: ['low'], defaultEffort: 'low' }], authUrl: '', waiting: false, rateLimits: [{ limitId: 'codex', limitName: 'Codex', primary: { usedPercent: 25, windowDurationMins: 300, resetsAt: 1800000000 }, secondary: { usedPercent: 40, windowDurationMins: 10080 } }] };
+      const chats: Array<Record<string, unknown>> = [{ id: 'api-chat', workspaceId: 'workspace-e2e', title: 'API conversation', driver: '', createdAt: Date.now(), updatedAt: Date.now() }];
+      app.CodexStatus = async () => structuredClone(status);
+      app.AiConnections = async () => ({ connections: [] });
+      app.ConnectCodex = async () => { status.connected = true; return structuredClone(status); };
+      app.RemoveCodexConnection = async () => { status.connected = false; status.account = 'refreshed@example.test · plus'; return { ok: true }; };
+      app.AgentChats = async (workspaceId: string) => structuredClone(chats.filter(chat => chat.workspaceId === workspaceId));
+      app.AgentChat = async (id: string) => structuredClone(chats.find(chat => chat.id === id));
+      app.SetAgentChatArchived = async (id: string, workspaceId: string, archived: boolean) => {
+        const chat = chats.find(item => item.id === id && item.workspaceId === workspaceId);
+        if (!chat) throw new Error('Chat not found');
+        chat.archivedAt = archived ? Date.now() : undefined;
+        return structuredClone(chat);
+      };
+      app.AgentPendingApprovals = async () => [];
+      app.SendAgentMessage = async (input: Record<string, string>) => {
+        e2e.codexSent = input;
+        const messages = [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Codex checked the collection.' }] }];
+        const chat = { id: 'codex-chat', workspaceId: input.workspaceId, title: 'Check collection', driver: 'codex', externalThreadId: 'native-thread', collection: input.collection, environment: input.environment, connectionId: '', model: 'codex-test', effort: input.effort, contextTokens: 12000, contextWindow: 128000, messages, usage, allowedTools: [], createdAt: Date.now(), updatedAt: Date.now() };
+        chats.push(chat);
+        e2e.emit('codex:rateLimits', { limitId: 'codex', limitName: 'Codex', primary: { usedPercent: 30, windowDurationMins: 300, resetsAt: 1800000000 }, secondary: { usedPercent: 40, windowDurationMins: 10080 } });
+        e2e.emit('agent:context', { chatId: chat.id, turnId: input.turnId, tokens: 12000, window: 128000 });
+        e2e.emit('ai:deltas', { sessionId: chat.id, turnId: input.turnId, deltas: [{ step: 0, index: 0, type: 'text', text: 'Codex checked the collection.' }] });
+        return { chat, messages, steps: [], text: 'Codex checked the collection.', usage, hasUsage: true, warnings: [] };
+      };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const sidebar = page.locator('.agent-sidebar');
+    await expect(sidebar).toContainText('API conversation');
+    await page.getByRole('button', { name: /Codex on this computer/ }).click();
+    const connection = page.getByRole('region', { name: 'Codex connection' });
+    await expect(connection).toContainText('user@example.test');
+    await expect(connection.locator('.agent-brand-glyph')).toHaveCount(1);
+    await expect(connection).not.toContainText('Cx');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-connect.png'), animations: 'disabled' });
+    await captureDocsScreenshot(page, 'agent-codex-connect');
+    await connection.getByRole('button', { name: 'Use this account', exact: true }).click();
+    await page.getByRole('button', { name: 'Close settings' }).click();
+
+    const picker = page.getByRole('button', { name: /^Agent:/ });
+    const effortPicker = page.getByRole('button', { name: /^Effort:/ });
+    await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+    await expect(picker.locator('.agent-brand-glyph')).toHaveCount(1);
+    await expect(effortPicker).toHaveAccessibleName('Effort: Medium');
+    await expect(page.locator('.agent-workspace')).toContainText('What should we check?');
+    await expect(page.locator('.agent-starter')).toHaveCount(4);
+    await effortPicker.click();
+    const efforts = page.getByRole('listbox', { name: 'Effort', exact: true });
+    await expect(efforts.getByRole('option')).toHaveText([/Low/, /Medium/, /High/, /Extra high/]);
+    await expect(efforts.getByRole('option', { name: /Medium/ })).toHaveAttribute('aria-selected', 'true');
+    await efforts.getByRole('option', { name: 'High', exact: true }).click();
+    await expect(effortPicker).toHaveAccessibleName('Effort: High');
+    await expect(page.getByRole('dialog', { name: 'Choose agent and model' })).toHaveCount(0);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-model-effort-${testInfo.project.name}.png`), animations: 'disabled' });
+    await picker.click();
+    const agentPanel = page.getByRole('dialog', { name: 'Choose agent and model' });
+    await expect(agentPanel).toContainText('Add a model');
+    await expect(agentPanel.getByRole('radio', { name: /^Codex.*Ready$/ })).toHaveAttribute('aria-checked', 'true');
+    const codexModels = agentPanel.getByRole('radiogroup', { name: 'Codex model' });
+    await expect(codexModels.getByRole('radio', { name: /Codex test/ })).toBeFocused();
+    const listTop = await codexModels.evaluate(element => element.getBoundingClientRect().top);
+    const modelSearch = agentPanel.getByRole('searchbox', { name: 'Search Codex models' });
+    await modelSearch.fill('small');
+    await expect(codexModels.getByRole('radio')).toHaveCount(1);
+    expect(Math.abs(await codexModels.evaluate(element => element.getBoundingClientRect().top) - listTop)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-agent-picker.png'), animations: 'disabled' });
+    await codexModels.getByRole('radio', { name: /^Small test/ }).click();
+    await expect(agentPanel).toHaveCount(0);
+    await expect(picker).toHaveAccessibleName('Agent: Codex · Small test');
+    await expect(effortPicker).toHaveAccessibleName('Effort: Low');
+    await effortPicker.click();
+    await expect(efforts.getByRole('option')).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(effortPicker).toBeFocused();
+    await picker.click();
+    await expect(codexModels.getByRole('radio', { name: /^Small test/ })).toBeFocused();
+    await page.keyboard.press('ArrowUp');
+    await expect(codexModels.getByRole('radio', { name: /^Codex test/ })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+    await expect(effortPicker).toHaveAccessibleName('Effort: Medium');
+    await effortPicker.click();
+    await efforts.getByRole('option', { name: 'High', exact: true }).click();
+
+    const input = page.getByRole('textbox', { name: 'Message the agent' });
+    await input.fill('Check collection');
+    await input.press('Enter');
+    await expect(page.locator('.agent-text')).toContainText('Codex checked the collection.');
+    await expect(sidebar.getByRole('button', { name: /Codex.*Check collection/ })).toHaveAttribute('aria-current', 'page');
+    await expect(sidebar.getByRole('button', { name: /Kurlo agent.*API conversation/ })).toBeVisible();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { codexSent: Record<string, string> }).codexSent)).toMatchObject({ driver: 'codex', text: 'Check collection', effort: 'high' });
+    await expect(page.locator('.agent-header .agent-usage')).toHaveCount(0);
+    await expect(page.locator('.agent-composer .agent-usage')).toContainText('10 in');
+    const details = page.getByRole('complementary', { name: 'Chat details' });
+    await expect(details).toHaveCount(0);
+    await expect(page.locator('.agent-composer .agent-session-status')).not.toContainText('Context');
+    await expect(page.locator('.agent-plan-mini')).toHaveText('Plan 60% left');
+    const toggle = page.getByRole('button', { name: 'Toggle chat details' });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(details.locator('.agent-context')).toContainText('9%');
+    await expect(details.locator('.agent-context')).toContainText('12.0k / 128k');
+    await expect(details.locator('.agent-limits')).toContainText('70% left');
+    await expect(details.locator('.agent-limits')).toContainText('60% left');
+    await expect(details.locator('.agent-limit-resets').first()).toContainText('resets');
+    await details.getByRole('region', { name: 'Context' }).getByRole('button', { name: /^Context/ }).click();
+    await expect(details).toContainText('Effort');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-chat.png'), animations: 'disabled' });
+    await captureDocsScreenshot(page, 'agent-codex-chat');
+    await toggle.click();
+    await expect(details).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('kurlo.agentDetails.v1'))).toBe('0');
+    await page.locator('.agent-plan-mini').click();
+    await expect(details).toBeVisible();
+    await toggle.click();
+
+    await picker.click();
+    await expect(page.getByRole('dialog', { name: 'Choose agent and model' })).toContainText('Start a new chat to switch to another agent.');
+    await page.keyboard.press('Escape');
+    await sidebar.getByRole('button', { name: 'New chat', exact: true }).click();
+    await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+    await expect(page.locator('.agent-empty')).toBeVisible();
+    await expect(effortPicker).toHaveAccessibleName('Effort: High');
+    await page.evaluate(() => {
+      const app = window.go!.api!.App as Record<string, (...args: unknown[]) => Promise<unknown>>;
+      const load = app.AgentChat;
+      app.AgentChat = async (...args: unknown[]) => { await new Promise(resolve => setTimeout(resolve, 600)); return load(...args); };
+    });
+    await sidebar.getByRole('button', { name: /Check collection/ }).click();
+    await expect(page.getByRole('textbox', { name: 'Chat name' })).toHaveValue('Check collection');
+    expect(await page.locator('.agent-empty').count()).toBe(0);
+    expect(await page.locator('.agent-text').count()).toBe(0);
+    await expect(page.locator('.agent-text')).toContainText('Codex checked the collection.');
+    await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+
+    await picker.click();
+    await page.getByRole('button', { name: 'Manage connections', exact: true }).click();
+    await connection.getByRole('button', { name: 'Remove connection', exact: true }).click();
+    await expect(connection).toContainText('Signed in: refreshed@example.test · plus');
+    await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Close settings' }).click();
+    await expect(page.locator('.agent-workspace')).toContainText('Connect a model to start');
+    const codexRow = sidebar.locator('.agent-chat').filter({ hasText: 'Check collection' });
+    await codexRow.getByRole('button', { name: 'Chat menu' }).click({ force: true });
+    await codexRow.getByRole('menuitem', { name: 'Archive', exact: true }).click();
+    await expect(codexRow).toHaveCount(0);
+    await sidebar.getByRole('button', { name: 'Archived', exact: true }).click();
+    await codexRow.locator('.agent-chat-main').click();
+    await expect(page.locator('.agent-text')).toContainText('Codex checked the collection.');
+    await expect(page.locator('.agent-workspace')).toContainText('Archived chat. Restore it from the chat menu to continue.');
+
+    await expect(page.locator('[title]:not(iframe)')).toHaveCount(0);
+  });
+  test('guides installation and completes sign-in through the CLI', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      const status = { installed: false, connected: false, authenticated: false, path: '', version: '', account: '', authType: '', model: '', models: [] as unknown[], authUrl: '', waiting: false };
+      let signingIn = false;
+      app.CodexStatus = async () => {
+        if (signingIn) { status.authenticated = true; status.waiting = false; status.account = 'Signed-in account'; status.model = 'codex-test'; status.models = [{ id: 'codex-test', name: 'Codex test', recommended: true, weakTools: false }]; }
+        return structuredClone(status);
+      };
+      app.OpenFileDialog = async () => { status.installed = true; status.path = '/custom/codex'; return status.path; };
+      app.StartCodexLogin = async () => { signingIn = true; return { ...status, waiting: true, authUrl: 'https://auth.openai.com/test' }; };
+      app.ConnectCodex = async () => { status.connected = true; return structuredClone(status); };
+      app.CancelCodexLogin = async () => { signingIn = false; e2e.codexLoginCancelled = true; };
+      app.AiConnections = async () => ({ connections: [] });
+      window.runtime!.BrowserOpenURL = (url: string) => { e2e.codexAuthURL = url; };
+    });
+    await page.goto('/');
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'AI', exact: true }).click();
+    await expect(page.getByRole('region', { name: 'Codex connection' })).toContainText('npm install -g @openai/codex');
+    await page.getByRole('region', { name: 'Codex connection' }).getByRole('button', { name: 'Choose executable', exact: true }).click();
+    await expect(page.getByRole('textbox', { name: 'Codex executable' })).toHaveValue('/custom/codex');
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Cancel sign-in', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { codexAuthURL: string }).codexAuthURL)).toBe('https://auth.openai.com/test');
+    await page.getByRole('button', { name: 'Cancel sign-in', exact: true }).click();
+    expect(await page.evaluate(() => (window.__kurloE2E as unknown as { codexLoginCancelled: boolean }).codexLoginCancelled)).toBe(true);
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Use this account', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Use this account', exact: true }).click();
+    await page.getByRole('button', { name: 'Close settings' }).click();
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await expect(page.getByRole('textbox', { name: 'Message the agent' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Agent:/ })).toHaveAccessibleName(/^Agent: Codex/);
+  });
+
+  test('keeps CLI detection separate from a failed model list and retries it', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      let attempts = 0;
+      app.CodexStatus = async () => {
+        attempts++;
+        return { installed: true, connected: false, authenticated: true, path: '/usr/local/bin/codex', version: 'codex-cli 0.166.0', account: 'user@example.test · plus', authType: 'chatgpt', model: attempts > 1 ? 'codex-test' : '', models: attempts > 1 ? [{ id: 'codex-test', name: 'Codex test', recommended: true, weakTools: false }] : [], authUrl: '', waiting: false, error: attempts === 1 ? 'Could not load Codex models: model/list: unavailable' : '' };
+      };
+    });
+    await page.goto('/');
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'AI', exact: true }).click();
+    const connection = page.getByRole('region', { name: 'Codex connection' });
+    await expect(connection).toContainText('Codex CLI detected');
+    await expect(connection).toContainText('Signed in: user@example.test');
+    await expect(connection).not.toContainText('Install Codex CLI');
+    await expect(connection.getByRole('textbox', { name: 'Codex executable' })).toHaveValue('/usr/local/bin/codex');
+    await expect(connection.getByRole('alert')).toContainText('Could not load Codex models');
+    await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeDisabled();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-model-error.png'), animations: 'disabled' });
+    await connection.getByRole('button', { name: 'Check again', exact: true }).click();
+    await expect(connection.getByRole('alert')).toHaveCount(0);
+    await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeEnabled();
+    await expect(connection.getByRole('button', { name: /^Codex model:/ })).toContainText('Codex test');
+  });
+
+});
+
+test('reconnects a saved Codex connection after a routing failure and retries the first message', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    let checks = 0;
+    let sends = 0;
+    const status = { installed: true, connected: true, authenticated: true, path: '/usr/local/bin/codex', version: 'codex-cli test', account: 'user@example.test', authType: 'chatgpt', model: 'test-model', models: [{ id: 'test-model', name: 'Test model' }], authUrl: '', waiting: false };
+    app.AiConnections = async () => ({ connections: [] });
+    app.AgentChats = async () => [];
+    app.AgentPendingApprovals = async () => [];
+    app.CodexStatus = async () => {
+      checks++;
+      if (checks === 1 || checks === 3) return { ...status, authenticated: false, models: [], error: 'account/read: workspace routing discovery failed' };
+      return structuredClone(status);
+    };
+    app.SendAgentMessage = async (input: Record<string, string>) => {
+      sends++;
+      if (sends === 1) return { error: 'account/read: workspace routing discovery failed' };
+      if (checks < 4) throw new Error('Sent before reconnect succeeded');
+      if (input.text !== 'Check connection') throw new Error('Lost the original prompt');
+      return { text: 'Connection restored', chat: { id: 'recovered-chat', driver: 'codex', workspaceId: input.workspaceId, title: 'Recovered', model: 'test-model', messages: [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Connection restored' }] }] } };
+    };
+  });
+  await page.goto('/');
+  await page.getByLabel('Settings', { exact: true }).click();
+  await page.getByRole('tab', { name: 'AI', exact: true }).click();
+  const connection = page.getByRole('region', { name: 'Codex connection' });
+  await expect(connection).toContainText('Unavailable');
+  await expect(connection.getByRole('alert')).toContainText('Could not reach the provider');
+  await connection.getByText('Technical details', { exact: true }).click();
+  await expect(connection.getByRole('alert')).toContainText('workspace routing discovery failed');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-network-error.png'), animations: 'disabled' });
+  await connection.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await expect(connection.getByRole('alert')).toHaveCount(0);
+  await expect(connection.locator('.settings-pill')).toHaveText('Connected');
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'Message the agent' });
+  await input.fill('Check connection');
+  await input.press('Enter');
+  await expect(page.locator('.agent-workspace').getByRole('alert')).toContainText('Could not reach the provider');
+  await expect(input).toHaveValue('Check connection');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-agent-network-error.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Reconnect and retry', exact: true }).click();
+  await expect(page.locator('.agent-workspace').getByRole('alert')).toContainText('Could not reach the provider');
+  await expect(page.getByRole('button', { name: /^Agent:/ })).toHaveAccessibleName(/^Agent: Codex/);
+  await expect(input).toHaveValue('Check connection');
+  await page.getByRole('button', { name: 'Reconnect and retry', exact: true }).click();
+  await expect(page.locator('.agent-text')).toContainText('Connection restored');
+  await expect(page.locator('.agent-workspace').getByRole('alert')).toHaveCount(0);
+});
+
+async function installLongAgentHistory(page: Page) {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+    const usage = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+    const base = { id: 'long-history', workspaceId: 'workspace-e2e', title: 'Ten thousand exchanges', driver: 'codex', model: 'test-model', collection: '', environment: '', createdAt: Date.now(), updatedAt: Date.now(), usage, allowedTools: [] };
+    let total = 20000;
+    const requests: Array<{ id: string; before: number; count: number }> = [];
+    e2e.historyRequests = requests;
+    app.AiConnections = async () => ({ connections: [] });
+    app.CodexStatus = async () => ({ installed: true, connected: true, authenticated: true, path: '/test/codex', model: 'test-model', models: [{ id: 'test-model', name: 'Test model' }] });
+    app.AgentChats = async () => [base, { ...base, id: 'short-history', title: 'Small chat' }];
+    app.AgentPendingApprovals = async () => [];
+    app.AgentChat = async () => { throw new Error('The full history must not be requested'); };
+    const pageOf = (id: string, before: number) => {
+      const end = before < 0 ? total : before;
+      const start = Math.max(0, end - 80);
+      const messages = Array.from({ length: end - start }, (_, offset) => {
+        const index = start + offset;
+        const turn = Math.floor(index / 2);
+        return index % 2 === 0 ? { role: 'user', blocks: [{ type: 'text', text: `Question ${turn}` }] } : { role: 'assistant', blocks: [{ type: 'text', text: `Answer ${turn}\n\n` + 'A paragraph with **formatted text**. '.repeat(turn % 7 + 1) }] };
+      });
+      return { ...base, id, messageOffset: start, messageCount: total, messages };
+    };
+    app.AgentChatPage = async (id: string, before: number) => {
+      if (id === 'short-history') return { ...base, id, title: 'Small chat', messages: [{ role: 'user', blocks: [{ type: 'text', text: 'Small question' }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Small answer' }] }] };
+      if (before >= 0 && e2e.failEarlier) { e2e.failEarlier = false; throw new Error('History temporarily unavailable'); }
+      const result = pageOf(id, before);
+      requests.push({ id, before, count: result.messages.length });
+      if (before >= 0 && e2e.deferEarlier) await new Promise<void>(resolve => { e2e.releaseHistory = resolve; });
+      return result;
+    };
+    app.SendAgentMessage = async (input: Record<string, string>) => {
+      e2e.longInput = input;
+      await new Promise<void>(resolve => { e2e.finishLongTurn = resolve; });
+      total += 2;
+      const chat = pageOf(base.id, -1);
+      chat.messages[chat.messages.length - 2] = { role: 'user', blocks: [{ type: 'text', text: input.text }] };
+      chat.messages[chat.messages.length - 1] = { role: 'assistant', blocks: [{ type: 'text', text: 'New answer finished' }] };
+      return { chat, messages: chat.messages.slice(-2), steps: [], text: 'New answer finished', usage, hasUsage: true, warnings: [] };
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.locator('.agent-sidebar').getByRole('button', { name: /Ten thousand exchanges/ }).click();
+  await expect(page.locator('.agent-text').last()).toContainText('Answer 9999');
+}
+
+async function visibleHistoryAnchor(page: Page) {
+  return page.locator('.agent-main > .agent-chat').evaluate(async element => {
+    await document.fonts.ready;
+    let previous = { id: '', top: 0 };
+    let stable = 0;
+    for (let frame = 0; frame < 20; frame++) {
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      const top = element.getBoundingClientRect().top;
+      const row = [...element.querySelectorAll<HTMLElement>('.virtual-agent-row')].find(row => row.getBoundingClientRect().bottom > top + 2);
+      if (!row) continue;
+      const current = { id: row.dataset.turnId!, top: row.getBoundingClientRect().top - top };
+      stable = current.id === previous.id && Math.abs(current.top - previous.top) < 0.5 ? stable + 1 : 0;
+      previous = current;
+      if (stable >= 3) break;
+    }
+    return previous;
+  });
+}
+
+test('pages and virtualizes a long Codex chat while preserving the reading position', async ({ page }, testInfo) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await installLongAgentHistory(page);
+  const chat = page.locator('.agent-main > .agent-chat');
+  await expect.poll(() => chat.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0);
+  if (testInfo.project.name === 'chromium') {
+    const scrollbar = await chat.evaluate(element => ({
+      nativeWidth: getComputedStyle(element).scrollbarWidth,
+      track: getComputedStyle(element, '::-webkit-scrollbar-track').backgroundColor,
+      thumb: getComputedStyle(element, '::-webkit-scrollbar-thumb').backgroundColor,
+    }));
+    expect(scrollbar.nativeWidth).toBe('auto');
+    expect(scrollbar.track).toBe('rgba(0, 0, 0, 0)');
+    expect(scrollbar.thumb).not.toBe(scrollbar.track);
+  }
+  const rows = page.locator('.virtual-agent-row');
+  expect(await rows.count()).toBeLessThan(20);
+  for (let index = 0; index < 4; index++) {
+    await page.evaluate(() => { (window.__kurloE2E as unknown as Record<string, unknown>).deferEarlier = true; });
+    await chat.evaluate(element => { element.scrollTop = 30; });
+    await expect.poll(() => page.evaluate(() => Boolean((window.__kurloE2E as unknown as Record<string, unknown>).releaseHistory))).toBe(true);
+    const anchor = await visibleHistoryAnchor(page);
+    await page.evaluate(() => {
+      const e2e = window.__kurloE2E as unknown as { releaseHistory?: () => void; deferEarlier: boolean };
+      e2e.deferEarlier = false;
+      e2e.releaseHistory?.();
+      delete e2e.releaseHistory;
+    });
+    await expect(page.getByRole('button', { name: 'Load earlier messages', exact: true })).toBeEnabled();
+    await expect.poll(async () => {
+      return page.locator(`[data-turn-id="${anchor.id}"]`).evaluate((element, expected) => Math.abs(element.getBoundingClientRect().top - element.closest('.agent-chat')!.getBoundingClientRect().top - expected), anchor.top);
+    }).toBeLessThan(2);
+    expect(await rows.count()).toBeLessThan(25);
+  }
+  const calls = await page.evaluate(() => (window.__kurloE2E as unknown as { historyRequests: Array<{ before: number; count: number }> }).historyRequests);
+  expect(calls.map(call => call.before)).toEqual([-1, 19920, 19840, 19760, 19680]);
+  expect(calls.every(call => call.count === 80)).toBe(true);
+  await page.screenshot({ path: join(tmpdir(), `kurlo-long-history-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.setViewportSize({ width: 800, height: 620 });
+  await expect.poll(() => rows.count()).toBeGreaterThan(0);
+  expect(await rows.count()).toBeLessThan(25);
+  await chat.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect(page.locator('.agent-text').last()).toContainText('Answer 9999');
+});
+
+test('keeps the viewport when loading earlier history with the keyboard', async ({ page }) => {
+  await installLongAgentHistory(page);
+  const button = page.getByRole('button', { name: 'Load earlier messages', exact: true });
+  const anchor = await visibleHistoryAnchor(page);
+  await button.evaluate(element => {
+    element.focus({ preventScroll: true });
+  });
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => (window.__kurloE2E as unknown as { historyRequests: unknown[] }).historyRequests.length)).toBe(2);
+  await expect.poll(async () => {
+    const current = await visibleHistoryAnchor(page);
+    return current.id === anchor.id ? Math.abs(current.top - anchor.top) : Infinity;
+  }).toBeLessThan(2);
+});
+
+test('keeps paged history failures and delayed pages separate from another chat', async ({ page }) => {
+  await installLongAgentHistory(page);
+  await page.evaluate(() => { (window.__kurloE2E as unknown as Record<string, unknown>).failEarlier = true; });
+  await page.locator('.agent-main > .agent-chat').evaluate(element => { element.scrollTop = 0; });
+  await expect(page.locator('.agent-main > .agent-chat').getByRole('alert')).toHaveText('History temporarily unavailable');
+  await expect(page.locator('.agent-text').first()).toContainText('Answer 9960');
+  await page.evaluate(() => { (window.__kurloE2E as unknown as Record<string, unknown>).deferEarlier = true; });
+  await page.getByRole('button', { name: 'Load earlier messages', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => Boolean((window.__kurloE2E as unknown as Record<string, unknown>).releaseHistory))).toBe(true);
+  await page.locator('.agent-sidebar').getByRole('button', { name: /Small chat/ }).click();
+  await expect(page.locator('.agent-text')).toHaveText('Small answer');
+  await page.evaluate(() => { (window.__kurloE2E as unknown as { releaseHistory: () => void }).releaseHistory(); });
+  await expect(page.locator('.agent-text')).toHaveText('Small answer');
+  await expect(page.getByRole('textbox', { name: 'Chat name' })).toHaveValue('Small chat');
+});
+
+test('shows Codex compaction, ignores unrelated events and does not jump during background streaming', async ({ page }, testInfo) => {
+  await installLongAgentHistory(page);
+  const input = page.getByRole('textbox', { name: 'Message the agent' });
+  await input.fill('Continue');
+  await input.press('Enter');
+  await expect.poll(() => page.evaluate(() => Boolean((window.__kurloE2E as unknown as Record<string, unknown>).longInput))).toBe(true);
+  const emitCompaction = async (active: boolean, unrelated = false) => page.evaluate(({ active, unrelated }) => {
+    const e2e = window.__kurloE2E as unknown as { emit: (name: string, payload: unknown) => void; longInput: { turnId: string } };
+    e2e.emit('agent:compaction', { chatId: 'long-history', turnId: unrelated ? 'old-turn' : e2e.longInput.turnId, active });
+  }, { active, unrelated });
+  await emitCompaction(true, true);
+  await expect(page.getByText('Compacting context…', { exact: true })).toHaveCount(0);
+  await emitCompaction(true);
+  await expect(page.getByText('Compacting context…', { exact: true })).toBeVisible();
+  await page.screenshot({ path: join(tmpdir(), `kurlo-codex-compacting-${testInfo.project.name}.png`), animations: 'disabled' });
+  const chat = page.locator('.agent-main > .agent-chat');
+  const movement = await chat.evaluate(async element => {
+    const e2e = window.__kurloE2E as unknown as { emit: (name: string, payload: unknown) => void; longInput: { turnId: string } };
+    const holdScroll = (event: Event) => event.stopImmediatePropagation();
+    element.addEventListener('scroll', holdScroll, true);
+    element.scrollTop -= 1600;
+    const expected = element.scrollTop;
+    e2e.emit('ai:deltas', { sessionId: 'long-history', turnId: e2e.longInput.turnId, deltas: [{ step: 0, index: 0, type: 'text', text: 'Updated before the scroll handler. '.repeat(200) }] });
+    for (let frame = 0; frame < 4; frame++) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const difference = Math.abs(element.scrollTop - expected);
+    element.removeEventListener('scroll', holdScroll, true);
+    element.dispatchEvent(new Event('scroll'));
+    return difference;
+  });
+  expect(movement).toBeLessThan(2);
+  const anchor = await visibleHistoryAnchor(page);
+  await page.evaluate(() => {
+    const e2e = window.__kurloE2E as unknown as { emit: (name: string, payload: unknown) => void; longInput: { turnId: string } };
+    e2e.emit('ai:deltas', { sessionId: 'long-history', turnId: e2e.longInput.turnId, deltas: [{ step: 0, index: 0, type: 'text', text: 'Streaming new text. '.repeat(200) }] });
+  });
+  await emitCompaction(false);
+  await expect(page.getByText('Compacting context…', { exact: true })).toHaveCount(0);
+  await expect.poll(async () => {
+    const current = await visibleHistoryAnchor(page);
+    return current.id === anchor.id ? Math.abs(current.top - anchor.top) : 9999;
+  }).toBeLessThan(2);
+  await emitCompaction(true);
+  await page.evaluate(() => { (window.__kurloE2E as unknown as { finishLongTurn: () => void }).finishLongTurn(); });
+  await expect(page.getByText('Compacting context…', { exact: true })).toHaveCount(0);
+  await page.locator('.agent-main > .agent-chat').evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect(page.locator('.agent-text').last()).toContainText('New answer finished');
+});
+
+test('keeps the running Codex chat visible after a disconnected status refresh', async ({ page }) => {
+  await installLongAgentHistory(page);
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  await composer.fill('Keep this Codex turn visible');
+  await composer.press('Enter');
+  const stop = page.getByRole('button', { name: 'Stop the agent' });
+  await expect(stop).toBeVisible();
+  await page.evaluate(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    app.CodexStatus = async () => ({ connected: false, installed: true, authenticated: true, path: '/test/codex', models: [] });
+  });
+  await page.getByLabel('Settings', { exact: true }).click();
+  await page.getByRole('tab', { name: 'AI', exact: true }).click();
+  const connection = page.getByRole('region', { name: 'Codex connection' });
+  await connection.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await expect(connection.getByRole('button', { name: 'Remove connection' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await expect(stop).toBeVisible();
+  await expect(page.getByText('Keep this Codex turn visible', { exact: true })).toBeVisible();
+  await page.evaluate(() => (window.__kurloE2E as unknown as { finishLongTurn: () => void }).finishLongTurn());
+  await expect(stop).toHaveCount(0);
+});
+
+for (const connected of [true, false]) {
+  test(`shows the agent welcome before connection checks finish (${connected ? 'API model' : 'no connection'})`, async ({ page }, testInfo) => {
+    await installKurloBridge(page);
+    await page.addInitScript(connected => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      const connections = connected ? [{ id: 'instant-model', kind: 'openai', label: 'My API', baseUrl: 'https://example.test/v1', model: 'test-model', hasKey: true, default: true, provider: 'openai' }] : [];
+      app.AiConnections = async () => {
+        await new Promise<void>(resolve => { e2e.finishConnectionCheck = resolve; });
+        return { connections };
+      };
+      app.CodexStatus = async () => {
+        await new Promise<void>(resolve => { e2e.finishCodexCheck = resolve; });
+        return { installed: true, connected: false, authenticated: false, path: '/test/codex', models: [], error: 'account/read: workspace routing discovery failed' };
+      };
+      app.AgentChats = async () => [];
+      app.AgentPendingApprovals = async () => [];
+    }, connected);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'What should we check?' })).toBeVisible();
+    await expect(page.locator('.agent-starter')).toHaveCount(4);
+    const input = page.getByRole('textbox', { name: 'Message the agent' });
+    await input.fill('Draft while connections are checked');
+    await expect.poll(() => page.evaluate(() => {
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      return Boolean(e2e.finishConnectionCheck && e2e.finishCodexCheck);
+    })).toBe(true);
+    if (connected) await page.screenshot({ path: join(tmpdir(), `kurlo-agent-instant-welcome-${testInfo.project.name}.png`), animations: 'disabled' });
+    await page.evaluate(() => { (window.__kurloE2E as unknown as { finishConnectionCheck: () => void }).finishConnectionCheck(); });
+    await expect(page.getByRole('heading', { name: 'What should we check?' })).toBeVisible();
+    await expect(input).toHaveValue('Draft while connections are checked');
+    await page.evaluate(() => { (window.__kurloE2E as unknown as { finishCodexCheck: () => void }).finishCodexCheck(); });
+    if (connected) {
+      await expect(page.getByRole('button', { name: /^Agent:/ })).toHaveAccessibleName('Agent: Kurlo agent · test-model');
+      await expect(page.getByRole('heading', { name: 'What should we check?' })).toBeVisible();
+      await expect(input).toHaveValue('Draft while connections are checked');
+    } else {
+      await expect(page.getByRole('heading', { name: 'Connect a model to start' })).toBeVisible();
+      await expect(page.locator('.agent-onboarding-card')).toHaveCount(4);
+    }
+  });
+}
+
+test('marks an environment as a sandbox for the agent', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  await page.getByLabel('New environment', { exact: true }).click();
+  await fillPrompt(page, 'New environment', 'Sandbox test');
+  const workspace = page.locator('.environment-workspace');
+  const trigger = page.getByRole('button', { name: 'More environment actions', exact: true });
+  await trigger.click();
+  await workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Sandbox for the agent' }).click();
+  await expect(workspace.locator('.env-sandbox')).toHaveText('Sandbox');
+  await trigger.click();
+  await expect(workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Stop treating as a sandbox' })).toHaveAttribute('aria-checked', 'true');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-sandbox-${testInfo.project.name}.png`), animations: 'disabled' });
+  await workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Protect from AI agents' }).click();
+  await expect(workspace.locator('.env-protected')).toHaveText('Protected');
+  await trigger.click();
+  await expect(workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Stop treating as a sandbox' })).toBeDisabled();
+});
+
+test('dismisses environment actions outside the menu and keeps switching in the top bar and sidebar', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  for (const name of ['Local menu test', 'Staging menu test']) {
+    await page.getByLabel('New environment', { exact: true }).click();
+    await fillPrompt(page, 'New environment', name);
+  }
+  await page.getByRole('radio', { name: 'Single', exact: true }).click();
+  const workspace = page.locator('.environment-workspace');
+  const trigger = page.getByRole('button', { name: 'More environment actions', exact: true });
+  const menu = workspace.getByRole('menu');
+  await expect(workspace.getByRole('button', { name: /^(In use|Use environment)$/ })).toHaveCount(0);
+  await expect(page.locator('.environment-select')).toContainText('Staging menu test');
+  await trigger.click();
+  await expect(menu).toBeVisible();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await workspace.getByRole('heading', { name: 'Staging menu test', exact: true }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await menu.getByRole('menuitemcheckbox', { name: 'Protect from AI agents' }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(workspace.locator('.env-protected')).toHaveText('Protected');
+  await trigger.click();
+  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-actions-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.locator('.environment-select').click();
+  await expect(menu).toHaveCount(0);
+  await page.locator('.environment-menu').getByRole('button', { name: 'Local menu test' }).click();
+  await expect(page.locator('.environment-select')).toContainText('Local menu test');
+  await page.locator('.environment-item-main').filter({ hasText: 'Staging menu test' }).click();
+  await expect(page.locator('.environment-select')).toContainText('Staging menu test');
+  await expect(workspace.getByRole('textbox', { name: 'Environment name', exact: true })).toHaveValue('Staging menu test');
+  await trigger.click();
+  await trigger.click();
+  await expect(menu).toHaveCount(0);
+});
+
+test('renames environments inline in the header and sidebar without a dialog', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  await page.getByLabel('New environment', { exact: true }).click();
+  await fillPrompt(page, 'New environment', 'Local rename');
+  const workspace = page.locator('.environment-workspace');
+  const dialog = page.getByRole('dialog', { name: 'Rename environment' });
+  const title = workspace.getByRole('textbox', { name: 'Environment name', exact: true });
+  const row = page.locator('button.environment-item-main');
+  const sidebarName = page.getByRole('textbox', { name: 'Sidebar environment name', exact: true });
+  await page.getByTestId('environment-variable-row').first().getByLabel('Environment variable key').fill('baseUrl');
+  await page.getByTestId('environment-variable-row').first().getByLabel('Environment variable value').fill('https://example.test');
+  const original = await page.evaluate(() => (window.__kurloE2E.store as { environments: Array<{ id: string; name: string }> }).environments.find(environment => environment.name === 'Local rename')!.id);
+  await title.dblclick();
+  await expect(dialog).toHaveCount(0);
+  await title.fill('Cancel this');
+  await title.press('Escape');
+  await expect(title).toHaveValue('Local rename');
+  await title.fill('Staging renamed');
+  await title.press('Enter');
+  await expect(title).toHaveValue('Staging renamed');
+  await expect(page.locator('.environment-select')).toContainText('Staging renamed');
+  await expect(row).toContainText('Staging renamed');
+  await row.dblclick();
+  await expect(sidebarName).toBeFocused();
+  await expect(sidebarName).toHaveValue('Staging renamed');
+  await expect(dialog).toHaveCount(0);
+  await sidebarName.fill('Discard sidebar edit');
+  await sidebarName.press('Escape');
+  await expect(row).toContainText('Staging renamed');
+  await row.dblclick();
+  await sidebarName.fill('Production renamed');
+  await sidebarName.press('Enter');
+  await expect(title).toHaveValue('Production renamed');
+  await row.focus();
+  await row.press('F2');
+  await sidebarName.fill('Keyboard renamed');
+  await title.click();
+  await expect(title).toHaveValue('Keyboard renamed');
+  await page.getByRole('button', { name: 'More environment actions', exact: true }).click();
+  await workspace.getByRole('menuitem', { name: 'Rename', exact: true }).click();
+  await expect(title).toBeFocused();
+  await expect(title).toHaveJSProperty('selectionStart', 0);
+  await expect(title).toHaveJSProperty('selectionEnd', 'Keyboard renamed'.length);
+  await expect(dialog).toHaveCount(0);
+  await title.fill('');
+  await title.press('Enter');
+  await expect(title).toHaveValue('Keyboard renamed');
+  await title.fill('Final name');
+  await title.press('Tab');
+  await expect.poll(() => page.evaluate(() => {
+    const store = window.__kurloE2E.store as { activeEnvironmentId: string; environments: Array<{ id: string; name: string; values: Array<{ key: string; value: string }> }> };
+    const environment = store.environments.find(environment => environment.name === 'Final name');
+    return { id: environment?.id, active: store.activeEnvironmentId, value: environment?.values.find(row => row.key === 'baseUrl')?.value };
+  })).toEqual({ id: original, active: original, value: 'https://example.test' });
+  await row.focus();
+  await row.press('F2');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-inline-name-${testInfo.project.name}.png`), animations: 'disabled' });
+  await sidebarName.press('Escape');
+});
+
+for (const driver of ['', 'codex']) {
+  test(`stops ${driver || 'API'} before the first chat ID arrives and keeps event subscriptions stable`, async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(driver => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+      const connections = [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }];
+      app.AiConnections = async () => ({ connections: driver ? [] : connections });
+      app.CodexStatus = async () => ({ installed: true, connected: driver === 'codex', authenticated: driver === 'codex', path: '/test/codex', models: [{ id: 'test-model', name: 'Test model' }], model: 'test-model' });
+      app.AgentChats = async () => [];
+      app.AgentPendingApprovals = async () => [];
+      let registered = false;
+      let release: (() => void) | undefined;
+      const stopped: string[] = [];
+      e2e.stoppedTurns = stopped;
+      app.StopAgentTurn = async (turnId: string) => { stopped.push(turnId); if (registered) release?.(); };
+      app.SendAgentMessage = async (input: Record<string, string>) => {
+        e2e.lifecycleInput = input;
+        await new Promise<void>(resolve => { e2e.registerLifecycleTurn = resolve; });
+        registered = true;
+        await new Promise<void>(resolve => {
+          release = resolve;
+          e2e.emit('ai:deltas', { sessionId: 'lifecycle-chat', turnId: input.turnId, deltas: [] });
+        });
+        return { error: 'Cancelled' };
+      };
+    }, driver);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await expect(page.getByRole('button', { name: /^Agent:/ })).toHaveAccessibleName(driver ? 'Agent: Codex · Test model' : 'Agent: Kurlo agent · test-model');
+    const counts = () => page.evaluate(() => window.__kurloE2E.calls.filter(call => /^event:(ai:|agent:|codex:)/.test(call)));
+    const original = await counts();
+    for (let i = 0; i < 12; i++) {
+      await page.getByRole('tab', { name: /New Request/ }).first().click();
+      await page.getByRole('tab', { name: 'Agent', exact: true }).click();
+    }
+    expect(await counts()).toEqual(original);
+    const composer = page.getByRole('textbox', { name: 'Message the agent' });
+    await composer.fill('Stop immediately');
+    await composer.press('Enter');
+    await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeVisible();
+    await page.getByRole('button', { name: 'Stop the agent' }).click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E as unknown as { stoppedTurns: string[] }).stoppedTurns.length)).toBe(1);
+    await page.evaluate(() => { (window.__kurloE2E as unknown as { registerLifecycleTurn: () => void }).registerLifecycleTurn(); });
+    await expect(page.getByRole('button', { name: 'Stop the agent' })).toHaveCount(0);
+    const stopped = await page.evaluate(() => (window.__kurloE2E as unknown as { stoppedTurns: string[] }).stoppedTurns);
+    expect(stopped).toHaveLength(2);
+    expect(stopped[0]).toBe(stopped[1]);
+    await page.evaluate(() => {
+      const e2e = window.__kurloE2E as unknown as { emit: (name: string, payload: unknown) => void; lifecycleInput: { turnId: string } };
+      e2e.emit('agent:approval', { id: 'late', chatId: 'lifecycle-chat', turnId: e2e.lifecycleInput.turnId, tool: 'save_request', kind: 'write', arguments: '{}', reason: '', changes: [] });
+      e2e.emit('agent:compaction', { chatId: 'lifecycle-chat', turnId: e2e.lifecycleInput.turnId, active: true });
+    });
+    await expect(page.locator('.agent-approval')).toHaveCount(0);
+    await expect(page.getByText('Compacting context…', { exact: true })).toHaveCount(0);
+    await expect(composer).toBeEnabled();
+  });
+}
+
+test('requires a fresh cookie jar approval and retries a failed response', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown> & { emit: (name: string, payload: unknown) => void };
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    app.AgentChats = async () => [];
+    app.CodexStatus = async () => ({ connected: false, installed: false, authenticated: false, models: [] });
+    let release: (() => void) | undefined;
+    let answers = 0;
+    app.AnswerAgentApproval = async () => {
+      answers++;
+      if (answers === 1) throw new Error('Decision could not be delivered. Try again.');
+      e2e.closeAcceptedApproval = () => {
+        e2e.emit('agent:approval-closed', { id: 'waiting', chatId: 'waiting-chat', decision: 'allow' });
+        release?.();
+      };
+      return { ok: true };
+    };
+    app.SendAgentMessage = async (input: Record<string, string>) => {
+      await new Promise<void>(resolve => {
+        release = resolve;
+        e2e.emit('agent:approval', { id: 'waiting', chatId: 'waiting-chat', turnId: input.turnId, tool: 'clear_cookie_jar', kind: 'write', arguments: '{}', reason: 'Clears all cookies in the selected workspace jar. This can sign you out.', changes: [] });
+      });
+      return { text: 'Done', messages: [], steps: [], warnings: [] };
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Message the agent' }).fill('Clear the cookie jar');
+  await page.getByRole('textbox', { name: 'Message the agent' }).press('Enter');
+  const approval = page.locator('.agent-approval');
+  await expect(approval).toBeVisible();
+  await expect(approval.getByText('Clear the cookie jar?', { exact: true })).toBeVisible();
+  await expect(approval.getByRole('button', { name: 'Allow for this chat' })).toHaveCount(0);
+  await approval.getByRole('button', { name: 'Clear cookies', exact: true }).click();
+  await expect(approval.getByRole('alert')).toHaveText('Decision could not be delivered. Try again.');
+  await expect(approval.getByRole('button', { name: 'Clear cookies', exact: true })).toBeEnabled();
+  await expect(approval).toContainText('30 minutes');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-cookie-approval-${testInfo.project.name}.png`), animations: 'disabled' });
+  await approval.getByRole('button', { name: 'Clear cookies', exact: true }).click();
+  await expect(approval).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeVisible();
+  await page.evaluate(() => (window.__kurloE2E as unknown as { closeAcceptedApproval: () => void }).closeAcceptedApproval());
+  await expect(page.getByRole('button', { name: 'Stop the agent' })).toHaveCount(0);
+});
+
+test('connects Claude Code like Codex and sends a workspace chat', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    let signedIn = false;
+    let account = 'dev@example.com · pro';
+    let connected = false;
+    let savedModel = 'claude-opus-5-5';
+    let finishSignIn: () => void;
+    const efforts = ['low', 'medium', 'high', 'xhigh', 'max'];
+    const models = [{ id: 'claude-opus-5-5', name: 'Opus 5.5', recommended: true, efforts, defaultEffort: 'high' }, { id: 'claude-sonnet-5-5', name: 'Sonnet 5.5', efforts, defaultEffort: 'high' }];
+    const rateLimits = [{ limitId: 'claude', limitName: 'Claude', primary: { usedPercent: 23, windowDurationMins: 300, resetsAt: 4102444800 }, secondary: { usedPercent: 61, windowDurationMins: 10080, resetsAt: 4102444800 } }];
+    const status = () => ({ installed: true, connected, authenticated: signedIn, path: '/test/claude', version: '2.1.0 (Claude Code)', account: signedIn ? account : '', authMethod: signedIn ? 'subscription' : '', model: savedModel, models, defaultModel: 'claude-opus-5-5', ...(connected ? { rateLimits } : {}) });
+    app.ClaudeCodeStatus = async () => status();
+    app.ConnectClaudeCode = async (input: { model: string }) => {
+      connected = true;
+      savedModel = input.model || savedModel;
+      return status();
+    };
+    app.RemoveClaudeCodeConnection = async () => { connected = false; account = 'refreshed@example.test · pro'; return { ok: true }; };
+    app.SignInClaudeCode = async () => {
+      await new Promise<void>(resolve => { finishSignIn = resolve; });
+      signedIn = true;
+      return { ok: true };
+    };
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+    e2e.finishClaudeSignIn = () => finishSignIn();
+    const chats: Record<string, unknown>[] = [];
+    app.AgentChats = async () => chats;
+    app.SendAgentMessage = async (input: Record<string, string>) => {
+      if (input.driver !== 'claude-code') throw new Error('Unexpected agent');
+      e2e.claudeInput = input;
+      const messages = [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Claude checked the collection.' }] }];
+      const usage = { input: 10, output: 400, cacheRead: 20000, cacheWrite: 5000, reasoning: 0, cost: 0.25 };
+      const chat = { ...input, id: 'claude-chat', title: 'Check collection', externalThreadId: 'claude-session', messages, allowedTools: [], usage, contextTokens: 25010, contextWindow: 1000000, createdAt: Date.now(), updatedAt: Date.now() };
+      chats.push(chat);
+      return { chat, messages, steps: [], warnings: [], text: 'Claude checked the collection.', usage, hasUsage: true };
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const picker = page.getByRole('button', { name: /^Agent:/ });
+  await picker.click();
+  await expect(page.locator('.agent-pick-agent', { hasText: 'Claude Code' })).toContainText('Not signed in');
+  await page.getByRole('button', { name: 'Manage connections' }).click();
+  const connection = page.getByRole('region', { name: 'Claude Code connection' });
+  await expect(connection.getByRole('status')).toHaveText('CLI detected');
+  await expect(connection).toContainText('Claude Code CLI detected · 2.1.0 (Claude Code)');
+  await expect(connection.getByRole('button', { name: 'Use this account' })).toHaveCount(0);
+  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-sign-in-${testInfo.project.name}.png`), animations: 'disabled' });
+  await connection.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(connection.getByRole('status')).toHaveText('Signing in…');
+  await page.evaluate(() => (window.__kurloE2E as unknown as { finishClaudeSignIn: () => void }).finishClaudeSignIn());
+  await expect(connection.getByRole('status')).toHaveText('Signed in');
+  await expect(connection).toContainText('Signed in: dev@example.com · pro');
+  await expect(connection.getByRole('button', { name: 'Reconnect' })).toBeVisible();
+  await expect(connection.getByRole('button', { name: 'Check connection' })).toHaveCount(0);
+  await connection.getByRole('button', { name: 'Use this account' }).click();
+  await expect(connection.getByRole('status')).toHaveText('Connected');
+  await expect(connection.getByRole('button', { name: 'Remove connection' })).toBeVisible();
+  await expect(connection.getByRole('button', { name: 'Claude Code model: Opus 5.5' })).toBeVisible();
+  await expect(connection.getByLabel('Claude plan limits')).toContainText('77% left');
+  await expect(connection.locator('.claude-glyph .agent-brand-glyph')).toHaveCount(1);
+  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-settings-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Close settings' }).click();
+  await picker.click();
+  await page.getByRole('radio', { name: /Claude Code/ }).click();
+  await expect(page.getByRole('radiogroup', { name: 'Claude Code model' }).getByRole('radio')).toHaveText([/Opus 5\.5/, /Sonnet 5\.5/]);
+  await page.getByRole('radio', { name: /^Sonnet 5\.5/ }).click();
+  await expect(picker).toHaveAccessibleName('Agent: Claude Code · Sonnet 5.5');
+  const effortPicker = page.getByRole('button', { name: /^Effort:/ });
+  await expect(effortPicker).toHaveAccessibleName('Effort: High');
+  await effortPicker.click();
+  const effortList = page.getByRole('listbox', { name: 'Effort', exact: true });
+  await expect(effortList.getByRole('option')).toHaveText([/Low/, /Medium/, /High/, /Extra high/, /Max/]);
+  await effortList.getByRole('option', { name: 'Max', exact: true }).click();
+  await expect(effortPicker).toHaveAccessibleName('Effort: Max');
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  await composer.fill('Check collection');
+  await composer.press('Enter');
+  await expect(page.locator('.agent-text')).toContainText('Claude checked the collection.');
+  expect(await page.evaluate(() => (window.__kurloE2E as unknown as { claudeInput: Record<string, string> }).claudeInput)).toMatchObject({ driver: 'claude-code', model: 'claude-sonnet-5-5', effort: 'max' });
+  await expect(page.locator('.agent-sidebar').getByRole('button', { name: /Claude Code.*Check collection/ })).toBeVisible();
+  await expect(page.locator('.agent-composer .agent-usage')).toContainText('25.0k in');
+  await expect(page.locator('.agent-plan-mini')).toHaveText('Plan 39% left');
+  await page.getByRole('button', { name: 'Toggle chat details' }).click();
+  const details = page.getByRole('complementary', { name: 'Chat details', exact: true });
+  await details.getByRole('region', { name: 'Context' }).getByRole('button', { name: /^Context/ }).click();
+  await expect(details).toContainText('Claude Code · Sonnet 5.5');
+  await expect(details).toContainText('Cost at API prices$0.25');
+  await expect(details.locator('.agent-context')).toContainText('3%');
+  await expect(details.locator('.agent-context')).toContainText('25.0k / 1.0M');
+  await expect(details.getByRole('region', { name: 'Claude plan' })).toContainText('39% left');
+  await expect(details.locator('.agent-limits')).toContainText('77% left');
+  await expect(details.locator('.agent-limits')).toContainText('39% left');
+  await expect(details).toContainText('Shared with your other Claude Code sessions.');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-chat-${testInfo.project.name}.png`), animations: 'disabled' });
+  await picker.click();
+  await page.getByRole('button', { name: 'Manage connections', exact: true }).click();
+  await connection.getByRole('button', { name: 'Remove connection', exact: true }).click();
+  await expect(connection).toContainText('Signed in: refreshed@example.test · pro');
+  await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeVisible();
+  await expect(connection.getByLabel('Claude plan limits')).toHaveCount(0);
+});
+
+test('keeps streaming chat history and restores failed drafts only in their original chat', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+    const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, cost: 0 };
+    const base = { workspaceId: 'workspace-e2e', model: 'test-model', connectionId: 'c1', collection: '', environment: '', createdAt: Date.now(), updatedAt: Date.now(), usage, allowedTools: [] };
+    const user = (text: string): { role: string; blocks: Array<Record<string, string>> } => ({ role: 'user', blocks: [{ type: 'text', text }] });
+    const thinking = { type: 'thinking', text: 'Working through the request.' };
+    const tool = { type: 'tool_use', id: 'tool-1', name: 'list_requests', input: '{"scope":"test"}' };
+    const first = { ...base, id: 'first', title: 'First chat', messages: [user('Existing history')] };
+    const other = { ...base, id: 'other', title: 'Other chat', messages: [user('Other history')] };
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    app.AgentChats = async () => [first, other];
+    app.AgentChatPage = async (id: string) => structuredClone(id === 'first' ? first : other);
+    app.AgentPendingApprovals = async () => [];
+    app.SendAgentMessage = async (input: { text: string; turnId: string }) => {
+      if (input.text === 'Streaming prompt') {
+        const emit = e2e.emit as (name: string, payload: unknown) => void;
+        emit('ai:deltas', { sessionId: 'first', turnId: input.turnId, deltas: [{ ...thinking, step: 0, index: 0 }, { ...tool, step: 0, index: 1 }] });
+      }
+      if (input.text === 'Streaming prompt' || input.text === 'Saved before failure') first.messages.push(user(input.text));
+      const outcome = await new Promise<string>(resolve => { e2e.finishAgentSend = resolve; });
+      if (outcome === 'reject') throw new Error('The bridge rejected the send.');
+      if (outcome === 'saved-error') return { chat: structuredClone(first), error: 'The agent stopped after saving.' };
+      if (outcome === 'unsaved') return { chat: structuredClone(first), error: 'The prompt could not be saved.' };
+      if (outcome === 'no-chat') return { error: 'The chat could not be created.' };
+      first.messages.push({ role: 'assistant', blocks: [thinking, tool] });
+      return { chat: structuredClone(first) };
+    };
+  });
+  const finish = (outcome: string) => page.evaluate(value => {
+    (window.__kurloE2E as unknown as { finishAgentSend: (result: string) => void }).finishAgentSend(value);
+  }, outcome);
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const sidebar = page.locator('.agent-sidebar');
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  const stop = page.getByRole('button', { name: 'Stop the agent' });
+  const first = sidebar.getByRole('button', { name: /First chat/ });
+  const other = sidebar.getByRole('button', { name: /Other chat/ });
+  await first.click();
+  await expect(page.getByText('Existing history', { exact: true })).toBeVisible();
+  await composer.fill('Streaming prompt');
+  await composer.press('Enter');
+  await expect(stop).toBeVisible();
+  await other.click();
+  await expect(page.getByText('Other history', { exact: true })).toBeVisible();
+  await first.click();
+  await expect(page.getByText('Existing history', { exact: true })).toBeVisible();
+  await expect(page.getByText('Streaming prompt', { exact: true })).toHaveCount(1);
+  await expect(page.getByText('Other history', { exact: true })).toHaveCount(0);
+  await page.locator('.agent-step-toggle').click();
+  await page.locator('.agent-tool-toggle').click();
+  await finish('saved');
+  await expect(stop).toHaveCount(0);
+  await expect(page.locator('.agent-step-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.agent-tool-toggle')).toHaveAttribute('aria-expanded', 'true');
+
+  for (const outcome of ['reject', 'unsaved']) {
+    await composer.fill('Retry this prompt');
+    await composer.press('Enter');
+    await expect(stop).toBeVisible();
+    await finish(outcome);
+    await expect(composer).toHaveValue('Retry this prompt');
+  }
+
+  await composer.fill('Saved before failure');
+  await composer.press('Enter');
+  await expect(stop).toBeVisible();
+  await finish('saved-error');
+  await expect(stop).toHaveCount(0);
+  await expect(page.getByText('Saved before failure', { exact: true })).toHaveCount(1);
+  await expect(composer).toHaveValue('');
+
+  await sidebar.getByRole('button', { name: 'New chat', exact: true }).click();
+  await composer.fill('Keep out of other chat');
+  await composer.press('Enter');
+  await expect(stop).toBeVisible();
+  await other.click();
+  await expect(page.getByText('Other history', { exact: true })).toBeVisible();
+  await finish('no-chat');
+  await expect(composer).toBeEnabled();
+  await expect(composer).toHaveValue('');
+});
+
+test('shows a failed chat deletion in the agent sidebar', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const chat = { id: 'locked-chat', workspaceId: 'workspace-e2e', title: 'Locked chat', createdAt: Date.now(), updatedAt: Date.now(), model: 'test-model', connectionId: 'c1', messages: [] };
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    app.AgentChats = async () => [chat];
+    app.AgentChatPage = async () => chat;
+    app.AgentPendingApprovals = async () => [];
+    app.DeleteAgentChat = async () => ({ ok: false, error: 'Chat storage is read-only.' });
+  });
+
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const sidebar = page.locator('.agent-sidebar');
+  const row = sidebar.locator('.agent-chat').filter({ hasText: 'Locked chat' });
+  await row.hover();
+  const trigger = row.getByRole('button', { name: 'Chat menu' });
+  await trigger.press('Enter');
+  const menu = row.getByRole('menu');
+  await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeFocused();
+  await sidebar.screenshot({ path: join(tmpdir(), 'kurlo-agent-sidebar-menu.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.press('Enter');
+  await menu.getByRole('menuitem', { name: 'Delete' }).click();
+  await expect(sidebar.getByRole('alert')).toHaveText('Chat storage is read-only.');
+  await expect(row).toBeVisible();
+  await sidebar.screenshot({ path: join(tmpdir(), 'kurlo-agent-delete-error.png'), animations: 'disabled' });
+  await row.getByRole('button', { name: /Locked chat/ }).click();
+  await expect(page.locator('.agent-header').getByRole('button', { name: 'Chat actions' })).toHaveCount(0);
+});
+
+test('restores the selected agent when reopening a workspace', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    app.CodexStatus = async () => ({ installed: true, connected: true, authenticated: true, path: '/test/codex', model: 'codex-test', models: [{ id: 'codex-test', name: 'Codex test' }] });
+    let opens = 0;
+    app.OpenWorkspaceRoot = async () => {
+      const id = ++opens === 1 ? 'second-workspace' : 'workspace-e2e';
+      return {
+        ok: true,
+        root: '/exports',
+        payload: JSON.stringify({ workspaces: [{ id, name: id }], activeWorkspaceId: id }),
+      };
+    };
+  });
+
+  await page.goto('/');
+  const agent = page.getByRole('button', { name: 'Agent', exact: true });
+  const picker = page.getByRole('button', { name: /^Agent:/ });
+  const openWorkspace = async () => {
+    await page.getByLabel('Open Git and storage status').click();
+    await page.getByRole('button', { name: /Open existing repo/ }).click();
+    await expect(page.getByRole('button', { name: /Open existing repo/ })).toBeEnabled();
+    await agent.click();
+  };
+  await agent.click();
+  await picker.click();
+  await page.getByRole('radio', { name: /^Codex/ }).click();
+  await page.getByRole('radio', { name: /^Codex test/ }).click();
+  await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+
+  await openWorkspace();
+  await picker.click();
+  await page.getByRole('radio', { name: /^Test API/ }).click();
+  await page.keyboard.press('Escape');
+  await expect(picker).toHaveAccessibleName('Agent: Kurlo agent · test-model');
+
+  await openWorkspace();
+  await expect(picker).toHaveAccessibleName('Agent: Codex · Codex test');
+});
+
+test('connects project context and drops files onto an agent message', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+    app.AiConnections = async () => ({ connections: [{ id: 'c1', label: 'Test API', kind: 'openai', provider: 'openai', model: 'test-model', hasKey: true, default: true }] });
+    let savedChat: Record<string, unknown> | undefined;
+    const originals: Record<string, string> = { 'spec': 'openapi: 3.1.0' };
+    app.AgentChats = async () => savedChat ? [savedChat] : [];
+    app.AgentChatPage = async () => savedChat;
+    app.AgentAttachmentData = async (chatId: string, workspaceId: string, id: string) => {
+      if (chatId !== 'source-chat' || workspaceId !== 'workspace-e2e' || !(id in originals)) throw new Error('Attachment missing');
+      return originals[id];
+    };
+    app.CodexStatus = async () => ({ connected: false, installed: false, authenticated: false, models: [] });
+    app.OpenDirectoryDialog = async () => '/source/pet-store';
+    app.OpenFileDialog = async () => '/data/openapi.yaml';
+    window.runtime!.OnFileDrop = (callback, useDropTarget) => {
+      e2e.dropAgentFiles = callback;
+      e2e.agentDropTargetEnabled = useDropTarget;
+    };
+    window.runtime!.OnFileDropOff = () => { delete e2e.dropAgentFiles; };
+    app.SendAgentMessage = async (input: Record<string, unknown>) => {
+      e2e.knowledgeInput = input;
+      const canvas = document.createElement('canvas');
+      canvas.width = 720;
+      canvas.height = 420;
+      const image = canvas.getContext('2d')!;
+      image.scale(3, 3);
+      image.fillStyle = '#20242b';
+      image.fillRect(0, 0, 240, 140);
+      image.font = '18px monospace';
+      image.fillStyle = '#78dfac';
+      image.fillText('200 OK', 16, 34);
+      image.fillStyle = '#f1f4f8';
+      image.fillText('{ "pet": "Mochi" }', 16, 68);
+      const thumbnail = document.createElement('canvas');
+      thumbnail.width = 240;
+      thumbnail.height = 140;
+      thumbnail.getContext('2d')!.drawImage(canvas, 0, 0, thumbnail.width, thumbnail.height);
+      originals.screenshot = canvas.toDataURL('image/png');
+      originals.icon = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96"><rect x="8" y="8" width="80" height="80" rx="16" fill="#35404e"/><path d="M48 66c-15-10-24-19-24-29 0-16 19-20 24-7 5-13 24-9 24 7 0 10-9 19-24 29Z" fill="#7bdca9"/></svg>');
+      const attachments = [
+        { name: 'openapi.yaml', id: 'spec', mediaType: 'text/plain' },
+        { name: 'screenshot.png', id: 'screenshot', mediaType: 'image/png', preview: thumbnail.toDataURL('image/jpeg') },
+        { name: 'icon.svg', id: 'icon', mediaType: 'image/svg+xml', preview: originals.icon },
+      ];
+      (e2e.emit as (name: string, payload: unknown) => void)('ai:deltas', { sessionId: 'source-chat', turnId: input.turnId, deltas: [], attachments });
+      await new Promise<void>(resolve => { e2e.finishAttachmentTurn = resolve; });
+      const messages = [{ role: 'user', blocks: [{ type: 'text', text: input.text }], attachments }, { role: 'assistant', blocks: [{ type: 'text', text: 'I found the pet routes.' }] }];
+      savedChat = { ...input, id: 'source-chat', title: 'Review the pet routes', messages, allowedTools: [], createdAt: Date.now(), updatedAt: Date.now() };
+      return { chat: savedChat, messages, steps: [], warnings: [], text: 'I found the pet routes.' };
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  await page.getByRole('button', { name: 'Connect project folder' }).click();
+  await page.getByRole('button', { name: 'Attach file', exact: true }).click();
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  await composer.evaluate(input => {
+    const bridge = window.__kurloE2E as unknown as {
+      dropAgentFiles: (x: number, y: number, paths: string[]) => void;
+      agentDropTargetEnabled: boolean;
+    };
+    if (!bridge.agentDropTargetEnabled || getComputedStyle(input).getPropertyValue('--wails-drop-target').trim() !== 'drop') {
+      throw new Error('The agent composer is not registered as a file drop target.');
+    }
+    const { left, top } = input.getBoundingClientRect();
+    bridge.dropAgentFiles(0, 0, ['/data/outside.txt']);
+    bridge.dropAgentFiles(left + 10, top + 10, ['/data/screenshot.png', '/data/openapi.yaml', '/data/rows.csv', '/data/icon.svg']);
+  });
+  await expect(page.getByRole('button', { name: 'Remove attachment outside.txt' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Remove attachment rows.csv' })).toBeVisible();
+  await page.getByRole('button', { name: 'Remove attachment rows.csv' }).click();
+  await expect(page.getByRole('button', { name: 'Disconnect project pet-store' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove attachment openapi.yaml' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Remove attachment screenshot.png' })).toBeVisible();
+  await composer.fill('Review the pet routes');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-context-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  const bubble = page.locator('.agent-user');
+  const files = page.getByRole('list', { name: 'Attachments' });
+  const preview = files.getByRole('img', { name: 'Preview of screenshot.png' });
+  await expect(preview).toBeVisible();
+  await expect.poll(() => preview.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(240);
+  await expect(files.getByText('openapi.yaml')).toBeVisible();
+  await expect(files.getByRole('img', { name: 'Preview of icon.svg' })).toBeVisible();
+  await expect(bubble).toHaveText('Review the pet routes');
+  const fileBox = (await files.boundingBox())!;
+  expect(fileBox.y + fileBox.height).toBeLessThan((await bubble.boundingBox())!.y);
+  await expect(page.getByRole('button', { name: 'Remove attachment screenshot.png' })).toHaveCount(0);
+  await page.evaluate(() => (window.__kurloE2E as unknown as { finishAttachmentTurn: () => void }).finishAttachmentTurn());
+  await expect(page.getByText('I found the pet routes.', { exact: true })).toBeVisible();
+  const input = await page.evaluate(() => (window.__kurloE2E as unknown as { knowledgeInput: Record<string, unknown> }).knowledgeInput);
+  expect(input.projectRoot).toBe('/source/pet-store');
+  expect(input.attachments).toEqual(['/data/openapi.yaml', '/data/screenshot.png', '/data/icon.svg']);
+  await expect(page.getByRole('button', { name: 'Remove attachment openapi.yaml' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Disconnect project pet-store' })).toBeVisible();
+  await page.getByRole('button', { name: 'New chat', exact: true }).click();
+  await page.locator('.agent-sidebar').getByRole('button', { name: /Review the pet routes/ }).click();
+  await expect(preview).toBeVisible();
+  await expect(bubble).toHaveText('Review the pet routes');
+  await captureDocsScreenshot(page, 'agent-context');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-attachments-${testInfo.project.name}.png`), animations: 'disabled' });
+  const openImage = files.getByRole('button', { name: 'Open screenshot.png' });
+  await openImage.click();
+  const viewer = page.getByRole('dialog', { name: 'screenshot.png' });
+  const image = viewer.getByRole('img', { name: 'screenshot.png' });
+  await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBe(720);
+  const fitted = (await image.boundingBox())!.width;
+  await viewer.getByRole('button', { name: 'Zoom in' }).click();
+  await expect.poll(async () => (await image.boundingBox())!.width).toBeGreaterThan(fitted);
+  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-attachment-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(viewer).toHaveCount(0);
+  await expect(openImage).toBeFocused();
+  await files.getByRole('button', { name: 'Open icon.svg' }).click();
+  const svg = page.getByRole('dialog', { name: 'icon.svg' }).getByRole('img', { name: 'icon.svg' });
+  await expect.poll(() => svg.evaluate(element => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await page.keyboard.press('Escape');
+  await files.getByRole('button', { name: 'Open openapi.yaml' }).click();
+  await expect(page.getByRole('dialog', { name: 'openapi.yaml' }).getByRole('region', { name: 'File contents' })).toHaveText('openapi: 3.1.0');
 });

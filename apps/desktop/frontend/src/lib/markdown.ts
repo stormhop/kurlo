@@ -28,6 +28,7 @@ const QUOTE = /^ {0,3}> ?(.*)$/;
 const LIST_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
 const EMPTY_LIST_ITEM = /^( {0,3})([-*+]|\d{1,9}[.)])[ \t]*$/;
 const TABLE_DIVIDER = /^ {0,3}\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+const MAX_INLINE_DEPTH = 64;
 
 export function safeMarkdownURL(raw: string, allowImageData = false): string {
   const url = raw.trim().replace(/^<(.*)>$/, '$1');
@@ -209,12 +210,21 @@ function splitRow(line: string): string[] {
 }
 
 export function parseInline(text: string): MdInline[] {
+  return parseInlineContent(text, 0);
+}
+
+function parseInlineContent(text: string, depth: number): MdInline[] {
+  if (depth >= MAX_INLINE_DEPTH) return [{ type: 'text', text }];
   const out: MdInline[] = [];
   let buffer = '';
   const flush = () => {
     if (buffer) out.push({ type: 'text', text: buffer });
     buffer = '';
   };
+  let links: ReturnType<typeof indexLinkDelimiters> | undefined;
+  let backticks: ReturnType<typeof indexBackticks> | undefined;
+  const emphasisEnds = new Map<string, Int32Array>();
+  let emphasisRunEnd = 0;
   let i = 0;
   while (i < text.length) {
     const char = text[i];
@@ -239,8 +249,10 @@ export function parseInline(text: string): MdInline[] {
     }
 
     if (char === '`') {
-      const run = /^`+/.exec(text.slice(i))![0];
-      const end = text.indexOf(run, i + run.length);
+      backticks ??= indexBackticks(text);
+      const run = text.slice(i, i + backticks.runs[i]);
+      const next = i + run.length;
+      const end = backticks.longest[next] >= run.length ? text.indexOf(run, next) : -1;
       if (end > 0) {
         flush();
         const code = text.slice(i + run.length, end).replace(/\n/g, ' ');
@@ -254,7 +266,7 @@ export function parseInline(text: string): MdInline[] {
     }
 
     if (char === '!' && text[i + 1] === '[') {
-      const link = readLink(text, i + 1);
+      const link = readLink(text, i + 1, links ??= indexLinkDelimiters(text));
       if (link) {
         const src = safeMarkdownURL(link.href, true);
         flush();
@@ -266,11 +278,11 @@ export function parseInline(text: string): MdInline[] {
     }
 
     if (char === '[') {
-      const link = readLink(text, i);
+      const link = readLink(text, i, links ??= indexLinkDelimiters(text));
       if (link) {
         const href = safeMarkdownURL(link.href);
         flush();
-        const children = parseInline(link.label);
+        const children = parseInlineContent(link.label, depth + 1);
         if (href) out.push({ type: 'link', href, children });
         else out.push(...children);
         i = link.end;
@@ -279,7 +291,9 @@ export function parseInline(text: string): MdInline[] {
     }
 
     if (char === '<') {
-      const auto = /^<((?:https?:\/\/|mailto:)[^\s<>]+)>/i.exec(text.slice(i));
+      const auto = /^<(?:https?:\/\/|mailto:)/i.test(text.slice(i, i + 9))
+        ? /^<((?:https?:\/\/|mailto:)[^\s<>]+)>/i.exec(text.slice(i))
+        : null;
       if (auto) {
         flush();
         out.push({ type: 'link', href: auto[1], children: [{ type: 'text', text: auto[1].replace(/^mailto:/i, '') }] });
@@ -289,7 +303,9 @@ export function parseInline(text: string): MdInline[] {
     }
 
     if ((char === 'h' || char === 'H') && (i === 0 || /[\s(]/.test(text[i - 1]))) {
-      const bare = /^https?:\/\/[^\s<>]+/i.exec(text.slice(i));
+      const bare = /^https?:\/\//i.test(text.slice(i, i + 8))
+        ? /^https?:\/\/[^\s<>]+/i.exec(text.slice(i))
+        : null;
       if (bare) {
         const url = bare[0].replace(/[.,;:!?)\]'"]+$/, '');
         flush();
@@ -303,18 +319,31 @@ export function parseInline(text: string): MdInline[] {
       const end = text.indexOf('~~', i + 2);
       if (end > i + 2) {
         flush();
-        out.push({ type: 'del', children: parseInline(text.slice(i + 2, end)) });
+        out.push({ type: 'del', children: parseInlineContent(text.slice(i + 2, end), depth + 1) });
         i = end + 2;
         continue;
       }
     }
 
     if (char === '*' || char === '_') {
-      const emphasis = readEmphasis(text, i);
+      if (i >= emphasisRunEnd) {
+        emphasisRunEnd = i + 1;
+        while (text[emphasisRunEnd] === char) emphasisRunEnd++;
+      }
+      if (emphasisRunEnd === text.length) {
+        buffer += text.slice(i);
+        break;
+      }
+      const emphasis = readEmphasis(text, i, emphasisRunEnd, emphasisEnds);
       if (emphasis) {
         flush();
-        out.push(emphasis.node);
-        i = emphasis.end;
+        const { length, end } = emphasis;
+        const children = parseInlineContent(text.slice(i + length, end), depth + 1);
+        const node: MdInline = length === 3
+          ? { type: 'strong', children: [{ type: 'em', children }] }
+          : length === 2 ? { type: 'strong', children } : { type: 'em', children };
+        out.push(node);
+        i = end + length;
         continue;
       }
     }
@@ -326,73 +355,100 @@ export function parseInline(text: string): MdInline[] {
   return out;
 }
 
-function readLink(text: string, open: number): { label: string; href: string; end: number } | null {
-  let depth = 0;
-  let close = -1;
-  for (let index = open; index < text.length; index++) {
-    const char = text[index];
-    if (char === '\\') {
-      index++;
-      continue;
-    }
-    if (char === '`') {
-      const end = text.indexOf('`', index + 1);
-      if (end > 0) index = end;
-      continue;
-    }
-    if (char === '[') depth++;
-    if (char === ']') {
-      depth--;
-      if (depth === 0) {
-        close = index;
-        break;
-      }
-    }
+function indexBackticks(text: string) {
+  const runs = new Uint32Array(text.length + 1);
+  const longest = new Uint32Array(text.length + 1);
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (text[i] === '`') runs[i] = runs[i + 1] + 1;
+    longest[i] = Math.max(runs[i], longest[i + 1]);
   }
-  if (close < 0 || text[close + 1] !== '(') return null;
-  let parens = 0;
-  for (let index = close + 1; index < text.length; index++) {
-    const char = text[index];
-    if (char === '\n') return null;
-    if (char === '(') parens++;
-    if (char === ')') {
-      parens--;
-      if (parens === 0) {
-        const inside = text.slice(close + 2, index).trim();
-        const href = inside.replace(/\s+(".*"|'.*')$/, '');
-        return { label: text.slice(open + 1, close), href, end: index + 1 };
-      }
-    }
-  }
-  return null;
+  return { runs, longest };
 }
 
-function readEmphasis(text: string, start: number): { node: MdInline; end: number } | null {
+function indexLinkDelimiters(text: string) {
+  const brackets = new Int32Array(text.length + 1);
+  const parens = new Int32Array(text.length + 1);
+  brackets[text.length] = parens[text.length] = -1;
+  let nextBacktick = -1;
+  for (let i = text.length - 1; i >= 0; i--) {
+    const char = text[i];
+    brackets[i] = brackets[i + 1];
+    if (char === ']') brackets[i] = i;
+    else if (char === '[') {
+      const close = brackets[i + 1];
+      brackets[i] = close < 0 ? -1 : brackets[close + 1];
+    } else if (char === '\\') {
+      brackets[i] = brackets[Math.min(i + 2, text.length)];
+    } else if (char === '`') {
+      if (nextBacktick >= 0) brackets[i] = brackets[nextBacktick + 1];
+      nextBacktick = i;
+    }
+
+    parens[i] = parens[i + 1];
+    if (char === ')') parens[i] = i;
+    else if (char === '(') {
+      const close = parens[i + 1];
+      parens[i] = close < 0 ? -1 : parens[close + 1];
+    } else if (char === '\n') {
+      parens[i] = -1;
+    }
+  }
+  return { brackets, parens };
+}
+
+function readLink(text: string, open: number, { brackets, parens }: ReturnType<typeof indexLinkDelimiters>) {
+  const close = brackets[open + 1];
+  if (close < 0 || text[close + 1] !== '(') return null;
+  const end = parens[close + 2];
+  if (end < 0) return null;
+  const inside = text.slice(close + 2, end).trim();
+  const href = stripLinkTitle(inside);
+  return { label: text.slice(open + 1, close), href, end: end + 1 };
+}
+
+function stripLinkTitle(text: string): string {
+  const quote = text.at(-1);
+  if (quote !== '"' && quote !== "'") return text;
+  let title = -1;
+  for (let i = text.length - 2; i > 0 && !/[\r\n\u2028\u2029]/.test(text[i]); i--) {
+    if (text[i] === quote && /\s/.test(text[i - 1])) title = i;
+  }
+  return title < 0 ? text : text.slice(0, title).trimEnd();
+}
+
+function indexEmphasisEnds(text: string, marker: string) {
+  const ends = new Int32Array(text.length + 1).fill(-1);
+  const char = marker[0];
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (!text.startsWith(marker, i)) {
+      ends[i] = ends[i + 1];
+      continue;
+    }
+    const next = text[i + marker.length];
+    const closesWord = char !== '_' || !next || !/[\p{L}\p{N}]/u.test(next);
+    ends[i] = i > 0 && !/\s/.test(text[i - 1]) && closesWord && next !== char
+      ? i : ends[i + marker.length];
+  }
+  return ends;
+}
+
+function readEmphasis(text: string, start: number, runEnd: number, endsByMarker: Map<string, Int32Array>) {
   const char = text[start];
-  const run = text.slice(start).match(char === '*' ? /^\*+/ : /^_+/)![0];
-  const size = Math.min(run.length, 3);
+  const size = Math.min(runEnd - start, 3);
   const after = text[start + size];
   if (!after || /\s/.test(after)) return null;
   if (char === '_' && start > 0 && /[\p{L}\p{N}]/u.test(text[start - 1])) return null;
   for (const length of size === 3 ? [3, 2, 1] : [size]) {
     const marker = char.repeat(length);
-    let search = start + length;
-    while (search < text.length) {
-      const end = text.indexOf(marker, search);
-      if (end < 0) break;
-      const before = text[end - 1];
-      const next = text[end + length];
-      const closesWord = char !== '_' || !next || !/[\p{L}\p{N}]/u.test(next);
-      if (end > start + length && before && !/\s/.test(before) && closesWord && text[end + length] !== char) {
-        const inner = text.slice(start + length, end);
-        const children = parseInline(inner);
-        const node: MdInline = length === 3
-          ? { type: 'strong', children: [{ type: 'em', children }] }
-          : length === 2 ? { type: 'strong', children } : { type: 'em', children };
-        return { node, end: end + length };
-      }
-      search = end + length;
+    let ends = endsByMarker.get(marker);
+    if (!ends) {
+      ends = indexEmphasisEnds(text, marker);
+      endsByMarker.set(marker, ends);
     }
+    const search = start + length;
+    let end = ends[text.startsWith(marker, search) ? search + length : search];
+    if (end >= 0 && end < runEnd) end = ends[runEnd];
+    if (end >= 0) return { length, end };
   }
   return null;
 }

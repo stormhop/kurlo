@@ -64,6 +64,10 @@ func hideWindowOnClose(goos string) bool {
 	return goos == "darwin"
 }
 
+func framelessWindow(goos string) bool {
+	return goos == "windows" || goos == "linux"
+}
+
 func buildAppOptions(app *api.App, frontendAssets embed.FS) *options.App {
 	bgR, bgG, bgB, bgA := api.InitialWindowBackgroundRGBA()
 
@@ -74,10 +78,11 @@ func buildAppOptions(app *api.App, frontendAssets embed.FS) *options.App {
 		MinWidth:          1120,
 		MinHeight:         680,
 		HideWindowOnClose: hideWindowOnClose(runtime.GOOS),
-		Frameless:         runtime.GOOS == "windows",
+		Frameless:         framelessWindow(runtime.GOOS),
 		AssetServer: &assetserver.Options{
 			Assets: frontendAssets,
 		},
+		DragAndDrop:      &options.DragAndDrop{EnableFileDrop: true},
 		BackgroundColour: options.NewRGBA(bgR, bgG, bgB, bgA),
 		Menu:             buildMenu(app),
 		OnStartup:        app.Startup,
@@ -160,6 +165,9 @@ func buildMenuFor(app *api.App, goos string) *menu.Menu {
 			viewMenu(app),
 			menu.WindowMenu(),
 		)
+	}
+	if goos == "linux" {
+		return nil
 	}
 
 	appMenu := menu.NewMenu()

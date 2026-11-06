@@ -16,7 +16,7 @@
     { value: 'oauth2', label: 'OAuth 2.0' },
     { value: 'none', label: 'No auth' },
   ] as const;
-  let authOptions = $derived(vm.requestType === 'grpc' ? GRPC_AUTH_OPTIONS : AUTH_OPTIONS);
+  let authOptions = $derived(vm.requestType === 'grpc' ? GRPC_AUTH_OPTIONS : AUTH_OPTIONS.filter(option => option.value !== 'ntlm' || vm.requestType === 'http' || vm.requestType === 'graphql'));
   const OAUTH2_GRANT_OPTIONS = [
     { value: 'client_credentials', label: 'Client credentials' },
     { value: 'authorization_code', label: 'Authorization code' },
@@ -92,7 +92,6 @@
             type="button"
             aria-label={bearerTokenVisible ? 'Hide token' : 'Show token'}
             aria-pressed={bearerTokenVisible}
-            title={bearerTokenVisible ? 'Hide token' : 'Show token'}
             onclick={() => (bearerTokenVisible = !bearerTokenVisible)}
           >
             {#if bearerTokenVisible}
@@ -158,7 +157,7 @@
         </div>
       {/if}
 
-    {:else if vm.authType === 'basic' || vm.authType === 'digest'}
+    {:else if vm.authType === 'basic' || vm.authType === 'digest' || vm.authType === 'ntlm'}
       <label class="field-label" for="auth-user">Username</label>
       <input id="auth-user" class="field field-input" bind:value={vm.basicUser} placeholder="Enter username" spellcheck="false" />
       <label class="field-label" for="auth-pass">Password</label>

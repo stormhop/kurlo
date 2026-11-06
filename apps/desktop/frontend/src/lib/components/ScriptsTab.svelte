@@ -28,10 +28,10 @@
   <div class="script-head">
     <div class="segmented subtabs" role="tablist" use:tabListKeyboard>
       <button class="segmented-item" role="tab" class:active={vm.scriptTab === 'pre-request'} aria-selected={vm.scriptTab === 'pre-request'} tabindex={vm.scriptTab === 'pre-request' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'pre-request')}>
-        Pre-request{#if scriptLineCount(vm.activePreRequestScript) > 0}<span class="subtab-count" title="Lines">{scriptLineCount(vm.activePreRequestScript)}</span>{/if}
+        Pre-request{#if scriptLineCount(vm.activePreRequestScript) > 0}<span class="subtab-count">{scriptLineCount(vm.activePreRequestScript)}</span>{/if}
       </button>
       <button class="segmented-item" role="tab" class:active={vm.scriptTab === 'tests'} aria-selected={vm.scriptTab === 'tests'} tabindex={vm.scriptTab === 'tests' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'tests')}>
-        Tests{#if scriptLineCount(vm.activeTestScript) > 0}<span class="subtab-count" title="Lines">{scriptLineCount(vm.activeTestScript)}</span>{/if}
+        Tests{#if scriptLineCount(vm.activeTestScript) > 0}<span class="subtab-count">{scriptLineCount(vm.activeTestScript)}</span>{/if}
       </button>
     </div>
     <span class="script-hint">{engineLabel} · {vm.scriptTab === 'pre-request' ? 'runs before the request is sent' : 'runs after the response is received'}</span>
@@ -43,7 +43,6 @@
         <button
           class="btn btn-secondary btn-sm script-snippet"
           type="button"
-          title={snippet.code}
           aria-label="Insert snippet: {snippet.label}"
           data-testid="script-snippet"
           onclick={() => (vm.activePreRequestScript = appendSnippet(vm.activePreRequestScript, snippet.code))}
@@ -68,7 +67,6 @@
         <button
           class="btn btn-secondary btn-sm script-snippet"
           type="button"
-          title={snippet.code}
           aria-label="Insert snippet: {snippet.label}"
           data-testid="script-snippet"
           onclick={() => (vm.activeTestScript = appendSnippet(vm.activeTestScript, snippet.code))}

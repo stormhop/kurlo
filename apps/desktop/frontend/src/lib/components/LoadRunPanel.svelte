@@ -215,7 +215,7 @@
         {#if result.error}<span class="loadrun-error">{result.error}</span>{/if}
       </div>
       <div class="loadtest-row">
-        <button class="btn btn-secondary" type="button" disabled={!result.hasReport} title={result.hasReport ? '' : 'k6 writes the HTML report only for runs long enough to chart'} onclick={onOpenReport}>Open HTML report</button>
+        <button class="btn btn-secondary" type="button" disabled={!result.hasReport} onclick={onOpenReport}>Open HTML report</button>
         <button class="btn btn-secondary" type="button" disabled={!result.hasSummary} onclick={onSaveSummary}>Save summary JSON</button>
       </div>
     </section>

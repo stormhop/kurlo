@@ -249,7 +249,6 @@
             <input
               class="request-title-input"
               value={draft.name}
-              title={draft.name}
               aria-label="Load test name"
               aria-invalid={nameProblems.length > 0}
               spellcheck="false"
@@ -260,7 +259,7 @@
               }}
             />
             {#if isDraft}
-              <span class="loadtest-draft-note" title={`Saving adds it to ${collection.name}`}>Unsaved draft</span>
+              <span class="loadtest-draft-note">Unsaved draft</span>
               <RequestSaveActions saveDirty={true} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
             {:else if !autosave}
               <RequestSaveActions saveDirty={dirty} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
@@ -284,7 +283,7 @@
           {#if runningHere}
             <button class="btn btn-secondary btn-danger loadtest-run-action" type="button" disabled={run.stopping} onclick={onStop}>{run.stopping ? 'Stopping…' : 'Stop'}</button>
           {:else}
-            <button class="btn btn-primary loadtest-run-action" type="button" disabled={workspaceBlocked || runningElsewhere} title={runningElsewhere ? 'Another load test is running' : ''} onclick={runDraft}>
+            <button class="btn btn-primary loadtest-run-action" type="button" disabled={workspaceBlocked || runningElsewhere} onclick={runDraft}>
               <svg width="0.75rem" height="0.75rem" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l11-7z"/></svg>
               Run with k6
             </button>
@@ -315,9 +314,9 @@
       </div>
     </header>
     <div class="tab-bar tabs loadtest-tabs" role="tablist" use:tabListKeyboard>
-      <button class="tab" role="tab" aria-selected={loadTestTab === 'flow'} tabindex={loadTestTab === 'flow' ? 0 : -1} type="button" onclick={() => selectTab('flow')}>Flow{#if stepCount}<span class="badge">{stepCount}</span>{/if}{#if flowProblems.some(problem => problem !== 'Add at least one request to the flow.') || nameProblems.length}<span class="loadtest-tab-issue" title="Has problems to fix"></span>{/if}</button>
-      <button class="tab" role="tab" aria-selected={loadTestTab === 'load'} tabindex={loadTestTab === 'load' ? 0 : -1} type="button" onclick={() => selectTab('load')}>Load &amp; thresholds{#if thresholdCount}<span class="badge">{thresholdCount}</span>{/if}{#if profileProblems.length}<span class="loadtest-tab-issue" title="Has problems to fix"></span>{/if}</button>
-      <button class="tab" role="tab" aria-selected={loadTestTab === 'data'} tabindex={loadTestTab === 'data' ? 0 : -1} type="button" onclick={() => selectTab('data')}>Data &amp; options{#if dataProblems.length}<span class="loadtest-tab-issue" title="Has problems to fix"></span>{/if}</button>
+      <button class="tab" role="tab" aria-selected={loadTestTab === 'flow'} tabindex={loadTestTab === 'flow' ? 0 : -1} type="button" onclick={() => selectTab('flow')}>Flow{#if stepCount}<span class="badge">{stepCount}</span>{/if}{#if flowProblems.some(problem => problem !== 'Add at least one request to the flow.') || nameProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
+      <button class="tab" role="tab" aria-selected={loadTestTab === 'load'} tabindex={loadTestTab === 'load' ? 0 : -1} type="button" onclick={() => selectTab('load')}>Load &amp; thresholds{#if thresholdCount}<span class="badge">{thresholdCount}</span>{/if}{#if profileProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
+      <button class="tab" role="tab" aria-selected={loadTestTab === 'data'} tabindex={loadTestTab === 'data' ? 0 : -1} type="button" onclick={() => selectTab('data')}>Data &amp; options{#if dataProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
       <button class="tab" role="tab" aria-selected={loadTestTab === 'results'} tabindex={loadTestTab === 'results' ? 0 : -1} type="button" onclick={() => selectTab('results')}>Results{#if runningHere}<span class="badge badge-on">running</span>{:else if result}<span class="loadtest-result-badge {result.status}">{RESULT_LABELS[result.status] ?? result.status}</span>{/if}</button>
     </div>
     <div class="loadtest-content" role="tabpanel">

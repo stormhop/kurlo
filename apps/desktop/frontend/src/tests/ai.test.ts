@@ -243,6 +243,18 @@ describe('ai streaming', () => {
     expect(current.steps[0].blocks[1]).toMatchObject({ type: 'tool_use', id: 'c1', name: 'get_weather', input: '{"city":"Lisbon"}' });
   });
 
+  it('ignores invalid stream indices and keeps valid deltas from the same batch', () => {
+    const valid = { sessionId: 'r', step: 0, index: 0, type: 'text', text: 'OK' };
+    const invalid = [-1, 0.5, NaN, Infinity, 1001];
+    const current = applyAiDeltas(turn(), [
+      ...invalid.map(step => ({ ...valid, step })),
+      ...invalid.map(index => ({ ...valid, index })),
+      valid,
+    ]);
+    expect(current.steps).toHaveLength(1);
+    expect(current.steps[0].blocks).toEqual([{ type: 'text', text: 'OK' }]);
+  });
+
   it('carries finished turns into the next request and skips failed ones', () => {
     const done = turn({
       id: 'a', prompt: 'First', status: 'done',
@@ -454,5 +466,30 @@ describe('mcp request serialization', () => {
     expect(built.url).toBe('http://tools.test/mcp');
     expect(built.mcpName).toBe('forecast');
     expect(built.mcpArguments).toBe('{"city":"Lisbon"}');
+  });
+});
+
+
+describe('provider connection errors', () => {
+  it.each([
+    'account/read: workspace routing discovery failed',
+    'Post "https://example.test": dial tcp: no such host',
+    'TypeError: Failed to fetch',
+    'stream disconnected before completion: error sending request',
+    'context deadline exceeded',
+  ])('explains a connection failure: %s', text => {
+    expect(aiErrorView(text)).toMatchObject({ title: 'Could not reach the provider', hint: expect.stringContaining('internet connection') });
+  });
+
+  it.each([
+    '403 Forbidden: {"error":{"code":"unsupported_country_region_territory"}}',
+    'This service is not available in your region',
+  ])('explains regional restrictions: %s', text => {
+    expect(aiErrorView(text)).toMatchObject({ title: 'Access restricted by the provider', hint: expect.stringContaining('another connection') });
+  });
+
+  it('keeps permission failures separate from regional restrictions', () => {
+    expect(aiErrorView('403 Forbidden: model access denied')).toMatchObject({ title: 'The provider returned an error', status: '403 Forbidden' });
+    expect(aiErrorView('401 Unauthorized: invalid key')).toMatchObject({ title: 'Sign-in required' });
   });
 });

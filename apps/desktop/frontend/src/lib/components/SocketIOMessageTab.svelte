@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
   import { bodyPlaceholder } from '../bodyTemplates';
@@ -63,13 +64,12 @@
             <button
               class="btn btn-ghost btn-icon btn-xs sio-arg-del"
               type="button"
-              title="Remove argument"
               onclick={(e) => { e.stopPropagation(); vm.sioRemoveArg(arg.id); }}
             >✕</button>
           </div>
         {/each}
         <button class="btn btn-dashed btn-sm sio-add-arg-btn" type="button" onclick={vm.sioAddArg}>
-          + Add Arg
+          <AddCloseIcon add /> Add Arg
         </button>
       </div>
     {/if}
@@ -148,8 +148,8 @@
 
 
           {#if vm.sioArgs.length === 1}
-            <button class="btn btn-dashed btn-sm sio-add-arg-inline" type="button" onclick={vm.sioAddArg} title="Add argument">
-              + Arg
+            <button class="btn btn-dashed btn-sm sio-add-arg-inline" type="button" onclick={vm.sioAddArg}>
+              <AddCloseIcon add /> Arg
             </button>
           {/if}
 

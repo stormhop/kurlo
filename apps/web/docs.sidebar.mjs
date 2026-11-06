@@ -31,6 +31,7 @@ export const DOCS_SIDEBAR = [
       { label: 'Collection Runner', link: '/docs/guides/collection-runner/' },
       { label: 'Load testing with k6', link: '/docs/guides/load-testing/' },
       { label: 'CLI runner (run & load)', link: '/docs/guides/cli-runner/' },
+      { label: 'Agent', link: '/docs/guides/agent/' },
       { label: 'MCP server (kurlo mcp)', link: '/docs/guides/mcp-server/' },
       { label: 'Git-backed workspaces', link: '/docs/guides/git-workspaces/' },
       { label: 'Import & export', link: '/docs/guides/import-export/' },

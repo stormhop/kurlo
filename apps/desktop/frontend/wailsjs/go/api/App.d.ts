@@ -5,7 +5,27 @@ import {api} from '../models';
 
 export function AckQuit():Promise<void>;
 
+export function AgentActivity(arg1:model.AgentActivityFilter):Promise<model.AgentActivityList>;
+
+export function AgentActivityEntry(arg1:string):Promise<model.AgentActivityEntry>;
+
+export function AgentAttachmentData(arg1:string,arg2:string,arg3:string):Promise<string>;
+
+export function AgentChat(arg1:string):Promise<model.AgentChat>;
+
+export function AgentChatPage(arg1:string,arg2:number):Promise<model.AgentChat>;
+
+export function AgentChats(arg1:string):Promise<Array<model.AgentChatSummary>>;
+
+export function AgentMcpServers():Promise<model.AgentMcpServersState>;
+
+export function AgentPendingApprovals(arg1:string):Promise<Array<model.AgentApproval>>;
+
+export function AgentWorkspaceNotes():Promise<model.AgentWorkspaceNotes>;
+
 export function AiConnections():Promise<model.AiConnectionsState>;
+
+export function AnswerAgentApproval(arg1:string,arg2:string):Promise<model.AgentResult>;
 
 export function AppInfo():Promise<model.AppInfo>;
 
@@ -17,6 +37,10 @@ export function AuthorizeOAuth2(arg1:model.AuthConfig):Promise<model.OAuth2Token
 
 export function AuthorizeOAuth2Device(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
+export function BranchAgentChat(arg1:string,arg2:string,arg3:number):Promise<model.AgentChat>;
+
+export function CancelCodexLogin():Promise<void>;
+
 export function CancelOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 
 export function CancelQuit():Promise<void>;
@@ -26,6 +50,10 @@ export function CancelRequest(arg1:string):Promise<void>;
 export function CheckForUpdate():Promise<model.UpdateCheckResult>;
 
 export function CheckWorkspaceYAML(arg1:string,arg2:string):Promise<api.WorkspaceYAMLCheckResult>;
+
+export function ClaudeCodeStatus(arg1:string):Promise<model.ClaudeStatus>;
+
+export function ClearAgentActivity():Promise<model.AgentResult>;
 
 export function ClearCookies(arg1:string):Promise<Array<model.Cookie>>;
 
@@ -37,13 +65,23 @@ export function ClipboardGet():Promise<string>;
 
 export function ClipboardSet(arg1:string):Promise<void>;
 
+export function CodexStatus(arg1:string):Promise<model.CodexStatus>;
+
 export function ConfirmQuit():Promise<void>;
+
+export function ConnectClaudeCode(arg1:model.ClaudeConnection):Promise<model.ClaudeStatus>;
+
+export function ConnectCodex(arg1:model.CodexConnection):Promise<model.CodexStatus>;
 
 export function CookieSyncStatus():Promise<model.CookieSyncStatus>;
 
 export function CreateLocalWorkspaceRoot(arg1:string,arg2:string,arg3:string):Promise<api.WorkspaceOpenResult>;
 
 export function DefaultWorkspaceLocation():Promise<api.DefaultWorkspaceLocationResult>;
+
+export function DeleteAgentChat(arg1:string):Promise<model.AgentResult>;
+
+export function DeleteAgentMcpServer(arg1:string):Promise<model.AgentMcpServersState>;
 
 export function DeleteCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 
@@ -54,6 +92,8 @@ export function DenyCookieSyncPairing(arg1:string):Promise<model.CookieSyncStatu
 export function DiagnosticsReport():Promise<string>;
 
 export function DiscoverLocalAiServers():Promise<model.AiLocalDiscovery>;
+
+export function ExportAgentChat(arg1:string,arg2:string):Promise<string>;
 
 export function ExportLoadTestK6(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
 
@@ -120,6 +160,8 @@ export function GitInitWorkspace():Promise<api.GitOperationResult>;
 export function GitOutgoingChanges():Promise<api.GitDiffResult>;
 
 export function GitPullBranch(arg1:string):Promise<api.GitOperationResult>;
+
+export function GitPullRequestURL():Promise<api.GitPullRequestResult>;
 
 export function GitPullWorkspace():Promise<api.WorkspaceOpenResult>;
 
@@ -215,15 +257,25 @@ export function RefreshOAuth2Token(arg1:model.AuthConfig):Promise<model.OAuth2To
 
 export function RemoveAiConnection(arg1:string):Promise<model.AiConnectionsState>;
 
+export function RemoveClaudeCodeConnection():Promise<model.AgentResult>;
+
+export function RemoveCodexConnection():Promise<model.AgentResult>;
+
+export function RenameAgentChat(arg1:string,arg2:string):Promise<model.AgentResult>;
+
 export function ReopenOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 
 export function RestartApp():Promise<void>;
+
+export function RevertAgentActivity(arg1:string,arg2:string):Promise<model.AgentActivityEntry>;
 
 export function RevokeCookieSyncPairing():Promise<model.CookieSyncStatus>;
 
 export function SSEConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
 
 export function SSEDisconnect(arg1:string):Promise<void>;
+
+export function SaveAgentMcpServer(arg1:model.AgentMcpServer):Promise<model.AgentMcpServersState>;
 
 export function SaveAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionsState>;
 
@@ -243,6 +295,8 @@ export function SaveResponseBody(arg1:string,arg2:string):Promise<api.SaveRespon
 
 export function SaveWorkspaceSecrets(arg1:Record<string, string>):Promise<api.WorkspaceOpenResult>;
 
+export function SendAgentMessage(arg1:model.AgentSendInput):Promise<model.AgentTurn>;
+
 export function SendAiRequest(arg1:model.AiRequest):Promise<model.AiResponse>;
 
 export function SendGrpcRequest(arg1:model.GrpcRequest):Promise<model.GrpcResponse>;
@@ -252,6 +306,10 @@ export function SendMcpRequest(arg1:model.HttpRequest):Promise<model.McpResponse
 export function SendRequest(arg1:model.HttpRequest):Promise<model.HttpResponse>;
 
 export function SendRequestToFile(arg1:model.HttpRequest,arg2:string):Promise<api.DownloadResult>;
+
+export function SetAgentActivityEnabled(arg1:boolean):Promise<model.AgentResult>;
+
+export function SetAgentChatArchived(arg1:string,arg2:string,arg3:boolean):Promise<model.AgentChatSummary>;
 
 export function SetAppThemeBackground(arg1:string,arg2:string):Promise<void>;
 
@@ -273,11 +331,15 @@ export function SetVariables(arg1:Record<string, string>):Promise<void>;
 
 export function Show():Promise<void>;
 
+export function SignInClaudeCode(arg1:string):Promise<model.AgentResult>;
+
 export function SocketIOConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
 
 export function SocketIODisconnect(arg1:string):Promise<void>;
 
 export function SocketIOEmit(arg1:string,arg2:model.SocketIOEmitMessage):Promise<model.SocketIOEmitResult>;
+
+export function StartCodexLogin(arg1:string):Promise<model.CodexStatus>;
 
 export function StartCookieSync(arg1:model.CookieSyncConfig,arg2:string):Promise<model.CookieSyncStatus>;
 
@@ -287,6 +349,10 @@ export function StartMockServer(arg1:model.MockServerConfig):Promise<model.MockS
 
 export function StartOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 
+export function StopAgent(arg1:string):Promise<void>;
+
+export function StopAgentTurn(arg1:string):Promise<void>;
+
 export function StopCookieSync():Promise<model.CookieSyncStatus>;
 
 export function StopLoadRun():Promise<model.LoadRunState>;
@@ -294,6 +360,8 @@ export function StopLoadRun():Promise<model.LoadRunState>;
 export function StopMockServer():Promise<model.MockServerStatus>;
 
 export function StoredHistoryResponseIDs():Promise<Array<string>>;
+
+export function TestAgentMcpServer(arg1:model.AgentMcpServer):Promise<model.AgentMcpTestResult>;
 
 export function TestAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionTestResult>;
 

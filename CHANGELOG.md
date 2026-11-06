@@ -9,14 +9,152 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **The agent's loop.** Chats in Agent Mode run at the same time: start a task in one chat and keep working in another, with a working dot on each busy chat. Reading tools called in one step run together. Long turns stay inside the model's context: Kurlo counts tokens instead of characters, takes the window from the provider's model list and shortens the oldest tool results of a turn when it would pass 70% of it. Anthropic connections use prompt caching, OpenRouter reports the cost of each step, and **Chat details** shows the cost and the context of the last request.
+
+- **Permissions, trusted hosts and sandbox environments for the agent.** **Approvals** next to the model in the message box chooses **Ask always**, **Ask for changes** or **Auto** per chat. **Trusted hosts** such as `localhost` or `*.staging.example.com` and environments marked **Sandbox for the agent** let `POST`, `PUT`, `PATCH` and `DELETE` run without asking; `git push`, k6, OAuth sign-in and clearing cookies always ask. **Budget** stops a chat at a number of tokens or sent requests.
+
+- **Plans before multi-step tasks.** The agent shows **Follow this plan?** with its steps and the exact calls it intends to make; **Approve plan** lets those calls, and nothing else, run without asking for the rest of the turn.
+
+- **Team notes in kurlo-agent.md.** The Kurlo agent reads `kurlo-agent.md` from the workspace folder every turn, follows its conventions and proposes additions as a diff you approve. Templates under `## Templates` appear in the message box.
+
+- **MCP servers for the agent.** **Settings → AI → MCP servers for the agent** connects HTTP servers and local commands over stdio, such as GitHub or Jira, with encrypted headers and environment variables and a **Test** button. Each call to them waits for approval unless allowed for the chat or listed in an approved plan.
+
+- **Folding sections in Chat details and Settings → AI.** Each part of **Chat details**, and **Your agents**, **Kurlo agent** and **MCP servers for the agent** in **Settings → AI**, folds with a click and shows a short summary while closed, such as the connected agents, the default connection or the token count and cost. Kurlo remembers which parts are open, and **Manage connections** opens the part you came from.
+
+- **Edit and branch agent messages.** Hover a sent message to **Edit message**, which replaces it and everything after it, or **Branch from here** to continue in a new chat with the conversation up to that point.
+
+- **Zoom in Settings.** **Settings → Appearance** (renamed from Theme) has a **Zoom** row with −, + and **Reset** that steps the interface from 80% to 150% and lists the zoom shortcuts. The size is stored on this device. Windows and Linux have no View menu, so this was only reachable from the keyboard there.
+
+- **Drag and drop attachments in Agent Mode.** Drop files onto the message box to attach them to your next message.
+
+- **Project context and imports in Agent Mode.** Connect a read-only source folder, attach a specification, proto, CSV or screenshot, and ask the agent to cover an endpoint from the code. Preview and approve YAML imports from OpenAPI, Swagger, Postman, Insomnia, HAR and cURL. Read or edit saved Markdown docs and generate HTTP request snippets. Imports and project tools also work through `kurlo mcp`.
+
+- **Run more from Agent Mode.** Open WebSocket, Socket.IO, SSE and gRPC streams, send and read messages, and close connections with **Stop** or when the turn ends. Run saved unary gRPC, MCP and AI requests. Run collections with iterations, CSV or JSON data, a delay and stop on failure. Save load tests, run k6 in the background and compare completed runs. Start a localhost mock from saved examples, inspect its log, and check request timings, redirects, TLS and cookie metadata. Clearing the cookie jar always asks first.
+
+- **Agent activity screen.** **Activity** in the agent sidebar lists every tool call made by the Kurlo agent, Codex, Claude Code or an MCP client, newest first, with search and filters by client and period. A call shows its arguments, result, branch and commit, and the diff of every file it changed; **Restore** and **Restore all** put files back to their version before the call and refuse when a file has changed since. **Record activity** turns logging off and **Clear…** deletes the log. The list shows the workspace selected in the top bar; **All workspaces** shows the rest, marked with their workspace, and **Open chat** appears only for chats of the current workspace.
+
+- **The agent works in its chat's workspace.** When a folder holds several workspaces, the Kurlo agent, Codex and Claude Code see and change only the collections, requests and environments of the workspace the chat belongs to; new collections and environments go there, other workspaces' files stay untouched, and the system prompt names the workspace. Activity entries record their workspace; `kurlo mcp` calls are assigned by the files they change. **Chat details → Git** notes that Git applies to the whole folder.
+
+- **Git tools for agents.** `git_status`, `git_diff` and `pull_request_url` run without asking; `git_create_branch` and `git_commit` ask first, with the files and diff of a commit; `git_push` asks every time and is never allowed for the whole chat. Only Kurlo workspace files are committed. The tools are also available to assistants through `kurlo mcp`; `--read-only` leaves out the ones that change the repository.
+
+- **Agent branch.** **Branch** in the agent's message box commits each approved change to a branch of its own, `kurlo-agent/<chat>-<id>`, created from the current commit on the first change. **Chat details → Git** shows the current and agent branch and **Open pull request** opens a pull or merge request page on GitHub, GitLab or Bitbucket.
+
+- **NTLM and OAuth 2.0 sign-in.** Use NTLMv2 on HTTP requests and authorize saved OAuth 2.0 requests in Agent Mode or through MCP.
+
+- **Edit workspace requests and apply batches in Agent Mode.** Save requests of every supported type with workspace YAML, patch individual fields, and review a batch of request, collection, folder, environment, global or example edits in one diff.
+
+- **Archive and export Agent Mode chats.** Keep selected chats in an encrypted local archive beyond the 90-day and 200-chat limits, restore them to the chat list, or save the full stored conversation as Markdown.
+
+- **Meet Agent mode.** The first launch after updating from 2.x to 3.0 shows a short introduction to Agent mode instead of the long list of changes: the Kurlo agent, Claude Code and Codex, with **Try Agent mode** to open the Agent tab and **All changes** for the release notes. It appears once. Until the Agent tab is opened for the first time, its icon in the activity bar carries a blue dot, for new installs too.
+
+- **Claude Code in Agent Mode.** Connect the installed Claude Code CLI in **Settings → AI** the same way as Codex: Kurlo shows the CLI version and the signed-in account and plan (or API key / cloud provider), starts the official Claude sign-in if needed, and **Use this account** saves the connection with the chosen model; **Reconnect**, **Remove connection** and a custom executable path work as for Codex. Pick Claude Code and a model by its full name (Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5; the CLI's own default is preselected and marked) and an effort from Low to Max, with High preselected and always passed to the CLI, so the menu shows the level actually used, continue native sessions, and review workspace changes with Kurlo’s approval controls. Chat details show token usage, the cost at API prices, the last request's context against the model's window, and the Claude plan's 5-hour and weekly limits, which also appear as bars in Settings as soon as the connection is checked (read with the CLI's own `/usage`, which uses no tokens); a failed turn shows the CLI's reason, such as a model that needs usage credits.
+
+- **Rename environments from their names.** Edit the environment name directly in the editor, or double-click it in the sidebar. **Rename** focuses the name field; Enter or leaving the field saves, and Escape cancels.
+
+- **Find agent chats from the command palette.** Search chat names with `Cmd/Ctrl K` to open either agent's chat from the selected workspace, alongside requests and commands.
+
+- **Reasoning effort for local agents.** Choose a supported effort in its own menu beside the agent picker. The model's default is highlighted until you choose another; the choice is saved per chat, and choosing the default again restores the CLI's own setting.
+
+- **Local agent connections.** Connect an installed coding agent with its own account in **Settings → AI**, pick it in the agent picker and continue its chats across app restarts. One picker in the message box chooses Codex with its model, or the Kurlo agent with any connected model; a separate menu chooses Codex effort; chats of both share the sidebar, each marked with its agent, and a new chat keeps the draft, collection and environment when you switch agent. Workspace tools keep the same approval and diff review; removing a connection keeps the CLI login intact.
+
 - **Suggestions while you type.** The URL field offers the rest of a URL you have sent or saved in the workspace, newest history first, and typing the start of a request's name offers that request's URL. A JSON body offers the next key from the request's saved examples, including those an OpenAPI import created, following the nested object you are in and skipping keys already there. The suggestion shows in faded text; `Tab` accepts it and `Escape` hides it.
 - **Environment inheritance.** An environment can inherit from another: every variable it does not set comes from its parent, then from the parent's parent. The environment page lists the inherited variables with an **Override** button, the matrix shows inherited values in grey with the environment they come from, and the sidebar names the parent. Requests, scripts, the runner, load tests, `kurlo run` and `kurlo mcp` resolve variables the same way; scripts write to the environment in use, never to its parent. An environment under a protected one is protected too. The parent is stored as `parentId` in the environment file, so existing workspaces need no migration.
 - **Folder defaults.** A folder's **Settings** (in its `...` menu) set headers, auth, a pre-request script and tests for every request inside it, subfolders included. Headers layer collection → outer folder → inner folder → request; a request set to **Inherit auth** takes the nearest folder's auth, and a folder can switch auth off for its requests; folder scripts run between the collection's and the request's. Renaming a folder keeps its settings, refreshed OAuth 2.0 tokens are saved to the folder that supplies them, and the CLI, runner, load tests and `kurlo mcp` apply the same layers. Postman and Bruno/OpenCollection folder auth and scripts now import as folder defaults instead of being copied into every request, and export back to the folder. Stored as `folderDefaults` in `collection.yml`, with secrets kept out of the YAML.
 
+- **Agent.** A built-in agent works on the open workspace with your connected model: ask it in plain words to run requests, explain a failure, run a collection and explain what failed, or add a request with tests. Open it from the activity bar or with `Alt Cmd/Ctrl 4`; chats are listed in the sidebar under Today and Earlier, and quick tasks start the common jobs. Chips in the message box choose the collection and environment, and the agent picker beside them the model. An empty chat offers four starting tasks. Each tool call shows as one line that expands to its arguments and result and opens the request, history entry or environment it touched; token use is shown and **Stop** ends a turn. Reading and requests that only send `GET`, `HEAD` or `OPTIONS` run at once; other methods ask first, and every change to the workspace shows the exact lines of each YAML file for **Apply**, **Reject** or **Allow for this chat**. Nothing is written while it waits, and a change to a file you edited in the meantime is dropped instead of overwriting you. Protected environments stay off limits and secrets reach the model only as `[secret]`. **Templates** in the message box fill in common requests. Chats can be filtered and renamed (in the header, by double-click, `F2` or the **•••** menu), messages can be selected or copied with a button, and a failed or stopped turn has **Retry**; the sidebar follows the tab, so opening a request from the chat shows your collections again; long chats show their latest 40 exchanges first. The model gets the last two exchanges in full, older tool results shortened, and the oldest exchanges are left out past about 400,000 characters. Changes the agent writes load into the app without a "Workspace refreshed" notice and keep open unsaved drafts; only unsaved edits in manual-save mode pause the reload, with a message saying the agent changed the workspace. Chats are encrypted in the local profile, never in the workspace, and kept for 90 days. Without a connected model, the tab offers OpenRouter, an API key, a local model or Codex.
+- **Agent activity log.** Every tool call by the agent or by an assistant connected through `kurlo mcp` is written to an encrypted local log with its client, arguments and result (secrets masked) and the files it changed before and after, kept for 30 days.
 - **AI connections.** **Settings → AI** keeps the models Kurlo's own AI features use: sign in with OpenRouter (Kurlo opens the browser and receives the key on a one-time loopback callback), add an Anthropic, OpenAI or OpenAI-compatible key, or pick a local Ollama or LM Studio model that Kurlo finds on this machine. OpenRouter returns through kurlo.dev, so its approval page names Kurlo instead of a localhost port. **Test** checks the key and lists the provider's models in a searchable picker, marking those recommended for tool use and those without tool support. An AI request can use the default connection and its model by choosing **Kurlo connection** as its provider; changing the default in Settings updates open requests at once. Keys are encrypted with the profile key from the system keychain, are never written to workspace YAML and never reach the interface; only a hint such as `sk-ant-…XYZ` is shown, and a key a provider repeats in an error is masked. Up to ten connections are kept. Other AI request providers keep their own URL and key.
+
+### Changed
+
+- **Linux window without the system title bar.** On Linux Kurlo draws its own title bar like on Windows: the top bar drags the window, a double click maximizes it, and minimize, maximize and close sit on the right. The GTK title bar and the Kurlo / View menu bar are gone, so the app gains two rows of space. The window still resizes from its edges, `Ctrl Q` quits, and zoom is in **Settings → Appearance** and on `Ctrl =`, `Ctrl -` and `Ctrl 0`.
+- **Cookie jar redesign.** The Cookies window now matches Settings: domains in a filterable list on the left, the selected domain's cookies in a table with value, path, expiry and flags, and expired cookies struck through. Clicking a row opens an editor below the table with **Fields** (name, value, path, expires, SameSite, HttpOnly, Secure, include subdomains) and **Raw** for pasting a `Set-Cookie` string; `Cmd/Ctrl Enter` saves. Domains holding a cookie without a value are marked. Opening the window no longer adds the open request's domain as an empty entry; an empty jar offers to add a cookie for it instead. The **Sync** tab is laid out as Settings cards with a switch to turn sync on, and the manual pairing code stays hidden until **Show code**.
+- **Faster test runs.** Browser tests run in parallel with a bounded worker count; documentation screenshots, profiling and interactive slow runs stay serial. `make check` runs independent checks concurrently, and focused, watch, failed-only and full test commands are available from the repository root.
+
+- **Agent icons.** Codex and Claude Code are shown with their own marks in settings, the agent picker, chat lists and search results.
+
+- **Long agent conversations.** Chats load 40 exchanges at a time and render only messages near the viewport. Scroll up to load earlier messages while keeping your reading position. Codex reports **Compacting context…** while its CLI compresses the model context, and continuing a session no longer asks the CLI to return its whole transcript.
+
+- **Simpler chat headers.** The header shows the chat name and actions; the agent and model remain in the composer and Chat details.
+
+- **Cleaner agent chats.** Exchanges are separated by spacing without horizontal divider lines.
+
+- **Separate model and effort choices.** Clicking **Codex** in the agent picker switches to it at once, and its models are listed right below with a search field, the same way as a Kurlo agent connection's models; the list keeps its height while you search, so the panel does not jump. A compact Effort menu beside it changes reasoning effort without reopening the model picker and keeps the choice for new chats.
+
+- **Settings, one layout for every page.** The Settings window is wider, and each page has a title and a line on what it covers, with settings grouped in boxes: name and description on the left, the control on the right. General shows every setting at once instead of folded cards (Saving and Script engine are switches, On launch is a list), Proxy shows the server and sign-in fields only when the proxy is **On**, Shortcuts, Support and About use the same rows, and the AI page puts **Your agents** first: the Codex row shows its state, account, model (saved as soon as you pick it) and plan limits as bars, with the executable path folded below.
+
+- **Agent chat layout.** A saved chat has a slim header with its name, the agent and model on the right and a **•••** menu to rename or delete it. Tool calls of a turn sit in one card, one line each with a status mark, the request it touched, and for a run the status code and time; the approval card has a tinted header and its buttons in a footer, and a line above the message box says when the agent waits for you. The **Chat details** button at the right of the status bar opens a side panel with the chat's collection, environment, agent and effort, token usage and context size, plan limits with reset times, changes and recent runs; it stays open or closed across launches. Below the message box only the token count and, for Codex, the tightest plan limit remain, and clicking that limit opens the panel. Messages and the message box use a narrower centred column, and the box is white with a soft shadow. The box keeps its controls on one row (collection, environment and templates on the left, agent, effort and send on the right), moving the agent to a second row only in a very narrow window; starting tasks are compact, and in a window too narrow for both the chat and **Chat details**, the panel takes the chat's place until closed instead of floating over it.
+- **Choose the Kurlo agent's model per chat.** The agent picker lists the models of the selected connection with a search field, as it does for Codex. The choice is saved with the chat; the connection's default model in Settings and AI requests are not changed.
+- **Agent chat list.** The sidebar has a **New** button beside its title, and each chat is marked with its agent: the Kurlo bird for the Kurlo agent and a terminal icon for Codex; a chat waiting for your approval shows an amber dot instead of its time.
+- **Agent chat controls stay beside the message.** The agent and model are chosen in one picker in the composer, effort in a separate menu, and the collection and environment in chips beside them. Token usage appears below it; local agents also show account quota windows as bars and the last reported request size relative to the context window, without treating cumulative token usage as context occupancy.
 
 ### Fixed
 
+- **Workspace data files in Agent Mode.** Collection runs read CSV and JSON files within the workspace folder and reject symbolic links in the path.
+
+- **No crash right after the first request is sent.** The response panel could restart its waiting timer in a loop when a request started, which sometimes ended in the fatal error screen.
+
+- **Resizable chat name field.** The field grows to fit the name up to a limit, then scrolls horizontally while you edit.
+
+- **Scrollbar tracks blend into their panels.** Desktop scrollbars use transparent tracks and inset, rounded handles across the app.
+
+- **Open and zoom in on Agent Mode attachments.** Image thumbnails and file buttons appear above the message. Open the saved original even if you delete the source file. Kurlo keeps an encrypted local copy with the chat. SVGs open in the viewer, and the agent can read their source.
+
+- **AI requests in Git workspaces.** Workspace YAML accepts provider strings, so requests using the default Kurlo connection or a custom provider can load.
+
+- **Restore Agent Mode chat history after switching workspaces.** A chat that finishes loading in the background is ready when you return to its workspace.
+
+- **Private agent tool channel.** The local MCP server the Claude Code agent talks to during a turn now requires a random per-turn token, and its address reaches the CLI through a temporary file readable only by your account instead of the process arguments, which any local user can read.
+
+- **Smooth agent chat rendering.** Model output with long runs of `[`, `*` or backticks renders faster while it streams, including in long links and code spans.
+
+- **Owner-only variable exports.** `kurlo run --export-environment` and `--export-globals` write owner-only files on Unix, including when replacing an earlier export.
+
+- **What's new dialog and update flow.** The dialog closes with Escape, and its release notes link handles versions written with a leading "v". Blocked browser storage no longer breaks the update check, the automatic install or the first launch, and the manual install link opens in a fully isolated tab.
+
+- **Agent chat menus.** Closing a menu by clicking outside returns focus to its button, Home and End jump to the first and last item, and deleting a chat clears its pending approvals. Invalid step and block indices in streaming events are ignored.
+
+- **Agent chat controls.** Chat menus support arrow keys and Escape. Loading earlier messages and receiving streamed updates preserve the reading position. Expanded tool and thinking details stay open when a turn finishes. A running Codex chat stays visible during a connection refresh, and approval decisions can be retried after a failure.
+
+- **Agent chat reliability.** Reopening a streaming chat shows the prompt once. Failed sends restore unsaved prompts to their original chat, and failed deletes show an error. Removing a local agent connection refreshes its status, and reopening a workspace restores its selected agent mode.
+
+- **Consistent add and close icons.** Plus and close icons have the same size and stroke across tabs, dialogs, panels, and the sidebar.
+
+- **Agent turns release resources and stop reliably.** Completed turns release cached tool bridges. Stop works before the first reply and targets its own turn; late events cannot reopen approval cards. Unanswered approvals stop the whole turn after 30 minutes without resuming the model, and a failed decision can be retried. Codex stops after five minutes without progress (paused while approval is pending), ends on a CLI crash and limits tool loops to 50 calls. CLI cancellation also terminates its process tree. Background workspace snapshots keep only the latest history page.
+
+- **Environment actions dismiss normally.** Click outside the menu or press Escape to close it. The editor no longer duplicates environment switching with an **In use** or **Use environment** button; use the top bar or sidebar.
+
+- **Development startup warnings.** The Vite config uses an explicit TypeScript import extension for native loading, and an explicit Svelte config removes the missing-config notice.
+
+- **Agent welcome appears immediately.** Opening the Agent tab no longer waits for connection checks or the Codex CLI to show the welcome screen and starting tasks. Connections are checked in the background.
+
+- **Recover from provider connection failures.** Network, sign-in and regional access errors explain what to do and keep technical details available. Codex has **Reconnect** in Settings and **Reconnect and retry** in failed chats; the first message can also be retried without restarting the app.
+
+- **Agent chats fit smaller windows.** Long collection, environment and model names shorten instead of pushing controls out of the window. The composer uses two rows when space is tight, starting tasks become compact buttons, and the prompt's height limit follows the window height. Chat details open over the conversation when a side panel would squeeze it; close with Escape, the close button or a click outside. Messages and approval cards keep their height and scroll normally in short windows.
+
+- **Agent chats belong to the selected workspace.** The sidebar and command palette show only that workspace's chats. Switching workspaces restores each one's open chat, draft and agent selection; delayed replies and chat-list loads cannot replace another workspace's conversation. Both agents reject continuing a chat from a different workspace.
+
+- **Manual request names stay unsaved.** Renaming a request changes its editor and tab immediately; the collection tree and starred list keep the saved name until you save.
+- **Agent context follows the selected workspace.** Collection and environment choices are kept separately for each workspace and invalid choices are cleared. The environment menu no longer reserves an empty checkmark column.
+
+- **Compact agent input and aligned chat history.** The prompt box starts at one line, grows with typed or pasted text up to a height limit, then scrolls. It shrinks when cleared, including in older WebViews. Chat menus sit inside their rows, and the selected chat's outline stays visible on the left.
+- **Local storage status fits the status bar.** The storage label and mode badge are centred, with room above and below the text.
+
+- **Agent changes survive a storage switch.** After switching to local storage or opening another workspace folder, Kurlo kept watching the previous folder, so requests and variables the agent saved in the new one did not appear and the next save in the app wrote over them. Kurlo now watches the workspace it opens, and every agent turn checks it watches the folder the agent writes to.
+- **Codex can call Kurlo's tools.** Newer Codex CLIs run every tool call through their code-mode host, which Kurlo switched off together with the shell, so Codex answered that the workspace tools were unavailable. The host now stays on; the read-only sandbox, disabled shell and inherited MCP servers are unchanged, and existing chats work again on their next message.
+- **No flash of the starter screen when switching chats.** Opening a saved chat briefly showed the empty chat with its starting tasks while the messages loaded; the chat name now appears at once and the starters only show for a new chat.
+- **Chat list no longer opens without the Agent tab.** After a session that ended in the agent, Kurlo started on the request editor with the agent's chat list in the sidebar; the sidebar now shows your collections unless the Agent tab itself opens.
+- **Close the Agent tab with the keyboard.** The close-tab shortcut now closes the Agent tab with either agent and returns to the request editor, preserving the chat draft.
+
+- **Local agents on Windows.** CLI checks and agent processes run without opening a console window.
+
+- **Local agent setup is clearer.** The first model-list request no longer sends an invalid empty pagination cursor. Settings separates **Kurlo agent** and **Your agents** with more space, shows CLI detection independently from sign-in and model loading, and disables connecting until models are available.
+
+- **Cookies without their secret are no longer sent.** A workspace cookie whose value is kept as a secret that this computer does not have, for example after cloning the workspace elsewhere, was sent as the literal `{{kurloSecret:…}}` text. Kurlo now leaves such a cookie out of requests, the header preview and `pm.cookies`, and the Cookies window marks it *no value* and explains how to fill it in.
+- **No browser tooltips.** The grey tooltips the system drew on hover are gone everywhere in the app; icon-only buttons keep their names for screen readers.
+- **Selectable text in the macOS app.** Chat messages in AI requests and other text marked as selectable could not be selected in the macOS and Linux WebView, which needs a prefixed CSS property; the prefix is now set everywhere, and panel resizing no longer selects text there.
+- **Readable icons on primary buttons.** Icon-only primary buttons, such as **Send** in an AI request, drew their icon in a faint grey on the accent colour; the icon now uses the accent's text colour in every theme.
+- **Dropdowns stay inside the window.** A dropdown near the right edge opens towards the left and shortens long option names instead of running past the window.
 - **Current application screenshots.** Landing-page and documentation images now show the current sidebar and bottom status bar, with Git accessed from the status bar.
 - **Inherited secrets stay secret after scripts change them.** An override written to a child environment keeps the variable's secret flag and description, so its value stays masked and outside the workspace YAML.
 - **OAuth results stay with their request.** Getting or refreshing a token while switching tabs updates the original request, respects manual saving, and never replaces another tab's credentials. Send keeps the request and variables you started with. The collection runner uses the refreshed token for HTTP and gRPC calls and reuses it on later iterations.

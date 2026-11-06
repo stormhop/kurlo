@@ -130,7 +130,7 @@
       <div class="loadrun-table-wrap loadtest-data-preview">
         <table class="loadrun-table" aria-label="Test data preview">
           <thead><tr>{#each preview.columns as column (column)}<th>{column}</th>{/each}</tr></thead>
-          <tbody>{#each preview.rows as row, index (index)}<tr>{#each preview.columns as column, columnIndex (column)}<td title={row[columnIndex] ?? ''}>{row[columnIndex] ?? ''}</td>{/each}</tr>{/each}</tbody>
+          <tbody>{#each preview.rows as row, index (index)}<tr>{#each preview.columns as column, columnIndex (column)}<td>{row[columnIndex] ?? ''}</td>{/each}</tr>{/each}</tbody>
         </table>
       </div>
     {/if}

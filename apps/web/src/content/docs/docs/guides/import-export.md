@@ -133,7 +133,7 @@ See [Kurlo YAML format](/docs/reference/kurlo-yaml-format/) for the public contr
 
 ## All-data backups
 
-Use **Settings -> General -> Advanced data -> Export all data** for a Kurlo-to-Kurlo profile backup. Unlike collection interchange formats, it includes history, cookies, all local workspaces, and selected preferences.
+Use **Settings -> General -> Data -> Export all data** for a Kurlo-to-Kurlo profile backup. Unlike collection interchange formats, it includes history, cookies, all local workspaces, and selected preferences.
 
 The file is plaintext and can contain secrets. Import replaces the current local profile rather than merging it. See [Backup & recovery](/docs/guides/backup-recovery/) for the exact contents, exclusions, recovery-key behavior, and a safe restore procedure.
 

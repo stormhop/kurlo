@@ -70,6 +70,13 @@ export function shouldShowWhatsNew(current: string, lastSeen: string | null, has
   return compareVersions(current, lastSeen) > 0;
 }
 
+export const AGENT_MODE_VERSION = '3.0.0';
+
+export function shouldSpotlightAgentMode(current: string, lastSeen: string | null): boolean {
+  if (!isReleaseVersion(current) || !lastSeen || !isReleaseVersion(lastSeen)) return false;
+  return compareVersions(lastSeen, AGENT_MODE_VERSION) < 0 && compareVersions(current, AGENT_MODE_VERSION) >= 0;
+}
+
 export type WhatsNewItem = { text: string; children: string[] };
 export type WhatsNewBlock = { heading: string; items: WhatsNewItem[] };
 

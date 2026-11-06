@@ -62,9 +62,9 @@ function violations(check: (decl: { selector: string; property: string; value: s
 
 const KIT_BUTTON_CLASSES = new Set(['btn', 'btn-link', 'menu-item', 'segmented-item', 'field', 'option-card', 'tab']);
 const SPECIAL_BUTTON_CLASSES = new Set([
-  'about-item', 'activity-rail-btn', 'ai-combo-option', 'btn-send', 'btn-send-caret', 'code-panel-resizer', 'collection-collapse',
-  'collection-empty-row', 'collection-name', 'collection-request', 'cookie-add-chip', 'cookie-chip-delete',
-  'cookie-chip-select', 'cookie-domain-title', 'dialog-choice-card', 'env-in-use', 'env-matrix-inherited', 'env-matrix-not-set',
+  'about-item', 'activity-rail-btn', 'agent-picker-trigger', 'agent-tool-toggle', 'ai-combo-option', 'btn-send', 'btn-send-caret', 'code-panel-resizer', 'collection-collapse',
+  'collection-empty-row', 'collection-name', 'collection-request', 'cookie-domain-item', 'cookie-row-main',
+  'dialog-choice-card', 'disclosure-toggle', 'env-matrix-inherited', 'env-matrix-not-set',
   'env-matrix-unset', 'env-type-toggle', 'environment-globals-item', 'environment-item-main',
   'environment-none-item', 'examples-row-main', 'git-branch-chip', 'git-branch-row-main', 'git-branch-section',
   'git-commit-row', 'git-conflict-choice-btn', 'git-conflict-file-pill', 'git-file-open', 'git-history-toggle', 'git-popover-scrim',
@@ -128,6 +128,31 @@ describe('design tokens', () => {
   it('keeps lengths in rem so the interface size scales them', () => {
     expect(violations(d => !PX_ALLOWED_PROPERTY.test(d.property) && /(^|[\s(,])-?([2-9]|\d{2,})(\.\d+)?px/.test(d.value)
       && !/var\(--(mac-traffic-w|titlebar-h), \d+px\)/.test(d.value))).toEqual([]);
+  });
+
+  it('pairs user-select with the WebKit prefix the macOS app needs', () => {
+    const offenders = styleSources().flatMap(({ file, css }) => {
+      const rules = css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g);
+      return Array.from(rules).flatMap(rule => {
+        const body = rule[2];
+        const plain = /(^|[;\s])user-select:\s*([a-z]+)/.exec(body);
+        if (!plain) return [];
+        const prefixed = /-webkit-user-select:\s*([a-z]+)/.exec(body);
+        return prefixed && prefixed[1] === plain[2] ? [] : [`${relative(SRC, file)} ${rule[1].trim().replace(/\s+/g, ' ')}`];
+      });
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('shows no native browser tooltips', () => {
+    const offenders = walk(SRC).filter(file => file.endsWith('.svelte')).flatMap(file => {
+      const source = readFileSync(file, 'utf8');
+      const markup = Array.from(source.matchAll(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/g)).reduce((text, block) => text.replace(block[0], ' '.repeat(block[0].length)), source);
+      return Array.from(markup.matchAll(/<([a-z][a-z0-9-]*)\b(?:[^<>{}]|\{[^{}]*\})*?\stitle=/g))
+        .filter(match => match[1] !== 'iframe')
+        .map(match => `${relative(SRC, file)}:${markup.slice(0, match.index).split('\n').length} <${match[1]}>`);
+    });
+    expect(offenders).toEqual([]);
   });
 
   it('builds every button from a kit component or a named special one', () => {

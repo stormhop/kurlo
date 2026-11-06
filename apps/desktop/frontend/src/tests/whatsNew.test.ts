@@ -9,6 +9,7 @@ import {
   sectionIntro,
   releaseNotesFor,
   shouldShowWhatsNew,
+  shouldSpotlightAgentMode,
   stripInlineMarkdown,
 } from '../lib/whatsNew';
 
@@ -205,3 +206,22 @@ describe('sectionIntro', () => {
   });
 });
 
+describe('shouldSpotlightAgentMode', () => {
+  it('spotlights Agent mode when an update crosses 3.0.0', () => {
+    expect(shouldSpotlightAgentMode('3.0.0', '2.6.1')).toBe(true);
+    expect(shouldSpotlightAgentMode('v3.0.2', '2.5.0')).toBe(true);
+    expect(shouldSpotlightAgentMode('3.1.0', '2.6.1')).toBe(true);
+  });
+
+  it('keeps the usual notes once 3.0 was seen', () => {
+    expect(shouldSpotlightAgentMode('3.0.1', '3.0.0')).toBe(false);
+    expect(shouldSpotlightAgentMode('3.1.0', '3.0.4')).toBe(false);
+  });
+
+  it('stays quiet on a first install, a downgrade and development builds', () => {
+    expect(shouldSpotlightAgentMode('3.0.0', null)).toBe(false);
+    expect(shouldSpotlightAgentMode('2.6.1', '2.6.0')).toBe(false);
+    expect(shouldSpotlightAgentMode('dev', '2.6.1')).toBe(false);
+    expect(shouldSpotlightAgentMode('3.0.0', 'dev')).toBe(false);
+  });
+});

@@ -1,10 +1,14 @@
 <script lang="ts">
+  import AgentGlyph from './AgentGlyph.svelte';
   import Keycaps from './Keycaps.svelte';
+  import KurloGlyph from './KurloGlyph.svelte';
   import { onMount, tick } from 'svelte';
   import { trapFocus } from '../a11y';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import { filterPaletteCommands, parsePaletteQuery, type PaletteCommand } from '../commandPalette';
   import type { SavedRequest, ShortcutId } from '../types/models';
+  import type { AgentChatSummary } from '../backend';
+  import { agentFilterChats } from '../agent';
 
   const EMPTY_QUERY_REQUESTS = 6;
   const MAX_REQUESTS = 50;
@@ -13,6 +17,8 @@
     query = $bindable(''),
     results,
     commands,
+    chats = [],
+    onOpenChat = () => {},
     activeRequestId,
     requestTabLabel,
     collectionLabel,
@@ -24,6 +30,8 @@
     query: string;
     results: SavedRequest[];
     commands: PaletteCommand[];
+    chats?: AgentChatSummary[];
+    onOpenChat?: (chat: AgentChatSummary) => void;
     activeRequestId: string;
     requestTabLabel: (request: SavedRequest) => string;
     collectionLabel: (request: SavedRequest) => string;
@@ -35,6 +43,7 @@
 
   type Item =
     | { kind: 'request'; key: string; heading: string; request: SavedRequest }
+    | { kind: 'chat'; key: string; heading: string; chat: AgentChatSummary }
     | { kind: 'command'; key: string; heading: string; command: PaletteCommand };
 
   let input: HTMLInputElement;
@@ -56,7 +65,10 @@
       command,
     }));
   });
-  let items = $derived([...requestItems, ...commandItems]);
+  let chatItems = $derived<Item[]>(parsed.commandsOnly ? [] : agentFilterChats(chats, parsed.text)
+    .slice(0, parsed.text ? MAX_REQUESTS : EMPTY_QUERY_REQUESTS)
+    .map((chat, index) => ({ kind: 'chat', key: `chat:${chat.id}`, heading: index === 0 ? 'Chats in this workspace' : '', chat })));
+  let items = $derived([...requestItems, ...chatItems, ...commandItems]);
 
   $effect(() => {
     void query;
@@ -71,6 +83,7 @@
     if (!item) return;
     onClose();
     if (item.kind === 'request') onSwitchRequest(item.request.id);
+    else if (item.kind === 'chat') onOpenChat(item.chat);
     else void item.command.run();
   }
 
@@ -107,7 +120,7 @@
 </script>
 
 <div class="global-search-backdrop" role="presentation" onmousedown={(event) => event.target === event.currentTarget && onClose()}>
-  <div class="modal global-search-modal" role="dialog" aria-modal="true" aria-label="Search requests and commands" tabindex="-1" use:trapFocus>
+  <div class="modal global-search-modal" role="dialog" aria-modal="true" aria-label="Search requests, chats and commands" tabindex="-1" use:trapFocus>
     <div class="global-search-input-wrap">
       <svg width="1rem" height="1rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
         <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.4"/>
@@ -116,10 +129,10 @@
       <input
         bind:value={query}
         bind:this={input}
-        placeholder="Search requests and commands…"
+        placeholder="Search requests, chats and commands…"
         spellcheck="false"
         role="combobox"
-        aria-label="Search requests and commands"
+        aria-label="Search requests, chats and commands"
         aria-expanded="true"
         aria-controls="palette-list"
         aria-activedescendant={items.length ? optionId(selectedIndex) : undefined}
@@ -154,6 +167,24 @@
             </div>
             <span class="gsr-collection">{collectionLabel(item.request)}</span>
           </button>
+        {:else if item.kind === 'chat'}
+          <button
+            id={optionId(index)}
+            class="global-search-item"
+            class:selected={index === selectedIndex}
+            type="button"
+            role="option"
+            aria-selected={index === selectedIndex}
+            data-palette-index={index}
+            data-chat-id={item.chat.id}
+            tabindex="-1"
+            onmousemove={() => (selectedIndex = index)}
+            onclick={() => run(item)}
+          >
+            <span class="global-search-chat-icon" aria-hidden="true">{#if item.chat.driver}<AgentGlyph driver={item.chat.driver} size="0.875rem" />{:else}<KurloGlyph size="0.875rem" />{/if}</span>
+            <div class="gsr-info"><span class="gsr-name">{item.chat.title || 'Untitled chat'}</span></div>
+            <span class="gsr-collection">{item.chat.driver === 'codex' ? 'Codex' : item.chat.driver === 'claude-code' ? 'Claude Code' : 'Kurlo agent'}</span>
+          </button>
         {:else}
           <button
             id={optionId(index)}
@@ -176,7 +207,7 @@
         {/if}
       {/each}
       {#if !items.length}
-        <div class="global-search-empty">{parsed.commandsOnly ? 'No matching commands' : 'No requests or commands found'}</div>
+        <div class="global-search-empty">{parsed.commandsOnly ? 'No matching commands' : 'No requests, chats or commands found'}</div>
       {/if}
     </div>
     <div class="global-search-footer">
@@ -187,3 +218,14 @@
     </div>
   </div>
 </div>
+
+<style>
+  .global-search-chat-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+    font-size: var(--text-label);
+  }
+</style>

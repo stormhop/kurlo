@@ -103,7 +103,15 @@ func (j *trackedCookieJar) Cookies(u *url.URL) []*http.Cookie {
 	defer j.mu.Unlock()
 
 	j.pruneExpiredLocked(time.Now())
-	return j.jar.Cookies(u)
+	cookies := j.jar.Cookies(u)
+	sendable := cookies[:0]
+	for _, cookie := range cookies {
+		if _, unresolved := kurloSecretKeyFromPlaceholder(cookie.Value); unresolved {
+			continue
+		}
+		sendable = append(sendable, cookie)
+	}
+	return sendable
 }
 
 func (j *trackedCookieJar) ListCookies() []model.Cookie {

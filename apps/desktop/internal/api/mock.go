@@ -200,6 +200,10 @@ func (m *mockServer) swapRoutes(config model.MockServerConfig, emit func(model.M
 }
 
 func (m *mockServer) start(config model.MockServerConfig, emit func(model.MockRequestLog)) model.MockServerStatus {
+	return m.startScoped(config, emit, nil)
+}
+
+func (m *mockServer) startScoped(config model.MockServerConfig, emit func(model.MockRequestLog), collections map[string]bool) model.MockServerStatus {
 	port := config.Port
 	if port <= 0 {
 		port = mockDefaultPort
@@ -213,6 +217,9 @@ func (m *mockServer) start(config model.MockServerConfig, emit func(model.MockRe
 
 	m.startMu.Lock()
 	defer m.startMu.Unlock()
+	if status := m.status(); collections != nil && status.Running && !collections[status.CollectionID] {
+		return model.MockServerStatus{Error: "The running mock belongs to another workspace."}
+	}
 
 	if status, swapped := m.swapRoutes(config, emit, port); swapped {
 		return status
@@ -268,8 +275,15 @@ func mockListenError(err error, port int) string {
 }
 
 func (m *mockServer) stop() model.MockServerStatus {
+	return m.stopScoped(nil)
+}
+
+func (m *mockServer) stopScoped(collections map[string]bool) model.MockServerStatus {
 	m.startMu.Lock()
 	defer m.startMu.Unlock()
+	if status := m.status(); collections != nil && status.Running && !collections[status.CollectionID] {
+		return model.MockServerStatus{Error: "The running mock belongs to another workspace."}
+	}
 	m.teardown()
 	return model.MockServerStatus{}
 }
@@ -385,11 +399,20 @@ func (m *mockServer) record(entry model.MockRequestLog) bool {
 }
 
 func (m *mockServer) recentLog() []model.MockRequestLog {
+	_, entries := m.logSnapshot(nil)
+	return entries
+}
+
+func (m *mockServer) logSnapshot(collections map[string]bool) (model.MockServerStatus, []model.MockRequestLog) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+	status := m.statusLocked()
+	if collections != nil && status.Running && !collections[status.CollectionID] {
+		return model.MockServerStatus{Error: "The running mock belongs to another workspace."}, nil
+	}
 	out := make([]model.MockRequestLog, len(m.log))
 	copy(out, m.log)
-	return out
+	return status, out
 }
 
 func (m *mockServer) handle(w http.ResponseWriter, r *http.Request) {

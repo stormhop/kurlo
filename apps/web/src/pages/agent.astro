@@ -1,0 +1,213 @@
+---
+import SiteLayout from '../components/SiteLayout.astro';
+import Scene from '../components/Scene.astro';
+import DownloadButton from '../components/site/DownloadButton.astro';
+import InstallButton from '../components/site/InstallButton.astro';
+import EndCta from '../components/site/EndCta.astro';
+import Rich from '../components/site/Rich.astro';
+import AgentDemo from '../components/site/AgentDemo.astro';
+import AgentIcon from '../components/site/AgentIcon.astro';
+import agentApproval from '../assets/screenshots/agent-approval.png';
+import { structuredData } from '../../site.schema.mjs';
+
+const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const site = Astro.site ? new URL(base, Astro.site).toString() : base;
+const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
+const pageUrl = new URL('agent/', site).href;
+
+const title = 'Agent mode: an AI agent for your API requests — Kurlo';
+const description = 'Agent mode in Kurlo 3.0: ask in plain words and the Kurlo agent with any model, Claude Code or Codex runs your API requests, explains failures and writes tests. Every change waits for your Apply, secrets reach the model only as [secret], and chats stay encrypted on your computer.';
+
+const terms = /(\[secret\]|kurlo mcp|@kurlo\/cli|\/usage|\bGET\b|\bHEAD\b|\bOPTIONS\b|\bPOST\b|\bDELETE\b|Alt Cmd\/Ctrl 4|Cmd\/Ctrl K)/g;
+
+const agents = [
+  {
+    id: 'kurlo',
+    name: 'Kurlo agent',
+    runs: 'Any model you connect in Settings → AI: sign in with OpenRouter, add an Anthropic, OpenAI or compatible key, or pick Ollama or LM Studio on this machine.',
+    pays: 'Your provider, or nothing at all with a local model.',
+    extras: ['Pick a model per chat', 'Models good at tools are marked Recommended', 'Keys encrypted with your system keychain'],
+  },
+  {
+    id: 'claude',
+    name: 'Claude Code',
+    runs: 'The Claude Code CLI on this computer, signed in with its own account. Kurlo finds it, or starts the official sign-in.',
+    pays: 'Your Claude plan, or the API key the CLI uses.',
+    extras: ['Fable 5.1, Opus 5.5, Sonnet 5.5, Haiku 5.5', 'Effort from Low to Max', '5-hour and weekly limits read with /usage, which uses no tokens'],
+  },
+  {
+    id: 'codex',
+    name: 'Codex',
+    runs: 'The Codex CLI on this computer, signed in with ChatGPT or an API key. Read-only sandbox, shell switched off.',
+    pays: 'Your ChatGPT plan’s usage, or API billing.',
+    extras: ['Effort levels the model supports', 'Plan limits as bars with reset times', 'Native sessions continue across restarts'],
+  },
+];
+
+const asks = [
+  { prompt: 'Why did my last request fail?', does: 'Reads the history entry, compares it with the saved request and the environment, and names the cause.' },
+  { prompt: 'Run the Orders folder and explain what failed.', does: 'Runs the collection with its auth, scripts and tests, then goes through each failed test.' },
+  { prompt: 'Write tests for Create order.', does: 'Sends it, reads the response and proposes pm.test checks for status, shape and values.' },
+  { prompt: 'Cover POST /orders/{id}/refund.', does: 'Adds a request to the collection with a body, variables and tests, ready to apply.' },
+  { prompt: 'Explain the Login request.', does: 'Walks through its auth, headers, scripts and which variables it sets for the next call.' },
+  { prompt: 'Point Staging at the new host.', does: 'Proposes the variable change in the environment file, so you see the exact line first.' },
+];
+
+const rules = [
+  { part: 'Read requests, environments, history', details: 'Listing, reading and diagnosing a failure.', status: 'At once', tone: 'yes' },
+  { part: 'Send GET, HEAD, OPTIONS', details: 'Runs, collection runs and one-off calls that only read.', status: 'At once', tone: 'yes' },
+  { part: 'Send POST, PUT, PATCH, DELETE', details: 'The card shows the call before it goes out.', status: 'Asks first', tone: 'part' },
+  { part: 'Change workspace files', details: 'The exact YAML lines, file by file: Apply, Reject or Allow for this chat.', status: 'Asks first', tone: 'part' },
+  { part: 'A file you edited meanwhile', details: 'The agent’s change is dropped and it is told to try again.', status: 'Yours wins', tone: 'yes' },
+  { part: 'Secrets', details: 'Reach your API. The model gets [secret] and never writes a value into YAML.', status: 'Masked', tone: 'yes' },
+  { part: 'Protected environments', details: 'Listed, but no agent can send with them. You run those yourself.', status: 'Refused', tone: 'no' },
+];
+
+const home = [
+  { title: 'Encrypted chats', text: 'Kept in your local profile, never in the workspace, so they never reach Git. 90 days after the last message.' },
+  { title: 'An activity log', text: 'Every tool call, by the agent or by an assistant on kurlo mcp, with its arguments, result and the files before and after. Encrypted, 30 days.' },
+  { title: 'No Kurlo account', text: 'There is no Kurlo server between you and the model. Requests go to your provider or to the CLI on this computer.' },
+  { title: 'A Stop that stops', text: 'Stop ends the turn even before the first reply. Unanswered approvals end it after 30 minutes, and a turn ends after 50 steps.' },
+];
+
+const clients = ['Claude Code', 'Codex', 'Cursor', 'VS Code', 'Windsurf', 'Gemini CLI', 'Claude Desktop'];
+
+const faq = [
+  { q: 'Which agents work in Agent mode?', a: 'The Kurlo agent with any model you connect, and the Claude Code and Codex CLIs installed on this computer. All three share one chat list, and each chat keeps the agent it started with.', link: 'docs/guides/agent/#local-agents' },
+  { q: 'What does it cost?', a: 'Nothing from us. The Kurlo agent runs free on a local model or on your own key, and Claude Code and Codex use the plan you already pay for.' },
+  { q: 'Do I need Claude Code or Codex?', a: 'No. The Kurlo agent works with OpenRouter, an Anthropic, OpenAI or compatible key, or a local Ollama or LM Studio model.', link: 'docs/guides/settings/#ai' },
+  { q: 'Can it break my collection?', a: 'Not without your Apply. Every change is shown line by line first, nothing is written while the card waits, and the files are YAML in Git, so any change can be reverted.' },
+  { q: 'Does the model see my tokens?', a: 'No. Secrets reach your API, but the model gets [secret], and protected environments are off limits to every agent.' },
+  { q: 'How is this different from kurlo mcp?', a: 'Same tools, other side. Agent mode runs the agent inside Kurlo with approval cards. kurlo mcp hands the tools to the assistant in your terminal or editor, which can also read and fix your code.', link: 'mcp/' },
+];
+
+const ldJson = structuredData({
+  siteRoot: site,
+  description,
+  screenshot: new URL(agentApproval.src, site).href,
+  page: { url: pageUrl, name: title, description },
+});
+---
+
+<SiteLayout title={title} description={description} canonical={pageUrl} ldJson={ldJson} links={[{ label: 'Agents', href: '#agents' }, { label: 'Ask', href: '#ask' }, { label: 'Rules', href: '#rules' }, { label: 'Terminal', href: '#terminal' }, { label: 'FAQ', href: '#faq' }]}>
+  <section class="k-hero" data-hero data-replies="Applied · 1 file|tests 3/3|Asked first · POST|[secret] stays secret|Ran Orders · 12 passed" aria-labelledby="hero-title">
+    <Scene variant="night" bird />
+    <p class="k-hint" data-hint aria-hidden="true">Click the sky <svg width="38" height="22" viewBox="0 0 38 22" fill="none"><path d="M2 4c10 0 22 2 32 14m0 0-1-8m1 8-8-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></p>
+    <div class="k-hero-copy">
+      <p class="k-label k-label-hero">Agent mode · New in Kurlo 3.0</p>
+      <h1 id="hero-title"><span>Just</span><span>ask.</span></h1>
+      <p class="k-lead">Ask in plain words. The agent runs your requests, finds out why one failed and writes the missing test. Bring any model, Claude Code or Codex, and approve every change.</p>
+      <div class="k-cta">
+        <DownloadButton />
+        <a class="k-source" href={href('docs/guides/agent/')}>Read the guide</a>
+      </div>
+    </div>
+    <p class="k-counter" data-counter hidden>Approved <b data-count>0</b></p>
+  </section>
+
+  <section class="k-a3" id="demo" aria-labelledby="demo-title">
+    <div class="k-a3-in">
+      <div class="k-a3-head">
+        <p class="k-a3-badge"><span>Live</span>Not a screenshot</p>
+        <h2 class="k-a3-title k-a3-title-s" id="demo-title"><span>Go on,</span><span>press Apply.</span></h2>
+      </div>
+      <AgentDemo />
+    </div>
+  </section>
+
+  <section class="k-wrap" id="agents" aria-labelledby="agents-title">
+    <p class="k-label">Three agents, one chat list</p>
+    <h2 class="k-display" id="agents-title">Bring your own.</h2>
+    <p class="k-sub">Pick who answers in the message box. Kurlo has no credits of its own, so you use the model or the plan you already have.</p>
+    <div class="k-agents">
+      {agents.map(agent => (
+        <article class="k-agent">
+          <header>
+            <span class={`k-a3-glyph g-${agent.id}`} aria-hidden="true"><AgentIcon id={agent.id as 'kurlo' | 'claude' | 'codex'} /></span>
+            <h3>{agent.name}</h3>
+          </header>
+          <dl>
+            <dt>Runs on</dt><dd>{agent.runs}</dd>
+            <dt>You pay</dt><dd>{agent.pays}</dd>
+          </dl>
+          <ul>
+            {agent.extras.map(item => <li><Rich text={item} terms={terms} /></li>)}
+          </ul>
+        </article>
+      ))}
+    </div>
+    <p class="k-fine"><a href={href('docs/guides/agent/#local-agents')}>How to connect each one</a></p>
+  </section>
+
+  <section class="k-wrap" id="ask" aria-labelledby="ask-title">
+    <p class="k-label">What to ask</p>
+    <h2 class="k-display" id="ask-title">Plain words.</h2>
+    <p class="k-sub">Chips in the message box pick the collection and environment, and Templates fill in the common jobs. The rest is a sentence.</p>
+    <div class="k-asks">
+      {asks.map(item => (
+        <div>
+          <p class="k-ask-q">{item.prompt}</p>
+          <p>{item.does}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="k-parts" id="rules" aria-labelledby="rules-title">
+    <p class="k-label">Approvals</p>
+    <h2 class="k-display" id="rules-title">It asks first.</h2>
+    <p class="k-sub">The same rules for all three agents. Reading is free; anything that changes a server or your files waits for you.</p>
+    <table class="k-table">
+      <thead><tr><th>The agent wants to</th><th>Details</th><th>What happens</th></tr></thead>
+      <tbody>
+        {rules.map(p => (
+          <tr>
+            <th>{p.part}</th>
+            <td><Rich text={p.details} terms={terms} /></td>
+            <td><span class={`k-status k-s-${p.tone}`}>{p.status}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="k-wrap" id="home" aria-labelledby="home-title">
+    <p class="k-label">Privacy</p>
+    <h2 class="k-display" id="home-title">Stays home.</h2>
+    <div class="k-reasons">
+      {home.map((item, i) => (
+        <div>
+          <p class="k-no"><span class="k-dot" aria-hidden="true"></span>No. {String(i + 1).padStart(2, '0')}</p>
+          <h3>{item.title}</h3>
+          <p><Rich text={item.text} terms={terms} /></p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="k-wrap" id="terminal" aria-labelledby="terminal-title">
+    <p class="k-label">The other way round</p>
+    <h2 class="k-display" id="terminal-title">Or stay in your terminal.</h2>
+    <p class="k-sub"><Rich text="Agent mode works on your requests, not your code. When the fix is in the server, give the coding assistant you already use the same tools with kurlo mcp: it runs the collection, changes the code and runs it again." terms={terms} /></p>
+    <div class="k-install"><InstallButton tag="Copy" /></div>
+    <ul class="k-chips" aria-label="Works with">
+      {clients.map(client => <li>{client}</li>)}
+    </ul>
+    <p class="k-fine"><a href={href('mcp/')}>Kurlo as an MCP server and client</a></p>
+  </section>
+
+  <section class="k-faq" id="faq" aria-labelledby="faq-title">
+    <p class="k-label">FAQ</p>
+    <h2 class="k-display" id="faq-title">Fair questions.</h2>
+    <div class="k-faq-list">
+      {faq.map(item => (
+        <details>
+          <summary>{item.q}</summary>
+          <p><Rich text={item.a} terms={terms} />{item.link && <> <a href={href(item.link)}>Read more</a></>}</p>
+        </details>
+      ))}
+    </div>
+  </section>
+
+  <EndCta label="Agent mode · Kurlo 3.0 · Free" title="Ask it." lead="Your requests, your model, your Apply. Nothing changes until you say so." />
+</SiteLayout>

@@ -18,7 +18,6 @@
     showSave = false,
     saveDirty = false,
     canRevert = false,
-    saveShortcut = '',
     sendShortcut = '',
     sendShortcutInline = false,
     onSave = () => {},
@@ -56,7 +55,6 @@
     showSave?: boolean;
     saveDirty?: boolean;
     canRevert?: boolean;
-    saveShortcut?: string;
     sendShortcut?: string;
     sendShortcutInline?: boolean;
     onSave?: () => void;
@@ -241,7 +239,7 @@
 <div class="request-composer" bind:this={requestComposerRef}>
   <div class="request-meta">
     {#if requestLocation}
-      <span class="request-location" title={requestLocation}>{requestLocation}</span>
+      <span class="request-location">{requestLocation}</span>
       <span class="request-location-sep" aria-hidden="true">/</span>
     {/if}
     <input
@@ -255,7 +253,7 @@
       onkeydown={onNameKeydown}
     />
     {#if showSave}
-      <RequestSaveActions {saveDirty} {canRevert} {saveShortcut} {onSave} {onRevert} />
+      <RequestSaveActions {saveDirty} {canRevert} {onSave} {onRevert} />
     {/if}
   </div>
 
@@ -271,7 +269,6 @@
           aria-haspopup={pickerInteractive ? 'listbox' : undefined}
           aria-expanded={pickerInteractive ? methodMenuOpen : undefined}
           aria-disabled={!pickerInteractive}
-          title={pickerInteractive ? undefined : 'The protocol can only be changed while the request is a draft or has no URL'}
           onclick={() => { if (pickerInteractive) methodMenuOpen = !methodMenuOpen; }}
         >
           <span>{pickerLabel}</span>
@@ -324,7 +321,7 @@
       </div>
 
       {#if isAI && vm.aiProvider === 'kurlo'}
-      <button class="field url-input ai-connection-url" type="button" title="Uses the default connection in Settings → AI" aria-label="Default AI connection" onclick={() => vm.openSettings('ai')}>
+      <button class="field url-input ai-connection-url" type="button" aria-label="Default AI connection" onclick={() => vm.openSettings('ai')}>
         <span class="ai-connection-url-label">{aiConnectionsStore.defaultConnection?.label ?? 'No AI connection yet'}</span>
         <span class="ai-connection-url-hint">Settings → AI</span>
       </button>
@@ -362,7 +359,7 @@
           onclick={toggleGrpcMethodMenu}
         >
           <span class="grpc-method-icon" aria-hidden="true">↕</span>
-          <span class="grpc-method-label" title={grpcMethod || grpcSelectedLabel}>{grpcSelectedLabel}</span>
+          <span class="grpc-method-label">{grpcSelectedLabel}</span>
           <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
             <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
@@ -441,7 +438,6 @@
         class:btn-send-cancel={loading}
         onclick={onSend}
         type="button"
-        title={!loading && sendShortcut ? `Send (${sendShortcut})` : undefined}
       >
         {#if loading}<span class="spinner"></span>Stop
         {:else}
@@ -494,7 +490,6 @@
           class:btn-send-cancel={loading}
           onclick={onSend}
           type="button"
-          title={!loading && sendShortcut ? `Send (${sendShortcut})` : undefined}
         >
           {#if loading}<span class="spinner"></span>Cancel
           {:else}
@@ -535,7 +530,7 @@
     {/if}
   </div>
   {#if isAI && aiEndpoint.base}
-    <p class="ai-endpoint" title="Kurlo adds the API path to the base URL">
+    <p class="ai-endpoint">
       <span class="ai-endpoint-label">Sends to</span>
       <span class="ai-endpoint-url"><span class="ai-endpoint-method">POST</span> {aiEndpoint.base}{#if aiEndpoint.suffix}<mark class="ai-endpoint-suffix">{aiEndpoint.suffix}</mark>{/if}{aiEndpoint.query}</span>
     </p>

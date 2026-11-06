@@ -114,13 +114,14 @@ func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string,
 	)
 	defer batch.flush()
 
-	onOpen := func(ev model.SSEOpenEvent) {
-		emit("sse:open", ev)
-	}
-	onEvent := func(ev model.SSEEvent) {
-		batch.add(ev)
-	}
+	m.runStreamEvents(sseCtx, sessionID, req, func(name string, payload any) {
+		batch.flush()
+		emit(name, payload)
+	}, batch.add)
+}
 
+func (m *sseManager) runStreamEvents(sseCtx context.Context, sessionID string, req model.HttpRequest, emit func(string, any), onEvent func(model.SSEEvent)) {
+	onOpen := func(ev model.SSEOpenEvent) { emit("sse:open", ev) }
 	lastEventID := ""
 	attempt := 0
 	for {
@@ -128,7 +129,6 @@ func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string,
 		lastEventID = res.lastEventID
 
 		if !res.reconnect || req.SSEDisableReconnect || sseCtx.Err() != nil {
-			batch.flush()
 			if res.errorEvent != nil {
 				emit("sse:error", *res.errorEvent)
 			} else if res.closeEvent != nil {
@@ -139,7 +139,6 @@ func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string,
 
 		delay := sseReconnectDelay(req, res.retry)
 		attempt++
-		batch.flush()
 		emit("sse:reconnecting", model.SSEReconnectEvent{
 			SessionID:   sessionID,
 			Attempt:     attempt,

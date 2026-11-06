@@ -458,7 +458,7 @@
               {#if auth.type === 'bearer'}
                 <label class="field-label" for="collection-bearer-token">Token</label>
                 <input id="collection-bearer-token" class="field field-input field-mono" type="password" bind:value={auth.bearerToken} placeholder="Bearer token" spellcheck="false" />
-              {:else if auth.type === 'basic' || auth.type === 'digest'}
+              {:else if auth.type === 'basic' || auth.type === 'digest' || auth.type === 'ntlm'}
                 <label class="field-label" for="collection-auth-user">Username</label>
                 <input id="collection-auth-user" class="field field-input" bind:value={auth.basicUser} spellcheck="false" />
                 <label class="field-label" for="collection-auth-pass">Password</label>
@@ -586,7 +586,7 @@
                   <div class="client-cert-row">
                     <span class="client-cert-label">Certificate (CRT/PEM)</span>
                     {#if settings.clientCertPath}
-                      <span class="client-cert-path" title={settings.clientCertPath}>{settings.clientCertPath}</span>
+                      <span class="client-cert-path">{settings.clientCertPath}</span>
                       <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientCertPath')}>Clear</button>
                     {:else}
                       <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientCertPath')}>Choose file…</button>
@@ -595,7 +595,7 @@
                   <div class="client-cert-row">
                     <span class="client-cert-label">Private key (optional)</span>
                     {#if settings.clientKeyPath}
-                      <span class="client-cert-path" title={settings.clientKeyPath}>{settings.clientKeyPath}</span>
+                      <span class="client-cert-path">{settings.clientKeyPath}</span>
                       <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientKeyPath')}>Clear</button>
                     {:else}
                       <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientKeyPath')} disabled={!settings.clientCertPath}>Choose file…</button>

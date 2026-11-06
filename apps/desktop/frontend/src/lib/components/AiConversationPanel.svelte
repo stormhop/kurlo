@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import { tabListKeyboard } from '../a11y';
@@ -29,7 +30,6 @@
   const usage = $derived(last ? aiTurnUsage(last) : null);
   const hasUsage = $derived(Boolean(last?.response?.hasUsage || last?.steps.some(step => step.hasUsage)));
   const firstTokenMs = $derived(last?.response?.firstTokenMs || last?.steps[0]?.firstTokenMs || 0);
-  const durationMs = $derived(last?.response?.durationMs || last?.steps.reduce((sum, step) => sum + step.durationMs, 0) || 0);
   const tokensPerSecond = $derived.by(() => {
     if (!last || !usage || !usage.output) return 0;
     const generating = last.steps.reduce((sum, step) => sum + Math.max(step.durationMs - step.firstTokenMs, 0), 0);
@@ -40,20 +40,6 @@
   const testPassed = $derived(tests?.tests?.filter(test => test.passed).length ?? 0);
   const rawSteps = $derived(last?.response?.steps ?? []);
   const turnKey = $derived(last?.id ?? '');
-  const metricsTitle = $derived.by(() => {
-    if (!usage) return '';
-    const lines = [
-      `First token: ${formatMs(firstTokenMs)}`,
-      `Total: ${formatMs(durationMs)}`,
-      `Input: ${usage.input.toLocaleString('en-US')}`,
-      `Output: ${usage.output.toLocaleString('en-US')}`,
-    ];
-    if (usage.cacheRead) lines.push(`Cache read: ${usage.cacheRead.toLocaleString('en-US')}`);
-    if (usage.cacheWrite) lines.push(`Cache write: ${usage.cacheWrite.toLocaleString('en-US')}`);
-    if (usage.reasoning) lines.push(`Reasoning: ${usage.reasoning.toLocaleString('en-US')}`);
-    if (last && last.steps.length > 1) lines.push(`Steps: ${last.steps.length}`);
-    return lines.join('\n');
-  });
 
   $effect(() => {
     void turns;
@@ -214,11 +200,11 @@
         {:else if last?.status === 'error'}
           <span class="status-badge status-5xx">Error</span>
         {/if}
-        {#if lastStep?.model}<span class="status-meta ai-model-name" title={lastStep.model}>{lastStep.model}</span>{/if}
+        {#if lastStep?.model}<span class="status-meta ai-model-name">{lastStep.model}</span>{/if}
       </div>
       <div class="status-right">
         {#if firstTokenMs || hasUsage}
-          <span class="ai-metrics" title={metricsTitle}>
+          <span class="ai-metrics">
             {#if firstTokenMs}<span class="ai-metric-ttft"><span class="ai-metric-key">TTFT</span> {formatMs(firstTokenMs)}</span>{/if}
             {#if tokensPerSecond}<span class="ai-metric-extra"><span class="ai-metric-key">speed</span> {tokensPerSecond} tok/s</span>{/if}
             {#if hasUsage && usage}
@@ -227,10 +213,8 @@
             {/if}
           </span>
         {/if}
-        <button class="btn btn-secondary btn-sm ai-new-chat" type="button" onclick={() => { composerError = ''; reply = ''; vm.clearAiConversation(); }} disabled={streaming} aria-label="New chat" title="Clear the chat. Send starts again from the Prompt tab.">
-          <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-            <path d="M6 2v8M2 6h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-          </svg>
+        <button class="btn btn-secondary btn-sm ai-new-chat" type="button" onclick={() => { composerError = ''; reply = ''; vm.clearAiConversation(); }} disabled={streaming} aria-label="New chat">
+          <AddCloseIcon add />
           <span class="ai-new-chat-label">New chat</span>
         </button>
       </div>
@@ -348,7 +332,7 @@
           onkeydown={onReplyKeydown}
           disabled={streaming}
         ></textarea>
-        <button class="btn btn-primary btn-icon btn-lg ai-send" type="button" onclick={sendReply} disabled={streaming || !reply.trim()} aria-label="Send reply" title="Send (Enter)">
+        <button class="btn btn-primary btn-icon btn-lg ai-send" type="button" onclick={sendReply} disabled={streaming || !reply.trim()} aria-label="Send reply">
           <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
             <path d="M7 12V2M2.5 6.5L7 2l4.5 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
@@ -534,6 +518,7 @@
     line-height: var(--leading-relaxed);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    -webkit-user-select: text;
     user-select: text;
   }
   .ai-text {
@@ -567,6 +552,7 @@
     font-size: var(--text-label);
     line-height: var(--leading-relaxed);
     white-space: pre-wrap;
+    -webkit-user-select: text;
     user-select: text;
   }
   .ai-tool {
@@ -620,6 +606,7 @@
     overflow-wrap: anywhere;
     max-height: 18rem;
     overflow: auto;
+    -webkit-user-select: text;
     user-select: text;
   }
   .ai-tool-result {
@@ -663,6 +650,7 @@
     background: color-mix(in srgb, var(--danger) 8%, transparent);
     color: var(--text);
     font-size: var(--text-label);
+    -webkit-user-select: text;
     user-select: text;
   }
   .ai-error-icon {
@@ -830,6 +818,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-code);
     overflow-wrap: anywhere;
+    -webkit-user-select: text;
     user-select: text;
   }
   .ai-raw-method {
@@ -855,6 +844,7 @@
     line-height: var(--leading-relaxed);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    -webkit-user-select: text;
     user-select: text;
   }
   @keyframes ai-blink {

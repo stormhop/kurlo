@@ -338,6 +338,11 @@
   width: 100%;
 }
 .app-select-option.active { color: var(--text); }
+.app-select-option > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .app-select-check {
   width: 0.875rem;
   flex-shrink: 0;
@@ -353,6 +358,7 @@
   justify-self: start;
   gap: var(--space-2);
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -633,6 +639,7 @@
   place-items: center;
   justify-self: center;
   color: var(--text-3);
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -843,6 +850,7 @@
   font-weight: var(--weight-semibold);
   letter-spacing: 0.12em;
   color: var(--text);
+  -webkit-user-select: all;
   user-select: all;
 }
 
@@ -1090,6 +1098,7 @@ input::-webkit-calendar-picker-indicator { opacity: 0; }
   background: var(--bg);
   cursor: row-resize;
   position: relative;
+  -webkit-user-select: none;
   user-select: none;
 }
 .panel-divider::after {
@@ -1159,10 +1168,10 @@ input::-webkit-calendar-picker-indicator { opacity: 0; }
   height: 2.25rem;
 }
 
-.resizing-sidebar { cursor: col-resize !important; user-select: none !important; }
-.resizing-row { cursor: row-resize !important; user-select: none !important; }
-.resizing-col { cursor: col-resize !important; user-select: none !important; }
-.resizing-sidebar *, .resizing-row *, .resizing-col * { user-select: none !important; }
+.resizing-sidebar { cursor: col-resize !important; -webkit-user-select: none !important; user-select: none !important; }
+.resizing-row { cursor: row-resize !important; -webkit-user-select: none !important; user-select: none !important; }
+.resizing-col { cursor: col-resize !important; -webkit-user-select: none !important; user-select: none !important; }
+.resizing-sidebar *, .resizing-row *, .resizing-col * { -webkit-user-select: none !important; user-select: none !important; }
 
 .save-status {
   position: fixed;

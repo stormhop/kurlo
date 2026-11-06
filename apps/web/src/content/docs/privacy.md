@@ -5,7 +5,7 @@ description: Kurlo is local-first. What stays on your machine, what leaves it, a
 
 Kurlo is a local-first desktop application. There is no Kurlo backend, account system, cloud sync, usage analytics, crash reporting, or telemetry. Network access occurs only for product features that require it, such as requests, Git operations, OAuth flows, schema introspection, and update checks.
 
-This page documents exactly what data Kurlo stores, where, how it's protected, and the few cases where the app talks to a network on your behalf.
+This page explains what the Kurlo app stores, when it connects to the network, and how kurlo.dev measures visits.
 
 None of it has to be taken on trust: Kurlo is open source under the MIT license, so every claim below can be checked against the code at [stormhop/kurlo](https://github.com/stormhop/kurlo), and the binaries can be reproduced from that source.
 
@@ -27,6 +27,8 @@ Inside that directory you may find:
 - `request-store.key` — a base64-encoded recovery copy of the encryption key, written with owner-only `0600` permissions.
 - `request-store.key.dpapi` — an additional Windows DPAPI-protected key copy.
 - `preferences.json` — the configured default workspace location, cookie sync settings, and [AI connections](/docs/guides/settings/#ai) with their keys encrypted by the request-store key. Other UI preferences are stored by the desktop WebView.
+- `agent-chats/` — [agent](/docs/guides/agent/) chats and copies of sent attachments, encrypted on disk. Kurlo keeps up to 200 unarchived chats across the local profile for up to 90 days of inactivity. Archived chats and their attachments are kept until you delete them. Markdown exports are unencrypted files saved at a location you choose.
+- `agent-activity/` — the encrypted log of tool calls made by the agent and by assistants connected through `kurlo mcp`, with the files they changed, kept for 30 days.
 - `workspaces/` — the default folder-backed YAML workspace location.
 
 If you select another workspace folder or Git repository, its shared YAML files live at that selected path. Those files are intentionally human-readable and are not encrypted as a unit.
@@ -71,7 +73,7 @@ Four features bind a local listener. All four are loopback-only (`127.0.0.1`, an
 |----------|----------------|----------------|
 | OAuth 2.0 redirect | Only while an Authorization Code sign-in is in flight, on an ephemeral port | The single `/callback` that receives the authorization code, then closes |
 | OpenRouter sign-in | Only while *Connect OpenRouter* is waiting (at most five minutes), on an ephemeral port | The single `/callback` that receives OpenRouter's code, then closes |
-| [Cookie sync](/docs/guides/cookies/#sync-cookies-from-your-browser) bridge | While *Sync Cookies* is on (ports 3199-3203) | Pairing and the WebSocket a paired browser pushes cookies over. Extension origins only; a web page probing the port gets a `403` |
+| [Cookie sync](/docs/guides/cookies/#sync-cookies-from-your-browser) bridge | While cookie sync is on (ports 3199-3203) | Pairing and the WebSocket a paired browser pushes cookies over. Extension origins only; a web page probing the port gets a `403` |
 | [Mock server](/docs/guides/mock-server/) | While you have it running, on the port you choose | The saved examples of the collection you pointed it at — status, headers and body as recorded. Any program on your machine that can reach the port can read them, so treat a mock made from real responses accordingly. In a browser, only a page served from this machine is answered; a site on another host gets a `403` |
 
 ## Scripting safety
@@ -92,14 +94,22 @@ By default Kurlo maintains a cookie jar across requests, just like a browser. Co
 
 Cookies are never transmitted anywhere except in the request to the domain that set them, following standard browser rules.
 
-**Cookie sync** (Cookies modal -> *Sync Cookies*) is off unless you turn it on. When on, Kurlo opens a listener bound to `127.0.0.1` that a browser extension can find and ask to connect to; you approve the request in Kurlo by matching a six-digit code, and only then does Kurlo hand over a token. The extension then holds a WebSocket to that port and pushes cookies for the domains you allowlist there, and only those. The token and the allowlist are stored in `preferences.json`. Cookies travel browser -> Kurlo over loopback only, and a snapshot replaces what the jar held for those domains. *Disconnect it* mints a new token and drops the browser immediately.
+**Cookie sync** (Cookies window -> *Sync*) is off unless you turn it on. When on, Kurlo opens a listener bound to `127.0.0.1` that a browser extension can find and ask to connect to; you approve the request in Kurlo by matching a six-digit code, and only then does Kurlo hand over a token. The extension then holds a WebSocket to that port and pushes cookies for the domains you allowlist there, and only those. The token and the allowlist are stored in `preferences.json`. Cookies travel browser -> Kurlo over loopback only, and a snapshot replaces what the jar held for those domains. *Disconnect* mints a new token and drops the browser immediately.
 
 ## Data export and deletion
 
-- **Export** - *Settings -> General -> Advanced data -> Export all data* writes workspace data, history, cookies, secrets, and selected preferences to a plaintext JSON file you choose. External Git repositories, the global proxy password, and some local UI preferences are not bundled. See [Backup & recovery](/docs/guides/backup-recovery/).
+- **Export** - *Settings -> General -> Data -> Export all data* writes workspace data, history, cookies, secrets, and selected preferences to a plaintext JSON file you choose. External Git repositories, the global proxy password, and some local UI preferences are not bundled. See [Backup & recovery](/docs/guides/backup-recovery/).
 - **Import** — replaces the current profile with a previous export. This is destructive; Kurlo shows a confirmation dialog before running.
 - **Delete** — quit Kurlo and remove the directory listed under [What Kurlo stores on your machine](#what-kurlo-stores-on-your-machine).
 
 ## Reporting a security issue
 
 If you find a vulnerability, please follow the process in our [security policy](https://github.com/stormhop/kurlo/blob/main/SECURITY.md). Please do not file public GitHub issues for security problems.
+
+## Local coding agents
+
+Connecting Codex starts the installed CLI on this computer. The CLI owns authentication and sends conversation content and tool results to its configured provider. ChatGPT sign-in uses the official Codex flow; Kurlo does not collect subscription access or refresh tokens. Kurlo saves the executable path and default model in its preferences and associates each local chat with a native Codex session ID.
+
+Kurlo's chat copy is encrypted in its profile. Codex separately stores native sessions and credentials according to its own settings. Deleting a Kurlo chat or removing the connection does not delete the native Codex copy or sign you out. Workspace changes still pass through Kurlo's approval controls.
+
+Claude Code runs through the installed CLI. Its configured provider receives prompts and tool results. Kurlo associates its encrypted chat with the native Claude Code session ID. The CLI manages its credentials and native transcript separately from Kurlo.

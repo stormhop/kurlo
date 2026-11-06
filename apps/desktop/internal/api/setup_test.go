@@ -17,7 +17,18 @@ func TestMain(m *testing.M) {
 	if err := os.Setenv(requestStoreDisableKeychain, "1"); err != nil {
 		panic(err)
 	}
-	os.Exit(m.Run())
+	home, err := os.MkdirTemp("", "kurlo-api-test-home-")
+	if err != nil {
+		panic(err)
+	}
+	for _, name := range []string{"HOME", "USERPROFILE", "XDG_CONFIG_HOME", "APPDATA", "LOCALAPPDATA"} {
+		if err := os.Setenv(name, home); err != nil {
+			panic(err)
+		}
+	}
+	code := m.Run()
+	_ = os.RemoveAll(home)
+	os.Exit(code)
 }
 
 func requireSymlinks(t *testing.T) {

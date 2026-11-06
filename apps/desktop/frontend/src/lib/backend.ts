@@ -1,5 +1,5 @@
 import type {
-  AppInfo, AuthConfig, CollectionTextFile, CollectionTextFilesResult, CookieJarEntry, CookieJarResult,
+  CodexStatus, CodexConnection, ClaudeStatus, ClaudeConnection, AppInfo, AuthConfig, CollectionTextFile, CollectionTextFilesResult, CookieJarEntry, CookieJarResult,
   CookieSyncConfig, CookieSyncStatus,
   DefaultWorkspaceLocationResult, DownloadResult, GitAuthConfigResult, GitBranchListResult,
   GitConflictFileResult, GitDiffResult, GitLogResult, GitOperationResult, GitTokenInfoResult,
@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -739,4 +739,185 @@ export async function openRouterConnectStatus(): Promise<OpenRouterConnectState>
 
 export function onOpenRouterConnect(callback: (state: OpenRouterConnectState) => void): () => void {
   return window.runtime?.EventsOn?.<OpenRouterConnectState>('ai:openrouter-connect', callback) ?? (() => {});
+}
+
+const AGENT_DESKTOP_ONLY = 'The agent is only available in the desktop app.';
+
+export async function sendAgentMessage(input: AgentSendInput): Promise<AgentTurnResult> {
+  const app = window.go?.api?.App;
+  if (!app?.SendAgentMessage) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.SendAgentMessage(input);
+}
+
+export async function stopAgent(chatId: string, turnId = ''): Promise<void> {
+  const app = window.go?.api?.App;
+  if (turnId && app?.StopAgentTurn) await app.StopAgentTurn(turnId);
+  else if (chatId) await app?.StopAgent?.(chatId);
+}
+
+export async function agentChats(workspaceId: string): Promise<AgentChatSummary[]> {
+  return (await window.go?.api?.App?.AgentChats?.(workspaceId)) ?? [];
+}
+
+export async function agentChatPage(id: string, before = -1): Promise<AgentChat> {
+  const app = window.go?.api?.App;
+  if (app?.AgentChatPage) return app.AgentChatPage(id, before);
+  const { agentHistoryPage } = await import('./agentHistory');
+  return agentHistoryPage(await agentChat(id), before);
+}
+
+export async function agentAttachmentData(chatId: string, workspaceId: string, attachmentId: string): Promise<string> {
+  const app = window.go?.api?.App;
+  if (!app?.AgentAttachmentData) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.AgentAttachmentData(chatId, workspaceId, attachmentId);
+}
+
+export async function agentChat(id: string): Promise<AgentChat> {
+  const app = window.go?.api?.App;
+  if (!app?.AgentChat) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.AgentChat(id);
+}
+
+export async function deleteAgentChat(id: string): Promise<AgentResult> {
+  return (await window.go?.api?.App?.DeleteAgentChat?.(id)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function setAgentChatArchived(id: string, workspaceId: string, archived: boolean): Promise<AgentChatSummary> {
+  const app = window.go?.api?.App;
+  if (!app?.SetAgentChatArchived) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.SetAgentChatArchived(id, workspaceId, archived);
+}
+
+export async function exportAgentChat(id: string, workspaceId: string): Promise<string> {
+  const app = window.go?.api?.App;
+  if (!app?.ExportAgentChat) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.ExportAgentChat(id, workspaceId);
+}
+
+export async function renameAgentChat(id: string, title: string): Promise<AgentResult> {
+  return (await window.go?.api?.App?.RenameAgentChat?.(id, title)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function branchAgentChat(id: string, workspaceId: string, before: number): Promise<AgentChat> {
+  const app = window.go?.api?.App;
+  if (!app?.BranchAgentChat) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.BranchAgentChat(id, workspaceId, before);
+}
+
+export async function agentWorkspaceNotes(): Promise<AgentWorkspaceNotes> {
+  return (await window.go?.api?.App?.AgentWorkspaceNotes?.()) ?? { path: '', exists: false, templates: [] };
+}
+
+export async function agentMcpServers(): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.AgentMcpServers?.()) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function saveAgentMcpServer(server: AgentMcpServer): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.SaveAgentMcpServer?.(server)) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function deleteAgentMcpServer(id: string): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.DeleteAgentMcpServer?.(id)) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function testAgentMcpServer(server: AgentMcpServer): Promise<AgentMcpTestResult> {
+  return (await window.go?.api?.App?.TestAgentMcpServer?.(server)) ?? { ok: false, tools: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function answerAgentApproval(id: string, decision: 'allow' | 'allow_chat' | 'reject'): Promise<AgentResult> {
+  return (await window.go?.api?.App?.AnswerAgentApproval?.(id, decision)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function agentActivity(filter: Partial<AgentActivityFilter> = {}): Promise<AgentActivityList> {
+  const app = window.go?.api?.App;
+  if (!app?.AgentActivity) return { entries: [], enabled: true, error: AGENT_DESKTOP_ONLY };
+  return app.AgentActivity({ workspaceId: '', allWorkspaces: false, client: '', tool: '', since: 0, until: 0, limit: 0, ...filter });
+}
+
+export async function agentActivityEntry(id: string): Promise<AgentActivityEntry> {
+  const app = window.go?.api?.App;
+  if (!app?.AgentActivityEntry) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.AgentActivityEntry(id);
+}
+
+export async function revertAgentActivity(id: string, path = ''): Promise<AgentActivityEntry> {
+  const app = window.go?.api?.App;
+  if (!app?.RevertAgentActivity) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.RevertAgentActivity(id, path);
+}
+
+export async function setAgentActivityEnabled(enabled: boolean): Promise<AgentResult> {
+  return (await window.go?.api?.App?.SetAgentActivityEnabled?.(enabled)) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function clearAgentActivity(): Promise<AgentResult> {
+  return (await window.go?.api?.App?.ClearAgentActivity?.()) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function gitPullRequestUrl(): Promise<GitPullRequestResult> {
+  const app = window.go?.api?.App;
+  if (!app?.GitPullRequestURL) return { url: '', branch: '', base: '', error: 'Pull request links are only available in the desktop app.' };
+  return app.GitPullRequestURL();
+}
+
+export async function agentPendingApprovals(chatId: string): Promise<AgentApproval[]> {
+  return (await window.go?.api?.App?.AgentPendingApprovals?.(chatId)) ?? [];
+}
+
+export function onAgentEvent<T>(name: string, callback: (payload: T) => void): () => void {
+  return window.runtime?.EventsOn?.<T>(name, callback) ?? (() => {});
+}
+
+export async function codexStatus(path = ''): Promise<CodexStatus> {
+  const app = window.go?.api?.App;
+  if (!app?.CodexStatus) return { installed: false, connected: false, authenticated: false, path: '', version: '', account: '', authType: '', model: '', models: [], authUrl: '', waiting: false, error: 'Codex is only available in the desktop app.' };
+  return app.CodexStatus(path);
+}
+
+export async function connectCodex(input: CodexConnection): Promise<CodexStatus> {
+  const app = window.go?.api?.App;
+  if (!app?.ConnectCodex) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.ConnectCodex(input);
+}
+
+export async function startCodexLogin(path: string): Promise<CodexStatus> {
+  const app = window.go?.api?.App;
+  if (!app?.StartCodexLogin) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.StartCodexLogin(path);
+}
+
+export async function cancelCodexLogin(): Promise<void> {
+  await window.go?.api?.App?.CancelCodexLogin?.();
+}
+
+export async function removeCodexConnection(): Promise<AgentResult> {
+  return (await window.go?.api?.App?.RemoveCodexConnection?.()) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export const emptyClaudeStatus = (error = ''): ClaudeStatus => ({ installed: false, connected: false, authenticated: false, path: '', version: '', account: '', authMethod: '', model: '', models: [], ...(error ? { error } : {}) });
+
+export async function claudeCodeStatus(path = ''): Promise<ClaudeStatus> {
+  const app = window.go?.api?.App;
+  if (!app?.ClaudeCodeStatus) return emptyClaudeStatus('Claude Code is only available in the desktop app.');
+  return app.ClaudeCodeStatus(path);
+}
+
+export async function connectClaudeCode(input: ClaudeConnection): Promise<ClaudeStatus> {
+  const app = window.go?.api?.App;
+  if (!app?.ConnectClaudeCode) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.ConnectClaudeCode(input);
+}
+
+export async function removeClaudeCodeConnection(): Promise<AgentResult> {
+  return (await window.go?.api?.App?.RemoveClaudeCodeConnection?.()) ?? { ok: false, error: AGENT_DESKTOP_ONLY };
+}
+
+export async function signInClaudeCode(path = ''): Promise<AgentResult> {
+  const app = window.go?.api?.App;
+  if (!app?.SignInClaudeCode) return { ok: false, error: 'Claude Code sign-in is only available in the desktop app.' };
+  return app.SignInClaudeCode(path);
+}
+
+export async function cancelClaudeCodeSignIn(): Promise<void> {
+  await window.go?.api?.App?.CancelRequest?.('claude-code-sign-in');
 }

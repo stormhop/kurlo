@@ -112,6 +112,7 @@
   padding-right: var(--space-2-5);
   color: var(--text-3);
   text-align: right;
+  -webkit-user-select: none;
   user-select: none;
 }
 

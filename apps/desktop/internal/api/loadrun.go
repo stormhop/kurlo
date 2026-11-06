@@ -36,8 +36,10 @@ var safeLoadTestID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,80}$`)
 type loadRunManager struct {
 	mu              sync.Mutex
 	run             *loadtest.Run
+	done            chan struct{}
 	state           model.LoadRunState
 	log             []string
+	secrets         []string
 	pendingLog      []string
 	pendingProgress bool
 	result          model.LoadRunResult
@@ -113,6 +115,16 @@ func loadTestHosts(plan loadtest.Plan) []string {
 }
 
 func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
+	plan, err := loadTestPlanFromPayload(payload, fileWorkspaceStorePath())
+	if err != nil {
+		return model.LoadRunState{Error: err.Error()}
+	}
+	var decoded loadTestPayload
+	_ = json.Unmarshal([]byte(payload), &decoded)
+	return a.startLoadPlan(plan, decoded, k6Path)
+}
+
+func (a *App) startLoadPlan(plan loadtest.Plan, decoded loadTestPayload, k6Path string) model.LoadRunState {
 	failed := func(message string) model.LoadRunState {
 		return model.LoadRunState{Error: message}
 	}
@@ -125,17 +137,9 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	}
 	a.loadRuns.mu.Unlock()
 
-	plan, err := loadTestPlanFromPayload(payload, fileWorkspaceStorePath())
-	if err != nil {
-		return failed(err.Error())
-	}
-	var decoded loadTestPayload
-	_ = json.Unmarshal([]byte(payload), &decoded)
-	targets := make([]model.LoadTestRequest, 0, len(decoded.Requests))
-	for _, request := range decoded.Requests {
-		if !request.IsDraft {
-			targets = append(targets, model.LoadTestRequest{ID: request.ID, RequestType: request.RequestType})
-		}
+	targets := make([]model.LoadTestRequest, 0, len(plan.Requests))
+	for _, request := range plan.Requests {
+		targets = append(targets, model.LoadTestRequest{ID: request.ID, RequestType: request.Type})
 	}
 	if problems := loadtest.Validate(plan.Test, targets); len(problems) > 0 {
 		return failed("Fix the problems in the load test before running it: " + problems[0])
@@ -165,9 +169,11 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	if port, err := freeLocalPort(); err == nil {
 		env = append(env, fmt.Sprintf("K6_WEB_DASHBOARD_PORT=%d", port))
 	}
+	var secrets []string
 	for _, variable := range plan.Variables {
 		if variable.Secret && variable.Value != "" && !strings.ContainsAny(variable.Name, "=\x00") {
 			env = append(env, variable.Name+"="+variable.Value)
+			secrets = append(secrets, variable.Value)
 		}
 	}
 
@@ -203,6 +209,7 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	}
 	a.loadRuns.state = state
 	a.loadRuns.log = nil
+	a.loadRuns.secrets = secrets
 	a.loadRuns.pendingLog = nil
 	a.loadRuns.pendingProgress = false
 	a.loadRuns.result = result
@@ -216,17 +223,21 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	})
 	if err != nil {
 		a.loadRuns.state = model.LoadRunState{}
+		a.loadRuns.secrets = nil
 		a.loadRuns.mu.Unlock()
 		_ = os.RemoveAll(dir)
 		return failed(fmt.Sprintf("k6 did not start: %v", err))
 	}
 	a.loadRuns.run = run
+	finished := make(chan struct{})
+	a.loadRuns.done = finished
 	a.loadRuns.mu.Unlock()
 	a.emit("load:progress", state)
 	stopEvents := make(chan struct{})
 	eventsDone := make(chan struct{})
 	go a.pumpLoadRunEvents(stopEvents, eventsDone)
 	go func() {
+		defer close(finished)
 		run.Wait()
 		close(stopEvents)
 		<-eventsDone
@@ -276,10 +287,13 @@ func (a *App) flushLoadRunEvents() {
 }
 
 func (a *App) onLoadRunLine(line string) {
+	progress, hasProgress := loadtest.ParseProgress(line)
+	dashboard := loadtest.ParseDashboardURL(line)
+	a.loadRuns.mu.Lock()
+	line = redactSecrets(line, a.loadRuns.secrets)
 	if len(line) > loadRunLogLineLimit {
 		line = strings.ToValidUTF8(line[:loadRunLogLineLimit], "") + "…"
 	}
-	a.loadRuns.mu.Lock()
 	a.loadRuns.log = append(a.loadRuns.log, line)
 	if len(a.loadRuns.log) > loadRunLogLimit {
 		a.loadRuns.log = a.loadRuns.log[len(a.loadRuns.log)-loadRunLogLimit:]
@@ -289,12 +303,12 @@ func (a *App) onLoadRunLine(line string) {
 		a.loadRuns.pendingLog = a.loadRuns.pendingLog[len(a.loadRuns.pendingLog)-loadRunLogLimit:]
 	}
 	changed := false
-	if progress, ok := loadtest.ParseProgress(line); ok {
+	if hasProgress {
 		a.loadRuns.state.Progress = progress
 		a.loadRuns.result.Totals.Interrupted = progress.Interrupted
 		changed = true
 	}
-	if dashboard := loadtest.ParseDashboardURL(line); dashboard != "" {
+	if dashboard != "" {
 		a.loadRuns.state.DashboardURL = dashboard
 		changed = true
 	}
@@ -335,6 +349,8 @@ func (a *App) finishLoadRun(run *loadtest.Run, dir string, test model.LoadTest, 
 
 	a.loadRuns.mu.Lock()
 	a.loadRuns.run = nil
+	a.loadRuns.done = nil
+	a.loadRuns.secrets = nil
 	a.loadRuns.state = model.LoadRunState{}
 	a.loadRuns.mu.Unlock()
 	a.emit("load:progress", model.LoadRunState{})
@@ -357,19 +373,33 @@ func lastErrorLine(lines []string, exitCode int) string {
 	return fmt.Sprintf("k6 ended with exit code %d.", exitCode)
 }
 
+func loadRunSnapshotPath(collectionID, testID string, startedAt int64) string {
+	key := sha256.Sum256([]byte(collectionID + "\x00" + testID))
+	return filepath.Join(requestStoreDir(), "loadrun-history", hex.EncodeToString(key[:]), fmt.Sprintf("%d.json", startedAt))
+}
+
 func saveLoadRun(result model.LoadRunResult, summary, report []byte) error {
-	dir := loadRunDir(result.LoadTestID)
-	if err := os.RemoveAll(dir); err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, loadRunResultFile), data, 0600); err != nil {
+	snapshot := loadRunSnapshotPath(result.CollectionID, result.LoadTestID, result.StartedAt)
+	if err := os.MkdirAll(filepath.Dir(snapshot), 0700); err != nil {
+		return err
+	}
+	if err := writeFileAtomic(snapshot, data); err != nil {
+		return err
+	}
+	dir := loadRunDir(result.LoadTestID)
+	unlock, err := lockWorkspaceWrites(dir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
 	}
 	if summary != nil {
@@ -382,7 +412,7 @@ func saveLoadRun(result model.LoadRunResult, summary, report []byte) error {
 			return err
 		}
 	}
-	return nil
+	return writeFileAtomic(filepath.Join(dir, loadRunResultFile), data)
 }
 
 func (a *App) StopLoadRun() model.LoadRunState {
@@ -432,17 +462,12 @@ func (a *App) OpenLoadRunReport(loadTestID string) string {
 
 func (a *App) stopLoadRunForShutdown() {
 	a.loadRuns.mu.Lock()
-	run := a.loadRuns.run
+	run, done := a.loadRuns.run, a.loadRuns.done
 	a.loadRuns.mu.Unlock()
 	if run == nil {
 		return
 	}
 	run.Stop()
-	done := make(chan struct{})
-	go func() {
-		_, _ = run.Wait()
-		close(done)
-	}()
 	select {
 	case <-done:
 	case <-time.After(15 * time.Second):

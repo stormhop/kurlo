@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { trapFocus } from '../a11y';
   import type { AppDialogState } from '../types/dialog';
 
@@ -44,7 +45,7 @@
   <div class="modal app-dialog" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title" tabindex="-1" use:trapFocus>
     <div class="modal-head dialog-head">
       <h2 class="modal-title" id="app-dialog-title">{dialog.title}</h2>
-      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog">×</button>
+      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog"><AddCloseIcon /></button>
     </div>
     {#if dialog.message}
       <p>{dialog.message}</p>

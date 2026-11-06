@@ -133,7 +133,7 @@ func (s *mcpServer) getPrompt(params json.RawMessage) (map[string]any, error) {
 	return result, nil
 }
 
-const mcpPromptBaseURLRules = "If no environment sets baseUrl, look for the address in the project (.env, docker-compose.yml, launch settings, README) and ask the user before calling set_variable; never point an environment at production. " +
+const mcpPromptBaseURLRules = "If no environment sets baseUrl, look for the address in the project (docker-compose.yml, launch settings, README) and ask the user before calling set_variable; never point an environment at production. " +
 	"When the server is not running anywhere, still save the requests and call generate_tests with from: example and the response the code returns, so the mock server can serve it and the tests run once the server is up."
 
 func mcpSyncCollectionPrompt(args map[string]string) string {
@@ -152,7 +152,7 @@ func mcpSyncCollectionPrompt(args map[string]string) string {
 	return strings.Join([]string{
 		"Bring " + target + " in line with the HTTP API defined in " + where + ".",
 		"",
-		"1. Find the routes: read the router and controller definitions (Express or Fastify routers, FastAPI or Flask decorators, Go handlers registered on net/http, chi, gin or echo, Spring mappings, Rails routes, ASP.NET controllers). For each route note the method, path, path and query parameters, and the request and response body types.",
+		"1. Find the routes: use search_code and read_file to inspect the router and controller definitions (Express or Fastify routers, FastAPI or Flask decorators, Go handlers registered on net/http, chi, gin or echo, Spring mappings, Rails routes, ASP.NET controllers). For each route note the method, path, path and query parameters, and the request and response body types.",
 		"2. Call list_requests" + collectionArg + " and match each route to a saved request by method and path. Treat {{baseUrl}}, :id and {id} placeholders as equal.",
 		"3. For each route without a request, call save_request with the URL {{baseUrl}}/path, path parameters as {{variables}}, a JSON body built from the request type, and auth left as inherit unless the route needs something else. Put it in a folder named after the resource.",
 		"4. Call generate_tests for each new request: from: run when list_environments shows an environment whose baseUrl answers, otherwise from: example with the status and body the code returns.",
@@ -171,7 +171,7 @@ func mcpCoverEndpointPrompt(args map[string]string) string {
 	return strings.Join([]string{
 		"Add " + args["endpoint"] + " of this project's API to Kurlo" + collection + ".",
 		"",
-		"1. Find the handler for " + args["endpoint"] + " in the code and read its parameters, request body type, the responses it returns and the auth it needs.",
+		"1. Use search_code and read_file to find the handler for " + args["endpoint"] + " and inspect its parameters, request body type, the responses it returns and the auth it needs.",
 		"2. Call list_requests to check it is not saved already. If it is, change that request with save_request instead of adding a second one.",
 		"3. Call save_request with the URL {{baseUrl}}/path, path parameters as {{variables}} and a realistic JSON body built from the request type.",
 		"4. Call generate_tests on it: from: run when an environment's baseUrl answers, otherwise from: example with the success response the code returns. Then add the main error responses (validation, not found, unauthorized) with save_example and the status and body the code returns for them.",

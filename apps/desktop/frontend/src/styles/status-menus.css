@@ -98,6 +98,8 @@
   border-color: transparent;
   border-radius: var(--radius-md);
   color: var(--text-2);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
 }
 
 .btn.storage-status-btn.git {
@@ -128,6 +130,10 @@
   align-items: baseline;
   gap: var(--space-2);
   min-width: 0;
+}
+
+.storage-status-btn:not(.git) .storage-status-line {
+  align-items: center;
 }
 
 .storage-flag,

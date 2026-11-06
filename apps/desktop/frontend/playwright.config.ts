@@ -1,9 +1,23 @@
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test';
 
 const slowMoMs = Number.parseInt(process.env.KURLO_E2E_SLOWMO_MS ?? '0', 10);
 const slowMo = Number.isFinite(slowMoMs) && slowMoMs > 0 ? slowMoMs : 0;
+const serialMode = Boolean(
+  slowMo ||
+  process.env.PWDEBUG ||
+  process.env.KURLO_E2E_STEP_PAUSE_MS ||
+  process.env.KURLO_DOCS_SCREENSHOT_DIR ||
+  process.env.KURLO_README_SCREENSHOT ||
+  process.env.KURLO_E2E_SHOT ||
+  process.env.KURLO_E2E_RESPONSE_SCREENSHOT ||
+  process.env.KURLO_PERF_FIXTURES ||
+  process.env.KURLO_PERF_PROFILE ||
+  process.env.KURLO_ROUNDTRIP_IN,
+);
+const localWorkers = Math.min(4, Math.max(1, availableParallelism() - 1));
+const workers = serialMode ? 1 : process.env.CI ? 2 : localWorkers;
 const artifactDir = process.env.KURLO_E2E_ARTIFACT_DIR ?? join(tmpdir(), 'kurlo-playwright-artifacts');
 const reporter: PlaywrightTestConfig['reporter'] = process.env.CI || process.env.KURLO_E2E_HTML_REPORT === '1'
   ? [
@@ -24,7 +38,8 @@ export default defineConfig({
   expect: {
     timeout: 10_000,
   },
-  fullyParallel: false,
+  fullyParallel: !serialMode,
+  workers,
   retries: process.env.CI ? 2 : 0,
   reporter,
   use: {

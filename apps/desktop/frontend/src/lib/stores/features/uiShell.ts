@@ -60,6 +60,12 @@ export function readResponseLayout(): ResponseLayout {
   }
 }
 
+export const AGENT_DOCKED_MIN_WIDTH = 704;
+
+export function agentSidebarMaxWidth(viewportWidth: number): number {
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.floor(viewportWidth - ACTIVITY_RAIL_WIDTH - AGENT_DOCKED_MIN_WIDTH - 2)));
+}
+
 export function codePanelMaxWidth(viewportWidth: number, sidebarWidth: number): number {
   const availableWidth = Math.max(0, viewportWidth - ACTIVITY_RAIL_WIDTH - sidebarWidth);
   const balancedWidth = Math.floor(availableWidth / 2);
@@ -164,6 +170,7 @@ type UiShellHost = {
   runActiveRequest: () => Promise<unknown>;
   runShortcut: (id: ShortcutId) => Promise<unknown>;
   showSidebarView: (view: SidebarView) => void;
+  openAgentTab: () => void;
   openEnvironmentPicker: () => void;
   copyActiveRequestCurl: () => Promise<unknown>;
   saveActiveRequest: () => Promise<unknown>;
@@ -474,6 +481,7 @@ export const uiShellFeature = {
     else if (id === 'go-collections') this.showSidebarView('collections');
     else if (id === 'go-environments') this.showSidebarView('environments');
     else if (id === 'go-history') this.showSidebarView('history');
+    else if (id === 'go-agent') this.showSidebarView('agent');
     else if (id === 'choose-environment') this.openEnvironmentPicker();
     else if (id === 'new-collection') await this.createCollection();
     else if (id === 'import-collection') await this.openPostmanImport();
@@ -484,6 +492,7 @@ export const uiShellFeature = {
   showSidebarView(this: UiShellHost, view: SidebarView) {
     this.sidebarView = view;
     this.sidebarHidden = false;
+    if (view === 'agent') this.openAgentTab();
   },
 
   openEnvironmentPicker(this: UiShellHost) {

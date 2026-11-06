@@ -38,6 +38,7 @@ type websocketSession struct {
 }
 
 type websocketCallbacks struct {
+	onDone      func()
 	onOpen      func(model.WebSocketOpenEvent)
 	onEvent     func(model.WebSocketMessage)
 	onClose     func(model.WebSocketCloseEvent)
@@ -79,6 +80,9 @@ func (m *websocketManager) connectWithCallbacks(appCtx context.Context, sessionI
 	m.mu.Unlock()
 
 	go func() {
+		if callbacks.onDone != nil {
+			defer callbacks.onDone()
+		}
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("kurlo: websocket session %s panicked: %v", sessionID, r)

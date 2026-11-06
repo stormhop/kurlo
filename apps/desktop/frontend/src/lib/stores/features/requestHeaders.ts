@@ -111,6 +111,7 @@ export const requestHeadersFeature = {
       try { add('Authorization', `Basic ${btoa(`${auth.basicUser}:${auth.basicPass}`)}`, 'from auth settings', false); }
       catch { add('Authorization', 'Basic <generated>', 'from auth settings', false); }
     }
+    if (auth.type === 'ntlm' && auth.basicUser) add('Authorization', 'NTLM <negotiated>', 'from auth settings', false);
     if (auth.type === 'oauth2' && auth.oauth2Token) add('Authorization', `Bearer ${auth.oauth2Token}`, 'from OAuth token', false);
     if (auth.type === 'apikey' && auth.apiKeyIn === 'header' && auth.apiKeyName) add(auth.apiKeyName, auth.apiKeyValue, 'from API key auth', false);
     if (auth.type === 'aws') { add('Authorization', 'AWS4-HMAC-SHA256 <generated>', 'from AWS Signature v4', false); add('X-Amz-Date', '<generated>', 'from AWS Signature v4', false); add('X-Amz-Content-Sha256', '<generated>', 'from AWS Signature v4', false); }

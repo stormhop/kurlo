@@ -167,14 +167,19 @@ jobs:
         working-directory: apps/desktop/frontend
 
       - name: Run E2E tests
-        run: npm run frontend:e2e
+        run: npm run frontend:e2e -- --grep-invert @scale
         env:
           KURLO_E2E_ARTIFACT_DIR: ${{ runner.temp }}/playwright
 
       - name: Run E2E tests in WebKit
-        run: npm run frontend:e2e:webkit
+        run: npm run frontend:e2e:webkit -- --grep-invert @scale
         env:
           KURLO_E2E_ARTIFACT_DIR: ${{ runner.temp }}/playwright-webkit
+
+      - name: Run scale tests with one worker
+        run: npm exec --workspace @kurlo/desktop-frontend -- playwright test --grep @scale --workers=1
+        env:
+          KURLO_E2E_ARTIFACT_DIR: ${{ runner.temp }}/playwright-scale
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
@@ -182,6 +187,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
-          path: ${{ runner.temp }}/playwright/html-report
+          path: |
+            ${{ runner.temp }}/playwright/html-report
+            ${{ runner.temp }}/playwright-webkit/html-report
+            ${{ runner.temp }}/playwright-scale/html-report
           retention-days: 3
           if-no-files-found: ignore

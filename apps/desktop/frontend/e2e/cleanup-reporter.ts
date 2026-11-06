@@ -10,9 +10,14 @@ type CleanupReporterOptions = {
 class KurloCleanupReporter implements Reporter {
   private artifactDir: string;
   private passed = false;
+  private ranTests = false;
 
   constructor(options: CleanupReporterOptions = {}) {
     this.artifactDir = options.artifactDir ?? '';
+  }
+
+  onTestBegin() {
+    this.ranTests = true;
   }
 
   onEnd(result: FullResult) {
@@ -21,7 +26,7 @@ class KurloCleanupReporter implements Reporter {
 
   onExit() {
     if (process.env.CI || process.env.KURLO_E2E_KEEP_ARTIFACTS === '1' || process.env.KURLO_E2E_HTML_REPORT === '1') return;
-    if (!this.passed || !this.isSafeArtifactDir()) return;
+    if (!this.ranTests || !this.passed || !this.isSafeArtifactDir()) return;
 
     rmSync(this.artifactDir, { recursive: true, force: true });
   }

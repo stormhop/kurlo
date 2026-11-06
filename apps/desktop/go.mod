@@ -6,6 +6,7 @@ toolchain go1.26.10
 
 require (
 	aead.dev/minisign v0.3.0
+	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/andybalholm/brotli v1.2.6
 	github.com/d5/tengo/v2 v2.17.0
@@ -19,6 +20,7 @@ require (
 	github.com/minio/selfupdate v0.6.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/wailsapp/wails/v2 v2.13.0
+	golang.org/x/image v0.40.0
 	golang.org/x/net v0.61.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0

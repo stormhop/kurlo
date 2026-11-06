@@ -38,7 +38,11 @@ func (anthropicProvider) build(req model.AiRequest, messages []model.AiMessage, 
 	}
 	body["max_tokens"] = maxTokens
 	if strings.TrimSpace(req.System) != "" {
-		body["system"] = req.System
+		if req.Settings.CachePrompt {
+			body["system"] = []map[string]any{{"type": "text", "text": req.System, "cache_control": anthropicCacheControl()}}
+		} else {
+			body["system"] = req.System
+		}
 	}
 	thinking := req.Settings.Thinking == "summarized"
 	if req.Settings.Temperature != nil && !thinking {
@@ -59,7 +63,13 @@ func (anthropicProvider) build(req model.AiRequest, messages []model.AiMessage, 
 			}
 			list = append(list, entry)
 		}
+		if req.Settings.CachePrompt {
+			list[len(list)-1]["cache_control"] = anthropicCacheControl()
+		}
 		body["tools"] = list
+	}
+	if req.Settings.CachePrompt {
+		anthropicMarkLastMessage(body["messages"].([]anthropicMessage))
 	}
 	encoded, err := json.Marshal(body)
 	if err != nil {
@@ -70,6 +80,24 @@ func (anthropicProvider) build(req model.AiRequest, messages []model.AiMessage, 
 		headers = append(headers, model.KeyValue{Key: "anthropic-version", Value: anthropicAPIVersion, Enabled: true})
 	}
 	return encoded, headers, nil
+}
+
+func anthropicCacheControl() map[string]any {
+	return map[string]any{"type": "ephemeral"}
+}
+
+func anthropicMarkLastMessage(messages []anthropicMessage) {
+	for index := len(messages) - 1; index >= 0; index-- {
+		content := messages[index].Content
+		for block := len(content) - 1; block >= 0; block-- {
+			switch content[block]["type"] {
+			case "thinking", "redacted_thinking":
+				continue
+			}
+			content[block]["cache_control"] = anthropicCacheControl()
+			return
+		}
+	}
 }
 
 func anthropicMessages(messages []model.AiMessage) []anthropicMessage {
@@ -117,6 +145,11 @@ func anthropicHasUnsignedThinking(blocks []model.AiBlock) bool {
 
 func anthropicContentFor(role string, block model.AiBlock) anthropicContent {
 	switch block.Type {
+	case model.AiBlockImage:
+		if role != "user" || block.Data == "" {
+			return nil
+		}
+		return anthropicContent{"type": "image", "source": map[string]string{"type": "base64", "media_type": block.MediaType, "data": block.Data}}
 	case model.AiBlockText:
 		if block.Text == "" {
 			return nil

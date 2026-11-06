@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -292,7 +293,11 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 	existingSecrets := map[string]string{}
 	existingSharedHash := ""
 	existingStorageMode := inferWorkspaceStorageMode(workspaceRoot)
+	delete(store, profileGlobalsRevisionField)
 	if existingStore, _, err := loadLocalRequestStore(localStorePath); err == nil {
+		if revision := stringValue(existingStore, profileGlobalsRevisionField); revision != "" {
+			store[profileGlobalsRevisionField] = revision
+		}
 		if workspaceRootUnavailable(workspaceRoot) && sameWorkspaceRoot(resolvedStoredWorkspaceRoot(stringValue(localStoreStorage(existingStore), "root")), workspaceRoot) {
 			return fmt.Errorf("%s", missingWorkspaceRootMessage())
 		}
@@ -1312,8 +1317,20 @@ func readYAMLRequestEntriesWithDiagnostics(root string, order []string, secrets 
 			diagnostics = append(diagnostics, workspaceDiagnostic{scope: "request", path: path, root: workspaceRoot, err: err, workspaceID: workspaceID, collectionID: collectionID, requestID: requestID}.toDiagnostic())
 			return nil
 		}
-		mergeRequestSecrets(request, secrets)
 		normalizeLoadedBodyType(request)
+		id, validID := request["id"].(string)
+		if doc.Version == fileStoreVersion && validID && strings.TrimSpace(id) != "" {
+			fields := request
+			if bodyType, ok := request["bodyType"].(string); ok && bodyType != "" && !loadedBodyTypes[bodyType] && stringValue(request, "bodyContent") == "" {
+				fields = maps.Clone(request)
+				delete(fields, "bodyType")
+			}
+			if err := validateWorkspaceFileContract("request", fields); err != nil {
+				diagnostics = append(diagnostics, workspaceDiagnostic{scope: "request", path: path, root: workspaceRoot, err: err, workspaceID: workspaceID, collectionID: collectionID, requestID: requestID}.toDiagnostic())
+				return nil
+			}
+		}
+		mergeRequestSecrets(request, secrets)
 		sortOrder := doc.Order
 		if ordered, ok := orderIndex[requestID]; ok {
 			sortOrder = ordered

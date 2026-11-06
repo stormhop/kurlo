@@ -320,7 +320,7 @@
       {/if}
       {#if status === 'connected'}<span class="sse-summary-dot"></span><span>{elapsed}</span>{/if}
       {#if status === 'reconnecting'}<span class="sse-summary-dot"></span><span class="sse-spinner-sm"></span><span>Reconnecting</span>{/if}
-      {#if status === 'error' && error}<span class="sse-summary-dot"></span><span class="sse-status-error" title={error}>{friendlyWebSocketError(error)}</span>{/if}
+      {#if status === 'error' && error}<span class="sse-summary-dot"></span><span class="sse-status-error">{friendlyWebSocketError(error)}</span>{/if}
       {#if status !== 'idle'}<span class="sse-summary-dot"></span>{/if}<span>{messages.length} {messages.length === 1 ? 'message' : 'messages'}</span>
       <span class="sse-summary-dot"></span><span>{formatSize(streamSize)}</span>
     </div>
@@ -390,7 +390,7 @@
 
     <div class="resp-actions">
       {#if responseTab === 'messages'}
-        <button class="btn btn-icon" title="Search response" aria-label="Search response" aria-pressed={searchOpen} onclick={() => (searchOpen = !searchOpen)} type="button">
+        <button class="btn btn-icon" aria-label="Search response" aria-pressed={searchOpen} onclick={() => (searchOpen = !searchOpen)} type="button">
           <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none">
             <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
             <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
@@ -406,7 +406,7 @@
         </button>
       {/if}
       {#if responseTab === 'messages'}
-        <button class="btn btn-icon" type="button" onclick={onClear} disabled={messages.length === 0} title="Clear messages" aria-label="Clear messages">
+        <button class="btn btn-icon" type="button" onclick={onClear} disabled={messages.length === 0} aria-label="Clear messages">
           <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
             <path d="M2 3h9M5 3V2h3v1M4 3v7a1 1 0 001 1h3a1 1 0 001-1V3"
               stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>

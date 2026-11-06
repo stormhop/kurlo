@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { tabListKeyboard, trapFocus } from '../a11y';
   import CodeEditor from '../CodeEditor.svelte';
   import type { K6ExportResult, LoadTest } from '../wire';
@@ -91,7 +92,7 @@
         <h2 class="modal-title" id="k6-export-title">Export to k6</h2>
         <span class="loadtest-hint">{loadTest.name} · {stepCount} step{stepCount === 1 ? '' : 's'}</span>
       </div>
-      <button type="button" class="btn btn-ghost btn-icon" onclick={onClose} aria-label="Close dialog">×</button>
+      <button type="button" class="btn btn-ghost btn-icon" onclick={onClose} aria-label="Close dialog"><AddCloseIcon /></button>
     </div>
 
     <div class="k6-export-body">

@@ -45,7 +45,7 @@ func (v *workspaceIntegrityValidator) item(kind, path string, item map[string]an
 	raw, present := item["id"]
 	id, valid := raw.(string)
 	if present && raw != nil && !valid {
-		v.report(path, fmt.Sprintf("The %s id must be text. Put it in quotes, for example id: \"%v\".", kind, raw))
+		v.report(path, fmt.Sprintf("The %s id must be text. Put it in quotes.", kind))
 		return
 	}
 	if strings.TrimSpace(id) == "" {

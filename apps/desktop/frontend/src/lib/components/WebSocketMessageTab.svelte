@@ -56,7 +56,7 @@
       <BeautifyButton onbeautify={() => editorRef?.format()} beautified={vm.beautifiedBody} disabled={vm.bodyLang !== 'json'} title="Beautify message" />
 
       <div class="ws-message-actions">
-        <button class="btn btn-secondary btn-sm toolbar-btn ws-toolbar-btn" type="button" disabled={!vm.webSocketConnected} onclick={() => vm.webSocketSendControl('ping')} title="Send ping">
+        <button class="btn btn-secondary btn-sm toolbar-btn ws-toolbar-btn" type="button" disabled={!vm.webSocketConnected} onclick={() => vm.webSocketSendControl('ping')}>
           Ping
         </button>
         <button class="btn btn-primary btn-sm ws-message-send" type="button" disabled={!vm.webSocketConnected} onclick={vm.webSocketSendCurrentMessage}>

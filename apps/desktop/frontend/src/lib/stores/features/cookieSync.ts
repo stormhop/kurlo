@@ -20,7 +20,7 @@ type CookieSyncHost = {
   cookieSyncCodeCopied: boolean;
   cookieSyncRefreshTimer: ReturnType<typeof setTimeout> | null;
   activeRequestCookieDomain: () => string;
-  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean) => Promise<void>;
+  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean, workspaceId?: string) => Promise<void>;
   cookieSyncDomains: () => string[];
   startCookieSyncBridge: () => Promise<void>;
   stopCookieSyncBridge: () => Promise<void>;
@@ -234,6 +234,9 @@ export const cookieSyncFeature = {
   initCookieSyncListeners(this: CookieSyncHost) {
     const runtime = window.runtime;
     if (!runtime?.EventsOn) return;
+    runtime.EventsOn<string>('cookies:jar-changed', workspaceId => {
+      if (workspaceId) void this.refreshCookieJar(true, true, workspaceId);
+    });
     runtime.EventsOn<CookieSyncStatus>('cookies:synced', status => {
       this.cookieSync = status ?? EMPTY_COOKIE_SYNC_STATUS;
       this.cookieSyncError = status?.error ?? '';

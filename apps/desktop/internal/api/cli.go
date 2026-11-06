@@ -51,6 +51,7 @@ type cliTestResult struct {
 }
 
 type cliRunResult struct {
+	secrets     []string
 	Name        string          `json:"name"`
 	Method      string          `json:"method"`
 	URL         string          `json:"url"`
@@ -65,6 +66,7 @@ type cliRunResult struct {
 	Tests       []cliTestResult `json:"tests"`
 	TestsPassed int             `json:"testsPassed"`
 	TestsTotal  int             `json:"testsTotal"`
+	Logs        []string        `json:"logs,omitempty"`
 }
 
 func (r cliRunResult) failed() bool {
@@ -355,6 +357,14 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 		return base, model.HttpResponse{}
 	}
 	httpReq.Auth.Token = resolvedAuth.Token
+	base.secrets = []string{
+		resolvedAuth.Token, resolvedAuth.Password, resolvedAuth.KeyValue,
+		resolvedAuth.OAuth2Secret, resolvedAuth.OAuth2Password, resolvedAuth.OAuth2RefreshToken,
+		resolvedAuth.OAuth2AssertionPrivateKey, resolvedAuth.OAuth1ConsumerSecret,
+		resolvedAuth.OAuth1Token, resolvedAuth.OAuth1TokenSecret, resolvedAuth.OAuth1PrivateKey,
+		resolvedAuth.AWSSecretKey, resolvedAuth.AWSSessionToken,
+	}
+	httpReq.SecretEnvironmentValues = append(httpReq.SecretEnvironmentValues, base.secrets...)
 
 	resp := sendRequest(ctx, httpReq, sm, jars, cache)
 
@@ -399,9 +409,13 @@ func headerLookup(headers []model.KeyValue, key string) string {
 }
 
 func selectCLIRequests(requests []cliSavedRequest, opts cliOptions) []cliSavedRequest {
+	return selectRequestsForRun(requests, opts, cliRunnable)
+}
+
+func selectRequestsForRun(requests []cliSavedRequest, opts cliOptions, runnable func(cliSavedRequest) bool) []cliSavedRequest {
 	selected := make([]cliSavedRequest, 0, len(requests))
 	for _, req := range requests {
-		if !cliRunnable(req) {
+		if !runnable(req) {
 			continue
 		}
 		if opts.collection != "" && !strings.EqualFold(strings.TrimSpace(req.Collection), strings.TrimSpace(opts.collection)) {
@@ -632,7 +646,7 @@ func writeVariableExport(path, name string, values map[string]string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	return replaceFileAtomicMode(path, append(data, '\n'), 0o600)
 }
 
 func runReporters(opts cliOptions, results []cliRunResult, elapsed time.Duration) error {

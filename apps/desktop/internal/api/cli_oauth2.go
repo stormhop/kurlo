@@ -17,8 +17,9 @@ type oauth2TokenCache struct {
 }
 
 type cachedOAuth2Token struct {
-	accessToken string
-	expiresAt   time.Time
+	accessToken  string
+	refreshToken string
+	expiresAt    time.Time
 }
 
 func newOAuth2TokenCache() *oauth2TokenCache {
@@ -36,14 +37,19 @@ func (c *oauth2TokenCache) resolveOAuth2Token(cfg *model.AuthConfig) error {
 	lock.Lock()
 	defer lock.Unlock()
 	c.mu.Lock()
-	if cached, ok := c.tokens[key]; ok && cached.accessToken != "" && !oauth2TokenExpired(cached.expiresAt) {
+	cached := c.tokens[key]
+	if cached.accessToken != "" && !oauth2TokenExpired(cached.expiresAt) {
 		cfg.Token = cached.accessToken
 		c.mu.Unlock()
 		return nil
 	}
 	c.mu.Unlock()
 
-	response, attempted := fetchCLIOAuth2Token(*cfg)
+	fetch := *cfg
+	if cached.refreshToken != "" {
+		fetch.OAuth2RefreshToken = cached.refreshToken
+	}
+	response, attempted := fetchCLIOAuth2Token(fetch)
 	if !attempted {
 		if cfg.Token != "" {
 			return nil
@@ -71,16 +77,23 @@ func (c *oauth2TokenCache) resolveOAuth2Token(cfg *model.AuthConfig) error {
 		return fmt.Errorf("auth error: the token endpoint returned no access token")
 	}
 
+	if response.RefreshToken == "" {
+		response.RefreshToken = fetch.OAuth2RefreshToken
+	}
+	c.rememberOAuth2Token(key, response)
+	cfg.Token = response.AccessToken
+	return nil
+}
+
+func (c *oauth2TokenCache) rememberOAuth2Token(key string, response model.OAuth2TokenResponse) {
 	expiresAt := time.Time{}
 	if response.ExpiresIn > 0 {
 		expiresAt = time.Now().Add(time.Duration(response.ExpiresIn) * time.Second)
 	}
 	c.mu.Lock()
-	c.tokens[key] = cachedOAuth2Token{accessToken: response.AccessToken, expiresAt: expiresAt}
+	c.tokens[key] = cachedOAuth2Token{accessToken: response.AccessToken, refreshToken: response.RefreshToken, expiresAt: expiresAt}
 	c.mu.Unlock()
 
-	cfg.Token = response.AccessToken
-	return nil
 }
 
 func fetchCLIOAuth2Token(cfg model.AuthConfig) (model.OAuth2TokenResponse, bool) {

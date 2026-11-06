@@ -5,6 +5,8 @@ description: Switch between staging, prod, and local without rewriting every req
 
 Variables in Kurlo use the `{{name}}` template syntax. They expand in URLs, headers, query params, request bodies, and auth fields just before send.
 
+Edit the environment name directly in the editor, or double-click its name in the sidebar. `F2` or **Rename** in the editor’s **•••** menu focuses the name field. Press `Enter` or click elsewhere to save; `Escape` cancels the edit.
+
 ![Environment editor with a base URL and masked secret token](../../../../assets/screenshots/environments-panel.png)
 
 ## Scopes
@@ -115,6 +117,10 @@ Mark a variable as **secret** in the environment editor — its value is masked 
 ## Protecting an environment from AI agents
 
 Choose **Protect from AI agents** in an environment's ⋯ menu to keep assistants connected through [`kurlo mcp`](/docs/guides/mcp-server/#protected-environments) away from it. They can still see that it exists, but they cannot send requests with it or change its variables. The environment shows a **Protected** badge, and the mark is saved in its file, so a Git-backed workspace shares it with your team. Use it for production.
+
+## Sandbox environments for the agent
+
+Choose **Sandbox for the agent** in an environment's ⋯ menu for an environment that points at disposable data, such as a local stack or a test tenant. The Kurlo agent then sends every request with it without asking, including `POST`, `PUT`, `PATCH` and `DELETE`. The environment shows a **Sandbox** badge and the mark is saved in its file. A protected environment cannot be a sandbox. See [What the agent may do without asking](/docs/guides/agent/#what-it-may-do-without-asking).
 
 ## Global variables
 

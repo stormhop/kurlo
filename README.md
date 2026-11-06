@@ -11,7 +11,7 @@ No account, no paid plan, no telemetry. Collections live as YAML in your Git rep
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/stormhop/kurlo/releases/latest)
 
-**[Download](https://github.com/stormhop/kurlo/releases/latest)** · [Website](https://kurlo.dev/) · [Docs](https://kurlo.dev/docs/getting-started/installation/) · [MCP server](https://kurlo.dev/mcp/) · [Compare](https://kurlo.dev/vs/postman/)
+**[Download](https://github.com/stormhop/kurlo/releases/latest)** · [Website](https://kurlo.dev/) · [Docs](https://kurlo.dev/docs/getting-started/installation/) · [Agent mode](https://kurlo.dev/agent/) · [MCP server](https://kurlo.dev/mcp/) · [Compare](https://kurlo.dev/vs/postman/)
 
 </div>
 
@@ -117,7 +117,9 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 - Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets
 - **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure. `kurlo load list|export|run` lists collection load tests, exports k6 scripts or runs local k6 with threshold results and reports
 
-**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved requests and whole collections with their auth, scripts and tests, and send one-off calls with your `{{variables}}`. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
+**Built-in agent** — ask in plain words and it runs requests, explains failures and edits collections on your own model (OpenRouter, an API key, or Ollama and LM Studio). It asks before sending anything but `GET`, `HEAD` or `OPTIONS` and shows every file change as a diff to apply or reject; chats stay on your machine and can be archived or exported as Markdown. The **Your agents** tab also connects installed Codex and Claude Code CLIs with their own credentials and native sessions. See the [agent guide](https://kurlo.dev/docs/guides/agent/).
+
+**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved HTTP, GraphQL, unary gRPC, MCP and AI requests, run collections with CSV or JSON data, and send one-off calls with your `{{variables}}`. It can start and compare k6 runs and serve saved examples from a local mock. In the desktop app, Agent Mode can also exchange messages on live connections. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It can preview and apply Go imports, read a connected project folder, edit Markdown docs and generate snippets. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
 
 ```bash
 npx -y @kurlo/cli mcp install --env Staging
@@ -186,10 +188,29 @@ make build
 make build-all
 ```
 
-**Run the full check suite** — frontend types, unit tests, `gofmt`, `go vet`, and race-enabled Go tests:
+**Run everyday checks** — lint, frontend types, unit tests and Go tests run concurrently, with Go's test cache enabled:
 ```bash
 make check
 ```
+
+**Run the full test suite**, including the Go race detector and Chromium/WebKit:
+```bash
+make check-full
+```
+
+| During development | Command |
+| --- | --- |
+| One unit-test file | `npm run test:unit -- src/tests/agent.test.ts` |
+| Watch unit tests | `npm run test:watch -- agent` |
+| Unit tests related to uncommitted changes | `npm run test:changed` |
+| Matching Go tests | `make test GO_TEST_FLAGS='-run TestCodex'` |
+| Go tests without the heavy scale cases | `make test GO_TEST_FLAGS=-short` |
+| Matching browser tests | `npm run test:e2e -- --grep 'Codex'` |
+| Both browsers | `npm run test:e2e:all` |
+| Interactive browser test runner | `npm run test:e2e:ui` |
+| Retry only failed browser tests | `npm run test:e2e:failed` |
+
+Browser tests use up to four workers locally and two in CI. Override this with `--workers=2`; use `--workers=1` for isolated performance comparisons. Screenshot-generation and profiling modes default to one worker. On a memory-constrained machine, `make check CHECK_JOBS=1` runs the independent checks sequentially. Go tests already run packages in parallel; tests sharing process-wide environment variables stay sequential within a package. Go caches successful runs; add `GO_TEST_FLAGS='-count=1'` only when a fresh run is needed.
 
 See `make help` for every available target.
 

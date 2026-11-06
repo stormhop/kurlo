@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { onMount } from 'svelte';
   import { trapFocus } from '../a11y';
   import { FIND_DEBOUNCE_MS, buildFindRegExp, expandReplacement, findInRequests, replaceMatches, type FindMatch, type FindOptions } from '../findReplace';
@@ -111,18 +112,18 @@
     <div class="modal-head dialog-head">
       <div class="find-replace-heading">
         <h2 class="modal-title" id="find-replace-title">Find and replace</h2>
-        <span class="find-replace-scope" title={scopeLabel}>{scopeLabel}</span>
+        <span class="find-replace-scope">{scopeLabel}</span>
       </div>
-      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onClose} aria-label="Close dialog">×</button>
+      <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onClose} aria-label="Close dialog"><AddCloseIcon /></button>
     </div>
 
     <div class="find-replace-form">
       <div class="find-replace-row">
         <input class="field field-input" bind:this={findInput} bind:value={query} placeholder="Find" aria-label="Find" spellcheck="false" data-autofocus />
         <div class="find-replace-toggles" role="group" aria-label="Search options">
-          <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.matchCase} aria-pressed={options.matchCase} title="Match case" aria-label="Match case" onclick={() => toggle('matchCase')}>Aa</button>
-          <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.wholeWord} aria-pressed={options.wholeWord} title="Whole word" aria-label="Whole word" onclick={() => toggle('wholeWord')}><u>ab</u></button>
-          <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.regex} aria-pressed={options.regex} title="Regular expression ($1 refers to a group in the replacement)" aria-label="Regular expression" onclick={() => toggle('regex')}>.*</button>
+          <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.matchCase} aria-pressed={options.matchCase} aria-label="Match case" onclick={() => toggle('matchCase')}>Aa</button>
+          <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.wholeWord} aria-pressed={options.wholeWord} aria-label="Whole word" onclick={() => toggle('wholeWord')}><u>ab</u></button>
+          <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.regex} aria-pressed={options.regex} aria-label="Regular expression" onclick={() => toggle('regex')}>.*</button>
         </div>
       </div>
       <div class="find-replace-row">
@@ -157,7 +158,7 @@
         <section class="find-replace-group">
           <div class="find-replace-group-head">
             <RequestTypeBadge request={group.request} variant="search" />
-            <button type="button" class="btn-link find-replace-request" title="Open request" onclick={() => onOpenRequest(group.request.id)}>{requestLabel(group.request)}</button>
+            <button type="button" class="btn-link find-replace-request" onclick={() => onOpenRequest(group.request.id)}>{requestLabel(group.request)}</button>
             <span class="find-replace-count">{group.matches.length}</span>
             <button type="button" class="btn btn-ghost btn-sm" disabled={busy} onclick={() => apply([group.request])}>Replace in request</button>
           </div>

@@ -6,14 +6,20 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
 
 const appPreferencesFileName = "preferences.json"
 
 type appPreferences struct {
-	DefaultWorkspaceLocation string                 `json:"defaultWorkspaceLocation,omitempty"`
-	CookieSync               *cookieSyncPreferences `json:"cookieSync,omitempty"`
-	AiConnections            []savedAiConnection    `json:"aiConnections,omitempty"`
+	DefaultWorkspaceLocation string                  `json:"defaultWorkspaceLocation,omitempty"`
+	CookieSync               *cookieSyncPreferences  `json:"cookieSync,omitempty"`
+	AiConnections            []savedAiConnection     `json:"aiConnections,omitempty"`
+	AgentActivityOff         bool                    `json:"agentActivityOff,omitempty"`
+	AgentMcpServers          []savedAgentMcpServer   `json:"agentMcpServers,omitempty"`
+	Codex                    *model.CodexConnection  `json:"codex,omitempty"`
+	Claude                   *model.ClaudeConnection `json:"claude,omitempty"`
 }
 
 type cookieSyncPreferences struct {

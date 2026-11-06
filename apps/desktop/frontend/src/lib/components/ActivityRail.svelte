@@ -8,24 +8,26 @@
     topView,
     mockRunning = false,
     cookieCount = 0,
-    settingsShortcut = '',
     workspaceBlocked = false,
     openCollectionRunner,
     openMockTab,
     openCookieJar,
     openSettings,
+    openAgent,
+    agentNew = false,
   }: {
     sidebarView: SidebarView;
     sidebarHidden: boolean;
     topView: TopView;
     mockRunning?: boolean;
     cookieCount?: number;
-    settingsShortcut?: string;
     workspaceBlocked?: boolean;
     openCollectionRunner: () => void;
     openMockTab: () => void;
     openCookieJar: () => void;
     openSettings: (tab?: SettingsTab) => void;
+    openAgent: () => void;
+    agentNew?: boolean;
   } = $props();
 
   function showSidebarView(view: SidebarView) {
@@ -40,32 +42,38 @@
   <div class="activity-rail-titlebar titlebar-drag-region"></div>
 
   <div class="activity-rail-group">
-    <button class="activity-rail-btn" class:active={sidebarActive('collections')} type="button" aria-label="Collections" title="Collections" aria-pressed={sidebarActive('collections')} onclick={() => showSidebarView('collections')} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('collections')} type="button" aria-label="Collections" aria-pressed={sidebarActive('collections')} onclick={() => showSidebarView('collections')} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="m3 13 9 5 9-5"/>
       </svg>
     </button>
-    <button class="activity-rail-btn" class:active={sidebarActive('environments')} type="button" aria-label="Environments" title="Environments" aria-pressed={sidebarActive('environments')} onclick={() => showSidebarView('environments')} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('environments')} type="button" aria-label="Environments" aria-pressed={sidebarActive('environments')} onclick={() => showSidebarView('environments')} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>
       </svg>
     </button>
-    <button class="activity-rail-btn" class:active={sidebarActive('history')} type="button" aria-label="History" title="History" aria-pressed={sidebarActive('history')} onclick={() => showSidebarView('history')} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('history')} type="button" aria-label="History" aria-pressed={sidebarActive('history')} onclick={() => showSidebarView('history')} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
       </svg>
+    </button>
+    <button class="activity-rail-btn" class:active={sidebarActive('agent')} type="button" aria-label="Agent" aria-pressed={sidebarActive('agent')} onclick={() => { showSidebarView('agent'); openAgent(); }} disabled={workspaceBlocked}>
+      <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3.5 13.6 8a2 2 0 0 0 1.4 1.4l4.5 1.6-4.5 1.6a2 2 0 0 0-1.4 1.4L12 18.5 10.4 14A2 2 0 0 0 9 12.6L4.5 11 9 9.4A2 2 0 0 0 10.4 8z"/><path d="M18.5 3v3M17 4.5h3"/>
+      </svg>
+      {#if agentNew}<span class="activity-rail-dot activity-rail-dot-new" aria-hidden="true"></span>{/if}
     </button>
   </div>
 
   <div class="activity-rail-separator" aria-hidden="true"></div>
 
   <div class="activity-rail-group">
-    <button class="activity-rail-btn" class:active={topView === 'runner'} type="button" aria-label="Collection runner" title="Collection runner" onclick={openCollectionRunner} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={topView === 'runner'} type="button" aria-label="Collection runner" onclick={openCollectionRunner} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M7 5v14l11-7z"/>
       </svg>
     </button>
-    <button class="activity-rail-btn" class:active={topView === 'mock'} type="button" aria-label="Mock server" title={mockRunning ? 'Mock server (running)' : 'Mock server'} onclick={openMockTab} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={topView === 'mock'} type="button" aria-label="Mock server" onclick={openMockTab} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>
       </svg>
@@ -76,13 +84,13 @@
   <div class="activity-rail-spacer"></div>
 
   <div class="activity-rail-group">
-    <button class="activity-rail-btn" type="button" aria-label="Cookies" title="Cookies" onclick={openCookieJar} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" type="button" aria-label="Cookies" onclick={openCookieJar} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M20.6 13.1A8.5 8.5 0 1 1 10.9 3.4a3 3 0 0 0 3.9 3.9 3 3 0 0 0 3.9 3.9 3 3 0 0 0 1.9 1.9z"/><path d="M8.2 9h.01M11.5 14.2h.01M7.4 16.2h.01M14.8 11.7h.01" stroke-width="2.6"/>
       </svg>
       {#if cookieCount > 0}<span class="activity-rail-count" aria-hidden="true">{cookieCount > 99 ? '99+' : cookieCount}</span>{/if}
     </button>
-    <button class="activity-rail-btn" type="button" aria-label="Settings" title={settingsShortcut ? `Settings (${settingsShortcut})` : 'Settings'} onclick={() => openSettings('general')}>
+    <button class="activity-rail-btn" type="button" aria-label="Settings" onclick={() => openSettings('general')}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4z"/>
         <path d="M19.6 13.5a7.8 7.8 0 0 0 0-3l2-1.45-2-3.46-2.42 1a8 8 0 0 0-2.6-1.5L14.25 2h-4.5l-.33 3.08a8 8 0 0 0-2.6 1.5l-2.42-1-2 3.46 2 1.45a7.8 7.8 0 0 0 0 3l-2 1.45 2 3.46 2.42-1a8 8 0 0 0 2.6 1.5l.33 3.08h4.5l.33-3.08a8 8 0 0 0 2.6-1.5l2.42 1 2-3.46-2-1.45z"/>
@@ -196,6 +204,10 @@
     border: 1.5px solid var(--surface);
     border-radius: 50%;
     background: var(--s2xx);
+  }
+
+  .activity-rail-dot-new {
+    background: var(--accent);
   }
 
   .activity-rail-count {

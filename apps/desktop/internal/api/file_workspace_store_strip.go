@@ -54,6 +54,7 @@ var authActiveFields = map[string][]string{
 	"bearer":  {"bearerToken"},
 	"basic":   {"basicUser", "basicPass"},
 	"digest":  {"basicUser", "basicPass"},
+	"ntlm":    {"basicUser", "basicPass"},
 	"apikey":  {"apiKeyName", "apiKeyValue", "apiKeyIn"},
 	"oauth2": {
 		"oauth2GrantType", "oauth2AuthURL", "oauth2DeviceAuthURL", "oauth2TokenURL",

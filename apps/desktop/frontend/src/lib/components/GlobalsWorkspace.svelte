@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import type { KVRow } from '../types/models';
 
   let {
@@ -88,7 +89,6 @@
             class:active={row.secret}
             type="button"
             aria-pressed={Boolean(row.secret)}
-            title={row.secret ? 'Shown as a secret' : 'Mark as secret'}
             onclick={() => updateRow(index, { secret: !row.secret })}
           >Secret</button>
           <button
@@ -96,7 +96,7 @@
             type="button"
             aria-label={`Remove ${row.key || 'variable'}`}
             onclick={() => removeRow(index)}
-          >×</button>
+          ><AddCloseIcon /></button>
         </span>
       </div>
     {/each}

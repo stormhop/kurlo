@@ -18,6 +18,8 @@ import (
 const (
 	workspaceDiskPollInterval   = time.Second
 	workspaceExternalChangeNote = "files changed outside Kurlo"
+	workspaceAgentChangeNote    = "changed by the Kurlo agent"
+	workspaceAgentDeletedMark   = "-"
 )
 
 type workspaceFileStamp struct {
@@ -35,10 +37,11 @@ type workspaceExternalChange struct {
 }
 
 type workspaceDiskTracker struct {
-	mu        sync.Mutex
-	root      string
-	known     workspaceSnapshot
-	announced string
+	mu         sync.Mutex
+	root       string
+	known      workspaceSnapshot
+	announced  string
+	agentFiles map[string]string
 }
 
 var workspaceDisk = &workspaceDiskTracker{}
@@ -153,6 +156,63 @@ func (t *workspaceDiskTracker) remember(root string) {
 	t.root = root
 	t.known = snapshot
 	t.announced = snapshot.fingerprint()
+	t.agentFiles = nil
+}
+
+func trackOpenedWorkspace(root string) {
+	if hasYAMLWorkspaceStore(root) {
+		workspaceDisk.remember(root)
+	}
+}
+
+func (t *workspaceDiskTracker) ensureTracking(root string) {
+	t.mu.Lock()
+	tracked := t.known != nil && sameWorkspaceRoot(t.root, root)
+	t.mu.Unlock()
+	if !tracked {
+		trackOpenedWorkspace(root)
+	}
+}
+
+func (t *workspaceDiskTracker) noteAgentWrite(root string, files map[string]string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.known == nil || !sameWorkspaceRoot(t.root, root) {
+		return
+	}
+	if t.agentFiles == nil {
+		t.agentFiles = map[string]string{}
+	}
+	for rel, hash := range files {
+		t.agentFiles[rel] = hash
+	}
+}
+
+func (t *workspaceDiskTracker) changeReason(root string, changes []workspaceExternalChange) string {
+	if len(changes) == 0 {
+		return workspaceExternalChangeNote
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !sameWorkspaceRoot(t.root, root) || len(t.agentFiles) == 0 {
+		return workspaceExternalChangeNote
+	}
+	for _, change := range changes {
+		want, ok := t.agentFiles[change.rel]
+		if !ok {
+			return workspaceExternalChangeNote
+		}
+		if change.deleted {
+			if want != workspaceAgentDeletedMark {
+				return workspaceExternalChangeNote
+			}
+			continue
+		}
+		if want != contentHash(change.content) {
+			return workspaceExternalChangeNote
+		}
+	}
+	return workspaceAgentChangeNote
 }
 
 func (t *workspaceDiskTracker) trackedRoot() string {
@@ -268,31 +328,46 @@ func (t *workspaceDiskTracker) markAnnounced(root string) {
 func (a *App) watchWorkspaceDisk(ctx context.Context) {
 	ticker := time.NewTicker(workspaceDiskPollInterval)
 	defer ticker.Stop()
+	var announcedGlobals string
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if a.workspaceChangedOutside() {
-				a.emitWorkspaceChanged(workspaceExternalChangeNote)
+			if seen := a.globalsRevision.Load(); seen != nil {
+				revision := currentProfileGlobalsRevision()
+				if revision != "" && revision != *seen && revision != announcedGlobals {
+					announcedGlobals = revision
+					a.emitWorkspaceChanged(workspaceAgentChangeNote)
+				}
+			}
+			if changed, reason := a.workspaceChangedOutside(); changed {
+				a.emitWorkspaceChanged(reason)
 			}
 		}
 	}
 }
 
-func (a *App) workspaceChangedOutside() bool {
+func (a *App) workspaceChangedOutside() (bool, string) {
 	if !gitOperationMu.TryRLock() {
-		return false
+		return false, ""
 	}
 	defer gitOperationMu.RUnlock()
 	root := workspaceDisk.trackedRoot()
 	if root == "" {
-		return false
+		return false, ""
 	}
 	unlock, ok := tryLockWorkspaceWrites(root)
 	if !ok {
-		return false
+		return false, ""
 	}
 	defer unlock()
-	return workspaceDisk.unannouncedChange(root)
+	if !workspaceDisk.unannouncedChange(root) {
+		return false, ""
+	}
+	_, changes, err := workspaceDisk.externalChanges(root)
+	if err != nil {
+		return true, workspaceExternalChangeNote
+	}
+	return true, workspaceDisk.changeReason(root, changes)
 }

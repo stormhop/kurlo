@@ -644,6 +644,12 @@
   background: var(--bg);
 }
 
+@supports (hanging-punctuation: first) {
+  .workspace-overview {
+    overflow-y: scroll;
+  }
+}
+
 .workspace-overview-header {
   display: flex;
   justify-content: space-between;
@@ -968,6 +974,12 @@
   overflow-x: hidden;
   overflow-y: auto;
   scrollbar-gutter: stable;
+}
+
+@supports (hanging-punctuation: first) {
+  .git-content {
+    overflow-y: scroll;
+  }
 }
 
 .git-toolbar {
@@ -1989,6 +2001,7 @@
 .git-diff-sign {
   color: inherit;
   text-align: center;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2031,6 +2044,7 @@
   color: var(--text-3);
   font-size: var(--text-micro);
   text-align: right;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2453,6 +2467,7 @@
   color: color-mix(in srgb, var(--text-3) 70%, transparent);
   font-size: var(--text-micro);
   text-align: right;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -2604,6 +2619,7 @@
   font-size: var(--text-caption);
   line-height: var(--leading-normal);
   white-space: pre;
+  -webkit-user-select: text;
   user-select: text;
   -webkit-user-select: text;
 }
@@ -3320,6 +3336,12 @@
   background: var(--bg);
 }
 
+@supports (hanging-punctuation: first) {
+  .environment-workspace {
+    overflow-y: scroll;
+  }
+}
+
 .environment-workspace-head {
   display: flex;
   justify-content: space-between;
@@ -3450,6 +3472,12 @@
   overflow: auto;
   scrollbar-gutter: stable;
   background: var(--bg);
+}
+
+@supports (hanging-punctuation: first) {
+  .collection-workspace {
+    overflow-y: scroll;
+  }
 }
 
 .collection-workspace-head {
@@ -3859,6 +3887,12 @@
     border-bottom: none;
     overflow: auto;
     scrollbar-gutter: stable;
+  }
+
+  @supports (hanging-punctuation: first) {
+    .collection-runner-config {
+      overflow-y: scroll;
+    }
   }
   .collection-runner-title {
     gap: var(--space-2-5);
@@ -4579,6 +4613,7 @@
   font-family: var(--font-mono);
   font-size: var(--text-body);
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -4622,6 +4657,7 @@
   border-top: 1px solid var(--border-subtle);
   font-family: var(--font-mono);
   font-size: var(--text-label);
+  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -4656,6 +4692,7 @@
   line-height: var(--leading-normal);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  -webkit-user-select: text;
   user-select: text;
 }
 

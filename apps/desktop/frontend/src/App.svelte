@@ -4,11 +4,13 @@
   import { getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
   import type { MockRequestLog, OAuth2DevicePrompt, UpdateInfo } from './lib/backend';
   import { hasReleaseNotes } from 'virtual:kurlo-changelog-meta';
-  import { isReleaseVersion, latestReleaseNotes, releaseNotesFor, shouldShowWhatsNew, type ChangelogSection } from './lib/whatsNew';
+  import { isReleaseVersion, latestReleaseNotes, normalizeVersion, releaseNotesFor, shouldShowWhatsNew, shouldSpotlightAgentMode, type ChangelogSection } from './lib/whatsNew';
   import WhatsNewModal from './lib/components/WhatsNewModal.svelte';
   import UpdateBanner from './lib/components/UpdateBanner.svelte';
   import { vm } from './lib/stores/app.svelte';
+  import { agentNavigation, syncAgentWorkspace } from './lib/stores/agent.svelte';
   import { appLazyComponents as lazy } from './lib/stores/lazyComponents.svelte';
+
   import AppOverlays from './lib/components/AppOverlays.svelte';
   import AppToasts from './lib/components/AppToasts.svelte';
   import BodyModeSelector from './lib/components/BodyModeSelector.svelte';
@@ -16,16 +18,17 @@
   import RequestEditorTabs from './lib/components/RequestEditorTabs.svelte';
   import ActivityRail from './lib/components/ActivityRail.svelte';
   import { shortcutComboLabel, usesMacShortcutGlyphs } from './lib/stores/features/preferences';
-  import { responseRightMinWidth } from './lib/stores/features/uiShell';
-  import { rem, uiScale } from './lib/uiScale';
+  import { agentSidebarMaxWidth, responseRightMinWidth } from './lib/stores/features/uiShell';
+  import { rem, toLogicalPx, uiScale } from './lib/uiScale';
   import Sidebar from './lib/components/Sidebar.svelte';
   import StatusBar from './lib/components/StatusBar.svelte';
   import WorkspaceChrome from './lib/components/WorkspaceChrome.svelte';
   import WorkspaceOverview from './lib/components/WorkspaceOverview.svelte';
   import GlobalsWorkspace from './lib/components/GlobalsWorkspace.svelte';
   import HistoryDetail from './lib/components/HistoryDetail.svelte';
+  import AgentWorkspace from './lib/components/AgentWorkspace.svelte';
   import { METHODS, REQUEST_TYPES, DEFAULT_WORKSPACE, RAW_BODY_TYPES } from './lib/constants';
-  import { installTitlebarDoubleClickHandler } from './lib/windowControls';
+  import { installQuitShortcut, installTitlebarDoubleClickHandler } from './lib/windowControls';
   import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
   import type { SnippetLanguage } from './lib/stores/ui';
   import type { ResponseTab } from './lib/types/models';
@@ -34,11 +37,56 @@
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from './lib/response-render';
   import { tallyCollectionRun } from './lib/collectionRuns';
 
+  $effect(() => {
+    if (!vm.requestStoreLoaded) return;
+    const workspaceId = vm.activeWorkspaceId;
+    const collections = vm.activeWorkspaceCollections().map(collection => collection.name);
+    const environments = vm.activeWorkspaceEnvironments.map(environment => environment.name);
+    const activeEnvironment = vm.activeEnvironment?.name ?? '';
+    untrack(() => {
+      syncAgentWorkspace(workspaceId, collections, environments, activeEnvironment);
+    });
+  });
+
   const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
   const UPDATE_READY_KEY = 'kurlo:update-ready';
   const LAST_SEEN_VERSION_KEY = 'kurlo:last-seen-version';
+  const AGENT_SEEN_KEY = 'kurlo:agent-seen';
 
   let whatsNewSection = $state<ChangelogSection | null>(null);
+  let whatsNewSpotlight = $state(false);
+  let agentSeen = $state(readAgentSeen());
+
+  function readAgentSeen() {
+    try {
+      return localStorage.getItem(AGENT_SEEN_KEY) === '1';
+    } catch {
+      return true;
+    }
+  }
+
+  function readStoredFlag(key: string) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeStoredValue(key: string, value: string | null) {
+    try {
+      if (value === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, value);
+    } catch {}
+  }
+
+  $effect(() => {
+    if (vm.topView !== 'agent' || agentSeen) return;
+    agentSeen = true;
+    try {
+      localStorage.setItem(AGENT_SEEN_KEY, '1');
+    } catch {  }
+  });
 
   async function loadChangelog(): Promise<string> {
     return (await import('virtual:kurlo-changelog')).default;
@@ -51,10 +99,12 @@
     } catch {
       return;
     }
-    const mayShow = shouldShowWhatsNew(version, lastSeen, hasReleaseNotes);
-    if (mayShow) {
-      const section = releaseNotesFor(await loadChangelog(), version);
+    const spotlight = shouldSpotlightAgentMode(version, lastSeen);
+    if (spotlight || shouldShowWhatsNew(version, lastSeen, hasReleaseNotes)) {
+      const notes = hasReleaseNotes ? releaseNotesFor(await loadChangelog(), version) : null;
+      const section = notes ?? (spotlight ? { version: normalizeVersion(version), date: '', body: '' } : null);
       if (!section) return;
+      whatsNewSpotlight = spotlight;
       whatsNewSection = section;
     }
     if (isReleaseVersion(version)) {
@@ -66,10 +116,17 @@
 
   function dismissWhatsNew() {
     whatsNewSection = null;
+    whatsNewSpotlight = false;
+  }
+
+  function tryAgentMode() {
+    dismissWhatsNew();
+    vm.openAgentTab();
   }
 
   async function showWhatsNew() {
     const markdown = await loadChangelog();
+    whatsNewSpotlight = false;
     whatsNewSection = releaseNotesFor(markdown, vm.appVersion) ?? latestReleaseNotes(markdown);
   }
 
@@ -87,12 +144,18 @@
 
   let updateInfo = $state<UpdateInfo | null>(null);
   let updateReady = $state(false);
-  let autoUpdateInstall = $state(localStorage.getItem(AUTO_UPDATE_INSTALL_KEY) === 'true');
+  let autoUpdateInstall = $state(readStoredFlag(AUTO_UPDATE_INSTALL_KEY) === 'true');
   let autoUpdateInstalling = $state(false);
   let updateCheckTimer: ReturnType<typeof setTimeout> | null = null;
   let destroyed = false;
   let focusedBeforeWindowBlur: HTMLElement | null = null;
   let codePanelAvailable = $derived(vm.codePanelAvailable);
+  let windowWidth = $state(window.innerWidth);
+  let agentDetailsDocked = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity && !vm.sidebarHidden);
+  let shownSidebarWidth = $derived(vm.sidebarHidden ? 0 : agentDetailsDocked ? Math.min(vm.sidebarWidth, agentSidebarMaxWidth(toLogicalPx(windowWidth))) : vm.sidebarWidth);
+  $effect(() => {
+    if (agentDetailsDocked && vm.sidebarWidth > shownSidebarWidth) vm.sidebarWidth = shownSidebarWidth;
+  });
   let sseSessionVisible = $derived(vm.sseSessionIsVisible());
   let requestSplitWidth = $state(0);
   let activeRequestLocation = $derived.by(() => {
@@ -123,7 +186,7 @@
 
   function setAutoUpdateInstall(value: boolean) {
     autoUpdateInstall = value;
-    localStorage.setItem(AUTO_UPDATE_INSTALL_KEY, value ? 'true' : 'false');
+    writeStoredValue(AUTO_UPDATE_INSTALL_KEY, value ? 'true' : 'false');
   }
 
   function markUpdateReady(info: UpdateInfo) {
@@ -132,18 +195,18 @@
   }
 
   function syncUpdateReadyForVersion(version: string): boolean {
-    const pendingReadyVersion = localStorage.getItem(UPDATE_READY_KEY);
+    const pendingReadyVersion = readStoredFlag(UPDATE_READY_KEY);
     if (!pendingReadyVersion) {
       updateReady = false;
       return false;
     }
     if (pendingReadyVersion === version) {
-      localStorage.removeItem(UPDATE_READY_KEY);
+      writeStoredValue(UPDATE_READY_KEY, null);
       updateReady = false;
       return false;
     }
     if (!isPendingVersionNewer(pendingReadyVersion, version)) {
-      localStorage.removeItem(UPDATE_READY_KEY);
+      writeStoredValue(UPDATE_READY_KEY, null);
       updateReady = false;
       return false;
     }
@@ -167,7 +230,7 @@
   }
 
   async function installUpdateAutomatically(info: UpdateInfo): Promise<boolean> {
-    if (info.manualInstallUrl || !autoUpdateInstall || autoUpdateInstalling || localStorage.getItem(UPDATE_READY_KEY)) return false;
+    if (info.manualInstallUrl || !autoUpdateInstall || autoUpdateInstalling || readStoredFlag(UPDATE_READY_KEY)) return false;
     autoUpdateInstalling = true;
     try {
       const err = await applyUpdate(info);
@@ -175,7 +238,7 @@
         console.warn('Auto-update install failed:', err);
         return false;
       }
-      localStorage.setItem(UPDATE_READY_KEY, info.version);
+      writeStoredValue(UPDATE_READY_KEY, info.version);
       updateReady = true;
       return true;
     } catch (err) {
@@ -187,17 +250,22 @@
   }
 
   function downloadPackagedUpdate(info: UpdateInfo) {
-    if (window.runtime?.BrowserOpenURL) {
-      window.runtime.BrowserOpenURL(info.manualInstallUrl);
-    } else {
-      window.open(info.manualInstallUrl, '_blank');
-    }
+    openExternalURL(info.manualInstallUrl);
   }
 
   function restartForInstalledUpdate() {
-    localStorage.removeItem(UPDATE_READY_KEY);
+    writeStoredValue(UPDATE_READY_KEY, null);
     void restartApp();
   }
+
+  $effect(() => {
+    void vm.topView;
+    untrack(() => vm.syncAgentSidebar());
+  });
+
+  $effect(() => {
+    if (vm.sidebarView === 'agent' && untrack(() => vm.topView) !== 'agent') untrack(() => vm.syncAgentSidebar());
+  });
 
   $effect(() => {
     vm.requestEditSignal();
@@ -261,6 +329,7 @@
 
   onMount(() => {
     const uninstallTitlebarDoubleClick = installTitlebarDoubleClickHandler();
+    let uninstallQuitShortcut = () => {};
     const offBeforeQuit = window.runtime?.EventsOn?.('kurlo:before-quit', () => {
       void ackQuit();
       void vm.reviewDraftsBeforeQuit();
@@ -354,6 +423,7 @@
       vm.appRuntime = info.runtime;
       vm.appVersion = info.version;
       setRuntimePlatform(info.runtime);
+      if (!destroyed) uninstallQuitShortcut = installQuitShortcut(document.documentElement.dataset.platform ?? '');
       const updatePendingRestart = syncUpdateReadyForVersion(info.version);
       void checkWhatsNew(info.version);
 
@@ -381,6 +451,7 @@
         updateCheckTimer = null;
       }
       uninstallTitlebarDoubleClick();
+      uninstallQuitShortcut();
       offBeforeQuit?.();
       offMockRequest?.();
       offZoom?.();
@@ -397,6 +468,7 @@
 </script>
 
 <svelte:window
+  bind:innerWidth={windowWidth}
   on:keydown={vm.onKeydown}
   on:contextmenu={preventNativeContextMenu}
   on:mousedown={vm.onWindowMouseDown}
@@ -432,7 +504,7 @@
 />
 
 {#if whatsNewSection}
-  <WhatsNewModal section={whatsNewSection} onDismiss={dismissWhatsNew} />
+  <WhatsNewModal section={whatsNewSection} onDismiss={dismissWhatsNew} spotlight={whatsNewSpotlight} onTryAgent={tryAgentMode} />
 {/if}
 
 <main
@@ -443,7 +515,7 @@
   class:resizing-code={vm.codePanelResizing}
   class:code-open={vm.codePanelOpen && codePanelAvailable}
   class:sidebar-hidden={vm.sidebarHidden}
-  style="--sidebar-w: {rem(vm.sidebarHidden ? 0 : vm.sidebarWidth)}; --code-requested-w: {rem(vm.codePanelOpen && codePanelAvailable ? vm.codePanelWidth : 0)}"
+  style="--sidebar-w: {rem(shownSidebarWidth)}; --code-requested-w: {rem(vm.codePanelOpen && codePanelAvailable ? vm.codePanelWidth : 0)}"
 >
   <input
     class="hidden-file-input"
@@ -459,12 +531,13 @@
     topView={vm.topView}
     mockRunning={vm.mockServer.running}
     cookieCount={vm.cookies.length}
-    settingsShortcut={shortcutComboLabel(vm.shortcutCombo('settings'), vm.appRuntime)}
     workspaceBlocked={vm.workspaceBlocked}
     openCollectionRunner={vm.openCollectionRunner}
     openMockTab={vm.openMockServerTab}
     openCookieJar={vm.openCookieJar}
     openSettings={vm.openSettings}
+    openAgent={() => vm.openAgentTab()}
+    agentNew={!agentSeen}
   />
 
   <Sidebar
@@ -544,6 +617,7 @@
     globalVariableCount={vm.globalVariableCount()}
     selectEnvironment={vm.selectEnvironment}
     openEnvironment={vm.openEnvironment}
+    renameEnvironment={vm.renameEnvironment}
     environmentValueCount={vm.environmentValueCount}
     openWorkspaceDiagnostic={vm.openWorkspaceDiagnostic}
     workspaceBlocked={vm.workspaceBlocked}
@@ -581,6 +655,9 @@
       activeFolderSettingsPath={vm.activeFolderSettingsPath}
       historyDetailOpen={Boolean(vm.historyDetailEntry)}
       gitTabOpen={vm.gitWorkspaceOpen}
+      agentTabOpen={vm.agentTabOpen}
+      openAgentTab={() => vm.openAgentTab()}
+      closeAgentTab={() => vm.closeAgentTab()}
       mockTabOpen={vm.mockServerTabOpen}
       loadTestTabTitle={loadTestTab ? loadTestTab.title : ''}
       loadTestTabUnsaved={loadTestTab ? loadTestTab.unsaved : ''}
@@ -718,8 +795,8 @@
         createEnvironment={vm.createEnvironment}
         renameEnvironment={vm.renameEnvironment}
         setEnvironmentProtected={vm.setEnvironmentProtected}
+        setEnvironmentSandbox={vm.setEnvironmentSandbox}
         setEnvironmentParent={vm.setEnvironmentParent}
-        useEnvironment={vm.useEnvironment}
         deleteEnvironment={vm.deleteEnvironment}
         saveEnvironment={vm.saveEnvironment}
         updateEnvironmentRow={vm.updateEnvironmentRow}
@@ -844,6 +921,8 @@
         onCopyCurl={() => vm.copyHistoryEntryCurl(historyEntry.id)}
         onDelete={() => vm.deleteHistoryEntry(historyEntry.id)}
       />
+    {:else if vm.topView === 'agent'}
+      <AgentWorkspace workspaceBlocked={vm.workspaceBlocked} />
     {:else if vm.topView === 'runner'}
       {#if lazy.CollectionRunnerWorkspaceComponent}
       <lazy.CollectionRunnerWorkspaceComponent
@@ -862,7 +941,6 @@
         parallel={vm.collectionRunnerParallel}
         concurrency={vm.collectionRunnerConcurrency}
         running={vm.collectionRunnerRunning}
-        title={vm.collectionRunnerTitle}
         results={vm.collectionRunnerResults}
         summary={vm.collectionRunnerSummary}
         lastRunAt={vm.collectionRunnerShowingLastRun ? vm.collectionRunnerFinishedAt : 0}
@@ -896,7 +974,6 @@
         showSave={!vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
         saveDirty={!vm.workspaceBlocked && vm.activeRequestIsDirty}
         canRevert={!vm.workspaceBlocked && vm.activeRequestCanRevert}
-        saveShortcut={shortcutComboLabel(vm.shortcutCombo('save-request'), vm.appRuntime)}
         sendShortcut={shortcutComboLabel(vm.shortcutCombo('send-request'), vm.appRuntime)}
         sendShortcutInline={usesMacShortcutGlyphs(vm.appRuntime)}
         onSave={vm.saveActiveRequest}
@@ -1156,7 +1233,6 @@
     topView={vm.topView}
     gitStatus={vm.gitStatus}
     appVersion={vm.appVersion}
-    appRuntime={vm.appRuntime}
     appTheme={vm.appTheme}
     resolvedAppTheme={vm.resolvedAppTheme}
     setThemeMode={vm.setThemeMode}

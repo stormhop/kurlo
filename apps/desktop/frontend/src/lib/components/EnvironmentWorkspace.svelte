@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import EnvironmentMatrix from './EnvironmentMatrix.svelte';
   import Select from './Select.svelte';
@@ -13,8 +14,8 @@
     createEnvironment,
     renameEnvironment,
     setEnvironmentProtected = () => {},
+    setEnvironmentSandbox = () => {},
     setEnvironmentParent = () => {},
-    useEnvironment,
     deleteEnvironment,
     saveEnvironment,
     updateEnvironmentRow,
@@ -37,10 +38,10 @@
     autosave: boolean;
     environmentSaveState: 'idle' | 'dirty' | 'saving' | 'saved';
     createEnvironment: () => void;
-    renameEnvironment: (environmentId: string) => void;
+    renameEnvironment: (environmentId: string, name: string) => void | Promise<void>;
     setEnvironmentProtected?: (environmentId: string, isProtected: boolean) => void;
+    setEnvironmentSandbox?: (environmentId: string, sandbox: boolean) => void;
     setEnvironmentParent?: (environmentId: string, parentId: string) => void;
-    useEnvironment: (environmentId: string) => void;
     deleteEnvironment: (environmentId: string) => void;
     saveEnvironment: () => void;
     updateEnvironmentRow: (environmentId: string, index: number, patch: Partial<KVRow>) => void;
@@ -63,7 +64,57 @@
   let activeName = $derived(environments.find(environment => environment.id === activeEnvironmentId)?.name ?? '');
   let workspaceVariableCount = $derived(new Set(environments.flatMap(environment => environment.values.map(row => row.key.trim()).filter(Boolean))).size);
 
+  let nameInput = $state<HTMLInputElement>();
+  let nameDraft = $state('');
+  let nameEnvironmentId = $state('');
+  let nameEditing = $state(false);
+
+  $effect(() => {
+    const id = activeEnvironment?.id ?? '';
+    const name = activeEnvironment?.name ?? '';
+    if (id !== nameEnvironmentId) {
+      nameEnvironmentId = id;
+      nameEditing = false;
+      nameDraft = name;
+    } else if (!nameEditing) nameDraft = name;
+  });
+
+  function focusName() {
+    nameInput?.focus();
+    nameInput?.select();
+  }
+
+  function commitName() {
+    if (!nameEditing) return;
+    const id = nameEnvironmentId;
+    const name = nameDraft.trim();
+    nameEditing = false;
+    if (id && name) void renameEnvironment(id, name);
+    else nameDraft = activeEnvironment?.name ?? '';
+  }
+
+  function onNameKeydown(event: KeyboardEvent) {
+    if (event.key === 'F2') {
+      event.preventDefault();
+      event.stopPropagation();
+      focusName();
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      commitName();
+      nameInput?.blur();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      nameEditing = false;
+      nameDraft = activeEnvironment?.name ?? '';
+      nameInput?.blur();
+    }
+  }
+
   let moreMenuOpen = $state(false);
+  let moreMenuRoot = $state<HTMLDivElement>();
+  let moreMenuButton = $state<HTMLButtonElement>();
   let variableCount = $derived((activeEnvironment?.values ?? []).filter(row => row.key.trim()).length);
   let parent = $derived(activeEnvironment ? parentEnvironment(environments, activeEnvironment) : undefined);
   let protectedBy = $derived(activeEnvironment ? protectingAncestor(environments, activeEnvironment.id) : undefined);
@@ -92,6 +143,18 @@
     if (!(next instanceof Node) || !current.contains(next)) moreMenuOpen = false;
   }
 
+  function closeMoreMenuOnOutsidePointer(event: PointerEvent) {
+    if (moreMenuOpen && event.target instanceof Node && !moreMenuRoot?.contains(event.target)) moreMenuOpen = false;
+  }
+
+  function closeMoreMenuOnEscape(event: KeyboardEvent) {
+    if (!moreMenuOpen || event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    moreMenuOpen = false;
+    moreMenuButton?.focus();
+  }
+
   function runMenuAction(action: () => void) {
     moreMenuOpen = false;
     action();
@@ -108,6 +171,8 @@
 
   $effect(() => {
     activeEnvironment?.id;
+    environmentView;
+    moreMenuOpen = false;
     valuePage = 0;
   });
 
@@ -138,6 +203,8 @@
   }
 </script>
 
+<svelte:document onpointerdowncapture={closeMoreMenuOnOutsidePointer} onkeydowncapture={closeMoreMenuOnEscape} />
+
 <section class="environment-workspace">
   {#snippet viewSwitch()}
     {#if environments.length > 1}
@@ -163,7 +230,7 @@
         {#if !autosave}
           <button class="btn btn-secondary" type="button" onclick={saveEnvironment} disabled={environmentSaveState !== 'dirty'}>Save</button>
         {/if}
-        <button class="btn btn-primary" type="button" onclick={addVariable}>+ Variable</button>
+        <button class="btn btn-primary" type="button" onclick={addVariable}><AddCloseIcon add /> Variable</button>
       </div>
     </div>
     <EnvironmentMatrix
@@ -179,12 +246,14 @@
   {:else if activeEnvironment}
     <div class="environment-workspace-head">
       <div class="environment-title">
-        <h1>
-          {activeEnvironment.name}
+        <h1 aria-label={activeEnvironment.name}>
+          <input class="request-title-input env-name" bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} />
           {#if activeEnvironment.protected}
-            <span class="env-protected" title="AI agents connected through kurlo mcp cannot send requests with this environment or change it"><MenuIcon name="lock" />Protected</span>
+            <span class="env-protected"><MenuIcon name="lock" />Protected</span>
           {:else if protectedBy}
-            <span class="env-protected" title={`Protected because it inherits from ${protectedBy.name}: AI agents connected through kurlo mcp cannot send requests with it or change it`}><MenuIcon name="lock" />Protected through {protectedBy.name}</span>
+            <span class="env-protected"><MenuIcon name="lock" />Protected through {protectedBy.name}</span>
+          {:else if activeEnvironment.sandbox}
+            <span class="env-protected env-sandbox"><MenuIcon name="play" />Sandbox</span>
           {/if}
         </h1>
         <p>
@@ -199,19 +268,15 @@
         {#if !autosave}
           <button class="btn btn-secondary" type="button" onclick={saveEnvironment} disabled={environmentSaveState !== 'dirty'}>Save</button>
         {/if}
-        {#if activeEnvironmentId === activeEnvironment.id}
-          <button class="env-in-use" type="button" onclick={() => useEnvironment(activeEnvironment.id)} title="This environment's values are applied to requests">In use</button>
-        {:else}
-          <button class="btn btn-primary" type="button" onclick={() => useEnvironment(activeEnvironment.id)}>Use environment</button>
-        {/if}
-        <div class="env-more" onfocusout={closeMoreMenuOnFocusOut}>
-          <button class="btn btn-ghost btn-icon env-more-btn" type="button" aria-label="More environment actions" aria-haspopup="menu" aria-expanded={moreMenuOpen} onclick={() => (moreMenuOpen = !moreMenuOpen)}>•••</button>
+        <div class="env-more" bind:this={moreMenuRoot} onfocusout={closeMoreMenuOnFocusOut}>
+          <button class="btn btn-ghost btn-icon env-more-btn" bind:this={moreMenuButton} type="button" aria-label="More environment actions" aria-haspopup="menu" aria-expanded={moreMenuOpen} onclick={() => (moreMenuOpen = !moreMenuOpen)}>•••</button>
           {#if moreMenuOpen}
             <div class="menu request-menu env-more-menu" role="menu">
-              <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => renameEnvironment(activeEnvironment.id))}><MenuIcon name="rename" />Rename</button>
-              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.protected || protectedBy)} disabled={Boolean(protectedBy && !activeEnvironment.protected)} title={protectedBy && !activeEnvironment.protected ? `Protected through ${protectedBy.name}` : 'AI agents connected through kurlo mcp cannot send requests with a protected environment or change it'} onclick={() => runMenuAction(() => setEnvironmentProtected(activeEnvironment.id, !activeEnvironment.protected))}><MenuIcon name="lock" />{activeEnvironment.protected ? 'Unprotect from AI agents' : 'Protect from AI agents'}</button>
+              <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(focusName)}><MenuIcon name="rename" />Rename</button>
+              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.protected || protectedBy)} disabled={Boolean(protectedBy && !activeEnvironment.protected)} onclick={() => runMenuAction(() => setEnvironmentProtected(activeEnvironment.id, !activeEnvironment.protected))}><MenuIcon name="lock" />{activeEnvironment.protected ? 'Unprotect from AI agents' : 'Protect from AI agents'}</button>
+              <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.sandbox)} disabled={Boolean(activeEnvironment.protected || protectedBy)} onclick={() => runMenuAction(() => setEnvironmentSandbox(activeEnvironment.id, !activeEnvironment.sandbox))}><MenuIcon name="play" />{activeEnvironment.sandbox ? 'Stop treating as a sandbox' : 'Sandbox for the agent'}</button>
               <div class="menu-separator" role="separator"></div>
-              <button class="menu-item" type="button" role="menuitem" title="Import variables from a .env file" onclick={() => runMenuAction(() => importEnvFromFile(activeEnvironment.id))}><MenuIcon name="import" />Import .env</button>
+              <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => importEnvFromFile(activeEnvironment.id))}><MenuIcon name="import" />Import .env</button>
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => exportEnvironment(activeEnvironment.id))}><MenuIcon name="export" />Export…</button>
               <div class="menu-separator" role="separator"></div>
               <button class="menu-item danger" type="button" role="menuitem" onclick={() => runMenuAction(() => deleteEnvironment(activeEnvironment.id))}><MenuIcon name="trash" />Delete</button>
@@ -239,14 +304,13 @@
       {#each visibleEnvironmentRows as item (item.row.id)}
         {@const row = item.row}
         {@const i = item.index}
-        <div class="kv-row env-kv-row" data-testid="environment-variable-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)} title={!row.enabled && (row.key || row.value || row.description) ? 'Disabled variables are not applied to requests' : ''}>
+        <div class="kv-row env-kv-row" data-testid="environment-variable-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
           <input type="checkbox" class="check" checked={row.enabled} onchange={(event) => updateEnvironmentRow(activeEnvironment.id, i, { enabled: inputChecked(event) })} aria-label="Enable variable" disabled={!row.key && !row.value} />
           <input class="field field-bare kv-input" value={row.key} placeholder="Add variable" aria-label="Environment variable key" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { key: inputValue(event) })} spellcheck="false" />
           <button
             class="env-type-toggle"
             class:secret={row.secret}
             type="button"
-            title={row.secret ? 'Secret variables are masked in UI, logs, and snippets' : 'Default variable'}
             onclick={() => updateEnvironmentRow(activeEnvironment.id, i, { secret: !row.secret })}
             disabled={!row.key && !row.value}
           >
@@ -274,14 +338,14 @@
             <span></span>
             <span class="env-inherited-key">{item.key}</span>
             {#if item.row.secret}
-              <button class="env-type-toggle secret" type="button" title={revealedInherited.has(item.key) ? 'Hide value' : 'Show value'} onclick={() => toggleInheritedReveal(item.key)}>Secret</button>
+              <button class="env-type-toggle secret" type="button" onclick={() => toggleInheritedReveal(item.key)}>Secret</button>
             {:else}
               <span class="env-inherited-type">Default</span>
             {/if}
             <span class="env-inherited-value">{item.row.secret && !revealedInherited.has(item.key) ? '••••••••' : item.row.value || 'empty'}</span>
             <span class="env-inherited-source">
               <span>from {item.sourceName}</span>
-              <button class="btn btn-ghost btn-sm" type="button" aria-label={`Override ${item.key} in ${activeEnvironment.name}`} title={`Set ${item.key} in ${activeEnvironment.name} instead of taking it from ${item.sourceName}`} onclick={() => setMatrixValue(activeEnvironment.id, item.key, item.row.value)}>Override</button>
+              <button class="btn btn-ghost btn-sm" type="button" aria-label={`Override ${item.key} in ${activeEnvironment.name}`} onclick={() => setMatrixValue(activeEnvironment.id, item.key, item.row.value)}>Override</button>
             </span>
             <span></span>
           </div>
@@ -296,3 +360,17 @@
     </div>
   {/if}
 </section>
+
+<style>
+  .environment-title h1 { display: flex; align-items: center; min-width: 0; }
+  .environment-title .env-name {
+    width: 100%;
+    max-width: none;
+    flex: 1 1 auto;
+    height: 2rem;
+    margin-left: calc(var(--space-1-5) * -1);
+    font-size: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+  }
+</style>

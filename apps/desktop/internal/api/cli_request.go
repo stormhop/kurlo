@@ -31,6 +31,8 @@ type cliAuth struct {
 	OAuth2Token               string `json:"oauth2Token"`
 	OAuth2TokenURL            string `json:"oauth2TokenURL"`
 	OAuth2AuthURL             string `json:"oauth2AuthURL"`
+	OAuth2RedirectURL         string `json:"oauth2RedirectURL"`
+	OAuth2UsePKCE             bool   `json:"oauth2UsePKCE"`
 	OAuth2DeviceAuthURL       string `json:"oauth2DeviceAuthURL"`
 	OAuth2ClientID            string `json:"oauth2ClientID"`
 	OAuth2Secret              string `json:"oauth2Secret"`
@@ -69,6 +71,22 @@ type cliAuth struct {
 }
 
 type cliSettings struct {
+	GrpcUseReflection            *bool  `json:"grpcUseReflection"`
+	GrpcUseTLS                   *bool  `json:"grpcUseTls"`
+	GrpcServerName               string `json:"grpcServerName"`
+	GrpcIncludeDefaultValues     *bool  `json:"grpcIncludeDefaultValues"`
+	GrpcMaxResponseMessageSizeMb int    `json:"grpcMaxResponseMessageSizeMb"`
+	WSHandshakeTimeoutMs         int    `json:"wsHandshakeTimeoutMs"`
+	WSReconnectAttempts          int    `json:"wsReconnectAttempts"`
+	WSReconnectIntervalMs        int    `json:"wsReconnectIntervalMs"`
+	WSMaxMessageSizeMb           int    `json:"wsMaxMessageSizeMb"`
+	WSKeepAliveIntervalMs        int    `json:"wsKeepAliveIntervalMs"`
+	SSEDisableReconnect          bool   `json:"sseDisableReconnect"`
+	SSEReconnectIntervalMs       int    `json:"sseReconnectIntervalMs"`
+	SIOClientVersion             string `json:"sioClientVersion"`
+	SIOPath                      string `json:"sioPath"`
+	SIONamespace                 string `json:"sioNamespace"`
+
 	HTTPVersion            string `json:"httpVersion"`
 	EnableSSLVerification  *bool  `json:"enableSSLVerification"`
 	FollowRedirects        *bool  `json:"followRedirects"`
@@ -92,6 +110,7 @@ type cliSettings struct {
 }
 
 type cliExampleResponse struct {
+	DurationMs    int     `json:"durationMs"`
 	StatusCode    int     `json:"statusCode"`
 	Status        string  `json:"status"`
 	Headers       []cliKV `json:"headers"`
@@ -100,6 +119,13 @@ type cliExampleResponse struct {
 }
 
 type cliExample struct {
+	Snapshot struct {
+		Method string `json:"method"`
+	} `json:"snapshot"`
+	Match struct {
+		PathTemplate string            `json:"pathTemplate"`
+		Query        map[string]string `json:"query"`
+	} `json:"match"`
 	ID       string             `json:"id"`
 	Name     string             `json:"name"`
 	Source   string             `json:"source"`
@@ -108,6 +134,30 @@ type cliExample struct {
 }
 
 type cliSavedRequest struct {
+	WorkspaceID          string   `json:"-"`
+	GrpcMethod           string   `json:"grpcMethod"`
+	GrpcMetadata         []cliKV  `json:"grpcMetadata"`
+	GrpcUseReflection    *bool    `json:"grpcUseReflection"`
+	GrpcProtoFilePath    string   `json:"grpcProtoFilePath"`
+	GrpcProtoImportPaths []string `json:"grpcProtoImportPaths"`
+	SIOEvents            []cliKV  `json:"sioEvents"`
+	McpProtocolVersion   string   `json:"mcpProtocolVersion"`
+	McpMethod            string   `json:"mcpMethod"`
+	McpName              string   `json:"mcpName"`
+	McpArguments         string   `json:"mcpArguments"`
+	AiProvider           string   `json:"aiProvider"`
+	AiModel              string   `json:"aiModel"`
+	AiSystem             string   `json:"aiSystem"`
+	AiPrompt             string   `json:"aiPrompt"`
+	AiTemperature        string   `json:"aiTemperature"`
+	AiTopP               string   `json:"aiTopP"`
+	AiMaxTokens          string   `json:"aiMaxTokens"`
+	AiMaxSteps           string   `json:"aiMaxSteps"`
+	AiIdleTimeoutSec     string   `json:"aiIdleTimeoutSec"`
+	AiThinking           string   `json:"aiThinking"`
+	AiStream             *bool    `json:"aiStream"`
+	AiToolRequestIds     []string `json:"aiToolRequestIds"`
+
 	ID                 string          `json:"id"`
 	Name               string          `json:"name"`
 	RequestType        string          `json:"requestType"`
@@ -172,6 +222,7 @@ type cliEnvironment struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`
 	Protected   bool    `json:"protected"`
+	Sandbox     bool    `json:"sandbox"`
 	ParentID    string  `json:"parentId"`
 	Parent      string  `json:"-"`
 	Values      []cliKV `json:"values"`
@@ -282,12 +333,13 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 	}
 
 	return model.HttpRequest{
-		RequestID:  req.ID,
-		Method:     method,
-		URL:        strings.TrimSpace(req.URL),
-		Params:     params,
-		PathParams: pathParams,
-		Headers:    headers,
+		RequestID:   req.ID,
+		WorkspaceID: req.WorkspaceID,
+		Method:      method,
+		URL:         strings.TrimSpace(req.URL),
+		Params:      params,
+		PathParams:  pathParams,
+		Headers:     headers,
 		Auth: model.AuthConfig{
 			Type:                      req.Auth.Type,
 			Token:                     token,
@@ -299,6 +351,8 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 			OAuth2GrantType:           req.Auth.OAuth2GrantType,
 			OAuth2TokenURL:            req.Auth.OAuth2TokenURL,
 			OAuth2AuthURL:             req.Auth.OAuth2AuthURL,
+			OAuth2RedirectURL:         req.Auth.OAuth2RedirectURL,
+			OAuth2UsePKCE:             req.Auth.OAuth2UsePKCE,
 			OAuth2DeviceAuthURL:       req.Auth.OAuth2DeviceAuthURL,
 			OAuth2ClientID:            req.Auth.OAuth2ClientID,
 			OAuth2Secret:              req.Auth.OAuth2Secret,

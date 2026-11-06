@@ -99,22 +99,52 @@ The workspace is read again on every call, so a request you edit in the app is w
 | `list_requests` | Lists saved requests with their path (`Collection/Folder/Name`), id, protocol, method and URL. Can be filtered to one collection, and searched with `query`: every word has to appear in the path, method or URL, so `post orders` finds `POST /orders`. |
 | `get_request` | Shows how one request is defined: method, URL, query parameters, headers, body, auth type, scripts and browser settings, plus its saved [examples](/docs/guides/examples/) with their status, content type and body, so the assistant can compare a live response with the expected one. Credentials are left out. |
 | `list_environments` | Lists environments and their variables. Secret values are hidden. |
-| `run_request` | Sends one saved HTTP or GraphQL request with its collection defaults, auth and scripts. Returns the status, headers, body, timings, test results and script logs. |
-| `run_collection` | Runs a collection or folder in order with its test scripts and returns pass/fail per request. Realtime requests are skipped, as in `kurlo run`. When the call carries a `progressToken`, the server reports progress after every request. |
+| `run_request` | Sends a saved HTTP, GraphQL, unary gRPC, MCP or AI request. HTTP responses include timings, redirects and TLS details. For MCP, pass `mcpMethod` as `tools/list` or `tools/call`. Pass `mcpName` and `mcpArguments` to call a tool, and `mcpCursor` to read another page. |
+| `run_collection` | Runs HTTP, GraphQL and unary gRPC requests in order, with per-request results and assertions. Use `iterations`, `delayMs`, `failFast` and a workspace-relative CSV or JSON `dataFile`. A data file runs one iteration per row. Pass a `progressToken` for progress after each request. |
 | `send_request` | Sends an unsaved HTTP request. `{{variables}}` in the URL, headers and body are resolved from the environment. |
 | `list_history` | Lists the requests you recently sent from the Kurlo app, newest first, with status, timing and the saved request each came from. Can be searched, or narrowed to failures. |
 | `get_history_entry` | Shows one request you sent from the app and the response you got: status, headers, body, error, test results and script logs. Without an entry it shows the last one. |
 | `diagnose_last_failure` | Explains why a request sent from the app failed. See [When a request fails](#when-a-request-fails). |
+| `import_preview`, `import_apply` | Preview imported YAML, then confirm and apply that preview. |
+| `list_files`, `read_file`, `search_code` | List, read or search the read-only source folder supplied with `--project-root`. |
+| `get_docs`, `save_docs` | Read or replace Markdown docs for a saved request or collection. |
+| `code_snippet` | Generate a snippet in cURL, HTTPie, JavaScript, Node.js, Axios, Python, Go, Java, C#, PHP, Ruby, Swift, Kotlin or Rust. |
+| `sync_collection`, `cover_endpoint` | Get a workflow for using the connected source folder to update collection coverage. |
+| `list_load_tests`, `get_load_test`, `save_load_test` | List, read or save a collection's load tests. Omit the test ID to create a test, or keep it to replace its definition. |
+| `start_load_test`, `load_test_status`, `stop_load_test` | Start k6 in the background, inspect progress or stop the active run. |
+| `list_load_runs`, `load_test_result`, `compare_load_runs` | Find completed runs and compare their summaries by test ID and `startedAt` timestamp. |
+| `start_mock_server`, `mock_server_log`, `stop_mock_server` | Serve a collection's saved examples on localhost, check the recent request log or stop the server. |
+| `list_cookies`, `clear_cookie_jar` | Inspect cookie metadata for a domain or clear the jar used by this MCP connection. |
 | `create_collection` | Creates an empty collection. |
-| `save_request` | Creates a saved HTTP or GraphQL request, or changes one. See [Writing to the workspace](#writing-to-the-workspace). |
+| `save_request` | Creates or edits any supported request type using workspace YAML. The HTTP and GraphQL shorthand is also available. |
+| `patch_request` | Changes individual fields of a saved request with JSON Merge Patch. |
+| `list_globals` | Reads globals in the active local profile. Secret values are hidden. |
+| `authorize_oauth2` | Authorizes a saved request for the current session. See [OAuth 2.0 sign-in](#oauth-20-sign-in). |
+| `apply_changes` | Applies an ordered batch of workspace edits. Agent Mode reviews the combined diff once. |
 | `delete_request` | Deletes a saved request and its examples. |
 | `save_example` | Saves a response as an [example](/docs/guides/examples/) of a request: the response of the last `run_request` of that request, or one the assistant describes with `status` and `body`. |
 | `set_variable` | Sets a non-secret variable in an environment, and creates the environment if there is none with that name. |
 | `generate_tests` | Writes a request's status, `Content-Type` and JSON schema tests from a real or described response. See [Tests from a response](#tests-from-a-response). |
+| `git_status` | Shows the branch, its upstream, commits ahead and behind, and which workspace files have uncommitted changes. |
+| `git_diff` | Shows the uncommitted diff of the workspace files or one file; with `outgoing`, the committed changes not pushed yet. |
+| `pull_request_url` | Builds the link that starts a pull request for the current branch on GitHub, or a merge request on GitLab and Bitbucket. |
+| `git_create_branch` | Creates a branch from the current commit and switches to it. |
+| `git_commit` | Commits uncommitted workspace files, or only the `paths` given, with a `message`. Other files in the repository are never committed. |
+| `git_push` | Pushes the current branch to its remote, never with force. The assistant is told to push only when you ask. |
 
 A request can be named by its id, its full path, or just its name when that name is unique. When a name matches more than one request, the tool lists the matches with their ids so the assistant can pick one.
 
-Every run accepts an `environment` and a `variables` object of overrides for that call. `run_request` and `send_request` return up to 64 KB of the response body by default. An assistant can ask for up to 1 MB with `maxBodyBytes`. Binary bodies are described but not included.
+Request and collection runs accept an `environment` and a `variables` object of overrides for that call. `run_request` and `send_request` return up to 64 KB of the response body by default. An assistant can ask for up to 1 MB with `maxBodyBytes`. Binary bodies are described but not included.
+
+Live connection tools are available in the desktop app’s [Agent Mode](/docs/guides/agent/#running-requests-and-tests). A mock or k6 run started through `kurlo mcp` belongs to that process and stops when it exits. The cookie jar is local to the process.
+
+## Import requests and read project source
+
+Start the server with `kurlo mcp /path/to/kurlo-workspace --project-root /path/to/source`. Source paths for `list_files`, `read_file` and `search_code` are relative to the connected folder. The server skips symlinks, hidden configuration, credential files and common dependency and build directories. These tools only read the source. Workspace tools still operate on the Kurlo workspace supplied separately.
+
+Call `import_preview` with a relative `file`, pasted `content` or an OpenAPI `url`. A file path is relative to the source folder when supplied and otherwise to the Kurlo workspace. OpenAPI and Swagger, Postman, Insomnia, HAR and cURL are supported. Format detection is automatic, or you can pass `format` explicitly. For a spec with external references, bundle it into one file before importing.
+
+The preview reports the intended collection, requests and environments and shows the YAML diff. Omit `collection` to create a collection, or supply its name or ID to append requests. Pass `workspace` when the Kurlo folder contains multiple workspaces and you are creating a collection. If the diff spans several pages, call `import_preview` again with the `importId` and `nextOffset` as `offset`. Review the result and pass its `importId` and `confirm: true` to `import_apply`. A file changed since the preview requires a new preview. Agent Mode asks you to approve the diff in the chat.
 
 ## Prompts
 
@@ -126,7 +156,7 @@ The server also offers three [prompts](https://modelcontextprotocol.io/specifica
 | `cover_endpoint` | `endpoint` (required), `collection` | Does the same for one endpoint, such as `POST /orders`, and also saves its main error responses as examples. |
 | `debug_last_failure` | `entry` | Calls `diagnose_last_failure`, explains the cause and proposes a fix, which it applies only after you agree. |
 
-Requests are saved with `{{baseUrl}}` in the URL, so the address lives in an environment, not in each request. When no environment sets it, the prompts tell the assistant to look for it in the project (`.env`, `docker-compose.yml`, launch settings, the README) and to ask you before calling `set_variable`, and never to point an environment at production. With `--read-only` only `debug_last_failure` is offered.
+Requests are saved with `{{baseUrl}}` in the URL, so the address lives in an environment, not in each request. When no environment sets it, the prompts tell the assistant to look for it in the project (`docker-compose.yml`, launch settings, the README) and to ask you before calling `set_variable`, and never to point an environment at production. With `--read-only` only `debug_last_failure` is offered.
 
 ## Tests from a response
 
@@ -165,7 +195,7 @@ These tools read the [history](/docs/guides/history/) that Kurlo keeps on this m
 
 The write tools change the same YAML files the app writes, through the same code, so the result looks exactly as if you had made it in the app. In a [Git-backed workspace](/docs/guides/git-workspaces/) every change shows up in Git, and a deletion can be undone from history. Each result names the file it wrote.
 
-`save_request` without `request` creates a request. It needs a `url`, and a `collection` unless the workspace has only one. With `request`, the id or path of an existing one, it changes only the fields the call passes. `params`, `headers` and `form` replace the whole list. `folder` puts the request in a folder, creating it if needed, and `collection` moves it to another collection. The other fields are:
+For the HTTP and GraphQL shorthand, `save_request` without `request` creates a request. It needs a `url`, and a `collection` unless the workspace has only one. With `request`, the id or path of an existing one, it changes only the fields the call passes. `params`, `headers` and `form` replace the whole list. `folder` puts the request in a folder, creating it if needed, and `collection` moves it to another collection. The other fields are:
 
 | Field | Meaning |
 |-------|---------|
@@ -179,19 +209,48 @@ The write tools change the same YAML files the app writes, through the same code
 | `preRequestScript`, `testScript` | JavaScript with the [Postman `pm.*` API](/docs/reference/scripting-api/). `pm.test` calls in `testScript` become the request's tests, which `run_request` and `run_collection` report. |
 | `notes` | Notes shown with the request. |
 
-Only HTTP and GraphQL requests can be created or changed. WebSocket, Socket.IO, SSE and gRPC requests are listed and described, but not changed.
+### Workspace YAML and partial edits
+
+Pass the `yaml` argument to `save_request` for HTTP (including SSE), GraphQL, WebSocket, Socket.IO, gRPC, MCP or AI requests. Use a single `version: 1` document with a `request` mapping and the fields in the [workspace format](/docs/reference/kurlo-yaml-format/#request-file). Kurlo can assign the request ID. Pass `collection` to choose the target collection or use `collectionId` in the document. Use `request` to edit an existing request. Call `get_request` with `format: "yaml"` to inspect its workspace fields, including protocol-specific settings. The output omits stored credentials.
+
+Pass `request` and a `patch` object to `patch_request`. It merges nested objects, replaces arrays and removes fields set to `null`. For example, `{"request":"Orders/List orders","patch":{"requestNotes":"Returns recent orders"}}` changes only the notes. Use the workspace field names for authentication, client certificate settings and scripts. NTLM uses `auth.type: ntlm`, `basicUser` and `basicPass`.
+
+### Batch edits
+
+Pass an `operations` array to `apply_changes`. Each entry has a `tool` name and an `arguments` object. Operations run in order, so an edit can refer to a request created earlier in the batch. If validation fails, Kurlo saves none of the edits. In Agent Mode, all affected files appear in one review with one **Apply** button.
+
+![Agent Mode review showing a request change and a local global change together](../../../../assets/screenshots/agent-apply-changes.png)
+
+The results from `run_request` and `run_collection` include the logs from collection, folder and request scripts.
+
+| Operation | Arguments |
+|-----------|-----------|
+| `create_collection`, `save_request`, `patch_request`, `delete_request`, `save_example`, `set_variable` | Same arguments as the standalone tools. |
+| `duplicate_request` | `request` and an optional `patch` for the copy. |
+| `patch_collection` | `collection` and `patch` for the name, description, defaults, folder paths or folder defaults. Set scripts and authentication in `defaults` or `folderDefaults`. |
+| `move_folder`, `duplicate_folder` | `collection`, `from` and `to` as slash-separated folder paths, and optional `targetCollection`. Includes nested requests and folder defaults. |
+| `duplicate_collection` | `collection` and optional `name`. Copies requests, examples and defaults. |
+| `create_environment`, `patch_environment`, `delete_environment` | Create with `name` and optional `workspace` and `patch`. Update with `environment` and `patch` for `name`, `parentId` or `values`. Delete with `environment`. |
+| `patch_example`, `delete_example` | `request` and `example` by name or ID. Pass a `patch` object to edit the example. |
+| `edit_global` | `key` and `value` to create or update, `name` to rename, or `delete: true` to remove. Open the workspace in Kurlo first. |
+
+Globals stay in the encrypted local profile. Agent Mode shows global edits alongside workspace files in the same review. Set secret globals in Kurlo.
+
+### OAuth 2.0 sign-in
+
+Call `authorize_oauth2` with a saved request ID or path and, if needed, its environment. For Authorization Code and Device Code, approve the call and finish sign-in in your browser. An external MCP client needs to request progress notifications to receive the URL or device code. Client Credentials and Password use the saved configuration directly. Tokens stay in memory for the current Agent Mode turn or external MCP connection and stay out of tool results.
 
 ### Secrets stay out
 
-The write tools never put a secret in a file. A bearer token, password or API key value has to be a variable reference such as `{{apiToken}}`, and a literal value is refused. Add the value in the app as a variable marked secret, and the request uses it. Headers, parameters and environment variables that are marked secret are kept as they are when the assistant changes a request, cannot be overwritten through MCP, and are shown to the assistant only as `<secret>`.
+The write tools never put a secret in a file. A bearer token, password or API key value has to be a variable reference such as `{{apiToken}}`, and a literal value is refused. Add the value in the app as a variable marked secret, and the request uses it. Existing secrets are masked on reads. Omit fields containing saved secrets from a patch to preserve them. The YAML and patch tools accept normal variable references in authentication fields and refuse internal vault placeholders.
 
 ### Read-only
 
-Start the server with `--read-only` to offer only the tools that read and run. The write tools are then left out of the tool list, and calling one is refused.
+Start the server with `--read-only` to offer only the tools that read and run. The write tools, `git_create_branch`, `git_commit` and `git_push` are then left out of the tool list, and calling one is refused.
 
 ## Protected environments
 
-Mark an environment **Protect from AI agents** in its ⋯ menu in the app, and `kurlo mcp` refuses every call that would use it: `run_request`, `run_collection` and `send_request` with that environment, and `set_variable` in it. The assistant is told to ask you to run the request in the app instead. Use it for production and anything else an assistant should not reach by picking the wrong environment.
+Mark an environment **Protect from AI agents** in its ⋯ menu in the app, and `kurlo mcp` refuses every call that would use it: `run_request`, `run_collection`, `send_request` and `start_load_test` with that environment, and edits to it through `set_variable` or `apply_changes`. The assistant is told to ask you to run the request in the app instead. Use it for production and anything else an assistant should not reach by picking the wrong environment.
 
 The mark is saved in the environment's file as `protected: true`, so in a Git-backed workspace it applies to everyone on the team. `list_environments` shows it. An environment that [inherits](/docs/guides/environments/#inheriting-from-another-environment) from a protected one is protected too; `list_environments` names its parent under `inherits` and lists the variables it inherits.
 
@@ -227,7 +286,8 @@ Environment variables marked secret are used when requests are sent, but they ar
 | `--timeout MS` | Per-request timeout, overriding request settings. |
 | `--insecure`, `-k` | Turn off TLS certificate verification for every request. |
 | `--allow-send-request` | Let scripts call `pm.sendRequest`. Off by default, as in `kurlo run`. |
-| `--read-only` | Offer only the tools that read and run; never change workspace files. |
+| `--project-root <path>` | Connect a read-only source folder for project tools and file imports. |
+| `--read-only` | Offer only the tools that read and run. |
 
 ## Docs for agents
 

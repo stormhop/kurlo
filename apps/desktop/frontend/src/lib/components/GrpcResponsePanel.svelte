@@ -220,21 +220,21 @@
         {/if}
         <div class="resp-actions">
           {#if vm.grpcResponseTab === 'messages'}
-            <button class="btn btn-icon" title="Search response" aria-label="Search response" aria-pressed={vm.responseSearchOpen} onclick={() => (vm.responseSearchOpen = !vm.responseSearchOpen)} type="button">
+            <button class="btn btn-icon" aria-label="Search response" aria-pressed={vm.responseSearchOpen} onclick={() => (vm.responseSearchOpen = !vm.responseSearchOpen)} type="button">
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none">
                 <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
                 <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
               </svg>
             </button>
           {/if}
-          <button class="btn btn-icon" class:feedback-ok={vm.copiedBody} title={vm.copiedBody ? 'Copied response' : 'Copy response'} aria-label={vm.copiedBody ? 'Copied response' : 'Copy response'} onclick={vm.copyGrpcResponseBody} type="button">
+          <button class="btn btn-icon" class:feedback-ok={vm.copiedBody} aria-label={vm.copiedBody ? 'Copied response' : 'Copy response'} onclick={vm.copyGrpcResponseBody} type="button">
             {#if vm.copiedBody}
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             {:else}
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><rect x="3" y="1" width="8" height="9" rx="1.2" stroke="currentColor" stroke-width="1.2"/><path d="M1 3.5v7a1.2 1.2 0 001.2 1.2H8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
             {/if}
           </button>
-          <button class="btn btn-icon" class:feedback-ok={vm.savedResponse} title={vm.savedResponse ? 'Saved response' : 'Save to file'} aria-label={vm.savedResponse ? 'Saved response' : 'Save to file'} onclick={vm.saveGrpcResponseFile} type="button">
+          <button class="btn btn-icon" class:feedback-ok={vm.savedResponse} aria-label={vm.savedResponse ? 'Saved response' : 'Save to file'} onclick={vm.saveGrpcResponseFile} type="button">
             {#if vm.savedResponse}
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             {:else}

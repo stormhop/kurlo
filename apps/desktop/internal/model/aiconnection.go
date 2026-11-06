@@ -41,10 +41,13 @@ type AiConnectionInput struct {
 }
 
 type AiConnectionModel struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Recommended bool   `json:"recommended"`
-	WeakTools   bool   `json:"weakTools"`
+	Efforts       []string `json:"efforts,omitempty"`
+	DefaultEffort string   `json:"defaultEffort,omitempty"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Recommended   bool     `json:"recommended"`
+	WeakTools     bool     `json:"weakTools"`
+	ContextWindow int      `json:"contextWindow,omitempty"`
 }
 
 type AiConnectionTestResult struct {

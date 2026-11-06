@@ -139,7 +139,7 @@ export const authFeature = {
       return Boolean(auth && authHasPersistableData(auth, auth.type));
     }
     if (this.authType === 'bearer') return Boolean(this.bearerToken);
-    if (this.authType === 'basic' || this.authType === 'digest') return Boolean(this.basicUser || this.basicPass);
+    if (this.authType === 'basic' || this.authType === 'digest' || this.authType === 'ntlm') return Boolean(this.basicUser || this.basicPass);
     if (this.authType === 'apikey') return Boolean(this.apiKeyName && this.apiKeyValue);
     if (this.authType === 'oauth2') {
       if (this.oauth2Token) return true;

@@ -50,6 +50,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     { id: 'go-collections', group: 'Go to', label: 'Collections', keywords: 'sidebar requests tree', shortcut: 'go-collections', run: () => ctx.showSidebarView('collections') },
     { id: 'go-environments', group: 'Go to', label: 'Environments', keywords: 'variables env matrix', shortcut: 'go-environments', run: () => ctx.showSidebarView('environments') },
     { id: 'go-history', group: 'Go to', label: 'History', keywords: 'recent sent', shortcut: 'go-history', run: () => ctx.showSidebarView('history') },
+    { id: 'go-agent', group: 'Go to', label: 'Agent', keywords: 'ai chat assistant llm', shortcut: 'go-agent', run: () => ctx.showSidebarView('agent') },
     { id: 'go-globals', group: 'Go to', label: 'Globals', keywords: 'global variables', run: ctx.openGlobals },
     { id: 'go-runner', group: 'Go to', label: 'Collection runner', keywords: 'run tests iterations', shortcut: 'collection-runner', run: ctx.openCollectionRunner },
     { id: 'go-mock', group: 'Go to', label: 'Mock server', keywords: 'examples serve', run: ctx.openMockServer },
