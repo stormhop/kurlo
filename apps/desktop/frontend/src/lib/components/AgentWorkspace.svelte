@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import AgentChatWorkspace from './AgentChatWorkspace.svelte';
   import AgentActivityView from './AgentActivityView.svelte';
+  import AgentNotesEditor from './AgentNotesEditor.svelte';
+  import { agentNotesEditor } from '../stores/agentNotes.svelte';
   import { agentNavigation, agentStoreFor, codexAgentStore, switchAgent } from '../stores/agent.svelte';
   import { claudeConnectionStore as claude } from '../stores/claude.svelte';
   import { codexConnectionStore } from '../stores/codex.svelte';
@@ -35,6 +37,8 @@
     <AgentChatWorkspace {workspaceBlocked} agentStore={store} codexReady={codexReady || claude.usable} />
   {/if}
 </div>
+
+{#if agentNotesEditor.open}<AgentNotesEditor />{/if}
 
 <style>
   .agent-mode-workspace { display: flex; flex-direction: column; min-height: 0; height: 100%; flex: 1; }

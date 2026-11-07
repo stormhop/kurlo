@@ -732,13 +732,13 @@ func buildRequestBody(req model.HttpRequest) (preparedBody, error) {
 	}
 	switch req.BodyType {
 	case "urlencoded":
-		form := url.Values{}
+		pairs := make([]string, 0, len(req.FormData))
 		for _, kv := range req.FormData {
 			if kv.Enabled && kv.Key != "" {
-				form.Add(kv.Key, kv.Value)
+				pairs = append(pairs, url.QueryEscape(kv.Key)+"="+url.QueryEscape(kv.Value))
 			}
 		}
-		encoded := form.Encode()
+		encoded := strings.Join(pairs, "&")
 		if encoded == "" && methodConventionallyHasNoBody(req.Method) {
 			return noRequestBody(), nil
 		}

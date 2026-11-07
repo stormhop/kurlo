@@ -77,6 +77,7 @@ export type AgentApproval = Wire<model.AgentApproval>;
 export type AgentPlan = Wire<model.AgentPlan>;
 export type AgentTemplate = Wire<model.AgentTemplate>;
 export type AgentWorkspaceNotes = Wire<model.AgentWorkspaceNotes>;
+export type AgentNotesSaveResult = Wire<model.AgentNotesSaveResult>;
 export type AgentMcpPair = Wire<model.AgentMcpPair>;
 export type AgentMcpServer = Wire<model.AgentMcpServer>;
 export type AgentMcpServersState = Wire<model.AgentMcpServersState>;

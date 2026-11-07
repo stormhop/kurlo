@@ -1,7 +1,8 @@
 package model
 
 const (
-	AgentClientName = "Kurlo agent"
+	AgentClientName     = "Kurlo agent"
+	AiRequestClientName = "Kurlo AI request"
 
 	AgentToolRead     = "read"
 	AgentToolRun      = "run"
@@ -22,11 +23,27 @@ const (
 )
 
 type AgentFileChange struct {
-	Path     string  `json:"path"`
-	Before   *string `json:"before"`
-	After    *string `json:"after"`
-	TooLarge bool    `json:"tooLarge,omitempty"`
-	Reverted bool    `json:"reverted,omitempty"`
+	Path     string              `json:"path"`
+	Before   *string             `json:"before"`
+	After    *string             `json:"after"`
+	TooLarge bool                `json:"tooLarge,omitempty"`
+	Reverted bool                `json:"reverted,omitempty"`
+	Summary  *AgentChangeSummary `json:"summary,omitempty"`
+}
+
+type AgentChangeSummary struct {
+	Kind     string             `json:"kind"`
+	Name     string             `json:"name"`
+	Location string             `json:"location,omitempty"`
+	Detail   string             `json:"detail,omitempty"`
+	Fields   []AgentChangeField `json:"fields,omitempty"`
+}
+
+type AgentChangeField struct {
+	Label  string `json:"label"`
+	Change string `json:"change"`
+	Before string `json:"before,omitempty"`
+	After  string `json:"after,omitempty"`
 }
 
 type AgentMcpPair struct {
@@ -45,6 +62,10 @@ type AgentMcpServer struct {
 	Headers []AgentMcpPair `json:"headers"`
 	Env     []AgentMcpPair `json:"env"`
 	Enabled bool           `json:"enabled"`
+
+	Auth          string `json:"auth,omitempty"`
+	OAuthClientID string `json:"oauthClientId,omitempty"`
+	SignedIn      bool   `json:"signedIn,omitempty"`
 }
 
 type AgentMcpServersState struct {
@@ -58,9 +79,11 @@ type AgentMcpToolInfo struct {
 }
 
 type AgentMcpTestResult struct {
-	OK    bool               `json:"ok"`
-	Tools []AgentMcpToolInfo `json:"tools"`
-	Error string             `json:"error,omitempty"`
+	OK        bool               `json:"ok"`
+	Tools     []AgentMcpToolInfo `json:"tools"`
+	Resources bool               `json:"resources,omitempty"`
+	Prompts   bool               `json:"prompts,omitempty"`
+	Error     string             `json:"error,omitempty"`
 }
 
 type AgentTemplate struct {
@@ -71,8 +94,19 @@ type AgentTemplate struct {
 type AgentWorkspaceNotes struct {
 	Path      string          `json:"path"`
 	Exists    bool            `json:"exists"`
+	Content   string          `json:"content"`
+	TooLarge  bool            `json:"tooLarge,omitempty"`
 	Templates []AgentTemplate `json:"templates"`
 	Error     string          `json:"error,omitempty"`
+}
+
+type AgentNotesSaveResult struct {
+	Ok            bool                `json:"ok"`
+	Error         string              `json:"error,omitempty"`
+	Conflict      bool                `json:"conflict,omitempty"`
+	Current       string              `json:"current,omitempty"`
+	CurrentExists bool                `json:"currentExists,omitempty"`
+	Notes         AgentWorkspaceNotes `json:"notes"`
 }
 
 type AgentPlanCall struct {
@@ -146,6 +180,8 @@ type AgentChat struct {
 	BudgetTokens     int64       `json:"budgetTokens,omitempty"`
 	BudgetRequests   int         `json:"budgetRequests,omitempty"`
 	RequestsSent     int         `json:"requestsSent,omitempty"`
+	Summary          string      `json:"summary,omitempty"`
+	SummaryBefore    int         `json:"summaryBefore,omitempty"`
 }
 
 type AgentAttachment struct {

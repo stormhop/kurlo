@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { AgentApproval } from '../backend';
   import { agentAllowsChatApproval, agentApprovalAction, agentApprovalArguments, agentApprovalTitle } from '../agent';
-  import AgentFileDiff from './AgentFileDiff.svelte';
+  import AgentChangeList from './AgentChangeList.svelte';
 
   let {
     approval,
@@ -37,6 +37,7 @@
     <strong>{agentApprovalTitle(approval)}</strong>
     <span class="agent-approval-tool">{approval.tool}</span>
   </div>
+  <div class="agent-approval-body">
   {#if approval.reason}<p class="agent-approval-reason">{approval.reason}</p>{/if}
 
   {#if approval.plan}
@@ -58,11 +59,7 @@
       <p class="agent-approval-reason">Every change in this plan still waits for your approval.</p>
     {/if}
   {:else if write && approval.changes.length}
-    <div class="agent-approval-files">
-      {#each approval.changes as change (change.path)}
-        <AgentFileDiff {change} />
-      {/each}
-    </div>
+    <AgentChangeList changes={approval.changes} />
   {:else}
     <button class="btn btn-ghost btn-sm agent-approval-args-toggle" type="button" aria-expanded={showArgs} onclick={() => (showArgs = !showArgs)}>
       <svg class:open={showArgs} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
@@ -75,6 +72,7 @@
 
   <p class="agent-approval-reason">This turn stops after 30 minutes without a response.</p>
   {#if error}<p class="agent-approval-error" role="alert">{error}</p>{/if}
+  </div>
   <div class="agent-approval-actions">
     <button class="btn btn-primary btn-sm" type="button" onclick={() => answer('allow')} disabled={busy}>{agentApprovalAction(approval)}</button>
     {#if agentAllowsChatApproval(approval)}
@@ -89,7 +87,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    margin-block: var(--space-2) 0;
+    margin: 0;
     padding-left: var(--space-5);
     color: var(--text);
     font-size: var(--text-body);
@@ -99,7 +97,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-1);
-    margin-top: var(--space-2);
     padding: var(--space-2);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
@@ -132,7 +129,7 @@
   .agent-plan-once {
     color: var(--text-3);
   }
-  .agent-approval-error { color: var(--danger); font-size: var(--text-label); overflow-wrap: anywhere; }
+  .agent-approval-error { margin: 0; color: var(--danger); font-size: var(--text-label); overflow-wrap: anywhere; }
   .agent-approval {
     display: flex;
     flex: 0 0 auto;
@@ -142,8 +139,12 @@
     border-radius: var(--radius-xl);
     background: var(--bg);
   }
-  .agent-approval > * {
-    margin-inline: var(--space-3);
+  .agent-approval-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2-5);
+    min-width: 0;
+    padding: var(--space-2-5) var(--space-3) var(--space-3);
   }
   .agent-approval-head {
     display: flex;
@@ -178,20 +179,13 @@
     white-space: nowrap;
   }
   .agent-approval-reason {
-    margin-top: var(--space-2-5);
-    margin-bottom: 0;
+    margin: 0;
     color: var(--text-2);
     font-size: var(--text-label);
   }
-  .agent-approval-files {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    margin-block: var(--space-2-5);
-  }
   .agent-approval-args-toggle {
     align-self: flex-start;
-    margin-block: var(--space-2);
+    margin-left: calc(-1 * var(--space-2));
     gap: var(--space-1-5);
     color: var(--text-2);
   }
@@ -203,8 +197,7 @@
     transform: rotate(90deg);
   }
   .agent-approval-args {
-    margin-top: 0;
-    margin-bottom: var(--space-2-5);
+    margin: 0;
     max-height: 14rem;
     overflow: auto;
     padding: var(--space-2) var(--space-2-5);

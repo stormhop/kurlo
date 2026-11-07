@@ -103,9 +103,7 @@ func (a *App) OpenLogFolder() string {
 
 func (a *App) Shutdown(_ context.Context) {
 	a.CancelCodexLogin()
-	if a.agent != nil {
-		a.agent.closeMcpClients()
-	}
+	a.agentRuntime().closeMcpClients()
 	a.requestMu.Lock()
 	for _, pending := range a.requestCancels {
 		pending.cancel()

@@ -361,7 +361,16 @@ func defaultSavedAiConnection() (savedAiConnection, error) {
 }
 
 func resolveKurloAiRequest(req model.AiRequest) (model.AiRequest, string, error) {
-	connection, err := defaultSavedAiConnection()
+	var connection savedAiConnection
+	var err error
+	if id := strings.TrimSpace(req.ConnectionID); id != "" {
+		connection, err = findSavedAiConnection(id)
+		if errors.Is(err, errAiConnectionNotFound) {
+			err = errors.New("The AI connection this request uses no longer exists; pick another one in the request or in Settings → AI")
+		}
+	} else {
+		connection, err = defaultSavedAiConnection()
+	}
 	if err != nil {
 		return req, "", err
 	}

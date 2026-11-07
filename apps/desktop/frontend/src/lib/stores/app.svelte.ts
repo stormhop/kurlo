@@ -1171,6 +1171,8 @@ class AppVM {
   aiThinking = $state('');
   aiStream = $state(true);
   aiToolRequestIds = $state<string[]>([]);
+  aiKurloTools = $state(false);
+  aiConnectionId = $state('');
   grpcMetadata = $state<KVRow[]>([mkRow()]);
   grpcUseReflection = $state(true);
   grpcProtoFilePath = $state('');

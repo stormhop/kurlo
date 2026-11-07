@@ -272,7 +272,7 @@
                   <span class="agent-chat-glyph agent-chat-glyph-kurlo" role="img" aria-label="Kurlo agent"><KurloGlyph size="0.75rem" /></span>
                 {/if}
                 <span class="agent-chat-title">{chat.title || 'Untitled chat'}</span>
-                {#if chatStore.approvals.some(approval => approval.chatId === chat.id)}
+                {#if chatStore.isWaiting(chat.id)}
                   <span class="agent-chat-waiting" role="img" aria-label="Waiting for you"></span>
                 {:else if chatStore.isRunning(chat.id)}
                   <span class="agent-chat-live" role="img" aria-label="Working"></span>

@@ -270,6 +270,12 @@ func TestKnowledgeAttachmentsBecomeTurnToolsAndVisionContent(t *testing.T) {
 	if len(msg.Attachments) != 0 || !strings.Contains(msg.Blocks[0].Text, fmt.Sprintf("%q (attachment %s, available with read_attachment)", "rows.csv", files[0].id)) {
 		t.Fatalf("model attachment prompt = %+v", msg)
 	}
+	earlier := newAgentUserMessage("First", files)
+	reply := model.AiMessage{Role: "assistant", Blocks: []model.AiBlock{{Type: model.AiBlockText, Text: "ok"}}}
+	twoTurns, _ := agentHistoryForModel([]model.AiMessage{earlier, reply, newAgentUserMessage("Again", files)}, 0)
+	if first, last := twoTurns[0].Blocks[0].Text, twoTurns[2].Blocks[0].Text; strings.Contains(first, "image included with this message") || !strings.Contains(first, "no longer included") || !strings.Contains(last, "image included with this message") {
+		t.Fatalf("image notes = %q / %q", first, last)
+	}
 	openAI := fmt.Sprint(openAIMessages("", []model.AiMessage{msg}))
 	anthropic := fmt.Sprint(anthropicMessages([]model.AiMessage{msg}))
 	if !strings.Contains(openAI, "image_url") || !strings.Contains(openAI, "data:image/png;base64,") || !strings.Contains(anthropic, "media_type:image/png") {

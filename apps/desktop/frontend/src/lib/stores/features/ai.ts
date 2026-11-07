@@ -620,7 +620,7 @@ export function aiModelsProblem(outcome:
     case 'no-url':
       return { title: 'Enter the base URL first', status: '', detail: '', hint: 'Kurlo reads the model list from the base URL.' };
     case 'no-key':
-      return { title: 'The API key is not set', status: '', detail: outcome.message, hint: '' };
+      return { title: 'The API key is not set', status: '', detail: '', hint: outcome.message };
     case 'network':
       return { title: 'Could not reach the provider', status: '', detail: `GET ${displayURL(outcome.url)}\n${outcome.error}`, hint: 'Check the base URL and that the server is running. You can still type the model name.' };
     case 'empty':
@@ -649,6 +649,7 @@ export function aiUnresolvedKey(req: Pick<HttpRequest, 'auth' | 'headers'>): str
   const value = req.auth?.type === 'bearer' ? req.auth.token : req.auth?.type === 'apikey' ? req.auth.keyValue : '';
   const match = /\{\{\s*([^{}\s]+)\s*\}\}/.exec(value ?? '');
   if (!match) return '';
+  if (match[1].startsWith('kurloSecret:')) return 'The API key saved in the Auth tab is not on this computer. Enter it in the Auth tab again.';
   return `The API key comes from {{${match[1]}}}, which the active environment does not set. Add ${match[1]} to an environment (mark it secret), or put the key in the Auth tab.`;
 }
 

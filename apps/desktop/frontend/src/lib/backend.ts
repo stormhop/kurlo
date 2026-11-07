@@ -7,7 +7,7 @@ import type {
   OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
-  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -804,8 +804,20 @@ export async function branchAgentChat(id: string, workspaceId: string, before: n
   return app.BranchAgentChat(id, workspaceId, before);
 }
 
+export async function compactAgentChat(id: string, workspaceId: string): Promise<AgentChat> {
+  const app = window.go?.api?.App;
+  if (!app?.CompactAgentChat) throw new Error(AGENT_DESKTOP_ONLY);
+  return app.CompactAgentChat(id, workspaceId);
+}
+
 export async function agentWorkspaceNotes(): Promise<AgentWorkspaceNotes> {
-  return (await window.go?.api?.App?.AgentWorkspaceNotes?.()) ?? { path: '', exists: false, templates: [] };
+  return (await window.go?.api?.App?.AgentWorkspaceNotes?.()) ?? { path: '', exists: false, content: '', templates: [] };
+}
+
+export async function saveAgentWorkspaceNotes(content: string, base: string, baseExists: boolean): Promise<AgentNotesSaveResult> {
+  const app = window.go?.api?.App;
+  if (!app?.SaveAgentWorkspaceNotes) return { ok: false, error: AGENT_DESKTOP_ONLY, notes: { path: '', exists: false, content: '', templates: [] } };
+  return app.SaveAgentWorkspaceNotes(content, base, baseExists);
 }
 
 export async function agentMcpServers(): Promise<AgentMcpServersState> {
@@ -818,6 +830,18 @@ export async function saveAgentMcpServer(server: AgentMcpServer): Promise<AgentM
 
 export async function deleteAgentMcpServer(id: string): Promise<AgentMcpServersState> {
   return (await window.go?.api?.App?.DeleteAgentMcpServer?.(id)) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function signInAgentMcpServer(id: string): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.SignInAgentMcpServer?.(id)) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
+}
+
+export async function cancelAgentMcpSignIn(id: string): Promise<void> {
+  await window.go?.api?.App?.CancelAgentMcpSignIn?.(id);
+}
+
+export async function signOutAgentMcpServer(id: string): Promise<AgentMcpServersState> {
+  return (await window.go?.api?.App?.SignOutAgentMcpServer?.(id)) ?? { servers: [], error: AGENT_DESKTOP_ONLY };
 }
 
 export async function testAgentMcpServer(server: AgentMcpServer): Promise<AgentMcpTestResult> {

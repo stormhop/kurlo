@@ -71,9 +71,9 @@ func agentApprovalRule(chat model.AgentChat) string {
 	case model.AgentModeAsk:
 		rule = "- This chat asks before every request: only reading tools run at once. Requests and every change to the workspace files wait for the user's approval."
 	case model.AgentModeAuto:
-		rule = "- This chat runs in auto mode: reading tools, requests that only send GET, HEAD or OPTIONS and changes to the workspace files run at once. Requests with other methods wait for approval unless they go to a trusted host or a sandbox environment, and git_push always waits."
+		rule = "- This chat runs in auto mode: reading tools, requests that only send GET, HEAD or OPTIONS and changes to the workspace files run at once. Requests with other methods, and send_request calls to a host no saved request or variable of the workspace uses, wait for approval unless they go to a trusted host or a sandbox environment, and git_push always waits."
 	default:
-		rule = "- Reading tools and requests that only send GET, HEAD or OPTIONS run at once. Requests with other methods and every change to the workspace files wait for the user's approval in the chat, except requests to trusted hosts or sandbox environments."
+		rule = "- Reading tools and requests that only send GET, HEAD or OPTIONS run at once. Requests with other methods, send_request calls to a host no saved request or variable of the workspace uses, and every change to the workspace files wait for the user's approval in the chat, except requests to trusted hosts or sandbox environments."
 	}
 	if hosts := agentNormalizeHosts(chat.AllowedHosts); len(hosts) > 0 && agentNormalizeMode(chat.Mode) != model.AgentModeAsk {
 		rule += " Trusted hosts: " + strings.Join(hosts, ", ") + "."

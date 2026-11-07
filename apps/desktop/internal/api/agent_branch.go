@@ -54,6 +54,7 @@ func (a *App) BranchAgentChat(id, workspaceID string, before int) (model.AgentCh
 	branch.ContextTokens = 0
 	branch.MessageOffset = 0
 	branch.MessageCount = 0
+	agentDropStaleSummary(&branch, before)
 	branch.Messages = agentCloseToolUses(append([]model.AiMessage(nil), source.Messages[:before]...))
 	if err := copyAgentAttachments(source, branch); err != nil {
 		return model.AgentChat{}, err

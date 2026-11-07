@@ -142,6 +142,16 @@ func agentRunTargets(s *mcpServer, tool string, arguments json.RawMessage) agent
 	if err != nil {
 		return target
 	}
+	target.urls = append(target.urls, agentResolvedRequestURLs(ws, values, requests)...)
+	if tool == "send_request" {
+		target.urls = []string{substituteTemplates(args.URL, values)}
+	}
+	target.known = true
+	return target
+}
+
+func agentResolvedRequestURLs(ws mcpWorkspace, values map[string]string, requests []cliSavedRequest) []string {
+	urls := make([]string, 0, len(requests))
 	for _, req := range requests {
 		merged := map[string]string{}
 		for _, collection := range ws.collections {
@@ -157,13 +167,68 @@ func agentRunTargets(s *mcpServer, tool string, arguments json.RawMessage) agent
 		for key, value := range values {
 			merged[key] = value
 		}
-		target.urls = append(target.urls, substituteTemplates(req.URL, merged))
+		urls = append(urls, substituteTemplates(req.URL, merged))
 	}
-	if tool == "send_request" {
-		target.urls = []string{substituteTemplates(args.URL, values)}
+	return urls
+}
+
+func agentWorkspaceUsesHost(s *mcpServer, env, host string) bool {
+	host = strings.Trim(strings.ToLower(strings.TrimSpace(host)), "[]")
+	if host == "" {
+		return false
 	}
-	target.known = true
-	return target
+	ws, err := s.loadWorkspace()
+	if err != nil {
+		return false
+	}
+	matches := func(raw string) bool {
+		return strings.Contains(raw, "://") && strings.EqualFold(agentURLHost(raw), host)
+	}
+	for _, environment := range ws.environments {
+		for _, row := range environment.Values {
+			if row.Enabled && matches(row.Value) {
+				return true
+			}
+		}
+	}
+	for _, collection := range ws.collections {
+		for _, row := range collection.Defaults.Variables {
+			if row.Enabled && matches(row.Value) {
+				return true
+			}
+		}
+	}
+	globals, _ := mcpGlobalValues(s.opts.workspace, s.opts.loadAppSecrets)
+	for _, value := range globals {
+		if matches(value) {
+			return true
+		}
+	}
+	values, _, err := resolveCLIValues(cliOptions{env: env}, ws.collections, ws.environments, globals)
+	if err != nil {
+		return false
+	}
+	for _, raw := range agentResolvedRequestURLs(ws, values, ws.requests) {
+		if strings.EqualFold(agentURLHost(raw), host) {
+			return true
+		}
+	}
+	return false
+}
+
+func agentForeignSend(s *mcpServer, arguments json.RawMessage) (bool, string) {
+	target := agentRunTargets(s, "send_request", arguments)
+	if !target.known || len(target.urls) == 0 {
+		return true, "Kurlo could not resolve the URL of this request to check where it goes."
+	}
+	host := agentURLHost(target.urls[0])
+	if host == "" {
+		return true, "Kurlo could not tell which host this request goes to."
+	}
+	if agentWorkspaceUsesHost(s, target.env, host) {
+		return false, ""
+	}
+	return true, fmt.Sprintf("Sends a request to %s, a host no saved request or variable in this workspace uses.", host)
 }
 
 func agentURLHost(raw string) string {

@@ -39,6 +39,8 @@ export function AuthorizeOAuth2Device(arg1:model.AuthConfig):Promise<model.OAuth
 
 export function BranchAgentChat(arg1:string,arg2:string,arg3:number):Promise<model.AgentChat>;
 
+export function CancelAgentMcpSignIn(arg1:string):Promise<void>;
+
 export function CancelCodexLogin():Promise<void>;
 
 export function CancelOpenRouterConnect():Promise<model.OpenRouterConnectState>;
@@ -66,6 +68,8 @@ export function ClipboardGet():Promise<string>;
 export function ClipboardSet(arg1:string):Promise<void>;
 
 export function CodexStatus(arg1:string):Promise<model.CodexStatus>;
+
+export function CompactAgentChat(arg1:string,arg2:string):Promise<model.AgentChat>;
 
 export function ConfirmQuit():Promise<void>;
 
@@ -277,6 +281,8 @@ export function SSEDisconnect(arg1:string):Promise<void>;
 
 export function SaveAgentMcpServer(arg1:model.AgentMcpServer):Promise<model.AgentMcpServersState>;
 
+export function SaveAgentWorkspaceNotes(arg1:string,arg2:string,arg3:boolean):Promise<model.AgentNotesSaveResult>;
+
 export function SaveAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionsState>;
 
 export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
@@ -331,7 +337,11 @@ export function SetVariables(arg1:Record<string, string>):Promise<void>;
 
 export function Show():Promise<void>;
 
+export function SignInAgentMcpServer(arg1:string):Promise<model.AgentMcpServersState>;
+
 export function SignInClaudeCode(arg1:string):Promise<model.AgentResult>;
+
+export function SignOutAgentMcpServer(arg1:string):Promise<model.AgentMcpServersState>;
 
 export function SocketIOConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
 

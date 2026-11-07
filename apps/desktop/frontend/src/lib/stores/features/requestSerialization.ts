@@ -37,6 +37,7 @@ type RequestSerializationHost = {
   proxyConfig: ProxyConfig;
   activeWorkspaceId: string;
   activeEnvironmentValues: () => Record<string, string>;
+  activeEnvironment?: { name: string };
   activeSecretEnvironmentKeys: () => string[];
   activeSecretEnvironmentValues: () => string[];
   globalVariableValues?: () => Record<string, string>;
@@ -317,6 +318,8 @@ export const requestSerializationFeature = {
       },
       toolServers,
       maxSteps: aiOptionalNumber(resolved.aiMaxSteps) ?? 0,
+      ...(usesConnection && resolved.aiConnectionId ? { connectionId: resolved.aiConnectionId } : {}),
+      ...(resolved.aiKurloTools ? { kurloTools: true, kurloEnvironment: this.activeEnvironment?.name ?? '' } : {}),
     };
   },
 

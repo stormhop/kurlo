@@ -85,6 +85,7 @@ type RequestCrudHost = {
   closeAgentTab: () => void;
   closeFloatingMenus: () => void;
   closeGitTab: () => void;
+  closeMockServerTab: () => void;
   closeHistoryDetail: () => void;
   closeActiveRequestTab: (force?: boolean) => Promise<void>;
   closeRequestTab: (id: string, force?: boolean) => Promise<void>;
@@ -654,6 +655,8 @@ export const requestCrudFeature = {
       this.closeHistoryDetail();
     } else if (this.topView === 'agent') {
       this.closeAgentTab();
+    } else if (this.topView === 'mock') {
+      this.closeMockServerTab();
     }
   },
 

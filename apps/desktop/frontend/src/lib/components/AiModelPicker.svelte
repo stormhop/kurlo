@@ -17,7 +17,7 @@
 
   const preset = $derived(vm.aiCurrentPreset());
   const usesConnection = $derived(preset.id === 'kurlo');
-  const connection = $derived(aiConnectionsStore.defaultConnection);
+  const connection = $derived((vm.aiConnectionId ? aiConnectionsStore.list.find(item => item.id === vm.aiConnectionId) : null) ?? aiConnectionsStore.defaultConnection);
   const shownModel = $derived(usesConnection ? (connection?.model ?? '') : vm.aiModel.trim());
 
   $effect(() => {
@@ -128,7 +128,7 @@
             <span class="ai-model-connection-name">No AI connection yet</span>
           {/if}
           <p class="ai-model-hint">The request uses the default connection and its model. Change both in Settings → AI.</p>
-          <button class="btn btn-secondary btn-sm" type="button" onclick={() => { open = false; vm.openSettings('ai'); }}>Open Settings → AI</button>
+          <button class="btn btn-secondary btn-sm" type="button" onclick={() => { open = false; aiConnectionsStore.reveal = 'models'; vm.openSettings('ai'); }}>Open Settings → AI</button>
         </div>
       {:else}
       <label class="field-label" for="ai-model-input">Model</label>

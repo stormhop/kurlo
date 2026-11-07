@@ -4,7 +4,7 @@ class AiConnectionsStore {
   list = $state<AiConnection[]>([]);
   loaded = $state(false);
   intent = $state<'' | 'key' | 'local'>('');
-  reveal = $state<'' | 'agents' | 'kurlo'>('');
+  reveal = $state<'' | 'agents' | 'kurlo' | 'models'>('');
   models = $state<Record<string, AiConnectionModel[]>>({});
   modelsLoading = $state<Record<string, boolean>>({});
   modelsError = $state<Record<string, string>>({});

@@ -158,6 +158,9 @@ func TestAiOpenAIStreamAssemblesTextAndUsage(t *testing.T) {
 	if out.Steps[0].URL != server.URL+"/v1/chat/completions" || out.Steps[0].Method != "POST" || !strings.Contains(out.Steps[0].RequestBody, `"model":"test-model"`) {
 		t.Fatalf("step request %s %s %s", out.Steps[0].Method, out.Steps[0].URL, out.Steps[0].RequestBody)
 	}
+	if len(log.steps) == 0 || log.steps[0].RequestBody != "" || log.steps[0].URL != out.Steps[0].URL {
+		t.Fatalf("step events must leave out the request body: %+v", log.steps)
+	}
 	body := server.body(0)
 	if body["max_tokens"] != float64(256) || body["stream"] != true {
 		t.Fatalf("body %v", body)

@@ -106,6 +106,9 @@ func (s *mcpServer) toolOpenSession(ctx context.Context, arguments json.RawMessa
 		return nil, err
 	}
 	if len(live.sessions) >= 8 {
+		live.pruneFinished()
+	}
+	if len(live.sessions) >= 8 {
 		return nil, fmt.Errorf("close a session before opening another; this turn can hold up to eight sessions")
 	}
 	if args.TimeoutMs < 0 || args.TimeoutMs > 120000 {
@@ -258,6 +261,16 @@ func (l *agentLiveSessions) connect(session *agentLiveSession, req model.HttpReq
 				}
 			}, func(ev model.SSEEvent) { session.push("message", ev) })
 		}()
+	}
+}
+
+func (l *agentLiveSessions) pruneFinished() {
+	for id, session := range l.sessions {
+		select {
+		case <-session.done:
+			delete(l.sessions, id)
+		default:
+		}
 	}
 }
 

@@ -8,6 +8,8 @@
   import Markdown from './Markdown.svelte';
   import Select from './Select.svelte';
   import Disclosure from './Disclosure.svelte';
+  import MenuIcon from './MenuIcon.svelte';
+  import { agentNotesEditor } from '../stores/agentNotes.svelte';
   import { focusFirstMenuItem, handleMenuKeydown } from '../menuKeyboard';
   import AgentApprovalCard from './AgentApprovalCard.svelte';
   import AgentAttachmentViewer from './AgentAttachmentViewer.svelte';
@@ -168,12 +170,12 @@
   const persisted = $derived<AgentTurnView[]>(agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId ? agentTurnsFromMessages(agentStore.activeChat.messages, '', agentStore.activeChat.messageOffset ?? 0) : []);
   const live = $derived(agentStore.liveInActiveChat ? agentStore.live : null);
   const draftAttachments = $derived(live && agentStore.liveAttachments.length ? [] : agentStore.attachmentPaths);
+  const persistedRows = $derived(persisted.map(turn => ({ ...turn, live: false })));
   const turns = $derived.by<Array<AgentTurnView & { live: boolean }>>(() => {
-    const out = persisted.map(turn => ({ ...turn, live: false }));
+    if (!live) return persistedRows;
     const chat = chatLoaded ? agentStore.activeChat : null;
     const nextMessage = chat?.messageCount ?? (chat?.messageOffset ?? 0) + (chat?.messages.length ?? 0);
-    if (live) out.push({ id: `:${nextMessage}`, prompt: live.prompt, attachments: agentStore.liveAttachments, steps: live.steps, live: true });
-    return out;
+    return [...persistedRows, { id: `:${nextMessage}`, prompt: live.prompt, attachments: agentStore.liveAttachments, steps: live.steps, live: true }];
   });
   const notes = $derived(agentStore.notes && agentStore.notes.chatId === agentStore.activeChatId ? agentStore.notes : null);
   const lastPersisted = $derived(persisted.at(-1) ?? null);
@@ -274,6 +276,14 @@
     const parsed = Number.parseInt(value.replace(/\D+/g, ''), 10);
     return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, limit) : 0;
   }
+  function commitTokenBudget(event: Event & { currentTarget: HTMLInputElement }) {
+    agentStore.budgetTokens = budgetValue(event.currentTarget.value, AGENT_BUDGET_MAX_TOKENS);
+    event.currentTarget.value = agentStore.budgetTokens ? String(agentStore.budgetTokens) : '';
+  }
+  function commitRequestBudget(event: Event & { currentTarget: HTMLInputElement }) {
+    agentStore.budgetRequests = budgetValue(event.currentTarget.value, AGENT_BUDGET_MAX_REQUESTS);
+    event.currentTarget.value = agentStore.budgetRequests ? String(agentStore.budgetRequests) : '';
+  }
   const chatTokens = $derived(usage ? usage.input + usage.output + usage.cacheRead + usage.cacheWrite : 0);
 
   const collectionOptions = $derived([
@@ -350,6 +360,13 @@
   });
 
 
+  let approvalCount = 0;
+  $effect(() => {
+    const count = approvals.length;
+    if (count > approvalCount) stickToBottom = true;
+    approvalCount = count;
+  });
+
   function loadEarlier() {
     history?.captureAnchor();
     stickToBottom = false;
@@ -385,13 +402,11 @@
     else set.add(key);
   }
 
-  function savedRequests() {
-    return vm.requests.filter(request => !request.isDraft).map(request => ({
-      id: request.id,
-      name: request.name ?? '',
-      path: [vm.collectionNameById(request.collectionId), ...(request.folderPath ?? []), request.name ?? ''].filter(Boolean).join('/'),
-    }));
-  }
+  const savedRequestList = $derived(vm.requests.filter(request => !request.isDraft).map(request => ({
+    id: request.id,
+    name: request.name ?? '',
+    path: [vm.collectionNameById(request.collectionId), ...(request.folderPath ?? []), request.name ?? ''].filter(Boolean).join('/'),
+  })));
 
   function targetLabel(target: AgentToolTarget): string {
     if (target.kind === 'history') return 'Open entry';
@@ -402,7 +417,7 @@
   function canOpen(target: AgentToolTarget): boolean {
     if (target.kind === 'history') return vm.requestHistory.some(entry => entry.id === target.id);
     if (target.kind === 'environment') return vm.activeWorkspaceEnvironments.some(environment => environment.name.toLowerCase() === target.name.toLowerCase());
-    return Boolean(agentFindRequest(savedRequests(), target.ref));
+    return Boolean(agentFindRequest(savedRequestList, target.ref));
   }
 
   function openTarget(target: AgentToolTarget) {
@@ -415,7 +430,7 @@
       if (environment) void vm.openEnvironment(environment.id);
       return;
     }
-    const request = agentFindRequest(savedRequests(), target.ref);
+    const request = agentFindRequest(savedRequestList, target.ref);
     if (request) void vm.switchRequest(request.id);
   }
 
@@ -512,8 +527,19 @@
   }
 
   let workspaceTemplates = $state<AgentTemplate[]>([]);
+  let notesExist = $state(true);
   let branching = $state(false);
   let branchError = $state('');
+  let compactError = $state('');
+  let summaryOpen = $state(false);
+  const compactedAt = $derived(chatLoaded && agentStore.activeChat?.summary && agentStore.activeChat.summaryBefore ? agentStore.activeChat.summaryBefore : null);
+  const messageTotal = $derived(chatLoaded ? agentStore.activeChat?.messageCount ?? (agentStore.activeChat?.messageOffset ?? 0) + (agentStore.activeChat?.messages.length ?? 0) : 0);
+  const compacting = $derived(Boolean(agentStore.compactingChat) && agentStore.compactingChat === agentStore.activeChatId);
+  const historySummary = $derived(compactedAt !== null ? `${compactedAt} compacted` : `${messageTotal} ${messageTotal === 1 ? 'message' : 'messages'}`);
+
+  async function compactChat() {
+    compactError = await agentStore.compact();
+  }
 
   async function editMessage(index: number, text: string) {
     agentStore.startEdit(index, text);
@@ -538,11 +564,17 @@
     try {
       const notes = await agentWorkspaceNotes();
       workspaceTemplates = notes.templates.map((template, index) => ({ id: `workspace:${index}`, title: template.title, summary: '', text: template.text }));
+      notesExist = notes.exists;
     } catch {
       workspaceTemplates = [];
     }
     await tick();
     focusFirstMenuItem(templatesMenu);
+  }
+
+  function editNotes() {
+    templatesOpen = false;
+    void agentNotesEditor.show();
   }
 
   async function useTemplate(template: AgentTemplate) {
@@ -730,7 +762,7 @@
                   {#each turn.attachments as file, index (file.id || `${index}:${file.name}`)}
                     <li class="agent-message-file">
                       {#if file.preview || (file.id && file.mediaType)}
-                        <button class="btn btn-secondary agent-file-button" class:agent-image-file={file.preview} type="button" aria-label={`Open ${file.name}`} onclick={() => (openAttachment = file)}>
+                        <button class="btn btn-secondary agent-file-button" class:agent-image-file={file.preview} type="button" aria-label={`Open ${file.name}`} onclick={event => { event.currentTarget.focus(); openAttachment = file; }}>
                           {#if file.preview}
                             <img src={file.preview} alt={`Preview of ${file.name}`} draggable="false" class:vector={file.mediaType === 'image/svg+xml'} />
                           {:else}
@@ -743,6 +775,9 @@
                     </li>
                   {/each}
                 </ul>
+              {/if}
+              {#if compactedAt !== null && turn.messageIndex === compactedAt}
+                <div class="agent-compact-divider" role="separator">Messages above are compacted. The agent works from their summary.</div>
               {/if}
               {#if turn.prompt}
                 <div class="agent-user-row" class:editing={agentStore.editing !== null && turn.messageIndex !== undefined && agentStore.editing.index === turn.messageIndex}>
@@ -829,6 +864,9 @@
             </div>
             {/snippet}
           </VirtualAgentHistory>
+          {#if compactedAt !== null && compactedAt >= messageTotal && !agentStore.running}
+            <div class="agent-compact-divider" role="separator">Messages above are compacted. The agent works from their summary.</div>
+          {/if}
           {/key}
 
           {#each approvals.filter(approval => !approval.toolUseId || !live || !live.steps.some(step => step.blocks.some(block => block.id === approval.toolUseId))) as approval (approval.id)}
@@ -942,6 +980,8 @@
                             <span class="agent-template-text">{template.text}</span>
                           </button>
                         {/each}
+                        <div class="menu-separator" role="separator"></div>
+                        <button class="menu-item" type="button" role="menuitem" onclick={editNotes}><MenuIcon name="rename" />{notesExist ? 'Edit kurlo-agent.md…' : 'Create kurlo-agent.md…'}</button>
                       </div>
                     {/if}
                   </div>
@@ -996,6 +1036,7 @@
             <div class="agent-kv"><span>Collection</span><span>{agentStore.collection || 'Any'}</span></div>
             <div class="agent-kv"><span>Environment</span><span>{agentStore.environment || 'None'}{#if environmentProtected}<svg class="agent-kv-lock" width="0.6875rem" height="0.6875rem" viewBox="0 0 16 16" fill="none" aria-label="Protected" role="img"><rect x="3.5" y="7" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.4"/></svg>{/if}</span></div>
             <div class="agent-kv"><span>Agent</span><span>{headerAgent}</span></div>
+            <div class="agent-kv"><span>Team notes</span><span><button class="btn-link agent-notes-link" type="button" onclick={() => void agentNotesEditor.show()} disabled={workspaceBlocked}>kurlo-agent.md</button></span></div>
             {#if agentStore.driver}<div class="agent-kv"><span>Effort</span><span>{agentEffortLabel(agentStore.effort || selectedCodexDefaultEffort)}</span></div>{/if}
           </Disclosure>
 
@@ -1011,17 +1052,28 @@
             <Disclosure title="Budget" summary={budgetSummary} storageKey="agent-details-budget">
               <label class="agent-detail-field">
                 <span>Tokens</span>
-                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="13" value={agentStore.budgetTokens ? String(agentStore.budgetTokens) : ''} placeholder="No limit" aria-label="Token budget" disabled={agentStore.running} oninput={digitsOnly} onchange={event => { agentStore.budgetTokens = budgetValue(event.currentTarget.value, AGENT_BUDGET_MAX_TOKENS); event.currentTarget.value = agentStore.budgetTokens ? String(agentStore.budgetTokens) : ''; }} />
+                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="13" value={agentStore.budgetTokens ? String(agentStore.budgetTokens) : ''} placeholder="No limit" aria-label="Token budget" disabled={agentStore.running} oninput={digitsOnly} onchange={commitTokenBudget} onblur={commitTokenBudget} />
               </label>
               <label class="agent-detail-field">
                 <span>Sent requests</span>
-                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="7" value={agentStore.budgetRequests ? String(agentStore.budgetRequests) : ''} placeholder="No limit" aria-label="Request budget" disabled={agentStore.running} oninput={digitsOnly} onchange={event => { agentStore.budgetRequests = budgetValue(event.currentTarget.value, AGENT_BUDGET_MAX_REQUESTS); event.currentTarget.value = agentStore.budgetRequests ? String(agentStore.budgetRequests) : ''; }} />
+                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="7" value={agentStore.budgetRequests ? String(agentStore.budgetRequests) : ''} placeholder="No limit" aria-label="Request budget" disabled={agentStore.running} oninput={digitsOnly} onchange={commitRequestBudget} onblur={commitRequestBudget} />
               </label>
               {#if agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId}
                 <div class="agent-kv"><span>Used</span><span>{formatTokens(chatTokens)} tokens · {requestsSent} {requestsSent === 1 ? 'request' : 'requests'}</span></div>
               {/if}
               <p class="agent-detail-note">The agent stops when the chat reaches either limit, up to {AGENT_BUDGET_MAX_TOKENS.toLocaleString('en-US')} tokens or {AGENT_BUDGET_MAX_REQUESTS.toLocaleString('en-US')} requests. Changes apply from your next message.</p>
             </Disclosure>
+            {#if chatLoaded}
+              <Disclosure title="History" summary={historySummary} storageKey="agent-details-history">
+                <p class="agent-detail-note">{compactedAt !== null ? 'The agent sees a summary instead of the compacted messages. They stay in the chat for you.' : 'Compacting replaces the messages so far with a summary for the agent, so a long chat costs fewer tokens. The messages stay in the chat for you.'}</p>
+                {#if compactedAt !== null}
+                  <button class="btn-link agent-summary-toggle" type="button" aria-expanded={summaryOpen} onclick={() => (summaryOpen = !summaryOpen)}>{summaryOpen ? 'Hide summary' : 'Show summary'}</button>
+                  {#if summaryOpen}<div class="agent-summary-text" role="region" aria-label="Chat summary">{agentStore.activeChat?.summary}</div>{/if}
+                {/if}
+                <button class="btn btn-secondary btn-sm agent-compact" type="button" onclick={() => void compactChat()} disabled={archived || agentStore.running || compacting || messageTotal - (compactedAt ?? 0) < 2}>{compacting ? 'Compacting…' : 'Compact chat'}</button>
+                {#if compactError}<p class="agent-detail-note agent-detail-error" role="alert">{compactError}</p>{/if}
+              </Disclosure>
+            {/if}
           {/if}
 
           {#if vm.gitStatus.isRepo}
@@ -1683,7 +1735,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     background: var(--bg);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-composer);
     transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
   }
   .agent-composer-box:focus-within {
@@ -1713,7 +1765,9 @@
   }
 
   @supports (hanging-punctuation: first) {
-    .agent-input {
+    .agent-input,
+    .agent-chat,
+    .agent-context-panel {
       overflow-y: scroll;
     }
   }
@@ -1974,6 +2028,41 @@
   .agent-turn-actions {
     display: flex;
     gap: var(--space-1-5);
+  }
+  .agent-compact-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin: var(--space-2) 0 var(--space-4);
+    color: var(--text-3);
+    font-size: var(--text-caption);
+  }
+  .agent-compact-divider::before,
+  .agent-compact-divider::after {
+    content: '';
+    flex: 1 1 auto;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+  .agent-compact {
+    align-self: flex-start;
+  }
+  .agent-summary-toggle {
+    align-self: flex-start;
+    font-size: var(--text-caption);
+  }
+  .agent-summary-text {
+    max-height: 16rem;
+    overflow: auto;
+    padding: var(--space-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-2);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
+    white-space: pre-wrap;
+    user-select: text;
+    -webkit-user-select: text;
   }
   .agent-earlier {
     align-self: center;

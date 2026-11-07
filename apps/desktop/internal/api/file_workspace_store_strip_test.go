@@ -80,7 +80,7 @@ func TestStripRequestForFilesystemPrunesTypeSpecificFields(t *testing.T) {
 			wantOverrides:         []string{"timeoutMs"},
 			absentOverrides:       []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
 			wantFields:            []string{"mcpMethod", "mcpName", "mcpArguments", "mcpProtocolVersion"},
-			absentFields:          []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds"},
+			absentFields:          []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds", "aiKurloTools", "aiConnectionId"},
 			wantMissingMethod:     true,
 			wantMissingRequestTab: true,
 		},
@@ -91,7 +91,7 @@ func TestStripRequestForFilesystemPrunesTypeSpecificFields(t *testing.T) {
 			absentSettings:        []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
 			wantOverrides:         []string{"timeoutMs"},
 			absentOverrides:       []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantFields:            []string{"aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds"},
+			wantFields:            []string{"aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds", "aiKurloTools", "aiConnectionId"},
 			absentFields:          []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "mcpMethod", "mcpName", "mcpArguments"},
 			wantMissingMethod:     true,
 			wantMissingRequestTab: true,
@@ -230,6 +230,8 @@ func stripTestRequest(requestType, method, requestTab, bodyType string) map[stri
 		"aiPrompt":             "Hello {{name}}",
 		"aiStream":             false,
 		"aiToolRequestIds":     []any{"req-tools"},
+		"aiKurloTools":         true,
+		"aiConnectionId":       "conn-1",
 	}
 }
 

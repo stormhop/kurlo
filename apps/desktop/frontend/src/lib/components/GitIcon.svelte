@@ -21,6 +21,7 @@
     | 'link'
     | 'merge'
     | 'play'
+    | 'pull-request'
     | 'pull'
     | 'push'
     | 'rebase'
@@ -65,6 +66,13 @@
       <path d="M10 7l3 3-3 3" />
       <circle cx="4" cy="3" r="1.4" />
       <circle cx="4" cy="13" r="1.4" />
+    {:else if name === 'pull-request'}
+      <circle cx="4" cy="3.5" r="1.5" />
+      <circle cx="4" cy="12.5" r="1.5" />
+      <circle cx="12" cy="12.5" r="1.5" />
+      <path d="M4 5v6" />
+      <path d="M12 11V6.5a2 2 0 0 0-2-2H7" />
+      <path d="M8.5 3 7 4.5 8.5 6" />
     {:else if name === 'rebase'}
       <path d="M5 14V2" />
       <path d="M11 2v12" />

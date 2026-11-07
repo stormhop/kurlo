@@ -7,6 +7,7 @@ var savedRequestFieldDefaults = map[string]any{
 	"sioAck":            false,
 	"grpcUseReflection": true,
 	"aiStream":          true,
+	"aiKurloTools":      false,
 }
 
 var savedRequestSettingDefaults = map[string]any{
@@ -257,6 +258,7 @@ func stripRealtimeFieldsForType(request map[string]any, requestType string) {
 var aiRequestFields = []string{
 	"aiProvider", "aiModel", "aiSystem", "aiPrompt", "aiTemperature", "aiTopP",
 	"aiMaxTokens", "aiMaxSteps", "aiIdleTimeoutSec", "aiThinking", "aiStream", "aiToolRequestIds",
+	"aiKurloTools", "aiConnectionId",
 }
 
 func stripMethodForType(request map[string]any, requestType string) {

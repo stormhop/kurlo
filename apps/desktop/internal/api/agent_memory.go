@@ -91,17 +91,77 @@ func parseAgentTemplates(notes string) []model.AgentTemplate {
 	return templates
 }
 
-func (a *App) AgentWorkspaceNotes() model.AgentWorkspaceNotes {
-	root := fileWorkspaceStorePath()
+func readAgentNotesFile(root string) (string, bool, error) {
+	data, err := os.ReadFile(agentNotesPath(root))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return string(data), true, nil
+}
+
+func agentWorkspaceNotes(root string) model.AgentWorkspaceNotes {
 	out := model.AgentWorkspaceNotes{Path: agentNotesPath(root), Templates: []model.AgentTemplate{}}
-	notes, ok, err := readAgentNotes(root)
+	raw, ok, err := readAgentNotesFile(root)
 	if err != nil {
 		out.Error = err.Error()
 		return out
 	}
 	out.Exists = ok
-	out.Templates = parseAgentTemplates(notes)
+	out.Content = strings.ToValidUTF8(raw, "")
+	if len(raw) > agentNotesMaxBytes {
+		out.TooLarge = true
+		out.Content = ""
+		raw = raw[:agentNotesMaxBytes]
+	}
+	out.Templates = parseAgentTemplates(strings.ToValidUTF8(raw, ""))
 	return out
+}
+
+func (a *App) AgentWorkspaceNotes() model.AgentWorkspaceNotes {
+	return agentWorkspaceNotes(fileWorkspaceStorePath())
+}
+
+func (a *App) SaveAgentWorkspaceNotes(content, base string, baseExists bool) model.AgentNotesSaveResult {
+	return saveAgentWorkspaceNotes(fileWorkspaceStorePath(), content, base, baseExists)
+}
+
+func saveAgentWorkspaceNotes(root, content, base string, baseExists bool) model.AgentNotesSaveResult {
+	if strings.TrimSpace(root) == "" {
+		return model.AgentNotesSaveResult{Error: "Open a workspace folder first."}
+	}
+	if strings.TrimSpace(content) == "" {
+		return model.AgentNotesSaveResult{Error: "The notes are empty. Write something or cancel."}
+	}
+	content = strings.TrimRight(content, " \n\t") + "\n"
+	if len(content) > agentNotesMaxBytes {
+		return model.AgentNotesSaveResult{Error: fmt.Sprintf("kurlo-agent.md can be at most %d KB.", agentNotesMaxBytes/1024)}
+	}
+	if !utf8.ValidString(content) {
+		return model.AgentNotesSaveResult{Error: "The notes must be UTF-8 text."}
+	}
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		return model.AgentNotesSaveResult{Error: err.Error()}
+	}
+	defer unlock()
+	current, exists, err := readAgentNotesFile(root)
+	if err != nil {
+		return model.AgentNotesSaveResult{Error: err.Error()}
+	}
+	if exists != baseExists || current != base {
+		result := model.AgentNotesSaveResult{Conflict: true, CurrentExists: exists, Error: "kurlo-agent.md changed outside this editor since you opened it."}
+		if len(current) <= agentNotesMaxBytes {
+			result.Current = current
+		}
+		return result
+	}
+	if err := writeTextFileAtomic(agentNotesPath(root), []byte(content)); err != nil {
+		return model.AgentNotesSaveResult{Error: err.Error()}
+	}
+	return model.AgentNotesSaveResult{Ok: true, Notes: agentWorkspaceNotes(root)}
 }
 
 func agentNotesDefinition() map[string]any {
@@ -183,7 +243,10 @@ func (b *agentToolBridge) updateAgentNotes(ctx context.Context, input, toolUseID
 	if b.server.onWrite != nil {
 		b.server.onWrite(root, record.changes)
 	}
-	result := mcpToolText("Saved kurlo-agent.md. Commit it so the team gets it.", false)
-	b.server.logCall(agentNotesTool, arguments, record, result, nil)
-	return "Saved kurlo-agent.md. Commit it so the team gets it.", false
+	text := "Saved kurlo-agent.md. Commit it so the team gets it."
+	if committed := b.commitOwnBranch(agentNotesTool, record); committed != "" {
+		text = "Saved kurlo-agent.md. " + committed
+	}
+	b.server.logCall(agentNotesTool, arguments, record, mcpToolText(text, false), nil)
+	return text, false
 }

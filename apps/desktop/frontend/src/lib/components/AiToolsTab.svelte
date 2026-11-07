@@ -10,8 +10,16 @@
 
 <div class="ai-tools">
   <p class="ai-tools-intro">
-    Give the model the tools of MCP servers saved in this workspace. When it calls one, Kurlo runs the call with that request's URL, auth and headers and sends the result back, until the model answers or the step limit is reached.
+    Give the model Kurlo's own tools or the tools of MCP servers saved in this workspace. When it calls an MCP tool, Kurlo runs the call with that request's URL, auth and headers and sends the result back, until the model answers or the step limit is reached.
   </p>
+
+  <label class="ai-tool-row ai-tool-kurlo">
+    <input class="check" type="checkbox" bind:checked={vm.aiKurloTools} />
+    <span class="ai-tool-main">
+      <span class="ai-tool-name">Kurlo tools</span>
+      <span class="ai-tool-hint">Read this workspace and run its requests in the active environment, without leaving the app. Calls that change data or the workspace files are declined.</span>
+    </span>
+  </label>
 
   {#if servers.length}
     <div class="ai-tools-list" role="group" aria-label="MCP servers">
@@ -91,6 +99,14 @@
     color: var(--text);
     font-size: var(--text-body);
     font-weight: var(--weight-medium);
+  }
+  .ai-tool-kurlo {
+    border-top: 1px solid var(--border-subtle);
+  }
+  .ai-tool-hint {
+    color: var(--text-3);
+    font-size: var(--text-caption);
+    line-height: var(--leading-normal);
   }
   .ai-tool-url,
   .ai-tool-collection {

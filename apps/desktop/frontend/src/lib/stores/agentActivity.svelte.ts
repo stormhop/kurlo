@@ -2,7 +2,6 @@ import {
   agentActivity, agentActivityEntry, clearAgentActivity, revertAgentActivity, setAgentActivityEnabled,
   type AgentActivityEntry, type AgentActivitySummary,
 } from '../backend';
-import type { AgentActivityPeriod } from '../agentActivity';
 
 const ACTIVITY_LIMIT = 500;
 
@@ -18,7 +17,6 @@ class AgentActivityStore {
   error = $state('');
   text = $state('');
   client = $state('');
-  period = $state<AgentActivityPeriod>('all');
   allWorkspaces = $state(false);
   workspaceId = $state('');
   selectedId = $state('');

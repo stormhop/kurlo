@@ -250,7 +250,7 @@ func agentHistoryForModel(messages []model.AiMessage, budget int) ([]model.AiMes
 	for index, message := range messages {
 		if message.Role == "user" && len(message.Attachments) > 0 && len(message.Blocks) == 1 && message.Blocks[0].Type == model.AiBlockText {
 			message.Blocks = append([]model.AiBlock(nil), message.Blocks...)
-			message.Blocks[0].Text = agentAttachmentPrompt(message.Blocks[0].Text, message.Attachments)
+			message.Blocks[0].Text = agentAttachmentPromptFor(message.Blocks[0].Text, message.Attachments, index == len(messages)-1)
 			message.Attachments = nil
 		}
 		if index >= recent {
@@ -495,6 +495,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 			}
 			if input.EditFrom != nil && agentCheckEditIndex(*chat, *input.EditFrom) == nil {
 				chat.Messages = chat.Messages[:*input.EditFrom]
+				agentDropStaleSummary(chat, *input.EditFrom)
 			}
 			chat.Messages = append(chat.Messages, userMessage)
 		}, files...); err != nil {
@@ -540,10 +541,10 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 			chat.AllowedTools = append(chat.AllowedTools, tool)
 		})
 	}
-	req.System = agentSystemPrompt(bridge.server, chat)
+	req.System = agentSystemPrompt(bridge.server, chat) + agentSummaryPrompt(chat)
 	window := agentContextWindow(connection, req.HTTP.URL, req.Model)
 	fixed := agentEstimateTokens(req.System) + agentToolsTokens(bridge.tools())
-	history, dropped := agentHistoryForModel(chat.Messages, agentContextBudget(window)-fixed)
+	history, dropped := agentHistoryForModel(agentHistoryAfterSummary(chat), agentContextBudget(window)-fixed)
 	if images := agentImageBlocks(files); len(images) > 0 && len(history) > 0 {
 		last := &history[len(history)-1]
 		last.Blocks = append(append([]model.AiBlock(nil), last.Blocks...), images...)
@@ -623,7 +624,7 @@ func (a *App) SendAgentMessage(input model.AgentSendInput) model.AgentTurn {
 	return normalizeAgentTurn(model.AgentTurn{
 		Chat:     saved,
 		Messages: out.Messages,
-		Steps:    out.Steps,
+		Steps:    aiStepsForBridge(out.Steps),
 		Text:     out.Text,
 		Usage:    out.Usage,
 		HasUsage: out.HasUsage,

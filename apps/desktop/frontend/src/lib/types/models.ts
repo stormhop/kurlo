@@ -295,6 +295,8 @@ export type SavedRequest = {
   aiThinking?: string;
   aiStream?: boolean;
   aiToolRequestIds?: string[];
+  aiKurloTools?: boolean;
+  aiConnectionId?: string;
   examples?: RequestExample[];
 };
 

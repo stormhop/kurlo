@@ -1,12 +1,18 @@
 import type { AgentActivityEntry, AgentActivitySummary, AgentFileChange } from './backend';
 import type { AgentMode } from './stores/agent.svelte';
 
-export type AgentActivityPeriod = 'all' | 'day' | 'week';
-
 export type AgentActivityQuery = {
   text: string;
   client: string;
-  period: AgentActivityPeriod;
+};
+
+export type AgentActivityOverview = {
+  today: number;
+  week: number;
+  errors: number;
+  changed: number;
+  changes: AgentActivitySummary[];
+  problems: AgentActivitySummary[];
 };
 
 export const AGENT_ACTIVITY_SCOPES = [
@@ -20,28 +26,40 @@ export function agentActivityPlace(entry: AgentActivitySummary): string {
   return entry.workspaceId ? 'Another workspace' : 'No workspace';
 }
 
-export const AGENT_ACTIVITY_PERIODS: Array<{ value: AgentActivityPeriod; label: string }> = [
-  { value: 'all', label: 'Any time' },
-  { value: 'day', label: 'Last 24 hours' },
-  { value: 'week', label: 'Last 7 days' },
-];
-
 const DAY = 24 * 60 * 60 * 1000;
 
 export function agentActivityClients(entries: AgentActivitySummary[]): string[] {
   return [...new Set(entries.map(entry => entry.client).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
 
-export function filterAgentActivity(entries: AgentActivitySummary[], query: AgentActivityQuery, now = Date.now()): AgentActivitySummary[] {
+export function filterAgentActivity(entries: AgentActivitySummary[], query: AgentActivityQuery): AgentActivitySummary[] {
   const words = query.text.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const since = query.period === 'day' ? now - DAY : query.period === 'week' ? now - 7 * DAY : 0;
   return entries.filter(entry => {
     if (query.client && entry.client !== query.client) return false;
-    if (since && entry.time < since) return false;
     if (!words.length) return true;
     const haystack = [entry.tool, entry.client, entry.status, entry.error ?? '', entry.branch ?? '', entry.commit ?? '', ...entry.files].join(' ').toLowerCase();
     return words.every(word => haystack.includes(word));
   });
+}
+
+export function agentActivityOverview(entries: AgentActivitySummary[], now = Date.now(), limit = 5): AgentActivityOverview {
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const week = entries.filter(entry => entry.time >= now - 7 * DAY);
+  const changed = week.filter(entry => entry.files.length && entry.status !== 'declined');
+  const problems = week.filter(entry => entry.status === 'error' || entry.status === 'declined');
+  return {
+    today: entries.filter(entry => entry.time >= today.getTime()).length,
+    week: week.length,
+    errors: week.filter(entry => entry.status === 'error').length,
+    changed: changed.length,
+    changes: changed.slice(0, limit),
+    problems: problems.slice(0, limit),
+  };
+}
+
+export function agentActivityFileName(path: string): string {
+  return path.split('/').pop()?.replace(/\.ya?ml$/, '') || path;
 }
 
 export function agentActivityGroups(entries: AgentActivitySummary[], now = Date.now()): Array<{ label: string; entries: AgentActivitySummary[] }> {
@@ -80,7 +98,7 @@ export function agentActivityTime(time: number, now = Date.now()): string {
 }
 
 export function agentActivityFullTime(time: number): string {
-  return new Date(time).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  return new Date(time).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'medium', hourCycle: 'h23' });
 }
 
 export function agentActivityCanRestore(change: AgentFileChange): boolean {

@@ -3111,13 +3111,14 @@ func selectedManagedChangedGitPaths(workspaceRoot string, status GitWorkspaceSta
 func managedWorkspaceGitPathspecs(workspaceRoot, repoRoot string) []string {
 	prefix := workspaceGitPrefix(workspaceRoot, repoRoot)
 	workspaceYAMLFiles := ":(glob)" + filepath.ToSlash(filepath.Join(fileStoreWorkspacesDir, "**", "*"+fileStoreYAMLExt))
-	base := []string{fileStoreRootIndex, ".gitignore", workspaceYAMLFiles}
+	base := []string{fileStoreRootIndex, ".gitignore", agentNotesFile, workspaceYAMLFiles}
 	if prefix == "" {
 		return base
 	}
 	pathspecs := make([]string, 0, len(base))
 	pathspecs = append(pathspecs, filepath.ToSlash(filepath.Join(prefix, fileStoreRootIndex)))
 	pathspecs = append(pathspecs, filepath.ToSlash(filepath.Join(prefix, ".gitignore")))
+	pathspecs = append(pathspecs, filepath.ToSlash(filepath.Join(prefix, agentNotesFile)))
 	pathspecs = append(pathspecs, ":(glob)"+filepath.ToSlash(filepath.Join(prefix, fileStoreWorkspacesDir, "**", "*"+fileStoreYAMLExt)))
 	return pathspecs
 }
@@ -3136,6 +3137,7 @@ func isManagedWorkspaceGitPath(workspaceRoot, repoRoot, repoRelPath string) bool
 	}
 	return path == fileStoreRootIndex ||
 		path == ".gitignore" ||
+		path == agentNotesFile ||
 		(strings.HasPrefix(path, fileStoreWorkspacesDir+"/") && filepath.Ext(path) == fileStoreYAMLExt)
 }
 

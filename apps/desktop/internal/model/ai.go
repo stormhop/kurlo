@@ -69,6 +69,10 @@ type AiRequest struct {
 	ToolServers []AiToolServer `json:"toolServers"`
 	MaxSteps    int            `json:"maxSteps"`
 	TurnID      string         `json:"turnId,omitempty"`
+
+	ConnectionID     string `json:"connectionId,omitempty"`
+	KurloTools       bool   `json:"kurloTools,omitempty"`
+	KurloEnvironment string `json:"kurloEnvironment,omitempty"`
 }
 
 type AiUsage struct {

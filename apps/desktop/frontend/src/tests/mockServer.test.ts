@@ -15,6 +15,7 @@ import * as backend from '../lib/backend';
 import { EMPTY_MOCK_SERVER_STATUS } from '../lib/wire';
 import { collectionsWithExamples, mockRouteConflicts, mockRouteShadows, mockRoutesForCollection, mockRoutesSignature } from '../lib/mockRoutes';
 import { mockServerFeature } from '../lib/stores/features/mockServer';
+import { requestCrudFeature } from '../lib/stores/features/requestCrud';
 import { normalizeSavedRequest } from '../lib/normalizers';
 import type { SavedRequest } from '../lib/types/models';
 
@@ -448,6 +449,13 @@ describe('mock server feature', () => {
   it('closing the tab returns to a view that exists', () => {
     const host = makeHost({ topView: 'mock', mockServerTabOpen: true, activeRequestId: '' });
     host.closeMockServerTab();
+    expect(host.mockServerTabOpen).toBe(false);
+    expect(host.topView).toBe('overview');
+  });
+
+  it('the close-tab shortcut closes the mock server tab', async () => {
+    const host = makeHost({ topView: 'mock', mockServerTabOpen: true, activeRequestId: '' });
+    await requestCrudFeature.closeActiveTab.call(host as never);
     expect(host.mockServerTabOpen).toBe(false);
     expect(host.topView).toBe('overview');
   });

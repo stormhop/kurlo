@@ -726,12 +726,69 @@ export namespace api {
 
 export namespace model {
 	
+	export class AgentChangeField {
+	    label: string;
+	    change: string;
+	    before?: string;
+	    after?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentChangeField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.change = source["change"];
+	        this.before = source["before"];
+	        this.after = source["after"];
+	    }
+	}
+	export class AgentChangeSummary {
+	    kind: string;
+	    name: string;
+	    location?: string;
+	    detail?: string;
+	    fields?: AgentChangeField[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentChangeSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.name = source["name"];
+	        this.location = source["location"];
+	        this.detail = source["detail"];
+	        this.fields = this.convertValues(source["fields"], AgentChangeField);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AgentFileChange {
 	    path: string;
 	    before?: string;
 	    after?: string;
 	    tooLarge?: boolean;
 	    reverted?: boolean;
+	    summary?: AgentChangeSummary;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentFileChange(source);
@@ -744,7 +801,26 @@ export namespace model {
 	        this.after = source["after"];
 	        this.tooLarge = source["tooLarge"];
 	        this.reverted = source["reverted"];
+	        this.summary = this.convertValues(source["summary"], AgentChangeSummary);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class AgentActivityEntry {
 	    id: string;
@@ -1025,6 +1101,8 @@ export namespace model {
 	        this.preview = source["preview"];
 	    }
 	}
+	
+	
 	export class AiUsage {
 	    input: number;
 	    output: number;
@@ -1141,6 +1219,8 @@ export namespace model {
 	    budgetTokens?: number;
 	    budgetRequests?: number;
 	    requestsSent?: number;
+	    summary?: string;
+	    summaryBefore?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentChat(source);
@@ -1177,6 +1257,8 @@ export namespace model {
 	        this.budgetTokens = source["budgetTokens"];
 	        this.budgetRequests = source["budgetRequests"];
 	        this.requestsSent = source["requestsSent"];
+	        this.summary = source["summary"];
+	        this.summaryBefore = source["summaryBefore"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1248,6 +1330,9 @@ export namespace model {
 	    headers: AgentMcpPair[];
 	    env: AgentMcpPair[];
 	    enabled: boolean;
+	    auth?: string;
+	    oauthClientId?: string;
+	    signedIn?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentMcpServer(source);
@@ -1264,6 +1349,9 @@ export namespace model {
 	        this.headers = this.convertValues(source["headers"], AgentMcpPair);
 	        this.env = this.convertValues(source["env"], AgentMcpPair);
 	        this.enabled = source["enabled"];
+	        this.auth = source["auth"];
+	        this.oauthClientId = source["oauthClientId"];
+	        this.signedIn = source["signedIn"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1333,6 +1421,8 @@ export namespace model {
 	export class AgentMcpTestResult {
 	    ok: boolean;
 	    tools: AgentMcpToolInfo[];
+	    resources?: boolean;
+	    prompts?: boolean;
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1343,6 +1433,8 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ok = source["ok"];
 	        this.tools = this.convertValues(source["tools"], AgentMcpToolInfo);
+	        this.resources = source["resources"];
+	        this.prompts = source["prompts"];
 	        this.error = source["error"];
 	    }
 	
@@ -1365,6 +1457,100 @@ export namespace model {
 		}
 	}
 	
+	export class AgentTemplate {
+	    title: string;
+	    text: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentTemplate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.title = source["title"];
+	        this.text = source["text"];
+	    }
+	}
+	export class AgentWorkspaceNotes {
+	    path: string;
+	    exists: boolean;
+	    content: string;
+	    tooLarge?: boolean;
+	    templates: AgentTemplate[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentWorkspaceNotes(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.exists = source["exists"];
+	        this.content = source["content"];
+	        this.tooLarge = source["tooLarge"];
+	        this.templates = this.convertValues(source["templates"], AgentTemplate);
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentNotesSaveResult {
+	    ok: boolean;
+	    error?: string;
+	    conflict?: boolean;
+	    current?: string;
+	    currentExists?: boolean;
+	    notes: AgentWorkspaceNotes;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentNotesSaveResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.error = source["error"];
+	        this.conflict = source["conflict"];
+	        this.current = source["current"];
+	        this.currentExists = source["currentExists"];
+	        this.notes = this.convertValues(source["notes"], AgentWorkspaceNotes);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	export class AgentResult {
@@ -1427,20 +1613,7 @@ export namespace model {
 	        this.budgetRequests = source["budgetRequests"];
 	    }
 	}
-	export class AgentTemplate {
-	    title: string;
-	    text: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new AgentTemplate(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.title = source["title"];
-	        this.text = source["text"];
-	    }
-	}
 	export class TimelineEvent {
 	    label: string;
 	    atMs: number;
@@ -1813,42 +1986,7 @@ export namespace model {
 		    return a;
 		}
 	}
-	export class AgentWorkspaceNotes {
-	    path: string;
-	    exists: boolean;
-	    templates: AgentTemplate[];
-	    error?: string;
 	
-	    static createFrom(source: any = {}) {
-	        return new AgentWorkspaceNotes(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.path = source["path"];
-	        this.exists = source["exists"];
-	        this.templates = this.convertValues(source["templates"], AgentTemplate);
-	        this.error = source["error"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	
 	export class AiConnection {
 	    id: string;
@@ -2406,6 +2544,9 @@ export namespace model {
 	    toolServers: AiToolServer[];
 	    maxSteps: number;
 	    turnId?: string;
+	    connectionId?: string;
+	    kurloTools?: boolean;
+	    kurloEnvironment?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AiRequest(source);
@@ -2422,6 +2563,9 @@ export namespace model {
 	        this.toolServers = this.convertValues(source["toolServers"], AiToolServer);
 	        this.maxSteps = source["maxSteps"];
 	        this.turnId = source["turnId"];
+	        this.connectionId = source["connectionId"];
+	        this.kurloTools = source["kurloTools"];
+	        this.kurloEnvironment = source["kurloEnvironment"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

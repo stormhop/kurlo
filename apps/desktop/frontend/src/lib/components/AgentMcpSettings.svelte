@@ -2,11 +2,15 @@
   import { onMount } from 'svelte';
   import Select from './Select.svelte';
   import Disclosure from './Disclosure.svelte';
-  import { agentMcpServers, deleteAgentMcpServer, saveAgentMcpServer, testAgentMcpServer, type AgentMcpPair, type AgentMcpServer } from '../backend';
+  import { agentMcpServers, cancelAgentMcpSignIn, deleteAgentMcpServer, saveAgentMcpServer, signInAgentMcpServer, signOutAgentMcpServer, testAgentMcpServer, type AgentMcpPair, type AgentMcpServer } from '../backend';
 
   const KIND_OPTIONS = [
     { value: 'http', label: 'HTTP' },
     { value: 'stdio', label: 'Local command' },
+  ];
+  const AUTH_OPTIONS = [
+    { value: '', label: 'Headers' },
+    { value: 'oauth', label: 'OAuth sign-in' },
   ];
 
   let servers = $state<AgentMcpServer[]>([]);
@@ -22,6 +26,9 @@
   let formError = $state('');
   let tested = $state('');
   let pendingRemove = $state('');
+  let authMode = $state('');
+  let clientId = $state('');
+  let signingIn = $state('');
   const summary = $derived.by(() => {
     if (!servers.length) return 'None';
     const off = servers.filter(server => !server.enabled).length;
@@ -40,7 +47,9 @@
   }
 
   function open(server: AgentMcpServer | null) {
-    editing = server ?? { id: '', name: '', kind: 'http', url: '', command: '', args: [], headers: [], env: [], enabled: true };
+    editing = server ?? { id: '', name: '', kind: 'http', url: '', command: '', args: [], headers: [], env: [], enabled: true, auth: '', oauthClientId: '' };
+    authMode = editing.auth ?? '';
+    clientId = editing.oauthClientId ?? '';
     name = editing.name;
     kind = editing.kind || 'http';
     url = editing.url ?? '';
@@ -80,7 +89,34 @@
       headers: kind === 'http' ? parsed : [],
       env: kind === 'stdio' ? parsed : [],
       enabled: base.enabled,
+      auth: kind === 'http' ? authMode : '',
+      oauthClientId: kind === 'http' && authMode === 'oauth' ? clientId.trim() : '',
     };
+  }
+
+  function testedText(tools: number, resources: boolean, prompts: boolean): string {
+    const parts = [tools === 1 ? '1 tool' : `${tools} tools`];
+    if (resources) parts.push('resources');
+    if (prompts) parts.push('prompts');
+    return `Connected. ${parts.join(', ')} available.`;
+  }
+
+  async function signIn(server: AgentMcpServer) {
+    signingIn = server.id;
+    listError = '';
+    try {
+      const state = await signInAgentMcpServer(server.id);
+      servers = state.servers;
+      listError = state.error ?? '';
+    } finally {
+      signingIn = '';
+    }
+  }
+
+  async function signOut(server: AgentMcpServer) {
+    const state = await signOutAgentMcpServer(server.id);
+    servers = state.servers;
+    listError = state.error ?? '';
   }
 
   async function test() {
@@ -89,7 +125,7 @@
     tested = '';
     try {
       const result = await testAgentMcpServer(draft());
-      if (result.ok) tested = result.tools.length === 1 ? 'Connected. 1 tool available.' : `Connected. ${result.tools.length} tools available.`;
+      if (result.ok) tested = testedText(result.tools.length, Boolean(result.resources), Boolean(result.prompts));
       else formError = result.error || 'Kurlo could not reach the server.';
     } finally {
       busy = false;
@@ -151,6 +187,17 @@
           <label class="agent-mcp-label" for="agent-mcp-url">URL</label>
           <input id="agent-mcp-url" class="field agent-mcp-input agent-mcp-mono" type="url" spellcheck="false" autocomplete="off" placeholder="https://mcp.example.com/mcp" bind:value={url} />
         </div>
+        <div class="agent-mcp-row">
+          <span class="agent-mcp-label">Sign-in</span>
+          <Select value={authMode} options={AUTH_OPTIONS} className="agent-mcp-select" ariaLabel="Sign-in" onChange={value => { authMode = value; tested = ''; }} />
+        </div>
+        {#if authMode === 'oauth'}
+          <div class="agent-mcp-row">
+            <label class="agent-mcp-label" for="agent-mcp-client">Client ID</label>
+            <input id="agent-mcp-client" class="field agent-mcp-input agent-mcp-mono" type="text" spellcheck="false" autocomplete="off" placeholder="Optional" bind:value={clientId} />
+          </div>
+          <p class="agent-mcp-note">Save, then choose Sign in. Kurlo finds the server's sign-in page and registers itself there; enter a client ID only if the server asks for one you created.</p>
+        {/if}
         <div class="agent-mcp-row agent-mcp-top">
           <label class="agent-mcp-label" for="agent-mcp-pairs">Headers</label>
           <textarea id="agent-mcp-pairs" class="field agent-mcp-input agent-mcp-mono" rows="3" spellcheck="false" placeholder="Authorization: Bearer …" bind:value={pairs}></textarea>
@@ -183,10 +230,19 @@
       {#each servers as server (server.id)}
         <li class="settings-row">
           <div class="settings-row-text">
-            <span class="settings-row-title">{server.name}{#if !server.enabled}<span class="settings-pill">Off</span>{/if}</span>
+            <span class="settings-row-title">{server.name}{#if !server.enabled}<span class="settings-pill">Off</span>{/if}{#if server.auth === 'oauth'}<span class="settings-pill">{server.signedIn ? 'Signed in' : 'Not signed in'}</span>{/if}</span>
             <span class="settings-row-desc agent-mcp-detail">{server.kind === 'http' ? server.url : [server.command, ...server.args].join(' ')}</span>
           </div>
           <div class="settings-row-control">
+            {#if server.auth === 'oauth'}
+              {#if signingIn === server.id}
+                <button class="btn btn-ghost btn-sm" type="button" onclick={() => void cancelAgentMcpSignIn(server.id)}>Cancel sign-in</button>
+              {:else if server.signedIn}
+                <button class="btn btn-ghost btn-sm" type="button" onclick={() => void signOut(server)}>Sign out</button>
+              {:else}
+                <button class="btn btn-secondary btn-sm" type="button" disabled={Boolean(signingIn)} onclick={() => void signIn(server)}>Sign in</button>
+              {/if}
+            {/if}
             <button class="btn btn-ghost btn-sm" type="button" onclick={() => void toggle(server)}>{server.enabled ? 'Turn off' : 'Turn on'}</button>
             <button class="btn btn-ghost btn-sm" type="button" onclick={() => open(server)}>Edit</button>
             <button class="btn btn-ghost btn-sm" class:btn-danger={pendingRemove === server.id} type="button" onclick={() => void remove(server)} onblur={() => pendingRemove === server.id && (pendingRemove = '')}>{pendingRemove === server.id ? 'Remove?' : 'Remove'}</button>
@@ -204,7 +260,7 @@
       </li>
     </ul>
   {/if}
-  <p class="settings-group-note">Every call waits for your approval unless you allow that tool for the chat, and answers are treated as data, not instructions.</p>
+  <p class="settings-group-note">Every tool call waits for your approval unless you allow that tool for the chat. Reading a server's resources and prompts runs without asking. Answers are treated as data, not instructions.</p>
 </Disclosure>
 
 <style>

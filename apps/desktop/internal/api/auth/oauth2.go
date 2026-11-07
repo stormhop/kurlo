@@ -39,6 +39,10 @@ func FetchToken(cfg model.AuthConfig) model.OAuth2TokenResponse {
 }
 
 func RefreshToken(cfg model.AuthConfig) model.OAuth2TokenResponse {
+	return RefreshTokenWithParams(cfg, nil)
+}
+
+func RefreshTokenWithParams(cfg model.AuthConfig, extra url.Values) model.OAuth2TokenResponse {
 	if cfg.OAuth2TokenURL == "" {
 		return model.OAuth2TokenResponse{Error: "token URL is required"}
 	}
@@ -50,6 +54,9 @@ func RefreshToken(cfg model.AuthConfig) model.OAuth2TokenResponse {
 	form.Set("refresh_token", cfg.OAuth2RefreshToken)
 	if cfg.OAuth2Scope != "" {
 		form.Set("scope", cfg.OAuth2Scope)
+	}
+	for key, values := range extra {
+		form[key] = append([]string(nil), values...)
 	}
 	resp := postTokenRequest(cfg, form)
 	if resp.Error == "" && resp.RefreshToken == "" {
@@ -64,6 +71,10 @@ type authorizeOutcome struct {
 }
 
 func AuthorizeCode(ctx context.Context, cfg model.AuthConfig, openBrowser func(string) error) model.OAuth2TokenResponse {
+	return AuthorizeCodeWithParams(ctx, cfg, openBrowser, nil)
+}
+
+func AuthorizeCodeWithParams(ctx context.Context, cfg model.AuthConfig, openBrowser func(string) error, extra url.Values) model.OAuth2TokenResponse {
 	if cfg.OAuth2AuthURL == "" {
 		return model.OAuth2TokenResponse{Error: "authorization URL is required"}
 	}
@@ -110,6 +121,9 @@ func AuthorizeCode(ctx context.Context, cfg model.AuthConfig, openBrowser func(s
 	if cfg.OAuth2UsePKCE {
 		q.Set("code_challenge", challenge)
 		q.Set("code_challenge_method", "S256")
+	}
+	for key, values := range extra {
+		q[key] = append([]string(nil), values...)
 	}
 	authURL.RawQuery = q.Encode()
 
@@ -175,6 +189,9 @@ func AuthorizeCode(ctx context.Context, cfg model.AuthConfig, openBrowser func(s
 	form.Set("redirect_uri", redirectURL)
 	if cfg.OAuth2UsePKCE {
 		form.Set("code_verifier", verifier)
+	}
+	for key, values := range extra {
+		form[key] = append([]string(nil), values...)
 	}
 	return postTokenRequest(cfg, form)
 }

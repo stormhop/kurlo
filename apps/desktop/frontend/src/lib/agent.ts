@@ -236,6 +236,41 @@ export function agentToolLabel(name: string | undefined): string {
   }
 }
 
+const AGENT_CHANGE_KINDS: Record<string, string> = {
+  request: 'Request', collection: 'Collection', environment: 'Environment', example: 'Example',
+  loadTest: 'Load test', workspace: 'Workspace', globals: 'Globals',
+};
+
+export function agentChangeKindLabel(kind: string): string {
+  return AGENT_CHANGE_KINDS[kind] ?? kind;
+}
+
+export function agentChangeStatus(change: AgentFileChange): 'New' | 'Changed' | 'Deleted' {
+  if (!change.tooLarge && change.before == null && change.after != null) return 'New';
+  if (!change.tooLarge && change.after == null && change.before != null) return 'Deleted';
+  return 'Changed';
+}
+
+export function agentChangeHint(change: AgentFileChange): string {
+  const fields = change.summary?.fields ?? [];
+  if (fields.length === 1) return `${fields[0].label} ${fields[0].change}`;
+  if (fields.length > 1) return `${fields.length} changes`;
+  return '';
+}
+
+export function agentChangeCounts(changes: AgentFileChange[]): string {
+  const groups = new Map<string, { status: string; kind: string; count: number }>();
+  for (const change of changes) {
+    const status = agentChangeStatus(change).toLowerCase();
+    const kind = change.summary ? agentChangeKindLabel(change.summary.kind).toLowerCase() : 'file';
+    const key = `${status}|${kind}`;
+    const group = groups.get(key) ?? { status, kind, count: 0 };
+    group.count++;
+    groups.set(key, group);
+  }
+  return [...groups.values()].map(group => `${group.count} ${group.status} ${group.kind === 'globals' ? group.kind : group.count === 1 ? group.kind : `${group.kind}s`}`).join(', ');
+}
+
 export function agentChangeSummary(change: AgentFileChange): string {
   if (change.tooLarge) return 'changed';
   if (change.before == null) return 'new file';

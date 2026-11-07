@@ -275,7 +275,7 @@ func TestAgentContextWindowComesFromTheModelList(t *testing.T) {
 func TestAgentApprovedPlanAllowsOnlyItsCalls(t *testing.T) {
 	useTempConfigDir(t, t.TempDir())
 	root := agentTestWorkspace(t, "http://127.0.0.1:1")
-	bridge, approvals := newTestAgentBridge(t, root, model.AgentApprovalAllow, model.AgentApprovalReject, model.AgentApprovalReject)
+	bridge, approvals := newTestAgentBridge(t, root, model.AgentApprovalAllow, model.AgentApprovalReject, model.AgentApprovalReject, model.AgentApprovalReject)
 	bridge.setTurn("turn-1")
 
 	text, isError := agentBridgeCall(t, bridge, agentPlanTool, map[string]any{
@@ -304,6 +304,9 @@ func TestAgentApprovedPlanAllowsOnlyItsCalls(t *testing.T) {
 	}
 	if _, isError := agentBridgeCall(t, bridge, "set_variable", map[string]any{"environment": "Local", "key": "token", "value": "x"}); !isError || approvals.count() != 3 {
 		t.Fatalf("a target outside the plan must ask: approvals=%d", approvals.count())
+	}
+	if _, isError := agentBridgeCall(t, bridge, "set_variable", map[string]any{"environment": "Local", "key": "token", "value": "region"}); !isError || approvals.count() != 4 {
+		t.Fatalf("a value equal to a planned target must not match it: approvals=%d", approvals.count())
 	}
 	bridge.setTurn("turn-2")
 	if decision := bridge.planCovers("set_variable", json.RawMessage(`{"key":"region"}`)); decision {
@@ -347,6 +350,47 @@ func TestAgentWorkspaceNotesFeedThePromptTemplatesAndUpdates(t *testing.T) {
 	entries, _ := listAgentActivity(model.AgentActivityFilter{})
 	if len(entries) != 2 || entries[0].Tool != agentNotesTool {
 		t.Fatalf("activity = %+v", entries)
+	}
+}
+
+func TestSaveAgentWorkspaceNotesRefusesChangesMadeElsewhere(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	root := agentTestWorkspace(t, "http://127.0.0.1:1")
+	path := filepath.Join(root, agentNotesFile)
+	if notes := agentWorkspaceNotes(root); notes.Exists || notes.Content != "" {
+		t.Fatalf("notes = %+v", notes)
+	}
+	if result := saveAgentWorkspaceNotes(root, "  \n", "", false); result.Ok || result.Error == "" {
+		t.Fatalf("empty save = %+v", result)
+	}
+	created := saveAgentWorkspaceNotes(root, "# Team notes\n\n## Templates\n\n### Smoke\nRun the Smoke collection.\n\n\n", "", false)
+	if !created.Ok || !created.Notes.Exists || created.Notes.Content != "# Team notes\n\n## Templates\n\n### Smoke\nRun the Smoke collection.\n" || len(created.Notes.Templates) != 1 {
+		t.Fatalf("create = %+v", created)
+	}
+	if again := saveAgentWorkspaceNotes(root, "# Other\n", "", false); again.Ok || !again.Conflict || !again.CurrentExists || again.Current != created.Notes.Content {
+		t.Fatalf("stale create = %+v", again)
+	}
+	if err := os.WriteFile(path, []byte("# Edited in an IDE\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stale := saveAgentWorkspaceNotes(root, "# Mine\n", created.Notes.Content, true)
+	if stale.Ok || !stale.Conflict || stale.Current != "# Edited in an IDE\n" {
+		t.Fatalf("stale save = %+v", stale)
+	}
+	if data, _ := os.ReadFile(path); string(data) != "# Edited in an IDE\n" {
+		t.Fatalf("file overwritten: %q", data)
+	}
+	if forced := saveAgentWorkspaceNotes(root, "# Mine\n", stale.Current, stale.CurrentExists); !forced.Ok {
+		t.Fatalf("save over the newer version = %+v", forced)
+	}
+	if result := saveAgentWorkspaceNotes(root, strings.Repeat("x", agentNotesMaxBytes+1), "# Mine\n", true); result.Ok || result.Conflict {
+		t.Fatalf("too large = %+v", result)
+	}
+	if err := os.WriteFile(path, []byte(strings.Repeat("y", agentNotesMaxBytes+10)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if notes := agentWorkspaceNotes(root); !notes.TooLarge || notes.Content != "" {
+		t.Fatalf("large notes = %+v", notes)
 	}
 }
 

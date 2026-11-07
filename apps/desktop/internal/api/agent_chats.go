@@ -81,15 +81,12 @@ func readAgentChat(id string) (model.AgentChat, error) {
 	if err != nil {
 		return chat, err
 	}
-	data, err := os.ReadFile(path)
+	head, err := readAgentChatHead(path)
 	if err != nil {
 		return chat, err
 	}
-	payload, err := decryptRequestStorePayload(data)
+	chat, err = readAgentChatParts(path, head)
 	if err != nil {
-		return chat, err
-	}
-	if err := json.Unmarshal(payload, &chat); err != nil {
 		return chat, err
 	}
 	return normalizeAgentChat(chat), nil
@@ -172,11 +169,11 @@ func rebuildAgentChatIndex() (map[string]agentChatIndexEntry, error) {
 		if entry.IsDir() || !strings.HasSuffix(name, ".json") || strings.HasPrefix(name, ".") || name == agentChatIndexName {
 			continue
 		}
-		chat, err := readAgentChat(strings.TrimSuffix(name, ".json"))
-		if err != nil {
+		head, err := readAgentChatHead(filepath.Join(agentChatsDir(), name))
+		if err != nil || head.ID+".json" != name {
 			continue
 		}
-		index[chat.ID] = agentChatIndexEntryOf(chat)
+		index[head.ID] = agentChatIndexEntryOf(head.AgentChat)
 	}
 	return index, writeAgentChatIndex(index)
 }
@@ -225,7 +222,11 @@ func writeAgentChatFile(chat model.AgentChat) error {
 		return err
 	}
 	chat = normalizeAgentChat(chat)
-	payload, err := json.Marshal(chat)
+	head, err := writeAgentChatParts(path, chat)
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(head)
 	if err != nil {
 		return err
 	}
@@ -233,7 +234,11 @@ func writeAgentChatFile(chat model.AgentChat) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, encrypted)
+	if err := writeFileAtomic(path, encrypted); err != nil {
+		return err
+	}
+	pruneAgentChatParts(path, head)
+	return nil
 }
 
 func writeAgentChat(chat model.AgentChat, files ...agentAttachment) error {
@@ -242,16 +247,28 @@ func writeAgentChat(chat model.AgentChat, files ...agentAttachment) error {
 	if err != nil {
 		return err
 	}
+	index, err := loadAgentChatIndex()
+	if err != nil {
+		rollback()
+		return err
+	}
+	if err := removeAgentChatIndex(); err != nil {
+		rollback()
+		return err
+	}
 	if err := writeAgentChatFile(chat); err != nil {
 		rollback()
 		return err
 	}
-	index, err := loadAgentChatIndex()
-	if err != nil {
-		return err
-	}
 	index[chat.ID] = agentChatIndexEntryOf(chat)
 	return writeAgentChatIndex(index)
+}
+
+func removeAgentChatIndex() error {
+	if err := os.Remove(agentChatIndexPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 func loadAgentChat(id string) (model.AgentChat, error) {
@@ -335,11 +352,14 @@ func listAgentChats(workspace string, now time.Time) ([]model.AgentChatSummary, 
 func deleteAgentChat(id string) error {
 	agentChatsMu.Lock()
 	defer agentChatsMu.Unlock()
-	if err := removeAgentChatFiles(id); err != nil {
-		return err
-	}
 	index, err := loadAgentChatIndex()
 	if err != nil {
+		return err
+	}
+	if err := removeAgentChatIndex(); err != nil {
+		return err
+	}
+	if err := removeAgentChatFiles(id); err != nil {
 		return err
 	}
 	delete(index, id)
@@ -352,6 +372,9 @@ func removeAgentChatFiles(id string) error {
 		return err
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	if err := os.RemoveAll(agentChatPartsDir(path)); err != nil {
 		return err
 	}
 	return os.RemoveAll(path + ".attachments")

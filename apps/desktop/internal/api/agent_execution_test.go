@@ -490,3 +490,18 @@ func TestAgentExecutionClosesLiveConnectionAtTurnEnd(t *testing.T) {
 	}
 	assertAgentReleased(t, app)
 }
+
+func TestAgentLiveSessionsFreeSlotsOfFinishedConnections(t *testing.T) {
+	live := newAgentLiveSessions(context.Background(), newCookieJarRegistry())
+	for i := 0; i < 8; i++ {
+		session := &agentLiveSession{id: fmt.Sprintf("s%d", i), done: make(chan struct{})}
+		if i > 0 {
+			close(session.done)
+		}
+		live.sessions[session.id] = session
+	}
+	live.pruneFinished()
+	if len(live.sessions) != 1 || live.sessions["s0"] == nil {
+		t.Fatalf("sessions after prune = %v", live.sessions)
+	}
+}

@@ -217,6 +217,10 @@ func agentDisplayMessage(message model.AiMessage) model.AiMessage {
 }
 
 func agentAttachmentPrompt(text string, files []model.AgentAttachment) string {
+	return agentAttachmentPromptFor(text, files, true)
+}
+
+func agentAttachmentPromptFor(text string, files []model.AgentAttachment, imagesIncluded bool) string {
 	if len(files) == 0 {
 		return text
 	}
@@ -224,8 +228,10 @@ func agentAttachmentPrompt(text string, files []model.AgentAttachment) string {
 	for _, item := range files {
 		if item.ID != "" && !agentRasterImage(item.MediaType) {
 			lines = append(lines, fmt.Sprintf("- %q (attachment %s, available with read_attachment)", item.Name, item.ID))
-		} else {
+		} else if imagesIncluded {
 			lines = append(lines, fmt.Sprintf("- %q (image included with this message)", item.Name))
+		} else {
+			lines = append(lines, fmt.Sprintf("- %q (image shared earlier; it is no longer included, ask the user to attach it again if you need it)", item.Name))
 		}
 	}
 	return text + agentAttachmentHeading + strings.Join(lines, "\n")

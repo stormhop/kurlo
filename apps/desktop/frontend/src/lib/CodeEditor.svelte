@@ -86,6 +86,7 @@
     },
     '.cm-scroller': {
       overflow: 'auto',
+      ...(prose ? { overflowX: 'hidden' } : {}),
       ...(fillHeight ? {} : { maxHeight: maxHeight }),
       fontFamily: 'inherit',
       lineHeight: compact ? '1.42' : '1.65',
@@ -252,6 +253,14 @@
       return 'string';
     },
   });
+
+  function foldMarker(open: boolean): HTMLElement {
+    const marker = document.createElement('span');
+    marker.className = open ? 'cm-fold-open' : 'cm-fold-closed';
+    marker.textContent = open ? '⌄' : '›';
+    marker.setAttribute('aria-hidden', 'true');
+    return marker;
+  }
 
   function immediateLangExtension(lang: Lang): Extension {
     return languageExtensions[lang] ?? (lang === 'graphql' ? graphQLLanguage : lang === 'yaml' ? yamlLanguage : []);
@@ -661,7 +670,7 @@
     return [
       ...(prose
         ? [EditorView.lineWrapping]
-        : [lineNumbers(), foldGutter(), highlightActiveLineGutter(), highlightActiveLine(), bracketMatching(), closeBrackets()]),
+        : [lineNumbers(), foldGutter({ markerDOM: foldMarker }), highlightActiveLineGutter(), highlightActiveLine(), bracketMatching(), closeBrackets()]),
       history(),
       indentOnInput(),
       autocompletion({ override: [variableCompletionSource] }),

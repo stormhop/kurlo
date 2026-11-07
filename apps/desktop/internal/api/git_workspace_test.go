@@ -2731,7 +2731,7 @@ func TestGitStatusMarksWhichChangesKurloCanHandle(t *testing.T) {
 	root := filepath.Join(repo, "api")
 	writeKurloWorkspaceFiles(t, root)
 	runGitForTest(t, repo, "init")
-	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt"} {
+	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt", "api/kurlo-agent.md", "kurlo-agent.md", "api/workspaces/Main/kurlo-agent.md"} {
 		if err := os.WriteFile(filepath.Join(repo, filepath.FromSlash(path)), []byte("x\n"), 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -2740,10 +2740,10 @@ func TestGitStatusMarksWhichChangesKurloCanHandle(t *testing.T) {
 	for _, file := range gitStatusForWorkspace(root).Files {
 		managed[file.Path] = file.Managed
 	}
-	if !managed["api/kurlo.yml"] || !managed["api/workspaces/Main/workspace.yml"] {
+	if !managed["api/kurlo.yml"] || !managed["api/workspaces/Main/workspace.yml"] || !managed["api/kurlo-agent.md"] {
 		t.Fatalf("Kurlo files must be managed: %#v", managed)
 	}
-	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt"} {
+	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt", "kurlo-agent.md", "api/workspaces/Main/kurlo-agent.md"} {
 		if value, listed := managed[path]; !listed || value {
 			t.Fatalf("%s must be listed as not managed: %#v", path, managed)
 		}

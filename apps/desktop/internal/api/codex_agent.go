@@ -195,7 +195,7 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 		saved = chat
 		out.Warnings = append(out.Warnings, "Kurlo could not save the chat: "+saveErr.Error())
 	}
-	return normalizeAgentTurn(model.AgentTurn{Chat: saved, Messages: out.Messages, Steps: out.Steps, Text: out.Text, Usage: out.Usage, HasUsage: out.HasUsage, Warnings: out.Warnings, Error: out.Error})
+	return normalizeAgentTurn(model.AgentTurn{Chat: saved, Messages: out.Messages, Steps: aiStepsForBridge(out.Steps), Text: out.Text, Usage: out.Usage, HasUsage: out.HasUsage, Warnings: out.Warnings, Error: out.Error})
 }
 
 func runCodexAgentTurn(ctx context.Context, cancel context.CancelCauseFunc, path string, bridge *agentToolBridge, chat model.AgentChat, turnID, text string, emit aiEmitter, idleTimeout time.Duration) externalAgentTurnResult {

@@ -3,14 +3,14 @@
   import { vm } from '../stores/app.svelte';
   import { agentActivityStore as activity } from '../stores/agentActivity.svelte';
   import {
-    AGENT_ACTIVITY_PERIODS, AGENT_ACTIVITY_SCOPES, agentActivityClients, agentActivityPlace, agentActivityFilesLabel, agentActivityGroups, agentActivityStatus,
-    agentActivityTime, filterAgentActivity, type AgentActivityPeriod,
+    AGENT_ACTIVITY_SCOPES, agentActivityClients, agentActivityPlace, agentActivityFilesLabel, agentActivityGroups, agentActivityStatus,
+    agentActivityTime, filterAgentActivity,
   } from '../agentActivity';
 
   const clientOptions = $derived([{ value: '', label: 'All clients' }, ...agentActivityClients(activity.entries).map(client => ({ value: client, label: client }))]);
-  const visible = $derived(filterAgentActivity(activity.entries, { text: activity.text, client: activity.client, period: activity.period }));
+  const visible = $derived(filterAgentActivity(activity.entries, { text: activity.text, client: activity.client }));
   const groups = $derived(agentActivityGroups(visible));
-  const filtered = $derived(Boolean(activity.text.trim() || activity.client || activity.period !== 'all'));
+  const filtered = $derived(Boolean(activity.text.trim() || activity.client));
 
   function open(id: string) {
     vm.openAgentTab();
@@ -20,7 +20,6 @@
   function clearFilters() {
     activity.text = '';
     activity.client = '';
-    activity.period = 'all';
   }
 </script>
 
@@ -32,12 +31,9 @@
     </svg>
     <input bind:value={activity.text} placeholder="Search tools and files" aria-label="Filter activity" spellcheck="false" />
   </div>
-  <div class="agent-activity-scope">
-    <Select value={activity.allWorkspaces ? 'all' : 'workspace'} options={AGENT_ACTIVITY_SCOPES} className="agent-activity-select" ariaLabel="Workspaces" onChange={value => activity.setAllWorkspaces(value === 'all')} />
-  </div>
   <div class="agent-activity-selects">
+    <Select value={activity.allWorkspaces ? 'all' : 'workspace'} options={AGENT_ACTIVITY_SCOPES} className="agent-activity-select" ariaLabel="Workspaces" onChange={value => activity.setAllWorkspaces(value === 'all')} />
     <Select value={activity.client} options={clientOptions} className="agent-activity-select" ariaLabel="Client" onChange={value => (activity.client = value)} />
-    <Select value={activity.period} options={AGENT_ACTIVITY_PERIODS} className="agent-activity-select" ariaLabel="Period" onChange={value => (activity.period = value as AgentActivityPeriod)} />
   </div>
 </div>
 
@@ -80,23 +76,19 @@
   }
   .agent-activity-selects {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
     gap: var(--space-1-5);
-    padding: 0 var(--space-1);
   }
-  .agent-activity-scope {
-    padding: 0 var(--space-1);
-  }
-  .agent-activity-scope :global(.agent-activity-select),
-  .agent-activity-scope :global(.agent-activity-select .app-select-trigger),
   .agent-activity-selects :global(.agent-activity-select),
   .agent-activity-selects :global(.agent-activity-select .app-select-trigger) {
     width: 100%;
     min-width: 0;
   }
-  .agent-activity-scope :global(.agent-activity-select .app-select-trigger),
   .agent-activity-selects :global(.agent-activity-select .app-select-trigger) {
     justify-content: space-between;
+    height: var(--control-md);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-md);
   }
   .agent-activity-error {
     padding: 0 var(--space-1-5);

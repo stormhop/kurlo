@@ -66,6 +66,12 @@ export function agentSidebarMaxWidth(viewportWidth: number): number {
   return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.floor(viewportWidth - ACTIVITY_RAIL_WIDTH - AGENT_DOCKED_MIN_WIDTH - 2)));
 }
 
+const REQUEST_SCOPED_SHORTCUTS = new Set<ShortcutId>([
+  'send-request', 'cancel-request', 'copy-curl', 'find-replace', 'toggle-response-layout', 'toggle-right-sidebar',
+  'duplicate-item', 'rename-item', 'copy-item', 'paste-item', 'delete-item',
+  'next-item', 'previous-item', 'expand-item', 'collapse-item', 'expand-all', 'collapse-all',
+]);
+
 export function codePanelMaxWidth(viewportWidth: number, sidebarWidth: number): number {
   const availableWidth = Math.max(0, viewportWidth - ACTIVITY_RAIL_WIDTH - sidebarWidth);
   const balancedWidth = Math.floor(availableWidth / 2);
@@ -400,8 +406,11 @@ export const uiShellFeature = {
     }
     this.sidebarHidden = false;
     setTimeout(() => {
-      this._sidebarSearchInput?.focus();
-      this._sidebarSearchInput?.select();
+      const input = this.sidebarView === 'agent'
+        ? document.querySelector<HTMLInputElement>('.agent-sidebar .sidebar-search input')
+        : this._sidebarSearchInput;
+      input?.focus();
+      input?.select();
     }, 0);
   },
 
@@ -545,6 +554,10 @@ export const uiShellFeature = {
       return;
     }
     const shortcutId = this.shortcutForEvent(e);
+    if (shortcutId && this.topView === 'agent' && REQUEST_SCOPED_SHORTCUTS.has(shortcutId)) {
+      if (e.key === 'Escape') this.closeFloatingMenus();
+      return;
+    }
     if (shortcutId === 'cancel-request' && (e.defaultPrevented || !this.inFlightRequestIds.has(this.activeRequestId))) {
       if (e.key === 'Escape' && this.rawTypeMenuOpen) this.rawTypeMenuOpen = false;
       if (e.key === 'Escape') this.closeFloatingMenus();

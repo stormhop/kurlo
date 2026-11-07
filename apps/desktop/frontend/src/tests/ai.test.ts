@@ -125,6 +125,8 @@ describe('ai presets', () => {
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{openaiApiKey}}' } } as never)).toContain('openaiApiKey');
     expect(aiUnresolvedKey({ auth: { type: 'apikey', keyValue: '{{ anthropicApiKey }}' } } as never)).toContain('anthropicApiKey');
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: 'sk-real' } } as never)).toBe('');
+    const missing = aiUnresolvedKey({ auth: { type: 'bearer', token: '{{kurloSecret:request.d06c0394-4e39-45d3-9a5e-f528b4914e65.auth.bearerToken}}' } } as never);
+    expect(missing).toBe('The API key saved in the Auth tab is not on this computer. Enter it in the Auth tab again.');
     expect(aiUnresolvedKey({ auth: { type: 'none' } } as never)).toBe('');
     expect(aiUnresolvedKey({ auth: { type: 'bearer', token: '{{apiKey}}' }, headers: [{ key: 'Authorization', value: 'Bearer sk-x', enabled: true }] } as never)).toBe('');
     for (const key of ['x-auth-token', 'anthropic-api-key', 'x-goog-api-key', 'X-Api-Key']) {
@@ -449,6 +451,18 @@ describe('ai request serialization', () => {
     expect(built.toolServers).toEqual([{ name: 'Weather', request: { url: 'http://mcp.test', mcpMethod: '' } }]);
     expect(built.http.method).toBe('POST');
     expect(built.http.testScript).toBe('pm.test()');
+    expect(built.kurloTools).toBeUndefined();
+    expect(built.connectionId).toBeUndefined();
+
+    const withKurlo = requestSerializationFeature.savedRequestToRunnableAiRequest.call(
+      { ...host, activeEnvironment: { name: 'Staging' }, savedRequestToRunnableHttpRequest: () => ({ ...emptyHttpResponse(), url: '', headers: [], auth: { type: 'bearer', token: 'x' } }) } as never,
+      { ...req, aiProvider: 'kurlo', aiConnectionId: 'conn-2', aiKurloTools: true } as SavedRequest,
+      [{ role: 'user', blocks: [{ type: 'text', text: 'List my requests' }] }],
+    );
+    expect(withKurlo.kurloTools).toBe(true);
+    expect(withKurlo.kurloEnvironment).toBe('Staging');
+    expect(withKurlo.connectionId).toBe('conn-2');
+    expect(withKurlo.http.url).toBe('');
   });
 });
 

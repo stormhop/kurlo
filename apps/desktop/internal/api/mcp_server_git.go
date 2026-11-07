@@ -488,6 +488,8 @@ func gitCommitPreview(workspaceRoot string, paths []string) ([]model.AgentFileCh
 		}
 		changes = append(changes, change)
 	}
+	files, _ := readWorkspaceFileContents(workspaceRoot)
+	summarizeAgentChanges(changes, files)
 	return changes, nil
 }
 

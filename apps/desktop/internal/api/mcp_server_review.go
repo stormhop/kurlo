@@ -97,6 +97,7 @@ func diffWorkspaceFiles(before, after map[string][]byte) []model.AgentFileChange
 		}
 		changes = append(changes, change)
 	}
+	summarizeAgentChanges(changes, before, after)
 	return changes
 }
 

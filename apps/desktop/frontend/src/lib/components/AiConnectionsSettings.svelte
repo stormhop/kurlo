@@ -298,13 +298,13 @@
     </div>
   </header>
 
-  <Disclosure title="Your agents" summary={agentsSummary} storageKey="settings-ai-agents" reveal={revealed === 'agents'} defaultOpen={codexConnectionStore.loaded && claudeConnectionStore.loaded && !codexConnectionStore.status.connected && !claudeConnectionStore.status.connected} variant="settings">
+  <Disclosure title="Your agents" summary={agentsSummary} storageKey="settings-ai-agents" reveal={revealed === 'agents'} conceal={revealed === 'models'} defaultOpen={codexConnectionStore.loaded && claudeConnectionStore.loaded && !codexConnectionStore.status.connected && !claudeConnectionStore.status.connected} variant="settings">
     <CodexConnectionSettings />
     <ClaudeConnectionSettings />
     <p class="settings-group-note">Agents on this computer run with their own account and reach this workspace through Kurlo's tools. Changes still wait for your approval.</p>
   </Disclosure>
 
-  <Disclosure title="Kurlo agent" summary={kurloSummary} storageKey="settings-ai-kurlo" reveal={revealed === 'kurlo'} defaultOpen={loaded && !connections.length} forceOpen={addMode !== 'none' || openRouter.status === 'waiting'} variant="settings">
+  <Disclosure title="Kurlo agent" summary={kurloSummary} storageKey="settings-ai-kurlo" reveal={revealed === 'kurlo' || revealed === 'models'} defaultOpen={loaded && !connections.length} forceOpen={addMode !== 'none' || openRouter.status === 'waiting'} variant="settings">
     {#if listError}<p class="settings-group-note error" role="alert">{listError}</p>{/if}
     {#if loaded && connections.length}
       <ul class="settings-group ai-connection-list" aria-label="AI connections">

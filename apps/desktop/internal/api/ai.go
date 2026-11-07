@@ -86,6 +86,9 @@ func (a *App) SendAiRequest(req model.AiRequest) model.AiResponse {
 		},
 		now: time.Now,
 	}
+	if req.KurloTools {
+		runner.local = a.aiRequestKurloTools(req)
+	}
 	out := runner.run()
 	out = finishAiTests(ctx, req, out, a.state, a.cookieJars)
 	return model.NormalizeAiResponse(redactAiResponseKey(out, connectionKey))
@@ -463,7 +466,16 @@ func (r *aiRunner) attemptStep(index int, conversation []model.AiMessage, tools 
 
 func aiStepEventCopy(step model.AiStep) model.AiStep {
 	step.HTTP = model.HttpResponse{StatusCode: step.HTTP.StatusCode, Status: step.HTTP.Status, Headers: []model.KeyValue{}}
+	step.RequestBody = ""
 	return step
+}
+
+func aiStepsForBridge(steps []model.AiStep) []model.AiStep {
+	out := make([]model.AiStep, len(steps))
+	for i, step := range steps {
+		out[i] = aiStepEventCopy(step)
+	}
+	return out
 }
 
 func headerContainsEventStream(headers []model.KeyValue) bool {

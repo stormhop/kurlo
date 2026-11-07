@@ -9,6 +9,7 @@
     variant = 'details',
     forceOpen = false,
     reveal = false,
+    conceal = false,
     children,
   }: {
     title: string;
@@ -18,6 +19,7 @@
     variant?: 'details' | 'settings';
     forceOpen?: boolean;
     reveal?: boolean;
+    conceal?: boolean;
     children: Snippet;
   } = $props();
 
@@ -32,7 +34,7 @@
     }
   }
 
-  let override = $derived<boolean | null>(reveal ? true : stored(storageKey));
+  let override = $derived<boolean | null>(reveal ? true : conceal ? false : stored(storageKey));
   const open = $derived(forceOpen || (override ?? defaultOpen));
 
   function toggle() {

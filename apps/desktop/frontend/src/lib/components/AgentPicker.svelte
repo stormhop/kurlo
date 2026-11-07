@@ -236,7 +236,7 @@
                 <span class="agent-pick-title">Codex</span>
                 <span class="agent-pick-meta">{external ? (codexModel?.name || codexModelId || codex.account || 'Signed in') : (codex.account || 'Signed in')}</span>
               </span>
-              <span class="agent-pick-state"><span class="agent-dot" class:agent-dot-ok={!codex.error}></span>{codex.error ? 'Unavailable' : 'Ready'}</span>
+              <span class="agent-pick-state" class:agent-pick-state-error={Boolean(codex.error)}><span class="agent-dot" class:agent-dot-ok={!codex.error}></span>{codex.error ? 'Unavailable' : 'Ready'}</span>
               {#if external}{@render check()}{/if}
             </button>
             {#if external}
@@ -483,10 +483,14 @@
     color: var(--s2xx);
     font-size: var(--text-caption);
   }
+  .agent-pick-state-error {
+    color: var(--s5xx);
+  }
   .agent-dot {
     width: 0.4375rem;
     height: 0.4375rem;
     border-radius: var(--radius-full);
+    background: currentColor;
   }
   .agent-dot-ok {
     background: var(--s2xx);

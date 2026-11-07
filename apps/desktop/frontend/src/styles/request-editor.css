@@ -2179,6 +2179,10 @@ textarea.url-input {
   white-space: nowrap;
 }
 
+.ai-connection-url-label.missing {
+  color: var(--warning);
+}
+
 .ai-connection-url-hint {
   flex: 0 0 auto;
   font-size: var(--text-caption);

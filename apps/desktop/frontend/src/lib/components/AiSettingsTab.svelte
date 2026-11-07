@@ -2,11 +2,23 @@
   import { vm } from '../stores/app.svelte';
   import Select from './Select.svelte';
   import { aiSettingErrors } from '../stores/features/ai';
+  import { aiConnectionsStore } from '../stores/aiConnections.svelte';
 
   const THINKING_OPTIONS = [
     { value: '', label: 'Model default' },
     { value: 'summarized', label: 'Show summarized' },
   ];
+
+  const connectionOptions = $derived.by(() => {
+    const list = aiConnectionsStore.list;
+    const fallback = aiConnectionsStore.defaultConnection;
+    const options = [
+      { value: '', label: fallback ? `Default (${fallback.label})` : 'Default connection' },
+      ...list.map(connection => ({ value: connection.id, label: connection.label })),
+    ];
+    if (vm.aiConnectionId && !list.some(connection => connection.id === vm.aiConnectionId)) options.push({ value: vm.aiConnectionId, label: 'Removed connection' });
+    return options;
+  });
 
   const errors = $derived(aiSettingErrors({
     aiTemperature: vm.aiTemperature,
@@ -26,6 +38,16 @@
   </div>
 
   <div class="settings-list ai-settings-list">
+    {#if vm.aiProvider === 'kurlo'}
+      <div class="postman-setting">
+        <span class="setting-copy">
+          <strong>Connection</strong>
+          <span>The connection from Settings → AI this request uses. The request file keeps only its id, never the key.</span>
+        </span>
+        <Select value={vm.aiConnectionId} options={connectionOptions} className="setting-select" ariaLabel="Connection" onChange={value => (vm.aiConnectionId = value)} />
+      </div>
+    {/if}
+
     <label class="postman-setting">
       <span class="setting-copy">
         <strong>Temperature</strong>

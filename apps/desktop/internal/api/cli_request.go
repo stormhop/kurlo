@@ -157,6 +157,8 @@ type cliSavedRequest struct {
 	AiThinking           string   `json:"aiThinking"`
 	AiStream             *bool    `json:"aiStream"`
 	AiToolRequestIds     []string `json:"aiToolRequestIds"`
+	AiKurloTools         bool     `json:"aiKurloTools"`
+	AiConnectionID       string   `json:"aiConnectionId"`
 
 	ID                 string          `json:"id"`
 	Name               string          `json:"name"`

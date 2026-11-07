@@ -1024,7 +1024,7 @@
           grpcMethodSelected={Boolean(vm.grpcMethod)}
           mcpArgumentsHaveContent={Boolean(vm.mcpArguments.trim())}
           aiPromptHasContent={Boolean(vm.aiPrompt.trim())}
-          aiToolCount={vm.aiToolRequestIds.length}
+          aiToolCount={vm.aiToolRequestIds.length + (vm.aiKurloTools ? 1 : 0)}
           exampleCount={vm.requestExamples.length}
         />
 

@@ -44,7 +44,7 @@
         bind:value={vm.aiPrompt}
         language="text"
         prose
-        minHeight="9rem"
+        minHeight="100%"
         maxHeight="none"
         testId="ai-prompt-editor"
         ariaLabel="Prompt"
@@ -113,20 +113,25 @@
   .ai-editor-prompt {
     flex: 0 1 auto;
     display: flex;
-    flex-direction: column;
+  }
+  .ai-editor-prompt::before {
+    content: '';
+    flex: none;
+    width: 0;
+    height: 9rem;
   }
   .ai-editor-prompt :global(.cm-wrap) {
     display: flex;
     flex-direction: column;
-    flex: 0 1 auto;
-    min-height: 0;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .ai-editor-prompt :global(.cm-editor) {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-height: 0;
   }
   .ai-editor-prompt :global(.cm-scroller) {
-    flex: 0 1 auto;
+    flex: 1 1 auto;
     min-height: 0;
   }
 </style>

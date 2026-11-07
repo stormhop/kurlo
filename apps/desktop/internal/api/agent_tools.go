@@ -43,6 +43,7 @@ type agentDecision struct {
 	changes []model.AgentFileChange
 	trusted string
 	auto    bool
+	foreign bool
 }
 
 func mcpParallelTool(name string) bool {
@@ -187,6 +188,11 @@ func agentDecide(s *mcpServer, tool string, arguments json.RawMessage) agentDeci
 		}
 		if unsafe := agentUnsafeMethods(methods); len(unsafe) > 0 {
 			return agentDecision{kind: kind, ask: true, methods: unsafe, reason: fmt.Sprintf("Sends %s requests, which can change data on the server.", strings.Join(unsafe, ", "))}
+		}
+		if tool == "send_request" {
+			if foreign, reason := agentForeignSend(s, arguments); foreign {
+				return agentDecision{kind: kind, ask: true, foreign: true, reason: reason}
+			}
 		}
 		return agentDecision{kind: kind, ask: kind == model.AgentToolWrite}
 	}
@@ -383,9 +389,10 @@ func agentAutoWrites(tool string) bool {
 func (b *agentToolBridge) decide(name string, arguments json.RawMessage) agentDecision {
 	decision := agentDecide(b.server, name, arguments)
 	mode, hosts := b.policy()
-	if decision.ask && len(decision.methods) > 0 && mode != model.AgentModeAsk {
+	if decision.ask && (len(decision.methods) > 0 || decision.foreign) && mode != model.AgentModeAsk {
 		if trusted, reason := agentTrustedRun(b.server, name, arguments, hosts); trusted {
 			decision.methods = nil
+			decision.foreign = false
 			decision.trusted = reason
 			if decision.kind == model.AgentToolRun {
 				decision.ask = false
@@ -585,5 +592,9 @@ func (b *agentToolBridge) call(ctx context.Context, tool aiTool, input, toolUseI
 		}
 		return err.Error(), true
 	}
-	return mcpResultPlainText(result)
+	text, isError := mcpResultPlainText(result)
+	if len(text) > agentMcpResultMaxText {
+		text = agentTrimTokens(text, agentMcpResultMaxText/4)
+	}
+	return text, isError
 }

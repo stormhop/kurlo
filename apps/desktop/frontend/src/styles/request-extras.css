@@ -316,6 +316,11 @@
   display: flex;
   white-space: nowrap;
 }
+.app-select-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .app-select-chevron {
   flex-shrink: 0;
   color: var(--text-3);

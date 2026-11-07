@@ -188,11 +188,12 @@ func (c *mcpStdioClient) request(ctx context.Context, method string, params any)
 	default:
 	}
 	c.nextID++
-	id := fmt.Sprintf("%d", c.nextID)
+	seq := c.nextID
+	id := fmt.Sprintf("%d", seq)
 	waiter := make(chan mcpStdioMessage, 1)
 	c.pending[id] = waiter
 	c.mu.Unlock()
-	message := map[string]any{"jsonrpc": "2.0", "id": c.nextID, "method": method}
+	message := map[string]any{"jsonrpc": "2.0", "id": seq, "method": method}
 	if params != nil {
 		message["params"] = params
 	}
@@ -217,7 +218,7 @@ func (c *mcpStdioClient) request(ctx context.Context, method string, params any)
 		c.mu.Lock()
 		delete(c.pending, id)
 		c.mu.Unlock()
-		_ = c.notify("notifications/cancelled", map[string]any{"requestId": c.nextID, "reason": "cancelled"})
+		_ = c.notify("notifications/cancelled", map[string]any{"requestId": seq, "reason": "cancelled"})
 		return nil, ctx.Err()
 	}
 }

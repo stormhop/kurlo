@@ -98,6 +98,7 @@
   let isGraphQL = $derived(requestType === 'graphql');
   let isGRPC = $derived(requestType === 'grpc');
   let isAI = $derived(requestType === 'ai');
+  const chosenAiConnection = $derived(vm.aiConnectionId ? aiConnectionsStore.list.find(connection => connection.id === vm.aiConnectionId) ?? null : null);
   let sseConnected = $derived(sseStatus === 'connected');
   let sseConnecting = $derived(sseStatus === 'connecting');
   let showSSEControls = $derived(isSSE || sseConnected || sseConnecting);
@@ -321,8 +322,8 @@
       </div>
 
       {#if isAI && vm.aiProvider === 'kurlo'}
-      <button class="field url-input ai-connection-url" type="button" aria-label="Default AI connection" onclick={() => vm.openSettings('ai')}>
-        <span class="ai-connection-url-label">{aiConnectionsStore.defaultConnection?.label ?? 'No AI connection yet'}</span>
+      <button class="field url-input ai-connection-url" type="button" aria-label={vm.aiConnectionId ? 'AI connection' : 'Default AI connection'} onclick={() => { aiConnectionsStore.reveal = 'models'; vm.openSettings('ai'); }}>
+        <span class="ai-connection-url-label" class:missing={vm.aiConnectionId && !chosenAiConnection}>{vm.aiConnectionId ? chosenAiConnection?.label ?? 'Removed connection' : aiConnectionsStore.defaultConnection?.label ?? 'No AI connection yet'}</span>
         <span class="ai-connection-url-hint">Settings → AI</span>
       </button>
       {:else}

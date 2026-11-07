@@ -5,6 +5,8 @@
   import { gitDiffRows, type GitDiffRow } from '../gitDiffRows';
   import { kurloChangedFiles, otherChangedFileCount } from '../gitFiles';
   import GitIcon from './GitIcon.svelte';
+  import { gitPullRequestUrl } from '../backend';
+  import { openExternalURL } from '../externalLinks';
   import type { GitBranchEntry, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, WorkspaceDiagnostic } from '../backend';
   import { gitConflictHunks, parseGitConflictBlocks, replaceAllGitConflictHunks, replaceGitConflictHunk, type ConflictSide, type GitConflictBlock } from '../gitConflicts';
 
@@ -191,6 +193,22 @@
   let pushCount = $derived(status.ahead > 0 ? status.ahead : (status.pushCommitCount ?? 0));
   let hasPushTarget = $derived(Boolean(status.upstream || remoteCount > 0));
   let canPush = $derived(Boolean(canRepoAction && !status.operation && hasPushTarget && (pushCount > 0 || !status.upstream || status.upstreamGone)));
+  let canCreatePullRequest = $derived(Boolean(canRepoAction && !status.operation && status.branch && status.upstream && !status.upstreamGone && pushCount === 0));
+  let pullRequestBusy = $state(false);
+  let pullRequestError = $state('');
+
+  async function createPullRequest() {
+    pullRequestBusy = true;
+    pullRequestError = '';
+    try {
+      const result = await gitPullRequestUrl();
+      if (result.url) openExternalURL(result.url);
+      else pullRequestError = result.error || 'Kurlo could not build a pull request link.';
+    } finally {
+      pullRequestBusy = false;
+    }
+  }
+
   let showRepositorySetup = $derived(!status.isRepo || (!status.upstream && remoteCount === 0));
   let storagePath = $derived(status.isRepo ? status.root : (status.workspaceRoot || 'Kurlo local app storage'));
   let workspaceMissing = $derived(!status.isRepo && Boolean(status.missingRoot));
@@ -899,6 +917,17 @@
           Push
           {#if pushCount > 0}<span class="git-tool-badge">{pushCount}</span>{/if}
         </button>
+        {#if canCreatePullRequest}
+          <button
+            class="btn btn-secondary git-tool-btn"
+            type="button"
+            onclick={() => void createPullRequest()}
+            disabled={pullRequestBusy}
+          >
+            <GitIcon name="pull-request" />
+            Create PR
+          </button>
+        {/if}
         <div class="git-more-control">
           <button
             class="btn btn-ghost btn-icon git-tool-btn"
@@ -1059,6 +1088,12 @@
       </div>
     {:else if workspaceBlocked}
       <div class="git-banner warning">Workspace files are invalid. Editing is paused until this workspace loads again; pull a commit that fixes them.</div>
+    {/if}
+    {#if pullRequestError}
+      <div class="git-banner error git-banner-row" role="alert">
+        <span>{pullRequestError}</span>
+        <button class="btn btn-ghost btn-sm git-action-btn" type="button" onclick={() => (pullRequestError = '')}>Dismiss</button>
+      </div>
     {/if}
     {#if error || status.error}
       <div class="git-banner error git-banner-row">

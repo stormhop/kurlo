@@ -74,6 +74,10 @@ export function BranchAgentChat(arg1, arg2, arg3) {
   return window['go']['api']['App']['BranchAgentChat'](arg1, arg2, arg3);
 }
 
+export function CancelAgentMcpSignIn(arg1) {
+  return window['go']['api']['App']['CancelAgentMcpSignIn'](arg1);
+}
+
 export function CancelCodexLogin() {
   return window['go']['api']['App']['CancelCodexLogin']();
 }
@@ -128,6 +132,10 @@ export function ClipboardSet(arg1) {
 
 export function CodexStatus(arg1) {
   return window['go']['api']['App']['CodexStatus'](arg1);
+}
+
+export function CompactAgentChat(arg1, arg2) {
+  return window['go']['api']['App']['CompactAgentChat'](arg1, arg2);
 }
 
 export function ConfirmQuit() {
@@ -550,6 +558,10 @@ export function SaveAgentMcpServer(arg1) {
   return window['go']['api']['App']['SaveAgentMcpServer'](arg1);
 }
 
+export function SaveAgentWorkspaceNotes(arg1, arg2, arg3) {
+  return window['go']['api']['App']['SaveAgentWorkspaceNotes'](arg1, arg2, arg3);
+}
+
 export function SaveAiConnection(arg1) {
   return window['go']['api']['App']['SaveAiConnection'](arg1);
 }
@@ -658,8 +670,16 @@ export function Show() {
   return window['go']['api']['App']['Show']();
 }
 
+export function SignInAgentMcpServer(arg1) {
+  return window['go']['api']['App']['SignInAgentMcpServer'](arg1);
+}
+
 export function SignInClaudeCode(arg1) {
   return window['go']['api']['App']['SignInClaudeCode'](arg1);
+}
+
+export function SignOutAgentMcpServer(arg1) {
+  return window['go']['api']['App']['SignOutAgentMcpServer'](arg1);
 }
 
 export function SocketIOConnect(arg1, arg2) {

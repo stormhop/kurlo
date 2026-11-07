@@ -276,6 +276,7 @@ func (s *mcpServer) runSavedAI(ctx context.Context, ws mcpWorkspace, run *mcpRun
 	}
 	if provider == model.AiProviderKurlo {
 		var key string
+		input.ConnectionID = strings.TrimSpace(req.AiConnectionID)
 		input, key, err = resolveKurloAiRequest(input)
 		if err != nil {
 			return model.AiResponse{}, err
@@ -300,6 +301,13 @@ func (s *mcpServer) runSavedAI(ctx context.Context, ws mcpWorkspace, run *mcpRun
 			return sendRequestWithBodySink(ctx, prepared, run.sm, s.jars, s.cache, sink)
 		},
 		mcp: func(prepared model.HttpRequest) model.McpResponse { return s.sendProtocolMCP(ctx, run, prepared) },
+	}
+	if req.AiKurloTools {
+		opts := s.opts
+		tools := newAiRequestKurloTools(opts, defaultString(req.ID, "ai-request"))
+		tools.server.executionApp = s.executionApp
+		tools.server.jars = s.jars
+		runner.local = tools
 	}
 	return finishAiTests(ctx, input, runner.run(), run.sm, s.jars), nil
 }

@@ -624,6 +624,7 @@ html, body, #app {
   --focus-ring: 0 0 0 2px var(--accent-dim);
   --focus-outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
   --shadow-popover: 0 14px 36px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  --shadow-composer: 0 1px 2px rgba(0,0,0,0.16), 0 8px 24px rgba(0,0,0,0.22);
   --shadow-modal: 0 24px 80px rgba(0,0,0,0.5);
   --opacity-disabled: 0.45;
   --scrim: rgba(5, 5, 12, 0.58);
@@ -634,6 +635,7 @@ html, body, #app {
 
 :root[data-theme="light"] {
   --shadow-popover: 0 12px 32px rgba(15,15,25,0.14), 0 0 0 1px rgba(15,15,25,0.02);
+  --shadow-composer: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
   --shadow-modal: 0 24px 72px rgba(15,15,25,0.22);
   --scrim: rgba(15, 15, 25, 0.32);
 }

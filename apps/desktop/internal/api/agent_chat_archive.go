@@ -40,7 +40,7 @@ func setAgentChatArchived(id, workspace, workspaceID string, archived bool, now 
 	if err != nil {
 		return chat, err
 	}
-	if err := os.Remove(agentChatIndexPath()); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := removeAgentChatIndex(); err != nil {
 		return chat, err
 	}
 	if err := writeAgentChatFile(chat); err != nil {

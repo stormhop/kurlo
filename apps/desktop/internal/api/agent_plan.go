@@ -127,17 +127,34 @@ func agentPlanCallsText(calls []model.AgentPlanCall) string {
 	return strings.Join(parts, ", ")
 }
 
-func agentArgumentStrings(value any, out *[]string) {
-	switch typed := value.(type) {
-	case string:
-		*out = append(*out, strings.TrimSpace(typed))
-	case map[string]any:
-		for _, item := range typed {
-			agentArgumentStrings(item, out)
+var agentPlanTargetKeys = []string{"request", "collection", "folder", "name", "key", "environment", "url", "path", "id", "target"}
+
+func agentArgumentStrings(arguments map[string]any, external bool, out *[]string) {
+	if external {
+		for _, value := range arguments {
+			if text, ok := value.(string); ok {
+				*out = append(*out, strings.TrimSpace(text))
+			}
 		}
-	case []any:
-		for _, item := range typed {
-			agentArgumentStrings(item, out)
+		return
+	}
+	for _, key := range agentPlanTargetKeys {
+		if text, ok := arguments[key].(string); ok {
+			*out = append(*out, strings.TrimSpace(text))
+		}
+	}
+	collection, _ := arguments["collection"].(string)
+	for _, key := range []string{"name", "request", "folder"} {
+		if name, ok := arguments[key].(string); ok && strings.TrimSpace(collection) != "" && strings.TrimSpace(name) != "" {
+			*out = append(*out, strings.TrimSpace(collection)+"/"+strings.TrimSpace(name))
+		}
+	}
+	operations, _ := arguments["operations"].([]any)
+	for _, operation := range operations {
+		if item, ok := operation.(map[string]any); ok {
+			if nested, ok := item["arguments"].(map[string]any); ok {
+				agentArgumentStrings(nested, false, out)
+			}
 		}
 	}
 }
@@ -162,13 +179,7 @@ func agentPlanTargetValues(tool string, arguments json.RawMessage) []string {
 		return nil
 	}
 	var values []string
-	agentArgumentStrings(parsed, &values)
-	collection, _ := parsed["collection"].(string)
-	for _, key := range []string{"name", "request", "folder"} {
-		if name, ok := parsed[key].(string); ok && collection != "" && strings.TrimSpace(name) != "" {
-			values = append(values, strings.TrimSpace(collection)+"/"+strings.TrimSpace(name))
-		}
-	}
+	agentArgumentStrings(parsed, strings.Contains(tool, "."), &values)
 	return values
 }
 

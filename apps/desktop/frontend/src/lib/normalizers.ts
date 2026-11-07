@@ -66,9 +66,9 @@ const REQUEST_FIELDS: FieldTypes = {
         'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema', 'preRequestScript', 'testScript',
         'preRequestScriptJs', 'testScriptJs', 'requestNotes', 'sioEventName', 'grpcMethod', 'grpcProtoFilePath',
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
-        'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking',
+        'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId',
     ],
-    booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection', 'aiStream'],
+    booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection', 'aiStream', 'aiKurloTools'],
     arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
@@ -311,6 +311,8 @@ export function normalizeSavedRequest(
         aiThinking: input.aiThinking || '',
         aiStream: input.aiStream ?? true,
         aiToolRequestIds: Array.isArray(input.aiToolRequestIds) ? input.aiToolRequestIds.map(asText).filter(Boolean) : [],
+        aiKurloTools: input.aiKurloTools === true,
+        aiConnectionId: input.aiConnectionId || '',
         ...(normalizedExamples ? { examples: normalizedExamples } : {}),
     };
 }

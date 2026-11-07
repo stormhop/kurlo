@@ -177,6 +177,40 @@ func TestAgentOwnBranchCommitsEveryApprovedChange(t *testing.T) {
 	}
 }
 
+func TestKurloCommitsTheTeamNotesWithTheWorkspace(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	root, _ := agentGitWorkspace(t)
+	if result := saveAgentWorkspaceNotes(root, "# Team notes\n\nUse the Local environment.\n", "", false); !result.Ok {
+		t.Fatalf("save notes: %+v", result)
+	}
+	if paths := managedChangedGitPaths(root, gitStatusForWorkspace(root)); len(paths) != 1 || paths[0] != agentNotesFile {
+		t.Fatalf("changed workspace files = %v", paths)
+	}
+	if result := gitCommitWorkspaceForRoot(root, "Add team notes"); !result.Ok {
+		t.Fatalf("commit: %s", result.Error)
+	}
+	if status := gitStatusForWorkspace(root); !status.Clean {
+		t.Fatalf("notes left uncommitted: %+v", status.Files)
+	}
+	if subjects := gitLogSubjects(t, root, "HEAD"); subjects[0] != "Add team notes" {
+		t.Fatalf("log = %v", subjects)
+	}
+
+	bridge, _ := newTestAgentBridge(t, root, model.AgentApprovalAllow)
+	bridge.setChat(model.AgentChat{ID: "chat-1", Title: "Notes", OwnBranch: true}, func(string) {})
+	text, isError := agentBridgeCall(t, bridge, agentNotesTool, map[string]any{"content": "# Team notes\n\nUse the Local environment.\nTag smoke requests.\n"})
+	if isError || !strings.Contains(text, "on branch kurlo-agent/notes-") {
+		t.Fatalf("update notes = %v %s", isError, text)
+	}
+	status := gitStatusForWorkspace(root)
+	if !strings.HasPrefix(status.Branch, "kurlo-agent/notes-") || !status.Clean {
+		t.Fatalf("status = branch %q clean %v files %+v", status.Branch, status.Clean, status.Files)
+	}
+	if subjects := gitLogSubjects(t, root, "HEAD"); !strings.Contains(subjects[0], agentNotesTool) {
+		t.Fatalf("log = %v", subjects)
+	}
+}
+
 func TestAgentOwnBranchReportsWhenItCannotCommit(t *testing.T) {
 	useTempConfigDir(t, t.TempDir())
 	root := agentTestWorkspace(t, "http://127.0.0.1:1")

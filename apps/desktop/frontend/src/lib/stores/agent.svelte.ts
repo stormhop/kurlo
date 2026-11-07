@@ -1,5 +1,5 @@
 import {
-  agentChatPage, agentChats, agentPendingApprovals, answerAgentApproval, branchAgentChat, deleteAgentChat,
+  agentChatPage, agentChats, agentPendingApprovals, answerAgentApproval, branchAgentChat, compactAgentChat, deleteAgentChat,
   onAgentEvent, renameAgentChat, sendAgentMessage, setAgentChatArchived, stopAgent,
   type AgentContext, type AgentApproval, type AgentApprovalClosed, type AgentAttachment, type AgentChat, type AgentChatSummary,
   type AiBlock, type AiStep, type AiUsage,
@@ -27,7 +27,6 @@ export type AgentEditTarget = { index: number; text: string };
 type WorkspaceChatView = {
   activeChatId: string;
   activeChat: AgentChat | null;
-  draft: string;
   composer: symbol;
   projectRoot: string;
   attachmentPaths: string[];
@@ -57,6 +56,26 @@ export function agentChatBefore(chat: AgentChat, index: number): AgentChat {
   return { ...chat, messages: chat.messages.slice(0, keep), messageCount: Math.min(chatMessageCount(chat), index) };
 }
 
+const AGENT_DRAFTS_KEY = 'kurlo.agentDrafts.v1';
+
+function savedAgentDrafts(): Record<string, string> {
+  try {
+    const value = JSON.parse(localStorage.getItem(AGENT_DRAFTS_KEY) ?? '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch {
+    return {};
+  }
+}
+
+const agentDrafts = new SvelteMap<string, string>(Object.entries(savedAgentDrafts()).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && Boolean(entry[1])));
+
+function storeAgentDrafts() {
+  try {
+    if (agentDrafts.size) localStorage.setItem(AGENT_DRAFTS_KEY, JSON.stringify(Object.fromEntries(agentDrafts)));
+    else localStorage.removeItem(AGENT_DRAFTS_KEY);
+  } catch {}
+}
+
 function newTurnId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
@@ -82,12 +101,12 @@ export class AgentStore {
   budgetRequests = $state(0);
   editing = $state<AgentEditTarget | null>(null);
   connectionId = $state('');
-  draft = $state('');
   projectRoot = $state('');
   attachmentPaths = $state<string[]>([]);
   loadError = $state('');
   historyError = $state('');
   loadingEarlier = $state(false);
+  compactingChat = $state('');
   private historyRequest = 0;
   private chatLoads = new SvelteMap<string, symbol>();
   workspaceId = $state('');
@@ -99,6 +118,37 @@ export class AgentStore {
   private views = new SvelteMap<string, WorkspaceChatView>();
   private collectionNames: string[] = [];
   private environmentNames: string[] = [];
+
+  get draft(): string {
+    return this.draftFor(this.workspaceId, this.activeChatId);
+  }
+
+  set draft(text: string) {
+    this.setDraftFor(this.workspaceId, this.activeChatId, text);
+  }
+
+  private draftKey(workspaceId: string, chatId: string): string {
+    return `${this.driver}\n${workspaceId}\n${chatId}`;
+  }
+
+  private draftFor(workspaceId: string, chatId: string): string {
+    return agentDrafts.get(this.draftKey(workspaceId, chatId)) ?? '';
+  }
+
+  private setDraftFor(workspaceId: string, chatId: string, text: string) {
+    const key = this.draftKey(workspaceId, chatId);
+    if ((agentDrafts.get(key) ?? '') === text) return;
+    if (text) agentDrafts.set(key, text);
+    else agentDrafts.delete(key);
+    storeAgentDrafts();
+  }
+
+  private adoptNewChatDraft(workspaceId: string, chatId: string) {
+    const text = this.draftFor(workspaceId, '');
+    if (!text || !chatId) return;
+    this.setDraftFor(workspaceId, '', '');
+    if (!this.draftFor(workspaceId, chatId)) this.setDraftFor(workspaceId, chatId, text);
+  }
 
   syncWorkspaceSelection(workspaceId: string, collections: string[], environments: string[], activeEnvironment: string) {
     this.collectionNames = collections;
@@ -113,7 +163,6 @@ export class AgentStore {
       if (saved) this.restoreView(saved);
       else {
         this.newChat();
-        this.draft = '';
         this.collection = '';
         this.environment = activeEnvironment;
       }
@@ -129,7 +178,7 @@ export class AgentStore {
 
   private captureView(trimHistory = false): WorkspaceChatView {
     return {
-      activeChatId: this.activeChatId, activeChat: trimHistory && this.activeChat ? agentHistoryPage(this.activeChat) : this.activeChat, draft: this.draft, composer: this.composer,
+      activeChatId: this.activeChatId, activeChat: trimHistory && this.activeChat ? agentHistoryPage(this.activeChat) : this.activeChat, composer: this.composer,
       collection: this.collection, environment: this.environment, ownBranch: this.ownBranch, connectionId: this.connectionId,
       mode: this.mode, allowedHosts: [...this.allowedHosts], budgetTokens: this.budgetTokens, budgetRequests: this.budgetRequests, editing: this.editing,
       projectRoot: this.projectRoot, attachmentPaths: [...this.attachmentPaths],
@@ -140,7 +189,6 @@ export class AgentStore {
   private restoreView(view: WorkspaceChatView) {
     this.activeChatId = view.activeChatId;
     this.activeChat = view.activeChat;
-    this.draft = view.draft;
     this.composer = view.composer;
     this.projectRoot = view.projectRoot;
     this.attachmentPaths = view.attachmentPaths;
@@ -208,9 +256,17 @@ export class AgentStore {
     return Boolean(this.activeTurn);
   }
 
+  #runningKey = $derived([...this.turns.values()].filter(entry => entry.chatId && entry.turn.status === 'streaming').map(entry => entry.chatId).sort().join('\n'));
+  #runningChats = $derived(this.#runningKey ? this.#runningKey.split('\n') : []);
+  #waitingKey = $derived(this.approvals.map(approval => approval.chatId).filter((chatId, index, all) => chatId && all.indexOf(chatId) === index).sort().join('\n'));
+  #waitingChats = $derived(this.#waitingKey ? this.#waitingKey.split('\n') : []);
+
   isRunning(chatId: string): boolean {
-    for (const entry of this.turns.values()) if (entry.chatId === chatId && entry.turn.status === 'streaming') return true;
-    return false;
+    return this.#runningChats.includes(chatId);
+  }
+
+  isWaiting(chatId: string): boolean {
+    return this.#waitingChats.includes(chatId);
   }
 
   get activeApprovals(): AgentApproval[] {
@@ -281,7 +337,9 @@ export class AgentStore {
       this.turns.set(turnId, assigned);
       if (entry.stopRequested) void stopAgent(sessionId, turnId);
       this.updateView(entry.workspaceId, this.generation, view => {
-        if (!view.activeChatId && view.composer === entry.composer) view.activeChatId = sessionId;
+        if (view.activeChatId || view.composer !== entry.composer) return;
+        view.activeChatId = sessionId;
+        this.adoptNewChatDraft(entry.workspaceId, sessionId);
       });
       void this.refreshChats();
       return assigned;
@@ -313,6 +371,7 @@ export class AgentStore {
 
   newChat() {
     agentNavigation.activity = false;
+    this.cancelEdit();
     this.composer = Symbol();
     this.chatLoads.delete(this.workspaceId);
     this.historyRequest++;
@@ -331,6 +390,7 @@ export class AgentStore {
   async openChat(id: string) {
     agentNavigation.activity = false;
     if (!id) return this.newChat();
+    if (this.activeChatId !== id) this.cancelEdit();
     const workspaceId = this.workspaceId;
     const generation = this.generation;
     const collectionNames = this.collectionNames;
@@ -460,20 +520,22 @@ export class AgentStore {
           ? view.activeChatId === chatId || view.activeChatId === resultChatId
           : !chatId && view.composer === composer;
         if (originalChat && result.chat?.id && result.chat.workspaceId === workspaceId) {
+          if (!view.activeChatId) this.adoptNewChatDraft(workspaceId, result.chat.id);
           view.activeChatId = result.chat.id;
           view.activeChat = editing ? result.chat : mergeAgentHistory(view.activeChat, result.chat);
           if (!result.error) view.attachmentPaths = [];
         }
         if (originalChat) view.notes = { chatId: resultChatId, error: stopped ? '' : (result.error ?? ''), warnings: result.warnings ?? [] };
-        if (originalChat && result.error && !stopped && !view.draft && chatMessageCount(result.chat) <= messageCount) view.draft = text;
+        if (originalChat && result.error && !stopped && !this.draftFor(workspaceId, view.activeChatId) && chatMessageCount(result.chat) <= messageCount) this.setDraftFor(workspaceId, view.activeChatId, text);
       });
     } catch (error) {
       const failedChatId = this.turns.get(turn.id)?.chatId || chatId;
       this.updateView(workspaceId, generation, view => {
         const originalChat = view.activeChatId ? view.activeChatId === failedChatId : !chatId && view.composer === composer;
         if (!originalChat) return;
+        if (editing && history && view.activeChat?.id === history.id) view.activeChat = history;
         view.notes = { chatId: failedChatId, error: error instanceof Error ? error.message : String(error), warnings: [] };
-        if (!view.draft) view.draft = text;
+        if (!this.draftFor(workspaceId, view.activeChatId)) this.setDraftFor(workspaceId, view.activeChatId, text);
       });
     } finally {
       this.turns.delete(turn.id);
@@ -484,7 +546,7 @@ export class AgentStore {
   }
 
   async stop() {
-    const entry = this.activeTurn ?? (this.driver ? [...this.turns.values()][0] : undefined);
+    const entry = this.activeTurn ?? (this.driver ? [...this.turns.values()].find(candidate => candidate.workspaceId === this.workspaceId) : undefined);
     if (!entry) return;
     this.updateEntry(entry, value => ({ ...value, stopRequested: true }));
     await stopAgent(entry.chatId || this.activeChatId, entry.turn.id);
@@ -512,6 +574,30 @@ export class AgentStore {
       return '';
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  async compact(): Promise<string> {
+    const chatId = this.activeChatId;
+    if (!chatId || this.running || this.compactingChat) return '';
+    const workspaceId = this.workspaceId;
+    const generation = this.generation;
+    this.compactingChat = chatId;
+    try {
+      const chat = await compactAgentChat(chatId, workspaceId);
+      this.updateView(workspaceId, generation, view => {
+        if (view.activeChat?.id !== chatId) return;
+        view.activeChat = {
+          ...view.activeChat, summary: chat.summary, summaryBefore: chat.summaryBefore, usage: chat.usage,
+          contextTokens: chat.contextTokens, contextWindow: chat.contextWindow, updatedAt: chat.updatedAt,
+        };
+      });
+      void this.refreshChats();
+      return '';
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    } finally {
+      if (this.compactingChat === chatId) this.compactingChat = '';
     }
   }
 
@@ -559,6 +645,7 @@ export class AgentStore {
     const generation = this.generation;
     const result = await deleteAgentChat(id);
     if (!result.ok) throw new Error(result.error || 'Kurlo could not delete the chat.');
+    this.setDraftFor(workspaceId, id, '');
     if (generation !== this.generation) return;
     this.chats = this.chats.filter(chat => chat.id !== id);
     this.approvals = this.approvals.filter(approval => approval.chatId !== id);
@@ -582,7 +669,6 @@ export class AgentStore {
     this.turns.clear();
     this.collection = '';
     this.environment = '';
-    this.draft = '';
     this.chats = [];
     this.chatsLoaded = false;
     this.newChat();

@@ -294,7 +294,9 @@
         "aiToolRequestIds": {
           "type": "array",
           "items": { "$ref": "#/definitions/id" }
-        }
+        },
+        "aiKurloTools": { "type": "boolean", "description": "Give the model Kurlo's read and run tools for this workspace." },
+        "aiConnectionId": { "type": "string", "description": "With aiProvider kurlo: the AI connection from Settings → AI to use. Empty uses the default connection." }
       }
     },
     "environment": {
@@ -307,6 +309,7 @@
         "name": { "type": "string" },
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "protected": { "type": "boolean" },
+        "sandbox": { "type": "boolean" },
         "values": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
