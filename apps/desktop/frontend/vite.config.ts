@@ -1,5 +1,5 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 import { latestReleaseNotes } from './src/lib/whatsNew.ts';
@@ -39,6 +39,7 @@ export default defineConfig({
     {
       name: 'keep-wails-dist-placeholder',
       closeBundle() {
+        mkdirSync(resolve('dist'), { recursive: true });
         writeFileSync(resolve('dist/.gitkeep'), '');
       }
     }
