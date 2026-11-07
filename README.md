@@ -2,8 +2,8 @@
 
 # Kurlo
 
-**The open-source Postman alternative your AI agent can drive.**<br>
-No account, no paid plan, no telemetry. Collections live as YAML in your Git repo.
+**The open-source API client with an agent inside.**<br>
+Bring any model, Claude Code or Codex. No account, no paid plan, no telemetry. Collections live as YAML in your Git repo.
 
 [![Latest release](https://img.shields.io/github/v/release/stormhop/kurlo)](https://github.com/stormhop/kurlo/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/stormhop/kurlo?style=flat)](https://github.com/stormhop/kurlo/stargazers)
@@ -15,14 +15,20 @@ No account, no paid plan, no telemetry. Collections live as YAML in your Git rep
 
 </div>
 
-![Claude Code adds tests to a Kurlo collection over MCP, finds a pricing bug and fixes it, while the tests appear in Kurlo](.github/assets/demo.gif)
+## New in 3.0: Agent mode
+
+Ask in plain words and the agent runs your requests and collections, explains why a call failed, writes requests and tests and imports your specs, right inside Kurlo. Pick the Kurlo agent on your own model (OpenRouter, an API key, Ollama or LM Studio), or connect the Claude Code or Codex you already use. Every change and every call other than `GET`, `HEAD` or `OPTIONS` waits for your approval, and the model never sees your secrets.
+
+![The Kurlo agent adds a status test to a request and asks to apply the change](.github/assets/agent-mode.png)
+
+[Agent mode on kurlo.dev](https://kurlo.dev/agent/) · [Agent guide](https://kurlo.dev/docs/guides/agent/)
 
 ## Why Kurlo
 
+- **An agent that asks first.** The Kurlo agent, Claude Code or Codex works on your collections inside the app. It shows every change before it is written, can follow a plan you approve and work on its own Git branch, and keeps chats on your machine.
 - **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request as the API change.
 - **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
-- **Agent mode.** Ask in plain words and the Kurlo agent on your own model, Claude Code or Codex runs your requests, explains failures and writes tests inside the app. It asks before every change, can follow a plan you approve and work on its own Git branch, and the model never sees your secrets.
-- **Your AI agent can use it.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
+- **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
 - **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.0 MB and the Linux one is 13.2 MB.
 
 | | Kurlo | Postman | Insomnia | Bruno |
@@ -122,7 +128,9 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 
 **Agent mode** — new in 3.0. Pick the Kurlo agent on your own model (OpenRouter, an API key, or Ollama and LM Studio), or connect the Claude Code and Codex CLIs you already use with their own accounts, and ask in plain words. The agent runs requests and collections, explains failures, writes requests and tests, imports OpenAPI, Postman and HAR files, and reads a connected project folder. It asks before every change and every call other than `GET`, `HEAD` or `OPTIONS`, can follow a plan you approve, work on its own Git branch and call your own MCP servers. Trusted hosts and sandbox environments run without asking, protected environments are off limits, and secrets reach the API while the model sees `[secret]`. Chats stay encrypted on your machine, and **Activity** lists every tool call with the files it changed and a way to restore them. See the [agent guide](https://kurlo.dev/docs/guides/agent/).
 
-**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved HTTP, GraphQL, unary gRPC, MCP and AI requests, run collections with CSV or JSON data, and send one-off calls with your `{{variables}}`. It can start and compare k6 runs and serve saved examples from a local mock. In the desktop app, Agent Mode can also exchange messages on live connections. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It can preview and apply Go imports, read a connected project folder, edit Markdown docs and generate snippets. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
+**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved HTTP, GraphQL, unary gRPC, MCP and AI requests, run collections with CSV or JSON data, and send one-off calls with your `{{variables}}`. It can start and compare k6 runs and serve saved examples from a local mock. In the desktop app, Agent Mode can also exchange messages on live connections. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It can preview and apply imports, read a connected project folder, edit Markdown docs and generate snippets. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
+
+![Claude Code adds tests to a Kurlo collection over MCP, finds a pricing bug and fixes it, while the tests appear in Kurlo](.github/assets/demo.gif)
 
 ```bash
 npx -y @kurlo/cli mcp install --env Staging
