@@ -144,7 +144,7 @@ function checkCodeBackedDocs() {
   }
 
   try {
-    const latestTag = execFileSync('git', ['describe', '--tags', '--abbrev=0', '--match', 'v*'], { cwd: root, encoding: 'utf8' }).trim();
+    const latestTag = execFileSync('git', ['describe', '--tags', '--abbrev=0', '--match', 'v*', '--exclude', 'v*-*'], { cwd: root, encoding: 'utf8' }).trim();
     if (latestTag && !coverage.includes(`desktop tag **${latestTag}**`)) {
       fail(`DOCS_COVERAGE.md audit tag is stale: expected ${latestTag}`);
     }
