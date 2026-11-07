@@ -21,8 +21,8 @@ No account, no paid plan, no telemetry. Collections live as YAML in your Git rep
 
 - **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request as the API change.
 - **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
+- **Agent mode.** Ask in plain words and the Kurlo agent on your own model, Claude Code or Codex runs your requests, explains failures and writes tests inside the app. It asks before every change, can follow a plan you approve and work on its own Git branch, and the model never sees your secrets.
 - **Your AI agent can use it.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
-- **See what the browser will do.** Send a request with a browser's CORS and CSP rules and get the error before your users do. Postman, Insomnia and Bruno do not do this.
 - **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 23.2 MB and the Linux one is 12.3 MB.
 
 | | Kurlo | Postman | Insomnia | Bruno |
@@ -33,7 +33,6 @@ No account, no paid plan, no telemetry. Collections live as YAML in your Git rep
 | Postman `pm.*` scripts | ✅ Run as written | Native | Compatibility layer | Converted to `bru.*` |
 | Mock server | ✅ Local, no cap | Cloud, needs an account | 1,000 requests/mo free | ✅ Local |
 | MCP | ✅ Client and server | Client | Client | Community servers |
-| Browser CORS and CSP checks | ✅ | — | — | — |
 
 Checked against vendor pricing pages on 15 October 2026. Details and sources: [vs Postman](https://kurlo.dev/vs/postman/), [vs Insomnia](https://kurlo.dev/vs/insomnia/), [vs Bruno](https://kurlo.dev/vs/bruno/).
 
@@ -70,6 +69,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - Query params, headers, body (JSON, form-data, x-www-form-urlencoded, raw text/XML/HTML, binary file)
 - cURL import — paste a curl command into the URL field, it parses automatically
 - Bulk edit for params, headers and form fields — switch the table to a `key: value` text area and back
+- Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved examples
 - GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
 - Postman, Insomnia, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and all-data backup import paths
 - OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the collection
@@ -78,6 +78,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 **Authentication**
 - Bearer Token
 - Basic Auth
+- NTLM (NTLMv2)
 - Digest Auth — MD5, SHA-256 and SHA-512-256 plus their `-sess` variants, with `qop=auth` and `auth-int`
 - API Key — in header or query string
 - OAuth 2.0 — Client Credentials, Authorization Code (with PKCE), Password, and Device Code grants; loopback browser sign-in, refresh tokens, and automatic token refresh before each send
@@ -102,6 +103,7 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 
 **Environments & Variables**
 - Multiple environments per workspace, switch with one click
+- Environments inherit the variables they do not set from another environment, such as Staging from Base
 - Matrix view — every variable as a row, every environment as a column, edited in place
 - `{{variable}}` template syntax in URLs, headers, params, body, auth fields
 - Set variables from test scripts (`pm.variables.set`, `pm.environment.set`)
@@ -110,14 +112,15 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 **Workspaces & Collections**
 - Multiple workspaces for separate projects or clients
 - Collections with nested folder hierarchy and empty-folder preservation
+- Folder defaults — headers, auth, scripts and tests on a folder apply to every request inside it
 - Drag-and-drop organisation
 - Request history — every send on its own page, request and stored response side by side, reopenable in the editor (14-day retention, 1000 entries)
 - Collection runner — sequential or parallel, data files, iterations, an HTML report, and the last run of every collection kept
 - [Load testing with k6](https://kurlo.dev/docs/guides/load-testing/) — collection flows with extraction and checks, virtual users or iteration rates, thresholds, CSV/JSON data, script export, local runs and last-run reports
-- Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets
+- Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets; branch, commit, pull, push and open a pull request from the app
 - **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure. `kurlo load list|export|run` lists collection load tests, exports k6 scripts or runs local k6 with threshold results and reports
 
-**Built-in agent** — ask in plain words and it runs requests, explains failures and edits collections on your own model (OpenRouter, an API key, or Ollama and LM Studio). It asks before sending anything but `GET`, `HEAD` or `OPTIONS` and shows every file change as a diff to apply or reject; chats stay on your machine and can be archived or exported as Markdown. The **Your agents** tab also connects installed Codex and Claude Code CLIs with their own credentials and native sessions. See the [agent guide](https://kurlo.dev/docs/guides/agent/).
+**Agent mode** — new in 3.0. Pick the Kurlo agent on your own model (OpenRouter, an API key, or Ollama and LM Studio), or connect the Claude Code and Codex CLIs you already use with their own accounts, and ask in plain words. The agent runs requests and collections, explains failures, writes requests and tests, imports OpenAPI, Postman and HAR files, and reads a connected project folder. It asks before every change and every call other than `GET`, `HEAD` or `OPTIONS`, can follow a plan you approve, work on its own Git branch and call your own MCP servers. Trusted hosts and sandbox environments run without asking, protected environments are off limits, and secrets reach the API while the model sees `[secret]`. Chats stay encrypted on your machine, and **Activity** lists every tool call with the files it changed and a way to restore them. See the [agent guide](https://kurlo.dev/docs/guides/agent/).
 
 **AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved HTTP, GraphQL, unary gRPC, MCP and AI requests, run collections with CSV or JSON data, and send one-off calls with your `{{variables}}`. It can start and compare k6 runs and serve saved examples from a local mock. In the desktop app, Agent Mode can also exchange messages on live connections. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It can preview and apply Go imports, read a connected project folder, edit Markdown docs and generate snippets. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
 

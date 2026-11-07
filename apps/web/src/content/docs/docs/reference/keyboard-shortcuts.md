@@ -72,6 +72,19 @@ Two more work without a binding and cannot be remapped: `Enter` in the URL field
 
 The arrow keys and `Backspace` leave the sidebar alone while a text field, the response body, a dialog, a menu or a tab bar has focus — there they scroll, edit or move between choices instead.
 
+## Agent
+
+| Shortcut | Action |
+|----------|--------|
+| `Enter` or `Cmd/Ctrl Enter` | Send the message |
+| `Shift Enter` | New line in the message |
+| `Cmd/Ctrl F` | Search chats |
+| `F2` | Rename the selected chat |
+| `Cmd/Ctrl W` | Close the Agent tab and keep its draft |
+| `Escape` | Close the agent picker, a menu or chat details |
+
+While the Agent tab is open, the request and sidebar shortcuts above (send, cancel, copy as cURL, find and replace, the response layout, the code panel, and the arrow keys, `Backspace`, `Cmd/Ctrl E`, `D`, `C` and `V` of the sidebar) do nothing, so they never change the request hidden behind the chat. Arrow keys scroll the chat instead. Tab, zoom, search, settings and **Show** shortcuts work everywhere.
+
 ## Remapping
 
 **Settings → Shortcuts** lists every action with its current binding. Click a shortcut, press the desired key combination, and the new binding is saved immediately. Assigning an existing combination unassigns it from the previous action. **Reset all** restores the default table. On Windows a binding can use the Windows key, and on Linux the Super key; they show as their own keys rather than as `Ctrl`.

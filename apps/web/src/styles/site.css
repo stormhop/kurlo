@@ -202,6 +202,37 @@ code {
   font-weight: 700;
 }
 
+.k-star {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.56rem;
+  padding: 0 0.85rem;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.k-star:hover {
+  border-color: color-mix(in srgb, currentColor 55%, transparent);
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+.k-star-icon {
+  color: #e3b341;
+  transition: transform 0.25s ease;
+}
+
+.k-star:hover .k-star-icon {
+  transform: rotate(72deg) scale(1.15);
+}
+
 .k-nav:not(.k-nav-solid) .k-nav-cta {
   background: var(--cream);
   color: #15161c;
@@ -908,10 +939,6 @@ code {
   margin-right: 0.4rem;
 }
 
-.k-out-err {
-  color: var(--con-bad);
-}
-
 .k-log {
   list-style: none;
   margin: 0;
@@ -932,48 +959,6 @@ code {
 
 .k-log .t {
   color: #b39af5;
-}
-
-.k-envs {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--mono);
-  font-size: 0.75rem;
-}
-
-.k-envs th,
-.k-envs td {
-  padding: 0.55rem 0.8rem;
-  text-align: left;
-  border-bottom: 1px solid var(--con-line);
-  white-space: nowrap;
-}
-
-.k-envs thead th {
-  color: var(--con-dim);
-  font-weight: 500;
-}
-
-.k-envs tbody th {
-  color: var(--con-key);
-  font-weight: 500;
-}
-
-.k-envs .inh {
-  color: var(--con-dim);
-}
-
-.k-envs .inh i {
-  margin-left: 0.35rem;
-  font-style: normal;
-  font-size: 0.625rem;
-  opacity: 0.7;
-}
-
-.k-envs .miss {
-  color: var(--con-bad);
-  background: rgba(242, 124, 133, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(242, 124, 133, 0.5);
 }
 
 .k-protos {
@@ -1878,7 +1863,7 @@ code {
     display: none;
   }
 
-  .k-nav-cta {
+  .k-star {
     margin-left: auto;
   }
 
@@ -2037,6 +2022,10 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .k-star-icon {
+    transition: none;
+  }
+
   .bird .wing,
   .bird .bird-bob,
   .k-send,
@@ -2956,5 +2945,15 @@ code {
 @media (max-width: 960px) {
   .k-agents {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .k-star-word {
+    display: none;
+  }
+
+  .k-star {
+    padding: 0 0.7rem;
   }
 }

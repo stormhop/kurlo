@@ -36,12 +36,15 @@ Shared files:
 ```text
 kurlo.yml
 .gitignore
+kurlo-agent.md
 workspaces/**/*.yml
 ```
 
 The shared YAML contains workspaces, collections, explicit folder paths, requests, environments, defaults, scripts, and settings. Secret values are replaced with `{{kurloSecret:...}}` placeholders. Their real values stay in Kurlo's encrypted local `requests.json` profile instead of the Git workspace.
 
 See [Kurlo YAML format](/docs/reference/kurlo-yaml-format/) for the public schema.
+
+`kurlo-agent.md` holds the team's notes for the agent, if the workspace has them; see [Team notes in kurlo-agent.md](/docs/guides/agent/#team-notes-in-kurlo-agentmd). Kurlo lists it under Changes and commits it with the rest of the workspace.
 
 ## Starting a folder workspace
 
@@ -77,6 +80,8 @@ Open the Git workspace screen from the branch at the left of the status bar. The
 7. Push to the configured upstream.
 
 Kurlo shows ahead/behind counts, current branch, upstream status, remotes, stashes, changed files, commit history, and outgoing commits.
+
+Once a branch is pushed and has nothing left to push, **Create PR** appears next to **Push**. It opens the page that starts a pull request on GitHub, or a merge request on GitLab and Bitbucket, from the current branch into the remote's default branch. Kurlo builds the link from the remote URL and sends nothing itself; for other hosts it says it cannot build one.
 
 ## Branches and stashes
 

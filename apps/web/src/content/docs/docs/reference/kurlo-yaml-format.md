@@ -221,6 +221,8 @@ request:
 | `aiThinking` | Empty, or `summarized` to show an Anthropic model's thinking. |
 | `aiStream` | `false` to wait for the whole answer; omitted when `true`. |
 | `aiToolRequestIds` | IDs of saved MCP requests whose tools the model may call. |
+| `aiKurloTools` | `true` to give the model Kurlo's read and run tools for the workspace; omitted when `false`. |
+| `aiConnectionId` | With `aiProvider: kurlo`, the id of the AI connection from Settings → AI to use; omitted for the default connection. |
 | `bodyType` | `none`, `json`, `text`, `xml`, `html`, `form`, `urlencoded`, `binary`, or `graphql`. |
 | `rawBodyType` | `text`, `json`, `html`, or `xml`. |
 | `preRequestScript`, `testScript` | Legacy Tengo scripts. |

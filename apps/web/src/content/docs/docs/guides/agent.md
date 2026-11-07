@@ -95,7 +95,7 @@ Click a file above a sent message to open it. For images, use **+** or **−** t
 
 ![Agent Mode message with an OpenAPI file, screenshot and SVG above the message](../../../../assets/screenshots/agent-context.png)
 
-Ask for an import from a file in the connected folder, an attachment, a pasted cURL command or an OpenAPI URL. The agent previews the changes before showing **Apply this import?** with the YAML diff. Approve to write the files or reject to leave the workspace as it was. The same Go importers work through the MCP server without a desktop window. [MCP import tools](/docs/guides/mcp-server/#import-requests-and-read-project-source)
+Ask for an import from a file in the connected folder, an attachment, a pasted cURL command or an OpenAPI URL. The agent previews the changes before showing **Apply this import?** with the list of requests it adds or changes. Approve to write the files or reject to leave the workspace as it was. The same Go importers work through the MCP server without a desktop window. [MCP import tools](/docs/guides/mcp-server/#import-requests-and-read-project-source)
 
 You can also ask the agent to read or update the Markdown docs of a request or collection, or generate a code snippet for an HTTP or GraphQL request. Give the request name and your language, for example, “Show me the Python snippet for Get pet.”
 
@@ -109,6 +109,8 @@ For the Kurlo agent, **Chat details** also shows the cost of the chat when the p
 
 **Budget** in **Chat details** caps a chat, up to 1,000,000,000 tokens and 100,000 requests, by tokens, counted over the whole chat, and by sent requests, counted as every request the agent sends with `run_request`, `send_request`, `run_collection` or `generate_tests`. Leave a field empty for no limit. The agent stops when the chat reaches either one and tells you, and a call that would go over the request budget does not run. Raise the budget to continue.
 
+When a Kurlo agent chat gets long, open **Chat details → History** and choose **Compact chat**. Kurlo asks the chat's model for a summary of the conversation so far: what you asked for, what was created or changed, results that matter later and what is still open. From your next message on, the agent works from that summary instead of the earlier messages, so each request is smaller. The messages stay in the chat for you, under a line that marks where the compacted part ends, and **Show summary** shows what the agent sees. Compact again after more messages to fold them into the summary too. Editing or branching from a message inside the compacted part drops the summary. Codex and Claude Code manage their own history and do not offer this.
+
 In **Chat details**, **Context (last request)** compares the last reported request's token count with the reported model window. It is a snapshot, not cumulative token usage or a prediction of the next request after compaction. The last reported snapshot is retained with the chat; if the CLI does not report a window, no percentage is invented.
 
 ## What it may do without asking
@@ -117,7 +119,7 @@ In **Chat details**, **Context (last request)** compares the last reported reque
 
 - **Ask always.** Only reading runs on its own. Every request, even a `GET`, and every change waits for you.
 - **Ask for changes.** The default, as in the table below.
-- **Auto.** Requests and changes to the workspace files run on their own. A `POST`, `PUT`, `PATCH` or `DELETE` to a host that is not trusted, starting k6, clearing cookies, OAuth sign-in and `git push` still wait for you.
+- **Auto.** Requests and changes to the workspace files run on their own. A `POST`, `PUT`, `PATCH` or `DELETE` to a host that is not trusted, a one-off call to a host the workspace does not use, starting k6, clearing cookies, OAuth sign-in and `git push` still wait for you.
 
 **Chat details → Permissions → Trusted hosts** lists hosts where `POST`, `PUT`, `PATCH` and `DELETE` run without asking, such as `localhost` or `*.staging.example.com`; new chats start with `localhost` and `127.0.0.1`. Kurlo resolves the request's URL with the chosen environment before it checks the host, and asks when the host contains a variable it cannot resolve. An environment marked as a [sandbox](/docs/guides/environments/#sandbox-environments-for-the-agent) lets every request sent with it run without asking. The settings are saved with the chat when you send a message.
 
@@ -125,12 +127,13 @@ In **Chat details**, **Context (last request)** compares the last reported reque
 |--------------------|--------------|
 | List or read requests, environments or history, or diagnose a failure | Runs at once |
 | Run a request, a collection or a one-off call that only sends `GET`, `HEAD` or `OPTIONS` | Runs at once |
+| Send a one-off call to a host that no saved request or variable of the workspace uses | Asks first, even for `GET`, unless the host is trusted |
 | Send any other method, such as `POST` or `DELETE` | Asks first, showing the call |
 | Run a saved unary gRPC, MCP or AI request, or open a live connection | Asks before contacting the configured server |
 | Send a live message or start or stop the mock server | Asks first |
 | Start k6 or clear the cookie jar | Asks every time |
 | Fetch an OpenAPI URL | Asks before fetching |
-| Apply an import or edit Markdown docs | Shows the YAML diff for approval |
+| Apply an import or edit Markdown docs | Shows the changes for approval |
 | Check k6 progress, compare results, read the mock log or list cookie metadata | Runs at once |
 | Change the workspace: save or delete a request, save an example, set a variable, create a collection, write tests or save a load test | Asks first, showing the change file by file |
 | Read the Git status or diff of the workspace, or build a pull request link | Runs at once |
@@ -139,15 +142,21 @@ In **Chat details**, **Context (last request)** compares the last reported reque
 
 Before a task with several changes the agent shows **Follow this plan?** with its steps and, under **Runs without asking again**, the exact calls it intends to make, each with its target such as a request path, a variable or a URL. **Approve plan** lets exactly those calls run without asking for the rest of the turn; a call listed without a target runs once. Anything else still waits for you, and `git push` never joins a plan.
 
-An approval card shows the exact lines that would change in each YAML file. **Apply** writes them, **Reject** tells the agent no and it asks what you want instead, and **Allow for this chat** applies this change and lets the same tool run without asking for the rest of the chat.
+An approval card lists what would change in plain terms: each request, environment, collection or the globals, where it lives, such as `Shop API / Orders`, whether it is new, changed or deleted, and which fields change, such as **Tests added** or the old and new URL. Internal details such as ids are left out; a change that touches only them says so. **Show file changes** opens the exact lines of the YAML file. With one or two changes every item is open; with more, the card shows a short count such as **9 new requests** and a folded list you open item by item or with **Expand all**, and the list scrolls inside the card so the buttons stay close. **Apply** writes the changes, **Reject** tells the agent no and it asks what you want instead, and **Allow for this chat** applies this change and lets the same tool run without asking for the rest of the chat.
 
-![Approval card with the diff of a request file that gains a test](../../../../assets/screenshots/agent-approval.png)
+![Approval card listing a request that gains a test](../../../../assets/screenshots/agent-approval.png)
 
 Nothing is written while the card waits, and Kurlo keeps saving your own edits in the meantime. If you change one of those files before you click **Apply**, the change is dropped and the agent is told to try again, so it never overwrites your edit. The agent never writes a secret into the workspace: it uses a `{{variable}}` and asks you to set the value. Secret values reach it only as `[secret]`.
 
 ## Team notes in kurlo-agent.md
 
 Keep conventions for the agent in `kurlo-agent.md` at the root of the workspace folder: which environment to use for tests, naming rules, tags, what never to touch. The file is plain Markdown and lives in Git with the workspace, so the whole team shares it. The Kurlo agent reads it at the start of every turn and follows it, without letting it override the rules on this page. When the agent learns a convention that is missing, it offers to add it; the change shows as a diff and always waits for your approval, even after **Allow for this chat**.
+
+To edit the file in Kurlo, choose **Edit kurlo-agent.md…** at the bottom of **Templates** in the message box, or select **kurlo-agent.md** next to **Team notes** under **Chat details → Context**. When the workspace has no such file yet, the menu reads **Create kurlo-agent.md…** and the editor starts from an example with conventions and one template; **Create file** writes it. **Preview** shows the rendered Markdown, and the bottom line shows the size against the 32 KB limit and how many templates the file has. Press `Cmd+S` (`Ctrl+S` on Windows and Linux) or **Save** to save; closing with unsaved changes asks first. If the file changed on disk after you opened it, for example in another editor or through `git pull`, Kurlo does not overwrite it: **Load newer version** replaces your text with the copy on disk, and **Replace it** saves your text over it. A file over 32 KB is not opened here; shorten it in another editor first.
+
+Kurlo treats `kurlo-agent.md` as one of the workspace's files in Git: it shows under Changes on the Git screen, **Commit** includes it, and with **Branch** on, a change the agent makes to it is committed to the agent's branch like any other.
+
+![The kurlo-agent.md editor with the example notes in Preview](../../../../assets/screenshots/agent-notes-editor.png)
 
 Under a `## Templates` heading, each `### Title` with the text below it becomes a template in the message box:
 
@@ -164,9 +173,11 @@ Run the Smoke collection against Staging and explain every failure.
 
 ## MCP servers for the agent
 
-**Settings → AI → MCP servers for the agent** connects other MCP servers, such as GitHub, Jira, a database or your own service, to the Kurlo agent. Add an **HTTP** server with its URL and headers, or a **Local command** that Kurlo starts, such as `npx` with `-y` and `@modelcontextprotocol/server-github`, with its environment variables. **Test** connects and lists the tools. Header and environment values are encrypted on this computer; to keep a saved value when you edit a server, leave its line as `NAME=`.
+**Settings → AI → MCP servers for the agent** connects other MCP servers, such as GitHub, Jira, a database or your own service, to the Kurlo agent. Add an **HTTP** server with its URL and headers, or a **Local command** that Kurlo starts, such as `npx` with `-y` and `@modelcontextprotocol/server-github`, with its environment variables. **Test** connects and lists the tools, and says whether the server also has resources and prompts. Header and environment values are encrypted on this computer; to keep a saved value when you edit a server, leave its line as `NAME=`.
 
-Each turn the agent sees the tools of every server that is on, named `server__tool`. Every call waits for your approval, showing the server, the tool and its arguments, unless you choose **Allow for this chat** or an approved plan lists it as `server.tool`. Answers from these servers are treated as data, not instructions. **Turn off** keeps a server without offering its tools. Calls appear in the [activity log](#agent-activity) under the server and tool name.
+For an HTTP server that asks you to sign in, such as Linear or Notion, set **Sign-in** to **OAuth sign-in** and save. **Sign in** in the list reads the server's metadata to find its authorization server, registers Kurlo there and opens the sign-in page in your browser; when you approve, the server shows **Signed in**. If the authorization server does not let apps register themselves, create an app there and enter its **Client ID**. Kurlo uses PKCE and asks for a token for that server only. The tokens are encrypted on this computer and renewed when they expire; when that fails, the agent tells you to sign in again. **Sign out** forgets them.
+
+Each turn the agent sees the tools of every server that is on, named `server__tool`. Every call waits for your approval, showing the server, the tool and its arguments, unless you choose **Allow for this chat** or an approved plan lists it as `server.tool`. A server that offers resources or prompts also gets `server__resources_list`, `server__resource_read`, `server__prompts_list` and `server__prompt_get`, so the agent can read its documents or fill in its prompt templates. These only read, so they run without asking. Answers from these servers are treated as data, not instructions. **Turn off** keeps a server without offering its tools. Calls appear in the [activity log](#agent-activity) under the server and tool name.
 
 ## Git
 
@@ -180,7 +191,7 @@ To keep the agent's work apart from yours, turn on **Branch** in the message box
 
 ## Chats and the activity log
 
-Chats are kept on this computer in Kurlo's profile, encrypted like the [request history](/docs/guides/history/), and not in the workspace files, so they never end up in Git. Each chat belongs to the workspace selected in the top bar when you start it. The agent in that chat sees and changes only that workspace: its collections, requests and environments. Other workspaces in the same folder are out of its reach, and new collections and environments go into the chat's workspace. Switching workspaces shows that workspace's chats and restores its open chat, selected agent and unsent draft when you return. A new chat is named after its first message; rename it by clicking its name in the header, double-clicking it in the sidebar, pressing `F2`, or choosing **Rename** in its **•••** menu, where **Delete** removes it. Kurlo keeps up to 200 unarchived chats across the local profile and removes them after 90 days of inactivity.
+Chats are kept on this computer in Kurlo's profile, encrypted like the [request history](/docs/guides/history/), and not in the workspace files, so they never end up in Git. Each chat belongs to the workspace selected in the top bar when you start it. The agent in that chat sees and changes only that workspace: its collections, requests and environments. Other workspaces in the same folder are out of its reach, and new collections and environments go into the chat's workspace. Switching workspaces shows that workspace's chats and restores its open chat and selected agent when you return. Every chat, and the new chat, keeps its own unsent draft on this computer: it stays when you switch chats or workspaces, close the Agent tab or restart Kurlo, and disappears once you send it or clear the message box. A new chat is named after its first message; rename it by clicking its name in the header, double-clicking it in the sidebar, pressing `F2`, or choosing **Rename** in its **•••** menu, where **Delete** removes it. Kurlo keeps up to 200 unarchived chats across the local profile and removes them after 90 days of inactivity.
 
 Use `Cmd/Ctrl K` to find a chat by its name alongside requests and commands. **Chats in this workspace** includes unarchived chats from the selected workspace. Selecting a result opens its agent and chat. Prefix the query with `>` to search commands only.
 
@@ -192,13 +203,15 @@ Choose **Export as Markdown…** in either list to save the full stored conversa
 
 ### Agent activity
 
-Every tool call, by the Kurlo agent, Codex, Claude Code or an assistant connected through `kurlo mcp`, is also written to a local activity log with the files it changed, before and after. Open **Activity** at the top of the agent sidebar to see it. It shows the calls made in the workspace selected in the top bar; choose **All workspaces** to see calls from every workspace and folder, each marked with where it happened. A call from a `kurlo mcp` client belongs to the workspace whose files it changed; a call that only read belongs to none and shows only under **All workspaces**. Calls are listed newest first under **Today**, **Yesterday** and **Earlier**; search by tool, file, branch or commit, or narrow the list to one client and to the last 24 hours or 7 days. A grey dot marks a declined or restored call, a red one an error.
+Every tool call, by the Kurlo agent, Codex, Claude Code or an assistant connected through `kurlo mcp`, is also written to a local activity log with the files it changed, before and after. Open **Activity** at the top of the agent sidebar to see it. It shows the calls made in the workspace selected in the top bar; choose **All workspaces** to see calls from every workspace and folder, each marked with where it happened. A call from a `kurlo mcp` client belongs to the workspace whose files it changed; a call that only read belongs to none and shows only under **All workspaces**. Calls are listed newest first under **Today**, **Yesterday** and **Earlier**; search by tool, file, branch or commit, or narrow the list to one client. A grey dot marks a declined or restored call, a red one an error. The list updates by itself when an agent turn ends and when you come back to Kurlo.
 
-Select a call to see its client, time, arguments and result, the branch and commit it made, and the diff of each file it changed. **Restore** puts a file back to its version from before the call, and **Restore all** does it for every file of the call. Kurlo refuses when the file has changed since, so it never overwrites later work; restore that file from Git instead. Files over 512 KB are listed without their content and cannot be restored here. **Open chat** opens the chat the call came from when that chat is in the current workspace; for a call from another workspace, switch to that workspace in the top bar first.
+With no call selected, the screen sums up the calls of today and the last 7 days, the errors among them and the calls that changed files. **Recent changes** lists the latest calls that changed files, and **Errors and declined** the calls that failed or that you declined; select a row to open the call.
+
+Select a call to see its client, time, arguments and result, the branch and commit it made, and the diff of each file it changed. The close button at the top right returns to the summary. **Restore** puts a file back to its version from before the call, and **Restore all** does it for every file of the call. Kurlo refuses when the file has changed since, so it never overwrites later work; restore that file from Git instead. Files over 512 KB are listed without their content and cannot be restored here. **Open chat** opens the chat the call came from when that chat is in the current workspace; for a call from another workspace, switch to that workspace in the top bar first.
 
 ![Agent activity with a save_request call, its branch and commit, and the diff of the request file](../../../../assets/screenshots/agent-activity.png)
 
-The log is encrypted, kept for 30 days or 2,000 calls, and stores arguments and results with secrets masked and cut at 16 KB. Turn off **Record activity** to stop logging new calls, and **Clear…** deletes the whole log.
+The log is encrypted, kept for 30 days or 2,000 calls, and stores arguments and results with secrets masked and cut at 16 KB. In the **•••** menu of the summary, **Pause recording** stops logging new calls and **Clear activity…** deletes the whole log.
 
 ## Limits
 

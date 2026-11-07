@@ -71,24 +71,10 @@ const features = [
     visual: 'ci',
   },
   {
-    title: 'Environments that inherit.',
-    text: 'Staging takes whatever it doesn’t set from Base. Every variable across every environment sits in one table, so the one missing from staging stands out.',
-    link: 'docs/guides/environments/#inheriting-from-another-environment',
-    plate: 'b',
-    visual: 'envs',
-  },
-  {
-    title: 'Sees CORS before your users do.',
-    text: 'Send a request the way a page on another origin would. The missing header shows up here, not in a bug report.',
-    link: 'docs/guides/browser-security/',
-    plate: 'd',
-    visual: 'cors',
-  },
-  {
     title: 'Speaks everything.',
     text: 'HTTP/1.1 and 2, GraphQL with a schema explorer, gRPC, WebSocket, Socket.IO, SSE, language models, and MCP servers you can call by hand.',
     link: 'docs/guides/request-types/',
-    plate: 'c',
+    plate: 'b',
     visual: 'protocols',
   },
 ];
@@ -97,11 +83,11 @@ const also = [
   { title: 'Postman moves in', text: 'Postman, Insomnia, Bruno, OpenAPI, HAR and cURL. pm.* tests keep running, nothing to rewrite.', link: 'docs/getting-started/migrating/' },
   { title: 'Folders set the rules', text: 'Headers, auth, scripts and tests on a folder apply to every request inside it.', link: 'docs/guides/collection-defaults/#folder-defaults' },
   { title: 'Finishes your URLs', text: 'Completes URLs from history and saved requests, and the next JSON key from your examples.', link: 'docs/guides/request-types/#suggestions-while-you-type' },
-  { title: 'Auth, all of it', text: 'OAuth 2.0 with all four grants, PKCE and refresh, AWS SigV4, Digest, API keys and client certificates.', link: 'docs/guides/authentication/' },
+  { title: 'Environments that inherit', text: 'Staging takes what it does not set from Base, and one table shows every variable in every environment.', link: 'docs/guides/environments/#inheriting-from-another-environment' },
+  { title: 'Auth, all of it', text: 'OAuth 2.0 with all four grants, PKCE and refresh, NTLM, AWS SigV4, Digest, API keys and client certificates.', link: 'docs/guides/authentication/' },
   { title: 'Your browser’s cookies', text: 'An extension for Chrome, Edge, Brave and Firefox sends the session you are already signed into.', link: 'docs/guides/cookies/' },
   { title: 'Remembers', text: 'Every send with its response, kept for 14 days and reopenable in the editor.', link: 'docs/guides/history/' },
   { title: 'Runs with data', text: 'A whole collection over a CSV or JSON data file, right in the app.', link: 'docs/guides/collection-runner/' },
-  { title: 'Saves to disk', text: 'Send and download writes a binary response straight to a file, byte for byte.' },
   { title: 'Keeps secrets home', text: 'In a shared repo, tokens are placeholders. The values live encrypted on your machine.', link: 'privacy/' },
   { title: 'Notices outside edits', text: 'Change a file in your editor, or let an agent do it, and the open app merges it in.' },
   { title: 'Tests your MCP server', text: 'Discover tools, call them with arguments from their schema and read the raw JSON-RPC.', link: 'mcp/' },
@@ -109,7 +95,7 @@ const also = [
 ];
 
 const parts = [
-  { part: 'Agent mode', details: 'The Kurlo agent with any model, Claude Code and Codex. Every change asks first.', status: 'Yes', tone: 'yes' },
+  { part: 'Agent mode', details: 'The Kurlo agent with any model, Claude Code and Codex. Approvals, plans, MCP servers and a Git branch per chat.', status: 'Yes', tone: 'yes' },
   { part: 'HTTP', details: '1.1 and 2, with proxies and client certificates.', status: 'Yes', tone: 'yes' },
   { part: 'GraphQL', details: 'Queries, variables and a schema explorer.', status: 'Yes', tone: 'yes' },
   { part: 'gRPC', details: 'Server reflection or your own .proto files.', status: 'Yes', tone: 'yes' },
@@ -117,8 +103,10 @@ const parts = [
   { part: 'AI requests', details: 'OpenAI, Anthropic, OpenRouter, Groq, Ollama, LM Studio and any compatible API.', status: 'Yes', tone: 'yes' },
   { part: 'MCP servers', details: 'Streamable HTTP, every revision since 2025-03-26. The stdio transport is still to come.', status: 'Partly', tone: 'part' },
   { part: 'Load tests', details: 'k6 under the hood: run locally, export a script or use the CLI.', status: 'Yes', tone: 'yes' },
+  { part: 'Mock server', details: 'Saved examples served on localhost, with a request log.', status: 'Yes', tone: 'yes' },
+  { part: 'CI', details: 'kurlo run with JUnit and JSON reports, from npm as @kurlo/cli.', status: 'Yes', tone: 'yes' },
   { part: 'Postman scripts', details: 'pm.*, pm.sendRequest, chai and CryptoJS.', status: 'Yes', tone: 'yes' },
-  { part: 'Git', details: 'Clone, commit, pull and push without leaving the app.', status: 'Yes', tone: 'yes' },
+  { part: 'Git', details: 'Clone, branch, commit, pull, push and open a pull request without leaving the app.', status: 'Yes', tone: 'yes' },
   { part: 'Account', details: 'There is no Kurlo server to have one on.', status: 'None', tone: 'yes' },
   { part: 'Telemetry', details: 'Update checks ask GitHub for one file. That’s it.', status: 'None', tone: 'yes' },
   { part: 'Platforms', details: 'macOS 12+, Windows 10+ on x64 and Arm64, Linux x64.', status: 'Yes', tone: 'yes' },
@@ -230,7 +218,7 @@ const ldJson = structuredData({
     <div class="k-features-head">
       <p class="k-label">Everything around the request</p>
       <h2 class="k-display" id="features-title">Not just Send.</h2>
-      <p class="k-sub">Load tests, mocks, models, CI and the browser’s rules, in the same app and the same YAML.</p>
+      <p class="k-sub">Load tests, mocks, models and CI, in the same app and the same YAML.</p>
     </div>
     {features.map((feature, i) => (
       <article class={`k-feature ${i % 2 ? 'k-feature-flip' : ''}`}>
@@ -320,29 +308,6 @@ Cursor        <span class="ok">added</span>
 <b class="ok">✓</b> POST /orders/42/refund  → 201   84ms  [2/2 tests]
 
 <span class="dim">3 requests, 3 passed, 0 failed · 5/5 assertions · 214ms</span></pre>
-            </figure>
-          )}
-          {feature.visual === 'cors' && (
-            <figure class="k-card">
-              <figcaption><span>Browser check</span><span>origin https://shop.example.com</span></figcaption>
-<pre><span class="dim">OPTIONS</span> api.example.com/orders  → 204
-  Access-Control-Allow-Methods: GET, POST
-  <span class="err">Access-Control-Allow-Origin: missing</span></pre>
-              <div class="k-out k-out-err"><span><b>✗</b> A page on shop.example.com can’t read this response</span></div>
-            </figure>
-          )}
-          {feature.visual === 'envs' && (
-            <figure class="k-card">
-              <figcaption><span>Environments</span><span>Staging and Prod inherit from Base</span></figcaption>
-              <table class="k-envs">
-                <thead><tr><th><span class="k-sr">Variable</span></th><th>Base</th><th>Staging</th><th>Prod</th></tr></thead>
-                <tbody>
-                  <tr><th>baseUrl</th><td>localhost:8080</td><td>stg.shop.dev</td><td>api.shop.dev</td></tr>
-                  <tr><th>currency</th><td>EUR</td><td class="inh">EUR <i>Base</i></td><td class="inh">EUR <i>Base</i></td></tr>
-                  <tr><th>token</th><td>••••••</td><td>••••••</td><td>••••••</td></tr>
-                  <tr><th>webhookUrl</th><td class="inh">—</td><td class="miss">missing</td><td>hooks.shop.dev</td></tr>
-                </tbody>
-              </table>
             </figure>
           )}
           {feature.visual === 'protocols' && (
