@@ -2808,6 +2808,26 @@ code {
   .k-pill span {
     white-space: normal;
   }
+
+  .k-hero-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .k-hero-copy .k-lead {
+    order: 1;
+    margin-bottom: 1.25rem;
+  }
+
+  .k-hero-copy .k-pill {
+    order: 2;
+    margin-bottom: 1.75rem;
+  }
+
+  .k-hero-copy .k-cta {
+    order: 3;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
