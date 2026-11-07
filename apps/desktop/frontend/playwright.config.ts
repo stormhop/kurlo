@@ -16,9 +16,12 @@ const serialMode = Boolean(
   process.env.KURLO_PERF_PROFILE ||
   process.env.KURLO_ROUNDTRIP_IN,
 );
+const recordArtifacts = Boolean(process.env.CI || process.env.KURLO_E2E_TRACE === '1');
+const useDevServer = process.env.KURLO_E2E_SERVER === 'dev';
 const localWorkers = Math.min(4, Math.max(1, availableParallelism() - 1));
 const workers = serialMode ? 1 : process.env.CI ? 2 : localWorkers;
 const artifactDir = process.env.KURLO_E2E_ARTIFACT_DIR ?? join(tmpdir(), 'kurlo-playwright-artifacts');
+const bundleDir = join(artifactDir, 'app');
 const reporter: PlaywrightTestConfig['reporter'] = process.env.CI || process.env.KURLO_E2E_HTML_REPORT === '1'
   ? [
       ['list'],
@@ -44,17 +47,19 @@ export default defineConfig({
   reporter,
   use: {
     baseURL: 'http://127.0.0.1:4173',
-    trace: 'retain-on-failure',
+    trace: recordArtifacts ? 'retain-on-failure' : 'off',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: recordArtifacts ? 'retain-on-failure' : 'off',
     launchOptions: {
       slowMo,
     },
   },
   webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 4173 --strictPort',
+    command: useDevServer
+      ? 'npm run dev -- --host 127.0.0.1 --port 4173 --strictPort'
+      : `npx vite build --logLevel warn --outDir "${bundleDir}" --emptyOutDir && npx vite preview --outDir "${bundleDir}" --host 127.0.0.1 --port 4173 --strictPort`,
     url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: useDevServer && !process.env.CI,
     timeout: 120_000,
   },
   projects: [

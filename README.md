@@ -221,7 +221,7 @@ make check-full
 | Interactive browser test runner | `npm run test:e2e:ui` |
 | Retry only failed browser tests | `npm run test:e2e:failed` |
 
-Browser tests use up to four workers locally and two in CI. Override this with `--workers=2`; use `--workers=1` for isolated performance comparisons. Screenshot-generation and profiling modes default to one worker. On a memory-constrained machine, `make check CHECK_JOBS=1` runs the independent checks sequentially. Go tests already run packages in parallel; tests sharing process-wide environment variables stay sequential within a package. Go caches successful runs; add `GO_TEST_FLAGS='-count=1'` only when a fresh run is needed.
+Browser tests run against a production build of the frontend that Playwright builds and serves on each run, so they do not keep a dev server compiling modules for every page. Locally they record no video or trace; set `KURLO_E2E_TRACE=1` to keep them for failures (`npm run test:e2e:failed` does), and `KURLO_E2E_SERVER=dev` to test against the Vite dev server, which the `--ui` and `--debug` modes use. Browser tests use up to four workers locally and two in CI. Override this with `--workers=2`; use `--workers=1` for isolated performance comparisons. Screenshot-generation and profiling modes default to one worker. On a memory-constrained machine, `make check CHECK_JOBS=1` runs the independent checks sequentially. Go tests already run packages in parallel; tests sharing process-wide environment variables stay sequential within a package. Go caches successful runs; add `GO_TEST_FLAGS='-count=1'` only when a fresh run is needed.
 
 See `make help` for every available target.
 
