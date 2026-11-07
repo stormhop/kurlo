@@ -70,7 +70,7 @@ func TestAgentChatIsStoredInSealedParts(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(raw), "xxxx") {
+		if strings.Contains(string(raw), `"role"`) || strings.Contains(string(raw), strings.Repeat("x", 64)) {
 			t.Fatal("chat parts are encrypted on disk")
 		}
 	}
