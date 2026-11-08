@@ -19,7 +19,7 @@ Bring any model, Claude Code or Codex. No account, no paid plan, no telemetry. C
 
 Ask in plain words and the agent runs your requests and collections, explains why a call failed, writes requests and tests and imports your specs, right inside Kurlo. Pick the Kurlo agent on your own model (OpenRouter, an API key, Ollama or LM Studio), or connect the Claude Code or Codex you already use. Every change and every call other than `GET`, `HEAD` or `OPTIONS` waits for your approval, and the model never sees your secrets.
 
-![The Kurlo agent adds a status test to a request and asks to apply the change](.github/assets/agent-mode.png)
+![The Kurlo agent reads a collection, runs the requests, and asks before adding tests to four of them](.github/assets/agent-mode.gif)
 
 [Agent mode on kurlo.dev](https://kurlo.dev/agent/) · [Agent guide](https://kurlo.dev/docs/guides/agent/)
 
