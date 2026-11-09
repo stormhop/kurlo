@@ -43,6 +43,9 @@ jobs:
       - name: Check docs
         run: npm run web:check-docs
 
+      - name: Check download links
+        run: npm run web:check-downloads
+
       - name: Publish
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}

@@ -182,8 +182,13 @@ const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
         document.querySelectorAll('[data-os-download]').forEach(button => {
           const label = button.querySelector('[data-os-label]');
           const tag = button.querySelector('[data-os-tag]');
+          const url = button.getAttribute(`data-url-${os}`);
           if (label && label.dataset.osLabel !== 'keep') label.textContent = `Download for ${names[os]}`;
-          if (tag) tag.textContent = kinds[os];
+          if (tag) tag.textContent = button.getAttribute(`data-tag-${os}`) || kinds[os];
+          if (url) {
+            button.href = url;
+            button.setAttribute('download', '');
+          }
         });
       }
 

@@ -58,6 +58,9 @@ jobs:
           KURLO_SITE_BASE: ${{ vars.KURLO_SITE_BASE }}
         run: npm run web:check-docs
 
+      - name: Check download links
+        run: npm run web:check-downloads
+
       - name: Install Wails Linux dependencies
         run: |
           sudo apt-get update

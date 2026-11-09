@@ -1,10 +1,10 @@
 ---
-const releases = 'https://github.com/stormhop/kurlo/releases/latest';
+import { RELEASE_PAGE, RELEASE_VERSION, assetName, assetUrl, primaryDownloads } from '../lib/downloads';
+
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 
 interface PlatformFile {
   label: string;
-  file: string;
   match: string;
   arch?: 'x86' | 'arm';
   primary?: boolean;
@@ -24,7 +24,7 @@ const platforms: Platform[] = [
     name: 'macOS',
     requirement: 'macOS 12 Monterey or later · Apple Silicon and Intel',
     files: [
-      { label: 'Universal disk image', file: 'kurlo-<version>-darwin-universal.dmg', match: '-darwin-universal.dmg', primary: true },
+      { label: 'Universal disk image', match: '-darwin-universal.dmg', primary: true },
     ],
     note: 'Not Apple-notarized yet: on first launch, allow it in System Settings → Privacy & Security → Open Anyway.',
   },
@@ -33,10 +33,10 @@ const platforms: Platform[] = [
     name: 'Windows',
     requirement: 'Windows 10 1903+ or Windows 11 · x64 and Arm64',
     files: [
-      { label: 'Installer', file: 'kurlo-<version>-windows-amd64-installer.exe', match: '-windows-amd64-installer.exe', arch: 'x86', primary: true },
-      { label: 'MSIX package', file: 'kurlo-<version>-windows-amd64.msix', match: '-windows-amd64.msix', arch: 'x86' },
-      { label: 'Installer', file: 'kurlo-<version>-windows-arm64-installer.exe', match: '-windows-arm64-installer.exe', arch: 'arm', primary: true },
-      { label: 'MSIX package', file: 'kurlo-<version>-windows-arm64.msix', match: '-windows-arm64.msix', arch: 'arm' },
+      { label: 'Installer', match: '-windows-amd64-installer.exe', arch: 'x86', primary: true },
+      { label: 'MSIX package', match: '-windows-amd64.msix', arch: 'x86' },
+      { label: 'Installer', match: '-windows-arm64-installer.exe', arch: 'arm', primary: true },
+      { label: 'MSIX package', match: '-windows-arm64.msix', arch: 'arm' },
     ],
     note: 'SmartScreen may warn: the installer is not Authenticode-signed yet.',
   },
@@ -45,11 +45,15 @@ const platforms: Platform[] = [
     name: 'Linux',
     requirement: 'Ubuntu 22.04+, Debian 12+ or Fedora 37+ · x64 · WebKitGTK 4.1',
     files: [
-      { label: 'Portable AppImage', file: 'kurlo-<version>-linux-amd64.AppImage', match: '-linux-amd64.AppImage', primary: true },
+      { label: 'Portable AppImage', match: '-linux-amd64.AppImage', primary: true },
     ],
     note: 'Install libwebkit2gtk-4.1-0 and libfuse2, make the file executable with chmod +x, then run it.',
   },
 ];
+
+const sizes = new Map(primaryDownloads.map(item => [item.suffix, item.size]));
+const fileLabel = (suffix: string) => [assetName(suffix), sizes.get(suffix)].filter(Boolean).join(' · ');
+const primaryUrl = (platform: Platform) => assetUrl(platform.files.find(item => item.primary)?.match ?? platform.files[0].match);
 ---
 
 <div class="kurlo-platforms not-content">
@@ -63,20 +67,20 @@ const platforms: Platform[] = [
       <ul>
         {platform.files.map(item => (
           <li data-arch={item.arch} hidden={item.arch === 'arm'}>
-            <a href={releases} data-asset={item.match} data-primary={item.primary ? '' : undefined}>
+            <a href={assetUrl(item.match)} data-asset={item.match} data-primary={item.primary ? '' : undefined}>
               {item.label}
             </a>
-            <code data-asset-name>{item.file}</code>
+            <code data-asset-name>{fileLabel(item.match)}</code>
           </li>
         ))}
       </ul>
       <p class="kurlo-platform-note">{platform.note}</p>
-      <a class="kurlo-platform-cta" href={releases} data-cta>Download for {platform.name}</a>
+      <a class="kurlo-platform-cta" href={primaryUrl(platform)} data-cta download>Download for {platform.name}</a>
     </section>
   ))}
 </div>
 <p class="kurlo-platforms-after not-content">
-  <span data-release-line>Every file is on the <a href={releases}>latest release</a>.</span> First-run steps for each system are in <a href={`${base}docs/getting-started/installation/`}>Installation</a>.
+  <span data-release-line>Kurlo {RELEASE_VERSION}. Every file is on the <a href={RELEASE_PAGE}>release page</a>.</span> First-run steps for each system are in <a href={`${base}docs/getting-started/installation/`}>Installation</a>.
 </p>
 
 <script is:inline>
@@ -111,6 +115,14 @@ const platforms: Platform[] = [
     } catch {}
   }
 
+  function syncCtas() {
+    for (const card of document.querySelectorAll('.kurlo-platform')) {
+      const primary = card.querySelector<HTMLAnchorElement>('li:not([hidden]) a[data-primary]');
+      const cta = card.querySelector<HTMLAnchorElement>('[data-cta]');
+      if (primary && cta) cta.href = primary.href;
+    }
+  }
+
   function render(release: Release) {
     for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-asset]')) {
       const asset = findAsset(release, link.dataset.asset ?? '');
@@ -120,18 +132,10 @@ const platforms: Platform[] = [
       if (name) name.textContent = `${asset.name} · ${formatSize(asset.size)}`;
     }
 
-    for (const card of document.querySelectorAll('.kurlo-platform')) {
-      const primary = card.querySelector<HTMLElement>('li:not([hidden]) a[data-primary]');
-      const cta = card.querySelector<HTMLAnchorElement>('[data-cta]');
-      if (!primary || !cta) continue;
-      const asset = findAsset(release, primary.dataset.asset ?? '');
-      if (!asset) continue;
-      cta.href = asset.browser_download_url;
-      cta.setAttribute('download', '');
-    }
+    syncCtas();
 
     const line = document.querySelector('[data-release-line]');
-    const releasePage = line?.querySelector('a')?.href;
+    const releasePage = release.html_url || line?.querySelector('a')?.href;
     if (line && releasePage && release.tag_name) {
       const published = release.published_at
         ? new Date(release.published_at).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -145,6 +149,7 @@ const platforms: Platform[] = [
   }
 
   await applyArchitecture();
+  syncCtas();
   const release = await latestRelease();
   if (release) render(release);
 </script>

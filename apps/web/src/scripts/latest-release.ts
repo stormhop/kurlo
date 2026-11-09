@@ -8,6 +8,7 @@ export interface ReleaseAsset {
 
 export interface Release {
   tag_name?: string;
+  html_url?: string;
   published_at?: string;
   assets?: ReleaseAsset[];
 }
