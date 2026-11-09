@@ -1,7 +1,8 @@
 import { getEnvironment, setEnvironment } from '../../backend';
 import { makeEnvironment } from '../../normalizers';
 import { mkRow } from '../../constants';
-import type { Environment, KVRow, Workspace } from '../../types/models';
+import type { Collection, Environment, KVRow, Workspace } from '../../types/models';
+import { environmentForCollectionEntry, pinnedEnvironments, withoutPinnedEnvironment } from '../../collectionEnvironments';
 import type { VariableSuggestion } from '../../variables';
 import { variableTemplate } from '../../variables';
 import { resolveDynamicVariable } from '../../dynamicVariables';
@@ -49,6 +50,11 @@ type EnvironmentHost = {
   environmentPersistTimer: ReturnType<typeof setTimeout> | null;
   environmentSavedTimer: ReturnType<typeof setTimeout> | null;
   environments: Environment[];
+  collections: Collection[];
+  environmentScopeKey: string;
+  environmentScopePinnedIds: string[];
+  environmentOutsideScopeId: string | null;
+  workspaceBlocked: boolean;
   environmentView: EnvironmentView;
   workspaces: Workspace[];
   sidebarView: 'collections' | 'environments' | 'history' | 'agent';
@@ -68,6 +74,7 @@ type EnvironmentHost = {
   activeSecretEnvironmentValues: () => string[];
   redactedActiveEnvironmentValues: () => Record<string, string>;
   selectEnvironment: (environmentId: string) => Promise<void>;
+  showEnvironmentScopeToast: (message: string) => void;
   resolveTemplate: (value: string, values?: Record<string, string>) => string;
   environmentRowsWithTrailing: (rows: KVRow[]) => KVRow[];
   scheduleEnvironmentPersist: (delay?: number) => void;
@@ -183,6 +190,41 @@ export const environmentFeature = {
       this.environmentToastTimer = null;
     }, 1800);
   },
+  showEnvironmentScopeToast(this: EnvironmentHost, message: string) {
+    if (this.environmentToastTimer) clearTimeout(this.environmentToastTimer);
+    this.environmentToast = message;
+    this.environmentToastTimer = setTimeout(() => {
+      if (this.environmentToast === message) this.environmentToast = '';
+      this.environmentToastTimer = null;
+    }, 2400);
+  },
+  async enterEnvironmentScope(this: EnvironmentHost, collection: Collection | null | undefined) {
+    if (collection === undefined) return;
+    const key = collection ? [collection.id, ...(collection.environmentIds ?? []), collection.defaultEnvironmentId ?? ''].join('\u001f') : '\u0000';
+    if (key === this.environmentScopeKey) return;
+    this.environmentScopeKey = key;
+    const previousPins = this.environmentScopePinnedIds;
+    const pins = pinnedEnvironments(collection ?? undefined, this.activeWorkspaceEnvironments).map(environment => environment.id);
+    this.environmentScopePinnedIds = pins;
+    if (this.workspaceBlocked) return;
+    if (!pins.length) {
+      const outside = this.environmentOutsideScopeId;
+      this.environmentOutsideScopeId = null;
+      if (outside === null || !previousPins.includes(this.activeEnvironmentId)) return;
+      const target = this.activeWorkspaceEnvironments.some(environment => environment.id === outside) ? outside : '';
+      if (target === this.activeEnvironmentId) return;
+      await this.selectEnvironment(target);
+      const name = this.environments.find(environment => environment.id === target)?.name;
+      this.showEnvironmentScopeToast(name ? `Using ${name} again` : 'No environment selected');
+      return;
+    }
+    if (!previousPins.length) this.environmentOutsideScopeId = this.activeEnvironmentId;
+    const next = environmentForCollectionEntry(collection ?? undefined, this.activeWorkspaceEnvironments, this.activeEnvironmentId);
+    if (next === null || next === this.activeEnvironmentId) return;
+    await this.selectEnvironment(next);
+    const name = this.environments.find(environment => environment.id === next)?.name ?? 'No environment';
+    this.showEnvironmentScopeToast(`Using ${name} for ${collection?.name ?? ''}`);
+  },
   async createEnvironment(this: EnvironmentHost) {
     if (!this.guardWorkspaceWritable('Creating environments')) return;
     const workspaceId = this.activeWorkspaceId || this.workspaces[0]?.id;
@@ -254,6 +296,9 @@ export const environmentFeature = {
         const { parentId: _previous, ...rest } = candidate;
         return environment.parentId ? { ...rest, parentId: environment.parentId } : rest;
       });
+    if (this.collections.some(collection => collection.environmentIds?.includes(environmentId))) {
+      this.collections = this.collections.map(collection => withoutPinnedEnvironment(collection, environmentId));
+    }
     if (this.activeEnvironmentId === environmentId) this.activeEnvironmentId = '';
     if (this.topView === 'environment') this.topView = 'overview';
     await this.persistRequestStore();

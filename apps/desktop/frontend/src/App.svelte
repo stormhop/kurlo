@@ -48,6 +48,14 @@
     });
   });
 
+  $effect(() => {
+    if (!vm.requestStoreLoaded) return;
+    const target = vm.environmentScopeTarget;
+    untrack(() => {
+      void vm.enterEnvironmentScope(target);
+    });
+  });
+
   const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
   const UPDATE_READY_KEY = 'kurlo:update-ready';
   const LAST_SEEN_VERSION_KEY = 'kurlo:last-seen-version';
@@ -647,6 +655,8 @@
       openRequests={vm.openRequestsForTabs}
       activeRequestId={vm.activeRequestId}
       activeWorkspaceEnvironments={vm.activeWorkspaceEnvironments}
+      environmentMenu={vm.environmentMenu}
+      environmentScopeName={vm.environmentScopeCollection?.name ?? ''}
       activeEnvironmentId={vm.activeEnvironmentId}
       dirtyRequestIds={vm.dirtyRequestIdList}
       collectionRunnerOpen={vm.collectionRunnerOpen}
@@ -819,6 +829,7 @@
       {#if lazy.CollectionWorkspaceComponent}
       <lazy.CollectionWorkspaceComponent
         collection={vm.activeCollectionSettings}
+        environments={vm.activeWorkspaceEnvironments}
         requestCount={vm.activeCollectionSettings ? vm.collectionRequestCount(vm.activeCollectionSettings.id) : 0}
         lastRun={activeCollectionLastRun}
         onOpenRunner={vm.openCollectionRunner}

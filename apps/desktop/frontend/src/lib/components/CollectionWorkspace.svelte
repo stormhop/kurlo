@@ -7,7 +7,8 @@
   import { collectionSettingsFingerprint, emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsFingerprint, folderDefaultsFor, inheritedAuthSource, normalizeCollectionDefaults } from '../collectionDefaults';
   import { activeCount, cloneRowsForStore, guardTrailing, removeRow, restoreRows, scriptLineCount } from '../utils';
   import { openFileDialog } from '../backend';
-  import type { AuthState, Collection, CollectionDefaults, FolderDefaults, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
+  import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
+  import { defaultPinnedEnvironmentId, normalizeCollectionEnvironmentPins } from '../collectionEnvironments';
   import type { VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
   import Select from './Select.svelte';
@@ -15,7 +16,7 @@
   import { relativeTime, type CollectionRunTally } from '../collectionRuns';
 
   type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy';
-  type CollectionSettingsPatch = Pick<Collection, 'name' | 'description' | 'defaults'> & { baseFingerprint?: string };
+  type CollectionSettingsPatch = Pick<Collection, 'name' | 'description' | 'defaults' | 'environmentIds' | 'defaultEnvironmentId'> & { baseFingerprint?: string };
 
   const HTTP_VERSION_OPTIONS = [
     { value: 'auto', label: 'Auto' },
@@ -29,6 +30,7 @@
 
   let {
     collection,
+    environments = [],
     requestCount = 0,
     lastRun = null,
     onOpenRunner,
@@ -48,6 +50,7 @@
     onCreateRequestInFolder = () => {},
   }: {
     collection: Collection | undefined;
+    environments?: Environment[];
     requestCount?: number;
     lastRun?: (CollectionRunTally & { finishedAt: number }) | null;
     onOpenRunner: (collectionId: string) => void;
@@ -111,6 +114,10 @@
   let preRequestScriptJs = $state('');
   let testScriptJs = $state('');
   let settings = $state<RequestSettings>(emptyCollectionDefaults().settings);
+  let pinnedEnvironmentIds = $state<string[]>([]);
+  let defaultEnvironmentId = $state('');
+  const pinnedEnvironmentCount = $derived(environments.filter(environment => pinnedEnvironmentIds.includes(environment.id)).length);
+  const effectiveDefaultEnvironmentId = $derived(defaultPinnedEnvironmentId({ environmentIds: pinnedEnvironmentIds, defaultEnvironmentId }, environments));
 
   const engineLabel = $derived(scriptEngine === 'js' ? 'JavaScript' : 'Tengo');
   const activePre = $derived(scriptEngine === 'js' ? preRequestScriptJs : preRequestScript);
@@ -187,7 +194,21 @@
     preRequestScriptJs = defaults.preRequestScriptJs;
     testScriptJs = defaults.testScriptJs;
     settings = { ...defaults.settings };
+    const pins = normalizeCollectionEnvironmentPins(next);
+    pinnedEnvironmentIds = [...(pins.environmentIds ?? [])];
+    defaultEnvironmentId = pins.defaultEnvironmentId ?? '';
     authMenuOpen = false;
+  }
+
+  function togglePinnedEnvironment(environmentId: string, pinned: boolean) {
+    pinnedEnvironmentIds = pinned
+      ? [...pinnedEnvironmentIds.filter(id => id !== environmentId), environmentId]
+      : pinnedEnvironmentIds.filter(id => id !== environmentId);
+    if (!pinned && defaultEnvironmentId === environmentId) defaultEnvironmentId = '';
+  }
+
+  function draftPins() {
+    return normalizeCollectionEnvironmentPins({ environmentIds: pinnedEnvironmentIds, defaultEnvironmentId });
   }
 
   function inputValue(event: Event): string {
@@ -245,6 +266,7 @@
       name,
       description,
       defaults: draftDefaults(),
+      ...draftPins(),
     });
   }
 
@@ -262,10 +284,13 @@
         externalUpdate = false;
         return;
       }
+      const pins = draftPins();
       const didSave = await onSave(collection.id, {
         name,
         description,
         defaults: draftDefaults(),
+        environmentIds: pins.environmentIds ?? [],
+        defaultEnvironmentId: pins.defaultEnvironmentId ?? '',
         baseFingerprint,
       });
       if (didSave === false) return;
@@ -383,6 +408,34 @@
               <div><strong>{activeCount(variables)}</strong><span>collection vars</span></div>
               <div><strong>{auth.type === 'none' ? 'No' : 'Yes'}</strong><span>default auth</span></div>
               <div><strong>{scriptLineCount(preRequestScript) + scriptLineCount(testScript)}</strong><span>script lines</span></div>
+            </div>
+            <div class="collection-environments">
+              <div class="request-section-bar">
+                <span class="request-section-title">Environments</span>
+                <span class="request-section-meta">{pinnedEnvironmentCount ? 'Only pinned environments are listed in the switcher while you work in this collection. Opening the collection selects the default one.' : 'Pin environments to list only them in the switcher while you work in this collection.'}</span>
+              </div>
+              {#if environments.length}
+                <div class="collection-environment-list" role="list">
+                  {#each environments as environment (environment.id)}
+                    {@const pinned = pinnedEnvironmentIds.includes(environment.id)}
+                    <div class="collection-environment-row" class:pinned role="listitem">
+                      <label class="collection-environment-pin">
+                        <input type="checkbox" class="check" checked={pinned} onchange={(event) => togglePinnedEnvironment(environment.id, event.currentTarget.checked)} disabled={workspaceBlocked} />
+                        <span class="collection-environment-name">{environment.name}</span>
+                      </label>
+                      {#if pinned}
+                        {#if environment.id === effectiveDefaultEnvironmentId}
+                          <span class="collection-environment-default">Default</span>
+                        {:else}
+                          <button class="btn btn-ghost btn-sm" type="button" onclick={() => (defaultEnvironmentId = environment.id)} disabled={workspaceBlocked}>Set as default</button>
+                        {/if}
+                      {/if}
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <p class="collection-environment-empty">This workspace has no environments yet.</p>
+              {/if}
             </div>
           </div>
         {:else if collectionSettingsTab === 'headers'}

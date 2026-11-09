@@ -6,6 +6,7 @@ import {
   reorderWorkspaceCollections,
   type DropPlacement,
 } from '../../collections';
+import { normalizeCollectionEnvironmentPins } from '../../collectionEnvironments';
 import { makeCollection } from '../../normalizers';
 import type { Collection, CollectionGroup, FolderDefaults, FolderGroup, PersistRequestStore, RequestType, SavedRequest, SidebarView } from '../../types/models';
 import { requestTabLabel } from '../../utils';
@@ -183,7 +184,7 @@ export const collectionFeature = {
   collectionRequestCount(this: CollectionHost, collectionId: string) {
     return this.requests.filter(request => !request.isDraft && request.collectionId === collectionId).length;
   },
-  async saveCollectionSettings(this: CollectionHost, collectionId: string, patch: Pick<Collection, 'name' | 'description' | 'defaults'> & { baseFingerprint?: string }): Promise<boolean> {
+  async saveCollectionSettings(this: CollectionHost, collectionId: string, patch: Pick<Collection, 'name' | 'description' | 'defaults' | 'environmentIds' | 'defaultEnvironmentId'> & { baseFingerprint?: string }): Promise<boolean> {
     if (!this.guardWorkspaceWritable('Saving collection settings')) return false;
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection || collection.isInvalid) return false;
@@ -196,9 +197,12 @@ export const collectionFeature = {
     }
     const name = patch.name.trim() || collection.name;
     const defaults = normalizeCollectionDefaults(patch.defaults);
-    this.collections = this.collections.map(candidate => candidate.id === collectionId
-      ? { ...candidate, name, description: patch.description, defaults }
-      : candidate);
+    const pins = 'environmentIds' in patch || 'defaultEnvironmentId' in patch ? normalizeCollectionEnvironmentPins(patch) : normalizeCollectionEnvironmentPins(collection);
+    this.collections = this.collections.map(candidate => {
+      if (candidate.id !== collectionId) return candidate;
+      const { environmentIds: _ids, defaultEnvironmentId: _default, ...rest } = candidate;
+      return { ...rest, name, description: patch.description, defaults, ...pins };
+    });
     this.collectionSettingsSaveState = 'saving';
     if (this.collectionSettingsSavedTimer) {
       clearTimeout(this.collectionSettingsSavedTimer);

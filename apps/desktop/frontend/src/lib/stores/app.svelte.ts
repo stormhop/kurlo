@@ -81,6 +81,7 @@ import { mkSioEventRow, socketioFormFeature } from './features/socketioForm';
 import { mockServerFeature } from './features/mockServer';
 import { dialogFeature } from './features/dialogs';
 import { environmentFeature, readEnvironmentView, type EnvironmentView } from './features/environments';
+import { environmentMenuGroups, type EnvironmentMenuGroups } from '../collectionEnvironments';
 import { globalsFeature, withTrailingRow as withTrailingGlobalRow } from './features/globals';
 import { historyFeature } from './features/history';
 import { normalizeCollectionRuns, type CollectionRunRecord } from '../collectionRuns';
@@ -864,6 +865,8 @@ class AppVM {
   declare environmentValueCount: typeof environmentFeature.environmentValueCount;
   declare selectEnvironment: typeof environmentFeature.selectEnvironment;
   declare useEnvironment: typeof environmentFeature.useEnvironment;
+  declare enterEnvironmentScope: typeof environmentFeature.enterEnvironmentScope;
+  declare showEnvironmentScopeToast: typeof environmentFeature.showEnvironmentScopeToast;
   declare createEnvironment: typeof environmentFeature.createEnvironment;
   declare renameEnvironment: typeof environmentFeature.renameEnvironment;
   declare setEnvironmentProtected: typeof environmentFeature.setEnvironmentProtected;
@@ -1201,6 +1204,9 @@ class AppVM {
   activeRequestId = $state('');
   activeWorkspaceId = $state('');
   activeEnvironmentId = $state('');
+  environmentScopeKey = '';
+  environmentScopePinnedIds: string[] = [];
+  environmentOutsideScopeId: string | null = null;
   openRequestIds = $state<string[]>([]);
   requestStoreLoaded = $state(false);
   folderCollapseState = $state<Record<string, boolean>>({});
@@ -1458,6 +1464,21 @@ class AppVM {
   }
   get activeCollectionSettings(): Collection | undefined {
     return this.collections.find(collection => collection.id === this.activeCollectionSettingsId && collection.workspaceId === this.activeWorkspaceId);
+  }
+  get environmentScopeCollection(): Collection | undefined {
+    if (this.topView === 'collection') return this.activeCollectionSettings;
+    if (this.topView !== 'request') return undefined;
+    const request = this.requestsById.get(this.activeRequestId);
+    if (!request || request.isDraft) return undefined;
+    return this.collections.find(collection => collection.id === request.collectionId && collection.workspaceId === this.activeWorkspaceId);
+  }
+  get environmentScopeTarget(): Collection | null | undefined {
+    const collection = this.environmentScopeCollection;
+    if (collection) return collection;
+    return this.topView === 'request' ? null : undefined;
+  }
+  get environmentMenu(): EnvironmentMenuGroups {
+    return environmentMenuGroups(this.environmentScopeCollection, this.activeWorkspaceEnvironments);
   }
   get variableSuggestions(): VariableSuggestion[] { return this.requestVariableSuggestions(); }
   get cookieJarDefaultDomain() { return this.activeRequestCookieDomain(); }

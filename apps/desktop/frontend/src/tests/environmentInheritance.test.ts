@@ -74,6 +74,7 @@ describe('environment inheritance in the store', () => {
   function host(environments: Environment[], activeEnvironmentId = 'stage') {
     const h = {
       environments,
+      collections: [],
       activeEnvironmentId,
       activeWorkspaceId: 'ws',
       guardWorkspaceWritable: () => true,

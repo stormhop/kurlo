@@ -2,6 +2,7 @@ import { DEFAULT_REQUEST_SETTINGS } from './constants';
 import type { AuthState, Collection, CollectionDefaults, FolderDefaults, KVRow, RequestSettings, RequestSettingsOverrides, SavedRequest } from './types/models';
 import { authStateHasData, cloneRowsForStore, emptyAuthState, newEntityId, rowHasContent, sanitizeLike } from './utils';
 import { folderPathKey, folderPathStartsWith, normalizeFolderPath } from './collections';
+import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
 
 type RequestSettingKey = keyof RequestSettings;
 
@@ -72,17 +73,16 @@ export function normalizeCollectionDefaults(raw?: Partial<CollectionDefaults>): 
   };
 }
 
-export function collectionSettingsFingerprint(input: Pick<Collection, 'name' | 'description' | 'defaults'> | undefined): string {
+export function collectionSettingsFingerprint(input: Pick<Collection, 'name' | 'description' | 'defaults' | 'environmentIds' | 'defaultEnvironmentId'> | undefined): string {
   if (!input) return '';
-
-
-
-
+  const pins = normalizeCollectionEnvironmentPins(input);
   return JSON.stringify(
     {
       name: input.name ?? '',
       description: input.description ?? '',
       defaults: normalizeCollectionDefaults(input.defaults),
+      environmentIds: pins.environmentIds ?? [],
+      defaultEnvironmentId: pins.defaultEnvironmentId ?? '',
     },
     (key, value) => (key === 'id' ? undefined : value),
   );

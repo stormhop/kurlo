@@ -20,6 +20,7 @@ import { emptyCollectionDefaults, normalizeCollectionDefaults, normalizeFolderDe
 import { normalizeRequestExamples } from './examples';
 import { normalizeLoadTests } from './loadTests';
 import { normalizeCollectionFolderPaths } from './collections';
+import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
 import { defaultSocketIOArgs, requestBodyDefaultsFor } from './requestBodyDefaults';
 import {
     asText,
@@ -172,6 +173,7 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
         folderPaths: normalizeCollectionFolderPaths(input.folderPaths),
         defaults: normalizeCollectionDefaults(input.defaults),
         ...(folderDefaults.length ? { folderDefaults } : {}),
+        ...normalizeCollectionEnvironmentPins(input),
         ...(loadTests ? { loadTests } : {}),
     };
 }

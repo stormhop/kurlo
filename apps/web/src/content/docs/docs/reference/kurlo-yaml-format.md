@@ -87,6 +87,10 @@ collection:
     - - Auth
     - - Auth
       - Admin
+  environmentIds:
+    - env-core-dev
+    - env-core-staging
+  defaultEnvironmentId: env-core-staging
   folderDefaults:
     - id: folder-admin
       path:
@@ -104,6 +108,8 @@ requestOrder:
 ```
 
 `collection.folderPaths` preserves explicit folders, including empty folders. `collection.folderDefaults` holds the headers, auth, `preRequestScript`/`testScript` (and their `Js` variants) a folder applies to its requests, keyed by `path`. An `auth.type` of `none` means the folder's requests send no auth; a missing `auth` means they inherit. Secret auth fields and secret header values become placeholders, as in collection defaults. Request files stay flat under `requests/`; the UI hierarchy comes from `request.folderPath` and `collection.folderPaths`, not from nested filesystem directories.
+
+`collection.environmentIds` lists the ids of workspace environments pinned to the collection, and `collection.defaultEnvironmentId` names the one selected when the collection is opened (the first pinned one if it is missing). Both are left out when nothing is pinned. Ids of environments that no longer exist are ignored. They only affect the app's environment switcher.
 
 ## Request file
 

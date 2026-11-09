@@ -198,6 +198,8 @@ export type Collection = {
   folderPaths?: string[][];
   defaults: CollectionDefaults;
   folderDefaults?: FolderDefaults[];
+  environmentIds?: string[];
+  defaultEnvironmentId?: string;
   loadTests?: LoadTest[];
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;

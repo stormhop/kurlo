@@ -10,6 +10,7 @@
   import { MAX_WORKSPACES } from '../constants';
   import type { Collection, Environment, SavedRequest, SidebarView, Workspace } from '../types/models';
   import type { TopView } from '../stores/ui';
+  import type { EnvironmentMenuGroups } from '../collectionEnvironments';
 
   let {
     workspaceSearch = $bindable(''),
@@ -27,6 +28,8 @@
     openRequests,
     activeRequestId,
     activeWorkspaceEnvironments,
+    environmentMenu = undefined,
+    environmentScopeName = '',
     activeEnvironmentId,
     dirtyRequestIds,
     collectionRunnerOpen = false,
@@ -86,6 +89,8 @@
     openRequests: SavedRequest[];
     activeRequestId: string;
     activeWorkspaceEnvironments: Environment[];
+    environmentMenu?: EnvironmentMenuGroups;
+    environmentScopeName?: string;
     activeEnvironmentId: string;
     dirtyRequestIds: string[];
     collectionRunnerOpen?: boolean;
@@ -192,7 +197,22 @@
     });
   });
 
+  let otherEnvironmentsOpen = $state(false);
+  const othersHoldActive = $derived(Boolean(activeEnvironmentId && environmentMenu?.others.some(environment => environment.id === activeEnvironmentId)));
+  const showOtherEnvironments = $derived(otherEnvironmentsOpen || othersHoldActive);
+
+  $effect(() => {
+    if (!environmentMenuOpen) otherEnvironmentsOpen = false;
+  });
 </script>
+
+{#snippet environmentItem(environment: Environment, isDefault: boolean)}
+  <button class="menu-item" class:active={environment.id === activeEnvironmentId} type="button" onclick={() => useEnvironment(environment.id)} disabled={workspaceBlocked}>
+    <span class="environment-menu-dot" class:in-use={environment.id === activeEnvironmentId} aria-hidden="true"></span>
+    <span class="environment-menu-name">{environment.name}</span>
+    {#if isDefault}<small class="environment-menu-default">default</small>{:else if environmentHasValues(environment)}<small>{environmentValueCount(environment)}</small>{/if}
+  </button>
+{/snippet}
 
 <div class="workspace-searchbar titlebar-drag-region">
   <div class="workspace-searchbar-left">
@@ -444,13 +464,28 @@
             <span class="environment-menu-dot none" aria-hidden="true"></span>
             <span class="environment-menu-name">No environment</span>
           </button>
-          {#each activeWorkspaceEnvironments as environment, eachIndex (eachIndex)}
-            <button class="menu-item" class:active={environment.id === activeEnvironmentId} type="button" onclick={() => useEnvironment(environment.id)} disabled={workspaceBlocked}>
-              <span class="environment-menu-dot" class:in-use={environment.id === activeEnvironmentId} aria-hidden="true"></span>
-              <span class="environment-menu-name">{environment.name}</span>
-              {#if environmentHasValues(environment)}<small>{environmentValueCount(environment)}</small>{/if}
-            </button>
-          {/each}
+          {#if environmentMenu?.scoped}
+            <div class="menu-label environment-menu-scope">Pinned to {environmentScopeName}</div>
+            {#each environmentMenu.pinned as environment (environment.id)}
+              {@render environmentItem(environment, environment.id === environmentMenu.defaultId)}
+            {/each}
+            {#if environmentMenu.others.length}
+              <button class="menu-item environment-menu-others" type="button" aria-expanded={showOtherEnvironments} onclick={() => (otherEnvironmentsOpen = !otherEnvironmentsOpen)} disabled={workspaceBlocked || othersHoldActive}>
+                <svg class="environment-menu-chevron" class:open={showOtherEnvironments} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2L6.5 5L3.5 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span class="environment-menu-name">Other environments</span>
+                <small>{environmentMenu.others.length}</small>
+              </button>
+              {#if showOtherEnvironments}
+                {#each environmentMenu.others as environment (environment.id)}
+                  {@render environmentItem(environment, false)}
+                {/each}
+              {/if}
+            {/if}
+          {:else}
+            {#each activeWorkspaceEnvironments as environment, eachIndex (eachIndex)}
+              {@render environmentItem(environment, false)}
+            {/each}
+          {/if}
           <div class="menu-separator" role="separator"></div>
           <button class="menu-item" type="button" onclick={() => { environmentMenuOpen = false; sidebarView = 'environments'; topView = 'environment'; }} disabled={workspaceBlocked}>
             <MenuIcon name="settings" />

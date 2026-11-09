@@ -5,6 +5,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Environments pinned to a collection.** Under **Environments** on a collection's **Overview**, tick the environments that belong to it and pick a default. While a request from that collection is open, the environment switcher lists only those, with the rest of the workspace under a collapsed **Other environments**. Opening the collection selects its default environment unless the active one is already pinned, and moving on to a collection without pins or a new request switches back to the environment you had before, so a request is not sent with another service's variables by accident. Pins are stored as `environmentIds` and `defaultEnvironmentId` in `collection.yml`; deleting an environment unpins it everywhere. Collections without pins list every environment, as before.
+
 ## [3.0.0] - 2026-11-07
 
 ### Added

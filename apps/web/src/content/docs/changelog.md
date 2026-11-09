@@ -10,6 +10,12 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **Environments pinned to a collection.** Pin a collection's environments so the switcher shows only them while you work in it, select its default environment when you open it, and go back to your previous environment when you leave it. See [Pinning environments to a collection](/docs/guides/environments/#pinning-environments-to-a-collection).
+
 ## 3.0.0
 
 ### Added

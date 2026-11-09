@@ -178,6 +178,15 @@
             "items": { "type": "string" }
           }
         },
+        "environmentIds": {
+          "type": "array",
+          "description": "Ids of workspace environments pinned to this collection. While a request from the collection is open, the environment switcher lists only these.",
+          "items": { "$ref": "#/definitions/id" }
+        },
+        "defaultEnvironmentId": {
+          "$ref": "#/definitions/id",
+          "description": "Pinned environment selected when the collection is opened. Defaults to the first pinned environment."
+        },
         "defaults": { "$ref": "#/definitions/collectionDefaults" }
       }
     },
