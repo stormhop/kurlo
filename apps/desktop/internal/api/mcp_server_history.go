@@ -305,6 +305,9 @@ func mcpHistoryResponse(resp model.HttpResponse, entry mcpStoredHistoryEntry, se
 	if resp.Error != "" {
 		out["error"] = redactSecrets(resp.Error, secrets)
 	}
+	if resp.Skipped {
+		out["skipped"], out["skipReason"] = true, resp.SkipReason
+	}
 	headers := make([]mcpHeader, 0, len(resp.Headers))
 	for _, header := range resp.Headers {
 		headers = append(headers, mcpHeader{Name: header.Key, Value: redactSecrets(header.Value, secrets)})

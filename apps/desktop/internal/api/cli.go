@@ -226,7 +226,7 @@ func runCLI(opts cliOptions) int {
 		fmt.Fprintln(opts.stderr, "kurlo run:", err)
 		return 2
 	}
-	values, secretValues, err := resolveCLIValues(opts, collections, environments, globals)
+	values, secretValues, err := resolveCLIValues(opts, nil, environments, nil)
 	if err != nil {
 		fmt.Fprintln(opts.stderr, "kurlo run:", err)
 		return 2
@@ -261,6 +261,7 @@ func runCLI(opts cliOptions) int {
 
 	sm := state.New()
 	sm.SetEnvironment(values)
+	sm.SetVariables(globals)
 	jars := newCookieJarRegistry()
 	cache := newPreflightCache()
 	tokens := newOAuth2TokenCache()
@@ -323,7 +324,8 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 	}
 	base := cliRunResult{Name: label, Method: strings.ToUpper(req.Method), URL: req.URL, Iteration: iteration}
 
-	values := sm.GetEnvironment()
+	req = cliRequestCollectionScope(req, sm)
+	values := cliRequestValues(req, sm)
 	if len(dataRow) > 0 {
 		merged := make(map[string]string, len(values)+len(dataRow))
 		for k, v := range values {
@@ -367,6 +369,7 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 	httpReq.SecretEnvironmentValues = append(httpReq.SecretEnvironmentValues, base.secrets...)
 
 	resp := sendRequest(ctx, httpReq, sm, jars, cache)
+	applyCLICollectionUpdates(sm, req.CollectionID, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
 
 	if resp.Skipped {
 		base.Skipped = true

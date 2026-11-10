@@ -1119,10 +1119,11 @@ func (s *mcpServer) toolListEnvironments(_ context.Context, _ json.RawMessage) (
 }
 
 type mcpRunContext struct {
-	envName string
-	values  map[string]string
-	secrets []string
-	sm      *state.Manager
+	envName     string
+	values      map[string]string
+	secrets     []string
+	sm          *state.Manager
+	collections map[string]map[string]string
 }
 
 func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[string]any) (*mcpRunContext, error) {
@@ -1134,7 +1135,7 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 		return nil, fmt.Errorf("environment %s is protected: Kurlo does not send requests with it for AI agents; ask the user to run this in the app, or use another environment", env.Name)
 	}
 	globals, globalSecrets := mcpGlobalValues(s.opts.workspace, s.opts.loadAppSecrets)
-	values, secrets, err := resolveCLIValues(cliOptions{env: envName}, ws.collections, ws.environments, globals)
+	values, secrets, err := resolveCLIValues(cliOptions{env: envName}, nil, ws.environments, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1161,7 +1162,21 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 	sm := state.New()
 	sm.SetEnvironment(values)
 	sm.SetVariables(globals)
-	return &mcpRunContext{envName: envName, values: values, secrets: append(secrets, globalSecrets...), sm: sm}, nil
+	collections := map[string]map[string]string{}
+	for _, collection := range ws.collections {
+		rows := enabledRowValues(collection.Defaults.Variables)
+		if scope := s.session[mcpCollectionSessionKey(envName, collection.ID)]; scope != nil {
+			for key := range scope.removed {
+				delete(rows, key)
+			}
+			for key, value := range scope.set {
+				rows[key] = value
+			}
+		}
+		collections[collection.ID] = rows
+		sm.SetCollectionVariables(collection.ID, rows)
+	}
+	return &mcpRunContext{envName: envName, values: values, secrets: append(secrets, globalSecrets...), sm: sm, collections: collections}, nil
 }
 
 func (s *mcpServer) runOptions() cliOptions {
@@ -1185,51 +1200,49 @@ func (s *mcpServer) executeIteration(ctx context.Context, run *mcpRunContext, re
 			result.Logs = append(result.Logs, redactSecrets(line, run.secrets))
 		}
 	}
-	s.applyCollectionUpdates(run, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
 	return result, resp
 }
 
-func (s *mcpServer) applyCollectionUpdates(run *mcpRunContext, updates map[string]string, removed []string) {
-	if len(updates) > 0 || len(removed) > 0 {
-		values := run.sm.GetEnvironment()
-		for key, value := range updates {
-			values[key] = value
-		}
-		for _, key := range removed {
-			delete(values, key)
-		}
-		run.sm.SetEnvironment(values)
-	}
+func (s *mcpServer) applyCollectionUpdates(run *mcpRunContext, req cliSavedRequest, updates map[string]string, removed []string) {
+	applyCLICollectionUpdates(run.sm, req.CollectionID, updates, removed)
+}
+
+func mcpCollectionSessionKey(envName, collectionID string) string {
+	return strings.ToLower(envName) + "\ncollection:" + collectionID
 }
 
 func (s *mcpServer) remember(run *mcpRunContext) []string {
-	after := run.sm.GetEnvironment()
-	key := strings.ToLower(run.envName)
-	scope := s.session[key]
-	var changed []string
-	ensure := func() *mcpSessionScope {
-		if scope == nil {
-			scope = &mcpSessionScope{set: map[string]string{}, removed: map[string]bool{}}
-			s.session[key] = scope
+	changed := map[string]string{}
+	remember := func(key string, before, after map[string]string) {
+		scope := s.session[key]
+		ensure := func() *mcpSessionScope {
+			if scope == nil {
+				scope = &mcpSessionScope{set: map[string]string{}, removed: map[string]bool{}}
+				s.session[key] = scope
+			}
+			return scope
 		}
-		return scope
-	}
-	for name, value := range after {
-		if before, ok := run.values[name]; !ok || before != value {
-			ensure().set[name] = value
-			delete(scope.removed, name)
-			changed = append(changed, name)
+		for name, value := range after {
+			if previous, ok := before[name]; !ok || previous != value {
+				ensure().set[name] = value
+				delete(scope.removed, name)
+				changed[name] = ""
+			}
+		}
+		for name := range before {
+			if _, ok := after[name]; !ok {
+				ensure().removed[name] = true
+				delete(scope.set, name)
+				changed[name] = ""
+			}
 		}
 	}
-	for name := range run.values {
-		if _, ok := after[name]; !ok {
-			ensure().removed[name] = true
-			delete(scope.set, name)
-			changed = append(changed, name)
-		}
+	remember(strings.ToLower(run.envName), run.values, run.sm.GetEnvironment())
+	for id, before := range run.collections {
+		after, _ := run.sm.GetCollectionVariables(id)
+		remember(mcpCollectionSessionKey(run.envName, id), before, after)
 	}
-	sort.Strings(changed)
-	return changed
+	return sortedKeys(changed)
 }
 
 type mcpHeader struct {
@@ -1267,7 +1280,7 @@ var mcpVariableRe = regexp.MustCompile(`\{\{\s*([^{}$\s][^{}]*?)\s*\}\}`)
 
 func mcpUnresolvedVariables(req cliSavedRequest, run *mcpRunContext) []string {
 	known := map[string]bool{}
-	for _, source := range []map[string]string{run.values, run.sm.GetEnvironment(), run.sm.GetVariables()} {
+	for _, source := range []map[string]string{cliRequestValues(req, run.sm)} {
 		for key := range source {
 			known[key] = true
 		}

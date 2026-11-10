@@ -10,6 +10,22 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Fixed
+
+- **Exports without secrets.** Remove custom API keys, client-key passwords, proxy credentials and secrets in saved example requests; detect secrets in settings and examples before exporting.
+- **Agent host approvals.** Check the actual destination after applying request and session variable overrides.
+- **CLI and MCP collection variables.** Keep each collection's variables separate when running requests.
+- **Environment changes during sends and runs.** Collection runs keep their original environment, and gRPC script updates stay with the environment that started the request.
+- **gRPC scripts.** Honor `pm.execution.skipRequest()` and pass pre-request collection-variable changes to test scripts.
+- **Compressed SSE responses.** Read events when an explicit `Accept-Encoding` header requests compression.
+- **Duplicate request.** Keep pending edits in the source request when duplicating before autosave finishes.
+- **k6 export.** Resolve templates in header names, API-key header names and URL-encoded field names without generating invalid JavaScript.
+- **Long environment lists.** Keep rows at full height and let the sidebar list scroll, also after resizing the window or switching tabs.
+- **Selecting a response.** Cmd/Ctrl+A in the response panel selects only the body, and a selection dragged from the body leaves warnings above it out.
+- **Creating environments through the agent.** Create many environments with their variables in one batch; `values` or `variables` can be a list of rows or a `key: value` object. See [Batch edits](/docs/guides/mcp-server/#batch-edits).
+
 ## 3.0.1
 
 ### Added

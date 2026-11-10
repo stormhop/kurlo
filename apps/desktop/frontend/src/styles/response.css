@@ -8,6 +8,15 @@
   background: var(--bg);
 }
 
+.response-area:focus {
+  outline: none;
+}
+
+.response-tab-panel:has(.response-body-viewer:focus) .response-warning {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .response-status-bar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, auto);

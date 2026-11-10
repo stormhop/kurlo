@@ -1,4 +1,6 @@
-import { cancelHttpRequest, getEnvironment, getGlobalVariables, openFileDialog, readTextFile, sendGrpcRequest, sendHttpRequest } from '../../backend';
+import { cancelHttpRequest, openFileDialog, readTextFile, sendGrpcRequest, sendHttpRequest } from '../../backend';
+import { environmentValuesAfterChanges, type EnvironmentChanges } from './environments';
+import { globalValuesAfterChanges, type GlobalVariableChanges } from './globals';
 import type { RunnableHttpOptions } from './requestSerialization';
 import { clampConcurrency, DEFAULT_RUNNER_CONCURRENCY, forEachWithConcurrency } from '../../concurrency';
 import type { GrpcRequest, HttpRequest, HttpResponse } from '../../backend';
@@ -15,6 +17,7 @@ type CollectionRunnerHost = {
   requests: SavedRequest[];
   activeWorkspaceId: string;
   activeRequestId: string;
+  activeEnvironmentId: string;
   topView: TopView;
   collectionImportToast: string;
   collectionRunnerOpen: boolean;
@@ -55,21 +58,19 @@ type CollectionRunnerHost = {
   folderPathMatches: (path?: string[], prefix?: string[]) => boolean;
   headerValidationErrorForRequest: (req: SavedRequest, envValues?: Record<string, string>) => string;
   savedRequestToRunnableHttpRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string, options?: RunnableHttpOptions) => HttpRequest;
-  savedRequestToRunnableGrpcRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string, globals?: Record<string, string>) => GrpcRequest;
+  savedRequestToRunnableGrpcRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string, globals?: Record<string, string>, iterationData?: Record<string, string>) => GrpcRequest;
   activeEnvironmentValues: () => Record<string, string>;
   globalVariableValues: () => Record<string, string>;
   activeSecretEnvironmentValues: () => string[];
   activeSecretEnvironmentKeys: () => string[];
-  syncBackendEnvironment: () => Promise<void>;
-  syncBackendGlobals: () => Promise<void>;
-  syncGlobalsFromBackend: () => Promise<boolean>;
-  mergeActiveEnvironmentValues: (values: Record<string, string>) => Promise<boolean>;
+  applyEnvironmentChangesFromResponse: (changes: EnvironmentChanges, environmentId: string) => Promise<void>;
+  applyGlobalVariableChangesFromResponse: (changes: GlobalVariableChanges) => Promise<boolean>;
   applyCollectionVariableUpdates: (
     req: Pick<SavedRequest, 'collectionId'>,
     updates: Record<string, string> | undefined,
     removed: string[] | undefined,
   ) => Promise<boolean>;
-  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean) => Promise<void>;
+  refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean, workspaceId?: string) => Promise<void>;
   ensureValidOAuth2TokenForRequest: (req: SavedRequest, values?: Record<string, string>) => Promise<SavedRequest>;
   requestForEditing: (id: string) => SavedRequest | undefined;
   saveTextFile: (name: string, content: string) => Promise<boolean>;
@@ -89,10 +90,10 @@ type CollectionRunnerHost = {
   buildCollectionRunnerSummary: () => { total: number; completed: number; passed: number; failed: number; skipped: number; testsPassed: number; testsTotal: number; duration: number; allPassed: boolean };
   updateCollectionRunnerResult: (runId: string, patch: Partial<CollectionRunnerResult>) => void;
   waitForCollectionRunnerDelay: (ms: number) => Promise<void>;
-  executeCollectionRunnerRequest: (req: SavedRequest, runId: string, iteration: number, envValues: Record<string, string>, secretValues: string[], secretKeys: string[], dataRow?: RunnerDataRow, context?: RunnerRequestContext) => Promise<void>;
+  executeCollectionRunnerRequest: (req: SavedRequest, runId: string, iteration: number, envValues: Record<string, string>, secretValues: string[], secretKeys: string[], dataRow?: RunnerDataRow, context?: RunnerRequestContext) => Promise<(EnvironmentChanges & GlobalVariableChanges) | undefined>;
 };
 
-type RunnerRequestContext = { globals?: Record<string, string>; iterationCount?: number };
+type RunnerRequestContext = { globals?: Record<string, string>; iterationCount?: number; workspaceId?: string };
 
 const runnerResultIndexes = new WeakMap<CollectionRunnerResult[], Map<string, number>>();
 
@@ -308,6 +309,7 @@ export const collectionRunnerFeature = {
     const testFailed = testsTotal > 0 && testsPassed !== testsTotal;
     const grpcError = resp.grpcCode && resp.grpcCode !== 'OK' ? `gRPC ${resp.grpcCode}${resp.grpcMessage ? `: ${resp.grpcMessage}` : ''}` : '';
     const error = resp.error || scriptError || grpcError;
+    if (resp.skipped) return { ...this.runnerResultShell(req, 'skipped', runId, iteration), error: '' };
     return {
       ...this.runnerResultShell(req, 'queued', runId, iteration),
       status: error || testFailed ? 'failed' : 'passed',
@@ -421,7 +423,7 @@ export const collectionRunnerFeature = {
           this.updateCollectionRunnerResult(runId, { status: 'error', error: 'Select a gRPC method before running this request' });
           return;
         }
-        const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(req, runnerEnvValues, secretValues, secretKeys, runnerRequestId, context.globals));
+        const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(req, envValues, secretValues, secretKeys, runnerRequestId, context.globals, dataRow));
         if (this.collectionRunnerCancelRequested && resp.error === REQUEST_CANCELED_ERROR) {
           this.updateCollectionRunnerResult(runId, { status: 'skipped', error: '' });
         } else {
@@ -430,15 +432,17 @@ export const collectionRunnerFeature = {
             await this.applyCollectionVariableUpdates(req, resp.collectionVariableUpdates, resp.collectionVariablesRemoved);
           } catch {}
         }
+        return resp;
       } else {
         const headerError = this.headerValidationErrorForRequest(req, runnerEnvValues);
         if (headerError) {
           this.updateCollectionRunnerResult(runId, { status: 'error', error: headerError });
           return;
         }
-        const resp = await sendHttpRequest(this.savedRequestToRunnableHttpRequest(req, runnerEnvValues, secretValues, secretKeys, runnerRequestId, {
+        const resp = await sendHttpRequest(this.savedRequestToRunnableHttpRequest(req, envValues, secretValues, secretKeys, runnerRequestId, {
           deferTemplates: true,
           globals: context.globals,
+          workspaceId: context.workspaceId,
           iterationData: Object.keys(dataRow).length ? { ...dataRow } : undefined,
           iteration,
           iterationCount: context.iterationCount,
@@ -451,6 +455,7 @@ export const collectionRunnerFeature = {
             await this.applyCollectionVariableUpdates(req, resp.collectionVariableUpdates, resp.collectionVariablesRemoved);
           } catch {}
         }
+        return resp;
       }
     } catch (error) {
       this.updateCollectionRunnerResult(runId, { status: 'error', error: error instanceof Error ? error.message : String(error) });
@@ -493,11 +498,20 @@ export const collectionRunnerFeature = {
     this.collectionRunnerActiveRequestId = '';
     this.collectionRunnerActiveRequestIds = new Set();
     let envValues = this.activeEnvironmentValues();
+    const environmentId = this.activeEnvironmentId;
+    const workspaceId = this.activeWorkspaceId;
     let globals = this.globalVariableValues();
     const secretValues = this.activeSecretEnvironmentValues();
     const secretKeys = this.activeSecretEnvironmentKeys();
-    try { await this.syncBackendEnvironment(); } catch {}
-    try { await this.syncBackendGlobals(); } catch {}
+    const executeRun = async (run: (typeof runs)[number]) => {
+      const changes = await this.executeCollectionRunnerRequest(run.request, run.runId, run.iteration, envValues, secretValues, secretKeys, dataRows[run.iteration - 1] ?? {}, { globals, iterationCount: iterations, workspaceId });
+      if (changes) {
+        envValues = environmentValuesAfterChanges(envValues, changes);
+        globals = globalValuesAfterChanges(globals, changes);
+        try { await this.applyEnvironmentChangesFromResponse(changes, environmentId); } catch {}
+        try { await this.applyGlobalVariableChangesFromResponse(changes); } catch {}
+      }
+    };
     if (skippedRealtimeRequests.length) {
       this.collectionImportToast = `Skipped ${skippedRealtimeRequests.length} realtime request${skippedRealtimeRequests.length === 1 ? '' : 's'}`;
       setTimeout(() => (this.collectionImportToast = ''), 3200);
@@ -510,10 +524,7 @@ export const collectionRunnerFeature = {
           for (const run of batch) this.updateCollectionRunnerResult(run.runId, { status: 'skipped' });
           continue;
         }
-        await forEachWithConcurrency(batch, concurrency, run =>
-          this.executeCollectionRunnerRequest(run.request, run.runId, run.iteration, envValues, secretValues, secretKeys, dataRows[run.iteration - 1] ?? {}, { globals, iterationCount: iterations }));
-        try { envValues = await getEnvironment(); } catch {}
-        try { globals = await getGlobalVariables(); } catch {}
+        await forEachWithConcurrency(batch, concurrency, executeRun);
         if (delayMs > 0 && iteration < iterations && !this.collectionRunnerCancelRequested) {
           await this.waitForCollectionRunnerDelay(delayMs);
         }
@@ -532,16 +543,12 @@ export const collectionRunnerFeature = {
             continue;
           }
         }
-        await this.executeCollectionRunnerRequest(run.request, run.runId, run.iteration, envValues, secretValues, secretKeys, dataRows[run.iteration - 1] ?? {}, { globals, iterationCount: iterations });
-        try { envValues = await getEnvironment(); } catch {}
-        try { globals = await getGlobalVariables(); } catch {}
+        await executeRun(run);
       }
     }
-    try { await this.mergeActiveEnvironmentValues(envValues); } catch {}
-    try { await this.syncGlobalsFromBackend(); } catch {}
     this.collectionRunnerFinishedAt = Date.now();
     this.collectionRunnerRunning = false;
-    void this.refreshCookieJar(true, true);
+    void this.refreshCookieJar(true, true, workspaceId);
     const record = options.collectionId
       ? collectionRunRecord(options.collectionId, title, this.collectionRunnerStartedAt, this.collectionRunnerFinishedAt, this.collectionRunnerResults)
       : null;

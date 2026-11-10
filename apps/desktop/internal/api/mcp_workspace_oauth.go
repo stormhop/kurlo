@@ -33,11 +33,12 @@ func (s *mcpServer) toolAuthorizeOAuth2(ctx context.Context, arguments json.RawM
 			break
 		}
 	}
-	run, err := s.prepareRun(ws, args.Environment, nil)
+	run, err := s.prepareRun(ws.forRequest(req), args.Environment, nil)
 	if err != nil {
 		return nil, err
 	}
-	cfg := resolveAuthTemplates(buildHTTPRequest(req, run.values, run.secrets, 0).Auth, run.values)
+	values := cliRequestValues(req, run.sm)
+	cfg := resolveAuthTemplates(buildHTTPRequest(req, values, run.secrets, 0).Auth, values)
 	if cfg.Type != "oauth2" {
 		return nil, fmt.Errorf("the saved request must use OAuth 2.0")
 	}

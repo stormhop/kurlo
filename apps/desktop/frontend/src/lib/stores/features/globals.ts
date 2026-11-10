@@ -2,6 +2,14 @@ import { getGlobalVariables, setGlobalVariables } from '../../backend';
 import type { KVRow } from '../../types/models';
 import { rowHasContent } from '../../utils';
 
+export type GlobalVariableChanges = { globalVariableUpdates?: Record<string, string>; globalVariablesRemoved?: string[] };
+
+export function globalValuesAfterChanges(values: Record<string, string>, changes: GlobalVariableChanges) {
+  const next = { ...values, ...changes.globalVariableUpdates };
+  for (const key of changes.globalVariablesRemoved ?? []) delete next[key];
+  return next;
+}
+
 type GlobalsHost = {
   globalVariables: KVRow[];
   globalsSaveState: 'idle' | 'dirty' | 'saving' | 'saved';
@@ -158,6 +166,17 @@ export const globalsFeature = {
   async syncGlobalsFromBackend(this: GlobalsHost) {
     const values = await getGlobalVariables();
     const next = mergeGlobalRowsWithValues(this.globalVariables, values);
+    if (JSON.stringify(next) === JSON.stringify(this.globalVariables)) return false;
+    this.globalVariables = next;
+    await this.persistRequestStore();
+    return true;
+  },
+
+  async applyGlobalVariableChangesFromResponse(this: GlobalsHost, changes: GlobalVariableChanges) {
+    const updates = changes.globalVariableUpdates ?? {};
+    const removed = new Set(changes.globalVariablesRemoved ?? []);
+    if ((!Object.keys(updates).length && !removed.size) || !this.guardWorkspaceWritable('Global variables')) return false;
+    const next = mergeGlobalRowsWithValues(this.globalVariables.filter(row => !removed.has(row.key.trim())), updates);
     if (JSON.stringify(next) === JSON.stringify(this.globalVariables)) return false;
     this.globalVariables = next;
     await this.persistRequestStore();

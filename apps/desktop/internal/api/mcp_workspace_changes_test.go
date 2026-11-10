@@ -284,3 +284,78 @@ func TestMCPWorkspaceAndLoaderRejectTheSameInvalidRequestField(t *testing.T) {
 		t.Fatalf("loader accepted invalid request type: %v", err)
 	}
 }
+
+func TestMCPWorkspaceBatchCreatesEnvironmentsWithVariables(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	root := writeYAMLWorkspace(t, "https://example.test")
+	s := newMCPServer(mcpServerOptions{workspace: root}, io.Discard)
+	ctx := withMcpReview(context.Background(), func([]model.AgentFileChange) error { return nil })
+	call := func(operations []map[string]any) (string, bool) {
+		t.Helper()
+		arguments, err := json.Marshal(map[string]any{"name": "apply_changes", "arguments": map[string]any{"operations": operations}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := s.callTool(ctx, arguments)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return mcpResultPlainText(result)
+	}
+	operations := make([]map[string]any, 0, 35)
+	for index := 1; index <= 35; index++ {
+		name := fmt.Sprintf("env-%02d", index)
+		var patch map[string]any
+		switch index % 3 {
+		case 0:
+			patch = map[string]any{"values": []any{map[string]any{"key": "baseUrl", "value": "https://httpbin.org"}, map[string]any{"key": "port", "value": 8080, "description": "HTTP port"}}}
+		case 1:
+			patch = map[string]any{"variables": []any{map[string]any{"key": "baseUrl", "value": "https://httpbin.org"}, map[string]any{"key": "port", "value": "8080"}}}
+		default:
+			patch = map[string]any{"variables": map[string]any{"baseUrl": "https://httpbin.org", "port": "8080"}}
+		}
+		operations = append(operations, map[string]any{"tool": "create_environment", "arguments": map[string]any{"name": name, "patch": patch}})
+	}
+	if result, failed := call(operations); failed {
+		t.Fatalf("batch failed: %s", result)
+	}
+	st, err := loadMCPStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := 1; index <= 35; index++ {
+		environment, err := mcpFindByName(st.environments, fmt.Sprintf("env-%02d", index), "environment")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]string{}
+		for _, row := range mapSlice(environment["values"]) {
+			if !boolValue(row["enabled"]) {
+				t.Fatalf("%s row %v is not enabled", stringValue(environment, "name"), row)
+			}
+			got[stringValue(row, "key")] = stringValue(row, "value")
+		}
+		if len(got) != 2 || got["baseUrl"] != "https://httpbin.org" || got["port"] != "8080" {
+			t.Fatalf("%s values = %v", stringValue(environment, "name"), environment["values"])
+		}
+	}
+	for _, patch := range []map[string]any{
+		{"values": []any{map[string]any{"key": "token", "value": "literal", "secret": true}}},
+		{"variables": []any{map[string]any{"key": "a", "value": "1"}, map[string]any{"key": "a", "value": "2"}}},
+		{"values": []any{map[string]any{"key": "a"}}, "variables": map[string]any{"a": "1"}},
+		{"values": []any{map[string]any{"value": "no key"}}},
+		{"values": "baseUrl=https://httpbin.org"},
+	} {
+		result, failed := call([]map[string]any{{"tool": "create_environment", "arguments": map[string]any{"name": "refused", "patch": patch}}})
+		if !failed {
+			t.Fatalf("patch %v should be refused, got %s", patch, result)
+		}
+	}
+	st, err = loadMCPStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := mcpFindByName(st.environments, "refused", "environment"); err == nil {
+		t.Fatal("a refused environment was saved")
+	}
+}

@@ -189,10 +189,8 @@ func agentDecide(s *mcpServer, tool string, arguments json.RawMessage) agentDeci
 		if unsafe := agentUnsafeMethods(methods); len(unsafe) > 0 {
 			return agentDecision{kind: kind, ask: true, methods: unsafe, reason: fmt.Sprintf("Sends %s requests, which can change data on the server.", strings.Join(unsafe, ", "))}
 		}
-		if tool == "send_request" {
-			if foreign, reason := agentForeignSend(s, arguments); foreign {
-				return agentDecision{kind: kind, ask: true, foreign: true, reason: reason}
-			}
+		if foreign, reason := agentForeignRun(s, tool, arguments); foreign {
+			return agentDecision{kind: kind, ask: true, foreign: true, reason: reason}
 		}
 		return agentDecision{kind: kind, ask: kind == model.AgentToolWrite}
 	}

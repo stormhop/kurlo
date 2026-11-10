@@ -750,6 +750,7 @@ export const requestCrudFeature = {
 
   async duplicateRequest(this: RequestCrudHost, id: string) {
     if (!this.guardWorkspaceWritable('Duplicating requests')) return;
+    await this.persistActiveRequestNow();
     const req = id === this.activeRequestId
       ? this.snapshotActiveRequest({ forPersistence: true })
       : this.requestForEditing(id) ?? this.requestsById.get(id);

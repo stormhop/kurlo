@@ -55,7 +55,13 @@ func withResponseHeaders(resp model.HttpResponse) model.HttpResponse {
 	return resp
 }
 
-func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, sm *state.Manager, jars *cookieJarRegistry, cache *preflightCache, sinkFactory responseBodySinkFactory) model.HttpResponse {
+func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, sm *state.Manager, jars *cookieJarRegistry, cache *preflightCache, sinkFactory responseBodySinkFactory) (response model.HttpResponse) {
+	sm, commitVariables := isolateScriptState(sm, req.ScriptVariables, req.ScriptEnvironment)
+	defer func() {
+		delta := commitVariables()
+		response.GlobalVariableUpdates = delta.updates
+		response.GlobalVariablesRemoved = delta.removedKeys()
+	}()
 	var jar http.CookieJar
 	if jars != nil {
 		jar = jars.jar(req.WorkspaceID)
@@ -199,6 +205,34 @@ type scriptStateScope struct {
 	beforeEnv  map[string]string
 }
 
+func isolateScriptState(shared *state.Manager, variables, environment map[string]string) (*state.Manager, func() environmentDelta) {
+	if variables == nil && environment == nil {
+		before := shared.GetVariables()
+		return shared, func() environmentDelta {
+			var delta environmentDelta
+			delta.add(before, shared.GetVariables())
+			return delta
+		}
+	}
+	sharedVariables, sharedEnvironment := shared.Snapshot()
+	if variables == nil {
+		variables = sharedVariables
+	}
+	if environment == nil {
+		environment = sharedEnvironment
+	}
+	isolated := state.New()
+	isolated.SetVariables(variables)
+	isolated.SetEnvironment(environment)
+	return isolated, func() environmentDelta {
+		after := isolated.GetVariables()
+		shared.Merge(variables, after, nil, nil)
+		var delta environmentDelta
+		delta.add(variables, after)
+		return delta
+	}
+}
+
 func beginScriptScope(sm *state.Manager, collectionVariables map[string]string) *scriptStateScope {
 	vars, env := sm.Snapshot()
 	beforeVars := util.CloneMap(vars)
@@ -261,11 +295,16 @@ func (d *environmentDelta) merge(other environmentDelta) {
 
 func (d environmentDelta) apply(resp *model.HttpResponse) {
 	resp.EnvironmentUpdates = d.updates
-	resp.EnvironmentRemoved = nil
+	resp.EnvironmentRemoved = d.removedKeys()
+}
+
+func (d environmentDelta) removedKeys() []string {
+	var keys []string
 	for key := range d.removed {
-		resp.EnvironmentRemoved = append(resp.EnvironmentRemoved, key)
+		keys = append(keys, key)
 	}
-	sort.Strings(resp.EnvironmentRemoved)
+	sort.Strings(keys)
+	return keys
 }
 
 func redactScriptResult(result model.ScriptResult, secrets []string) model.ScriptResult {

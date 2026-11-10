@@ -27,6 +27,7 @@ const RAW_BODY_TYPES = ['text', 'json', 'html', 'xml'] as const;
 
 export type RunnableHttpOptions = {
   deferTemplates?: boolean;
+  workspaceId?: string;
   globals?: Record<string, string>;
   iterationData?: Record<string, string>;
   iteration?: number;
@@ -128,6 +129,8 @@ export const requestSerializationFeature = {
     requestId = req.id,
     options: RunnableHttpOptions = {},
   ): HttpRequest {
+    const scriptEnvironment = { ...envValues };
+    const scriptVariables = { ...(options.globals ?? this.globalVariableValues?.() ?? {}) };
     req = this.requestWithCollectionDefaults(req);
     envValues = this.environmentValuesForRequest(req, envValues, options.globals);
     secretEnvironmentValues = this.secretEnvironmentValuesForRequest(req, secretEnvironmentValues);
@@ -155,7 +158,7 @@ export const requestSerializationFeature = {
     const flat = flattenUrlParams(req.url.trim(), req.params);
     const resolvedUrl = resolveValue(flat.url);
     return {
-      workspaceId: this.activeWorkspaceId,
+      workspaceId: options.workspaceId ?? this.activeWorkspaceId,
       method: isGraphQL ? 'POST' : req.method,
       url: normalizedRequestType === 'ws' || normalizedRequestType === 'socketio'
         ? this.normalizeWebSocketUrlForSend(resolvedUrl)
@@ -233,7 +236,7 @@ export const requestSerializationFeature = {
       requestId,
       secretEnvironmentKeys,
       secretEnvironmentValues,
-      ...(defer ? { resolveTemplates: true, templateValues: { ...envValues, ...(options.iterationData ?? {}) } } : {}),
+      ...(defer ? { resolveTemplates: true, templateValues: { ...envValues, ...(options.iterationData ?? {}) }, scriptEnvironment, scriptVariables } : {}),
       ...(deferredGraphQL ? { graphql: deferredGraphQL } : {}),
       ...(options.iterationData ? { iterationData: options.iterationData } : {}),
       ...(options.iteration ? { iteration: options.iteration, iterationCount: options.iterationCount ?? 0 } : {}),
@@ -331,9 +334,12 @@ export const requestSerializationFeature = {
     secretEnvironmentKeys = this.activeSecretEnvironmentKeys(),
     requestId = req.id,
     globals?: Record<string, string>,
+    iterationData?: Record<string, string>,
   ): GrpcRequest {
+    const scriptEnvironment = { ...envValues };
+    const scriptVariables = { ...(globals ?? this.globalVariableValues?.() ?? {}) };
     req = this.requestWithCollectionDefaults(req);
-    envValues = this.environmentValuesForRequest(req, envValues, globals);
+    envValues = { ...this.environmentValuesForRequest(req, envValues, globals), ...iterationData };
     secretEnvironmentValues = this.secretEnvironmentValuesForRequest(req, secretEnvironmentValues);
     secretEnvironmentKeys = this.secretEnvironmentKeysForRequest(req, secretEnvironmentKeys);
     const auth = req.auth;
@@ -379,6 +385,8 @@ export const requestSerializationFeature = {
       allowSendRequest: req.settings.allowSendRequest,
       ...this.scriptFieldsForSend(req),
       collectionVariables: collectionVariableValues(this.collectionForRequest(req)),
+      scriptEnvironment,
+      scriptVariables,
       secretEnvironmentKeys,
       secretEnvironmentValues,
     };

@@ -320,6 +320,12 @@
     };
   }
 
+  function trackViewport(node: HTMLElement, sync: () => void) {
+    const observer = new ResizeObserver(() => sync());
+    observer.observe(node);
+    return { destroy() { observer.disconnect(); } };
+  }
+
   let collectionScrollRaf = 0;
   let historyScrollRaf = 0;
   let environmentScrollRaf = 0;
@@ -656,7 +662,7 @@
           <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createCollection} aria-label="New collection" disabled={workspaceBlocked}><AddCloseIcon add /></button>
         </div>
       </div>
-      <div class="collection-list" role="list" bind:this={collectionListEl} onscroll={onCollectionScroll}>
+      <div class="collection-list" role="list" bind:this={collectionListEl} use:trackViewport={syncCollectionViewport} onscroll={onCollectionScroll}>
         <div class="sidebar-virtual-spacer" style={`height: ${visibleCollectionRows.before}px`}></div>
         {#each visibleCollectionRows.rows as row (row.key)}
           <div class="sidebar-vrow" use:measureRow={row.key}>
@@ -941,7 +947,7 @@
         </div>
       {/if}
       {#if historyRows.length}
-        <div class="history-list" bind:this={historyListEl} onscroll={onHistoryScroll}>
+        <div class="history-list" bind:this={historyListEl} use:trackViewport={syncHistoryViewport} onscroll={onHistoryScroll}>
           <div class="sidebar-virtual-spacer" style={`height: ${visibleHistoryRows.before}px`}></div>
           {#each visibleHistoryRows.rows as row (row.key)}
             {#if row.type === 'day'}
@@ -1016,7 +1022,7 @@
         </span>
       </button>
       {#if activeWorkspaceEnvironments.length}
-        <div class="environment-list" bind:this={environmentListEl} onscroll={onEnvironmentScroll}>
+        <div class="environment-list" bind:this={environmentListEl} use:trackViewport={syncEnvironmentViewport} onscroll={onEnvironmentScroll}>
           <div class="sidebar-virtual-spacer" style={`height: ${visibleEnvironmentRows.before}px`}></div>
           {#each visibleEnvironmentRows.rows as row (row.key)}
             {#if row.type === 'none'}

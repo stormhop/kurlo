@@ -223,6 +223,65 @@ func TestGenerateIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestGenerateResolvesTemplatedObjectKeys(t *testing.T) {
+	for _, kind := range []string{"header", "form", "apikey"} {
+		t.Run(kind, func(t *testing.T) {
+			req := Request{ID: "r", Name: "Request", Method: "POST", URL: "https://api.example.test", VerifyTLS: true}
+			switch kind {
+			case "header":
+				req.Headers = []Pair{{Key: "{{key}}", Value: "{{value}}"}}
+			case "form":
+				req.BodyType = "urlencoded"
+				req.Form = []FormField{{Key: "{{key}}", Value: "{{value}}"}}
+			case "apikey":
+				req.Auth = model.AuthConfig{Type: "apikey", KeyName: "{{key}}", KeyValue: "{{value}}", KeyIn: "header"}
+			}
+			plan := Plan{
+				Test: model.LoadTest{Name: "Dynamic keys", Scenarios: []model.LoadScenario{{
+					Executor: model.LoadExecutor{Type: "constant-vus", VUs: 1, DurationMs: 1000},
+					Steps:    []model.LoadStep{{ID: "step", RequestID: "r"}},
+				}}},
+				Requests:  map[string]Request{"r": req},
+				Variables: []Variable{{Name: "key", Value: "X-Dynamic"}, {Name: "value", Value: "resolved-value"}},
+			}
+			result := GenerateK6(plan, Options{})
+			if len(result.Warnings) != 0 {
+				t.Fatalf("unexpected export warnings: %+v", result.Warnings)
+			}
+			var lines []string
+			for _, line := range strings.Split(result.Script, "\n") {
+				if !strings.HasPrefix(line, "import ") {
+					lines = append(lines, strings.TrimPrefix(line, "export "))
+				}
+			}
+			source := strings.ReplaceAll(strings.Join(lines, "\n"), "default function", "function main")
+			vm := goja.New()
+			calls := 0
+			_ = vm.Set("capture", func(method, target string, body any, params map[string]any) {
+				calls++
+				if method != "POST" || target != req.URL {
+					t.Errorf("unexpected request: %s %s", method, target)
+				}
+				values := params["headers"]
+				if kind == "form" {
+					values = body
+				}
+				rows, ok := values.(map[string]any)
+				if !ok || rows["X-Dynamic"] != "resolved-value" {
+					t.Errorf("resolved fields = %#v", values)
+				}
+			})
+			_, err := vm.RunString("const __ENV = {}; const http = { request: capture }; function group(name, fn) { fn(); }\n" + source + "\nmain();")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if calls != 1 {
+				t.Fatalf("sent %d requests, want 1", calls)
+			}
+		})
+	}
+}
+
 func TestGenerateWarnsAboutUnknownVariablesAndMissingData(t *testing.T) {
 	plan := checkoutPlan()
 	plan.Data = nil

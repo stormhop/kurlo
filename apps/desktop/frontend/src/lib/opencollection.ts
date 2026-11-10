@@ -2,7 +2,7 @@ import { DEFAULT_REQUEST_SETTINGS, mkRow } from './constants';
 import { emptyFolderDefaults, folderDefaultsHaveContent, normalizeCollectionDefaults, requestSettingsOverridesFromPatch, REQUEST_SETTING_KEYS } from './collectionDefaults';
 import { folderPathKey } from './collections';
 import { normalizeRequestExample } from './examples';
-import { safeExportRow, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
+import { safeExportRow, safeExportSettings, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
 import type { AuthState, AuthType, BodyType, CollectionDefaults, Environment, FolderDefaults, KVRow, Method, RawBodyType, RequestExample, RequestSettings, RequestSettingsOverrides, RequestTab, RequestType, SavedRequest, SIOArg } from './types/models';
 import { asArray, asText, authStateHasData, emptyAuthState, inheritAuthState, isRecord, newEntityId, newRequestId, safeFileName } from './utils';
 import { filesystemNameFromName } from './normalizers';
@@ -252,7 +252,7 @@ function authToOpenCollection(auth: SavedRequest['auth'], includeSecrets = false
     return {
       type: 'apikey',
       key: auth.apiKeyName,
-      value: safeExportValue(auth.apiKeyName || 'apiKey', auth.apiKeyValue, includeSecrets),
+      value: safeExportValue('apiKey', auth.apiKeyValue, includeSecrets),
       placement: auth.apiKeyIn,
     };
   }
@@ -592,7 +592,7 @@ function collectionDefaultsToOpenCollection(defaults: CollectionDefaults, includ
     normalized.preRequestScript ? { type: 'before-request', code: normalized.preRequestScript } : undefined,
     normalized.testScript ? { type: 'tests', code: normalized.testScript } : undefined,
   ].filter(Boolean);
-  const settings = settingsToOpenCollection(normalized.settings, true, true);
+  const settings = settingsToOpenCollection(safeExportSettings(normalized.settings, includeSecrets), true, true);
   return {
     ...(normalized.headers.some(row => row.key || row.value) ? { headers: normalized.headers.filter(row => row.key || row.value).map(row => rowToOpenCollection(row, undefined, includeSecrets)) } : {}),
     ...(normalized.variables.some(row => row.key || row.value) ? { variables: normalized.variables.filter(row => row.key || row.value).map(row => rowToOpenCollection(row, undefined, includeSecrets)) } : {}),
@@ -1113,7 +1113,7 @@ function yamlMap(value: Record<string, unknown>, indent = 0): string {
 function requestToOpenCollection(req: SavedRequest, seq: number, stripFn: (source: string, bodyType: string) => string, includeSecrets = false) {
   const examples = examplesToOpenCollection(req, stripFn, includeSecrets);
   const body = bodyToOpenCollection(req, stripFn, includeSecrets);
-  const settings = settingsToOpenCollection(req.settings, true, true, req.settingsOverrides);
+  const settings = settingsToOpenCollection(safeExportSettings(req.settings, includeSecrets), true, true, req.settingsOverrides);
   const runtimeScripts = [
     req.preRequestScript ? { type: 'before-request', code: req.preRequestScript } : undefined,
     req.testScript ? { type: 'tests', code: req.testScript } : undefined,

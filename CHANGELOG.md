@@ -5,6 +5,22 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Exports without secrets cover auth, settings and examples.** OpenCollection and Insomnia remove API keys even when the key has a custom name. Postman and Insomnia remove client-key passwords and credentials in proxy URLs, and Postman cleans the original requests stored in examples. The export prompt detects secrets in settings and examples too.
+- **The agent checks the address it actually sends to.** Request and session variable overrides are included when checking whether a call needs approval for another host.
+- **Collection variables stay in their collection in the CLI and MCP.** Requests use their own collection's defaults instead of an identically named variable from another collection.
+- **Collection runs keep their original environment.** Switching environments while a run is in progress does not redirect later requests or move script updates into another environment. gRPC requests keep their script updates in the environment they started with too.
+- **gRPC scripts follow the same pre-request and test lifecycle as HTTP.** `pm.execution.skipRequest()` prevents the RPC, and test scripts see collection variables changed by the pre-request script.
+- **SSE decodes compressed responses with an explicit Accept-Encoding header.** A manually configured `Accept-Encoding: gzip` no longer causes events to disappear.
+- **Duplicating a request keeps pending edits in the original.** Duplicating before autosave finishes no longer leaves the source request with its old contents.
+- **k6 exports support templates in header and form-field names.** Templates in header names, API-key header names and URL-encoded field names produce valid JavaScript and resolve when the test runs.
+- **A long environment list scrolls.** With many environments the sidebar rows were squeezed, their dots and labels clipped and the last environments out of reach. Rows now keep their height, the list scrolls, and it stays drawn after resizing the window or switching sidebar tabs.
+- **Select all in a response selects only the body.** Cmd/Ctrl+A anywhere in the response panel selects the response body instead of the whole window, and dragging a selection up from the body no longer takes in a warning above it, such as the one about the Auth tab replacing a header.
+- **The agent creates environments with their variables in one batch.** `create_environment` in `apply_changes` accepted variables only under the file's `values` field and did not say so, so the agent fell back to one `set_variable` call per value. It now also takes `variables`, and either a list of `{key, value}` rows or an object of `key: value` pairs; numbers are stored as text, rows are enabled by default, and rows marked as secret are refused because secrets are added in the app.
+
 ## [3.0.1] - 2026-11-09
 
 ### Added

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"net/http"
@@ -13,6 +14,76 @@ import (
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
+
+func TestSSEStreamDecodesExplicitContentEncoding(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Content-Encoding", "gzip")
+		z := gzip.NewWriter(w)
+		_, _ = z.Write([]byte("data: hello\n\n"))
+		_ = z.Close()
+	}))
+	defer server.Close()
+	for _, explicit := range []bool{false, true} {
+		req := model.HttpRequest{URL: server.URL, SSEDisableReconnect: true}
+		if explicit {
+			req.Headers = []model.KeyValue{{Key: "Accept-Encoding", Value: "gzip", Enabled: true}}
+		}
+		em := &testEmitter{}
+		runStreamWithEmitter(t.Context(), req, em)
+		if len(em.errors) != 0 || len(em.events) != 1 || em.events[0].Data != "hello" {
+			t.Errorf("explicit Accept-Encoding=%v: events=%#v errors=%#v", explicit, em.events, em.errors)
+		}
+	}
+}
+
+func TestSSEStreamReportsInvalidCompressedBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Content-Encoding", "gzip")
+		_, _ = w.Write([]byte("invalid compressed body"))
+	}))
+	defer server.Close()
+	em := &testEmitter{}
+	runStreamWithEmitter(t.Context(), model.HttpRequest{
+		URL: server.URL, Headers: []model.KeyValue{{Key: "Accept-Encoding", Value: "gzip", Enabled: true}},
+	}, em)
+	if len(em.errors) != 1 || !strings.Contains(em.errors[0].Message, "Stream error") || len(em.events) != 0 {
+		t.Fatalf("invalid compression was not reported: events=%#v errors=%#v", em.events, em.errors)
+	}
+}
+
+func TestSSECompressedStreamClosesOnCancel(t *testing.T) {
+	closed := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer close(closed)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Content-Encoding", "gzip")
+		z := gzip.NewWriter(w)
+		_, _ = z.Write([]byte("data: hello\n\n"))
+		_ = z.Flush()
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	events := 0
+	res := newSSEManager(nil).runStreamAttempt(ctx, "compressed", model.HttpRequest{
+		URL: server.URL, Headers: []model.KeyValue{{Key: "Accept-Encoding", Value: "gzip", Enabled: true}},
+	}, "", noopOpen, func(ev model.SSEEvent) {
+		events++
+		cancel()
+	})
+	if events != 1 || res.closeEvent == nil || res.closeEvent.Message != "Disconnected" || res.reconnect {
+		t.Fatalf("cancelled compressed stream events=%d result=%#v", events, res)
+	}
+	select {
+	case <-closed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled compressed stream kept its HTTP connection open")
+	}
+}
 
 type testEmitter struct {
 	mu     sync.Mutex

@@ -133,3 +133,34 @@ func TestMergeConcurrentNoRace(t *testing.T) {
 		t.Errorf("expected %d distinct keys preserved across concurrent merges, got %d", n, got)
 	}
 }
+
+func TestCollectionVariableChangesPreserveConcurrentDisjointUpdates(t *testing.T) {
+	manager := New()
+	const workers = 64
+	start := make(chan struct{})
+	var done sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		done.Add(1)
+		go func(index int) {
+			defer done.Done()
+			<-start
+			manager.EnsureCollectionVariables("a", map[string]string{"base": "original"})
+			manager.ApplyCollectionVariableChanges("a", map[string]string{fmt.Sprint(index): "value"}, nil)
+		}(i)
+	}
+	close(start)
+	done.Wait()
+	values, ok := manager.GetCollectionVariables("a")
+	if !ok || len(values) != workers+1 || values["base"] != "original" {
+		t.Fatalf("values=%v", values)
+	}
+	values["base"] = "changed"
+	if next, _ := manager.GetCollectionVariables("a"); next["base"] != "original" {
+		t.Fatalf("snapshot mutated collection: %v", next)
+	}
+	manager.SetCollectionVariables("b", map[string]string{"base": "B"})
+	manager.ApplyCollectionVariableChanges("a", nil, []string{"base"})
+	if next, _ := manager.GetCollectionVariables("b"); next["base"] != "B" {
+		t.Fatalf("another collection changed: %v", next)
+	}
+}

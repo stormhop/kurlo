@@ -1,4 +1,4 @@
-import type { KVRow, SavedRequest } from './types/models';
+import type { KVRow, RequestSettings, SavedRequest } from './types/models';
 
 const TEMPLATE_VALUE_RE = /^\s*(?:(?:Bearer|Basic|Token|JWT|ApiKey|API-Key|Digest)\s+)?\{\{[^{}]+\}\}\s*$/i;
 const SENSITIVE_KEY_RE = /(^|[-_\s.])(authorization|cookie|set-cookie|password|passwd|pwd|secret|token|access[-_\s]?token|refresh[-_\s]?token|api[-_\s]?key|apikey|client[-_\s]?secret|private[-_\s]?key|session|jwt)([-_\s.]|$)/i;
@@ -22,6 +22,14 @@ export function safeExportRow(row: KVRow, includeSecrets = false): KVRow {
   return {
     ...row,
     value: safeExportValue(row.key, row.value, includeSecrets, row.secret === true),
+  };
+}
+
+export function safeExportSettings(settings: RequestSettings, includeSecrets = false): RequestSettings {
+  return {
+    ...settings,
+    clientKeyPassword: safeExportValue('password', settings.clientKeyPassword, includeSecrets),
+    proxyUrl: safeExportUrl(settings.proxyUrl, includeSecrets),
   };
 }
 
@@ -164,6 +172,8 @@ function requestHasExportSecrets(req: SavedRequest) {
     || hasRawSecret('refreshToken', auth.oauth2RefreshToken ?? '')
     || hasRawSecret('accessToken', auth.bearerToken)
     || hasRawSecret('clientSecret', auth.oauth2Secret)
+    || hasRawSecret('password', auth.oauth2Password ?? '')
+    || hasRawSecret('privateKey', auth.oauth2AssertionPrivateKey ?? '')
     || hasRawSecret('awsSecretKey', auth.awsSecretKey)
     || hasRawSecret('consumerSecret', auth.oauth1ConsumerSecret ?? '')
     || hasRawSecret('token', auth.oauth1Token ?? '')
@@ -173,6 +183,16 @@ function requestHasExportSecrets(req: SavedRequest) {
     || req.params.some(row => hasRawSecret(row.key, row.value, row.secret))
     || req.headers.some(row => hasRawSecret(row.key, row.value, row.secret))
     || req.formRows.some(row => hasRawSecret(row.key, row.value, row.secret))
+    || hasRawSecret('password', req.settings.clientKeyPassword)
+    || urlHasRawUserInfo(req.settings.proxyUrl)
+    || urlHasRawSecret(req.settings.proxyUrl)
+    || (req.examples ?? []).some(example =>
+      urlHasRawUserInfo(example.snapshot.url)
+      || urlHasRawSecret(example.snapshot.url)
+      || bodyHasRawSecret(example.snapshot.bodyContent)
+      || example.snapshot.headers.some(row => hasRawSecret(row.key, row.value, row.secret))
+      || example.response.headers.some(row => hasRawSecret(row.key, row.value, row.secret))
+      || bodyHasRawSecret(example.response.body))
     || urlHasRawUserInfo(req.url)
     || urlHasRawSecret(req.url)
     || bodyHasRawSecret(req.bodyContent);

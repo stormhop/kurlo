@@ -3,7 +3,7 @@ import { DEFAULT_REQUEST_SETTINGS } from './constants';
 import { isRecord, asArray, asText, newRequestId } from './utils';
 import { mkRow } from './constants';
 import { emptyAuthState, inheritAuthState } from './utils';
-import { safeExportRow, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
+import { safeExportRow, safeExportSettings, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
 import { parseGraphQLPayload, parseGraphQLVariables, serializeGraphQLPayload } from './graphql';
 import { filterSocketIOTransportParams, graphQLBodyContentFromJsonText, isWebSocketUrl, socketIOImportDetails } from './importDetection';
 import { filesystemNameFromName } from './normalizers';
@@ -700,7 +700,7 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (s: string, t: st
   const extension: Record<string, unknown> = {
     requestType,
     requestTab: req.requestTab,
-    settings: req.settings,
+    settings: safeExportSettings(req.settings, includeSecrets),
   };
   if (requestType === 'socketio') {
     extension.sioEvents = (req.sioEvents ?? []).filter(row => row.key || row.value).map(row => postmanKv(row, includeSecrets));
@@ -731,10 +731,10 @@ function postmanResponsesFromExamples(req: SavedRequest, includeSecrets = false)
     name: example.name,
     originalRequest: {
       method: example.snapshot.method,
-      url: example.snapshot.url,
+      url: safeExportUrl(example.snapshot.url, includeSecrets),
       header: example.snapshot.headers.filter(row => row.key).map(row => postmanKv(row, includeSecrets)),
       ...(example.snapshot.bodyContent
-        ? { body: { mode: 'raw', raw: example.snapshot.bodyContent } }
+        ? { body: { mode: 'raw', raw: exportBodyLikeValue(example.snapshot.bodyContent, example.snapshot.bodyType, (value: string) => value, includeSecrets) } }
         : {}),
     },
     status: example.response.status.replace(/^\d+\s*/, ''),

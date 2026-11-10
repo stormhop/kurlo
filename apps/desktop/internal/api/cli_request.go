@@ -134,6 +134,9 @@ type cliExample struct {
 }
 
 type cliSavedRequest struct {
+	CollectionVariables    map[string]string `json:"-"`
+	CollectionSecretValues []string          `json:"-"`
+
 	WorkspaceID          string   `json:"-"`
 	GrpcMethod           string   `json:"grpcMethod"`
 	GrpcMetadata         []cliKV  `json:"grpcMetadata"`
@@ -414,9 +417,10 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		BrowserEnforceCORS:      req.Settings.BrowserEnforceCORS,
 		BrowserEnforceCSP:       req.Settings.BrowserEnforceCSP,
 		BrowserCSP:              req.Settings.BrowserCSP,
-		SecretEnvironmentValues: secretValues,
+		SecretEnvironmentValues: append(append([]string(nil), secretValues...), req.CollectionSecretValues...),
 		ResolveTemplates:        true,
 		TemplateValues:          values,
+		CollectionVariables:     req.CollectionVariables,
 	}
 }
 

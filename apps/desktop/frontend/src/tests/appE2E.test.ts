@@ -46,6 +46,7 @@ import { normalizeRequestExample } from '../lib/examples';
 import { environmentFeature } from '../lib/stores/features/environments';
 import { folderFeature } from '../lib/stores/features/folders';
 import { graphqlFeature } from '../lib/stores/features/graphql';
+import { grpcFeature } from '../lib/stores/features/grpc';
 import { globalsFeature } from '../lib/stores/features/globals';
 import { buildGraphQLRequestBody } from '../lib/graphql';
 import { historyFeature } from '../lib/stores/features/history';
@@ -110,7 +111,7 @@ const backend = vi.hoisted(() => {
         ]));
         expect(req.body).toContain('"username":"ada"');
         state.environment.sessionId = 'session-from-login';
-        return response(200, { ok: true, token: 'server-token' }, [{ name: 'status', passed: true }]);
+        return { ...response(200, { ok: true, token: 'server-token' }, [{ name: 'status', passed: true }]), environmentUpdates: { sessionId: 'session-from-login' } };
       }
       if (req.url.endsWith('/graphql')) {
         expect(req.method).toBe('POST');
@@ -118,7 +119,7 @@ const backend = vi.hoisted(() => {
         const payload = JSON.parse(req.body);
         expect(payload.query).toContain('viewer');
         state.environment.viewerId = 'viewer-1';
-        return response(200, { data: { viewer: { id: 'viewer-1' } } }, [{ name: 'viewer', passed: true }]);
+        return { ...response(200, { data: { viewer: { id: 'viewer-1' } } }, [{ name: 'viewer', passed: true }]), environmentUpdates: { viewerId: 'viewer-1' } };
       }
       return response(404, { error: `Unhandled ${req.method} ${req.url}` }, [{ name: 'handled', passed: false, error: 'No mock route' }]);
     }),
@@ -789,8 +790,8 @@ describe('full application e2e smoke', () => {
       bodyContent: '{"name":"Grace"}',
     });
     expect(app.requests.find(req => req.id === originalId)).toMatchObject({
-      method: 'POST',
-      bodyContent: '{"name":"Ada"}',
+      method: 'PATCH',
+      bodyContent: '{"name":"Grace"}',
     });
   });
 
@@ -1358,7 +1359,7 @@ describe('request templates reach the backend unresolved', () => {
     app.activeEnvironmentId = 'child';
     backend.sendHttpRequest.mockImplementationOnce(async () => {
       backend.state.environment.credential = 'new-secret';
-      return httpResponse(200, { ok: true });
+      return { ...httpResponse(200, { ok: true }), environmentUpdates: { credential: 'new-secret' } };
     });
     await app.runActiveRequest();
 
@@ -1443,7 +1444,7 @@ describe('request templates reach the backend unresolved', () => {
     vi.mocked(backend.sendHttpRequest).mockImplementation(async (req: HttpRequest) => {
       sent.push(req);
       backend.state.globals = { ...backend.state.globals, counter: String(sent.length) };
-      return httpResponse(200, { ok: true });
+      return { ...httpResponse(200, { ok: true }), globalVariableUpdates: { counter: String(sent.length) } };
     });
     await app.startCollectionRunner('Templates', [saved], { dataRows: [{ name: 'ada' }, { name: 'bob' }], parallel: false });
     vi.mocked(backend.sendHttpRequest).mockReset();
@@ -1461,7 +1462,7 @@ describe('request templates reach the backend unresolved', () => {
     const grpc = { ...login, id: 'grpc-1', name: 'Greet', requestType: 'grpc', url: 'grpc.example.test:443', grpcMethod: 'greeter.Greeter/Hello', bodyContent: '{"token":"{{token}}"}' } as SavedRequest;
     vi.mocked(backend.sendHttpRequest).mockImplementation(async () => {
       backend.state.globals = { ...backend.state.globals, token: 'from-login' };
-      return httpResponse(200, { ok: true });
+      return { ...httpResponse(200, { ok: true }), globalVariableUpdates: { token: 'from-login' } };
     });
     const grpcSent: GrpcRequest[] = [];
     vi.mocked(backend.sendGrpcRequest).mockImplementationOnce(async (req: GrpcRequest) => {
@@ -1471,6 +1472,137 @@ describe('request templates reach the backend unresolved', () => {
     await app.startCollectionRunner('Templates', [login, grpc], { parallel: false });
     vi.mocked(backend.sendHttpRequest).mockReset();
     expect(grpcSent[0]?.message).toBe('{"token":"from-login"}');
+  });
+
+  for (const autosave of [true, false]) {
+    it(`keeps source edits when duplicating before the persist debounce with autosave ${autosave}`, async () => {
+      const app = await appWithRequest('https://source.example.test');
+      const sourceId = app.activeRequestId;
+      app.autosave = autosave;
+      app.url = 'https://edited.example.test';
+      app.scheduleActiveRequestPersist();
+      await app.duplicateRequest(sourceId);
+      const copyId = app.activeRequestId;
+      expect(app.url).toBe('https://edited.example.test');
+      await app.switchRequest(sourceId);
+      expect(app.url).toBe('https://edited.example.test');
+      expect(app.requests.find((req: SavedRequest) => req.id === copyId)?.url).toBe('https://edited.example.test');
+      const storedSource = backend.state.savedStores.at(-1)?.requests.find(req => req.id === sourceId);
+      expect(storedSource?.url).toBe(autosave ? 'https://edited.example.test' : 'https://source.example.test');
+      expect(app.isRequestDirty(sourceId)).toBe(!autosave);
+    });
+  }
+
+  for (const parallel of [false, true]) {
+    it(`keeps runner script scopes and updates owned by their original environment with parallel ${parallel}`, async () => {
+      const app = await appWithRequest('{{host}}/{{token}}/{{counter}}');
+      const workspaceId = app.activeWorkspaceId;
+      app.environments = [
+        { id: 'dev', workspaceId, name: 'Dev', values: [row('host', 'https://dev.test'), row('old', 'remove-me')] },
+        { id: 'prod', workspaceId, name: 'Prod', values: [row('host', 'https://prod.test'), row('keep', 'prod-only')] },
+      ];
+      app.activeEnvironmentId = 'dev';
+      app.globalVariables = [row('counter', '0'), row('oldGlobal', 'remove-me')];
+      const saved = app.requests.find((req: SavedRequest) => req.id === app.activeRequestId)!;
+      const sent: HttpRequest[] = [];
+      vi.mocked(backend.sendHttpRequest).mockImplementation(async (req: HttpRequest) => {
+        sent.push(req);
+        if (sent.length === 1) {
+          await app.selectEnvironment('prod');
+          app.globalVariables = [...app.globalVariables, row('unrelated', 'edited-elsewhere')];
+          backend.state.globals = { counter: '999', foreign: 'other-request' };
+          return {
+            ...httpResponse(200, {}), environmentUpdates: { token: 'dev-token' }, environmentRemoved: ['old'],
+            globalVariableUpdates: { counter: '1' }, globalVariablesRemoved: ['oldGlobal'],
+          };
+        }
+        return httpResponse(200, {});
+      });
+      try {
+        await app.startCollectionRunner('Scopes', [saved], { iterations: 2, parallel, concurrency: 1 });
+      } finally {
+        vi.mocked(backend.sendHttpRequest).mockReset();
+      }
+      expect(sent[0]).toMatchObject({ scriptEnvironment: { host: 'https://dev.test', old: 'remove-me' }, scriptVariables: { counter: '0', oldGlobal: 'remove-me' } });
+      expect(sent[1]).toMatchObject({
+        templateValues: { host: 'https://dev.test', token: 'dev-token', counter: '1' },
+        scriptEnvironment: { host: 'https://dev.test', token: 'dev-token' }, scriptVariables: { counter: '1' },
+      });
+      expect(sent[1].scriptEnvironment).not.toHaveProperty('old');
+      expect(sent[1].scriptVariables).not.toHaveProperty('foreign');
+      expect(app.activeEnvironmentId).toBe('prod');
+      expect(app.activeEnvironmentValues()).toEqual({ host: 'https://prod.test', keep: 'prod-only' });
+      expect(app.environmentValuesFor('dev')).toEqual({ host: 'https://dev.test', token: 'dev-token' });
+      expect(app.globalVariableValues()).toEqual({ counter: '1', unrelated: 'edited-elsewhere' });
+      const persisted = backend.state.savedStores.at(-1)!;
+      expect(persisted.environments.find(env => env.id === 'dev')?.values).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'token', value: 'dev-token' })]));
+      expect(persisted.environments.find(env => env.id === 'prod')?.values.some(value => value.key === 'token')).toBe(false);
+    });
+  }
+
+  it('keeps runner iteration data separate from the script environment snapshot', async () => {
+    const app = await appWithRequest('https://example.test/{{name}}');
+    app.environments = [{ id: 'env', workspaceId: app.activeWorkspaceId, name: 'Env', values: [row('name', 'environment')] }];
+    app.activeEnvironmentId = 'env';
+    const saved = app.requests.find((req: SavedRequest) => req.id === app.activeRequestId)!;
+    let sent: HttpRequest | undefined;
+    vi.mocked(backend.sendHttpRequest).mockImplementationOnce(async (req: HttpRequest) => {
+      sent = req;
+      return httpResponse(200, {});
+    });
+    await app.startCollectionRunner('Iteration data', [saved], { dataRows: [{ name: 'iteration' }] });
+    expect(sent).toMatchObject({
+      scriptEnvironment: { name: 'environment' }, iterationData: { name: 'iteration' }, templateValues: { name: 'iteration' },
+    });
+  });
+
+  it('applies completed gRPC script changes to the original environment after selection changes', async () => {
+    const app = await appWithRequest('grpc.example.test:443');
+    app.requestType = 'grpc';
+    app.grpcMethod = 'greeter.Greeter/Hello';
+    app.grpcServiceDefinition = { source: '', services: [], methods: [] };
+    app.environments = [
+      { id: 'dev', workspaceId: app.activeWorkspaceId, name: 'Dev', values: [row('host', 'dev')] },
+      { id: 'prod', workspaceId: app.activeWorkspaceId, name: 'Prod', values: [row('host', 'prod')] },
+    ];
+    app.activeEnvironmentId = 'dev';
+    app.globalVariables = [row('before', 'captured')];
+    Object.defineProperties(app, Object.getOwnPropertyDescriptors(grpcFeature));
+    let finish!: (response: GrpcResponse) => void;
+    vi.mocked(backend.sendGrpcRequest).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const sending = app.invokeGrpc();
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    await app.selectEnvironment('prod');
+    finish({
+      status: 'OK', grpcCode: 'OK', grpcMessage: '', messages: [], headers: [], trailers: [], body: '', size: 0,
+      duration: 1, preRequestResult: { tests: [] }, testResult: { tests: [] }, method: {} as never,
+      environmentUpdates: { token: 'dev-token' }, globalVariableUpdates: { after: 'written' }, globalVariablesRemoved: ['before'],
+    });
+    await sending;
+    expect(app.environmentValuesFor('dev')).toEqual({ host: 'dev', token: 'dev-token' });
+    expect(app.activeEnvironmentValues()).toEqual({ host: 'prod' });
+    expect(app.globalVariableValues()).toEqual({ after: 'written' });
+  });
+
+  it('records a skipped gRPC call as skipped and applies its pre-request variable changes', async () => {
+    const app = await appWithRequest('grpc.example.test:443');
+    app.requestType = 'grpc';
+    app.grpcMethod = 'greeter.Greeter/Hello';
+    app.grpcServiceDefinition = { source: '', services: [], methods: [] };
+    app.environments = [{ id: 'dev', workspaceId: app.activeWorkspaceId, name: 'Dev', values: [] }];
+    app.activeEnvironmentId = 'dev';
+    Object.defineProperties(app, Object.getOwnPropertyDescriptors(grpcFeature));
+    const response = {
+      status: '', grpcCode: '', grpcMessage: '', messages: [], headers: [], trailers: [], body: '', size: 0,
+      duration: 0, preRequestResult: { tests: [] }, testResult: { tests: [] }, method: {} as never,
+      skipped: true, skipReason: 'Skipped by pre-request script', environmentUpdates: { checked: 'true' },
+    };
+    vi.mocked(backend.sendGrpcRequest).mockResolvedValueOnce(response);
+    await app.invokeGrpc();
+    expect(app.grpcResponse).toMatchObject({ skipped: true, skipReason: 'Skipped by pre-request script' });
+    expect(app.requestHistory[0]).toMatchObject({ status: 'SKIPPED', statusCode: 0 });
+    expect(app.environmentValuesFor('dev')).toEqual({ checked: 'true' });
+    expect(app.runnerResultFromGrpcResponse(app.snapshotActiveRequest(), response, 'run', 1)).toMatchObject({ status: 'skipped', error: '' });
   });
 });
 

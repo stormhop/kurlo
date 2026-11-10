@@ -141,6 +141,8 @@ type HttpRequest struct {
 	SecretEnvironmentKeys        []string          `json:"secretEnvironmentKeys"`
 	SecretEnvironmentValues      []string          `json:"secretEnvironmentValues"`
 	CollectionVariables          map[string]string `json:"collectionVariables"`
+	ScriptEnvironment            map[string]string `json:"scriptEnvironment,omitempty"`
+	ScriptVariables              map[string]string `json:"scriptVariables,omitempty"`
 	IterationData                map[string]string `json:"iterationData,omitempty"`
 	ResolveTemplates             bool              `json:"resolveTemplates,omitempty"`
 	TemplateValues               map[string]string `json:"templateValues,omitempty"`
@@ -219,6 +221,8 @@ type HttpResponse struct {
 	CollectionVariablesRemoved []string          `json:"collectionVariablesRemoved,omitempty"`
 	EnvironmentUpdates         map[string]string `json:"environmentUpdates,omitempty"`
 	EnvironmentRemoved         []string          `json:"environmentRemoved,omitempty"`
+	GlobalVariableUpdates      map[string]string `json:"globalVariableUpdates,omitempty"`
+	GlobalVariablesRemoved     []string          `json:"globalVariablesRemoved,omitempty"`
 
 	Llm string `json:"llm,omitempty"`
 }

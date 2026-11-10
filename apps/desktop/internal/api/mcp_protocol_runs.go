@@ -22,6 +22,7 @@ type mcpProtocolArgs struct {
 }
 
 func (s *mcpServer) protocolHTTP(run *mcpRunContext, req cliSavedRequest, values map[string]string) (model.HttpRequest, error) {
+	req = cliRequestCollectionScope(req, run.sm)
 	prepared := buildHTTPRequest(req, values, run.secrets, s.opts.timeoutMs)
 	prepared.Name = req.Name
 	prepared.ScriptTimeoutMs = req.Settings.ScriptTimeoutMs
@@ -88,15 +89,16 @@ func (s *mcpServer) protocolGRPC(run *mcpRunContext, req cliSavedRequest, values
 		MaxResponseMessageSizeMb: settings.GrpcMaxResponseMessageSizeMb, TimeoutMs: httpReq.TimeoutMs, Name: req.Name,
 		PreRequestScript: httpReq.PreRequestScript, TestScript: httpReq.TestScript, ScriptEngine: httpReq.ScriptEngine,
 		ScriptTimeoutMs: httpReq.ScriptTimeoutMs, AllowSendRequest: httpReq.AllowSendRequest, SecretEnvironmentValues: run.secrets,
+		CollectionVariables: httpReq.CollectionVariables,
 	}, nil
 }
 
 func (s *mcpServer) protocolMCP(run *mcpRunContext, req cliSavedRequest, args mcpProtocolArgs) (model.HttpRequest, error) {
-	httpReq, err := s.protocolHTTP(run, req, run.sm.GetEnvironment())
+	httpReq, err := s.protocolHTTP(run, req, cliRequestValues(req, run.sm))
 	if err != nil {
 		return httpReq, err
 	}
-	values := run.sm.GetEnvironment()
+	values := cliRequestValues(req, run.sm)
 	httpReq.McpProtocolVersion = req.McpProtocolVersion
 	httpReq.McpMethod = defaultString(args.McpMethod, defaultString(req.McpMethod, "tools/list"))
 	httpReq.McpName = resolveTemplateValue(defaultString(args.McpName, req.McpName), values)
@@ -150,7 +152,7 @@ func (s *mcpServer) runSavedProtocol(ctx context.Context, ws mcpWorkspace, run *
 	var httpResp model.HttpResponse
 	switch kind {
 	case "grpc":
-		prepared, err := s.protocolGRPC(run, req, run.sm.GetEnvironment())
+		prepared, err := s.protocolGRPC(run, req, cliRequestValues(req, run.sm))
 		if err != nil {
 			return nil, err
 		}
@@ -159,9 +161,10 @@ func (s *mcpServer) runSavedProtocol(ctx context.Context, ws mcpWorkspace, run *
 		out.Error = grpcRunError(resp)
 		out.Response = map[string]any{
 			"grpcCode": resp.GrpcCode, "grpcMessage": resp.GrpcMessage, "method": resp.Method,
+			"skipped": resp.Skipped, "skipReason": resp.SkipReason,
 			"trailers": mcpSafeHeaders(resp.Trailers, run.secrets),
 		}
-		s.applyCollectionUpdates(run, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
+		s.applyCollectionUpdates(run, req, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
 	case "mcp":
 		if args.McpMethod != "" && args.McpMethod != "tools/list" && args.McpMethod != "tools/call" {
 			return nil, fmt.Errorf("mcpMethod must be tools/list or tools/call")
@@ -178,7 +181,7 @@ func (s *mcpServer) runSavedProtocol(ctx context.Context, ws mcpWorkspace, run *
 		}
 		body, truncated := mcpTruncate(redactSecrets(defaultString(resp.StructuredContent, resp.Result), run.secrets), limit)
 		out.Response = map[string]any{"server": resp.ServerName, "tools": resp.Tools, "nextCursor": resp.NextCursor, "result": body, "resultTruncated": truncated, "rpcErrorCode": resp.RPCErrorCode, "warnings": resp.Warnings}
-		s.applyCollectionUpdates(run, httpResp.CollectionVariableUpdates, httpResp.CollectionVariablesRemoved)
+		s.applyCollectionUpdates(run, req, httpResp.CollectionVariableUpdates, httpResp.CollectionVariablesRemoved)
 	case "ai":
 		resp, err := s.runSavedAI(ctx, ws, run, req)
 		if err != nil {
@@ -188,7 +191,7 @@ func (s *mcpServer) runSavedProtocol(ctx context.Context, ws mcpWorkspace, run *
 		out.Error = defaultString(resp.Error, defaultString(httpResp.Error, httpResp.TestResult.Error))
 		text, truncated := mcpTruncate(redactSecrets(resp.Text, run.secrets), limit)
 		out.Response = map[string]any{"text": text, "textTruncated": truncated, "stopReason": resp.StopReason, "usage": resp.Usage, "firstTokenMs": resp.FirstTokenMs, "durationMs": resp.DurationMs, "steps": len(resp.Steps), "warnings": resp.Warnings}
-		s.applyCollectionUpdates(run, httpResp.CollectionVariableUpdates, httpResp.CollectionVariablesRemoved)
+		s.applyCollectionUpdates(run, req, httpResp.CollectionVariableUpdates, httpResp.CollectionVariablesRemoved)
 	default:
 		return nil, fmt.Errorf("%s is a %s request; use open_session in Agent Mode for live connections", mcpRequestPath(req), kind)
 	}
@@ -260,12 +263,12 @@ func (s *mcpServer) runSavedAI(ctx context.Context, ws mcpWorkspace, run *mcpRun
 		req.URL = ""
 		req.Auth = cliAuth{Type: "none"}
 	}
-	httpReq, err := s.protocolHTTP(run, req, run.sm.GetEnvironment())
+	httpReq, err := s.protocolHTTP(run, req, cliRequestValues(req, run.sm))
 	if err != nil {
 		return model.AiResponse{}, err
 	}
 	httpReq.Method, httpReq.BodyType, httpReq.Body, httpReq.BodyFilePath, httpReq.FormData = "POST", "none", "", "", nil
-	resolve := func(v string) string { return resolveTemplateValue(v, run.sm.GetEnvironment()) }
+	resolve := func(v string) string { return resolveTemplateValue(v, cliRequestValues(req, run.sm)) }
 	maxTokens, _ := strconv.Atoi(strings.TrimSpace(req.AiMaxTokens))
 	maxSteps, _ := strconv.Atoi(strings.TrimSpace(req.AiMaxSteps))
 	idleTimeout, _ := strconv.Atoi(strings.TrimSpace(req.AiIdleTimeoutSec))
@@ -320,6 +323,9 @@ func mcpGrpcHTTPResponse(resp model.GrpcResponse) model.HttpResponse {
 	out := *grpcResponseAsHTTP(resp)
 	out.PreRequestResult = resp.PreRequestResult
 	out.TestResult = resp.TestResult
+	out.Skipped, out.SkipReason = resp.Skipped, resp.SkipReason
+	out.CollectionVariableUpdates, out.CollectionVariablesRemoved = resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved
+	out.GlobalVariableUpdates, out.GlobalVariablesRemoved = resp.GlobalVariableUpdates, resp.GlobalVariablesRemoved
 	return out
 }
 
@@ -333,7 +339,7 @@ func grpcRunError(resp model.GrpcResponse) string {
 
 func (s *mcpServer) executeGrpcIteration(ctx context.Context, run *mcpRunContext, req cliSavedRequest, iteration grpcRunIteration) cliRunResult {
 	result := cliRunResult{Name: mcpRequestLabel(req), Method: "GRPC", URL: req.URL, Iteration: iteration.index}
-	values := run.sm.GetEnvironment()
+	values := cliRequestValues(req, run.sm)
 	if len(iteration.data) > 0 {
 		values = maps.Clone(values)
 		maps.Copy(values, iteration.data)
@@ -345,11 +351,16 @@ func (s *mcpServer) executeGrpcIteration(ctx context.Context, run *mcpRunContext
 	}
 	result.URL = prepared.Target
 	resp := sendGrpcRequestWith(ctx, prepared, run.sm, nil, doUnaryGrpcRequest, iteration)
+	if resp.Skipped {
+		result.Skipped, result.SkipReason = true, resp.SkipReason
+		s.applyCollectionUpdates(run, req, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
+		return result
+	}
 	if resp.Error == grpcStreamingRequired {
 		result.Skipped, result.SkipReason = true, resp.Error
 		return result
 	}
-	s.applyCollectionUpdates(run, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
+	s.applyCollectionUpdates(run, req, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
 	if resp.GrpcCode == "OK" {
 		result.StatusCode = 200
 	}

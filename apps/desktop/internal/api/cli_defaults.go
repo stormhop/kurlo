@@ -13,6 +13,12 @@ func applyCollectionDefaults(req cliSavedRequest, collection *cliCollection) cli
 	}
 	req.WorkspaceID = collection.WorkspaceID
 	defaults := collection.Defaults
+	req.CollectionVariables = enabledRowValues(defaults.Variables)
+	for _, row := range defaults.Variables {
+		if row.Enabled && row.Secret && row.Value != "" {
+			req.CollectionSecretValues = append(req.CollectionSecretValues, row.Value)
+		}
+	}
 	folders := folderDefaultsChain(collection, req.FolderPath)
 
 	auth := defaults.Auth

@@ -199,7 +199,17 @@ func sendGrpcRequest(requestCtx context.Context, req model.GrpcRequest, sm *stat
 	return sendGrpcRequestWith(requestCtx, req, sm, emit, doGrpcRequest, grpcRunIteration{})
 }
 
-func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *state.Manager, emit grpcEventEmitter, invoke func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse, iteration grpcRunIteration) model.GrpcResponse {
+func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *state.Manager, emit grpcEventEmitter, invoke func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse, iteration grpcRunIteration) (resp model.GrpcResponse) {
+	sm, commitVariables := isolateScriptState(sm, req.ScriptVariables, req.ScriptEnvironment)
+	var envDelta environmentDelta
+	defer func() {
+		resp.EnvironmentUpdates = envDelta.updates
+		resp.EnvironmentRemoved = envDelta.removedKeys()
+		globalDelta := commitVariables()
+		resp.GlobalVariableUpdates = globalDelta.updates
+		resp.GlobalVariablesRemoved = globalDelta.removedKeys()
+		emitGrpcDone(emit, req.RequestID, resp)
+	}()
 	scope := beginScriptScope(sm, req.CollectionVariables)
 	ctx := scope.ctx
 	populateScriptGrpcRequestContext(ctx, req)
@@ -211,23 +221,31 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 		preResult = script.RunPreRequest(req.ScriptEngine, req.PreRequestScript, ctx)
 		preResult = redactScriptResult(preResult, req.SecretEnvironmentValues)
 		mergeScriptGrpcRequestContext(ctx, &req)
-		scope.commit(sm)
+		envDelta.merge(scope.commit(sm))
 		if preResult.Error != "" {
-			resp := model.GrpcResponse{
+			resp = model.GrpcResponse{
 				Error:            "pre-request script failed: " + preResult.Error,
 				PreRequestResult: preResult,
 			}
 			resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult)
-			emitGrpcDone(emit, req.RequestID, resp)
+			return resp
+		}
+		if preResult.SkippedRequest {
+			resp = model.GrpcResponse{
+				Skipped:          true,
+				SkipReason:       "skipped by pm.execution.skipRequest()",
+				PreRequestResult: preResult,
+			}
+			resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult)
 			return resp
 		}
 	}
 
-	resp := invoke(requestCtx, req, emit)
+	resp = invoke(requestCtx, req, emit)
 	resp.PreRequestResult = preResult
 
 	if req.TestScript != "" && resp.Error != grpcStreamingRequired {
-		testScope := beginScriptScope(sm, req.CollectionVariables)
+		testScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult))
 		testCtx := testScope.ctx
 		populateScriptGrpcRequestContext(testCtx, req)
 		testCtx.IterationData, testCtx.Info.Iteration, testCtx.Info.IterationCount = iteration.data, iteration.index, iteration.count
@@ -235,11 +253,10 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 		testCtx.Response = grpcResponseAsHTTP(resp)
 		resp.TestResult = script.RunTests(req.ScriptEngine, req.TestScript, testCtx)
 		resp.TestResult = redactScriptResult(resp.TestResult, req.SecretEnvironmentValues)
-		testScope.commit(sm)
+		envDelta.merge(testScope.commit(sm))
 	}
 
 	resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult, resp.TestResult)
-	emitGrpcDone(emit, req.RequestID, resp)
 	return resp
 }
 

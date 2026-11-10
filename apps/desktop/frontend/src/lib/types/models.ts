@@ -342,6 +342,12 @@ export type GrpcResponse = {
   testResult: ScriptResult;
   collectionVariableUpdates?: Record<string, string>;
   collectionVariablesRemoved?: string[];
+  environmentUpdates?: Record<string, string>;
+  environmentRemoved?: string[];
+  globalVariableUpdates?: Record<string, string>;
+  globalVariablesRemoved?: string[];
+  skipped?: boolean;
+  skipReason?: string;
 };
 export type GrpcHeadersEvent = {
   requestId: string;

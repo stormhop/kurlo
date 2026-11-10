@@ -174,6 +174,13 @@ func (g *generator) text(step int, value string) string {
 	return "t(" + jsString(value) + ")"
 }
 
+func (g *generator) objectKey(step int, value string) string {
+	if strings.Contains(value, "{{") {
+		return "[" + g.text(step, value) + "]"
+	}
+	return jsString(value)
+}
+
 func (g *generator) scan(step int, value string, depth int) {
 	if depth > 10 {
 		return
@@ -424,7 +431,7 @@ func (g *generator) bodyExpr(number int, request Request) string {
 				skipped = true
 				continue
 			}
-			fields = append(fields, g.text(number, field.Key)+": "+g.text(number, field.Value))
+			fields = append(fields, g.objectKey(number, field.Key)+": "+g.text(number, field.Value))
 		}
 		if request.BodyType == "form" {
 			g.warn(number, "The multipart form of %s is sent URL-encoded.", request.Name)
@@ -447,7 +454,7 @@ func (g *generator) paramsExpr(number int, request Request, tag string) string {
 	has := map[string]bool{}
 	for _, header := range request.Headers {
 		has[strings.ToLower(strings.TrimSpace(header.Key))] = true
-		headers = append(headers, g.text(number, header.Key)+": "+g.text(number, header.Value))
+		headers = append(headers, g.objectKey(number, header.Key)+": "+g.text(number, header.Value))
 	}
 	if contentType, ok := rawContentTypes[request.BodyType]; ok && request.Body != "" && !has["content-type"] {
 		headers = append(headers, jsString("Content-Type")+": "+jsString(contentType))
@@ -457,7 +464,7 @@ func (g *generator) paramsExpr(number int, request Request, tag string) string {
 	}
 	auth := strings.ToLower(strings.TrimSpace(request.Auth.Type))
 	if auth == "apikey" && request.Auth.KeyIn != "query" && request.Auth.KeyName != "" {
-		headers = append(headers, g.text(number, request.Auth.KeyName)+": "+g.text(number, request.Auth.KeyValue))
+		headers = append(headers, g.objectKey(number, request.Auth.KeyName)+": "+g.text(number, request.Auth.KeyValue))
 	}
 	parts := []string{}
 	if len(headers) > 0 {

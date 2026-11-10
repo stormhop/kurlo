@@ -40,9 +40,12 @@ func (s *agentLiveSession) runGRPC(req model.GrpcRequest, sm *state.Manager) {
 	resp := sendGrpcRequestWith(s.ctx, req, sm, nil, s.invokeGRPC, grpcRunIteration{})
 	if resp.Error != "" {
 		s.opened(fmt.Errorf("%s", resp.Error))
+	} else if resp.Skipped {
+		s.opened(fmt.Errorf("%s", resp.SkipReason))
 	}
 	s.push("close", map[string]any{
 		"grpcCode": resp.GrpcCode, "grpcMessage": resp.GrpcMessage, "error": resp.Error,
+		"skipped": resp.Skipped, "skipReason": resp.SkipReason,
 		"trailers": mcpSafeHeaders(resp.Trailers, s.secrets), "durationMs": resp.Duration,
 		"preRequestResult": resp.PreRequestResult, "testResult": resp.TestResult,
 	})

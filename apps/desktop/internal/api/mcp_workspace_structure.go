@@ -184,6 +184,10 @@ func mcpUpdateEnvironment(st *mcpStore, environment, patch map[string]any) error
 	if err := mcpEditableEnvironment(st, environment); err != nil {
 		return err
 	}
+	patch, err := mcpNormalizeEnvironmentPatch(patch)
+	if err != nil {
+		return err
+	}
 	for key := range patch {
 		switch key {
 		case "name", "parentId", "values":
@@ -227,6 +231,97 @@ func mcpUpdateEnvironment(st *mcpStore, environment, patch map[string]any) error
 		return err
 	}
 	return validateWorkspaceFileContract("environment", environment)
+}
+
+func mcpNormalizeEnvironmentPatch(patch map[string]any) (map[string]any, error) {
+	if patch == nil {
+		return nil, nil
+	}
+	normalized := make(map[string]any, len(patch))
+	for key, value := range patch {
+		normalized[key] = value
+	}
+	if variables, ok := normalized["variables"]; ok {
+		if _, both := normalized["values"]; both {
+			return nil, fmt.Errorf("environment patch must use values or variables, not both")
+		}
+		delete(normalized, "variables")
+		normalized["values"] = variables
+	}
+	raw, ok := normalized["values"]
+	if !ok {
+		return normalized, nil
+	}
+	rows, err := mcpEnvironmentValueRows(raw)
+	if err != nil {
+		return nil, err
+	}
+	normalized["values"] = rows
+	return normalized, nil
+}
+
+func mcpEnvironmentValueRows(raw any) ([]any, error) {
+	var input []map[string]any
+	switch value := raw.(type) {
+	case nil:
+	case map[string]any:
+		keys := make([]string, 0, len(value))
+		for key := range value {
+			keys = append(keys, key)
+		}
+		slices.Sort(keys)
+		for _, key := range keys {
+			input = append(input, map[string]any{"key": key, "value": value[key]})
+		}
+	case []any:
+		for _, item := range value {
+			row, ok := item.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("environment values must be objects with key and value")
+			}
+			input = append(input, row)
+		}
+	default:
+		return nil, fmt.Errorf("environment values must be a list of {key, value} objects or an object of key: value pairs")
+	}
+	rows := make([]any, 0, len(input))
+	seen := make(map[string]bool, len(input))
+	for index, item := range input {
+		key := strings.TrimSpace(stringValue(item, "key"))
+		if key == "" {
+			return nil, fmt.Errorf("environment value %d needs a key", index+1)
+		}
+		if seen[key] {
+			return nil, fmt.Errorf("environment variable %s is listed twice", key)
+		}
+		seen[key] = true
+		if boolValue(item["secret"]) {
+			return nil, fmt.Errorf("%s is a secret; add secret values in Kurlo", key)
+		}
+		row := make(map[string]any, len(item)+3)
+		for field, value := range item {
+			row[field] = value
+		}
+		row["key"] = key
+		switch value := item["value"].(type) {
+		case nil:
+			row["value"] = ""
+		case string:
+		case bool, float64, int, int64, json.Number:
+			row["value"] = fmt.Sprint(value)
+		default:
+			return nil, fmt.Errorf("environment variable %s must have a text value", key)
+		}
+		if _, ok := row["enabled"]; !ok {
+			row["enabled"] = true
+		}
+		if _, ok := row["description"]; !ok {
+			row["description"] = ""
+		}
+		row["id"] = index + 1
+		rows = append(rows, row)
+	}
+	return rows, nil
 }
 
 func mcpDeleteEnvironment(st *mcpStore, arguments json.RawMessage) (func() any, error) {

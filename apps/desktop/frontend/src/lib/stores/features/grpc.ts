@@ -20,11 +20,14 @@ import type {
   SavedRequest,
 } from '../../types/models';
 import { newRequestId } from '../../utils';
+import type { EnvironmentChanges } from './environments';
+import type { GlobalVariableChanges } from './globals';
 
 const REQUEST_CANCELED_ERROR = 'Request canceled';
 
 type GrpcHost = {
   activeRequestId: string;
+  activeEnvironmentId: string;
   authType: AuthType;
   bearerToken: string;
   beautifiedBody: boolean;
@@ -55,6 +58,7 @@ type GrpcHost = {
   activeEnvironmentValues: () => Record<string, string>;
   activeSecretEnvironmentKeys: () => string[];
   activeSecretEnvironmentValues: () => string[];
+  globalVariableValues: () => Record<string, string>;
   cancelActiveRequest: () => Promise<void>;
   discoverGrpcServices: () => Promise<void>;
   emptyGrpcResponse: () => GrpcResponse;
@@ -75,7 +79,7 @@ type GrpcHost = {
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   recordRequestHistory: (httpResponse: HttpResponse, requestSnapshot?: SavedRequest) => Promise<void>;
   requestIsActive: (requestId: string) => boolean;
-  savedRequestToRunnableGrpcRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string) => GrpcRequest;
+  savedRequestToRunnableGrpcRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string, globals?: Record<string, string>) => GrpcRequest;
   setActiveGrpcResponse: (response: GrpcResponse | null, requestId?: string) => void;
   setActiveGrpcResponseTab: (tab: GrpcResponseTab, requestId?: string) => void;
   setActiveResponse: (response: HttpResponse | null, requestId?: string) => void;
@@ -84,6 +88,8 @@ type GrpcHost = {
   snapshotActiveRequest: (options?: { forPersistence?: boolean }) => SavedRequest;
   syncActiveEnvironmentFromBackend: () => Promise<void>;
   syncBackendEnvironment: () => Promise<void>;
+  applyEnvironmentChangesFromResponse: (changes: EnvironmentChanges, environmentId: string) => Promise<void>;
+  applyGlobalVariableChangesFromResponse: (changes: GlobalVariableChanges) => Promise<boolean>;
   applyCollectionVariableUpdates: (
     req: Pick<SavedRequest, 'collectionId'>,
     updates: Record<string, string> | undefined,
@@ -396,7 +402,9 @@ export const grpcFeature = {
       return;
     }
     const requestSnapshot = this.snapshotActiveRequest();
+    const environmentId = this.activeEnvironmentId;
     const envValues = this.activeEnvironmentValues();
+    const globals = this.globalVariableValues();
     const secretValues = this.activeSecretEnvironmentValues();
     const secretKeys = this.activeSecretEnvironmentKeys();
     const requestId = this.activeRequestId || newRequestId();
@@ -409,9 +417,9 @@ export const grpcFeature = {
     this.responseSearchIndex = 0;
     try {
       await this.persistActiveRequestNow();
-      try { await this.syncBackendEnvironment(); } catch {}
-      const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(requestSnapshot, envValues, secretValues, secretKeys, requestId));
-      try { await this.syncActiveEnvironmentFromBackend(); } catch {}
+      const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(requestSnapshot, envValues, secretValues, secretKeys, requestId, globals));
+      try { await this.applyEnvironmentChangesFromResponse(resp, environmentId); } catch {}
+      try { await this.applyGlobalVariableChangesFromResponse(resp); } catch {}
       try { await this.applyCollectionVariableUpdates(requestSnapshot, resp.collectionVariableUpdates, resp.collectionVariablesRemoved); } catch {}
       if (resp.error && !resp.grpcCode && !(resp.messages ?? []).length) {
         if (this.requestIsActive(requestId)) this.requestError = resp.error;
@@ -446,7 +454,9 @@ export const grpcFeature = {
       await this.recordRequestHistory({
         ...emptyHttpResponse(),
         statusCode: resp.grpcCode === 'OK' ? 200 : 0,
-        status: resp.grpcCode || 'gRPC',
+        status: resp.skipped ? 'SKIPPED' : resp.grpcCode || 'gRPC',
+        skipped: resp.skipped,
+        skipReason: resp.skipReason,
         headers: resp.headers ?? [],
         body: resp.body ?? '',
         duration: resp.duration ?? 0,

@@ -29,6 +29,14 @@ import {
 export type EnvironmentView = 'single' | 'matrix';
 export const ENVIRONMENT_VIEW_KEY = 'kurlo.environmentView.v1';
 
+export type EnvironmentChanges = { environmentUpdates?: Record<string, string>; environmentRemoved?: string[] };
+
+export function environmentValuesAfterChanges(values: Record<string, string>, changes: EnvironmentChanges) {
+  const next = { ...values, ...changes.environmentUpdates };
+  for (const key of changes.environmentRemoved ?? []) delete next[key];
+  return next;
+}
+
 export function readEnvironmentView(): EnvironmentView {
   try {
     return localStorage.getItem(ENVIRONMENT_VIEW_KEY) === 'single' ? 'single' : 'matrix';
@@ -447,11 +455,7 @@ export const environmentFeature = {
     await this.persistRequestStore();
     return true;
   },
-  async applyEnvironmentChangesFromResponse(this: EnvironmentHost, resp: { environmentUpdates?: Record<string, string>; environmentRemoved?: string[] }, environmentId: string) {
-    if (environmentId === this.activeEnvironmentId) {
-      await this.syncActiveEnvironmentFromBackend();
-      return;
-    }
+  async applyEnvironmentChangesFromResponse(this: EnvironmentHost, resp: EnvironmentChanges, environmentId: string) {
     const updates = resp.environmentUpdates ?? {};
     const removed = new Set(resp.environmentRemoved ?? []);
     const environment = this.environments.find(candidate => candidate.id === environmentId);

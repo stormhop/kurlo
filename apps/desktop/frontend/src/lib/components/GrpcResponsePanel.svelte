@@ -185,9 +185,10 @@
   {:else if response}
     <div class="response-status-bar">
       <div class="status-left">
-        <span class="status-badge {grpcStatusClass(response.grpcCode)}">
-          {response.grpcCode || 'UNKNOWN'}
+        <span class="status-badge {grpcStatusClass(response.skipped ? 'STREAMING' : response.grpcCode)}">
+          {response.skipped ? 'SKIPPED' : response.grpcCode || 'UNKNOWN'}
         </span>
+        {#if response.skipped && response.skipReason}<span class="status-meta">{response.skipReason}</span>{/if}
         <span class="status-meta">{response.duration} ms</span>
         <span class="status-meta">{formatSize(response.size)}</span>
         {#if response.method?.fullName}<span class="status-meta grpc-status-method">{response.method.fullName}</span>{/if}
@@ -268,7 +269,7 @@
       <div class="response-tab-panel" id="grpc-response-messages" role="tabpanel">
         {#if grpcRows.length === 0}
           <div class="response-placeholder response-empty-state" role="status">
-            <span class="response-placeholder-text">No response messages</span>
+            <span class="response-placeholder-text">{response.skipped ? 'Request skipped before sending' : 'No response messages'}</span>
           </div>
         {:else if filteredGrpcRows.length === 0 && vm.responseSearch}
           <div class="response-placeholder response-empty-state" role="status">

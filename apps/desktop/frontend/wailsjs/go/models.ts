@@ -1829,6 +1829,8 @@ export namespace model {
 	    collectionVariablesRemoved?: string[];
 	    environmentUpdates?: Record<string, string>;
 	    environmentRemoved?: string[];
+	    globalVariableUpdates?: Record<string, string>;
+	    globalVariablesRemoved?: string[];
 	    llm?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -1863,6 +1865,8 @@ export namespace model {
 	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
 	        this.environmentUpdates = source["environmentUpdates"];
 	        this.environmentRemoved = source["environmentRemoved"];
+	        this.globalVariableUpdates = source["globalVariableUpdates"];
+	        this.globalVariablesRemoved = source["globalVariablesRemoved"];
 	        this.llm = source["llm"];
 	    }
 	
@@ -2402,6 +2406,8 @@ export namespace model {
 	    secretEnvironmentKeys: string[];
 	    secretEnvironmentValues: string[];
 	    collectionVariables: Record<string, string>;
+	    scriptEnvironment?: Record<string, string>;
+	    scriptVariables?: Record<string, string>;
 	    iterationData?: Record<string, string>;
 	    resolveTemplates?: boolean;
 	    templateValues?: Record<string, string>;
@@ -2478,6 +2484,8 @@ export namespace model {
 	        this.secretEnvironmentKeys = source["secretEnvironmentKeys"];
 	        this.secretEnvironmentValues = source["secretEnvironmentValues"];
 	        this.collectionVariables = source["collectionVariables"];
+	        this.scriptEnvironment = source["scriptEnvironment"];
+	        this.scriptVariables = source["scriptVariables"];
 	        this.iterationData = source["iterationData"];
 	        this.resolveTemplates = source["resolveTemplates"];
 	        this.templateValues = source["templateValues"];
@@ -3159,6 +3167,8 @@ export namespace model {
 	    secretEnvironmentKeys: string[];
 	    secretEnvironmentValues: string[];
 	    collectionVariables: Record<string, string>;
+	    scriptEnvironment?: Record<string, string>;
+	    scriptVariables?: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new GrpcRequest(source);
@@ -3190,6 +3200,8 @@ export namespace model {
 	        this.secretEnvironmentKeys = source["secretEnvironmentKeys"];
 	        this.secretEnvironmentValues = source["secretEnvironmentValues"];
 	        this.collectionVariables = source["collectionVariables"];
+	        this.scriptEnvironment = source["scriptEnvironment"];
+	        this.scriptVariables = source["scriptVariables"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3222,11 +3234,17 @@ export namespace model {
 	    size: number;
 	    timestamp?: number;
 	    error?: string;
+	    skipped?: boolean;
+	    skipReason?: string;
 	    method: GrpcMethodInfo;
 	    preRequestResult: ScriptResult;
 	    testResult: ScriptResult;
 	    collectionVariableUpdates?: Record<string, string>;
 	    collectionVariablesRemoved?: string[];
+	    environmentUpdates?: Record<string, string>;
+	    environmentRemoved?: string[];
+	    globalVariableUpdates?: Record<string, string>;
+	    globalVariablesRemoved?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new GrpcResponse(source);
@@ -3245,11 +3263,17 @@ export namespace model {
 	        this.size = source["size"];
 	        this.timestamp = source["timestamp"];
 	        this.error = source["error"];
+	        this.skipped = source["skipped"];
+	        this.skipReason = source["skipReason"];
 	        this.method = this.convertValues(source["method"], GrpcMethodInfo);
 	        this.preRequestResult = this.convertValues(source["preRequestResult"], ScriptResult);
 	        this.testResult = this.convertValues(source["testResult"], ScriptResult);
 	        this.collectionVariableUpdates = source["collectionVariableUpdates"];
 	        this.collectionVariablesRemoved = source["collectionVariablesRemoved"];
+	        this.environmentUpdates = source["environmentUpdates"];
+	        this.environmentRemoved = source["environmentRemoved"];
+	        this.globalVariableUpdates = source["globalVariableUpdates"];
+	        this.globalVariablesRemoved = source["globalVariablesRemoved"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

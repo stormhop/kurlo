@@ -6,7 +6,7 @@ import { parseGraphQLPayload, parseGraphQLVariables, serializeGraphQLPayload } f
 import { filterSocketIOTransportParams, graphQLBodyContentFromJsonText, isWebSocketUrl, socketIOImportDetails } from './importDetection';
 import { filesystemNameFromName } from './normalizers';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
-import { safeExportRow, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
+import { safeExportRow, safeExportSettings, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
 import { pathParamsFromUrl } from './pathParams';
 
 const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp']);
@@ -304,7 +304,7 @@ function insomniaRow(row: KVRow, includeSecrets = false) {
 function insomniaAuth(auth: SavedRequest['auth'], includeSecrets = false) {
   if (auth.type === 'bearer') return { type: 'bearer', token: safeExportValue('token', auth.bearerToken, includeSecrets) };
   if (auth.type === 'basic' || auth.type === 'digest') return { type: auth.type, username: auth.basicUser, password: safeExportValue('password', auth.basicPass, includeSecrets) };
-  if (auth.type === 'apikey') return { type: 'apikey', key: auth.apiKeyName, value: safeExportValue(auth.apiKeyName || 'apiKey', auth.apiKeyValue, includeSecrets), addTo: auth.apiKeyIn };
+  if (auth.type === 'apikey') return { type: 'apikey', key: auth.apiKeyName, value: safeExportValue('apiKey', auth.apiKeyValue, includeSecrets), addTo: auth.apiKeyIn };
   if (auth.type === 'oauth2') {
     return {
       type: 'oauth2',
@@ -416,7 +416,7 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (source: string, 
   const extension: Record<string, unknown> = {
     requestType,
     requestTab: req.requestTab,
-    settings: req.settings,
+    settings: safeExportSettings(req.settings, includeSecrets),
   };
   if (requestType === 'socketio') {
     extension.sioEvents = (req.sioEvents ?? []).filter(row => row.key || row.value).map(row => insomniaRow(row, includeSecrets));

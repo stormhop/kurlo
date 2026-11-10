@@ -204,7 +204,7 @@ func (s *mcpServer) observeByRunning(ctx context.Context, args mcpGenerateTestsA
 			break
 		}
 	}
-	run, err := s.prepareRun(ws, args.Environment, args.Variables)
+	run, err := s.prepareRun(ws.forRequest(req), args.Environment, args.Variables)
 	if err != nil {
 		return mcpObservedResponse{}, nil, err
 	}

@@ -887,6 +887,7 @@ class AppVM {
   declare saveGlobals: typeof globalsFeature.saveGlobals;
   declare syncBackendGlobals: typeof globalsFeature.syncBackendGlobals;
   declare syncGlobalsFromBackend: typeof globalsFeature.syncGlobalsFromBackend;
+  declare applyGlobalVariableChangesFromResponse: typeof globalsFeature.applyGlobalVariableChangesFromResponse;
   declare saveEnvironment: typeof environmentFeature.saveEnvironment;
   declare updateEnvironmentRow: typeof environmentFeature.updateEnvironmentRow;
   declare setEnvironmentView: typeof environmentFeature.setEnvironmentView;

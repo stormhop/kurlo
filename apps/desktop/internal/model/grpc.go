@@ -29,6 +29,8 @@ type GrpcRequest struct {
 	SecretEnvironmentKeys   []string          `json:"secretEnvironmentKeys"`
 	SecretEnvironmentValues []string          `json:"secretEnvironmentValues"`
 	CollectionVariables     map[string]string `json:"collectionVariables"`
+	ScriptEnvironment       map[string]string `json:"scriptEnvironment,omitempty"`
+	ScriptVariables         map[string]string `json:"scriptVariables,omitempty"`
 }
 
 type GrpcMessage struct {
@@ -44,21 +46,27 @@ type GrpcResponse struct {
 	GrpcMessage string `json:"grpcMessage"`
 	Status      string `json:"status"`
 
-	Headers   []KeyValue     `json:"headers"`
-	Trailers  []KeyValue     `json:"trailers"`
-	Messages  []GrpcMessage  `json:"messages"`
-	Body      string         `json:"body"`
-	Duration  int64          `json:"duration"`
-	Size      int64          `json:"size"`
-	Timestamp int64          `json:"timestamp,omitempty"`
-	Error     string         `json:"error,omitempty"`
-	Method    GrpcMethodInfo `json:"method"`
+	Headers    []KeyValue     `json:"headers"`
+	Trailers   []KeyValue     `json:"trailers"`
+	Messages   []GrpcMessage  `json:"messages"`
+	Body       string         `json:"body"`
+	Duration   int64          `json:"duration"`
+	Size       int64          `json:"size"`
+	Timestamp  int64          `json:"timestamp,omitempty"`
+	Error      string         `json:"error,omitempty"`
+	Skipped    bool           `json:"skipped,omitempty"`
+	SkipReason string         `json:"skipReason,omitempty"`
+	Method     GrpcMethodInfo `json:"method"`
 
 	PreRequestResult ScriptResult `json:"preRequestResult"`
 	TestResult       ScriptResult `json:"testResult"`
 
 	CollectionVariableUpdates  map[string]string `json:"collectionVariableUpdates,omitempty"`
 	CollectionVariablesRemoved []string          `json:"collectionVariablesRemoved,omitempty"`
+	EnvironmentUpdates         map[string]string `json:"environmentUpdates,omitempty"`
+	EnvironmentRemoved         []string          `json:"environmentRemoved,omitempty"`
+	GlobalVariableUpdates      map[string]string `json:"globalVariableUpdates,omitempty"`
+	GlobalVariablesRemoved     []string          `json:"globalVariablesRemoved,omitempty"`
 }
 
 type GrpcHeadersEvent struct {

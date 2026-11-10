@@ -150,14 +150,14 @@ func (s *mcpServer) toolOpenSession(ctx context.Context, arguments json.RawMessa
 		}
 	}()
 	if kind == "grpc" {
-		prepared, err := s.protocolGRPC(run, req, run.sm.GetEnvironment())
+		prepared, err := s.protocolGRPC(run, req, cliRequestValues(req, run.sm))
 		if err != nil {
 			return nil, err
 		}
 		session.secrets = run.secrets
 		go session.runGRPC(prepared, run.sm)
 	} else {
-		prepared, err := s.protocolHTTP(run, req, run.sm.GetEnvironment())
+		prepared, err := s.protocolHTTP(run, req, cliRequestValues(req, run.sm))
 		if err != nil {
 			return nil, err
 		}

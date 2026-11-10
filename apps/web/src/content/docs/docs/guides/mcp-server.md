@@ -230,7 +230,7 @@ The results from `run_request` and `run_collection` include the logs from collec
 | `patch_collection` | `collection` and `patch` for the name, description, defaults, folder paths or folder defaults. Set scripts and authentication in `defaults` or `folderDefaults`. |
 | `move_folder`, `duplicate_folder` | `collection`, `from` and `to` as slash-separated folder paths, and optional `targetCollection`. Includes nested requests and folder defaults. |
 | `duplicate_collection` | `collection` and optional `name`. Copies requests, examples and defaults. |
-| `create_environment`, `patch_environment`, `delete_environment` | Create with `name` and optional `workspace` and `patch`. Update with `environment` and `patch` for `name`, `parentId` or `values`. Delete with `environment`. |
+| `create_environment`, `patch_environment`, `delete_environment` | Create with `name` and optional `workspace` and `patch`. Update with `environment` and `patch` for `name`, `parentId` or `values`; `values` replaces the whole list. `values` (or `variables`) is a list of `{key, value}` rows with optional `description` and `enabled`, or an object such as `{"baseUrl": "https://api.example.com"}`, so one batch can create many environments with their variables. Rows marked `secret` are refused: add secrets in the app. Delete with `environment`. |
 | `patch_example`, `delete_example` | `request` and `example` by name or ID. Pass a `patch` object to edit the example. |
 | `edit_global` | `key` and `value` to create or update, `name` to rename, or `delete: true` to remove. Open the workspace in Kurlo first. |
 

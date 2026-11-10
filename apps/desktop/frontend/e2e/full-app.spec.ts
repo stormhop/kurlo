@@ -438,6 +438,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       return {
         statusCode: 200,
         status: '200 OK',
+        ...(req.url.includes('/login') ? { environmentUpdates: { sessionId: 'session-from-login' } } : {}),
         headers: [
           { key: 'content-type', value: 'application/json' },
           { key: 'x-kurlo-e2e', value: 'playwright' },
@@ -2733,6 +2734,100 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(trigger).toContainText('Billing');
   });
 
+  test('keeps a running collection on its original environment after switching to production', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeEnvironmentId: 'dev',
+      collections: [{ id: 'col-owned', workspaceId: 'workspace-e2e', name: 'Owned scopes' }],
+      environments: [
+        { id: 'dev', workspaceId: 'workspace-e2e', name: 'Development', values: [{ id: 1, enabled: true, key: 'host', value: 'https://dev.kurlo.test' }] },
+        { id: 'prod', workspaceId: 'workspace-e2e', name: 'Production', values: [{ id: 2, enabled: true, key: 'host', value: 'https://prod.kurlo.test' }] },
+      ],
+      requests: [
+        { id: 'owned-login', collectionId: 'col-owned', name: 'First request', method: 'GET', url: '{{host}}/slow?ms=1500&setenv=token:dev-token', testScriptJs: 'pm.environment.set("token", "dev-token")' },
+        { id: 'owned-next', collectionId: 'col-owned', name: 'Second request', method: 'GET', url: '{{host}}/slow?ms=1&seen={{token}}' },
+      ],
+    });
+    await page.goto('/');
+    await expect(page.locator('.environment-select')).toContainText('Development');
+    await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+    const runner = page.getByRole('region', { name: 'Collection runner' });
+    await runner.locator('.runner-select .app-select-trigger').click();
+    await runner.getByRole('option', { name: 'Owned scopes' }).click();
+    await runner.getByRole('button', { name: 'Run 2 requests' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(1);
+    await page.locator('.environment-select').click();
+    await page.locator('.environment-menu').getByRole('button', { name: /Production/ }).click();
+    await expect(page.locator('.environment-select')).toContainText('Production');
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(2);
+    await expect(runner.locator('.runner-results-summary')).toContainText('Requests 2/2');
+    const sent = await page.evaluate(() => window.__kurloE2E.sentRequests);
+    expect(sent.map(request => request.url)).toEqual(['https://dev.kurlo.test/slow', 'https://dev.kurlo.test/slow']);
+    expect(sent[1]).toMatchObject({
+      scriptEnvironment: { host: 'https://dev.kurlo.test', token: 'dev-token' },
+      params: expect.arrayContaining([expect.objectContaining({ key: 'seen', value: 'dev-token' })]),
+    });
+    await expect.poll(() => page.evaluate(() => {
+      const environments = window.__kurloE2E.store.environments as Array<{ id: string; values: Array<{ key: string; value: string }> }>;
+      return environments.find(environment => environment.id === 'dev')?.values.find(row => row.key === 'token')?.value;
+    })).toBe('dev-token');
+    const production = await page.evaluate(() => {
+      const environments = window.__kurloE2E.store.environments as Array<{ id: string; values: Array<{ key: string; value: string }> }>;
+      return environments.find(environment => environment.id === 'prod')?.values;
+    });
+    expect(production).not.toEqual(expect.arrayContaining([expect.objectContaining({ key: 'token' })]));
+  });
+
+  test('preserves source edits when duplicating before autosave fires', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeId: 'duplicate-source', openIds: ['duplicate-source'],
+      collections: [{ id: 'col-duplicate', workspaceId: 'workspace-e2e', name: 'Duplicate API' }],
+      requests: [{ id: 'duplicate-source', collectionId: 'col-duplicate', name: 'Source request', method: 'GET', url: 'https://source.kurlo.test' }],
+    });
+    await page.goto('/');
+    const url = page.getByLabel('Request URL');
+    await expect(url).toHaveValue('https://source.kurlo.test');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('radio', { name: 'Autosave', exact: true }).click();
+    await page.getByLabel('Close settings').click();
+    await page.evaluate(() => {
+      const original = window.setTimeout.bind(window);
+      window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) =>
+        original(handler, delay === 1200 ? 60000 : delay, ...args)) as typeof window.setTimeout;
+    });
+    await url.fill('https://edited.kurlo.test');
+    const source = page.locator('.collection-request-wrap').filter({ hasText: 'Source request' });
+    await source.getByLabel('Request menu').click();
+    await source.getByRole('button', { name: 'Duplicate', exact: true }).click();
+    await expect(page.getByRole('tab', { name: /Source request Copy/ })).toBeVisible();
+    await page.getByRole('tab', { name: /^GET Source request(?: \(Unsaved changes\))?$/ }).click();
+    await expect(url).toHaveValue('https://edited.kurlo.test');
+    expect(await page.evaluate(() => {
+      const requests = window.__kurloE2E.store.requests as Array<{ id: string; url: string }>;
+      return requests.find(request => request.id === 'duplicate-source')?.url;
+    })).toBe('https://edited.kurlo.test');
+  });
+
+  test('shows skipped gRPC requests without an unknown or sent status', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeId: 'grpc-skipped', openIds: ['grpc-skipped'],
+      collections: [{ id: 'col-grpc-skip', workspaceId: 'workspace-e2e', name: 'gRPC API' }],
+      requests: [{ id: 'grpc-skipped', collectionId: 'col-grpc-skip', name: 'Skipped call', requestType: 'grpc', method: 'POST', url: 'grpc.kurlo.test:443', grpcMethod: 'greeter.Greeter/Hello' }],
+    });
+    await page.goto('/');
+    await page.evaluate(() => {
+      window.go.api.App.SendGrpcRequest = async () => ({
+        grpcCode: '', grpcMessage: '', status: '', headers: [], trailers: [], messages: [], body: '', duration: 0, size: 0,
+        skipped: true, skipReason: 'Skipped by pre-request script', preRequestResult: { tests: [], logs: [] }, testResult: { tests: [], logs: [] },
+      });
+    });
+    await page.getByRole('button', { name: 'Invoke', exact: true }).click();
+    await expect(page.locator('.status-badge')).toHaveText('SKIPPED');
+    await expect(page.locator('.response-status-bar')).toContainText('Skipped by pre-request script');
+    await expect(page.getByText('Request skipped before sending', { exact: true })).toBeVisible();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-grpc-skipped.png'), animations: 'disabled' });
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.history as Array<{ status: string }>)[0]?.status)).toBe('SKIPPED');
+  });
+
   test('keeps the full saved runner verdict when result details are limited', async ({ page, browserName }) => {
     const results = Array.from({ length: 501 }, (_, index) => ({
       runId: `run-${index}`, requestId: 'req-limited', iteration: index + 1,
@@ -2863,6 +2958,83 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(metrics.lineHeight).toBeGreaterThan(40);
     expect(Math.abs(metrics.gutterHeight - metrics.lineHeight)).toBeLessThan(1);
     expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  });
+
+  test('keeps a response selection inside the body when a warning sits above it', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false);
+    await page.goto('/');
+    await page.evaluate(() => {
+      window.go.api.App.SendRequest = async () => {
+        const body = '{"type":"parseQuery","text":"hello"}\n{"type":"error","message":"free tier"}\n';
+        return {
+          statusCode: 200, status: '200 OK', headers: [{ key: 'content-type', value: 'application/x-ndjson' }], body, duration: 12, size: body.length,
+          warnings: ['Replaced by the Auth tab: Authorization. The value in the Headers tab was not sent.'],
+          preRequestResult: { tests: [], logs: [] }, testResult: { tests: [], logs: [] },
+        };
+      };
+    });
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/chat');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByText('200 OK')).toBeVisible();
+    const warning = page.locator('.response-warning');
+    const viewer = page.getByRole('textbox', { name: 'Response body', exact: true });
+    await expect(warning).toBeVisible();
+    const selected = () => page.evaluate(() => window.getSelection()?.toString() ?? '');
+
+    await warning.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    expect(await selected()).toContain('free tier');
+    expect(await selected()).not.toContain('Replaced by the Auth tab');
+
+    await page.locator('.response-status-bar').getByText('200 OK').click();
+    await page.keyboard.press('ControlOrMeta+a');
+    expect(await selected()).not.toContain('Replaced by the Auth tab');
+
+    const lastLine = viewer.locator('.response-line[data-line-number="2"] .response-line-code');
+    const lineBox = (await lastLine.boundingBox())!;
+    const warningBox = (await warning.boundingBox())!;
+    await page.mouse.move(lineBox.x + lineBox.width - 4, lineBox.y + lineBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(warningBox.x + 20, warningBox.y + warningBox.height / 2, { steps: 8 });
+    await page.mouse.up();
+    expect(await selected()).toContain('parseQuery');
+    expect(await selected()).not.toContain('Replaced by the Auth tab');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-response-selection-warning.png'), animations: 'disabled' });
+  });
+
+  test('scrolls a long environment list without squeezing its rows', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      environments: Array.from({ length: 30 }, (_, index) => ({ id: `env-${index + 1}`, workspaceId: 'workspace-e2e', name: `Environment ${index + 1}`, values: [] })),
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Environments', exact: true }).click();
+    const list = page.locator('.environment-list');
+    const envRow = (name: string) => list.locator('.environment-item-text > span').filter({ hasText: new RegExp(`^${name}$`) });
+    const rowHeights = () => page.locator('.environment-item').evaluateAll(rows => rows.map(row => row.getBoundingClientRect().height));
+    const noneHeight = await page.locator('.environment-none-item').evaluate(row => row.getBoundingClientRect().height);
+    for (const height of await rowHeights()) expect(Math.abs(height - noneHeight)).toBeLessThan(1);
+    const overflow = await list.evaluate(node => node.scrollHeight - node.clientHeight);
+    expect(overflow).toBeGreaterThan(100);
+
+    await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await expect(envRow('Environment 30')).toBeInViewport();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-list-scrolled.png'), animations: 'disabled' });
+
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 560 });
+    await page.getByRole('button', { name: 'Environments', exact: true }).click();
+    await expect(envRow('Environment 1')).toBeInViewport();
+    await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await expect(envRow('Environment 30')).toBeInViewport();
+    for (const height of await rowHeights()) expect(Math.abs(height - noneHeight)).toBeLessThan(1);
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await expect(envRow('Environment 30')).toBeInViewport();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-list-resized.png'), animations: 'disabled' });
   });
 
   test('shows the branch, sync state and changes in the status bar as the only Git entry point', async ({ page }) => {

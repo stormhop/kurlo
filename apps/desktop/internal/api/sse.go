@@ -3,6 +3,9 @@ package api
 import (
 	"bufio"
 	"bytes"
+	"compress/flate"
+	"compress/gzip"
+	"compress/zlib"
 	"context"
 	"errors"
 	"fmt"
@@ -16,6 +19,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -355,7 +360,12 @@ func (m *sseManager) runStreamAttempt(
 		Timestamp:  openedAt.UnixMilli(),
 	})
 
-	parsed := parseSSEStream(sseCtx, resp.Body, result.lastEventID, onEvent)
+	stream, closeDecoders, err := decodeSSEBody(resp)
+	if err != nil {
+		return fail(fmt.Sprintf("Stream error: %s", err), false)
+	}
+	defer closeDecoders()
+	parsed := parseSSEStream(sseCtx, stream, result.lastEventID, onEvent)
 	result.lastEventID = parsed.lastEventID
 	if parsed.retry >= 0 {
 		result.retry = parsed.retry
@@ -372,6 +382,58 @@ func (m *sseManager) runStreamAttempt(
 		return fail(fmt.Sprintf("Stream error: %s", scanErr), status2xx)
 	}
 	return closed("Connection closed by server", status2xx)
+}
+
+func decodeSSEBody(resp *http.Response) (io.Reader, func(), error) {
+	var closers []io.Closer
+	closeDecoders := func() {
+		for i := len(closers) - 1; i >= 0; i-- {
+			_ = closers[i].Close()
+		}
+	}
+	var current io.Reader = resp.Body
+	if resp.Uncompressed {
+		return current, closeDecoders, nil
+	}
+	encodings := strings.Split(resp.Header.Get("Content-Encoding"), ",")
+	for i := len(encodings) - 1; i >= 0; i-- {
+		name := strings.ToLower(strings.TrimSpace(encodings[i]))
+		var decoder io.ReadCloser
+		var err error
+		switch name {
+		case "", "identity":
+			continue
+		case "gzip", "x-gzip":
+			decoder, err = gzip.NewReader(current)
+		case "br":
+			current = brotli.NewReader(current)
+			continue
+		case "zstd":
+			var z *zstd.Decoder
+			z, err = zstd.NewReader(current)
+			if err == nil {
+				decoder = z.IOReadCloser()
+			}
+		case "deflate":
+			sniff := newSniffReader(current)
+			decoder, err = zlib.NewReader(sniff)
+			if err != nil {
+				decoder = flate.NewReader(sniff.rewind())
+				err = nil
+			} else {
+				sniff.stop()
+			}
+		default:
+			err = fmt.Errorf("unsupported content encoding %q", name)
+		}
+		if err != nil {
+			closeDecoders()
+			return nil, func() {}, err
+		}
+		closers = append(closers, decoder)
+		current = decoder
+	}
+	return current, closeDecoders, nil
 }
 
 type sseParseResult struct {

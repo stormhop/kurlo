@@ -139,9 +139,29 @@
     return () => clearTimeout(timer);
   });
 
+  function selectResponseText(event: KeyboardEvent) {
+    if (event.defaultPrevented || event.altKey || event.shiftKey || (!event.metaKey && !event.ctrlKey) || event.key.toLowerCase() !== 'a') return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"], [contenteditable=""]')) return;
+    const area = event.currentTarget as HTMLElement;
+    const scope = area.querySelector<HTMLElement>('.response-body-viewer') ?? area.querySelector<HTMLElement>('[role="tabpanel"]');
+    event.preventDefault();
+    const selection = window.getSelection();
+    if (!scope || !selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(scope);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  function scopeSelectAll(node: HTMLElement) {
+    node.addEventListener('keydown', selectResponseText);
+    return { destroy() { node.removeEventListener('keydown', selectResponseText); } };
+  }
+
 </script>
 
-<div class="response-area" class:loading={loading && Boolean(response)} aria-busy={loading}>
+<div class="response-area" class:loading={loading && Boolean(response)} aria-busy={loading} tabindex="-1" use:scopeSelectAll>
   {#if loading}
     <div class="response-loading-progress" aria-hidden="true"><span></span></div>
   {/if}

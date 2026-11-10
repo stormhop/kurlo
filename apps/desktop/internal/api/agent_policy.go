@@ -103,12 +103,13 @@ type agentRunTarget struct {
 
 func agentRunTargets(s *mcpServer, tool string, arguments json.RawMessage) agentRunTarget {
 	var args struct {
-		Request     string `json:"request"`
-		Collection  string `json:"collection"`
-		Folder      string `json:"folder"`
-		URL         string `json:"url"`
-		Environment string `json:"environment"`
-		From        string `json:"from"`
+		Request     string         `json:"request"`
+		Collection  string         `json:"collection"`
+		Folder      string         `json:"folder"`
+		URL         string         `json:"url"`
+		Environment string         `json:"environment"`
+		From        string         `json:"from"`
+		Variables   map[string]any `json:"variables"`
 	}
 	_ = json.Unmarshal(arguments, &args)
 	target := agentRunTarget{env: defaultString(strings.TrimSpace(args.Environment), s.opts.env)}
@@ -137,39 +138,28 @@ func agentRunTargets(s *mcpServer, tool string, arguments json.RawMessage) agent
 	default:
 		return target
 	}
-	globals, _ := mcpGlobalValues(s.opts.workspace, s.opts.loadAppSecrets)
-	values, _, err := resolveCLIValues(cliOptions{env: target.env}, ws.collections, ws.environments, globals)
-	if err != nil {
-		return target
-	}
-	target.urls = append(target.urls, agentResolvedRequestURLs(ws, values, requests)...)
 	if tool == "send_request" {
-		target.urls = []string{substituteTemplates(args.URL, values)}
+		run, err := s.prepareRun(ws, target.env, args.Variables)
+		if err != nil {
+			return target
+		}
+		target.urls = []string{resolveTemplateValue(args.URL, cliRequestValues(cliSavedRequest{}, run.sm))}
+	} else {
+		scope := ws
+		if tool != "run_collection" && len(requests) == 1 {
+			scope = ws.forRequest(requests[0])
+		}
+		run, err := s.prepareRun(scope, target.env, args.Variables)
+		if err != nil {
+			return target
+		}
+		for _, req := range requests {
+			req = ws.withDefaults(req)
+			target.urls = append(target.urls, resolveTemplateValue(req.URL, cliRequestValues(req, run.sm)))
+		}
 	}
 	target.known = true
 	return target
-}
-
-func agentResolvedRequestURLs(ws mcpWorkspace, values map[string]string, requests []cliSavedRequest) []string {
-	urls := make([]string, 0, len(requests))
-	for _, req := range requests {
-		merged := map[string]string{}
-		for _, collection := range ws.collections {
-			if collection.ID != req.CollectionID {
-				continue
-			}
-			for _, row := range collection.Defaults.Variables {
-				if row.Enabled {
-					merged[row.Key] = row.Value
-				}
-			}
-		}
-		for key, value := range values {
-			merged[key] = value
-		}
-		urls = append(urls, substituteTemplates(req.URL, merged))
-	}
-	return urls
 }
 
 func agentWorkspaceUsesHost(s *mcpServer, env, host string) bool {
@@ -204,31 +194,39 @@ func agentWorkspaceUsesHost(s *mcpServer, env, host string) bool {
 			return true
 		}
 	}
-	values, _, err := resolveCLIValues(cliOptions{env: env}, ws.collections, ws.environments, globals)
-	if err != nil {
-		return false
-	}
-	for _, raw := range agentResolvedRequestURLs(ws, values, ws.requests) {
-		if strings.EqualFold(agentURLHost(raw), host) {
+	for _, req := range ws.requests {
+		scoped := ws.forRequest(req)
+		values, _, err := resolveCLIValues(cliOptions{env: env}, scoped.collections, scoped.environments, globals)
+		if err != nil {
+			continue
+		}
+		if strings.EqualFold(agentURLHost(resolveTemplateValue(req.URL, values)), host) {
 			return true
 		}
 	}
 	return false
 }
 
-func agentForeignSend(s *mcpServer, arguments json.RawMessage) (bool, string) {
-	target := agentRunTargets(s, "send_request", arguments)
+func agentForeignRun(s *mcpServer, tool string, arguments json.RawMessage) (bool, string) {
+	target := agentRunTargets(s, tool, arguments)
 	if !target.known || len(target.urls) == 0 {
 		return true, "Kurlo could not resolve the URL of this request to check where it goes."
 	}
-	host := agentURLHost(target.urls[0])
-	if host == "" {
-		return true, "Kurlo could not tell which host this request goes to."
+	checked := map[string]bool{}
+	for _, raw := range target.urls {
+		host := agentURLHost(raw)
+		if host == "" {
+			return true, "Kurlo could not tell which host this request goes to."
+		}
+		if checked[host] {
+			continue
+		}
+		checked[host] = true
+		if !agentWorkspaceUsesHost(s, target.env, host) {
+			return true, fmt.Sprintf("Sends a request to %s, a host no saved request or variable in this workspace uses.", host)
+		}
 	}
-	if agentWorkspaceUsesHost(s, target.env, host) {
-		return false, ""
-	}
-	return true, fmt.Sprintf("Sends a request to %s, a host no saved request or variable in this workspace uses.", host)
+	return false, ""
 }
 
 func agentURLHost(raw string) string {

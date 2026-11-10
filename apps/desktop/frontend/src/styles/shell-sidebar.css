@@ -885,6 +885,7 @@
 .environment-none-item,
 .environment-globals-item {
   display: flex;
+  flex: 0 0 auto;
   width: 100%;
   color: var(--text-2);
   text-align: left;
@@ -892,6 +893,7 @@
 
 .environment-item {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   overflow: hidden;
 }
