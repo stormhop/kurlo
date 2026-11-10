@@ -10,6 +10,19 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Changed
+
+- **Pinning environments.** The collection Overview shows only pinned environments and adds others from a search picker instead of a checkbox for every environment. See [Pinning environments to a collection](/docs/guides/environments/#pinning-environments-to-a-collection).
+
+- **Environment switcher.** Scrolls with many environments and adds a search field above eight; environment dropdowns get search too. See [Switching environments](/docs/guides/environments/#switching-environments).
+- **Steady scrolling.** Dropdown lists and panels no longer bounce past their edges.
+
+### Fixed
+
+- **Unsaved mark on new requests.** Undoing an edit in a request created from a collection's settings no longer leaves it marked as changed.
+
 ## 3.0.2
 
 ### Fixed

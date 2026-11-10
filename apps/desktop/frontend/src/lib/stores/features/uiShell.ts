@@ -508,6 +508,11 @@ export const uiShellFeature = {
     this.closeFloatingMenus();
     this.environmentMenuOpen = true;
     setTimeout(() => {
+      const search = document.querySelector<HTMLElement>('.environment-menu-search');
+      if (search) {
+        search.focus({ preventScroll: true });
+        return;
+      }
       const items = document.querySelectorAll<HTMLElement>('.environment-menu .menu-item');
       (document.querySelector<HTMLElement>('.environment-menu .menu-item.active') ?? items[0])?.focus();
     }, 0);

@@ -30,10 +30,12 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     formRows,
     sioEvents,
     sioArgs,
+    isDraft,
     ...stable
   } = req;
   return stableStringify({
     ...stable,
+    isDraft: Boolean(isDraft),
     params: rowsWithoutUiIds(params),
     headers: rowsWithoutUiIds(headers),
     formRows: rowsWithoutUiIds(formRows),

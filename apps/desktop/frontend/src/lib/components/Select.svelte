@@ -6,6 +6,7 @@
     className = '',
     disabled = false,
     searchable = false,
+    searchPlaceholder = 'Search models',
     ariaLabel = undefined,
     onChange = () => {},
   }: {
@@ -14,6 +15,7 @@
     className?: string;
     disabled?: boolean;
     searchable?: boolean;
+    searchPlaceholder?: string;
     ariaLabel?: string;
     onChange?: (value: string) => void;
   } = $props();
@@ -34,7 +36,7 @@
     search = '';
     if (open && searchable) {
       await tick();
-      searchInput?.focus();
+      searchInput?.focus({ preventScroll: true });
     }
   }
 
@@ -58,6 +60,7 @@
 
   const MENU_MARGIN = 10;
   const MENU_MIN_HEIGHT = 120;
+  const MENU_MAX_REM = 20;
 
   function clipBounds(from: HTMLElement) {
     let node = from.parentElement;
@@ -86,11 +89,13 @@
       const room = trigger.right - viewportLeft;
       horizontal = `left:auto;right:0;max-width:${Math.max(trigger.width, Math.floor(room))}px;`;
     }
-    if (natural <= below || below >= above) {
-      menuStyle = `${horizontal}max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(below))}px`;
+    const cap = MENU_MAX_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
+    const wanted = Math.min(natural, cap);
+    if (wanted <= below || below >= above) {
+      menuStyle = `${horizontal}max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(Math.min(below, cap)))}px`;
       return;
     }
-    menuStyle = `${horizontal}top:auto;bottom:calc(100% + 4px);max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(above))}px`;
+    menuStyle = `${horizontal}top:auto;bottom:calc(100% + 4px);max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(Math.min(above, cap)))}px`;
   }
 
   function onPointerDownOutside(event: PointerEvent) {
@@ -154,7 +159,7 @@
   {#if open}
     <div class="menu app-select-menu" role="listbox" tabindex="-1" bind:this={menu} style={menuStyle} onkeydown={navigate} aria-label={ariaLabel}>
       {#if searchable}
-        <input class="field field-sm" type="search" bind:value={search} bind:this={searchInput} aria-label={`Search ${ariaLabel || 'options'}`} placeholder="Search models" spellcheck="false" />
+        <input class="field field-sm" type="search" bind:value={search} bind:this={searchInput} aria-label={`Search ${ariaLabel || 'options'}`} placeholder={searchPlaceholder} spellcheck="false" />
       {/if}
       {#each filteredOptions as opt (opt.value)}
         <button

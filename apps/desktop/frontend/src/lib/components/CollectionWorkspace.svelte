@@ -12,6 +12,8 @@
   import type { VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
   import Select from './Select.svelte';
+  import AddCloseIcon from './AddCloseIcon.svelte';
+  import SearchPicker from './SearchPicker.svelte';
   import VariableInput from './VariableInput.svelte';
   import { relativeTime, type CollectionRunTally } from '../collectionRuns';
 
@@ -118,6 +120,11 @@
   let defaultEnvironmentId = $state('');
   const pinnedEnvironmentCount = $derived(environments.filter(environment => pinnedEnvironmentIds.includes(environment.id)).length);
   const effectiveDefaultEnvironmentId = $derived(defaultPinnedEnvironmentId({ environmentIds: pinnedEnvironmentIds, defaultEnvironmentId }, environments));
+  const pinnedEnvironments = $derived(environments.filter(environment => pinnedEnvironmentIds.includes(environment.id)));
+  const unpinnedEnvironmentOptions = $derived(environments.filter(environment => !pinnedEnvironmentIds.includes(environment.id)).map(environment => {
+    const count = (environment.values ?? []).filter(row => row.key?.trim()).length;
+    return { value: environment.id, label: environment.name, hint: `${count} ${count === 1 ? 'variable' : 'variables'}` };
+  }));
 
   const engineLabel = $derived(scriptEngine === 'js' ? 'JavaScript' : 'Tengo');
   const activePre = $derived(scriptEngine === 'js' ? preRequestScriptJs : preRequestScript);
@@ -205,6 +212,10 @@
       ? [...pinnedEnvironmentIds.filter(id => id !== environmentId), environmentId]
       : pinnedEnvironmentIds.filter(id => id !== environmentId);
     if (!pinned && defaultEnvironmentId === environmentId) defaultEnvironmentId = '';
+  }
+
+  function pinEnvironment(environmentId: string) {
+    if (environmentId) togglePinnedEnvironment(environmentId, true);
   }
 
   function draftPins() {
@@ -415,24 +426,35 @@
                 <span class="request-section-meta">{pinnedEnvironmentCount ? 'Only pinned environments are listed in the switcher while you work in this collection. Opening the collection selects the default one.' : 'Pin environments to list only them in the switcher while you work in this collection.'}</span>
               </div>
               {#if environments.length}
-                <div class="collection-environment-list" role="list">
-                  {#each environments as environment (environment.id)}
-                    {@const pinned = pinnedEnvironmentIds.includes(environment.id)}
-                    <div class="collection-environment-row" class:pinned role="listitem">
-                      <label class="collection-environment-pin">
-                        <input type="checkbox" class="check" checked={pinned} onchange={(event) => togglePinnedEnvironment(environment.id, event.currentTarget.checked)} disabled={workspaceBlocked} />
+                {#if pinnedEnvironments.length}
+                  <div class="collection-environment-list" role="list" aria-label="Pinned environments">
+                    {#each pinnedEnvironments as environment (environment.id)}
+                      <div class="collection-environment-row" role="listitem">
                         <span class="collection-environment-name">{environment.name}</span>
-                      </label>
-                      {#if pinned}
-                        {#if environment.id === effectiveDefaultEnvironmentId}
-                          <span class="collection-environment-default">Default</span>
-                        {:else}
-                          <button class="btn btn-ghost btn-sm" type="button" onclick={() => (defaultEnvironmentId = environment.id)} disabled={workspaceBlocked}>Set as default</button>
-                        {/if}
-                      {/if}
-                    </div>
-                  {/each}
-                </div>
+                        <span class="collection-environment-actions">
+                          {#if environment.id === effectiveDefaultEnvironmentId}
+                            <span class="collection-environment-default">Default</span>
+                          {:else}
+                            <button class="btn btn-ghost btn-sm" type="button" onclick={() => (defaultEnvironmentId = environment.id)} disabled={workspaceBlocked}>Set as default</button>
+                          {/if}
+                          <button class="btn btn-ghost btn-icon btn-sm" type="button" onclick={() => togglePinnedEnvironment(environment.id, false)} aria-label={`Unpin ${environment.name}`} disabled={workspaceBlocked}><AddCloseIcon /></button>
+                        </span>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+                {#if unpinnedEnvironmentOptions.length}
+                  <SearchPicker
+                    className="collection-environment-picker"
+                    options={unpinnedEnvironmentOptions}
+                    placeholder={pinnedEnvironments.length ? 'Pin another environment…' : 'Pin an environment…'}
+                    searchPlaceholder="Search environments"
+                    ariaLabel="Pin environment"
+                    emptyText="No environment matches."
+                    disabled={workspaceBlocked}
+                    onChoose={pinEnvironment}
+                  />
+                {/if}
               {:else}
                 <p class="collection-environment-empty">This workspace has no environments yet.</p>
               {/if}

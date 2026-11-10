@@ -276,6 +276,8 @@
             ariaLabel="Environment"
             value={draft.settings.environment ?? ''}
             options={environmentOptions}
+            searchable={environmentOptions.length > 8}
+            searchPlaceholder="Search environments"
             disabled={workspaceBlocked}
             onChange={setEnvironment}
           />

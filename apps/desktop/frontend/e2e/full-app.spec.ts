@@ -3037,6 +3037,191 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-list-resized.png'), animations: 'disabled' });
   });
 
+  test('pins collection environments from a searchable picker instead of a full list', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-pins', workspaceId: 'workspace-e2e', name: 'Pins API' }],
+      requests: [{ id: 'req-pins', collectionId: 'col-pins', collection: 'Pins API', name: 'Ping', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/ping', auth: { type: 'none' } }],
+      environments: Array.from({ length: 30 }, (_, index) => ({ id: `env-${index + 1}`, workspaceId: 'workspace-e2e', name: `env-${String(index + 1).padStart(2, '0')}`, values: [] })),
+    });
+    await page.goto('/');
+    await collectionRow(page, 'Pins API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Pins API').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    const block = page.locator('.collection-environments');
+    await expect(block.getByRole('list', { name: 'Pinned environments' })).toHaveCount(0);
+    await expect(block.getByRole('checkbox')).toHaveCount(0);
+    const picker = block.getByRole('button', { name: 'Pin environment' });
+    await expect(picker).toHaveText('Pin an environment…');
+
+    await picker.click();
+    const menu = block.getByRole('dialog', { name: 'Pin environment' });
+    const search = menu.getByRole('textbox', { name: 'Search environments' });
+    await expect(search).toBeFocused();
+    await expect(menu.getByRole('option')).toHaveCount(30);
+    await expect(menu.getByRole('option').first()).toContainText('0 variables');
+    await search.fill('07');
+    await expect(menu.locator('.search-picker-option-label')).toHaveText(['env-07']);
+    await menu.getByRole('option', { name: /env-07/ }).click();
+    await expect(menu).toHaveCount(0);
+    await expect(picker).toHaveText('Pin another environment…');
+    await picker.click();
+    await search.fill('env-12');
+    await search.press('Enter');
+    await expect(menu).toHaveCount(0);
+
+    const pinned = block.getByRole('list', { name: 'Pinned environments' }).getByRole('listitem');
+    await expect(pinned.locator('.collection-environment-name')).toHaveText(['env-07', 'env-12']);
+    await expect(pinned.first()).toContainText('Default');
+    await pinned.nth(1).getByRole('button', { name: 'Set as default' }).click();
+    await expect(pinned.nth(1)).toContainText('Default');
+    const scrollTopBefore = await page.locator('.collection-workspace').evaluate(node => node.scrollTop);
+    await picker.click();
+    await expect(menu.getByRole('option', { name: /env-07/ })).toHaveCount(0);
+    await expect(menu.getByRole('option')).toHaveCount(28);
+    const geometry = await menu.evaluate((node) => {
+      const trigger = node.parentElement!.querySelector('button')!.getBoundingClientRect();
+      const box = node.getBoundingClientRect();
+      const list = node.querySelector('.search-picker-list') as HTMLElement;
+      let scroller = node.parentElement;
+      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+      const bounds = scroller!.getBoundingClientRect();
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      return { width: Math.abs(box.width - trigger.width), listRem: list.clientHeight / rem, scrolls: list.scrollHeight > list.clientHeight, inside: box.top >= bounds.top - 1 && box.bottom <= bounds.bottom + 1, scrollTop: scroller!.scrollTop, overscroll: getComputedStyle(list).overscrollBehaviorY };
+    });
+    expect(geometry.width).toBeLessThan(1);
+    expect(geometry.listRem).toBeLessThanOrEqual(17.5);
+    expect(geometry.scrolls).toBe(true);
+    expect(geometry.inside).toBe(true);
+    expect(geometry.scrollTop).toBe(scrollTopBefore);
+    expect(geometry.overscroll).toBe('none');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-collection-environment-picker-open.png'), animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(picker).toBeFocused();
+    await picker.click();
+    await expect(menu).toBeVisible();
+    await picker.click();
+    await expect(menu).toHaveCount(0);
+    await picker.dblclick();
+    await expect(menu).toHaveCount(0);
+    await picker.click();
+    await expect(menu).toBeVisible();
+    await page.locator('.collection-workspace-head').click({ position: { x: 4, y: 4 } });
+    await expect(menu).toHaveCount(0);
+    await picker.click();
+    await expect(search).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(menu).toHaveCount(0);
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-collection-environment-picker.png'), animations: 'disabled' });
+
+    const save = page.locator('.overview-actions .btn-primary');
+    await save.click();
+    const savedPins = () => page.evaluate(() => {
+      const store = window.__kurloE2E.store as { collections?: Array<{ id: string; environmentIds?: string[]; defaultEnvironmentId?: string }> };
+      const collection = store.collections?.find(item => item.id === 'col-pins');
+      return { ids: collection?.environmentIds ?? [], defaultId: collection?.defaultEnvironmentId ?? '' };
+    });
+    await expect.poll(savedPins).toEqual({ ids: ['env-7', 'env-12'], defaultId: 'env-12' });
+
+    await pinned.nth(1).getByRole('button', { name: 'Unpin env-12' }).click();
+    await expect(pinned.locator('.collection-environment-name')).toHaveText(['env-07']);
+    await save.click();
+    await expect.poll(savedPins).toEqual({ ids: ['env-7'], defaultId: '' });
+  });
+
+  test('does not mark a request from collection settings as changed after an edit is undone', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-clean', workspaceId: 'workspace-e2e', name: 'Clean API' }],
+      requests: [],
+    });
+    await page.goto('/');
+    await collectionRow(page, 'Clean API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Clean API').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    await page.locator('.overview-actions').getByRole('button', { name: 'New request' }).click();
+    const url = page.getByLabel('Request URL');
+    await expect(url).toBeVisible();
+    const tab = page.locator('.saved-request-tab.active');
+    await expect(tab).not.toHaveClass(/\bdirty\b/);
+    await url.click();
+    await page.keyboard.type(' ');
+    await expect(tab).toHaveClass(/\bdirty\b/);
+    await page.keyboard.press('Backspace');
+    await expect(tab).not.toHaveClass(/\bdirty\b/);
+  });
+
+  test('scrolls and searches the environment switcher when a workspace has many environments', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      environments: Array.from({ length: 30 }, (_, index) => ({ id: `env-${index + 1}`, workspaceId: 'workspace-e2e', name: `env-${String(index + 1).padStart(2, '0')}`, values: [] })),
+    });
+    await page.setViewportSize({ width: 1280, height: 640 });
+    await page.goto('/');
+    const trigger = page.locator('.environment-select');
+    const menu = page.locator('.environment-menu');
+    const list = menu.locator('.environment-menu-list');
+    await trigger.click();
+    await expect(menu).toBeVisible();
+    const search = menu.getByRole('searchbox', { name: 'Search environments' });
+    await expect(search).toBeVisible();
+    const box = (await menu.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(640);
+    await expect(menu.getByRole('button', { name: 'Manage environments' })).toBeInViewport();
+    expect(await list.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
+    await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await expect(list.getByRole('button', { name: 'env-30' })).toBeInViewport();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-switcher-scroll.png'), animations: 'disabled' });
+
+    await search.fill('27');
+    await expect(list.locator('.environment-menu-name')).toHaveText(['env-27']);
+    await search.fill('nothing like this');
+    await expect(list).toContainText('No environment matches.');
+    await search.fill('env-27');
+    await search.press('Enter');
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toContainText('env-27');
+
+    await trigger.click();
+    await expect(menu.getByRole('searchbox', { name: 'Search environments' })).toHaveValue('');
+    await expect(list.locator('.menu-item.active')).toBeInViewport();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+Alt+E');
+    await expect(menu.getByRole('searchbox', { name: 'Search environments' })).toBeFocused();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-switcher-active.png'), animations: 'disabled' });
+  });
+
+  test('keeps environment selects and the matrix usable with many environments', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      environments: Array.from({ length: 30 }, (_, index) => ({ id: `env-${index + 1}`, workspaceId: 'workspace-e2e', name: `env-${String(index + 1).padStart(2, '0')}`, values: [{ id: 1, key: 'baseUrl', value: `https://env-${index + 1}.example.test`, enabled: true }] })),
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Environments', exact: true }).click();
+    await page.locator('.environment-list').evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await page.locator('.environment-item-main').filter({ hasText: 'env-30' }).click();
+    await page.getByRole('radio', { name: 'Single' }).click();
+    const parent = page.locator('.env-parent-select');
+    await parent.locator('.app-select-trigger').click();
+    const menu = parent.locator('.app-select-menu');
+    await expect(menu).toBeVisible();
+    const search = menu.getByRole('searchbox');
+    await expect(search).toBeFocused();
+    await expect(search).toHaveAttribute('placeholder', 'Search environments');
+    const sizes = await menu.evaluate((node) => {
+      const input = node.querySelector('input') as HTMLElement;
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      return { height: node.getBoundingClientRect().height / rem, inputWidth: input.getBoundingClientRect().width, menuWidth: node.clientWidth, scrolls: node.scrollHeight > node.clientHeight };
+    });
+    expect(sizes.height).toBeLessThanOrEqual(20.5);
+    expect(sizes.scrolls).toBe(true);
+    expect(sizes.menuWidth - sizes.inputWidth).toBeLessThan(40);
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-parent-select.png'), animations: 'disabled' });
+    await search.fill('05');
+    await expect(menu.getByRole('option')).toHaveText(['env-05']);
+    await menu.getByRole('option', { name: 'env-05' }).click();
+    await expect(parent.locator('.app-select-trigger')).toContainText('env-05');
+
+    await page.getByRole('radio', { name: 'Matrix' }).click();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-matrix-many.png'), animations: 'disabled' });
+  });
+
   test('shows the branch, sync state and changes in the status bar as the only Git entry point', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false);
     await page.goto('/');

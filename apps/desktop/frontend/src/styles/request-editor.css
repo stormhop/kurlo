@@ -1942,7 +1942,6 @@ textarea.url-input {
   min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  overscroll-behavior: contain;
   padding: var(--space-3) var(--space-4) var(--space-8);
   scroll-padding-top: 0.75rem;
   scroll-padding-bottom: 1.75rem;

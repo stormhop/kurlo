@@ -288,7 +288,7 @@
     {#if parentOptions.length > 1}
       <div class="env-parent">
         <span class="env-parent-label">Inherits from</span>
-        <Select value={activeEnvironment.parentId ?? ''} options={parentOptions} className="env-parent-select" ariaLabel="Inherits from" onChange={value => setEnvironmentParent(activeEnvironment.id, value)} />
+        <Select value={activeEnvironment.parentId ?? ''} options={parentOptions} className="env-parent-select" searchable={parentOptions.length > 8} searchPlaceholder="Search environments" ariaLabel="Inherits from" onChange={value => setEnvironmentParent(activeEnvironment.id, value)} />
         <span class="env-parent-hint">{parent ? `Variables not set here come from ${parent.name}.` : 'Pick an environment to take the variables this one does not set.'}</span>
       </div>
     {/if}

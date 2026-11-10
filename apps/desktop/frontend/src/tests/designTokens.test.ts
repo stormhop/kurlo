@@ -73,7 +73,7 @@ const SPECIAL_BUTTON_CLASSES = new Set([
   'graphql-panel-tab-btn', 'grpc-method-option', 'history-day-toggle', 'history-entry-main',
   'input-validation-anchor', 'kv-auto-toggle', 'kv-col-resizer', 'kv-file-value', 'method-trigger', 'mock-row-name',
   'mock-url', 'overview-row', 'palette-command', 'panel-divider', 'pinned-head', 'response-time-trigger',
-  'saved-request-tab-btn', 'settings-nav-item', 'shortcut-combo', 'sidebar-divider', 'sse-event-main',
+  'saved-request-tab-btn', 'search-picker-option', 'settings-nav-item', 'shortcut-combo', 'sidebar-divider', 'sse-event-main',
   'subfolder-collapse', 'support-link-card', 'tab-close', 'theme-menu-item', 'theme-menu-mode', 'theme-menu-scrim',
   'version-pill', 'win-control', 'workspace-diagnostic-chip', 'workspace-menu-footer', 'workspace-menu-select',
 ]);
@@ -107,6 +107,13 @@ function classWords(tag: string): string[] {
 }
 
 describe('design tokens', () => {
+  it('keeps every scroll area from bouncing past its edges', () => {
+    const offenders = styleSources().flatMap(({ file, css }) => declarations(css)
+      .filter(({ property, value }) => property.startsWith('overscroll-behavior') && value.trim() !== 'none')
+      .map(({ selector, property, value }) => `${relative(SRC, file)} ${selector} { ${property}: ${value} }`));
+    expect(offenders).toEqual([]);
+  });
+
   it('sizes text with the type scale', () => {
     expect(violations(d => d.property === 'font-size' && /\dpx/.test(d.value) && d.selector !== ':root')).toEqual([]);
   });

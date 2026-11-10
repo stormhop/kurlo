@@ -153,7 +153,6 @@
   height: 2.125rem;
   padding: 0;
   overflow-x: auto;
-  overscroll-behavior-inline: contain;
   scrollbar-width: none;
 }
 .saved-request-tabs::-webkit-scrollbar { display: none; }
@@ -590,7 +589,37 @@
   z-index: 65;
   top: 2.25rem;
   right: 0;
-  width: 13.75rem;
+  display: flex;
+  flex-direction: column;
+  width: 15rem;
+  max-height: min(32rem, calc(100vh - 4.5rem));
+}
+
+.environment-menu > :not(.environment-menu-list) {
+  flex: 0 0 auto;
+}
+
+.environment-menu-search {
+  width: 100%;
+  margin-bottom: var(--space-1-5);
+}
+
+.environment-menu-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.environment-menu-list > * {
+  flex: 0 0 auto;
+}
+
+.environment-menu-empty {
+  padding: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--text-label);
 }
 
 .environment-menu button {
@@ -3596,23 +3625,24 @@
   border-top: 1px solid var(--border-subtle);
 }
 
-.collection-environment-pin {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  cursor: pointer;
-}
-
 .collection-environment-name {
+  min-width: 0;
   overflow: hidden;
-  color: var(--text-2);
+  color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.collection-environment-row.pinned .collection-environment-name {
-  color: var(--text);
+.collection-environment-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.collection-environment-picker {
+  width: 100%;
+  max-width: 35rem;
 }
 
 .collection-environment-default {

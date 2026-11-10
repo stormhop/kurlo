@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  requestDiffersFromSavedSnapshot,
   requestForEditingSnapshot,
   updateManualRequestSnapshot,
 } from '../lib/manualSave';
@@ -170,5 +171,15 @@ describe('manual save request snapshots', () => {
 
     expect(state.dirtyRequestIds.has(saved.id)).toBe(true);
     expect(state.unsavedRequestSnapshots.get(saved.id)?.params).toEqual([{ id: 'row-1', enabled: true, key: 'q', value: '1' }]);
+  });
+});
+
+describe('requestDiffersFromSavedSnapshot', () => {
+  it('treats a missing draft flag as a saved request', () => {
+    const saved = request();
+    delete (saved as Partial<SavedRequest>).isDraft;
+    expect(requestDiffersFromSavedSnapshot(request(), saved)).toBe(false);
+    expect(requestDiffersFromSavedSnapshot(request({ isDraft: true }), saved)).toBe(true);
+    expect(requestDiffersFromSavedSnapshot(request({ url: 'https://example.test ' }), saved)).toBe(true);
   });
 });

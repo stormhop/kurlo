@@ -5,6 +5,19 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Pinning environments to a collection uses a search picker.** The collection **Overview** listed every environment in the workspace with a checkbox, which ran to dozens of rows in a large workspace. It now lists only the pinned environments, with **Set as default** and a button to unpin each one, and **Pin an environment…** opens a list with search and each environment's variable count. The list keeps its own scroll and opens above the field only when there is no room below.
+
+- **The environment switcher scrolls and searches.** With many environments the switcher in the title bar grew past the window with no way to reach the rest. It now keeps its height, scrolls its list with **Manage environments** always at the bottom, and shows a search field once a workspace has more than eight environments; Enter picks the first match. **Inherits from**, the load test **Environment** and the agent's environment picker get the same search, and every dropdown list is capped at a compact height instead of filling the window.
+- **Scroll areas no longer bounce.** Dropdown lists, the environment switcher and the test results panel stopped rubber-banding past their edges, like the rest of the app.
+
+### Fixed
+
+- **Undoing an edit clears the unsaved mark on a new request.** A request created with **New request** in a collection's settings stayed marked as changed after an edit was undone, for example after typing a space in the URL and deleting it, because its saved copy had no draft flag while the open request had one set to false.
+
 ## [3.0.2] - 2026-11-10
 
 ### Fixed

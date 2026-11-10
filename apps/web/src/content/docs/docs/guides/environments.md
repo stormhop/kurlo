@@ -96,13 +96,17 @@ The parent is saved as `parentId` in the environment's file.
 
 Use the environment switcher in the title bar. The active environment is per-workspace — switching to a different workspace remembers its last-used environment.
 
+When a workspace has more than eight environments, the switcher opens with a search field: type part of a name and press Enter to switch to the first match. The list scrolls, and **Manage environments** stays at the bottom.
+
 ## Pinning environments to a collection
 
 When one workspace holds several services, pin each collection's environments to it so the switcher shows only those while you work in that collection.
 
 1. Open the collection's settings and go to **Overview**.
-2. Under **Environments**, tick the environments that belong to this collection.
+2. Under **Environments**, click **Pin an environment…**, type to search and pick one. Repeat for every environment that belongs to this collection.
 3. Click **Set as default** next to the one to select when you open the collection. Without a choice, the first pinned environment is the default.
+
+Only pinned environments are listed there. Click **×** next to one to unpin it.
 
 While a request from that collection or its settings are open:
 

@@ -944,7 +944,7 @@
                   </span>
                   <span class="agent-composer-chip" class:compact={composerCompact}>
                     <svg class="agent-composer-chip-icon" width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-                    <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
+                    <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" searchable={environmentOptions.length > 8} searchPlaceholder="Search environments" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
                   </span>
                   {#if vm.gitStatus.isRepo}
                     <button class="btn btn-ghost btn-sm agent-branch-toggle" class:on={agentStore.ownBranch} type="button" aria-pressed={agentStore.ownBranch} aria-label="Agent branch" disabled={agentStore.running || workspaceBlocked} onclick={() => (agentStore.ownBranch = !agentStore.ownBranch)}>

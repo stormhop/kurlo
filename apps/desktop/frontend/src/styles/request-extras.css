@@ -334,7 +334,17 @@
   left: 0;
   min-width: 100%;
   overflow-y: auto;
-  overscroll-behavior: contain;
+}
+.app-select-menu:has(> input[type='search']) {
+  min-width: max(100%, 15rem);
+}
+.app-select-menu > input[type='search'] {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  width: 100%;
+  margin-bottom: var(--space-1);
+  box-shadow: 0 0 0 var(--space-1-5) var(--modal-bg);
 }
 .app-select-option {
   display: flex;
