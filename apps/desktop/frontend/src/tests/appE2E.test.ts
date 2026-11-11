@@ -208,6 +208,8 @@ class TestApp {
   previousResponses = new Map<string, HttpResponse>();
   responseTabs = new Map<string, ResponseTab>();
   grpcResponses = new Map<string, GrpcResponse>();
+  mcpResponse = null;
+  mcpResponses = new Map();
   grpcResponseTabs = new Map<string, GrpcResponseTab>();
   aiConversations = new Map<string, unknown[]>();
   sseSessions = new Map();
@@ -412,7 +414,8 @@ class TestApp {
   sseConnect() { return Promise.resolve(); }
   sseDisconnect() { return Promise.resolve(); }
   clearTransientSSESession() {}
-  promoteActiveRequestToSSE() {}
+  promoteRequestToSSE() { return Promise.resolve(true); }
+  noteSuccessfulSend() {}
   webSocketDisconnect() { return Promise.resolve(); }
   socketIODisconnect() { return Promise.resolve(); }
   ensureValidOAuth2Token() { return Promise.resolve(); }
@@ -562,7 +565,7 @@ describe('full application e2e smoke', () => {
     });
 
     await app.runActiveRequest();
-    expect(app.response?.statusCode).toBe(200);
+    expect(app.response?.statusCode, app.requestError || app.response?.error).toBe(200);
     expect(app.responseTestSummary).toEqual({ passed: 1, total: 1, allPassed: true });
     expect(app.requestHistory).toHaveLength(1);
     expect(backend.state.sentHttpRequests[0]).toMatchObject({
@@ -891,9 +894,11 @@ describe('full application e2e smoke', () => {
       headerValidationErrorForRequest: () => '',
       isEventStreamResponse: () => false,
       markRequestLoading: () => undefined,
+      noteSuccessfulSend: () => undefined,
       persistActiveRequestNow: async () => undefined,
       refreshCookieJar: async () => undefined,
       requestIsActive: (requestId: string) => requestId === 'req-retry',
+      requestForEditing: (requestId: string) => ({ id: requestId }),
       savedRequestToRunnableHttpRequest: () => ({ requestId: 'req-retry' } as HttpRequest),
       setActiveResponse: (response: HttpResponse | null) => {
         activeResponse = response;

@@ -31,9 +31,26 @@ All notable changes to Kurlo are documented here. This project follows
 - The **Protected** and **Sandbox** marks on an environment sit right after its name instead of halfway across the header.
 - Agent chat messages scroll all the way to the message box instead of stopping in a strip above it.
 - Theme miniatures in settings show each theme's own button text and status colours instead of borrowing them from the active theme.
+- Collection Runner respects the checked request subset when opened from the activity rail, preventing unchecked requests from being sent.
+- Background MCP and gRPC results, stream updates and HTTP connection errors stay with their source requests without replacing the visible response.
 - On macOS, the title area is one 45px band across the whole window: the line under the top bar runs over the activity rail and sidebar to the window edge, the rail icons line up with the sidebar filter instead of crossing that line, and while the sidebar is open the workspace switcher sits in that band at the sidebar's right edge, giving request tabs more room.
 - In a narrow Agent sidebar, such as when Chat details is docked, the New chat button shrinks to a + icon instead of sticking out past the chat search field.
 - The Settings window is a little taller, so the General page fits without a scroll bar.
+- A GET response first detected as SSE in the background opens the source stream with its captured request settings and environment.
+- Environment matrices, request tabs and workspace menus scroll over their contents, including at the minimum window size and 150% interface scale.
+- Network errors mask environment secrets, including URL-encoded values, before they reach history or script results.
+- Redirect limits count followed transitions correctly and report an explicit error when the limit is exceeded.
+- Response-body timeouts and cancellation use consistent error messages while retaining the received status and partial body.
+- Postman scripts can read `pm.response.body` as a string, alongside `pm.response.text()`.
+- NTLM handshake requests appear in the sent-request trace and exchange cookies between authentication steps.
+- Failed reads of local workspace metadata stop saves before changing workspace files.
+- Saving examples preserves unrelated files and removes only legacy body files referenced by saved examples.
+- The binary response cache refreshes recently used entries and limits retained bodies to 128 MiB.
+- Proxy DNS errors identify the failing proxy hostname.
+- Scrolling over row labels works in environment lists, the environment switcher, collections, history and the environment pin picker without restoring scroll bounce.
+- HTTP responses that finish in the background stay available in their original request tabs without replacing the response or selected response tab you are viewing.
+- An open environment pin picker adjusts to window, panel and interface-scale changes instead of remaining clipped below the window.
+- Collection settings adapt to the available panel width, keeping documentation and header actions usable at the minimum window size and 150% interface scale.
 
 ## [3.0.3] - 2026-11-10
 

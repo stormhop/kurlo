@@ -72,12 +72,13 @@ type McpHost = {
   ) => HttpRequest;
   markRequestLoading: (requestId: string, loading: boolean) => void;
   requestIsActive: (requestId: string) => boolean;
+  requestForEditing: (requestId: string) => SavedRequest | undefined;
   cancelActiveRequest: () => Promise<void>;
   persistActiveRequestNow: () => Promise<void>;
   syncBackendEnvironment: () => Promise<void>;
   syncActiveEnvironmentFromBackend: () => Promise<void>;
   recordRequestHistory: (response: ReturnType<typeof emptyHttpResponse>, req: SavedRequest) => Promise<void>;
-  setActiveResponse: (response: null, requestId?: string) => void;
+  setActiveResponse: (response: ReturnType<typeof emptyHttpResponse> | null, requestId?: string) => void;
   setActiveMcpResponse: (response: McpResponse | null, requestId?: string) => void;
   mcpSelectedTool: () => McpTool | undefined;
   mcpSelectableTools: () => McpTool[];
@@ -86,7 +87,7 @@ type McpHost = {
 
 export const mcpFeature = {
   setActiveMcpResponse(this: McpHost, response: McpResponse | null, requestId = this.activeRequestId) {
-    this.mcpResponse = response;
+    if (!requestId || requestId === this.activeRequestId) this.mcpResponse = response;
     if (!requestId) return;
     const next = new Map(this.mcpResponses);
     if (response) next.set(requestId, response);
@@ -228,10 +229,8 @@ export const mcpFeature = {
         { inputSchema: tool?.inputSchema ?? '', outputSchema: tool?.outputSchema ?? '' },
       ));
       try { await this.syncActiveEnvironmentFromBackend(); } catch {  }
-      if (this.requestIsActive(requestId)) {
-        this.requestError = mcpFailureMessage(response);
-        this.setActiveMcpResponse(response, requestId);
-      }
+      if (this.requestForEditing(requestId)) this.setActiveMcpResponse(response, requestId);
+      if (this.requestIsActive(requestId)) this.requestError = mcpFailureMessage(response);
       await this.recordRequestHistory({
         ...emptyHttpResponse(),
         statusCode: response.http?.statusCode ?? 0,
@@ -242,9 +241,9 @@ export const mcpFeature = {
         size: response.http?.size ?? 0,
       }, snapshot);
     } catch (error) {
-      if (this.requestIsActive(requestId)) {
-        this.requestError = error instanceof Error ? error.message : String(error);
-      }
+      const message = error instanceof Error ? error.message : String(error);
+      if (this.requestForEditing(requestId)) this.setActiveResponse({ ...emptyHttpResponse(), error: message }, requestId);
+      if (this.requestIsActive(requestId)) this.requestError = message;
     } finally {
       this.markRequestLoading(requestId, false);
     }

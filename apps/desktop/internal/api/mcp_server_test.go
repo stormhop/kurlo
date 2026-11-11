@@ -543,6 +543,7 @@ func TestMCPServerCancelsAToolCall(t *testing.T) {
 }
 
 func TestParseMCPServerArgs(t *testing.T) {
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
 	opts, err := parseMCPServerArgs([]string{"./ws", "--env", "Staging", "-k", "--timeout", "500"}, io.Discard)
 	if err != nil {
 		t.Fatal(err)

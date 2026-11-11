@@ -191,7 +191,7 @@ class AppVM {
   declare sseSessionIsActive: typeof sseFeature.sseSessionIsActive;
   declare sseSessionIsVisible: typeof sseFeature.sseSessionIsVisible;
   declare clearTransientSSESession: typeof sseFeature.clearTransientSSESession;
-  declare promoteActiveRequestToSSE: typeof sseFeature.promoteActiveRequestToSSE;
+  declare promoteRequestToSSE: typeof sseFeature.promoteRequestToSSE;
   declare _emptySSESession: typeof sseFeature._emptySSESession;
   declare _sseSetSession: typeof sseFeature._sseSetSession;
   declare _sseAddEvent: typeof sseFeature._sseAddEvent;

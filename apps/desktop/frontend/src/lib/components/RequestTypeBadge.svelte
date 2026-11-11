@@ -85,7 +85,7 @@
   }
 
   .request-kind-text {
-    overflow: hidden;
+    overflow: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

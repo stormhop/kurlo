@@ -68,7 +68,7 @@
   <div class="activity-rail-separator" aria-hidden="true"></div>
 
   <div class="activity-rail-group">
-    <button class="activity-rail-btn" class:active={topView === 'runner'} type="button" aria-label="Collection runner" onclick={openCollectionRunner} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={topView === 'runner'} type="button" aria-label="Collection runner" onclick={() => openCollectionRunner()} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M7 5v14l11-7z"/>
       </svg>

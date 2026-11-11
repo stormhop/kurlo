@@ -205,7 +205,7 @@
 
 <svelte:document onpointerdowncapture={closeMoreMenuOnOutsidePointer} onkeydowncapture={closeMoreMenuOnEscape} />
 
-<section class="environment-workspace">
+<section class="environment-workspace" class:matrix={showMatrix}>
   {#snippet viewSwitch()}
     {#if environments.length > 1}
       <div class="segmented env-view-switch" role="radiogroup" aria-label="Environment view">

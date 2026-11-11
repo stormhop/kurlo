@@ -8,11 +8,13 @@ import (
 )
 
 const binaryResponseCacheSize = 4
+const binaryResponseCacheBytes = 128 * 1024 * 1024
 
 type binaryResponseCache struct {
 	mu     sync.Mutex
 	order  []string
 	bodies map[string]binaryResponseBody
+	bytes  int
 }
 
 type binaryResponseBody struct {
@@ -28,6 +30,7 @@ func (c *binaryResponseCache) put(requestID string, body binaryResponseBody) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, exists := c.bodies[requestID]; exists {
+		c.bytes -= len(c.bodies[requestID].data)
 		for i, id := range c.order {
 			if id == requestID {
 				c.order = append(c.order[:i], c.order[i+1:]...)
@@ -36,8 +39,10 @@ func (c *binaryResponseCache) put(requestID string, body binaryResponseBody) {
 		}
 	}
 	c.bodies[requestID] = body
+	c.bytes += len(body.data)
 	c.order = append(c.order, requestID)
-	for len(c.order) > binaryResponseCacheSize {
+	for len(c.order) > binaryResponseCacheSize || c.bytes > binaryResponseCacheBytes {
+		c.bytes -= len(c.bodies[c.order[0]].data)
 		delete(c.bodies, c.order[0])
 		c.order = c.order[1:]
 	}
@@ -46,10 +51,12 @@ func (c *binaryResponseCache) put(requestID string, body binaryResponseBody) {
 func (c *binaryResponseCache) drop(requestID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if _, exists := c.bodies[requestID]; !exists {
+	cached, exists := c.bodies[requestID]
+	if !exists {
 		return
 	}
 	delete(c.bodies, requestID)
+	c.bytes -= len(cached.data)
 	for i, id := range c.order {
 		if id == requestID {
 			c.order = append(c.order[:i], c.order[i+1:]...)
@@ -62,6 +69,15 @@ func (c *binaryResponseCache) get(requestID string) (binaryResponseBody, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	body, ok := c.bodies[requestID]
+	if ok {
+		for i, id := range c.order {
+			if id == requestID {
+				c.order = append(c.order[:i], c.order[i+1:]...)
+				break
+			}
+		}
+		c.order = append(c.order, requestID)
+	}
 	return body, ok
 }
 

@@ -1,5 +1,5 @@
 import { cancelQuit, confirmQuit } from '../../backend';
-import type { HttpResponse } from '../../backend';
+import type { HttpResponse, McpResponse } from '../../backend';
 import { DEFAULT_COLLECTION } from '../../constants';
 import { addCollectionFolderPath } from '../../collections';
 import {
@@ -55,6 +55,7 @@ type RequestCrudHost = {
   graphqlVariables: string;
   grpcResponseTabs: Map<string, GrpcResponseTab>;
   grpcResponses: Map<string, GrpcResponse>;
+  mcpResponses: Map<string, McpResponse>;
   lastClosedRequestIds: string[];
   method: Method;
   openRequestIds: string[];
@@ -784,6 +785,7 @@ export const requestCrudFeature = {
     this.responses = new Map([...this.responses].filter(([requestId]) => requestId !== id));
     this.responseTabs = new Map([...this.responseTabs].filter(([requestId]) => requestId !== id));
     this.grpcResponses = new Map([...this.grpcResponses].filter(([requestId]) => requestId !== id));
+    this.mcpResponses = new Map([...this.mcpResponses].filter(([requestId]) => requestId !== id));
     this.grpcResponseTabs = new Map([...this.grpcResponseTabs].filter(([requestId]) => requestId !== id));
     this.aiConversations = new Map([...this.aiConversations].filter(([requestId]) => requestId !== id));
     if (id === this.activeRequestId) {

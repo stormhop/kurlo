@@ -49,7 +49,7 @@
     let current = node?.parentElement ?? null;
     while (current && current !== document.body) {
       const style = getComputedStyle(current);
-      if (/(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight) return current;
+      if (/(auto|scroll)/.test(style.overflowY)) return current;
       current = current.parentElement;
     }
     return null;
@@ -142,6 +142,21 @@
     if (!open) return;
     document.addEventListener('pointerdown', closeOnPointerOutside, true);
     return () => document.removeEventListener('pointerdown', closeOnPointerOutside, true);
+  });
+
+  $effect(() => {
+    if (!open || !wrap || !menu) return;
+    const container = scrollParent(wrap);
+    const observer = new ResizeObserver(fitMenu);
+    observer.observe(wrap);
+    if (container) observer.observe(container);
+    window.addEventListener('resize', fitMenu);
+    container?.addEventListener('scroll', fitMenu, { passive: true });
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', fitMenu);
+      container?.removeEventListener('scroll', fitMenu);
+    };
   });
 </script>
 
@@ -263,7 +278,7 @@
   .search-picker-option.active { background: var(--hover); }
   .search-picker-option-label {
     min-width: 0;
-    overflow: hidden;
+    overflow: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

@@ -934,7 +934,7 @@ var __kurloAPI = (function (host) {
   if (host.hasResponse) {
     var resp = {
       text: function () { return host.resBody(); },
-      body: function () { return host.resBody(); },
+      body: host.resBody(),
       json: function () { return JSON.parse(host.resBody()); },
       llm: function () {
         var raw = host.resLLM();

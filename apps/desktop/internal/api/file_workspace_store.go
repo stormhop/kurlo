@@ -308,6 +308,8 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 		if mode := stringValue(localStoreStorage(existingStore), "mode"); mode == workspaceStorageModeGit || mode == workspaceStorageModeLocal {
 			existingStorageMode = mode
 		}
+	} else if !errors.Is(err, os.ErrNotExist) && !isRequestStoreAuthenticationError(err) {
+		return fmt.Errorf("could not read local request store: %w", err)
 	}
 
 	secrets := map[string]string{}
@@ -494,6 +496,10 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 	if err := ensureManagedWorkspaceDirIfExists(root, fileStoreWorkspacesDir); err != nil {
 		return err
 	}
+	legacyBodies, err := legacyExampleBodyPaths(root)
+	if err != nil {
+		return err
+	}
 	collectionsByWorkspace := groupByString(collections, "workspaceId")
 	requestsByCollection := groupByString(requests, "collectionId")
 	environmentsByWorkspace := groupByString(environments, "workspaceId")
@@ -611,7 +617,7 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 
 	}
 
-	if err := pruneYAMLWorkspaceStore(root, desiredFiles, preserveDirs); err != nil {
+	if err := pruneYAMLWorkspaceStore(root, desiredFiles, preserveDirs, legacyBodies); err != nil {
 		return err
 	}
 	if err := journal.finish(); err != nil {
@@ -644,7 +650,7 @@ func mergePreservedWorkspaceOrder(root string, desired []string) []string {
 	return merged
 }
 
-func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, preserveDirs []string) error {
+func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, preserveDirs []string, legacyBodies map[string]struct{}) error {
 	managedRoot := filepath.Join(root, fileStoreWorkspacesDir)
 	if _, err := readDirNoSymlink(managedRoot); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -660,7 +666,7 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		if entry.IsDir() {
 			return nil
 		}
-		isExampleBody := isExampleBodyPath(path)
+		_, isExampleBody := legacyBodies[path]
 		if !isExampleBody && filepath.Ext(path) != fileStoreYAMLExt {
 			return nil
 		}

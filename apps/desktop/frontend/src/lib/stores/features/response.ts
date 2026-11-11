@@ -188,7 +188,7 @@ export const responseFeature = {
 
   setActiveResponse(this: ResponseHost, response: HttpResponse | null, requestId = this.activeRequestId) {
     const replaced = requestId ? this.responses.get(requestId) : null;
-    this.response = response;
+    if (!requestId || requestId === this.activeRequestId) this.response = response;
     if (!requestId) return;
     const next = new Map(this.responses);
     if (response) next.set(requestId, response);
@@ -261,7 +261,7 @@ export const responseFeature = {
   },
 
   setActiveResponseTab(this: ResponseHost, tab: ResponseTab, requestId = this.activeRequestId) {
-    this.responseTab = tab;
+    if (!requestId || requestId === this.activeRequestId) this.responseTab = tab;
     if (!requestId) return;
     const next = new Map(this.responseTabs);
     next.set(requestId, tab);

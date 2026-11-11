@@ -79,6 +79,7 @@ type GrpcHost = {
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   recordRequestHistory: (httpResponse: HttpResponse, requestSnapshot?: SavedRequest) => Promise<void>;
   requestIsActive: (requestId: string) => boolean;
+  requestForEditing: (requestId: string) => SavedRequest | undefined;
   savedRequestToRunnableGrpcRequest: (req: SavedRequest, envValues?: Record<string, string>, secretValues?: string[], secretKeys?: string[], requestId?: string, globals?: Record<string, string>) => GrpcRequest;
   setActiveGrpcResponse: (response: GrpcResponse | null, requestId?: string) => void;
   setActiveGrpcResponseTab: (tab: GrpcResponseTab, requestId?: string) => void;
@@ -221,7 +222,7 @@ export const grpcFeature = {
   },
 
   setActiveGrpcResponse(this: GrpcHost, response: GrpcResponse | null, requestId = this.activeRequestId) {
-    this.grpcResponse = response;
+    if (!requestId || requestId === this.activeRequestId) this.grpcResponse = response;
     if (!requestId) return;
     const next = new Map(this.grpcResponses);
     if (response) next.set(requestId, response);
@@ -230,7 +231,7 @@ export const grpcFeature = {
   },
 
   setActiveGrpcResponseTab(this: GrpcHost, tab: GrpcResponseTab, requestId = this.activeRequestId) {
-    this.grpcResponseTab = tab;
+    if (!requestId || requestId === this.activeRequestId) this.grpcResponseTab = tab;
     if (!requestId) return;
     const next = new Map(this.grpcResponseTabs);
     next.set(requestId, tab);
@@ -264,8 +265,9 @@ export const grpcFeature = {
   },
 
   ensureActiveGrpcResponse(this: GrpcHost, requestId: string): GrpcResponse | null {
-    if (!this.requestIsActive(requestId)) return null;
-    if (this.grpcResponse) return this.grpcResponse;
+    if (!this.requestForEditing(requestId)) return null;
+    const existing = this.grpcResponses.get(requestId);
+    if (existing) return existing;
     const response = this.emptyGrpcResponse();
     this.setActiveGrpcResponse(response, requestId);
     this.setActiveGrpcResponseTab('messages', requestId);
@@ -318,10 +320,10 @@ export const grpcFeature = {
   },
 
   applyGrpcDoneEvent(this: GrpcHost, payload: GrpcDoneEvent) {
-    if (!this.requestIsActive(payload.requestId)) return;
+    if (!this.requestForEditing(payload.requestId)) return;
     const response = payload.response;
     const messages = response.messages ?? [];
-    this.requestError = '';
+    if (this.requestIsActive(payload.requestId)) this.requestError = '';
     this.setActiveGrpcResponse({
       ...response,
       headers: response.headers ?? [],
@@ -329,7 +331,7 @@ export const grpcFeature = {
       messages,
       body: response.body || this.grpcBodyFromMessages(messages),
       timestamp: response.timestamp || payload.timestamp,
-      method: response.method?.fullName ? response.method : this.grpcSelectedMethodInfo(),
+      method: response.method?.fullName ? response.method : this.grpcResponses.get(payload.requestId)?.method ?? this.grpcEmptyMethodInfo(),
       preRequestResult: response.preRequestResult ?? { tests: [] },
       testResult: response.testResult ?? { tests: [] },
     }, payload.requestId);
@@ -422,6 +424,7 @@ export const grpcFeature = {
       try { await this.applyGlobalVariableChangesFromResponse(resp); } catch {}
       try { await this.applyCollectionVariableUpdates(requestSnapshot, resp.collectionVariableUpdates, resp.collectionVariablesRemoved); } catch {}
       if (resp.error && !resp.grpcCode && !(resp.messages ?? []).length) {
+        if (this.requestForEditing(requestId)) this.setActiveGrpcResponse(resp, requestId);
         if (this.requestIsActive(requestId)) this.requestError = resp.error;
         if (resp.error !== REQUEST_CANCELED_ERROR) {
           await this.recordRequestHistory({
@@ -439,13 +442,13 @@ export const grpcFeature = {
         }
         return;
       }
-      if (this.requestIsActive(requestId)) {
-        this.requestError = '';
+      if (this.requestForEditing(requestId)) {
+        if (this.requestIsActive(requestId)) this.requestError = '';
         this.setActiveGrpcResponse({
           ...resp,
           body: resp.body || this.grpcBodyFromMessages(resp.messages ?? []),
           timestamp: resp.timestamp || Date.now(),
-          method: resp.method?.fullName ? resp.method : this.grpcSelectedMethodInfo(),
+          method: resp.method?.fullName ? resp.method : this.grpcEmptyMethodInfo(requestSnapshot.grpcMethod),
           preRequestResult: resp.preRequestResult ?? emptyScriptResult(),
           testResult: resp.testResult ?? emptyScriptResult(),
         }, requestId);
@@ -465,6 +468,7 @@ export const grpcFeature = {
         testResult: resp.testResult ?? emptyScriptResult(),
       }, requestSnapshot);
     } catch (e) {
+      if (this.requestForEditing(requestId)) this.setActiveGrpcResponse({ ...this.emptyGrpcResponse(), grpcCode: '', error: String(e) }, requestId);
       if (this.requestIsActive(requestId)) this.requestError = String(e);
     } finally {
       this.markRequestLoading(requestId, false);

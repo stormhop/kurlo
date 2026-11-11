@@ -58,6 +58,7 @@ func withResponseHeaders(resp model.HttpResponse) model.HttpResponse {
 func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, sm *state.Manager, jars *cookieJarRegistry, cache *preflightCache, sinkFactory responseBodySinkFactory) (response model.HttpResponse) {
 	sm, commitVariables := isolateScriptState(sm, req.ScriptVariables, req.ScriptEnvironment)
 	defer func() {
+		response.Error = redactRequestError(response.Error, req.SecretEnvironmentValues)
 		delta := commitVariables()
 		response.GlobalVariableUpdates = delta.updates
 		response.GlobalVariablesRemoved = delta.removedKeys()
@@ -338,6 +339,14 @@ func redactSecrets(text string, secrets []string) string {
 		text = strings.ReplaceAll(text, secret, "[secret]")
 	}
 	return text
+}
+
+func redactRequestError(text string, secrets []string) string {
+	values := make([]string, 0, len(secrets)*3)
+	for _, secret := range secrets {
+		values = append(values, secret, url.QueryEscape(secret), url.PathEscape(secret))
+	}
+	return redactSecrets(text, values)
 }
 
 func populateScriptRequestContext(ctx *script.Context, req model.HttpRequest) {
@@ -646,7 +655,10 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 	resp.BodyIsBinary, resp.BodySniffedType = classifyResponseBody(bodyBytes, respHeaders)
 	switch {
 	case readErr != nil:
-		if streamedToSink {
+		var networkErr net.Error
+		if errors.Is(readErr, context.Canceled) || errors.Is(readErr, context.DeadlineExceeded) || errors.As(readErr, &networkErr) && networkErr.Timeout() {
+			resp.Error = formatRequestError(readErr, u, effectiveTimeout)
+		} else if streamedToSink {
 			resp.Error = fmt.Sprintf("failed to save response body: %s", readErr)
 		} else {
 			resp.Error = fmt.Sprintf("failed to read response body: %s", readErr)
@@ -1067,10 +1079,17 @@ func buildHTTPClient(req model.HttpRequest, jar http.CookieJar, timeout time.Dur
 	if req.DisableCookieJar {
 		jar = nil
 	}
+	var roundTripper http.RoundTripper = recorder
+	if ntlm, ok := recorder.base.(*auth.NTLMTransport); ok {
+		ntlm.WrapTransport = func(base http.RoundTripper) http.RoundTripper {
+			return &ntlmHandshakeRecorder{base: base, recorder: recorder, jar: jar}
+		}
+		roundTripper = ntlm
+	}
 
 	client := &http.Client{
 		Timeout:   timeout,
-		Transport: recorder,
+		Transport: roundTripper,
 		Jar:       jar,
 	}
 	client.CheckRedirect = buildRedirectPolicy(req, maxRedirects, browserCtx, func(ctx context.Context, next *http.Request) error {
@@ -1108,8 +1127,8 @@ func buildRedirectPolicy(req model.HttpRequest, maxRedirects int, browserCtx *br
 		if !req.FollowRedirects {
 			return http.ErrUseLastResponse
 		}
-		if len(via) >= maxRedirects {
-			return http.ErrUseLastResponse
+		if len(via) > maxRedirects {
+			return fmt.Errorf("stopped after %d redirects", maxRedirects)
 		}
 		prev := via[len(via)-1]
 		if req.FollowOriginalMethod {
@@ -1317,8 +1336,8 @@ func formatRequestError(err error, target *url.URL, timeout time.Duration) strin
 	if errors.Is(err, context.Canceled) {
 		return "Request canceled"
 	}
-	var urlErr *url.Error
-	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &urlErr) && urlErr.Timeout() {
+	var networkErr net.Error
+	if errors.Is(err, context.DeadlineExceeded) || errors.As(err, &networkErr) && networkErr.Timeout() {
 		if timeout <= 0 {
 			return "Error: request timed out"
 		}
@@ -1339,6 +1358,10 @@ func formatRequestError(err error, target *url.URL, timeout time.Duration) strin
 	case strings.Contains(lower, "i/o timeout"), strings.Contains(lower, "timeout awaiting response headers"), strings.Contains(lower, "tls handshake timeout"):
 		return "Error: connect ETIMEDOUT " + targetAddr
 	case strings.Contains(lower, "no such host"):
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.Name != "" {
+			return "Error: getaddrinfo ENOTFOUND " + dnsErr.Name
+		}
 		return "Error: getaddrinfo ENOTFOUND " + target.Hostname()
 	}
 

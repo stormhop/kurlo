@@ -1,5 +1,6 @@
 import { cancelHttpRequest, sendHttpRequest, sendHttpRequestToFile, setEnvironment, setGlobalVariables } from '../../backend';
 import type { HttpRequest, HttpResponse } from '../../backend';
+import { emptyHttpResponse } from '../../wire';
 import type {
   AuthType,
   GrpcResponse,
@@ -11,6 +12,7 @@ import type {
 } from '../../types/models';
 import { newRequestId } from '../../utils';
 import type { RunnableHttpOptions } from './requestSerialization';
+import type { SSEConnectOptions } from './sse';
 
 const REQUEST_CANCELED_ERROR = 'Request canceled';
 const sendGenerations = new Map<string, number>();
@@ -73,11 +75,12 @@ type RequestExecutionHost = {
     removed: string[] | undefined,
   ) => Promise<boolean>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
-  promoteActiveRequestToSSE: () => void;
+  promoteRequestToSSE: (id: string) => Promise<boolean>;
   noteSuccessfulSend: () => void;
   recordRequestHistory: (httpResponse: HttpResponse, requestSnapshot?: SavedRequest) => Promise<void>;
   refreshCookieJar: (silent?: boolean, persistAfterRefresh?: boolean, workspaceId?: string) => Promise<void>;
   requestIsActive: (requestId: string) => boolean;
+  requestForEditing: (requestId: string) => SavedRequest | undefined;
   savedRequestToRunnableHttpRequest: (
     req: SavedRequest,
     envValues?: Record<string, string>,
@@ -93,7 +96,7 @@ type RequestExecutionHost = {
   snapshotActiveRequest: (options?: { forPersistence?: boolean }) => SavedRequest;
   socketIOConnect: () => Promise<void>;
   socketIODisconnect: () => Promise<void>;
-  sseConnect: (options?: { persistBeforeConnect?: boolean }) => Promise<void>;
+  sseConnect: (options?: SSEConnectOptions) => Promise<void>;
   sseDisconnect: () => Promise<void>;
   sseSessionIsActive: () => boolean;
   syncActiveEnvironmentFromBackend: () => Promise<void>;
@@ -178,6 +181,7 @@ export const requestExecutionFeature = {
     const useCookieJar = !this.disableCookieJar;
     this.markRequestLoading(requestId, true);
     this.requestError = '';
+    let completedResponse: HttpResponse | undefined;
     try {
       let requestSnapshot = this.snapshotActiveRequest();
       const sentEnvironmentId = this.activeEnvironmentId;
@@ -215,30 +219,35 @@ export const requestExecutionFeature = {
       } else {
         resp = await sendHttpRequest(serialized);
       }
+      completedResponse = resp;
       try { await this.applyEnvironmentChangesFromResponse(resp, sentEnvironmentId); } catch {}
       try { await this.applyCollectionVariableUpdates(requestSnapshot, resp.collectionVariableUpdates, resp.collectionVariablesRemoved); } catch {}
       try { await this.syncGlobalsFromBackend(); } catch {}
       if (!isCurrent()) return;
       if (requestSnapshot.method === 'GET' && this.isEventStreamResponse(resp)) {
-        if (this.requestIsActive(requestId)) {
+        if (this.requestForEditing(requestId) && await this.promoteRequestToSSE(requestId)) {
           this.setActiveResponse(null, requestId);
           this.setActiveResponseTab('body', requestId);
-          this.responseSearch = '';
-          this.responseSearchIndex = 0;
-          this.promoteActiveRequestToSSE();
-          await this.sseConnect({ persistBeforeConnect: false });
-        }
+          if (this.requestIsActive(requestId)) {
+            this.responseSearch = '';
+            this.responseSearchIndex = 0;
+          }
+          if (isCurrent()) await this.sseConnect({ persistBeforeConnect: false, request: serialized, snapshot: requestSnapshot });
+        } else await this.recordRequestHistory(resp, requestSnapshot);
         return;
       }
       if (resp.error && !resp.statusCode) {
+        if (this.requestForEditing(requestId)) this.setActiveResponse(resp, requestId);
         if (this.requestIsActive(requestId)) this.requestError = resp.error;
         if (resp.error !== REQUEST_CANCELED_ERROR) await this.recordRequestHistory(resp, requestSnapshot);
         return;
       }
-      if (this.requestIsActive(requestId)) {
+      if (this.requestIsActive(requestId) || this.requestForEditing(requestId)) {
         this.setActiveResponse(resp, requestId);
-        this.responseBodyPage = 0;
-        this.responseSearchIndex = 0;
+        if (this.requestIsActive(requestId)) {
+          this.responseBodyPage = 0;
+          this.responseSearchIndex = 0;
+        }
         const defaultTab = resp.testResult?.tests?.length
           ? 'test-results'
           : (resp.previewImageBase64 ? 'preview' : 'body');
@@ -252,6 +261,7 @@ export const requestExecutionFeature = {
       await this.recordRequestHistory(resp, requestSnapshot);
       if (resp.statusCode && !resp.error) this.noteSuccessfulSend();
     } catch (e) {
+      if (isCurrent() && this.requestForEditing(requestId)) this.setActiveResponse({ ...(completedResponse ?? emptyHttpResponse()), error: String(e) }, requestId);
       if (isCurrent() && this.requestIsActive(requestId)) this.requestError = String(e);
     }
     finally {

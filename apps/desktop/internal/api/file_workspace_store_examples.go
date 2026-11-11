@@ -185,10 +185,27 @@ func readRequestExamples(collectionDir, requestSegment, workspaceRoot, workspace
 	return examples, diagnostics
 }
 
-func isExampleBodyPath(path string) bool {
-	if filepath.Ext(path) == fileStoreYAMLExt {
-		return false
-	}
-	parent := filepath.Dir(path)
-	return filepath.Base(filepath.Dir(parent)) == fileStoreExamplesDir
+func legacyExampleBodyPaths(root string) (map[string]struct{}, error) {
+	paths := map[string]struct{}{}
+	err := filepath.WalkDir(filepath.Join(root, fileStoreWorkspacesDir), func(path string, entry os.DirEntry, err error) error {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || filepath.Ext(path) != fileStoreYAMLExt || filepath.Base(filepath.Dir(filepath.Dir(path))) != fileStoreExamplesDir {
+			return nil
+		}
+		var example filesystemExampleFile
+		if err := readYAMLFile(path, &example); err != nil || example.Version != fileStoreVersion || stringValue(example.Example, "id") == "" {
+			return nil
+		}
+		body := stringValue(exampleResponseMap(example.Example), "bodyFile")
+		if body != "" && body == filepath.Base(body) {
+			paths[filepath.Join(filepath.Dir(path), body)] = struct{}{}
+		}
+		return nil
+	})
+	return paths, err
 }

@@ -1,5 +1,6 @@
 import { sseDisconnect, socketIODisconnect, webSocketDisconnect } from '../../backend';
-import type { HttpResponse } from '../../backend';
+import type { HttpResponse, McpResponse } from '../../backend';
+import { mcpFailureMessage } from './mcp';
 import { normalizeRequestSettingsOverrides } from '../../collectionDefaults';
 import {
   DEFAULT_GRAPHQL_QUERY,
@@ -154,6 +155,8 @@ type RequestStateHost = {
   responseTab: ResponseTab;
   responseTabs: Map<string, ResponseTab>;
   responses: Map<string, HttpResponse>;
+  mcpResponse: McpResponse | null;
+  mcpResponses: Map<string, McpResponse>;
   sioAck: boolean;
   sioArgs: SIOArg[];
   sioEventName: string;
@@ -456,7 +459,10 @@ export const requestStateFeature = {
     this.responseSearchIndex = 0;
     this.grpcResponse = this.requestType === 'grpc' ? (this.grpcResponses.get(req.id) ?? null) : null;
     this.grpcResponseTab = this.requestType === 'grpc' ? (this.grpcResponseTabs.get(req.id) ?? 'messages') : 'messages';
-    this.requestError = '';
+    this.mcpResponse = this.requestType === 'mcp' ? this.mcpResponses.get(req.id) ?? null : null;
+    this.requestError = (this.mcpResponse ? mcpFailureMessage(this.mcpResponse) : '')
+      || (this.response && !this.response.statusCode ? this.response.error : '')
+      || (this.grpcResponse && !this.grpcResponse.grpcCode ? this.grpcResponse.error ?? '' : '');
     if (req.method !== 'SSE' && this.sseSessions.has(req.id)) {
       void sseDisconnect(req.id);
     }

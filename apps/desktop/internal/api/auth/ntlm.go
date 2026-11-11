@@ -11,11 +11,12 @@ import (
 )
 
 type NTLMTransport struct {
-	base      *http.Transport
-	handshake *http.Transport
-	origin    *url.URL
-	username  string
-	password  string
+	WrapTransport func(http.RoundTripper) http.RoundTripper
+	base          *http.Transport
+	handshake     *http.Transport
+	origin        *url.URL
+	username      string
+	password      string
 }
 
 func NewNTLMTransport(base *http.Transport, origin *url.URL, username, password string) *NTLMTransport {
@@ -29,7 +30,7 @@ func NewNTLMTransport(base *http.Transport, origin *url.URL, username, password 
 
 func (t *NTLMTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if t.origin == nil || !strings.EqualFold(req.URL.Scheme, t.origin.Scheme) || !strings.EqualFold(req.URL.Host, t.origin.Host) || req.Method == http.MethodOptions && req.Header.Get("Access-Control-Request-Method") != "" {
-		return t.base.RoundTrip(req)
+		return t.wrap(t.base).RoundTrip(req)
 	}
 	port := req.URL.Port()
 	if port == "" {
@@ -47,7 +48,7 @@ func (t *NTLMTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	copy := req.Clone(req.Context())
 	copy.SetBasicAuth(t.username, t.password)
-	negotiator := ntlmssp.Negotiator{RoundTripper: conn}
+	negotiator := ntlmssp.Negotiator{RoundTripper: t.wrap(conn)}
 	response, err := negotiator.RoundTrip(copy)
 	if err != nil {
 		if response != nil && response.Body != nil {
@@ -58,6 +59,13 @@ func (t *NTLMTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	response.Body = &ntlmResponseBody{ReadCloser: response.Body, conn: conn}
 	return response, nil
+}
+
+func (t *NTLMTransport) wrap(base http.RoundTripper) http.RoundTripper {
+	if t.WrapTransport != nil {
+		return t.WrapTransport(base)
+	}
+	return base
 }
 
 type ntlmResponseBody struct {

@@ -86,6 +86,7 @@ function makeHost(overrides: Record<string, unknown> = {}) {
     },
     markRequestLoading: () => {},
     requestIsActive: () => true,
+    requestForEditing: () => ({ id: 'req-1' }),
     cancelActiveRequest: async () => {},
     persistActiveRequestNow: async () => {},
     syncBackendEnvironment: async () => {},

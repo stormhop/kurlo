@@ -8,6 +8,12 @@ const SSE_MAX_EVENTS = 3000;
 const SSE_MAX_PENDING_EVENTS = 1000;
 const SSE_EVENT_FLUSH_MS = 50;
 
+export type SSEConnectOptions = {
+  persistBeforeConnect?: boolean;
+  request?: HttpRequest;
+  snapshot?: SavedRequest;
+};
+
 type SSEHost = {
   sseSessions: Map<string, SSESession>;
   _sseEntryCounter: number;
@@ -22,12 +28,16 @@ type SSEHost = {
   requestType: RequestType;
   requests: SavedRequest[];
   requestsById: Map<string, SavedRequest>;
+  autosave: boolean;
   requestError: string;
   requestTab: RequestTab;
   currentSSESession: SSESession | undefined;
   cleanupRealtimeSessions: () => void;
   recordRequestHistory: (httpResponse: HttpResponse, requestSnapshot?: SavedRequest) => Promise<void>;
   snapshotActiveRequest: (options?: { forPersistence?: boolean }) => SavedRequest;
+  requestForEditing: (id: string) => SavedRequest | undefined;
+  updateRequestDirtyState: (id: string, req?: SavedRequest) => void;
+  persistRequestStore: () => Promise<boolean>;
   normalizeSavedRequestCtx: (input: Partial<SavedRequest>) => SavedRequest;
   scheduleActiveRequestPersist: () => void;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
@@ -72,10 +82,19 @@ export const sseFeature = {
     if (!id || this.method === 'SSE' || !this.sseSessions.has(id)) return;
     this.forgetSSESession(id);
   },
-  promoteActiveRequestToSSE(this: SSEHost) {
-    if (this.requestType !== 'http' || this.method === 'SSE') return;
-    this.method = 'SSE';
-    this.scheduleActiveRequestPersist();
+  async promoteRequestToSSE(this: SSEHost, id: string) {
+    const req = id === this.activeRequestId ? this.snapshotActiveRequest() : this.requestForEditing(id);
+    if (!req || req.requestType !== 'http' || req.method !== 'GET') return false;
+    if (id === this.activeRequestId) {
+      this.method = 'SSE';
+      this.scheduleActiveRequestPersist();
+    } else {
+      const updated = { ...req, method: 'SSE' as const };
+      this.requests = this.requests.map(request => request.id === id ? updated : request);
+      this.updateRequestDirtyState(id, updated);
+      if (this.autosave || req.isDraft) await this.persistRequestStore();
+    }
+    return true;
   },
   _emptySSESession(this: SSEHost): SSESession {
     return {
@@ -176,16 +195,18 @@ export const sseFeature = {
       testResult: { tests: [] },
     }, requestSnapshot);
   },
-  async sseConnect(this: SSEHost, options: { persistBeforeConnect?: boolean } = {}) {
+  async sseConnect(this: SSEHost, options: SSEConnectOptions = {}) {
     const persistBeforeConnect = options.persistBeforeConnect ?? true;
-    const id = this.activeRequestId;
-    if (!id || !this.url.trim()) return;
-    const headerError = this.headerValidationErrorForRequest(this.snapshotActiveRequest());
+    const id = options.snapshot?.id ?? this.activeRequestId;
+    const request = options.request ?? this.buildRequest();
+    const url = request.url.trim();
+    if (!id || !url || !this.requestForEditing(id)) return;
+    const headerError = options.request ? '' : this.headerValidationErrorForRequest(this.snapshotActiveRequest());
     if (headerError) {
       this.requestError = headerError;
       this.setActiveResponse(null, id);
       this.requestTab = 'headers';
-      this._sseSetSession(id, { status: 'error', error: headerError, connectedUrl: this.url.trim() });
+      this._sseSetSession(id, { status: 'error', error: headerError, connectedUrl: url });
       return;
     }
     this._ssePendingEvents.delete(id);
@@ -202,12 +223,14 @@ export const sseFeature = {
       duration: 0,
       timings: null,
       error: '',
-      connectedUrl: this.url.trim(),
+      connectedUrl: url,
     });
     try {
       if (persistBeforeConnect) await this.persistActiveRequestNow();
-      try { await this.syncBackendEnvironment(); } catch {  }
-      await sseConnect(id, this.buildRequest());
+      if (!options.request) {
+        try { await this.syncBackendEnvironment(); } catch {  }
+      }
+      await sseConnect(id, request);
     } catch (e) {
       this._sseSetSession(id, { status: 'error', error: String(e) });
       await this._recordSSEHistoryOnce(id, 0, 'Error', Date.now());
