@@ -223,7 +223,7 @@
 .examples-warning {
   margin: 0;
   padding: var(--space-2) var(--space-2-5);
-  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border: 1px solid var(--warning-border);
   border-radius: var(--radius-md);
   color: var(--s4xx);
   font-size: var(--text-label);
@@ -327,6 +327,6 @@
 }
 
 .examples-warning {
-  border-color: color-mix(in srgb, var(--s4xx) 30%, var(--border));
+  border-color: var(--warning-border);
   background: transparent;
 }

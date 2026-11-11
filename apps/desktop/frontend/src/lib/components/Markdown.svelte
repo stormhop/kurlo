@@ -171,7 +171,7 @@
     font-size: 0.92em;
   }
   .md-link {
-    color: var(--accent);
+    color: var(--accent-text);
     text-decoration: none;
     cursor: pointer;
   }

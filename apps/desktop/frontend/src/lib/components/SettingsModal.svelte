@@ -1123,7 +1123,7 @@
   }
 
   .about-item-copy .updates-error-text {
-    color: var(--delete);
+    color: var(--danger);
   }
 
   .settings-search {
@@ -1360,7 +1360,7 @@
   }
 
   .about-update-note a {
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .about-update-note {

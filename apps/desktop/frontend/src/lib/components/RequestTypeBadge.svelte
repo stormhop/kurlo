@@ -91,7 +91,7 @@
   }
 
   .request-kind-badge--protocol {
-    color: color-mix(in srgb, var(--accent) 62%, var(--text));
+    color: var(--accent-text);
   }
 
   .request-kind-badge--invalid {

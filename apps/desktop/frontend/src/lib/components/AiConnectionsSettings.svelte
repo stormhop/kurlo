@@ -488,7 +488,7 @@
   .ai-connection-model :global(.ai-combo) { flex: 1; min-width: 0; }
   .ai-connection-actions { display: flex; justify-content: flex-end; gap: var(--space-1); width: 10rem; }
 
-  .ai-option-featured .settings-glyph { background: var(--accent-dim); color: var(--accent); }
+  .ai-option-featured .settings-glyph { background: var(--accent-dim); color: var(--accent-text); }
 
   .ai-form {
     display: flex;

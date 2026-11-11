@@ -381,7 +381,7 @@
   }
   .agent-chat-glyph-kurlo {
     background: var(--accent-dim);
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-chat-title {
     min-width: 0;

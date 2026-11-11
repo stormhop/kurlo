@@ -153,7 +153,7 @@
     color: var(--text-3);
     font-size: var(--text-caption);
   }
-  .globals-save-state.dirty { color: var(--accent); }
+  .globals-save-state.dirty { color: var(--accent-text); }
 
   .globals-table {
     display: flex;

@@ -185,15 +185,15 @@
     margin-left: 0;
   }
   .agent-change-status-new {
-    background: color-mix(in srgb, var(--s2xx) 14%, transparent);
+    background: var(--success-bg);
     color: var(--s2xx);
   }
   .agent-change-status-changed {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-change-status-deleted {
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    background: var(--danger-bg);
     color: var(--danger);
   }
   .agent-change-body {

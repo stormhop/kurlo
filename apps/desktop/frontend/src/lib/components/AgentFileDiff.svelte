@@ -90,14 +90,14 @@
     color: var(--text-2);
   }
   .agent-diff-added {
-    background: color-mix(in srgb, var(--s2xx) 12%, transparent);
+    background: var(--success-bg);
   }
   .agent-diff-added .agent-diff-sign,
   .agent-diff-added .agent-diff-text {
     color: var(--text);
   }
   .agent-diff-removed {
-    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    background: var(--danger-bg);
   }
   .agent-diff-removed .agent-diff-sign,
   .agent-diff-removed .agent-diff-text {

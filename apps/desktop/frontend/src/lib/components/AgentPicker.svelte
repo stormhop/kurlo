@@ -402,7 +402,7 @@
   }
   .agent-glyph-kurlo {
     background: var(--accent-dim);
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-glyph-kind {
     background: var(--elevated);
@@ -446,7 +446,7 @@
     gap: var(--space-1-5);
   }
   .agent-pick-label-kurlo :global(.kurlo-glyph) {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-pick-agent {
     display: flex;
@@ -517,7 +517,7 @@
   .agent-pick-check {
     flex: 0 0 auto;
     margin-left: auto;
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-pick-badge {
     flex: 0 0 auto;

@@ -231,7 +231,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--bg);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    box-shadow: var(--shadow-popover);
   }
   .search-picker-up {
     top: auto;

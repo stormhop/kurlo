@@ -214,8 +214,8 @@
   .grpc-service-alert {
     padding: var(--space-2-5) var(--space-3);
     border-radius: var(--radius-lg);
-    border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
-    background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+    border: 1px solid var(--danger-border);
+    background: var(--danger-bg);
     color: var(--danger);
     font-size: var(--text-label);
     line-height: var(--leading-tight);

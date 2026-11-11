@@ -210,7 +210,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     background: var(--bg);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+    box-shadow: var(--shadow-popover);
   }
   .ai-combo-up {
     top: auto;
@@ -238,7 +238,7 @@
     cursor: pointer;
   }
   .ai-combo-option.active { background: var(--hover); }
-  .ai-combo-option.selected .ai-combo-option-name { color: var(--accent); }
+  .ai-combo-option.selected .ai-combo-option-name { color: var(--accent-text); }
   .ai-combo-option-main {
     flex: 1 1 auto;
     min-width: 0;
@@ -265,7 +265,7 @@
   .ai-combo-tag-good {
     border-color: transparent;
     background: var(--accent-dim);
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .ai-combo-empty {
     display: flex;

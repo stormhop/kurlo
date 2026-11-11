@@ -45,7 +45,7 @@
     overflow: visible;
   }
   .kurlo-bird-body {
-    fill: var(--accent);
+    fill: var(--accent-text);
   }
   .kurlo-bird-stripe {
     fill: none;

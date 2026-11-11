@@ -3,20 +3,24 @@ export type ResolvedAppTheme = 'dark' | 'light';
 
 export type LightThemeVariantId =
   | 'light'
-  | 'light-monochrome'
-  | 'light-pastel'
+  | 'github-light'
+  | 'jetbrains-light'
+  | 'vscode-light'
   | 'catppuccin-latte'
-  | 'vscode-light';
+  | 'flexoki-paper'
+  | 'high-contrast-light';
 
 export type DarkThemeVariantId =
   | 'dark'
-  | 'dark-monochrome'
-  | 'dark-pastel'
-  | 'catppuccin-frappe'
-  | 'catppuccin-macchiato'
+  | 'github-dimmed'
+  | 'jetbrains-dark'
+  | 'vscode-dark'
+  | 'one-dark'
+  | 'tokyo-night'
   | 'catppuccin-mocha'
   | 'nord'
-  | 'vscode-dark';
+  | 'everforest'
+  | 'high-contrast-dark';
 
 export type ThemeVariantId = LightThemeVariantId | DarkThemeVariantId;
 
@@ -57,28 +61,40 @@ export const THEME_VARIANTS: ThemeVariant[] = [
     preview: { background: '#ffffff', surface: '#f7f7f8', rail: '#ececef', border: '#dfdfe4', accent: '#4f5be8', text: '#17171a' },
   },
   {
-    id: 'light-monochrome',
+    id: 'github-light',
     mode: 'light',
-    name: 'Light Monochrome',
-    preview: { background: '#ffffff', surface: '#f8f8f8', rail: '#eaeaea', border: '#cbcbcb', accent: '#525252', text: '#343434' },
+    name: 'GitHub Light',
+    preview: { background: '#ffffff', surface: '#f6f8fa', rail: '#e6eaef', border: '#d1d9e0', accent: '#0969da', text: '#1f2328' },
   },
   {
-    id: 'light-pastel',
+    id: 'jetbrains-light',
     mode: 'light',
-    name: 'Light Pastel',
-    preview: { background: '#fdfaf7', surface: '#f7f4ef', rail: '#e2dbd1', border: '#d3cabc', accent: '#d16c6c', text: '#2b2f3a' },
+    name: 'JetBrains Light',
+    preview: { background: '#ffffff', surface: '#f7f8fa', rail: '#dfe1e5', border: '#dfe1e5', accent: '#336fe6', text: '#000000' },
+  },
+  {
+    id: 'vscode-light',
+    mode: 'light',
+    name: 'VS Code Light Modern',
+    preview: { background: '#ffffff', surface: '#f8f8f8', rail: '#e8e8e8', border: '#e0e0e0', accent: '#005fb8', text: '#1f1f1f' },
   },
   {
     id: 'catppuccin-latte',
     mode: 'light',
     name: 'Catppuccin Latte',
-    preview: { background: '#eff1f5', surface: '#e6e9ef', rail: '#ccd0da', border: '#acb0be', accent: '#8839ef', text: '#4c4f69' },
+    preview: { background: '#eff1f5', surface: '#e6e9ef', rail: '#ccd0da', border: '#c5c9d4', accent: '#8839ef', text: '#4c4f69' },
   },
   {
-    id: 'vscode-light',
+    id: 'flexoki-paper',
     mode: 'light',
-    name: 'VS Code Light',
-    preview: { background: '#ffffff', surface: '#f3f3f3', rail: '#dddddd', border: '#cecece', accent: '#007acc', text: '#000000' },
+    name: 'Flexoki Paper',
+    preview: { background: '#fffcf0', surface: '#f2f0e5', rail: '#dad8ce', border: '#dad8ce', accent: '#205ea6', text: '#100f0f' },
+  },
+  {
+    id: 'high-contrast-light',
+    mode: 'light',
+    name: 'High Contrast Light',
+    preview: { background: '#ffffff', surface: '#f4f4f5', rail: '#dcdce0', border: '#6e6e78', accent: '#1d3fc4', text: '#000000' },
   },
   {
     id: 'dark',
@@ -87,46 +103,58 @@ export const THEME_VARIANTS: ThemeVariant[] = [
     preview: { background: '#111113', surface: '#0c0c0e', rail: '#1f1f23', border: '#2d2d32', accent: '#5865f2', text: '#ececef' },
   },
   {
-    id: 'dark-monochrome',
+    id: 'github-dimmed',
     mode: 'dark',
-    name: 'Dark Monochrome',
-    preview: { background: '#1e1e1e', surface: '#252526', rail: '#3D3D3D', border: '#444444', accent: '#a3a3a3', text: '#d4d4d4' },
+    name: 'GitHub Dark Dimmed',
+    preview: { background: '#22272e', surface: '#1c2128', rail: '#2d333b', border: '#444c56', accent: '#316dca', text: '#cdd9e5' },
   },
   {
-    id: 'dark-pastel',
+    id: 'jetbrains-dark',
     mode: 'dark',
-    name: 'Dark Pastel',
-    preview: { background: '#1a1625', surface: '#1f1a2e', rail: '#352e4d', border: '#453d5c', accent: '#f0a6ca', text: '#e8e0f0' },
+    name: 'JetBrains Dark',
+    preview: { background: '#1e1f22', surface: '#191a1c', rail: '#2b2d30', border: '#393b40', accent: '#336fe6', text: '#dfe1e5' },
   },
   {
-    id: 'catppuccin-frappe',
+    id: 'vscode-dark',
     mode: 'dark',
-    name: 'Catppuccin Frappé',
-    preview: { background: '#303446', surface: '#292c3c', rail: '#414559', border: '#626880', accent: '#ca9ee6', text: '#c6d0f5' },
+    name: 'VS Code Dark Modern',
+    preview: { background: '#1f1f1f', surface: '#181818', rail: '#323232', border: '#3c3c3c', accent: '#0077d2', text: '#cccccc' },
   },
   {
-    id: 'catppuccin-macchiato',
+    id: 'one-dark',
     mode: 'dark',
-    name: 'Catppuccin Macchiato',
-    preview: { background: '#24273a', surface: '#1e2030', rail: '#363a4f', border: '#5b6078', accent: '#c6a0f6', text: '#cad3f5' },
+    name: 'One Dark',
+    preview: { background: '#282c34', surface: '#21252b', rail: '#2f343e', border: '#3e4452', accent: '#4b74c6', text: '#d7dae0' },
+  },
+  {
+    id: 'tokyo-night',
+    mode: 'dark',
+    name: 'Tokyo Night',
+    preview: { background: '#1a1b26', surface: '#16161e', rail: '#222436', border: '#2f3549', accent: '#7aa2f7', text: '#c0caf5' },
   },
   {
     id: 'catppuccin-mocha',
     mode: 'dark',
     name: 'Catppuccin Mocha',
-    preview: { background: '#1e1e2e', surface: '#181825', rail: '#313244', border: '#585b70', accent: '#cba6f7', text: '#cdd6f4' },
+    preview: { background: '#1e1e2e', surface: '#181825', rail: '#2a2b3c', border: '#3c3e52', accent: '#cba6f7', text: '#cdd6f4' },
   },
   {
     id: 'nord',
     mode: 'dark',
     name: 'Nord',
-    preview: { background: '#2e3440', surface: '#3b4252', rail: '#434c5e', border: '#4c566a', accent: '#88c0d0', text: '#d8dee9' },
+    preview: { background: '#2e3440', surface: '#292e39', rail: '#3b4252', border: '#4c566a', accent: '#88c0d0', text: '#d8dee9' },
   },
   {
-    id: 'vscode-dark',
+    id: 'everforest',
     mode: 'dark',
-    name: 'VS Code Dark',
-    preview: { background: '#1e1e1e', surface: '#252526', rail: '#3c3c3c', border: '#454545', accent: '#007acc', text: '#d4d4d4' },
+    name: 'Everforest',
+    preview: { background: '#2d353b', surface: '#272e33', rail: '#343f44', border: '#475258', accent: '#a7c080', text: '#d3c6aa' },
+  },
+  {
+    id: 'high-contrast-dark',
+    mode: 'dark',
+    name: 'High Contrast Dark',
+    preview: { background: '#0b0b0c', surface: '#000000', rail: '#18181b', border: '#8c8c96', accent: '#8c9bff', text: '#ffffff' },
   },
 ];
 
@@ -135,10 +163,23 @@ export const DARK_THEME_VARIANTS = THEME_VARIANTS.filter((variant): variant is T
 
 const LIGHT_THEME_IDS = new Set<ThemeVariantId>(LIGHT_THEME_VARIANTS.map(variant => variant.id));
 const DARK_THEME_IDS = new Set<ThemeVariantId>(DARK_THEME_VARIANTS.map(variant => variant.id));
+export const RETIRED_THEME_VARIANTS: Record<string, ThemeVariantId> = {
+  'light-monochrome': 'light',
+  'light-pastel': 'flexoki-paper',
+  'dark-monochrome': 'dark',
+  'dark-pastel': 'everforest',
+  'catppuccin-frappe': 'catppuccin-mocha',
+  'catppuccin-macchiato': 'catppuccin-mocha',
+};
+
 const THEME_VARIANT_BY_ID = new Map<ThemeVariantId, ThemeVariant>(THEME_VARIANTS.map(variant => [variant.id, variant]));
 
 function isAppThemeMode(value: unknown): value is AppThemeMode {
   return value === 'system' || value === 'dark' || value === 'light';
+}
+
+function currentVariantId(value: unknown): unknown {
+  return typeof value === 'string' && Object.hasOwn(RETIRED_THEME_VARIANTS, value) ? RETIRED_THEME_VARIANTS[value] : value;
 }
 
 function isLightThemeVariant(value: unknown): value is LightThemeVariantId {
@@ -158,10 +199,12 @@ export function normalizeThemeSettings(input: unknown): AppTheme {
     return { ...DEFAULT_THEME_SETTINGS, mode: input };
   }
   if (!isRecord(input)) return { ...DEFAULT_THEME_SETTINGS };
+  const light = currentVariantId(input.light);
+  const dark = currentVariantId(input.dark);
   return {
     mode: isAppThemeMode(input.mode) ? input.mode : DEFAULT_THEME_SETTINGS.mode,
-    light: isLightThemeVariant(input.light) ? input.light : DEFAULT_THEME_SETTINGS.light,
-    dark: isDarkThemeVariant(input.dark) ? input.dark : DEFAULT_THEME_SETTINGS.dark,
+    light: isLightThemeVariant(light) ? light : DEFAULT_THEME_SETTINGS.light,
+    dark: isDarkThemeVariant(dark) ? dark : DEFAULT_THEME_SETTINGS.dark,
   };
 }
 
@@ -187,6 +230,12 @@ export function readStoredAppTheme(): AppTheme {
 
 export function resolveAppTheme(settings: AppTheme): ResolvedAppTheme {
   return settings.mode === 'system' ? systemTheme() : settings.mode;
+}
+
+export function withThemeVariant(settings: AppTheme, id: ThemeVariantId): AppTheme {
+  if (isLightThemeVariant(id)) return { ...settings, light: id };
+  if (isDarkThemeVariant(id)) return { ...settings, dark: id };
+  return settings;
 }
 
 export function themeVariantFor(settings: AppTheme, resolvedAppTheme = resolveAppTheme(settings)): ThemeVariant {

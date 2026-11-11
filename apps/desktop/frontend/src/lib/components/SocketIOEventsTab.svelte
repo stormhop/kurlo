@@ -117,8 +117,8 @@
     display: inline-flex;
   }
   .sio-listen-btn.active {
-    background: color-mix(in srgb, var(--success) 15%, transparent);
-    border-color: color-mix(in srgb, var(--success) 50%, transparent);
+    background: var(--success-bg);
+    border-color: var(--success-border);
     color: var(--success);
   }
 

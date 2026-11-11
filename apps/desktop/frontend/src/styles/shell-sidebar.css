@@ -271,7 +271,7 @@
 }
 
 .collection-empty-row:hover:not(:disabled) .collection-empty-plus {
-  color: var(--accent);
+  color: var(--accent-text);
   opacity: 1;
 }
 
@@ -961,7 +961,7 @@
   color: var(--text);
 }
 .environment-item-actions button.danger {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .history-stored {

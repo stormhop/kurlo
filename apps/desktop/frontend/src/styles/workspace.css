@@ -74,7 +74,7 @@
 }
 
 .workspace-menu-limit.limit-reached {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .workspace-menu-list {
@@ -981,7 +981,7 @@
 }
 
 .yaml-editor-status.error {
-  color: color-mix(in srgb, var(--delete) 82%, var(--text));
+  color: var(--danger);
 }
 
 .yaml-editor-dot {
@@ -990,7 +990,7 @@
   width: 0.5rem;
   height: 0.5rem;
   border-radius: var(--radius-full);
-  background: var(--delete);
+  background: var(--danger);
 }
 
 .yaml-editor-dot.ok {
@@ -1148,16 +1148,16 @@
 }
 
 .git-status-pill.dirty .git-action-icon {
-  color: color-mix(in srgb, var(--accent) 60%, var(--text));
+  color: var(--accent-text);
 }
 
 .git-status-pill.operation {
-  border-color: color-mix(in srgb, var(--delete) 20%, var(--border));
+  border-color: var(--danger-border);
   text-transform: capitalize;
 }
 
 .git-status-pill.operation .git-action-icon {
-  color: color-mix(in srgb, var(--delete) 72%, var(--text-2));
+  color: var(--danger);
 }
 
 .git-upstream {
@@ -1187,7 +1187,7 @@
 }
 
 .git-upstream.warn {
-  border-color: color-mix(in srgb, var(--warning) 32%, var(--border-subtle));
+  border-color: var(--warning-border);
 }
 
 .git-toolbar-actions {
@@ -1344,21 +1344,21 @@
 }
 
 .git-banner.success {
-  border-color: color-mix(in srgb, var(--s2xx) 34%, var(--border));
+  border-color: var(--success-border);
   color: var(--s2xx);
-  background: color-mix(in srgb, var(--s2xx) 8%, var(--surface));
+  background: var(--success-bg-subtle);
 }
 
 .git-banner.error {
-  border-color: color-mix(in srgb, var(--delete) 22%, var(--border));
-  color: color-mix(in srgb, var(--delete) 78%, var(--text));
-  background: color-mix(in srgb, var(--delete) 3%, var(--surface));
+  border-color: var(--danger-border);
+  color: var(--danger);
+  background: var(--danger-bg-subtle);
 }
 
 .git-banner.warning {
-  border-color: color-mix(in srgb, var(--warning) 24%, var(--border));
-  color: color-mix(in srgb, var(--warning) 78%, var(--text));
-  background: color-mix(in srgb, var(--warning) 4%, var(--surface));
+  border-color: var(--warning-border);
+  color: var(--warning);
+  background: var(--warning-bg-subtle);
 }
 
 .git-setup-card {
@@ -1423,7 +1423,7 @@
 }
 
 .git-yaml-card.blocking {
-  --yaml-accent: var(--delete);
+  --yaml-accent: var(--danger);
 }
 
 .git-yaml-head {
@@ -1501,7 +1501,7 @@
 }
 
 .git-yaml-row.blocking .git-yaml-dot {
-  background: var(--delete);
+  background: var(--danger);
 }
 
 .git-yaml-copy {
@@ -1563,20 +1563,20 @@
 }
 
 .git-local-card.missing {
-  border-color: color-mix(in srgb, var(--delete) 22%, var(--border));
+  border-color: var(--danger-border);
 }
 
 .git-local-card.missing .git-local-head {
-  background: color-mix(in srgb, var(--delete) 3%, var(--surface));
+  background: var(--danger-bg-subtle);
 }
 
 .git-local-card.missing .git-local-eyebrow {
-  color: color-mix(in srgb, var(--delete) 72%, var(--text));
+  color: var(--danger);
 }
 
 .git-local-card.missing .git-local-path {
-  border-color: color-mix(in srgb, var(--delete) 18%, var(--border));
-  color: color-mix(in srgb, var(--delete) 72%, var(--text));
+  border-color: var(--danger-border);
+  color: var(--danger);
 }
 
 .git-local-head {
@@ -1878,7 +1878,7 @@
 }
 
 .git-empty.error {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .git-diff-code {
@@ -2102,21 +2102,21 @@
 }
 
 .git-diff-line.added {
-  background: color-mix(in srgb, var(--s2xx) 13%, transparent);
-  color: color-mix(in srgb, var(--s2xx) 82%, var(--text));
+  background: var(--success-bg);
+  color: var(--success);
 }
 
 .git-diff-line.added .git-diff-line-no {
-  color: color-mix(in srgb, var(--s2xx) 70%, var(--text-3));
+  color: var(--success);
 }
 
 .git-diff-line.removed {
-  background: color-mix(in srgb, var(--delete) 8%, transparent);
-  color: color-mix(in srgb, var(--delete) 78%, var(--text));
+  background: var(--danger-bg-subtle);
+  color: var(--danger);
 }
 
 .git-diff-line.removed .git-diff-line-no {
-  color: color-mix(in srgb, var(--delete) 68%, var(--text-3));
+  color: var(--danger);
 }
 
 .git-commit-list {
@@ -2323,7 +2323,7 @@
 
 .git-conflict-file-pill span {
   grid-row: 1 / span 2;
-  color: var(--delete);
+  color: var(--danger);
   font-family: var(--font-mono);
   font-size: var(--text-caption);
   font-weight: var(--weight-semibold);
@@ -2740,7 +2740,7 @@
 
 .missing-secrets-kind {
   display: inline-flex;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .missing-secrets-group-title {
@@ -2804,10 +2804,10 @@
 .missing-secrets-error {
   margin-top: var(--space-3);
   padding: var(--space-2) var(--space-2-5);
-  border: 1px solid color-mix(in srgb, var(--delete) 22%, var(--border));
+  border: 1px solid var(--danger-border);
   border-radius: var(--radius-md);
-  color: color-mix(in srgb, var(--delete) 78%, var(--text));
-  background: color-mix(in srgb, var(--delete) 3%, var(--surface));
+  color: var(--danger);
+  background: var(--danger-bg-subtle);
   font-size: var(--text-label);
 }
 
@@ -3127,7 +3127,7 @@
 
 .git-file-open > span.removed,
 .git-file-open > span.conflict {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .git-file-list strong {
@@ -3430,7 +3430,7 @@
 }
 .env-save-indicator.saved {
   color: var(--s2xx);
-  border-color: color-mix(in srgb, var(--s2xx) 32%, var(--border));
+  border-color: var(--success-border);
 }
 
 .env-save-indicator.dirty {
@@ -3817,7 +3817,7 @@
 }
 
 .runner-file-error {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .runner-hint {
@@ -3992,7 +3992,7 @@
 
 .runner-result-row.fail .runner-status,
 .runner-result-row.fail .runner-error {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 @container workspace (max-width: 61.25rem) {
@@ -4255,7 +4255,7 @@
 }
 
 .runner-result-row.fail {
-  background: color-mix(in srgb, var(--s5xx) 5%, transparent);
+  background: var(--danger-bg-subtle);
 }
 
 .runner-result-head {
@@ -4678,7 +4678,7 @@
 }
 
 .history-detail-delete:hover:not(:disabled) {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .history-detail-body {
@@ -4827,7 +4827,7 @@
 }
 
 .history-detail-error {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .history-detail-viewer {
@@ -5005,7 +5005,7 @@
 }
 
 .git-branch-row.current .git-branch-mark {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .git-branch-row strong {
@@ -5034,7 +5034,7 @@
 }
 
 .git-branch-row small.warn {
-  color: color-mix(in srgb, var(--warning) 80%, var(--text));
+  color: var(--warning);
 }
 
 .git-branch-row-menu-btn {
@@ -5117,7 +5117,7 @@
 }
 
 .find-replace-toggle.active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: var(--accent-dim);
 }
 
@@ -5130,11 +5130,11 @@
 }
 
 .find-replace-error {
-  color: color-mix(in srgb, var(--delete) 78%, var(--text));
+  color: var(--danger);
 }
 
 .find-replace-skipped {
-  color: color-mix(in srgb, var(--s4xx) 70%, var(--text));
+  color: var(--warning);
 }
 
 .find-replace-undo {
@@ -5143,9 +5143,9 @@
   justify-content: space-between;
   gap: var(--space-3);
   padding: var(--space-1-5) var(--space-2-5);
-  border: 1px solid color-mix(in srgb, var(--s2xx) 30%, var(--border));
+  border: 1px solid var(--success-border);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--s2xx) 6%, var(--surface));
+  background: var(--success-bg-subtle);
   font-size: var(--text-label);
 }
 
@@ -5215,18 +5215,18 @@
 .find-replace-context mark {
   border-radius: var(--radius-xs);
   color: var(--text);
-  background: color-mix(in srgb, var(--s4xx) 32%, transparent);
+  background: var(--warning-bg-strong);
 }
 
 .find-replace-context mark.replaced {
   text-decoration: line-through;
-  background: color-mix(in srgb, var(--delete) 22%, transparent);
+  background: var(--danger-bg-strong);
 }
 
 .find-replace-context ins {
   border-radius: var(--radius-xs);
   color: var(--text);
-  background: color-mix(in srgb, var(--s2xx) 24%, transparent);
+  background: var(--success-bg-strong);
   text-decoration: none;
 }
 

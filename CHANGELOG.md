@@ -5,6 +5,27 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- Ten new themes: GitHub Light, GitHub Dark Dimmed, JetBrains Light, JetBrains Dark, One Dark, Tokyo Night, Everforest, Flexoki Paper, High Contrast Light and High Contrast Dark.
+
+### Removed
+
+- Light Monochrome, Light Pastel, Dark Monochrome, Dark Pastel, Catppuccin Frappé and Catppuccin Macchiato. A saved choice moves to Light, Flexoki Paper, Dark, Everforest or Catppuccin Mocha.
+
+### Changed
+
+- Catppuccin Latte, Catppuccin Mocha and Nord keep secondary text, method labels and status colours at a 4.5:1 contrast ratio on every panel, and Nord's sidebar now sits below the content like in the other themes.
+- VS Code Light and VS Code Dark follow the current Light Modern and Dark Modern palettes, with distinct secondary and muted text.
+- Error, warning and success highlights use the same tint strength on every screen and in every theme, and links and active tabs use a dedicated accent shade that stays readable on dark backgrounds.
+- The Cancel and Stop buttons shown while a request runs are tinted red with red text, so they stay readable in themes with a light error colour.
+
+### Fixed
+
+- Theme miniatures in settings show each theme's own button text and status colours instead of borrowing them from the active theme.
+
 ## [3.0.3] - 2026-11-10
 
 ### Changed

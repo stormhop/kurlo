@@ -288,7 +288,7 @@
   }
 
   .mcp-editor.invalid {
-    border-color: color-mix(in srgb, var(--s4xx) 55%, var(--border));
+    border-color: var(--warning-border);
   }
 
 </style>

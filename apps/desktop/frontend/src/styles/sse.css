@@ -118,7 +118,7 @@
 }
 .sse-restore-btn {
   color: var(--s2xx);
-  border-color: color-mix(in srgb, var(--s2xx) 34%, var(--border));
+  border-color: var(--success-border);
 }
 .sse-icon-action {
   width: 2rem;
@@ -188,14 +188,14 @@
   text-transform: lowercase;
 }
 .sse-badge-message   { border-color: color-mix(in srgb, var(--post) 40%, transparent); }
-.sse-badge-error     { border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.sse-badge-error     { border-color: var(--danger-border); }
 .sse-badge-notification { border-color: color-mix(in srgb, var(--patch) 40%, transparent); }
 .sse-badge-info      { border-color: color-mix(in srgb, var(--text-3) 40%, transparent); }
-.sse-badge-ping      { border-color: color-mix(in srgb, var(--warning) 40%, transparent); }
+.sse-badge-ping      { border-color: var(--warning-border); }
 .sse-badge-system    { border-color: color-mix(in srgb, var(--text-3) 40%, transparent); }
-.sse-badge-connected { border-color: color-mix(in srgb, var(--s2xx) 44%, transparent); }
-.sse-badge-disconnected { border-color: color-mix(in srgb, var(--s5xx) 44%, transparent); }
-.sse-badge-default   { border-color: color-mix(in srgb, var(--info) 40%, transparent); }
+.sse-badge-connected { border-color: var(--success-border); }
+.sse-badge-disconnected { border-color: var(--danger-border); }
+.sse-badge-default   { border-color: var(--info-border); }
 
 .sse-event-preview {
   flex: 1;
@@ -344,7 +344,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--accent) 88%, white),
+    var(--accent-text),
     transparent
   );
   animation: realtime-progress-slide 1.05s ease-in-out infinite;
@@ -394,7 +394,7 @@
 }
 
 .rt-detail-section-title {
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--text-caption);
   font-weight: var(--weight-semibold);
   margin: var(--space-3) 0 var(--space-1-5);
@@ -487,7 +487,7 @@
 .sse-footer-code {
   padding: 1px var(--space-1-5);
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
+  background: var(--success-bg);
   color: var(--success);
   font-weight: var(--weight-semibold);
   flex-shrink: 0;
@@ -574,7 +574,7 @@
 }
 
 .ws-panel .sse-event-arrow.outgoing {
-  color: color-mix(in srgb, var(--accent) 62%, var(--text));
+  color: var(--accent-text);
   background: transparent;
 }
 
@@ -586,7 +586,7 @@
 
 .ws-panel .sse-event-row.sse-event-connected .sse-event-arrow.system {
   color: var(--s2xx);
-  background: color-mix(in srgb, var(--s2xx) 13%, transparent);
+  background: var(--success-bg);
 }
 
 .ws-message-list {
@@ -636,7 +636,7 @@
   width: 1.375rem;
   height: 1.375rem;
   border-radius: var(--radius-sm);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.875rem;
   line-height: var(--leading-none);
 }
@@ -683,7 +683,7 @@
 }
 
 .sse-event-arrow.outgoing {
-  color: color-mix(in srgb, var(--accent) 62%, var(--text));
+  color: var(--accent-text);
 }
 
 .sse-event-arrow.incoming {
@@ -792,12 +792,12 @@
 
 .btn-send.btn-sse-disconnect,
 .btn-send.btn-ws-disconnect {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
 .btn-send.btn-sse-disconnect:hover:not(:disabled),
 .btn-send.btn-ws-disconnect:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 24%, transparent);
+  background: var(--danger-bg-strong);
   color: var(--danger);
 }

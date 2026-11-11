@@ -252,9 +252,9 @@
     gap: var(--space-2);
     margin-top: var(--space-1);
     padding: var(--space-2-5) var(--space-3);
-    border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+    border: 1px solid var(--warning-border);
     border-radius: var(--radius-md);
-    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    background: var(--warning-bg-subtle);
   }
   .ai-model-problem-icon {
     margin-top: var(--space-0-5);
@@ -289,7 +289,7 @@
     margin-right: var(--space-1-5);
     padding: 0 var(--space-1-5);
     border-radius: var(--radius-xs);
-    background: color-mix(in srgb, var(--warning) 16%, transparent);
+    background: var(--warning-bg);
     color: var(--text);
     font-weight: var(--weight-medium);
   }

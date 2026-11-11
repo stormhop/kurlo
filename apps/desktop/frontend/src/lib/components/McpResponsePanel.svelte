@@ -212,7 +212,7 @@
     gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
-    background: color-mix(in srgb, var(--s4xx) 8%, transparent);
+    background: var(--warning-bg-subtle);
     color: var(--s4xx);
   }
 

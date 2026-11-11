@@ -58,7 +58,7 @@
     -webkit-user-drag: none;
   }
   .about-night-body {
-    fill: var(--accent);
+    fill: var(--accent-text);
   }
   .about-night-stripe {
     fill: none;

@@ -297,9 +297,9 @@
   }
   .agent-activity-error {
     padding: var(--space-2-5) var(--space-3);
-    border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+    border: 1px solid var(--danger-border);
     border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    background: var(--danger-bg-subtle);
     color: var(--text);
     font-size: var(--text-body);
     line-height: var(--leading-normal);

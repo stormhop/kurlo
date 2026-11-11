@@ -361,7 +361,7 @@
 .app-select-check {
   width: 0.875rem;
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--text-caption);
 }
 
@@ -477,7 +477,7 @@
 .kv-file-name {
   flex: 1;
   font-size: var(--text-caption);
-  color: var(--accent);
+  color: var(--accent-text);
   font-family: var(--font-mono);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -494,7 +494,7 @@
   line-height: var(--leading-none);
   cursor: pointer;
 }
-.kv-file-clear:hover { color: var(--delete); }
+.kv-file-clear:hover { color: var(--danger); }
 
 .kv-file-btn {
   display: flex;
@@ -508,7 +508,7 @@
   color: var(--text-3);
   transition: color var(--dur-fast);
 }
-.kv-file-btn:hover { color: var(--accent); }
+.kv-file-btn:hover { color: var(--accent-text); }
 
 .form-kv-head,
 .form-kv-row {
@@ -918,7 +918,7 @@
 }
 
 .jwt-inspector-error {
-  border-color: color-mix(in srgb, var(--s5xx) 45%, var(--border));
+  border-color: var(--danger-border);
 }
 
 .jwt-inspector-top {
@@ -1092,8 +1092,8 @@
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-label);
   color: var(--s5xx);
-  background: color-mix(in srgb, var(--danger) 6%, transparent);
-  border-top: 1px solid color-mix(in srgb, var(--danger) 20%, transparent);
+  background: var(--danger-bg-subtle);
+  border-top: 1px solid var(--danger-border);
 }
 
 .modal-footer {
@@ -1217,16 +1217,16 @@ input::-webkit-calendar-picker-indicator { opacity: 0; }
 
 .save-status svg {
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .save-status.is-error {
-  border-color: color-mix(in srgb, var(--delete) 55%, transparent);
-  color: var(--delete);
+  border-color: var(--danger-border);
+  color: var(--danger);
 }
 
 .save-status.is-error svg {
-  color: var(--delete);
+  color: var(--danger);
 }
 
 .save-status-dot {

@@ -208,7 +208,7 @@
     height: 0.875rem;
     border-left: 1px solid color-mix(in srgb, var(--text-3) 25%, transparent);
     border-right: 1px solid color-mix(in srgb, var(--text-3) 14%, transparent);
-    background: color-mix(in srgb, var(--s2xx) 7%, transparent);
+    background: var(--success-bg-subtle);
     overflow: hidden;
   }
 

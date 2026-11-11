@@ -157,7 +157,7 @@
 }
 
 .dialog-choice-kind.protocol {
-  color: color-mix(in srgb, var(--accent) 62%, var(--text));
+  color: var(--accent-text);
 }
 
 .dialog-choice-copy {
@@ -299,9 +299,9 @@
 
 .cookie-error {
   padding: var(--space-2) var(--space-2-5);
-  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border: 1px solid var(--danger-border);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  background: var(--danger-bg-subtle);
   color: var(--text);
   font-size: var(--text-label);
   line-height: var(--leading-normal);
@@ -681,9 +681,9 @@
 .cookie-missing-note {
   margin: 0;
   padding: var(--space-2) var(--space-2-5);
-  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+  border: 1px solid var(--warning-border);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--warning) 8%, transparent);
+  background: var(--warning-bg-subtle);
   color: var(--text-2);
   font-size: var(--text-label);
   line-height: var(--leading-normal);
@@ -819,8 +819,8 @@
 }
 
 .cookie-sync-outdated {
-  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
-  background: color-mix(in srgb, var(--warning) 9%, transparent);
+  border-color: var(--warning-border);
+  background: var(--warning-bg-subtle);
 }
 
 .cookie-sync-approval-copy {
@@ -924,7 +924,7 @@
 }
 
 .cookie-sync-chip.unreadable {
-  border-color: color-mix(in srgb, var(--warning) 55%, transparent);
+  border-color: var(--warning-border);
   color: var(--warning);
 }
 
@@ -1418,18 +1418,18 @@ button.settings-row:focus-visible {
 }
 
 .settings-pill.ok {
-  background: color-mix(in srgb, var(--s2xx) 14%, transparent);
+  background: var(--success-bg);
   color: var(--s2xx);
 }
 
 .settings-pill.warn {
-  background: color-mix(in srgb, var(--s4xx) 16%, transparent);
+  background: var(--warning-bg);
   color: var(--s4xx);
 }
 
 .settings-pill.accent {
   background: var(--accent-dim);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .global-search-backdrop {
@@ -1792,7 +1792,7 @@ button.settings-row:focus-visible {
   padding: var(--space-0-5) var(--space-2);
   border-radius: var(--radius-full);
   background: var(--accent-dim);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: var(--text-caption);
   font-weight: var(--weight-semibold);
 }
@@ -1841,7 +1841,7 @@ button.settings-row:focus-visible {
 
 .agent-spotlight-glyph-kurlo {
   background: var(--accent-dim);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .agent-spotlight-glyph-claude-code {

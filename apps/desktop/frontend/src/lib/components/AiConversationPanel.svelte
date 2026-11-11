@@ -562,7 +562,7 @@
     overflow: hidden;
   }
   .ai-tool-error {
-    border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+    border-color: var(--danger-border);
   }
   .ai-tool-head {
     display: flex;
@@ -645,9 +645,9 @@
     gap: var(--space-2);
     min-width: 0;
     padding: var(--space-2-5) var(--space-3);
-    border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+    border: 1px solid var(--danger-border);
     border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    background: var(--danger-bg-subtle);
     color: var(--text);
     font-size: var(--text-label);
     -webkit-user-select: text;
@@ -676,7 +676,7 @@
   .ai-error-status {
     padding: 0 var(--space-1-5);
     border-radius: var(--radius-xs);
-    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    background: var(--danger-bg);
     color: var(--text);
     font-family: var(--font-mono);
     font-size: var(--text-caption);
@@ -708,8 +708,8 @@
     font-size: var(--text-label);
   }
   .ai-note-warn {
-    border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
-    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border-color: var(--warning-border);
+    background: var(--warning-bg-subtle);
     color: var(--text);
   }
   .ai-turn-foot {
@@ -726,7 +726,7 @@
     font-size: var(--text-caption);
   }
   .ai-stop-warn {
-    border-color: color-mix(in srgb, var(--warning) 40%, var(--border));
+    border-color: var(--warning-border);
     color: var(--warning);
   }
   .ai-turn-meta {

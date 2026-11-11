@@ -98,17 +98,17 @@
 }
 
 .runner-verdict.pass .runner-verdict-icon {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
+  background: var(--success-bg);
   color: var(--success);
 }
 
 .runner-verdict.fail .runner-verdict-icon {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
 .runner-verdict.stopped .runner-verdict-icon {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
@@ -157,7 +157,7 @@
 }
 
 .runner-results-panel .runner-result-row.fail {
-  background: color-mix(in srgb, var(--danger) 5%, transparent);
+  background: var(--danger-bg-subtle);
 }
 
 .runner-folder {

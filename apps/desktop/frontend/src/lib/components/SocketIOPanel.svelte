@@ -538,7 +538,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-caption);
     background: var(--accent-dim);
-    color: var(--accent);
+    color: var(--accent-text);
     border-radius: var(--radius-xs);
     padding: 1px var(--space-1-5);
   }
@@ -563,7 +563,7 @@
     line-height: var(--leading-relaxed);
   }
   .sio-hs-error {
-    color: var(--delete);
+    color: var(--danger);
     font-weight: var(--weight-medium);
     margin-bottom: var(--space-3);
     font-family: inherit;
@@ -577,7 +577,7 @@
   .sio-hs-status-ok { color: var(--success); }
 
   .sio-listen-count {
-    color: var(--accent);
+    color: var(--accent-text);
     opacity: 0.8;
   }
 
@@ -599,7 +599,7 @@
     pointer-events: all;
   }
   .sio-hs-section-title {
-    color: var(--accent);
+    color: var(--accent-text);
     font-size: var(--text-caption);
     font-weight: var(--weight-semibold);
     text-transform: none;
@@ -620,7 +620,7 @@
     flex-shrink: 0;
   }
   .sio-hs-url {
-    color: var(--accent);
+    color: var(--accent-text);
     word-break: break-all;
     text-decoration: none;
   }
@@ -641,7 +641,7 @@
     flex-shrink: 0;
   }
   .sio-hs-hval {
-    color: var(--accent);
+    color: var(--accent-text);
     word-break: break-all;
   }
 </style>

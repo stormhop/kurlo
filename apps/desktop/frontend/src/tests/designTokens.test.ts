@@ -182,4 +182,18 @@ describe('design tokens', () => {
     });
     expect(offenders).toEqual([]);
   });
+
+  it('tints status backgrounds and borders with the status tokens', () => {
+    const statusMix = /color-mix\(in srgb, var\(--(danger|warning|success|info|s[2-5]xx|delete)\)/;
+    expect(violations(d => /^(background(-color)?|border(-(top|right|bottom|left))?(-color)?|outline(-color)?)$/.test(d.property)
+      && statusMix.test(d.value)).filter(line => !line.startsWith('styles/tokens.css'))).toEqual([]);
+  });
+
+  it('keeps the DELETE method colour for method labels', () => {
+    expect(violations(d => d.value.includes('var(--delete)') && !/method-delete|tp-method\.delete/.test(d.selector))).toEqual([]);
+  });
+
+  it('colours accent text with the accent text token', () => {
+    expect(violations(d => /^(color|fill|stroke|caret-color|text-decoration-color)$/.test(d.property) && /^var\(--accent\)( !important)?$/.test(d.value))).toEqual([]);
+  });
 });

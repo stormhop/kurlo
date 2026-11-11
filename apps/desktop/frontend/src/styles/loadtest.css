@@ -459,7 +459,7 @@
 
 .loadtest-line {
   fill: none;
-  stroke: var(--accent);
+  stroke: var(--accent-text);
   stroke-width: 2px;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
@@ -496,7 +496,7 @@
 .sidebar-loadtest-icon {
   display: inline-flex;
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .collection-request:has(.sidebar-loadtest-status) {
@@ -714,14 +714,14 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid color-mix(in srgb, var(--success) 32%, var(--border-subtle));
+  border: 1px solid var(--success-border);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--success) 6%, transparent);
+  background: var(--success-bg-subtle);
 }
 
 .loadrun-banner.failed {
-  border-color: color-mix(in srgb, var(--danger) 40%, var(--border-subtle));
-  background: color-mix(in srgb, var(--danger) 6%, transparent);
+  border-color: var(--danger-border);
+  background: var(--danger-bg-subtle);
 }
 
 .loadrun-banner-text {
@@ -967,18 +967,18 @@
 }
 
 .loadtest-result-badge.passed {
-  background: color-mix(in srgb, var(--success) 14%, transparent);
+  background: var(--success-bg);
   color: var(--success);
 }
 
 .loadtest-result-badge.failed,
 .loadtest-result-badge.error {
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
 .loadtest-result-badge.stopped {
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
@@ -1093,7 +1093,7 @@
 }
 
 .loadtest-chip-warning {
-  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  border-color: var(--warning-border);
   color: var(--warning);
   font-family: var(--font-ui);
 }
@@ -1449,22 +1449,22 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--success) 16%, transparent);
+  background: var(--success-bg);
   color: var(--success);
 }
 
 .loadrun-banner.failed .loadrun-banner-icon {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
 .loadrun-banner.stopped {
-  border-color: color-mix(in srgb, var(--warning) 40%, var(--border-subtle));
-  background: color-mix(in srgb, var(--warning) 6%, transparent);
+  border-color: var(--warning-border);
+  background: var(--warning-bg-subtle);
 }
 
 .loadrun-banner.stopped .loadrun-banner-icon {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
@@ -1543,7 +1543,7 @@
 }
 
 .loadrun-table tr.loadrun-step-failing td {
-  background: color-mix(in srgb, var(--danger) 5%, transparent);
+  background: var(--danger-bg-subtle);
 }
 
 .loadrun-table td.loadrun-cell-bad {
@@ -1730,5 +1730,5 @@
 }
 
 .sidebar-loadtest-group-title .sidebar-loadtest-icon {
-  color: var(--accent);
+  color: var(--accent-text);
 }

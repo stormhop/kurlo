@@ -40,7 +40,7 @@
 }
 
 .star-prompt-btn svg {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .star-prompt-close {
@@ -117,12 +117,12 @@
 }
 
 .btn.storage-status-btn.missing {
-  color: color-mix(in srgb, var(--delete) 68%, var(--text-2));
+  color: var(--danger);
 }
 
 .storage-status-btn.missing:hover,
 .storage-status-btn.missing.active {
-  background: color-mix(in srgb, var(--delete) 8%, var(--surface));
+  background: var(--danger-bg-subtle);
 }
 
 .storage-status-line {
@@ -144,7 +144,7 @@
 
 .storage-branch-icon {
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .storage-status-main {
@@ -201,9 +201,9 @@
 }
 
 .storage-flag.warn {
-  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--border));
-  background: color-mix(in srgb, var(--warning) 10%, transparent);
-  color: color-mix(in srgb, var(--warning) 78%, var(--text-2));
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning);
 }
 
 .storage-status-mode {
@@ -212,9 +212,9 @@
 }
 
 .storage-status-btn.missing .storage-status-mode {
-  border-color: color-mix(in srgb, var(--delete) 30%, var(--border));
-  color: color-mix(in srgb, var(--delete) 74%, var(--text-2));
-  background: color-mix(in srgb, var(--delete) 8%, transparent);
+  border-color: var(--danger-border);
+  color: var(--danger);
+  background: var(--danger-bg-subtle);
 }
 
 .workspace-menu-item {
@@ -230,7 +230,7 @@
 
 .workspace-menu-item.invalid .workspace-lock,
 .workspace-menu-item.invalid .workspace-menu-select small {
-  color: color-mix(in srgb, var(--delete) 72%, var(--text-2));
+  color: var(--danger);
 }
 
 .workspace-menu-item.invalid .workspace-lock {

@@ -1,10 +1,6 @@
 :root {
   --tab-height: 2.5rem;
   --tab-gap: var(--space-4);
-  --danger: var(--s5xx);
-  --warning: var(--s4xx);
-  --success: var(--s2xx);
-  --info: var(--s3xx);
 }
 
 :where(.btn) {
@@ -106,28 +102,28 @@
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  background: var(--danger-bg);
 }
 
 .btn-secondary.btn-danger {
-  border-color: color-mix(in srgb, var(--danger) 35%, var(--border));
+  border-color: var(--danger-border);
 }
 
 .btn-primary.btn-danger {
-  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
 .btn-primary.btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  background: var(--danger-bg-strong);
   color: var(--danger);
 }
 
 .btn.feedback-ok,
 .btn.feedback-ok:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--success) 35%, transparent);
-  background: color-mix(in srgb, var(--success) 14%, transparent);
+  border-color: var(--success-border);
+  background: var(--success-bg);
   color: var(--success);
 }
 
@@ -235,7 +231,7 @@
 }
 
 .menu-item.danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  background: var(--danger-bg);
 }
 
 .menu-item > svg {
@@ -460,17 +456,17 @@
 }
 
 .tag-success {
-  background: color-mix(in srgb, var(--success) 16%, transparent);
+  background: var(--success-bg);
   color: var(--success);
 }
 
 .tag-warning {
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
 .tag-danger {
-  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 

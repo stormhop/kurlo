@@ -166,7 +166,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-code);
     line-height: var(--leading-relaxed);
-    caret-color: var(--accent);
+    caret-color: var(--accent-text);
   }
   .docs-textarea::placeholder {
     color: var(--text-3);

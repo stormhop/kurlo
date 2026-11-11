@@ -407,6 +407,6 @@
 
   .theme-menu-check {
     flex-shrink: 0;
-    color: var(--accent);
+    color: var(--accent-text);
   }
 </style>

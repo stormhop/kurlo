@@ -1253,7 +1253,7 @@
     height: 2.25rem;
     border-radius: var(--radius-lg);
     background: var(--accent-dim);
-    color: var(--accent);
+    color: var(--accent-text);
   }
 
   .agent-empty-title {
@@ -1564,7 +1564,7 @@
     color: var(--danger);
   }
   .agent-tool-waiting {
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-tool-label {
     flex: 0 1 auto;
@@ -1605,15 +1605,15 @@
     line-height: 1.6;
   }
   .agent-tool-status.ok {
-    background: color-mix(in srgb, var(--s2xx) 14%, transparent);
+    background: var(--success-bg);
     color: var(--s2xx);
   }
   .agent-tool-status.warn {
-    background: color-mix(in srgb, var(--s4xx) 16%, transparent);
+    background: var(--warning-bg);
     color: var(--s4xx);
   }
   .agent-tool-status.bad {
-    background: color-mix(in srgb, var(--s5xx) 14%, transparent);
+    background: var(--danger-bg);
     color: var(--s5xx);
   }
   .agent-tool-time {
@@ -1670,9 +1670,9 @@
     align-items: baseline;
     gap: var(--space-1) var(--space-2);
     padding: var(--space-2-5) var(--space-3);
-    border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+    border: 1px solid var(--danger-border);
     border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--danger) 8%, transparent);
+    background: var(--danger-bg-subtle);
     color: var(--text);
     font-size: var(--text-label);
     -webkit-user-select: text;
@@ -2098,7 +2098,7 @@
   }
   .agent-branch-toggle.on {
     background: var(--accent-dim);
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-kv-mono {
     font-family: var(--font-mono);

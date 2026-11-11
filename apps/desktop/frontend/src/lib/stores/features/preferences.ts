@@ -8,6 +8,7 @@ import {
   normalizeThemeSettings,
   syncNativeThemeBackground,
   THEME_KEY,
+  withThemeVariant,
   type AppTheme,
   type AppThemeMode,
   type ThemeVariantId,
@@ -443,10 +444,7 @@ export const preferencesFeature = {
     this.setTheme({ ...this.appTheme, mode });
   },
   setThemeVariant(this: PreferencesHost, id: ThemeVariantId) {
-    const next = id.startsWith('light') || id === 'catppuccin-latte' || id === 'vscode-light'
-      ? { ...this.appTheme, light: id as AppTheme['light'] }
-      : { ...this.appTheme, dark: id as AppTheme['dark'] };
-    this.setTheme(next);
+    this.setTheme(withThemeVariant(this.appTheme, id));
   },
   get uiScale(): number {
     return currentUiScale();

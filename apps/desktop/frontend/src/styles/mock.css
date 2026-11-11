@@ -79,8 +79,8 @@
 }
 
 .mock-status.running {
-  border-color: color-mix(in srgb, var(--success) 35%, var(--border-subtle));
-  background: color-mix(in srgb, var(--success) 6%, transparent);
+  border-color: var(--success-border);
+  background: var(--success-bg-subtle);
 }
 
 .mock-status-state {
@@ -233,8 +233,8 @@
 }
 
 .mock-error {
-  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
   color: var(--danger);
 }
 
@@ -348,11 +348,11 @@
 }
 
 .mock-row.conflict {
-  background: color-mix(in srgb, var(--warning) 6%, transparent);
+  background: var(--warning-bg-subtle);
 }
 
 .mock-row.unmatched {
-  background: color-mix(in srgb, var(--danger) 6%, transparent);
+  background: var(--danger-bg-subtle);
 }
 
 .mock-row .collection-method {

@@ -110,13 +110,13 @@
   .gitauth-head {
     display: flex; align-items: center; margin-bottom: var(--space-1);
   }
-  .gitauth-head svg { color: var(--accent); flex-shrink: 0; }
+  .gitauth-head svg { color: var(--accent-text); flex-shrink: 0; }
   .gitauth-head h2 { margin-right: auto; }
   .gitauth-host { color: var(--text-2); font-size: var(--text-label); line-height: var(--leading-normal); margin: var(--space-0-5) 0 var(--space-2-5); }
   .gitauth-warn {
-    font-size: var(--text-caption); color: var(--delete);
-    background: color-mix(in srgb, var(--delete) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--delete) 35%, transparent);
+    font-size: var(--text-caption); color: var(--danger);
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
     border-radius: var(--radius-md); padding: var(--space-2) var(--space-2-5); margin-bottom: var(--space-2-5);
   }
   .gitauth-tabs { display: inline-flex; margin-bottom: var(--space-3); }

@@ -160,7 +160,7 @@
   }
   .agent-approval-head svg {
     flex: 0 0 auto;
-    color: var(--accent);
+    color: var(--accent-text);
   }
   .agent-approval-head strong {
     min-width: 0;

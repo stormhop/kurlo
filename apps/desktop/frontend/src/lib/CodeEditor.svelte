@@ -160,7 +160,7 @@
       lineHeight: 'var(--leading-normal)',
       color: 'var(--text)',
     },
-    '.cm-diagnostic-error': { borderLeftColor: 'var(--delete)' },
+    '.cm-diagnostic-error': { borderLeftColor: 'var(--danger)' },
     '.cm-diagnostic-warning': { borderLeftColor: 'var(--put, orange)' },
     '.cm-diagnosticText': { color: 'var(--text)' },
     '.cm-diagnosticSource': {
