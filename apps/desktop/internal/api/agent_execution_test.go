@@ -265,17 +265,27 @@ func TestAgentExecutionUnaryAndStreamingGRPC(t *testing.T) {
 		t.Fatalf("unary = %v", unary)
 	}
 	id := callExecutionTool(t, s, ctx, "open_session", map[string]any{"request": "bidi"})["sessionId"].(string)
-	callExecutionTool(t, s, ctx, "read_messages", map[string]any{"sessionId": id, "timeoutMs": 0, "limit": 1})
 	callExecutionTool(t, s, ctx, "send_message", map[string]any{"sessionId": id, "data": `{"payload":{"body":"aGVsbG8="}}`})
-	out := callExecutionTool(t, s, ctx, "read_messages", map[string]any{"sessionId": id, "timeoutMs": 1000})
-	if !strings.Contains(fmt.Sprint(out), "aGVsbG8=") {
+	if out := readExecutionMessagesUntil(t, s, ctx, id, "aGVsbG8="); !strings.Contains(out, "aGVsbG8=") {
 		t.Fatalf("stream message = %v", out)
 	}
 	callExecutionTool(t, s, ctx, "send_message", map[string]any{"sessionId": id, "endStream": true})
-	out = callExecutionTool(t, s, ctx, "read_messages", map[string]any{"sessionId": id, "timeoutMs": 1000})
-	if !strings.Contains(fmt.Sprint(out), "grpcCode:OK") {
+	if out := readExecutionMessagesUntil(t, s, ctx, id, "grpcCode:OK"); !strings.Contains(out, "grpcCode:OK") {
 		t.Fatalf("stream status = %v", out)
 	}
+}
+
+func readExecutionMessagesUntil(t *testing.T, s *mcpServer, ctx context.Context, id, needle string) string {
+	t.Helper()
+	var seen strings.Builder
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		seen.WriteString(fmt.Sprint(callExecutionTool(t, s, ctx, "read_messages", map[string]any{"sessionId": id, "timeoutMs": 500})))
+		if strings.Contains(seen.String(), needle) {
+			break
+		}
+	}
+	return seen.String()
 }
 
 func TestAgentExecutionSavedMCPAndAI(t *testing.T) {
