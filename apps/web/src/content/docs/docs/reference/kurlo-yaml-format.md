@@ -220,6 +220,7 @@ request:
 | `folderPath` | Display names only. Request files are stored flat; `folderPath` is the UI source of truth. |
 | `params`, `pathParams`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. A row with `secret: true` keeps its value in the encrypted local store, with a `{{kurloSecret:...}}` placeholder in the file. |
 | `pathParams` | Values of the `:name` path variables in `url`. The names come from the URL; a row whose name the URL no longer has is dropped. |
+| `savedMessages` | WebSocket and Socket.IO only. Messages kept in the **Saved** menu, each with a `name`. A WebSocket message has `content` and `bodyType` (`text`, the default, `json`, `html`, `xml` or `binary`); a Socket.IO message has `event`, `args` (the same shape as `sioArgs`) and `ack: true` when it waits for an acknowledgement. Omitted when empty. |
 | `mcpMethod`, `mcpName`, `mcpArguments` | The MCP call: the method (`tools/list`, `tools/call` and the like), the tool, resource or prompt name, and the arguments as JSON text. |
 | `mcpProtocolVersion` | Pins an MCP protocol revision, such as `2025-06-18`. Empty lets Kurlo find the one the server speaks. |
 | `grpcMethod`, `grpcUseReflection`, `grpcProtoFilePath`, `grpcProtoFileName`, `grpcProtoImportPaths` | gRPC method and service-definition source metadata. |

@@ -74,6 +74,7 @@ describe('environment inheritance in the store', () => {
   function host(environments: Environment[], activeEnvironmentId = 'stage') {
     const h = {
       environments,
+      environmentBaselines: new Map(),
       collections: [],
       activeEnvironmentId,
       activeWorkspaceId: 'ws',

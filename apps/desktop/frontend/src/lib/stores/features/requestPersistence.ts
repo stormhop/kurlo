@@ -75,6 +75,8 @@ type RequestPersistenceHost = {
   requestDiffersFromStored: (req: SavedRequest) => boolean;
   requestForEditing: (id: string) => SavedRequest | undefined;
   requestsForStore: (nextRequests: SavedRequest[]) => SavedRequest[];
+  environmentsForStore: (environments: Environment[]) => Environment[];
+  globalsForStore: () => KVRow[];
   savedRequestSnapshot: (req: SavedRequest) => SavedRequest;
   savedRequestSnapshotFromStore: (id: string) => Promise<SavedRequest | null>;
   discardRequestChanges: (id: string) => Promise<boolean>;
@@ -141,7 +143,7 @@ export const requestPersistenceFeature = {
     const storeCollectionIds = new Set(storeCollections.map(collection => collection.id));
     const storeRequests = nextRequests.filter(request => !request.isInvalid && storeCollectionIds.has(request.collectionId));
     const storeRequestIds = new Set(storeRequests.map(request => request.id));
-    const storeEnvironments = nextEnvironments.filter(environment => storeWorkspaceIds.has(environment.workspaceId));
+    const storeEnvironments = this.environmentsForStore(nextEnvironments).filter(environment => storeWorkspaceIds.has(environment.workspaceId));
     const storeWorkspaceId = storeWorkspaceIds.has(workspaceId) ? workspaceId : storeWorkspaces[0]?.id ?? '';
     const storeActiveId = storeRequestIds.has(activeId) ? activeId : '';
     const storeOpenIds = nextOpenIds.filter(id => storeRequestIds.has(id));
@@ -167,7 +169,7 @@ export const requestPersistenceFeature = {
       environments: storeEnvironments.map(e => ({ ...e, values: cloneRowsForStore(e.values) })),
       requests: storeRequests,
       history: this.pruneHistory(nextHistory),
-      globals: cloneRowsForStore(this.globalVariables),
+      globals: cloneRowsForStore(this.globalsForStore()),
       workspaceCookies: storeWorkspaceCookies,
       collectionRuns: Object.fromEntries(
         Object.entries(this.collectionLastRuns).filter(([collectionId]) => storeCollections.some(collection => collection.id === collectionId)),

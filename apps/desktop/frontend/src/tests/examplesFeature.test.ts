@@ -83,7 +83,7 @@ function hostFor(options: {
     scheduleActiveRequestPersist: vi.fn(),
     guardWorkspaceWritable: vi.fn(() => options.writable ?? true),
     openConfirmDialog: vi.fn(async () => options.confirm ?? true),
-    openPromptDialog: vi.fn(async () => (options.prompt === undefined ? null : options.prompt)),
+    openNameDialog: vi.fn(async () => (options.prompt === undefined ? null : options.prompt)),
   };
   return host as unknown as ExamplesTestHost;
 }

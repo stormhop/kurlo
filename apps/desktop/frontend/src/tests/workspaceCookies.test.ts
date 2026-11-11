@@ -136,6 +136,8 @@ describe('workspace scoped cookies', () => {
       requestHistory: [],
       collectionLastRuns: {},
       pruneHistory: (history: unknown[]) => history,
+      environmentsForStore: (environments: unknown[]) => environments,
+      globalsForStore: () => [],
     };
 
     const payload = requestPersistenceFeature.requestStorePayload.call(host as never);

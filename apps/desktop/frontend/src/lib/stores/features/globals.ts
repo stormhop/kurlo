@@ -1,6 +1,7 @@
 import { getGlobalVariables, setGlobalVariables } from '../../backend';
 import type { KVRow } from '../../types/models';
 import { rowHasContent } from '../../utils';
+import { changedValues, globalsFingerprint, trackGlobalsEdit } from '../../manualWorkspaceEdits';
 
 export type GlobalVariableChanges = { globalVariableUpdates?: Record<string, string>; globalVariablesRemoved?: string[] };
 
@@ -12,6 +13,7 @@ export function globalValuesAfterChanges(values: Record<string, string>, changes
 
 type GlobalsHost = {
   globalVariables: KVRow[];
+  globalsBaseline: KVRow[] | null;
   globalsSaveState: 'idle' | 'dirty' | 'saving' | 'saved';
   globalsPersistTimer: ReturnType<typeof setTimeout> | null;
   globalsSavedTimer: ReturnType<typeof setTimeout> | null;
@@ -21,6 +23,8 @@ type GlobalsHost = {
   globalVariableRows: () => KVRow[];
   globalVariableValues: () => Record<string, string>;
   scheduleGlobalsPersist: (delay?: number) => void;
+  editGlobals: (next: KVRow[]) => void;
+  changeGlobalsEverywhere: (change: (rows: KVRow[]) => KVRow[]) => void;
 };
 
 const GLOBALS_ROW_LIMIT = 5000;
@@ -102,21 +106,51 @@ export const globalsFeature = {
   updateGlobalVariableRow(this: GlobalsHost, index: number, patch: Partial<KVRow>) {
     if (!this.guardWorkspaceWritable('Global variables')) return;
     const rows = this.globalVariables.map((row, i) => (i === index ? { ...row, ...patch } : row));
-    this.globalVariables = withTrailingRow(rows);
-    this.scheduleGlobalsPersist();
+    this.editGlobals(withTrailingRow(rows));
   },
 
   removeGlobalVariableRow(this: GlobalsHost, index: number) {
     if (!this.guardWorkspaceWritable('Global variables')) return;
     const rows = this.globalVariables.filter((_, i) => i !== index);
-    this.globalVariables = withTrailingRow(rows);
-    this.scheduleGlobalsPersist();
+    this.editGlobals(withTrailingRow(rows));
   },
 
   clearGlobalVariables(this: GlobalsHost) {
     if (!this.guardWorkspaceWritable('Global variables')) return;
-    this.globalVariables = withTrailingRow([]);
+    this.editGlobals(withTrailingRow([]));
+  },
+
+  editGlobals(this: GlobalsHost, next: KVRow[]) {
+    if (!this.autosave) this.globalsBaseline = trackGlobalsEdit(this.globalVariables, next, this.globalsBaseline);
+    this.globalVariables = next;
     this.scheduleGlobalsPersist();
+  },
+
+  changeGlobalsEverywhere(this: GlobalsHost, change: (rows: KVRow[]) => KVRow[]) {
+    this.globalVariables = change(this.globalVariables);
+    if (!this.globalsBaseline) return;
+    const baseline = change(this.globalsBaseline);
+    this.globalsBaseline = globalsFingerprint(baseline) === globalsFingerprint(this.globalVariables) ? null : baseline;
+  },
+
+  hasUnsavedGlobalsChanges(this: GlobalsHost) {
+    return this.globalsBaseline !== null;
+  },
+
+  globalsForStore(this: GlobalsHost) {
+    return this.globalsBaseline ?? this.globalVariables;
+  },
+
+  discardGlobalsChanges(this: GlobalsHost) {
+    if (!this.globalsBaseline) return;
+    this.globalVariables = this.globalsBaseline;
+    this.globalsBaseline = null;
+    if (this.globalsSavedTimer) {
+      clearTimeout(this.globalsSavedTimer);
+      this.globalsSavedTimer = null;
+    }
+    this.globalsSaveState = 'idle';
+    void setGlobalVariables(this.globalVariableValues());
   },
 
   scheduleGlobalsPersist(this: GlobalsHost, delay = 360) {
@@ -133,7 +167,7 @@ export const globalsFeature = {
     };
     if (!this.autosave) {
       clearTimers();
-      this.globalsSaveState = 'dirty';
+      this.globalsSaveState = this.globalsBaseline ? 'dirty' : 'idle';
       return;
     }
     this.globalsSaveState = 'saving';
@@ -152,9 +186,16 @@ export const globalsFeature = {
       clearTimeout(this.globalsPersistTimer);
       this.globalsPersistTimer = null;
     }
+    if (this.globalsSavedTimer) {
+      clearTimeout(this.globalsSavedTimer);
+      this.globalsSavedTimer = null;
+    }
     this.globalsSaveState = 'saving';
+    const baseline = this.globalsBaseline;
+    this.globalsBaseline = null;
     const ok = await this.persistRequestStore();
-    this.globalsSaveState = ok ? 'saved' : 'dirty';
+    if (!ok && !this.globalsBaseline) this.globalsBaseline = baseline;
+    this.globalsSaveState = ok ? 'saved' : this.globalsBaseline ? 'dirty' : 'idle';
     if (ok) this.globalsSavedTimer = setTimeout(() => (this.globalsSaveState = 'idle'), 1800);
     return ok;
   },
@@ -167,7 +208,8 @@ export const globalsFeature = {
     const values = await getGlobalVariables();
     const next = mergeGlobalRowsWithValues(this.globalVariables, values);
     if (JSON.stringify(next) === JSON.stringify(this.globalVariables)) return false;
-    this.globalVariables = next;
+    const updates = changedValues(this.globalVariableValues(), values);
+    this.changeGlobalsEverywhere(rows => rows === this.globalVariables ? next : mergeGlobalRowsWithValues(rows, updates));
     await this.persistRequestStore();
     return true;
   },
@@ -176,9 +218,10 @@ export const globalsFeature = {
     const updates = changes.globalVariableUpdates ?? {};
     const removed = new Set(changes.globalVariablesRemoved ?? []);
     if ((!Object.keys(updates).length && !removed.size) || !this.guardWorkspaceWritable('Global variables')) return false;
-    const next = mergeGlobalRowsWithValues(this.globalVariables.filter(row => !removed.has(row.key.trim())), updates);
+    const apply = (rows: KVRow[]) => mergeGlobalRowsWithValues(rows.filter(row => !removed.has(row.key.trim())), updates);
+    const next = apply(this.globalVariables);
     if (JSON.stringify(next) === JSON.stringify(this.globalVariables)) return false;
-    this.globalVariables = next;
+    this.changeGlobalsEverywhere(apply);
     await this.persistRequestStore();
     return true;
   },

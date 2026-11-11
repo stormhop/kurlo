@@ -33,7 +33,7 @@ function makeHost(requestType: SavedRequest['requestType'] = 'http') {
     topView: 'request' as string,
     closeFloatingMenus: vi.fn(),
     guardWorkspaceWritable: () => true,
-    openPromptDialog: vi.fn().mockResolvedValue(null),
+    openNameDialog: vi.fn().mockResolvedValue(null),
     openAlertDialog: vi.fn().mockResolvedValue(undefined),
     openConfirmDialog: vi.fn().mockResolvedValue(true),
     requestForEditing: (id: string): SavedRequest | undefined => host.requests.find(request => request.id === id),
@@ -134,16 +134,16 @@ describe('load test store', () => {
     const { host, collection, saved } = makeHost();
     await createSaved(host, collection.id, ['req-login']);
     const original = testsOf(host)[0];
-    host.openPromptDialog.mockResolvedValueOnce(' Checkout smoke ');
+    host.openNameDialog.mockResolvedValueOnce(' Checkout smoke ');
     await host.renameLoadTest(collection.id, original.id);
-    expect(host.openPromptDialog).toHaveBeenCalledWith('Rename load test', original.name);
+    expect(host.openNameDialog).toHaveBeenCalledWith('Rename load test', original.name);
     expect(testsOf(host)[0]).toMatchObject({ id: original.id, name: 'Checkout smoke', scenarios: original.scenarios, settings: original.settings });
     expect(saved.at(-1)?.[0].loadTests?.[0].name).toBe('Checkout smoke');
     const filename = testsOf(host)[0].filesystemName;
     await host.renameLoadTest(collection.id, original.id, 'Inline name');
     expect(testsOf(host)[0].name).toBe('Inline name');
     expect(testsOf(host)[0].filesystemName).not.toBe(filename);
-    host.openPromptDialog.mockResolvedValueOnce(null);
+    host.openNameDialog.mockResolvedValueOnce(null);
     await host.renameLoadTest(collection.id, original.id);
     await host.renameLoadTest(collection.id, original.id, '  ');
     expect(testsOf(host)[0].name).toBe('Inline name');

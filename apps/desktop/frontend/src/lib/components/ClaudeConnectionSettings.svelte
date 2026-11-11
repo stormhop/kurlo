@@ -15,7 +15,8 @@
   const status = $derived(claude.status);
   const working = $derived(busy || claude.checking || claude.signingIn);
   const ready = $derived(status.authenticated && !status.error);
-  const label = $derived(claude.checking ? 'Checking…' : claude.signingIn ? 'Signing in…' : status.error && status.installed ? 'Unavailable' : status.connected && ready ? 'Connected' : status.authenticated ? 'Signed in' : status.installed ? 'CLI detected' : claude.loaded ? 'Not installed' : 'Not checked');
+  const signedOut = $derived(status.connected && status.installed && !status.authenticated && !status.error);
+  const label = $derived(claude.checking ? 'Checking…' : claude.signingIn ? 'Signing in…' : status.error && status.installed ? 'Unavailable' : status.connected && ready ? 'Connected' : signedOut ? 'Signed out' : status.authenticated ? 'Signed in' : status.installed ? 'CLI detected' : claude.loaded ? 'Not installed' : 'Not checked');
   const quotaWindows = $derived(agentQuotaWindows(status.rateLimits ?? []));
   const options = $derived(claude.models.map(item => ({ value: item.id, label: item.name || item.id })));
 
@@ -59,13 +60,13 @@
   <div class="settings-row">
     <span class="settings-glyph claude-glyph" aria-hidden="true"><AgentGlyph driver="claude-code" size="1.25rem" /></span>
     <div class="settings-row-text">
-      <span class="settings-row-title claude-title">Claude Code <span class="settings-pill" class:ok={status.connected && ready} class:warn={!status.installed && claude.loaded} role="status">{label}</span></span>
+      <span class="settings-row-title claude-title">Claude Code <span class="settings-pill" class:ok={status.connected && ready} class:warn={(!status.installed && claude.loaded) || signedOut} role="status">{label}</span></span>
       {#if claude.signingIn}
         <span class="settings-row-desc">Complete sign-in with Claude in your browser.</span>
       {:else if claude.checking && !claude.loaded}
         <span class="settings-row-desc">Checking Claude Code…</span>
       {:else if status.installed}
-        <span class="settings-row-desc">Claude Code CLI detected · {status.version}{#if status.authenticated}{' · '}Signed in: {status.account}{/if}</span>
+        <span class="settings-row-desc">Claude Code CLI detected · {status.version}{#if status.authenticated}{' · '}Signed in: {status.account}{:else if signedOut}{' · '}Signed out. Sign in to use your Claude subscription again.{/if}</span>
       {:else if claude.loaded}
         <span class="settings-row-desc">Install Claude Code, then check again or choose its executable: <code>npm install -g @anthropic-ai/claude-code</code></span>
       {:else}
@@ -81,6 +82,9 @@
         {/if}
         {#if options.length && status.authenticated}
           <Select value={model || status.model} {options} ariaLabel="Claude Code model" disabled={working} onChange={value => { model = value; if (status.connected) void act(save); }} />
+        {/if}
+        {#if signedOut}
+          <button class="btn btn-primary btn-sm" type="button" onclick={() => void claude.signIn(path || status.path)} disabled={working}>Sign in</button>
         {/if}
         {#if status.connected}
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => void act(disconnect)} disabled={working}>Remove connection</button>
@@ -106,7 +110,7 @@
     </div>
   {/if}
 
-  {#if status.connected && quotaWindows.length}
+  {#if status.connected && ready && quotaWindows.length}
     <div class="settings-row claude-limits" aria-label="Claude plan limits">
       {#each quotaWindows as window, index (`${window.label}:${index}`)}
         <div class="claude-limit">

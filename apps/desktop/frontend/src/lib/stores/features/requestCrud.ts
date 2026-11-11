@@ -1,6 +1,6 @@
 import { cancelQuit, confirmQuit } from '../../backend';
 import type { HttpResponse, McpResponse } from '../../backend';
-import { DEFAULT_COLLECTION } from '../../constants';
+import { DEFAULT_COLLECTION, clampName } from '../../constants';
 import { addCollectionFolderPath } from '../../collections';
 import {
   DEFAULT_GRAPHQL_QUERY,
@@ -31,6 +31,7 @@ import { newRequestId, requestTabLabel } from '../../utils';
 import type { TopView } from '../ui';
 
 type RequestCrudHost = {
+  reviewWorkspaceEditsBeforeQuit: () => Promise<boolean>;
   unsavedRequestSnapshots: Map<string, SavedRequest>;
   activeRequest: SavedRequest | undefined;
   activeRequestId: string;
@@ -107,6 +108,7 @@ type RequestCrudHost = {
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   openDraftRequests: () => SavedRequest[];
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
+  openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openSaveChangesDialog: (name: string) => Promise<'save' | 'discard' | 'cancel'>;
   openSelectDialog: (title: string, message: string, options: DialogOption[], confirmLabel?: string, cancelLabel?: string) => Promise<string | false | null>;
   openWorkspaceDiagnostic: (diagnostics?: SavedRequest['workspaceDiagnostics']) => void;
@@ -493,6 +495,10 @@ export const requestCrudFeature = {
           }
         }
       }
+      if (!(await this.reviewWorkspaceEditsBeforeQuit())) {
+        await cancelQuit();
+        return;
+      }
       for (const draftId of this.openDraftRequests().map(req => req.id)) {
         const draft = this.requestsById.get(draftId);
         if (!draft?.isDraft) continue;
@@ -722,8 +728,8 @@ export const requestCrudFeature = {
     this.openRequestMenuId = '';
     try {
       const name = typeof nextName === 'string'
-        ? nextName.trim()
-        : await this.openPromptDialog('Rename request', requestTabLabel(promptReq));
+        ? clampName(nextName)
+        : await this.openNameDialog('Rename request', requestTabLabel(promptReq));
       if (!name) return;
       const stillExists = this.requests.some(r => r.id === id);
       if (!stillExists) {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NAME_MAX_LENGTH } from '../constants';
   import { onMount } from 'svelte';
   import Select from './Select.svelte';
   import Disclosure from './Disclosure.svelte';
@@ -176,7 +177,7 @@
     <form class="settings-group agent-mcp-form" aria-label={editing.id ? `Edit ${editing.name}` : 'Add an MCP server'} onsubmit={event => { event.preventDefault(); void save(); }}>
       <div class="agent-mcp-row">
         <label class="agent-mcp-label" for="agent-mcp-name">Name</label>
-        <input id="agent-mcp-name" class="field agent-mcp-input" type="text" spellcheck="false" autocomplete="off" placeholder="GitHub" bind:value={name} />
+        <input id="agent-mcp-name" class="field agent-mcp-input" type="text" maxlength={NAME_MAX_LENGTH} spellcheck="false" autocomplete="off" placeholder="GitHub" bind:value={name} />
       </div>
       <div class="agent-mcp-row">
         <span class="agent-mcp-label">Type</span>

@@ -238,6 +238,10 @@ describe('deleteEnvironment', () => {
       guardWorkspaceWritable: () => true,
       openConfirmDialog: vi.fn().mockResolvedValue(true),
       persistRequestStore: vi.fn().mockResolvedValue(true),
+      environmentBaselines: new Map(),
+      changeEnvironmentsEverywhere(change: (environment: (typeof environments)[number]) => (typeof environments)[number]) {
+        environmentFeature.changeEnvironmentsEverywhere.call(host as never, change);
+      },
     };
     await environmentFeature.deleteEnvironment.call(host as never, 'pay-stage');
     expect(host.collections[0].environmentIds).toEqual(['pay-dev']);

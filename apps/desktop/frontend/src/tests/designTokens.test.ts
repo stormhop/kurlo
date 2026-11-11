@@ -73,7 +73,7 @@ const SPECIAL_BUTTON_CLASSES = new Set([
   'graphql-panel-tab-btn', 'grpc-method-option', 'history-day-toggle', 'history-entry-main',
   'input-validation-anchor', 'kv-auto-toggle', 'kv-col-resizer', 'kv-file-value', 'method-trigger', 'mock-row-name',
   'mock-url', 'overview-name', 'overview-row', 'overview-tile', 'palette-command', 'panel-divider', 'pinned-head', 'response-time-trigger',
-  'saved-request-tab-btn', 'search-picker-option', 'settings-nav-item', 'shortcut-combo', 'sidebar-divider', 'sse-event-main',
+  'saved-messages-load', 'saved-request-tab-btn', 'search-picker-option', 'settings-nav-item', 'shortcut-combo', 'sidebar-divider', 'sse-event-main',
   'subfolder-collapse', 'support-link-card', 'tab-close', 'theme-menu-item', 'theme-menu-mode', 'theme-menu-scrim',
   'version-pill', 'win-control', 'workspace-diagnostic-chip', 'workspace-menu-footer', 'workspace-menu-select',
 ]);

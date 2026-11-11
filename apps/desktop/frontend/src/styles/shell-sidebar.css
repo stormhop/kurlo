@@ -1137,9 +1137,17 @@
 
 .environment-item-text {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: var(--space-0-5);
   min-width: 0;
+}
+
+.environment-item-text > span,
+.environment-item-text > small {
+  overflow: clip;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .environment-none-item span,
@@ -1205,6 +1213,7 @@
 
 .environment-title .env-save-indicator {
   display: inline;
+  white-space: nowrap;
   min-height: 0;
   padding: 0;
   border: none;

@@ -146,6 +146,8 @@ describe('load tests on a collection', () => {
       globalVariables: [],
       collectionLastRuns: {},
       pruneHistory: () => [],
+      environmentsForStore: (environments: unknown[]) => environments,
+      globalsForStore: () => [],
     };
     const store = requestPersistenceFeature.requestStorePayload.call(host as never);
     const saved = JSON.parse(JSON.stringify(store.collections)) as Collection[];

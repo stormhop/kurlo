@@ -162,6 +162,9 @@
 
 .runner-folder {
   padding: var(--space-3) var(--space-4) var(--space-1);
+  overflow: clip;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--text-3);
   font-size: var(--text-micro);
   font-weight: var(--weight-semibold);

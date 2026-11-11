@@ -28,6 +28,7 @@ type FolderHost = {
   openAlertDialog: (title: string, message: string) => Promise<void>;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
+  openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: PersistRequestStore;
   scheduleRequestStorePersist: (delay?: number) => void;
@@ -94,7 +95,7 @@ export const folderFeature = {
       await this.openAlertDialog('Folder limit', `Folders can be nested up to ${MAX_FOLDER_DEPTH} levels.`);
       return;
     }
-    const name = await this.openPromptDialog('New subfolder', 'New Folder');
+    const name = await this.openNameDialog('New subfolder', 'New Folder');
     const trimmed = name?.trim();
     if (!trimmed) return;
     const path = [...parentPath, trimmed];
@@ -109,7 +110,7 @@ export const folderFeature = {
   async createFolderInCollection(this: FolderHost, collectionId: string) {
     if (!this.guardWorkspaceWritable('Creating folders')) return;
     this.closeFloatingMenus();
-    const name = await this.openPromptDialog('New folder', 'New Folder');
+    const name = await this.openNameDialog('New folder', 'New Folder');
     const trimmed = name?.trim();
     if (!trimmed) return;
     this.collections = this.collections.map(collection =>
@@ -123,7 +124,7 @@ export const folderFeature = {
     if (!this.guardWorkspaceWritable('Renaming folders')) return;
     this.closeFloatingMenus();
     const oldName = folderPath.at(-1) ?? '';
-    const name = await this.openPromptDialog('Rename folder', oldName);
+    const name = await this.openNameDialog('Rename folder', oldName);
     if (!name || name === oldName) return;
     const newPath = [...folderPath.slice(0, -1), name];
     this.collections = this.collections.map(collection =>

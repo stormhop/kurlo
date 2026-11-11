@@ -102,6 +102,10 @@ export function CheckWorkspaceYAML(arg1, arg2) {
   return window['go']['api']['App']['CheckWorkspaceYAML'](arg1, arg2);
 }
 
+export function ChooseEnvFileToImport() {
+  return window['go']['api']['App']['ChooseEnvFileToImport']();
+}
+
 export function ClaudeCodeStatus(arg1) {
   return window['go']['api']['App']['ClaudeCodeStatus'](arg1);
 }

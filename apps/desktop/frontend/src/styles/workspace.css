@@ -582,6 +582,7 @@
 .environment-select {
   display: inline-flex;
   min-width: 8.625rem;
+  max-width: 13.75rem;
 }
 
 .environment-select-icon {
@@ -1080,6 +1081,17 @@
 }
 
 .overview-readme-readonly {
+  color: var(--text-3);
+  font-size: var(--text-label);
+}
+
+.overview-readme-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.overview-readme-unsaved {
   color: var(--text-3);
   font-size: var(--text-label);
 }
@@ -3788,6 +3800,20 @@
   gap: var(--space-4);
 }
 
+.collection-workspace-head > .overview-title {
+  flex: 1 1 auto;
+}
+
+.overview-folder-name {
+  overflow: clip;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-folder-path {
+  overflow-wrap: anywhere;
+}
+
 .collection-workspace h1 {
   color: var(--text);
 }
@@ -5486,10 +5512,13 @@
 
 .env-parent .env-parent-select {
   min-width: 10rem;
+  max-width: 20rem;
 }
 
 .env-parent-hint {
+  min-width: 0;
   color: var(--text-3);
+  overflow-wrap: anywhere;
 }
 
 .env-inherited-head {

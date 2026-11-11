@@ -9,7 +9,7 @@
   import CookieSidebar from './CookieSidebar.svelte';
   import { virtualizeRows } from '../sidebarVirtual';
   import { uiScale } from '../uiScale';
-  import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS } from '../constants';
+  import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS, NAME_MAX_LENGTH } from '../constants';
   import type {
     Collection,
     CollectionGroup,
@@ -750,6 +750,7 @@
                 {#if editingCollectionId === row.group.collection.id}
                   <input
                     class="collection-name-input"
+                    maxlength={NAME_MAX_LENGTH}
                     bind:this={editingCollectionInput}
                     bind:value={editingCollectionName}
                     aria-label="Collection name"
@@ -817,7 +818,7 @@
               style={`--tree-depth: ${row.depth}`}
             >
               {#if editingLoadTestId === row.loadTest.id}
-                <input class="field field-sm sidebar-request-title-input" bind:this={editingLoadTestInput} bind:value={editingLoadTestName} aria-label="Load test name" spellcheck="false" onblur={commitLoadTestRename} onkeydown={(event) => {
+                <input class="field field-sm sidebar-request-title-input" maxlength={NAME_MAX_LENGTH} bind:this={editingLoadTestInput} bind:value={editingLoadTestName} aria-label="Load test name" spellcheck="false" onblur={commitLoadTestRename} onkeydown={(event) => {
                   if (event.key === 'Enter') { event.preventDefault(); void commitLoadTestRename(); }
                   else if (event.key === 'Escape') { event.preventDefault(); cancelLoadTestRename(); }
                 }} />
@@ -1042,7 +1043,7 @@
                 <div class="environment-item-main">
                   <span class="environment-dot" aria-hidden="true"></span>
                   <span class="environment-item-text">
-                    <input class="sidebar-request-title-input" bind:this={editingEnvironmentInput} bind:value={editingEnvironmentName} aria-label="Sidebar environment name" spellcheck="false" onblur={commitEnvironmentRename} onkeydown={onEnvironmentNameKeydown} />
+                    <input class="sidebar-request-title-input" maxlength={NAME_MAX_LENGTH} bind:this={editingEnvironmentInput} bind:value={editingEnvironmentName} aria-label="Sidebar environment name" spellcheck="false" onblur={commitEnvironmentRename} onkeydown={onEnvironmentNameKeydown} />
                     <small>{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}</small>
                   </span>
                 </div>

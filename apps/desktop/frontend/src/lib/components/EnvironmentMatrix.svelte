@@ -1,7 +1,7 @@
 <script lang="ts">
   import AddCloseIcon from './AddCloseIcon.svelte';
-  import { tick } from 'svelte';
-  import { buildEnvironmentMatrix, type MatrixRow } from '../environmentMatrix';
+  import { flushSync, tick, untrack } from 'svelte';
+  import { buildEnvironmentMatrix, matrixRowWindow, type MatrixRow } from '../environmentMatrix';
   import { effectiveEnvironmentRows, parentEnvironment } from '../environmentInheritance';
   import { readMatrixColumns, toggleMatrixColumn, visibleMatrixEnvironments, writeMatrixColumns } from '../environmentMatrixColumns';
   import type { Environment } from '../types/models';
@@ -103,6 +103,151 @@
     return query ? rows.filter(row => row.key.toLowerCase().includes(query)) : rows;
   });
 
+  const ROW_OVERSCAN = 4;
+  const ROW_QUANTUM = 2;
+  const COLUMN_OVERSCAN = 1;
+  const COLUMN_MIN_REM = 11.25;
+  let scrollEl = $state<HTMLDivElement>();
+  let scrollTop = $state(0);
+  let scrollLeft = $state(0);
+  let viewportHeight = $state(0);
+  let viewportWidth = $state(0);
+  let rowHeight = $state(38);
+  let headHeight = $state(34);
+  let nameColumnWidth = $state(200);
+  let actionsColumnWidth = $state(36);
+  let remPx = $state(16);
+  let columnWidth = $derived(COLUMN_MIN_REM * remPx);
+  let rowWindow = $derived(matrixRowWindow(
+    visibleRows.length,
+    scrollTop - headHeight,
+    viewportHeight,
+    rowHeight,
+    ROW_OVERSCAN,
+  ));
+  let renderedRows = $derived(visibleRows.slice(rowWindow.start, rowWindow.end));
+  let columnsOverflow = $derived(viewportWidth > 0 && nameColumnWidth + shown.length * columnWidth + actionsColumnWidth > viewportWidth);
+  let columnWindow = $derived(columnsOverflow
+    ? matrixRowWindow(shown.length, scrollLeft - nameColumnWidth, viewportWidth, columnWidth, COLUMN_OVERSCAN)
+    : { start: 0, end: shown.length, before: 0, after: 0 });
+  let renderedColumns = $derived(shown.slice(columnWindow.start, columnWindow.end));
+  let gridTemplate = $derived(`minmax(12.5rem, 15rem) repeat(${Math.max(1, shown.length)}, ${columnsOverflow ? `${COLUMN_MIN_REM}rem` : `minmax(${COLUMN_MIN_REM}rem, 1fr)`}) 2.25rem`);
+  let actionsColumn = $derived(shown.length + 2);
+  let setCounts = $derived(new Map(rows.map(row => [row.key, Object.values(row.cells).filter(Boolean).length])));
+
+  let deferredSync = 0;
+
+  function syncScroll() {
+    if (!scrollEl) return;
+    const rowQuantum = rowHeight * ROW_QUANTUM;
+    const nextTop = Math.floor(scrollEl.scrollTop / rowQuantum) * rowQuantum;
+    const nextLeft = Math.floor(scrollEl.scrollLeft / columnWidth) * columnWidth;
+    if (nextTop === scrollTop && nextLeft === scrollLeft) return;
+    if (releaseFocusLeavingWindow(nextTop, nextLeft)) {
+      if (!deferredSync) deferredSync = requestAnimationFrame(() => { deferredSync = 0; syncScroll(); });
+      return;
+    }
+    scrollTop = nextTop;
+    scrollLeft = nextLeft;
+  }
+
+  function releaseFocusLeavingWindow(nextTop: number, nextLeft: number): boolean {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement) || !gridEl?.contains(active)) return false;
+    const key = active.closest<HTMLElement>('[data-row-key]')?.dataset.rowKey;
+    const environmentId = active.closest<HTMLElement>('[data-environment-id]')?.dataset.environmentId;
+    const rowIndex = key === undefined ? -1 : visibleRows.findIndex(row => row.key === key);
+    const columnIndex = environmentId === undefined ? -1 : shown.findIndex(environment => environment.id === environmentId);
+    const rows = matrixRowWindow(visibleRows.length, nextTop - headHeight, viewportHeight, rowHeight, ROW_OVERSCAN);
+    const columns = columnsOverflow
+      ? matrixRowWindow(shown.length, nextLeft - nameColumnWidth, viewportWidth, columnWidth, COLUMN_OVERSCAN)
+      : { start: 0, end: shown.length };
+    const rowGone = rowIndex >= 0 && (rowIndex < rows.start || rowIndex >= rows.end);
+    const columnGone = columnIndex >= 0 && (columnIndex < columns.start || columnIndex >= columns.end);
+    if (!rowGone && !columnGone) return false;
+    active.blur();
+    return true;
+  }
+
+  function measureLayout() {
+    if (!scrollEl) return;
+    viewportHeight = scrollEl.clientHeight;
+    viewportWidth = scrollEl.clientWidth;
+    remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const nameWidth = gridEl?.querySelector<HTMLElement>('.env-matrix-name-head')?.getBoundingClientRect().width ?? 0;
+    const actionsWidth = gridEl?.querySelector<HTMLElement>('.env-matrix-actions-head')?.getBoundingClientRect().width ?? 0;
+    const cellHeight = gridEl?.querySelector<HTMLElement>('[data-testid="environment-matrix-row"] > span')?.getBoundingClientRect().height ?? 0;
+    const headCellHeight = gridEl?.querySelector<HTMLElement>('.env-matrix-head > span')?.getBoundingClientRect().height ?? 0;
+    if (nameWidth > 0 && Math.abs(nameWidth - nameColumnWidth) > 0.01) nameColumnWidth = nameWidth;
+    if (actionsWidth > 0 && Math.abs(actionsWidth - actionsColumnWidth) > 0.01) actionsColumnWidth = actionsWidth;
+    if (cellHeight > 0 && Math.abs(cellHeight - rowHeight) > 0.01) rowHeight = cellHeight;
+    if (headCellHeight > 0 && Math.abs(headCellHeight - headHeight) > 0.01) headHeight = headCellHeight;
+    syncScroll();
+  }
+
+  function wheelPixels(delta: number, mode: number, page: number) {
+    if (mode === WheelEvent.DOM_DELTA_LINE) return delta * rowHeight;
+    if (mode === WheelEvent.DOM_DELTA_PAGE) return delta * page;
+    return delta;
+  }
+
+  let pendingDx = 0;
+  let pendingDy = 0;
+  let wheelFrame = 0;
+
+  function applyWheel() {
+    wheelFrame = 0;
+    const dx = pendingDx;
+    const dy = pendingDy;
+    pendingDx = 0;
+    pendingDy = 0;
+    if (!scrollEl) return;
+    if (dy !== 0) scrollEl.scrollTop = Math.max(0, Math.min(scrollEl.scrollTop + dy, scrollEl.scrollHeight - scrollEl.clientHeight));
+    if (dx !== 0) scrollEl.scrollLeft = Math.max(0, Math.min(scrollEl.scrollLeft + dx, scrollEl.scrollWidth - scrollEl.clientWidth));
+    syncScroll();
+    flushSync();
+  }
+
+  function onMatrixWheel(event: WheelEvent) {
+    if (!scrollEl || event.ctrlKey) return;
+    event.preventDefault();
+    let dy = wheelPixels(event.deltaY, event.deltaMode, scrollEl.clientHeight);
+    let dx = wheelPixels(event.deltaX, event.deltaMode, scrollEl.clientWidth);
+    if (event.shiftKey && dx === 0) {
+      dx = dy;
+      dy = 0;
+    }
+    pendingDx += dx;
+    pendingDy += dy;
+    if (!wheelFrame) wheelFrame = requestAnimationFrame(applyWheel);
+  }
+
+  function onMatrixScroll() {
+    syncScroll();
+  }
+
+  function trackMatrixViewport(node: HTMLDivElement) {
+    const observer = new ResizeObserver(() => measureLayout());
+    observer.observe(node);
+    node.addEventListener('wheel', onMatrixWheel, { passive: false });
+    measureLayout();
+    return {
+      destroy: () => {
+        observer.disconnect();
+        node.removeEventListener('wheel', onMatrixWheel);
+        if (wheelFrame) cancelAnimationFrame(wheelFrame);
+        if (deferredSync) cancelAnimationFrame(deferredSync);
+        wheelFrame = 0;
+        deferredSync = 0;
+      },
+    };
+  }
+
+  $effect(() => {
+    if (visibleRows.length >= 0 && shown.length >= 0) untrack(measureLayout);
+  });
+
+
   function inputValue(event: Event): string {
     const target = event.currentTarget;
     return target instanceof HTMLInputElement ? target.value : '';
@@ -144,11 +289,16 @@
     gridEl?.querySelector<HTMLInputElement>(`[data-unset-cell="${CSS.escape(environmentId)}:${CSS.escape(key)}"]`)?.focus();
   }
 
-  function onUnsetInput(environmentId: string, key: string, event: Event) {
+  async function onUnsetInput(environmentId: string, key: string, event: Event) {
     const value = inputValue(event);
     if (value === '') return;
     editingUnset = null;
     onSetValue(environmentId, key, value);
+    await tick();
+    const input = gridEl?.querySelector<HTMLInputElement>(`[data-row-key="${CSS.escape(key)}"] [data-environment-id="${CSS.escape(environmentId)}"] input.env-matrix-value`);
+    if (!input) return;
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   }
 </script>
 
@@ -213,12 +363,12 @@
   </div>
 </div>
 
-<div class="env-matrix-scroll">
-  <div class="env-matrix" role="table" aria-label="Variables by environment" bind:this={gridEl} style={`--env-columns: ${shown.length}`}>
+<div class="env-matrix-scroll" bind:this={scrollEl} use:trackMatrixViewport onscroll={onMatrixScroll}>
+  <div class="env-matrix" role="table" aria-label="Variables by environment" aria-rowcount={visibleRows.length + 1} aria-colcount={shown.length + 2} bind:this={gridEl} style={`grid-template-columns: ${gridTemplate}; min-height: ${headHeight + visibleRows.length * rowHeight}px`}>
     <div class="env-matrix-row env-matrix-head" role="row">
       <span class="env-matrix-name-head" role="columnheader">Variable</span>
-      {#each shown as environment (environment.id)}
-        <span class="env-matrix-col-head" class:in-use={environment.id === activeEnvironmentId} role="columnheader">
+      {#each renderedColumns as environment, columnIndex (environment.id)}
+        <span class="env-matrix-col-head" class:in-use={environment.id === activeEnvironmentId} role="columnheader" style={`grid-column: ${columnWindow.start + columnIndex + 2}`}>
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => onOpenEnvironment(environment.id)}>
             {#if environment.id === activeEnvironmentId}<span class="env-matrix-dot" aria-hidden="true"></span>{/if}
             <span>{environment.name}</span>
@@ -228,11 +378,14 @@
           {/if}
         </span>
       {/each}
-      <span role="columnheader" aria-label="Actions"></span>
+      <span class="env-matrix-actions-head" role="columnheader" aria-label="Actions" style={`grid-column: ${actionsColumn}`}></span>
     </div>
 
-    {#each visibleRows as row (row.key)}
-      <div class="env-matrix-row" role="row" data-testid="environment-matrix-row">
+    {#if rowWindow.before > 0}
+      <div class="env-matrix-spacer" aria-hidden="true" style={`height: ${rowWindow.before}px`}></div>
+    {/if}
+    {#each renderedRows as row, index (row.key)}
+      <div class="env-matrix-row" role="row" aria-rowindex={rowWindow.start + index + 2} data-testid="environment-matrix-row" data-row-key={row.key}>
         <span class="env-matrix-name" role="rowheader">
           <input
             class="field field-bare field-md env-matrix-name-input"
@@ -259,10 +412,10 @@
           {/if}
         </span>
 
-        {#each shown as environment (environment.id)}
+        {#each renderedColumns as environment, columnIndex (environment.id)}
           {@const cell = row.cells[environment.id]}
           {@const inherited = cell?.enabled ? undefined : inheritedCell(environment.id, row.key)}
-          <span class="env-matrix-cell" class:in-use={environment.id === activeEnvironmentId} role="cell">
+          <span class="env-matrix-cell" class:in-use={environment.id === activeEnvironmentId} role="cell" data-environment-id={environment.id} style={`grid-column: ${columnWindow.start + columnIndex + 2}`}>
             {#if cell}
               <input
                 class="field field-bare field-md env-matrix-value"
@@ -275,7 +428,9 @@
                 autocomplete="off"
                 oninput={(event) => onSetValue(environment.id, row.key, inputValue(event))}
               />
-              <button class="env-matrix-unset" type="button" aria-label={`Unset ${row.key} in ${environment.name}`} onclick={() => onUnsetValue(environment.id, row.key)}><AddCloseIcon /></button>
+              {#if (setCounts.get(row.key) ?? 0) > 1}
+                <button class="env-matrix-unset" type="button" aria-label={`Unset ${row.key} in ${environment.name}`} onclick={() => onUnsetValue(environment.id, row.key)}><AddCloseIcon /></button>
+              {/if}
             {:else if editingUnset?.environmentId === environment.id && editingUnset.key === row.key}
               <input
                 class="field field-bare field-md env-matrix-value"
@@ -300,7 +455,7 @@
           </span>
         {/each}
 
-        <span class="env-matrix-actions" role="cell">
+        <span class="env-matrix-actions" role="cell" style={`grid-column: ${actionsColumn}`}>
           <button class="btn btn-ghost btn-icon btn-sm env-matrix-icon env-matrix-remove" type="button" aria-label={`Delete ${row.key} from every environment`} onclick={() => onRemove(row.key)}>
             <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M2 3.5h9M5 3.5V2.5h3v1M3.5 3.5l.5 7h5l.5-7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
@@ -311,6 +466,9 @@
         <span role="cell">{rows.length ? 'No variable matches.' : 'No variables yet. Add one to every environment at once with + Variable.'}</span>
       </div>
     {/each}
+    {#if rowWindow.after > 0}
+      <div class="env-matrix-spacer" aria-hidden="true" style={`height: ${rowWindow.after}px`}></div>
+    {/if}
   </div>
 </div>
 
@@ -433,7 +591,6 @@
 
   .env-matrix {
     display: grid;
-    grid-template-columns: minmax(12.5rem, 15rem) repeat(var(--env-columns), minmax(11.25rem, 1fr)) 2.25rem;
     min-width: max-content;
   }
 
@@ -441,10 +598,15 @@
     display: contents;
   }
 
+  .env-matrix-spacer {
+    grid-column: 1 / -1;
+  }
+
   .env-matrix-row > span {
     display: flex;
     align-items: center;
     min-width: 0;
+    contain: inline-size;
     min-height: 2.375rem;
     border-bottom: 1px solid var(--border-subtle);
   }
@@ -479,10 +641,20 @@
   .env-matrix-col-head button {
     display: inline-flex;
     align-items: center;
+    flex: 0 1 auto;
     gap: var(--space-2);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .env-matrix-col-head button > span:last-child {
+    overflow: clip;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .env-matrix-dot {
+    flex: 0 0 auto;
     width: 0.4375rem;
     height: 0.4375rem;
     border-radius: 50%;
@@ -587,6 +759,9 @@
   }
 
   .env-matrix-parent {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 45%;
     overflow: hidden;
     color: var(--text-3);
     font-size: var(--text-label);

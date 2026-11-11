@@ -99,6 +99,14 @@ Use the Message tab to send a text or binary payload after connecting. Per-reque
 
 ![WebSocket request with sent payload and echoed frame](../../../../assets/screenshots/request-websocket.png)
 
+### Saved messages
+
+**Saved** in the Message tab keeps messages you send again and again: a subscribe frame, a ping in your own format, a test payload. Type the message, open **Saved**, name it and press **Save current**. Click a saved message to put it back in the editor, or use its send button to send it straight away while connected.
+
+Saved messages are stored with the request as `savedMessages` in its YAML file, so they are shared through Git with the rest of the collection. Socket.IO requests have the same menu next to the event name; a saved Socket.IO message keeps the event name, every argument and the **Ack** setting.
+
+![Saved WebSocket messages in the Message tab](../../../../assets/screenshots/websocket-saved-messages.png)
+
 ## Socket.IO
 
 Socket.IO mode speaks the Socket.IO protocol rather than raw WebSocket frames. Configure:

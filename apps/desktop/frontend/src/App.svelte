@@ -296,6 +296,8 @@
     vm.responseSearch;
     vm.responseBodyPage;
     vm.responseBodyIsPaged;
+    vm.responseFilterOpen;
+    vm.responseFilter;
     untrack(() => vm.scheduleResponseSearchCount());
   });
 
@@ -717,6 +719,10 @@
         shortcutCombo={(id) => vm.shortcutCombo(id)}
         appRuntime={vm.appRuntime}
         updateWorkspaceDescription={vm.updateWorkspaceDescription}
+        autosave={vm.autosave}
+        readmeDraft={vm.activeWorkspace ? vm.workspaceReadmeDrafts[vm.activeWorkspace.id] : undefined}
+        saveReadme={vm.saveWorkspaceReadmes}
+        discardReadme={vm.discardWorkspaceReadmes}
         setWorkspaceName={(name) => vm.setWorkspaceName(name)}
         createWorkspace={vm.createWorkspace}
         openSettings={vm.openSettings}
@@ -796,6 +802,7 @@
         removeRow={vm.removeGlobalVariableRow}
         clearAll={vm.clearGlobalVariables}
         save={vm.saveGlobals}
+        discard={vm.discardGlobalsChanges}
       />
 
     {:else if vm.topView === 'cookies'}
@@ -817,6 +824,7 @@
         setEnvironmentParent={vm.setEnvironmentParent}
         deleteEnvironment={vm.deleteEnvironment}
         saveEnvironment={vm.saveEnvironment}
+        discardEnvironment={vm.discardEnvironmentChanges}
         updateEnvironmentRow={vm.updateEnvironmentRow}
         removeEnvironmentRow={vm.removeEnvironmentRow}
         importEnvFromFile={vm.importEnvFromFile}

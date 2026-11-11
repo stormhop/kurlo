@@ -29,6 +29,7 @@
   padding: var(--space-3) var(--space-4) 0;
   color: var(--text-2);
   line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
 }
 
 .app-dialog input {

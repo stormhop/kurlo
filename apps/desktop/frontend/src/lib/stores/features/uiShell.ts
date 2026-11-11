@@ -85,6 +85,8 @@ export function codePanelMaxWidth(viewportWidth: number, sidebarWidth: number): 
 type ColumnResizeTarget = 'key' | 'val' | 'type' | 'desc';
 
 type UiShellHost = {
+  saveGlobals: () => Promise<boolean>;
+  saveWorkspaceReadmes: () => Promise<boolean>;
   _sidebarSearchInput: HTMLInputElement | undefined;
   _urlInputRef: HTMLInputElement | HTMLTextAreaElement | undefined;
   activeRequestId: string;
@@ -449,8 +451,11 @@ export const uiShellFeature = {
       return;
     }
     if (id === 'save-request') {
-      if (!this.autosave && this.topView === 'environment') await this.saveEnvironment();
-      else if (!this.autosave && this.activeRequestId) await this.saveActiveRequest();
+      if (this.autosave) return;
+      if (this.topView === 'environment') await this.saveEnvironment();
+      else if (this.topView === 'globals') await this.saveGlobals();
+      else if (this.topView === 'overview') await this.saveWorkspaceReadmes();
+      else if (this.activeRequestId) await this.saveActiveRequest();
       return;
     }
     if (id === 'close-tab' || id === 'force-close-tab') await this.closeActiveTab(id === 'force-close-tab');

@@ -440,26 +440,3 @@ export async function clipboardCopy(text: string) {
     await clipboardSet(text);
   }
 }
-
-const ENV_FILE_ESCAPES: Record<string, string> = { n: '\n', t: '\t', '"': '"', '\\': '\\' };
-
-export function parseEnvFile(text: string): Array<{ key: string; value: string }> {
-  const result: Array<{ key: string; value: string }> = [];
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) continue;
-    const eqIdx = trimmed.indexOf('=');
-    if (eqIdx < 1) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    if (!/^[A-Za-z_][A-Za-z0-9_.]*$/.test(key)) continue;
-    let value = trimmed.slice(eqIdx + 1);
-    const dq = value.startsWith('"') && value.endsWith('"');
-    const sq = value.startsWith("'") && value.endsWith("'");
-    if (dq || sq) {
-      value = value.slice(1, -1);
-      if (dq) value = value.replace(/\\([nt"\\])/g, (_, ch: string) => ENV_FILE_ESCAPES[ch]);
-    }
-    result.push({ key, value });
-  }
-  return result;
-}

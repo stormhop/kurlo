@@ -187,6 +187,7 @@ func stripRequestForFilesystem(request map[string]any) {
 	}
 	stripSioArgRowIDs(request["sioArgs"])
 	stripEmptySioArgs(request)
+	stripSavedMessagesForType(request, requestType)
 
 	stripAuthForFilesystem(request)
 	stripNestedDefaults(request, "settings", savedRequestSettingDefaults)
@@ -289,6 +290,48 @@ func stripRequestTabForType(request map[string]any, requestType string) {
 	if tab == defaultTab {
 		delete(request, "requestTab")
 	}
+}
+
+func stripSavedMessagesForType(request map[string]any, requestType string) {
+	rows, ok := request["savedMessages"].([]any)
+	if !ok || (requestType != "ws" && requestType != "socketio") {
+		delete(request, "savedMessages")
+		return
+	}
+	kept := make([]any, 0, len(rows))
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		delete(row, "id")
+		if requestType == "ws" {
+			delete(row, "event")
+			delete(row, "args")
+			delete(row, "ack")
+			if stringValue(row, "bodyType") == "text" {
+				delete(row, "bodyType")
+			}
+		} else {
+			delete(row, "content")
+			delete(row, "bodyType")
+			stripSioArgRowIDs(row["args"])
+			if ack, isBool := row["ack"].(bool); isBool && !ack {
+				delete(row, "ack")
+			}
+		}
+		for key, value := range row {
+			if isEmptyValue(value) {
+				delete(row, key)
+			}
+		}
+		kept = append(kept, row)
+	}
+	if len(kept) == 0 {
+		delete(request, "savedMessages")
+		return
+	}
+	request["savedMessages"] = kept
 }
 
 func stripEmptySioArgs(request map[string]any) {

@@ -15,6 +15,7 @@ type ExamplesHost = {
   guardWorkspaceWritable: (action?: string) => boolean;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
+  openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   addCapturedExample: (example: RequestExample) => void;
   selectedExample: () => RequestExample | null;
   selectExample: (id: string) => void;
@@ -86,7 +87,7 @@ export const examplesFeature = {
     const example = this.requestExamples.find(item => item.id === id);
     if (!example) return;
     if (!this.guardWorkspaceWritable('Renaming an example')) return;
-    const next = await this.openPromptDialog('Rename example', example.name);
+    const next = await this.openNameDialog('Rename example', example.name);
     const trimmed = next?.trim();
     if (!trimmed || trimmed === example.name) return;
     this.updateExample(id, { name: uniqueExampleName(this.requestExamples.filter(item => item.id !== id), trimmed) });

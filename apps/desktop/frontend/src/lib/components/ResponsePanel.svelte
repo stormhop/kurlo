@@ -99,6 +99,15 @@
   } = $props();
 
   let responseSearchInput = $state<HTMLInputElement | undefined>();
+  let responseFilterInput = $state<HTMLInputElement | undefined>();
+  let canFilter = $derived(Boolean(response?.body && !response.bodyIsBinary && !response.error && vm.isJsonResponse(response)));
+  let filterResult = $derived(vm.responseFilterResult);
+  let filterStatus = $derived.by(() => {
+    if (!filterResult) return '';
+    if (!filterResult.ok) return filterResult.error;
+    const count = filterResult.matches.length;
+    return count === 1 ? '1 match' : `${count} matches`;
+  });
   let responsePreview = $derived(responsePreviewFor(response));
   let browserHiddenHeaders = $derived(new Set((response?.browserHiddenHeaders ?? []).map(name => name.toLowerCase())));
   let binaryBodyDescription = $derived.by(() => {
@@ -111,6 +120,10 @@
 
   $effect(() => {
     if (responseSearchOpen) setTimeout(() => responseSearchInput?.focus(), 0);
+  });
+
+  $effect(() => {
+    if (vm.responseFilterOpen) setTimeout(() => responseFilterInput?.focus(), 0);
   });
 
   let waitingSince = $state(0);
@@ -230,6 +243,13 @@
               <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
             </svg>
           </button>
+          {#if canFilter}
+            <button class="btn btn-icon" aria-label="Filter response" aria-pressed={vm.responseFilterOpen} onclick={() => { vm.toggleResponseFilter(); if (responseTab !== 'body') setResponseTab('body'); }} type="button">
+              <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M1.75 2.25h9.5L7.5 6.75v3.5l-2 1v-4.5L1.75 2.25z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          {/if}
           <button class="btn btn-icon" class:feedback-ok={copiedBody} aria-label={copiedBody ? 'Copied response' : 'Copy response'} onclick={copyResponseBody} type="button">
             {#if copiedBody}
               <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -318,7 +338,39 @@
           </div>
         </div>
       {:else}
-        {#if responseBodyIsPaged}
+        {#if vm.responseFilterOpen && canFilter}
+          <div class="response-filter-bar">
+            <div class="field field-md field-wrap field-mono response-filter-field" class:invalid={filterResult && !filterResult.ok}>
+              <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M1.75 2.25h9.5L7.5 6.75v3.5l-2 1v-4.5L1.75 2.25z" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/>
+              </svg>
+              <input
+                bind:this={responseFilterInput}
+                bind:value={vm.responseFilter}
+                oninput={() => (responseSearchIndex = 0)}
+                onkeydown={vm.onResponseFilterKeydown}
+                placeholder="$.items[*].id  or  .items[].id"
+                aria-label="Filter response with JSONPath"
+                aria-describedby="response-filter-status"
+                aria-invalid={filterResult && !filterResult.ok ? true : undefined}
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="none"
+                spellcheck={false}
+              />
+            </div>
+            <span id="response-filter-status" class="response-filter-status" class:error={filterResult && !filterResult.ok} role="status">{filterStatus}</span>
+            <button class="btn btn-ghost btn-icon btn-xs" type="button" aria-label="Close filter" onclick={() => vm.toggleResponseFilter()}>
+              <svg width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        {/if}
+        {#if filterResult?.ok && filterResult.matches.length === 0}
+          <div class="response-placeholder response-empty-state" role="status">
+            <span class="response-placeholder-text">Nothing matches this filter</span>
+          </div>
+        {:else}
+        {#if responseBodyIsPaged && !filterResult?.ok}
           <div class="response-page-bar">
             <span>Large response preview</span>
             <small>{responseBodyPageLabel}</small>
@@ -335,6 +387,7 @@
           virtualized={responseBodyVirtualized}
           page={responseBodyPage}
         />
+        {/if}
         {/if}
         </div>
 

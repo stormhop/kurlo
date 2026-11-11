@@ -5,7 +5,7 @@ description: Switch between staging, prod, and local without rewriting every req
 
 Variables in Kurlo use the `{{name}}` template syntax. They expand in URLs, headers, query params, request bodies, and auth fields just before send.
 
-Edit the environment name directly in the editor, or double-click its name in the sidebar. `F2` or **Rename** in the editor’s **•••** menu focuses the name field. Press `Enter` or click elsewhere to save; `Escape` cancels the edit.
+Edit the environment name directly in the editor, or double-click its name in the sidebar. `F2` or **Rename** in the editor’s **•••** menu focuses the name field. Press `Enter` or click elsewhere to apply the name; `Escape` cancels the edit. With [manual save](#manual-save-vs-autosave), the new name is saved with the environment's other edits. A name can be up to 100 characters; a long one is shortened with **…** in the sidebar, the environment picker and the Matrix.
 
 ![Environment editor with a base URL and masked secret token](../../../../assets/screenshots/environments-panel.png)
 
@@ -72,6 +72,7 @@ An environment opens on its own page with only its variables. With two or more e
 - Rename a variable in its row and it is renamed in every environment.
 - The lock marks a variable secret everywhere — masking it in one environment and showing it in another would leak it anyway. The eye shows the values while you look.
 - **+ Variable** adds a variable to every environment at once, empty; the bin removes it from all of them.
+- **×** in a cell removes the value from that environment only, and the cell goes back to *Not set* or to the inherited value. It shows only while another environment still sets the variable — to delete the last one, use the bin.
 - The Matrix shows the environment in use and up to four more. **Environments** above the table picks which ones to compare, with a search for long lists; **Show all** adds every environment and **Reset** goes back to the first five. Kurlo remembers the choice for each workspace.
 - The variable names stay on the left while you scroll across the columns.
 - Click an environment's name to open it on its own. **Single** switches back to one environment at a time; Kurlo remembers which view you used.
@@ -93,6 +94,12 @@ Open an environment and pick its parent under **Inherits from**. A variable the 
 - Postman has no inheritance, so **Export…** writes the environment with the inherited values included.
 
 The parent is saved as `parentId` in the environment's file.
+
+## Importing a .env file
+
+To copy variables from an existing `.env` file, open an environment and choose **Import .env** in its **•••** menu. The file picker shows hidden files, so `.env` and `.env.local` are listed; pick one from any folder.
+
+Each `KEY=value` line becomes a variable in the environment, and a variable that already exists takes the value from the file. `export` prefixes, `#` comments and quoted values are understood. The values are copied once: later edits to the file do not reach Kurlo, so import it again after changing it. Mark the imported tokens and passwords as **Secret** so they stay out of the workspace files.
 
 ## Switching environments
 
@@ -160,6 +167,8 @@ Globals are saved with your local data rather than in the Git-backed workspace Y
 Environment edits follow the same save mode as requests:
 
 - **Autosave on:** edits persist after a short debounce.
-- **Manual save:** edits mark the environment dirty and persist only when you save.
+- **Manual save:** renaming an environment, changing **Inherits from**, editing variables in either view and **Import .env** mark the environments unsaved. They reach the disk only when you click **Save** or press the save shortcut, and **Revert** puts back the saved version. Other actions that write the workspace, such as switching the environment in use or creating one, leave the unsaved edits alone.
+
+**Protect from AI agents**, **Sandbox for the agent** and **Delete** in the **•••** menu apply right away in both modes. Global variables follow the same rules, with their own **Save** and **Revert**.
 
 Script updates from `pm.environment.set(...)` are merged back into the active environment after a request or runner execution.

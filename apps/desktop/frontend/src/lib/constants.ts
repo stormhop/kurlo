@@ -25,6 +25,18 @@ export const DEFAULT_COLLECTION = 'Requests';
 export const MAX_WORKSPACES = 15;
 export const MAX_FOLDER_DEPTH = 4;
 export const MAX_FOLDER_REQUESTS = 50;
+export const NAME_MAX_LENGTH = 100;
+
+export function clampName(value: string): string {
+  const name = value.trim();
+  if (name.length <= NAME_MAX_LENGTH) return name;
+  return name.slice(0, NAME_MAX_LENGTH).replace(/[\uD800-\uDBFF]$/, '').trim();
+}
+
+export function shortName(name: string, max = 40): string {
+  if (name.length <= max) return name;
+  return `${name.slice(0, max - 1).replace(/[\uD800-\uDBFF]$/, '').trimEnd()}…`;
+}
 
 export const DEFAULT_REQUEST_SETTINGS: RequestSettings = {
   httpVersion: 'auto',

@@ -53,6 +53,8 @@ export function CheckForUpdate():Promise<model.UpdateCheckResult>;
 
 export function CheckWorkspaceYAML(arg1:string,arg2:string):Promise<api.WorkspaceYAMLCheckResult>;
 
+export function ChooseEnvFileToImport():Promise<api.EnvFileImportResult>;
+
 export function ClaudeCodeStatus(arg1:string):Promise<model.ClaudeStatus>;
 
 export function ClearAgentActivity():Promise<model.AgentResult>;

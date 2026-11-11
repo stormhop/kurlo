@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { NAME_MAX_LENGTH } from '../constants';
   import { onMount } from 'svelte';
-  import RequestSaveActions from './RequestSaveActions.svelte';
+  import SaveActions from './SaveActions.svelte';
   import VariableInput from './VariableInput.svelte';
   import { urlGhost, urlGhostCandidates } from '../ghostText';
   import AiModelPicker from './AiModelPicker.svelte';
@@ -245,6 +246,7 @@
     {/if}
     <input
       class="request-title-input"
+      maxlength={NAME_MAX_LENGTH}
       value={requestName}
       placeholder="New Request"
       spellcheck="false"
@@ -254,7 +256,7 @@
       onkeydown={onNameKeydown}
     />
     {#if showSave}
-      <RequestSaveActions {saveDirty} {canRevert} {onSave} {onRevert} />
+      <SaveActions {saveDirty} {canRevert} {onSave} {onRevert} />
     {/if}
   </div>
 

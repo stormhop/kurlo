@@ -1,8 +1,9 @@
 <script lang="ts">
+  import SaveActions from './SaveActions.svelte';
   import { useClock } from '../clock.svelte';
   const now = useClock();
   import { tabListKeyboard } from '../a11y';
-  import { AUTH_OPTIONS, COLLECTION_AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
+  import { AUTH_OPTIONS, COLLECTION_AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS, NAME_MAX_LENGTH, shortName } from '../constants';
   import { HEADER_PICKER_NAMES, getHeaderValues } from '../headers';
   import { collectionSettingsFingerprint, emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsFingerprint, folderDefaultsFor, inheritedAuthSource, normalizeCollectionDefaults } from '../collectionDefaults';
   import { activeCount, cloneRowsForStore, guardTrailing, removeRow, restoreRows, scriptLineCount } from '../utils';
@@ -141,7 +142,7 @@
   let savingInFlight = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const saved = $derived(saveState === 'saved');
+  const draftDirty = $derived(Boolean(collection) && draftFingerprint() !== loadedFingerprint);
 
   $effect(() => {
     if (!collection) return;
@@ -481,12 +482,13 @@
     <div class="collection-workspace-head">
       <div class="overview-title">
         {#if isFolder}
-          <h1>{folderName}</h1>
-          <p>Folder in {[collection.name, ...folderPath.slice(0, -1)].join(' / ')} · {folderRequestCount} request{folderRequestCount === 1 ? '' : 's'} · applies to every request inside, subfolders included</p>
+          <h1 class="overview-folder-name">{folderName}</h1>
+          <p class="overview-folder-path">Folder in {[collection.name, ...folderPath.slice(0, -1)].map(segment => shortName(segment)).join(' / ')} · {folderRequestCount} request{folderRequestCount === 1 ? '' : 's'} · applies to every request inside, subfolders included</p>
         {:else}
           {#if renaming}
             <input
               class="field overview-name-input"
+              maxlength={NAME_MAX_LENGTH}
               bind:this={nameInput}
               bind:value={nameDraft}
               onkeydown={onNameKeydown}
@@ -524,7 +526,7 @@
         {/if}
         <button class="btn btn-secondary" type="button" onclick={() => (isFolder ? onCreateRequestInFolder(collection.id, folderPath) : onCreateRequest(collection.id))} disabled={workspaceBlocked}><AddCloseIcon add /> New request</button>
         {#if !autosave}
-          <button class="btn btn-primary" class:feedback-ok={saved} type="button" onclick={save} disabled={workspaceBlocked}>{saved ? 'Saved' : 'Save'}</button>
+          <SaveActions saveDirty={draftDirty} canRevert={draftDirty} disabled={workspaceBlocked || savingInFlight} onSave={() => void save()} onRevert={() => { if (collection) loadCollection(collection); }} />
         {/if}
         <div class="env-more" bind:this={moreMenuRoot} onfocusout={closeMoreMenuOnFocusOut}>
           <button class="btn btn-ghost btn-icon env-more-btn" bind:this={moreMenuButton} type="button" aria-label={isFolder ? 'More folder actions' : 'More collection actions'} aria-haspopup="menu" aria-expanded={moreMenuOpen} onclick={() => (moreMenuOpen = !moreMenuOpen)} disabled={workspaceBlocked}>•••</button>

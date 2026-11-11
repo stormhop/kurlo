@@ -1,3 +1,4 @@
+import { NAME_MAX_LENGTH, clampName } from '../../constants';
 import type { AppDialogState, DialogOption } from '../../types/dialog';
 
 type DialogHost = {
@@ -19,13 +20,17 @@ function selectedEnabledOption(options: DialogOption[] | undefined, value: strin
 }
 
 export const dialogFeature = {
-  openPromptDialog(this: DialogHost, title: string, initialValue = '', message = '', placeholder = 'Name', confirmLabel = 'Save') {
+  openPromptDialog(this: DialogHost, title: string, initialValue = '', message = '', placeholder = 'Name', confirmLabel = 'Save', maxLength?: number) {
     this.closeFloatingMenus();
     this.dialogSelectOpen = false;
     this.dialogInputValue = initialValue;
     return new Promise<string | null>((resolve) => {
-      this.appDialog = { mode: 'prompt', title, message, confirmLabel, cancelLabel: 'Cancel', danger: false, placeholder, resolve: (value) => resolve(typeof value === 'string' ? value : null) };
+      this.appDialog = { mode: 'prompt', title, message, confirmLabel, cancelLabel: 'Cancel', danger: false, placeholder, maxLength, resolve: (value) => resolve(typeof value === 'string' ? value : null) };
     });
+  },
+  async openNameDialog(this: DialogHost, title: string, initialValue = '', message = '') {
+    const name = await dialogFeature.openPromptDialog.call(this, title, clampName(initialValue), message, 'Name', 'Save', NAME_MAX_LENGTH);
+    return name === null ? null : clampName(name);
   },
   openConfirmDialog(this: DialogHost, title: string, message: string, confirmLabel = 'Delete') {
     this.closeFloatingMenus();

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SaveActions from './SaveActions.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import type { KVRow } from '../types/models';
 
@@ -10,6 +11,7 @@
     removeRow,
     clearAll,
     save,
+    discard = () => {},
   }: {
     rows: KVRow[];
     autosave: boolean;
@@ -18,6 +20,7 @@
     removeRow: (index: number) => void;
     clearAll: () => void;
     save: () => void;
+    discard?: () => void;
   } = $props();
 
   let filled = $derived(rows.filter(row => row.key.trim() !== '').length);
@@ -38,7 +41,7 @@
     <div class="globals-actions">
       {#if saveLabel}<span class="globals-save-state" class:dirty={saveState === 'dirty'}>{saveLabel}</span>{/if}
       {#if !autosave}
-        <button class="btn btn-primary" type="button" onclick={save} disabled={saveState === 'saving'}>Save</button>
+        <SaveActions saveDirty={saveState === 'dirty'} canRevert={saveState === 'dirty'} disabled={saveState === 'saving'} onSave={save} onRevert={discard} />
       {/if}
       <button class="btn btn-ghost" type="button" onclick={clearAll} disabled={!filled}>Clear all</button>
     </div>

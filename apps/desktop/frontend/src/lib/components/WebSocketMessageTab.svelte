@@ -1,6 +1,7 @@
 <script lang="ts">
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
+  import SavedMessagesMenu from './SavedMessagesMenu.svelte';
   import { RAW_BODY_TYPES } from '../constants';
   import { vm } from '../stores/app.svelte';
   import type { RawBodyType } from '../types/models';
@@ -56,6 +57,7 @@
       <BeautifyButton onbeautify={() => editorRef?.format()} beautified={vm.beautifiedBody} disabled={vm.bodyLang !== 'json'} title="Beautify message" />
 
       <div class="ws-message-actions">
+        <SavedMessagesMenu connected={vm.webSocketConnected} />
         <button class="btn btn-secondary btn-sm toolbar-btn ws-toolbar-btn" type="button" disabled={!vm.webSocketConnected} onclick={() => vm.webSocketSendControl('ping')}>
           Ping
         </button>

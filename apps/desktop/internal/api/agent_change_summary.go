@@ -29,7 +29,7 @@ var agentChangeLabels = map[string]string{
 	"preRequestScriptJs": "Pre-request script", "preRequestScript": "Pre-request script", "requestNotes": "Docs",
 	"docs": "Docs", "description": "Description", "settings": "Settings", "settingsOverrides": "Settings",
 	"examples": "Examples", "values": "Variables", "protected": "Protected", "sandbox": "Sandbox for the agent",
-	"parentId": "Parent environment", "defaults": "Defaults", "folders": "Folders", "variables": "Variables",
+	"parentId": "Parent environment", "savedMessages": "Saved messages", "defaults": "Defaults", "folders": "Folders", "variables": "Variables",
 	"response": "Response", "status": "Status", "statusCode": "Status", "body": "Body",
 }
 

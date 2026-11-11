@@ -23,8 +23,12 @@ See [Collection defaults](/docs/guides/collection-defaults/) and [Per-request se
 
 Under **Editing**, the **Saving** row switches between two modes:
 
-- **Autosave** saves request and collection edits automatically.
-- **Manual save** keeps edits dirty until you click **Save** or use the save shortcut. A dot on the request tab marks unsaved work.
+- **Autosave** saves edits automatically.
+- **Manual save** keeps edits unsaved until you click **Save** or use the save shortcut. A dot on the request tab marks unsaved work.
+
+The mode covers every editor that has a **Save** button: requests, collection and folder settings, load tests, environments (name, **Inherits from** and variables), global variables and the workspace README. With manual save, nothing you type in them reaches the disk until you save, even when another action — switching the environment in use, creating an environment, renaming a collection — writes the workspace. Every one of them has the same two buttons in its header: the round arrow (**Revert**) throws the unsaved edits away, and **Save** turns into a dimmed **Saved** once there is nothing left to save. Quitting asks what to do with unsaved edits.
+
+Some things are saved right away in both modes, because they are actions rather than edits: creating, renaming from the sidebar, moving and deleting collections, folders and workspaces; **Protect from AI agents** and **Sandbox for the agent**; the environment in use; history, cookies and run results; and values that scripts write with `pm.environment.set(...)`, `pm.globals.set(...)` and similar calls. A value a script writes is saved on its own, without the unsaved edits next to it.
 
 In manual-save mode, an all-data export contains the last saved version of each request, not unsaved editor changes. Kurlo warns you before exporting when dirty requests exist.
 
@@ -96,7 +100,7 @@ The AI page has three groups. **Your agents** connects an installed Codex CLI us
 
 The AI tab keeps the models that Kurlo's own AI features use. AI requests are separate: each one keeps its own base URL and key, so it can point at any provider or gateway you are testing.
 
-![AI settings with Codex, a saved Anthropic connection and the three ways to add another](../../../../assets/screenshots/settings-ai.png)
+![AI settings with Claude Code signed in, a saved Anthropic connection and the three ways to add another](../../../../assets/screenshots/settings-ai.png)
 
 There are three ways to connect a model:
 

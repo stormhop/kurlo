@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SaveActions from './SaveActions.svelte';
+  import { NAME_MAX_LENGTH } from '../constants';
   import { useClock } from '../clock.svelte';
   const now = useClock();
   import { tick } from 'svelte';
@@ -23,6 +25,10 @@
     shortcutCombo,
     appRuntime = '',
     updateWorkspaceDescription,
+    autosave = true,
+    readmeDraft = undefined,
+    saveReadme = async () => true,
+    discardReadme = () => {},
     setWorkspaceName,
     createWorkspace,
     openSettings,
@@ -46,6 +52,10 @@
     shortcutCombo: (id: 'new-request' | 'search' | 'shortcut-help') => string;
     appRuntime?: string;
     updateWorkspaceDescription: (value: string) => void;
+    autosave?: boolean;
+    readmeDraft?: string;
+    saveReadme?: () => Promise<boolean>;
+    discardReadme?: () => void;
     setWorkspaceName: (name: string) => void;
     createWorkspace: () => void;
     openSettings: (tab?: SettingsTab) => void;
@@ -153,7 +163,8 @@
   }
 
 
-  let readme = $derived(activeWorkspace?.description ?? '');
+  let readme = $derived(readmeDraft ?? activeWorkspace?.description ?? '');
+  let readmeDirty = $derived(!autosave && readmeDraft !== undefined);
   let readmeIssue = $derived(activeWorkspace?.readmeIssue ?? '');
   let readmeTooLarge = $derived(markdownTooLongToPreview(readme));
   let editingReadme = $state(false);
@@ -178,8 +189,17 @@
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      editingReadme = false;
+      if (!readmeDirty) editingReadme = false;
     }
+  }
+
+  async function finishReadme() {
+    if (await saveReadme()) editingReadme = false;
+  }
+
+  function cancelReadme() {
+    discardReadme();
+    editingReadme = false;
   }
 
   function inputValue(event: Event): string {
@@ -194,6 +214,7 @@
       {#if renaming}
         <input
           class="field overview-name-input"
+          maxlength={NAME_MAX_LENGTH}
           bind:this={nameInput}
           bind:value={nameDraft}
           onkeydown={onNameKeydown}
@@ -314,8 +335,18 @@
           <h2 id="overview-readme-title">README</h2>
           {#if readmeIssue}
             <span class="overview-readme-readonly">Read-only</span>
+          {:else if editingReadme && !autosave}
+            <div class="overview-readme-actions">
+              <button class="btn btn-secondary btn-sm" type="button" onclick={() => (editingReadme = false)}>Done</button>
+              <SaveActions saveDirty={readmeDirty} canRevert={readmeDirty} disabled={workspaceBlocked} onSave={() => void finishReadme()} onRevert={cancelReadme} />
+            </div>
           {:else if editingReadme}
             <button class="btn btn-secondary btn-sm" type="button" onclick={() => (editingReadme = false)}>Done</button>
+          {:else if readmeDirty}
+            <div class="overview-readme-actions">
+              <button class="btn btn-ghost btn-sm" type="button" onclick={editReadme} disabled={workspaceBlocked}><MenuIcon name="rename" />Edit</button>
+              <SaveActions saveDirty={readmeDirty} canRevert={readmeDirty} disabled={workspaceBlocked} onSave={() => void saveReadme()} onRevert={cancelReadme} />
+            </div>
           {:else if readme.trim()}
             <button class="btn btn-ghost btn-sm" type="button" onclick={editReadme} disabled={workspaceBlocked}><MenuIcon name="rename" />Edit</button>
           {/if}

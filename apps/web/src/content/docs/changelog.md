@@ -14,6 +14,9 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **Filter JSON responses** with JSONPath or a jq-style path. See [Filtering a JSON response](/docs/guides/response-viewer/#filtering-a-json-response).
+- **Saved WebSocket and Socket.IO messages**, kept with the request. See [Saved messages](/docs/guides/request-types/#saved-messages).
+- **Fable 5.2** in the Claude Code model menu. See [Agent](/docs/guides/agent/).
 - Ten new themes: GitHub Light, GitHub Dark Dimmed, JetBrains Light, JetBrains Dark, One Dark, Tokyo Night, Everforest, Flexoki Paper, High Contrast Light and High Contrast Dark.
 
 ### Removed
@@ -22,6 +25,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Changed
 
+- Environments, the Matrix, global variables, collection and folder settings and the workspace README use the same **Revert** and **Save** buttons as a request. See [Settings](/docs/guides/settings/).
 - A cookie's **Expires** uses Kurlo's own date and time picker on every platform, in the app's theme, with quick choices such as **In 1 hour** and **In 7 days**, instead of the operating system's calendar.
 - Environments open one at a time by default; the **Matrix** view stays one click away and is remembered once chosen. The Matrix shows the environment in use and up to four more, with an **Environments** picker to choose the columns, keeps variable names on the left while scrolling sideways, and sits its scroll bar right under the table.
 - Cookies open as a sidebar section like environments instead of a window over the app. The sidebar lists **Browser sync** and the jar's domains, each domain gets a page with a summary, and deleting a domain or clearing the jar moves into the page's **•••** menu.
@@ -37,6 +41,15 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- A connected Claude Code CLI that signed out shows **Signed out** and a **Sign in** button in Settings → AI.
+- Typing into a **Not set** cell of the environment **Matrix** keeps every character instead of only the first one.
+- The **Default location** field in Settings lines up with its buttons, and an environment's **Unsaved changes** note stays on one line.
+- The environment **Matrix** scrolls through hundreds of variables and dozens of environments without flashing empty areas.
+- In the **Matrix**, **×** no longer deletes a variable set in only one environment; the bin deletes it and asks first. See [Comparing environments](/docs/guides/environments/#comparing-environments).
+- Names are limited to 100 characters when you type them, and a long name is cut short with **…** instead of stretching the window. Before, a long environment name pushed the top bar and editor off screen. See [Environments](/docs/guides/environments/).
+- Manual save covers environments, global variables and the workspace README: renames, **Inherits from** and README edits wait for **Save**, and other changes no longer save them in passing. See [Saving](/docs/guides/settings/#saving).
+- **Import .env** shows hidden files in its file picker, so `.env` files can be picked. See [Importing a .env file](/docs/guides/environments/#importing-a-env-file).
+- The YAML schema published at kurlo.dev describes load test files and environments pinned to a collection.
 - The cookie editor no longer shows the internal `{{kurloSecret:…}}` reference for a cookie whose value lives on another computer, in the **Fields** editor, in **Raw** or after switching between them; the value is empty and saving without a value keeps the reference.
 - The **Protected** and **Sandbox** marks on an environment sit right after its name instead of halfway across the header.
 - Agent chat messages scroll all the way to the message box instead of stopping in a strip above it.

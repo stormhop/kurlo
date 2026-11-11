@@ -296,6 +296,15 @@ export async function openDirectoryDialog(title: string, defaultDirectory = ''):
   return (await app?.OpenDirectoryDialog?.(title)) ?? '';
 }
 
+export type EnvFileImportResult = { path: string; values: Array<{ key: string; value: string }>; error: string };
+
+export async function chooseEnvFileToImport(): Promise<EnvFileImportResult> {
+  const app = window.go?.api?.App;
+  if (!app?.ChooseEnvFileToImport) return { path: '', values: [], error: 'Importing a .env file needs the desktop app.' };
+  const result = await app.ChooseEnvFileToImport();
+  return { path: result?.path ?? '', values: result?.values ?? [], error: result?.error ?? '' };
+}
+
 export async function readTextFile(path: string): Promise<string> {
   return (await window.go?.api?.App?.ReadTextFile?.(path)) ?? '';
 }

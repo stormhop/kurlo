@@ -1,4 +1,4 @@
-import { DEFAULT_COLLECTION, MAX_WORKSPACES } from '../../constants';
+import { DEFAULT_COLLECTION, MAX_WORKSPACES, clampName } from '../../constants';
 import { makeCollection, makeWorkspace } from '../../normalizers';
 import type { Collection, Environment, PersistRequestStore, RequestHistoryEntry, SavedRequest, Workspace } from '../../types/models';
 import type { CookieJarEntry } from '../../backend';
@@ -15,11 +15,23 @@ type WorkspaceHost = {
   requestsById: Map<string, SavedRequest>;
   topView: string;
   workspaceMenuOpen: boolean;
+  autosave: boolean;
+  workspaceReadmeDrafts: Record<string, string>;
+  hasUnsavedEnvironmentChanges: () => boolean;
+  hasUnsavedGlobalsChanges: () => boolean;
+  saveEnvironment: () => Promise<boolean>;
+  saveGlobals: () => Promise<boolean>;
+  saveWorkspaceReadmes: () => Promise<boolean>;
+  discardEnvironmentChanges: () => Promise<void>;
+  discardGlobalsChanges: () => void;
+  discardWorkspaceReadmes: () => void;
+  openSaveChangesDialog: (name: string) => Promise<'save' | 'discard' | 'cancel'>;
   workspaces: Workspace[];
   workspaceCookies: Record<string, CookieJarEntry[]>;
   activeWorkspace: Workspace | undefined;
   defaultCollectionForWorkspace: (workspaceId?: string) => Collection | undefined;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
+  openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   guardWorkspaceWritable: (action?: string) => boolean;
@@ -104,7 +116,7 @@ export const workspaceFeature = {
       await this.openAlertDialog('Workspace limit', `You can create up to ${MAX_WORKSPACES} workspaces in this storage. Delete an old workspace before creating another one.`);
       return;
     }
-    const name = await this.openPromptDialog('New workspace', `Workspace ${this.workspaces.length + 1}`, 'Create a workspace for a separate set of collections.');
+    const name = await this.openNameDialog('New workspace', `Workspace ${this.workspaces.length + 1}`, 'Create a workspace for a separate set of collections.');
     if (!name) return;
     await this.persistActiveRequestNow();
     await this.captureActiveWorkspaceCookies();
@@ -119,11 +131,56 @@ export const workspaceFeature = {
   },
   updateWorkspaceDescription(this: WorkspaceHost, value: string) {
     if (!this.guardWorkspaceWritable('Workspace changes')) return;
-    this.workspaces = this.workspaces.map(workspace => workspace.id === this.activeWorkspaceId ? { ...workspace, description: value } : workspace);
+    const workspaceId = this.activeWorkspaceId;
+    if (!this.autosave) {
+      const { [workspaceId]: _previous, ...rest } = this.workspaceReadmeDrafts;
+      const saved = this.workspaces.find(workspace => workspace.id === workspaceId)?.description ?? '';
+      this.workspaceReadmeDrafts = value === saved ? rest : { ...rest, [workspaceId]: value };
+      return;
+    }
+    this.workspaces = this.workspaces.map(workspace => workspace.id === workspaceId ? { ...workspace, description: value } : workspace);
     this.scheduleWorkspacePersist();
   },
+  workspaceReadme(this: WorkspaceHost, workspaceId = this.activeWorkspaceId) {
+    return this.workspaceReadmeDrafts[workspaceId] ?? this.workspaces.find(workspace => workspace.id === workspaceId)?.description ?? '';
+  },
+  async saveWorkspaceReadmes(this: WorkspaceHost) {
+    const drafts = this.workspaceReadmeDrafts;
+    if (!Object.keys(drafts).length) return true;
+    if (!this.guardWorkspaceWritable('Saving')) return false;
+    const previous = this.workspaces;
+    this.workspaces = this.workspaces.map(workspace => workspace.id in drafts ? { ...workspace, description: drafts[workspace.id] } : workspace);
+    this.workspaceReadmeDrafts = {};
+    const ok = await this.persistRequestStore();
+    if (!ok) {
+      this.workspaces = previous;
+      this.workspaceReadmeDrafts = { ...drafts, ...this.workspaceReadmeDrafts };
+    }
+    return ok;
+  },
+  discardWorkspaceReadmes(this: WorkspaceHost) {
+    this.workspaceReadmeDrafts = {};
+  },
+  async reviewWorkspaceEditsBeforeQuit(this: WorkspaceHost) {
+    const pending: Array<{ name: string; dirty: () => boolean; save: () => Promise<boolean>; discard: () => unknown }> = [
+      { name: 'Environments', dirty: () => this.hasUnsavedEnvironmentChanges(), save: () => this.saveEnvironment(), discard: () => this.discardEnvironmentChanges() },
+      { name: 'Global variables', dirty: () => this.hasUnsavedGlobalsChanges(), save: () => this.saveGlobals(), discard: () => this.discardGlobalsChanges() },
+      { name: 'README', dirty: () => Object.keys(this.workspaceReadmeDrafts).length > 0, save: () => this.saveWorkspaceReadmes(), discard: () => this.discardWorkspaceReadmes() },
+    ];
+    for (const item of pending) {
+      if (!item.dirty()) continue;
+      const choice = await this.openSaveChangesDialog(item.name);
+      if (choice === 'cancel') return false;
+      if (choice === 'discard') await item.discard();
+      else if (!(await item.save())) return false;
+    }
+    return true;
+  },
+  hasUnsavedWorkspaceEdits(this: WorkspaceHost) {
+    return this.hasUnsavedEnvironmentChanges() || this.hasUnsavedGlobalsChanges() || Object.keys(this.workspaceReadmeDrafts).length > 0;
+  },
   async setWorkspaceName(this: WorkspaceHost, value: string) {
-    const name = value.trim();
+    const name = clampName(value);
     if (!name || !this.activeWorkspace || name === this.activeWorkspace.name) return;
     if (!this.guardWorkspaceWritable('Renaming workspaces')) return;
     this.workspaces = this.workspaces.map(workspace => workspace.id === this.activeWorkspaceId ? { ...workspace, name } : workspace);

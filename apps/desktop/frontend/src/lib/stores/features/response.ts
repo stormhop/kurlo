@@ -3,6 +3,7 @@ import { emptyHttpResponse } from '../../wire';
 import type { HttpResponse, ScriptResult } from '../../backend';
 import { countMatchesAsync, shouldVirtualizeResponseBody } from '../../response-render';
 import { diffResponseBodies, type ResponseDiff } from '../../responseDiff';
+import { applyJsonFilter, type JsonFilterResult } from '../../jsonFilter';
 import type { GrpcResponse, RequestExample, RequestType, ResponseTab } from '../../types/models';
 import { responseFromExample } from '../../examples';
 import { clamp, clipboardCopy, formatSize, prettyJson, prettyMarkup } from '../../utils';
@@ -15,6 +16,15 @@ const responseDisplayCache = new WeakMap<HttpResponse, {
   paged: boolean;
   value: string;
 }>();
+
+let lastFilter: { body: string; query: string; result: JsonFilterResult } | null = null;
+
+function cachedJsonFilter(body: string, query: string): JsonFilterResult {
+  if (lastFilter && lastFilter.body === body && lastFilter.query === query) return lastFilter.result;
+  const result = applyJsonFilter(body, query);
+  lastFilter = { body, query, result };
+  return result;
+}
 
 type ResponseHost = {
   _responseSearchCountKey: string;
@@ -31,6 +41,10 @@ type ResponseHost = {
   responseBodyPage: number;
   responseBodyPageCount: number;
   responseDisplayBody: string;
+  responseFilter: string;
+  responseFilterOpen: boolean;
+  responseFilterActive: boolean;
+  responseFilterResult: JsonFilterResult | null;
   responseRenderMode: 'json' | 'html' | 'text';
   responseSearch: string;
   responseSearchCounting: boolean;
@@ -82,8 +96,22 @@ export const responseFeature = {
     return host.testSummary(host.grpcResponse?.testResult);
   },
 
+  get responseFilterActive(): boolean {
+    const host = this as unknown as ResponseHost;
+    const response = host.response;
+    return Boolean(host.responseFilterOpen && host.responseFilter.trim() && response?.body && !response.bodyIsBinary && host.isJsonResponse(response));
+  },
+
+  get responseFilterResult(): JsonFilterResult | null {
+    const host = this as unknown as ResponseHost;
+    if (!host.responseFilterActive || !host.response) return null;
+    return cachedJsonFilter(host.response.body, host.responseFilter.trim());
+  },
+
   get responseDisplayBody(): string {
     const host = this as unknown as ResponseHost;
+    const filtered = host.responseFilterResult;
+    if (filtered?.ok) return filtered.text;
     return host.formatResponseBody(host.response);
   },
 
@@ -114,6 +142,7 @@ export const responseFeature = {
 
   get responseRenderMode(): 'json' | 'html' | 'text' {
     const host = this as unknown as ResponseHost;
+    if (host.responseFilterResult?.ok) return 'json';
     if (host.responseBodyIsPaged) return 'text';
     if (host.isJsonResponse()) return 'json';
     if (host.isHtmlResponse()) return 'html';
@@ -272,6 +301,19 @@ export const responseFeature = {
     this.responseSearchOpen = !this.responseSearchOpen;
   },
 
+  toggleResponseFilter(this: ResponseHost) {
+    this.responseFilterOpen = !this.responseFilterOpen;
+    this.responseSearchIndex = 0;
+  },
+
+  onResponseFilterKeydown(this: ResponseHost, e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this.responseFilterOpen = false;
+      this.responseSearchIndex = 0;
+    }
+  },
+
   scheduleResponseSearchCount(this: ResponseHost) {
     const query = this.responseSearch.trim();
     const key = [
@@ -280,6 +322,7 @@ export const responseFeature = {
       this.response?.duration ?? 0,
       this.responseBodyPage,
       this.responseRenderMode,
+      this.responseFilterActive ? this.responseFilter.trim() : '',
       query,
     ].join('|');
     const source = query && this.response ? this.responseDisplayBody : '';
@@ -361,7 +404,8 @@ export const responseFeature = {
 
   async copyResponseBody(this: ResponseHost) {
     if (!this.response) return;
-    await clipboardCopy(this.response.error || this.response.body);
+    const filtered = this.responseFilterResult;
+    await clipboardCopy(this.response.error || (filtered?.ok ? filtered.text : this.response.body));
     this.copiedBody = true;
     setTimeout(() => (this.copiedBody = false), 2000);
   },
@@ -431,6 +475,8 @@ export const responseFeature = {
     };
     this.requestError = '';
     this.responseSearchOpen = false;
+    this.responseFilterOpen = false;
+    this.responseFilter = '';
     this.responseSearch = '';
     this.responseSearchIndex = 0;
     this.responseBodyPage = 0;

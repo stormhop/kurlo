@@ -356,3 +356,54 @@ func TestSanitizeRequestsForFilesystemKeepsOAuth1SecretsOutOfTheYAML(t *testing.
 		t.Fatalf("fields of another auth type must be stripped: %#v", auth)
 	}
 }
+
+func TestStripRequestForFilesystemKeepsSavedMessagesForRealtimeRequests(t *testing.T) {
+	ws := map[string]any{
+		"requestType": "ws",
+		"savedMessages": []any{
+			map[string]any{"id": "msg-1", "name": "Subscribe", "content": `{"op":"sub"}`, "bodyType": "json", "event": "stray", "args": []any{}, "ack": true},
+			map[string]any{"id": "msg-2", "name": "Ping text", "content": "ping", "bodyType": "text"},
+		},
+	}
+	stripRequestForFilesystem(ws)
+	got, _ := ws["savedMessages"].([]any)
+	if len(got) != 2 {
+		t.Fatalf("ws savedMessages = %#v", ws["savedMessages"])
+	}
+	first := got[0].(map[string]any)
+	if first["name"] != "Subscribe" || first["content"] != `{"op":"sub"}` || first["bodyType"] != "json" {
+		t.Fatalf("first ws message = %#v", first)
+	}
+	assertMapMissingKeys(t, first, []string{"id", "event", "args", "ack"})
+	assertMapMissingKeys(t, got[1].(map[string]any), []string{"id", "bodyType"})
+
+	sio := map[string]any{
+		"requestType": "socketio",
+		"savedMessages": []any{
+			map[string]any{"id": "msg-1", "name": "Join", "event": "join", "content": "stray", "bodyType": "json", "ack": false, "args": []any{
+				map[string]any{"id": "1", "content": `{"room":"a"}`, "bodyType": "json", "encoding": "base64"},
+			}},
+		},
+	}
+	stripRequestForFilesystem(sio)
+	join := sio["savedMessages"].([]any)[0].(map[string]any)
+	if join["event"] != "join" || join["name"] != "Join" {
+		t.Fatalf("socket.io message = %#v", join)
+	}
+	assertMapMissingKeys(t, join, []string{"id", "content", "bodyType", "ack"})
+	arg := join["args"].([]any)[0].(map[string]any)
+	assertMapMissingKeys(t, arg, []string{"id"})
+	if arg["content"] != `{"room":"a"}` {
+		t.Fatalf("socket.io arg = %#v", arg)
+	}
+
+	for _, requestType := range []string{"http", "graphql", "grpc", "mcp", "ai"} {
+		request := map[string]any{"requestType": requestType, "savedMessages": []any{map[string]any{"name": "x", "content": "y"}}}
+		stripRequestForFilesystem(request)
+		assertMapMissingKeys(t, request, []string{"savedMessages"})
+	}
+
+	empty := map[string]any{"requestType": "ws", "savedMessages": []any{}}
+	stripRequestForFilesystem(empty)
+	assertMapMissingKeys(t, empty, []string{"savedMessages"})
+}

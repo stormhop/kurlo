@@ -70,6 +70,7 @@ describe('environment manual-save scheduling', () => {
     const persistRequestStore = vi.fn().mockResolvedValue(true);
     const host = {
       autosave: false,
+      environmentBaselines: new Map([['dev', { id: 'dev', workspaceId: 'ws', name: 'Dev', values: [] }]]),
       environmentPersistTimer: setTimeout(() => undefined, 1000),
       environmentSavedTimer: setTimeout(() => undefined, 1000),
       environmentSaveState: 'idle',

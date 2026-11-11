@@ -22,6 +22,7 @@ const claudeDefaultEffort = "high"
 const claudeFallbackModel = "claude-opus-5-5"
 
 var claudeModels = []model.AiConnectionModel{
+	{ID: "claude-fable-5-2", Name: "Fable 5.2", Efforts: claudeEfforts, DefaultEffort: claudeDefaultEffort},
 	{ID: "claude-fable-5-1", Name: "Fable 5.1", Efforts: claudeEfforts, DefaultEffort: claudeDefaultEffort},
 	{ID: "claude-opus-5-5", Name: "Opus 5.5", Efforts: claudeEfforts, DefaultEffort: claudeDefaultEffort},
 	{ID: "claude-sonnet-5-5", Name: "Sonnet 5.5", Efforts: claudeEfforts, DefaultEffort: claudeDefaultEffort},

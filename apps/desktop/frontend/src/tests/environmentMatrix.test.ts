@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  matrixRowWindow,
   addMatrixKey,
   buildEnvironmentMatrix,
   matrixKeyProblem,
@@ -87,5 +88,31 @@ describe('matrixKeyProblem', () => {
     expect(matrixKeyProblem(['baseUrl'], 'baseUrl')).not.toBe('');
     expect(matrixKeyProblem(['baseUrl'], 'baseUrl', 'baseUrl')).toBe('');
     expect(matrixKeyProblem(['baseUrl'], 'token')).toBe('');
+  });
+});
+
+describe('matrixRowWindow', () => {
+  it('renders only the rows in view plus a margin and keeps the full height', () => {
+    const window = matrixRowWindow(175, 3800, 600, 38, 8);
+    expect(window.start).toBe(92);
+    expect(window.end).toBe(124);
+    expect(window.before + (window.end - window.start) * 38 + window.after).toBe(175 * 38);
+  });
+
+  it('renders everything when the list fits', () => {
+    expect(matrixRowWindow(4, 0, 600, 38, 8)).toEqual({ start: 0, end: 4, before: 0, after: 0 });
+  });
+
+  it('keeps the focused row rendered after it scrolls away', () => {
+    const window = matrixRowWindow(175, 6000, 600, 38, 8, 3);
+    expect(window.start).toBe(3);
+    expect(window.end).toBeGreaterThan(150);
+  });
+
+  it('stays inside the list when scrolled past the end', () => {
+    const window = matrixRowWindow(10, 99999, 600, 38, 8);
+    expect(window.start).toBeGreaterThanOrEqual(0);
+    expect(window.end).toBe(10);
+    expect(window.end).toBeGreaterThan(window.start);
   });
 });

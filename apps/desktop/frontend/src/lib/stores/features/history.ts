@@ -28,6 +28,7 @@ type HistoryHost = {
   workspaceIdForCollection: (collectionId: string) => string;
   applySavedRequest: (request: SavedRequest) => void;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
+  openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   guardWorkspaceWritable: (action?: string) => boolean;
   activeCollectionId: () => string;
@@ -296,7 +297,7 @@ export const historyFeature = {
     if (!this.guardWorkspaceWritable('Saving history')) return;
     const entry = this.requestHistory.find(candidate => candidate.id === historyId);
     if (!entry) return;
-    const name = await this.openPromptDialog('New collection', 'History', 'Create a collection for this history request.');
+    const name = await this.openNameDialog('New collection', 'History', 'Create a collection for this history request.');
     if (!name) return;
     const workspaceId = this.activeWorkspaceId || this.workspaces[0]?.id;
     if (!workspaceId) return;

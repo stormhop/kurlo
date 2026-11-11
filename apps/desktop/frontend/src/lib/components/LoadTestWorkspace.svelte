@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NAME_MAX_LENGTH } from '../constants';
   import { tabListKeyboard } from '../a11y';
   import { loadTestFingerprint, normalizeLoadTest } from '../loadTests';
   import { executorDurationMs, executorModel, executorPeak, formatDuration } from '../loadPresets';
@@ -12,7 +13,7 @@
   import LoadFlowEditor from './LoadFlowEditor.svelte';
   import LoadProfileEditor from './LoadProfileEditor.svelte';
   import Select from './Select.svelte';
-  import RequestSaveActions from './RequestSaveActions.svelte';
+  import SaveActions from './SaveActions.svelte';
   import LoadValidationMessages from './LoadValidationMessages.svelte';
 
   const AUTOSAVE_DEBOUNCE_MS = 1200;
@@ -248,6 +249,7 @@
           <div class="request-meta loadtest-meta">
             <input
               class="request-title-input"
+              maxlength={NAME_MAX_LENGTH}
               value={draft.name}
               aria-label="Load test name"
               aria-invalid={nameProblems.length > 0}
@@ -260,9 +262,9 @@
             />
             {#if isDraft}
               <span class="loadtest-draft-note">Unsaved draft</span>
-              <RequestSaveActions saveDirty={true} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
+              <SaveActions saveDirty={true} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
             {:else if !autosave}
-              <RequestSaveActions saveDirty={dirty} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
+              <SaveActions saveDirty={dirty} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
             {:else}
               <span class="loadtest-save-status">{saveState === 'saving' ? 'Saving changes…' : 'Saved'}</span>
             {/if}

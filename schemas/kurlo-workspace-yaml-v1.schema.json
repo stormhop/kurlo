@@ -148,6 +148,24 @@
         "encoding": { "type": "string", "enum": ["base64", "hex"] }
       }
     },
+    "savedMessage": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "name": { "type": "string", "description": "Name shown in the Saved menu." },
+        "content": { "type": "string", "description": "WebSocket message text." },
+        "bodyType": { "type": "string", "enum": ["text", "json", "html", "xml", "binary"], "description": "WebSocket message type. Defaults to text." },
+        "event": { "type": "string", "description": "Socket.IO event name." },
+        "args": {
+          "type": "array",
+          "description": "Socket.IO event arguments.",
+          "items": { "$ref": "#/definitions/sioArg" }
+        },
+        "ack": { "type": "boolean", "description": "Socket.IO: wait for an acknowledgement." }
+      }
+    },
     "workspace": {
       "type": "object",
       "additionalProperties": true,
@@ -273,6 +291,11 @@
           "items": { "$ref": "#/definitions/sioArg" }
         },
         "sioAck": { "type": "boolean" },
+        "savedMessages": {
+          "type": "array",
+          "description": "WebSocket and Socket.IO messages saved with the request.",
+          "items": { "$ref": "#/definitions/savedMessage" }
+        },
         "grpcMethod": { "type": "string" },
         "grpcMetadata": {
           "type": "array",

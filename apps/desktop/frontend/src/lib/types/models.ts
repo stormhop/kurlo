@@ -18,6 +18,16 @@ export type SIOArg = {
   encoding: SIOArgEncoding;
 };
 
+export type SavedRealtimeMessage = {
+  id: string;
+  name: string;
+  content?: string;
+  bodyType?: RawBodyType | 'binary';
+  event?: string;
+  args?: SIOArg[];
+  ack?: boolean;
+};
+
 export type SocketIOHandshake = {
   url: string;
   method: string;
@@ -276,6 +286,7 @@ export type SavedRequest = {
   sioEventName?: string;
   sioArgs?: SIOArg[];
   sioAck?: boolean;
+  savedMessages?: SavedRealtimeMessage[];
   grpcMethod?: string;
   grpcMetadata?: KVRow[];
   grpcUseReflection?: boolean;

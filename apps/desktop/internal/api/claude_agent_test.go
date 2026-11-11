@@ -72,7 +72,7 @@ printf '%s\n' '{"type":"system","subtype":"init","session_id":"claude-session","
 		t.Fatalf("unconnected Claude Code should be rejected, got %+v", blocked)
 	}
 	status := app.ClaudeCodeStatus("")
-	if !status.Installed || !status.Authenticated || status.Connected || status.Account != "dev@example.com · pro" || status.AuthMethod != "subscription" || status.Version != "2.1.0 (Claude Code)" || status.Model != "claude-sonnet-5-5" || status.DefaultModel != "claude-sonnet-5-5" || len(status.Models) != 4 || len(status.RateLimits) != 1 {
+	if !status.Installed || !status.Authenticated || status.Connected || status.Account != "dev@example.com · pro" || status.AuthMethod != "subscription" || status.Version != "2.1.0 (Claude Code)" || status.Model != "claude-sonnet-5-5" || status.DefaultModel != "claude-sonnet-5-5" || len(status.Models) != 5 || status.Models[0].ID != "claude-fable-5-2" || status.Models[0].Name != "Fable 5.2" || len(status.RateLimits) != 1 {
 		t.Fatalf("unexpected status before connect: %+v", status)
 	}
 	usageLimits := status.RateLimits[0]

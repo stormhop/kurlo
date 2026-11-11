@@ -109,3 +109,19 @@ export function matrixKeyProblem(existing: string[], key: string, current = ''):
   if (trimmed !== current && existing.includes(trimmed)) return `There is already a variable called ${trimmed}.`;
   return '';
 }
+
+export type MatrixWindow = { start: number; end: number; before: number; after: number };
+
+export function matrixRowWindow(count: number, scrollTop: number, viewportHeight: number, rowHeight: number, overscan: number, keepIndex = -1): MatrixWindow {
+  if (count <= 0 || rowHeight <= 0) return { start: 0, end: count, before: 0, after: 0 };
+  const top = Math.max(0, scrollTop);
+  let start = Math.max(0, Math.floor(top / rowHeight) - overscan);
+  let end = Math.min(count, Math.ceil((top + Math.max(viewportHeight, rowHeight)) / rowHeight) + overscan);
+  if (start >= count) start = Math.max(0, count - overscan);
+  if (end <= start) end = Math.min(count, start + 1);
+  if (keepIndex >= 0 && keepIndex < count) {
+    start = Math.min(start, keepIndex);
+    end = Math.max(end, keepIndex + 1);
+  }
+  return { start, end, before: start * rowHeight, after: (count - end) * rowHeight };
+}

@@ -154,7 +154,8 @@ Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json
 - Preview tab for HTML, images and PDFs; binary bodies are detected rather than rendered as mojibake
 - Diff against the previous response or a saved example
 - Timeline with connection details and the request as it went on the wire, secrets masked, one block per redirect hop
-- Realtime panels for SSE, WebSocket, Socket.IO, and gRPC responses
+- Realtime panels for SSE, WebSocket, Socket.IO, and gRPC responses, with saved WebSocket and Socket.IO messages kept in the request
+- Filter JSON responses with JSONPath or jq-style paths such as `.items[].id`
 
 **Code generation** — copy the current request as a runnable snippet in one of 14 targets: cURL, HTTPie, JavaScript `fetch`, Node.js `fetch`, Axios, Python `requests`, Go `net/http`, Java OkHttp, C# `HttpClient`, PHP cURL, Ruby `Net::HTTP`, Swift `URLSession`, Kotlin OkHttp, and Rust `reqwest`. Secret variables stay as `{{name}}` placeholders.
 

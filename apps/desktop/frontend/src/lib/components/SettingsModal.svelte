@@ -810,7 +810,7 @@
                     <span class="settings-row-desc">New folder workspaces and exported collections go here.</span>
                   </div>
                   <div class="settings-row-block default-location-row">
-                    <input class="field"
+                    <input class="field field-md"
                       id="settings-default-location"
                       value={defaultWorkspaceLocationDraft}
                       spellcheck="false"

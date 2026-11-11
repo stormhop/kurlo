@@ -37,7 +37,7 @@ import type {
   Workspace, Collection, Environment,
    RequestSettingsOverrides, ProxyConfig, SavedRequest, RequestHistoryEntry, RequestStore, ScriptEngine,
   CollectionGroup, HistoryDayGroup,
-  CollectionRunnerResult, RenderedSnippetLine, RequestType, SIOArg, GrpcResponse, GrpcServiceDefinition,
+  CollectionRunnerResult, RenderedSnippetLine, RequestType, SIOArg, SavedRealtimeMessage, GrpcResponse, GrpcServiceDefinition,
   RequestExample,
 } from '../types/models';
 import type { VariableSuggestion } from '../variables';
@@ -77,6 +77,7 @@ import { snippetsFeature } from './features/snippets';
 import { sseFeature } from './features/sse';
 import { websocketFeature } from './features/websocket';
 import { socketioFeature } from './features/socketio';
+import { savedMessagesFeature } from './features/savedMessages';
 import { mkSioEventRow, socketioFormFeature } from './features/socketioForm';
 import { mockServerFeature } from './features/mockServer';
 import { dialogFeature } from './features/dialogs';
@@ -237,6 +238,13 @@ class AppVM {
   declare socketIOConnect: typeof socketioFeature.socketIOConnect;
   declare socketIODisconnect: typeof socketioFeature.socketIODisconnect;
   declare socketIOEmitCurrentMessage: typeof socketioFeature.socketIOEmitCurrentMessage;
+  declare savedMessagesAvailable: typeof savedMessagesFeature.savedMessagesAvailable;
+  declare suggestedSavedMessageName: typeof savedMessagesFeature.suggestedSavedMessageName;
+  declare saveCurrentMessage: typeof savedMessagesFeature.saveCurrentMessage;
+  declare loadSavedMessage: typeof savedMessagesFeature.loadSavedMessage;
+  declare sendSavedMessage: typeof savedMessagesFeature.sendSavedMessage;
+  declare renameSavedMessage: typeof savedMessagesFeature.renameSavedMessage;
+  declare deleteSavedMessage: typeof savedMessagesFeature.deleteSavedMessage;
   declare socketIOClearMessages: typeof socketioFeature.socketIOClearMessages;
   declare socketIORestoreMessages: typeof socketioFeature.socketIORestoreMessages;
 
@@ -630,6 +638,10 @@ class AppVM {
   declare responseTestSummary: typeof responseFeature.responseTestSummary;
   declare grpcResponseTestSummary: typeof responseFeature.grpcResponseTestSummary;
   declare responseDisplayBody: typeof responseFeature.responseDisplayBody;
+  declare responseFilterActive: typeof responseFeature.responseFilterActive;
+  declare responseFilterResult: typeof responseFeature.responseFilterResult;
+  declare toggleResponseFilter: typeof responseFeature.toggleResponseFilter;
+  declare onResponseFilterKeydown: typeof responseFeature.onResponseFilterKeydown;
   declare responseBodyIsPaged: typeof responseFeature.responseBodyIsPaged;
   declare responseBodyVirtualized: typeof responseFeature.responseBodyVirtualized;
   declare responseBodyPageCount: typeof responseFeature.responseBodyPageCount;
@@ -778,6 +790,7 @@ class AppVM {
   declare onWindowMouseDown: typeof menuFeature.onWindowMouseDown;
 
   declare openPromptDialog: typeof dialogFeature.openPromptDialog;
+  declare openNameDialog: typeof dialogFeature.openNameDialog;
   declare openConfirmDialog: typeof dialogFeature.openConfirmDialog;
   declare openAlertDialog: typeof dialogFeature.openAlertDialog;
   declare openSelectDialog: typeof dialogFeature.openSelectDialog;
@@ -885,10 +898,21 @@ class AppVM {
   declare clearGlobalVariables: typeof globalsFeature.clearGlobalVariables;
   declare scheduleGlobalsPersist: typeof globalsFeature.scheduleGlobalsPersist;
   declare saveGlobals: typeof globalsFeature.saveGlobals;
+  declare editGlobals: typeof globalsFeature.editGlobals;
+  declare changeGlobalsEverywhere: typeof globalsFeature.changeGlobalsEverywhere;
+  declare hasUnsavedGlobalsChanges: typeof globalsFeature.hasUnsavedGlobalsChanges;
+  declare globalsForStore: typeof globalsFeature.globalsForStore;
+  declare discardGlobalsChanges: typeof globalsFeature.discardGlobalsChanges;
   declare syncBackendGlobals: typeof globalsFeature.syncBackendGlobals;
   declare syncGlobalsFromBackend: typeof globalsFeature.syncGlobalsFromBackend;
   declare applyGlobalVariableChangesFromResponse: typeof globalsFeature.applyGlobalVariableChangesFromResponse;
   declare saveEnvironment: typeof environmentFeature.saveEnvironment;
+  declare editEnvironments: typeof environmentFeature.editEnvironments;
+  declare changeEnvironmentsEverywhere: typeof environmentFeature.changeEnvironmentsEverywhere;
+  declare hasUnsavedEnvironmentChanges: typeof environmentFeature.hasUnsavedEnvironmentChanges;
+  declare environmentsForStore: typeof environmentFeature.environmentsForStore;
+  declare discardEnvironmentChanges: typeof environmentFeature.discardEnvironmentChanges;
+  declare applyScriptChangesToSavedEnvironment: typeof environmentFeature.applyScriptChangesToSavedEnvironment;
   declare updateEnvironmentRow: typeof environmentFeature.updateEnvironmentRow;
   declare setEnvironmentView: typeof environmentFeature.setEnvironmentView;
   declare updateWorkspaceEnvironments: typeof environmentFeature.updateWorkspaceEnvironments;
@@ -980,6 +1004,11 @@ class AppVM {
   declare switchWorkspace: typeof workspaceFeature.switchWorkspace;
   declare createWorkspace: typeof workspaceFeature.createWorkspace;
   declare updateWorkspaceDescription: typeof workspaceFeature.updateWorkspaceDescription;
+  declare workspaceReadme: typeof workspaceFeature.workspaceReadme;
+  declare saveWorkspaceReadmes: typeof workspaceFeature.saveWorkspaceReadmes;
+  declare discardWorkspaceReadmes: typeof workspaceFeature.discardWorkspaceReadmes;
+  declare hasUnsavedWorkspaceEdits: typeof workspaceFeature.hasUnsavedWorkspaceEdits;
+  declare reviewWorkspaceEditsBeforeQuit: typeof workspaceFeature.reviewWorkspaceEditsBeforeQuit;
   declare setWorkspaceName: typeof workspaceFeature.setWorkspaceName;
   declare deleteWorkspace: typeof workspaceFeature.deleteWorkspace;
 
@@ -1094,6 +1123,8 @@ class AppVM {
 
   responseSearchOpen = $state(false);
   responseSearch = $state('');
+  responseFilterOpen = $state(false);
+  responseFilter = $state('');
   responseSearchIndex = $state(0);
   responseSearchTotal = $state(0);
   responseSearchCounting = $state(false);
@@ -1156,6 +1187,7 @@ class AppVM {
   sioNamespace = $state('/');
   sioEvents = $state<KVRow[]>([mkSioEventRow()]);
   sioArgs = $state<SIOArg[]>(defaultSocketIOArgs());
+  savedMessages = $state<SavedRealtimeMessage[]>([]);
   sioSelectedArgId = $state('1');
   sioAck = $state(false);
   grpcMethod = $state('');
@@ -1389,6 +1421,9 @@ class AppVM {
   missingSecretsSaving = $state(false);
   missingSecretsError = $state('');
   environmentSaveState = $state<'idle' | 'dirty' | 'saving' | 'saved'>('idle');
+  environmentBaselines = $state.raw<Map<string, Environment>>(new Map());
+  globalsBaseline = $state.raw<KVRow[] | null>(null);
+  workspaceReadmeDrafts = $state<Record<string, string>>({});
   environmentView = $state<EnvironmentView>(readEnvironmentView());
   globalVariables = $state<KVRow[]>([{ id: 1, enabled: true, key: '', value: '', description: '' }]);
   globalsSaveState = $state<'idle' | 'dirty' | 'saving' | 'saved'>('idle');
@@ -1595,6 +1630,8 @@ class AppVM {
     if (!lCols.length && !this.workspaceDiagnostics.length && !lWs.find(workspace => workspace.id === lWsId)?.isInvalid) lCols = [makeCollection(lWsId, DEFAULT_COLLECTION)];
     if (lEnvId && !lEnvs.some(e => e.id === lEnvId && e.workspaceId === lWsId)) lEnvId = '';
     this.workspaces = lWs; this.collections = lCols; this.environments = lEnvs;
+    this.environmentBaselines = new Map(); this.globalsBaseline = null; this.workspaceReadmeDrafts = {};
+    this.environmentSaveState = 'idle'; this.globalsSaveState = 'idle';
     try {
       let parsed = requestStoreParsed;
       if (requestStoreReadFailed) {
@@ -1993,6 +2030,7 @@ applyFeatures(
   websocketFeature,
   socketioFeature,
   socketioFormFeature,
+  savedMessagesFeature,
   mockServerFeature,
   realtimeFeature,
   collectionRunnerDerivedFeature,

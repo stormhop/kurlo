@@ -15,6 +15,7 @@ type AppDialogBase = {
   cancelLabel: string;
   danger: boolean;
   placeholder?: string;
+  maxLength?: number;
   resolve: (value?: DialogResult) => void;
 };
 

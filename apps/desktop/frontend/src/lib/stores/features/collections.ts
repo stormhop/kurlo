@@ -1,3 +1,4 @@
+import { clampName } from '../../constants';
 import type { WorkspaceDiagnostic } from '../../backend';
 import { collectionDefaultsHaveContent, collectionSettingsFingerprint, emptyCollectionDefaults, folderDefaultsFingerprint, folderDefaultsFor, folderDefaultsHaveContent, normalizeCollectionDefaults, normalizeFolderDefaults, withFolderDefaults } from '../../collectionDefaults';
 import {
@@ -52,6 +53,7 @@ type CollectionHost = {
   openAlertDialog: (title: string, message: string) => Promise<void>;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
+  openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: PersistRequestStore;
   requestsForDisplay: () => SavedRequest[];
@@ -88,7 +90,7 @@ export const collectionFeature = {
     if (!this.guardWorkspaceWritable('Creating collections')) return;
     const workspaceId = this.activeWorkspaceId || this.workspaces[0]?.id;
     if (!workspaceId) return;
-    const name = await this.openPromptDialog('New collection', `Collection ${this.collections.filter(collection => collection.workspaceId === workspaceId).length + 1}`, 'Collections group related requests inside the current workspace.');
+    const name = await this.openNameDialog('New collection', `Collection ${this.collections.filter(collection => collection.workspaceId === workspaceId).length + 1}`, 'Collections group related requests inside the current workspace.');
     if (!name) return;
     this.collections = [...this.collections, makeCollection(workspaceId, name)];
     await this.persistRequestStore();
@@ -98,8 +100,8 @@ export const collectionFeature = {
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection) return;
     const name = typeof nextName === 'string'
-      ? nextName.trim()
-      : await this.openPromptDialog('Rename collection', collection.name);
+      ? clampName(nextName)
+      : await this.openNameDialog('Rename collection', collection.name);
     if (!name || name === collection.name) return;
     this.collections = this.collections.map(candidate => candidate.id === collectionId ? { ...candidate, name } : candidate);
     await this.persistRequestStore();

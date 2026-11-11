@@ -10,6 +10,7 @@ import { cloneRequestExample } from '../../examples';
 import { AI_DEFAULT_PRESET, aiDefaultAuthFor } from './ai';
 import { filesystemNameFromName, normalizeSavedRequest, normalizeSioArgs } from '../../normalizers';
 import { pathParamsFromUrl } from '../../pathParams';
+import { cloneSavedMessages, normalizeSavedMessages, requestTypeSupportsSavedMessages } from '../../savedMessages';
 import {
   defaultBodyContentFor,
   defaultSocketIOArgs,
@@ -35,6 +36,7 @@ import type {
   ResponseTab,
   SIOArg,
   SSESession,
+  SavedRealtimeMessage,
   SavedRequest,
   SocketIOSession,
   WebSocketSession,
@@ -158,6 +160,7 @@ type RequestStateHost = {
   mcpResponse: McpResponse | null;
   mcpResponses: Map<string, McpResponse>;
   sioAck: boolean;
+  savedMessages: SavedRealtimeMessage[];
   sioArgs: SIOArg[];
   sioEventName: string;
   sioEvents: KVRow[];
@@ -203,6 +206,7 @@ export const requestStateFeature = {
 	      settingsOverrides: this.currentRequestSettingsOverrides(),
 	      sioEvents: this.sioEvents, sioEventName: this.sioEventName,
       sioArgs: this.sioArgs, sioAck: this.sioAck,
+      savedMessages: this.savedMessages,
       grpcMethod: this.grpcMethod, grpcMetadata: this.grpcMetadata,
       grpcUseReflection: this.grpcUseReflection, grpcProtoFilePath: this.grpcProtoFilePath,
       grpcProtoFileName: this.grpcProtoFileName, grpcProtoImportPaths: this.grpcProtoImportPaths,
@@ -243,7 +247,7 @@ export const requestStateFeature = {
     const settings = this.currentRequestSettings();
     const id = newRequestId();
     const aiAuth = aiDefaultAuthFor();
-    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, isPinned: false, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], aiKurloTools: false, aiConnectionId: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
+    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, isPinned: false, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, savedMessages: [], grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], aiKurloTools: false, aiConnectionId: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
   },
 
   snapshotActiveRequest(this: RequestStateHost, options: { forPersistence?: boolean } = {}): SavedRequest {
@@ -280,6 +284,7 @@ export const requestStateFeature = {
       sioEventName: this.sioEventName,
       sioArgs: this.sioArgs.map(a => ({ ...a })),
       sioAck: this.sioAck,
+      ...(requestTypeSupportsSavedMessages(normalizedType) && this.savedMessages.length ? { savedMessages: cloneSavedMessages(this.savedMessages) } : {}),
       grpcMethod: this.grpcMethod,
       mcpMethod: this.mcpMethod,
       mcpName: this.mcpName,
@@ -326,8 +331,9 @@ export const requestStateFeature = {
       req.params.some(rowHasContent) || (req.pathParams ?? []).some(r => r.value.trim()) || req.headers.some(rowHasContent) ||
       this.authStateHasData(req.auth, req.auth.type) || req.preRequestScript.trim() || req.testScript.trim() ||
       req.requestNotes.trim();
+    const hasSavedMessages = Boolean(req.savedMessages?.length);
     if (requestType === 'ws') {
-      return Boolean(hasName || hasUrl || hasBodyContent || hasSharedContent);
+      return Boolean(hasName || hasUrl || hasBodyContent || hasSharedContent || hasSavedMessages);
     }
     if (requestType === 'socketio') {
       const hasSocketIOContent =
@@ -335,7 +341,7 @@ export const requestStateFeature = {
         Boolean(req.sioEventName?.trim()) ||
         Boolean((req.sioArgs ?? []).some(arg => arg.content.trim())) ||
         Boolean(req.sioAck);
-      return Boolean(hasName || hasUrl || hasBodyContent || hasSharedContent || hasSocketIOContent);
+      return Boolean(hasName || hasUrl || hasBodyContent || hasSharedContent || hasSocketIOContent || hasSavedMessages);
     }
     if (requestType === 'mcp') {
       const hasMcpContent =
@@ -388,6 +394,7 @@ export const requestStateFeature = {
     this.sioArgs = normalizeSioArgs(req.sioArgs);
     this.sioSelectedArgId = this.sioArgs[0]?.id ?? '1';
     this.sioAck = req.sioAck ?? false;
+    this.savedMessages = normalizeSavedMessages(req.savedMessages, this.requestType);
     this.grpcMethod = req.grpcMethod ?? '';
     this.mcpMethod = req.mcpMethod || (this.requestType === 'mcp' ? 'tools/list' : '');
     this.mcpName = req.mcpName ?? '';

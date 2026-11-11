@@ -48,11 +48,18 @@
   const revealed = aiConnectionsStore.reveal;
   aiConnectionsStore.reveal = '';
   const agentsSummary = $derived.by(() => {
+    const codex = codexConnectionStore.status;
+    const claude = claudeConnectionStore.status;
     const connected = [
-      codexConnectionStore.status.connected ? 'Codex' : '',
-      claudeConnectionStore.status.connected ? 'Claude Code' : '',
+      codex.connected && codex.authenticated ? 'Codex' : '',
+      claude.connected && claude.authenticated ? 'Claude Code' : '',
     ].filter(Boolean);
-    if (connected.length) return `${connected.join(' · ')} connected`;
+    const signedOut = [
+      codex.connected && codex.installed && !codex.authenticated ? 'Codex' : '',
+      claude.connected && claude.installed && !claude.authenticated ? 'Claude Code' : '',
+    ].filter(Boolean);
+    const parts = [connected.length ? `${connected.join(' · ')} connected` : '', signedOut.length ? `${signedOut.join(' · ')} signed out` : ''].filter(Boolean);
+    if (parts.length) return parts.join(' · ');
     return codexConnectionStore.loaded && claudeConnectionStore.loaded ? 'Not connected' : 'Checking…';
   });
   const kurloSummary = $derived.by(() => {

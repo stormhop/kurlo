@@ -75,6 +75,7 @@ function fileSegmentForExport(name: string) {
 }
 
 type ImportExportHost = {
+  changeGlobalsEverywhere: (change: (rows: KVRow[]) => KVRow[]) => void;
   collectionImportSource: ImportSource;
   collectionImportToast: string;
   collectionImportSummary: string;
@@ -308,7 +309,7 @@ export const importExportFeature = {
     const filled = bundle.values.filter(row => row.key.trim());
     const plural = `${filled.length} variable${filled.length === 1 ? '' : 's'}`;
     if (bundle.scope === 'globals') {
-      this.globalVariables = mergeGlobalRowsWithImportedRows(this.globalVariables, filled);
+      this.changeGlobalsEverywhere(rows => mergeGlobalRowsWithImportedRows(rows, filled));
       await this.persistRequestStore();
       this.collectionImportSummary = `Imported ${plural} into Globals`;
       return filled.length;

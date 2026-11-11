@@ -55,6 +55,7 @@
         bind:value={inputValue}
         onkeydown={onInputKeydown}
         placeholder={dialog.placeholder || 'Name'}
+        maxlength={dialog.maxLength}
         spellcheck="false"
         data-autofocus
       />

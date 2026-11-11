@@ -13,7 +13,7 @@ function socketIoArgsWithoutUiIds(args: SavedRequest['sioArgs'] | undefined) {
   return (args ?? []).map(({ id, ...arg }) => arg);
 }
 
-function stableStringify(value: unknown): string {
+export function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
   const entries = Object.entries(value as Record<string, unknown>)
@@ -30,6 +30,7 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     formRows,
     sioEvents,
     sioArgs,
+    savedMessages,
     isDraft,
     ...stable
   } = req;
@@ -41,6 +42,7 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     formRows: rowsWithoutUiIds(formRows),
     sioEvents: rowsWithoutUiIds(sioEvents),
     sioArgs: socketIoArgsWithoutUiIds(sioArgs),
+    savedMessages: savedMessages?.length ? savedMessages : undefined,
   });
 }
 

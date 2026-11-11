@@ -8,7 +8,7 @@ import { parseRunnerDataFile, type RunnerDataRow } from '../lib/runnerData';
 import type { CollectionRunRecord } from '../lib/collectionRuns';
 import { DEFAULT_RUNNER_CONCURRENCY } from '../lib/concurrency';
 import { emptyCollectionDefaults } from '../lib/collectionDefaults';
-import { makeWorkspace, normalizeSavedRequest } from '../lib/normalizers';
+import { makeCollection, makeWorkspace, normalizeSavedRequest } from '../lib/normalizers';
 import { oauth1FieldsFromAuth } from '../lib/utils';
 import type {
   BodyType,
@@ -190,6 +190,12 @@ class TestApp {
   collections: Collection[] = [];
   environments: Environment[] = [];
   globalVariables: KVRow[] = [];
+  environmentBaselines = new Map<string, Environment>();
+  globalsBaseline: KVRow[] | null = null;
+  globalsSaveState: 'idle' | 'dirty' | 'saving' | 'saved' = 'idle';
+  globalsPersistTimer: ReturnType<typeof setTimeout> | null = null;
+  globalsSavedTimer: ReturnType<typeof setTimeout> | null = null;
+  workspaceReadmeDrafts: Record<string, string> = {};
   requests: SavedRequest[] = [];
   get requestsById() { return new Map(this.requests.map(request => [request.id, request])); }
   requestHistory: RequestHistoryEntry[] = [];
@@ -426,6 +432,7 @@ class TestApp {
   diagnosticsForRequest() { return []; }
   workspaceDiagnosticKey(diagnostic: { path?: string }) { return diagnostic.path ?? 'diagnostic'; }
   openPromptDialog(_title: string, initialValue = '') { return Promise.resolve(this.prompts.shift() ?? initialValue); }
+  openNameDialog(title: string, initialValue = '') { return this.openPromptDialog(title, initialValue); }
   openSelectDialog(_title: string, _message: string, options: Array<{ value: string }>) {
     return Promise.resolve(this.selects.shift() ?? options[0]?.value ?? null);
   }
@@ -1611,3 +1618,163 @@ describe('request templates reach the backend unresolved', () => {
   });
 });
 
+
+describe('manual save mode keeps workspace edits off disk until Save', () => {
+  function storedEnvironment(id: string) {
+    return backend.state.savedStores.at(-1)?.environments?.find(environment => environment.id === id);
+  }
+
+  async function manualApp() {
+    backend.state.savedStores = [];
+    backend.state.environment = {};
+    backend.state.globals = {};
+    const app = new TestApp() as TestApp & Record<string, any>;
+    const workspace = makeWorkspace('Manual');
+    app.workspaces = [workspace];
+    app.activeWorkspaceId = workspace.id;
+    app.collections = [makeCollection(workspace.id, 'Manual')];
+    app.environments = [
+      { id: 'dev', workspaceId: app.activeWorkspaceId, name: 'Dev', values: [row('host', 'dev.example.test')] },
+      { id: 'prod', workspaceId: app.activeWorkspaceId, name: 'Prod', values: [row('host', 'prod.example.test')] },
+    ];
+    app.globalVariables = [row('region', 'eu'), mkRow()];
+    await app.persistRequestStore();
+    app.autosave = false;
+    return app;
+  }
+
+  it('keeps an environment rename unsaved while other actions write the store', async () => {
+    const app = await manualApp();
+    await app.renameEnvironment('dev', 'Development');
+    app.updateEnvironmentRow('dev', 0, { value: 'edited.example.test' });
+    await app.selectEnvironment('prod');
+    await app.openEnvironment('prod');
+
+    expect(app.environmentSaveState).toBe('dirty');
+    expect(app.environments.find((environment: Environment) => environment.id === 'dev')?.name).toBe('Development');
+    expect(storedEnvironment('dev')).toMatchObject({ name: 'Dev', values: [expect.objectContaining({ value: 'dev.example.test' })] });
+    expect(backend.state.savedStores.at(-1)?.activeEnvironmentId).toBe('prod');
+
+    expect(await app.saveEnvironment()).toBe(true);
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(false);
+    expect(storedEnvironment('dev')).toMatchObject({ name: 'Development', values: [expect.objectContaining({ value: 'edited.example.test' })] });
+  });
+
+  it('keeps a parent change unsaved and reverts all environment edits', async () => {
+    const app = await manualApp();
+    await app.setEnvironmentParent('prod', 'dev');
+    app.updateEnvironmentRow('prod', 0, { value: 'changed' });
+    await app.createEnvironment();
+
+    expect(storedEnvironment('prod')?.parentId).toBeUndefined();
+    expect(backend.state.savedStores.at(-1)?.environments).toHaveLength(3);
+
+    await app.discardEnvironmentChanges();
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(false);
+    expect(app.environmentSaveState).toBe('idle');
+    expect(app.environments.find((environment: Environment) => environment.id === 'prod')).toMatchObject({ name: 'Prod', values: [expect.objectContaining({ value: 'prod.example.test' })] });
+    expect(app.environments.find((environment: Environment) => environment.id === 'prod')?.parentId).toBeUndefined();
+  });
+
+  it('clears the unsaved mark when an edit is typed back', async () => {
+    const app = await manualApp();
+    app.updateEnvironmentRow('dev', 0, { value: 'x' });
+    expect(app.environmentSaveState).toBe('dirty');
+    app.updateEnvironmentRow('dev', 0, { value: 'dev.example.test' });
+    expect(app.environmentSaveState).toBe('idle');
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(false);
+  });
+
+  it('saves script-set values right away without saving the user edits next to them', async () => {
+    const app = await manualApp();
+    app.activeEnvironmentId = 'dev';
+    app.updateEnvironmentRow('dev', 0, { value: 'typed.example.test' });
+    await app.applyEnvironmentChangesFromResponse({ environmentUpdates: { token: 'abc' } }, 'dev');
+
+    const stored = storedEnvironment('dev');
+    expect(stored?.values.map((value: KVRow) => [value.key, value.value])).toEqual([['host', 'dev.example.test'], ['token', 'abc']]);
+    expect(app.environmentValuesFor('dev')).toEqual({ host: 'typed.example.test', token: 'abc' });
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(true);
+  });
+
+  it('keeps protection a direct action that does not save pending edits', async () => {
+    const app = await manualApp();
+    app.updateEnvironmentRow('dev', 0, { value: 'typed' });
+    await app.setEnvironmentProtected('dev', true);
+
+    expect(storedEnvironment('dev')).toMatchObject({ protected: true, values: [expect.objectContaining({ value: 'dev.example.test' })] });
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(true);
+  });
+
+  it('keeps global variable edits unsaved until Save and reverts them', async () => {
+    const app = await manualApp();
+    app.updateGlobalVariableRow(0, { value: 'us' });
+    await app.selectEnvironment('dev');
+
+    expect(app.globalsSaveState).toBe('dirty');
+    expect(backend.state.savedStores.at(-1)?.globals?.map((value: KVRow) => value.value)).toEqual(['eu']);
+
+    app.discardGlobalsChanges();
+    expect(app.globalVariableValues()).toEqual({ region: 'eu' });
+    expect(app.globalsSaveState).toBe('idle');
+
+    app.updateGlobalVariableRow(0, { value: 'ap' });
+    expect(await app.saveGlobals()).toBe(true);
+    expect(backend.state.savedStores.at(-1)?.globals?.map((value: KVRow) => value.value)).toEqual(['ap']);
+    expect(app.hasUnsavedGlobalsChanges()).toBe(false);
+  });
+
+  it('saves script-set globals without the edits typed next to them', async () => {
+    const app = await manualApp();
+    app.updateGlobalVariableRow(0, { value: 'typed' });
+    await app.applyGlobalVariableChangesFromResponse({ globalVariableUpdates: { token: 'abc' } });
+
+    expect(backend.state.savedStores.at(-1)?.globals?.map((value: KVRow) => [value.key, value.value])).toEqual([['region', 'eu'], ['token', 'abc']]);
+    expect(app.globalVariableValues()).toEqual({ region: 'typed', token: 'abc' });
+  });
+
+  it('keeps the workspace README as a draft until Save', async () => {
+    const app = await manualApp();
+    app.updateWorkspaceDescription('# Draft');
+    await app.selectEnvironment('dev');
+
+    expect(app.workspaceReadme()).toBe('# Draft');
+    expect(backend.state.savedStores.at(-1)?.workspaces?.[0]?.description ?? '').toBe('');
+    expect(app.hasUnsavedWorkspaceEdits()).toBe(true);
+
+    expect(await app.saveWorkspaceReadmes()).toBe(true);
+    expect(backend.state.savedStores.at(-1)?.workspaces?.[0]?.description).toBe('# Draft');
+    expect(app.hasUnsavedWorkspaceEdits()).toBe(false);
+  });
+
+  it('asks about environment, globals and README edits before quitting', async () => {
+    const app = await manualApp();
+    app.updateEnvironmentRow('dev', 0, { value: 'typed' });
+    app.updateGlobalVariableRow(0, { value: 'typed' });
+    app.updateWorkspaceDescription('# Draft');
+    const asked: string[] = [];
+    app.openSaveChangesDialog = (name: string) => {
+      asked.push(name);
+      return Promise.resolve(name === 'Global variables' ? 'discard' : 'save');
+    };
+
+    expect(await app.reviewWorkspaceEditsBeforeQuit()).toBe(true);
+    expect(asked).toEqual(['Environments', 'Global variables', 'README']);
+    expect(storedEnvironment('dev')?.values[0]?.value).toBe('typed');
+    expect(backend.state.savedStores.at(-1)?.globals?.[0]?.value).toBe('eu');
+    expect(backend.state.savedStores.at(-1)?.workspaces?.[0]?.description).toBe('# Draft');
+  });
+
+  it('autosaves the same edits straight away', async () => {
+    const app = await manualApp();
+    app.autosave = true;
+    await app.renameEnvironment('dev', 'Development');
+    expect(storedEnvironment('dev')?.name).toBe('Development');
+    app.scheduleWorkspacePersist = vi.fn();
+    app.updateWorkspaceDescription('# Live');
+    expect(app.scheduleWorkspacePersist).toHaveBeenCalledTimes(1);
+    expect(app.workspaces[0].description).toBe('# Live');
+    expect(app.workspaceReadmeDrafts).toEqual({});
+    expect(app.hasUnsavedWorkspaceEdits()).toBe(false);
+  });
+});

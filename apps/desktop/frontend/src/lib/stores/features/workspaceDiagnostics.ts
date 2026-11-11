@@ -40,6 +40,7 @@ type WorkspaceDiagnosticsHost = {
   externalWorkspacePendingMessage: (action?: string) => string;
   hasUnsavedDrafts: () => boolean;
   hasUnsavedRequestChanges: () => boolean;
+  hasUnsavedWorkspaceEdits: () => boolean;
   snapshotActiveRequest: (options?: { forPersistence?: boolean }) => SavedRequest;
   draftRequestIds: Set<string>;
   requests: SavedRequest[];
@@ -331,7 +332,7 @@ export const workspaceDiagnosticsFeature = {
   async refreshPendingExternalWorkspaceChangeIfClean(this: WorkspaceDiagnosticsHost) {
     if (!this.externalWorkspaceChangePending) return false;
     if (this.gitLoading || this.gitAction) return false;
-    if (this.hasUnsavedDrafts() || this.hasUnsavedRequestChanges()) return false;
+    if (this.hasUnsavedDrafts() || this.hasUnsavedRequestChanges() || this.hasUnsavedWorkspaceEdits()) return false;
     const reason = this.externalWorkspaceChangeReason;
     this.clearExternalWorkspaceChangePending();
     await this.reloadWorkspaceAfterExternalChange(reason);
@@ -377,12 +378,12 @@ export const workspaceDiagnosticsFeature = {
 
   async handleExternalWorkspaceChange(this: WorkspaceDiagnosticsHost, reason: string) {
     if (this.gitLoading || this.gitAction) return;
-    if (reason === AGENT_WORKSPACE_CHANGE && !this.hasUnsavedRequestChanges()) {
+    if (reason === AGENT_WORKSPACE_CHANGE && !this.hasUnsavedRequestChanges() && !this.hasUnsavedWorkspaceEdits()) {
       this.clearExternalWorkspaceChangePending();
       await this.reloadKeepingDrafts(reason);
       return;
     }
-    if (this.hasUnsavedDrafts() || this.hasUnsavedRequestChanges()) {
+    if (this.hasUnsavedDrafts() || this.hasUnsavedRequestChanges() || this.hasUnsavedWorkspaceEdits()) {
       this.markExternalWorkspaceChangePending(reason);
       return;
     }

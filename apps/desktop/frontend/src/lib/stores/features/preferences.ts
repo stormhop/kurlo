@@ -17,6 +17,11 @@ import { applyUiScale, currentUiScale, saveUiScale, stepUiScale } from '../../ui
 import type { HttpVersion, ProxyConfig, RequestSettings, ScriptEngine, ShortcutId, Workspace } from '../../types/models';
 
 type PreferencesHost = {
+  hasUnsavedEnvironmentChanges: () => boolean;
+  hasUnsavedGlobalsChanges: () => boolean;
+  saveEnvironment: () => Promise<boolean>;
+  saveGlobals: () => Promise<boolean>;
+  saveWorkspaceReadmes: () => Promise<boolean>;
   autosave: boolean;
   startupView: StartupView;
   scriptEngine: ScriptEngine;
@@ -472,6 +477,9 @@ export const preferencesFeature = {
     localStorage.setItem(AUTOSAVE_STORAGE_KEY, String(value));
     if (value) {
       void this.saveDirtyRequestsToDisk();
+      if (this.hasUnsavedEnvironmentChanges()) void this.saveEnvironment();
+      if (this.hasUnsavedGlobalsChanges()) void this.saveGlobals();
+      void this.saveWorkspaceReadmes();
     } else {
       void this.persistActiveRequestNow(true);
     }

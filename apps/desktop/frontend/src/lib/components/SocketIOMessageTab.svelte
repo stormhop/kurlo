@@ -2,6 +2,7 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
+  import SavedMessagesMenu from './SavedMessagesMenu.svelte';
   import { bodyPlaceholder } from '../bodyTemplates';
   import { vm } from '../stores/app.svelte';
   import type { RawBodyType, SIOArgEncoding } from '../types/models';
@@ -155,6 +156,7 @@
 
 
           <div class="sio-toolbar-spacer"></div>
+          <SavedMessagesMenu connected={vm.socketIOConnected} />
 
 
           <input

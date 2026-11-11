@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SaveActions from './SaveActions.svelte';
+  import { NAME_MAX_LENGTH, shortName } from '../constants';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import EnvironmentMatrix from './EnvironmentMatrix.svelte';
@@ -18,6 +20,7 @@
     setEnvironmentParent = () => {},
     deleteEnvironment,
     saveEnvironment,
+    discardEnvironment = () => {},
     updateEnvironmentRow,
     removeEnvironmentRow,
     importEnvFromFile,
@@ -44,6 +47,7 @@
     setEnvironmentParent?: (environmentId: string, parentId: string) => void;
     deleteEnvironment: (environmentId: string) => void;
     saveEnvironment: () => void;
+    discardEnvironment?: () => void;
     updateEnvironmentRow: (environmentId: string, index: number, patch: Partial<KVRow>) => void;
     removeEnvironmentRow: (environmentId: string, index: number) => void;
     importEnvFromFile: (environmentId: string) => void;
@@ -219,7 +223,7 @@
       <div class="environment-title">
         <h1>Variables</h1>
         <p>
-          {workspaceVariableCount} {workspaceVariableCount === 1 ? 'variable' : 'variables'} across {environments.length} environments{activeName ? ` · ${activeName} is in use` : ''}
+          {workspaceVariableCount} {workspaceVariableCount === 1 ? 'variable' : 'variables'} across {environments.length} environments{activeName ? ` · ${shortName(activeName)} is in use` : ''}
           {#if environmentSaveState !== 'idle'}
             <span class="env-save-indicator" class:saved={environmentSaveState === 'saved'} class:dirty={environmentSaveState === 'dirty'}> · {environmentSaveState === 'saving' ? 'Saving…' : environmentSaveState === 'dirty' ? 'Unsaved changes' : 'Saved'}</span>
           {/if}
@@ -228,7 +232,7 @@
       <div class="overview-actions">
         {@render viewSwitch()}
         {#if !autosave}
-          <button class="btn btn-secondary" type="button" onclick={saveEnvironment} disabled={environmentSaveState !== 'dirty'}>Save</button>
+          <SaveActions saveDirty={environmentSaveState === 'dirty'} canRevert={environmentSaveState === 'dirty'} disabled={environmentSaveState === 'saving'} onSave={saveEnvironment} onRevert={discardEnvironment} />
         {/if}
         <button class="btn btn-primary" type="button" onclick={addVariable}><AddCloseIcon add /> Variable</button>
       </div>
@@ -248,18 +252,18 @@
       <div class="environment-title">
         <h1 aria-label={activeEnvironment.name}>
           <span class="env-name-fit" data-value={nameDraft}>
-            <input class="request-title-input env-name" size="1" bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} />
+            <input class="request-title-input env-name" size="1" maxlength={NAME_MAX_LENGTH} bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} />
           </span>
           {#if activeEnvironment.protected}
             <span class="env-protected"><MenuIcon name="lock" />Protected</span>
           {:else if protectedBy}
-            <span class="env-protected"><MenuIcon name="lock" />Protected through {protectedBy.name}</span>
+            <span class="env-protected"><MenuIcon name="lock" />Protected through {shortName(protectedBy.name)}</span>
           {:else if activeEnvironment.sandbox}
             <span class="env-protected env-sandbox"><MenuIcon name="play" />Sandbox</span>
           {/if}
         </h1>
         <p>
-          {variableCount} {variableCount === 1 ? 'variable' : 'variables'}{#if parent}{` · ${inheritedRows.length} inherited from ${parent.name}`}{/if} · use them in requests as {'{{variableName}}'}
+          {variableCount} {variableCount === 1 ? 'variable' : 'variables'}{#if parent}{` · ${inheritedRows.length} inherited from ${shortName(parent.name)}`}{/if} · use them in requests as {'{{variableName}}'}
           {#if environmentSaveState !== 'idle'}
             <span class="env-save-indicator" class:saved={environmentSaveState === 'saved'} class:dirty={environmentSaveState === 'dirty'}> · {environmentSaveState === 'saving' ? 'Saving…' : environmentSaveState === 'dirty' ? 'Unsaved changes' : 'Saved'}</span>
           {/if}
@@ -268,7 +272,7 @@
       <div class="overview-actions">
         {@render viewSwitch()}
         {#if !autosave}
-          <button class="btn btn-secondary" type="button" onclick={saveEnvironment} disabled={environmentSaveState !== 'dirty'}>Save</button>
+          <SaveActions saveDirty={environmentSaveState === 'dirty'} canRevert={environmentSaveState === 'dirty'} disabled={environmentSaveState === 'saving'} onSave={saveEnvironment} onRevert={discardEnvironment} />
         {/if}
         <div class="env-more" bind:this={moreMenuRoot} onfocusout={closeMoreMenuOnFocusOut}>
           <button class="btn btn-ghost btn-icon env-more-btn" bind:this={moreMenuButton} type="button" aria-label="More environment actions" aria-haspopup="menu" aria-expanded={moreMenuOpen} onclick={() => (moreMenuOpen = !moreMenuOpen)}>•••</button>
@@ -291,7 +295,7 @@
       <div class="env-parent">
         <span class="env-parent-label">Inherits from</span>
         <Select value={activeEnvironment.parentId ?? ''} options={parentOptions} className="env-parent-select" searchable={parentOptions.length > 8} searchPlaceholder="Search environments" ariaLabel="Inherits from" onChange={value => setEnvironmentParent(activeEnvironment.id, value)} />
-        <span class="env-parent-hint">{parent ? `Variables not set here come from ${parent.name}.` : 'Pick an environment to take the variables this one does not set.'}</span>
+        <span class="env-parent-hint">{parent ? `Variables not set here come from ${shortName(parent.name)}.` : 'Pick an environment to take the variables this one does not set.'}</span>
       </div>
     {/if}
     <div class="environment-editor-card">
@@ -364,7 +368,9 @@
 </section>
 
 <style>
+  .environment-workspace-head > .environment-title { flex: 1 1 auto; min-width: 0; }
   .environment-title h1 { display: flex; align-items: center; min-width: 0; }
+  .environment-title p { overflow-wrap: anywhere; }
   .env-name-fit {
     display: inline-grid;
     flex: 0 1 auto;

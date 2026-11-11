@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { NAME_MAX_LENGTH } from '../constants';
   import { requestSupportsCurl } from '../utils';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import MenuIcon from './MenuIcon.svelte';
@@ -106,6 +107,7 @@
       <RequestTypeBadge request={req} invalid={req.isInvalid} />
       <input
         class="sidebar-request-title-input"
+        maxlength={NAME_MAX_LENGTH}
         bind:this={editingRequestInput}
         bind:value={editingRequestName}
         aria-label="Sidebar request name"

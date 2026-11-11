@@ -1,12 +1,12 @@
-import { getEnvironment, setEnvironment } from '../../backend';
+import { chooseEnvFileToImport, getEnvironment, setEnvironment } from '../../backend';
 import { makeEnvironment } from '../../normalizers';
-import { mkRow } from '../../constants';
+import { mkRow, clampName } from '../../constants';
 import type { Collection, Environment, KVRow, SidebarView, Workspace } from '../../types/models';
 import { environmentForCollectionEntry, pinnedEnvironments, withoutPinnedEnvironment } from '../../collectionEnvironments';
 import type { VariableSuggestion } from '../../variables';
 import { variableTemplate } from '../../variables';
 import { resolveDynamicVariable } from '../../dynamicVariables';
-import { parseEnvFile } from '../../utils';
+import { changedValues, enabledValues, environmentsForStore, mapEnvironmentBaselines, trackEnvironmentEdit } from '../../manualWorkspaceEdits';
 import {
   addMatrixKey,
   buildEnvironmentMatrix,
@@ -58,6 +58,7 @@ type EnvironmentHost = {
   environmentPersistTimer: ReturnType<typeof setTimeout> | null;
   environmentSavedTimer: ReturnType<typeof setTimeout> | null;
   environments: Environment[];
+  environmentBaselines: Map<string, Environment>;
   collections: Collection[];
   environmentScopeKey: string;
   environmentScopePinnedIds: string[];
@@ -70,7 +71,9 @@ type EnvironmentHost = {
   activeEnvironment: Environment | undefined;
   activeWorkspaceEnvironments: Environment[];
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
+  openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openAlertDialog: (title: string, message: string) => Promise<unknown>;
   guardWorkspaceWritable: (action?: string) => boolean;
   persistRequestStore: () => Promise<boolean>;
   syncActiveEnvironmentFromBackend: () => Promise<void>;
@@ -89,6 +92,10 @@ type EnvironmentHost = {
   saveEnvironment: () => Promise<boolean>;
   mergeActiveEnvironmentValues: (values: Record<string, string>) => Promise<boolean>;
   updateWorkspaceEnvironments: (change: (environment: Environment) => KVRow[], onlyId?: string) => void;
+  editEnvironments: (next: Environment[]) => void;
+  changeEnvironmentsEverywhere: (change: (environment: Environment) => Environment) => void;
+  hasUnsavedEnvironmentChanges: () => boolean;
+  applyScriptChangesToSavedEnvironment: (environmentId: string, updates: Record<string, string>, removed: string[]) => void;
 };
 
 export function mergeEnvironmentRowsWithValues(rows: KVRow[], values: Record<string, string>, inherited: Map<string, InheritedRow> = new Map()) {
@@ -237,7 +244,7 @@ export const environmentFeature = {
     if (!this.guardWorkspaceWritable('Creating environments')) return;
     const workspaceId = this.activeWorkspaceId || this.workspaces[0]?.id;
     if (!workspaceId) return;
-    const name = await this.openPromptDialog('New environment', `Environment ${this.activeWorkspaceEnvironments.length + 1}`, 'Create a set of variables reusable as {{name}} in requests.');
+    const name = await this.openNameDialog('New environment', `Environment ${this.activeWorkspaceEnvironments.length + 1}`, 'Create a set of variables reusable as {{name}} in requests.');
     if (!name) return;
     const environment = makeEnvironment(workspaceId, name);
     this.environments = [...this.environments, environment];
@@ -250,14 +257,14 @@ export const environmentFeature = {
     if (!this.guardWorkspaceWritable('Renaming environments')) return;
     const environment = this.environments.find(candidate => candidate.id === environmentId);
     if (!environment) return;
-    const name = nextName.trim();
+    const name = clampName(nextName);
     if (!name || name === environment.name) return;
-    this.environments = this.environments.map(candidate => candidate.id === environmentId ? { ...candidate, name } : candidate);
-    await this.persistRequestStore();
+    this.editEnvironments(this.environments.map(candidate => candidate.id === environmentId ? { ...candidate, name } : candidate));
+    if (this.autosave) await this.saveEnvironment();
   },
   async setEnvironmentProtected(this: EnvironmentHost, environmentId: string, isProtected: boolean) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
-    this.environments = this.environments.map(candidate => {
+    this.changeEnvironmentsEverywhere(candidate => {
       if (candidate.id !== environmentId) return candidate;
       const { protected: _previous, ...rest } = candidate;
       return isProtected ? { ...rest, protected: true } : rest;
@@ -266,7 +273,7 @@ export const environmentFeature = {
   },
   async setEnvironmentSandbox(this: EnvironmentHost, environmentId: string, sandbox: boolean) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
-    this.environments = this.environments.map(candidate => {
+    this.changeEnvironmentsEverywhere(candidate => {
       if (candidate.id !== environmentId) return candidate;
       const { sandbox: _previous, ...rest } = candidate;
       return sandbox ? { ...rest, sandbox: true } : rest;
@@ -278,13 +285,13 @@ export const environmentFeature = {
     const environment = this.environments.find(candidate => candidate.id === environmentId);
     if (!environment) return;
     if (parentId && !environmentParentCandidates(this.environments, environment).some(candidate => candidate.id === parentId)) return;
-    this.environments = this.environments.map(candidate => {
+    this.editEnvironments(this.environments.map(candidate => {
       if (candidate.id !== environmentId) return candidate;
       const { parentId: _previous, ...rest } = candidate;
       return parentId ? { ...rest, parentId } : rest;
-    });
+    }));
     if (environmentId === this.activeEnvironmentId) await this.syncBackendEnvironment();
-    await this.persistRequestStore();
+    if (this.autosave) await this.saveEnvironment();
   },
   async deleteEnvironment(this: EnvironmentHost, environmentId: string) {
     if (!this.guardWorkspaceWritable('Deleting environments')) return;
@@ -297,13 +304,15 @@ export const environmentFeature = {
       : '';
     const confirmed = await this.openConfirmDialog('Delete environment', `Delete "${environment.name}" from this workspace?${childNote}`);
     if (!confirmed) return;
-    this.environments = this.environments
-      .filter(candidate => candidate.id !== environmentId)
-      .map(candidate => {
-        if (candidate.parentId !== environmentId) return candidate;
-        const { parentId: _previous, ...rest } = candidate;
-        return environment.parentId ? { ...rest, parentId: environment.parentId } : rest;
-      });
+    const baselines = new Map(this.environmentBaselines);
+    baselines.delete(environmentId);
+    this.environmentBaselines = baselines;
+    this.environments = this.environments.filter(candidate => candidate.id !== environmentId);
+    this.changeEnvironmentsEverywhere(candidate => {
+      if (candidate.parentId !== environmentId) return candidate;
+      const { parentId: _previous, ...rest } = candidate;
+      return environment.parentId ? { ...rest, parentId: environment.parentId } : rest;
+    });
     if (this.collections.some(collection => collection.environmentIds?.includes(environmentId))) {
       this.collections = this.collections.map(collection => withoutPinnedEnvironment(collection, environmentId));
     }
@@ -323,6 +332,21 @@ export const environmentFeature = {
     const last = next.at(-1);
     return last && (last.key || last.value || last.description || last.isFile) ? [...next, mkRow()] : next;
   },
+  editEnvironments(this: EnvironmentHost, next: Environment[]) {
+    if (!this.autosave) this.environmentBaselines = trackEnvironmentEdit(this.environments, next, this.environmentBaselines);
+    this.environments = next;
+    this.scheduleEnvironmentPersist();
+  },
+  changeEnvironmentsEverywhere(this: EnvironmentHost, change: (environment: Environment) => Environment) {
+    this.environments = this.environments.map(change);
+    this.environmentBaselines = mapEnvironmentBaselines(this.environmentBaselines, change);
+  },
+  hasUnsavedEnvironmentChanges(this: EnvironmentHost) {
+    return this.environmentBaselines.size > 0;
+  },
+  environmentsForStore(this: EnvironmentHost, environments: Environment[]) {
+    return environmentsForStore(environments, this.environmentBaselines);
+  },
   scheduleEnvironmentPersist(this: EnvironmentHost, delay = 360) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
     if (!this.autosave) {
@@ -334,7 +358,7 @@ export const environmentFeature = {
         clearTimeout(this.environmentSavedTimer);
         this.environmentSavedTimer = null;
       }
-      this.environmentSaveState = 'dirty';
+      this.environmentSaveState = this.environmentBaselines.size ? 'dirty' : 'idle';
       return;
     }
     this.environmentSaveState = 'saving';
@@ -358,19 +382,32 @@ export const environmentFeature = {
       this.environmentSavedTimer = null;
     }
     this.environmentSaveState = 'saving';
+    const baselines = this.environmentBaselines;
+    this.environmentBaselines = new Map();
     const ok = await this.persistRequestStore();
+    if (!ok && !this.environmentBaselines.size) this.environmentBaselines = baselines;
     this.environmentSaveState = ok ? 'saved' : 'dirty';
     if (ok) this.environmentSavedTimer = setTimeout(() => (this.environmentSaveState = 'idle'), 1800);
     return ok;
   },
+  async discardEnvironmentChanges(this: EnvironmentHost) {
+    if (!this.environmentBaselines.size) return;
+    this.environments = environmentsForStore(this.environments, this.environmentBaselines);
+    this.environmentBaselines = new Map();
+    if (this.environmentSavedTimer) {
+      clearTimeout(this.environmentSavedTimer);
+      this.environmentSavedTimer = null;
+    }
+    this.environmentSaveState = 'idle';
+    await this.syncBackendEnvironment();
+  },
   updateEnvironmentRow(this: EnvironmentHost, environmentId: string, index: number, patch: Partial<KVRow>) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
-    this.environments = this.environments.map(environment => {
+    this.editEnvironments(this.environments.map(environment => {
       if (environment.id !== environmentId) return environment;
       const next = environment.values.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row);
       return { ...environment, values: this.environmentRowsWithTrailing(next) };
-    });
-    this.scheduleEnvironmentPersist();
+    }));
   },
   setEnvironmentView(this: EnvironmentHost, view: EnvironmentView) {
     this.environmentView = view;
@@ -380,13 +417,12 @@ export const environmentFeature = {
   },
   updateWorkspaceEnvironments(this: EnvironmentHost, change: (environment: Environment) => KVRow[], onlyId = '') {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
-    this.environments = this.environments.map(environment => {
+    this.editEnvironments(this.environments.map(environment => {
       if (environment.workspaceId !== this.activeWorkspaceId) return environment;
       if (onlyId && environment.id !== onlyId) return environment;
       const values = change(environment);
       return values === environment.values ? environment : { ...environment, values };
-    });
-    this.scheduleEnvironmentPersist();
+    }));
   },
   setEnvironmentMatrixValue(this: EnvironmentHost, environmentId: string, key: string, value: string) {
     const secret = secretFor(this.activeWorkspaceEnvironments, key);
@@ -435,12 +471,11 @@ export const environmentFeature = {
   },
   removeEnvironmentRow(this: EnvironmentHost, environmentId: string, index: number) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
-    this.environments = this.environments.map(environment => {
+    this.editEnvironments(this.environments.map(environment => {
       if (environment.id !== environmentId) return environment;
       const next = environment.values.length <= 1 ? [mkRow()] : environment.values.filter((_, rowIndex) => rowIndex !== index);
       return { ...environment, values: this.environmentRowsWithTrailing(next) };
-    });
-    this.scheduleEnvironmentPersist();
+    }));
   },
   async syncBackendEnvironment(this: EnvironmentHost) {
     await setEnvironment(this.activeEnvironmentValues());
@@ -451,7 +486,11 @@ export const environmentFeature = {
     if (!environment) return false;
     const nextValues = mergeEnvironmentRowsWithValues(environment.values, values, inheritedEnvironmentRows(this.environments, environment.id));
     if (JSON.stringify(environment.values) === JSON.stringify(nextValues)) return false;
+    const before = enabledValues(environment.values);
+    const updates = changedValues(before, values);
+    const removed = Object.keys(before).filter(key => !(key in values));
     this.environments = this.environments.map(candidate => candidate.id === environment.id ? { ...candidate, values: nextValues } : candidate);
+    this.applyScriptChangesToSavedEnvironment(environment.id, updates, removed);
     await this.persistRequestStore();
     return true;
   },
@@ -468,41 +507,45 @@ export const environmentFeature = {
       Object.assign(values, updates);
       const nextValues = mergeEnvironmentRowsWithValues(environment.values, values, inheritedEnvironmentRows(this.environments, environment.id));
       this.environments = this.environments.map(candidate => candidate.id === environment.id ? { ...candidate, values: nextValues } : candidate);
+      this.applyScriptChangesToSavedEnvironment(environment.id, updates, [...removed]);
       await this.persistRequestStore();
     }
     await this.syncBackendEnvironment();
+  },
+  applyScriptChangesToSavedEnvironment(this: EnvironmentHost, environmentId: string, updates: Record<string, string>, removed: string[]) {
+    const saved = this.environmentBaselines.get(environmentId);
+    if (!saved || (!Object.keys(updates).length && !removed.length)) return;
+    const values = enabledValues(saved.values);
+    for (const key of removed) delete values[key];
+    Object.assign(values, updates);
+    const nextValues = mergeEnvironmentRowsWithValues(saved.values, values, inheritedEnvironmentRows(this.environments, environmentId));
+    this.environmentBaselines = trackEnvironmentEdit([], this.environments, new Map(this.environmentBaselines).set(environmentId, { ...saved, values: nextValues }));
   },
   async syncActiveEnvironmentFromBackend(this: EnvironmentHost) {
     await this.mergeActiveEnvironmentValues(await getEnvironment());
   },
   async importEnvFromFile(this: EnvironmentHost, environmentId: string) {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.env,.txt,text/plain';
-    await new Promise<void>(resolve => {
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        if (!file) { resolve(); return; }
-        const text = await file.text();
-        const pairs = parseEnvFile(text);
-        if (!pairs.length) { resolve(); return; }
-        this.environments = this.environments.map(environment => {
-          if (environment.id !== environmentId) return environment;
-          const existing = new Map(environment.values.filter(r => r.key).map(r => [r.key, r]));
-          for (const { key, value } of pairs) {
-            if (existing.has(key)) {
-              existing.set(key, { ...existing.get(key)!, value });
-            } else {
-              existing.set(key, { ...mkRow(), key, value });
-            }
-          }
-          const merged = Array.from(existing.values());
-          return { ...environment, values: this.environmentRowsWithTrailing(merged) };
-        });
-        this.scheduleEnvironmentPersist();
-        resolve();
-      };
-      input.click();
-    });
+    const result = await chooseEnvFileToImport();
+    if (result.error) {
+      await this.openAlertDialog('Cannot import this file', result.error);
+      return;
+    }
+    if (!result.values.length) {
+      if (result.path) await this.openAlertDialog('Nothing to import', 'The file has no KEY=value lines.');
+      return;
+    }
+    this.editEnvironments(this.environments.map(environment => {
+      if (environment.id !== environmentId) return environment;
+      const existing = new Map(environment.values.filter(r => r.key).map(r => [r.key, r]));
+      for (const { key, value } of result.values) {
+        if (existing.has(key)) {
+          existing.set(key, { ...existing.get(key)!, value });
+        } else {
+          existing.set(key, { ...mkRow(), key, value });
+        }
+      }
+      const merged = Array.from(existing.values());
+      return { ...environment, values: this.environmentRowsWithTrailing(merged) };
+    }));
   },
 };

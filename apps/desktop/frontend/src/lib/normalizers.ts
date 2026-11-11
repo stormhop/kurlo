@@ -18,6 +18,7 @@ import {
 } from './constants';
 import { emptyCollectionDefaults, normalizeCollectionDefaults, normalizeFolderDefaultsList, normalizeRequestSettingsOverrides } from './collectionDefaults';
 import { normalizeRequestExamples } from './examples';
+import { normalizeSavedMessages } from './savedMessages';
 import { normalizeLoadTests } from './loadTests';
 import { normalizeCollectionFolderPaths } from './collections';
 import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
@@ -70,7 +71,7 @@ const REQUEST_FIELDS: FieldTypes = {
         'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId',
     ],
     booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection', 'aiStream', 'aiKurloTools'],
-    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
+    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'savedMessages', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
 
@@ -292,6 +293,7 @@ export function normalizeSavedRequest(
         sioEventName: input.sioEventName || '',
         sioArgs: normalizeSioArgs(input.sioArgs),
         sioAck: input.sioAck ?? false,
+        savedMessages: normalizeSavedMessages(input.savedMessages, normalizedRequestType),
         grpcMethod: input.grpcMethod || '',
         grpcMetadata: cloneRowsForStore(input.grpcMetadata ?? []),
         grpcUseReflection: settings.grpcUseReflection,

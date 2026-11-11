@@ -1,3 +1,4 @@
+import { clampName } from '../../constants';
 import { exportLoadTestK6, openDirectoryDialog, openFileDialog, previewLoadTestData, saveLoadTestK6Folder, validateLoadTest } from '../../backend';
 import { loadTestFingerprint, normalizeLoadTest } from '../../loadTests';
 import { presetExecutor } from '../../loadPresets';
@@ -236,12 +237,13 @@ export const loadTestFeature = {
     await this.createLoadTest(request.collectionId, [request.id]);
   },
 
-  async renameLoadTest(this: LoadTestHost & { openPromptDialog: (title: string, value: string) => Promise<string | null> }, collectionId: string, loadTestId: string, nextName?: string) {
+  async renameLoadTest(this: LoadTestHost & { openNameDialog: (title: string, value: string) => Promise<string | null> }, collectionId: string, loadTestId: string, nextName?: string) {
     if (!this.guardWorkspaceWritable('Renaming a load test')) return;
     this.closeFloatingMenus();
     const test = this.collections.find(collection => collection.id === collectionId)?.loadTests?.find(candidate => candidate.id === loadTestId);
     if (!test) return;
-    const name = (nextName ?? await this.openPromptDialog('Rename load test', test.name))?.trim();
+    const rawName = nextName ?? await this.openNameDialog('Rename load test', test.name);
+    const name = rawName === null ? '' : clampName(rawName);
     if (!name || name === test.name) return;
     await this.updateCollectionLoadTests(collectionId, tests => tests.map(candidate => candidate.id === loadTestId
       ? { ...candidate, name, filesystemName: filesystemNameFromName(name, 'load-test') } : candidate));
