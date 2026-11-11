@@ -35,11 +35,7 @@
   let columnsRoot = $state<HTMLDivElement>();
   let columnsButton = $state<HTMLButtonElement>();
   let workspaceId = $derived(environments[0]?.workspaceId ?? '');
-  let chosenColumns = $state<string[] | null>(null);
-
-  $effect.pre(() => {
-    chosenColumns = readMatrixColumns(workspaceId);
-  });
+  let chosenColumns = $derived<string[] | null>(readMatrixColumns(workspaceId));
 
   let shown = $derived(visibleMatrixEnvironments(environments, chosenColumns, activeEnvironmentId));
   let shownIds = $derived(new Set(shown.map(environment => environment.id)));

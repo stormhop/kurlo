@@ -9599,7 +9599,6 @@ test('marks an environment as a sandbox for the agent', async ({ page }, testInf
   await workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Protect from AI agents' }).click();
   await expect(workspace.locator('.env-protected')).toHaveText('Protected');
   const nameField = workspace.getByLabel('Environment name');
-  const badge = workspace.locator('.env-protected');
   const gapToText = () => nameField.evaluate((input: HTMLInputElement) => {
     const probe = document.createElement('span');
     const style = getComputedStyle(input);
