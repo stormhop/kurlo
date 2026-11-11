@@ -84,7 +84,7 @@
   <div class="activity-rail-spacer"></div>
 
   <div class="activity-rail-group">
-    <button class="activity-rail-btn" type="button" aria-label="Cookies" onclick={openCookieJar} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('cookies')} type="button" aria-label="Cookies" aria-pressed={sidebarActive('cookies')} onclick={() => openCookieJar()} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M20.6 13.1A8.5 8.5 0 1 1 10.9 3.4a3 3 0 0 0 3.9 3.9 3 3 0 0 0 3.9 3.9 3 3 0 0 0 1.9 1.9z"/><path d="M8.2 9h.01M11.5 14.2h.01M7.4 16.2h.01M14.8 11.7h.01" stroke-width="2.6"/>
       </svg>

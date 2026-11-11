@@ -1,7 +1,7 @@
 import { getEnvironment, setEnvironment } from '../../backend';
 import { makeEnvironment } from '../../normalizers';
 import { mkRow } from '../../constants';
-import type { Collection, Environment, KVRow, Workspace } from '../../types/models';
+import type { Collection, Environment, KVRow, SidebarView, Workspace } from '../../types/models';
 import { environmentForCollectionEntry, pinnedEnvironments, withoutPinnedEnvironment } from '../../collectionEnvironments';
 import type { VariableSuggestion } from '../../variables';
 import { variableTemplate } from '../../variables';
@@ -65,7 +65,7 @@ type EnvironmentHost = {
   workspaceBlocked: boolean;
   environmentView: EnvironmentView;
   workspaces: Workspace[];
-  sidebarView: 'collections' | 'environments' | 'history' | 'agent';
+  sidebarView: SidebarView;
   topView: string;
   activeEnvironment: Environment | undefined;
   activeWorkspaceEnvironments: Environment[];

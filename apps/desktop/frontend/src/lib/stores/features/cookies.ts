@@ -1,12 +1,17 @@
 import { listCookies, upsertCookie, deleteCookie, clearCookies } from '../../backend';
 import type { CookieJarEntry } from '../../backend';
 import { parseCookieHeader } from '../../cookieJar';
+import type { SidebarView } from '../../types/models';
+import type { TopView } from '../ui';
+import { cookieView, type CookieSection } from '../cookieView.svelte';
 
 type CookieHost = {
   activeWorkspaceId: string;
   cookies: CookieJarEntry[];
   workspaceCookies: Record<string, CookieJarEntry[]>;
-  cookieJarOpen: boolean;
+  sidebarView: SidebarView;
+  sidebarHidden: boolean;
+  topView: TopView;
   cookieJarLoading: boolean;
   cookieJarSaving: boolean;
   cookieJarError: string;
@@ -121,15 +126,15 @@ export const cookieFeature = {
       if (!silent) this.cookieJarLoading = false;
     }
   },
-  async openCookieJar(this: CookieHost) {
+  async openCookieJar(this: CookieHost, section?: CookieSection) {
     this.closeFloatingMenus();
-    this.cookieJarOpen = true;
+    if (section) cookieView.section = section;
+    this.sidebarView = 'cookies';
+    this.sidebarHidden = false;
+    this.topView = 'cookies';
     await this.refreshCookieJar();
   },
-  closeCookieJar(this: CookieHost) {
-    this.cookieJarOpen = false;
-    this.cookieJarError = '';
-  },
+
   async importCookieHeaderForUrl(this: CookieHost, requestUrl: string, cookieHeader: string) {
     const workspaceId = this.activeWorkspaceId;
     let hostname: string;

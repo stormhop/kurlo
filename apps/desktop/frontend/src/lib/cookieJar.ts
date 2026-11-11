@@ -151,6 +151,16 @@ export function cookieValueIsMissingSecret(value: string): boolean {
   return /^\{\{kurloSecret:[^{}]+\}\}$/.test(value);
 }
 
+export function cookieForEditing(cookie: CookieJarEntry): CookieJarEntry {
+  return cookieValueIsMissingSecret(cookie.value) ? { ...cookie, value: '' } : cookie;
+}
+
+export function keepMissingSecret(next: CookieJarEntry, original: CookieJarEntry | undefined): CookieJarEntry {
+  if (!original || !cookieValueIsMissingSecret(original.value)) return next;
+  if (next.value && !cookieValueIsMissingSecret(next.value)) return next;
+  return { ...next, value: original.value };
+}
+
 export function cookieHeaderForUrl(cookies: CookieJarEntry[], requestUrl: string, now = Date.now()): string {
   return cookies
     .filter(cookie => cookieMatchesUrl(cookie, requestUrl, now) && !cookieValueIsMissingSecret(cookie.value))

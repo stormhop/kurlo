@@ -1612,7 +1612,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expectIconSize('Close settings');
     await page.getByLabel('Close settings').click();
     await page.getByRole('button', { name: 'Cookies', exact: true }).click();
-    await expectIconSize('Close cookie jar');
+    await expectIconSize('Add domain');
   });
 
   test('sets NTLM auth on an HTTP request', async ({ page }) => {
@@ -1659,9 +1659,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     if (docsScreenshotDir) {
       try {
         await page.getByRole('button', { name: 'Cookies', exact: true }).click();
-        await expect(page.locator('.cookie-modal')).toBeVisible();
+        await expect(page.locator('.cookie-workspace')).toBeVisible();
         await captureDocsScreenshot(page, 'cookie-jar-empty');
-        await page.getByLabel('Close cookie jar').click();
       } catch (err) { console.log('docs screenshot cookie-jar-empty skipped:', err); }
     }
 
@@ -1895,14 +1894,13 @@ test.describe('Kurlo desktop browser E2E', () => {
     if (docsScreenshotDir) {
       try {
         await page.getByRole('button', { name: 'Cookies', exact: true }).click();
-        const cookieModal = page.getByRole('dialog', { name: 'Cookies' });
+        const cookieModal = page.locator('.cookie-workspace');
         await cookieModal.getByRole('button', { name: 'Add cookie for api.kurlo.test' }).click();
         await cookieModal.getByRole('button', { name: 'Raw' }).click();
         await cookieModal.getByLabel('Raw cookie').fill('session=abc123; Path=/; Secure; HttpOnly; SameSite=Lax');
         await cookieModal.getByRole('button', { name: 'Save' }).click();
         await expect(cookieModal.locator('.cookie-row')).toContainText('session');
         await captureDocsScreenshot(page, 'cookie-jar-populated');
-        await page.getByLabel('Close cookie jar').click();
       } catch (err) {
         console.log('docs screenshot cookie-jar-populated skipped:', err);
         await page.keyboard.press('Escape').catch(() => {});
@@ -5864,12 +5862,13 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.getByLabel('Request URL').fill('https://api.kurlo.test/orders');
     await page.getByRole('button', { name: 'Cookies', exact: true }).click();
 
-    const modal = page.getByRole('dialog', { name: 'Cookies' });
-    await modal.getByRole('tab', { name: /^Sync/ }).click();
+    const modal = page.locator('.cookie-workspace');
+    const panel = page.locator('.cookie-panel');
+    await panel.getByRole('button', { name: /^Browser sync/ }).click();
     await expect(modal.getByText('Cookie sync is off')).toBeVisible();
     await expect(modal.getByRole('switch', { name: 'Cookie sync' })).not.toBeChecked();
 
-    await modal.locator('.cookie-sync-status .switch-track').click();
+    await modal.locator('.cookie-sync-toggle .switch-track').click();
     await expect(modal.getByText('Waiting for a browser')).toBeVisible();
     await expect(modal.getByText(/install the extension and press Connect/)).toBeVisible();
     await captureDocsScreenshot(page, 'cookie-jar-sync');
@@ -5967,15 +5966,15 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(modal.locator('.cookie-sync-chip.unreadable')).toHaveCount(1);
     await captureDocsScreenshot(page, 'cookie-jar-sync-paired');
 
-    await modal.getByRole('tab', { name: 'Manage' }).click();
-    await expect(modal.getByRole('button', { name: /^api\.kurlo\.test/ })).toHaveAttribute('aria-current', 'true');
+    await panel.getByRole('button', { name: /^api\.kurlo\.test/ }).click();
+    await expect(panel.getByRole('button', { name: /^api\.kurlo\.test/ })).toHaveAttribute('aria-current', 'page');
     await expect(modal.locator('.cookie-row')).toContainText('session');
 
-    await modal.getByRole('tab', { name: /^Sync/ }).click();
+    await panel.getByRole('button', { name: /^Browser sync/ }).click();
     await modal.getByRole('button', { name: 'Disconnect' }).click();
     await expect(modal.getByText('Waiting for a browser')).toBeVisible();
 
-    await modal.locator('.cookie-sync-status .switch-track').click();
+    await modal.locator('.cookie-sync-toggle .switch-track').click();
     await expect(modal.getByText('Cookie sync is off')).toBeVisible();
     await expect(modal.locator('.cookie-sync-code')).toHaveCount(0);
   });
@@ -6609,8 +6608,8 @@ test.describe('Cookie sync extension', () => {
     });
     await page.goto('/');
     await page.getByRole('button', { name: 'Cookies', exact: true }).click();
-    const modal = page.getByRole('dialog', { name: 'Cookies' });
-    await modal.getByRole('tab', { name: /^Sync/ }).click();
+    const modal = page.locator('.cookie-workspace');
+    await page.locator('.cookie-panel').getByRole('button', { name: /^Browser sync/ }).click();
 
     await modal.getByRole('button', { name: 'Chrome, Edge, Brave' }).click();
     await expect(modal.getByText('chrome://extensions')).toBeVisible();
@@ -6639,6 +6638,86 @@ test.describe('Cookie sync extension', () => {
 });
 
 test.describe('Cookie jar', () => {
+  test('opens cookies as a sidebar section beside the other workspace screens', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/orders');
+    await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Cookies', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('.cookie-panel')).toBeVisible();
+    await expect(page.locator('.cookie-workspace')).toBeVisible();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    const main = page.locator('.cookie-workspace');
+    await main.getByRole('button', { name: 'Add cookie for api.kurlo.test' }).click();
+    const editor = main.getByRole('form', { name: 'Cookie editor' });
+    await editor.getByLabel('Name').press('Escape');
+    await expect(editor).toHaveCount(0);
+    await expect(main).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Cookies' })).toHaveCount(0);
+    await page.getByRole('tab', { name: /New Request/ }).last().click();
+    await expect(main).toHaveCount(0);
+    await expect(page.getByLabel('Request URL')).toHaveValue('https://api.kurlo.test/orders');
+    await page.getByRole('button', { name: 'Environments', exact: true }).click();
+    await expect(page.locator('.cookie-panel')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+    await expect(page.locator('.cookie-panel')).toBeVisible();
+    await expect(main).toBeVisible();
+  });
+
+  test('picks a cookie expiry with the app date picker instead of the system one', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/orders');
+    await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+    const main = page.locator('.cookie-workspace');
+    const stored = () => page.evaluate(() => (window.__kurloE2E as any).cookies['workspace-e2e'] ?? []);
+    await main.getByRole('button', { name: 'Add cookie for api.kurlo.test' }).click();
+    const editor = main.getByRole('form', { name: 'Cookie editor' });
+    await editor.getByLabel('Name').fill('token');
+    await editor.getByLabel('Value').fill('t1');
+    await expect(page.locator('input[type="datetime-local"]')).toHaveCount(0);
+
+    const trigger = editor.getByRole('button', { name: 'Expires' });
+    await expect(trigger).toHaveText('When the session ends');
+    await trigger.click();
+    const picker = page.getByRole('dialog', { name: 'Expires date' });
+    await expect(picker).toBeVisible();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-date-picker-${test.info().project.name}.png`), animations: 'disabled' });
+    const today = await page.evaluate(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() }; });
+    await expect(picker.locator(`[data-day="${today.y}-${today.m}-${today.d}"]`)).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('Enter');
+    await picker.getByLabel('Hour').fill('9');
+    await picker.getByLabel('Minute').fill('30');
+    await picker.getByLabel('Minute').press('Enter');
+    await expect(picker).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    const expected = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 30, 0, 0); return d.getTime(); });
+    await expect(trigger).toContainText('· 09:30');
+
+    await trigger.click();
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
+    await expect(editor).toBeVisible();
+
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(editor).toHaveCount(0);
+    expect((await stored()).find((cookie: { name: string }) => cookie.name === 'token')).toEqual(expect.objectContaining({ expiresAt: expected, session: false }));
+
+    await main.getByRole('button', { name: 'Edit cookie token' }).click();
+    await editor.getByRole('button', { name: 'Expires' }).click();
+    await picker.getByRole('button', { name: 'Next month' }).click();
+    await picker.getByRole('button', { name: 'In 7 days' }).click();
+    await picker.getByRole('button', { name: 'Clear' }).click();
+    await expect(editor.getByRole('button', { name: 'Expires' })).toHaveText('When the session ends');
+    await editor.getByRole('button', { name: 'Save' }).click();
+    expect((await stored()).find((cookie: { name: string }) => cookie.name === 'token')).toEqual(expect.objectContaining({ expiresAt: 0, session: true }));
+  });
+
   test('manages cookies in a table with a fields and a raw editor', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page);
@@ -6647,7 +6726,8 @@ test.describe('Cookie jar', () => {
     await chooseRequestType(page, 'HTTP Request');
     await page.getByLabel('Request URL').fill('https://api.kurlo.test/orders');
     await page.getByRole('button', { name: 'Cookies', exact: true }).click();
-    const modal = page.getByRole('dialog', { name: 'Cookies' });
+    const modal = page.locator('.cookie-workspace');
+    const panel = page.locator('.cookie-panel');
     const stored = () => page.evaluate(() => (window.__kurloE2E as any).cookies['workspace-e2e'] ?? []);
 
     await expect(modal.getByText('No cookies yet')).toBeVisible();
@@ -6685,7 +6765,7 @@ test.describe('Cookie jar', () => {
     await editor.getByRole('button', { name: 'Save' }).click();
     await expect(editor).toHaveCount(0);
 
-    await expect(modal.getByRole('button', { name: /^kurlo\.test/ })).toHaveAttribute('aria-current', 'true');
+    await expect(panel.getByRole('button', { name: /^kurlo\.test/ })).toHaveAttribute('aria-current', 'page');
     const moved = modal.locator('.cookie-row', { hasText: 'session' });
     await expect(moved).toContainText('xyz');
     await expect(moved).toContainText('in 1 h');
@@ -6698,33 +6778,46 @@ test.describe('Cookie jar', () => {
         secure: false, httpOnly: false, sameSite: '', hostOnly: true, createdAt: Date.now(), updatedAt: Date.now(),
       });
     });
-    await modal.getByRole('button', { name: 'Refresh' }).click();
-    const authDomain = modal.getByRole('button', { name: /^auth\.kurlo\.test/ });
-    await expect(authDomain.locator('.cookie-domain-warning')).toHaveCount(1);
+    await modal.getByRole('button', { name: 'More cookie actions' }).click();
+    await modal.getByRole('menuitem', { name: 'Reload from disk' }).click();
+    const authDomain = panel.getByRole('button', { name: /^auth\.kurlo\.test/ });
+    await expect(authDomain.locator('.cookie-domain-dot.warning')).toHaveCount(1);
+    await expect(authDomain).toContainText('some without a value');
     await authDomain.click();
     await expect(modal.locator('.cookie-row', { hasText: 'refresh' })).toContainText('no value');
     await modal.getByRole('button', { name: 'Edit cookie refresh' }).click();
-    await expect(editor.getByText(/is not on this computer/)).toBeVisible();
-    await editor.getByRole('button', { name: 'Cancel' }).click();
+    await expect(editor.getByText(/kept on the computer that created it/)).toBeVisible();
+    await expect(editor.getByLabel('Value')).toHaveValue('');
+    await expect(editor.getByLabel('Value')).toHaveAttribute('placeholder', 'Not on this computer');
+    await editor.getByRole('button', { name: 'Raw' }).click();
+    await expect(editor.getByLabel('Raw cookie')).toHaveValue('refresh=; Path=/;');
+    await editor.getByRole('button', { name: 'Fields' }).click();
+    await expect(editor.getByLabel('Value')).toHaveValue('');
+    await editor.getByLabel('Path').fill('/auth');
+    await editor.getByRole('button', { name: 'Save' }).click();
+    await expect(editor).toHaveCount(0);
+    expect((await stored()).find((cookie: { name: string }) => cookie.name === 'refresh')).toEqual(expect.objectContaining({ value: '{{kurloSecret:cookie.refresh}}', path: '/auth' }));
 
-    await modal.getByLabel('Filter domains').fill('auth');
-    await expect(modal.locator('.cookie-domain-item')).toHaveCount(1);
-    await modal.getByLabel('Filter domains').fill('');
+    await panel.getByLabel('Filter domains').fill('auth');
+    await expect(panel.locator('.cookie-domain-item')).toHaveCount(1);
+    await panel.getByLabel('Filter domains').fill('');
 
-    await modal.getByRole('button', { name: 'Add domain' }).click();
-    await modal.getByLabel('New domain').fill('https://Shop.Kurlo.test/cart');
-    await modal.getByLabel('New domain').press('Enter');
-    await expect(modal.getByRole('button', { name: /^shop\.kurlo\.test/ })).toHaveAttribute('aria-current', 'true');
+    await panel.getByRole('button', { name: 'Add domain' }).click();
+    await panel.getByLabel('New domain').fill('https://Shop.Kurlo.test/cart');
+    await panel.getByLabel('New domain').press('Enter');
+    await expect(panel.getByRole('button', { name: /^shop\.kurlo\.test/ })).toHaveAttribute('aria-current', 'page');
     await expect(editor.getByLabel('Name')).toHaveValue('Cookie_1');
     await editor.getByRole('button', { name: 'Cancel' }).click();
     await expect(modal.getByText('No cookies for shop.kurlo.test')).toBeVisible();
-    await modal.getByRole('button', { name: 'Delete domain' }).click();
-    await expect(modal.locator('.cookie-domain-item')).toHaveCount(2);
+    await modal.getByRole('button', { name: 'More cookie actions' }).click();
+    await modal.getByRole('menuitem', { name: 'Delete shop.kurlo.test' }).click();
+    await expect(panel.locator('.cookie-domain-item')).toHaveCount(2);
 
-    await modal.getByRole('button', { name: /^kurlo\.test/ }).click();
+    await panel.getByRole('button', { name: /^kurlo\.test/ }).click();
     await modal.getByRole('button', { name: 'Delete cookie session' }).click();
-    await expect(modal.locator('.cookie-domain-item')).toHaveCount(1);
-    await modal.getByRole('button', { name: 'Clear all' }).click();
+    await expect(panel.locator('.cookie-domain-item')).toHaveCount(1);
+    await modal.getByRole('button', { name: 'More cookie actions' }).click();
+    await modal.getByRole('menuitem', { name: 'Clear all cookies' }).click();
     await expect(modal.getByText('No cookies yet')).toBeVisible();
     expect(await stored()).toEqual([]);
   });

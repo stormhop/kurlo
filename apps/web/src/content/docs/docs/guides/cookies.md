@@ -27,13 +27,15 @@ Cookies are refreshed after normal sends and after Collection Runner runs.
 
 ## Managing cookies
 
-Open the cookie window from the cookie icon at the bottom of the activity rail, on the far left of the window. The **Manage** tab lists domains on the left and the selected domain's cookies on the right.
+Open cookies from the cookie icon at the bottom of the activity rail, on the far left of the window. Cookies work like environments: the sidebar lists **Browser sync** and every domain in the jar, and the main area shows the domain you pick, with its cookie count, how many last only for this session and how many have expired. Click a request tab to go back to your request.
 
-- **Find a domain** with the filter above the list. A dot next to a domain means one of its cookies has no value on this computer.
-- **Add a domain** with **+** next to the list heading; Kurlo opens a new cookie for it straight away. When the jar is empty, it offers to add a cookie for the domain of the open request.
+- **Find a domain** with the filter above the list. A yellow dot and *some without a value* under a domain mean one of its cookies has no value on this computer.
+- **Add a domain** with **+** next to the **Cookies** heading; Kurlo opens a new cookie for it straight away. When the jar is empty, the main area offers to add a cookie for the domain of the open request or any domain you type.
 - **Read cookies at a glance.** The table shows each cookie's value, path, when it expires and its flags: HttpOnly, Secure, SameSite and Subdomains for cookies sent to subdomains as well. Expired cookies are struck through.
-- **Edit a cookie** by clicking its row. The editor opens under the table; `Cmd/Ctrl Enter` or **Save** stores the change.
-- **Delete** one cookie with the cross at the end of its row, every cookie of a domain with **Delete domain**, or the whole jar with **Clear all**. **Refresh** reloads the jar from disk.
+- **Cookies from another computer.** A cookie created on another machine keeps its value in that machine's Kurlo profile, and the workspace files only reference it. Kurlo shows such a cookie with an empty value marked *Not on this computer*, in the **Raw** editor too, and does not send it. Type the value and save to use it here; saving without a value keeps the reference.
+- **Set when a cookie expires** with the **Expires** field: pick a day in the calendar, type the time, or choose **In 1 hour**, **Tomorrow**, **In 7 days** or **In 30 days**. The arrow keys move between days and `Escape` closes the calendar. **Clear** turns the cookie back into a session cookie.
+- **Edit a cookie** by clicking its row. The editor opens under the table; `Cmd/Ctrl Enter` or **Save** stores the change and `Escape` closes the editor without saving.
+- **Delete** one cookie with the cross at the end of its row. The **•••** menu next to **Add cookie** deletes every cookie of the domain, clears the whole jar, or reloads the jar from disk.
 
 ![Cookie editor with the Fields mode open](../../../../assets/screenshots/cookie-jar-editor.png)
 
@@ -62,23 +64,23 @@ This is useful when reproducing a production request exactly from a copied cURL 
 
 ## Sync cookies from your browser
 
-The **Sync** tab of the cookie window pairs Kurlo with a browser extension, so a session you already
+**Browser sync**, at the top of the cookie sidebar, pairs Kurlo with a browser extension, so a session you already
 have in Chrome, Edge, Brave or Firefox is the session Kurlo sends with. It is the local
 answer to copying a `Cookie:` header out of DevTools after every login.
 
-![Sync tab waiting for a browser to connect](../../../../assets/screenshots/cookie-jar-sync.png)
+![Browser sync waiting for a browser to connect](../../../../assets/screenshots/cookie-jar-sync.png)
 
 Cookies flow one way — browser into Kurlo — and three separate gates stand in front of
 them:
 
-1. **The bridge has to be on.** The switch at the top of the tab opens a listener bound to `127.0.0.1` (port 3199
+1. **The bridge has to be on.** The switch at the top of the **Browser sync** page opens a listener bound to `127.0.0.1` (port 3199
    by default). Nothing listens until you ask for it.
 2. **You have to let the browser in.** The extension finds Kurlo by itself and asks to
    connect; Kurlo shows the request with a six-digit code and the extension shows the same
    code. Approve it only if the numbers match — that is what stops anything else on the
    machine from being approved in its place.
 3. **The domain has to be allowlisted twice.** Kurlo only accepts cookies for the domains
-   listed in the tab, and the browser only lets the extension read the domains you grant in
+   listed on the page, and the browser only lets the extension read the domains you grant in
    its popup. A domain missing from either list is never read and never sent.
 
 ![Kurlo asking whether Chrome may sync cookies, with a code to match](../../../../assets/screenshots/cookie-jar-sync-approval.png)
@@ -88,8 +90,8 @@ refused with an explanation rather than accepted and quietly ignored.
 
 ### Connecting a browser
 
-1. Turn on the switch at the top of the **Sync** tab in Kurlo.
-2. Under **Browser extension** in the same tab, pick **Chrome, Edge, Brave** or **Firefox**.
+1. Open **Browser sync** in the cookie sidebar and turn on the switch at the top of the page.
+2. Under **Browser extension** on the same page, pick **Chrome, Edge, Brave** or **Firefox**.
    Kurlo puts the extension in a folder and opens it. In Chrome, Edge or Brave, open
    `chrome://extensions`, turn on **Developer mode**, press **Load unpacked** and pick that
    folder. In Firefox, open `about:debugging#/runtime/this-firefox`, press
@@ -102,7 +104,7 @@ refused with an explanation rather than accepted and quietly ignored.
 
 The extension has the same version as Kurlo. Kurlo keeps the folder up to date when it
 updates, so the browser loads the new version the next time it starts, or when you press
-**Reload** on the extension. If a connected extension is older than Kurlo, the tab says so.
+**Reload** on the extension. If a connected extension is older than Kurlo, the page says so.
 Each release on GitHub also has the extension as a zip, `kurlo-cookie-sync-<version>-chromium.zip`
 and `-firefox.zip`, for setting it up without the app.
 
@@ -126,7 +128,7 @@ traffic are:
 
 A cookie you typed by hand for a synced domain is replaced by the browser's view of it.
 
-![Sync tab connected to Chrome, showing two allowlisted domains and recent activity](../../../../assets/screenshots/cookie-jar-sync-paired.png)
+![Browser sync connected to Chrome, showing two allowlisted domains and recent activity](../../../../assets/screenshots/cookie-jar-sync-paired.png)
 
 Cookies land in the jar of the workspace you have open, and follow you when you switch
 workspaces. The bridge closes when Kurlo quits and reopens on the next start if you left it
@@ -142,7 +144,7 @@ same from the other side.
 - **Nothing on the allowlist.** The extension is told there is nothing to read.
 - **Permission not granted.** The extension reports only the domains it could actually
   read, so a domain it cannot read is left out of the snapshot instead of looking empty and
-  clearing the jar. Kurlo marks those domains in the tab and names them, rather than leaving
+  clearing the jar. Kurlo marks those domains on the page and names them, rather than leaving
   you to wonder why nothing arrives.
 - **Kurlo is closed or sync is off.** The extension retries with a backoff and reconnects
   when the bridge comes back.
@@ -162,4 +164,4 @@ reachable only with the pairing token. The token and the sync allowlist live in
 `preferences.json` next to the request store, with the token encrypted by the same key as the
 store; no cookie leaves the machine, and the browser extension talks to `127.0.0.1` and nothing else.
 
-If you need to remove sensitive cookies, clear them from the cookie modal or clear request history/all data from Settings.
+If you need to remove sensitive cookies, clear them from the cookie page or clear request history/all data from Settings.

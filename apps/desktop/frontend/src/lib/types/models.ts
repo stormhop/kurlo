@@ -124,7 +124,7 @@ export type ScriptTab = 'pre-request' | 'tests';
 export type ResponseTab = 'body' | 'preview' | 'headers' | 'test-results' | 'timeline' | 'diff';
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
 export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'oauth2' | 'oauth1' | 'aws' | 'digest' | 'ntlm';
-export type SidebarView = 'collections' | 'environments' | 'history' | 'agent';
+export type SidebarView = 'collections' | 'environments' | 'history' | 'agent' | 'cookies';
 export type ShortcutId =
   | 'close-tab' | 'force-close-tab' | 'next-tab' | 'previous-tab'
   | 'tab-1' | 'tab-2' | 'tab-3' | 'tab-4' | 'tab-5' | 'tab-6' | 'tab-7' | 'tab-8' | 'last-tab'

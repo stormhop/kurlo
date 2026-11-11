@@ -22,6 +22,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Changed
 
+- A cookie's **Expires** uses Kurlo's own date and time picker on every platform, in the app's theme, with quick choices such as **In 1 hour** and **In 7 days**, instead of the operating system's calendar.
+- Cookies open as a sidebar section like environments instead of a window over the app. The sidebar lists **Browser sync** and the jar's domains, each domain gets a page with a summary, and deleting a domain or clearing the jar moves into the page's **•••** menu.
 - Catppuccin Latte, Catppuccin Mocha and Nord keep secondary text, method labels and status colours at a 4.5:1 contrast ratio on every panel, and Nord's sidebar now sits below the content like in the other themes.
 - VS Code Light and VS Code Dark follow the current Light Modern and Dark Modern palettes, with distinct secondary and muted text.
 - Error, warning and success highlights use the same tint strength on every screen and in every theme, and links and active tabs use a dedicated accent shade that stays readable on dark backgrounds.
@@ -29,6 +31,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- The cookie editor no longer shows the internal `{{kurloSecret:…}}` reference for a cookie whose value lives on another computer, in the **Fields** editor, in **Raw** or after switching between them; the value is empty and saving without a value keeps the reference.
 - Theme miniatures in settings show each theme's own button text and status colours instead of borrowing them from the active theme.
 
 ## 3.0.3

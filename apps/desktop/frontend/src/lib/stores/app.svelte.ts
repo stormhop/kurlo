@@ -96,8 +96,8 @@ import { workspaceDiagnosticsFeature } from './features/workspaceDiagnostics';
 
 const SIDEBAR_DEFAULT_WIDTH = 280;
 const TOP_VIEW_STORAGE_KEY = 'kurlo.topView.v1';
-const TOP_VIEW_VALUES: TopView[] = ['overview', 'request', 'environment', 'git', 'runner', 'collection', 'agent'];
-const SIDEBAR_VIEW_VALUES: SidebarView[] = ['collections', 'environments', 'history', 'agent'];
+const TOP_VIEW_VALUES: TopView[] = ['overview', 'request', 'environment', 'git', 'runner', 'collection', 'agent', 'cookies'];
+const SIDEBAR_VIEW_VALUES: SidebarView[] = ['collections', 'environments', 'history', 'agent', 'cookies'];
 const INITIAL_BODY_DEFAULTS = requestBodyDefaultsFor('http');
 
 type ImportSource = 'bruno' | 'postman' | 'insomnia' | 'openapi' | 'har';
@@ -164,7 +164,6 @@ class AppVM {
   declare restoreCookieJar: typeof cookieFeature.restoreCookieJar;
   declare refreshCookieJar: typeof cookieFeature.refreshCookieJar;
   declare openCookieJar: typeof cookieFeature.openCookieJar;
-  declare closeCookieJar: typeof cookieFeature.closeCookieJar;
   declare importCookieHeaderForUrl: typeof cookieFeature.importCookieHeaderForUrl;
   declare saveCookie: typeof cookieFeature.saveCookie;
   declare removeCookie: typeof cookieFeature.removeCookie;
@@ -1327,7 +1326,6 @@ class AppVM {
   collectionRunnerShowingLastRun = $state(false);
   collectionRunnerStartedAt = $state(0);
   collectionRunnerFinishedAt = $state(0);
-  cookieJarOpen = $state(false);
   cookieJarLoading = $state(false);
   cookieJarSaving = $state(false);
   cookieJarError = $state('');
@@ -1940,6 +1938,10 @@ class AppVM {
     if (state.topView === 'agent') {
       this.agentTabOpen = true;
       this.topView = 'agent';
+      return;
+    }
+    if (state.topView === 'cookies') {
+      this.topView = 'cookies';
       return;
     }
     if (state.topView === 'runner') {

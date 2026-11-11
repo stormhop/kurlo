@@ -3,10 +3,12 @@ import {
   blankCookieForm,
   buildCookieDomainGroups,
   cookieExpiryLabel,
+  cookieForEditing,
   cookieFormFromCookie,
   cookieFromForm,
   cookieHeaderForUrl,
   cookieValueIsMissingSecret,
+  keepMissingSecret,
   parseCookieHeader,
   parseRawCookie,
   serializeCookie,
@@ -115,6 +117,20 @@ describe('cookie jar helpers', () => {
     expect(header).toBe('theme=dark');
     expect(cookieValueIsMissingSecret('{{kurloSecret:a.b}}')).toBe(true);
     expect(cookieValueIsMissingSecret('x{{kurloSecret:a.b}}')).toBe(false);
+  });
+
+  it('never shows a missing secret reference while editing and keeps it when no value is typed', () => {
+    const missing = cookie({ name: 'value', value: '{{kurloSecret:workspace.ws.cookies.value.5a2aa6e9.value}}' });
+    expect(serializeCookie(cookieForEditing(missing))).toBe('value=; Path=/;');
+    expect(cookieFormFromCookie(cookieForEditing(missing)).value).toBe('');
+    expect(cookieFormFromCookie(cookieForEditing(parseRawCookie(serializeCookie(missing), 'api.example.test', now))).value).toBe('');
+    expect(cookieForEditing(cookie({ value: 'abc' })).value).toBe('abc');
+
+    expect(keepMissingSecret(parseRawCookie('value=; Path=/', 'api.example.test', now), missing).value).toBe(missing.value);
+    expect(keepMissingSecret(cookie({ value: '{{kurloSecret:other}}' }), missing).value).toBe(missing.value);
+    expect(keepMissingSecret(cookie({ value: 'typed' }), missing).value).toBe('typed');
+    expect(keepMissingSecret(cookie({ value: '' }), cookie({ value: 'abc' })).value).toBe('');
+    expect(keepMissingSecret(cookie({ value: '' }), undefined).value).toBe('');
   });
 });
 

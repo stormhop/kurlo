@@ -174,36 +174,6 @@
   {/if}
 {/if}
 
-{#if vm.cookieJarOpen}
-  {#if lazy.CookieJarModalComponent}
-    <lazy.CookieJarModalComponent
-      cookies={vm.cookies}
-      loading={vm.cookieJarLoading}
-      saving={vm.cookieJarSaving}
-      error={vm.cookieJarError}
-      defaultDomain={vm.cookieJarDefaultDomain}
-      onRefresh={vm.refreshCookieJar}
-      onSave={vm.saveCookie}
-      onDelete={vm.removeCookie}
-      onClear={vm.clearCookieJar}
-      onClose={vm.closeCookieJar}
-      sync={vm.cookieSync}
-      syncUnreadable={vm.cookieSyncUnreadableDomains()}
-      syncBusy={vm.cookieSyncBusy}
-      syncError={vm.cookieSyncError}
-      syncCodeCopied={vm.cookieSyncCodeCopied}
-      onToggleSync={vm.toggleCookieSync}
-      onAddSyncDomain={vm.addCookieSyncDomain}
-      onRemoveSyncDomain={vm.removeCookieSyncDomain}
-      onRevokeSync={vm.revokeCookieSyncBrowser}
-      onApproveSync={vm.approveCookieSyncBrowser}
-      onDenySync={vm.denyCookieSyncBrowser}
-      onCopySyncCode={vm.copyCookieSyncPairingCode}
-      onSyncPortChange={(port: number) => (vm.cookieSyncPort = port)}
-    />
-  {/if}
-{/if}
-
 {#if vm.yamlEditorOpen}
   <WorkspaceYAMLEditor />
 {/if}

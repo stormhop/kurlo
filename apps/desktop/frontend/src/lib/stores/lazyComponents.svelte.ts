@@ -11,7 +11,6 @@ export type AppLazyComponentState = {
   topView: TopView;
   codePanelOpen: boolean;
   codePanelAvailable: boolean;
-  cookieJarOpen: boolean;
   globalSearchOpen: boolean;
   settingsOpen: boolean;
   sseSessionVisible: boolean;
@@ -23,7 +22,7 @@ class AppLazyComponents {
   CodeSnippetPanelComponent = $state<LazyComponent | null>(null);
   CollectionRunnerWorkspaceComponent = $state<LazyComponent | null>(null);
   CollectionWorkspaceComponent = $state<LazyComponent | null>(null);
-  CookieJarModalComponent = $state<LazyComponent | null>(null);
+  CookieWorkspaceComponent = $state<LazyComponent | null>(null);
   DocsTabComponent = $state<LazyComponent | null>(null);
   EnvironmentWorkspaceComponent = $state<LazyComponent | null>(null);
   ExamplesTabComponent = $state<LazyComponent | null>(null);
@@ -79,8 +78,8 @@ class AppLazyComponents {
     if (!this.CollectionWorkspaceComponent) this.CollectionWorkspaceComponent = (await import('../components/CollectionWorkspace.svelte')).default as LazyComponent;
   }
 
-  async loadCookieJarModal() {
-    if (!this.CookieJarModalComponent) this.CookieJarModalComponent = (await import('../components/CookieJarModal.svelte')).default as LazyComponent;
+  async loadCookieWorkspace() {
+    if (!this.CookieWorkspaceComponent) this.CookieWorkspaceComponent = (await import('../components/CookieWorkspace.svelte')).default as LazyComponent;
   }
 
   async loadDocsTab() {
@@ -229,11 +228,11 @@ class AppLazyComponents {
     if (state.requestTab === 'examples') void this.loadExamplesTab();
     if (state.requestTab === 'settings' && state.requestType !== 'ws' && state.requestType !== 'socketio' && state.requestType !== 'grpc') void this.loadRequestSettingsTab();
     if (state.codePanelOpen && state.codePanelAvailable) void this.loadCodeSnippetPanel();
-    if (state.cookieJarOpen) void this.loadCookieJarModal();
     if (state.globalSearchOpen) void this.loadGlobalSearchModal();
     if (state.settingsOpen) void this.loadSettingsModal();
     if (state.topView === 'collection') void this.loadCollectionWorkspace();
     if (state.topView === 'environment') void this.loadEnvironmentWorkspace();
+    if (state.topView === 'cookies') void this.loadCookieWorkspace();
     if (state.topView === 'git') void this.loadGitWorkspace();
     if (state.topView === 'runner') void this.loadCollectionRunnerWorkspace();
     if (state.topView === 'mock') void this.loadMockServerWorkspace();

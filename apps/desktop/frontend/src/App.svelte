@@ -305,7 +305,6 @@
       topView: vm.topView,
       codePanelOpen: vm.codePanelOpen,
       codePanelAvailable,
-      cookieJarOpen: vm.cookieJarOpen,
       globalSearchOpen: vm.globalSearchOpen,
       settingsOpen: vm.settingsOpen,
       sseSessionVisible,
@@ -794,6 +793,11 @@
         clearAll={vm.clearGlobalVariables}
         save={vm.saveGlobals}
       />
+
+    {:else if vm.topView === 'cookies'}
+      {#if lazy.CookieWorkspaceComponent}
+        <lazy.CookieWorkspaceComponent />
+      {/if}
 
     {:else if vm.topView === 'environment'}
       {#if lazy.EnvironmentWorkspaceComponent}
