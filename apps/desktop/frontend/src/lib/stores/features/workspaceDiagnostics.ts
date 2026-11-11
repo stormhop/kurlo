@@ -4,6 +4,7 @@ import type { WorkspaceDiagnostic, WorkspaceOpenResult } from '../../backend';
 import { filesystemNameFromName } from '../../normalizers';
 import type { RequestTab, RequestType, ResponseTab, SavedRequest, ScriptTab, Workspace } from '../../types/models';
 import type { TopView } from '../ui';
+import { listenRuntime } from '../../runtimeEvents';
 
 type WorkspaceDiagnosticsHost = {
   activeRequestId: string;
@@ -295,10 +296,9 @@ export const workspaceDiagnosticsFeature = {
   },
 
   initWorkspaceListeners(this: WorkspaceDiagnosticsHost) {
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
+    if (!window.runtime?.EventsOn) return;
     let pending: ReturnType<typeof setTimeout> | null = null;
-    runtime.EventsOn('kurlo:workspace-changed', (reason: string) => {
+    listenRuntime('kurlo:workspace-changed', (reason: string) => {
       if (pending) clearTimeout(pending);
       pending = setTimeout(() => {
         pending = null;

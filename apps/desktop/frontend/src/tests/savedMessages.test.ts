@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SAVED_MESSAGE_MAX_BYTES,
+  SAVED_MESSAGES_MAX,
+  filterSavedMessages,
   normalizeSavedMessages,
+  savedMessageBytes,
+  savedMessageProblem,
   savedMessageSummary,
   socketIODraftFromMessage,
   socketIOMessageFromDraft,
@@ -81,5 +86,42 @@ describe('saved realtime messages', () => {
     const { savedMessages, ...snapshotWithoutField } = withoutMessages;
     expect(savedMessages).toEqual([]);
     expect(requestDirtyFingerprint(snapshotWithoutField as SavedRequest)).toBe(requestDirtyFingerprint(withoutMessages));
+  });
+});
+
+describe('saved message limits', () => {
+  it('allows saving below the count and size limits', () => {
+    expect(savedMessageProblem(SAVED_MESSAGES_MAX - 1, SAVED_MESSAGE_MAX_BYTES)).toBe('');
+  });
+
+  it('stops at 100 messages per request', () => {
+    expect(savedMessageProblem(SAVED_MESSAGES_MAX, 10)).toBe('A request keeps up to 100 saved messages. Delete one to save another.');
+  });
+
+  it('refuses a message over 256 KB', () => {
+    expect(savedMessageProblem(0, SAVED_MESSAGE_MAX_BYTES + 1)).toContain('over 256 KB');
+  });
+
+  it('counts UTF-8 bytes of the content, the event and every argument', () => {
+    expect(savedMessageBytes({ content: 'привет' })).toBe(12);
+    expect(savedMessageBytes({ event: 'join', args: [{ id: '1', content: 'ab', bodyType: 'text' }, { id: '2', content: 'é', bodyType: 'text' }] })).toBe(8);
+  });
+
+  it('keeps every message from the request file even past the limit', () => {
+    const raw = Array.from({ length: SAVED_MESSAGES_MAX + 20 }, (_, index) => ({ id: `m${index}`, name: `Message ${index}`, content: `${index}` }));
+    expect(normalizeSavedMessages(raw, 'ws')).toHaveLength(SAVED_MESSAGES_MAX + 20);
+  });
+
+  it('finds messages by name, content, event and arguments', () => {
+    const messages = [
+      { id: 'a', name: 'Subscribe orders', content: '{"op":"subscribe"}' },
+      { id: 'b', name: 'Ping', content: 'heartbeat' },
+      { id: 'c', name: 'Join', event: 'room:join', args: [{ id: '1', content: '{"room":"Kitchen"}', bodyType: 'text' as const }] },
+    ];
+    expect(filterSavedMessages(messages, 'ORDERS').map(item => item.id)).toEqual(['a']);
+    expect(filterSavedMessages(messages, 'heartbeat').map(item => item.id)).toEqual(['b']);
+    expect(filterSavedMessages(messages, 'room:join').map(item => item.id)).toEqual(['c']);
+    expect(filterSavedMessages(messages, 'kitchen').map(item => item.id)).toEqual(['c']);
+    expect(filterSavedMessages(messages, '  ')).toHaveLength(3);
   });
 });

@@ -14,6 +14,7 @@ import type { Collection, Environment } from '../../types/models';
 import { environmentIsProtected } from '../../environmentInheritance';
 import type { K6Info, LoadRunResult, LoadRunState, LoadTest } from '../../wire';
 import type { LoadTestTab } from './loadTests';
+import { listenRuntime } from '../../runtimeEvents';
 
 const K6_PATH_STORAGE_KEY = 'kurlo.k6Path.v1';
 const LOAD_RUN_LOG_LIMIT = 500;
@@ -80,9 +81,8 @@ export const loadRunFeature = {
     void loadRunLog().then(lines => {
       if (!receivedLogs) this.loadRunLogLines = lines.slice(-LOAD_RUN_LOG_LIMIT);
     });
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
-    runtime.EventsOn<LoadRunState>('load:progress', state => {
+    if (!window.runtime?.EventsOn) return;
+    listenRuntime<LoadRunState>('load:progress', state => {
       if (state.running && state.loadTestId !== this.loadRunLogTestId) {
         if (timer !== undefined) clearTimeout(timer);
         timer = undefined;
@@ -93,9 +93,9 @@ export const loadRunFeature = {
       }
       this.loadRun = state;
     });
-    runtime.EventsOn<string>('load:log', line => enqueue([line]));
-    runtime.EventsOn<string[]>('load:logs', lines => enqueue(lines));
-    runtime.EventsOn<LoadRunResult>('load:done', result => {
+    listenRuntime<string>('load:log', line => enqueue([line]));
+    listenRuntime<string[]>('load:logs', lines => enqueue(lines));
+    listenRuntime<LoadRunResult>('load:done', result => {
       flush();
       this.loadRunResults = { ...this.loadRunResults, [result.loadTestId]: result };
     });

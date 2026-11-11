@@ -22,6 +22,7 @@ import type {
 import { newRequestId } from '../../utils';
 import type { EnvironmentChanges } from './environments';
 import type { GlobalVariableChanges } from './globals';
+import { listenRuntime } from '../../runtimeEvents';
 
 const REQUEST_CANCELED_ERROR = 'Request canceled';
 
@@ -476,22 +477,21 @@ export const grpcFeature = {
   },
 
   initGrpcListeners(this: GrpcHost) {
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
+    if (!window.runtime?.EventsOn) return;
 
-    runtime.EventsOn('grpc:headers', (payload: GrpcHeadersEvent) => {
+    listenRuntime('grpc:headers', (payload: GrpcHeadersEvent) => {
       this.applyGrpcHeadersEvent(payload);
     });
 
-    runtime.EventsOn('grpc:message', (payload: GrpcMessageEvent) => {
+    listenRuntime('grpc:message', (payload: GrpcMessageEvent) => {
       this.applyGrpcMessageEvent(payload);
     });
 
-    runtime.EventsOn('grpc:trailers', (payload: GrpcTrailersEvent) => {
+    listenRuntime('grpc:trailers', (payload: GrpcTrailersEvent) => {
       this.applyGrpcTrailersEvent(payload);
     });
 
-    runtime.EventsOn('grpc:done', (payload: GrpcDoneEvent) => {
+    listenRuntime('grpc:done', (payload: GrpcDoneEvent) => {
       this.applyGrpcDoneEvent(payload);
     });
   },

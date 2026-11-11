@@ -241,6 +241,7 @@ class AppVM {
   declare savedMessagesAvailable: typeof savedMessagesFeature.savedMessagesAvailable;
   declare suggestedSavedMessageName: typeof savedMessagesFeature.suggestedSavedMessageName;
   declare saveCurrentMessage: typeof savedMessagesFeature.saveCurrentMessage;
+  declare saveCurrentMessageProblem: typeof savedMessagesFeature.saveCurrentMessageProblem;
   declare loadSavedMessage: typeof savedMessagesFeature.loadSavedMessage;
   declare sendSavedMessage: typeof savedMessagesFeature.sendSavedMessage;
   declare renameSavedMessage: typeof savedMessagesFeature.renameSavedMessage;

@@ -1,6 +1,8 @@
 import { clampName } from '../../constants';
 import {
   requestTypeSupportsSavedMessages,
+  savedMessageBytes,
+  savedMessageProblem,
   socketIODraftFromMessage,
   socketIOMessageFromDraft,
   suggestedSavedMessageName,
@@ -25,6 +27,7 @@ type SavedMessagesHost = {
   webSocketSendCurrentMessage: () => Promise<void>;
   socketIOEmitCurrentMessage: () => Promise<void>;
   loadSavedMessage: (id: string) => boolean;
+  saveCurrentMessageProblem: () => string;
 };
 
 export const savedMessagesFeature = {
@@ -36,8 +39,14 @@ export const savedMessagesFeature = {
     return suggestedSavedMessageName(this.requestType, { event: this.sioEventName }, this.savedMessages);
   },
 
+  saveCurrentMessageProblem(this: SavedMessagesHost): string {
+    const draft = this.requestType === 'socketio' ? { event: this.sioEventName, args: this.sioArgs } : { content: this.bodyContent };
+    return savedMessageProblem(this.savedMessages.length, savedMessageBytes(draft));
+  },
+
   saveCurrentMessage(this: SavedMessagesHost, name: string): SavedRealtimeMessage | null {
     if (!requestTypeSupportsSavedMessages(this.requestType)) return null;
+    if (this.saveCurrentMessageProblem()) return null;
     const message = this.requestType === 'socketio'
       ? socketIOMessageFromDraft(name, { event: this.sioEventName, args: this.sioArgs, ack: this.sioAck }, this.savedMessages)
       : webSocketMessageFromDraft(name, { content: this.bodyContent, type: this.webSocketMessageBodyType() }, this.savedMessages);

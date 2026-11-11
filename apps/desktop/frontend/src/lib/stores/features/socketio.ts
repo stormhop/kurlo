@@ -168,14 +168,16 @@ export const socketioFeature = {
     const eventName = this.sioEventName.trim() || 'message';
     const namespace = this.sioNamespace || '/';
     const envValues = this.environmentValuesForRequest(this.snapshotActiveRequest());
-    const args = this.sioArgs.map(a => {
-      if (a.bodyType === 'binary') return a.content;
-      return this.resolveTemplate(a.content, envValues);
-    });
+    const args = this.sioArgs
+      .filter(a => a.content.trim() !== '')
+      .map(a => {
+        if (a.bodyType === 'binary') return a.content;
+        return this.resolveTemplate(a.content, envValues);
+      });
     const result = await socketIOEmit(id, { eventName, args, namespace, ack: this.sioAck });
     const timestamp = Date.now();
     if (result.ok) {
-      this._sioAddMessage(id, { id: `sio-out-${timestamp}`, direction: 'outgoing', eventName, args, namespace, timestamp, isSystem: false, isError: false });
+      this._sioAddMessage(id, { id: '', direction: 'outgoing', eventName, args, namespace, timestamp, isSystem: false, isError: false });
     } else {
       this._sioAddMessage(id, { id: '', direction: 'system', eventName: '', args: [], namespace, timestamp, isSystem: true, isError: true, message: result.error || 'Failed to emit Socket.IO event' });
     }

@@ -103,6 +103,8 @@ Use the Message tab to send a text or binary payload after connecting. Per-reque
 
 **Saved** in the Message tab keeps messages you send again and again: a subscribe frame, a ping in your own format, a test payload. Type the message, open **Saved**, name it and press **Save current**. Click a saved message to put it back in the editor, or use its send button to send it straight away while connected.
 
+A request keeps up to 100 saved messages of up to 256 KB each; at the limit **Save current** is turned off until you delete one. From nine messages on, a search field above the list finds messages by name, content, event or argument. A request file that already holds more than 100 shows the first 100 and finds the rest by search; nothing is removed.
+
 Saved messages are stored with the request as `savedMessages` in its YAML file, so they are shared through Git with the rest of the collection. Socket.IO requests have the same menu next to the event name; a saved Socket.IO message keeps the event name, every argument and the **Ack** setting.
 
 ![Saved WebSocket messages in the Message tab](../../../../assets/screenshots/websocket-saved-messages.png)
@@ -114,7 +116,7 @@ Socket.IO mode speaks the Socket.IO protocol rather than raw WebSocket frames. C
 - Client version: v2 or v3.
 - Path, usually `/socket.io`.
 - Namespace, usually `/`.
-- Event name, arguments, and ack behavior.
+- Event name, arguments, and ack behavior. Empty arguments are not sent; to send an empty string, write `""` in JSON.
 - Reconnect attempts and interval.
 
 Socket.IO events are displayed with namespace, direction, args, and system/error rows. Cookies, headers, and the Authorization tab are applied to the Engine.IO handshake unless the request disables the cookie jar. As with WebSocket, there is no Scripts tab.

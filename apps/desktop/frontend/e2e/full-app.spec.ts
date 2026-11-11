@@ -2768,6 +2768,158 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.locator('.sio-panel .ws-message-list')).toContainText('ack for "room:join"');
   });
 
+  async function openRequestWithSavedMessages(page: Page, count: number) {
+    const savedMessages = Array.from({ length: count }, (_, index) => ({ id: `m-${index + 1}`, name: `Message ${index + 1}`, content: `{"op":"subscribe","channel":"orders-${index + 1}"}`, bodyType: 'json' }));
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-ws', workspaceId: 'workspace-e2e', name: 'Test' }],
+      requests: [{ id: 'ws-echo', collectionId: 'col-ws', collection: 'Test', name: 'WS echo', requestType: 'ws', method: 'GET', url: 'ws://localhost:4567/ws', auth: { type: 'none' }, savedMessages }],
+      activeId: 'ws-echo',
+      openIds: ['ws-echo'],
+    });
+    await page.goto('/');
+    const trigger = page.getByRole('button', { name: /^Saved messages/ });
+    await expect(trigger).toHaveAccessibleName(`Saved messages, ${count}`);
+    await trigger.click();
+    return page.getByRole('dialog', { name: 'Saved messages' });
+  }
+
+  for (const scale of [1, 1.5]) {
+    test(`scrolls through 100 saved messages and stops saving at the limit at ${scale}`, async ({ page }, testInfo) => {
+      await page.addInitScript(value => localStorage.setItem('kurlo.uiScale.v1', String(value)), scale);
+      await page.setViewportSize({ width: 1100, height: 720 });
+      const menu = await openRequestWithSavedMessages(page, 100);
+      const list = menu.getByRole('list', { name: 'Saved messages list' });
+
+      await expect(menu.getByRole('button', { name: 'Save current' })).toBeDisabled();
+      await expect(menu.getByRole('status').filter({ hasText: 'up to 100 saved messages' })).toBeVisible();
+      await expect(list.getByRole('listitem')).toHaveCount(100);
+      const geometry = await list.evaluate(node => {
+        const menuBox = node.closest('[role="dialog"]')!.getBoundingClientRect();
+        return { scrolls: node.scrollHeight > node.clientHeight, sideways: node.scrollWidth > node.clientWidth, fits: menuBox.bottom <= window.innerHeight && menuBox.right <= window.innerWidth };
+      });
+      expect(geometry).toEqual({ scrolls: true, sideways: false, fits: true });
+
+      const visibleAt = (locator: Locator) => locator.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return Boolean(hit && node.contains(hit));
+      });
+      const trigger = page.getByRole('button', { name: /^Saved messages/ });
+      const triggerTop = await trigger.evaluate(node => node.getBoundingClientRect().top);
+      expect(await visibleAt(menu.getByRole('button', { name: 'Save current' }))).toBe(true);
+
+      const last = menu.getByRole('button', { name: 'Load Message 100', exact: true });
+      await list.hover();
+      for (let step = 0; step < 4; step += 1) await page.mouse.wheel(0, 30000);
+      await expect.poll(() => list.evaluate(node => Math.ceil(node.scrollTop + node.clientHeight) >= node.scrollHeight)).toBe(true);
+      await expect.poll(() => visibleAt(last)).toBe(true);
+      expect(await trigger.evaluate(node => node.getBoundingClientRect().top)).toBe(triggerTop);
+      expect(await visibleAt(menu.getByRole('searchbox', { name: 'Search saved messages' }))).toBe(true);
+      await page.screenshot({ path: join(tmpdir(), `kurlo-saved-messages-100-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
+
+      await menu.getByRole('searchbox', { name: 'Search saved messages' }).fill('orders-42"');
+      await expect(list.getByRole('listitem')).toHaveCount(1);
+      await expect(menu.getByRole('button', { name: 'Load Message 42', exact: true })).toBeVisible();
+      await menu.getByRole('searchbox', { name: 'Search saved messages' }).fill('nothing-like-this');
+      await expect(menu).toContainText('No saved message matches “nothing-like-this”.');
+      await menu.getByRole('searchbox', { name: 'Search saved messages' }).fill('');
+
+      await menu.getByRole('button', { name: 'Delete Message 7', exact: true }).click();
+      await expect(menu.getByRole('button', { name: 'Save current' })).toBeEnabled();
+      await expect(menu.getByRole('status').filter({ hasText: 'up to 100 saved messages' })).toHaveCount(0);
+
+      await menu.getByRole('button', { name: 'Load Message 100', exact: true }).click();
+      await expect(page.getByTestId('websocket-message-editor').locator('.cm-content')).toHaveText('{"op":"subscribe","channel":"orders-100"}');
+    });
+  }
+
+  test('keeps long saved messages inside the menu without sideways scrolling', async ({ page }, testInfo) => {
+    const savedMessages = Array.from({ length: 12 }, (_, index) => ({
+      id: `long-${index}`,
+      name: index % 2 ? `Echo order ${index} for the warehouse in the northern distribution region` : `Echo order ${index}`,
+      content: JSON.stringify({ type: 'order', id: index, items: [{ sku: `SKU-${index}`, qty: 2 }], total: index * 3.75, note: 'x'.repeat(200) }),
+      bodyType: 'json',
+    }));
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-ws', workspaceId: 'workspace-e2e', name: 'Test' }],
+      requests: [{ id: 'ws-echo', collectionId: 'col-ws', collection: 'Test', name: 'WS echo', requestType: 'ws', method: 'GET', url: 'ws://localhost:4567/ws', auth: { type: 'none' }, savedMessages }],
+      activeId: 'ws-echo',
+      openIds: ['ws-echo'],
+    });
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.goto('/');
+    await page.getByRole('button', { name: /^Saved messages/ }).click();
+    const menu = page.getByRole('dialog', { name: 'Saved messages' });
+    const list = menu.getByRole('list', { name: 'Saved messages list' });
+    await expect(list.getByRole('listitem')).toHaveCount(12);
+    const layout = await list.evaluate(node => {
+      const rows = [...node.querySelectorAll('li')].map(item => {
+        const load = item.querySelector('.saved-messages-load')!.getBoundingClientRect();
+        const actions = [...item.querySelectorAll('button:not(.saved-messages-load)')].map(button => button.getBoundingClientRect());
+        const texts = [...item.querySelectorAll('.saved-messages-item-name, .saved-messages-item-hint')].map(span => span.getBoundingClientRect());
+        return { textInside: texts.every(text => text.right <= load.right + 0.5), actionsAfter: actions.every(action => action.left >= load.right - 0.5) };
+      });
+      return { sideways: node.scrollWidth > node.clientWidth, rows: rows.every(row => row.textInside && row.actionsAfter) };
+    });
+    expect(layout).toEqual({ sideways: false, rows: true });
+    await expect(menu.getByRole('button', { name: /^Load Echo order 1 for the warehouse/ })).toHaveAttribute('title', /northern distribution region/);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-saved-messages-long-${testInfo.project.name}.png`), animations: 'disabled' });
+  });
+
+  test('shows the first 100 of a longer saved message list and finds the rest by search', async ({ page }) => {
+    const menu = await openRequestWithSavedMessages(page, 120);
+    const list = menu.getByRole('list', { name: 'Saved messages list' });
+    await expect(list.getByRole('listitem')).toHaveCount(100);
+    await expect(menu).toContainText('20 more not shown. Search to find them.');
+    await menu.getByRole('searchbox', { name: 'Search saved messages' }).fill('orders-115"');
+    await expect(menu.getByRole('button', { name: 'Load Message 115', exact: true })).toBeVisible();
+  });
+
+  test('cuts a long AI connection name inside the request bar button', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const label = 'Company OpenAI-compatible gateway for the analytics and reporting platform in Europe';
+      const app = window.go.api.App as Record<string, unknown>;
+      app.AiConnections = async () => ({ connections: [{ id: 'c1', kind: 'compatible', label, baseUrl: 'https://gateway.example.test/v1', model: 'gpt-4.1', hasKey: true, keyHint: 'sk-…d5e', default: true, provider: 'openai' }] });
+    });
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'AI Request');
+    await page.getByLabel('Provider and model').click();
+    await page.getByRole('radio', { name: 'Kurlo connection' }).click();
+    await page.keyboard.press('Escape');
+    const button = page.getByRole('button', { name: 'Default AI connection' });
+    await expect(button).toContainText('Company OpenAI-compatible gateway');
+    const layout = await button.evaluate(node => {
+      const box = node.getBoundingClientRect();
+      const label = node.querySelector('.ai-connection-url-label')!;
+      const hint = node.querySelector('.ai-connection-url-hint')!.getBoundingClientRect();
+      const text = label.getBoundingClientRect();
+      return { labelInside: text.right <= box.right + 0.5, labelCut: label.scrollWidth > label.clientWidth, hintInside: hint.right <= box.right + 0.5 && hint.left >= text.right - 0.5, sameLine: Math.abs(hint.top - text.top) < 4 };
+    });
+    expect(layout).toEqual({ labelInside: true, labelCut: true, hintInside: true, sameLine: true });
+    await page.screenshot({ path: join(tmpdir(), `kurlo-ai-connection-long-${test.info().project.name}.png`), clip: { x: 330, y: 80, width: 670, height: 60 } });
+  });
+
+  test('emits a Socket.IO event without arguments when the message is empty', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'Socket.IO Request');
+    await page.getByLabel('Request URL').fill('https://io.kurlo.test');
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    await expect(page.locator('.sio-panel')).toContainText('Connected');
+
+    await page.locator('.sio-event-name-input').fill('ping');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await fillCodeEditor(page, 'socketio-message-editor', '"fast"');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.socketIOEmits.map(entry => (entry.message as { args: string[] }).args))).toEqual([[], ['"fast"']]);
+    await expect(page.locator('.sio-panel .ws-message-list')).toContainText('"fast"');
+  });
+
   test('shows what is new after an update and skips the changelog otherwise', async ({ page }) => {
     const changelogRequests: string[] = [];
     page.on('request', request => {
@@ -7611,6 +7763,7 @@ test.describe('GraphQL explorer', () => {
         'language(code: ID!): Language',
         'languages(filter: LanguageFilterInput = {}): [Language!]!',
         ...Array.from({ length: 14 }, (_, index) => `extra${index}(id: ID!, first: Int = 10, after: String): [Country!]!`),
+        'ordersByCustomerAndWarehouseAndRegionWithPaginationAndFilters(customerId: ID!, warehouseId: ID!, region: String, first: Int = 10, after: String, filter: String): [CountryConnectionPayloadWithPagination!]!',
       ];
       const schema = `type Query {\n  ${fields.join('\n  ')}\n}\ntype Continent { code: ID! }\ntype Country { code: ID! }\ntype Language { code: ID! }`;
       const store = window.__kurloE2E.store as Record<string, unknown>;
@@ -7629,12 +7782,14 @@ test.describe('GraphQL explorer', () => {
 
     const rows = page.locator('.graphql-explorer-field');
     await expect.poll(() => rows.count()).toBeGreaterThan(0);
-    expect(await rows.count()).toBe(20);
+    expect(await rows.count()).toBe(21);
     const layout = await rows.evaluateAll(buttons => buttons.map(button => {
       const box = button.getBoundingClientRect();
       const args = button.querySelector('.graphql-field-args')?.getBoundingClientRect();
-      return { top: box.top, bottom: box.bottom, argsBottom: args?.bottom ?? box.top };
+      const textRight = Math.max(...[...button.querySelectorAll('span')].map(span => span.getBoundingClientRect().right));
+      return { top: box.top, bottom: box.bottom, argsBottom: args?.bottom ?? box.top, textInside: textRight <= box.right + 0.5 };
     }));
+    expect(layout.filter(row => !row.textInside), 'field text stays inside its row').toEqual([]);
     for (let index = 0; index < layout.length; index += 1) {
       expect(layout[index].argsBottom, `arguments of row ${index} stay inside it`).toBeLessThanOrEqual(layout[index].bottom + 0.5);
       if (index) expect(layout[index].top, `row ${index} starts below row ${index - 1}`).toBeGreaterThanOrEqual(layout[index - 1].bottom - 0.5);
@@ -7645,6 +7800,9 @@ test.describe('GraphQL explorer', () => {
     expect(clipped, 'text lines are not cut vertically').toEqual([]);
     const list = page.locator('.graphql-explorer-list');
     expect(await list.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+    expect(await list.evaluate(element => element.scrollWidth > element.clientWidth), 'the field list does not scroll sideways').toBe(false);
+    await list.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await page.screenshot({ path: join(tmpdir(), `kurlo-graphql-explorer-long-${test.info().project.name}.png`), animations: 'disabled' });
   });
 });
 

@@ -5,6 +5,10 @@ import type { RawBodyType, RequestType, SavedRealtimeMessage, SIOArg } from './t
 export type WebSocketDraft = { content: string; type: RawBodyType | 'binary' };
 export type SocketIODraft = { event: string; args: SIOArg[]; ack: boolean };
 
+export const SAVED_MESSAGES_MAX = 100;
+export const SAVED_MESSAGE_MAX_BYTES = 256 * 1024;
+export const SAVED_MESSAGES_SEARCH_FROM = 9;
+
 export function requestTypeSupportsSavedMessages(requestType: RequestType | undefined): boolean {
   return requestType === 'ws' || requestType === 'socketio';
 }
@@ -99,4 +103,27 @@ export function savedMessageSummary(message: SavedRealtimeMessage, requestType: 
 
 export function cloneSavedMessages(messages: SavedRealtimeMessage[]): SavedRealtimeMessage[] {
   return messages.map(message => ({ ...message, ...(message.args ? { args: message.args.map(arg => ({ ...arg })) } : {}) }));
+}
+
+function textBytes(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+export function savedMessageBytes(message: { content?: string; event?: string; args?: SIOArg[] }): number {
+  return textBytes(message.content ?? '') + textBytes(message.event ?? '') + (message.args ?? []).reduce((sum, arg) => sum + textBytes(arg.content), 0);
+}
+
+export function savedMessageProblem(count: number, bytes: number): string {
+  if (count >= SAVED_MESSAGES_MAX) return `A request keeps up to ${SAVED_MESSAGES_MAX} saved messages. Delete one to save another.`;
+  if (bytes > SAVED_MESSAGE_MAX_BYTES) return `This message is over ${SAVED_MESSAGE_MAX_BYTES / 1024} KB. Saved messages are kept in the request file, so keep them under that size.`;
+  return '';
+}
+
+export function savedMessageSearchText(message: SavedRealtimeMessage): string {
+  return [message.name, message.content ?? '', message.event ?? '', ...(message.args ?? []).map(arg => arg.content)].join('\n').toLowerCase();
+}
+
+export function filterSavedMessages(messages: SavedRealtimeMessage[], query: string): SavedRealtimeMessage[] {
+  const needle = query.trim().toLowerCase();
+  return needle ? messages.filter(message => savedMessageSearchText(message).includes(needle)) : messages;
 }

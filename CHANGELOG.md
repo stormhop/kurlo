@@ -10,7 +10,8 @@ All notable changes to Kurlo are documented here. This project follows
 ### Added
 
 - **Filter JSON responses.** The funnel next to search filters a JSON body with JSONPath, such as `$.items[?(@.status == 'paid')].id`, or a jq-style path such as `.items[].id`. Search, Copy and paging work on the filtered result, and a mistake in the expression is pointed out instead of hiding the body.
-- **Saved WebSocket and Socket.IO messages.** **Saved** in the Message tab keeps messages you send often with the request, so they are shared through Git. Click one to put it back in the editor or send it straight away; a Socket.IO message keeps its event, arguments and ack.
+- **Saved WebSocket and Socket.IO messages.** **Saved** in the Message tab keeps messages you send often with the request, so they are shared through Git. Click one to put it back in the editor or send it straight away; a Socket.IO message keeps its event, arguments and ack. A request keeps up to 100 saved messages of up to 256 KB each, and a search field appears once there are more than eight.
+- **Import a .env file.** **Import .env** in an environment's **•••** menu copies `KEY=value` lines into the environment, with `export` prefixes, `#` comments and quoted values understood. The file picker shows hidden files, so `.env` and `.env.local` can be picked.
 - **Fable 5.2 for Claude Code.** The Claude Code model menu lists Fable 5.2 next to Fable 5.1, Opus 5.5, Sonnet 5.5 and Haiku 5.5. Like Fable 5.1, it may need usage credits on your Claude plan.
 - Ten new themes: GitHub Light, GitHub Dark Dimmed, JetBrains Light, JetBrains Dark, One Dark, Tokyo Night, Everforest, Flexoki Paper, High Contrast Light and High Contrast Dark.
 
@@ -20,56 +21,37 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
-- Environments, the Matrix, global variables, collection and folder settings and the workspace README save and revert with the same buttons as a request: a round-arrow **Revert** and a **Save** that turns into **Saved** when nothing is left to save. Collection settings now offer **Revert**, and **Save** stays named for screen readers when the window is narrow and only its icon shows.
-- A cookie's **Expires** uses Kurlo's own date and time picker on every platform, in the app's theme, with quick choices such as **In 1 hour** and **In 7 days**, instead of the operating system's calendar.
-- Environments open one at a time by default; the **Matrix** view stays one click away and is remembered once chosen. The Matrix shows the environment in use and up to four more, with an **Environments** picker to choose the columns, keeps variable names on the left while scrolling sideways, and sits its scroll bar right under the table.
-- Cookies open as a sidebar section like environments instead of a window over the app. The sidebar lists **Browser sync** and the jar's domains, each domain gets a page with a summary, and deleting a domain or clearing the jar moves into the page's **•••** menu.
-- Catppuccin Latte, Catppuccin Mocha and Nord keep secondary text, method labels and status colours at a 4.5:1 contrast ratio on every panel, and Nord's sidebar now sits below the content like in the other themes.
-- VS Code Light and VS Code Dark follow the current Light Modern and Dark Modern palettes, with distinct secondary and muted text.
-- Error, warning and success highlights use the same tint strength on every screen and in every theme, and links and active tabs use a dedicated accent shade that stays readable on dark backgrounds.
-- The Cancel and Stop buttons shown while a request runs are tinted red with red text, so they stay readable in themes with a light error colour.
-- Dialogs, settings, search and keyboard shortcuts dim the window behind them without blurring it, so the app stays readable and opening them no longer costs a full-window blur.
-- The workspace overview has clearer actions: click the workspace name to rename it in place, **New workspace** is a real button, recent requests show a **Send** button on hover that opens and sends the request in one click, and the **Start** actions are a compact grid of tiles with icons.
-- Workspace **Notes** became a **README**: it shows as rendered Markdown with an **Edit** button and is kept as `README.md` in the workspace folder, so Git hosts show it and edits made outside Kurlo appear in the app. Notes saved in `workspace.yml` by earlier versions move into `README.md` on the next save. The Git screen lists `README.md` with the other workspace files and commits it. A long README is folded under **Show all**, and a `README.md` over 256 KB, not UTF-8 or a link is shown read-only and never changed.
-- Collection settings open on a clearer overview: click the collection name to rename it in place, **Run** and **New request** sit in the header with **Export…**, **Reset defaults** and **Delete collection** in a **•••** menu, an **Applied to every request** list shows what each default sets and opens its tab, and the documentation shows as rendered Markdown with an **Edit** button. In manual-save mode the header no longer shows **Saved** twice.
-- Markdown previews (collection documentation, request docs, the workspace README and agent replies) show a short note instead of rendering text over 256 KB, so a huge document no longer freezes the screen; the editor warns when documentation passes that size and still saves it. Long collection documentation is folded under **Show all**, and documentation made only of blank lines is saved as empty instead of showing **Updated elsewhere**.
+- **Supported macOS is now 15 Sequoia or later.** Kurlo is built and tested on the WebKit that macOS 15 ships with. It still starts on macOS 12–14, but those versions are no longer tested and parts of the app may look wrong there. Windows and Linux are unchanged.
+- Environments open one at a time by default; the **Matrix** view stays one click away and is remembered once chosen. The Matrix shows the environment in use and up to four more, with an **Environments** picker to choose the columns, keeps variable names on the left while scrolling sideways, and stays smooth with hundreds of variables across dozens of environments.
+- Cookies open as a sidebar section like environments instead of a window over the app. The sidebar lists **Browser sync** and the jar's domains, each domain gets a page with a summary, and a cookie's **Expires** uses Kurlo's own date and time picker with quick choices such as **In 1 hour**.
+- Workspace **Notes** became a **README**: it shows as rendered Markdown with an **Edit** button and is kept as `README.md` in the workspace folder, so Git hosts show it and edits made outside Kurlo appear in the app. Notes saved in `workspace.yml` by earlier versions move into `README.md` on the next save.
+- Clearer workspace and collection overviews: click the name to rename it in place, the main actions sit in the header with the rest in a **•••** menu, and collection settings list what each default applies to every request. Collection documentation shows as rendered Markdown with an **Edit** button.
+- Environments, the Matrix, global variables, collection and folder settings and the workspace README save and revert with the same buttons as a request: a round-arrow **Revert** and a **Save** that turns into **Saved** when nothing is left to save.
+- Themes: Catppuccin, Nord and VS Code keep secondary text and status colours readable on every panel, highlights use the same tint in every theme, and the Cancel and Stop buttons are tinted red. Dialogs dim the window behind them without blurring it.
+- On macOS, the title area is one band across the whole window, and the workspace switcher sits in it at the sidebar's right edge, giving request tabs more room.
+- Markdown previews show a short note instead of rendering text over 256 KB, so a huge document no longer freezes the screen.
 
 ### Fixed
 
-- When the Claude Code CLI signs out after it was connected, Settings → AI shows **Signed out** with a **Sign in** button instead of a **Reconnect** that did nothing, hides the plan limits saved before, and **Your agents** no longer calls it connected.
-- Typing into a **Not set** cell of the environment **Matrix** keeps every character; before, only the first one stayed and the rest were lost.
-- The **Default location** field in Settings is now the same height as its **Browse** and **Save** buttons, and an environment's **Unsaved changes** note no longer breaks across two lines.
-- The environment **Matrix** draws only the rows and columns in view, so scrolling through hundreds of variables across dozens of environments no longer flashes empty areas. Scrolling with a trackpad or mouse wheel moves the table and fills it in the same frame, at most once per frame. A variable name you are renaming is saved when its row scrolls out of view.
-- In the **Matrix**, **×** on a value set in only one environment deleted the whole variable without asking, the same as the bin. **×** now shows only when another environment also sets the variable; to delete it, use the bin, which asks first.
-- Names of workspaces, collections, folders, requests, environments, load tests, examples, saved messages and MCP servers are limited to 100 characters when you type them. A long name no longer stretches the window: the environment picker in the top bar, the sidebar, the environment, folder and collection headers, the Matrix columns, the runner and dropdown lists cut it short with **…**, and dialogs wrap it. Before, a long environment name pushed the whole top bar and editor off screen.
-- Manual save covers environments, global variables and the workspace README. Renaming an environment, changing **Inherits from** or editing a README used to be saved at once, and any other change to the workspace saved unsaved environment and global variable edits with it. They now wait for **Save**, **Revert** discards them, and quitting asks about them. Values written by scripts are still saved straight away.
-- **Import .env** opens a file picker that shows hidden files, so `.env` and `.env.local` can be picked; before, they were hidden and could not be chosen. The file can also use `export` prefixes and trailing `#` comments, and a file that cannot be read says why.
-- The YAML schema published at kurlo.dev describes load test files and environments pinned to a collection.
-- The cookie editor no longer shows the internal `{{kurloSecret:…}}` reference for a cookie whose value lives on another computer, in the **Fields** editor, in **Raw** or after switching between them; the value is empty and saving without a value keeps the reference.
-- The **Protected** and **Sandbox** marks on an environment sit right after its name instead of halfway across the header.
-- Agent chat messages scroll all the way to the message box instead of stopping in a strip above it.
-- Theme miniatures in settings show each theme's own button text and status colours instead of borrowing them from the active theme.
-- Collection Runner respects the checked request subset when opened from the activity rail, preventing unchecked requests from being sent.
-- Background MCP and gRPC results, stream updates and HTTP connection errors stay with their source requests without replacing the visible response.
-- On macOS, the title area is one 45px band across the whole window: the line under the top bar runs over the activity rail and sidebar to the window edge, the rail icons line up with the sidebar filter instead of crossing that line, and while the sidebar is open the workspace switcher sits in that band at the sidebar's right edge, giving request tabs more room.
-- In a narrow Agent sidebar, such as when Chat details is docked, the New chat button shrinks to a + icon instead of sticking out past the chat search field.
-- The Settings window is a little taller, so the General page fits without a scroll bar.
-- A GET response first detected as SSE in the background opens the source stream with its captured request settings and environment.
-- Environment matrices, request tabs and workspace menus scroll over their contents, including at the minimum window size and 150% interface scale.
-- Network errors mask environment secrets, including URL-encoded values, before they reach history or script results.
-- Redirect limits count followed transitions correctly and report an explicit error when the limit is exceeded.
-- Response-body timeouts and cancellation use consistent error messages while retaining the received status and partial body.
+- **Manual save now covers environments, global variables and the workspace README.** Renaming an environment, changing **Inherits from** or editing a README used to be saved at once, and other changes to the workspace saved unsaved environment edits with them. They now wait for **Save**, **Revert** discards them, and quitting asks about them.
+- **Unchecked requests in the Collection Runner are no longer sent** when the runner is opened from the activity rail.
+- **Network errors mask environment secrets**, including URL-encoded values, before they reach history or script results.
+- In the environment **Matrix**, **×** on a value set in only one environment deleted the whole variable without asking. It now shows only when another environment also sets the variable; the bin deletes it and asks first.
+- Typing into a **Not set** cell of the **Matrix** keeps every character; before, only the first one stayed.
+- A long environment, collection or request name no longer pushes the top bar and editor off screen: names are limited to 100 characters and cut short with **…**.
+- When the Claude Code CLI signs out after it was connected, Settings → AI shows **Signed out** with a **Sign in** button instead of a **Reconnect** that did nothing.
+- A Socket.IO event sent with an empty message goes out without arguments instead of with one empty string, so server handlers that take only an ack callback receive it first.
+- Long names in the GraphQL **Explore** field list and on the AI request connection button are cut with an ellipsis instead of running under the buttons next to them.
+- Background MCP, gRPC and HTTP results stay with their own request tab instead of replacing the response you are looking at, and a GET first detected as SSE in the background opens with its own request settings.
+- Redirect limits count followed redirects correctly, timeouts and cancellation keep the received status and partial body, and proxy DNS errors name the proxy.
 - Postman scripts can read `pm.response.body` as a string, alongside `pm.response.text()`.
-- NTLM handshake requests appear in the sent-request trace and exchange cookies between authentication steps.
-- Failed reads of local workspace metadata stop saves before changing workspace files.
-- Saving examples preserves unrelated files and removes only legacy body files referenced by saved examples.
-- The binary response cache refreshes recently used entries and limits retained bodies to 128 MiB.
-- Proxy DNS errors identify the failing proxy hostname.
-- Scrolling over row labels works in environment lists, the environment switcher, collections, history and the environment pin picker without restoring scroll bounce.
-- HTTP responses that finish in the background stay available in their original request tabs without replacing the response or selected response tab you are viewing.
-- An open environment pin picker adjusts to window, panel and interface-scale changes instead of remaining clipped below the window.
-- Collection settings adapt to the available panel width, keeping documentation and header actions usable at the minimum window size and 150% interface scale.
-- File headers in a Git diff no longer pile up at the top while you scroll: each stays pinned only while its own file is in view, with no lines showing through above it.
+- NTLM handshake requests appear in the sent-request trace and pass cookies between authentication steps.
+- Saving examples no longer touches unrelated files, and a failed read of workspace metadata stops a save before any file changes.
+- The cookie editor no longer shows the internal `{{kurloSecret:…}}` reference for a cookie whose value lives on another computer.
+- Agent chat messages scroll all the way to the message box.
+- File headers in a Git diff no longer pile up at the top while you scroll.
+- Lists scroll when the pointer is over a row label, and the environment pin picker follows window and panel size changes.
+- The YAML schema published at kurlo.dev describes load test files and environments pinned to a collection.
 
 ## [3.0.3] - 2026-11-10
 

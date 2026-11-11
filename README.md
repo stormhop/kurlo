@@ -52,7 +52,7 @@ Grab the latest build from the [releases page](https://github.com/stormhop/kurlo
 
 | Platform | Installer |
 |----------|-----------|
-| macOS (Apple Silicon + Intel) | `.dmg` |
+| macOS 15 Sequoia or later (Apple Silicon + Intel) | `.dmg` |
 | Windows 10/11 (x64, arm64) | `.exe` (NSIS installer), `.msix` |
 | Linux (x64) | `.AppImage` |
 

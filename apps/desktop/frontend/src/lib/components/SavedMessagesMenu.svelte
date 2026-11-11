@@ -1,7 +1,7 @@
 <script lang="ts">
   import { NAME_MAX_LENGTH } from '../constants';
   import { tick } from 'svelte';
-  import { savedMessageSummary } from '../savedMessages';
+  import { SAVED_MESSAGES_MAX, SAVED_MESSAGES_SEARCH_FROM, filterSavedMessages, savedMessageSummary } from '../savedMessages';
   import { vm } from '../stores/app.svelte';
 
   let { connected = false }: { connected?: boolean } = $props();
@@ -11,9 +11,17 @@
   let wrap = $state<HTMLDivElement>();
   let trigger = $state<HTMLButtonElement>();
   let nameInput = $state<HTMLInputElement>();
+  let menu = $state<HTMLDivElement>();
+  let menuStyle = $state('');
   let justSaved = $state('');
+  let query = $state('');
 
   const messages = $derived(vm.savedMessages);
+  const problem = $derived(open ? vm.saveCurrentMessageProblem() : '');
+  const searchable = $derived(messages.length >= SAVED_MESSAGES_SEARCH_FROM);
+  const matches = $derived(searchable ? filterSavedMessages(messages, query) : messages);
+  const shown = $derived(matches.slice(0, SAVED_MESSAGES_MAX));
+  const hidden = $derived(matches.length - shown.length);
 
   async function toggle() {
     if (open) {
@@ -22,6 +30,7 @@
     }
     name = vm.suggestedSavedMessageName();
     justSaved = '';
+    query = '';
     open = true;
     await tick();
     nameInput?.focus({ preventScroll: true });
@@ -73,10 +82,45 @@
     open = false;
   }
 
+  const MENU_MARGIN = 10;
+  const MENU_MIN_HEIGHT = 160;
+
+  function clipBounds(from: HTMLElement) {
+    let node = from.parentElement;
+    while (node && node !== document.body) {
+      const style = getComputedStyle(node);
+      if (style.overflow !== 'visible' || style.overflowY !== 'visible') return node.getBoundingClientRect();
+      node = node.parentElement;
+    }
+    return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+
+  function fitMenu() {
+    if (!wrap || !menu) return;
+    const trigger = wrap.getBoundingClientRect();
+    const bounds = clipBounds(wrap);
+    const below = Math.min(bounds.bottom, window.innerHeight) - trigger.bottom - MENU_MARGIN;
+    const above = trigger.top - Math.max(bounds.top, 0) - MENU_MARGIN;
+    const natural = menu.scrollHeight;
+    if (natural <= below || below >= above) {
+      menuStyle = `max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(below))}px`;
+      return;
+    }
+    menuStyle = `top:auto;bottom:calc(100% + 4px);max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(above))}px`;
+  }
+
   $effect(() => {
-    if (!open) return;
+    if (!open) {
+      menuStyle = '';
+      return;
+    }
+    if (menu) fitMenu();
     document.addEventListener('pointerdown', closeOnPointerOutside, true);
-    return () => document.removeEventListener('pointerdown', closeOnPointerOutside, true);
+    window.addEventListener('resize', fitMenu);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointerOutside, true);
+      window.removeEventListener('resize', fitMenu);
+    };
   });
 </script>
 
@@ -98,7 +142,7 @@
   </button>
 
   {#if open}
-    <div class="saved-messages-menu" role="dialog" aria-label="Saved messages" tabindex="-1" onkeydown={onKeydown}>
+    <div class="saved-messages-menu" bind:this={menu} style={menuStyle} role="dialog" aria-label="Saved messages" tabindex="-1" onkeydown={onKeydown}>
       <form class="saved-messages-form" onsubmit={save}>
         <input
           bind:this={nameInput}
@@ -110,14 +154,27 @@
           autocomplete="off"
           spellcheck="false"
         />
-        <button class="btn btn-primary btn-sm" type="submit" disabled={!name.trim()}>Save current</button>
+        <button class="btn btn-primary btn-sm" type="submit" disabled={!name.trim() || Boolean(problem)}>Save current</button>
       </form>
+      {#if problem}<p class="saved-messages-note" role="status">{problem}</p>{/if}
 
-      {#if messages.length}
+      {#if searchable}
+        <div class="field field-sm field-wrap saved-messages-search">
+          <svg width="0.75rem" height="0.75rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <input bind:value={query} type="search" aria-label="Search saved messages" placeholder={`Search ${messages.length} messages`} autocomplete="off" spellcheck="false" />
+        </div>
+      {/if}
+
+      {#if messages.length && !shown.length}
+        <p class="saved-messages-empty" role="status">No saved message matches “{query.trim()}”.</p>
+      {:else if messages.length}
         <ul class="saved-messages-list" aria-label="Saved messages list">
-          {#each messages as message (message.id)}
+          {#each shown as message (message.id)}
             <li class="saved-messages-item" class:just-saved={justSaved === message.id}>
-              <button class="saved-messages-load" type="button" aria-label={`Load ${message.name}`} onclick={() => load(message.id)}>
+              <button class="saved-messages-load" type="button" aria-label={`Load ${message.name}`} title={message.name} onclick={() => load(message.id)}>
                 <span class="saved-messages-item-name">{message.name}</span>
                 <span class="saved-messages-item-hint">{savedMessageSummary(message, vm.requestType)}</span>
               </button>
@@ -132,6 +189,7 @@
             </li>
           {/each}
         </ul>
+        {#if hidden > 0}<p class="saved-messages-note" role="status">{hidden} more not shown. Search to find them.</p>{/if}
       {:else}
         <p class="saved-messages-empty">Save the message in the editor to send it again later. Saved messages are kept with the request.</p>
       {/if}
@@ -162,9 +220,11 @@
     border-radius: var(--radius-md);
     background: var(--bg);
     box-shadow: var(--shadow-popover);
+    overflow: hidden;
   }
   .saved-messages-form {
     display: flex;
+    flex: 0 0 auto;
     gap: var(--space-1-5);
   }
   .saved-messages-name {
@@ -174,10 +234,14 @@
   .saved-messages-list {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
     max-height: 17.5rem;
     margin: 0;
     padding: 0;
+    overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: none;
     list-style: none;
   }
   .saved-messages-item {
@@ -195,9 +259,9 @@
     color: var(--accent-text);
   }
   .saved-messages-load {
-    display: flex;
+    display: grid;
     flex: 1 1 auto;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-0-5);
     min-width: 0;
     padding: var(--space-1-5) var(--space-2);
@@ -210,7 +274,7 @@
   .saved-messages-item-name,
   .saved-messages-item-hint {
     min-width: 0;
-    overflow: clip;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -222,7 +286,18 @@
     font-family: var(--font-mono);
     font-size: var(--text-caption);
   }
+  .saved-messages-search {
+    flex: 0 0 auto;
+  }
+  .saved-messages-note {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0 var(--space-2);
+    color: var(--text-2);
+    font-size: var(--text-caption);
+  }
   .saved-messages-empty {
+    flex: 0 0 auto;
     margin: 0;
     padding: var(--space-1-5) var(--space-2);
     color: var(--text-2);

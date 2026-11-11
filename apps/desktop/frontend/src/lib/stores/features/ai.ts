@@ -3,6 +3,7 @@ import { emptyHttpResponse } from '../../wire';
 import type { AiBlock, AiMessage, AiRequest, AiResponse, AiStep, AiUsage, HttpRequest, HttpResponse } from '../../backend';
 import type { AuthType, RequestTab, RequestType, SavedRequest } from '../../types/models';
 import { newRequestId } from '../../utils';
+import { listenRuntime } from '../../runtimeEvents';
 
 export type AiPresetId = 'kurlo' | 'openai' | 'anthropic' | 'openrouter' | 'groq' | 'ollama' | 'lmstudio' | 'custom';
 
@@ -459,16 +460,15 @@ export const aiFeature = {
   },
 
   initAiListeners(this: AiHost) {
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
-    runtime.EventsOn('ai:deltas', (payload: { sessionId: string; turnId?: string; deltas: AiDelta[] }) => {
+    if (!window.runtime?.EventsOn) return;
+    listenRuntime('ai:deltas', (payload: { sessionId: string; turnId?: string; deltas: AiDelta[] }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
       if (!turn || turn.status !== 'streaming' || !payload.deltas?.length) return;
       if (payload.turnId && payload.turnId !== turn.id) return;
       this.updateAiTurn(payload.sessionId, turn.id, current => applyAiDeltas(current, payload.deltas));
     });
-    runtime.EventsOn('ai:step', (payload: { sessionId: string; turnId?: string; step: AiStep }) => {
+    listenRuntime('ai:step', (payload: { sessionId: string; turnId?: string; step: AiStep }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
       if (!turn || turn.status !== 'streaming' || !isAiStepIndex(payload.step.index)) return;
@@ -480,7 +480,7 @@ export const aiFeature = {
         return { ...current, steps };
       });
     });
-    runtime.EventsOn('ai:tool', (payload: { sessionId: string; turnId?: string; step: number; block: AiBlock }) => {
+    listenRuntime('ai:tool', (payload: { sessionId: string; turnId?: string; step: number; block: AiBlock }) => {
       const turns = this.aiConversations.get(payload.sessionId);
       const turn = turns?.at(-1);
       if (!turn || turn.status !== 'streaming' || !isAiStepIndex(payload.step)) return;

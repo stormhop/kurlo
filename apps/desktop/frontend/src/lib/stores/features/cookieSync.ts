@@ -6,6 +6,7 @@ import {
 import type { CookieSyncStatus } from '../../backend';
 import { EMPTY_COOKIE_SYNC_STATUS } from '../../wire';
 import { clipboardCopy } from '../../utils';
+import { listenRuntime } from '../../runtimeEvents';
 
 export const DEFAULT_COOKIE_SYNC_PORT = 3199;
 export const COOKIE_SYNC_REFRESH_DEBOUNCE_MS = 250;
@@ -232,12 +233,11 @@ export const cookieSyncFeature = {
   },
 
   initCookieSyncListeners(this: CookieSyncHost) {
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
-    runtime.EventsOn<string>('cookies:jar-changed', workspaceId => {
+    if (!window.runtime?.EventsOn) return;
+    listenRuntime<string>('cookies:jar-changed', workspaceId => {
       if (workspaceId) void this.refreshCookieJar(true, true, workspaceId);
     });
-    runtime.EventsOn<CookieSyncStatus>('cookies:synced', status => {
+    listenRuntime<CookieSyncStatus>('cookies:synced', status => {
       this.cookieSync = status ?? EMPTY_COOKIE_SYNC_STATUS;
       this.cookieSyncError = status?.error ?? '';
       this.scheduleCookieSyncJarRefresh();

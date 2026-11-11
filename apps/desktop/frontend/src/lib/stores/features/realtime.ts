@@ -10,6 +10,7 @@ import type {
   WebSocketMessageEntry,
   WebSocketSession,
 } from '../../types/models';
+import { listenRuntime } from '../../runtimeEvents';
 
 const REALTIME_MAX_STORED_SESSIONS = 24;
 const REALTIME_IDLE_SESSION_TTL_MS = 30 * 60 * 1000;
@@ -129,10 +130,9 @@ export const realtimeFeature = {
   },
 
   initSSEListeners(this: RealtimeHost) {
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
+    if (!window.runtime?.EventsOn) return;
 
-    runtime.EventsOn('sse:open', (payload: { sessionId: string; url: string; statusCode: number; status: string; headers?: KeyValue[]; duration?: number; timings?: ResponseTimings; timestamp: number }) => {
+    listenRuntime('sse:open', (payload: { sessionId: string; url: string; statusCode: number; status: string; headers?: KeyValue[]; duration?: number; timings?: ResponseTimings; timestamp: number }) => {
       const startedAt = this._sseStartedAt.get(payload.sessionId) ?? payload.timestamp;
       const duration = typeof payload.duration === 'number' && Number.isFinite(payload.duration)
         ? payload.duration
@@ -158,15 +158,15 @@ export const realtimeFeature = {
       void this._recordSSEHistoryOnce(payload.sessionId, payload.statusCode, payload.status, payload.timestamp);
     });
 
-    runtime.EventsOn('sse:event', (payload: { sessionId: string; event: SSEEventEntry }) => {
+    listenRuntime('sse:event', (payload: { sessionId: string; event: SSEEventEntry }) => {
       this._sseAddEvent(payload.sessionId, payload.event);
     });
 
-    runtime.EventsOn('sse:events', (payload: { sessionId: string; events: SSEEventEntry[] }) => {
+    listenRuntime('sse:events', (payload: { sessionId: string; events: SSEEventEntry[] }) => {
       this._sseAddEvents(payload.sessionId, payload.events);
     });
 
-    runtime.EventsOn('sse:close', (payload: { sessionId: string; message: string; timestamp: number }) => {
+    listenRuntime('sse:close', (payload: { sessionId: string; message: string; timestamp: number }) => {
       this._sseSetSession(payload.sessionId, { status: 'idle' });
       this._sseAddEvent(payload.sessionId, {
         id: '', event: 'disconnected', data: '',
@@ -175,7 +175,7 @@ export const realtimeFeature = {
       });
     });
 
-    runtime.EventsOn('sse:reconnecting', (payload: { sessionId: string; attempt: number; delayMs: number; lastEventId: string; message: string; timestamp: number }) => {
+    listenRuntime('sse:reconnecting', (payload: { sessionId: string; attempt: number; delayMs: number; lastEventId: string; message: string; timestamp: number }) => {
       this._sseSetSession(payload.sessionId, { status: 'reconnecting' });
       const seconds = Math.max(1, Math.round(payload.delayMs / 1000));
       const reason = payload.message ? ` — ${payload.message}` : '';
@@ -186,7 +186,7 @@ export const realtimeFeature = {
       });
     });
 
-    runtime.EventsOn('sse:error', (payload: { sessionId: string; message: string; timestamp: number }) => {
+    listenRuntime('sse:error', (payload: { sessionId: string; message: string; timestamp: number }) => {
       const existing = this.sseSessions.get(payload.sessionId);
       this._sseSetSession(payload.sessionId, { status: 'error', error: payload.message });
       this._sseAddEvent(payload.sessionId, {
@@ -201,10 +201,9 @@ export const realtimeFeature = {
   },
 
   initWebSocketListeners(this: RealtimeHost) {
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
+    if (!window.runtime?.EventsOn) return;
 
-    runtime.EventsOn('ws:open', (payload: { sessionId: string; url: string; status: string; headers?: KeyValue[]; requestHeaders?: KeyValue[]; responseHeaders?: KeyValue[]; protocol?: string; timestamp: number }) => {
+    listenRuntime('ws:open', (payload: { sessionId: string; url: string; status: string; headers?: KeyValue[]; requestHeaders?: KeyValue[]; responseHeaders?: KeyValue[]; protocol?: string; timestamp: number }) => {
       const statusCode = Number(payload.status.match(/\b(\d{3})\b/)?.[1] ?? 101);
       const responseHeaders = payload.responseHeaders ?? payload.headers ?? [];
       this._wsSetSession(payload.sessionId, {
@@ -232,15 +231,15 @@ export const realtimeFeature = {
       });
     });
 
-    runtime.EventsOn('ws:event', (payload: { sessionId: string; event: WebSocketMessageEntry }) => {
+    listenRuntime('ws:event', (payload: { sessionId: string; event: WebSocketMessageEntry }) => {
       this._wsAddMessage(payload.sessionId, payload.event);
     });
 
-    runtime.EventsOn('ws:events', (payload: { sessionId: string; events: WebSocketMessageEntry[] }) => {
+    listenRuntime('ws:events', (payload: { sessionId: string; events: WebSocketMessageEntry[] }) => {
       this._wsAddMessages(payload.sessionId, payload.events);
     });
 
-    runtime.EventsOn('ws:close', (payload: { sessionId: string; message: string; code?: number; timestamp: number }) => {
+    listenRuntime('ws:close', (payload: { sessionId: string; message: string; code?: number; timestamp: number }) => {
       const existing = this.webSocketSessions.get(payload.sessionId);
       this._wsSetSession(payload.sessionId, { status: 'idle' });
       this._wsAddMessage(payload.sessionId, {
@@ -257,7 +256,7 @@ export const realtimeFeature = {
       void this._recordWebSocketHistoryOnce(payload.sessionId, 101, '101 Switching Protocols', payload.timestamp);
     });
 
-    runtime.EventsOn('ws:reconnecting', (payload: { sessionId: string; attempt: number; maxAttempts: number; intervalMs: number; timestamp: number }) => {
+    listenRuntime('ws:reconnecting', (payload: { sessionId: string; attempt: number; maxAttempts: number; intervalMs: number; timestamp: number }) => {
       this._wsSetSession(payload.sessionId, {
         status: 'reconnecting',
         error: '',
@@ -272,7 +271,7 @@ export const realtimeFeature = {
       });
     });
 
-    runtime.EventsOn('ws:error', (payload: { sessionId: string; message: string; timestamp: number }) => {
+    listenRuntime('ws:error', (payload: { sessionId: string; message: string; timestamp: number }) => {
       const existing = this.webSocketSessions.get(payload.sessionId);
       this._wsSetSession(payload.sessionId, { status: 'error', error: payload.message });
       this._wsAddMessage(payload.sessionId, {
@@ -291,10 +290,9 @@ export const realtimeFeature = {
   },
 
   initSocketIOListeners(this: RealtimeHost) {
-    const runtime = window.runtime;
-    if (!runtime?.EventsOn) return;
+    if (!window.runtime?.EventsOn) return;
 
-    runtime.EventsOn('sio:open', (payload: { sessionId: string; url: string; namespace: string; timestamp: number; requestHeaders?: { key: string; value: string }[]; responseHeaders?: { key: string; value: string }[]; statusCode?: number; statusText?: string }) => {
+    listenRuntime('sio:open', (payload: { sessionId: string; url: string; namespace: string; timestamp: number; requestHeaders?: { key: string; value: string }[]; responseHeaders?: { key: string; value: string }[]; statusCode?: number; statusText?: string }) => {
       this._sioSetSession(payload.sessionId, { status: 'connected', connectedUrl: payload.url, namespace: payload.namespace, connectedAt: payload.timestamp, headers: [...(payload.requestHeaders ?? []), ...(payload.responseHeaders ?? [])], error: '' });
       const handshake: SocketIOHandshake = {
         url: payload.url,
@@ -320,15 +318,15 @@ export const realtimeFeature = {
       });
     });
 
-    runtime.EventsOn('sio:event', (payload: { sessionId: string; event: SocketIOMessageEntry }) => {
+    listenRuntime('sio:event', (payload: { sessionId: string; event: SocketIOMessageEntry }) => {
       this._sioAddMessage(payload.sessionId, payload.event);
     });
 
-    runtime.EventsOn('sio:events', (payload: { sessionId: string; events: SocketIOMessageEntry[] }) => {
+    listenRuntime('sio:events', (payload: { sessionId: string; events: SocketIOMessageEntry[] }) => {
       this._sioAddMessages(payload.sessionId, payload.events);
     });
 
-    runtime.EventsOn('sio:close', (payload: { sessionId: string; message: string; timestamp: number }) => {
+    listenRuntime('sio:close', (payload: { sessionId: string; message: string; timestamp: number }) => {
       this._sioFlushMessages();
       const existing = this.socketIOSessions.get(payload.sessionId);
       this._sioSetSession(payload.sessionId, { status: 'disconnected' });
@@ -353,20 +351,20 @@ export const realtimeFeature = {
       void this._recordSocketIOHistoryOnce(payload.sessionId, 101, '101 Switching Protocols', payload.timestamp);
     });
 
-    runtime.EventsOn('sio:reconnecting', (payload: { sessionId: string; attempt: number; maxAttempts: number; intervalMs: number; timestamp: number }) => {
+    listenRuntime('sio:reconnecting', (payload: { sessionId: string; attempt: number; maxAttempts: number; intervalMs: number; timestamp: number }) => {
       this._sioFlushMessages();
       this._sioSetSession(payload.sessionId, { status: 'reconnecting', error: '' });
       this._sioAddMessage(payload.sessionId, { id: '', direction: 'system', eventName: '', args: [], namespace: '/', timestamp: payload.timestamp, isSystem: true, isError: false, message: payload.intervalMs > 0 ? `Reconnecting in ${Math.round(payload.intervalMs / 1000)}s (${payload.attempt}/${payload.maxAttempts})` : `Reconnecting (${payload.attempt}/${payload.maxAttempts})` });
     });
 
-    runtime.EventsOn('sio:error', (payload: { sessionId: string; message: string; timestamp: number; handshake?: SocketIOHandshake }) => {
+    listenRuntime('sio:error', (payload: { sessionId: string; message: string; timestamp: number; handshake?: SocketIOHandshake }) => {
       this._sioFlushMessages();
       this._sioSetSession(payload.sessionId, { status: 'error', error: payload.message });
       this._sioAddMessage(payload.sessionId, { id: `sio-err-${payload.timestamp}`, direction: 'system', eventName: '', args: [], namespace: '/', timestamp: payload.timestamp, isSystem: true, isError: true, message: payload.message, handshake: payload.handshake });
       void this._recordSocketIOHistoryOnce(payload.sessionId, 0, 'Error', payload.timestamp);
     });
 
-    runtime.EventsOn('sio:ack', (payload: { sessionId: string; ackId: number; eventName: string; args: string[]; namespace: string; timestamp: number }) => {
+    listenRuntime('sio:ack', (payload: { sessionId: string; ackId: number; eventName: string; args: string[]; namespace: string; timestamp: number }) => {
       const ackLabel = payload.eventName ? `ack for "${payload.eventName}"` : `ack #${payload.ackId}`;
       const preview = payload.args?.length ? payload.args.join(', ') : '(no args)';
       this._sioAddMessage(payload.sessionId, { id: `sio-ack-${payload.ackId}`, direction: 'incoming', eventName: ackLabel, args: payload.args ?? [], namespace: payload.namespace ?? '/', timestamp: payload.timestamp, isSystem: false, isError: false, message: preview });
