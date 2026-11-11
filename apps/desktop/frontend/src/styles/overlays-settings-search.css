@@ -950,7 +950,7 @@
   flex-direction: column;
   width: 60rem;
   max-width: calc(100vw - 3rem);
-  height: min(44rem, 88vh);
+  height: min(46rem, 88vh);
   overflow: hidden;
 }
 

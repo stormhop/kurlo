@@ -159,6 +159,7 @@
   let focusedBeforeWindowBlur: HTMLElement | null = null;
   let codePanelAvailable = $derived(vm.codePanelAvailable);
   let windowWidth = $state(window.innerWidth);
+  let runtimePlatform = $state(document.documentElement.dataset.platform ?? 'browser');
   let agentDetailsDocked = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity && !vm.sidebarHidden);
   let shownSidebarWidth = $derived(vm.sidebarHidden ? 0 : agentDetailsDocked ? Math.min(vm.sidebarWidth, agentSidebarMaxWidth(toLogicalPx(windowWidth))) : vm.sidebarWidth);
   $effect(() => {
@@ -185,6 +186,7 @@
   function setRuntimePlatform(runtime: string) {
     const platform = runtime.split('/')[0] || 'browser';
     document.documentElement.dataset.platform = platform;
+    runtimePlatform = platform;
     document.documentElement.dataset.runtime = runtime;
   }
 
@@ -647,6 +649,7 @@
       bind:sidebarView={vm.sidebarView}
       bind:codePanelOpen={vm.codePanelOpen}
       codePanelAvailable={codePanelAvailable}
+      switcherDocked={runtimePlatform === 'darwin' && !vm.sidebarHidden}
       defaultWorkspace={DEFAULT_WORKSPACE}
       activeWorkspace={vm.activeWorkspace}
       workspaces={vm.workspaces}

@@ -1482,7 +1482,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(codePanelResizer).toHaveCSS('cursor', 'col-resize');
     expect(await codePanelResizer.evaluate((resizer) => getComputedStyle(resizer, '::after').content)).toBe('none');
     await expect.poll(async () => page.locator('.workspace-searchbar').evaluate((header) => {
-      const workspace = header.querySelector<HTMLElement>('.workspace-switcher-trigger');
+      const workspace = document.querySelector<HTMLElement>('.workspace-switcher-trigger');
       const search = header.querySelector<HTMLElement>('.global-search');
       const actions = header.querySelector<HTMLElement>('.searchbar-right');
       const codePanel = document.querySelector<HTMLElement>('.code-snippet-panel');
@@ -2574,6 +2574,23 @@ test.describe('Kurlo desktop browser E2E', () => {
     expect(layout).toEqual({ listScrolls: false, bodyScrolls: false, glyphWidths: 1, rightEdges: 1, headingAligned: true });
     await list.screenshot({ path: test.info().outputPath('shortcuts.png') });
   });
+
+  for (const runtime of ['darwin/e2e', 'windows/e2e']) {
+    test(`fits the General settings page without vertical scrolling on ${runtime.split('/')[0]}`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await installKurloBridge(page, '', runtime);
+      await page.goto('/');
+      await page.getByRole('button', { name: /^Settings/ }).click();
+      const settings = page.getByRole('dialog', { name: 'Settings' });
+      await expect(settings.getByRole('heading', { name: 'General' })).toBeVisible();
+      const body = settings.locator('.settings-body');
+      for (const mode of ['Manual save', 'Autosave']) {
+        await settings.getByRole('radio', { name: mode }).click();
+        expect(await body.evaluate(el => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(0);
+      }
+      await settings.screenshot({ path: join(tmpdir(), `kurlo-settings-general-${runtime.split('/')[0]}.png`), animations: 'disabled' });
+    });
+  }
 
   test('sends a WebSocket message with the send shortcut and stays connected', async ({ page }) => {
     await installKurloBridge(page, '', 'windows/e2e');
@@ -6356,6 +6373,72 @@ test.describe('Window title bar', () => {
     });
   }
 
+  test('keeps one title band with a line across the rail and sidebar on macOS', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'darwin/e2e');
+    await page.goto('/');
+    await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.platform)).toBe('darwin');
+    const measure = () => page.evaluate(() => {
+      const rail = document.querySelector('.activity-rail') as HTMLElement;
+      const bar = document.querySelector('.workspace-searchbar') as HTMLElement;
+      const sidebarBand = document.querySelector('.sidebar-titlebar') as HTMLElement;
+      const filter = document.querySelector('.sidebar-search') as HTMLElement;
+      const button = document.querySelector('.activity-rail-btn') as HTMLElement;
+      const line = getComputedStyle(rail, '::before');
+      const railBox = rail.getBoundingClientRect();
+      const barBox = bar.getBoundingClientRect();
+      const bandBox = sidebarBand.getBoundingClientRect();
+      return {
+        railLineTop: railBox.top + parseFloat(line.top),
+        railLineWidth: parseFloat(line.width),
+        railLineColor: line.backgroundColor,
+        railWidth: railBox.width,
+        barLineTop: barBox.bottom - parseFloat(getComputedStyle(bar).borderBottomWidth),
+        barLineColor: getComputedStyle(bar).borderBottomColor,
+        sidebarLineTop: bandBox.bottom - parseFloat(getComputedStyle(sidebarBand).borderBottomWidth),
+        sidebarLineColor: getComputedStyle(sidebarBand).borderBottomColor,
+        buttonTop: button.getBoundingClientRect().top,
+        filterTop: filter.getBoundingClientRect().top,
+      };
+    });
+    const open = await measure();
+    expect(open.railLineTop).toBeCloseTo(open.barLineTop, 1);
+    expect(open.sidebarLineTop).toBeCloseTo(open.barLineTop, 1);
+    expect(open.sidebarLineColor).toBe(open.barLineColor);
+    expect(open.railLineColor).toBe(open.barLineColor);
+    expect(open.railLineWidth).toBeCloseTo(open.railWidth, 1);
+    expect(open.buttonTop).toBeGreaterThan(open.barLineTop + 1);
+    expect(open.filterTop).toBeCloseTo(open.buttonTop, 0);
+    const switcher = page.getByRole('button', { name: 'Workspace switcher' });
+    await expect(page.locator('.workspace-searchbar .workspace-switcher')).toHaveCount(0);
+    const switcherBox = (await switcher.boundingBox())!;
+    const sidebarBox = (await page.locator('.sidebar').boundingBox())!;
+    expect(switcherBox.x).toBeGreaterThanOrEqual(80);
+    expect(sidebarBox.x + sidebarBox.width - (switcherBox.x + switcherBox.width)).toBeCloseTo(8, 0);
+    const stripStart = await page.locator('.workspace-searchbar').evaluate(bar => (bar.querySelector('.request-tab-strip') as HTMLElement).getBoundingClientRect().left - bar.getBoundingClientRect().left);
+    expect(stripStart).toBeLessThanOrEqual(12.5);
+    expect(switcherBox.y + switcherBox.height / 2).toBeCloseTo((open.barLineTop + 1) / 2, 0);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-title-band-darwin-open-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 480, height: 140 }, animations: 'disabled' });
+    await switcher.click();
+    const menu = page.locator('.workspace-menu');
+    await expect(menu).toBeVisible();
+    const menuBox = (await menu.boundingBox())!;
+    expect(menuBox.y).toBeGreaterThan(open.barLineTop);
+    expect(await page.evaluate(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.workspace-menu')), [menuBox.x + menuBox.width - 8, menuBox.y + 20])).toBe(true);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-title-band-darwin-menu-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 560, height: 320 }, animations: 'disabled' });
+    await switcher.click();
+    await expect(menu).toHaveCount(0);
+    await page.getByRole('button', { name: 'Toggle sidebar' }).click();
+    await expect(page.locator('.shell')).toHaveClass(/sidebar-hidden/);
+    const hidden = await measure();
+    await expect(page.locator('.workspace-searchbar .workspace-switcher')).toHaveCount(1);
+    await expect(page.locator('.workspace-switcher.docked')).toHaveCount(0);
+    expect(hidden.railLineTop).toBeCloseTo(hidden.barLineTop, 1);
+    expect(hidden.buttonTop).toBe(open.buttonTop);
+    await page.getByRole('button', { name: 'Collections' }).hover();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-title-band-darwin-hidden-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 480, height: 140 }, animations: 'disabled' });
+  });
+
   test('quits with Ctrl+Q on Linux only', async ({ page }) => {
     for (const runtime of ['linux/e2e', 'windows/e2e']) {
       await installKurloBridge(page, '', runtime);
@@ -7947,6 +8030,42 @@ test.describe('Agent', () => {
     await expect(page.locator('.agent-turn').filter({ hasText: 'Rename it to All orders' }).locator('.agent-compact-divider')).toHaveCount(1);
   });
 
+  test('scrolls the chat right up to the composer box', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const usage = { input: 10, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+      const messages = Array.from({ length: 24 }, (_, index) => ({
+        role: index % 2 ? 'assistant' : 'user',
+        blocks: [{ type: 'text', text: index % 2 ? `Answer ${index}: saved the request and ran it.` : `Question ${index}: add a test for status 200` }],
+      }));
+      const chat = { workspaceId: 'workspace-e2e', createdAt: Date.now(), updatedAt: Date.now(), collection: '', environment: '', connectionId: 'c1', model: '', usage, allowedTools: [], id: 'chat-scroll', title: 'Scroll chat', messages };
+      app.AgentChats = async () => [{ id: chat.id, title: chat.title, workspaceId: chat.workspaceId, createdAt: chat.createdAt, updatedAt: chat.updatedAt }];
+      app.AgentChat = async () => structuredClone(chat);
+      app.AgentChatPage = async () => structuredClone(chat);
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await page.locator('.agent-sidebar').getByRole('button', { name: /Scroll chat/ }).click();
+    await expect(page.getByText('Answer 23: saved the request and ran it.')).toBeVisible();
+    const chat = page.locator('.agent-main .agent-chat');
+    await chat.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    const atEnd = await chat.evaluate(element => {
+      const main = element.closest('.agent-main')!;
+      const chat = element.getBoundingClientRect();
+      const box = main.querySelector('.agent-composer-box')!.getBoundingClientRect();
+      const turns = [...element.querySelectorAll('.agent-turn')];
+      const last = turns[turns.length - 1].getBoundingClientRect();
+      return { chatBottom: chat.bottom, boxTop: box.top, lastBottom: last.bottom };
+    });
+    expect(atEnd.chatBottom).toBeGreaterThanOrEqual(atEnd.boxTop - 1);
+    expect(atEnd.lastBottom).toBeLessThanOrEqual(atEnd.boxTop - 8);
+    await chat.evaluate(element => { element.scrollTop = element.scrollHeight - element.clientHeight - 105; });
+    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-composer-edge-${testInfo.project.name}.png`), animations: 'disabled' });
+  });
+
   test('keeps the approval mode clear of the composer buttons at every width', async ({ page }, testInfo) => {
     await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
     await installAgentBridge(page, [{ ...connection, model: 'deepseek-v4-pro' }]);
@@ -8783,6 +8902,21 @@ test.describe('Agent', () => {
     await expect(page.locator('.agent-sidebar')).toContainText('No chat matches this filter.');
     await filter.fill('checks');
     await expect(chatRow).toHaveCount(1);
+    const headEdges = () => page.locator('.agent-sidebar').evaluate(panel => {
+      const box = (selector: string) => panel.querySelector(selector)!.getBoundingClientRect();
+      return { newChat: box('.agent-new-chat').right, searchRight: box('.sidebar-search').right, lists: box('.agent-chat-lists').right, newChatLeft: box('.agent-new-chat').left };
+    });
+    const newChat = page.getByRole('button', { name: 'New chat' });
+    await expect(newChat.locator('.agent-new-chat-label')).toBeVisible();
+    const wide = await headEdges();
+    expect(wide.newChat).toBeLessThanOrEqual(wide.searchRight);
+    await page.locator('.shell').evaluate(shell => (shell as HTMLElement).style.setProperty('--sidebar-w', '16.25rem'));
+    await expect(newChat.locator('.agent-new-chat-label')).toBeHidden();
+    const narrow = await headEdges();
+    expect(narrow.newChat).toBeLessThanOrEqual(narrow.searchRight);
+    expect(narrow.lists).toBeLessThan(narrow.newChatLeft);
+    await page.locator('.agent-sidebar-head').screenshot({ path: join(tmpdir(), `kurlo-agent-head-narrow-${testInfo.project.name}.png`), animations: 'disabled' });
+    await page.locator('.shell').evaluate(shell => (shell as HTMLElement).style.removeProperty('--sidebar-w'));
 
     await page.locator('.agent-tool-toggle').first().click();
     await expect(page.locator('.agent-tool-body').first()).toContainText('Shop API/Orders/List orders');
@@ -9550,7 +9684,7 @@ for (const driver of ['', 'codex']) {
     const counts = () => page.evaluate(() => window.__kurloE2E.calls.filter(call => /^event:(ai:|agent:|codex:)/.test(call)));
     const original = await counts();
     for (let i = 0; i < 12; i++) {
-      await page.getByRole('tab', { name: /New Request/ }).first().click();
+      await page.getByRole('tab', { name: /New Request/ }).last().click();
       await page.getByRole('tab', { name: 'Agent', exact: true }).click();
     }
     expect(await counts()).toEqual(original);

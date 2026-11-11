@@ -213,7 +213,7 @@
     </div>
     <button class="btn btn-secondary btn-xs agent-new-chat" type="button" onclick={newChat} disabled={workspaceBlocked || !agentReady} aria-label="New chat">
       <AddCloseIcon add />
-      New
+      <span class="agent-new-chat-label">New</span>
     </button>
   </div>
 
@@ -315,6 +315,7 @@
 
 <style>
   .agent-sidebar-head {
+    container: agent-sidebar-head / inline-size;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -328,6 +329,15 @@
   }
   .agent-new-chat {
     gap: var(--space-1);
+  }
+  @container agent-sidebar-head (max-width: 15.5rem) {
+    .agent-new-chat {
+      width: var(--control-xs);
+      padding: 0;
+    }
+    .agent-new-chat-label {
+      display: none;
+    }
   }
   .agent-chat-group {
     padding: var(--space-3) var(--space-2) var(--space-1);

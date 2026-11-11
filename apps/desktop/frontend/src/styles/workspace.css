@@ -44,6 +44,24 @@
   max-width: 12.5rem;
 }
 
+.shell > .workspace-switcher.docked {
+  position: absolute;
+  z-index: 46;
+  top: calc((2.8125rem - var(--control-md)) / 2);
+  right: calc(100% - var(--rail-w) - var(--sidebar-w, 17.5rem) + var(--space-2));
+  max-width: calc(var(--rail-w) + var(--sidebar-w, 17.5rem) - var(--mac-traffic-w, 80px) - var(--space-3));
+  -webkit-app-region: no-drag;
+  --wails-draggable: no-drag;
+}
+
+.shell > .workspace-switcher.docked .workspace-switcher-trigger {
+  max-width: 100%;
+}
+
+.workspace-searchbar-left:not(:has(.workspace-switcher)) {
+  display: none;
+}
+
 .workspace-switcher-trigger span {
   min-width: 0;
   overflow: hidden;

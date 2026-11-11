@@ -43,6 +43,11 @@
   margin: calc(var(--space-3) * -1) calc(var(--space-4) * -1) 0;
 }
 
+:root[data-platform="darwin"] .sidebar-titlebar {
+  height: 2.8125rem;
+  border-bottom: 1px solid var(--border);
+}
+
 .sidebar-divider {
   position: relative;
   z-index: 46;

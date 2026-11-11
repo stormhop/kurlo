@@ -21,6 +21,7 @@
     sidebarView = $bindable<SidebarView>('collections'),
     codePanelOpen = $bindable(false),
     codePanelAvailable = true,
+    switcherDocked = false,
     defaultWorkspace,
     activeWorkspace,
     workspaces,
@@ -82,6 +83,7 @@
     sidebarView: SidebarView;
     codePanelOpen: boolean;
     codePanelAvailable?: boolean;
+    switcherDocked?: boolean;
     defaultWorkspace: string;
     activeWorkspace: Workspace | undefined;
     workspaces: Workspace[];
@@ -226,6 +228,24 @@
     const first = environmentMatches?.[0];
     if (first) useEnvironment(first.id);
   }
+
+  function dockToShell(node: HTMLElement, docked: boolean) {
+    const home = node.parentElement!;
+    const place = (dock: boolean) => {
+      const shell = home.closest('.shell');
+      if (dock && shell) {
+        if (node.parentElement !== shell) shell.appendChild(node);
+      } else if (node.parentElement !== home) {
+        home.appendChild(node);
+      }
+      node.classList.toggle('docked', dock && Boolean(shell));
+    };
+    place(docked);
+    return {
+      update: place,
+      destroy: () => place(false),
+    };
+  }
 </script>
 
 {#snippet environmentItem(environment: Environment, isDefault: boolean)}
@@ -238,7 +258,7 @@
 
 <div class="workspace-searchbar titlebar-drag-region">
   <div class="workspace-searchbar-left">
-    <div class="workspace-switcher">
+    <div class="workspace-switcher" use:dockToShell={switcherDocked}>
       <button class="btn btn-ghost workspace-switcher-trigger" type="button" onclick={toggleWorkspaceMenu} aria-label="Workspace switcher" aria-expanded={workspaceMenuOpen}>
         <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 15 15" fill="none" aria-hidden="true">
           <path d="M4.5 6V4.2a3 3 0 016 0V6M3.2 6h8.6v6.2H3.2V6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>

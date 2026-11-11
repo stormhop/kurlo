@@ -32,7 +32,11 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Fixed
 
 - The cookie editor no longer shows the internal `{{kurloSecret:…}}` reference for a cookie whose value lives on another computer, in the **Fields** editor, in **Raw** or after switching between them; the value is empty and saving without a value keeps the reference.
+- Agent chat messages scroll all the way to the message box instead of stopping in a strip above it.
 - Theme miniatures in settings show each theme's own button text and status colours instead of borrowing them from the active theme.
+- On macOS, the title area is one 45px band across the whole window: the line under the top bar runs over the activity rail and sidebar to the window edge, the rail icons line up with the sidebar filter instead of crossing that line, and while the sidebar is open the workspace switcher sits in that band at the sidebar's right edge, giving request tabs more room.
+- In a narrow Agent sidebar, such as when Chat details is docked, the New chat button shrinks to a + icon instead of sticking out past the chat search field.
+- The Settings window is a little taller, so the General page fits without a scroll bar.
 
 ## 3.0.3
 

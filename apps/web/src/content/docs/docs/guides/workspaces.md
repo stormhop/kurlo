@@ -27,6 +27,8 @@ A workspace is the top-level container. Everything inside it — collections, en
 
 Click the workspace name in the title bar and choose **+ New workspace**. Pick a short name; you can rename it any time via the same menu.
 
+On macOS the workspace name sits above the sidebar, at its right edge. When you hide the sidebar it moves to the start of the top bar.
+
 ### Switching workspaces
 
 The same dropdown shows all workspaces with their request counts. Switching is instant — Kurlo keeps each workspace's open tabs, active environment, and last-viewed request restored separately.

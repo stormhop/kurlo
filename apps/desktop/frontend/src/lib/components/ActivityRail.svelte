@@ -130,11 +130,24 @@
   :global(:root[data-platform="darwin"] .shell:not(.sidebar-hidden)) .activity-rail::after {
     display: none;
   }
+  :global(:root[data-platform="darwin"]) .activity-rail::before {
+    content: '';
+    position: absolute;
+    top: calc(var(--rail-divider-top) - 1px);
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: var(--border);
+    pointer-events: none;
+  }
 
   .activity-rail-titlebar {
     flex: 0 0 auto;
     align-self: stretch;
     height: var(--titlebar-h, 0px);
+  }
+  :global(:root[data-platform="darwin"]) .activity-rail-titlebar {
+    height: calc(var(--rail-divider-top) - var(--space-1));
   }
 
   .activity-rail-group {

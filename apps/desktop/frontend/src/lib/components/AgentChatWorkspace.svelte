@@ -1230,7 +1230,7 @@
     overflow-x: hidden;
     overflow-y: auto;
     overflow-anchor: none;
-    padding: var(--space-6) var(--agent-gutter) var(--space-4);
+    padding: var(--space-6) var(--agent-gutter) calc(var(--space-4) + var(--space-2));
   }
   .agent-empty {
     display: flex;
@@ -1703,12 +1703,19 @@
     font-size: var(--text-label);
   }
   .agent-composer {
+    position: relative;
+    z-index: 1;
     display: flex;
     flex: 0 0 auto;
     flex-direction: column;
     gap: var(--space-2);
     min-width: 0;
+    margin-top: calc(var(--space-2) * -1);
     padding: var(--space-2) var(--agent-gutter) var(--space-3);
+    pointer-events: none;
+  }
+  .agent-composer > * {
+    pointer-events: auto;
   }
   .agent-status {
     display: flex;
@@ -2258,7 +2265,7 @@
   }
   @container agent-main (max-width: 40rem) {
     .agent-chat {
-      padding: var(--space-4) var(--space-3) var(--space-3);
+      padding: var(--space-4) var(--space-3) calc(var(--space-3) + var(--space-2));
     }
     .agent-composer {
       padding: var(--space-2) var(--space-3) var(--space-3);
