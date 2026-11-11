@@ -3111,7 +3111,8 @@ func selectedManagedChangedGitPaths(workspaceRoot string, status GitWorkspaceSta
 func managedWorkspaceGitPathspecs(workspaceRoot, repoRoot string) []string {
 	prefix := workspaceGitPrefix(workspaceRoot, repoRoot)
 	workspaceYAMLFiles := ":(glob)" + filepath.ToSlash(filepath.Join(fileStoreWorkspacesDir, "**", "*"+fileStoreYAMLExt))
-	base := []string{fileStoreRootIndex, ".gitignore", agentNotesFile, workspaceYAMLFiles}
+	workspaceReadmes := ":(glob,icase)" + filepath.ToSlash(filepath.Join(fileStoreWorkspacesDir, "*", workspaceReadmeFile))
+	base := []string{fileStoreRootIndex, ".gitignore", agentNotesFile, workspaceYAMLFiles, workspaceReadmes}
 	if prefix == "" {
 		return base
 	}
@@ -3120,6 +3121,7 @@ func managedWorkspaceGitPathspecs(workspaceRoot, repoRoot string) []string {
 	pathspecs = append(pathspecs, filepath.ToSlash(filepath.Join(prefix, ".gitignore")))
 	pathspecs = append(pathspecs, filepath.ToSlash(filepath.Join(prefix, agentNotesFile)))
 	pathspecs = append(pathspecs, ":(glob)"+filepath.ToSlash(filepath.Join(prefix, fileStoreWorkspacesDir, "**", "*"+fileStoreYAMLExt)))
+	pathspecs = append(pathspecs, ":(glob,icase)"+filepath.ToSlash(filepath.Join(prefix, fileStoreWorkspacesDir, "*", workspaceReadmeFile)))
 	return pathspecs
 }
 
@@ -3138,7 +3140,13 @@ func isManagedWorkspaceGitPath(workspaceRoot, repoRoot, repoRelPath string) bool
 	return path == fileStoreRootIndex ||
 		path == ".gitignore" ||
 		path == agentNotesFile ||
-		(strings.HasPrefix(path, fileStoreWorkspacesDir+"/") && filepath.Ext(path) == fileStoreYAMLExt)
+		(strings.HasPrefix(path, fileStoreWorkspacesDir+"/") && filepath.Ext(path) == fileStoreYAMLExt) ||
+		isWorkspaceReadmeGitPath(path)
+}
+
+func isWorkspaceReadmeGitPath(path string) bool {
+	parts := strings.Split(path, "/")
+	return len(parts) == 3 && parts[0] == fileStoreWorkspacesDir && parts[1] != "" && isWorkspaceReadmeName(parts[2])
 }
 
 func isKurloGeneratedArtifactGitPath(workspaceRoot, repoRoot, repoRelPath string) bool {

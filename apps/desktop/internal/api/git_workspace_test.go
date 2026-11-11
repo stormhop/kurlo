@@ -905,6 +905,9 @@ func TestGitCommitStagesAndCommitsOnlyKurloFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "workspaces", "Main", "notes.txt"), []byte("draft notes\n"), 0644); err != nil {
 		t.Fatalf("write workspace notes: %v", err)
 	}
+	if err := os.WriteFile(filepath.Join(dir, "workspaces", "Main", "Readme.md"), []byte("# Main\n"), 0644); err != nil {
+		t.Fatalf("write workspace README: %v", err)
+	}
 
 	initResult := gitInitWorkspaceForRoot(dir)
 	if !initResult.Ok {
@@ -928,7 +931,7 @@ func TestGitCommitStagesAndCommitsOnlyKurloFiles(t *testing.T) {
 	if strings.Contains(tree, "history.json") || strings.Contains(tree, ".kurlo-local") || strings.Contains(tree, "workspaces/Main/notes.txt") {
 		t.Fatalf("committed non-Kurlo files:\n%s", tree)
 	}
-	if !strings.Contains(tree, "kurlo.yml") || !strings.Contains(tree, "workspaces/Main/workspace.yml") {
+	if !strings.Contains(tree, "kurlo.yml") || !strings.Contains(tree, "workspaces/Main/workspace.yml") || !strings.Contains(tree, "workspaces/Main/Readme.md") {
 		t.Fatalf("committed tree is missing Kurlo files:\n%s", tree)
 	}
 }
@@ -2731,7 +2734,7 @@ func TestGitStatusMarksWhichChangesKurloCanHandle(t *testing.T) {
 	root := filepath.Join(repo, "api")
 	writeKurloWorkspaceFiles(t, root)
 	runGitForTest(t, repo, "init")
-	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt", "api/kurlo-agent.md", "kurlo-agent.md", "api/workspaces/Main/kurlo-agent.md"} {
+	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt", "api/kurlo-agent.md", "kurlo-agent.md", "api/workspaces/Main/kurlo-agent.md", "api/workspaces/Main/README.md"} {
 		if err := os.WriteFile(filepath.Join(repo, filepath.FromSlash(path)), []byte("x\n"), 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -2740,7 +2743,7 @@ func TestGitStatusMarksWhichChangesKurloCanHandle(t *testing.T) {
 	for _, file := range gitStatusForWorkspace(root).Files {
 		managed[file.Path] = file.Managed
 	}
-	if !managed["api/kurlo.yml"] || !managed["api/workspaces/Main/workspace.yml"] || !managed["api/kurlo-agent.md"] {
+	if !managed["api/kurlo.yml"] || !managed["api/workspaces/Main/workspace.yml"] || !managed["api/kurlo-agent.md"] || !managed["api/workspaces/Main/README.md"] {
 		t.Fatalf("Kurlo files must be managed: %#v", managed)
 	}
 	for _, path := range []string{"README.md", "api/workspaces/Main/notes.txt", "kurlo-agent.md", "api/workspaces/Main/kurlo-agent.md"} {

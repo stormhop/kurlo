@@ -3,7 +3,7 @@ import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const SRC = join(import.meta.dirname, '..');
-const PX_ALLOWED_PROPERTY = /^(border(-(top|right|bottom|left))?(-width)?|outline(-offset|-width)?|box-shadow|text-shadow|filter|backdrop-filter|-webkit-backdrop-filter|stroke-width|-webkit-text-stroke|--titlebar-h|--mac-traffic-w|--shadow-[a-z]+|--focus-[a-z]+|--radius-full)$/;
+const PX_ALLOWED_PROPERTY = /^(border(-(top|right|bottom|left))?(-width)?|outline(-offset|-width)?|box-shadow|text-shadow|filter|stroke-width|-webkit-text-stroke|--titlebar-h|--mac-traffic-w|--shadow-[a-z]+|--focus-[a-z]+|--radius-full)$/;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap(name => {
@@ -72,7 +72,7 @@ const SPECIAL_BUTTON_CLASSES = new Set([
   'graphql-explorer-footer-action', 'graphql-explorer-introspection-link', 'graphql-introspection-status',
   'graphql-panel-tab-btn', 'grpc-method-option', 'history-day-toggle', 'history-entry-main',
   'input-validation-anchor', 'kv-auto-toggle', 'kv-col-resizer', 'kv-file-value', 'method-trigger', 'mock-row-name',
-  'mock-url', 'overview-row', 'palette-command', 'panel-divider', 'pinned-head', 'response-time-trigger',
+  'mock-url', 'overview-name', 'overview-row', 'overview-tile', 'palette-command', 'panel-divider', 'pinned-head', 'response-time-trigger',
   'saved-request-tab-btn', 'search-picker-option', 'settings-nav-item', 'shortcut-combo', 'sidebar-divider', 'sse-event-main',
   'subfolder-collapse', 'support-link-card', 'tab-close', 'theme-menu-item', 'theme-menu-mode', 'theme-menu-scrim',
   'version-pill', 'win-control', 'workspace-diagnostic-chip', 'workspace-menu-footer', 'workspace-menu-select',
@@ -112,6 +112,10 @@ describe('design tokens', () => {
       .filter(({ property, value }) => property.startsWith('overscroll-behavior') && value.trim() !== 'none')
       .map(({ selector, property, value }) => `${relative(SRC, file)} ${selector} { ${property}: ${value} }`));
     expect(offenders).toEqual([]);
+  });
+
+  it('dims overlays without blurring what is behind them', () => {
+    expect(violations(({ property }) => /backdrop-filter$/.test(property))).toEqual([]);
   });
 
   it('sizes text with the type scale', () => {

@@ -15,6 +15,10 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import SearchPicker from './SearchPicker.svelte';
   import VariableInput from './VariableInput.svelte';
+  import CollapsibleMarkdown from './CollapsibleMarkdown.svelte';
+  import { markdownSizeLabel, markdownTooLongToPreview } from '../markdown';
+  import MenuIcon from './MenuIcon.svelte';
+  import { tick } from 'svelte';
   import { relativeTime, type CollectionRunTally } from '../collectionRuns';
 
   type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy';
@@ -50,6 +54,8 @@
     onSaveFolder = () => false,
     onResetFolder = () => false,
     onCreateRequestInFolder = () => {},
+    onExport = () => {},
+    onDelete = () => {},
   }: {
     collection: Collection | undefined;
     environments?: Environment[];
@@ -70,6 +76,8 @@
     onSaveFolder?: (collectionId: string, folder: FolderDefaults, baseFingerprint?: string) => boolean | Promise<boolean>;
     onResetFolder?: (collectionId: string, folderPath: string[]) => boolean | Promise<boolean>;
     onCreateRequestInFolder?: (collectionId: string, folderPath: string[]) => void | Promise<void>;
+    onExport?: (collectionId: string) => void | Promise<void>;
+    onDelete?: (collectionId: string) => void | Promise<void>;
   } = $props();
 
   const FOLDER_AUTH_OPTIONS = [
@@ -271,11 +279,15 @@
     };
   }
 
+  function savedDescription(): string {
+    return description.trim() ? description : '';
+  }
+
   function draftFingerprint(): string {
     if (isFolder) return folderDefaultsFingerprint(draftFolder());
     return collectionSettingsFingerprint({
       name,
-      description,
+      description: savedDescription(),
       defaults: draftDefaults(),
       ...draftPins(),
     });
@@ -298,7 +310,7 @@
       const pins = draftPins();
       const didSave = await onSave(collection.id, {
         name,
-        description,
+        description: savedDescription(),
         defaults: draftDefaults(),
         environmentIds: pins.environmentIds ?? [],
         defaultEnvironmentId: pins.defaultEnvironmentId ?? '',
@@ -313,6 +325,118 @@
       savingInFlight = false;
     }
   }
+
+  let renaming = $state(false);
+  let nameDraft = $state('');
+  let nameInput = $state<HTMLInputElement>();
+  let editingDocs = $state(false);
+  let docsInput = $state<HTMLTextAreaElement>();
+  let docsCollectionId = $state('');
+  let moreMenuOpen = $state(false);
+  let moreMenuRoot = $state<HTMLElement | null>(null);
+  let moreMenuButton = $state<HTMLButtonElement | null>(null);
+
+  $effect(() => {
+    const id = loadedCollectionId;
+    if (id === docsCollectionId) return;
+    docsCollectionId = id;
+    editingDocs = false;
+    renaming = false;
+    moreMenuOpen = false;
+  });
+
+  async function startRename() {
+    if (workspaceBlocked || isFolder) return;
+    nameDraft = name;
+    renaming = true;
+    await tick();
+    nameInput?.select();
+  }
+
+  function finishRename(commit: boolean) {
+    if (!renaming) return;
+    renaming = false;
+    const next = nameDraft.trim();
+    if (!commit || !next || next === name) return;
+    name = next;
+    void save();
+  }
+
+  function onNameKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      finishRename(true);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      finishRename(false);
+    }
+  }
+
+  async function editDocs() {
+    editingDocs = true;
+    await tick();
+    docsInput?.focus();
+  }
+
+  function onDocsKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      editingDocs = false;
+    }
+  }
+
+  function runMenuAction(action: () => unknown) {
+    moreMenuOpen = false;
+    void action();
+  }
+
+  function closeMoreMenuOnFocusOut(event: FocusEvent) {
+    const current = event.currentTarget;
+    const next = event.relatedTarget;
+    if (!(current instanceof HTMLElement) || next === null) return;
+    if (next instanceof Node && current.contains(next)) return;
+    moreMenuOpen = false;
+  }
+
+  function closeMoreMenuOnOutsidePointer(event: PointerEvent) {
+    if (moreMenuOpen && event.target instanceof Node && !moreMenuRoot?.contains(event.target)) moreMenuOpen = false;
+  }
+
+  function closeMoreMenuOnEscape(event: KeyboardEvent) {
+    if (!moreMenuOpen || event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    moreMenuOpen = false;
+    moreMenuButton?.focus();
+  }
+
+  function plural(count: number, word: string): string {
+    return `${count} ${word}${count === 1 ? '' : 's'}`;
+  }
+
+  const changedSettingsCount = $derived.by(() => {
+    const base = emptyCollectionDefaults().settings as Record<string, unknown>;
+    const current = settings as Record<string, unknown>;
+    return Object.keys(base).filter(key => JSON.stringify(current[key] ?? null) !== JSON.stringify(base[key] ?? null)).length;
+  });
+
+  const defaultRows = $derived.by((): Array<{ tab: CollectionSettingsTab; label: string; value: string; set: boolean }> => {
+    const headerCount = activeCount(headers);
+    const variableCount = activeCount(variables);
+    const preLines = scriptLineCount(activePre);
+    const testLines = scriptLineCount(activeTest);
+    const authSet = auth.type !== 'none' && auth.type !== 'inherit';
+    return [
+      { tab: 'headers', label: 'Headers', value: headerCount ? plural(headerCount, 'header') : 'None', set: headerCount > 0 },
+      { tab: 'vars', label: 'Variables', value: variableCount ? plural(variableCount, 'variable') : 'None', set: variableCount > 0 },
+      { tab: 'auth', label: 'Auth', value: authSet ? (AUTH_OPTIONS.find(option => option.value === auth.type)?.label ?? auth.type) : 'None', set: authSet },
+      { tab: 'script', label: 'Pre-request script', value: preLines ? plural(preLines, 'line') : 'None', set: preLines > 0 },
+      { tab: 'tests', label: 'Tests', value: testLines ? plural(testLines, 'line') : 'None', set: testLines > 0 },
+      { tab: 'proxy', label: 'Proxy and settings', value: settings.proxyUrl?.trim() ? `Proxy ${settings.proxyUrl.trim()}` : changedSettingsCount ? `${plural(changedSettingsCount, 'setting')} changed` : 'Defaults', set: Boolean(settings.proxyUrl?.trim()) || changedSettingsCount > 0 },
+    ];
+  });
 
   async function reset() {
     if (!collection || savingInFlight) return;
@@ -350,15 +474,34 @@
   }
 </script>
 
+<svelte:document onpointerdowncapture={closeMoreMenuOnOutsidePointer} onkeydowncapture={closeMoreMenuOnEscape} />
+
 <section class="collection-workspace">
   {#if collection}
     <div class="collection-workspace-head">
-      <div>
+      <div class="overview-title">
         {#if isFolder}
           <h1>{folderName}</h1>
           <p>Folder in {[collection.name, ...folderPath.slice(0, -1)].join(' / ')} · {folderRequestCount} request{folderRequestCount === 1 ? '' : 's'} · applies to every request inside, subfolders included</p>
         {:else}
-          <h1>{collection.name}</h1>
+          {#if renaming}
+            <input
+              class="field overview-name-input"
+              bind:this={nameInput}
+              bind:value={nameDraft}
+              onkeydown={onNameKeydown}
+              onblur={() => finishRename(true)}
+              aria-label="Collection name"
+              spellcheck="false"
+            />
+          {:else}
+            <h1>
+              <button class="overview-name" type="button" onclick={startRename} disabled={workspaceBlocked} aria-label={`Rename collection ${name}`}>
+                <span>{name}</span>
+                <MenuIcon name="rename" />
+              </button>
+            </h1>
+          {/if}
           <p>{requestCount} request{requestCount === 1 ? '' : 's'} · defaults are applied when requests are sent</p>
         {/if}
         {#if lastRun && !isFolder}
@@ -375,14 +518,29 @@
           <button class="btn btn-secondary" type="button" onclick={() => loadCollection(collection)} disabled={workspaceBlocked}>Reload</button>
         {:else if autosave && saveState !== 'idle'}
           <span class="env-save-indicator" class:saved={saveState === 'saved'}>{saveState === 'saving' ? 'Saving changes…' : 'Saved'}</span>
-        {:else if !autosave && saved}
-          <span class="env-save-indicator saved">Saved</span>
         {/if}
-        <button class="btn btn-secondary" type="button" onclick={() => (isFolder ? onCreateRequestInFolder(collection.id, folderPath) : onCreateRequest(collection.id))} disabled={workspaceBlocked}>New request</button>
-        <button class="btn btn-ghost" type="button" onclick={reset} disabled={workspaceBlocked}>Reset defaults</button>
+        {#if !isFolder}
+          <button class="btn btn-secondary" type="button" onclick={() => onOpenRunner(collection.id)} disabled={workspaceBlocked || requestCount === 0}><MenuIcon name="play" />Run</button>
+        {/if}
+        <button class="btn btn-secondary" type="button" onclick={() => (isFolder ? onCreateRequestInFolder(collection.id, folderPath) : onCreateRequest(collection.id))} disabled={workspaceBlocked}><AddCloseIcon add /> New request</button>
         {#if !autosave}
           <button class="btn btn-primary" class:feedback-ok={saved} type="button" onclick={save} disabled={workspaceBlocked}>{saved ? 'Saved' : 'Save'}</button>
         {/if}
+        <div class="env-more" bind:this={moreMenuRoot} onfocusout={closeMoreMenuOnFocusOut}>
+          <button class="btn btn-ghost btn-icon env-more-btn" bind:this={moreMenuButton} type="button" aria-label={isFolder ? 'More folder actions' : 'More collection actions'} aria-haspopup="menu" aria-expanded={moreMenuOpen} onclick={() => (moreMenuOpen = !moreMenuOpen)} disabled={workspaceBlocked}>•••</button>
+          {#if moreMenuOpen}
+            <div class="menu request-menu env-more-menu" role="menu">
+              {#if !isFolder}
+                <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => onExport(collection.id))}><MenuIcon name="export" />Export…</button>
+              {/if}
+              <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(reset)}><MenuIcon name="restore" />Reset defaults</button>
+              {#if !isFolder}
+                <div class="menu-separator" role="separator"></div>
+                <button class="menu-item danger" type="button" role="menuitem" onclick={() => runMenuAction(() => onDelete(collection.id))}><MenuIcon name="trash" />Delete collection</button>
+              {/if}
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
 
@@ -406,59 +564,97 @@
       <div class="collection-settings-content">
         {#if collectionSettingsTab === 'overview'}
           <div class="collection-overview-grid">
-            <label class="collection-field">
-              <span>Name</span>
-              <input class="field field-input" value={name} oninput={(event) => (name = inputValue(event))} spellcheck="false" />
-            </label>
-            <label class="collection-field collection-field-wide">
-              <span>Documentation</span>
-              <textarea class="field field-area" value={description} oninput={(event) => (description = inputValue(event))} placeholder="Collection notes, auth hints, links, or API conventions…" spellcheck="false"></textarea>
-            </label>
-            <div class="collection-summary-row">
-              <div><strong>{activeCount(headers)}</strong><span>default headers</span></div>
-              <div><strong>{activeCount(variables)}</strong><span>collection vars</span></div>
-              <div><strong>{auth.type === 'none' ? 'No' : 'Yes'}</strong><span>default auth</span></div>
-              <div><strong>{scriptLineCount(preRequestScript) + scriptLineCount(testScript)}</strong><span>script lines</span></div>
-            </div>
-            <div class="collection-environments">
-              <div class="request-section-bar">
-                <span class="request-section-title">Environments</span>
-                <span class="request-section-meta">{pinnedEnvironmentCount ? 'Only pinned environments are listed in the switcher while you work in this collection. Opening the collection selects the default one.' : 'Pin environments to list only them in the switcher while you work in this collection.'}</span>
-              </div>
-              {#if environments.length}
-                {#if pinnedEnvironments.length}
-                  <div class="collection-environment-list" role="list" aria-label="Pinned environments">
-                    {#each pinnedEnvironments as environment (environment.id)}
-                      <div class="collection-environment-row" role="listitem">
-                        <span class="collection-environment-name">{environment.name}</span>
-                        <span class="collection-environment-actions">
-                          {#if environment.id === effectiveDefaultEnvironmentId}
-                            <span class="collection-environment-default">Default</span>
-                          {:else}
-                            <button class="btn btn-ghost btn-sm" type="button" onclick={() => (defaultEnvironmentId = environment.id)} disabled={workspaceBlocked}>Set as default</button>
-                          {/if}
-                          <button class="btn btn-ghost btn-icon btn-sm" type="button" onclick={() => togglePinnedEnvironment(environment.id, false)} aria-label={`Unpin ${environment.name}`} disabled={workspaceBlocked}><AddCloseIcon /></button>
-                        </span>
-                      </div>
-                    {/each}
+            <div class="collection-overview-main">
+              <section class="overview-section" aria-labelledby="collection-docs-title">
+                <div class="overview-section-head">
+                  <h2 id="collection-docs-title">Documentation</h2>
+                  {#if editingDocs}
+                    <button class="btn btn-secondary btn-sm" type="button" onclick={() => (editingDocs = false)}>Done</button>
+                  {:else if !editingDocs && description.trim()}
+                    <button class="btn btn-ghost btn-sm" type="button" onclick={editDocs} disabled={workspaceBlocked}><MenuIcon name="rename" />Edit</button>
+                  {/if}
+                </div>
+                {#if editingDocs}
+                  <textarea
+                    class="field field-area collection-docs-input"
+                    bind:this={docsInput}
+                    value={description}
+                    oninput={(event) => (description = inputValue(event))}
+                    onkeydown={onDocsKeydown}
+                    aria-label="Documentation"
+                    placeholder={'# What this collection covers\n\nAuth, base URLs, conventions, links to the API docs.'}
+                    spellcheck="false"
+                    disabled={workspaceBlocked}
+                  ></textarea>
+                  {#if markdownTooLongToPreview(description)}
+                    <p class="overview-readme-hint error" role="alert">Documentation is {markdownSizeLabel(description)}. Kurlo saves it, but only previews documentation up to 256 KB.</p>
+                  {:else}
+                    <p class="overview-readme-hint">Markdown. Saved with the collection.</p>
+                  {/if}
+                {:else if description.trim()}
+                  <CollapsibleMarkdown source={description} resetKey={loadedCollectionId} />
+                {:else}
+                  <div class="overview-readme-empty">
+                    <p>Auth, base URLs, conventions, links to the API docs — what someone needs before sending these requests.</p>
+                    <button class="btn btn-secondary btn-sm" type="button" onclick={editDocs} disabled={workspaceBlocked}><AddCloseIcon add /> Write documentation</button>
                   </div>
                 {/if}
-                {#if unpinnedEnvironmentOptions.length}
-                  <SearchPicker
-                    className="collection-environment-picker"
-                    options={unpinnedEnvironmentOptions}
-                    placeholder={pinnedEnvironments.length ? 'Pin another environment…' : 'Pin an environment…'}
-                    searchPlaceholder="Search environments"
-                    ariaLabel="Pin environment"
-                    emptyText="No environment matches."
-                    disabled={workspaceBlocked}
-                    onChoose={pinEnvironment}
-                  />
+              </section>
+
+              <section class="overview-section collection-environments" aria-labelledby="collection-environments-title">
+                <div class="overview-section-head">
+                  <h2 id="collection-environments-title">Environments</h2>
+                </div>
+                {#if environments.length}<p class="collection-environments-hint">{pinnedEnvironmentCount ? 'The switcher lists only these while you work here. Opening the collection selects the default.' : 'Pin environments to list only them in the switcher while you work in this collection.'}</p>{/if}
+                {#if environments.length}
+                  {#if pinnedEnvironments.length}
+                    <div class="collection-environment-list" role="list" aria-label="Pinned environments">
+                      {#each pinnedEnvironments as environment (environment.id)}
+                        <div class="collection-environment-row" role="listitem">
+                          <span class="collection-environment-name">{environment.name}</span>
+                          <span class="collection-environment-actions">
+                            {#if environment.id === effectiveDefaultEnvironmentId}
+                              <span class="collection-environment-default">Default</span>
+                            {:else}
+                              <button class="btn btn-ghost btn-sm" type="button" onclick={() => (defaultEnvironmentId = environment.id)} disabled={workspaceBlocked}>Set as default</button>
+                            {/if}
+                            <button class="btn btn-ghost btn-icon btn-sm" type="button" onclick={() => togglePinnedEnvironment(environment.id, false)} aria-label={`Unpin ${environment.name}`} disabled={workspaceBlocked}><AddCloseIcon /></button>
+                          </span>
+                        </div>
+                      {/each}
+                    </div>
+                  {/if}
+                  {#if unpinnedEnvironmentOptions.length}
+                    <SearchPicker
+                      className="collection-environment-picker"
+                      options={unpinnedEnvironmentOptions}
+                      placeholder={pinnedEnvironments.length ? 'Pin another environment…' : 'Pin an environment…'}
+                      searchPlaceholder="Search environments"
+                      ariaLabel="Pin environment"
+                      emptyText="No environment matches."
+                      disabled={workspaceBlocked}
+                      onChoose={pinEnvironment}
+                    />
+                  {/if}
+                {:else}
+                  <p class="collection-environment-empty">This workspace has no environments yet.</p>
                 {/if}
-              {:else}
-                <p class="collection-environment-empty">This workspace has no environments yet.</p>
-              {/if}
+              </section>
             </div>
+
+            <aside class="overview-section collection-defaults" aria-labelledby="collection-defaults-title">
+              <h2 id="collection-defaults-title">Applied to every request</h2>
+              <div class="overview-list">
+                {#each defaultRows as row (row.tab)}
+                  <button class="overview-row collection-default-row" type="button" onclick={() => (collectionSettingsTab = row.tab)}>
+                    <span class="overview-row-name">{row.label}</span>
+                    <span class="collection-default-value" class:set={row.set}>{row.value}</span>
+                    <svg class="collection-default-chevron" width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5"/></svg>
+                  </button>
+                {/each}
+              </div>
+              <p class="collection-defaults-hint">Every request here inherits these. A request header with the same key, or the request's own auth, wins; collection scripts run before the request's.</p>
+            </aside>
           </div>
         {:else if collectionSettingsTab === 'headers'}
           <div class="request-section-bar">

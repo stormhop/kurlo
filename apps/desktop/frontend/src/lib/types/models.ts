@@ -146,6 +146,7 @@ export type WorkspaceDiagnostic = import('../backend').WorkspaceDiagnostic;
 
 export type Workspace = {
   id: string; name: string; filesystemName: string; description: string;
+  readmeIssue?: string;
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;
 };

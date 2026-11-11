@@ -504,6 +504,7 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 	requestsByCollection := groupByString(requests, "collectionId")
 	environmentsByWorkspace := groupByString(environments, "workspaceId")
 	workspaceDirs := filesystemSegmentsForItems(workspaces)
+	previousWorkspaceDirs := workspaceDirsByID(filepath.Join(root, fileStoreWorkspacesDir))
 	desiredFiles := map[string]struct{}{}
 
 	rootIndexPath := filepath.Join(root, fileStoreRootIndex)
@@ -536,6 +537,12 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 		workspacePath := filepath.Join(workspaceDir, fileStoreRootFileName)
 		desiredFiles[workspacePath] = struct{}{}
 		delete(workspace, filesystemNameField)
+		if err := carryWorkspaceReadme(previousWorkspaceDirs[workspaceID], workspaceDir, journal); err != nil {
+			return err
+		}
+		if err := writeWorkspaceReadme(workspaceDir, workspace, journal); err != nil {
+			return err
+		}
 		if err := writeJournaledYAMLFile(workspacePath, filesystemWorkspaceFile{
 			Version:         fileStoreVersion,
 			Workspace:       workspace,
@@ -687,6 +694,7 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 	}); err != nil {
 		return err
 	}
+	stale = append(stale, staleWorkspaceReadmes(managedRoot, stale)...)
 	sort.SliceStable(stale, func(i, j int) bool {
 		return pruneRank(stale[i]) < pruneRank(stale[j])
 	})
@@ -1196,6 +1204,7 @@ func readYAMLWorkspaceEntriesWithDiagnostics(root string, secrets map[string]str
 			invalidFolders = append(invalidFolders, invalidWorkspaceFolder{path: path, workspaceID: id})
 			continue
 		}
+		applyWorkspaceReadme(path, workspace)
 		mergeWorkspaceCookieSecrets(doc.Cookies, secrets)
 		sortOrder, ok := orderIndex[id]
 		if !ok {

@@ -1889,7 +1889,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(recent).toContainText('Login user');
     await expect(recent).toContainText('Smoke API / Auth');
     await expect(recent).toContainText('200');
-    await recent.getByRole('button', { name: /Login user/ }).click();
+    await recent.locator('.overview-row', { hasText: 'Login user' }).click();
     await expect(page.getByLabel('Request URL')).toHaveValue(/\/login/);
     if (docsScreenshotDir) {
       try {
@@ -1984,7 +1984,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await collectionHeaderRows.nth(0).locator('input[placeholder="Value"]').fill('kurlo-docs');
     await collectionHeaderRows.nth(1).locator('input[placeholder="Header"]').fill('Accept');
     await collectionHeaderRows.nth(1).locator('input[placeholder="Value"]').fill('application/json');
-    await page.getByRole('heading', { name: 'Smoke API', exact: true }).click();
+    await page.locator('.collection-workspace-head p').first().click();
     await captureDocsScreenshot(page, 'collection-defaults');
 
     await addRequestFromFolder(page, 'Auth', 'gRPC Request');
@@ -2049,7 +2049,8 @@ test.describe('Kurlo desktop browser E2E', () => {
       try {
         await page.getByLabel('Workspace switcher').click({ timeout: 4000 });
         await page.getByRole('button', { name: 'View all workspaces' }).click({ timeout: 4000 });
-        const workspaceNotes = page.getByLabel('Notes', { exact: true });
+        await page.getByRole('button', { name: 'Write README' }).click();
+        const workspaceNotes = page.getByLabel('README', { exact: true });
         await workspaceNotes.fill(
           [
             'Staging base URL: https://api.kurlo.test',
@@ -2057,10 +2058,12 @@ test.describe('Kurlo desktop browser E2E', () => {
             'Run the Smoke API collection before tagging a release.',
           ].join('\n'),
         );
-        await workspaceNotes.blur();
+        await page.getByRole('button', { name: 'Done' }).click();
         await page.locator('.workspace-overview').evaluate((overview) => { overview.scrollTop = 0; });
         await captureDocsScreenshot(page, 'workspace-overview');
+        await page.getByRole('button', { name: 'Edit', exact: true }).click();
         await workspaceNotes.fill('');
+        await page.getByRole('button', { name: 'Done' }).click();
         await page.getByLabel('Open Git and storage status').click({ timeout: 4000 });
         await expect(page.locator('.git-workspace')).toContainText('feature/docs-refresh');
         await page.locator('.git-file-open').first().click();
@@ -3518,6 +3521,50 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.locator('.git-commit-row').first().click();
     await expect(page.locator('.git-diff .git-panel-title')).toContainText('Restore original workspace ID');
     await expect(page.locator('.git-diff .git-panel-title')).toContainText('abc1234 · Evgeny');
+  });
+
+  test('pushes the previous file header away instead of stacking it in a commit diff', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 820 });
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
+    await setGitStatus(page, {
+      isRepo: true, root: '/workspace', workspaceRoot: '/workspace',
+      branch: 'main', head: 'a1b2c3d', upstream: 'origin/main', remotes: ['origin'], clean: true, files: [],
+    });
+    await page.evaluate(() => {
+      const app = window.go.api.App;
+      const file = (name: string) => [
+        `diff --git a/workspaces/Main/${name} b/workspaces/Main/${name}`, '--- /dev/null', `+++ b/workspaces/Main/${name}`, '@@ -0,0 +1,40 @@',
+        ...Array.from({ length: 40 }, (_, index) => `+line ${index + 1}`),
+      ].join('\n');
+      app.GitCommitLogPage = async (limit, offset) => ({
+        git: await app.GitStatus(), limit, offset, hasMore: false, error: '', output: '',
+        commits: [{ hash: 'abc1234def', shortHash: 'abc1234', author: 'Evgeny', date: '2026-10-06', message: 'Add requests' }],
+      });
+      app.GitCommitDiff = async (hash) => ({ path: hash, diff: ['first.yml', 'second.yml', 'third.yml'].map(file).join('\n'), stagedDiff: '', unstagedDiff: '', binary: false, truncated: false, error: '' });
+    });
+    await openGitPanel(page);
+    await page.getByRole('tab', { name: 'History' }).click();
+    await page.locator('.git-commit-row').first().click();
+    const code = page.getByRole('region', { name: 'Git diff' });
+    await expect(code.locator('.git-diff-file')).toHaveCount(3);
+    const second = code.locator('.git-diff-file', { hasText: 'second.yml' });
+    await second.evaluate((header) => {
+      const scroller = header.closest('.git-diff-code') as HTMLElement;
+      scroller.scrollTop = (header.parentElement as HTMLElement).offsetTop - scroller.offsetTop + 120;
+    });
+    const tops = await code.locator('.git-diff-file').evaluateAll((headers) => {
+      const scroller = headers[0].closest('.git-diff-code') as HTMLElement;
+      const top = scroller.getBoundingClientRect().top;
+      return headers.map((header) => {
+        const rect = header.getBoundingClientRect();
+        return { text: header.textContent, top: Math.round(rect.top - top), bottom: Math.round(rect.bottom - top) };
+      });
+    });
+    const pinned = tops.filter((header) => header.bottom > 0 && header.top <= 1);
+    expect(pinned.map((header) => header.text)).toEqual(['workspaces/Main/second.yml']);
+    expect(pinned[0].top).toBe(0);
   });
 
   test('asks for missing secrets by request, environment and cookie names instead of ids', async ({ page }) => {
@@ -6049,6 +6096,200 @@ test.describe('Kurlo desktop browser E2E', () => {
     await modal.locator('.cookie-sync-toggle .switch-track').click();
     await expect(modal.getByText('Cookie sync is off')).toBeVisible();
     await expect(modal.locator('.cookie-sync-code')).toHaveCount(0);
+  });
+});
+
+test.describe('Workspace overview', () => {
+  test('renames the workspace in place, sends a recent request and keeps a README', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Orders API');
+    await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.example.test/orders');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(1);
+
+    await page.getByRole('tab', { name: 'Overview' }).click();
+    const overview = page.locator('.workspace-overview');
+
+    await overview.getByRole('button', { name: 'Rename workspace E2E Workspace' }).click();
+    const nameInput = overview.getByLabel('Workspace name');
+    await expect(nameInput).toBeFocused();
+    await nameInput.fill('Ignored name');
+    await nameInput.press('Escape');
+    await expect(overview.getByRole('heading', { level: 1 })).toHaveText('E2E Workspace');
+    await overview.getByRole('button', { name: 'Rename workspace E2E Workspace' }).click();
+    await nameInput.fill('Team API');
+    await nameInput.press('Enter');
+    await expect(overview.getByRole('heading', { level: 1 })).toHaveText('Team API');
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.workspaces as Array<{ name: string }>)[0].name)).toBe('Team API');
+
+    const recent = page.getByRole('region', { name: 'Continue where you left off' });
+    const row = recent.locator('.overview-recent-row').first();
+    const send = row.getByRole('button', { name: /^Send / });
+    await expect(send).toHaveCSS('opacity', '0');
+    await row.hover();
+    await expect(send).toHaveCSS('opacity', '1');
+    await send.click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(2);
+    await expect(page.getByLabel('Request URL')).toHaveValue('https://api.example.test/orders');
+
+    await page.getByRole('tab', { name: 'Overview' }).click();
+    const readme = page.getByRole('region', { name: 'README' });
+    await readme.getByRole('button', { name: 'Write README' }).click();
+    const readmeInput = readme.getByLabel('README', { exact: true });
+    await expect(readmeInput).toBeFocused();
+    await readmeInput.fill('## Auth\n\nRun **Login** first.');
+    await readme.getByRole('button', { name: 'Done' }).click();
+    await expect(readme.getByRole('heading', { name: 'Auth' })).toBeVisible();
+    await expect(readme.locator('strong')).toHaveText('Login');
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.workspaces as Array<{ description: string }>)[0].description)).toBe('## Auth\n\nRun **Login** first.');
+    await expect(page.locator('.overview-tile')).toHaveCount(6);
+  });
+
+  test('collapses a long README and shows a README Kurlo cannot edit as read-only', async ({ page }) => {
+    const long = Array.from({ length: 60 }, (_, index) => `## Section ${index + 1}\n\nText for section ${index + 1}.`).join('\n\n');
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      workspaces: [
+        { id: 'workspace-e2e', name: 'E2E Workspace', filesystemName: 'E2E-Workspace', description: long },
+        { id: 'workspace-big', name: 'Big', filesystemName: 'Big', description: '', readmeIssue: 'README.md is over 256 KB, so Kurlo does not show or edit it. Shorten it in another editor.' },
+      ],
+    });
+    await page.goto('/');
+    await page.getByRole('tab', { name: 'Overview' }).click();
+    const readme = page.getByRole('region', { name: 'README' });
+    const body = readme.locator('.overview-readme-body');
+    await expect(body).toHaveClass(/collapsed/);
+    const collapsedHeight = await body.evaluate((element) => element.getBoundingClientRect().height);
+    expect(collapsedHeight).toBeLessThanOrEqual(24 * 16 + 1);
+    await readme.getByRole('button', { name: 'Show all' }).click();
+    await expect(body).not.toHaveClass(/collapsed/);
+    await expect(readme.getByRole('heading', { name: 'Section 60' })).toBeVisible();
+    await readme.getByRole('button', { name: 'Show less' }).click();
+    await expect(body).toHaveClass(/collapsed/);
+
+    await readme.getByRole('button', { name: 'Edit' }).click();
+    await readme.getByLabel('README', { exact: true }).fill('x'.repeat(256 * 1024 + 1));
+    await expect(readme.getByRole('alert')).toContainText('over 256 KB');
+    await readme.getByLabel('README', { exact: true }).fill('short');
+    await expect(readme.getByRole('alert')).toHaveCount(0);
+    await readme.getByRole('button', { name: 'Done' }).click();
+
+    await page.getByLabel('Workspace switcher').click();
+    await page.getByRole('button', { name: /^Big/ }).first().click();
+    await page.getByRole('tab', { name: 'Overview' }).click();
+    await expect(readme.getByRole('status')).toContainText('over 256 KB');
+    await expect(readme).toContainText('Read-only');
+    await expect(readme.getByRole('button')).toHaveCount(0);
+    await expect(readme.getByRole('textbox')).toHaveCount(0);
+  });
+});
+
+test.describe('Collection overview', () => {
+  test('renames in place, summarizes defaults, renders docs and keeps rare actions in a menu', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{
+        id: 'col-ov', workspaceId: 'workspace-e2e', name: 'Orders API', description: '',
+        defaults: {
+          headers: [{ id: 1, enabled: true, key: 'X-Team', value: 'core' }, { id: 2, enabled: true, key: 'X-Trace', value: '1' }],
+          variables: [],
+          auth: { type: 'bearer', bearerToken: '{{token}}' },
+          preRequestScriptJs: 'pm.environment.set("a", 1);\npm.environment.set("b", 2);',
+          testScriptJs: '',
+          preRequestScript: '', testScript: '',
+          settings: { proxyUrl: 'http://proxy.local:8080' },
+        },
+      }],
+      requests: [{ id: 'req-ov', collectionId: 'col-ov', collection: 'Orders API', name: 'List orders', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/orders', auth: { type: 'inherit' } }],
+    });
+    await page.goto('/');
+    await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    const head = page.locator('.collection-workspace-head');
+
+    const defaults = page.getByRole('complementary', { name: 'Applied to every request' });
+    await expect(defaults.locator('.collection-default-row')).toHaveText([
+      /Headers\s*2 headers/, /Variables\s*None/, /Auth\s*Bearer token/, /Pre-request script\s*2 lines/, /Tests\s*None/, /Proxy and settings\s*Proxy http:\/\/proxy\.local:8080/,
+    ]);
+    await defaults.getByRole('button', { name: /^Auth/ }).click();
+    await expect(page.locator('.collection-tabs').getByRole('tab', { name: /Auth/ })).toHaveAttribute('aria-selected', 'true');
+    await page.locator('.collection-tabs').getByRole('tab', { name: 'Overview' }).click();
+
+    const docs = page.getByRole('region', { name: 'Documentation' });
+    await docs.getByRole('button', { name: 'Write documentation' }).click();
+    const docsInput = docs.getByRole('textbox', { name: 'Documentation' });
+    await expect(docsInput).toBeFocused();
+    await docsInput.fill('## Auth\n\nRun **Login** first.');
+    await docs.getByRole('button', { name: 'Done' }).click();
+    await expect(docs.getByRole('heading', { name: 'Auth' })).toBeVisible();
+    await expect(docs.locator('.md p')).toHaveCSS('color', await page.locator('.collection-workspace h1').evaluate(node => getComputedStyle(node).color));
+
+    await head.getByRole('button', { name: 'Rename collection Orders API' }).click();
+    const nameInput = head.getByLabel('Collection name');
+    await expect(nameInput).toBeFocused();
+    await nameInput.fill('Billing API');
+    await nameInput.press('Enter');
+    await expect(head.getByRole('heading', { level: 1 })).toHaveText('Billing API');
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.collections as Array<{ id: string; name: string; description: string }>).find(item => item.id === 'col-ov'))).toMatchObject({
+      name: 'Billing API', description: '## Auth\n\nRun **Login** first.',
+    });
+    await expect(collectionRow(page, 'Billing API')).toBeVisible();
+
+    await expect(head.getByRole('button', { name: 'Reset defaults' })).toHaveCount(0);
+    await head.getByRole('button', { name: 'More collection actions' }).click();
+    const menu = head.getByRole('menu');
+    await expect(menu.getByRole('menuitem')).toHaveText(['Export…', 'Reset defaults', 'Delete collection']);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+
+    await head.getByRole('button', { name: 'Run', exact: true }).click();
+    await expect(page.locator('.collection-runner-workspace')).toBeVisible();
+  });
+
+  test('keeps huge, long and blank collection documentation safe to show and save', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-docs', workspaceId: 'workspace-e2e', name: 'Docs API', description: '' }],
+      requests: [{ id: 'req-docs', collectionId: 'col-docs', collection: 'Docs API', name: 'Ping', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/ping', auth: { type: 'inherit' } }],
+    });
+    await page.goto('/');
+    await collectionRow(page, 'Docs API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Docs API').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    const docs = page.getByRole('region', { name: 'Documentation' });
+    const stored = () => page.evaluate(() => (window.__kurloE2E.store.collections as Array<{ id: string; description: string }>).find(item => item.id === 'col-docs')?.description);
+    const save = page.locator('.overview-actions .btn-primary');
+
+    await docs.getByRole('button', { name: 'Write documentation' }).click();
+    const input = docs.getByRole('textbox', { name: 'Documentation' });
+    const huge = '## Part\n\n' + 'word '.repeat(70000);
+    await input.fill(huge);
+    await expect(docs.getByRole('alert')).toContainText('only previews documentation up to 256 KB');
+    await save.click();
+    await expect.poll(async () => (await stored())?.length).toBe(huge.length);
+    await docs.getByRole('button', { name: 'Done' }).click();
+    await expect(docs.locator('.md-too-long')).toContainText('too long to preview');
+    await expect(docs.locator('.md-heading')).toHaveCount(0);
+
+    await docs.getByRole('button', { name: 'Edit' }).click();
+    const long = Array.from({ length: 50 }, (_, index) => `## Step ${index + 1}\n\nDo thing ${index + 1}.`).join('\n\n');
+    await input.fill(long);
+    await expect(docs.getByRole('alert')).toHaveCount(0);
+    await docs.getByRole('button', { name: 'Done' }).click();
+    const body = docs.locator('.overview-readme-body');
+    await expect(body).toHaveClass(/collapsed/);
+    expect(await body.evaluate(node => node.getBoundingClientRect().height)).toBeLessThanOrEqual(24 * 16 + 1);
+    await docs.getByRole('button', { name: 'Show all' }).click();
+    await expect(docs.getByRole('heading', { name: 'Step 50' })).toBeVisible();
+
+    await docs.getByRole('button', { name: 'Edit' }).click();
+    await input.fill('\n\n   \n');
+    await save.click();
+    await expect.poll(stored).toBe('');
+    await expect(page.locator('.overview-actions')).not.toContainText('Updated elsewhere');
+    await page.waitForTimeout(1500);
+    await expect(page.locator('.overview-actions')).not.toContainText('Updated elsewhere');
   });
 });
 
@@ -10336,6 +10577,7 @@ test.describe('Audit regressions', () => {
     const row = collectionRow(page, 'Audit');
     await row.getByLabel('Collection menu').click();
     await row.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Write documentation' }).click();
     const notes = page.getByRole('textbox', { name: 'Documentation', exact: true });
     const width = await notes.evaluate(node => node.getBoundingClientRect().width);
     expect(width).toBeGreaterThan(300);

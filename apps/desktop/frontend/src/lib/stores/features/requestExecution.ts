@@ -31,6 +31,9 @@ function downloadFilenameFromUrl(url: string): string {
 
 type RequestExecutionHost = {
   activeRequestId: string;
+  switchRequest: (id: string) => Promise<void>;
+  topView: string;
+  runActiveRequest: () => Promise<void>;
   activeWorkspaceId: string;
   authType: AuthType;
   bearerToken: string;
@@ -148,6 +151,12 @@ export const requestExecutionFeature = {
       return;
     }
     await this.send();
+  },
+
+  async openAndRunRequest(this: RequestExecutionHost, id: string) {
+    await this.switchRequest(id);
+    if (this.activeRequestId !== id || this.topView !== 'request') return;
+    await this.runActiveRequest();
   },
 
   async runActiveRequestAndDownload(this: RequestExecutionHost) {

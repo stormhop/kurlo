@@ -100,7 +100,6 @@
     position: fixed; inset: 0; z-index: 210;
     display: grid; place-items: center; padding: var(--space-6);
     background: var(--scrim);
-    backdrop-filter: blur(var(--scrim-blur));
   }
   .gitauth-modal {
     width: 26.25rem; max-width: calc(100vw - 3rem);

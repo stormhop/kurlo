@@ -37,6 +37,21 @@ export function safeMarkdownURL(raw: string, allowImageData = false): string {
   return '';
 }
 
+export const MARKDOWN_PREVIEW_MAX_BYTES = 256 * 1024;
+
+export function markdownByteLength(source: string): number {
+  return source.length * 3 <= MARKDOWN_PREVIEW_MAX_BYTES ? source.length : new TextEncoder().encode(source).length;
+}
+
+export function markdownTooLongToPreview(source: string): boolean {
+  return source.length > MARKDOWN_PREVIEW_MAX_BYTES / 3 && markdownByteLength(source) > MARKDOWN_PREVIEW_MAX_BYTES;
+}
+
+export function markdownSizeLabel(source: string): string {
+  const bytes = markdownByteLength(source);
+  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
+}
+
 export function parseMarkdown(source: string): MdBlock[] {
   return parseBlocks(String(source ?? '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n'));
 }

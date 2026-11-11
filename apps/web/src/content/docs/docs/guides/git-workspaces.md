@@ -38,6 +38,7 @@ kurlo.yml
 .gitignore
 kurlo-agent.md
 workspaces/**/*.yml
+workspaces/*/README.md
 ```
 
 The shared YAML contains workspaces, collections, explicit folder paths, requests, environments, defaults, scripts, and settings. Secret values are replaced with `{{kurloSecret:...}}` placeholders. Their real values stay in Kurlo's encrypted local `requests.json` profile instead of the Git workspace.
@@ -45,6 +46,8 @@ The shared YAML contains workspaces, collections, explicit folder paths, request
 See [Kurlo YAML format](/docs/reference/kurlo-yaml-format/) for the public schema.
 
 `kurlo-agent.md` holds the team's notes for the agent, if the workspace has them; see [Team notes in kurlo-agent.md](/docs/guides/agent/#team-notes-in-kurlo-agentmd). Kurlo lists it under Changes and commits it with the rest of the workspace.
+
+`workspaces/<workspace>/README.md` is the workspace README shown on the workspace overview, matched in any letter case (`Readme.md` works too). Kurlo lists it under Changes and commits it with the rest of the workspace, so a README a teammate pushes shows up after you pull.
 
 ## Starting a folder workspace
 

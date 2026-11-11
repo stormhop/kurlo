@@ -13,7 +13,7 @@ Defaults are applied when a request is sent. Folders can add their own headers, 
 
 | Tab | What it defines |
 |-----|-----------------|
-| Overview | Collection name and documentation. |
+| Overview | Documentation, pinned environments, and a summary of every default below. |
 | Headers | Header rows merged into child requests. |
 | Vars | Collection variables, including values marked secret. |
 | Auth | Default Bearer, Basic, Digest, API Key, OAuth 2.0, or AWS Signature v4 configuration. |
@@ -22,6 +22,16 @@ Defaults are applied when a request is sent. Folders can add their own headers, 
 | Proxy | HTTP version, TLS verification, redirects, timeout, proxy URL, browser security, and cookie-jar defaults. |
 
 Use the app-wide script-engine setting to switch between the independently stored JavaScript and Tengo fields.
+
+## Overview
+
+The **Overview** tab shows what the collection applies to its requests at a glance:
+
+- **Applied to every request** lists Headers, Variables, Auth, Pre-request script, Tests, and Proxy and settings with what each one sets (for example *2 headers*, *Bearer token*, *12 lines* or *None*). Click a row to open its tab.
+- **Documentation** shows the collection notes as rendered Markdown; **Edit** switches to the text, and **Done** or **Esc** back. Long documentation is folded under **Show all**; documentation over 256 KB is saved but not previewed.
+- **Environments** pins the environments the switcher lists while you work in the collection and picks the default one.
+
+Click the collection name at the top to rename it in place (**Enter** saves, **Esc** cancels). **Run** opens the collection runner and **New request** adds a request to the collection. The **•••** menu holds **Export…**, **Reset defaults**, and **Delete collection**.
 
 ## Precedence
 
@@ -85,7 +95,7 @@ Renaming a folder keeps its settings; deleting it removes them along with its re
 
 In autosave mode, collection edits are saved after a short delay. In manual-save mode, click **Save**.
 
-**Reset defaults** clears collection headers, variables, auth, scripts, tests, and transport settings after confirmation. It does not delete requests or folders, and folder defaults stay. On a folder's settings, **Reset defaults** clears only that folder's headers, auth, scripts, and tests.
+**Reset defaults**, in the **•••** menu, clears collection headers, variables, auth, scripts, tests, and transport settings after confirmation. It does not delete requests or folders, and folder defaults stay. On a folder's settings, the same menu item clears only that folder's headers, auth, scripts, and tests.
 
 ## Storage and export
 

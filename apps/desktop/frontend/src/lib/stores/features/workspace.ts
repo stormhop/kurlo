@@ -122,11 +122,10 @@ export const workspaceFeature = {
     this.workspaces = this.workspaces.map(workspace => workspace.id === this.activeWorkspaceId ? { ...workspace, description: value } : workspace);
     this.scheduleWorkspacePersist();
   },
-  async renameWorkspace(this: WorkspaceHost) {
+  async setWorkspaceName(this: WorkspaceHost, value: string) {
+    const name = value.trim();
+    if (!name || !this.activeWorkspace || name === this.activeWorkspace.name) return;
     if (!this.guardWorkspaceWritable('Renaming workspaces')) return;
-    if (!this.activeWorkspace) return;
-    const name = await this.openPromptDialog('Rename workspace', this.activeWorkspace.name);
-    if (!name) return;
     this.workspaces = this.workspaces.map(workspace => workspace.id === this.activeWorkspaceId ? { ...workspace, name } : workspace);
     await this.persistRequestStore();
   },

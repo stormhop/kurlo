@@ -24,6 +24,11 @@ All notable changes to Kurlo are documented here. This project follows
 - VS Code Light and VS Code Dark follow the current Light Modern and Dark Modern palettes, with distinct secondary and muted text.
 - Error, warning and success highlights use the same tint strength on every screen and in every theme, and links and active tabs use a dedicated accent shade that stays readable on dark backgrounds.
 - The Cancel and Stop buttons shown while a request runs are tinted red with red text, so they stay readable in themes with a light error colour.
+- Dialogs, settings, search and keyboard shortcuts dim the window behind them without blurring it, so the app stays readable and opening them no longer costs a full-window blur.
+- The workspace overview has clearer actions: click the workspace name to rename it in place, **New workspace** is a real button, recent requests show a **Send** button on hover that opens and sends the request in one click, and the **Start** actions are a compact grid of tiles with icons.
+- Workspace **Notes** became a **README**: it shows as rendered Markdown with an **Edit** button and is kept as `README.md` in the workspace folder, so Git hosts show it and edits made outside Kurlo appear in the app. Notes saved in `workspace.yml` by earlier versions move into `README.md` on the next save. The Git screen lists `README.md` with the other workspace files and commits it. A long README is folded under **Show all**, and a `README.md` over 256 KB, not UTF-8 or a link is shown read-only and never changed.
+- Collection settings open on a clearer overview: click the collection name to rename it in place, **Run** and **New request** sit in the header with **Export…**, **Reset defaults** and **Delete collection** in a **•••** menu, an **Applied to every request** list shows what each default sets and opens its tab, and the documentation shows as rendered Markdown with an **Edit** button. In manual-save mode the header no longer shows **Saved** twice.
+- Markdown previews (collection documentation, request docs, the workspace README and agent replies) show a short note instead of rendering text over 256 KB, so a huge document no longer freezes the screen; the editor warns when documentation passes that size and still saves it. Long collection documentation is folded under **Show all**, and documentation made only of blank lines is saved as empty instead of showing **Updated elsewhere**.
 
 ### Fixed
 
@@ -51,6 +56,7 @@ All notable changes to Kurlo are documented here. This project follows
 - HTTP responses that finish in the background stay available in their original request tabs without replacing the response or selected response tab you are viewing.
 - An open environment pin picker adjusts to window, panel and interface-scale changes instead of remaining clipped below the window.
 - Collection settings adapt to the available panel width, keeping documentation and header actions usable at the minimum window size and 150% interface scale.
+- File headers in a Git diff no longer pile up at the top while you scroll: each stays pinned only while its own file is in view, with no lines showing through above it.
 
 ## [3.0.3] - 2026-11-10
 

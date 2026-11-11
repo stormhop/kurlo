@@ -48,7 +48,7 @@ function showFatalOverlay(detail: string) {
   Object.assign(root.style, {
     position: 'fixed', inset: '0', zIndex: '2147483647',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'rgba(15, 16, 22, 0.72)', backdropFilter: 'blur(4px)',
+    background: 'rgba(15, 16, 22, 0.72)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
     padding: '1.5rem',
   } as CSSStyleDeclaration);

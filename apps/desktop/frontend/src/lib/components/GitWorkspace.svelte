@@ -652,16 +652,33 @@
     })).sort((left, right) => left.label.localeCompare(right.label));
   }
 
+  function diffFileBlocks(rows: GitDiffRow[]): Array<{ file: string; rows: GitDiffRow[] }> {
+    const blocks: Array<{ file: string; rows: GitDiffRow[] }> = [];
+    for (const row of rows) {
+      if (row.kind === 'file') blocks.push({ file: row.text, rows: [] });
+      else if (blocks.length) blocks[blocks.length - 1].rows.push(row);
+      else blocks.push({ file: '', rows: [row] });
+    }
+    return blocks;
+  }
+
   function remoteNameOf(startPoint: string) {
     return startPoint.slice(0, startPoint.indexOf('/')) || 'remote';
   }
 </script>
 
 {#snippet diffRowList(rows: GitDiffRow[])}
+  {#each diffFileBlocks(rows) as block, blockIndex (blockIndex)}
+    <div class="git-diff-file-block">
+      {#if block.file}<div class="git-diff-file">{block.file}</div>{/if}
+      {@render diffLines(block.rows)}
+    </div>
+  {/each}
+{/snippet}
+
+{#snippet diffLines(rows: GitDiffRow[])}
   {#each rows as row, index (index)}
-    {#if row.kind === 'file'}
-      <div class="git-diff-file">{row.text}</div>
-    {:else if row.kind === 'hunk'}
+    {#if row.kind === 'hunk'}
       <div class="git-diff-line hunk"><span class="git-diff-line-no">⋯</span><span class="git-diff-sign"></span><code>{row.text}</code></div>
     {:else if row.kind === 'note'}
       <div class="git-diff-line note"><span class="git-diff-line-no"></span><span class="git-diff-sign"></span><code>{row.text}</code></div>

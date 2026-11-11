@@ -717,7 +717,7 @@
         shortcutCombo={(id) => vm.shortcutCombo(id)}
         appRuntime={vm.appRuntime}
         updateWorkspaceDescription={vm.updateWorkspaceDescription}
-        renameWorkspace={vm.renameWorkspace}
+        setWorkspaceName={(name) => vm.setWorkspaceName(name)}
         createWorkspace={vm.createWorkspace}
         openSettings={vm.openSettings}
         createCollection={vm.createCollection}
@@ -728,6 +728,7 @@
         openCollectionRunner={() => vm.openCollectionRunner()}
         openCollection={(id) => vm.openCollectionSettings(id)}
         switchRequest={(id) => vm.switchRequest(id)}
+        sendRequest={(id) => vm.openAndRunRequest(id)}
       />
     {:else if vm.topView === 'git'}
       {#if lazy.GitWorkspaceComponent}
@@ -854,6 +855,8 @@
         onSaveFolder={vm.saveFolderSettings}
         onResetFolder={vm.resetFolderSettings}
         onCreateRequestInFolder={vm.createRequestInFolder}
+        onExport={vm.exportCollection}
+        onDelete={vm.deleteCollection}
       />
       {/if}
     {:else if vm.topView === 'mock'}

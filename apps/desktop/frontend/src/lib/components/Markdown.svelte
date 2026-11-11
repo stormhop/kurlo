@@ -1,6 +1,6 @@
 <script lang="ts">
   import { openExternalURL } from '../externalLinks';
-  import { parseMarkdown, type MdBlock, type MdInline } from '../markdown';
+  import { markdownTooLongToPreview, markdownSizeLabel, parseMarkdown, type MdBlock, type MdInline } from '../markdown';
   import { untrack } from 'svelte';
   import { clipboardCopy } from '../utils';
 
@@ -28,7 +28,9 @@
     }, wait);
     return () => clearTimeout(timer);
   });
-  const blocks = $derived(parseMarkdown(live ? liveSource : source));
+  const shown = $derived(live ? liveSource : source);
+  const tooLong = $derived(markdownTooLongToPreview(shown));
+  const blocks = $derived(tooLong ? [] : parseMarkdown(shown));
   let copiedIndex = $state('');
 
   function openLink(event: MouseEvent, href: string) {
@@ -109,7 +111,11 @@
 {/snippet}
 
 <div class="md" class:md-compact={compact}>
-  {@render blockList(blocks, 'b')}
+  {#if tooLong}
+    <p class="md-too-long">This text is {markdownSizeLabel(shown)}, too long to preview. Open it as text to read or edit it.</p>
+  {:else}
+    {@render blockList(blocks, 'b')}
+  {/if}
 </div>
 
 <style>
@@ -134,6 +140,9 @@
   }
   .md p {
     margin: 0 0 var(--space-3);
+  }
+  .md .md-too-long {
+    color: var(--text-2);
   }
   .md-heading {
     margin: var(--space-5) 0 var(--space-2);

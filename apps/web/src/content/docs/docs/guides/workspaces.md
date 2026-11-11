@@ -25,7 +25,7 @@ A workspace is the top-level container. Everything inside it — collections, en
 
 ### Creating a workspace
 
-Click the workspace name in the title bar and choose **+ New workspace**. Pick a short name; you can rename it any time via the same menu.
+Click the workspace name in the title bar and choose **+ New workspace**, or use **New workspace** on the workspace overview. Pick a short name; you can rename it any time via the same menu, or click the name at the top of the workspace overview and type a new one (**Enter** saves, **Esc** cancels).
 
 On macOS the workspace name sits above the sidebar, at its right edge. When you hide the sidebar it moves to the start of the top bar.
 
@@ -39,10 +39,10 @@ The same dropdown shows all workspaces with their request counts. Switching is i
 
 If no request is open, the workspace overview is shown. Under the workspace name — with how many collections, requests and environments it holds, and whether it lives in a Git repository — it lists:
 
-- **Continue where you left off** — the last requests you sent from this workspace, newest first, with the status each one got. Click one to open it. Requests you have since deleted are left out.
+- **Continue where you left off** — the last requests you sent from this workspace, newest first, with the status each one got. Click one to open it. Point at an HTTP, GraphQL or gRPC request to get a **Send** button that opens it and sends it again in one click. Requests you have since deleted are left out.
 - **Collections** — every collection with its request and folder count. Click one to open its settings.
-- **Start** — new request, search, import, new collection, new environment, run a collection and keyboard shortcuts, with the shortcut shown where there is one.
-- **Notes** — freeform text saved with the workspace. Useful for base URLs, auth hints, conventions or onboarding pointers for teammates.
+- **Start** — tiles for new request, search, import, run a collection, new collection and new environment, with the shortcut shown where there is one, and a link to the keyboard shortcuts.
+- **README** — Markdown notes for whoever opens the workspace next: base URLs, auth hints, which environment is safe to break, links. It shows rendered; **Edit** switches to the text and **Done** or **Esc** back. Kurlo keeps it as `README.md` in the workspace folder, so a Git host shows it when you browse that folder, and changes made to that file outside Kurlo show up here. A long README is folded to its first screen with **Show all** under it. A `README.md` that is over 256 KB, is not UTF-8 text, or is a link to another file shows as read-only with the reason, and Kurlo never changes or deletes it.
 
 A workspace with nothing in it yet shows a short first-run panel instead: start a new request (paste a URL or a whole cURL command) or import a collection from Postman, Insomnia, OpenAPI, Bruno / OpenCollection or HAR.
 

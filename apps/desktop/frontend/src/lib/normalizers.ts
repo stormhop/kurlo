@@ -154,6 +154,7 @@ export function normalizeWorkspace(raw: Partial<Workspace>): Workspace {
         name,
         filesystemName: filesystemNameFromName(input.filesystemName || name, id),
         description: input.description || '',
+        ...(typeof raw.readmeIssue === 'string' && raw.readmeIssue ? { readmeIssue: raw.readmeIssue } : {}),
     };
 }
 

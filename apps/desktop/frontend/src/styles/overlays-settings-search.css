@@ -6,7 +6,6 @@
   place-items: center;
   padding: var(--space-5);
   background: var(--scrim);
-  backdrop-filter: blur(var(--scrim-blur));
 }
 
 .app-dialog {
@@ -835,7 +834,6 @@
   place-items: center;
   padding: var(--space-5);
   background: var(--scrim);
-  backdrop-filter: blur(var(--scrim-blur));
 }
 
 .shortcut-modal {
@@ -938,7 +936,6 @@
   inset: 0;
   z-index: 200;
   background: var(--scrim);
-  backdrop-filter: blur(var(--scrim-blur));
   display: grid;
   place-items: center;
   padding: var(--space-6);
@@ -1238,7 +1235,6 @@ button.settings-row:focus-visible {
   inset: 0;
   z-index: 200;
   background: var(--scrim);
-  backdrop-filter: blur(var(--scrim-blur));
   display: flex;
   align-items: flex-start;
   justify-content: center;

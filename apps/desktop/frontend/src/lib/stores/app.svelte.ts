@@ -572,6 +572,7 @@ class AppVM {
   declare buildRequest: typeof requestExecutionFeature.buildRequest;
   declare runActiveRequest: typeof requestExecutionFeature.runActiveRequest;
   declare runActiveRequestAndDownload: typeof requestExecutionFeature.runActiveRequestAndDownload;
+  declare openAndRunRequest: typeof requestExecutionFeature.openAndRunRequest;
   declare send: typeof requestExecutionFeature.send;
   declare cancelActiveRequest: typeof requestExecutionFeature.cancelActiveRequest;
 
@@ -979,7 +980,7 @@ class AppVM {
   declare switchWorkspace: typeof workspaceFeature.switchWorkspace;
   declare createWorkspace: typeof workspaceFeature.createWorkspace;
   declare updateWorkspaceDescription: typeof workspaceFeature.updateWorkspaceDescription;
-  declare renameWorkspace: typeof workspaceFeature.renameWorkspace;
+  declare setWorkspaceName: typeof workspaceFeature.setWorkspaceName;
   declare deleteWorkspace: typeof workspaceFeature.deleteWorkspace;
 
   requestType = $state<RequestType>('http');

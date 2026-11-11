@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseInline, parseMarkdown, safeMarkdownURL } from '../lib/markdown';
+import { MARKDOWN_PREVIEW_MAX_BYTES, markdownSizeLabel, markdownTooLongToPreview, parseInline, parseMarkdown, safeMarkdownURL } from '../lib/markdown';
 
 describe('markdown', () => {
   it('parses headings, paragraphs, rules and soft line breaks', () => {
@@ -122,5 +122,16 @@ describe('markdown', () => {
     const text = 'x'.repeat(1200);
     expect(parseInline(`${ticks}code${ticks}`)).toEqual([{ type: 'code', text: 'code' }]);
     expect(parseInline(`*${text}*`)).toEqual([{ type: 'em', children: [{ type: 'text', text }] }]);
+  });
+});
+
+describe('markdown preview size', () => {
+  it('previews text up to 256 KB and labels larger text by size', () => {
+    expect(markdownTooLongToPreview('# Title')).toBe(false);
+    expect(markdownTooLongToPreview('a'.repeat(MARKDOWN_PREVIEW_MAX_BYTES))).toBe(false);
+    expect(markdownTooLongToPreview('a'.repeat(MARKDOWN_PREVIEW_MAX_BYTES + 1))).toBe(true);
+    expect(markdownTooLongToPreview('ж'.repeat(MARKDOWN_PREVIEW_MAX_BYTES / 2 + 1))).toBe(true);
+    expect(markdownSizeLabel('a'.repeat(300 * 1024))).toBe('300 KB');
+    expect(markdownSizeLabel('a'.repeat(3 * 1024 * 1024))).toBe('3.0 MB');
   });
 });
