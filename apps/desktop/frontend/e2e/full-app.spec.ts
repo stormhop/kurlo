@@ -3234,7 +3234,62 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(parent.locator('.app-select-trigger')).toContainText('env-05');
 
     await page.getByRole('radio', { name: 'Matrix' }).click();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-matrix-many.png'), animations: 'disabled' });
+    const columnHeads = page.locator('.env-matrix-col-head');
+    await expect(columnHeads).toHaveCount(5);
+    const columnsButton = page.getByRole('button', { name: 'Environments 5 of 30' });
+    await columnsButton.click();
+    const picker = page.getByRole('dialog', { name: 'Environments in the matrix' });
+    await expect(picker.getByLabel('Find environment')).toBeFocused();
+    await expect(columnHeads.last()).toContainText('env-30');
+    await picker.getByLabel('Find environment').fill('30');
+    await expect(picker.getByRole('checkbox', { name: 'env-30' })).toBeChecked();
+    await expect(picker.getByRole('checkbox', { name: 'env-30' })).toBeDisabled();
+    await picker.getByLabel('Find environment').fill('17');
+    await picker.getByRole('checkbox', { name: 'env-17' }).check();
+    await expect(columnHeads).toHaveCount(6);
+    await expect(columnHeads.nth(4)).toContainText('env-17');
+    await page.screenshot({ path: process.env.MATRIX_SHOT_DIR ? join(process.env.MATRIX_SHOT_DIR, 'picker.png') : join(tmpdir(), 'kurlo-environment-matrix-picker.png'), animations: 'disabled' });
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Environments 6 of 30' })).toBeFocused();
+
+    const grid = page.locator('.env-matrix-scroll');
+    const table = page.getByRole('table', { name: 'Variables by environment' });
+    const gridBox = (await grid.boundingBox())!;
+    const tableBox = (await table.boundingBox())!;
+    expect(gridBox.y + gridBox.height - (tableBox.y + tableBox.height)).toBeLessThan(24);
+
+    await page.getByRole('button', { name: 'Environments 6 of 30' }).click();
+    await picker.getByRole('button', { name: 'Show all' }).click();
+    await page.keyboard.press('Escape');
+    await expect(columnHeads).toHaveCount(30);
+    const name = page.getByLabel('Name of baseUrl');
+    const before = (await name.boundingBox())!;
+    await grid.evaluate(node => { node.scrollLeft = node.scrollWidth; });
+    await expect.poll(() => grid.evaluate(node => node.scrollLeft)).toBeGreaterThan(1000);
+    const after = (await name.boundingBox())!;
+    expect(Math.abs(after.x - before.x)).toBeLessThan(1);
+    await expect(page.getByLabel('baseUrl in env-30', { exact: true })).toBeInViewport();
+    await page.screenshot({ path: process.env.MATRIX_SHOT_DIR ? join(process.env.MATRIX_SHOT_DIR, 'scrolled.png') : join(tmpdir(), 'kurlo-environment-matrix-many.png'), animations: 'disabled' });
+
+    await page.getByRole('button', { name: 'Environments 30 of 30' }).click();
+    await picker.getByRole('button', { name: 'Reset' }).click();
+    await expect(columnHeads).toHaveCount(5);
+  });
+
+  test('opens environments one at a time by default', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      environments: [
+        { id: 'env-a', workspaceId: 'workspace-e2e', name: 'Alpha', values: [{ id: 1, key: 'baseUrl', value: 'https://a.example.test', enabled: true }] },
+        { id: 'env-b', workspaceId: 'workspace-e2e', name: 'Beta', values: [{ id: 1, key: 'baseUrl', value: 'https://b.example.test', enabled: true }] },
+      ],
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Environments', exact: true }).click();
+    await page.locator('.environment-item-main').filter({ hasText: 'Beta' }).click();
+    await expect(page.getByRole('radio', { name: 'Single' })).toBeChecked();
+    await expect(page.getByTestId('environment-variable-row').first().getByLabel('Environment variable value')).toHaveValue('https://b.example.test');
+    await expect(page.getByRole('table', { name: 'Variables by environment' })).toHaveCount(0);
   });
 
   test('shows the branch, sync state and changes in the status bar as the only Git entry point', async ({ page }) => {
@@ -9543,6 +9598,29 @@ test('marks an environment as a sandbox for the agent', async ({ page }, testInf
   await page.screenshot({ path: join(tmpdir(), `kurlo-environment-sandbox-${testInfo.project.name}.png`), animations: 'disabled' });
   await workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Protect from AI agents' }).click();
   await expect(workspace.locator('.env-protected')).toHaveText('Protected');
+  const nameField = workspace.getByLabel('Environment name');
+  const badge = workspace.locator('.env-protected');
+  const gapToText = () => nameField.evaluate((input: HTMLInputElement) => {
+    const probe = document.createElement('span');
+    const style = getComputedStyle(input);
+    probe.style.font = style.font;
+    probe.style.letterSpacing = style.letterSpacing;
+    probe.style.whiteSpace = 'pre';
+    probe.style.position = 'absolute';
+    probe.textContent = input.value;
+    document.body.append(probe);
+    const textRight = input.getBoundingClientRect().left + parseFloat(style.paddingLeft) + parseFloat(style.borderLeftWidth) + probe.getBoundingClientRect().width;
+    probe.remove();
+    const mark = document.querySelector('.environment-workspace .env-protected')!.getBoundingClientRect();
+    return mark.left - textRight;
+  });
+  await expect.poll(gapToText).toBeLessThan(32);
+  expect(await gapToText()).toBeGreaterThanOrEqual(0);
+  await nameField.fill('Sandbox test with a much longer name');
+  await expect.poll(gapToText).toBeLessThan(32);
+  expect(await gapToText()).toBeGreaterThanOrEqual(0);
+  await page.screenshot({ path: process.env.ENV_BADGE_SHOT || join(tmpdir(), `kurlo-environment-protected-${testInfo.project.name}.png`), animations: 'disabled' });
+  await nameField.press('Enter');
   await trigger.click();
   await expect(workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Stop treating as a sandbox' })).toBeDisabled();
 });

@@ -247,7 +247,9 @@
     <div class="environment-workspace-head">
       <div class="environment-title">
         <h1 aria-label={activeEnvironment.name}>
-          <input class="request-title-input env-name" bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} />
+          <span class="env-name-fit" data-value={nameDraft}>
+            <input class="request-title-input env-name" size="1" bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} />
+          </span>
           {#if activeEnvironment.protected}
             <span class="env-protected"><MenuIcon name="lock" />Protected</span>
           {:else if protectedBy}
@@ -363,14 +365,33 @@
 
 <style>
   .environment-title h1 { display: flex; align-items: center; min-width: 0; }
-  .environment-title .env-name {
-    width: 100%;
-    max-width: none;
-    flex: 1 1 auto;
-    height: 2rem;
+  .env-name-fit {
+    display: inline-grid;
+    flex: 0 1 auto;
+    min-width: 0;
     margin-left: calc(var(--space-1-5) * -1);
+  }
+  .env-name-fit::after {
+    content: attr(data-value) ' ';
+    grid-area: 1 / 1;
+    height: 0;
+    padding: 0 var(--space-1-5);
+    border: 1px solid transparent;
+    overflow: hidden;
+    visibility: hidden;
+    white-space: pre;
+  }
+  .environment-title .env-name {
+    grid-area: 1 / 1;
+    width: 100%;
+    min-width: 4rem;
+    max-width: none;
+    height: 2rem;
     font-size: inherit;
     font-weight: inherit;
     letter-spacing: inherit;
+  }
+  .environment-title h1 :global(.env-protected) {
+    flex-shrink: 0;
   }
 </style>

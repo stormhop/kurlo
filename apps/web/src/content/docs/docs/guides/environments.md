@@ -64,7 +64,7 @@ The editor's `{{` autocomplete lists them alongside your own variables. A `{{$na
 
 ## Comparing environments
 
-With two or more environments, the environment page has a **Matrix** view: every variable of the workspace as a row, every environment as a column, the one in use highlighted. It answers "what is `baseUrl` in staging?" and "which environment is missing a token?" without opening each environment.
+An environment opens on its own page with only its variables. With two or more environments, the page also has a **Matrix** view: every variable of the workspace as a row, environments as columns, the one in use highlighted. It answers "what is `baseUrl` in staging?" and "which environment is missing a token?" without opening each environment.
 
 ![Environment matrix comparing variables across two environments](../../../../assets/screenshots/environment-matrix.png)
 
@@ -72,6 +72,8 @@ With two or more environments, the environment page has a **Matrix** view: every
 - Rename a variable in its row and it is renamed in every environment.
 - The lock marks a variable secret everywhere — masking it in one environment and showing it in another would leak it anyway. The eye shows the values while you look.
 - **+ Variable** adds a variable to every environment at once, empty; the bin removes it from all of them.
+- The Matrix shows the environment in use and up to four more. **Environments** above the table picks which ones to compare, with a search for long lists; **Show all** adds every environment and **Reset** goes back to the first five. Kurlo remembers the choice for each workspace.
+- The variable names stay on the left while you scroll across the columns.
 - Click an environment's name to open it on its own. **Single** switches back to one environment at a time; Kurlo remembers which view you used.
 
 ## Inheriting from another environment

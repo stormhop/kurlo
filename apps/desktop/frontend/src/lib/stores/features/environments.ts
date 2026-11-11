@@ -39,9 +39,9 @@ export function environmentValuesAfterChanges(values: Record<string, string>, ch
 
 export function readEnvironmentView(): EnvironmentView {
   try {
-    return localStorage.getItem(ENVIRONMENT_VIEW_KEY) === 'single' ? 'single' : 'matrix';
+    return localStorage.getItem(ENVIRONMENT_VIEW_KEY) === 'matrix' ? 'matrix' : 'single';
   } catch {
-    return 'matrix';
+    return 'single';
   }
 }
 

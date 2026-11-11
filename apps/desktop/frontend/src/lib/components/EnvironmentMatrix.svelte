@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import { buildEnvironmentMatrix, type MatrixRow } from '../environmentMatrix';
   import { effectiveEnvironmentRows, parentEnvironment } from '../environmentInheritance';
+  import { readMatrixColumns, toggleMatrixColumn, visibleMatrixEnvironments, writeMatrixColumns } from '../environmentMatrixColumns';
   import type { Environment } from '../types/models';
 
   let {
@@ -29,6 +30,69 @@
   let revealed = $state<Set<string>>(new Set());
   let renameError = $state<{ key: string; message: string } | null>(null);
   let gridEl = $state<HTMLDivElement>();
+  let columnsOpen = $state(false);
+  let columnsQuery = $state('');
+  let columnsRoot = $state<HTMLDivElement>();
+  let columnsButton = $state<HTMLButtonElement>();
+  let workspaceId = $derived(environments[0]?.workspaceId ?? '');
+  let chosenColumns = $state<string[] | null>(null);
+
+  $effect.pre(() => {
+    chosenColumns = readMatrixColumns(workspaceId);
+  });
+
+  let shown = $derived(visibleMatrixEnvironments(environments, chosenColumns, activeEnvironmentId));
+  let shownIds = $derived(new Set(shown.map(environment => environment.id)));
+  let columnChoices = $derived.by(() => {
+    const query = columnsQuery.trim().toLowerCase();
+    return query ? environments.filter(environment => environment.name.toLowerCase().includes(query)) : environments;
+  });
+
+  function setColumns(ids: string[] | null) {
+    chosenColumns = ids;
+    writeMatrixColumns(workspaceId, ids);
+  }
+
+  function toggleColumn(environmentId: string) {
+    setColumns(toggleMatrixColumn(environments, chosenColumns, activeEnvironmentId, environmentId));
+  }
+
+  function closeColumns(focusButton = false) {
+    columnsOpen = false;
+    columnsQuery = '';
+    if (focusButton) columnsButton?.focus();
+  }
+
+  function closeColumnsOnFocusOut(event: FocusEvent) {
+    const next = event.relatedTarget;
+    if (columnsOpen && (!(next instanceof Node) || !columnsRoot?.contains(next))) closeColumns();
+  }
+
+  function closeColumnsOnOutsidePointer(event: PointerEvent) {
+    if (columnsOpen && event.target instanceof Node && !columnsRoot?.contains(event.target)) closeColumns();
+  }
+
+  function onColumnsKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeColumns(true);
+  }
+
+  function fitToWindow(node: HTMLElement) {
+    const fit = () => {
+      const top = node.getBoundingClientRect().top;
+      const bottom = node.closest('.environment-workspace')?.getBoundingClientRect().bottom ?? window.innerHeight;
+      node.style.maxHeight = `${Math.max(160, bottom - top - 12)}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return { destroy: () => window.removeEventListener('resize', fit) };
+  }
+
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus();
+  }
 
   let rows = $derived(buildEnvironmentMatrix(environments));
   let effective = $derived(new Map(environments.map(environment => [environment.id, effectiveEnvironmentRows(environments, environment.id)])));
@@ -92,6 +156,8 @@
   }
 </script>
 
+<svelte:window onpointerdown={closeColumnsOnOutsidePointer} />
+
 <div class="env-matrix-toolbar">
   <div class="field field-md field-wrap env-matrix-filter">
     <svg width="0.75rem" height="0.75rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
@@ -103,13 +169,59 @@
   {#if renameError}
     <span class="env-matrix-error" role="alert">{renameError.message}</span>
   {/if}
+  <div class="env-matrix-columns" bind:this={columnsRoot} onfocusout={closeColumnsOnFocusOut}>
+    <button
+      class="btn btn-secondary"
+      bind:this={columnsButton}
+      type="button"
+      aria-haspopup="dialog"
+      aria-expanded={columnsOpen}
+      onclick={() => (columnsOpen ? closeColumns() : (columnsOpen = true))}
+    >
+      Environments <span class="env-matrix-columns-count">{shown.length} of {environments.length}</span>
+    </button>
+    {#if columnsOpen}
+      <div class="menu env-matrix-columns-menu" role="dialog" aria-label="Environments in the matrix" tabindex="-1" onkeydown={onColumnsKeydown} use:fitToWindow>
+        <div class="field field-md field-wrap env-matrix-columns-search">
+          <svg width="0.75rem" height="0.75rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+            <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <input bind:value={columnsQuery} placeholder="Find environment" aria-label="Find environment" spellcheck="false" use:focusOnMount />
+        </div>
+        <div class="env-matrix-columns-list">
+          {#each columnChoices as environment (environment.id)}
+            {@const inUse = environment.id === activeEnvironmentId}
+            <label class="check-label env-matrix-columns-item">
+              <input
+                class="check"
+                type="checkbox"
+                checked={shownIds.has(environment.id)}
+                aria-disabled={inUse}
+                onclick={(event) => { if (inUse) event.preventDefault(); }}
+                onchange={() => toggleColumn(environment.id)}
+              />
+              <span class="env-matrix-columns-name">{environment.name}</span>
+              {#if inUse}<span class="env-matrix-columns-hint">in use</span>{/if}
+            </label>
+          {:else}
+            <p class="env-matrix-columns-empty">No environment matches.</p>
+          {/each}
+        </div>
+        <div class="env-matrix-columns-actions">
+          <button class="btn btn-ghost btn-sm" type="button" onclick={() => setColumns(environments.map(environment => environment.id))}>Show all</button>
+          <button class="btn btn-ghost btn-sm" type="button" onclick={() => setColumns(null)}>Reset</button>
+        </div>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <div class="env-matrix-scroll">
-  <div class="env-matrix" role="table" aria-label="Variables by environment" bind:this={gridEl} style={`--env-columns: ${environments.length}`}>
+  <div class="env-matrix" role="table" aria-label="Variables by environment" bind:this={gridEl} style={`--env-columns: ${shown.length}`}>
     <div class="env-matrix-row env-matrix-head" role="row">
       <span class="env-matrix-name-head" role="columnheader">Variable</span>
-      {#each environments as environment (environment.id)}
+      {#each shown as environment (environment.id)}
         <span class="env-matrix-col-head" class:in-use={environment.id === activeEnvironmentId} role="columnheader">
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => onOpenEnvironment(environment.id)}>
             {#if environment.id === activeEnvironmentId}<span class="env-matrix-dot" aria-hidden="true"></span>{/if}
@@ -151,7 +263,7 @@
           {/if}
         </span>
 
-        {#each environments as environment (environment.id)}
+        {#each shown as environment (environment.id)}
           {@const cell = row.cells[environment.id]}
           {@const inherited = cell?.enabled ? undefined : inheritedCell(environment.id, row.key)}
           <span class="env-matrix-cell" class:in-use={environment.id === activeEnvironmentId} role="cell">
@@ -224,13 +336,102 @@
     min-width: 0;
   }
 
+  .env-matrix-columns {
+    position: relative;
+    margin-left: auto;
+  }
+
+  .env-matrix-columns-count {
+    color: var(--text-3);
+  }
+
+  .env-matrix-columns-menu {
+    position: absolute;
+    top: calc(100% + var(--space-1));
+    right: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1-5);
+    width: 17.5rem;
+  }
+
+  .env-matrix-columns-search,
+  .env-matrix-columns-actions {
+    flex-shrink: 0;
+  }
+
+  .env-matrix-columns-search {
+    color: var(--text-3);
+  }
+
+  .env-matrix-columns-search input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .env-matrix-columns-list {
+    display: flex;
+    flex: 0 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    max-height: 17.5rem;
+    overflow-y: auto;
+    overscroll-behavior: none;
+  }
+
+  .env-matrix-columns-item {
+    gap: var(--space-2);
+    min-height: var(--control-md);
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+  }
+
+  .env-matrix-columns-item:hover {
+    background: var(--hover);
+  }
+
+  .env-matrix-columns-item .check[aria-disabled='true'] {
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
+  }
+
+  .env-matrix-columns-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .env-matrix-columns-hint,
+  .env-matrix-columns-empty {
+    color: var(--text-3);
+    font-size: var(--text-label);
+  }
+
+  .env-matrix-columns-empty {
+    margin: 0;
+    padding: var(--space-2);
+  }
+
+  .env-matrix-columns-actions {
+    display: flex;
+    justify-content: space-between;
+    padding-top: var(--space-1-5);
+    border-top: 1px solid var(--border-subtle);
+  }
+
   .env-matrix-error {
     color: var(--s5xx);
     font-size: var(--text-body);
   }
 
   .env-matrix-scroll {
-    overflow-x: auto;
+    flex: 0 1 auto;
+    min-height: 0;
+    overscroll-behavior: none;
+    overflow: auto;
     border-top: 1px solid var(--border-subtle);
   }
 
@@ -253,6 +454,10 @@
   }
 
   .env-matrix-head > span {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg);
     min-height: 2.125rem;
     color: var(--text-3);
     font-size: var(--text-label);
@@ -260,6 +465,19 @@
 
   .env-matrix-name-head {
     padding-left: var(--space-2);
+  }
+
+  .env-matrix-row > .env-matrix-name-head,
+  .env-matrix-row > .env-matrix-name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--bg);
+    box-shadow: inset -1px 0 0 var(--border-subtle);
+  }
+
+  .env-matrix-row > .env-matrix-name-head {
+    z-index: 3;
   }
 
   .env-matrix-col-head button {
@@ -277,6 +495,10 @@
 
   .env-matrix-row > .in-use {
     background: var(--accent-dim);
+  }
+
+  .env-matrix-head > .in-use {
+    background: linear-gradient(var(--accent-dim), var(--accent-dim)), var(--bg);
   }
 
   .env-matrix-name {

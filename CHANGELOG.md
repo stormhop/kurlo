@@ -18,6 +18,7 @@ All notable changes to Kurlo are documented here. This project follows
 ### Changed
 
 - A cookie's **Expires** uses Kurlo's own date and time picker on every platform, in the app's theme, with quick choices such as **In 1 hour** and **In 7 days**, instead of the operating system's calendar.
+- Environments open one at a time by default; the **Matrix** view stays one click away and is remembered once chosen. The Matrix shows the environment in use and up to four more, with an **Environments** picker to choose the columns, keeps variable names on the left while scrolling sideways, and sits its scroll bar right under the table.
 - Cookies open as a sidebar section like environments instead of a window over the app. The sidebar lists **Browser sync** and the jar's domains, each domain gets a page with a summary, and deleting a domain or clearing the jar moves into the page's **•••** menu.
 - Catppuccin Latte, Catppuccin Mocha and Nord keep secondary text, method labels and status colours at a 4.5:1 contrast ratio on every panel, and Nord's sidebar now sits below the content like in the other themes.
 - VS Code Light and VS Code Dark follow the current Light Modern and Dark Modern palettes, with distinct secondary and muted text.
@@ -27,6 +28,7 @@ All notable changes to Kurlo are documented here. This project follows
 ### Fixed
 
 - The cookie editor no longer shows the internal `{{kurloSecret:…}}` reference for a cookie whose value lives on another computer, in the **Fields** editor, in **Raw** or after switching between them; the value is empty and saving without a value keeps the reference.
+- The **Protected** and **Sandbox** marks on an environment sit right after its name instead of halfway across the header.
 - Agent chat messages scroll all the way to the message box instead of stopping in a strip above it.
 - Theme miniatures in settings show each theme's own button text and status colours instead of borrowing them from the active theme.
 - On macOS, the title area is one 45px band across the whole window: the line under the top bar runs over the activity rail and sidebar to the window edge, the rail icons line up with the sidebar filter instead of crossing that line, and while the sidebar is open the workspace switcher sits in that band at the sidebar's right edge, giving request tabs more room.
