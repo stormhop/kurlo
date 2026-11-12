@@ -460,26 +460,27 @@ func mcpAuth(arg mcpAuthArg) (map[string]any, error) {
 var mcpRawBodyTypes = map[string]bool{"json": true, "text": true, "xml": true, "html": true}
 
 type mcpSaveRequestArgs struct {
-	YAML             *string         `json:"yaml"`
-	Request          string          `json:"request"`
-	Collection       *string         `json:"collection"`
-	Folder           *string         `json:"folder"`
-	Name             *string         `json:"name"`
-	Type             *string         `json:"type"`
-	Method           *string         `json:"method"`
-	URL              *string         `json:"url"`
-	Params           *[]mcpRowArg    `json:"params"`
-	PathVariables    *[]mcpRowArg    `json:"pathVariables"`
-	Headers          *[]mcpRowArg    `json:"headers"`
-	Body             *mcpTextArg     `json:"body"`
-	BodyType         *string         `json:"bodyType"`
-	Form             *[]mcpRowArg    `json:"form"`
-	Query            *string         `json:"query"`
-	Variables        json.RawMessage `json:"variables"`
-	Auth             *mcpAuthArg     `json:"auth"`
-	PreRequestScript *string         `json:"preRequestScript"`
-	TestScript       *string         `json:"testScript"`
-	Notes            *string         `json:"notes"`
+	YAML             *string            `json:"yaml"`
+	Request          string             `json:"request"`
+	Collection       *string            `json:"collection"`
+	Folder           *string            `json:"folder"`
+	Name             *string            `json:"name"`
+	Type             *string            `json:"type"`
+	Method           *string            `json:"method"`
+	URL              *string            `json:"url"`
+	Params           *[]mcpRowArg       `json:"params"`
+	PathVariables    *[]mcpRowArg       `json:"pathVariables"`
+	Headers          *[]mcpRowArg       `json:"headers"`
+	Body             *mcpTextArg        `json:"body"`
+	BodyType         *string            `json:"bodyType"`
+	Form             *[]mcpRowArg       `json:"form"`
+	Query            *string            `json:"query"`
+	Variables        json.RawMessage    `json:"variables"`
+	Auth             *mcpAuthArg        `json:"auth"`
+	PreRequestScript *string            `json:"preRequestScript"`
+	TestScript       *string            `json:"testScript"`
+	Assertions       *[]model.Assertion `json:"assertions"`
+	Notes            *string            `json:"notes"`
 }
 
 func (s *mcpServer) toolSaveRequest(ctx context.Context, arguments json.RawMessage) (any, error) {
@@ -616,6 +617,13 @@ func mcpApplyRequestArgs(request map[string]any, args mcpSaveRequestArgs) error 
 	if args.Notes != nil {
 		request["requestNotes"] = *args.Notes
 	}
+	if args.Assertions != nil {
+		rows, err := mcpAssertionRows(*args.Assertions)
+		if err != nil {
+			return err
+		}
+		request["assertions"] = rows
+	}
 	if args.Auth != nil {
 		auth, err := mcpAuth(*args.Auth)
 		if err != nil {
@@ -627,6 +635,29 @@ func mcpApplyRequestArgs(request map[string]any, args mcpSaveRequestArgs) error 
 		return mcpApplyGraphQLBody(request, args)
 	}
 	return mcpApplyBody(request, args)
+}
+
+func mcpAssertionRows(assertions []model.Assertion) ([]any, error) {
+	if len(assertions) > maxRequestAssertions {
+		return nil, fmt.Errorf("a request can have up to %d assertions, got %d", maxRequestAssertions, len(assertions))
+	}
+	rows := make([]any, 0, len(assertions))
+	for i, assertion := range assertions {
+		target := strings.TrimSpace(assertion.Target)
+		operator := strings.TrimSpace(assertion.Operator)
+		if target == "" {
+			return nil, fmt.Errorf("assertions[%d] needs a target such as status, header.Content-Type or body.id", i)
+		}
+		if _, ok := assertionOperatorLabels[operator]; !ok {
+			return nil, fmt.Errorf("assertions[%d] has unknown operator %q; use %s", i, assertion.Operator, strings.Join(assertionOperatorNames(), ", "))
+		}
+		value := assertion.Value
+		if assertionOperatorsWithoutValue[operator] {
+			value = ""
+		}
+		rows = append(rows, map[string]any{"enabled": true, "target": target, "operator": operator, "value": value})
+	}
+	return rows, nil
 }
 
 func mcpApplyBody(request map[string]any, args mcpSaveRequestArgs) error {
@@ -1207,7 +1238,20 @@ func mcpServerWriteTools() []map[string]any {
 					},
 					"preRequestScript": str("JavaScript run before the request is sent."),
 					"testScript":       str("JavaScript run on the response; pm.test assertions become the request's tests."),
-					"notes":            str("Notes shown with the request."),
+					"assertions": map[string]any{
+						"type":        "array",
+						"description": "Checks without code, run after the test script and reported with the tests. Up to 200. Replaces the request's assertions; [] removes them. target is status, responseTime (ms), size (bytes), header.<Name>, body, or body.<path> such as body.items[0].id.",
+						"items": map[string]any{
+							"type": "object",
+							"properties": map[string]any{
+								"target":   str("What to check."),
+								"operator": map[string]any{"type": "string", "enum": assertionOperatorNames()},
+								"value":    str("Expected value; JSON literals such as 201, true or [200, 201] are compared as values. Not used by exists and notExists."),
+							},
+							"required": []string{"target", "operator"},
+						},
+					},
+					"notes": str("Notes shown with the request."),
 				},
 			},
 			"annotations": write,

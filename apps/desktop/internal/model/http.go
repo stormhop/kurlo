@@ -64,6 +64,22 @@ type AuthConfig struct {
 	OAuth1AddTo           string `json:"oauth1AddTo"`
 	OAuth1IncludeBodyHash bool   `json:"oauth1IncludeBodyHash"`
 	OAuth1AddEmptyParams  bool   `json:"oauth1AddEmptyParams"`
+
+	JWTAlgorithm    string `json:"jwtAlgorithm"`
+	JWTSecret       string `json:"jwtSecret"`
+	JWTSecretBase64 bool   `json:"jwtSecretBase64"`
+	JWTPrivateKey   string `json:"jwtPrivateKey"`
+	JWTPayload      string `json:"jwtPayload"`
+	JWTHeaders      string `json:"jwtHeaders"`
+	JWTExpiresIn    string `json:"jwtExpiresIn"`
+	JWTAddTo        string `json:"jwtAddTo"`
+	JWTHeaderPrefix string `json:"jwtHeaderPrefix"`
+	JWTQueryParam   string `json:"jwtQueryParam"`
+}
+
+type JWTBearerPreview struct {
+	Token string `json:"token"`
+	Error string `json:"error,omitempty"`
 }
 
 type OAuth2TokenResponse struct {
@@ -106,23 +122,24 @@ type CookieJarResult struct {
 }
 
 type HttpRequest struct {
-	RequestID        string     `json:"requestId"`
-	WorkspaceID      string     `json:"workspaceId"`
-	Method           string     `json:"method"`
-	URL              string     `json:"url"`
-	Params           []KeyValue `json:"params"`
-	PathParams       []KeyValue `json:"pathParams"`
-	Headers          []KeyValue `json:"headers"`
-	Auth             AuthConfig `json:"auth"`
-	BodyType         string     `json:"bodyType"`
-	Body             string     `json:"body"`
-	BodyFilePath     string     `json:"bodyFilePath"`
-	FormData         []KeyValue `json:"formData"`
-	PreRequestScript string     `json:"preRequestScript"`
-	TestScript       string     `json:"testScript"`
-	ScriptEngine     string     `json:"scriptEngine"`
-	FollowRedirects  bool       `json:"followRedirects"`
-	TimeoutMs        int        `json:"timeoutMs"`
+	RequestID        string      `json:"requestId"`
+	WorkspaceID      string      `json:"workspaceId"`
+	Method           string      `json:"method"`
+	URL              string      `json:"url"`
+	Params           []KeyValue  `json:"params"`
+	PathParams       []KeyValue  `json:"pathParams"`
+	Headers          []KeyValue  `json:"headers"`
+	Auth             AuthConfig  `json:"auth"`
+	BodyType         string      `json:"bodyType"`
+	Body             string      `json:"body"`
+	BodyFilePath     string      `json:"bodyFilePath"`
+	FormData         []KeyValue  `json:"formData"`
+	PreRequestScript string      `json:"preRequestScript"`
+	TestScript       string      `json:"testScript"`
+	Assertions       []Assertion `json:"assertions,omitempty"`
+	ScriptEngine     string      `json:"scriptEngine"`
+	FollowRedirects  bool        `json:"followRedirects"`
+	TimeoutMs        int         `json:"timeoutMs"`
 
 	Name             string `json:"name"`
 	ScriptTimeoutMs  int    `json:"scriptTimeoutMs"`

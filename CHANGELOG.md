@@ -5,6 +5,32 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **JWT Bearer auth.** A new auth type signs a JSON Web Token on every send from a secret (`HS256`–`HS512`) or a PEM private key (`RS`, `PS` and `ES` algorithms). Write the claims as JSON with `{{variables}}`, set **Expires in** to add `iat` and `exp`, and send the token in the `Authorization` header with your own prefix or as a query parameter. **Preview token** shows the header and claims of a token signed with the current settings. Works for HTTP, GraphQL, SSE, WebSocket, Socket.IO and gRPC requests, in collection and folder defaults, in `kurlo run` and `kurlo mcp`, and imports from and exports to Postman. The secret and the private key are kept out of workspace files like other auth secrets.
+- **Assertions.** Check a response without code in **Scripts → Assertions**: pick a target (`status`, `responseTime`, `size`, `header.<Name>`, `body` or a JSON path such as `body.items[0].id`), a check (equals, greater or less than, one of, contains, matches regex, exists, type, length) and the expected value, with `{{variables}}`. Results appear next to the tests with the reason a check failed, and count in the collection runner, `kurlo run`, its JUnit report and `kurlo mcp`. They are saved in the request file as `assertions`, can be written by agents through `save_request`, and export to Postman as `pm.test` code that imports back as assertions.
+- **Undo deletes.** Deleting a request, folder, collection or environment shows a message with **Undo**, and the last 20 deletions of a workspace stay in a **Recently deleted** list (the trash button in the Collections or Environments header) until you quit Kurlo. Restoring puts items back in place with their order, folders, folder defaults, child environments and collection pins.
+- **Environment colors.** Give an environment a color from its **•••** menu: red, amber, green, blue or gray. The environment switcher in the title bar is tinted while that environment is in use, and the color marks it in the environment list, the switcher menu and the Matrix view. The color is saved in the environment file and listed by `kurlo mcp`.
+- **Edit menu in text fields.** Right-click a text field or a code editor for Cut, Copy, Paste and Select all. Read-only editors offer Copy and Select all, and the menu works with the arrow keys and Escape.
+- **Show a request or collection on disk.** The request and collection menus have **Show in Finder** on macOS, **Show in Explorer** on Windows and **Show in file manager** on Linux. It opens the workspace folder with the request's YAML file or the collection's folder selected. On Linux the file is selected in file managers that support it, such as Files, Dolphin and Thunar, and other file managers open the folder.
+
+### Changed
+
+- **New requests start as drafts with manual saving.** **Add request** in a collection or folder menu, and **New request** on the overview, open a draft instead of writing a file. The draft already uses the collection's and folder's headers, auth, scripts and variables, and **Save** puts it into that collection or folder without asking where. With autosave on, new requests are still saved straight away.
+- **Closing a draft asks only after you changed it.** Request drafts and load-test drafts close without a question while they are untouched, and ask whether to save once you have edited them.
+- **Starred requests are personal.** Stars are kept in your local workspace data instead of the request files, so they no longer show up in Git or for your team. Stars saved in request files by earlier versions are picked up once, and the old field is dropped the next time each file is saved.
+- **The Starred group has its own scroll.** It shows up to ten requests and scrolls within that space, so collections stay in view however many requests are starred. Whether the group is collapsed is remembered across restarts.
+- **A free spot to drag the window by.** On Windows and Linux the title bar keeps an empty space between the request tabs and the search field however many tabs are open, so there is always somewhere to grab the window. The tabs scroll instead of filling it.
+
+### Fixed
+
+- On Windows, **Settings → Support → Open log folder** opens the folder again. The Explorer window used to start hidden.
+- The **All open tabs** button at the end of the tab row opens its list again. The list was cut off by the tab row and never showed.
+- **OpenAPI import reads generator-written YAML.** Specs written by Jackson, springdoc and similar generators imported with *Expected an OpenAPI/Swagger document with paths* or lost most of their operations. Kurlo now reads lists placed at the same indent as their key, strings in quotes that continue over several lines, every key of a list item after a nested block, lists nested on one line, escapes such as `\n` and `\u0041` in double quotes, `#` and blank lines inside `|` and `>` blocks, and numbers in exponent form.
+- On macOS, the lock and arrow icons of the workspace switcher no longer shift by a pixel when you move between sidebar screens such as Agent and Cookies.
+
 ## [3.0.4] - 2026-11-12
 
 ### Added

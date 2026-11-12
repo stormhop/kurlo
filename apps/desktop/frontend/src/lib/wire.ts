@@ -96,6 +96,7 @@ export type McpPrompt = Wire<model.McpPrompt>;
 export type McpContent = Wire<model.McpContent>;
 export type McpNotification = Wire<model.McpNotification>;
 export type OAuth2TokenResponse = Wire<model.OAuth2TokenResponse>;
+export type JWTBearerPreview = Wire<model.JWTBearerPreview>;
 export type ScriptResult = Wire<model.ScriptResult>;
 export type SentRequest = Wire<model.SentRequest>;
 export type SocketIOEmitMessage = Wire<model.SocketIOEmitMessage>;
@@ -304,6 +305,16 @@ export function emptyAuthConfig(): AuthConfig {
     oauth1AddTo: '',
     oauth1IncludeBodyHash: false,
     oauth1AddEmptyParams: false,
+    jwtAlgorithm: '',
+    jwtSecret: '',
+    jwtSecretBase64: false,
+    jwtPrivateKey: '',
+    jwtPayload: '',
+    jwtHeaders: '',
+    jwtExpiresIn: '',
+    jwtAddTo: '',
+    jwtHeaderPrefix: '',
+    jwtQueryParam: '',
   };
 }
 

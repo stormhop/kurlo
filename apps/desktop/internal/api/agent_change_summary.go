@@ -28,13 +28,13 @@ var agentChangeLabels = map[string]string{
 	"formRows": "Form fields", "bodyFilePath": "Body file", "testScriptJs": "Tests", "testScript": "Tests",
 	"preRequestScriptJs": "Pre-request script", "preRequestScript": "Pre-request script", "requestNotes": "Docs",
 	"docs": "Docs", "description": "Description", "settings": "Settings", "settingsOverrides": "Settings",
-	"examples": "Examples", "values": "Variables", "protected": "Protected", "sandbox": "Sandbox for the agent",
-	"parentId": "Parent environment", "savedMessages": "Saved messages", "defaults": "Defaults", "folders": "Folders", "variables": "Variables",
+	"examples": "Examples", "values": "Variables", "protected": "Protected", "sandbox": "Sandbox for the agent", "color": "Color",
+	"parentId": "Parent environment", "savedMessages": "Saved messages", "assertions": "Assertions", "defaults": "Defaults", "folders": "Folders", "variables": "Variables",
 	"response": "Response", "status": "Status", "statusCode": "Status", "body": "Body",
 }
 
 var agentChangeScalarFields = map[string]bool{
-	"name": true, "method": true, "url": true, "bodyType": true, "rawBodyType": true, "protected": true, "sandbox": true,
+	"name": true, "method": true, "url": true, "bodyType": true, "rawBodyType": true, "protected": true, "sandbox": true, "color": true,
 	"status": true, "statusCode": true,
 }
 

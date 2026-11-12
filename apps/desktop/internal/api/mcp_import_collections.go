@@ -261,6 +261,17 @@ func importAuth(kind string, values map[string]any) map[string]any {
 			}
 		}
 		out["oauth2UsePKCE"] = strings.Contains(strings.ToLower(importText(values["grant_type"])), "pkce") || values["usePkce"] == true
+	case "jwt":
+		keys = map[string]string{"secret": "jwtSecret", "privateKey": "jwtPrivateKey", "payload": "jwtPayload", "header": "jwtHeaders", "headerPrefix": "jwtHeaderPrefix", "queryParamKey": "jwtQueryParam"}
+		if algorithm := strings.ToUpper(strings.TrimSpace(importText(values["algorithm"]))); algorithm != "" {
+			out["jwtAlgorithm"] = algorithm
+		}
+		if strings.EqualFold(importText(values["addTokenTo"]), "queryParam") {
+			out["jwtAddTo"] = "query"
+		}
+		if values["isSecretBase64Encoded"] == true {
+			out["jwtSecretBase64"] = true
+		}
 	default:
 		out["type"] = "none"
 	}

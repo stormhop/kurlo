@@ -2319,6 +2319,24 @@ export namespace model {
 	        this.operationName = source["operationName"];
 	    }
 	}
+	export class Assertion {
+	    enabled: boolean;
+	    target: string;
+	    operator: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Assertion(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.target = source["target"];
+	        this.operator = source["operator"];
+	        this.value = source["value"];
+	    }
+	}
 	export class AuthConfig {
 	    type: string;
 	    token: string;
@@ -2366,6 +2384,16 @@ export namespace model {
 	    oauth1AddTo: string;
 	    oauth1IncludeBodyHash: boolean;
 	    oauth1AddEmptyParams: boolean;
+	    jwtAlgorithm: string;
+	    jwtSecret: string;
+	    jwtSecretBase64: boolean;
+	    jwtPrivateKey: string;
+	    jwtPayload: string;
+	    jwtHeaders: string;
+	    jwtExpiresIn: string;
+	    jwtAddTo: string;
+	    jwtHeaderPrefix: string;
+	    jwtQueryParam: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new AuthConfig(source);
@@ -2419,6 +2447,16 @@ export namespace model {
 	        this.oauth1AddTo = source["oauth1AddTo"];
 	        this.oauth1IncludeBodyHash = source["oauth1IncludeBodyHash"];
 	        this.oauth1AddEmptyParams = source["oauth1AddEmptyParams"];
+	        this.jwtAlgorithm = source["jwtAlgorithm"];
+	        this.jwtSecret = source["jwtSecret"];
+	        this.jwtSecretBase64 = source["jwtSecretBase64"];
+	        this.jwtPrivateKey = source["jwtPrivateKey"];
+	        this.jwtPayload = source["jwtPayload"];
+	        this.jwtHeaders = source["jwtHeaders"];
+	        this.jwtExpiresIn = source["jwtExpiresIn"];
+	        this.jwtAddTo = source["jwtAddTo"];
+	        this.jwtHeaderPrefix = source["jwtHeaderPrefix"];
+	        this.jwtQueryParam = source["jwtQueryParam"];
 	    }
 	}
 	export class HttpRequest {
@@ -2436,6 +2474,7 @@ export namespace model {
 	    formData: KeyValue[];
 	    preRequestScript: string;
 	    testScript: string;
+	    assertions?: Assertion[];
 	    scriptEngine: string;
 	    followRedirects: boolean;
 	    timeoutMs: number;
@@ -2514,6 +2553,7 @@ export namespace model {
 	        this.formData = this.convertValues(source["formData"], KeyValue);
 	        this.preRequestScript = source["preRequestScript"];
 	        this.testScript = source["testScript"];
+	        this.assertions = this.convertValues(source["assertions"], Assertion);
 	        this.scriptEngine = source["scriptEngine"];
 	        this.followRedirects = source["followRedirects"];
 	        this.timeoutMs = source["timeoutMs"];
@@ -2738,6 +2778,7 @@ export namespace model {
 	        this.packaged = source["packaged"];
 	    }
 	}
+	
 	
 	export class CodexRateWindow {
 	    usedPercent: number;
@@ -3381,6 +3422,20 @@ export namespace model {
 	}
 	
 	
+	export class JWTBearerPreview {
+	    token: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new JWTBearerPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.token = source["token"];
+	        this.error = source["error"];
+	    }
+	}
 	export class K6ExportFile {
 	    path: string;
 	    content: string;

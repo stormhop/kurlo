@@ -9,7 +9,7 @@ import type { CollectionRunRecord } from '../lib/collectionRuns';
 import { DEFAULT_RUNNER_CONCURRENCY } from '../lib/concurrency';
 import { emptyCollectionDefaults } from '../lib/collectionDefaults';
 import { makeCollection, makeWorkspace, normalizeSavedRequest } from '../lib/normalizers';
-import { oauth1FieldsFromAuth } from '../lib/utils';
+import { jwtFieldsFromAuth, oauth1FieldsFromAuth } from '../lib/utils';
 import type {
   BodyType,
   Collection,
@@ -37,6 +37,7 @@ import type {
 } from '../lib/types/models';
 import type { TopView } from '../lib/stores/ui';
 import { authFeature } from '../lib/stores/features/auth';
+import { trashFeature, type TrashEntry } from '../lib/stores/features/trash';
 import { collectionDefaultsFeature } from '../lib/stores/features/collectionDefaults';
 import { collectionFeature } from '../lib/stores/features/collections';
 import { collectionRunnerDerivedFeature } from '../lib/stores/features/collectionRunnerDerived';
@@ -204,10 +205,13 @@ class TestApp {
   openRequestIds: string[] = [];
   lastClosedRequestIds: string[] = [];
   folderCollapseState: Record<string, boolean> = {};
+  starredRequestIds = new Set<string>();
   historyDayCollapseState: Record<string, boolean> = {};
   dirtyRequestIds = new Set<string>();
   dirtyRequestIdList: string[] = [];
   draftRequestIds = new Set<string>();
+  draftTargets = new Map<string, { collectionId: string; folderPath: string[] }>();
+  draftBaselines = new Map<string, SavedRequest>();
   unsavedRequestSnapshots = new Map<string, SavedRequest>();
   savedRequestSnapshots = new Map<string, SavedRequest>();
   responses = new Map<string, HttpResponse>();
@@ -236,6 +240,9 @@ class TestApp {
   externalWorkspaceChangePending = false;
   workspaceBlocked = false;
   collectionImportToast = '';
+  trash: TrashEntry[] = [];
+  undoEntryId = '';
+  assertions = [];
   topView: TopView = 'overview';
   collectionImportSource = 'postman';
   collectionImportSummary = '';
@@ -295,6 +302,7 @@ class TestApp {
   awsRegion = '';
   awsService = '';
   oauth1 = oauth1FieldsFromAuth({});
+  jwt = jwtFieldsFromAuth({});
   bodyType: BodyType = 'none';
   rawBodyType: RawBodyType = 'json';
   bodyContent = '';
@@ -507,6 +515,7 @@ applyFeatures(
   scriptsFeature,
   socketioFormFeature,
   importExportFeature,
+  trashFeature,
 );
 
 async function settleMicrotasks() {
@@ -1072,6 +1081,79 @@ describe('importing a spec from a URL', () => {
 });
 
 describe('creating a request', () => {
+  it('keeps a request added to a collection as a draft until Save in manual mode', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Orders');
+    await app.createCollection();
+    const collection = app.collections[0];
+    app.autosave = false;
+    const selectDialog = vi.spyOn(app, 'openSelectDialog');
+
+    await app.createNewRequest(collection.id);
+    const id = app.activeRequestId;
+    expect(app.requestsById.get(id)).toMatchObject({ isDraft: true, collectionId: '' });
+    expect(backend.state.savedStores.at(-1)?.requests.find(request => request.id === id && request.collectionId)).toBeUndefined();
+
+    app.url = 'https://api.example.test/orders';
+    await app.saveActiveRequest();
+    expect(selectDialog).not.toHaveBeenCalled();
+    expect(app.requestsById.get(id)).toMatchObject({ isDraft: false, collectionId: collection.id, url: 'https://api.example.test/orders' });
+    expect(backend.state.savedStores.at(-1)?.requests.find(request => request.id === id)?.collectionId).toBe(collection.id);
+
+    app.prompts.push('Auth');
+    await app.createFolderInCollection(collection.id);
+    await app.createRequestInFolder(collection.id, ['Auth']);
+    const folderDraftId = app.activeRequestId;
+    expect(app.requestsById.get(folderDraftId)?.isDraft).toBe(true);
+    await app.saveActiveRequest();
+    expect(app.requestsById.get(folderDraftId)).toMatchObject({ isDraft: false, collectionId: collection.id, folderPath: ['Auth'] });
+    expect(selectDialog).not.toHaveBeenCalled();
+  });
+
+  it('asks before closing a draft only after it was edited', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Orders');
+    await app.createCollection();
+    const collection = app.collections[0];
+    app.autosave = false;
+    const saveChanges = vi.spyOn(app, 'openSaveChangesDialog');
+    const selectDialog = vi.spyOn(app, 'openSelectDialog');
+
+    await app.createNewRequest(collection.id);
+    const untouched = app.activeRequestId;
+    await app.closeRequestTab(untouched);
+    expect(saveChanges).not.toHaveBeenCalled();
+    expect(app.requestsById.has(untouched)).toBe(false);
+
+    await app.createDraftRequest();
+    const blank = app.activeRequestId;
+    await app.closeRequestTab(blank);
+    expect(selectDialog).not.toHaveBeenCalled();
+    expect(app.requestsById.has(blank)).toBe(false);
+
+    await app.createNewRequest(collection.id);
+    const discarded = app.activeRequestId;
+    app.url = 'https://api.example.test/scratch';
+    saveChanges.mockResolvedValueOnce('discard');
+    await app.closeRequestTab(discarded);
+    expect(saveChanges).toHaveBeenCalledTimes(1);
+    expect(app.requestsById.has(discarded)).toBe(false);
+
+    await app.createNewRequest(collection.id);
+    const kept = app.activeRequestId;
+    app.url = 'https://api.example.test/kept';
+    saveChanges.mockResolvedValueOnce('cancel');
+    await app.closeRequestTab(kept);
+    expect(app.openRequestIds).toContain(kept);
+    saveChanges.mockResolvedValueOnce('save');
+    await app.closeRequestTab(kept);
+    expect(app.openRequestIds).not.toContain(kept);
+    expect(app.requestsById.get(kept)).toMatchObject({ isDraft: false, collectionId: collection.id, url: 'https://api.example.test/kept' });
+    expect(selectDialog).not.toHaveBeenCalled();
+  });
+
   it('starts every new request as HTTP without asking for a protocol', async () => {
     backend.state.savedStores = [];
     const app = new TestApp() as TestApp & Record<string, any>;
@@ -1704,6 +1786,89 @@ describe('manual save mode keeps workspace edits off disk until Save', () => {
 
     expect(storedEnvironment('dev')).toMatchObject({ protected: true, values: [expect.objectContaining({ value: 'dev.example.test' })] });
     expect(app.hasUnsavedEnvironmentChanges()).toBe(true);
+  });
+
+  it('stores the environment color right away without saving pending edits, and clears it', async () => {
+    const app = await manualApp();
+    app.updateEnvironmentRow('dev', 0, { value: 'typed' });
+    await app.setEnvironmentColor('dev', 'red');
+
+    expect(storedEnvironment('dev')).toMatchObject({ color: 'red', values: [expect.objectContaining({ value: 'dev.example.test' })] });
+    expect(app.environments.find(environment => environment.id === 'dev')?.color).toBe('red');
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(true);
+
+    await app.setEnvironmentColor('dev', '');
+    expect(storedEnvironment('dev')).not.toHaveProperty('color');
+  });
+
+  it('restores a deleted request, folder, collection and environment in place', async () => {
+    const app = await manualApp();
+    const collection = app.collections[0];
+    const second = makeCollection(app.activeWorkspaceId, 'Second');
+    app.collections = [...app.collections, second];
+    const request = (id: string, name: string, folderPath: string[] = []) => normalizeSavedRequest({ id, name, method: 'GET', url: `https://api.test/${id}`, collectionId: collection.id, collection: collection.name, folderPath }, app.collections, app.activeWorkspaceId);
+    app.requests = [request('r1', 'First'), request('r2', 'In folder', ['Auth']), request('r3', 'Deep', ['Auth', 'Tokens']), request('r4', 'Last')];
+    app.collections = app.collections.map((candidate: Collection) => candidate.id === collection.id ? { ...candidate, folderPaths: [['Auth'], ['Auth', 'Tokens'], ['Empty']] } : candidate);
+    app.environments = app.environments.map((environment: Environment) => environment.id === 'prod' ? { ...environment, parentId: 'dev' } : environment);
+    app.collections = app.collections.map((candidate: Collection) => candidate.id === second.id ? { ...candidate, environmentIds: ['dev'], defaultEnvironmentId: 'dev' } : candidate);
+    await app.persistRequestStore();
+    const order = () => app.requests.map((req: SavedRequest) => req.id);
+
+    await app.deleteRequest('r2');
+    expect(order()).toEqual(['r1', 'r3', 'r4']);
+    expect(app.undoEntryId).toBe(app.trash[0].id);
+    expect(await app.restoreDeleted(app.trash[0].id)).toBe(true);
+    expect(order()).toEqual(['r1', 'r2', 'r3', 'r4']);
+    expect(app.trash).toHaveLength(0);
+    expect(backend.state.savedStores.at(-1)?.requests.map((req: SavedRequest) => req.id)).toEqual(['r1', 'r2', 'r3', 'r4']);
+
+    await app.deleteFolder(collection.id, ['Auth']);
+    expect(order()).toEqual(['r1', 'r4']);
+    expect(app.collections.find((candidate: Collection) => candidate.id === collection.id)?.folderPaths).toEqual([['Empty']]);
+    await app.restoreDeleted(app.trash[0].id);
+    expect(order()).toEqual(['r1', 'r2', 'r3', 'r4']);
+    expect(app.collections.find((candidate: Collection) => candidate.id === collection.id)?.folderPaths).toEqual(expect.arrayContaining([['Auth'], ['Auth', 'Tokens'], ['Empty']]));
+
+    await app.deleteCollection(collection.id);
+    expect(app.requests).toHaveLength(0);
+    expect(app.trashForWorkspace(app.activeWorkspaceId, ['collection']).map((entry: { name: string }) => entry.name)).toEqual(['Manual']);
+    await app.restoreDeleted(app.trash[0].id);
+    expect(app.collections.map((candidate: Collection) => candidate.id)).toEqual([collection.id, second.id]);
+    expect(order()).toEqual(['r1', 'r2', 'r3', 'r4']);
+
+    await app.deleteEnvironment('dev');
+    expect(app.environments.find((environment: Environment) => environment.id === 'prod')?.parentId).toBeUndefined();
+    expect(app.collections.find((candidate: Collection) => candidate.id === second.id)?.environmentIds ?? []).toEqual([]);
+    await app.restoreDeleted(app.trash[0].id);
+    expect(app.environments.map((environment: Environment) => environment.id)).toEqual(['dev', 'prod']);
+    expect(app.environments.find((environment: Environment) => environment.id === 'prod')?.parentId).toBe('dev');
+    expect(app.collections.find((candidate: Collection) => candidate.id === second.id)).toMatchObject({ environmentIds: ['dev'], defaultEnvironmentId: 'dev' });
+    expect(storedEnvironment('dev')).toMatchObject({ name: 'Dev' });
+  });
+
+  it('will not restore a request whose collection is gone, and keeps the entry', async () => {
+    const app = await manualApp();
+    const collection = app.collections[0];
+    app.requests = [normalizeSavedRequest({ id: 'r1', name: 'Orphan', method: 'GET', url: 'https://api.test', collectionId: collection.id, collection: collection.name }, app.collections, app.activeWorkspaceId)];
+    await app.deleteRequest('r1');
+    const requestEntry = app.trash[0].id;
+    await app.deleteCollection(collection.id);
+    const alerts: string[] = [];
+    app.openAlertDialog = async (_title: string, message: string) => { alerts.push(message); };
+    expect(await app.restoreDeleted(requestEntry)).toBe(false);
+    expect(alerts[0]).toContain('Restore the collection first');
+    expect(app.trash.some((entry: { id: string }) => entry.id === requestEntry)).toBe(true);
+    expect(app.trashRestoreProblem(app.trash[0])).toBe('');
+  });
+
+  it('keeps the newest twenty deletions', async () => {
+    const app = await manualApp();
+    const collection = app.collections[0];
+    app.requests = Array.from({ length: 22 }, (_, index) => normalizeSavedRequest({ id: `r${index}`, name: `Request ${index}`, method: 'GET', url: `https://api.test/${index}`, collectionId: collection.id, collection: collection.name }, app.collections, app.activeWorkspaceId));
+    for (let index = 0; index < 22; index += 1) await app.deleteRequest(`r${index}`);
+    expect(app.trash).toHaveLength(20);
+    expect(app.trash[0].name).toBe('Request 21');
+    expect(app.trash.at(-1).name).toBe('Request 2');
   });
 
   it('keeps global variable edits unsaved until Save and reverts them', async () => {

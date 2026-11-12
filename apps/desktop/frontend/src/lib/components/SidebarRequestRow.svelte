@@ -1,8 +1,9 @@
 <script lang="ts">
   import { NAME_MAX_LENGTH } from '../constants';
-  import { requestSupportsCurl } from '../utils';
+  import { fileManagerLabel, requestSupportsCurl } from '../utils';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import MenuIcon from './MenuIcon.svelte';
+  import { floatingMenu as floatingMenuAction } from '../floatingMenu';
   import type { SavedRequest, WorkspaceDiagnostic } from '../types/models';
   import type { TopView } from '../stores/ui';
 
@@ -19,10 +20,13 @@
     renameRequest,
     duplicateRequest,
     copyRequestCurl,
+    revealInFileManager,
     createLoadTestFromRequest,
     toggleRequestPinned,
     deleteRequest,
     openWorkspaceDiagnostic,
+    starred = false,
+    floatingMenu = false,
     disabled = false,
   }: {
     req: SavedRequest;
@@ -37,10 +41,13 @@
     renameRequest: (id: string, name?: string) => void | Promise<void>;
     duplicateRequest: (id: string) => void;
     copyRequestCurl: (id: string) => void;
+    revealInFileManager?: (kind: 'request' | 'collection', id: string) => void;
     createLoadTestFromRequest?: (id: string) => void;
     toggleRequestPinned: (id: string) => void;
     deleteRequest: (id: string) => void;
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
+    starred?: boolean;
+    floatingMenu?: boolean;
     disabled?: boolean;
   } = $props();
 
@@ -133,10 +140,10 @@
   {#if !req.isDraft && !req.isInvalid}
     <button
       class="btn btn-ghost btn-icon btn-sm request-star-btn"
-      class:active={req.isPinned}
+      class:active={starred}
       type="button"
       onclick={(event) => { event.stopPropagation(); toggleRequestPinned(req.id); }}
-      aria-label={req.isPinned ? 'Unstar request' : 'Star request'}
+      aria-label={starred ? 'Unstar request' : 'Star request'}
       disabled={disabled}
     >★</button>
   {/if}
@@ -144,12 +151,13 @@
     <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleRequestMenu(menuKey, event)} aria-label="Request menu" disabled={disabled}>•••</button>
   {/if}
   {#if !req.isInvalid && openRequestMenuId === menuKey}
-    <div class="menu request-menu">
+    <div class="menu request-menu" use:floatingMenuAction={floatingMenu}>
       <button class="menu-item" type="button" onclick={() => renameRequest(req.id)} disabled={disabled}><MenuIcon name="rename" />Rename</button>
       <button class="menu-item" type="button" onclick={() => duplicateRequest(req.id)} disabled={disabled}><MenuIcon name="duplicate" />Duplicate</button>
-      {#if !req.isDraft}<button class="menu-item" type="button" onclick={() => toggleRequestPinned(req.id)} disabled={disabled}><MenuIcon name="star" />{req.isPinned ? 'Unstar' : 'Star'}</button>{/if}
+      {#if !req.isDraft}<button class="menu-item" type="button" onclick={() => toggleRequestPinned(req.id)} disabled={disabled}><MenuIcon name="star" />{starred ? 'Unstar' : 'Star'}</button>{/if}
       {#if requestSupportsCurl(req)}<button class="menu-item" type="button" onclick={() => copyRequestCurl(req.id)} disabled={disabled}><MenuIcon name="copy" />Copy as cURL</button>{/if}
       {#if createLoadTestFromRequest && !req.isDraft && req.collectionId && (!req.requestType || req.requestType === 'http' || req.requestType === 'graphql')}<button class="menu-item" type="button" onclick={() => createLoadTestFromRequest(req.id)} disabled={disabled}><MenuIcon name="load" />Load test this request</button>{/if}
+      {#if revealInFileManager && fileManagerLabel() && !req.isDraft}<button class="menu-item" type="button" onclick={() => revealInFileManager('request', req.id)}><MenuIcon name="open" />{fileManagerLabel()}</button>{/if}
       <div class="menu-separator" role="separator"></div>
       <button class="menu-item danger" type="button" onclick={() => deleteRequest(req.id)} disabled={disabled}><MenuIcon name="trash" />Delete</button>
     </div>

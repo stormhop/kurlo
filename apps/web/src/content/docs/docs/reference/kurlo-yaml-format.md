@@ -123,7 +123,6 @@ request:
   id: req-login
   name: Login
   requestType: http
-  isPinned: false
   collectionId: collection-core
   folderPath:
     - Auth
@@ -236,13 +235,15 @@ request:
 | `rawBodyType` | `text`, `json`, `html`, or `xml`. |
 | `preRequestScript`, `testScript` | Legacy Tengo scripts. |
 | `preRequestScriptJs`, `testScriptJs` | JavaScript pre-request/test scripts. |
-| `auth.type` | `inherit`, `none`, `bearer`, `basic`, `apikey`, `oauth1`, `oauth2`, `aws`, `digest`, or `ntlm`. NTLM uses `basicUser` and `basicPass`. |
+| `assertions` | HTTP and GraphQL only. A list of [assertions](/docs/guides/scripting/#assertions), each with `enabled`, `target` (`status`, `responseTime`, `size`, `header.<Name>`, `body`, `body.<path>` or `$.<path>`), `operator` (`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `contains`, `notContains`, `matches`, `exists`, `notExists`, `type`, `length`) and `value`, a string. Rows without a target are dropped on save. |
+| `auth.type` | `inherit`, `none`, `bearer`, `basic`, `apikey`, `jwt`, `oauth1`, `oauth2`, `aws`, `digest`, or `ntlm`. NTLM uses `basicUser` and `basicPass`. |
+| `auth.jwtAlgorithm`, `auth.jwtSecretBase64`, `auth.jwtPayload`, `auth.jwtHeaders`, `auth.jwtExpiresIn`, `auth.jwtAddTo`, `auth.jwtHeaderPrefix`, `auth.jwtQueryParam` | JWT Bearer settings. `jwtAlgorithm` is `HS256` (default), `HS384`, `HS512`, `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384` or `ES512`. `jwtPayload` and `jwtHeaders` are JSON objects written as strings. `jwtExpiresIn` is a number of seconds as a string and adds `iat` and `exp`. `jwtAddTo` is `header` (default) or `query`; `jwtHeaderPrefix` defaults to `Bearer` and `jwtQueryParam` to `token`. Defaults are left out of the file, so `auth: { type: jwt }` with nothing else is valid. The token is signed on every send and never stored. |
 | `auth.oauth1ConsumerKey`, `auth.oauth1SignatureMethod`, `auth.oauth1AddTo`, `auth.oauth1Realm`, `auth.oauth1Callback`, `auth.oauth1Verifier`, `auth.oauth1Version`, `auth.oauth1Timestamp`, `auth.oauth1Nonce`, `auth.oauth1IncludeBodyHash`, `auth.oauth1AddEmptyParams` | OAuth 1.0 settings. `oauth1SignatureMethod` is `HMAC-SHA1` (default), `HMAC-SHA256`, `HMAC-SHA512`, `RSA-SHA1`, `RSA-SHA256`, `RSA-SHA512` or `PLAINTEXT`; `oauth1AddTo` is `header` (default), `query` or `body`. An empty timestamp or nonce is generated on every send. |
 | `auth.oauth2GrantType`, `auth.oauth2AuthURL`, `auth.oauth2TokenURL`, `auth.oauth2ClientID`, `auth.oauth2Scope`, `auth.oauth2TokenExpiry`, `auth.oauth2UsePKCE` | OAuth 2.0 grant metadata. `oauth2GrantType` is `client_credentials`, `authorization_code`, `password`, or `device_code`. Authorization Code can use PKCE. |
 | `settings` | Request transport settings. Unknown settings must be preserved by third-party tools. |
 | `settingsOverrides` | Per-request override markers for inherited collection defaults. |
 
-Secret-bearing auth fields (`bearerToken`, `basicPass`, `apiKeyValue`, `oauth2Secret`, `oauth2Token`, `oauth2RefreshToken`, `awsAccessKey`, `awsSecretKey`, `oauth1ConsumerSecret`, `oauth1Token`, `oauth1TokenSecret`, and `oauth1PrivateKey`) are replaced with `{{kurloSecret:...}}` placeholders in shared Git/YAML workspaces. Their plaintext values stay in Kurlo's encrypted local profile A value that is only a variable reference, such as `{{apiToken}}`, holds no secret and is written as is.
+Secret-bearing auth fields (`bearerToken`, `basicPass`, `apiKeyValue`, `oauth2Secret`, `oauth2Token`, `oauth2RefreshToken`, `awsAccessKey`, `awsSecretKey`, `oauth1ConsumerSecret`, `oauth1Token`, `oauth1TokenSecret`, `oauth1PrivateKey`, `jwtSecret`, and `jwtPrivateKey`) are replaced with `{{kurloSecret:...}}` placeholders in shared Git/YAML workspaces. Their plaintext values stay in Kurlo's encrypted local profile A value that is only a variable reference, such as `{{apiToken}}`, holds no secret and is written as is.
 
 ## Example file
 
@@ -411,6 +412,8 @@ environment:
 ```
 
 `protected: true` on the environment marks it as one that AI agents connected through [`kurlo mcp`](/docs/guides/mcp-server/#protected-environments) may not send requests with or change. It is left out when false.
+
+`color` is the environment's color in the app: `red`, `amber`, `green`, `blue` or `gray`. It is left out when the environment has none; any other value is ignored.
 
 ## Secrets
 

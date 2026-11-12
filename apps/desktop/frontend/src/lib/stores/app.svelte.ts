@@ -3,12 +3,13 @@ import {
   openDirectoryDialog, saveFileDialog, defaultWorkspaceLocation, setDefaultWorkspaceLocation,
   gitStatus, gitCommitLogPage, gitListBranches,
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
-  emptyLoadRunState,
+  emptyLoadRunState, revealWorkspaceItem,
 } from '../backend';
 import { agentStore, codexAgentStore, claudeAgentStore } from './agent.svelte';
 import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../backend';
 import { EMPTY_COOKIE_SYNC_STATUS, EMPTY_MOCK_SERVER_STATUS } from '../wire';
 import { DEFAULT_MOCK_PORT } from '../mockRoutes';
+import type { AssertionRow } from '../assertions';
 import type { SSEEventEntry, SSESession, WebSocketMessageEntry, WebSocketSession, SocketIOMessageEntry, SocketIOSession, SocketIOClientVersion } from '../types/models';
 import { initialThemeState, type AppTheme, type ResolvedAppTheme } from '../theme';
 import {
@@ -30,6 +31,7 @@ import {
 import {
   safeFileName, downloadTextFile, clipboardCopy, restoreRows, requestSupportsCurl,
   oauth1FieldsFromAuth, type OAuth1Fields,
+  jwtFieldsFromAuth, type JwtFields,
 } from '../utils';
 import type {
   Method, BodyType, RawBodyType, HttpVersion, RequestTab, ScriptTab, ResponseTab, GrpcResponseTab,
@@ -78,6 +80,7 @@ import { sseFeature } from './features/sse';
 import { websocketFeature } from './features/websocket';
 import { socketioFeature } from './features/socketio';
 import { savedMessagesFeature } from './features/savedMessages';
+import { trashFeature, type TrashEntry } from './features/trash';
 import { mkSioEventRow, socketioFormFeature } from './features/socketioForm';
 import { mockServerFeature } from './features/mockServer';
 import { dialogFeature } from './features/dialogs';
@@ -94,6 +97,7 @@ import { DEFAULT_STARTUP_VIEW, startupNeedsDraftRequest, startupTopView, type St
 import { readResponseLayout, readResponseLayoutChosen, uiShellFeature, type ResponseLayout } from './features/uiShell';
 import { workspaceFeature } from './features/workspace';
 import { workspaceDiagnosticsFeature } from './features/workspaceDiagnostics';
+import { starredRequestIdsFromStore } from '../starredRequests';
 
 const SIDEBAR_DEFAULT_WIDTH = 280;
 const TOP_VIEW_STORAGE_KEY = 'kurlo.topView.v1';
@@ -246,6 +250,16 @@ class AppVM {
   declare sendSavedMessage: typeof savedMessagesFeature.sendSavedMessage;
   declare renameSavedMessage: typeof savedMessagesFeature.renameSavedMessage;
   declare deleteSavedMessage: typeof savedMessagesFeature.deleteSavedMessage;
+  declare rememberDeleted: typeof trashFeature.rememberDeleted;
+  declare trashRequest: typeof trashFeature.trashRequest;
+  declare trashFolder: typeof trashFeature.trashFolder;
+  declare trashCollection: typeof trashFeature.trashCollection;
+  declare trashEnvironment: typeof trashFeature.trashEnvironment;
+  declare dismissUndo: typeof trashFeature.dismissUndo;
+  declare forgetDeleted: typeof trashFeature.forgetDeleted;
+  declare trashForWorkspace: typeof trashFeature.trashForWorkspace;
+  declare trashRestoreProblem: typeof trashFeature.trashRestoreProblem;
+  declare restoreDeleted: typeof trashFeature.restoreDeleted;
   declare socketIOClearMessages: typeof socketioFeature.socketIOClearMessages;
   declare socketIORestoreMessages: typeof socketioFeature.socketIORestoreMessages;
 
@@ -540,6 +554,11 @@ class AppVM {
   declare createNewRequest: typeof requestCrudFeature.createNewRequest;
   declare createDraftRequest: typeof requestCrudFeature.createDraftRequest;
   declare saveDraftToCollection: typeof requestCrudFeature.saveDraftToCollection;
+  declare openNewDraft: typeof requestCrudFeature.openNewDraft;
+  declare draftTarget: typeof requestCrudFeature.draftTarget;
+  declare draftWasEdited: typeof requestCrudFeature.draftWasEdited;
+  declare forgetDraft: typeof requestCrudFeature.forgetDraft;
+  declare settleDraft: typeof requestCrudFeature.settleDraft;
   declare discardDraftRequest: typeof requestCrudFeature.discardDraftRequest;
   declare openDraftRequests: typeof requestCrudFeature.openDraftRequests;
   declare hasUnsavedDrafts: typeof requestCrudFeature.hasUnsavedDrafts;
@@ -690,6 +709,7 @@ class AppVM {
   declare authStateHasData: typeof authFeature.authStateHasData;
   declare authForPersistence: typeof authFeature.authForPersistence;
   declare basicAuthPreview: typeof authFeature.basicAuthPreview;
+  declare previewJwtBearer: typeof authFeature.previewJwtBearer;
   declare oauth2ConfigForRequest: typeof authFeature.oauth2ConfigForRequest;
   declare oauth2ConfigForAuthState: typeof authFeature.oauth2ConfigForAuthState;
   declare applyOAuth2Result: typeof authFeature.applyOAuth2Result;
@@ -885,6 +905,7 @@ class AppVM {
   declare renameEnvironment: typeof environmentFeature.renameEnvironment;
   declare setEnvironmentProtected: typeof environmentFeature.setEnvironmentProtected;
   declare setEnvironmentSandbox: typeof environmentFeature.setEnvironmentSandbox;
+  declare setEnvironmentColor: typeof environmentFeature.setEnvironmentColor;
   declare setEnvironmentParent: typeof environmentFeature.setEnvironmentParent;
   declare deleteEnvironment: typeof environmentFeature.deleteEnvironment;
   declare openEnvironment: typeof environmentFeature.openEnvironment;
@@ -1096,6 +1117,7 @@ class AppVM {
   awsRegion = $state('us-east-1');
   awsService = $state('execute-api');
   oauth1 = $state<OAuth1Fields>(oauth1FieldsFromAuth({}));
+  jwt = $state<JwtFields>(jwtFieldsFromAuth({}));
 
   bodyType = $state<BodyType>(INITIAL_BODY_DEFAULTS.bodyType);
   rawBodyType = $state<RawBodyType>(INITIAL_BODY_DEFAULTS.rawBodyType);
@@ -1189,6 +1211,7 @@ class AppVM {
   sioEvents = $state<KVRow[]>([mkSioEventRow()]);
   sioArgs = $state<SIOArg[]>(defaultSocketIOArgs());
   savedMessages = $state<SavedRealtimeMessage[]>([]);
+  assertions = $state<AssertionRow[]>([]);
   sioSelectedArgId = $state('1');
   sioAck = $state(false);
   grpcMethod = $state('');
@@ -1244,6 +1267,7 @@ class AppVM {
   openRequestIds = $state<string[]>([]);
   requestStoreLoaded = $state(false);
   folderCollapseState = $state<Record<string, boolean>>({});
+  starredRequestIds = $state<Set<string>>(new Set());
   sidebarSearch = $state('');
   workspaceMenuOpen = $state(false);
   workspaceSearch = $state('');
@@ -1332,6 +1356,8 @@ class AppVM {
   shortcutCaptureMessage = $state('');
   lastClosedRequestIds = $state<string[]>([]);
   draftRequestIds = $state<Set<string>>(new Set());
+  draftTargets = new Map<string, { collectionId: string; folderPath: string[] }>();
+  draftBaselines = new Map<string, SavedRequest>();
   findReplaceScope = $state<FindReplaceScope | null>(null);
   findReplaceUndo = $state<FindReplaceUndo | null>(null);
   copiedRequestItem = $state<SavedRequest | null>(null);
@@ -1376,6 +1402,8 @@ class AppVM {
   resolvedAppTheme = $state<ResolvedAppTheme>(initialThemeState.resolvedAppTheme);
   headerValueSuggestions = $state<string[]>([]);
   collectionImportToast = $state('');
+  trash = $state<TrashEntry[]>([]);
+  undoEntryId = $state('');
   collectionImportSummary = $state('');
   collectionImportSource = $state<ImportSource>('postman');
   dataTransferStatus = $state('');
@@ -1588,6 +1616,13 @@ class AppVM {
     setTimeout(() => { if (this.collectionImportToast === 'Copied as cURL') this.collectionImportToast = ''; }, 1800);
   }
 
+  async revealInFileManager(kind: 'request' | 'collection', id: string) {
+    this.openRequestMenuId = '';
+    this.openCollectionMenuId = '';
+    const error = await revealWorkspaceItem(kind, id);
+    if (error) await this.openAlertDialog('Show in file manager', error);
+  }
+
   async copyRequestCurl(id: string) {
     const req = this.requestsById.get(id); if (!req) return;
     if (this.savedRequestIsRealtime(req)) { this.openRequestMenuId = ''; return; }
@@ -1598,7 +1633,7 @@ class AppVM {
 
   async loadRequestWorkspace(rawOverride?: string, diagnosticsOverride?: WorkspaceDiagnostic[]) {
     let lReqs: SavedRequest[] = [], lWs: Workspace[] = [], lCols: Collection[] = [], lEnvs: Environment[] = [];
-    let lActiveId = '', lWsId = '', lEnvId = '', lOpenIds: string[] = [], lFolderCollapsed: Record<string, boolean> = {}, lHistory: RequestHistoryEntry[] = [];
+    let lActiveId = '', lWsId = '', lEnvId = '', lOpenIds: string[] = [], lFolderCollapsed: Record<string, boolean> = {}, lStarredIds: string[] = [], lHistory: RequestHistoryEntry[] = [];
     let lCollectionRuns: Record<string, CollectionRunRecord> = {};
     let lWorkspaceCookies: Record<string, CookieJarEntry[]> = {};
     let lGlobals: KVRow[] = withTrailingGlobalRow([]);
@@ -1619,6 +1654,7 @@ class AppVM {
         lEnvs = (parsed.environments ?? []).map(e => normalizeEnvironment(e, lWsId));
         lEnvId = parsed.activeEnvironmentId ?? '';
         lActiveId = parsed.activeId ?? ''; lOpenIds = parsed.openIds ?? []; lFolderCollapsed = parsed.folderCollapsed ?? {};
+        lStarredIds = starredRequestIdsFromStore(parsed);
       }
     } catch (e) {
       requestStoreReadFailed = true;
@@ -1669,7 +1705,7 @@ class AppVM {
     this.savedRequestSnapshots = new Map(lReqs.filter(r => !r.isDraft).map(r => [r.id, this.savedRequestSnapshot(r)]));
     this.syncDirtyRequestIds(new Set());
     this.unsavedRequestSnapshots = new Map();
-    this.folderCollapseState = lFolderCollapsed; this.activeWorkspaceId = lWsId; this.activeEnvironmentId = lEnvId;
+    this.folderCollapseState = lFolderCollapsed; this.starredRequestIds = new Set(lStarredIds); this.activeWorkspaceId = lWsId; this.activeEnvironmentId = lEnvId;
     this.workspaceCookies = lWorkspaceCookies;
     this.globalVariables = lGlobals;
     void this.syncBackendGlobals();
@@ -2032,6 +2068,7 @@ applyFeatures(
   socketioFeature,
   socketioFormFeature,
   savedMessagesFeature,
+  trashFeature,
   mockServerFeature,
   realtimeFeature,
   collectionRunnerDerivedFeature,

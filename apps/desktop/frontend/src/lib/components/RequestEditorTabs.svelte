@@ -23,6 +23,7 @@
     bodyHasContent,
     bodyBadgeLabel,
     scriptLineCount,
+    assertionCount = 0,
     listenEventCount = 0,
     metadataCount = 0,
     grpcMethodSelected = false,
@@ -40,6 +41,7 @@
     bodyHasContent: boolean;
     bodyBadgeLabel: string;
     scriptLineCount: number;
+    assertionCount?: number;
     listenEventCount?: number;
     metadataCount?: number;
     grpcMethodSelected?: boolean;
@@ -59,7 +61,7 @@
     const params: TabItem = { id: 'params', label: 'Params', badge: paramsCount > 0 ? String(paramsCount) : undefined };
     const auth: TabItem = { id: 'auth', label: 'Authorization', short: 'Auth', badge: authConfigured ? 'On' : undefined, badgeKind: 'on' };
     const headers: TabItem = { id: 'headers', label: 'Headers', badge: headerCount > 0 ? String(headerCount) : undefined };
-    const scripts: TabItem = { id: 'scripts', label: 'Scripts', badge: scriptLineCount > 0 ? `${scriptLineCount} lines` : undefined, badgeKind: 'on' };
+    const scripts: TabItem = { id: 'scripts', label: 'Scripts', badge: scriptLineCount > 0 ? `${scriptLineCount} lines` : assertionCount > 0 ? `${assertionCount} ${assertionCount === 1 ? 'assertion' : 'assertions'}` : undefined, badgeKind: 'on' };
     const settings: TabItem = { id: 'settings', label: 'Settings' };
     const examples: TabItem = {
       id: 'examples',

@@ -21,7 +21,16 @@ type CurlAuth = {
   awsSessionToken?: string;
   awsRegion?: string;
   awsService?: string;
+  jwtAddTo?: string;
+  jwtHeaderPrefix?: string;
+  jwtQueryParam?: string;
 };
+
+export const JWT_TOKEN_PLACEHOLDER = '{{jwtToken}}';
+
+export function jwtHeaderValue(auth: { jwtHeaderPrefix?: string }) {
+  return `${(auth.jwtHeaderPrefix ?? '').trim() || 'Bearer'} ${JWT_TOKEN_PLACEHOLDER}`;
+}
 
 type CurlRequest = {
   method: string;
@@ -56,6 +65,9 @@ export function toCurl(req: CurlRequest): string {
     const sep = urlStr.includes('?') ? '&' : '?';
     urlStr += sep + activeParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
   }
+  if (req.auth.type === 'jwt' && req.auth.jwtAddTo === 'query') {
+    urlStr += `${urlStr.includes('?') ? '&' : '?'}${encodeURIComponent((req.auth.jwtQueryParam ?? '').trim() || 'token')}=${JWT_TOKEN_PLACEHOLDER}`;
+  }
   parts.push(shellQuote(urlStr));
 
   switch (req.auth.type) {
@@ -78,6 +90,9 @@ export function toCurl(req: CurlRequest): string {
       if (req.auth.keyIn === 'header' && req.auth.keyName) {
         parts.push(`-H ${shellQuote(`${req.auth.keyName}: ${req.auth.keyValue}`)}`);
       }
+      break;
+    case 'jwt':
+      if (req.auth.jwtAddTo !== 'query') parts.push(`-H ${shellQuote(`Authorization: ${jwtHeaderValue(req.auth)}`)}`);
       break;
   }
 

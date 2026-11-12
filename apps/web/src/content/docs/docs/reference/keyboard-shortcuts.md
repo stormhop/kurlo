@@ -9,6 +9,8 @@ Every shortcut is rebindable from **Settings → Shortcuts**. Click any shortcut
 
 ![Settings → Shortcuts](../../../../assets/screenshots/settings-shortcuts.png)
 
+Right-click any text field or code editor for **Cut**, **Copy**, **Paste** and **Select all**. The same actions keep their usual `Cmd/Ctrl X`, `C`, `V` and `A` keys, and a read-only editor such as the response body offers only **Copy** and **Select all**.
+
 ## Global
 
 | Shortcut | Action |

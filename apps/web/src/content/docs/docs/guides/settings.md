@@ -86,7 +86,7 @@ Theme preferences apply only to Kurlo's UI; they do not change generated code, r
 
 The **Zoom** row makes the whole interface larger or smaller: **−** and **+** step from 80% to 150% and **Reset** returns to 100%. The same steps are on `Cmd/Ctrl =`, `Cmd/Ctrl -` and `Cmd/Ctrl 0`, in the command palette as **Zoom in**, **Zoom out** and **Reset zoom**, and on macOS in the **View** menu. The size is stored on this device.
 
-On Windows and Linux Kurlo draws its own title bar: drag the top bar to move the window, double-click it to maximize, and use the buttons on the right to minimize, maximize or close. On Linux `Ctrl Q` quits.
+On Windows and Linux Kurlo draws its own title bar: drag the top bar to move the window, double-click it to maximize, and use the buttons on the right to minimize, maximize or close. The empty spot between the request tabs and the search field always stays free to grab, however many tabs are open: the tabs scroll instead of filling it. On Linux `Ctrl Q` quits.
 
 ## Proxy
 

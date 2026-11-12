@@ -10,6 +10,32 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **JWT Bearer auth**: Kurlo signs a fresh JWT on every send from a secret or a private key, with claims, an optional lifetime and a token preview. See [JWT Bearer](/docs/guides/authentication/#jwt-bearer).
+- **Assertions**: check the status, time, size, a header or a JSON field of a response without code, in **Scripts → Assertions**. Results show with the tests and count in the runner, `kurlo run` and `kurlo mcp`. See [Assertions](/docs/guides/scripting/#assertions).
+- **Undo deletes**: a deleted request, folder, collection or environment can be brought back with **Undo** or from **Recently deleted** until you quit Kurlo. See [Restoring deleted items](/docs/guides/workspaces/#restoring-deleted-items).
+- **Environment colors**: mark an environment red, amber, green, blue or gray, and the title bar switcher shows it while it is in use. See [Coloring an environment](/docs/guides/environments/#coloring-an-environment).
+- **Edit menu in text fields**: right-click a field or a code editor for Cut, Copy, Paste and Select all. See [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
+- **Show in Finder / Explorer**: open the YAML file of a request or the folder of a collection from its menu. See [The request ⋯ menu](/docs/guides/workspaces/#the-request--menu).
+
+### Changed
+
+- **New requests start as drafts with manual saving**: **Add request** opens a draft that already uses the collection's and folder's settings, and **Save** puts it there. See [Creating a request](/docs/guides/workspaces/#creating-a-request).
+- **Closing a draft asks only after you changed it**, for requests and load tests alike.
+- **Starred requests are personal**: stars stay on your machine instead of in request files and Git. See [Starred (favourites)](/docs/guides/workspaces/#starred-favourites).
+- **The Starred group shows up to ten requests** and scrolls within that space, so collections stay in view. Its collapsed state is remembered.
+- **A free spot to drag the window by**: on Windows and Linux the title bar keeps an empty space between the tabs and the search field, however many tabs are open. See [Window title bar](/docs/guides/settings/#appearance).
+
+### Fixed
+
+- On Windows, **Open log folder** in Settings opens the folder again.
+- The **All open tabs** button at the end of the tab row shows its list again.
+- **OpenAPI import reads generator-written YAML**: specs from Jackson, springdoc and similar tools no longer fail with *Expected an OpenAPI/Swagger document with paths* or lose operations. See [OpenAPI / Swagger](/docs/guides/import-export/#from-openapi--swagger).
+- On macOS, the workspace switcher icons no longer shift by a pixel when you change sidebar screens.
+
 ## 3.0.4
 
 ### Added

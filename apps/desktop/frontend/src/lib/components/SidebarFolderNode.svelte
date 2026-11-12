@@ -29,6 +29,7 @@
     renameRequest,
     duplicateRequest,
     copyRequestCurl,
+    revealInFileManager,
     toggleRequestPinned,
     deleteRequest,
     openWorkspaceDiagnostic,
@@ -54,6 +55,7 @@
     renameRequest: (id: string, name?: string) => void | Promise<void>;
     duplicateRequest: (id: string) => void;
     copyRequestCurl: (id: string) => void;
+    revealInFileManager?: (kind: 'request' | 'collection', id: string) => void;
     toggleRequestPinned: (id: string) => void;
     deleteRequest: (id: string) => void;
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
@@ -136,6 +138,7 @@
           {renameRequest}
           {duplicateRequest}
           {copyRequestCurl}
+          {revealInFileManager}
           {toggleRequestPinned}
           {deleteRequest}
           {openWorkspaceDiagnostic}
@@ -155,6 +158,7 @@
           {renameRequest}
           {duplicateRequest}
           {copyRequestCurl}
+          {revealInFileManager}
           {toggleRequestPinned}
           {deleteRequest}
           {openWorkspaceDiagnostic}

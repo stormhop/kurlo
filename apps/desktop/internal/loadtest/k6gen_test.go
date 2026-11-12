@@ -401,3 +401,22 @@ func TestGenerateK6FolderSeparatesDataAndPreservesSecrets(t *testing.T) {
 		t.Fatal("a test without data should export only the script")
 	}
 }
+
+func TestGenerateWarnsThatJWTBearerIsNotExported(t *testing.T) {
+	plan := Plan{
+		Test: model.LoadTest{ID: "lt", Name: "JWT", Scenarios: []model.LoadScenario{{
+			ID: "sc", Name: "Flow",
+			Executor: model.LoadExecutor{Type: "constant-vus", VUs: 1, DurationMs: 1000},
+			Steps:    []model.LoadStep{{ID: "s1", RequestID: "signed"}},
+		}}},
+		Requests: map[string]Request{"signed": {ID: "signed", Name: "Signed", Type: "http", Method: "GET", URL: "https://api.test",
+			Auth: model.AuthConfig{Type: "jwt", JWTSecret: "k"}}},
+	}
+	result := GenerateK6(plan, Options{})
+	if !strings.Contains(warningMessages(result), "JWT Bearer auth of Signed is signed per request in Kurlo and is not exported") {
+		t.Fatalf("expected a JWT Bearer warning in:\n%s", warningMessages(result))
+	}
+	if strings.Contains(result.Script, "Authorization") {
+		t.Fatalf("no Authorization header should be written:\n%s", result.Script)
+	}
+}

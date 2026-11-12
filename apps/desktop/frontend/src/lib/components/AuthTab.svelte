@@ -1,8 +1,10 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
-  import { AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
+  import { AUTH_OPTIONS, JWT_ALGORITHM_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
   import Select from './Select.svelte';
-  import { decodeJwt, formatJwtClaimValue, formatJwtNumericDate, jwtClaimRows, jwtHeaderRows, jwtTokenState } from '../jwt';
+  import CodeEditor from '../CodeEditor.svelte';
+  import { decodeJwt, formatJwtClaimValue, formatJwtNumericDate, jwtClaimRows, jwtHeaderRows, jwtTokenState, type JwtDecodeResult } from '../jwt';
+  import { clipboardCopy, jwtAlgorithmUsesSecret } from '../utils';
 
   let jwtInspectorOpen = $state(false);
   let bearerTokenVisible = $state(false);
@@ -13,6 +15,7 @@
     { value: 'apikey', label: 'API key' },
     { value: 'basic', label: 'Basic auth' },
     { value: 'bearer', label: 'Bearer token' },
+    { value: 'jwt', label: 'JWT Bearer' },
     { value: 'oauth2', label: 'OAuth 2.0' },
     { value: 'none', label: 'No auth' },
   ] as const;
@@ -31,6 +34,36 @@
   ];
 
   let oauth1UsesRsa = $derived(vm.oauth1.signatureMethod.startsWith('RSA-'));
+
+  let jwtUsesSecret = $derived(jwtAlgorithmUsesSecret(vm.jwt.algorithm));
+  let jwtPreview = $state<{ token: string; error?: string } | null>(null);
+  let jwtPreviewLoading = $state(false);
+  let jwtPreviewDecoded = $derived(jwtPreview?.token ? decodeJwt(jwtPreview.token) : null);
+  let jwtPreviewState = $derived(jwtPreviewDecoded?.ok && ('exp' in jwtPreviewDecoded.payload || 'nbf' in jwtPreviewDecoded.payload) ? jwtTokenState(jwtPreviewDecoded.payload) : null);
+  let jwtCopied = $state(false);
+  let jwtCopiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  async function copyPreviewToken(token: string) {
+    await clipboardCopy(token);
+    jwtCopied = true;
+    if (jwtCopiedTimer) clearTimeout(jwtCopiedTimer);
+    jwtCopiedTimer = setTimeout(() => (jwtCopied = false), 1600);
+  }
+
+  $effect(() => {
+    JSON.stringify(vm.jwt);
+    vm.activeRequestId;
+    jwtPreview = null;
+  });
+
+  async function previewJwt() {
+    jwtPreviewLoading = true;
+    try {
+      jwtPreview = await vm.previewJwtBearer();
+    } finally {
+      jwtPreviewLoading = false;
+    }
+  }
 
   let oauth2ActionLabel = $derived.by(() => {
     switch (vm.oauth2GrantType) {
@@ -55,6 +88,61 @@
     if (target instanceof HTMLInputElement) target.select();
   }
 </script>
+
+{#snippet jwtInspector(decoded: JwtDecodeResult, state: ReturnType<typeof jwtTokenState> | null, note: string, token = '')}
+  <div class="jwt-inspector" class:jwt-inspector-error={!decoded.ok}>
+    {#if decoded.ok}
+      <div class="jwt-inspector-top">
+        <span class="tag tag-accent jwt-badge">JWT</span>
+        {#if state}
+          <span class="tag jwt-state" class:tag-success={state.state !== 'expired' && state.state !== 'not-yet-valid'} class:tag-danger={state.state === 'expired' || state.state === 'not-yet-valid'} class:expired={state.state === 'expired'} class:not-yet-valid={state.state === 'not-yet-valid'}>{state.label}</span>
+        {:else if token}
+          <span class="tag jwt-state">No expiry</span>
+        {/if}
+        <span class="jwt-note">{note}</span>
+        {#if token}
+          <button class="btn btn-secondary btn-xs jwt-copy" type="button" onclick={() => copyPreviewToken(token)}>{jwtCopied ? 'Copied' : 'Copy token'}</button>
+        {/if}
+      </div>
+      {#if token}
+        <div class="jwt-token" data-testid="jwt-preview-token">{#each token.split('.') as part, partIndex (partIndex)}{#if partIndex > 0}<span class="jwt-token-dot">.</span>{/if}<span class="jwt-token-part jwt-token-part-{partIndex}">{part}</span>{/each}</div>
+      {/if}
+      <div class="jwt-sections">
+        <section class="jwt-section">
+          <h3>Header</h3>
+          <div class="jwt-claims">
+            {#each jwtHeaderRows(decoded.header) as [key, value], eachIndex (eachIndex)}
+              <div class="jwt-claim-row">
+                <span class="jwt-claim-key">{key}</span>
+                <span class="jwt-claim-value">{formatJwtClaimValue(value)}</span>
+              </div>
+            {/each}
+          </div>
+        </section>
+        <section class="jwt-section">
+          <h3>Claims</h3>
+          <div class="jwt-claims">
+            {#each jwtClaimRows(decoded.payload) as [key, value], eachIndex (eachIndex)}
+              <div class="jwt-claim-row">
+                <span class="jwt-claim-key">{key}</span>
+                <span class="jwt-claim-value">
+                  {formatJwtClaimValue(value)}
+                  {#if formatJwtNumericDate(key, value)}
+                    <small>{formatJwtNumericDate(key, value)}</small>
+                  {/if}
+                </span>
+              </div>
+            {:else}
+              <div class="jwt-claims-empty">No claims. {token ? 'Add them in Payload, or set Expires in to add iat and exp.' : 'The payload is an empty object.'}</div>
+            {/each}
+          </div>
+        </section>
+      </div>
+    {:else}
+      <div class="jwt-error-message">{decoded.error}</div>
+    {/if}
+  </div>
+{/snippet}
 
 {#if vm.requestType === 'ai' && vm.aiProvider === 'kurlo'}
   <p class="auth-connection-note" role="note">This request uses the default connection from Settings → AI, which adds its own key. The auth below is not sent.</p>
@@ -113,48 +201,7 @@
         </button>
       </div>
       {#if jwtInspectorOpen}
-        <div class="jwt-inspector" class:jwt-inspector-error={!jwtDecoded.ok}>
-          {#if jwtDecoded.ok}
-            <div class="jwt-inspector-top">
-              <span class="tag tag-accent jwt-badge">JWT</span>
-              {#if jwtState}
-                <span class="tag jwt-state" class:tag-success={jwtState.state !== 'expired' && jwtState.state !== 'not-yet-valid'} class:tag-danger={jwtState.state === 'expired' || jwtState.state === 'not-yet-valid'} class:expired={jwtState.state === 'expired'} class:not-yet-valid={jwtState.state === 'not-yet-valid'}>{jwtState.label}</span>
-              {/if}
-              <span class="jwt-note">Signature not verified</span>
-            </div>
-            <div class="jwt-sections">
-              <section class="jwt-section">
-                <h3>Header</h3>
-                <div class="jwt-claims">
-                  {#each jwtHeaderRows(jwtDecoded.header) as [key, value], eachIndex (eachIndex)}
-                    <div class="jwt-claim-row">
-                      <span class="jwt-claim-key">{key}</span>
-                      <span class="jwt-claim-value">{formatJwtClaimValue(value)}</span>
-                    </div>
-                  {/each}
-                </div>
-              </section>
-              <section class="jwt-section">
-                <h3>Claims</h3>
-                <div class="jwt-claims">
-                  {#each jwtClaimRows(jwtDecoded.payload) as [key, value], eachIndex (eachIndex)}
-                    <div class="jwt-claim-row">
-                      <span class="jwt-claim-key">{key}</span>
-                      <span class="jwt-claim-value">
-                        {formatJwtClaimValue(value)}
-                        {#if formatJwtNumericDate(key, value)}
-                          <small>{formatJwtNumericDate(key, value)}</small>
-                        {/if}
-                      </span>
-                    </div>
-                  {/each}
-                </div>
-              </section>
-            </div>
-          {:else}
-            <div class="jwt-error-message">{jwtDecoded.error}</div>
-          {/if}
-        </div>
+        {@render jwtInspector(jwtDecoded, jwtState, 'Signature not verified')}
       {/if}
 
     {:else if vm.authType === 'basic' || vm.authType === 'digest' || vm.authType === 'ntlm'}
@@ -257,6 +304,91 @@
         <span class="field-label">Current token</span>
         <input class="field field-input field-mono" type="password" readonly value={vm.oauth2Token} onclick={selectInputText} />
         {#if oauth2ExpiryLabel}<span class="oauth2-expiry-hint">{oauth2ExpiryLabel}</span>{/if}
+      {/if}
+
+    {:else if vm.authType === 'jwt'}
+      <div class="auth-grid-2">
+        <div>
+          <span class="field-label">Algorithm</span>
+          <Select bind:value={vm.jwt.algorithm} options={JWT_ALGORITHM_OPTIONS} className="auth-field-select" ariaLabel="JWT algorithm" />
+        </div>
+        <div>
+          <span class="field-label">Add token to</span>
+          <div class="segmented radio-group" role="radiogroup" aria-label="Add JWT to">
+            {#if vm.requestType === 'grpc'}
+              <label class="segmented-item radio-label"><input type="radio" bind:group={vm.jwt.addTo} value="header" /> Metadata</label>
+            {:else}
+              <label class="segmented-item radio-label"><input type="radio" bind:group={vm.jwt.addTo} value="header" /> Header</label>
+              <label class="segmented-item radio-label"><input type="radio" bind:group={vm.jwt.addTo} value="query" /> Query string</label>
+            {/if}
+          </div>
+        </div>
+        {#if jwtUsesSecret}
+          <div class="auth-grid-span">
+            <label class="field-label" for="jwt-secret">Secret</label>
+            <input id="jwt-secret" class="field field-input field-mono" bind:value={vm.jwt.secret} type="password" placeholder={'Shared secret or {{variable}}'} spellcheck="false" />
+            <label class="check-label jwt-secret-base64"><input class="check" type="checkbox" bind:checked={vm.jwt.secretBase64} /> Secret is base64-encoded</label>
+          </div>
+        {:else}
+          <div class="auth-grid-span">
+            <label class="field-label" for="jwt-private-key">Private key (PEM) <span class="field-label-hint">— accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
+            <textarea id="jwt-private-key" class="field field-input field-mono oauth2-key-input" bind:value={vm.jwt.privateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea>
+          </div>
+        {/if}
+        {#if vm.jwt.addTo === 'query' && vm.requestType !== 'grpc'}
+          <div>
+            <label class="field-label" for="jwt-query-param">Query parameter</label>
+            <input id="jwt-query-param" class="field field-input field-mono" bind:value={vm.jwt.queryParam} placeholder="token" spellcheck="false" />
+          </div>
+        {:else}
+          <div>
+            <label class="field-label" for="jwt-header-prefix">Header prefix</label>
+            <input id="jwt-header-prefix" class="field field-input field-mono" bind:value={vm.jwt.headerPrefix} placeholder="Bearer" spellcheck="false" />
+          </div>
+        {/if}
+        <div>
+          <label class="field-label" for="jwt-expires-in">Expires in, seconds <span class="field-label-hint">(adds iat and exp)</span></label>
+          <input id="jwt-expires-in" class="field field-input field-mono" bind:value={vm.jwt.expiresIn} inputmode="numeric" placeholder="Not set" spellcheck="false" />
+        </div>
+      </div>
+      <span class="field-label">Payload <span class="field-label-hint">— JSON claims, {'{{variables}}'} are resolved on send</span></span>
+      <div class="jwt-editor">
+        <CodeEditor
+          bind:value={vm.jwt.payload}
+          language="json"
+          minHeight="5rem"
+          maxHeight="14rem"
+          ariaLabel="JWT payload"
+          variableSuggestions={vm.variableSuggestions}
+          placeholder={'{ "sub": "{{userId}}", "role": "admin" }'}
+        />
+      </div>
+      <details class="oauth1-advanced">
+        <summary class="field-label">Advanced</summary>
+        <span class="field-label">Extra header fields <span class="field-label-hint">— JSON, for example kid; alg is set from the algorithm</span></span>
+        <div class="jwt-editor">
+          <CodeEditor
+            bind:value={vm.jwt.headers}
+            language="json"
+            minHeight="3.25rem"
+            maxHeight="8rem"
+            ariaLabel="JWT header fields"
+            variableSuggestions={vm.variableSuggestions}
+            placeholder={'{ "kid": "key-1" }'}
+          />
+        </div>
+      </details>
+      <div class="jwt-preview-row">
+        <button class="btn btn-secondary" type="button" onclick={previewJwt} disabled={jwtPreviewLoading}>
+          {#if jwtPreviewLoading}<span class="spinner-sm"></span>{/if}
+          Preview token
+        </button>
+        <span class="field-label-hint">Shows the token as it would go out now, with variables and iat/exp filled in. Kurlo signs a fresh one on every send.</span>
+      </div>
+      {#if jwtPreview?.error}
+        <div class="jwt-inspector jwt-inspector-error" role="alert"><div class="jwt-error-message">{jwtPreview.error}</div></div>
+      {:else if jwtPreviewDecoded}
+        {@render jwtInspector(jwtPreviewDecoded, jwtPreviewState, 'With the active environment', jwtPreview?.token ?? '')}
       {/if}
 
     {:else if vm.authType === 'oauth1'}

@@ -1,4 +1,4 @@
-import type { Method, RequestType, RawBodyType, ShortcutDefinition, AuthType, RequestSettings, KVRow, ProxyConfig } from './types/models';
+import type { Method, RequestType, RawBodyType, ShortcutDefinition, AuthType, JwtAlgorithm, RequestSettings, KVRow, ProxyConfig } from './types/models';
 
 export const REQUEST_TYPES: RequestType[] = ['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'ai'];
 
@@ -150,6 +150,7 @@ export const AUTH_OPTIONS: { value: AuthType; label: string }[] = [
   { value: 'digest', label: 'Digest auth' },
   { value: 'ntlm', label: 'NTLM' },
   { value: 'apikey', label: 'API key' },
+  { value: 'jwt', label: 'JWT Bearer' },
   { value: 'oauth1', label: 'OAuth 1.0' },
   { value: 'oauth2', label: 'OAuth 2.0' },
   { value: 'aws', label: 'AWS Signature v4' },
@@ -157,6 +158,10 @@ export const AUTH_OPTIONS: { value: AuthType; label: string }[] = [
 
 export const OAUTH1_SIGNATURE_OPTIONS = (['HMAC-SHA1', 'HMAC-SHA256', 'HMAC-SHA512', 'RSA-SHA1', 'RSA-SHA256', 'RSA-SHA512', 'PLAINTEXT'] as const)
   .map(value => ({ value, label: value }));
+
+export const JWT_ALGORITHMS: JwtAlgorithm[] = ['HS256', 'HS384', 'HS512', 'RS256', 'RS384', 'RS512', 'PS256', 'PS384', 'PS512', 'ES256', 'ES384', 'ES512'];
+
+export const JWT_ALGORITHM_OPTIONS = JWT_ALGORITHMS.map(value => ({ value, label: value }));
 
 export const COLLECTION_AUTH_OPTIONS = AUTH_OPTIONS
   .filter(option => option.value !== 'inherit')

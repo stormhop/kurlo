@@ -378,6 +378,14 @@ func (a *App) FetchOAuth2Token(cfg model.AuthConfig) model.OAuth2TokenResponse {
 	return auth.FetchToken(cfg)
 }
 
+func (a *App) PreviewJWTBearer(cfg model.AuthConfig) model.JWTBearerPreview {
+	token, err := auth.SignJWTBearer(cfg, time.Now())
+	if err != nil {
+		return model.JWTBearerPreview{Error: err.Error()}
+	}
+	return model.JWTBearerPreview{Token: token}
+}
+
 func (a *App) AuthorizeOAuth2(cfg model.AuthConfig) model.OAuth2TokenResponse {
 	ctx := a.ctx
 	if ctx == nil {

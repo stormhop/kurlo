@@ -11,6 +11,7 @@
   import type { Collection, Environment, SavedRequest, SidebarView, Workspace } from '../types/models';
   import type { TopView } from '../stores/ui';
   import type { EnvironmentMenuGroups } from '../collectionEnvironments';
+  import { environmentColorVar } from '../environmentColors';
 
   let {
     workspaceSearch = $bindable(''),
@@ -205,6 +206,7 @@
 
   const ENVIRONMENT_SEARCH_MIN = 8;
   let environmentQuery = $state('');
+  const activeEnvironmentColor = $derived(environmentColorVar(activeWorkspaceEnvironments.find(environment => environment.id === activeEnvironmentId)));
   const environmentSearchVisible = $derived(activeWorkspaceEnvironments.length > ENVIRONMENT_SEARCH_MIN);
   const environmentMatches = $derived.by(() => {
     const terms = environmentQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
@@ -250,7 +252,7 @@
 
 {#snippet environmentItem(environment: Environment, isDefault: boolean)}
   <button class="menu-item" class:active={environment.id === activeEnvironmentId} type="button" onclick={() => useEnvironment(environment.id)} disabled={workspaceBlocked}>
-    <span class="environment-menu-dot" class:in-use={environment.id === activeEnvironmentId} aria-hidden="true"></span>
+    <span class="environment-menu-dot" class:in-use={environment.id === activeEnvironmentId} class:env-colored={Boolean(environment.color)} style:--env-color={environmentColorVar(environment)} aria-hidden="true"></span>
     <span class="environment-menu-name">{environment.name}</span>
     {#if isDefault}<small class="environment-menu-default">default</small>{:else if environmentHasValues(environment)}<small>{environmentValueCount(environment)}</small>{/if}
   </button>
@@ -481,6 +483,7 @@
       </div>
     {/if}
   </div>
+  <div class="titlebar-grab" aria-hidden="true"></div>
   <button class="global-search" type="button" onclick={openGlobalSearch} disabled={workspaceBlocked}>
     <svg width="1rem" height="1rem" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle cx="11" cy="11" r="7.5" stroke="currentColor" stroke-width="2"/>
@@ -491,7 +494,7 @@
   </button>
   <div class="searchbar-right">
     <div class="environment-switcher">
-      <button class="btn btn-ghost select-trigger environment-select" class:env-none={!activeEnvironmentId} type="button" onclick={toggleEnvironmentMenu} aria-expanded={environmentMenuOpen} disabled={workspaceBlocked}>
+      <button class="btn btn-ghost select-trigger environment-select" class:env-none={!activeEnvironmentId} class:env-colored={Boolean(activeEnvironmentColor)} style:--env-color={activeEnvironmentColor} type="button" onclick={toggleEnvironmentMenu} aria-expanded={environmentMenuOpen} disabled={workspaceBlocked}>
         <svg class="environment-select-icon" width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
           <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>
         </svg>

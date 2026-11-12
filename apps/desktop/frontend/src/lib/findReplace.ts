@@ -63,6 +63,10 @@ const AUTH_FIELDS = [
   ['oauth1ConsumerKey', 'Consumer key'],
   ['oauth1Realm', 'Realm'],
   ['oauth1Callback', 'Callback URL'],
+  ['jwtPayload', 'JWT payload'],
+  ['jwtHeaders', 'JWT header fields'],
+  ['jwtHeaderPrefix', 'Header prefix'],
+  ['jwtQueryParam', 'Query parameter'],
 ] as const;
 
 const AUTH_FIELDS_BY_TYPE: Record<string, string[]> = {
@@ -72,6 +76,7 @@ const AUTH_FIELDS_BY_TYPE: Record<string, string[]> = {
   oauth2: ['oauth2AuthURL', 'oauth2TokenURL', 'oauth2DeviceAuthURL', 'oauth2ClientID', 'oauth2Scope', 'oauth2Audience', 'oauth2Username', 'oauth2AssertionAudience'],
   aws: ['awsRegion', 'awsService'],
   oauth1: ['oauth1ConsumerKey', 'oauth1Realm', 'oauth1Callback'],
+  jwt: ['jwtPayload', 'jwtHeaders', 'jwtHeaderPrefix', 'jwtQueryParam'],
 };
 
 const RAW_BODY_TYPES = new Set(['json', 'text', 'xml', 'html']);

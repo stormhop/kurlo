@@ -10,6 +10,7 @@ import (
 	"github.com/fullstorydev/grpcurl"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/dynamic"
+	authpkg "github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 	"google.golang.org/grpc"
@@ -54,6 +55,10 @@ func (s *agentLiveSession) runGRPC(req model.GrpcRequest, sm *state.Manager) {
 func (s *agentLiveSession) invokeGRPC(ctx context.Context, req model.GrpcRequest, _ grpcEventEmitter) (resp model.GrpcResponse) {
 	start := time.Now()
 	defer func() { resp.Duration = time.Since(start).Milliseconds() }()
+	if err := authpkg.PrepareJWTBearer(&req.Auth); err != nil {
+		resp.Error = "auth error: " + err.Error()
+		return
+	}
 	cc, reflection, source, cleanup, err := grpcPrepareSource(ctx, req, true)
 	defer cleanup()
 	if err != nil {

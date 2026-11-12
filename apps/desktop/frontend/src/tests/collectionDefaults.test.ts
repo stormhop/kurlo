@@ -24,7 +24,6 @@ const baseRequest: SavedRequest = {
   name: 'Users',
   filesystemName: 'Users',
   requestType: 'http',
-  isPinned: false,
   collectionId: 'collection-1',
   collection: 'Core',
   folderPath: [],

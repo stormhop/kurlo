@@ -207,6 +207,7 @@ For the HTTP and GraphQL shorthand, `save_request` without `request` creates a r
 | `query`, `variables` | The query and variables of a GraphQL request. |
 | `auth` | `inherit` (the default, the collection's auth), `none`, `bearer` with `token`, `basic` with `username` and `password`, or `apikey` with `key`, `value` and `in`. |
 | `preRequestScript`, `testScript` | JavaScript with the [Postman `pm.*` API](/docs/reference/scripting-api/). `pm.test` calls in `testScript` become the request's tests, which `run_request` and `run_collection` report. |
+| `assertions` | [Checks without code](/docs/guides/scripting/#assertions), such as `[{"target": "status", "operator": "eq", "value": "201"}]`. Operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `contains`, `notContains`, `matches`, `exists`, `notExists`, `type`, `length`. Replaces the whole list; `[]` removes them. `get_request` returns them, and `run_request` reports them with the tests. |
 | `notes` | Notes shown with the request. |
 
 ### Workspace YAML and partial edits

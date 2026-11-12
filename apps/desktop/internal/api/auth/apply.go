@@ -29,6 +29,8 @@ func Apply(req *http.Request, cfg model.AuthConfig) error {
 		return Sign(req, cfg)
 	case "oauth1":
 		return SignOAuth1(req, cfg)
+	case "jwt":
+		return ApplyJWTBearer(req, cfg)
 	default:
 		return fmt.Errorf("unsupported auth type %q", cfg.Type)
 	}

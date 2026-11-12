@@ -7,8 +7,10 @@ import (
 )
 
 var revealInFileManager = func(dir string) error {
-	cmd := fileManagerCommand(dir)
-	hideCmdWindow(cmd)
+	return startFileManager(fileManagerCommand(dir))
+}
+
+func startFileManager(cmd *exec.Cmd) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}

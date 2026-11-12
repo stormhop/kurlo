@@ -6,7 +6,8 @@
   import EnvironmentMatrix from './EnvironmentMatrix.svelte';
   import Select from './Select.svelte';
   import { effectiveEnvironmentRows, environmentParentCandidates, parentEnvironment, protectingAncestor } from '../environmentInheritance';
-  import type { Environment, KVRow } from '../types/models';
+  import type { Environment, EnvironmentColor, KVRow } from '../types/models';
+  import { ENVIRONMENT_COLORS, environmentColorVar } from '../environmentColors';
 
   let {
     activeEnvironment,
@@ -17,6 +18,7 @@
     renameEnvironment,
     setEnvironmentProtected = () => {},
     setEnvironmentSandbox = () => {},
+    setEnvironmentColor = () => {},
     setEnvironmentParent = () => {},
     deleteEnvironment,
     saveEnvironment,
@@ -44,6 +46,7 @@
     renameEnvironment: (environmentId: string, name: string) => void | Promise<void>;
     setEnvironmentProtected?: (environmentId: string, isProtected: boolean) => void;
     setEnvironmentSandbox?: (environmentId: string, sandbox: boolean) => void;
+    setEnvironmentColor?: (environmentId: string, color: EnvironmentColor | '') => void;
     setEnvironmentParent?: (environmentId: string, parentId: string) => void;
     deleteEnvironment: (environmentId: string) => void;
     saveEnvironment: () => void;
@@ -251,6 +254,7 @@
     <div class="environment-workspace-head">
       <div class="environment-title">
         <h1 aria-label={activeEnvironment.name}>
+          {#if activeEnvironment.color}<span class="env-color-dot env-title-color" style:--env-color={environmentColorVar(activeEnvironment)} aria-hidden="true"></span>{/if}
           <span class="env-name-fit" data-value={nameDraft}>
             <input class="request-title-input env-name" size="1" maxlength={NAME_MAX_LENGTH} bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} />
           </span>
@@ -281,6 +285,14 @@
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(focusName)}><MenuIcon name="rename" />Rename</button>
               <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.protected || protectedBy)} disabled={Boolean(protectedBy && !activeEnvironment.protected)} onclick={() => runMenuAction(() => setEnvironmentProtected(activeEnvironment.id, !activeEnvironment.protected))}><MenuIcon name="lock" />{activeEnvironment.protected ? 'Unprotect from AI agents' : 'Protect from AI agents'}</button>
               <button class="menu-item" type="button" role="menuitemcheckbox" aria-checked={Boolean(activeEnvironment.sandbox)} disabled={Boolean(activeEnvironment.protected || protectedBy)} onclick={() => runMenuAction(() => setEnvironmentSandbox(activeEnvironment.id, !activeEnvironment.sandbox))}><MenuIcon name="play" />{activeEnvironment.sandbox ? 'Stop treating as a sandbox' : 'Sandbox for the agent'}</button>
+              <div class="menu-separator" role="separator"></div>
+              <div class="menu-label">Color</div>
+              <div class="env-color-swatches" role="group" aria-label="Environment color">
+                <button class="env-color-swatch env-color-swatch-none" type="button" role="menuitemradio" aria-checked={!activeEnvironment.color} aria-label="No color" onclick={() => runMenuAction(() => setEnvironmentColor(activeEnvironment.id, ''))}></button>
+                {#each ENVIRONMENT_COLORS as color (color.value)}
+                  <button class="env-color-swatch" type="button" role="menuitemradio" aria-checked={activeEnvironment.color === color.value} aria-label={color.label} style:--env-color={color.cssVar} onclick={() => runMenuAction(() => setEnvironmentColor(activeEnvironment.id, color.value))}></button>
+                {/each}
+              </div>
               <div class="menu-separator" role="separator"></div>
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => importEnvFromFile(activeEnvironment.id))}><MenuIcon name="import" />Import .env</button>
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => exportEnvironment(activeEnvironment.id))}><MenuIcon name="export" />Export…</button>

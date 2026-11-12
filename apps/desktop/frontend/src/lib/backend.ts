@@ -4,7 +4,7 @@ import type {
   DefaultWorkspaceLocationResult, DownloadResult, GitAuthConfigResult, GitBranchListResult,
   GitConflictFileResult, GitDiffResult, GitLogResult, GitOperationResult, GitTokenInfoResult,
   GitWorkspaceStatus, GrpcRequest, GrpcResponse, GrpcServiceDefinition, HttpRequest, HttpResponse,
-  OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
+  JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
   McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
@@ -284,6 +284,18 @@ export async function clipboardSet(text: string): Promise<void> {
   await window.go?.api?.App?.ClipboardSet?.(text);
 }
 
+export async function clipboardGet(): Promise<string> {
+  const app = window.go?.api?.App;
+  if (app?.ClipboardGet) return (await app.ClipboardGet()) ?? '';
+  return navigator.clipboard.readText();
+}
+
+export async function revealWorkspaceItem(kind: 'request' | 'collection', id: string): Promise<string> {
+  const app = window.go?.api?.App;
+  if (!app?.RevealWorkspaceItem) return 'Files can be shown from the desktop app.';
+  return app.RevealWorkspaceItem(kind, id);
+}
+
 export async function openFileDialog(title: string): Promise<string> {
   return (await window.go?.api?.App?.OpenFileDialog?.(title)) ?? '';
 }
@@ -541,6 +553,10 @@ export async function saveWorkspaceSecrets(values: Record<string, string>): Prom
 
 export async function fetchOAuth2Token(auth: AuthConfig): Promise<OAuth2TokenResponse | null> {
   return (await window.go?.api?.App?.FetchOAuth2Token?.(auth)) ?? null;
+}
+
+export async function previewJWTBearer(auth: AuthConfig): Promise<JWTBearerPreview | null> {
+  return (await window.go?.api?.App?.PreviewJWTBearer?.(auth)) ?? null;
 }
 
 export async function authorizeOAuth2(auth: AuthConfig): Promise<OAuth2TokenResponse | null> {

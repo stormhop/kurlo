@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
@@ -358,6 +359,10 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 		base.Error = err.Error()
 		return base, model.HttpResponse{}
 	}
+	if err := auth.PrepareJWTBearer(&resolvedAuth); err != nil {
+		base.Error = err.Error()
+		return base, model.HttpResponse{}
+	}
 	httpReq.Auth.Token = resolvedAuth.Token
 	base.secrets = []string{
 		resolvedAuth.Token, resolvedAuth.Password, resolvedAuth.KeyValue,
@@ -365,6 +370,7 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 		resolvedAuth.OAuth2AssertionPrivateKey, resolvedAuth.OAuth1ConsumerSecret,
 		resolvedAuth.OAuth1Token, resolvedAuth.OAuth1TokenSecret, resolvedAuth.OAuth1PrivateKey,
 		resolvedAuth.AWSSecretKey, resolvedAuth.AWSSessionToken,
+		resolvedAuth.JWTSecret, resolvedAuth.JWTPrivateKey,
 	}
 	httpReq.SecretEnvironmentValues = append(httpReq.SecretEnvironmentValues, base.secrets...)
 

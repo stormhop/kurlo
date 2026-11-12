@@ -40,6 +40,9 @@ function snippetAuth(req: HttpRequest): SnippetRequest['auth'] {
     awsSessionToken: req.auth.awsSessionToken,
     awsRegion: req.auth.awsRegion,
     awsService: req.auth.awsService,
+    jwtAddTo: req.auth.jwtAddTo,
+    jwtHeaderPrefix: req.auth.jwtHeaderPrefix,
+    jwtQueryParam: req.auth.jwtQueryParam,
   };
 }
 

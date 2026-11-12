@@ -147,6 +147,12 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		resp.TestResult = redactScriptResult(resp.TestResult, req.SecretEnvironmentValues)
 		envDelta.merge(testScope.commit(sm))
 	}
+	if checks := runAssertions(req.Assertions, resp); len(checks) > 0 {
+		for i := range checks {
+			checks[i].Name = redactSecrets(checks[i].Name, req.SecretEnvironmentValues)
+		}
+		resp.TestResult.Tests = append(resp.TestResult.Tests, redactScriptResult(model.ScriptResult{Tests: checks}, req.SecretEnvironmentValues).Tests...)
+	}
 
 	resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult, resp.TestResult)
 	envDelta.apply(&resp)

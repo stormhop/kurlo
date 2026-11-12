@@ -114,6 +114,13 @@ func buildMCPCodeSnippet(lang string, req model.HttpRequest, secrets []string) (
 				headers = append(headers, snippetField{auth.KeyName, value})
 			}
 		}
+	case "jwt":
+		if auth.JWTAddTo == "query" {
+			params.Add(defaultString(strings.TrimSpace(auth.JWTQueryParam), "token"), "{{jwtToken}}")
+		} else {
+			headers = append(headers, snippetField{"Authorization", defaultString(strings.TrimSpace(auth.JWTHeaderPrefix), "Bearer") + " {{jwtToken}}"})
+		}
+		warnings = append(warnings, "Kurlo signs the JWT on every send; set jwtToken to a signed token.")
 	case "digest", "ntlm", "oauth1", "aws":
 		if lang != "curl" || (auth.Type != "digest" && auth.Type != "ntlm") {
 			warnings = append(warnings, "Configure "+auth.Type+" authentication in the selected HTTP library.")

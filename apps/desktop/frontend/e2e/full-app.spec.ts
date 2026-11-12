@@ -517,6 +517,16 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       SetEnvironment: async (values) => {
         state.environment = { ...values };
       },
+      PreviewJWTBearer: async (cfg) => {
+        const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
+        if (!cfg.jwtSecret && !cfg.jwtPrivateKey) return { token: '', error: `jwt: ${cfg.jwtAlgorithm || 'HS256'} requires a secret` };
+        let claims: Record<string, unknown> = {};
+        try { claims = cfg.jwtPayload ? JSON.parse(cfg.jwtPayload) : {}; } catch (error) { return { token: '', error: `jwt: payload is not valid JSON: ${String(error)}` }; }
+        const now = Math.floor(Date.now() / 1000);
+        const lifetime = Number(cfg.jwtExpiresIn || 0);
+        if (lifetime > 0) claims = { iat: now, exp: now + lifetime, ...claims };
+        return { token: `${encode({ alg: cfg.jwtAlgorithm || 'HS256', typ: 'JWT' })}.${encode(claims)}.c2lnbmF0dXJl` };
+      },
       SendRequest: async (sent) => {
         const req = materializeTemplates(sent);
         state.sentRequests.push(clone(req));
@@ -1073,6 +1083,12 @@ export default function () {
       MockServerLog: async () => clone(state.mockServerLog),
       ClipboardSet: async (text) => {
         state.calls.push(`clipboard:${text.length}`);
+        state.clipboard = text;
+      },
+      ClipboardGet: async () => state.clipboard ?? '',
+      RevealWorkspaceItem: async (kind, id) => {
+        state.calls.push(`reveal:${kind}:${id}`);
+        return '';
       },
       CheckForUpdate: async () => ({ info: null, error: '' }),
     };
@@ -1715,6 +1731,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     }
     await page.getByRole('option', { name: 'POST' }).click();
     await page.getByLabel('Request URL').fill('{{baseUrl}}/login');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Login user' })).toHaveCount(1);
     await page.getByLabel('Method and protocol').click();
     await expect(page.getByText('The protocol is fixed once a saved request has a URL.', { exact: false })).toBeVisible();
     await expect(page.getByRole('option', { name: 'GraphQL' })).toHaveCount(0);
@@ -1922,6 +1940,8 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.locator('.response-body-viewer')).toContainText('Kurlo Tester');
     await captureDocsScreenshot(page, 'request-graphql');
     await tourPause(page, 'GraphQL request sent');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Current user GraphQL' })).toHaveCount(1);
 
     await page.getByRole('button', { name: 'Collections' }).click();
     await folderRow(page, 'Auth').getByLabel('Folder menu').click();
@@ -3469,6 +3489,9 @@ test.describe('Kurlo desktop browser E2E', () => {
     const url = page.getByLabel('Request URL');
     await expect(url).toBeVisible();
     const tab = page.locator('.saved-request-tab.active');
+    await expect(tab).toHaveClass(/\bdraft\b/);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(tab).not.toHaveClass(/\bdraft\b/);
     await expect(tab).not.toHaveClass(/\bdirty\b/);
     await url.click();
     await page.keyboard.type(' ');
@@ -4321,6 +4344,10 @@ test.describe('Kurlo desktop browser E2E', () => {
     await overflowButton.click();
     const list = page.getByRole('listbox', { name: 'Open tabs' });
     await expect(list.getByRole('option')).toHaveCount(9);
+    expect(await list.evaluate(menu => {
+      const box = menu.getBoundingClientRect();
+      return menu.contains(document.elementFromPoint(box.left + box.width / 2, box.top + 16));
+    })).toBe(true);
     await list.getByRole('option', { name: 'Overview' }).click();
     await expect(list).toBeHidden();
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true');
@@ -5189,7 +5216,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await page.screenshot({ path: join(tmpdir(), 'kurlo-load-compact-header.png'), animations: 'disabled' });
   });
 
-  test('keeps a new load test in its own tab and asks before closing it unsaved', async ({ page }) => {
+  test('keeps a new load test in its own tab and asks before closing it once edited', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       collections: [{ id: 'col-tab', workspaceId: 'workspace-e2e', name: 'Tab API' }],
       requests: [
@@ -5224,17 +5251,25 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Draft check' })).toHaveCount(0);
     await collectionRow(page, 'Tab API').getByLabel('Collection menu').click();
     await collectionRow(page, 'Tab API').getByRole('button', { name: 'New load test', exact: true }).click();
+    await expect(tab).toHaveClass(/unsaved/);
+    await tab.getByRole('button', { name: 'Close load test tab' }).click();
+    await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toHaveCount(0);
+    await expect(tab).toHaveCount(0);
+    await expect(page.locator('.collection-request-wrap').filter({ hasText: 'New load test' })).toHaveCount(0);
+    await collectionRow(page, 'Tab API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Tab API').getByRole('button', { name: 'New load test', exact: true }).click();
+    await editor.getByLabel('Load test name').fill('Smoke');
     await tab.getByRole('button', { name: 'Close load test tab' }).click();
     await page.getByRole('dialog', { name: 'Unsaved changes' }).getByRole('button', { name: 'Save', exact: true }).click();
     await expect(tab).toHaveCount(0);
-    await expect(page.locator('.collection-request-wrap').filter({ hasText: 'New load test' })).toHaveCount(1);
+    await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Smoke' })).toHaveCount(1);
     await expect(page.locator('.sidebar-loadtest-group')).toContainText('Load tests');
     await page.locator('.sidebar-loadtest-group').screenshot({ path: join(tmpdir(), 'kurlo-load-sidebar-group.png'), animations: 'disabled' });
     await folderRow(page, 'Orders').getByLabel('Folder menu').click();
     await folderRow(page, 'Orders').locator('.folder-menu').getByRole('button', { name: 'New load test from folder' }).click();
     await expect(editor.locator('.loadtest-step-main')).toHaveCount(1);
     await expect(editor.locator('.loadtest-step-main')).toContainText('Create order');
-    await expect(editor.getByLabel('Load test name')).toHaveValue('New load test 2');
+    await expect(editor.getByLabel('Load test name')).toHaveValue('New load test');
   });
 
   test('keeps long load-test request menus inside the editor', async ({ page }) => {
@@ -6474,6 +6509,7 @@ test.describe('Workspace overview', () => {
     await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
     await chooseRequestType(page, 'HTTP Request');
     await page.getByLabel('Request URL').fill('https://api.example.test/orders');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
     await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(1);
 
@@ -7019,6 +7055,75 @@ test.describe('Interface size', () => {
   });
 });
 
+test.describe('Text fields and workspace files', () => {
+  test('edits text through the right-click menu', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'windows/e2e');
+    await page.goto('/');
+    const url = page.getByLabel('Request URL');
+    await url.fill('https://api.kurlo.test/orders');
+    const menu = page.getByRole('menu', { name: 'Edit' });
+
+    await url.click({ button: 'right' });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: /Cut/ })).toBeDisabled();
+    await expect(menu.getByRole('menuitem', { name: /Copy/ })).toBeDisabled();
+    await expect(menu.getByRole('menuitem', { name: /Paste/ })).toContainText('Ctrl+V');
+    await menu.getByRole('menuitem', { name: /Select all/ }).click();
+    await expect(menu).toBeHidden();
+
+    await url.click({ button: 'right' });
+    await page.screenshot({ path: join(tmpdir(), `kurlo-text-menu-${testInfo.project.name}.png`), animations: 'disabled' });
+    await menu.getByRole('menuitem', { name: /Copy/ }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.clipboard)).toBe('https://api.kurlo.test/orders');
+
+    const key = page.locator('.kv-table input.kv-desc').first();
+    await key.click({ button: 'right' });
+    await menu.getByRole('menuitem', { name: /Paste/ }).click();
+    await expect(key).toHaveValue('https://api.kurlo.test/orders');
+    await expect(key).toBeFocused();
+
+    await url.click({ button: 'right' });
+    await menu.getByRole('menuitem', { name: /Select all/ }).click();
+    await url.click({ button: 'right' });
+    await menu.getByRole('menuitem', { name: /Cut/ }).click();
+    await expect(url).toHaveText('');
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.clipboard)).toBe('https://api.kurlo.test/orders');
+
+    await url.click({ button: 'right' });
+    await expect(menu).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    await expect(menu.getByRole('menuitem', { name: /Paste/ })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await page.locator('.request-meta, .request-title').first().click({ button: 'right' });
+    await expect(menu).toBeHidden();
+  });
+
+  test('shows a saved request and its collection in the file manager', async ({ page }, testInfo) => {
+    await installKurloBridge(page, '', 'darwin/e2e');
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Orders API');
+    await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request name').fill('List orders');
+    await page.getByLabel('Request name').press('Enter');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/orders');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+
+    await page.evaluate(() => { window.__kurloE2E.calls.length = 0; });
+    await page.locator('.collection-request').filter({ hasText: 'List orders' }).click({ button: 'right' });
+    await page.screenshot({ path: join(tmpdir(), `kurlo-reveal-menu-${testInfo.project.name}.png`), animations: 'disabled' });
+    await page.locator('.request-menu').getByRole('button', { name: 'Show in Finder' }).click();
+    await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Show in Finder' }).click();
+    const calls = await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('reveal:')));
+    expect(calls.map(call => call.split(':').slice(0, 2).join(':'))).toEqual(['reveal:request', 'reveal:collection']);
+    expect(calls.every(call => call.split(':')[2])).toBe(true);
+  });
+});
+
 test.describe('Window title bar', () => {
   for (const [runtime, ownControls] of [['linux/e2e', true], ['windows/e2e', true], ['darwin/e2e', false]] as const) {
     test(`${ownControls ? 'draws' : 'leaves'} the window buttons on ${runtime.split('/')[0]}`, async ({ page }, testInfo) => {
@@ -7037,6 +7142,26 @@ test.describe('Window title bar', () => {
       }
     });
   }
+
+  test('keeps an empty spot to drag the window by however many tabs are open', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1100, height: 760 });
+    await installKurloBridge(page, '', 'windows/e2e');
+    await page.goto('/');
+    await expect(page.getByPlaceholder('Enter request URL or paste cURL…')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.platform)).toBe('windows');
+    const newTab = page.getByRole('button', { name: 'New unsaved request' });
+    for (let i = 0; i < 15; i += 1) await newTab.click();
+    await expect(page.locator('.saved-request-tab')).toHaveCount(17);
+    const grab = page.locator('.workspace-searchbar .titlebar-grab');
+    const spot = await grab.evaluate(el => {
+      const box = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return { width: box.width, hit: hit === el, drag: getComputedStyle(el).getPropertyValue('--wails-draggable').trim() };
+    });
+    expect(spot.width).toBeGreaterThanOrEqual(48);
+    expect(spot).toMatchObject({ hit: true, drag: 'drag' });
+    await page.screenshot({ path: join(tmpdir(), `kurlo-titlebar-grab-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 1100, height: 60 }, animations: 'disabled' });
+  });
 
   test('keeps one title band with a line across the rail and sidebar on macOS', async ({ page }, testInfo) => {
     await installKurloBridge(page, '', 'darwin/e2e');
@@ -7999,6 +8124,117 @@ test.describe('Scale', { tag: '@scale' }, () => {
   });
 });
 
+
+test('keeps the docked macOS workspace switcher still while switching sidebar views', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await installKurloBridge(page, '', 'darwin/e2e');
+  await page.goto('/');
+  const trigger = page.getByRole('button', { name: 'Workspace switcher' });
+  await expect(trigger).toBeVisible();
+  expect(await page.locator('.shell > .workspace-switcher.docked').evaluate(node => getComputedStyle(node).willChange)).toBe('transform');
+  await page.evaluate(() => {
+    const frames = new Set<string>();
+    (window as unknown as { __switcherFrames: Set<string> }).__switcherFrames = frames;
+    const tick = () => {
+      const node = document.querySelector('[aria-label="Workspace switcher"]');
+      if (node) frames.add([node, ...node.querySelectorAll('svg, span')].map(part => {
+        const box = part.getBoundingClientRect();
+        return [box.left, box.top, box.width, box.height].join(',');
+      }).join('|'));
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+  const rail = page.getByRole('navigation', { name: 'Kurlo' });
+  for (const view of ['Environments', 'History', 'Agent', 'Cookies', 'Collection runner', 'Mock server', 'Collections']) {
+    await rail.getByRole('button', { name: view, exact: true }).click();
+    await page.waitForTimeout(200);
+  }
+  expect(await page.evaluate(() => (window as unknown as { __switcherFrames: Set<string> }).__switcherFrames.size)).toBe(1);
+});
+
+test.describe('Starred requests', () => {
+  const collections = [{ id: 'col-api', workspaceId: 'workspace-e2e', name: 'API' }];
+  const requestsFor = (count: number) => Array.from({ length: count }, (_, index) => ({
+    id: `req-${index + 1}`, collectionId: 'col-api', collection: 'API', name: `Order ${index + 1}`, method: 'GET', url: `https://example.test/orders/${index + 1}`, auth: { type: 'none' },
+  }));
+
+  for (const scale of [1, 1.5]) {
+    test(`keeps 40 starred requests in a ten-row list above the collections at ${scale}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width: 1100, height: 900 });
+      const requests = requestsFor(40);
+      await installKurloBridge(page, '', 'browser/e2e', false, {
+        collections,
+        requests,
+        starredRequestIds: requests.map(request => request.id),
+        activeId: 'req-1',
+        openIds: ['req-1'],
+      });
+      await page.addInitScript(value => localStorage.setItem('kurlo.uiScale.v1', String(value)), scale);
+      await page.goto('/');
+      const head = page.getByRole('button', { name: 'Starred 40' });
+      await expect(head).toHaveAttribute('aria-expanded', 'true');
+      const list = page.locator('.starred-list');
+      const collectionsHead = page.locator('.collections-head');
+
+      const geometry = await list.evaluate(node => {
+        const row = node.querySelector('.collection-request-wrap')!.getBoundingClientRect().height;
+        return { rows: Math.round(node.clientHeight / row), scrolls: node.scrollHeight > node.clientHeight, rendered: node.querySelectorAll('.collection-request-wrap').length };
+      });
+      expect(geometry.rows).toBe(10);
+      expect(geometry.scrolls).toBe(true);
+      expect(geometry.rendered).toBeLessThan(40);
+      const listBottom = await list.evaluate(node => node.getBoundingClientRect().bottom);
+      const headTop = await collectionsHead.evaluate(node => node.getBoundingClientRect().top);
+      expect(headTop).toBeGreaterThanOrEqual(listBottom - 1);
+
+      await list.hover();
+      for (let step = 0; step < 4; step += 1) await page.mouse.wheel(0, 3000);
+      await expect.poll(() => list.evaluate(node => Math.ceil(node.scrollTop + node.clientHeight) >= node.scrollHeight)).toBe(true);
+      const last = list.locator('.collection-request-wrap').filter({ hasText: 'Order 40' });
+      await expect(last).toBeVisible();
+      expect(await collectionsHead.evaluate(node => node.getBoundingClientRect().top)).toBe(headTop);
+
+      await last.hover();
+      await last.getByRole('button', { name: 'Request menu' }).click();
+      const menu = last.locator('.request-menu');
+      await expect(menu.getByRole('button', { name: 'Unstar' })).toBeVisible();
+      const menuShown = await menu.evaluate(node => {
+        const box = node.getBoundingClientRect();
+        const corners = [[box.left + 4, box.top + 4], [box.right - 4, box.bottom - 4]];
+        return corners.every(([x, y]) => node.contains(document.elementFromPoint(x, y)));
+      });
+      expect(menuShown).toBe(true);
+      await page.screenshot({ path: join(tmpdir(), `kurlo-starred-40-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
+
+      await menu.getByRole('button', { name: 'Unstar' }).click();
+      await expect(page.getByRole('button', { name: 'Starred 39' })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store as { starredRequestIds?: string[] }).starredRequestIds?.length)).toBe(39);
+
+      await page.getByRole('button', { name: 'Starred 39' }).click();
+      await expect(list).toHaveCount(0);
+      expect(await page.evaluate(() => localStorage.getItem('kurlo.sidebar.starredCollapsed.v1'))).toBe('1');
+    });
+  }
+
+  test('moves stars from request files into the local store', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections,
+      requests: requestsFor(3).map((request, index) => ({ ...request, isPinned: index === 1 })),
+      activeId: 'req-1',
+      openIds: ['req-1'],
+    });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Starred 1' })).toBeVisible();
+    await expect(page.locator('.starred-list')).toContainText('Order 2');
+
+    await page.locator('.collection-list .collection-request-wrap').filter({ hasText: 'Order 3' }).getByRole('button', { name: 'Star request' }).click();
+    await expect(page.getByRole('button', { name: 'Starred 2' })).toBeVisible();
+    const saved = await page.evaluate(() => window.__kurloE2E.store as { starredRequestIds?: string[]; requests: Array<Record<string, unknown>> });
+    expect(saved.starredRequestIds).toEqual(['req-2', 'req-3']);
+    expect(saved.requests.some(request => 'isPinned' in request)).toBe(false);
+  });
+});
 
 test.describe('Perf fixtures', () => {
   const fixtures = process.env.KURLO_PERF_FIXTURES ?? '';
@@ -11209,3 +11445,282 @@ test.describe('Audit followup regressions', () => {
     });
   }
 });
+
+test('signs a request with JWT Bearer auth and previews the token', async ({ page }, testInfo) => {
+  if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByLabel('New collection').click();
+  await fillPrompt(page, 'New collection', 'Partner API');
+  await collectionRow(page, 'Partner API').getByLabel('Collection menu').click();
+  await collectionRow(page, 'Partner API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+  await chooseRequestType(page, 'HTTP Request');
+  await page.getByLabel('Request URL').fill('https://api.example.test/me');
+  await chooseRequestSection(page, 'Authorization');
+  await page.getByLabel('Auth Type').click();
+  await page.getByRole('button', { name: 'JWT Bearer', exact: true }).click();
+  await page.getByLabel('Secret', { exact: true }).fill('{{jwtSigningKey}}');
+  const payload = page.getByLabel('JWT payload');
+  await page.getByRole('button', { name: 'Preview token', exact: true }).click();
+  const inspector = page.locator('.jwt-inspector');
+  await expect(inspector.getByText('No claims')).toBeVisible();
+  await expect(inspector.locator('.jwt-state')).toHaveText('No expiry');
+  await expect(page.getByTestId('jwt-preview-token')).toHaveText(/^eyJ[\w-]+\.e30\.[\w-]+$/);
+  await page.getByLabel('Expires in, seconds (adds iat and exp)').fill('300');
+  await payload.click();
+  await page.keyboard.insertText('{ "sub": "user-42", "role": "admin" }');
+  await expect(inspector).toHaveCount(0);
+  await page.getByRole('button', { name: 'Preview token', exact: true }).click();
+  await expect(inspector).toContainText('With the active environment');
+  await expect(inspector).toContainText('user-42');
+  await expect(inspector).toContainText('exp');
+  await expect(inspector.locator('.jwt-state')).toHaveText('Valid time window');
+  const token = page.getByTestId('jwt-preview-token');
+  await expect(token).toHaveText(/^eyJ[\w-]+\.eyJ[\w-]+\.[\w-]+$/);
+  await inspector.getByRole('button', { name: 'Copy token' }).click();
+  await expect(inspector.getByRole('button', { name: 'Copied' })).toBeVisible();
+  await page.getByLabel('Auth Type').scrollIntoViewIfNeeded();
+  await captureDocsScreenshot(page, 'auth-jwt');
+  if (!docsScreenshotDir) {
+    await page.getByLabel('Auth Type').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-auth-jwt-top-${testInfo.project.name}.png`), animations: 'disabled' });
+    await inspector.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(tmpdir(), `kurlo-auth-jwt-${testInfo.project.name}.png`), animations: 'disabled' });
+  }
+
+  await page.getByRole('radio', { name: 'Query string' }).check();
+  await expect(page.getByLabel('Query parameter', { exact: true })).toHaveValue('token');
+  await page.getByRole('radio', { name: 'Header' }).check();
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1))).toMatchObject({
+    auth: { type: 'jwt', token: '', jwtAlgorithm: 'HS256', jwtSecret: '{{jwtSigningKey}}', jwtExpiresIn: '300', jwtAddTo: 'header', jwtHeaderPrefix: 'Bearer', jwtPayload: '{ "sub": "user-42", "role": "admin" }' },
+  });
+
+  await page.getByLabel('JWT algorithm').click();
+  await page.getByRole('option', { name: 'ES256', exact: true }).click();
+  await expect(page.getByLabel('Secret', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel(/Private key \(PEM\)/)).toBeVisible();
+});
+
+test('colors an environment and shows it in the switcher, sidebar and matrix', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  await page.getByLabel('New environment', { exact: true }).click();
+  await fillPrompt(page, 'New environment', 'Production');
+  const workspace = page.locator('.environment-workspace');
+  await page.getByRole('button', { name: 'More environment actions', exact: true }).click();
+  const swatches = workspace.getByRole('group', { name: 'Environment color' });
+  await expect(swatches.getByRole('menuitemradio', { name: 'No color' })).toHaveAttribute('aria-checked', 'true');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-color-menu-${testInfo.project.name}.png`), animations: 'disabled' });
+  await swatches.getByRole('menuitemradio', { name: 'Red' }).click();
+  await expect(workspace.locator('.env-title-color')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const store = (window as any).__kurloE2E.store as { environments?: Array<{ name: string; color?: string }> };
+    return store.environments?.find(environment => environment.name === 'Production')?.color;
+  })).toBe('red');
+
+  const sidebarDot = page.locator('.environment-item').filter({ hasText: 'Production' }).locator('.environment-dot');
+  await expect(sidebarDot).toHaveClass(/env-colored/);
+  const danger = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--danger').trim());
+  const sidebarColor = await sidebarDot.evaluate(element => getComputedStyle(element).backgroundColor);
+  const probe = await page.evaluate(color => { const el = document.createElement('span'); el.style.color = color; document.body.append(el); const value = getComputedStyle(el).color; el.remove(); return value; }, danger);
+  expect(sidebarColor).toBe(probe);
+
+  const switcher = page.locator('.environment-select');
+  await switcher.click();
+  await page.locator('.environment-menu').getByRole('button', { name: /Production/ }).click();
+  await expect(switcher).toHaveClass(/env-colored/);
+  await expect(switcher).toContainText('Production');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-color-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-color-dark-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.emulateMedia({ colorScheme: 'light' });
+
+  await page.getByRole('button', { name: 'More environment actions', exact: true }).click();
+  await swatches.getByRole('menuitemradio', { name: 'No color' }).click();
+  await expect(switcher).not.toHaveClass(/env-colored/);
+  await expect(workspace.locator('.env-title-color')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'More environment actions', exact: true }).click();
+  await swatches.getByRole('menuitemradio', { name: 'Blue' }).click();
+  await page.getByLabel('New environment', { exact: true }).click();
+  await fillPrompt(page, 'New environment', 'Staging');
+  await page.getByRole('radio', { name: 'Matrix' }).click();
+  await expect(page.locator('.env-matrix-col-head').filter({ hasText: 'Production' }).locator('.env-matrix-dot.env-colored')).toHaveCount(1);
+  await expect(page.locator('.env-matrix-col-head').filter({ hasText: 'Staging' }).locator('.env-matrix-dot.env-colored')).toHaveCount(0);
+});
+
+
+test('checks a response with assertions and sends them with the request', async ({ page }, testInfo) => {
+  if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByLabel('New collection').click();
+  await fillPrompt(page, 'New collection', 'Orders API');
+  await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
+  await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+  await chooseRequestType(page, 'HTTP Request');
+  await page.getByLabel('Request URL').fill('https://api.example.test/orders');
+  await chooseRequestSection(page, 'Scripts');
+  await page.getByRole('tab', { name: 'Assertions' }).click();
+  await expect(page.locator('.assertions-empty')).toContainText('Check the response without code');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-assertions-empty-${testInfo.project.name}.png`), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Status is 200', exact: true }).click();
+  await page.getByRole('button', { name: 'JSON response', exact: true }).click();
+  await page.getByRole('button', { name: 'Assertion', exact: true }).click();
+  const rows = page.getByTestId('assertion-row');
+  await expect(rows).toHaveCount(3);
+  await rows.nth(2).getByLabel('Assertion target').fill('body.items');
+  await rows.nth(2).getByLabel('Assertion check').click();
+  await page.getByRole('option', { name: 'has length', exact: true }).click();
+  await rows.nth(2).getByLabel('Expected value').fill('{{expectedCount}}');
+  await rows.nth(1).getByLabel('Enable assertion').uncheck();
+  await expect(page.getByRole('tab', { name: /Assertions\s*3/ })).toBeVisible();
+  await captureDocsScreenshot(page, 'request-assertions');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-assertions-${testInfo.project.name}.png`), animations: 'disabled' });
+
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1)?.assertions)).toEqual([
+    { enabled: true, target: 'status', operator: 'eq', value: '200' },
+    { enabled: true, target: 'body.items', operator: 'length', value: '{{expectedCount}}' },
+  ]);
+
+  await rows.nth(0).getByLabel('Assertion check').click();
+  await page.getByRole('option', { name: 'exists', exact: true }).click();
+  await expect(rows.nth(0).getByLabel('Expected value')).toHaveCount(0);
+  await rows.nth(0).getByLabel('Remove assertion').click();
+  await expect(rows).toHaveCount(2);
+});
+
+test('undoes a deletion and restores items from Recently deleted', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByLabel('New collection').click();
+  await fillPrompt(page, 'New collection', 'Billing API');
+  for (const url of ['https://api.example.test/invoices', 'https://api.example.test/refunds']) {
+    await collectionRow(page, 'Billing API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Billing API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill(url);
+    await page.keyboard.press('Control+s');
+  }
+  const storedNames = () => page.evaluate(() => ((window as any).__kurloE2E.store.requests ?? []).map((request: { url: string }) => request.url));
+  await expect.poll(storedNames).toEqual(expect.arrayContaining(['https://api.example.test/invoices', 'https://api.example.test/refunds']));
+
+  await collectionRow(page, 'Billing API').getByLabel('Collection menu').click();
+  await collectionRow(page, 'Billing API').locator('.collection-menu').getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /Delete|OK|Confirm/ }).click();
+  const toast = page.locator('.undo-toast');
+  await expect(toast).toContainText('Deleted collection “Billing API”');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-undo-toast-${testInfo.project.name}.png`), animations: 'disabled' });
+  await toast.getByRole('button', { name: 'Undo' }).click();
+  await expect(collectionRow(page, 'Billing API')).toBeVisible();
+  await expect.poll(storedNames).toEqual(expect.arrayContaining(['https://api.example.test/invoices', 'https://api.example.test/refunds']));
+
+  await collectionRow(page, 'Billing API').getByLabel('Collection menu').click();
+  await collectionRow(page, 'Billing API').locator('.collection-menu').getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /Delete|OK|Confirm/ }).click();
+  await toast.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(toast).toHaveCount(0);
+  await expect.poll(storedNames).toEqual([]);
+  await page.getByRole('button', { name: 'Recently deleted', exact: true }).click();
+  const menu = page.getByRole('menu', { name: 'Recently deleted' });
+  await expect(menu).toContainText('Billing API');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-recently-deleted-${testInfo.project.name}.png`), animations: 'disabled' });
+  await menu.getByRole('menuitem', { name: 'Restore collection Billing API' }).click();
+  await expect(collectionRow(page, 'Billing API')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Recently deleted', exact: true })).toHaveCount(0);
+  await expect.poll(storedNames).toEqual(expect.arrayContaining(['https://api.example.test/invoices', 'https://api.example.test/refunds']));
+});
+
+for (const scale of [1, 1.5]) {
+  test(`lists twenty deletions in Recently deleted and scrolls them at ${scale}`, async ({ page }, testInfo) => {
+    await page.addInitScript(value => localStorage.setItem('kurlo.uiScale.v1', String(value)), scale);
+    await page.setViewportSize({ width: 1100, height: 720 });
+    const requests = Array.from({ length: 22 }, (_, index) => {
+      const number = String(index + 1).padStart(2, '0');
+      return { id: `bulk-${number}`, collectionId: 'col-bulk', collection: 'Bulk', name: `Request ${number} with a rather long name to check truncation`, requestType: 'http', method: 'GET', url: `https://api.example.test/${number}`, auth: { type: 'none' } };
+    });
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-bulk', workspaceId: 'workspace-e2e', name: 'Bulk' }],
+      requests,
+      activeId: '',
+      openIds: [],
+    });
+    await page.goto('/');
+    for (const request of requests) {
+      const row = page.locator('.collection-request-wrap').filter({ hasText: request.name.slice(0, 10) }).first();
+      await row.hover();
+      await row.getByLabel('Request menu').click();
+      await page.getByRole('button', { name: 'Delete', exact: true }).last().click();
+      await page.getByRole('dialog').getByRole('button', { name: /Delete|OK|Confirm/ }).click();
+      await expect(page.locator('.collection-request-wrap').filter({ hasText: request.name.slice(0, 10) })).toHaveCount(0);
+    }
+
+    await page.locator('.undo-toast').getByRole('button', { name: 'Dismiss' }).click();
+    await page.getByRole('button', { name: 'Recently deleted', exact: true }).click();
+    const menu = page.getByRole('menu', { name: 'Recently deleted' });
+    const list = page.getByTestId('recently-deleted-list');
+    await expect(menu).toContainText('20 of 20');
+    await expect(list.getByRole('menuitem')).toHaveCount(20);
+    await expect(list.getByRole('menuitem').first()).toHaveAccessibleName(/Request 22/);
+    const geometry = await list.evaluate(node => {
+      const box = node.closest('[role="menu"]')!.getBoundingClientRect();
+      return { scrolls: node.scrollHeight > node.clientHeight, sideways: node.scrollWidth > node.clientWidth, fits: box.top >= 0 && box.left >= 0 && box.bottom <= window.innerHeight && box.right <= window.innerWidth };
+    });
+    expect(geometry).toEqual({ scrolls: true, sideways: false, fits: true });
+    expect(await list.evaluate(node => getComputedStyle(node).overscrollBehaviorY)).toBe('none');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-recently-deleted-20-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
+
+    await list.hover();
+    for (let step = 0; step < 4; step += 1) await page.mouse.wheel(0, 30000);
+    await expect.poll(() => list.evaluate(node => Math.ceil(node.scrollTop + node.clientHeight) >= node.scrollHeight)).toBe(true);
+    const oldest = list.getByRole('menuitem', { name: /Restore request Request 03/ });
+    await expect(oldest).toBeInViewport();
+    await expect(menu.getByRole('menuitem', { name: 'Clear list' })).toBeInViewport();
+    await oldest.click();
+    await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Request 03' })).toHaveCount(1);
+    await page.getByRole('button', { name: 'Recently deleted', exact: true }).click();
+    await expect(list.getByRole('menuitem')).toHaveCount(19);
+    await menu.getByRole('menuitem', { name: 'Clear list' }).click();
+    await expect(page.getByRole('button', { name: 'Recently deleted', exact: true })).toHaveCount(0);
+  });
+}
+
+for (const count of [200, 250]) {
+  test(`edits a request with ${count} assertions without losing any`, async ({ page }, testInfo) => {
+    const assertions = Array.from({ length: count }, (_, index) => ({ enabled: true, target: `body.items[${index}].id`, operator: 'exists', value: '' }));
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-checks', workspaceId: 'workspace-e2e', name: 'Checks' }],
+      requests: [{ id: 'checked', collectionId: 'col-checks', collection: 'Checks', name: 'Checked', requestType: 'http', method: 'GET', url: 'https://api.example.test/items', auth: { type: 'none' }, assertions }],
+      activeId: 'checked',
+      openIds: ['checked'],
+    });
+    await page.goto('/');
+    await chooseRequestSection(page, 'Scripts');
+    await page.getByRole('tab', { name: /Assertions/ }).click();
+    const rows = page.getByTestId('assertion-row');
+    await expect(rows).toHaveCount(count);
+    await expect(page.getByRole('tab', { name: new RegExp(`Assertions\\s*${count}`) })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Assertion', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Status is 200', exact: true })).toBeDisabled();
+    await expect(page.locator('.assertions-limit')).toContainText('Up to 200 assertions');
+
+    const last = rows.nth(count - 1);
+    await last.scrollIntoViewIfNeeded();
+    const started = Date.now();
+    await last.getByLabel('Assertion check').click();
+    await page.getByRole('option', { name: 'equals', exact: true }).click();
+    await last.getByLabel('Expected value').fill('42');
+    expect(Date.now() - started).toBeLessThan(5000);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-assertions-${count}-${testInfo.project.name}.png`), animations: 'disabled' });
+    await page.keyboard.press('Control+s');
+    await expect.poll(() => page.evaluate(() => (window as any).__kurloE2E.store.requests.find((request: { id: string }) => request.id === 'checked')?.assertions?.length)).toBe(count);
+    await expect.poll(() => page.evaluate(() => (window as any).__kurloE2E.store.requests.find((request: { id: string }) => request.id === 'checked')?.assertions?.at(-1))).toMatchObject({ operator: 'eq', value: '42' });
+
+    await rows.nth(0).getByLabel('Remove assertion').click();
+    await expect(rows).toHaveCount(count - 1);
+    if (count - 1 < 200) await expect(page.getByRole('button', { name: 'Assertion', exact: true })).toBeEnabled();
+  });
+}

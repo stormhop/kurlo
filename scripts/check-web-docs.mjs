@@ -136,6 +136,15 @@ function checkCodeBackedDocs() {
     if (!schema.includes(`"${field}"`)) fail(`OAuth2 field ${field} is missing from YAML schema`);
     if (!yamlDoc.includes(field)) fail(`OAuth2 field ${field} is missing from YAML reference docs`);
   }
+  for (const field of ['jwtAlgorithm', 'jwtSecretBase64', 'jwtPayload', 'jwtHeaders', 'jwtExpiresIn', 'jwtAddTo', 'jwtHeaderPrefix', 'jwtQueryParam']) {
+    if (!stripGo.includes(`"${field}"`)) fail(`JWT field ${field} is missing from authActiveFields`);
+    if (!schema.includes(`"${field}"`)) fail(`JWT field ${field} is missing from YAML schema`);
+    if (!yamlDoc.includes(field)) fail(`JWT field ${field} is missing from YAML reference docs`);
+  }
+  for (const field of ['jwtSecret', 'jwtPrivateKey']) {
+    if (!secretsGo.includes(`"${field}"`)) fail(`${field} is not listed as a filesystem workspace secret field`);
+    if (!yamlDoc.includes(`\`${field}\``)) fail(`${field} is missing from the YAML reference secret list`);
+  }
   if (!secretsGo.includes('"oauth2RefreshToken"')) {
     fail('oauth2RefreshToken is not listed as a filesystem workspace secret field');
   }

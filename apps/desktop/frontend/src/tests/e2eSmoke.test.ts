@@ -23,7 +23,6 @@ function request(overrides: Partial<SavedRequest>): SavedRequest {
     nameAuto: false,
     requestType: 'http',
     isDraft: false,
-    isPinned: false,
     collectionId: 'collection-1',
     collection: 'Smoke API',
     folderPath: [],

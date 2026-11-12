@@ -52,7 +52,7 @@ What doesn't carry over:
 
 ## From OpenAPI / Swagger
 
-Pick **OpenAPI / Swagger** and choose a JSON or YAML spec. Kurlo builds one request per operation, grouped into folders by the operation's first tag, with the summary as the request name and the description as its Docs tab.
+Pick **OpenAPI / Swagger** and choose a JSON or YAML spec. Kurlo builds one request per operation, grouped into folders by the operation's first tag, with the summary as the request name and the description as its Docs tab. The YAML that spec generators such as Jackson and springdoc write is read as is, including lists at the same indent as their key and quoted strings that continue over several lines.
 
 The point is a collection you can send straight away, so three things land on the collection rather than being baked into each request:
 

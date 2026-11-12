@@ -35,7 +35,7 @@ describe('normalizeSavedRequest', () => {
     expect(request.collection).toBe('');
   });
 
-  it('restores starred requests from storage', () => {
+  it('drops the legacy starred flag from request files', () => {
     const request = normalizeSavedRequest(
       {
         id: 'request-1',
@@ -49,7 +49,7 @@ describe('normalizeSavedRequest', () => {
       collection.workspaceId,
     );
 
-    expect(request.isPinned).toBe(true);
+    expect('isPinned' in request).toBe(false);
   });
 
   it('normalizes websocket request metadata from storage', () => {

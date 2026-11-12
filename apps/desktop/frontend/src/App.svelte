@@ -13,6 +13,8 @@
 
   import AppOverlays from './lib/components/AppOverlays.svelte';
   import AppToasts from './lib/components/AppToasts.svelte';
+  import TextContextMenu from './lib/components/TextContextMenu.svelte';
+  import { textTargetFrom, type TextMenuState } from './lib/textEditing';
   import BodyModeSelector from './lib/components/BodyModeSelector.svelte';
   import RequestBar from './lib/components/RequestBar.svelte';
   import RequestEditorTabs from './lib/components/RequestEditorTabs.svelte';
@@ -190,8 +192,12 @@
     document.documentElement.dataset.runtime = runtime;
   }
 
+  let textMenu = $state<TextMenuState | null>(null);
+
   function preventNativeContextMenu(event: MouseEvent) {
     event.preventDefault();
+    const target = textTargetFrom(event.target);
+    textMenu = target ? { x: event.clientX, y: event.clientY, target } : null;
   }
 
   function setAutoUpdateInstall(value: boolean) {
@@ -561,6 +567,7 @@
     collectionGroups={vm.collectionGroups}
     historyGroups={vm.historyGroups}
     pinnedRequests={vm.pinnedRequests}
+    starredRequestIds={vm.starredRequestIds}
     activeWorkspaceEnvironments={vm.activeWorkspaceEnvironments}
     openCollectionMenuId={vm.openCollectionMenuId}
     openRequestMenuId={vm.openRequestMenuId}
@@ -583,6 +590,7 @@
     renameRequest={vm.renameRequest}
     duplicateRequest={vm.duplicateRequest}
     copyRequestCurl={vm.copyRequestCurl}
+    revealInFileManager={vm.revealInFileManager}
     activeLoadTestId={vm.activeLoadTestId}
     openLoadTestMenuId={vm.openLoadTestMenuId}
     createLoadTest={(collectionId: string, requestIds?: string[]) => void vm.createLoadTest(collectionId, requestIds)}
@@ -821,6 +829,7 @@
         renameEnvironment={vm.renameEnvironment}
         setEnvironmentProtected={vm.setEnvironmentProtected}
         setEnvironmentSandbox={vm.setEnvironmentSandbox}
+        setEnvironmentColor={vm.setEnvironmentColor}
         setEnvironmentParent={vm.setEnvironmentParent}
         deleteEnvironment={vm.deleteEnvironment}
         saveEnvironment={vm.saveEnvironment}
@@ -1048,6 +1057,7 @@
           bodyHasContent={vm.bodyHasContent()}
           bodyBadgeLabel={vm.bodyBadgeLabel()}
           scriptLineCount={scriptLineCount(vm.preRequestScript) + scriptLineCount(vm.testScript)}
+          assertionCount={vm.assertions.filter(row => row.target.trim()).length}
           listenEventCount={activeCount(vm.sioEvents)}
           metadataCount={activeCount(vm.grpcMetadata)}
           grpcMethodSelected={Boolean(vm.grpcMethod)}
@@ -1284,5 +1294,9 @@
       onResizeStart={vm.startCodePanelResize}
       onDividerKeydown={vm.onCodePanelDividerKeydown}
     />
+  {/if}
+
+  {#if textMenu}
+    <TextContextMenu menu={textMenu} onclose={() => (textMenu = null)} />
   {/if}
 </main>

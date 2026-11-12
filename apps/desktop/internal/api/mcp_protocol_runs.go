@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
 
@@ -38,7 +39,10 @@ func (s *mcpServer) protocolHTTP(run *mcpRunContext, req cliSavedRequest, values
 	if err := s.tokens.resolveOAuth2Token(cfg); err != nil {
 		return prepared, fmt.Errorf("%s", redactSecrets(err.Error(), run.secrets))
 	}
-	run.secrets = append(run.secrets, cfg.Token, cfg.Password, cfg.KeyValue, cfg.OAuth2Secret, cfg.OAuth2Password, cfg.OAuth2RefreshToken, cfg.OAuth2AssertionPrivateKey, cfg.OAuth1ConsumerSecret, cfg.OAuth1Token, cfg.OAuth1TokenSecret, cfg.OAuth1PrivateKey, cfg.AWSSecretKey, cfg.AWSSessionToken)
+	if err := auth.PrepareJWTBearer(cfg); err != nil {
+		return prepared, fmt.Errorf("%s", redactSecrets(err.Error(), run.secrets))
+	}
+	run.secrets = append(run.secrets, cfg.JWTSecret, cfg.JWTPrivateKey, cfg.Token, cfg.Password, cfg.KeyValue, cfg.OAuth2Secret, cfg.OAuth2Password, cfg.OAuth2RefreshToken, cfg.OAuth2AssertionPrivateKey, cfg.OAuth1ConsumerSecret, cfg.OAuth1Token, cfg.OAuth1TokenSecret, cfg.OAuth1PrivateKey, cfg.AWSSecretKey, cfg.AWSSessionToken)
 	for _, header := range prepared.Headers {
 		if mcpSensitiveRequestHeaders[strings.ToLower(header.Key)] {
 			run.secrets = append(run.secrets, header.Value)

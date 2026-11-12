@@ -18,6 +18,7 @@ const FOLDER_MAP_SEPARATOR = '\u001f';
 type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy';
 
 type CollectionHost = {
+  trashCollection: (collection: import('../../types/models').Collection, requestIds: string[]) => void;
   activeCollectionSettingsId: string;
   activeRequestId: string;
   activeWorkspaceId: string;
@@ -238,9 +239,10 @@ export const collectionFeature = {
     if (!this.guardWorkspaceWritable('Deleting collections')) return;
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection) return;
-    const confirmed = await this.openConfirmDialog('Delete collection', `Delete "${collection.name}" and all requests inside it? This removes them from local storage.`);
+    const confirmed = await this.openConfirmDialog('Delete collection', `Delete "${collection.name}" and all requests inside it? You can restore it from Recently deleted until you quit Kurlo.`);
     if (!confirmed) return;
     const requestIds = this.requests.filter(request => request.collectionId === collectionId).map(request => request.id);
+    this.trashCollection(collection, requestIds);
     this.collections = this.collections.filter(candidate => candidate.id !== collectionId);
     this.requests = this.requests.filter(request => request.collectionId !== collectionId);
     if (this.activeCollectionSettingsId === collectionId) this.closeCollectionSettingsTab();

@@ -1,10 +1,10 @@
-import { authorizeOAuth2 as requestOAuth2Authorize, authorizeOAuth2Device as requestOAuth2Device, fetchOAuth2Token as requestOAuth2Token, refreshOAuth2Token as requestOAuth2Refresh } from '../../backend';
+import { authorizeOAuth2 as requestOAuth2Authorize, authorizeOAuth2Device as requestOAuth2Device, fetchOAuth2Token as requestOAuth2Token, previewJWTBearer as requestJwtPreview, refreshOAuth2Token as requestOAuth2Refresh } from '../../backend';
 import { emptyAuthConfig } from '../../wire';
-import type { AuthConfig, OAuth2DevicePrompt, OAuth2TokenResponse } from '../../backend';
+import type { AuthConfig, JWTBearerPreview, OAuth2DevicePrompt, OAuth2TokenResponse } from '../../backend';
 import { AUTH_OPTIONS } from '../../constants';
 import { inheritedAuth, withInheritedAuth } from '../../collectionDefaults';
 import type { AuthType, OAuth2ClientAuth, OAuth2GrantType, RequestType, SavedRequest } from '../../types/models';
-import { authForPersistence as resolveAuthForPersistence, authStateHasData as authHasPersistableData, oauth1AuthFields, type OAuth1Fields } from '../../utils';
+import { authForPersistence as resolveAuthForPersistence, authStateHasData as authHasPersistableData, jwtAlgorithmUsesSecret, jwtAuthFields, jwtConfigFields, oauth1AuthFields, type JwtFields, type OAuth1Fields } from '../../utils';
 
 type AuthHost = {
   activeRequestId: string;
@@ -20,6 +20,7 @@ type AuthHost = {
   awsSessionToken: string;
   awsService: string;
   oauth1: OAuth1Fields;
+  jwt: JwtFields;
   basicPass: string;
   basicUser: string;
   bearerToken: string;
@@ -124,6 +125,7 @@ export const authFeature = {
       awsRegion: this.awsRegion,
       awsService: this.awsService,
       ...oauth1AuthFields(this.oauth1),
+      ...jwtAuthFields(this.jwt),
     };
   },
 
@@ -150,6 +152,7 @@ export const authFeature = {
     }
     if (this.authType === 'aws') return Boolean(this.awsAccessKey && this.awsSecretKey && this.awsRegion && this.awsService);
     if (this.authType === 'oauth1') return Boolean(this.oauth1.consumerKey);
+    if (this.authType === 'jwt') return Boolean(jwtAlgorithmUsesSecret(this.jwt.algorithm) ? this.jwt.secret : this.jwt.privateKey);
     return false;
   },
 
@@ -160,6 +163,13 @@ export const authFeature = {
   authForPersistence(this: AuthHost, auth: SavedRequest['auth'] = this.currentAuthState()): SavedRequest['auth'] {
     const stored = this.savedRequestSnapshots.get(this.activeRequestId)?.auth ?? this.requestsById.get(this.activeRequestId)?.auth;
     return resolveAuthForPersistence(auth, stored);
+  },
+
+  async previewJwtBearer(this: AuthHost): Promise<JWTBearerPreview> {
+    const values = this.environmentValuesForRequest(this.snapshotActiveRequest());
+    const resolve = (value: string) => this.resolveTemplate(value, values);
+    const result = await requestJwtPreview({ ...emptyAuthConfig(), type: 'jwt', ...jwtConfigFields(this.currentAuthState(), resolve) });
+    return result ?? { token: '', error: 'The token preview is only available in the desktop app.' };
   },
 
   basicAuthPreview(this: AuthHost) {

@@ -2,7 +2,7 @@ import { RAW_BODY_CONTENT_TYPES } from './constants';
 import type { SnippetLanguage } from './stores/ui';
 import type { RenderedSnippetLine } from './types/models';
 import { methodColor, escapeHtml } from './utils';
-import { shellQuote } from './curl';
+import { JWT_TOKEN_PLACEHOLDER, jwtHeaderValue, shellQuote } from './curl';
 
 export type SnippetRequest = {
   method: string; url: string;
@@ -12,6 +12,7 @@ export type SnippetRequest = {
     type: string; token: string; username?: string; password?: string;
     keyName: string; keyValue: string; keyIn: string;
     awsAccessKey?: string; awsSecretKey?: string; awsSessionToken?: string; awsRegion?: string; awsService?: string;
+    jwtAddTo?: string; jwtHeaderPrefix?: string; jwtQueryParam?: string;
   };
   bodyType: string; body: string; bodyFilePath?: string;
   formData: Array<{ key: string; value: string; enabled: boolean; isFile?: boolean; fileName?: string; contentType?: string }>;
@@ -23,9 +24,14 @@ function snippetRequestUrl(req: SnippetRequest) {
   if (req.auth.type === 'apikey' && req.auth.keyIn === 'query' && req.auth.keyName) {
     paramsToAdd.push({ key: req.auth.keyName, value: req.auth.keyValue, enabled: true });
   }
-  if (!paramsToAdd.length) return nextUrl;
+  const jwtQuery = req.auth.type === 'jwt' && req.auth.jwtAddTo === 'query'
+    ? `${encodeURIComponent((req.auth.jwtQueryParam ?? '').trim() || 'token')}=${JWT_TOKEN_PLACEHOLDER}`
+    : '';
+  if (!paramsToAdd.length && !jwtQuery) return nextUrl;
   const joiner = nextUrl.includes('?') ? '&' : '?';
-  return `${nextUrl}${joiner}${paramsToAdd.map(row => `${encodeURIComponent(row.key)}=${encodeURIComponent(row.value)}`).join('&')}`;
+  const pairs = paramsToAdd.map(row => `${encodeURIComponent(row.key)}=${encodeURIComponent(row.value)}`);
+  if (jwtQuery) pairs.push(jwtQuery);
+  return `${nextUrl}${joiner}${pairs.join('&')}`;
 }
 
 function base64(value: string) {
@@ -53,6 +59,7 @@ function snippetHeaders(req: SnippetRequest) {
     headers.push({ key: 'Authorization', value: `Basic ${base64(`${req.auth.username ?? ''}:${req.auth.password ?? ''}`)}` });
   }
   if (req.auth.type === 'apikey' && req.auth.keyIn === 'header' && req.auth.keyName) headers.push({ key: req.auth.keyName, value: req.auth.keyValue });
+  if (req.auth.type === 'jwt' && req.auth.jwtAddTo !== 'query') headers.push({ key: 'Authorization', value: jwtHeaderValue(req.auth) });
   return headers;
 }
 
@@ -62,6 +69,9 @@ export function snippetAuthNotes(req: SnippetRequest): string[] {
   }
   if (req.auth.type === 'oauth1') {
     return ['OAuth 1.0: the signature covers the timestamp and a fresh nonce, so it is computed per request. Use an OAuth 1.0 signing library here.'];
+  }
+  if (req.auth.type === 'jwt') {
+    return [`JWT Bearer: Kurlo signs a fresh token on every send. Replace ${JWT_TOKEN_PLACEHOLDER} with a signed token; Preview token in the Auth tab shows one.`];
   }
   if (req.auth.type === 'aws') {
     return ['AWS Signature v4: the signature is computed per request from your access key. Use an AWS SDK or a signing helper here.'];

@@ -15,7 +15,6 @@ function savedRequest(overrides: Partial<SavedRequest> = {}): SavedRequest {
     filesystemName: 'Create-order',
     requestType: 'http',
     isDraft: false,
-    isPinned: false,
     collectionId: 'collection-1',
     collection: 'Collection',
     folderPath: [],

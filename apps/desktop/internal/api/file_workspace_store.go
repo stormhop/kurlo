@@ -57,6 +57,8 @@ var requestAuthSecretFields = []string{
 	"oauth1Token",
 	"oauth1TokenSecret",
 	"oauth1PrivateKey",
+	"jwtSecret",
+	"jwtPrivateKey",
 }
 
 var requestSettingSecretFields = []string{

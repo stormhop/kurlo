@@ -70,7 +70,7 @@ export const competitors: Competitor[] = [
         'Drop the files on Kurlo’s sidebar, or use the import button next to +.',
         'Pick an environment and send a request you use often to check it.',
       ],
-      carries: 'Folders, requests, bodies, auth (Basic, Bearer, API key, Digest, OAuth 2.0 and AWS SigV4), environments, saved responses as examples, and pre-request and test scripts. Kurlo can also export a collection back to Postman v2.1.',
+      carries: 'Folders, requests, bodies, auth (Basic, Bearer, API key, Digest, JWT Bearer, OAuth 1.0, OAuth 2.0 and AWS SigV4), environments, saved responses as examples, and pre-request and test scripts. Kurlo can also export a collection back to Postman v2.1.',
       link: 'docs/getting-started/migrating/',
     },
     sources: [{ label: 'Postman pricing', url: 'https://www.postman.com/pricing/' }],

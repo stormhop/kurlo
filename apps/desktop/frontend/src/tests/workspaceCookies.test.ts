@@ -127,6 +127,7 @@ describe('workspace scoped cookies', () => {
       cookies: [cookie('sid', 'active')],
       workspaceCookies: { 'workspace-2': [cookie('sid', 'other')] },
       folderCollapseState: {},
+      starredRequestIds: new Set<string>(),
       workspaces: [workspace('workspace-1'), workspace('workspace-2')],
       collections: [],
       requests: [],

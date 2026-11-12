@@ -143,6 +143,7 @@ describe('load tests on a collection', () => {
       workspaceCookies: {},
       cookies: [],
       folderCollapseState: {},
+      starredRequestIds: new Set<string>(),
       globalVariables: [],
       collectionLastRuns: {},
       pruneHistory: () => [],

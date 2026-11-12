@@ -3,12 +3,12 @@
   import { useClock } from '../clock.svelte';
   const now = useClock();
   import { tabListKeyboard } from '../a11y';
-  import { AUTH_OPTIONS, COLLECTION_AUTH_OPTIONS, OAUTH1_SIGNATURE_OPTIONS, NAME_MAX_LENGTH, shortName } from '../constants';
+  import { AUTH_OPTIONS, COLLECTION_AUTH_OPTIONS, JWT_ALGORITHM_OPTIONS, OAUTH1_SIGNATURE_OPTIONS, NAME_MAX_LENGTH, shortName } from '../constants';
   import { HEADER_PICKER_NAMES, getHeaderValues } from '../headers';
   import { collectionSettingsFingerprint, emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsFingerprint, folderDefaultsFor, inheritedAuthSource, normalizeCollectionDefaults } from '../collectionDefaults';
-  import { activeCount, cloneRowsForStore, guardTrailing, removeRow, restoreRows, scriptLineCount } from '../utils';
+  import { activeCount, cloneRowsForStore, guardTrailing, jwtAlgorithmUsesSecret, removeRow, restoreRows, scriptLineCount } from '../utils';
   import { openFileDialog } from '../backend';
-  import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
+  import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, JwtAlgorithm, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
   import { defaultPinnedEnvironmentId, normalizeCollectionEnvironmentPins } from '../collectionEnvironments';
   import type { VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
@@ -780,6 +780,44 @@
                     <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><input id="collection-oauth1-token-secret" class="field field-input field-mono" bind:value={auth.oauth1TokenSecret} type="password" /></div>
                   {/if}
                   <div><label class="field-label" for="collection-oauth1-realm">Realm</label><input id="collection-oauth1-realm" class="field field-input" bind:value={auth.oauth1Realm} spellcheck="false" /></div>
+                </div>
+              {:else if auth.type === 'jwt'}
+                <div class="auth-grid-2">
+                  <div>
+                    <span class="field-label">Algorithm</span>
+                    <Select value={auth.jwtAlgorithm ?? 'HS256'} options={JWT_ALGORITHM_OPTIONS} className="auth-field-select" ariaLabel="JWT algorithm" onChange={value => (auth.jwtAlgorithm = value as JwtAlgorithm)} />
+                  </div>
+                  <div>
+                    <span class="field-label">Add token to</span>
+                    <div class="segmented radio-group" role="radiogroup" aria-label="Add JWT to">
+                      {#each [['header', 'Header'], ['query', 'Query string']] as [value, label] (value)}
+                        <label class="segmented-item radio-label"><input type="radio" checked={(auth.jwtAddTo ?? 'header') === value} onchange={() => (auth.jwtAddTo = value === 'query' ? 'query' : 'header')} /> {label}</label>
+                      {/each}
+                    </div>
+                  </div>
+                  {#if jwtAlgorithmUsesSecret(auth.jwtAlgorithm)}
+                    <div class="auth-grid-span">
+                      <label class="field-label" for="collection-jwt-secret">Secret</label>
+                      <input id="collection-jwt-secret" class="field field-input field-mono" bind:value={auth.jwtSecret} type="password" spellcheck="false" />
+                      <label class="check-label jwt-secret-base64"><input class="check" type="checkbox" bind:checked={auth.jwtSecretBase64} /> Secret is base64-encoded</label>
+                    </div>
+                  {:else}
+                    <div class="auth-grid-span"><label class="field-label" for="collection-jwt-private-key">Private key (PEM)</label><textarea id="collection-jwt-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.jwtPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
+                  {/if}
+                  {#if auth.jwtAddTo === 'query'}
+                    <div><label class="field-label" for="collection-jwt-query-param">Query parameter</label><input id="collection-jwt-query-param" class="field field-input field-mono" bind:value={auth.jwtQueryParam} placeholder="token" spellcheck="false" /></div>
+                  {:else}
+                    <div><label class="field-label" for="collection-jwt-header-prefix">Header prefix</label><input id="collection-jwt-header-prefix" class="field field-input field-mono" bind:value={auth.jwtHeaderPrefix} placeholder="Bearer" spellcheck="false" /></div>
+                  {/if}
+                  <div><label class="field-label" for="collection-jwt-expires-in">Expires in, seconds <span class="field-label-hint">(adds iat and exp)</span></label><input id="collection-jwt-expires-in" class="field field-input field-mono" bind:value={auth.jwtExpiresIn} inputmode="numeric" placeholder="Not set" spellcheck="false" /></div>
+                </div>
+                <span class="field-label">Payload <span class="field-label-hint">— JSON claims</span></span>
+                <div class="jwt-editor">
+                  <CodeEditor bind:value={auth.jwtPayload} language="json" minHeight="5rem" maxHeight="14rem" ariaLabel="JWT payload" {variableSuggestions} placeholder={'{ "sub": "{{userId}}" }'} />
+                </div>
+                <span class="field-label">Extra header fields <span class="field-label-hint">— JSON, for example kid</span></span>
+                <div class="jwt-editor">
+                  <CodeEditor bind:value={auth.jwtHeaders} language="json" minHeight="3.25rem" maxHeight="8rem" ariaLabel="JWT header fields" {variableSuggestions} placeholder={'{ "kid": "key-1" }'} />
                 </div>
               {:else if auth.type === 'aws'}
                 <div class="auth-grid-2">

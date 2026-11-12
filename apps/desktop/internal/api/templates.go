@@ -97,6 +97,13 @@ func resolveAuthTemplates(cfg model.AuthConfig, values map[string]string) model.
 	cfg.OAuth1Timestamp = resolve(cfg.OAuth1Timestamp)
 	cfg.OAuth1Nonce = resolve(cfg.OAuth1Nonce)
 	cfg.OAuth1Version = resolve(cfg.OAuth1Version)
+	cfg.JWTSecret = resolve(cfg.JWTSecret)
+	cfg.JWTPrivateKey = resolve(cfg.JWTPrivateKey)
+	cfg.JWTPayload = resolve(cfg.JWTPayload)
+	cfg.JWTHeaders = resolve(cfg.JWTHeaders)
+	cfg.JWTExpiresIn = resolve(cfg.JWTExpiresIn)
+	cfg.JWTHeaderPrefix = resolve(cfg.JWTHeaderPrefix)
+	cfg.JWTQueryParam = resolve(cfg.JWTQueryParam)
 	return cfg
 }
 
@@ -108,6 +115,14 @@ func resolveHTTPRequestTemplates(req model.HttpRequest, values map[string]string
 	out.PathParams = resolveTemplateRows(req.PathParams, values)
 	out.Headers = resolveTemplateRows(req.Headers, values)
 	out.FormData = resolveTemplateRows(req.FormData, values)
+	if req.Assertions != nil {
+		out.Assertions = make([]model.Assertion, len(req.Assertions))
+		for i, assertion := range req.Assertions {
+			assertion.Target = resolve(assertion.Target)
+			assertion.Value = resolve(assertion.Value)
+			out.Assertions[i] = assertion
+		}
+	}
 	out.Auth = resolveAuthTemplates(req.Auth, values)
 	out.BodyFilePath = resolve(req.BodyFilePath)
 	out.ProxyURL = resolve(req.ProxyURL)

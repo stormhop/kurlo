@@ -10,6 +10,9 @@ import type { Collection, PersistRequestStore, RequestType, SavedRequest } from 
 import type { TopView } from '../ui';
 
 type FolderHost = {
+  autosave: boolean;
+  openNewDraft: (request: import('../../types/models').SavedRequest, target?: { collectionId: string; folderPath: string[] }) => Promise<void>;
+  trashFolder: (collection: import('../../types/models').Collection, folderPath: string[], requestIds: string[]) => void;
   activeRequestId: string;
   activeCollectionSettingsId: string;
   activeFolderSettingsPath: string[];
@@ -79,10 +82,15 @@ export const folderFeature = {
     this.collections = this.collections.map(collection =>
       collection.id === collectionId ? addCollectionFolderPath(collection, folderPath) : collection
     );
+    const wsId = this.workspaceIdForCollection(collectionId);
+    if (!this.autosave) {
+      if (wsId) this.activeWorkspaceId = wsId;
+      await this.openNewDraft({ ...this.blankSavedRequest(collectionId, requestType), folderPath }, { collectionId, folderPath });
+      return;
+    }
     const next = { ...this.blankSavedRequest(collectionId, requestType), folderPath };
     this.requests = [...this.requests, next];
     this.openRequestIds = [...new Set([...this.openRequestIds, next.id])];
-    const wsId = this.workspaceIdForCollection(collectionId);
     if (wsId) this.activeWorkspaceId = wsId;
     this.applySavedRequest(next);
     this.topView = 'request';
@@ -145,11 +153,13 @@ export const folderFeature = {
     this.closeFloatingMenus();
     const folderName = folderPath.at(-1) ?? 'this folder';
     const count = this.requests.filter(request => request.collectionId === collectionId && this.folderPathMatches(request.folderPath ?? [], folderPath)).length;
-    const confirmed = await this.openConfirmDialog('Delete folder', `Delete "${folderName}" and its ${count} request${count === 1 ? '' : 's'}? This cannot be undone.`);
+    const confirmed = await this.openConfirmDialog('Delete folder', `Delete "${folderName}" and its ${count} request${count === 1 ? '' : 's'}? You can restore it from Recently deleted until you quit Kurlo.`);
     if (!confirmed) return;
     const removed = this.requests
       .filter(request => request.collectionId === collectionId && this.folderPathMatches(request.folderPath ?? [], folderPath))
       .map(request => request.id);
+    const owner = this.collections.find(collection => collection.id === collectionId);
+    if (owner) this.trashFolder(owner, folderPath, removed);
     this.collections = this.collections.map(collection =>
       collection.id === collectionId ? removeFolderDefaultsTree(removeCollectionFolderPathTree(collection, folderPath), folderPath) : collection
     );

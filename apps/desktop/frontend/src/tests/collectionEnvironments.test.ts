@@ -238,6 +238,7 @@ describe('deleteEnvironment', () => {
       guardWorkspaceWritable: () => true,
       openConfirmDialog: vi.fn().mockResolvedValue(true),
       persistRequestStore: vi.fn().mockResolvedValue(true),
+      trashEnvironment: vi.fn(),
       environmentBaselines: new Map(),
       changeEnvironmentsEverywhere(change: (environment: (typeof environments)[number]) => (typeof environments)[number]) {
         environmentFeature.changeEnvironmentsEverywhere.call(host as never, change);

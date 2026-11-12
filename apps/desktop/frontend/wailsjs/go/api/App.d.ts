@@ -247,6 +247,8 @@ export function OpenRouterConnectStatus():Promise<model.OpenRouterConnectState>;
 
 export function OpenWorkspaceRoot(arg1:string):Promise<api.WorkspaceOpenResult>;
 
+export function PreviewJWTBearer(arg1:model.AuthConfig):Promise<model.JWTBearerPreview>;
+
 export function PreviewLoadTestData(arg1:string):Promise<model.LoadDataPreview>;
 
 export function PruneHistoryResponses(arg1:Array<string>):Promise<string>;
@@ -272,6 +274,8 @@ export function RenameAgentChat(arg1:string,arg2:string):Promise<model.AgentResu
 export function ReopenOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 
 export function RestartApp():Promise<void>;
+
+export function RevealWorkspaceItem(arg1:string,arg2:string):Promise<string>;
 
 export function RevertAgentActivity(arg1:string,arg2:string):Promise<model.AgentActivityEntry>;
 

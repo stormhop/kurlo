@@ -924,6 +924,23 @@ function securityForRequest(req: SavedRequest): SecurityExport | null {
       requirement: { bearerAuth: [] },
     };
   }
+  if (auth.type === 'jwt') {
+    if (auth.jwtAddTo === 'query') {
+      const name = (auth.jwtQueryParam ?? '').trim() || 'token';
+      return {
+        name: 'jwtQuery',
+        openapi: { type: 'apiKey', in: 'query', name, description: 'Signed JWT' },
+        swagger: { type: 'apiKey', in: 'query', name, description: 'Signed JWT' },
+        requirement: { jwtQuery: [] },
+      };
+    }
+    return {
+      name: 'jwtBearerAuth',
+      openapi: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      swagger: { type: 'apiKey', in: 'header', name: 'Authorization', description: 'Bearer JWT' },
+      requirement: { jwtBearerAuth: [] },
+    };
+  }
   if (auth.type === 'basic') {
     return {
       name: 'basicAuth',

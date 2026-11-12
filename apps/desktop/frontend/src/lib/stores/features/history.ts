@@ -174,7 +174,6 @@ export const historyFeature = {
       id: newRequestId(),
       filesystemName: undefined,
       isDraft: false,
-      isPinned: false,
       name: requestSnapshot
         ? (baseRequest.name && baseRequest.name !== 'New Request' ? baseRequest.name : requestTabLabel(baseRequest))
         : this.currentRequestName(),

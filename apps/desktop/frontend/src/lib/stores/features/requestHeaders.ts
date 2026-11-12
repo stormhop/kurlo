@@ -114,6 +114,7 @@ export const requestHeadersFeature = {
     if (auth.type === 'ntlm' && auth.basicUser) add('Authorization', 'NTLM <negotiated>', 'from auth settings', false);
     if (auth.type === 'oauth2' && auth.oauth2Token) add('Authorization', `Bearer ${auth.oauth2Token}`, 'from OAuth token', false);
     if (auth.type === 'apikey' && auth.apiKeyIn === 'header' && auth.apiKeyName) add(auth.apiKeyName, auth.apiKeyValue, 'from API key auth', false);
+    if (auth.type === 'jwt' && auth.jwtAddTo !== 'query') add('Authorization', `${auth.jwtHeaderPrefix || 'Bearer'} <signed JWT>`.trim(), 'signed on send from JWT Bearer auth', false);
     if (auth.type === 'aws') { add('Authorization', 'AWS4-HMAC-SHA256 <generated>', 'from AWS Signature v4', false); add('X-Amz-Date', '<generated>', 'from AWS Signature v4', false); add('X-Amz-Content-Sha256', '<generated>', 'from AWS Signature v4', false); }
     if (request.method === 'SSE') {
       add('Accept', 'text/event-stream', 'added automatically for SSE');

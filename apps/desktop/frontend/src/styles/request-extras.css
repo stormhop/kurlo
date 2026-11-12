@@ -887,6 +887,29 @@
   line-height: var(--leading-normal);
 }
 
+.jwt-secret-base64 {
+  margin-top: var(--space-2);
+}
+
+.jwt-editor {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.jwt-editor:focus-within {
+  border-color: var(--accent);
+}
+
+.jwt-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
 .bearer-token-row {
   display: grid;
   grid-template-columns: minmax(13.75rem, 1fr) auto;
@@ -918,7 +941,7 @@
   margin-top: var(--space-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  overflow: hidden;
+  overflow: clip;
   background: color-mix(in srgb, var(--surface) 70%, var(--elevated));
 }
 
@@ -987,7 +1010,7 @@
 }
 
 .jwt-claim-key {
-  overflow: hidden;
+  overflow: clip;
   color: var(--syn-hdr-key);
   font-family: var(--font-mono);
   font-size: var(--text-caption);
@@ -1012,6 +1035,51 @@
   color: var(--text-3);
   font-family: var(--font-mono);
   font-size: var(--text-caption);
+}
+
+.jwt-copy {
+  flex: 0 0 auto;
+}
+
+.jwt-note + .jwt-copy {
+  margin-left: 0;
+}
+
+.jwt-token {
+  max-height: 7.5rem;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  padding: var(--space-2) var(--space-2-5);
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.jwt-token-dot {
+  color: var(--text-3);
+}
+
+.jwt-token-part-0 {
+  color: var(--syn-key);
+}
+
+.jwt-token-part-1 {
+  color: var(--syn-hdr-key);
+}
+
+.jwt-token-part-2 {
+  color: var(--syn-str);
+}
+
+.jwt-claims-empty {
+  padding: var(--space-2) var(--space-2-5);
+  color: var(--text-3);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
 }
 
 .jwt-error-message {
@@ -1272,6 +1340,38 @@ input::-webkit-calendar-picker-indicator { opacity: 0; }
   pointer-events: none;
   animation: toast-in 0.18s ease;
   box-shadow: var(--shadow-popover);
+}
+
+.undo-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: min(32rem, calc(100vw - 2rem));
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  transform: translateX(-50%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--modal-bg);
+  box-shadow: var(--shadow-popover);
+  color: var(--text);
+  font-size: var(--text-body);
+  animation: toast-in 0.18s ease;
+}
+
+.undo-toast-text {
+  min-width: 0;
+  overflow: clip;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo-toast-action {
+  color: var(--accent-text);
+  font-weight: var(--weight-medium);
 }
 
 .git-toast {

@@ -490,6 +490,10 @@ export function OpenWorkspaceRoot(arg1) {
   return window['go']['api']['App']['OpenWorkspaceRoot'](arg1);
 }
 
+export function PreviewJWTBearer(arg1) {
+  return window['go']['api']['App']['PreviewJWTBearer'](arg1);
+}
+
 export function PreviewLoadTestData(arg1) {
   return window['go']['api']['App']['PreviewLoadTestData'](arg1);
 }
@@ -540,6 +544,10 @@ export function ReopenOpenRouterConnect() {
 
 export function RestartApp() {
   return window['go']['api']['App']['RestartApp']();
+}
+
+export function RevealWorkspaceItem(arg1, arg2) {
+  return window['go']['api']['App']['RevealWorkspaceItem'](arg1, arg2);
 }
 
 export function RevertAgentActivity(arg1, arg2) {

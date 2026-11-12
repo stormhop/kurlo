@@ -68,6 +68,17 @@ type cliAuth struct {
 	OAuth1AddTo           string `json:"oauth1AddTo"`
 	OAuth1IncludeBodyHash bool   `json:"oauth1IncludeBodyHash"`
 	OAuth1AddEmptyParams  bool   `json:"oauth1AddEmptyParams"`
+
+	JWTAlgorithm    string `json:"jwtAlgorithm"`
+	JWTSecret       string `json:"jwtSecret"`
+	JWTSecretBase64 bool   `json:"jwtSecretBase64"`
+	JWTPrivateKey   string `json:"jwtPrivateKey"`
+	JWTPayload      string `json:"jwtPayload"`
+	JWTHeaders      string `json:"jwtHeaders"`
+	JWTExpiresIn    string `json:"jwtExpiresIn"`
+	JWTAddTo        string `json:"jwtAddTo"`
+	JWTHeaderPrefix string `json:"jwtHeaderPrefix"`
+	JWTQueryParam   string `json:"jwtQueryParam"`
 }
 
 type cliSettings struct {
@@ -163,31 +174,32 @@ type cliSavedRequest struct {
 	AiKurloTools         bool     `json:"aiKurloTools"`
 	AiConnectionID       string   `json:"aiConnectionId"`
 
-	ID                 string          `json:"id"`
-	Name               string          `json:"name"`
-	RequestType        string          `json:"requestType"`
-	CollectionID       string          `json:"collectionId"`
-	Collection         string          `json:"collection"`
-	FolderPath         []string        `json:"folderPath"`
-	Method             string          `json:"method"`
-	URL                string          `json:"url"`
-	IsDraft            bool            `json:"isDraft"`
-	Params             []cliKV         `json:"params"`
-	PathParams         []cliKV         `json:"pathParams"`
-	Headers            []cliKV         `json:"headers"`
-	Auth               cliAuth         `json:"auth"`
-	BodyType           string          `json:"bodyType"`
-	RawBodyType        string          `json:"rawBodyType"`
-	BodyContent        string          `json:"bodyContent"`
-	BodyFilePath       string          `json:"bodyFilePath"`
-	FormRows           []cliKV         `json:"formRows"`
-	PreRequestScript   string          `json:"preRequestScript"`
-	TestScript         string          `json:"testScript"`
-	PreRequestScriptJs string          `json:"preRequestScriptJs"`
-	TestScriptJs       string          `json:"testScriptJs"`
-	Settings           cliSettings     `json:"settings"`
-	SettingsOverrides  map[string]bool `json:"settingsOverrides"`
-	Examples           []cliExample    `json:"examples"`
+	ID                 string            `json:"id"`
+	Name               string            `json:"name"`
+	RequestType        string            `json:"requestType"`
+	CollectionID       string            `json:"collectionId"`
+	Collection         string            `json:"collection"`
+	FolderPath         []string          `json:"folderPath"`
+	Method             string            `json:"method"`
+	URL                string            `json:"url"`
+	IsDraft            bool              `json:"isDraft"`
+	Params             []cliKV           `json:"params"`
+	PathParams         []cliKV           `json:"pathParams"`
+	Headers            []cliKV           `json:"headers"`
+	Auth               cliAuth           `json:"auth"`
+	BodyType           string            `json:"bodyType"`
+	RawBodyType        string            `json:"rawBodyType"`
+	BodyContent        string            `json:"bodyContent"`
+	BodyFilePath       string            `json:"bodyFilePath"`
+	FormRows           []cliKV           `json:"formRows"`
+	PreRequestScript   string            `json:"preRequestScript"`
+	TestScript         string            `json:"testScript"`
+	PreRequestScriptJs string            `json:"preRequestScriptJs"`
+	TestScriptJs       string            `json:"testScriptJs"`
+	Assertions         []model.Assertion `json:"assertions"`
+	Settings           cliSettings       `json:"settings"`
+	SettingsOverrides  map[string]bool   `json:"settingsOverrides"`
+	Examples           []cliExample      `json:"examples"`
 }
 
 type cliCollectionDefaults struct {
@@ -228,6 +240,7 @@ type cliEnvironment struct {
 	Name        string  `json:"name"`
 	Protected   bool    `json:"protected"`
 	Sandbox     bool    `json:"sandbox"`
+	Color       string  `json:"color"`
 	ParentID    string  `json:"parentId"`
 	Parent      string  `json:"-"`
 	Values      []cliKV `json:"values"`
@@ -325,8 +338,11 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 	}
 
 	token := req.Auth.BearerToken
-	if req.Auth.Type == "oauth2" {
+	switch req.Auth.Type {
+	case "oauth2":
 		token = req.Auth.OAuth2Token
+	case "jwt":
+		token = ""
 	}
 
 	timeoutMs := defaultCLIRequestTimeoutMs
@@ -391,6 +407,16 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 			OAuth1AddTo:               req.Auth.OAuth1AddTo,
 			OAuth1IncludeBodyHash:     req.Auth.OAuth1IncludeBodyHash,
 			OAuth1AddEmptyParams:      req.Auth.OAuth1AddEmptyParams,
+			JWTAlgorithm:              req.Auth.JWTAlgorithm,
+			JWTSecret:                 req.Auth.JWTSecret,
+			JWTSecretBase64:           req.Auth.JWTSecretBase64,
+			JWTPrivateKey:             req.Auth.JWTPrivateKey,
+			JWTPayload:                req.Auth.JWTPayload,
+			JWTHeaders:                req.Auth.JWTHeaders,
+			JWTExpiresIn:              req.Auth.JWTExpiresIn,
+			JWTAddTo:                  req.Auth.JWTAddTo,
+			JWTHeaderPrefix:           req.Auth.JWTHeaderPrefix,
+			JWTQueryParam:             req.Auth.JWTQueryParam,
 		},
 		BodyType:                bodyType,
 		Body:                    body,
@@ -398,6 +424,7 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		FormData:                formData,
 		PreRequestScript:        cliPreScript(req),
 		TestScript:              cliTestScript(req),
+		Assertions:              req.Assertions,
 		ScriptEngine:            cliScriptEngine(req),
 		FollowRedirects:         boolOr(req.Settings.FollowRedirects, true),
 		TimeoutMs:               timeoutMs,

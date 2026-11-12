@@ -1,8 +1,9 @@
 package api
 
+import "strings"
+
 var savedRequestFieldDefaults = map[string]any{
 	"isDraft":           false,
-	"isPinned":          false,
 	"nameAuto":          false,
 	"sioAck":            false,
 	"grpcUseReflection": true,
@@ -72,9 +73,21 @@ var authActiveFields = map[string][]string{
 		"oauth1Verifier", "oauth1Timestamp", "oauth1Nonce", "oauth1Version", "oauth1AddTo",
 		"oauth1IncludeBodyHash", "oauth1AddEmptyParams",
 	},
+	"jwt": {
+		"jwtAlgorithm", "jwtSecret", "jwtSecretBase64", "jwtPrivateKey", "jwtPayload",
+		"jwtHeaders", "jwtExpiresIn", "jwtAddTo", "jwtHeaderPrefix", "jwtQueryParam",
+	},
 }
 
-var authTypesWithoutFields = map[string]bool{"inherit": true}
+var authTypesWithoutFields = map[string]bool{"inherit": true, "jwt": true}
+
+var authFieldDefaults = map[string]any{
+	"jwtAlgorithm":    "HS256",
+	"jwtSecretBase64": false,
+	"jwtAddTo":        "header",
+	"jwtHeaderPrefix": "Bearer",
+	"jwtQueryParam":   "token",
+}
 
 var requestRowFieldsForStrip = []string{"params", "pathParams", "headers", "formRows", "sioEvents", "grpcMetadata"}
 
@@ -175,6 +188,7 @@ var grpcRequestSettingFieldSet = stringSet(grpcRequestSettingFields)
 
 func stripRequestForFilesystem(request map[string]any) {
 	stripTimestamps(request)
+	delete(request, "isPinned")
 	requestType := stringValue(request, "requestType")
 	stripBodyFieldsForType(request, requestType)
 	stripRealtimeFieldsForType(request, requestType)
@@ -187,12 +201,38 @@ func stripRequestForFilesystem(request map[string]any) {
 	}
 	stripSioArgRowIDs(request["sioArgs"])
 	stripEmptySioArgs(request)
+	stripAssertionsForType(request, requestType)
 	stripSavedMessagesForType(request, requestType)
 
 	stripAuthForFilesystem(request)
 	stripNestedDefaults(request, "settings", savedRequestSettingDefaults)
 
 	stripEmptyAndDefaults(request, savedRequestFieldDefaults)
+}
+
+func stripAssertionsForType(request map[string]any, requestType string) {
+	if requestType != "" && requestType != "http" && requestType != "graphql" {
+		delete(request, "assertions")
+		return
+	}
+	rows, ok := request["assertions"].([]any)
+	if !ok {
+		return
+	}
+	kept := make([]any, 0, len(rows))
+	for _, raw := range rows {
+		row, ok := raw.(map[string]any)
+		if !ok || strings.TrimSpace(stringValue(row, "target")) == "" {
+			continue
+		}
+		delete(row, "id")
+		kept = append(kept, row)
+	}
+	if len(kept) == 0 {
+		delete(request, "assertions")
+		return
+	}
+	request["assertions"] = kept
 }
 
 func stripBodyFieldsForType(request map[string]any, requestType string) {
@@ -525,6 +565,10 @@ func stripAuthForFilesystem(request map[string]any) {
 			continue
 		}
 		if str, ok := value.(string); ok && str == "" {
+			delete(auth, key)
+			continue
+		}
+		if defaultValue, ok := authFieldDefaults[key]; ok && valuesEqual(value, defaultValue) {
 			delete(auth, key)
 		}
 	}

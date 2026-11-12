@@ -509,6 +509,9 @@ func (g *generator) authHeader(number int, request Request) string {
 		}
 		g.warn(number, "The OAuth 2.0 %s grant of %s is not exported; the request is sent without auth.", strings.ReplaceAll(grant, "_", " "), request.Name)
 		return ""
+	case "jwt":
+		g.warn(number, "JWT Bearer auth of %s is signed per request in Kurlo and is not exported; the request is sent without it.", request.Name)
+		return ""
 	default:
 		g.warn(number, "%s auth of %s is not exported; the request is sent without it.", strings.ToUpper(cfg.Type[:1])+cfg.Type[1:], request.Name)
 		return ""

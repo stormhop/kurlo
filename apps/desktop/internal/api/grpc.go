@@ -19,6 +19,7 @@ import (
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/grpcreflect"
+	authpkg "github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 	"github.com/stormhop/kurlo/apps/desktop/internal/script"
@@ -284,6 +285,10 @@ func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpc
 		resp.Error = "Select a gRPC method before invoking the request"
 		return resp
 	}
+	if err := authpkg.PrepareJWTBearer(&req.Auth); err != nil {
+		resp.Error = "auth error: " + err.Error()
+		return resp
+	}
 
 	if req.TimeoutMs > 0 {
 		var cancel context.CancelFunc
@@ -398,6 +403,9 @@ func emitGrpcDone(emit grpcEventEmitter, requestID string, resp model.GrpcRespon
 }
 
 func discoverGrpcServices(ctx context.Context, req model.GrpcRequest) model.GrpcServiceDefinition {
+	if err := authpkg.PrepareJWTBearer(&req.Auth); err != nil {
+		return model.GrpcServiceDefinition{Error: "auth error: " + err.Error()}
+	}
 	cc, refClient, source, cleanup, err := grpcPrepareSource(ctx, req, req.UseReflection)
 	defer cleanup()
 	if err != nil {
@@ -616,6 +624,14 @@ func grpcMetadataHeaders(req model.GrpcRequest) []string {
 	case "apikey":
 		if auth.KeyName != "" {
 			headers = append(headers, fmt.Sprintf("%s: %s", auth.KeyName, auth.KeyValue))
+		}
+	case "jwt":
+		if auth.Token != "" {
+			if prefix := authpkg.JWTHeaderPrefix(auth); prefix != "" {
+				headers = append(headers, "authorization: "+prefix+" "+auth.Token)
+			} else {
+				headers = append(headers, "authorization: "+auth.Token)
+			}
 		}
 	}
 	return headers

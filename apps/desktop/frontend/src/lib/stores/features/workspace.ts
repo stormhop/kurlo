@@ -4,6 +4,7 @@ import type { Collection, Environment, PersistRequestStore, RequestHistoryEntry,
 import type { CookieJarEntry } from '../../backend';
 
 type WorkspaceHost = {
+  draftTargets?: Map<string, { collectionId: string; folderPath: string[] }>;
   activeRequestId: string;
   activeWorkspaceId: string;
   activeEnvironmentId: string;
@@ -58,7 +59,11 @@ export const workspaceFeature = {
   },
   activeCollectionId(this: WorkspaceHost) {
     const current = this.requestsById.get(this.activeRequestId);
-    if (current?.isDraft) return this.defaultCollectionForWorkspace()?.id || '';
+    if (current?.isDraft) {
+      const targetId = this.draftTargets?.get(current.id)?.collectionId;
+      if (targetId && this.collections.some(candidate => candidate.id === targetId)) return targetId;
+      return this.defaultCollectionForWorkspace()?.id || '';
+    }
     const collection = this.collections.find(candidate => candidate.id === current?.collectionId);
     if (this.topView === 'request' && collection?.workspaceId === this.activeWorkspaceId) return collection.id;
     return this.defaultCollectionForWorkspace()?.id || '';

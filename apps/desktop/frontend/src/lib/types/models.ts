@@ -130,10 +130,10 @@ export type BodyMode = 'none' | 'form' | 'urlencoded' | 'raw' | 'binary' | 'grap
 export type RawBodyType = 'text' | 'json' | 'html' | 'xml';
 export type HttpVersion = 'auto' | '1.1' | '2';
 export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'metadata' | 'body' | 'schema' | 'service' | 'events' | 'scripts' | 'settings' | 'examples' | 'tools';
-export type ScriptTab = 'pre-request' | 'tests';
+export type ScriptTab = 'pre-request' | 'tests' | 'assertions';
 export type ResponseTab = 'body' | 'preview' | 'headers' | 'test-results' | 'timeline' | 'diff';
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
-export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'oauth2' | 'oauth1' | 'aws' | 'digest' | 'ntlm';
+export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'jwt' | 'oauth2' | 'oauth1' | 'aws' | 'digest' | 'ntlm';
 export type SidebarView = 'collections' | 'environments' | 'history' | 'agent' | 'cookies';
 export type ShortcutId =
   | 'close-tab' | 'force-close-tab' | 'next-tab' | 'previous-tab'
@@ -164,6 +164,8 @@ export type OAuth2GrantType = 'client_credentials' | 'authorization_code' | 'pas
 export type OAuth2ClientAuth = 'basic' | 'body' | 'client_secret_jwt' | 'private_key_jwt';
 export type OAuth1SignatureMethod = 'HMAC-SHA1' | 'HMAC-SHA256' | 'HMAC-SHA512' | 'RSA-SHA1' | 'RSA-SHA256' | 'RSA-SHA512' | 'PLAINTEXT';
 export type OAuth1AddTo = 'header' | 'query' | 'body';
+export type JwtAlgorithm = 'HS256' | 'HS384' | 'HS512' | 'RS256' | 'RS384' | 'RS512' | 'PS256' | 'PS384' | 'PS512' | 'ES256' | 'ES384' | 'ES512';
+export type JwtAddTo = 'header' | 'query';
 export type AuthState = {
   type: AuthType; bearerToken: string; basicUser: string; basicPass: string;
   apiKeyName: string; apiKeyValue: string; apiKeyIn: 'header' | 'query';
@@ -182,6 +184,9 @@ export type AuthState = {
   oauth1Realm?: string; oauth1Callback?: string; oauth1Verifier?: string;
   oauth1Timestamp?: string; oauth1Nonce?: string; oauth1Version?: string;
   oauth1AddTo?: OAuth1AddTo; oauth1IncludeBodyHash?: boolean; oauth1AddEmptyParams?: boolean;
+  jwtAlgorithm?: JwtAlgorithm; jwtSecret?: string; jwtSecretBase64?: boolean; jwtPrivateKey?: string;
+  jwtPayload?: string; jwtHeaders?: string; jwtExpiresIn?: string;
+  jwtAddTo?: JwtAddTo; jwtHeaderPrefix?: string; jwtQueryParam?: string;
 };
 export type CollectionDefaults = {
   headers: KVRow[];
@@ -215,11 +220,13 @@ export type Collection = {
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;
 };
+export type EnvironmentColor = 'red' | 'amber' | 'green' | 'blue' | 'gray';
 export type Environment = {
   id: string; workspaceId: string; name: string; filesystemName: string; values: KVRow[];
   protected?: boolean;
   sandbox?: boolean;
   parentId?: string;
+  color?: EnvironmentColor;
 };
 export type ScriptEngine = 'js' | 'tengo';
 export type RequestSettings = {
@@ -272,7 +279,7 @@ export type RequestExample = {
   match: RequestExampleMatch;
 };
 export type SavedRequest = {
-  id: string; name: string; filesystemName: string; nameAuto?: boolean; requestType?: RequestType; isDraft?: boolean; isPinned?: boolean; collectionId: string; collection: string;
+  id: string; name: string; filesystemName: string; nameAuto?: boolean; requestType?: RequestType; isDraft?: boolean; collectionId: string; collection: string;
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;
   folderPath: string[]; method: Method; url: string; requestTab: RequestTab;
@@ -287,6 +294,7 @@ export type SavedRequest = {
   sioArgs?: SIOArg[];
   sioAck?: boolean;
   savedMessages?: SavedRealtimeMessage[];
+  assertions?: import('../assertions').AssertionRow[];
   grpcMethod?: string;
   grpcMetadata?: KVRow[];
   grpcUseReflection?: boolean;
@@ -407,7 +415,7 @@ export type RequestHistoryEntry = {
 };
 export type RequestStore = {
   version: number; activeId: string; activeWorkspaceId: string; activeEnvironmentId?: string;
-  openIds: string[]; folderCollapsed?: Record<string, boolean>;
+  openIds: string[]; folderCollapsed?: Record<string, boolean>; starredRequestIds?: string[];
   workspaces: Workspace[]; collections: Collection[]; environments?: Environment[];
   requests: SavedRequest[]; history?: RequestHistoryEntry[]; globals?: KVRow[];
   workspaceCookies?: Record<string, CookieJarEntry[]>;

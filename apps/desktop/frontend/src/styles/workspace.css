@@ -50,6 +50,7 @@
   top: calc((2.8125rem - var(--control-md)) / 2);
   right: calc(100% - var(--rail-w) - var(--sidebar-w, 17.5rem) + var(--space-2));
   max-width: calc(var(--rail-w) + var(--sidebar-w, 17.5rem) - var(--mac-traffic-w, 80px) - var(--space-3));
+  will-change: transform;
   -webkit-app-region: no-drag;
   --wails-draggable: no-drag;
 }
@@ -158,7 +159,6 @@
   padding: 0;
   border: none;
   border-radius: 0;
-  overflow: hidden;
   background: transparent;
 }
 
@@ -410,13 +410,19 @@
   min-width: 4.5rem;
 }
 
+.workspace-searchbar .titlebar-grab {
+  flex: 1 0 3rem;
+  align-self: stretch;
+  min-width: 3rem;
+  margin: 0 calc(var(--space-2) * -1);
+}
+
 .workspace-searchbar .global-search {
   container: search / inline-size;
   flex: 1 1 0;
   min-width: 1.875rem;
   max-width: 22.5rem;
   height: 1.875rem;
-  margin-left: auto;
   padding: 0 var(--space-2);
   gap: var(--space-2);
   justify-content: center;
@@ -568,6 +574,11 @@
     min-width: 2.5rem;
   }
 
+  .workspace-searchbar .titlebar-grab {
+    flex-basis: 1.5rem;
+    min-width: 1.5rem;
+  }
+
   .workspace-searchbar .environment-select {
     min-width: 0;
     width: 2.125rem;
@@ -666,6 +677,27 @@
 
 .environment-menu-dot.in-use {
   background: var(--s2xx);
+}
+
+.environment-menu-dot.env-colored {
+  background: var(--env-color, var(--text-3));
+}
+
+.environment-menu-dot.env-colored.in-use {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--env-color, var(--text-3)) 35%, transparent);
+}
+
+.workspace-searchbar .environment-select.env-colored {
+  background: color-mix(in srgb, var(--env-color, var(--text-3)) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--env-color, var(--text-3)) 55%, transparent);
+}
+
+.workspace-searchbar .environment-select.env-colored:hover {
+  background: color-mix(in srgb, var(--env-color, var(--text-3)) 22%, transparent);
+}
+
+.environment-select.env-colored .environment-select-icon {
+  color: var(--env-color, var(--text-3));
 }
 
 .environment-menu-dot.none {

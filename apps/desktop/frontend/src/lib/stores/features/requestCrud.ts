@@ -28,9 +28,16 @@ import type {
   SavedRequest,
 } from '../../types/models';
 import { newRequestId, requestTabLabel } from '../../utils';
+import { requestDiffersFromSavedSnapshot } from '../../manualSave';
 import type { TopView } from '../ui';
 
+export type DraftTarget = { collectionId: string; folderPath: string[] };
+
 type RequestCrudHost = {
+  draftTargets: Map<string, DraftTarget>;
+  draftBaselines: Map<string, SavedRequest>;
+  trashRequest: (request: import('../../types/models').SavedRequest, workspaceId: string) => void;
+  starredRequestIds: Set<string>;
   reviewWorkspaceEditsBeforeQuit: () => Promise<boolean>;
   unsavedRequestSnapshots: Map<string, SavedRequest>;
   activeRequest: SavedRequest | undefined;
@@ -96,6 +103,11 @@ type RequestCrudHost = {
   currentRequestName: () => string;
   defaultCollectionForWorkspace: (workspaceId?: string) => Collection | undefined;
   discardDraftRequest: (id: string) => void;
+  openNewDraft: (request: SavedRequest, target?: DraftTarget) => Promise<void>;
+  draftTarget: (draftId: string) => DraftTarget | undefined;
+  draftWasEdited: (draft: SavedRequest) => boolean;
+  forgetDraft: (draftId: string) => void;
+  settleDraft: (draftId: string) => Promise<'saved' | 'discarded' | 'cancelled'>;
   discardRequestChanges: (id: string) => Promise<void | boolean>;
   disposeRealtimeSession: (id: string) => void;
   graphQLBodyContentForStore: () => string;
@@ -184,7 +196,7 @@ export const requestCrudFeature = {
     host.dirtyRequestIdList;
     const collectionIds = new Set(host.collections.filter(collection => collection.workspaceId === host.activeWorkspaceId).map(collection => collection.id));
     const query = host.sidebarSearch.trim().toLowerCase();
-    return host.requests.filter(request => !request.isDraft && request.isPinned && collectionIds.has(request.collectionId) && requestMatchesSidebarQuery(request, query));
+    return host.requests.filter(request => !request.isDraft && host.starredRequestIds.has(request.id) && collectionIds.has(request.collectionId) && requestMatchesSidebarQuery(request, query));
   },
 
   requestsForDisplay(this: RequestCrudHost): SavedRequest[] {
@@ -321,7 +333,7 @@ export const requestCrudFeature = {
       this.requestTab = ['docs', 'body', 'auth', 'metadata', 'service', 'scripts', 'settings'].includes(this.requestTab) ? this.requestTab : 'body';
       this.bodyType = 'json';
       this.rawBodyType = 'json';
-      if (!['none', 'apikey', 'basic', 'bearer', 'oauth2'].includes(this.authType)) this.authType = 'none';
+      if (!['none', 'apikey', 'basic', 'bearer', 'jwt', 'oauth2'].includes(this.authType)) this.authType = 'none';
       this.apiKeyIn = 'header';
       if (wasGraphQL) this.bodyContent = defaultBodyContentFor('grpc');
       else if (!this.bodyContent.trim()) this.bodyContent = defaultBodyContentFor('grpc');
@@ -392,6 +404,10 @@ export const requestCrudFeature = {
     }
     const wsId = this.workspaceIdForCollection(resolved);
     if (wsId) this.activeWorkspaceId = wsId;
+    if (!this.autosave && resolved) {
+      await this.openNewDraft(this.blankSavedRequest(resolved, selectedType), { collectionId: resolved, folderPath: [] });
+      return;
+    }
     const next = this.blankSavedRequest(resolved, selectedType);
     this.requests = [...this.requests, next];
     this.openRequestIds = [...new Set([...this.openRequestIds, next.id])];
@@ -406,7 +422,13 @@ export const requestCrudFeature = {
     const selectedType = this.isRequestType(requestType) ? requestType : 'http';
     this.closeFloatingMenus();
     await this.persistActiveRequestNow();
-    const next: SavedRequest = { ...this.blankSavedRequest('', selectedType), isDraft: true, collectionId: '', collection: '' };
+    await this.openNewDraft(this.blankSavedRequest('', selectedType));
+  },
+
+  async openNewDraft(this: RequestCrudHost, request: SavedRequest, target?: DraftTarget) {
+    const next: SavedRequest = { ...request, isDraft: true, collectionId: '', collection: '' };
+    if (target) this.draftTargets.set(next.id, target);
+    this.draftBaselines.set(next.id, next);
     this.requests = [...this.requests, next];
     this.draftRequestIds = new Set([...this.draftRequestIds, next.id]);
     this.openRequestIds = [...new Set([...this.openRequestIds, next.id])];
@@ -415,9 +437,47 @@ export const requestCrudFeature = {
     await this.persistRequestStore(this.requests, next.id, this.openRequestIds);
   },
 
+  draftTarget(this: RequestCrudHost, draftId: string) {
+    const target = this.draftTargets.get(draftId);
+    return target && this.collections.some(collection => collection.id === target.collectionId && !collection.isInvalid) ? target : undefined;
+  },
+
+  draftWasEdited(this: RequestCrudHost, draft: SavedRequest) {
+    const baseline = this.draftBaselines.get(draft.id);
+    return baseline ? requestDiffersFromSavedSnapshot(draft, baseline) : this.requestHasContent(draft);
+  },
+
+  forgetDraft(this: RequestCrudHost, draftId: string) {
+    this.draftTargets.delete(draftId);
+    this.draftBaselines.delete(draftId);
+  },
+
+  async settleDraft(this: RequestCrudHost, draftId: string): Promise<'saved' | 'discarded' | 'cancelled'> {
+    const draft = this.requestsById.get(draftId);
+    if (!draft || !this.draftWasEdited(draft)) return 'discarded';
+    if (this.draftTarget(draftId)) {
+      const choice = await this.openSaveChangesDialog(requestTabLabel(draft));
+      if (choice === 'cancel') return 'cancelled';
+      if (choice === 'discard') return 'discarded';
+    }
+    const saved = await this.saveDraftToCollection(draftId);
+    if (saved === null) return 'cancelled';
+    return saved ? 'saved' : 'discarded';
+  },
+
   async saveDraftToCollection(this: RequestCrudHost, draftId: string, cancelLabel = 'Discard') {
     if (!this.guardWorkspaceWritable('Saving drafts')) return false;
     const draft = this.requestsById.get(draftId);
+    const target = this.draftTarget(draftId);
+    if (target) {
+      this.requests = this.requests.map(r => r.id === draftId ? { ...r, isDraft: false, collectionId: target.collectionId, collection: this.collectionNameById(target.collectionId), folderPath: target.folderPath } : r);
+      this.draftRequestIds = new Set([...this.draftRequestIds].filter(id => id !== draftId));
+      this.forgetDraft(draftId);
+      const saved = this.requestsById.get(draftId);
+      if (saved) this.savedRequestSnapshots.set(draftId, this.savedRequestSnapshot(saved));
+      await this.persistRequestStore();
+      return true;
+    }
     const wsCols = this.collections.filter(c => c.workspaceId === (this.activeWorkspaceId || this.workspaces[0]?.id));
     if (!wsCols.length) {
       const wsId = this.activeWorkspaceId || this.workspaces[0]?.id;
@@ -430,6 +490,7 @@ export const requestCrudFeature = {
     if (!selectedId) return selectedId;
     this.requests = this.requests.map(r => r.id === draftId ? { ...r, isDraft: false, collectionId: selectedId, collection: this.collectionNameById(selectedId) } : r);
     this.draftRequestIds = new Set([...this.draftRequestIds].filter(id => id !== draftId));
+    this.forgetDraft(draftId);
     const saved = this.requestsById.get(draftId);
     if (saved) this.savedRequestSnapshots.set(draftId, this.savedRequestSnapshot(saved));
     await this.persistRequestStore();
@@ -437,6 +498,7 @@ export const requestCrudFeature = {
   },
 
   discardDraftRequest(this: RequestCrudHost, id: string) {
+    this.forgetDraft(id);
     this.requests = this.requests.filter(r => r.id !== id);
     this.draftRequestIds = new Set([...this.draftRequestIds].filter(did => did !== id));
     this.openRequestIds = this.openRequestIds.filter(oid => oid !== id);
@@ -459,7 +521,7 @@ export const requestCrudFeature = {
   },
 
   hasUnsavedDrafts(this: RequestCrudHost) {
-    return this.openDraftRequests().some(req => this.requestHasContent(req));
+    return this.openDraftRequests().some(req => this.draftWasEdited(req));
   },
 
   hasUnsavedRequestChanges(this: RequestCrudHost) {
@@ -505,16 +567,12 @@ export const requestCrudFeature = {
         this.openRequestIds = [...new Set([...this.openRequestIds, draftId])];
         this.applySavedRequest(draft);
         this.topView = 'request';
-        if (!this.requestHasContent(draft)) {
-          this.discardDraftRequest(draftId);
-          continue;
-        }
-        const saved = await this.saveDraftToCollection(draftId);
-        if (saved === null) {
+        const outcome = await this.settleDraft(draftId);
+        if (outcome === 'cancelled') {
           await cancelQuit();
           return;
         }
-        if (saved === false) this.discardDraftRequest(draftId);
+        if (outcome === 'discarded') this.discardDraftRequest(draftId);
       }
       if (!(await this.persistRequestStore())) {
         const quitAnyway = await this.openConfirmDialog(
@@ -581,20 +639,18 @@ export const requestCrudFeature = {
       handledDirtyClose = true;
     }
     if (isDraft && force) {
+      this.forgetDraft(id);
       this.requests = this.requests.filter(r => r.id !== id);
       this.draftRequestIds = new Set([...this.draftRequestIds].filter(did => did !== id));
     } else if (isDraft) {
       if (id === this.activeRequestId) await this.persistActiveRequestNow();
-      const req = this.requestsById.get(id);
-      const hasContent = Boolean(req && this.requestHasContent(req));
-      if (hasContent) {
-        const saved = await this.saveDraftToCollection(id);
-        if (saved) {
-          await this.closeRequestTab(id, true);
-          return;
-        }
-        if (saved === null) return;
+      const outcome = await this.settleDraft(id);
+      if (outcome === 'cancelled') return;
+      if (outcome === 'saved') {
+        await this.closeRequestTab(id, true);
+        return;
       }
+      this.forgetDraft(id);
       this.requests = this.requests.filter(r => r.id !== id);
       this.draftRequestIds = new Set([...this.draftRequestIds].filter(did => did !== id));
     } else if (force && !this.autosave) {
@@ -777,8 +833,9 @@ export const requestCrudFeature = {
     const req = this.requestsById.get(id);
     if (!req) return;
     this.openRequestMenuId = '';
-    const confirmed = await this.openConfirmDialog('Delete request', `Delete "${requestTabLabel(req)}" from local storage?`);
+    const confirmed = await this.openConfirmDialog('Delete request', `Delete "${requestTabLabel(req)}"? You can restore it from Recently deleted until you quit Kurlo.`);
     if (!confirmed) return;
+    this.trashRequest(req, this.workspaceIdForCollection(req.collectionId));
     this.removeDirtyRequest(id);
     if ((req.folderPath ?? []).length) {
       this.collections = this.collections.map(collection =>
@@ -815,7 +872,10 @@ export const requestCrudFeature = {
     if (!this.guardWorkspaceWritable('Updating requests')) return;
     const req = this.requestsById.get(id);
     if (!req || req.isDraft) return;
-    this.requests = this.requests.map(r => r.id === id ? { ...r, isPinned: !r.isPinned } : r);
+    const next = new Set(this.starredRequestIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    this.starredRequestIds = next;
     this.openRequestMenuId = '';
     await this.persistRequestStore();
   },

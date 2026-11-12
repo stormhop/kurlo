@@ -30,6 +30,12 @@ const FIELD_LABELS: Record<string, string> = {
   awsAccessKey: 'AWS access key',
   awsSecretKey: 'AWS secret key',
   awsSessionToken: 'AWS session token',
+  oauth1ConsumerSecret: 'OAuth 1.0 consumer secret',
+  oauth1Token: 'OAuth 1.0 access token',
+  oauth1TokenSecret: 'OAuth 1.0 token secret',
+  oauth1PrivateKey: 'OAuth 1.0 private key',
+  jwtSecret: 'JWT signing secret',
+  jwtPrivateKey: 'JWT signing private key',
   digestPassword: 'Digest password',
   clientKeyPassword: 'Client key passphrase',
 };

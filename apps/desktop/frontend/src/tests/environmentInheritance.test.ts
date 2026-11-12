@@ -82,6 +82,7 @@ describe('environment inheritance in the store', () => {
       persistRequestStore: vi.fn().mockResolvedValue(true),
       syncBackendEnvironment: vi.fn().mockResolvedValue(undefined),
       openConfirmDialog: vi.fn().mockResolvedValue(true),
+      trashEnvironment: vi.fn(),
       topView: 'environment',
       get activeWorkspaceEnvironments() { return h.environments; },
     } as Record<string, unknown> & { environments: Environment[] };

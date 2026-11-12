@@ -407,3 +407,14 @@ func TestStripRequestForFilesystemKeepsSavedMessagesForRealtimeRequests(t *testi
 	stripRequestForFilesystem(empty)
 	assertMapMissingKeys(t, empty, []string{"savedMessages"})
 }
+
+func TestStripRequestForFilesystemDropsPersonalStar(t *testing.T) {
+	for _, pinned := range []bool{true, false} {
+		request := stripTestRequest("http", "GET", "params", "none")
+		request["isPinned"] = pinned
+		stripRequestForFilesystem(request)
+		if _, ok := request["isPinned"]; ok {
+			t.Fatalf("isPinned=%v was written to the request file", pinned)
+		}
+	}
+}

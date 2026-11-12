@@ -2,10 +2,25 @@ type YamlLine = {
   indent: number;
   text: string;
   raw: string;
+  blank?: boolean;
 };
 
-function stripComment(raw: string) {
-  let quote = '';
+type QuoteScan = {
+  quote: string;
+  escaped: boolean;
+  comment: number;
+};
+
+const BLOCK_HEADER = /^[|>][-+0-9]*$/;
+const BLOCK_HEADER_LINE = /^(?:-\s+)*(?:[^\s].*?:\s+)?(?:&\S+\s+)?[|>][-+0-9]*$/;
+
+function opensQuote(line: string, index: number) {
+  const before = line.slice(0, index).trimEnd();
+  return !before || ':-[{,?'.includes(before[before.length - 1]);
+}
+
+function scanQuotes(raw: string, openQuote: string): QuoteScan {
+  let quote = openQuote;
   let escaped = false;
   for (let i = 0; i < raw.length; i += 1) {
     const ch = raw[i];
@@ -15,41 +30,100 @@ function stripComment(raw: string) {
     }
     if (quote) {
       if (ch === '\\' && quote === '"') escaped = true;
-      else if (ch === quote) quote = '';
+      else if (ch === quote) {
+        if (quote === "'" && raw[i + 1] === "'") i += 1;
+        else quote = '';
+      }
       continue;
     }
-    if (ch === '"' || ch === "'") {
+    if ((ch === '"' || ch === "'") && opensQuote(raw, i)) {
       quote = ch;
       continue;
     }
-    if (ch === '#' && (i === 0 || /\s/.test(raw[i - 1]))) return raw.slice(0, i);
+    if (ch === '#' && (i === 0 || /\s/.test(raw[i - 1]))) return { quote, escaped, comment: i };
+  }
+  return { quote, escaped, comment: raw.length };
+}
+
+function leadingSpaces(raw: string) {
+  return raw.match(/^ */)?.[0].length ?? 0;
+}
+
+function joinQuoted(rows: string[], start: number, first: string, firstScan: QuoteScan): [string, number] | null {
+  let text = first.slice(0, firstScan.comment);
+  let scan = firstScan;
+  let cursor = start;
+  while (scan.quote) {
+    let breaks = 0;
+    cursor += 1;
+    while (cursor < rows.length && !rows[cursor].trim()) {
+      breaks += 1;
+      cursor += 1;
+    }
+    if (cursor >= rows.length) return null;
+    const next = rows[cursor].replace(/^[ \t]+/, '');
+    const separator = breaks ? '\n'.repeat(breaks) : ' ';
+    text = scan.escaped ? text.slice(0, -1) + (breaks ? separator : '') : text.trimEnd() + separator;
+    scan = scanQuotes(next, scan.quote);
+    text += next.slice(0, scan.comment);
+  }
+  return [text, cursor];
+}
+
+function preprocess(source: string): YamlLine[] {
+  const rows = source.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/);
+  const out: YamlLine[] = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    const first = rows[i].replace(/\t/g, '  ');
+    const indent = leadingSpaces(first);
+    const scan = scanQuotes(first, '');
+    let raw = first.slice(0, scan.comment);
+    if (scan.quote) {
+      const joined = joinQuoted(rows, i, first, scan);
+      if (joined) [raw, i] = joined;
+      else raw = stripUnclosed(first);
+    }
+    const text = raw.trim();
+    if (!text || text === '---' || text === '...') continue;
+    out.push({ indent, text, raw });
+    if (!BLOCK_HEADER_LINE.test(text)) continue;
+    while (i + 1 < rows.length) {
+      const row = rows[i + 1];
+      if (row.trim() && leadingSpaces(row) <= indent) break;
+      i += 1;
+      out.push(row.trim()
+        ? { indent: leadingSpaces(row), text: row.trim(), raw: row }
+        : { indent: Number.POSITIVE_INFINITY, text: '', raw: '', blank: true });
+    }
+  }
+  return out;
+}
+
+function stripUnclosed(raw: string) {
+  for (let i = 0; i < raw.length; i += 1) {
+    if (raw[i] === '#' && (i === 0 || /\s/.test(raw[i - 1]))) {
+      const quotes = raw.slice(0, i).replace(/\\./g, '').match(/"/g)?.length ?? 0;
+      if (quotes % 2 === 0) return raw.slice(0, i);
+    }
   }
   return raw;
 }
 
-function preprocess(source: string): YamlLine[] {
-  return source
-    .replace(/^\uFEFF/, '')
-    .split(/\r\n|\r|\n/)
-    .map(raw => {
-      const withoutComment = stripComment(raw).replace(/\t/g, '  ');
-      const indent = withoutComment.match(/^ */)?.[0].length ?? 0;
-      return { indent, text: withoutComment.trim(), raw: withoutComment };
-    })
-    .filter(line => line.text && line.text !== '---' && line.text !== '...');
+const ESCAPES: Record<string, string> = {
+  '0': '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b',
+  ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\x85', _: '\xa0', L: '\u2028', P: '\u2029',
+};
+
+function unescapeDoubleQuoted(body: string) {
+  return body.replace(/\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[\s\S])/g, (match, code: string) =>
+    code.length > 1 ? String.fromCodePoint(parseInt(code.slice(1), 16)) : ESCAPES[code] ?? match);
 }
 
 function unquote(value: string) {
   const text = value.trim();
-  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+  if (text.length > 1 && ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'")))) {
     const body = text.slice(1, -1);
-    if (text[0] === '"') {
-      return body
-        .replace(/\\"/g, '"')
-        .replace(/\\n/g, '\n')
-        .replace(/\\t/g, '\t')
-        .replace(/\\\\/g, '\\');
-    }
+    if (text[0] === '"') return unescapeDoubleQuoted(body);
     return body.replace(/''/g, "'");
   }
   return text;
@@ -167,30 +241,52 @@ function parseScalar(raw: string): unknown {
   if (text.startsWith('{') && text.endsWith('}')) return parseFlowObject(text);
   if (text.startsWith('[') && text.endsWith(']')) return parseFlowArray(text);
   if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) return unquote(text);
-  if (/^-?\d+(?:\.\d+)?$/.test(text)) return Number(text);
+  if (/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(text)) return Number(text);
   return text;
 }
 
 function collectBlockScalar(lines: YamlLine[], index: number, parentIndent: number, folded: boolean): [string, number] {
-  const collected: string[] = [];
   let minIndent = Number.POSITIVE_INFINITY;
   let cursor = index;
   while (cursor < lines.length && lines[cursor].indent > parentIndent) {
     minIndent = Math.min(minIndent, lines[cursor].indent);
     cursor += 1;
   }
-  cursor = index;
-  while (cursor < lines.length && lines[cursor].indent > parentIndent) {
-    collected.push(lines[cursor].raw.slice(Number.isFinite(minIndent) ? minIndent : lines[cursor].indent));
+  const collected = lines.slice(index, cursor).map(line => (line.blank ? '' : line.raw.slice(minIndent)));
+  while (collected.length && !collected[collected.length - 1]) collected.pop();
+  if (!folded) return [collected.join('\n'), cursor];
+  let text = '';
+  let breaks = 0;
+  for (const line of collected) {
+    if (!line.trim()) {
+      breaks += 1;
+      continue;
+    }
+    if (text) text += breaks ? '\n'.repeat(breaks) : ' ';
+    text += line.trim();
+    breaks = 0;
+  }
+  return [text, cursor];
+}
+
+function collectPlainScalar(lines: YamlLine[], index: number, indent: number, first: string): [unknown, number] {
+  let text = first;
+  let cursor = index;
+  while (cursor < lines.length && lines[cursor].indent > indent && !lines[cursor].blank) {
+    text += ` ${lines[cursor].text}`;
     cursor += 1;
   }
-  return [folded ? collected.map(line => line.trim()).join(' ') : collected.join('\n'), cursor];
+  return [parseScalar(text), cursor];
+}
+
+function isDash(text: string) {
+  return text === '-' || text.startsWith('- ');
 }
 
 function parseBlock(lines: YamlLine[], index: number, minIndent: number): [unknown, number] {
   if (index >= lines.length || lines[index].indent < minIndent) return [{}, index];
   const indent = lines[index].indent;
-  if (lines[index].text.startsWith('- ')) return parseSequence(lines, index, indent);
+  if (isDash(lines[index].text)) return parseSequence(lines, index, indent);
   return parseMap(lines, index, indent);
 }
 
@@ -200,7 +296,7 @@ function parseMap(lines: YamlLine[], index: number, indent: number): [Record<str
   let cursor = index;
   while (cursor < lines.length) {
     const line = lines[cursor];
-    if (line.indent < indent || line.text.startsWith('- ')) break;
+    if (line.indent < indent || isDash(line.text)) break;
     if (line.indent > indent) {
       cursor += 1;
       continue;
@@ -214,14 +310,14 @@ function parseMap(lines: YamlLine[], index: number, indent: number): [Record<str
     const [anchor, rest] = takeAnchor(restWithAnchor);
     let value: unknown;
     if (!rest) {
-      [value, cursor] = parseBlock(lines, cursor + 1, indent + 1);
-    } else if (rest === '|' || rest === '|-' || rest === '|+') {
-      [value, cursor] = collectBlockScalar(lines, cursor + 1, indent, false);
-    } else if (rest === '>' || rest === '>-' || rest === '>+') {
-      [value, cursor] = collectBlockScalar(lines, cursor + 1, indent, true);
+      const next = lines[cursor + 1];
+      [value, cursor] = next && next.indent === indent && isDash(next.text)
+        ? parseSequence(lines, cursor + 1, indent)
+        : parseBlock(lines, cursor + 1, indent + 1);
+    } else if (BLOCK_HEADER.test(rest)) {
+      [value, cursor] = collectBlockScalar(lines, cursor + 1, indent, rest[0] === '>');
     } else {
-      value = parseScalar(rest);
-      cursor += 1;
+      [value, cursor] = collectPlainScalar(lines, cursor + 1, indent, rest);
     }
     remember(anchor, value);
     if (key === '<<') merged.push(...mergeSources(value));
@@ -235,7 +331,7 @@ function parseSequence(lines: YamlLine[], index: number, indent: number): [unkno
   let cursor = index;
   while (cursor < lines.length) {
     const line = lines[cursor];
-    if (line.indent < indent || line.indent > indent || !line.text.startsWith('- ')) break;
+    if (line.indent < indent || line.indent > indent || !isDash(line.text)) break;
     const [anchor, rest] = takeAnchor(line.text.slice(2).trim());
     if (!rest) {
       const [value, next] = parseBlock(lines, cursor + 1, indent + 1);
@@ -243,38 +339,25 @@ function parseSequence(lines: YamlLine[], index: number, indent: number): [unkno
       cursor = next;
       continue;
     }
-    if (rest === '|' || rest === '|-' || rest === '|+') {
-      const [value, next] = collectBlockScalar(lines, cursor + 1, indent, false);
-      out.push(remember(anchor, value));
-      cursor = next;
-      continue;
-    }
-    if (rest === '>' || rest === '>-' || rest === '>+') {
-      const [value, next] = collectBlockScalar(lines, cursor + 1, indent, true);
+    if (BLOCK_HEADER.test(rest)) {
+      const [value, next] = collectBlockScalar(lines, cursor + 1, indent, rest[0] === '>');
       out.push(remember(anchor, value));
       cursor = next;
       continue;
     }
 
-    const pair = splitKeyValue(rest);
-    if (!pair) {
-      out.push(remember(anchor, parseScalar(rest)));
-      cursor += 1;
+    const nested = isDash(rest);
+    if (!nested && !splitKeyValue(rest)) {
+      const [value, next] = collectPlainScalar(lines, cursor + 1, indent, rest);
+      out.push(remember(anchor, value));
+      cursor = next;
       continue;
     }
 
-    let item: Record<string, unknown> = {};
-    const [extra, next] = parseBlock(lines, cursor + 1, indent + 1);
-    const extraMap = extra && typeof extra === 'object' && !Array.isArray(extra) ? extra as Record<string, unknown> : {};
-    const [valueAnchor, valueText] = takeAnchor(pair[1]);
-    const value = valueText ? remember(valueAnchor, parseScalar(valueText)) : remember(valueAnchor, extra);
-    if (pair[0] === '<<') {
-      item = Object.assign({}, ...mergeSources(value).reverse(), valueText ? extraMap : {});
-    } else if (valueText) {
-      Object.assign(item, extraMap, { [pair[0]]: value });
-    } else {
-      item[pair[0]] = value;
-    }
+    const itemIndent = indent + line.text.length - line.text.slice(1).trimStart().length;
+    lines[cursor] = { indent: itemIndent, text: rest, raw: `${' '.repeat(itemIndent)}${rest}` };
+    const [item, next] = nested ? parseSequence(lines, cursor, itemIndent) : parseMap(lines, cursor, itemIndent);
+    lines[cursor] = line;
     out.push(remember(anchor, item));
     cursor = next;
   }

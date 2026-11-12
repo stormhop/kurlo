@@ -22,12 +22,14 @@
     WorkspaceDiagnostic,
   } from '../types/models';
   import type { TopView } from '../stores/ui';
+  import { environmentColorVar } from '../environmentColors';
+  import { fileManagerLabel } from '../utils';
+  import RecentlyDeleted from './RecentlyDeleted.svelte';
   import type { LoadRunResult, LoadTest } from '../wire';
 
   type DropPlacement = 'before' | 'after';
   type CollectionSidebarRow =
     | { type: 'onboarding'; key: string; height: number }
-    | { type: 'pinned-head'; key: string; height: number; count: number; collapsed: boolean }
     | { type: 'request'; key: string; height: number; req: SavedRequest; depth: number; menuKey: string }
     | { type: 'collection'; key: string; height: number; group: CollectionGroup }
     | { type: 'collection-empty'; key: string; height: number; collectionId: string; depth: number }
@@ -47,13 +49,13 @@
   const COLLECTION_ROW_HEIGHT = 28;
   const LOADTEST_ROW_HEIGHT = 28;
   const FOLDER_ROW_HEIGHT = 30;
-  const PINNED_HEAD_HEIGHT = 24;
   const EMPTY_ROW_HEIGHT = 58;
   const FOLDER_EMPTY_ROW_HEIGHT = 124;
   const ONBOARDING_ROW_HEIGHT = 210;
   const ENVIRONMENT_ROW_HEIGHT = 46;
   const ENVIRONMENT_NONE_ROW_HEIGHT = 46;
   const PINNED_REQUEST_DEPTH = -1;
+  const STARRED_COLLAPSED_KEY = 'kurlo.sidebar.starredCollapsed.v1';
   const COLLECTION_CHILD_DEPTH = 0;
   const VIRTUAL_OVERSCAN = 8 * ROW_HEIGHT;
 
@@ -67,6 +69,7 @@
     collectionGroups,
     historyGroups,
     pinnedRequests,
+    starredRequestIds,
     activeWorkspaceEnvironments,
     openCollectionMenuId,
     openRequestMenuId,
@@ -89,6 +92,7 @@
     renameRequest,
     duplicateRequest,
     copyRequestCurl,
+    revealInFileManager,
     toggleRequestPinned,
     deleteRequest,
     toggleFolderCollapsed,
@@ -148,6 +152,7 @@
     collectionGroups: CollectionGroup[];
     historyGroups: HistoryDayGroup[];
     pinnedRequests: SavedRequest[];
+    starredRequestIds: Set<string>;
     activeWorkspaceEnvironments: Environment[];
     openCollectionMenuId: string;
     openRequestMenuId: string;
@@ -170,6 +175,7 @@
     renameRequest: (id: string, name?: string) => void | Promise<void>;
     duplicateRequest: (id: string) => void;
     copyRequestCurl: (id: string) => void;
+    revealInFileManager?: (kind: 'request' | 'collection', id: string) => void;
     toggleRequestPinned: (id: string) => void;
     deleteRequest: (id: string) => void;
     toggleFolderCollapsed: (collectionId: string, path: string[]) => void;
@@ -270,7 +276,47 @@
   let collectionViewportHeight = $state(0);
   let historyViewportHeight = $state(0);
   let environmentViewportHeight = $state(0);
-  let pinnedCollapsed = $state(false);
+  let pinnedCollapsed = $state(readStarredCollapsed());
+  let starredListEl = $state<HTMLElement | undefined>();
+  let starredScrollTop = $state(0);
+  let starredViewportHeight = $state(0);
+  let starredScrollRaf = 0;
+  const starredRowHeights = new SvelteMap<string, number>();
+  let starredExpanded = $derived(!pinnedCollapsed || Boolean(sidebarSearch.trim()));
+  let starredRows = $derived(pinnedRequests.map(req => ({ key: `pinned:${req.id}`, height: REQUEST_ROW_HEIGHT, req })));
+  let visibleStarredRows = $derived(virtualizeRows(starredRows, starredScrollTop, starredViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, starredRowHeights, $uiScale));
+
+  function readStarredCollapsed(): boolean {
+    try {
+      return localStorage.getItem(STARRED_COLLAPSED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function toggleStarredCollapsed() {
+    pinnedCollapsed = !pinnedCollapsed;
+    try {
+      if (pinnedCollapsed) localStorage.setItem(STARRED_COLLAPSED_KEY, '1');
+      else localStorage.removeItem(STARRED_COLLAPSED_KEY);
+    } catch {
+      return;
+    }
+  }
+
+  function syncStarredViewport() {
+    if (!starredListEl) return;
+    starredScrollTop = starredListEl.scrollTop;
+    starredViewportHeight = starredListEl.clientHeight;
+  }
+
+  function onStarredScroll() {
+    if (starredScrollRaf) return;
+    starredScrollRaf = requestAnimationFrame(() => {
+      starredScrollRaf = 0;
+      syncStarredViewport();
+    });
+  }
 
   const collectionRowHeights = new SvelteMap<string, number>();
   let collectionRows = $derived(buildCollectionRows());
@@ -299,18 +345,28 @@
     collectionRows.length;
     historyRows.length;
     environmentRows.length;
+    starredRows.length;
+    starredExpanded;
     requestAnimationFrame(() => {
+      syncStarredViewport();
       syncCollectionViewport();
       syncHistoryViewport();
       syncEnvironmentViewport();
     });
   });
 
-  function measureRow(node: HTMLElement, key: string) {
+  function rowMeasurer(heights: SvelteMap<string, number>) {
+    return (node: HTMLElement, key: string) => measureRowInto(heights, node, key);
+  }
+
+  const measureRow = rowMeasurer(collectionRowHeights);
+  const measureStarredRow = rowMeasurer(starredRowHeights);
+
+  function measureRowInto(heights: SvelteMap<string, number>, node: HTMLElement, key: string) {
     let currentKey = key;
     const report = () => {
       const h = node.getBoundingClientRect().height;
-      if (h > 0 && collectionRowHeights.get(currentKey) !== h) collectionRowHeights.set(currentKey, h);
+      if (h > 0 && heights.get(currentKey) !== h) heights.set(currentKey, h);
     };
     report();
     const observer = new ResizeObserver(report);
@@ -423,12 +479,6 @@
     const hasSearch = Boolean(sidebarSearch.trim());
     if (!collectionGroups.length && !pinnedRequests.length && !hasSearch) {
       rows.push({ type: 'onboarding', key: 'onboarding', height: ONBOARDING_ROW_HEIGHT });
-    }
-    if (pinnedRequests.length) {
-      rows.push({ type: 'pinned-head', key: 'pinned-head', height: PINNED_HEAD_HEIGHT, count: pinnedRequests.length, collapsed: pinnedCollapsed && !hasSearch });
-      if (!pinnedCollapsed || hasSearch) {
-        for (const req of pinnedRequests) rows.push({ type: 'request', key: `pinned:${req.id}`, height: REQUEST_ROW_HEIGHT, req, depth: PINNED_REQUEST_DEPTH, menuKey: `pinned:${req.id}` });
-      }
     }
     for (const group of collectionGroups) {
       rows.push({ type: 'collection', key: `collection:${group.collection.id}`, height: COLLECTION_ROW_HEIGHT, group });
@@ -654,9 +704,59 @@
         </svg>
         <input bind:this={sidebarSearchInput} bind:value={sidebarSearch} placeholder="Filter requests" aria-label="Filter requests" spellcheck="false" disabled={workspaceBlocked} />
       </div>
+      {#if pinnedRequests.length}
+        <section class="starred-section" aria-label="Starred requests">
+          <button
+            class="pinned-head"
+            class:collapsed={!starredExpanded}
+            type="button"
+            onclick={toggleStarredCollapsed}
+            aria-expanded={starredExpanded}
+          >
+            <svg class:collapsed={!starredExpanded} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+              <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Starred</span>
+            <span class="collection-count">{pinnedRequests.length}</span>
+          </button>
+          {#if starredExpanded}
+            <div class="starred-list" role="list" bind:this={starredListEl} use:trackViewport={syncStarredViewport} onscroll={onStarredScroll}>
+              <div class="sidebar-virtual-spacer" style={`height: ${visibleStarredRows.before}px`}></div>
+              {#each visibleStarredRows.rows as row (row.key)}
+                <div class="sidebar-vrow" role="listitem" use:measureStarredRow={row.key}>
+                  <SidebarRequestRow
+                    req={row.req}
+                    depth={PINNED_REQUEST_DEPTH}
+                    menuKey={row.key}
+                    {activeRequestId}
+                    {topView}
+                    {openRequestMenuId}
+                    {requestTabLabel}
+                    {switchRequest}
+                    {toggleRequestMenu}
+                    {renameRequest}
+                    {duplicateRequest}
+                    {copyRequestCurl}
+                    {revealInFileManager}
+                    {createLoadTestFromRequest}
+                    {toggleRequestPinned}
+                    {deleteRequest}
+                    {openWorkspaceDiagnostic}
+                    starred
+                    floatingMenu
+                    disabled={workspaceBlocked}
+                  />
+                </div>
+              {/each}
+              <div class="sidebar-virtual-spacer" style={`height: ${visibleStarredRows.after}px`}></div>
+            </div>
+          {/if}
+        </section>
+      {/if}
       <div class="collections-head">
         <span>Collections</span>
         <div class="collections-head-actions">
+          <RecentlyDeleted kinds={['request', 'folder', 'collection']} disabled={workspaceBlocked} />
           <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={openPostmanImport} aria-label="Import collection" disabled={workspaceBlocked}>
             <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1.5v6M4 5l2.5 2.5L9 5M2 9.5v1.2c0 .4.3.8.8.8h7.4c.5 0 .8-.4.8-.8V9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
@@ -679,20 +779,6 @@
                 <button class="btn btn-secondary" type="button" onclick={openPostmanImport} disabled={workspaceBlocked}>Import collection</button>
               </div>
             </div>
-          {:else if row.type === 'pinned-head'}
-            <button
-              class="pinned-head"
-              class:collapsed={row.collapsed}
-              type="button"
-              onclick={() => (pinnedCollapsed = !pinnedCollapsed)}
-              aria-expanded={!row.collapsed}
-            >
-              <svg class:collapsed={row.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-              <span>Starred</span>
-              <span class="collection-count">{row.count}</span>
-            </button>
           {:else if row.type === 'request'}
             <SidebarRequestRow
               req={row.req}
@@ -707,10 +793,12 @@
               {renameRequest}
               {duplicateRequest}
               {copyRequestCurl}
+              {revealInFileManager}
               {createLoadTestFromRequest}
               {toggleRequestPinned}
               {deleteRequest}
               {openWorkspaceDiagnostic}
+              starred={starredRequestIds.has(row.req.id)}
               disabled={workspaceBlocked}
             />
           {:else if row.type === 'collection'}
@@ -791,6 +879,7 @@
                     <button class="menu-item" type="button" onclick={() => renameCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                     <button class="menu-item" type="button" onclick={() => openFindReplace(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
                     <button class="menu-item" type="button" onclick={() => exportCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="export" />Export…</button>
+                    {#if revealInFileManager && fileManagerLabel()}<button class="menu-item" type="button" onclick={() => revealInFileManager('collection', row.group.collection.id)}><MenuIcon name="open" />{fileManagerLabel()}</button>{/if}
                     <div class="menu-separator" role="separator"></div>
                     <button class="menu-item danger" type="button" onclick={() => deleteCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete collection</button>
                   </div>
@@ -1016,7 +1105,10 @@
     <div class="environment-panel">
       <div class="collections-head">
         <span>Environments</span>
-        <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createEnvironment} aria-label="New environment" disabled={workspaceBlocked}><AddCloseIcon add /></button>
+        <div class="collections-head-actions">
+          <RecentlyDeleted kinds={['environment']} disabled={workspaceBlocked} />
+          <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createEnvironment} aria-label="New environment" disabled={workspaceBlocked}><AddCloseIcon add /></button>
+        </div>
       </div>
       <button class="environment-globals-item" class:active={topView === 'globals'} type="button" onclick={openGlobals} disabled={workspaceBlocked}>
         <span class="environment-dot environment-dot--globals" aria-hidden="true"></span>
@@ -1041,7 +1133,7 @@
               <div class="environment-item" class:active={row.environment.id === activeEnvironmentId}>
                 {#if editingEnvironmentId === row.environment.id}
                 <div class="environment-item-main">
-                  <span class="environment-dot" aria-hidden="true"></span>
+                  <span class="environment-dot" class:env-colored={Boolean(row.environment.color)} style:--env-color={environmentColorVar(row.environment)} aria-hidden="true"></span>
                   <span class="environment-item-text">
                     <input class="sidebar-request-title-input" maxlength={NAME_MAX_LENGTH} bind:this={editingEnvironmentInput} bind:value={editingEnvironmentName} aria-label="Sidebar environment name" spellcheck="false" onblur={commitEnvironmentRename} onkeydown={onEnvironmentNameKeydown} />
                     <small>{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}</small>
@@ -1049,7 +1141,7 @@
                 </div>
                 {:else}
                 <button class="environment-item-main" type="button" onclick={(event) => { if (event.detail < 2) openEnvironment(row.environment.id); }} ondblclick={() => startEnvironmentRename(row.environment)} onkeydown={(event) => { if (event.key === 'F2' && !event.repeat) { event.preventDefault(); event.stopPropagation(); startEnvironmentRename(row.environment); } }} disabled={workspaceBlocked}>
-                  <span class="environment-dot" aria-hidden="true"></span>
+                  <span class="environment-dot" class:env-colored={Boolean(row.environment.color)} style:--env-color={environmentColorVar(row.environment)} aria-hidden="true"></span>
                   <span class="environment-item-text">
                     <span>{row.environment.name}</span>
                     <small>{row.environment.id === activeEnvironmentId ? 'In use · ' : ''}{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}{#if row.environment.parentId && activeWorkspaceEnvironments.some(candidate => candidate.id === row.environment.parentId)}{` · inherits ${activeWorkspaceEnvironments.find(candidate => candidate.id === row.environment.parentId)?.name}`}{/if}</small>

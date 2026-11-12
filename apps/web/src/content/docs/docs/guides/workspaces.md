@@ -67,6 +67,7 @@ The `⋯` button next to a collection reveals:
 - **Run collection** — opens the [Collection Runner](/docs/guides/collection-runner/) with every runnable request inside. Useful for smoke-testing a whole API surface in order.
 - **Rename** — opens the same inline editor as double-click.
 - **Export collection** — writes a Postman, OpenAPI, or OpenCollection export to a file of your choice.
+- **Show in Finder** / **Show in Explorer** — shows the collection's folder in the workspace on disk, so you can see its YAML files or open them in another editor. On Linux it is **Show in file manager**.
 - **Delete** — destroys the collection and **everything inside it**. Asks for confirmation.
 
 ### Drag-and-drop reorder
@@ -112,6 +113,10 @@ A request is the leaf of the tree. Each request has its own URL, method, headers
 - Workspace overview → *Start* → **New request**
 - Drafts: **+** after the open tabs, then pick the request type. Drafts live in a special "scratch" area until you save them to a collection.
 
+With manual saving, a request added from a collection or folder starts as a draft too, marked with a dot on its tab. It already uses the headers, auth, scripts and variables of that collection and folder, and **Save** puts it there without asking where. With autosave on, it is saved straight away.
+
+Closing a draft asks whether to save it only when you have changed it since it opened. An untouched draft, like an empty tab from **+**, closes without asking.
+
 ### Docs
 
 The **Docs** tab of a request is written in Markdown: headings, **bold**, `code`, lists, task lists, tables, quotes, links and images. **Edit** shows the text on the left and a live preview on the right; **Preview** shows the rendered page, followed by a reference Kurlo builds from the request itself: the method and URL, the auth type, and the enabled path variables, query params, headers and body, with the description you gave each row. Links open in your browser, and secret values are masked. A request without docs opens in **Edit**; `Esc` goes back to the preview.
@@ -124,8 +129,9 @@ Right-click (or click the `⋯` button on hover) on any request to reveal:
 
 - **Rename** — inline rename; double-click the title also works
 - **Duplicate** — clones the request, including auth/headers/body/scripts
-- **Star** / **Unstar** — pins the request to the *Starred* group at the top of the sidebar. Star count appears in the workspace header.
+- **Star** / **Unstar** — adds the request to the *Starred* group at the top of the sidebar, or removes it.
 - **Copy cURL** — copies a runnable `curl` command. Variables stay as `{{name}}` placeholders so the export doesn't leak secrets.
+- **Show in Finder** / **Show in Explorer** — opens the folder that holds the request's YAML file with the file selected. On Linux it is **Show in file manager**: file managers that support it, such as Files (Nautilus), Dolphin, Thunar, Nemo and Caja, select the file too, and others open its folder. Unsaved drafts have no file yet, so they do not offer it.
 - **Delete** — asks for confirmation, then removes the request. If you deleted the only open tab, Kurlo switches to the workspace overview.
 
 ### Drag-and-drop between collections
@@ -138,7 +144,17 @@ You can't drag requests into a folder that's reached the 50-request cap — Kurl
 
 Use **Star** to mark requests you reach for often. Starred requests appear in their own group at the top of the sidebar, **above all collections**, regardless of which collection they live in. Unstar from the same menu to remove them from the favourites group (the request itself stays in its collection).
 
-The Starred group only appears when at least one request is starred and can be collapsed like a collection section.
+The Starred group only appears when at least one request is starred. It shows up to ten requests and scrolls within that space, so the collections below stay in view however many requests you star. Click the *Starred* header to collapse the group; Kurlo remembers that across restarts.
+
+Stars are personal. They are kept in your local workspace data, not in the request files, so they are not committed to Git and teammates do not see them. Stars saved in request files by Kurlo 3.0.4 and earlier are picked up the first time you open the workspace, and the old `isPinned` field is removed from each file the next time it is saved.
+
+## Restoring deleted items
+
+Deleting a request, folder, collection or environment shows a message with **Undo** for a few seconds. Undo puts it back where it was, with the same requests, folders, folder defaults and order; a restored environment gets back its child environments and the collections it was pinned to.
+
+After the message is gone, the trash button appears in the **Collections** header (requests, folders and collections) or the **Environments** header (environments). It lists the last 20 deletions of the current workspace, newest first; click one to restore it, or choose **Clear list** to forget them. A request or folder whose collection was deleted too can be restored once the collection is back.
+
+The list lives only while Kurlo is open: after you quit, deleted items are gone from Kurlo. In a [Git workspace](/docs/guides/git-workspaces/) you can still get the files back from Git until you commit the deletion. Deleting a workspace is not covered.
 
 ## Search
 

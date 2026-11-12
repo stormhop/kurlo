@@ -1,5 +1,5 @@
-import type { KVRow, BodyType, AuthType, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
-import { mkRow } from './constants';
+import type { KVRow, BodyType, AuthType, JwtAddTo, JwtAlgorithm, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
+import { JWT_ALGORITHMS, mkRow } from './constants';
 import { clipboardSet } from './backend';
 
 export function clamp(value: number, min: number, max: number) {
@@ -325,6 +325,7 @@ export function emptyAuthState() {
     oauth2AssertionAlgorithm: '', oauth2AssertionPrivateKey: '', oauth2AssertionKeyID: '', oauth2AssertionAudience: '',
     awsAccessKey: '', awsSecretKey: '', awsSessionToken: '', awsRegion: 'us-east-1', awsService: 'execute-api',
     ...oauth1AuthFields(oauth1FieldsFromAuth({})),
+    ...jwtAuthFields(jwtFieldsFromAuth({})),
   };
 }
 
@@ -370,6 +371,44 @@ export function oauth1ConfigFields(auth: SavedRequest['auth'], resolve: (value: 
   };
 }
 
+export type JwtFields = {
+  algorithm: JwtAlgorithm; secret: string; secretBase64: boolean; privateKey: string;
+  payload: string; headers: string; expiresIn: string;
+  addTo: JwtAddTo; headerPrefix: string; queryParam: string;
+};
+
+export function jwtAlgorithmUsesSecret(algorithm: string | undefined) {
+  return !algorithm || algorithm.toUpperCase().startsWith('HS');
+}
+
+export function jwtFieldsFromAuth(auth: Partial<SavedRequest['auth']>): JwtFields {
+  const algorithm = (auth.jwtAlgorithm ?? '').toUpperCase() as JwtAlgorithm;
+  return {
+    algorithm: JWT_ALGORITHMS.includes(algorithm) ? algorithm : 'HS256',
+    secret: auth.jwtSecret ?? '', secretBase64: auth.jwtSecretBase64 ?? false, privateKey: auth.jwtPrivateKey ?? '',
+    payload: auth.jwtPayload ?? '', headers: auth.jwtHeaders ?? '', expiresIn: auth.jwtExpiresIn ?? '',
+    addTo: auth.jwtAddTo === 'query' ? 'query' : 'header',
+    headerPrefix: auth.jwtHeaderPrefix || 'Bearer', queryParam: auth.jwtQueryParam || 'token',
+  };
+}
+
+export function jwtAuthFields(fields: JwtFields): Partial<SavedRequest['auth']> {
+  return {
+    jwtAlgorithm: fields.algorithm, jwtSecret: fields.secret, jwtSecretBase64: fields.secretBase64, jwtPrivateKey: fields.privateKey,
+    jwtPayload: fields.payload, jwtHeaders: fields.headers, jwtExpiresIn: fields.expiresIn,
+    jwtAddTo: fields.addTo, jwtHeaderPrefix: fields.headerPrefix, jwtQueryParam: fields.queryParam,
+  };
+}
+
+export function jwtConfigFields(auth: SavedRequest['auth'], resolve: (value: string) => string) {
+  const fields = jwtFieldsFromAuth(auth);
+  return {
+    jwtAlgorithm: fields.algorithm, jwtSecret: resolve(fields.secret), jwtSecretBase64: fields.secretBase64, jwtPrivateKey: resolve(fields.privateKey),
+    jwtPayload: resolve(fields.payload), jwtHeaders: resolve(fields.headers), jwtExpiresIn: resolve(fields.expiresIn),
+    jwtAddTo: fields.addTo, jwtHeaderPrefix: resolve(fields.headerPrefix), jwtQueryParam: resolve(fields.queryParam),
+  };
+}
+
 export function inheritAuthState() {
   return { ...emptyAuthState(), type: 'inherit' as AuthType };
 }
@@ -390,6 +429,11 @@ export function authStateHasData(auth: SavedRequest['auth'], type: AuthType = au
   if (type === 'oauth1') {
     const fields = oauth1FieldsFromAuth(auth);
     return has(fields.consumerKey, fields.consumerSecret, fields.token, fields.tokenSecret, fields.privateKey, fields.realm, fields.callback, fields.verifier);
+  }
+  if (type === 'jwt') {
+    const fields = jwtFieldsFromAuth(auth);
+    return has(fields.secret, fields.privateKey, fields.payload, fields.headers, fields.expiresIn)
+      || fields.algorithm !== 'HS256' || fields.addTo !== 'header' || fields.headerPrefix !== 'Bearer' || fields.queryParam !== 'token' || fields.secretBase64;
   }
   if (type === 'aws') {
     return has(auth.awsAccessKey, auth.awsSecretKey, auth.awsSessionToken ?? '') || auth.awsRegion.trim() !== 'us-east-1' || auth.awsService.trim() !== 'execute-api';
@@ -439,4 +483,11 @@ export async function clipboardCopy(text: string) {
   } catch {
     await clipboardSet(text);
   }
+}
+
+export function fileManagerLabel(platform = typeof document === 'undefined' ? '' : document.documentElement.dataset.platform ?? '') {
+  if (platform === 'darwin') return 'Show in Finder';
+  if (platform === 'windows') return 'Show in Explorer';
+  if (platform === 'linux') return 'Show in file manager';
+  return '';
 }

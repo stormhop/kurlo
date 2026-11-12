@@ -1,7 +1,8 @@
 import { chooseEnvFileToImport, getEnvironment, setEnvironment } from '../../backend';
 import { makeEnvironment } from '../../normalizers';
 import { mkRow, clampName } from '../../constants';
-import type { Collection, Environment, KVRow, SidebarView, Workspace } from '../../types/models';
+import type { Collection, Environment, EnvironmentColor, KVRow, SidebarView, Workspace } from '../../types/models';
+import { normalizeEnvironmentColor } from '../../environmentColors';
 import { environmentForCollectionEntry, pinnedEnvironments, withoutPinnedEnvironment } from '../../collectionEnvironments';
 import type { VariableSuggestion } from '../../variables';
 import { variableTemplate } from '../../variables';
@@ -48,6 +49,7 @@ export function readEnvironmentView(): EnvironmentView {
 const VARIABLE_RESOLUTION_DEPTH = 20;
 
 type EnvironmentHost = {
+  trashEnvironment: (environment: import('../../types/models').Environment) => void;
   activeEnvironmentId: string;
   activeWorkspaceId: string;
   autosave: boolean;
@@ -280,6 +282,16 @@ export const environmentFeature = {
     });
     await this.persistRequestStore();
   },
+  async setEnvironmentColor(this: EnvironmentHost, environmentId: string, color: EnvironmentColor | '') {
+    if (!this.guardWorkspaceWritable('Environment changes')) return;
+    const next = normalizeEnvironmentColor(color);
+    this.changeEnvironmentsEverywhere(candidate => {
+      if (candidate.id !== environmentId) return candidate;
+      const { color: _previous, ...rest } = candidate;
+      return next ? { ...rest, color: next } : rest;
+    });
+    await this.persistRequestStore();
+  },
   async setEnvironmentParent(this: EnvironmentHost, environmentId: string, parentId: string) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
     const environment = this.environments.find(candidate => candidate.id === environmentId);
@@ -302,8 +314,9 @@ export const environmentFeature = {
     const childNote = children.length
       ? ` ${children.map(child => child.name).join(', ')} ${children.length === 1 ? 'inherits' : 'inherit'} from it and will ${grandparent ? `inherit from ${grandparent.name} instead` : 'keep only the values set there'}.`
       : '';
-    const confirmed = await this.openConfirmDialog('Delete environment', `Delete "${environment.name}" from this workspace?${childNote}`);
+    const confirmed = await this.openConfirmDialog('Delete environment', `Delete "${environment.name}" from this workspace?${childNote} You can restore it from Recently deleted until you quit Kurlo.`);
     if (!confirmed) return;
+    this.trashEnvironment(environment);
     const baselines = new Map(this.environmentBaselines);
     baselines.delete(environmentId);
     this.environmentBaselines = baselines;

@@ -88,7 +88,7 @@ func buildClientAssertion(clientID, audience, algorithm, keyID, secret, privateK
 	}
 	key, inferred, err := parsePrivateKeyPEM(privateKeyPEM)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("oauth2: %w", err)
 	}
 	if algorithm == "" {
 		algorithm = inferred
@@ -99,10 +99,10 @@ func buildClientAssertion(clientID, audience, algorithm, keyID, secret, privateK
 func parsePrivateKeyPEM(pemData string) (crypto.PrivateKey, string, error) {
 	block, _ := pem.Decode([]byte(strings.TrimSpace(pemData)))
 	if block == nil {
-		return nil, "", fmt.Errorf("oauth2: private key is not valid PEM")
+		return nil, "", fmt.Errorf("private key is not valid PEM")
 	}
 	if strings.Contains(block.Type, "ENCRYPTED") {
-		return nil, "", fmt.Errorf("oauth2: encrypted private keys are not supported — decrypt the key first")
+		return nil, "", fmt.Errorf("encrypted private keys are not supported — decrypt the key first")
 	}
 
 	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
@@ -113,7 +113,7 @@ func parsePrivateKeyPEM(pemData string) (crypto.PrivateKey, string, error) {
 	}
 	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		return nil, "", fmt.Errorf("oauth2: could not parse private key: %w", err)
+		return nil, "", fmt.Errorf("could not parse private key: %w", err)
 	}
 	switch key := parsed.(type) {
 	case *rsa.PrivateKey:
@@ -121,7 +121,7 @@ func parsePrivateKeyPEM(pemData string) (crypto.PrivateKey, string, error) {
 	case *ecdsa.PrivateKey:
 		return key, ecdsaAlgorithm(key), nil
 	default:
-		return nil, "", fmt.Errorf("oauth2: unsupported private key type %T (RSA and ECDSA are supported)", parsed)
+		return nil, "", fmt.Errorf("unsupported private key type %T (RSA and ECDSA are supported)", parsed)
 	}
 }
 
@@ -141,6 +141,14 @@ func signJWT(claims map[string]any, algorithm, keyID string, hmacKey []byte, sig
 	if keyID != "" {
 		header["kid"] = keyID
 	}
+	token, err := signJWTWithHeader(header, claims, algorithm, hmacKey, signer)
+	if err != nil {
+		return "", fmt.Errorf("oauth2: %w", err)
+	}
+	return token, nil
+}
+
+func signJWTWithHeader(header, claims map[string]any, algorithm string, hmacKey []byte, signer crypto.PrivateKey) (string, error) {
 	headerJSON, err := json.Marshal(header)
 	if err != nil {
 		return "", err
@@ -163,7 +171,7 @@ func signJWT(claims map[string]any, algorithm, keyID string, hmacKey []byte, sig
 	switch {
 	case strings.HasPrefix(algorithm, "HS"):
 		if len(hmacKey) == 0 {
-			return "", fmt.Errorf("oauth2: algorithm %s requires a shared secret", algorithm)
+			return "", fmt.Errorf("algorithm %s requires a shared secret", algorithm)
 		}
 		mac := hmac.New(newHash, hmacKey)
 		mac.Write([]byte(signingInput))
@@ -171,34 +179,34 @@ func signJWT(claims map[string]any, algorithm, keyID string, hmacKey []byte, sig
 	case strings.HasPrefix(algorithm, "RS"):
 		key, ok := signer.(*rsa.PrivateKey)
 		if !ok {
-			return "", fmt.Errorf("oauth2: algorithm %s requires an RSA private key", algorithm)
+			return "", fmt.Errorf("algorithm %s requires an RSA private key", algorithm)
 		}
 		signature, err = rsa.SignPKCS1v15(rand.Reader, key, cryptoHash, digest)
 		if err != nil {
-			return "", fmt.Errorf("oauth2: failed to sign assertion: %w", err)
+			return "", fmt.Errorf("failed to sign token: %w", err)
 		}
 	case strings.HasPrefix(algorithm, "PS"):
 		key, ok := signer.(*rsa.PrivateKey)
 		if !ok {
-			return "", fmt.Errorf("oauth2: algorithm %s requires an RSA private key", algorithm)
+			return "", fmt.Errorf("algorithm %s requires an RSA private key", algorithm)
 		}
 		signature, err = rsa.SignPSS(rand.Reader, key, cryptoHash, digest, &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash, Hash: cryptoHash})
 		if err != nil {
-			return "", fmt.Errorf("oauth2: failed to sign assertion: %w", err)
+			return "", fmt.Errorf("failed to sign token: %w", err)
 		}
 	case strings.HasPrefix(algorithm, "ES"):
 		key, ok := signer.(*ecdsa.PrivateKey)
 		if !ok {
-			return "", fmt.Errorf("oauth2: algorithm %s requires an ECDSA private key", algorithm)
+			return "", fmt.Errorf("algorithm %s requires an ECDSA private key", algorithm)
 		}
 		r, s, signErr := ecdsa.Sign(rand.Reader, key, digest)
 		if signErr != nil {
-			return "", fmt.Errorf("oauth2: failed to sign assertion: %w", signErr)
+			return "", fmt.Errorf("failed to sign token: %w", signErr)
 		}
 		byteLen := (key.Curve.Params().BitSize + 7) / 8
 		signature = append(padBigInt(r, byteLen), padBigInt(s, byteLen)...)
 	default:
-		return "", fmt.Errorf("oauth2: unsupported assertion algorithm %q", algorithm)
+		return "", fmt.Errorf("unsupported signing algorithm %q", algorithm)
 	}
 
 	return signingInput + "." + base64.RawURLEncoding.EncodeToString(signature), nil
@@ -213,7 +221,7 @@ func jwtHash(algorithm string) (func() hash.Hash, crypto.Hash, error) {
 	case strings.HasSuffix(algorithm, "512"):
 		return sha512.New, crypto.SHA512, nil
 	default:
-		return nil, 0, fmt.Errorf("oauth2: unsupported assertion algorithm %q", algorithm)
+		return nil, 0, fmt.Errorf("unsupported signing algorithm %q", algorithm)
 	}
 }
 

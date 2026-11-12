@@ -19,9 +19,11 @@ import {
 import { emptyCollectionDefaults, normalizeCollectionDefaults, normalizeFolderDefaultsList, normalizeRequestSettingsOverrides } from './collectionDefaults';
 import { normalizeRequestExamples } from './examples';
 import { normalizeSavedMessages } from './savedMessages';
+import { normalizeAssertions, requestTypeSupportsAssertions } from './assertions';
 import { normalizeLoadTests } from './loadTests';
 import { normalizeCollectionFolderPaths } from './collections';
 import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
+import { normalizeEnvironmentColor } from './environmentColors';
 import { defaultSocketIOArgs, requestBodyDefaultsFor } from './requestBodyDefaults';
 import {
     asText,
@@ -70,8 +72,8 @@ const REQUEST_FIELDS: FieldTypes = {
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
         'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId',
     ],
-    booleans: ['nameAuto', 'isDraft', 'isPinned', 'sioAck', 'grpcUseReflection', 'aiStream', 'aiKurloTools'],
-    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'savedMessages', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
+    booleans: ['nameAuto', 'isDraft', 'sioAck', 'grpcUseReflection', 'aiStream', 'aiKurloTools'],
+    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'savedMessages', 'assertions', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
 
@@ -184,6 +186,7 @@ export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: str
     const input = sanitizeFields(raw, { strings: [...ENTITY_STRINGS, 'parentId'], booleans: ['protected', 'sandbox'], arrays: ['values'] });
     const id = input.id || newEntityId('environment');
     const parentId = input.parentId?.trim() ?? '';
+    const color = normalizeEnvironmentColor(input.color);
     const name = input.name || 'Local';
     return {
         id,
@@ -194,6 +197,7 @@ export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: str
         ...(input.protected ? { protected: true } : {}),
         ...(input.sandbox ? { sandbox: true } : {}),
         ...(parentId && parentId !== id ? { parentId } : {}),
+        ...(color ? { color } : {}),
     };
 }
 
@@ -264,7 +268,6 @@ export function normalizeSavedRequest(
         nameAuto: input.nameAuto ?? false,
         requestType: normalizedRequestType,
         isDraft,
-        isPinned: input.isPinned ?? false,
         collectionId,
         collection: isDraft ? '' : input.collection || collectionName,
         folderPath,
@@ -294,6 +297,7 @@ export function normalizeSavedRequest(
         sioArgs: normalizeSioArgs(input.sioArgs),
         sioAck: input.sioAck ?? false,
         savedMessages: normalizeSavedMessages(input.savedMessages, normalizedRequestType),
+        ...(requestTypeSupportsAssertions(normalizedRequestType) && Array.isArray(input.assertions) && input.assertions.length ? { assertions: normalizeAssertions(input.assertions) } : {}),
         grpcMethod: input.grpcMethod || '',
         grpcMetadata: cloneRowsForStore(input.grpcMetadata ?? []),
         grpcUseReflection: settings.grpcUseReflection,

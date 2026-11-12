@@ -1,5 +1,6 @@
-import type { KVRow, SavedRequest, CollectionDefaults, Environment, FolderDefaults, AuthType, BodyType, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SIOArg } from './types/models';
-import { DEFAULT_REQUEST_SETTINGS } from './constants';
+import type { KVRow, SavedRequest, CollectionDefaults, Environment, FolderDefaults, AuthType, BodyType, JwtAlgorithm, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SIOArg } from './types/models';
+import { DEFAULT_REQUEST_SETTINGS, JWT_ALGORITHMS } from './constants';
+import { assertionsToPostmanScript, assertionsWithoutUiIds, normalizeAssertions, requestTypeSupportsAssertions, type AssertionRow } from './assertions';
 import { isRecord, asArray, asText, newRequestId } from './utils';
 import { mkRow } from './constants';
 import { emptyAuthState, inheritAuthState } from './utils';
@@ -53,6 +54,14 @@ function joinScripts(first: string, second: string): string {
   if (!first.trim()) return second;
   if (!second.trim()) return first;
   return `${first.replace(/\s+$/, '')}\n\n${second}`;
+}
+
+function withoutGeneratedAssertions(scripts: PostmanScripts, assertions: AssertionRow[]): PostmanScripts {
+  const generated = assertionsToPostmanScript(assertions);
+  if (!generated) return scripts;
+  const test = scripts.testScript.replace(/\s+$/, '');
+  if (!test.endsWith(generated)) return scripts;
+  return { ...scripts, testScript: test.slice(0, test.length - generated.length).replace(/\s+$/, '') };
 }
 
 function mergeScripts(outer: PostmanScripts, inner: PostmanScripts): PostmanScripts {
@@ -143,6 +152,11 @@ function postmanAuthBool(auth: Record<string, unknown>, bucket: string, key: str
   return entry.value === true || asText(entry.value).toLowerCase() === 'true';
 }
 
+function postmanJsonText(value: unknown) {
+  const text = value && typeof value === 'object' ? JSON.stringify(value, null, 2) : asText(value);
+  return text.trim() === '{}' ? '' : text;
+}
+
 const OAUTH1_SIGNATURE_METHODS = new Set<string>(['HMAC-SHA1', 'HMAC-SHA256', 'HMAC-SHA512', 'RSA-SHA1', 'RSA-SHA256', 'RSA-SHA512', 'PLAINTEXT']);
 
 function postmanGrantType(value: string): { grant: OAuth2GrantType; pkce: boolean } | null {
@@ -214,6 +228,19 @@ function postmanAuthConfig(authValue: unknown, inheritedAuth?: unknown): SavedRe
     config.oauth1AddTo = postmanAuthBool(auth, 'oauth1', 'addParamsToHeader') === false ? 'query' : 'header';
     config.oauth1IncludeBodyHash = postmanAuthBool(auth, 'oauth1', 'includeBodyHash') ?? false;
     config.oauth1AddEmptyParams = postmanAuthBool(auth, 'oauth1', 'addEmptyParamsToSign') ?? false;
+  } else if (type === 'jwt') {
+    const param = (key: string) => postmanAuthParam(auth, 'jwt', key);
+    const algorithm = param('algorithm').toUpperCase() as JwtAlgorithm;
+    config.type = 'jwt';
+    config.jwtAlgorithm = JWT_ALGORITHMS.includes(algorithm) ? algorithm : 'HS256';
+    config.jwtSecret = param('secret');
+    config.jwtSecretBase64 = postmanAuthBool(auth, 'jwt', 'isSecretBase64Encoded') ?? false;
+    config.jwtPrivateKey = param('privateKey');
+    config.jwtPayload = postmanJsonText(postmanAuthEntry(auth, 'jwt', 'payload')?.value);
+    config.jwtHeaders = postmanJsonText(postmanAuthEntry(auth, 'jwt', 'header')?.value);
+    config.jwtAddTo = param('addTokenTo') === 'queryParam' ? 'query' : 'header';
+    config.jwtHeaderPrefix = param('headerPrefix') || 'Bearer';
+    config.jwtQueryParam = param('queryParamKey') || 'token';
   } else if (type === 'awsv4') {
     config.type = 'aws';
     config.awsAccessKey = postmanAuthParam(auth, 'awsv4', 'accessKey');
@@ -414,7 +441,8 @@ export function postmanRequestsFromItems(
     const grpcMethod = asText(kurlo.grpcMethod ?? kurlo.fullMethod);
     const grpcMetadata = kurloRows(kurlo.grpcMetadata ?? kurlo.metadata);
     const kurloTab = kurloRequestTab(kurlo.requestTab);
-    const scripts = mergeScripts(inheritedScripts, postmanScriptsFromEvents(item.event, req.event));
+    const assertions = requestTypeSupportsAssertions(requestType) ? normalizeAssertions(kurlo.assertions) : [];
+    const scripts = withoutGeneratedAssertions(mergeScripts(inheritedScripts, postmanScriptsFromEvents(item.event, req.event)), assertions);
     const id = newRequestId();
     const examples = postmanExamplesFromItem(item, id);
     const url = asText(kurlo.url) || socketIO?.url || urlData.url;
@@ -444,6 +472,7 @@ export function postmanRequestsFromItems(
       } : {}),
       preRequestScript: scripts.preRequestScript,
       testScript: scripts.testScript,
+      ...(assertions.length ? { assertions } : {}),
       requestNotes: postmanDescription(req.description) || postmanDescription(item.description),
       settings: {
         ...DEFAULT_REQUEST_SETTINGS,
@@ -639,6 +668,20 @@ function postmanAuthFromKurlo(auth: SavedRequest['auth'], includeSecrets = false
     );
     return { type: 'oauth1', oauth1: pairs };
   }
+  if (auth.type === 'jwt') {
+    const pairs: Array<{ key: string; value: string | boolean; type: string }> = [
+      postmanAuthPair('algorithm', auth.jwtAlgorithm || 'HS256', 'string', true),
+      postmanAuthPair('secret', auth.jwtSecret ?? '', 'string', includeSecrets, 'clientSecret'),
+      { key: 'isSecretBase64Encoded', value: auth.jwtSecretBase64 ?? false, type: 'boolean' },
+      postmanAuthPair('privateKey', auth.jwtPrivateKey ?? '', 'string', includeSecrets, 'privateKey'),
+      postmanAuthPair('payload', auth.jwtPayload || '{}', 'string', true),
+      postmanAuthPair('header', auth.jwtHeaders || '{}', 'string', true),
+      postmanAuthPair('addTokenTo', auth.jwtAddTo === 'query' ? 'queryParam' : 'header', 'string', true),
+      postmanAuthPair('headerPrefix', auth.jwtHeaderPrefix || 'Bearer', 'string', true),
+      postmanAuthPair('queryParamKey', auth.jwtQueryParam || 'token', 'string', true),
+    ];
+    return { type: 'jwt', jwt: pairs.filter(pair => pair.value !== '') };
+  }
   if (auth.type === 'aws') {
     return { type: 'awsv4', awsv4: [postmanAuthPair('accessKey', auth.awsAccessKey, 'string', includeSecrets), postmanAuthPair('secretKey', auth.awsSecretKey, 'string', includeSecrets), postmanAuthPair('region', auth.awsRegion, 'string', true), postmanAuthPair('service', auth.awsService, 'string', true)] };
   }
@@ -721,6 +764,8 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (s: string, t: st
     extension.grpcProtoFileName = req.grpcProtoFileName ?? '';
     extension.grpcProtoImportPaths = req.grpcProtoImportPaths ?? [];
   }
+  const assertions = assertionsWithoutUiIds(req.assertions);
+  if (assertions.length) extension.assertions = assertions;
   return extension;
 }
 
@@ -757,7 +802,7 @@ function postmanItemFromRequest(req: SavedRequest, stripFn: (s: string, t: strin
   const auth = postmanAuthFromKurlo(req.auth, includeSecrets);
   const body = postmanBodyFromKurlo(req, stripFn, includeSecrets);
   const name = req.name || req.url;
-  const event = postmanEventsFromScripts(req.preRequestScript, req.testScript);
+  const event = postmanEventsFromScripts(req.preRequestScript, joinScripts(req.testScript, assertionsToPostmanScript(req.assertions)));
   const response = postmanResponsesFromExamples(req, includeSecrets);
   return {
     name,

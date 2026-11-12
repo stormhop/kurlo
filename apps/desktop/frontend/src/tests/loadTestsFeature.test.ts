@@ -210,11 +210,11 @@ describe('load test store', () => {
     expect(host.openAlertDialog).toHaveBeenCalled();
   });
 
-  it('asks before closing a draft and saves, discards or stays as chosen', async () => {
+  it('asks before closing an edited draft and saves, discards or stays as chosen', async () => {
     const { host, collection } = makeHost();
     await host.createLoadTest(collection.id, ['req-login']);
     const draft = host.loadTestDraft!.test;
-    host.reportLoadTestEdits(collection.id, { ...draft, name: 'Checkout' }, false);
+    host.reportLoadTestEdits(collection.id, { ...draft, name: 'Checkout' }, true);
     host.openSaveChangesDialog.mockResolvedValueOnce('cancel');
     await host.closeLoadTestTab();
     expect(host.openSaveChangesDialog).toHaveBeenCalledWith('Checkout');
@@ -225,10 +225,23 @@ describe('load test store', () => {
     expect(testsOf(host).map(test => test.name)).toEqual(['Checkout']);
     expect(host.activeLoadTestId).toBe('');
     await host.createLoadTest(collection.id);
+    host.reportLoadTestEdits(collection.id, { ...host.loadTestDraft!.test, name: "Edited draft" }, true);
     host.openSaveChangesDialog.mockResolvedValueOnce('discard');
     await host.closeLoadTestTab();
     expect(testsOf(host)).toHaveLength(1);
     expect(host.loadTestDraft).toBeNull();
+  });
+
+  it('closes an untouched draft without asking', async () => {
+    const { host, collection } = makeHost();
+    await host.createLoadTest(collection.id, ['req-login']);
+    host.reportLoadTestEdits(collection.id, host.loadTestDraft!.test, false);
+    host.openSaveChangesDialog.mockClear();
+    await host.closeLoadTestTab();
+    expect(host.openSaveChangesDialog).not.toHaveBeenCalled();
+    expect(host.activeLoadTestId).toBe('');
+    expect(host.loadTestDraft).toBeNull();
+    expect(testsOf(host)).toHaveLength(0);
   });
 
   it('asks about unsaved edits of a saved test only when autosave is off', async () => {

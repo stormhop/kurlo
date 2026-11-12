@@ -1,4 +1,5 @@
 import type { SavedRequest } from './types/models';
+import { assertionsWithoutUiIds } from './assertions';
 
 export type ManualRequestSnapshotState = {
   dirtyRequestIds: Set<string>;
@@ -31,6 +32,7 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     sioEvents,
     sioArgs,
     savedMessages,
+    assertions,
     isDraft,
     ...stable
   } = req;
@@ -43,6 +45,7 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     sioEvents: rowsWithoutUiIds(sioEvents),
     sioArgs: socketIoArgsWithoutUiIds(sioArgs),
     savedMessages: savedMessages?.length ? savedMessages : undefined,
+    assertions: assertionsWithoutUiIds(assertions).length ? assertionsWithoutUiIds(assertions) : undefined,
   });
 }
 

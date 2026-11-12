@@ -1014,6 +1014,9 @@ func (s *mcpServer) toolGetRequest(_ context.Context, arguments json.RawMessage)
 	if script := cliTestScript(req); strings.TrimSpace(script) != "" {
 		detail["testScript"] = script
 	}
+	if len(req.Assertions) > 0 {
+		detail["assertions"] = req.Assertions
+	}
 	for i := range ws.collections {
 		if ws.collections[i].ID == req.CollectionID {
 			req = applyCollectionDefaults(req, &ws.collections[i])
@@ -1093,13 +1096,14 @@ func (s *mcpServer) toolListEnvironments(_ context.Context, _ json.RawMessage) (
 	type environment struct {
 		Name             string     `json:"name"`
 		Protected        bool       `json:"protected,omitempty"`
+		Color            string     `json:"color,omitempty"`
 		Inherits         string     `json:"inherits,omitempty"`
 		Variables        []variable `json:"variables"`
 		SessionVariables []string   `json:"sessionVariables,omitempty"`
 	}
 	environments := make([]environment, 0, len(ws.environments))
 	for _, env := range ws.environments {
-		entry := environment{Name: env.Name, Protected: env.Protected, Inherits: env.Parent, Variables: []variable{}}
+		entry := environment{Name: env.Name, Protected: env.Protected, Color: env.Color, Inherits: env.Parent, Variables: []variable{}}
 		for _, row := range env.Values {
 			if !row.Enabled || strings.TrimSpace(row.Key) == "" {
 				continue

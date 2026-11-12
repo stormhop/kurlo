@@ -5,6 +5,7 @@
   import { effectiveEnvironmentRows, parentEnvironment } from '../environmentInheritance';
   import { readMatrixColumns, toggleMatrixColumn, visibleMatrixEnvironments, writeMatrixColumns } from '../environmentMatrixColumns';
   import type { Environment } from '../types/models';
+  import { environmentColorVar } from '../environmentColors';
 
   let {
     environments,
@@ -370,7 +371,7 @@
       {#each renderedColumns as environment, columnIndex (environment.id)}
         <span class="env-matrix-col-head" class:in-use={environment.id === activeEnvironmentId} role="columnheader" style={`grid-column: ${columnWindow.start + columnIndex + 2}`}>
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => onOpenEnvironment(environment.id)}>
-            {#if environment.id === activeEnvironmentId}<span class="env-matrix-dot" aria-hidden="true"></span>{/if}
+            {#if environment.id === activeEnvironmentId || environment.color}<span class="env-matrix-dot" class:env-colored={Boolean(environment.color)} class:in-use={environment.id === activeEnvironmentId} style:--env-color={environmentColorVar(environment)} aria-hidden="true"></span>{/if}
             <span>{environment.name}</span>
           </button>
           {#if parents.get(environment.id)}
@@ -659,6 +660,14 @@
     height: 0.4375rem;
     border-radius: 50%;
     background: var(--s2xx);
+  }
+
+  .env-matrix-dot.env-colored {
+    background: var(--env-color, var(--text-3));
+  }
+
+  .env-matrix-dot.env-colored.in-use {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--env-color, var(--text-3)) 35%, transparent);
   }
 
   .env-matrix-row > .in-use {

@@ -87,6 +87,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - NTLM (NTLMv2)
 - Digest Auth — MD5, SHA-256 and SHA-512-256 plus their `-sess` variants, with `qop=auth` and `auth-int`
 - API Key — in header or query string
+- JWT Bearer — signed on every send from a secret or a private key (HS, RS, PS and ES algorithms), with claims, an optional lifetime and a token preview
 - OAuth 2.0 — Client Credentials, Authorization Code (with PKCE), Password, and Device Code grants; loopback browser sign-in, refresh tokens, and automatic token refresh before each send
 - AWS Signature v4
 - Client certificates (mutual TLS), per request or inherited from a collection
@@ -104,6 +105,8 @@ pm.request.body.update(JSON.stringify({ ...pm.request.body.json(), nonce: pm.cry
 pm.test("status is 200", () => pm.response.to.have.status(200))
 pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", required: ["id"] }))
 ```
+
+**Assertions** — check the status, response time, size, a header or a JSON field without code (`status equals 201`, `body.items has length 3`); they run in the app, the collection runner, `kurlo run` and `kurlo mcp`.
 
 `require` resolves bundled stand-ins for `lodash`, `ajv`, `tv4`, `uuid`, `crypto-js`, and `chai`, so imported Postman scripts keep working. `pm.sendRequest` makes an HTTP call from a script, and `pm.execution.skipRequest()` skips the send.
 

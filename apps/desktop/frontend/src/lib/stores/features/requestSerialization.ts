@@ -12,7 +12,8 @@ import { stripJsonComments } from '../../jsonEditing';
 import { resolveProxy, type ResolvedProxy } from '../../proxy';
 import { flattenUrlParams } from '../../queryParams';
 import { DEFAULT_GRPC_MESSAGE } from '../../requestBodyDefaults';
-import { oauth1ConfigFields } from '../../utils';
+import { jwtConfigFields, oauth1ConfigFields } from '../../utils';
+import { assertionsForSend, requestTypeSupportsAssertions } from '../../assertions';
 import type {
   Collection,
   BodyType,
@@ -169,7 +170,7 @@ export const requestSerializationFeature = {
       auth: {
         ...emptyAuthConfig(),
         type: req.auth.type,
-        token: resolveValue(req.auth.type === 'oauth2' ? req.auth.oauth2Token : req.auth.bearerToken),
+        token: req.auth.type === 'jwt' ? '' : resolveValue(req.auth.type === 'oauth2' ? req.auth.oauth2Token : req.auth.bearerToken),
         username: resolveValue(req.auth.basicUser),
         password: resolveValue(req.auth.basicPass),
         keyName: resolveValue(req.auth.apiKeyName),
@@ -189,12 +190,14 @@ export const requestSerializationFeature = {
         awsRegion: resolveValue(req.auth.awsRegion),
         awsService: resolveValue(req.auth.awsService),
         ...oauth1ConfigFields(req.auth, resolveValue),
+        ...jwtConfigFields(req.auth, resolveValue),
       },
       bodyType: isGraphQL ? 'graphql' : outBodyType,
       body: outBody,
       bodyFilePath: resolveValue(req.bodyFilePath),
       formData: resolveRows(req.formRows).filter(r => r.enabled && r.key).map(({ key, value, enabled, isFile, fileName, contentType }) => ({ key, value, enabled, isFile: isFile ?? false, fileName: fileName ?? '', contentType: contentType ?? '' })),
       ...this.scriptFieldsForSend(req),
+      ...(requestTypeSupportsAssertions(this.normalizeRequestTypeValue(req.requestType, req.url)) ? { assertions: assertionsForSend(req.assertions, resolveValue) } : {}),
       followRedirects: req.settings.followRedirects,
       timeoutMs: req.settings.timeoutMs,
       name: req.name,

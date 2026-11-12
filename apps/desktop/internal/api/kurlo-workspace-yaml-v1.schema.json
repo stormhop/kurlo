@@ -61,7 +61,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["inherit", "none", "bearer", "basic", "apikey", "oauth1", "oauth2", "aws", "digest", "ntlm"]
+          "enum": ["inherit", "none", "bearer", "basic", "apikey", "jwt", "oauth1", "oauth2", "aws", "digest", "ntlm"]
         },
         "bearerToken": { "type": "string" },
         "basicUser": { "type": "string" },
@@ -97,7 +97,17 @@
         "oauth1Version": { "type": "string" },
         "oauth1AddTo": { "type": "string", "enum": ["header", "query", "body"] },
         "oauth1IncludeBodyHash": { "type": "boolean" },
-        "oauth1AddEmptyParams": { "type": "boolean" }
+        "oauth1AddEmptyParams": { "type": "boolean" },
+        "jwtAlgorithm": { "type": "string", "enum": ["HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512"] },
+        "jwtSecret": { "type": "string" },
+        "jwtSecretBase64": { "type": "boolean" },
+        "jwtPrivateKey": { "type": "string" },
+        "jwtPayload": { "type": "string" },
+        "jwtHeaders": { "type": "string" },
+        "jwtExpiresIn": { "type": "string" },
+        "jwtAddTo": { "type": "string", "enum": ["header", "query"] },
+        "jwtHeaderPrefix": { "type": "string" },
+        "jwtQueryParam": { "type": "string" }
       }
     },
     "requestSettings": {
@@ -342,6 +352,7 @@
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "protected": { "type": "boolean" },
         "sandbox": { "type": "boolean" },
+        "color": { "type": "string", "enum": ["red", "amber", "green", "blue", "gray"] },
         "values": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }

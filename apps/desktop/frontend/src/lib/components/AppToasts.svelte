@@ -1,5 +1,8 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
+  import { trashEntryLabel } from '../stores/features/trash';
+
+  const undoEntry = $derived(vm.undoEntryId ? vm.trash.find(entry => entry.id === vm.undoEntryId) : undefined);
 </script>
 
 <div
@@ -17,6 +20,13 @@
   {/if}
 </div>
 
+{#if undoEntry}
+  <div class="undo-toast" role="status" aria-live="polite">
+    <span class="undo-toast-text">Deleted {trashEntryLabel(undoEntry).replace(/^\w/, letter => letter.toLowerCase())}</span>
+    <button class="btn btn-ghost btn-sm undo-toast-action" type="button" onclick={() => vm.restoreDeleted(undoEntry.id)}>Undo</button>
+    <button class="btn btn-ghost btn-icon btn-xs" type="button" aria-label="Dismiss" onclick={() => vm.dismissUndo()}>✕</button>
+  </div>
+{/if}
 {#if vm.curlPasteToast}<div class="curl-toast">cURL imported</div>{/if}
 {#if vm.collectionImportToast}<div class="curl-toast">{vm.collectionImportToast}</div>{/if}
 {#if vm.environmentToast}<div class="curl-toast">{vm.environmentToast}</div>{/if}

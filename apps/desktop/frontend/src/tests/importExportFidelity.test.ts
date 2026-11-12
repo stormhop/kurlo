@@ -3,7 +3,7 @@ import { buildPostmanCollection, postmanCollectionBundle } from '../lib/postman'
 import { buildInsomniaExport, insomniaRequestsFromResources } from '../lib/insomnia';
 import { harRequestsFromLog } from '../lib/har';
 import { parseCurl } from '../lib/curl';
-import { buildOpenApiDocument, openApiImportFromSpec } from '../lib/openapi';
+import { buildOpenApiDocument, openApiImportFromSpec, parseOpenApiResponse } from '../lib/openapi';
 import { openCollectionBundleFromFiles } from '../lib/opencollection';
 import { parseYaml } from '../lib/yaml';
 import { expandReplacement } from '../lib/findReplace';
@@ -224,6 +224,136 @@ describe('YAML anchors', () => {
 
   it('refuses an alias to an unknown anchor', () => {
     expect(() => parseYaml('a: *missing')).toThrow(/unknown anchor/);
+  });
+});
+
+describe('YAML documents written by spec generators', () => {
+  it('reads sequences that sit at the same indent as their key', () => {
+    expect(parseYaml([
+      'tags:',
+      '- name: A',
+      '- name: B',
+      'paths:',
+      '  /x: {}',
+    ].join('\n'))).toEqual({ tags: [{ name: 'A' }, { name: 'B' }], paths: { '/x': {} } });
+  });
+
+  it('folds double-quoted strings that span lines', () => {
+    expect(parseYaml([
+      'tags:',
+      '- name: "T-Bank ID"',
+      '  description: "единая точка авторизации, которая уп\\',
+      '    рощает вход"',
+      '- name: "Second"',
+      '  description: "first line',
+      '    continues',
+      '',
+      '    after a blank line"',
+      'pattern: "^[^\\\\n\\\\r\\\\x00\\\\/]{1,250}$\\',
+      '  # not a comment\\',
+      '  \\ tail"',
+      'paths:',
+      '  /x: {}',
+    ].join('\n'))).toEqual({
+      tags: [
+        { name: 'T-Bank ID', description: 'единая точка авторизации, которая упрощает вход' },
+        { name: 'Second', description: 'first line continues\nafter a blank line' },
+      ],
+      pattern: '^[^\\n\\r\\x00\\/]{1,250}$# not a comment tail',
+      paths: { '/x': {} },
+    });
+  });
+
+  it('folds single-quoted and plain strings that span lines', () => {
+    expect(parseYaml([
+      "single: 'it''s",
+      "  folded'",
+      'plain: first part',
+      '  second part',
+      "note: don't stop here",
+      'after: yes',
+    ].join('\n'))).toEqual({
+      single: "it's folded",
+      plain: 'first part second part',
+      note: "don't stop here",
+      after: 'yes',
+    });
+  });
+
+  it('decodes double-quoted escapes once', () => {
+    expect(parseYaml('a: "\\\\n \\u0041 \\/ \\t\\""')).toEqual({ a: '\\n A / \t"' });
+  });
+
+  it('keeps every key of a sequence item whose first key holds a block', () => {
+    expect(parseYaml([
+      'deps:',
+      '- depInfo:',
+      '    inn: "7710140679"',
+      '  rates:',
+      '  - rate: 13',
+      '    recs:',
+      '    - recCode: "201"',
+      '  total: 2',
+      'next: true',
+    ].join('\n'))).toEqual({
+      deps: [{ depInfo: { inn: '7710140679' }, rates: [{ rate: 13, recs: [{ recCode: '201' }] }], total: 2 }],
+      next: true,
+    });
+  });
+
+  it('reads sequences nested on one line', () => {
+    expect(parseYaml([
+      'example:',
+      '- - - 100',
+      '    - 0',
+      '  - - 101',
+      '    - 1',
+    ].join('\n'))).toEqual({ example: [[[100, 0], [101, 1]]] });
+  });
+
+  it('keeps comment marks and blank lines inside block scalars', () => {
+    expect(parseYaml([
+      'literal: |',
+      '  # heading',
+      '',
+      '  "unbalanced',
+      'folded: >-',
+      '  one',
+      '  two',
+      '',
+      '  three',
+      'after: 1.5E3',
+    ].join('\n'))).toEqual({
+      literal: '# heading\n\n"unbalanced',
+      folded: 'one two\nthree',
+      after: 1500,
+    });
+  });
+
+  it('imports a Jackson-style OpenAPI document', () => {
+    const spec = parseOpenApiResponse([
+      'openapi: "3.0.1"',
+      'info:',
+      '  title: "T-API"',
+      '  version: "1.0"',
+      'tags:',
+      '- name: "Accounts"',
+      '  description: "Methods that list the company\\',
+      '    \\ accounts"',
+      'servers:',
+      '- url: "https://example.test/api"',
+      'paths:',
+      '  /accounts:',
+      '    get:',
+      '      tags:',
+      '      - "Accounts"',
+      '      summary: "List accounts"',
+      '      responses:',
+      '        "200":',
+      '          description: "OK"',
+    ].join('\n'), 'text/plain');
+    const { requests } = openApiImportFromSpec(spec, 'c', 'T-API');
+    expect(requests.map(request => [request.method, request.name])).toEqual([['GET', 'List accounts']]);
   });
 });
 

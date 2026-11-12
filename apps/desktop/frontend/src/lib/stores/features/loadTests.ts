@@ -159,7 +159,7 @@ export const loadTestFeature = {
     if (!id) return true;
     const draft = this.loadTestDraft?.test.id === id ? this.loadTestDraft : null;
     const edits = this.loadTestEdits?.test.id === id ? this.loadTestEdits : null;
-    const unsaved = Boolean(draft) || Boolean(edits?.dirty && !this.autosave);
+    const unsaved = draft ? Boolean(edits?.dirty) : Boolean(edits?.dirty && !this.autosave);
     if (unsaved) {
       const test = edits?.test ?? draft!.test;
       const collectionId = edits?.collectionId ?? draft!.collectionId;

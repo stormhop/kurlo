@@ -19,6 +19,7 @@ const saveFailures = new WeakMap<object, number>();
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 type RequestPersistenceHost = {
+  starredRequestIds: Set<string>;
   activeEnvironmentId: string;
   activeRequestId: string;
   activeWorkspaceId: string;
@@ -164,6 +165,7 @@ export const requestPersistenceFeature = {
       activeEnvironmentId: storeActiveEnvId,
       openIds: storeOpenIds,
       folderCollapsed: this.folderCollapseState,
+      starredRequestIds: [...this.starredRequestIds].filter(id => nextRequests.some(request => request.id === id && !request.isDraft)),
       workspaces: storeWorkspaces,
       collections: storeCollections,
       environments: storeEnvironments.map(e => ({ ...e, values: cloneRowsForStore(e.values) })),

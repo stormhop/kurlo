@@ -4,9 +4,16 @@
   import { scriptLineCount } from '../utils';
   import { appendSnippet, preRequestSnippets, testSnippets } from '../scriptSnippets';
   import CodeEditor from '../CodeEditor.svelte';
+  import AssertionsEditor from './AssertionsEditor.svelte';
+  import { assertionsForStore, requestTypeSupportsAssertions } from '../assertions';
+
+  const assertionsAvailable = $derived(requestTypeSupportsAssertions(vm.requestType));
+  const assertionCount = $derived(assertionsForStore(vm.assertions).length);
+  const activeTab = $derived(vm.scriptTab === 'assertions' && !assertionsAvailable ? 'tests' : vm.scriptTab);
 
   const isJs = $derived(vm.scriptEngine === 'js');
   const engineLabel = $derived(isJs ? 'JavaScript' : 'Tengo');
+  const hint = $derived(activeTab === 'pre-request' ? `${engineLabel} · runs before the request is sent` : activeTab === 'tests' ? `${engineLabel} · runs after the response is received` : 'checked after the tests, no code needed');
 
   const preSnippets = $derived(preRequestSnippets(vm.scriptEngine));
   const testSnippetList = $derived(testSnippets(vm.scriptEngine));
@@ -27,16 +34,21 @@
 <div class="script-section">
   <div class="script-head">
     <div class="segmented subtabs" role="tablist" use:tabListKeyboard>
-      <button class="segmented-item" role="tab" class:active={vm.scriptTab === 'pre-request'} aria-selected={vm.scriptTab === 'pre-request'} tabindex={vm.scriptTab === 'pre-request' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'pre-request')}>
+      <button class="segmented-item" role="tab" class:active={activeTab === 'pre-request'} aria-selected={activeTab === 'pre-request'} tabindex={activeTab === 'pre-request' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'pre-request')}>
         Pre-request{#if scriptLineCount(vm.activePreRequestScript) > 0}<span class="subtab-count">{scriptLineCount(vm.activePreRequestScript)}</span>{/if}
       </button>
-      <button class="segmented-item" role="tab" class:active={vm.scriptTab === 'tests'} aria-selected={vm.scriptTab === 'tests'} tabindex={vm.scriptTab === 'tests' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'tests')}>
+      <button class="segmented-item" role="tab" class:active={activeTab === 'tests'} aria-selected={activeTab === 'tests'} tabindex={activeTab === 'tests' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'tests')}>
         Tests{#if scriptLineCount(vm.activeTestScript) > 0}<span class="subtab-count">{scriptLineCount(vm.activeTestScript)}</span>{/if}
       </button>
+      {#if assertionsAvailable}
+        <button class="segmented-item" role="tab" class:active={activeTab === 'assertions'} aria-selected={activeTab === 'assertions'} tabindex={activeTab === 'assertions' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'assertions')}>
+          Assertions{#if assertionCount > 0}<span class="subtab-count">{assertionCount}</span>{/if}
+        </button>
+      {/if}
     </div>
-    <span class="script-hint">{engineLabel} · {vm.scriptTab === 'pre-request' ? 'runs before the request is sent' : 'runs after the response is received'}</span>
+    <span class="script-hint">{hint}</span>
   </div>
-  {#if vm.scriptTab === 'pre-request'}
+  {#if activeTab === 'pre-request'}
     <div class="script-ref">
       <span class="ref-title">Snippets</span>
       {#each preSnippets as snippet (snippet.label)}
@@ -60,6 +72,8 @@
       testId="pre-request-script-editor"
       ariaLabel="Pre-request script editor"
     />
+  {:else if activeTab === 'assertions'}
+    <AssertionsEditor />
   {:else}
     <div class="script-ref">
       <span class="ref-title">Snippets</span>
