@@ -520,7 +520,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       PreviewJWTBearer: async (cfg) => {
         const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
         if (!cfg.jwtSecret && !cfg.jwtPrivateKey) return { token: '', error: `jwt: ${cfg.jwtAlgorithm || 'HS256'} requires a secret` };
-        let claims: Record<string, unknown> = {};
+        let claims: Record<string, unknown>;
         try { claims = cfg.jwtPayload ? JSON.parse(cfg.jwtPayload) : {}; } catch (error) { return { token: '', error: `jwt: payload is not valid JSON: ${String(error)}` }; }
         const now = Math.floor(Date.now() / 1000);
         const lifetime = Number(cfg.jwtExpiresIn || 0);
