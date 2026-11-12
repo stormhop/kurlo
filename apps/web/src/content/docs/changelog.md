@@ -33,6 +33,7 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Fixed
 
 - Imported collections and their folders start collapsed and remember your later expand and collapse choices.
+- **No false unsaved dot**: opening a request with path variables, for example one imported from OpenAPI, no longer marks it as changed.
 - **Locked workspaces explain themselves**: a missing workspace or collection file now locks only its own workspace, and the overview shows which file needs fixing with a button to edit it.
 - **Protection against wiping a workspace**: Kurlo will not save over a workspace it could not read, or save a state that drops every workspace in the folder. Full backup import still replaces everything.
 - **Imported requests that would not load**: a request whose description or notes began with a line break, for example from an OpenAPI import, is now saved so it loads again after a restart.

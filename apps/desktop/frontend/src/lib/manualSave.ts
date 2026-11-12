@@ -27,6 +27,7 @@ export function requestDirtyFingerprint(req: SavedRequest) {
   const {
     requestTab,
     params,
+    pathParams,
     headers,
     formRows,
     sioEvents,
@@ -40,6 +41,7 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     ...stable,
     isDraft: Boolean(isDraft),
     params: rowsWithoutUiIds(params),
+    pathParams: pathParams?.length ? rowsWithoutUiIds(pathParams) : undefined,
     headers: rowsWithoutUiIds(headers),
     formRows: rowsWithoutUiIds(formRows),
     sioEvents: rowsWithoutUiIds(sioEvents),

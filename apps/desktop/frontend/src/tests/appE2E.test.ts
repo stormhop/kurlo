@@ -1984,3 +1984,45 @@ describe('manual save mode keeps workspace edits off disk until Save', () => {
     expect(app.hasUnsavedWorkspaceEdits()).toBe(false);
   });
 });
+
+describe('imported requests stay unchanged when opened', () => {
+  it('opens every request of an imported OpenAPI spec without asking to save it', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.autosave = false;
+    const spec = {
+      openapi: '3.0.1',
+      info: { title: 'T-API', version: '1' },
+      servers: [{ url: 'https://business.example.test/openapi' }],
+      security: [{ bearerAuth: [] }],
+      components: { securitySchemes: { bearerAuth: { type: 'http', scheme: 'bearer' } } },
+      paths: {
+        '/api/v2/nominal-accounts/{accountNumber}/beneficiaries/scoring': {
+          get: {
+            summary: 'Получить результаты проверки бенефициаров',
+            description: '\nВозвращает информацию о результатах проверки.',
+            parameters: [
+              { name: 'accountNumber', in: 'path', required: true, schema: { type: 'string' }, example: '40702810' },
+              { name: 'beneficiaryId', in: 'query', description: '\nИдентификатор бенефициара.\nЕсли параметр не передается, возвращаются все.', schema: { type: 'string' } },
+              { name: 'X-Request-Id', in: 'header', schema: { type: 'string' } },
+            ],
+            responses: { '200': { description: 'OK', content: { 'application/json': { example: { results: [] } } } } },
+          },
+          post: {
+            summary: 'Создать',
+            requestBody: { content: { 'application/json': { example: { name: 'Rex' } } } },
+            responses: { '201': { description: 'Created' } },
+          },
+        },
+      },
+    };
+    await app.importOpenApiPayload(spec, 'tapi.json');
+    const ids = app.requests.filter((req: SavedRequest) => !req.isDraft).map((req: SavedRequest) => req.id);
+    expect(ids).toHaveLength(2);
+    for (const id of ids) {
+      await app.switchRequest(id);
+      app.updateRequestDirtyState(id, app.snapshotActiveRequest({ forPersistence: true }));
+      expect(app.dirtyRequestIds.has(id), app.requestsById.get(id)?.name).toBe(false);
+    }
+  });
+});
