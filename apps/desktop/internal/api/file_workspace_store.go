@@ -1977,7 +1977,7 @@ func writeCanonicalYAMLFile(path string, value any, journal *saveJournal, canoni
 			return err
 		}
 	}
-	data, err := yaml.Marshal(value)
+	data, err := marshalWorkspaceYAML(value)
 	if err != nil {
 		return err
 	}

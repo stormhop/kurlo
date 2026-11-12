@@ -198,7 +198,7 @@ func (s *mcpServer) getMCPRequestDocument(ref string) (any, error) {
 		secrets = agentActivitySecrets()
 	}
 	maskMCPWorkspaceValue(doc, secrets)
-	data, err := yaml.Marshal(filesystemRequestFile{Version: fileStoreVersion, Request: doc})
+	data, err := marshalWorkspaceYAML(filesystemRequestFile{Version: fileStoreVersion, Request: doc})
 	if err != nil {
 		return nil, err
 	}

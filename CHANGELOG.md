@@ -26,6 +26,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Requests with text that starts on a new line could not be loaded after a restart.** When a description, note or other multi-line value began with a line break, a space or a tab (common in OpenAPI specs, for example in parameter descriptions), Kurlo saved it in a form the YAML reader could not read back. After a restart the request was reported as a file that could not be loaded and its saved examples were missing. Such values are now saved in quotes. Files already written this way can be fixed in **Edit YAML** by changing `|4-` to `|-`.
 - **Saving, quitting and closing tabs on large workspaces.** Kurlo no longer writes the workspace again when you quit or close a tab and nothing changed since the last save, and a closed request tab disappears at once while its last edit is saved in the background. Each save also stops re-reading every workspace file: it skips files whose content is already known and reuses what it learned from the last load or save, so saving one change opens about a fifth as many files. On workspaces with over a thousand requests, especially on Windows, quitting and autosave used to take several seconds.
 - On Windows, **Settings → Support → Open log folder** opens the folder again. The Explorer window used to start hidden.
 - The **All open tabs** button at the end of the tab row opens its list again. The list was cut off by the tab row and never showed.
