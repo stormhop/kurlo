@@ -47,7 +47,7 @@ It is the quickest way to paste a block of headers from somewhere else, or to ad
 - Click **Save** (or `Cmd/Ctrl S`).
 - Pick **+ New collection**, name it `Examples`, and save the request as `Get with query`.
 
-The request now lives in the sidebar tree. Drag-and-drop reorders requests and folders.
+The request now lives in the sidebar tree. Drag-and-drop reorders requests within their collection or folder.
 
 ## 4. Parameterize with an environment
 

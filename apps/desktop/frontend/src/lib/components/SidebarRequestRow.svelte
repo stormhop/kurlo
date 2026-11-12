@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { DropPlacement } from '../collections';
   import { NAME_MAX_LENGTH } from '../constants';
   import { fileManagerLabel, requestSupportsCurl } from '../utils';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
@@ -28,6 +29,15 @@
     starred = false,
     floatingMenu = false,
     disabled = false,
+    dragEnabled = false,
+    dragging = false,
+    hovered,
+    dropPlacement,
+    ondragstart,
+    ondragover,
+    ondragleave,
+    ondrop,
+    ondragend,
   }: {
     req: SavedRequest;
     depth: number;
@@ -49,11 +59,22 @@
     starred?: boolean;
     floatingMenu?: boolean;
     disabled?: boolean;
+    dragEnabled?: boolean;
+    dragging?: boolean;
+    hovered?: boolean;
+    dropPlacement?: DropPlacement;
+    ondragstart?: (event: DragEvent) => void;
+    ondragover?: (event: DragEvent) => void;
+    ondragleave?: (event: DragEvent) => void;
+    ondrop?: (event: DragEvent) => void;
+    ondragend?: (event: DragEvent) => void;
   } = $props();
 
   let editingRequestName = $state('');
   let editingRequestInput = $state<HTMLInputElement | undefined>();
   let editingRequest = $state(false);
+
+  const canDrag = $derived(dragEnabled && !disabled && !req.isDraft && !req.isInvalid && !editingRequest);
 
   $effect(() => {
     if (!editingRequest || !editingRequestInput) return;
@@ -103,12 +124,35 @@
 
 <div
   class="collection-request-wrap"
+  class:dragging
+  class:hovered={hovered === true}
+  class:hover-managed={hovered !== undefined}
+  data-sidebar-request-key={menuKey}
+  role="listitem"
+  draggable={canDrag}
+  {ondragstart}
+  {ondragover}
+  {ondragleave}
+  {ondrop}
+  {ondragend}
   class:in-folder={depth >= 0}
   class:active={req.id === activeRequestId && topView === 'request'}
   class:editing={editingRequest}
   class:has-diagnostic={Boolean(req.workspaceDiagnostics?.length)}
   style={depth >= 0 ? `--tree-depth: ${depth}` : ''}
 >
+  {#if canDrag}
+    <span class="request-drag-handle" aria-hidden="true">
+      <svg width="0.625rem" height="0.875rem" viewBox="0 0 10 14" fill="currentColor">
+        <circle cx="3" cy="3" r="1"/><circle cx="7" cy="3" r="1"/>
+        <circle cx="3" cy="7" r="1"/><circle cx="7" cy="7" r="1"/>
+        <circle cx="3" cy="11" r="1"/><circle cx="7" cy="11" r="1"/>
+      </svg>
+    </span>
+  {/if}
+  {#if dropPlacement}
+    <span class="request-drop-line {dropPlacement}" aria-hidden="true"></span>
+  {/if}
   {#if editingRequest}
     <div class="collection-request collection-request-editor">
       <RequestTypeBadge request={req} invalid={req.isInvalid} />

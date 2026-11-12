@@ -584,6 +584,7 @@
     exportCollection={vm.exportCollection}
     deleteCollection={vm.deleteCollection}
     moveCollection={vm.moveCollection}
+    moveRequest={vm.moveRequest}
     switchRequest={vm.switchRequest}
     {requestTabLabel}
     toggleRequestMenu={vm.toggleRequestMenu}

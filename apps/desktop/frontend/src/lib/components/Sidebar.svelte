@@ -7,7 +7,8 @@
   import MenuIcon from './MenuIcon.svelte';
   import AgentSidebar from './AgentSidebar.svelte';
   import CookieSidebar from './CookieSidebar.svelte';
-  import { virtualizeRows } from '../sidebarVirtual';
+  import { frameSyncedWheel } from '../frameSyncedWheel';
+  import { createRowMeasurer, virtualOverscan, virtualizeRows, windowScrollTop } from '../sidebarVirtual';
   import { uiScale } from '../uiScale';
   import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS, NAME_MAX_LENGTH } from '../constants';
   import type {
@@ -27,7 +28,7 @@
   import RecentlyDeleted from './RecentlyDeleted.svelte';
   import type { LoadRunResult, LoadTest } from '../wire';
 
-  type DropPlacement = 'before' | 'after';
+  import { canReorderRequests, type DropPlacement } from '../collections';
   type CollectionSidebarRow =
     | { type: 'onboarding'; key: string; height: number }
     | { type: 'request'; key: string; height: number; req: SavedRequest; depth: number; menuKey: string }
@@ -86,6 +87,7 @@
     exportCollection,
     deleteCollection,
     moveCollection,
+    moveRequest,
     switchRequest,
     requestTabLabel,
     toggleRequestMenu,
@@ -169,6 +171,7 @@
     exportCollection: (id: string) => void;
     deleteCollection: (id: string) => void;
     moveCollection: (sourceId: string, targetId: string, placement: DropPlacement) => void;
+    moveRequest: (sourceId: string, targetId: string, placement: DropPlacement) => void;
     switchRequest: (id: string) => void;
     requestTabLabel: (request: SavedRequest) => string;
     toggleRequestMenu: (id: string, event: MouseEvent) => void;
@@ -227,6 +230,10 @@
     workspaceBlocked?: boolean;
   } = $props();
 
+  let hoveredRequestKey = $state('');
+  let draggingRequest = $state<SavedRequest | undefined>();
+  let dragOverRequestId = $state('');
+  let requestDropPlacement = $state<DropPlacement>('before');
   let draggingCollectionId = $state('');
   let dragOverCollectionId = $state('');
   let dragOverPlacement = $state<DropPlacement>('before');
@@ -280,11 +287,11 @@
   let starredListEl = $state<HTMLElement | undefined>();
   let starredScrollTop = $state(0);
   let starredViewportHeight = $state(0);
-  let starredScrollRaf = 0;
   const starredRowHeights = new SvelteMap<string, number>();
   let starredExpanded = $derived(!pinnedCollapsed || Boolean(sidebarSearch.trim()));
   let starredRows = $derived(pinnedRequests.map(req => ({ key: `pinned:${req.id}`, height: REQUEST_ROW_HEIGHT, req })));
-  let visibleStarredRows = $derived(virtualizeRows(starredRows, starredScrollTop, starredViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, starredRowHeights, $uiScale));
+  let starredOverscan = $derived(virtualOverscan(starredViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
+  let visibleStarredRows = $derived(virtualizeRows(starredRows, starredScrollTop, starredViewportHeight, starredOverscan, ROW_HEIGHT * $uiScale, starredRowHeights, $uiScale));
 
   function readStarredCollapsed(): boolean {
     try {
@@ -304,23 +311,22 @@
     }
   }
 
-  function syncStarredViewport() {
+  function syncStarredViewport(force = true) {
     if (!starredListEl) return;
-    starredScrollTop = starredListEl.scrollTop;
     starredViewportHeight = starredListEl.clientHeight;
+    starredScrollTop = windowScrollTop(starredScrollTop, starredListEl.scrollTop, starredOverscan, force);
   }
 
   function onStarredScroll() {
-    if (starredScrollRaf) return;
-    starredScrollRaf = requestAnimationFrame(() => {
-      starredScrollRaf = 0;
-      syncStarredViewport();
-    });
+    clearRequestHover();
+    syncStarredViewport(false);
   }
 
   const collectionRowHeights = new SvelteMap<string, number>();
+  let collectionsById = $derived(new Map(collectionGroups.map(group => [group.collection.id, group.collection])));
   let collectionRows = $derived(buildCollectionRows());
-  let visibleCollectionRows = $derived(virtualizeRows(collectionRows, collectionScrollTop, collectionViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, collectionRowHeights, $uiScale));
+  let collectionOverscan = $derived(virtualOverscan(collectionViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
+  let visibleCollectionRows = $derived(virtualizeRows(collectionRows, collectionScrollTop, collectionViewportHeight, collectionOverscan, ROW_HEIGHT * $uiScale, collectionRowHeights, $uiScale));
   let historyRows = $derived(buildHistoryRows());
 
   const LOAD_RUN_STATUS: Record<string, string> = { passed: 'passed', failed: 'failed', stopped: 'stopped', error: 'did not finish' };
@@ -330,9 +336,11 @@
       if (row.type === 'loadtest' && !loadRunResults[row.loadTest.id]) loadLoadTestResult(row.loadTest.id);
     }
   });
-  let visibleHistoryRows = $derived(virtualizeRows(historyRows, historyScrollTop, historyViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, undefined, $uiScale));
+  let historyOverscan = $derived(virtualOverscan(historyViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
+  let visibleHistoryRows = $derived(virtualizeRows(historyRows, historyScrollTop, historyViewportHeight, historyOverscan, ROW_HEIGHT * $uiScale, undefined, $uiScale));
   let environmentRows = $derived(buildEnvironmentRows());
-  let visibleEnvironmentRows = $derived(virtualizeRows(environmentRows, environmentScrollTop, environmentViewportHeight, VIRTUAL_OVERSCAN * $uiScale, ROW_HEIGHT * $uiScale, undefined, $uiScale));
+  let environmentOverscan = $derived(virtualOverscan(environmentViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
+  let visibleEnvironmentRows = $derived(virtualizeRows(environmentRows, environmentScrollTop, environmentViewportHeight, environmentOverscan, ROW_HEIGHT * $uiScale, undefined, $uiScale));
 
   $effect(() => {
     if (!editingCollectionId || !editingCollectionInput) return;
@@ -355,27 +363,8 @@
     });
   });
 
-  function rowMeasurer(heights: SvelteMap<string, number>) {
-    return (node: HTMLElement, key: string) => measureRowInto(heights, node, key);
-  }
-
-  const measureRow = rowMeasurer(collectionRowHeights);
-  const measureStarredRow = rowMeasurer(starredRowHeights);
-
-  function measureRowInto(heights: SvelteMap<string, number>, node: HTMLElement, key: string) {
-    let currentKey = key;
-    const report = () => {
-      const h = node.getBoundingClientRect().height;
-      if (h > 0 && heights.get(currentKey) !== h) heights.set(currentKey, h);
-    };
-    report();
-    const observer = new ResizeObserver(report);
-    observer.observe(node);
-    return {
-      update(nextKey: string) { currentKey = nextKey; report(); },
-      destroy() { observer.disconnect(); },
-    };
-  }
+  const measureRow = createRowMeasurer(collectionRowHeights);
+  const measureStarredRow = createRowMeasurer(starredRowHeights);
 
   function trackViewport(node: HTMLElement, sync: () => void) {
     const observer = new ResizeObserver(() => sync());
@@ -383,50 +372,35 @@
     return { destroy() { observer.disconnect(); } };
   }
 
-  let collectionScrollRaf = 0;
-  let historyScrollRaf = 0;
-  let environmentScrollRaf = 0;
-
-  function syncCollectionViewport() {
+  function syncCollectionViewport(force = true) {
     if (!collectionListEl) return;
-    collectionScrollTop = collectionListEl.scrollTop;
     collectionViewportHeight = collectionListEl.clientHeight;
+    collectionScrollTop = windowScrollTop(collectionScrollTop, collectionListEl.scrollTop, collectionOverscan, force);
   }
 
-  function syncHistoryViewport() {
+  function syncHistoryViewport(force = true) {
     if (!historyListEl) return;
-    historyScrollTop = historyListEl.scrollTop;
     historyViewportHeight = historyListEl.clientHeight;
+    historyScrollTop = windowScrollTop(historyScrollTop, historyListEl.scrollTop, historyOverscan, force);
   }
 
-  function syncEnvironmentViewport() {
+  function syncEnvironmentViewport(force = true) {
     if (!environmentListEl) return;
-    environmentScrollTop = environmentListEl.scrollTop;
     environmentViewportHeight = environmentListEl.clientHeight;
+    environmentScrollTop = windowScrollTop(environmentScrollTop, environmentListEl.scrollTop, environmentOverscan, force);
   }
 
   function onCollectionScroll() {
-    if (collectionScrollRaf) return;
-    collectionScrollRaf = requestAnimationFrame(() => {
-      collectionScrollRaf = 0;
-      syncCollectionViewport();
-    });
+    clearRequestHover();
+    syncCollectionViewport(false);
   }
 
   function onHistoryScroll() {
-    if (historyScrollRaf) return;
-    historyScrollRaf = requestAnimationFrame(() => {
-      historyScrollRaf = 0;
-      syncHistoryViewport();
-    });
+    syncHistoryViewport(false);
   }
 
   function onEnvironmentScroll() {
-    if (environmentScrollRaf) return;
-    environmentScrollRaf = requestAnimationFrame(() => {
-      environmentScrollRaf = 0;
-      syncEnvironmentViewport();
-    });
+    syncEnvironmentViewport(false);
   }
 
   function folderCanAcceptRequest(value: FolderGroup) {
@@ -611,8 +585,64 @@
     dragOverPlacement = 'before';
   }
 
+  function updateRequestHover(event: PointerEvent) {
+    const row = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-sidebar-request-key]') : null;
+    hoveredRequestKey = draggingRequest || draggingCollectionId ? '' : row?.dataset.sidebarRequestKey ?? '';
+  }
+
+  function clearRequestHover() {
+    hoveredRequestKey = '';
+  }
+
+  function clearRequestDragState() {
+    clearRequestHover();
+    draggingRequest = undefined;
+    dragOverRequestId = '';
+    requestDropPlacement = 'before';
+  }
+
+  function onRequestDragStart(request: SavedRequest, event: DragEvent) {
+    event.stopPropagation();
+    if (collectionDragDisabled() || request.isDraft || request.isInvalid) {
+      event.preventDefault();
+      return;
+    }
+    clearCollectionDragState();
+    clearRequestHover();
+    draggingRequest = request;
+    event.dataTransfer?.setData('application/x-kurlo-request-id', request.id);
+    event.dataTransfer?.setData('text/plain', request.id);
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onRequestDragOver(request: SavedRequest, event: DragEvent) {
+    if (collectionDragDisabled() || !canReorderRequests(draggingRequest, request)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = currentElement(event);
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    dragOverRequestId = request.id;
+    requestDropPlacement = event.clientY > rect.top + rect.height / 2 ? 'after' : 'before';
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  }
+
+  function onRequestDragLeave(event: DragEvent) {
+    const target = currentElement(event);
+    if (target && event.relatedTarget instanceof Node && target.contains(event.relatedTarget)) return;
+    dragOverRequestId = '';
+  }
+
+  function onRequestDrop(request: SavedRequest, event: DragEvent) {
+    if (collectionDragDisabled() || !draggingRequest || !canReorderRequests(draggingRequest, request)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moveRequest(draggingRequest.id, request.id, requestDropPlacement);
+    clearRequestDragState();
+  }
+
   function collectionById(collectionId: string) {
-    return collectionGroups.find(group => group.collection.id === collectionId)?.collection;
+    return collectionsById.get(collectionId);
   }
 
   function startCollectionInlineRename(collection: Collection, event: MouseEvent) {
@@ -656,6 +686,7 @@
       event.preventDefault();
       return;
     }
+    clearRequestDragState();
     draggingCollectionId = collectionId;
     event.dataTransfer?.setData('application/x-kurlo-collection-id', collectionId);
     event.dataTransfer?.setData('text/plain', collectionId);
@@ -692,7 +723,7 @@
 
 </script>
 
-<aside class="sidebar" class:workspace-blocked={workspaceBlocked}>
+<aside class="sidebar" class:workspace-blocked={workspaceBlocked} onpointermove={updateRequestHover} onpointerover={updateRequestHover} onpointerleave={clearRequestHover}>
   <div class="sidebar-titlebar titlebar-drag-region"></div>
 
   {#if sidebarView === 'collections'}
@@ -720,7 +751,7 @@
             <span class="collection-count">{pinnedRequests.length}</span>
           </button>
           {#if starredExpanded}
-            <div class="starred-list" role="list" bind:this={starredListEl} use:trackViewport={syncStarredViewport} onscroll={onStarredScroll}>
+            <div class="starred-list" role="list" bind:this={starredListEl} use:trackViewport={syncStarredViewport} use:frameSyncedWheel={onStarredScroll} onscroll={onStarredScroll}>
               <div class="sidebar-virtual-spacer" style={`height: ${visibleStarredRows.before}px`}></div>
               {#each visibleStarredRows.rows as row (row.key)}
                 <div class="sidebar-vrow" role="listitem" use:measureStarredRow={row.key}>
@@ -728,6 +759,7 @@
                     req={row.req}
                     depth={PINNED_REQUEST_DEPTH}
                     menuKey={row.key}
+                    hovered={hoveredRequestKey === row.key}
                     {activeRequestId}
                     {topView}
                     {openRequestMenuId}
@@ -763,7 +795,7 @@
           <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createCollection} aria-label="New collection" disabled={workspaceBlocked}><AddCloseIcon add /></button>
         </div>
       </div>
-      <div class="collection-list" role="list" bind:this={collectionListEl} use:trackViewport={syncCollectionViewport} onscroll={onCollectionScroll}>
+      <div class="collection-list" role="list" bind:this={collectionListEl} use:trackViewport={syncCollectionViewport} use:frameSyncedWheel={onCollectionScroll} onscroll={onCollectionScroll}>
         <div class="sidebar-virtual-spacer" style={`height: ${visibleCollectionRows.before}px`}></div>
         {#each visibleCollectionRows.rows as row (row.key)}
           <div class="sidebar-vrow" use:measureRow={row.key}>
@@ -784,6 +816,15 @@
               req={row.req}
               depth={row.depth}
               menuKey={row.menuKey}
+              hovered={hoveredRequestKey === row.menuKey}
+              dragEnabled={!collectionDragDisabled() && !collectionById(row.req.collectionId)?.isInvalid}
+              dragging={draggingRequest?.id === row.req.id}
+              dropPlacement={dragOverRequestId === row.req.id ? requestDropPlacement : undefined}
+              ondragstart={(event) => onRequestDragStart(row.req, event)}
+              ondragover={(event) => onRequestDragOver(row.req, event)}
+              ondragleave={onRequestDragLeave}
+              ondrop={(event) => onRequestDrop(row.req, event)}
+              ondragend={clearRequestDragState}
               {activeRequestId}
               {topView}
               {openRequestMenuId}
@@ -1038,7 +1079,7 @@
         </div>
       {/if}
       {#if historyRows.length}
-        <div class="history-list" bind:this={historyListEl} use:trackViewport={syncHistoryViewport} onscroll={onHistoryScroll}>
+        <div class="history-list" bind:this={historyListEl} use:trackViewport={syncHistoryViewport} use:frameSyncedWheel={onHistoryScroll} onscroll={onHistoryScroll}>
           <div class="sidebar-virtual-spacer" style={`height: ${visibleHistoryRows.before}px`}></div>
           {#each visibleHistoryRows.rows as row (row.key)}
             {#if row.type === 'day'}
@@ -1118,7 +1159,7 @@
         </span>
       </button>
       {#if activeWorkspaceEnvironments.length}
-        <div class="environment-list" bind:this={environmentListEl} use:trackViewport={syncEnvironmentViewport} onscroll={onEnvironmentScroll}>
+        <div class="environment-list" bind:this={environmentListEl} use:trackViewport={syncEnvironmentViewport} use:frameSyncedWheel={onEnvironmentScroll} onscroll={onEnvironmentScroll}>
           <div class="sidebar-virtual-spacer" style={`height: ${visibleEnvironmentRows.before}px`}></div>
           {#each visibleEnvironmentRows.rows as row (row.key)}
             {#if row.type === 'none'}

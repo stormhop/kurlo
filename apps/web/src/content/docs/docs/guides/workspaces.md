@@ -134,11 +134,11 @@ Right-click (or click the `⋯` button on hover) on any request to reveal:
 - **Show in Finder** / **Show in Explorer** — opens the folder that holds the request's YAML file with the file selected. On Linux it is **Show in file manager**: file managers that support it, such as Files (Nautilus), Dolphin, Thunar, Nemo and Caja, select the file too, and others open its folder. Unsaved drafts have no file yet, so they do not offer it.
 - **Delete** — asks for confirmation, then removes the request. If you deleted the only open tab, Kurlo switches to the workspace overview.
 
-### Drag-and-drop between collections
+### Reordering requests
 
-Hover a request to reveal its `⋮⋮` handle, then drag it into another collection or folder. The new parent is highlighted while you hover; drop to commit.
+Hover a request to reveal its `⋮⋮` handle on the left. Drag it onto another request in the same collection or folder: the top half places it above, and the bottom half places it below. A line shows the insertion point. The order is saved in `collection.yml` and persists between sessions.
 
-You can't drag requests into a folder that's reached the 50-request cap — Kurlo refuses the drop and shows a tooltip.
+Clear the sidebar search before dragging. Requests stay in their current folder and collection; dragging changes their order among siblings.
 
 ## Starred (favourites)
 

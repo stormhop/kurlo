@@ -14,6 +14,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
+- **Reorder requests by dragging** above or below another request in the same collection or folder. Order persists between sessions. See [Reordering requests](/docs/guides/workspaces/#reordering-requests).
 - **JWT Bearer auth**: Kurlo signs a fresh JWT on every send from a secret or a private key, with claims, an optional lifetime and a token preview. See [JWT Bearer](/docs/guides/authentication/#jwt-bearer).
 - **Assertions**: check the status, time, size, a header or a JSON field of a response without code, in **Scripts → Assertions**. Results show with the tests and count in the runner, `kurlo run` and `kurlo mcp`. See [Assertions](/docs/guides/scripting/#assertions).
 - **Undo deletes**: a deleted request, folder, collection or environment can be brought back with **Undo** or from **Recently deleted** until you quit Kurlo. See [Restoring deleted items](/docs/guides/workspaces/#restoring-deleted-items).
@@ -32,11 +33,14 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Smoother scrolling in large collections**: request rows no longer rebuild the collection tree as they appear, and sidebar data is reused until it changes.
 - Imported collections and their folders start collapsed and remember your later expand and collapse choices.
+- **Request hover after dragging**: unrelated rows no longer keep their hover background, drag handle or action buttons after reordering requests.
 - **No false unsaved dot**: opening a request with path variables, for example one imported from OpenAPI, no longer marks it as changed.
 - **Locked workspaces explain themselves**: a missing workspace or collection file now locks only its own workspace, and the overview shows which file needs fixing with a button to edit it.
 - **Protection against wiping a workspace**: Kurlo will not save over a workspace it could not read, or save a state that drops every workspace in the folder. Full backup import still replaces everything.
 - **Imported requests that would not load**: a request whose description or notes began with a line break, for example from an OpenAPI import, is now saved so it loads again after a restart.
+- **Sidebar scrolling**: fast scrolling through a long collection, history or environment list no longer shows blank patches before the rows appear.
 - **Saving, quitting and closing tabs on large workspaces.** Kurlo no longer writes the workspace again when you quit or close a tab and nothing changed since the last save, and a closed request tab disappears at once while its last edit is saved in the background. Each save also stops re-reading every workspace file: it skips files whose content is already known and reuses what it learned from the last load or save, so saving one change opens about a fifth as many files. On workspaces with over a thousand requests, especially on Windows, quitting and autosave used to take several seconds.
 - On Windows, **Open log folder** in Settings opens the folder again.
 - The **All open tabs** button at the end of the tab row shows its list again.

@@ -1,4 +1,4 @@
-import type { Collection } from './types/models';
+import type { Collection, SavedRequest } from './types/models';
 
 export type DropPlacement = 'before' | 'after';
 
@@ -97,4 +97,35 @@ export function reorderWorkspaceCollections(
       ? reorderedWorkspace[nextIndex++]
       : collection
   ));
+}
+
+export function canReorderRequests(source: SavedRequest | undefined, target: SavedRequest | undefined): boolean {
+  return Boolean(source && target
+    && source.id !== target.id
+    && source.collectionId
+    && source.collectionId === target.collectionId
+    && folderPathKey(source.folderPath) === folderPathKey(target.folderPath)
+    && !source.isDraft && !target.isDraft
+    && !source.isInvalid && !target.isInvalid);
+}
+
+export function reorderCollectionRequests(
+  requests: SavedRequest[],
+  sourceId: string,
+  targetId: string,
+  placement: DropPlacement,
+): SavedRequest[] {
+  const source = requests.find(request => request.id === sourceId);
+  const target = requests.find(request => request.id === targetId);
+  if (!source || !target || !canReorderRequests(source, target)) return requests;
+  const siblings = requests.filter(request => request.collectionId === source.collectionId
+    && folderPathKey(request.folderPath) === folderPathKey(source.folderPath));
+  const withoutSource = siblings.filter(request => request.id !== sourceId);
+  const targetIndex = withoutSource.findIndex(request => request.id === targetId);
+  const insertAt = targetIndex + (placement === 'after' ? 1 : 0);
+  const reordered = [...withoutSource.slice(0, insertAt), source, ...withoutSource.slice(insertAt)];
+  if (reordered.every((request, index) => request === siblings[index])) return requests;
+  let nextIndex = 0;
+  const siblingIds = new Set(siblings.map(request => request.id));
+  return requests.map(request => siblingIds.has(request.id) ? reordered[nextIndex++] : request);
 }

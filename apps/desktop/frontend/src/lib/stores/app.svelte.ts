@@ -397,6 +397,7 @@ class AppVM {
   declare resetCollectionSettings: typeof collectionFeature.resetCollectionSettings;
   declare deleteCollection: typeof collectionFeature.deleteCollection;
   declare moveCollection: typeof collectionFeature.moveCollection;
+  declare moveRequest: typeof collectionFeature.moveRequest;
   declare invalidCollectionFromDiagnostic: typeof collectionFeature.invalidCollectionFromDiagnostic;
   declare invalidRequestFromDiagnostic: typeof collectionFeature.invalidRequestFromDiagnostic;
   declare buildCollectionGroups: typeof collectionFeature.buildCollectionGroups;
@@ -1516,14 +1517,12 @@ class AppVM {
   _sidebarSearchInput: HTMLInputElement | undefined = undefined;
   _urlInputRef: HTMLInputElement | HTMLTextAreaElement | undefined = undefined;
 
-  get collectionGroups(): CollectionGroup[] { return this.buildCollectionGroups(); }
-  get historyGroups(): HistoryDayGroup[] { return this.buildHistoryGroups(); }
+  collectionGroups: CollectionGroup[] = $derived.by(() => this.buildCollectionGroups());
+  historyGroups: HistoryDayGroup[] = $derived.by(() => this.buildHistoryGroups());
   get activeWorkspace(): Workspace | undefined {
     return this.workspaces.find(w => w.id === this.activeWorkspaceId) ?? this.workspaces[0];
   }
-  get activeWorkspaceEnvironments(): Environment[] {
-    return this.environments.filter(e => e.workspaceId === this.activeWorkspaceId);
-  }
+  activeWorkspaceEnvironments = $derived(this.environments.filter(e => e.workspaceId === this.activeWorkspaceId));
   get activeEnvironment(): Environment | undefined {
     return this.environments.find(e => e.id === this.activeEnvironmentId && e.workspaceId === this.activeWorkspaceId);
   }

@@ -2026,3 +2026,39 @@ describe('imported requests stay unchanged when opened', () => {
     }
   });
 });
+
+describe('request reordering persistence', () => {
+  it('saves sibling order in manual mode without saving unrelated request edits', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    const workspace = makeWorkspace('Reorder');
+    const collection = makeCollection(workspace.id, 'API');
+    app.workspaces = [workspace];
+    app.activeWorkspaceId = workspace.id;
+    app.collections = [collection];
+    app.requests = ['a', 'b', 'c'].map(id => normalizeSavedRequest({
+      id, name: id, collectionId: collection.id, folderPath: [], method: 'GET', url: `https://example.test/${id}`,
+    }, [collection]));
+    app.activeRequestId = 'a';
+    app.applySavedRequest(app.requests[0]);
+    await app.persistRequestStore();
+    app.autosave = false;
+    app.url = 'https://example.test/unsaved';
+    await app.moveRequest('c', 'a', 'before');
+    expect(app.requests.map((req: SavedRequest) => req.id)).toEqual(['c', 'a', 'b']);
+    const saved = backend.state.savedStores.at(-1)!;
+    expect(saved.requests.map(req => req.id)).toEqual(['c', 'a', 'b']);
+    expect(saved.requests.find(req => req.id === 'a')?.url).toBe('https://example.test/a');
+    expect(app.url).toBe('https://example.test/unsaved');
+    expect(app.activeRequestId).toBe('a');
+    const saveCount = backend.state.savedStores.length;
+    app.sidebarSearch = 'a';
+    await app.moveRequest('a', 'c', 'before');
+    expect(backend.state.savedStores).toHaveLength(saveCount);
+    app.sidebarSearch = '';
+    app.guardWorkspaceWritable = () => false;
+    await app.moveRequest('a', 'c', 'before');
+    expect(backend.state.savedStores).toHaveLength(saveCount);
+    expect(app.requests.map((req: SavedRequest) => req.id)).toEqual(['c', 'a', 'b']);
+  });
+});

@@ -11213,6 +11213,69 @@ test.describe('Audit regressions', () => {
     });
   }
 
+  test('keeps rows rendered past both edges while a large collection is flung', async ({ page }, testInfo) => {
+    const requests = Array.from({ length: 3000 }, (_, index) => ({
+      ...request(`fling-r-${index}`, `Request ${String(index).padStart(4, '0')}`, `https://fling.test/item/${index}`),
+      folderPath: [`Folder ${String(Math.floor(index / 25)).padStart(3, '0')}`],
+    }));
+    await installKurloBridge(page, '', 'browser/e2e', false, { collections: [collection], requests });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/');
+    const list = page.locator('.collection-list');
+    await expect(list.getByRole('button', { name: /Request 0000/ })).toBeVisible();
+    const samples = await list.evaluate(async (node) => {
+      const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+      const results: Array<{ above: number; below: number; rows: number; contentAbove: number; contentBelow: number }> = [];
+      const viewport = node.getBoundingClientRect();
+      for (let step = 0; step < 60; step++) {
+        node.scrollTop += node.clientHeight * 0.45;
+        await frame();
+        const rows = node.querySelectorAll('.sidebar-vrow');
+        const first = rows[0].getBoundingClientRect();
+        const last = rows[rows.length - 1].getBoundingClientRect();
+        results.push({
+          above: viewport.top - first.top,
+          below: last.bottom - viewport.bottom,
+          rows: rows.length,
+          contentAbove: node.scrollTop,
+          contentBelow: node.scrollHeight - node.scrollTop - node.clientHeight,
+        });
+      }
+      return { results, height: node.clientHeight };
+    });
+    const half = samples.height / 2;
+    for (const sample of samples.results) {
+      expect(sample.above).toBeGreaterThanOrEqual(Math.min(sample.contentAbove, half) - 1);
+      expect(sample.below).toBeGreaterThanOrEqual(Math.min(sample.contentBelow, half) - 1);
+      expect(sample.rows).toBeLessThan(120);
+    }
+    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `fling-collection-${testInfo.project.name}.png`), animations: 'disabled' });
+
+    const wheelSamples = await list.evaluate(async (node) => {
+      node.scrollTop = 0;
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const viewport = node.getBoundingClientRect();
+      const results: Array<{ scrolled: number; above: number; below: number }> = [];
+      for (let step = 0; step < 20; step++) {
+        const before = node.scrollTop;
+        node.dispatchEvent(new WheelEvent('wheel', { deltaY: node.clientHeight * 1.5, bubbles: true, cancelable: true }));
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        const rows = node.querySelectorAll('.sidebar-vrow');
+        results.push({
+          scrolled: node.scrollTop - before,
+          above: viewport.top - rows[0].getBoundingClientRect().top,
+          below: rows[rows.length - 1].getBoundingClientRect().bottom - viewport.bottom,
+        });
+      }
+      return results;
+    });
+    for (const sample of wheelSamples) {
+      expect(sample.scrolled).toBeGreaterThan(0);
+      expect(sample.above).toBeGreaterThanOrEqual(0);
+      expect(sample.below).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   test('keeps a background HTTP response in its source tab without replacing the visible response', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, { collections: [collection], requests: [request('audit-a', 'Alpha', 'https://alpha.test/ping'), request('audit-b', 'Beta', 'https://beta.test/ping')], activeId: 'audit-a', openIds: ['audit-a', 'audit-b'] });
     await page.addInitScript(() => {
@@ -11784,3 +11847,83 @@ for (const count of [200, 250]) {
     if (count - 1 < 200) await expect(page.getByRole('button', { name: 'Assertion', exact: true })).toBeEnabled();
   });
 }
+
+
+test('reorders requests by dragging above and below siblings and restores the saved order', async ({ page, browserName }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [
+      { id: 'reorder-api', workspaceId: 'workspace-e2e', name: 'API', filesystemName: 'API' },
+      { id: 'other-api', workspaceId: 'workspace-e2e', name: 'Other', filesystemName: 'Other' },
+    ],
+    folderCollapsed: {},
+    requests: [
+      ...['Alpha', 'Bravo', 'Charlie'].map(name => ({ id: name, name, collectionId: 'reorder-api', folderPath: [], method: 'GET', url: `https://example.test/${name}` })),
+      ...['Nested one', 'Nested two'].map(name => ({ id: name, name, collectionId: 'reorder-api', folderPath: ['Users'], method: 'GET', url: `https://example.test/${name}` })),
+      { id: 'outside', name: 'Outside', collectionId: 'other-api', folderPath: [], method: 'GET', url: 'https://example.test/outside' },
+    ],
+  });
+  await page.goto('/');
+  const list = page.locator('.collection-list');
+  const row = (name: string) => list.locator('.collection-request-wrap').filter({ has: page.locator('.collection-title', { hasText: new RegExp(`^${name}$`) }) });
+  const titles = () => list.locator('.collection-title').allTextContents();
+  await expect(row('Alpha')).toBeVisible();
+  await row('Charlie').hover();
+  await row('Charlie').locator('.request-drag-handle').dragTo(row('Alpha'), { targetPosition: { x: 80, y: 3 } });
+  await expect.poll(titles).toEqual(['Nested one', 'Nested two', 'Charlie', 'Alpha', 'Bravo', 'Outside']);
+  await row('Charlie').dragTo(row('Bravo'), { targetPosition: { x: 80, y: 24 } });
+  await expect.poll(titles).toEqual(['Nested one', 'Nested two', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
+  await row('Nested two').dragTo(row('Nested one'), { targetPosition: { x: 80, y: 3 } });
+  await expect.poll(titles).toEqual(['Nested two', 'Nested one', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
+  await row('Alpha').dragTo(row('Outside'), { targetPosition: { x: 80, y: 3 } });
+  await row('Alpha').dragTo(row('Nested two'), { targetPosition: { x: 80, y: 3 } });
+  await expect.poll(titles).toEqual(['Nested two', 'Nested one', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
+  await page.getByRole('textbox', { name: 'Filter requests' }).fill('Alpha');
+  await expect(row('Alpha')).toHaveAttribute('draggable', 'false');
+  await page.getByRole('textbox', { name: 'Filter requests' }).fill('');
+  await expect(row('Alpha')).toHaveAttribute('draggable', 'true');
+  await expect.poll(() => page.evaluate(() => {
+    const requests = window.__kurloE2E.store.requests as Array<{ id: string }>;
+    return requests.map(request => request.id);
+  })).toEqual(['Alpha', 'Bravo', 'Charlie', 'Nested two', 'Nested one', 'outside']);
+  const saved = await page.evaluate(() => window.__kurloE2E.store);
+  await page.addInitScript(store => { window.__kurloE2E.store = store; }, saved);
+  await page.reload();
+  await expect.poll(titles).toEqual(['Nested two', 'Nested one', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
+  await row('Alpha').hover();
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-reorder.png'), animations: 'disabled' });
+  const transfer = await page.evaluateHandle(() => new DataTransfer());
+  await row('Charlie').dispatchEvent('dragstart', { dataTransfer: transfer });
+  const target = await row('Alpha').boundingBox();
+  expect(target).not.toBeNull();
+  await row('Alpha').dispatchEvent('dragover', { dataTransfer: transfer, clientY: target!.y + 3 });
+  await expect(row('Alpha').locator('.request-drop-line.before')).toBeVisible();
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-reorder-drop.png'), animations: 'disabled' });
+  await row('Charlie').dispatchEvent('dragend');
+  await expect(list.locator('.request-drop-line')).toHaveCount(0);
+  await expect(list.locator('.collection-request-wrap.active')).toHaveCount(1);
+  if (browserName === 'chromium') {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
+    const { root } = await cdp.send('DOM.getDocument');
+    for (const name of ['Bravo', 'Charlie', 'Nested one']) {
+      await row(name).evaluate((element, value) => element.setAttribute('data-sticky-hover', value), name);
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-sticky-hover="${name}"]` });
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['hover'] });
+    }
+    await page.mouse.move(800, 400);
+    for (const name of ['Bravo', 'Charlie', 'Nested one']) {
+      await expect(row(name).locator('.request-drag-handle')).toHaveCSS('opacity', '0');
+      await expect(row(name).locator('.request-menu-btn')).toHaveCSS('opacity', '0');
+      await expect(row(name).locator('.collection-request')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    }
+    await row('Bravo').hover();
+    await expect(row('Bravo').locator('.request-drag-handle')).toHaveCSS('opacity', '1');
+    await row('Charlie').hover();
+    await expect(row('Bravo').locator('.request-drag-handle')).toHaveCSS('opacity', '0');
+    await expect(row('Charlie').locator('.request-drag-handle')).toHaveCSS('opacity', '1');
+    await expect(row('Nested one').locator('.request-menu-btn')).toHaveCSS('opacity', '0');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-request-hover-after-drag.png'), animations: 'disabled' });
+    await cdp.detach();
+  }
+});

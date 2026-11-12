@@ -494,8 +494,8 @@
   flex-shrink: 0;
 }
 .collection-folder:hover .collection-menu-btn,
-.collection-request-wrap:hover .request-menu-btn,
-.collection-request-wrap:hover .request-star-btn,
+.collection-request-wrap:is(.hovered, :not(.hover-managed):hover) .request-menu-btn,
+.collection-request-wrap:is(.hovered, :not(.hover-managed):hover) .request-star-btn,
 .collection-subfolder:hover .folder-menu-btn {
   opacity: 1;
 }
@@ -635,7 +635,7 @@
   padding-left: 0;
 }
 
-.collection-request-wrap:hover,
+.collection-request-wrap:is(.hovered, :not(.hover-managed):hover),
 .collection-request-wrap.active {
   background: transparent;
 }
@@ -662,7 +662,7 @@
   cursor: text;
 }
 
-.collection-request-wrap:hover .collection-request,
+.collection-request-wrap:is(.hovered, :not(.hover-managed):hover) .collection-request,
 .collection-request-wrap.active .collection-request {
   color: var(--text);
 }
@@ -677,7 +677,7 @@
   color: color-mix(in srgb, var(--danger) 28%, var(--text-2));
 }
 
-.collection-request-wrap.has-diagnostic:hover .collection-request,
+.collection-request-wrap.has-diagnostic:is(.hovered, :not(.hover-managed):hover) .collection-request,
 .collection-request-wrap.has-diagnostic.active .collection-request {
   color: color-mix(in srgb, var(--danger) 20%, var(--text));
 }
@@ -1099,7 +1099,7 @@
   padding-left: var(--space-6);
 }
 
-.collection-request-wrap:hover .collection-request {
+.collection-request-wrap:is(.hovered, :not(.hover-managed):hover) .collection-request {
   background: var(--hover);
 }
 
@@ -1395,4 +1395,49 @@
 
 .env-view-switch {
   display: inline-flex;
+}
+
+.collection-request-wrap.dragging {
+  opacity: 0.55;
+}
+
+.request-drag-handle {
+  position: absolute;
+  left: calc(var(--request-tree-offset) + 0.375rem);
+  display: grid;
+  place-items: center;
+  width: 0.875rem;
+  height: 1.375rem;
+  color: var(--text-3);
+  cursor: grab;
+  opacity: 0;
+}
+
+.collection-request-wrap:is(.hovered, :not(.hover-managed):hover) .request-drag-handle,
+.collection-request-wrap.dragging .request-drag-handle {
+  opacity: 1;
+}
+
+.collection-request-wrap.dragging .request-drag-handle {
+  cursor: grabbing;
+}
+
+.request-drop-line {
+  position: absolute;
+  left: var(--request-tree-offset);
+  right: 0.5rem;
+  height: 0.125rem;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.request-drop-line.before {
+  top: 0;
+}
+
+.request-drop-line.after {
+  bottom: 0;
 }

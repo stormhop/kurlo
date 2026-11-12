@@ -5,6 +5,7 @@ import {
   folderCollapsedByDefault,
   normalizeCollectionFolderPaths,
   reorderWorkspaceCollections,
+  reorderCollectionRequests,
   type DropPlacement,
 } from '../../collections';
 import { normalizeCollectionEnvironmentPins } from '../../collectionEnvironments';
@@ -269,6 +270,17 @@ export const collectionFeature = {
     if (!source || !target || source.workspaceId !== target.workspaceId) return;
     this.collections = reorderWorkspaceCollections(this.collections, source.workspaceId, sourceId, targetId, placement);
     this.openCollectionMenuId = '';
+    await this.persistRequestStore();
+  },
+  async moveRequest(this: CollectionHost, sourceId: string, targetId: string, placement: DropPlacement) {
+    if (this.sidebarSearch.trim() || !this.guardWorkspaceWritable('Reordering requests')) return;
+    const source = this.requests.find(request => request.id === sourceId);
+    const collection = this.collections.find(collection => collection.id === source?.collectionId);
+    if (!collection || collection.isInvalid || collection.workspaceId !== this.activeWorkspaceId) return;
+    const reordered = reorderCollectionRequests(this.requests, sourceId, targetId, placement);
+    if (reordered === this.requests) return;
+    this.requests = reordered;
+    this.closeFloatingMenus();
     await this.persistRequestStore();
   },
   invalidCollectionFromDiagnostic(this: CollectionHost, diagnostic: WorkspaceDiagnostic): Collection {
