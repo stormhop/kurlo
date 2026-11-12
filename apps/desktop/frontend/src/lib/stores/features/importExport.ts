@@ -91,6 +91,8 @@ type ImportExportHost = {
   collectionImportToast: string;
   collectionImportSummary: string;
   collections: Collection[];
+  folderCollapseState: Record<string, boolean>;
+  folderCollapseKey: (collectionId: string, path: string[]) => string;
   requests: SavedRequest[];
   environments: Environment[];
   workspaces: Workspace[];
@@ -136,6 +138,22 @@ type ImportExportHost = {
   exportCollectionToOpenApi: (collectionId: string, format: OpenApiExportFormat) => Promise<void>;
   chooseCollectionSecretExportMode: (reqs: SavedRequest[], title: string) => Promise<boolean | null>;
 };
+
+function collapseImportedCollection(host: ImportExportHost, collection: Collection, requests: SavedRequest[]) {
+  collection.collapsed = true;
+  const next = { ...host.folderCollapseState };
+  const paths = [
+    ...(collection.folderPaths ?? []),
+    ...(collection.folderDefaults ?? []).map(folder => folder.path),
+    ...requests.map(request => request.folderPath ?? []),
+  ];
+  for (const path of paths) {
+    for (let depth = 1; depth <= path.length; depth += 1) {
+      next[host.folderCollapseKey(collection.id, path.slice(0, depth))] = true;
+    }
+  }
+  host.folderCollapseState = next;
+}
 
 export const importExportFeature = {
   async openPostmanImport(this: ImportExportHost) {
@@ -264,6 +282,7 @@ export const importExportFeature = {
     const importCollections = [...this.collections, importedCollection];
     const importedReqs = bundle.requests.map(req => routeImportedScripts(normalizeSavedRequest({ ...req, collectionId: importedCollection.id, collection: importedCollection.name }, importCollections, wsId)));
     const importedEnvs = (bundle.environments ?? []).map(env => normalizeEnvironment(env, wsId));
+    collapseImportedCollection(this, importedCollection, importedReqs);
     const nextCols = [...this.collections, importedCollection];
     const nextReqs = [...this.requests, ...importedReqs];
     const nextEnvs = [...this.environments, ...importedEnvs];
@@ -299,6 +318,7 @@ export const importExportFeature = {
     const importedReqs = builtRequests
       .map(req => routeImportedScripts(normalizeSavedRequest(req, importCollections, wsId)));
     if (!importedReqs.length) throw new Error('No requests found in import file');
+    collapseImportedCollection(this, collection, importedReqs);
     const nextCols = [...this.collections, collection]; const nextReqs = [...this.requests, ...importedReqs];
     const first = importedReqs[0]; const nextOpenIds = [...new Set([...this.openRequestIds, first.id])];
     this.activeWorkspaceId = wsId; this.collections = nextCols; this.requests = nextReqs; this.openRequestIds = nextOpenIds;

@@ -4204,6 +4204,10 @@ test.describe('Kurlo desktop browser E2E', () => {
 
   test('imports a Postman collection into the sidebar', async ({ page }) => {
     await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const saved = sessionStorage.getItem('import-collapse-store');
+      if (saved) window.__kurloE2E.store = JSON.parse(saved);
+    });
     await page.goto('/');
     await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
 
@@ -4226,9 +4230,13 @@ test.describe('Kurlo desktop browser E2E', () => {
           event: [{ listen: 'test', script: { exec: ['pm.test("ok", () => pm.response.to.have.status(200))'] } }],
         },
         {
-          name: 'Create invoice',
-          request: { method: 'POST', url: { raw: '{{baseUrl}}/invoices' }, body: { mode: 'raw', raw: '{"amount":10}' } },
+          name: 'Invoices',
+          item: [{ name: 'Archived', item: [{
+            name: 'Create invoice',
+            request: { method: 'POST', url: { raw: '{{baseUrl}}/invoices' }, body: { mode: 'raw', raw: '{"amount":10}' } },
+          }] }],
         },
+        { name: 'Empty folder', item: [] },
       ],
     };
 
@@ -4239,8 +4247,33 @@ test.describe('Kurlo desktop browser E2E', () => {
     });
 
     await expect(collectionRow(page, 'Billing API')).toBeVisible();
+    await expect(collectionRow(page, 'Billing API').getByLabel('Expand collection')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'GET List invoices' })).toBeHidden();
+    await expect(folderRow(page, 'Invoices')).toBeHidden();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-import-collapsed.png'), animations: 'disabled' });
+    await page.evaluate(() => sessionStorage.setItem('import-collapse-store', JSON.stringify(window.__kurloE2E.store)));
+    await page.reload();
+    await expect(collectionRow(page, 'Billing API').getByLabel('Expand collection')).toBeVisible();
+    await collectionRow(page, 'Billing API').getByLabel('Expand collection').click();
+    await expect(folderRow(page, 'Invoices').getByLabel('Expand folder')).toBeVisible();
+    await expect(folderRow(page, 'Empty folder').getByLabel('Expand folder')).toBeVisible();
+    await expect(folderRow(page, 'Archived')).toBeHidden();
+    await folderRow(page, 'Invoices').getByLabel('Expand folder').click();
+    await expect(folderRow(page, 'Archived').getByLabel('Expand folder')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'POST Create invoice' })).toBeHidden();
+    await folderRow(page, 'Archived').getByLabel('Expand folder').click();
     await expect(page.getByRole('button', { name: 'GET List invoices' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'POST Create invoice' })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => {
+      const store = window.__kurloE2E.store as { collections: Array<{ id: string; name: string; collapsed: boolean }>; folderCollapsed: Record<string, boolean> };
+      const collection = store.collections.find(entry => entry.name === 'Billing API')!;
+      return [collection.collapsed, store.folderCollapsed[`${collection.id}:Invoices`], store.folderCollapsed[`${collection.id}:Invoices/Archived`]];
+    })).toEqual([false, false, false]);
+    await page.evaluate(() => sessionStorage.setItem('import-collapse-store', JSON.stringify(window.__kurloE2E.store)));
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'POST Create invoice' })).toBeVisible();
+    await expect(folderRow(page, 'Empty folder').getByLabel('Expand folder')).toBeVisible();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-import-expanded-restored.png'), animations: 'disabled' });
 
     const store = await page.evaluate(() => window.__kurloE2E.store as {
       collections: Array<{ id: string; name: string }>;
@@ -4279,6 +4312,7 @@ test.describe('Kurlo desktop browser E2E', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(collection)),
     });
+    await collectionRow(page, 'Tengo user API').getByLabel('Expand collection').click();
     await expect(page.getByRole('button', { name: 'GET Ping' })).toBeVisible();
     const store = await page.evaluate(() => window.__kurloE2E.store as {
       collections: Array<{ name: string; defaults?: { preRequestScript?: string; preRequestScriptJs?: string } }>;
