@@ -616,6 +616,7 @@ export const requestCrudFeature = {
       this.updateRequestDirtyState(id, current);
     }
     let handledDirtyClose = false;
+    let pendingPersist: Promise<void> | null = null;
     if (!isDraft && !force && !this.autosave && this.dirtyRequestIds.has(id)) {
       if (id === this.activeRequestId) await this.persistActiveRequestNow();
       const name = closeTarget ? requestTabLabel(closeTarget) : 'this request';
@@ -656,7 +657,7 @@ export const requestCrudFeature = {
     } else if (force && !this.autosave) {
       await this.discardRequestChanges(id);
     } else if (!handledDirtyClose) {
-      await this.persistActiveRequestNow();
+      pendingPersist = this.persistActiveRequestNow();
     }
     const idx = this.openRequestIds.indexOf(id);
     if (idx >= 0 && !isDraft) this.lastClosedRequestIds = [id, ...this.lastClosedRequestIds.filter(i => i !== id)].slice(0, 12);
@@ -677,6 +678,7 @@ export const requestCrudFeature = {
         this.topView = 'overview';
       }
     }
+    if (pendingPersist) await pendingPersist;
     if (isDraft) await this.persistRequestStore(this.requests, this.activeRequestId, nextOpenIds);
     else await this.persistRequestStoreView(this.activeRequestId, nextOpenIds);
   },

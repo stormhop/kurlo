@@ -15,6 +15,7 @@ import type { CookieJarEntry } from '../../backend';
 import type { CollectionRunRecord } from '../../collectionRuns';
 
 const saveFailures = new WeakMap<object, number>();
+const queuedStorePayloads = new WeakMap<object, { epoch: number; serialized: string; result: Promise<boolean> }>();
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -204,11 +205,23 @@ export const requestPersistenceFeature = {
     const payload = this.requestStorePayload(storeRequests, activeId, nextOpenIds, nextWorkspaces, nextCollections, workspaceId, nextHistory, nextEnvironments, nextActiveEnvId);
     const serialized = JSON.stringify(payload);
     const persistEpoch = this.requestStorePersistEpoch;
+    const queued = queuedStorePayloads.get(this);
+    if (queued && queued.epoch === persistEpoch && queued.serialized === serialized) {
+      if (await queued.result && persistEpoch === this.requestStorePersistEpoch && queuedStorePayloads.get(this) === queued) {
+        this.recordSavedRequestSnapshots(storeRequests);
+        return true;
+      }
+    }
     const persistJob = this.requestStorePersistQueue.then(async () => {
       if (persistEpoch !== this.requestStorePersistEpoch) return false;
       const saved = await saveRequestStore(serialized);
       if (!saved.ok) throw new Error(saved.error || 'request store save failed');
       return saved.ok;
+    });
+    const entry = { epoch: persistEpoch, serialized, result: persistJob.then(saved => saved, () => false) };
+    queuedStorePayloads.set(this, entry);
+    void entry.result.then(saved => {
+      if (!saved && queuedStorePayloads.get(this) === entry) queuedStorePayloads.delete(this);
     });
     this.requestStorePersistQueue = persistJob.catch(() => {
       this.collectionImportToast = 'Warning: changes could not be saved';

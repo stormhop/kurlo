@@ -262,10 +262,7 @@ func (a *App) LoadRequestStore() string {
 	gitOperationMu.RLock()
 	defer gitOperationMu.RUnlock()
 	root := fileWorkspaceStorePath()
-	payload, _, err := loadKurloStorePayloadLocked(requestStorePath(), root)
-	if hasYAMLWorkspaceStore(root) {
-		workspaceDisk.remember(root)
-	}
+	payload, _, err := loadKurloStorePayloadRemembering(requestStorePath(), root)
 	if err != nil {
 		return ""
 	}
@@ -320,11 +317,18 @@ func (a *App) saveRequestStorePayload(payload string) error {
 	if err != nil {
 		return err
 	}
-	if err := a.writeRequestStorePayload(root, payload); err != nil {
+	hints := &workspaceSaveHints{}
+	if len(external) == 0 {
+		hints = workspaceDisk.saveHints(root)
+	}
+	if err := a.writeRequestStorePayload(root, payload, hints); err != nil {
 		return err
 	}
 	workspaceDisk.remember(root)
 	if len(external) == 0 {
+		if hints.healthy && hints.segments != nil {
+			workspaceDisk.rememberSavedSegments(root, hints.segments)
+		}
 		return nil
 	}
 	reason := workspaceDisk.changeReason(root, external)
@@ -335,7 +339,7 @@ func (a *App) saveRequestStorePayload(payload string) error {
 	return nil
 }
 
-func (a *App) writeRequestStorePayload(root, payload string) error {
+func (a *App) writeRequestStorePayload(root, payload string, hints *workspaceSaveHints) error {
 	localStoreAuthFailed := false
 	if _, err := loadRequestStorePayload(requestStorePath()); err != nil && isRequestStoreAuthenticationError(err) {
 		localStoreAuthFailed = true
@@ -347,6 +351,10 @@ func (a *App) writeRequestStorePayload(root, payload string) error {
 			}
 			return saveKurloStorePayloadPreserving(requestStorePath(), root, payload, nil)
 		}
+		if hints.cachedDisk() != nil {
+			hints.healthy = true
+			return saveKurloStorePayloadWithHints(requestStorePath(), root, payload, nil, hints)
+		}
 		_, diagnostics, err := loadKurloStoreWithDiagnostics(requestStorePath(), root)
 		if err != nil {
 			if isRequestStoreAuthenticationError(err) {
@@ -357,7 +365,10 @@ func (a *App) writeRequestStorePayload(root, payload string) error {
 			}
 			return err
 		}
-		return saveKurloStorePayloadPreserving(requestStorePath(), root, payload, diagnosticPreserveDirs(root, diagnostics))
+		if hints != nil {
+			hints.healthy = len(diagnostics) == 0
+		}
+		return saveKurloStorePayloadWithHints(requestStorePath(), root, payload, diagnosticPreserveDirs(root, diagnostics), hints)
 	}
 	return saveKurloStorePayload(requestStorePath(), root, payload)
 }

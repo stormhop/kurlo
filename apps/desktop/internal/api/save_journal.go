@@ -17,9 +17,26 @@ const saveJournalName = ".kurlo-save-journal.tmp"
 var yamlStoreWriteMu sync.Mutex
 
 type saveJournal struct {
-	root string
-	file *os.File
-	dirs map[string]bool
+	root     string
+	file     *os.File
+	dirs     map[string]bool
+	known    map[string]string
+	segments map[string]string
+}
+
+func (j *saveJournal) unchanged(path string, data []byte) bool {
+	if j == nil || j.known == nil {
+		return false
+	}
+	hash, ok := j.known[path]
+	return ok && hash == contentHash(data)
+}
+
+func (j *saveJournal) segment(kind, id, segment string) {
+	if j == nil || j.segments == nil {
+		return
+	}
+	j.segments[kind+":"+id] = segment
 }
 
 func (j *saveJournal) flush(f *os.File) error {

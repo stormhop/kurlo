@@ -279,6 +279,10 @@ func saveKurloStorePayload(localStorePath, workspaceRoot, payload string) error 
 }
 
 func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload string, preserveDirs []string) error {
+	return saveKurloStorePayloadWithHints(localStorePath, workspaceRoot, payload, preserveDirs, nil)
+}
+
+func saveKurloStorePayloadWithHints(localStorePath, workspaceRoot, payload string, preserveDirs []string, hints *workspaceSaveHints) error {
 	store, err := decodeJSONMap(payload)
 	if err != nil {
 		return err
@@ -287,9 +291,12 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 	if err := validateWorkspaceStorePayload(store); err != nil {
 		return err
 	}
-	disk, err := inspectWorkspaceStoreOnDisk(workspaceRoot)
-	if err != nil {
-		return err
+	disk := hints.cachedDisk()
+	if disk == nil {
+		disk, err = inspectWorkspaceStoreOnDisk(workspaceRoot)
+		if err != nil {
+			return err
+		}
 	}
 
 	existingSecrets := map[string]string{}
@@ -344,9 +351,11 @@ func saveKurloStorePayloadPreserving(localStorePath, workspaceRoot, payload stri
 				return err
 			}
 		}
-		if err := writeFilesystemWorkspaceStore(workspaceRoot, sanitizedWorkspaces, sanitizedCollections, sanitizedRequests, sanitizedEnvironments, sanitizedWorkspaceCookies, preserveDirs); err != nil {
+		if err := writeYAMLWorkspaceStoreWithHints(workspaceRoot, sanitizedWorkspaces, sanitizedCollections, sanitizedRequests, sanitizedEnvironments, sanitizedWorkspaceCookies, preserveDirs, hints); err != nil {
 			return err
 		}
+	} else if hints != nil {
+		hints.segments = disk
 	}
 
 	localStore := buildLocalKurloStore(store, workspaceRoot, secrets, sharedHash, existingStorageMode)
@@ -485,6 +494,10 @@ func writeFilesystemWorkspaceStore(root string, workspaces, collections, request
 }
 
 func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, environments []map[string]any, workspaceCookies map[string][]map[string]any, preserveDirs []string) error {
+	return writeYAMLWorkspaceStoreWithHints(root, workspaces, collections, requests, environments, workspaceCookies, preserveDirs, nil)
+}
+
+func writeYAMLWorkspaceStoreWithHints(root string, workspaces, collections, requests, environments []map[string]any, workspaceCookies map[string][]map[string]any, preserveDirs []string, hints *workspaceSaveHints) error {
 	yamlStoreWriteMu.Lock()
 	defer yamlStoreWriteMu.Unlock()
 	if err := os.MkdirAll(root, 0755); err != nil {
@@ -494,13 +507,21 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 		return err
 	}
 	journal := &saveJournal{root: root}
+	if hints != nil {
+		journal.known = hints.known
+		journal.segments = map[string]string{}
+	}
 	defer journal.close()
 	if err := ensureManagedWorkspaceDirIfExists(root, fileStoreWorkspacesDir); err != nil {
 		return err
 	}
-	legacyBodies, err := legacyExampleBodyPaths(root)
-	if err != nil {
-		return err
+	legacyBodies := map[string]struct{}{}
+	if hints == nil || hints.mayHoldLegacyExampleBodies() {
+		found, err := legacyExampleBodyPaths(root)
+		if err != nil {
+			return err
+		}
+		legacyBodies = found
 	}
 	collectionsByWorkspace := groupByString(collections, "workspaceId")
 	requestsByCollection := groupByString(requests, "collectionId")
@@ -536,6 +557,7 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 		if _, err := ensureManagedWorkspaceDir(root, fileStoreWorkspacesDir, workspaceDirs[workspaceID], fileStoreCollectionsDir); err != nil {
 			return err
 		}
+		journal.segment("workspace", workspaceID, workspaceDirs[workspaceID])
 		workspacePath := filepath.Join(workspaceDir, fileStoreRootFileName)
 		desiredFiles[workspacePath] = struct{}{}
 		delete(workspace, filesystemNameField)
@@ -569,6 +591,7 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 			if err != nil {
 				return err
 			}
+			journal.segment("collection", collectionID, collectionDirs[collectionID])
 			collectionPath := filepath.Join(collectionDir, fileStoreCollection)
 			loadTests := collectionLoadTestMaps(collection)
 			delete(collection, filesystemNameField)
@@ -589,6 +612,7 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 				if requestID == "" {
 					return fmt.Errorf("request is missing id")
 				}
+				journal.segment("request", requestID, requestFiles[requestID])
 				requestPath := filepath.Join(requestsDir, requestFiles[requestID]+fileStoreYAMLExt)
 				examples := requestExampleMaps(request)
 				delete(request, filesystemNameField)
@@ -615,6 +639,7 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 				if environmentID == "" {
 					continue
 				}
+				journal.segment("environment", environmentID, environmentFiles[environmentID])
 				envPath := filepath.Join(envDir, environmentFiles[environmentID]+fileStoreYAMLExt)
 				delete(environment, filesystemNameField)
 				if err := writeJournaledYAMLFile(envPath, filesystemEnvironmentFile{Version: fileStoreVersion, Environment: environment}, journal); err != nil {
@@ -631,6 +656,9 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 	}
 	if err := journal.finish(); err != nil {
 		return err
+	}
+	if hints != nil {
+		hints.segments = journal.segments
 	}
 	return ensureWorkspaceGitignore(root)
 }
@@ -668,11 +696,17 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		return err
 	}
 	var stale []string
+	var dirs []string
+	children := map[string]int{}
 	if err := filepath.WalkDir(managedRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+		if path != managedRoot {
+			children[filepath.Dir(path)]++
+		}
 		if entry.IsDir() {
+			dirs = append(dirs, path)
 			return nil
 		}
 		_, isExampleBody := legacyBodies[path]
@@ -704,8 +738,21 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
+		children[filepath.Dir(path)]--
 	}
-	return removeEmptyDirs(managedRoot)
+	sort.Slice(dirs, func(i, j int) bool {
+		return len(dirs[i]) > len(dirs[j])
+	})
+	for _, dir := range dirs {
+		if dir == managedRoot || children[dir] > 0 {
+			continue
+		}
+		if err := os.Remove(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+		children[filepath.Dir(dir)]--
+	}
+	return nil
 }
 
 func pruneRank(path string) int {
@@ -1933,6 +1980,9 @@ func writeCanonicalYAMLFile(path string, value any, journal *saveJournal, canoni
 	data, err := yaml.Marshal(value)
 	if err != nil {
 		return err
+	}
+	if journal.unchanged(path, data) {
+		return nil
 	}
 	if info, err := os.Lstat(path); err == nil {
 		if info.Mode()&os.ModeSymlink != 0 {

@@ -187,6 +187,8 @@ func readRequestExamples(collectionDir, requestSegment, workspaceRoot, workspace
 
 func legacyExampleBodyPaths(root string) (map[string]struct{}, error) {
 	paths := map[string]struct{}{}
+	examplesByDir := map[string][]string{}
+	dirsWithBodies := map[string]bool{}
 	err := filepath.WalkDir(filepath.Join(root, fileStoreWorkspacesDir), func(path string, entry os.DirEntry, err error) error {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -194,18 +196,31 @@ func legacyExampleBodyPaths(root string) (map[string]struct{}, error) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || filepath.Ext(path) != fileStoreYAMLExt || filepath.Base(filepath.Dir(filepath.Dir(path))) != fileStoreExamplesDir {
+		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 || filepath.Base(filepath.Dir(filepath.Dir(path))) != fileStoreExamplesDir {
 			return nil
 		}
-		var example filesystemExampleFile
-		if err := readYAMLFile(path, &example); err != nil || example.Version != fileStoreVersion || stringValue(example.Example, "id") == "" {
+		dir := filepath.Dir(path)
+		if filepath.Ext(path) != fileStoreYAMLExt {
+			dirsWithBodies[dir] = true
 			return nil
 		}
-		body := stringValue(exampleResponseMap(example.Example), "bodyFile")
-		if body != "" && body == filepath.Base(body) {
-			paths[filepath.Join(filepath.Dir(path), body)] = struct{}{}
-		}
+		examplesByDir[dir] = append(examplesByDir[dir], path)
 		return nil
 	})
-	return paths, err
+	if err != nil {
+		return paths, err
+	}
+	for dir := range dirsWithBodies {
+		for _, path := range examplesByDir[dir] {
+			var example filesystemExampleFile
+			if err := readYAMLFile(path, &example); err != nil || example.Version != fileStoreVersion || stringValue(example.Example, "id") == "" {
+				continue
+			}
+			body := stringValue(exampleResponseMap(example.Example), "bodyFile")
+			if body != "" && body == filepath.Base(body) {
+				paths[filepath.Join(dir, body)] = struct{}{}
+			}
+		}
+	}
+	return paths, nil
 }

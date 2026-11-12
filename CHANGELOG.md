@@ -26,6 +26,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Saving, quitting and closing tabs on large workspaces.** Kurlo no longer writes the workspace again when you quit or close a tab and nothing changed since the last save, and a closed request tab disappears at once while its last edit is saved in the background. Each save also stops re-reading every workspace file: it skips files whose content is already known and reuses what it learned from the last load or save, so saving one change opens about a fifth as many files. On workspaces with over a thousand requests, especially on Windows, quitting and autosave used to take several seconds.
 - On Windows, **Settings → Support → Open log folder** opens the folder again. The Explorer window used to start hidden.
 - The **All open tabs** button at the end of the tab row opens its list again. The list was cut off by the tab row and never showed.
 - **OpenAPI import reads generator-written YAML.** Specs written by Jackson, springdoc and similar generators imported with *Expected an OpenAPI/Swagger document with paths* or lost most of their operations. Kurlo now reads lists placed at the same indent as their key, strings in quotes that continue over several lines, every key of a list item after a nested block, lists nested on one line, escapes such as `\n` and `\u0041` in double quotes, `#` and blank lines inside `|` and `>` blocks, and numbers in exponent form.

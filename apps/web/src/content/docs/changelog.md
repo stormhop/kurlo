@@ -31,6 +31,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Saving, quitting and closing tabs on large workspaces.** Kurlo no longer writes the workspace again when you quit or close a tab and nothing changed since the last save, and a closed request tab disappears at once while its last edit is saved in the background. Each save also stops re-reading every workspace file: it skips files whose content is already known and reuses what it learned from the last load or save, so saving one change opens about a fifth as many files. On workspaces with over a thousand requests, especially on Windows, quitting and autosave used to take several seconds.
 - On Windows, **Open log folder** in Settings opens the folder again.
 - The **All open tabs** button at the end of the tab row shows its list again.
 - **OpenAPI import reads generator-written YAML**: specs from Jackson, springdoc and similar tools no longer fail with *Expected an OpenAPI/Swagger document with paths* or lose operations. See [OpenAPI / Swagger](/docs/guides/import-export/#from-openapi--swagger).

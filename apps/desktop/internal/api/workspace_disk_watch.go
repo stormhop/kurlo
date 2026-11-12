@@ -37,11 +37,12 @@ type workspaceExternalChange struct {
 }
 
 type workspaceDiskTracker struct {
-	mu         sync.Mutex
-	root       string
-	known      workspaceSnapshot
-	announced  string
-	agentFiles map[string]string
+	mu            sync.Mutex
+	root          string
+	known         workspaceSnapshot
+	announced     string
+	agentFiles    map[string]string
+	savedSegments map[string]string
 }
 
 var workspaceDisk = &workspaceDiskTracker{}
@@ -150,13 +151,14 @@ func (t *workspaceDiskTracker) remember(root string) {
 	}
 	snapshot, err := scanWorkspaceFiles(root, previous, true)
 	if err != nil {
-		t.root, t.known, t.announced = "", nil, ""
+		t.root, t.known, t.announced, t.savedSegments = "", nil, "", nil
 		return
 	}
 	t.root = root
 	t.known = snapshot
 	t.announced = snapshot.fingerprint()
 	t.agentFiles = nil
+	t.savedSegments = nil
 }
 
 func trackOpenedWorkspace(root string) {

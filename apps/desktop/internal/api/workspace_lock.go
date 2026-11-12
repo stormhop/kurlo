@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -87,4 +88,27 @@ func loadKurloStorePayloadLocked(localStorePath, root string) (string, []Workspa
 	}
 	defer unlock()
 	return loadKurloStorePayloadWithDiagnostics(localStorePath, root)
+}
+
+func loadKurloStorePayloadRemembering(localStorePath, root string) (string, []WorkspaceDiagnostic, error) {
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		return "", nil, err
+	}
+	defer unlock()
+	store, diagnostics, err := loadKurloStoreWithDiagnostics(localStorePath, root)
+	if hasYAMLWorkspaceStore(root) {
+		workspaceDisk.remember(root)
+		if err == nil && len(diagnostics) == 0 {
+			workspaceDisk.rememberSavedSegments(root, diskItemSegments(mapSlice(store["workspaces"]), mapSlice(store["collections"]), mapSlice(store["requests"]), mapSlice(store["environments"])))
+		}
+	}
+	if err != nil {
+		return "", diagnostics, err
+	}
+	payload, err := json.MarshalIndent(store, "", "  ")
+	if err != nil {
+		return "", diagnostics, err
+	}
+	return string(payload), diagnostics, nil
 }
