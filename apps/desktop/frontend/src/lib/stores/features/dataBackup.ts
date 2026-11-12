@@ -1,4 +1,4 @@
-import { openFileDialog, readTextFile, saveRequestStore } from '../../backend';
+import { openFileDialog, readTextFile, replaceRequestStore } from '../../backend';
 import type { ProxyConfig, RequestSettings, RequestStore, SavedRequest } from '../../types/models';
 import { normalizeThemeSettings, type AppTheme, type AppThemeMode } from '../../theme';
 import { normalizeProxyConfig, proxyConfigForPersistence } from '../../proxy';
@@ -161,7 +161,7 @@ export const dataBackupFeature = {
   async importAllDataPayload(this: DataBackupHost, text: string) {
     const parsed = this.parseAllDataBackup(text);
     const store = { ...parsed.store, version: Number(parsed.store.version) || 2 };
-    const saved = await saveRequestStore(JSON.stringify(store, null, 2));
+    const saved = await replaceRequestStore(JSON.stringify(store, null, 2));
     if (!saved.ok) throw new Error(saved.error || 'Could not write imported data');
     this.syncDirtyRequestIds(new Set());
     this.savedRequestSnapshots = new Map();

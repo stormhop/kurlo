@@ -3990,6 +3990,32 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(dialog).toBeHidden();
   });
 
+  test('overview explains why a blocked workspace is locked and leads to the fix', async ({ page }, testInfo) => {
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const app = window.go.api.App;
+      app.LoadWorkspaceDiagnostics = async () => {
+        const store = JSON.parse(await app.LoadRequestStore());
+        return [{
+          scope: 'workspace', severity: 'error', blocking: true, workspaceId: store.activeWorkspaceId,
+          path: 'workspaces/My-Workspace/workspace.yml', line: 3,
+          message: "line 3: could not find expected ':'",
+        }];
+      };
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+    const notice = page.locator('.overview-blocked');
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('Editing is paused: 1 workspace file needs fixing');
+    await expect(notice).toContainText('workspaces/My-Workspace/workspace.yml');
+    await expect(notice).toContainText("could not find expected ':'");
+    await expect(page.getByRole('button', { name: 'New request', exact: true }).first()).toBeDisabled();
+    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `overview-blocked-${testInfo.project.name}.png`), animations: 'disabled' });
+    await notice.getByRole('button', { name: 'Show all issues' }).click();
+    await expect(page.locator('.git-yaml-card')).toContainText('Editing is paused');
+  });
+
   test('Git panel shows a pulled syntax error in a workspace that is not open', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');

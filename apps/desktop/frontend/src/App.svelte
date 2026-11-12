@@ -719,6 +719,9 @@
       <WorkspaceOverview
         activeWorkspace={vm.activeWorkspace}
         workspaceBlocked={vm.workspaceBlocked}
+        blockingDiagnostics={vm.workspaceBlockingDiagnostics}
+        editDiagnostic={vm.openWorkspaceYAMLEditor}
+        showWorkspaceIssues={() => vm.openGitTab(false)}
         defaultWorkspace={DEFAULT_WORKSPACE}
         collectionGroups={vm.collectionGroups}
         history={vm.requestHistory}

@@ -291,6 +291,14 @@ func saveKurloStorePayloadWithHints(localStorePath, workspaceRoot, payload strin
 	if err := validateWorkspaceStorePayload(store); err != nil {
 		return err
 	}
+	if hints == nil || !hints.replaceAll {
+		if err := guardWorkspacesKept(workspaceRoot, store); err != nil {
+			return err
+		}
+	}
+	if err := refuseRecreatingMissingParents(workspaceRoot, mapSlice(store["workspaces"]), mapSlice(store["collections"])); err != nil {
+		return err
+	}
 	disk := hints.cachedDisk()
 	if disk == nil {
 		disk, err = inspectWorkspaceStoreOnDisk(workspaceRoot)
@@ -1225,10 +1233,12 @@ func readYAMLWorkspaceEntriesWithDiagnostics(root string, secrets map[string]str
 		if err := readYAMLFile(filePath, &doc); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				if workspaceChildrenRemain(path, fileStoreCollectionsDir, fileStoreEnvironmentsDir) {
+					workspaceID := invalidDiagnosticID("workspace", filePath)
 					diagnostics = append(diagnostics, workspaceDiagnostic{
-						scope: workspaceIntegrityScope, path: filePath, root: root, blocking: true,
+						scope: "workspace", path: filePath, root: root, workspaceID: workspaceID, blocking: true,
 						message: "workspace.yml is missing but its child files remain. Restore the workspace file before saving.",
 					}.toDiagnostic())
+					invalidFolders = append(invalidFolders, invalidWorkspaceFolder{path: path, workspaceID: workspaceID})
 				}
 				continue
 			}
@@ -1297,10 +1307,12 @@ func readYAMLCollectionEntriesWithDiagnostics(root string, order []string, works
 		if err := readYAMLFile(filePath, &doc); err != nil {
 			if errors.Is(err, os.ErrNotExist) {
 				if workspaceChildrenRemain(path, fileStoreRequestsDir, fileStoreExamplesDir, fileStoreLoadTestsDir) {
+					collectionID := invalidDiagnosticID("collection", filePath)
 					diagnostics = append(diagnostics, workspaceDiagnostic{
-						scope: workspaceIntegrityScope, path: filePath, root: workspaceRoot, blocking: true,
+						scope: "collection", path: filePath, root: workspaceRoot, workspaceID: workspaceID, collectionID: collectionID,
 						message: "collection.yml is missing but its child files remain. Restore the collection file before saving.",
 					}.toDiagnostic())
+					invalidFolders = append(invalidFolders, invalidCollectionFolder{path: path, workspaceID: workspaceID, collectionID: collectionID})
 				}
 				continue
 			}

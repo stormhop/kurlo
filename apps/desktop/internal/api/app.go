@@ -263,6 +263,11 @@ func (a *App) LoadRequestStore() string {
 	defer gitOperationMu.RUnlock()
 	root := fileWorkspaceStorePath()
 	payload, _, err := loadKurloStorePayloadRemembering(requestStorePath(), root)
+	if errors.Is(err, os.ErrNotExist) {
+		failedStoreLoads.note(root, nil)
+	} else {
+		failedStoreLoads.note(root, err)
+	}
 	if err != nil {
 		return ""
 	}
@@ -288,7 +293,16 @@ func (a *App) SaveRequestStore(payload string) bool {
 func (a *App) SaveRequestStoreWithError(payload string) SaveRequestStoreResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	if err := a.saveRequestStorePayload(payload); err != nil {
+	if err := a.saveRequestStorePayload(payload, false); err != nil {
+		return SaveRequestStoreResult{Ok: false, Error: err.Error()}
+	}
+	return SaveRequestStoreResult{Ok: true}
+}
+
+func (a *App) ReplaceRequestStoreWithError(payload string) SaveRequestStoreResult {
+	gitOperationMu.Lock()
+	defer gitOperationMu.Unlock()
+	if err := a.saveRequestStorePayload(payload, true); err != nil {
 		return SaveRequestStoreResult{Ok: false, Error: err.Error()}
 	}
 	return SaveRequestStoreResult{Ok: true}
@@ -303,13 +317,16 @@ func (a *App) SaveRequestStoreView(payload string) SaveRequestStoreResult {
 	return SaveRequestStoreResult{Ok: true}
 }
 
-func (a *App) saveRequestStorePayload(payload string) error {
+func (a *App) saveRequestStorePayload(payload string, replaceAll bool) error {
 	root := fileWorkspaceStorePath()
 	unlock, err := lockWorkspaceWrites(root)
 	if err != nil {
 		return err
 	}
 	defer unlock()
+	if !replaceAll && failedStoreLoads.failed(root) {
+		return fmt.Errorf("Kurlo could not read this workspace when it opened, so it will not save over it. Reload the workspace and try again")
+	}
 	if seen := a.globalsRevision.Load(); seen != nil && *seen != currentProfileGlobalsRevision() {
 		return fmt.Errorf("global variables changed outside the editor; reload the workspace before saving")
 	}
@@ -321,6 +338,7 @@ func (a *App) saveRequestStorePayload(payload string) error {
 	if len(external) == 0 {
 		hints = workspaceDisk.saveHints(root)
 	}
+	hints.replaceAll = replaceAll
 	if err := a.writeRequestStorePayload(root, payload, hints); err != nil {
 		return err
 	}

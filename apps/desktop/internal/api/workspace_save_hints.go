@@ -3,10 +3,11 @@ package api
 import "path/filepath"
 
 type workspaceSaveHints struct {
-	disk     map[string]string
-	known    map[string]string
-	segments map[string]string
-	healthy  bool
+	disk       map[string]string
+	known      map[string]string
+	segments   map[string]string
+	healthy    bool
+	replaceAll bool
 }
 
 func (h *workspaceSaveHints) cachedDisk() map[string]string {

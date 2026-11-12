@@ -542,6 +542,10 @@ export function ReopenOpenRouterConnect() {
   return window['go']['api']['App']['ReopenOpenRouterConnect']();
 }
 
+export function ReplaceRequestStoreWithError(arg1) {
+  return window['go']['api']['App']['ReplaceRequestStoreWithError'](arg1);
+}
+
 export function RestartApp() {
   return window['go']['api']['App']['RestartApp']();
 }

@@ -366,7 +366,13 @@ func TestWorkspaceIntegrityDetectsMissingParentFiles(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if workspaceIntegrityError(diagnostics) == nil {
+			detected := false
+			for _, diagnostic := range diagnostics {
+				if diagnostic.Path == path && strings.Contains(diagnostic.Message, "is missing") {
+					detected = true
+				}
+			}
+			if !detected {
 				t.Fatalf("missing parent not detected: %#v", diagnostics)
 			}
 			if err := saveKurloStorePayload(local, root, original); err == nil {

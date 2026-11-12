@@ -31,6 +31,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Locked workspaces explain themselves**: a missing workspace or collection file now locks only its own workspace, and the overview shows which file needs fixing with a button to edit it.
+- **Protection against wiping a workspace**: Kurlo will not save over a workspace it could not read, or save a state that drops every workspace in the folder. Full backup import still replaces everything.
 - **Imported requests that would not load**: a request whose description or notes began with a line break, for example from an OpenAPI import, is now saved so it loads again after a restart.
 - **Saving, quitting and closing tabs on large workspaces.** Kurlo no longer writes the workspace again when you quit or close a tab and nothing changed since the last save, and a closed request tab disappears at once while its last edit is saved in the background. Each save also stops re-reading every workspace file: it skips files whose content is already known and reuses what it learned from the last load or save, so saving one change opens about a fifth as many files. On workspaces with over a thousand requests, especially on Windows, quitting and autosave used to take several seconds.
 - On Windows, **Open log folder** in Settings opens the folder again.

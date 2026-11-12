@@ -162,6 +162,7 @@ func (t *workspaceDiskTracker) remember(root string) {
 }
 
 func trackOpenedWorkspace(root string) {
+	failedStoreLoads.note(root, nil)
 	if hasYAMLWorkspaceStore(root) {
 		workspaceDisk.remember(root)
 	}

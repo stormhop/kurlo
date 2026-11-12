@@ -273,6 +273,8 @@ export function RenameAgentChat(arg1:string,arg2:string):Promise<model.AgentResu
 
 export function ReopenOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 
+export function ReplaceRequestStoreWithError(arg1:string):Promise<api.SaveRequestStoreResult>;
+
 export function RestartApp():Promise<void>;
 
 export function RevealWorkspaceItem(arg1:string,arg2:string):Promise<string>;

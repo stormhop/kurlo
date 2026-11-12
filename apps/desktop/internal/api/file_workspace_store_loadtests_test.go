@@ -257,7 +257,13 @@ func TestLoadTestFolderWithoutCollectionFileIsReported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if workspaceIntegrityError(diagnostics) == nil {
-		t.Fatalf("load tests left without their collection file must block saving, got %+v", diagnostics)
+	if len(diagnostics) != 1 || !strings.Contains(diagnostics[0].Message, "collection.yml is missing") {
+		t.Fatalf("load tests left without their collection file must be reported, got %+v", diagnostics)
+	}
+	if err := saveKurloStorePayload(localPath, workspaceRoot, loadTestStorePayload(t, "["+checkoutLoadTest+"]")); err == nil {
+		t.Fatal("a save must not recreate the missing collection file over its load tests")
+	}
+	if _, err := os.Stat(filepath.Join(collectionDir, "collection.yml")); !os.IsNotExist(err) {
+		t.Fatalf("collection.yml was recreated: %v", err)
 	}
 }

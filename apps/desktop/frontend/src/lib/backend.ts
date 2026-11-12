@@ -233,6 +233,13 @@ export async function writeWorkspaceYAMLFile(path: string, content: string): Pro
   return (await window.go?.api?.App?.WriteWorkspaceYAMLFile?.(path, content)) ?? EMPTY_WORKSPACE_OPEN_RESULT;
 }
 
+export async function replaceRequestStore(payload: string): Promise<SaveRequestStoreResult> {
+  const app = window.go?.api?.App;
+  if (!app?.ReplaceRequestStoreWithError) return saveRequestStore(payload);
+  const result = await app.ReplaceRequestStoreWithError(payload);
+  return { ok: Boolean(result?.ok), error: result?.error ?? '' };
+}
+
 export async function saveRequestStore(payload: string): Promise<SaveRequestStoreResult> {
   const app = window.go?.api?.App;
   if (app?.SaveRequestStoreWithError) {

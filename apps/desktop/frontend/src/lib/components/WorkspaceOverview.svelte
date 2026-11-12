@@ -13,10 +13,14 @@
   import { requestTabLabel, statusClass } from '../utils';
   import type { CollectionGroup, FolderGroup, RequestHistoryEntry, SavedRequest, Workspace } from '../types/models';
   import type { SettingsTab } from '../stores/ui';
+  import type { WorkspaceDiagnostic } from '../backend';
 
   let {
     activeWorkspace,
     workspaceBlocked = false,
+    blockingDiagnostics = [],
+    editDiagnostic = () => {},
+    showWorkspaceIssues = () => {},
     defaultWorkspace,
     collectionGroups,
     history,
@@ -44,6 +48,9 @@
   }: {
     activeWorkspace: Workspace | undefined;
     workspaceBlocked?: boolean;
+    blockingDiagnostics?: WorkspaceDiagnostic[];
+    editDiagnostic?: (diagnostic: WorkspaceDiagnostic) => void;
+    showWorkspaceIssues?: () => void;
     defaultWorkspace: string;
     collectionGroups: CollectionGroup[];
     history: RequestHistoryEntry[];
@@ -236,6 +243,21 @@
       <button class="btn btn-secondary" type="button" onclick={createWorkspace}><AddCloseIcon add /> New workspace</button>
     </div>
   </header>
+
+  {#if workspaceBlocked && blockingDiagnostics.length}
+    {@const first = blockingDiagnostics[0]}
+    <div class="overview-blocked" role="alert">
+      <div class="overview-blocked-copy">
+        <strong>Editing is paused: {blockingDiagnostics.length} workspace {blockingDiagnostics.length === 1 ? 'file needs' : 'files need'} fixing</strong>
+        <p>Kurlo will not save or change anything in this workspace until {blockingDiagnostics.length === 1 ? 'it is' : 'they are'} fixed, so nothing on disk is overwritten.</p>
+        <p class="overview-blocked-file"><code>{first.path}</code> — {first.message}</p>
+      </div>
+      <div class="overview-blocked-actions">
+        <button class="btn btn-primary btn-sm" type="button" onclick={() => editDiagnostic(first)}><MenuIcon name="rename" />Edit YAML</button>
+        <button class="btn btn-secondary btn-sm" type="button" onclick={showWorkspaceIssues}>Show all issues</button>
+      </div>
+    </div>
+  {/if}
 
   {#if isEmpty}
     <div class="overview-first-run">
