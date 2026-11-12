@@ -20,6 +20,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Environment colors**: mark an environment red, amber, green, blue or gray, and the title bar switcher shows it while it is in use. See [Coloring an environment](/docs/guides/environments/#coloring-an-environment).
 - **Edit menu in text fields**: right-click a field or a code editor for Cut, Copy, Paste and Select all. See [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
 - **Show in Finder / Explorer**: open the YAML file of a request or the folder of a collection from its menu. See [The request ⋯ menu](/docs/guides/workspaces/#the-request--menu).
+- **Skip TLS check on URL import**: import an OpenAPI spec from a server with a self-signed or internal certificate by ticking **Skip TLS certificate check**. See [From a URL](/docs/guides/import-export/#from-a-url).
 
 ### Changed
 

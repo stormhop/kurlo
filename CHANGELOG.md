@@ -15,6 +15,7 @@ All notable changes to Kurlo are documented here. This project follows
 - **Environment colors.** Give an environment a color from its **•••** menu: red, amber, green, blue or gray. The environment switcher in the title bar is tinted while that environment is in use, and the color marks it in the environment list, the switcher menu and the Matrix view. The color is saved in the environment file and listed by `kurlo mcp`.
 - **Edit menu in text fields.** Right-click a text field or a code editor for Cut, Copy, Paste and Select all. Read-only editors offer Copy and Select all, and the menu works with the arrow keys and Escape.
 - **Show a request or collection on disk.** The request and collection menus have **Show in Finder** on macOS, **Show in Explorer** on Windows and **Show in file manager** on Linux. It opens the workspace folder with the request's YAML file or the collection's folder selected. On Linux the file is selected in file managers that support it, such as Files, Dolphin and Thunar, and other file managers open the folder.
+- **Import from URL without certificate checks.** The **Import from URL** dialog has a **Skip TLS certificate check** box for specs served with a self-signed, internal or expired certificate. It applies to that one import only and is off each time the dialog opens. When a certificate is rejected, the error suggests the box.
 
 ### Changed
 

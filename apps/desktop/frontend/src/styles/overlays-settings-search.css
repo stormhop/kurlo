@@ -32,7 +32,34 @@
   overflow-wrap: anywhere;
 }
 
-.app-dialog input {
+.dialog-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin: var(--space-3) var(--space-4) 0;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.app-dialog .dialog-toggle .check {
+  width: 0.875rem;
+  height: 0.875rem;
+  margin: 0;
+  padding: 0;
+}
+
+.dialog-toggle small {
+  grid-column: 2;
+  color: var(--text-3);
+  line-height: var(--leading-normal);
+}
+
+.dialog-toggle small.warn {
+  color: var(--warning);
+}
+
+.app-dialog input:not(.check) {
   width: calc(100% - 2rem);
   height: var(--control-lg);
   margin: var(--space-3) var(--space-4) 0;
@@ -44,7 +71,7 @@
   color: var(--text);
 }
 
-.app-dialog input:focus {
+.app-dialog input:not(.check):focus {
   border-color: var(--accent-hover);
   box-shadow: var(--focus-ring);
 }

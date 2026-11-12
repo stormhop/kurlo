@@ -29,7 +29,13 @@ function headerValue(headers: Array<{ key: string; value: string }> | undefined,
   return headers?.find(header => header.key.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
-async function fetchImportDocument(url: string): Promise<{ body: string; contentType: string }> {
+export type UrlImportOptions = { skipTlsVerification?: boolean };
+
+export function looksLikeTlsCertificateError(message: string): boolean {
+  return /x509|certificate|tls: failed to verify|unknown authority/i.test(message);
+}
+
+async function fetchImportDocument(url: string, options: UrlImportOptions = {}): Promise<{ body: string; contentType: string }> {
   const response = await sendHttpRequest({
     ...emptyHttpRequest(),
     requestId: `import-url-${Date.now()}`,
@@ -48,11 +54,16 @@ async function fetchImportDocument(url: string): Promise<{ body: string; content
     followRedirects: true,
     maxRedirects: 10,
     timeoutMs: 30000,
-    enableSSLVerification: true,
+    enableSSLVerification: !options.skipTlsVerification,
     encodeUrlAutomatically: true,
     disableCookieJar: true,
   });
-  if (response.error && !response.statusCode) throw new Error(response.error);
+  if (response.error && !response.statusCode) {
+    if (!options.skipTlsVerification && looksLikeTlsCertificateError(response.error)) {
+      throw new Error(`${response.error}. If you trust this server, import again with "Skip TLS certificate check" ticked.`);
+    }
+    throw new Error(response.error);
+  }
   if (response.statusCode >= 400) {
     throw new Error(`That URL answered ${response.status || response.statusCode}.`);
   }
@@ -116,7 +127,8 @@ type ImportExportHost = {
   importPostmanPayload: (payload: unknown, fileName: string) => Promise<number>;
   importInsomniaPayload: (payload: unknown, fileName: string) => Promise<number>;
   importOpenApiPayload: (payload: unknown, fileName: string) => Promise<number>;
-  importOpenApiFromUrl: (specUrl: string) => Promise<number>;
+  importOpenApiFromUrl: (specUrl: string, options?: UrlImportOptions) => Promise<number>;
+  openPromptWithToggleDialog: (title: string, message: string, placeholder: string, confirmLabel: string, toggle: { label: string; hint?: string }) => Promise<{ value: string; checked: boolean } | null>;
   openOpenApiUrlImport: () => Promise<void>;
   exportCollectionToOpenCollection: (collectionId: string) => Promise<void>;
   exportCollectionToPostman: (collectionId: string) => Promise<void>;
@@ -152,17 +164,17 @@ export const importExportFeature = {
   },
   async openOpenApiUrlImport(this: ImportExportHost) {
     if (!this.guardWorkspaceWritable('Importing')) return;
-    const entered = await this.openPromptDialog(
+    const entered = await this.openPromptWithToggleDialog(
       'Import from URL',
-      '',
       'Paste a link to an OpenAPI 3.x or Swagger 2.0 document. Kurlo fetches it and builds a collection from the paths it declares.',
       'https://api.example.com/openapi.json',
       'Import',
+      { label: 'Skip TLS certificate check', hint: 'For self-signed or internal certificates. Only use it for a server you trust.' },
     );
-    if (!entered?.trim()) return;
+    if (!entered?.value.trim()) return;
     this.collectionImportToast = 'Fetching spec…';
     try {
-      const count = await this.importOpenApiFromUrl(entered);
+      const count = await this.importOpenApiFromUrl(entered.value, { skipTlsVerification: entered.checked });
       this.collectionImportToast = this.collectionImportSummary
         || (count ? `Imported ${count} request${count === 1 ? '' : 's'}` : 'Imported empty collection');
       this.collectionImportSummary = '';
@@ -175,12 +187,12 @@ export const importExportFeature = {
     }
     setTimeout(() => (this.collectionImportToast = ''), 3200);
   },
-  async importOpenApiFromUrl(this: ImportExportHost, specUrl: string) {
+  async importOpenApiFromUrl(this: ImportExportHost, specUrl: string, options: UrlImportOptions = {}) {
     if (!this.guardWorkspaceWritable('Importing')) return 0;
     const url = normalizeSpecUrl(specUrl);
     if (!url) throw new Error('Enter a URL to import from.');
     const { parseOpenApiResponse, openApiNameFromUrl } = await import('../../openapi');
-    const { body, contentType } = await fetchImportDocument(url);
+    const { body, contentType } = await fetchImportDocument(url, options);
     const spec = parseOpenApiResponse(body, contentType);
     return this.importOpenApiPayload(spec, openApiNameFromUrl(url));
   },

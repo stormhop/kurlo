@@ -811,6 +811,7 @@ class AppVM {
   declare onWindowMouseDown: typeof menuFeature.onWindowMouseDown;
 
   declare openPromptDialog: typeof dialogFeature.openPromptDialog;
+  declare openPromptWithToggleDialog: typeof dialogFeature.openPromptWithToggleDialog;
   declare openNameDialog: typeof dialogFeature.openNameDialog;
   declare openConfirmDialog: typeof dialogFeature.openConfirmDialog;
   declare openAlertDialog: typeof dialogFeature.openAlertDialog;

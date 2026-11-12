@@ -70,6 +70,8 @@ Pick **OpenAPI / Swagger from URL** and paste the link. A spec URL is what teams
 
 The document is fetched by Kurlo itself rather than by the embedded browser, so a spec host that sends no CORS headers still works, redirects are followed, and your [proxy](/docs/guides/proxy/) and TLS settings apply. A link with no scheme is read as `https`, and no cookies are sent.
 
+If the server uses a self-signed, internal or expired certificate, tick **Skip TLS certificate check** in the same dialog. Kurlo then fetches the spec without verifying the certificate, so anyone between you and the server could change what you import: use it only for a server you trust. The box applies to that one import and is unticked every time the dialog opens; when a certificate is rejected, the error message points to it.
+
 The collection is named from the spec's `info.title`. When the spec has none, Kurlo falls back to the host rather than to a path segment like `/v3/api-docs`, which names the format instead of the API.
 
 One mistake is common enough to name: **linking to the Swagger UI page rather than the document it renders**. The page is HTML, and Kurlo says so and points at where the document usually lives — `/swagger.json`, `/openapi.json` or `/v3/api-docs` — instead of reporting a parse failure.

@@ -1,5 +1,5 @@
 import { NAME_MAX_LENGTH, clampName } from '../../constants';
-import type { AppDialogState, DialogOption } from '../../types/dialog';
+import type { AppDialogState, DialogOption, DialogToggle } from '../../types/dialog';
 
 type DialogHost = {
   appDialog: AppDialogState | null;
@@ -26,6 +26,19 @@ export const dialogFeature = {
     this.dialogInputValue = initialValue;
     return new Promise<string | null>((resolve) => {
       this.appDialog = { mode: 'prompt', title, message, confirmLabel, cancelLabel: 'Cancel', danger: false, placeholder, maxLength, resolve: (value) => resolve(typeof value === 'string' ? value : null) };
+    });
+  },
+  openPromptWithToggleDialog(this: DialogHost, title: string, message: string, placeholder: string, confirmLabel: string, toggle: Omit<DialogToggle, 'checked'>) {
+    this.closeFloatingMenus();
+    this.dialogSelectOpen = false;
+    this.dialogInputValue = '';
+    return new Promise<{ value: string; checked: boolean } | null>((resolve) => {
+      let live: AppDialogState | null = null;
+      this.appDialog = {
+        mode: 'prompt', title, message, confirmLabel, cancelLabel: 'Cancel', danger: false, placeholder, toggle: { ...toggle, checked: false },
+        resolve: (value) => resolve(typeof value === 'string' ? { value, checked: live?.mode === 'prompt' && live.toggle?.checked === true } : null),
+      };
+      live = this.appDialog;
     });
   },
   async openNameDialog(this: DialogHost, title: string, initialValue = '', message = '') {

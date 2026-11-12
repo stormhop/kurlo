@@ -441,6 +441,11 @@ class TestApp {
   workspaceDiagnosticKey(diagnostic: { path?: string }) { return diagnostic.path ?? 'diagnostic'; }
   openPromptDialog(_title: string, initialValue = '') { return Promise.resolve(this.prompts.shift() ?? initialValue); }
   openNameDialog(title: string, initialValue = '') { return this.openPromptDialog(title, initialValue); }
+  toggles: boolean[] = [];
+  openPromptWithToggleDialog() {
+    const value = this.prompts.shift() ?? '';
+    return Promise.resolve(value ? { value, checked: this.toggles.shift() ?? false } : null);
+  }
   openSelectDialog(_title: string, _message: string, options: Array<{ value: string }>) {
     return Promise.resolve(this.selects.shift() ?? options[0]?.value ?? null);
   }
@@ -1066,6 +1071,42 @@ describe('importing a spec from a URL', () => {
 
     expect(app.collections).toHaveLength(0);
     expect(app.alerts.at(-1)?.message).toMatch(/no such host/);
+  });
+
+  it('skips the certificate check when the box is ticked', async () => {
+    const app = newApp();
+    vi.mocked(backend.sendHttpRequest).mockImplementationOnce(async (req: HttpRequest) => {
+      expect(req.enableSSLVerification).toBe(false);
+      return specResponse(JSON.stringify(petstoreSpec));
+    });
+
+    app.selects.push('openapi-url');
+    app.prompts.push('https://self-signed.petstore.test/openapi.json');
+    app.toggles.push(true);
+    await app.openPostmanImport();
+
+    expect(app.collections[0].name).toBe('Petstore API');
+    expect(app.requests).toHaveLength(3);
+  });
+
+  it('suggests skipping the certificate check when it is rejected', async () => {
+    const app = newApp();
+    vi.mocked(backend.sendHttpRequest).mockImplementationOnce(async (req: HttpRequest) => {
+      expect(req.enableSSLVerification).toBe(true);
+      return {
+        ...specResponse(''),
+        statusCode: 0,
+        status: '',
+        error: 'tls: failed to verify certificate: x509: certificate signed by unknown authority',
+      };
+    });
+
+    app.selects.push('openapi-url');
+    app.prompts.push('https://self-signed.petstore.test/openapi.json');
+    await app.openPostmanImport();
+
+    expect(app.collections).toHaveLength(0);
+    expect(app.alerts.at(-1)?.message).toMatch(/unknown authority\. If you trust this server, import again with "Skip TLS certificate check" ticked\./);
   });
 
   it('does nothing when the URL prompt is dismissed', async () => {

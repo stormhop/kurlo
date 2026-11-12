@@ -7,8 +7,10 @@ vi.mock('../lib/backend', () => ({
   writeCollectionTextFiles: vi.fn(),
 }));
 
+import { sendHttpRequest } from '../lib/backend';
 import { openApiNameFromUrl, parseOpenApiResponse } from '../lib/openapi';
-import { normalizeSpecUrl } from '../lib/stores/features/importExport';
+import { dialogFeature } from '../lib/stores/features/dialogs';
+import { importExportFeature, looksLikeTlsCertificateError, normalizeSpecUrl } from '../lib/stores/features/importExport';
 
 const minimalSpec = JSON.stringify({
   openapi: '3.0.0',
@@ -98,5 +100,83 @@ describe('openApiNameFromUrl', () => {
   it('handles a root URL and an unparseable one', () => {
     expect(openApiNameFromUrl('https://api.example.test/')).toBe('api.example.test');
     expect(openApiNameFromUrl('not a url')).toBe('');
+  });
+});
+
+function urlImportHost() {
+  return {
+    guardWorkspaceWritable: () => true,
+    importOpenApiPayload: vi.fn(async () => 1),
+  };
+}
+
+function lastSentRequest() {
+  const calls = vi.mocked(sendHttpRequest).mock.calls;
+  return calls[calls.length - 1][0];
+}
+
+describe('importOpenApiFromUrl TLS verification', () => {
+  it('verifies the certificate by default', async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, body: minimalSpec, headers: [] } as never);
+    await importExportFeature.importOpenApiFromUrl.call(urlImportHost() as never, 'https://api.example.test/openapi.json');
+    expect(lastSentRequest().enableSSLVerification).toBe(true);
+  });
+
+  it('skips the certificate check when asked to', async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, body: minimalSpec, headers: [] } as never);
+    const host = urlImportHost();
+    const count = await importExportFeature.importOpenApiFromUrl.call(host as never, 'https://self-signed.example.test/openapi.json', { skipTlsVerification: true });
+    expect(lastSentRequest().enableSSLVerification).toBe(false);
+    expect(count).toBe(1);
+    expect(host.importOpenApiPayload).toHaveBeenCalledOnce();
+  });
+
+  it('points at the skip option when the certificate is rejected', async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 0, error: 'tls: failed to verify certificate: x509: certificate signed by unknown authority', headers: [] } as never);
+    await expect(importExportFeature.importOpenApiFromUrl.call(urlImportHost() as never, 'https://self-signed.example.test/openapi.json'))
+      .rejects.toThrow(/Skip TLS certificate check/);
+  });
+
+  it('does not suggest skipping when it is already skipped', async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 0, error: 'x509: certificate has expired', headers: [] } as never);
+    await expect(importExportFeature.importOpenApiFromUrl.call(urlImportHost() as never, 'https://old.example.test/openapi.json', { skipTlsVerification: true }))
+      .rejects.toThrow(/^x509: certificate has expired$/);
+  });
+
+  it('recognises certificate errors only', () => {
+    expect(looksLikeTlsCertificateError('x509: certificate signed by unknown authority')).toBe(true);
+    expect(looksLikeTlsCertificateError('dial tcp: connection refused')).toBe(false);
+  });
+});
+
+describe('openPromptWithToggleDialog', () => {
+  function dialogHost() {
+    const host = {
+      appDialog: null as import('../lib/types/dialog').AppDialogState | null,
+      dialogInputValue: '',
+      dialogSelectOpen: false,
+      closeFloatingMenus: () => {},
+      dismissDialog: () => dialogFeature.dismissDialog.call(host as never),
+      submitDialog: () => dialogFeature.submitDialog.call(host as never),
+      moveDialogSelection: () => {},
+    };
+    return host;
+  }
+
+  it('starts unticked and reports the ticked state with the value', async () => {
+    const host = dialogHost();
+    const pending = dialogFeature.openPromptWithToggleDialog.call(host as never, 'Import from URL', '', 'URL', 'Import', { label: 'Skip TLS certificate check' });
+    expect(host.appDialog?.mode === 'prompt' && host.appDialog.toggle?.checked).toBe(false);
+    host.dialogInputValue = 'https://self-signed.example.test/openapi.json';
+    if (host.appDialog?.mode === 'prompt' && host.appDialog.toggle) host.appDialog.toggle.checked = true;
+    host.submitDialog();
+    await expect(pending).resolves.toEqual({ value: 'https://self-signed.example.test/openapi.json', checked: true });
+  });
+
+  it('resolves to null when dismissed', async () => {
+    const host = dialogHost();
+    const pending = dialogFeature.openPromptWithToggleDialog.call(host as never, 'Import from URL', '', 'URL', 'Import', { label: 'Skip TLS certificate check' });
+    host.dismissDialog();
+    await expect(pending).resolves.toBeNull();
   });
 });

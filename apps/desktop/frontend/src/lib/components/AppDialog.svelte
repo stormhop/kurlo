@@ -59,6 +59,13 @@
         spellcheck="false"
         data-autofocus
       />
+      {#if dialog.toggle}
+        <label class="dialog-toggle">
+          <input class="check" type="checkbox" bind:checked={dialog.toggle.checked} />
+          <span>{dialog.toggle.label}</span>
+          {#if dialog.toggle.hint}<small class:warn={dialog.toggle.checked}>{dialog.toggle.hint}</small>{/if}
+        </label>
+      {/if}
     {/if}
     {#if dialog.mode === 'select' && dialog.options}
       {#if richSelect}
