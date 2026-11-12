@@ -28,6 +28,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Concurrent workspace saves no longer report a missing file by mistake.** Validation waits for any in-progress write before checking workspace metadata, so it cannot mistake a file being replaced for a deleted file.
 - **Smoother scrolling in large collections.** Showing a request row no longer rebuilds the entire collection tree to check whether it can be dragged. Collection groups, history groups and workspace environment lists are reused until their source data changes.
 - Imported collections and all their folders start collapsed instead of expanding the sidebar. Your later expand and collapse choices are remembered.
 - **Request rows stop looking selected after dragging.** Moving requests could leave hover backgrounds, drag handles and action buttons visible on several unrelated rows. Hover now follows the pointer and resets when a drag ends; the active request stays unchanged.

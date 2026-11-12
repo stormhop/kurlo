@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func guardStoreWithRequests(t *testing.T, count int) map[string]any {
@@ -133,4 +134,51 @@ func diskWorkspaceIDs(root string) []string {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+func TestSaveWaitsForWorkspaceWritesBeforeCheckingMissingParents(t *testing.T) {
+	withRequestStoreTestKey(t)
+	dir := t.TempDir()
+	root := filepath.Join(dir, "workspace")
+	local := filepath.Join(dir, "requests.json")
+	payload := kurloSaveFlowPayload("/saved", "token", []string{"req-main"}, "")
+	if err := saveKurloStorePayload(local, root, payload); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, fileStoreWorkspacesDir, "Main", fileStoreRootFileName)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	yamlStoreWriteMu.Lock()
+	locked := true
+	defer func() {
+		if locked {
+			_ = os.WriteFile(path, data, 0o644)
+			yamlStoreWriteMu.Unlock()
+		}
+	}()
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	result := make(chan error, 1)
+	go func() { result <- saveKurloStorePayload(local, root, payload) }()
+	select {
+	case err := <-result:
+		t.Fatalf("save checked an unfinished workspace write: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	yamlStoreWriteMu.Unlock()
+	locked = false
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("save did not finish after the workspace write completed")
+	}
 }

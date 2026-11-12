@@ -291,6 +291,8 @@ func saveKurloStorePayloadWithHints(localStorePath, workspaceRoot, payload strin
 	if err := validateWorkspaceStorePayload(store); err != nil {
 		return err
 	}
+	yamlStoreWriteMu.Lock()
+	defer yamlStoreWriteMu.Unlock()
 	if hints == nil || !hints.replaceAll {
 		if err := guardWorkspacesKept(workspaceRoot, store); err != nil {
 			return err
@@ -359,7 +361,7 @@ func saveKurloStorePayloadWithHints(localStorePath, workspaceRoot, payload strin
 				return err
 			}
 		}
-		if err := writeYAMLWorkspaceStoreWithHints(workspaceRoot, sanitizedWorkspaces, sanitizedCollections, sanitizedRequests, sanitizedEnvironments, sanitizedWorkspaceCookies, preserveDirs, hints); err != nil {
+		if err := writeYAMLWorkspaceStoreContents(workspaceRoot, sanitizedWorkspaces, sanitizedCollections, sanitizedRequests, sanitizedEnvironments, sanitizedWorkspaceCookies, preserveDirs, hints); err != nil {
 			return err
 		}
 	} else if hints != nil {
@@ -508,6 +510,10 @@ func writeYAMLWorkspaceStore(root string, workspaces, collections, requests, env
 func writeYAMLWorkspaceStoreWithHints(root string, workspaces, collections, requests, environments []map[string]any, workspaceCookies map[string][]map[string]any, preserveDirs []string, hints *workspaceSaveHints) error {
 	yamlStoreWriteMu.Lock()
 	defer yamlStoreWriteMu.Unlock()
+	return writeYAMLWorkspaceStoreContents(root, workspaces, collections, requests, environments, workspaceCookies, preserveDirs, hints)
+}
+
+func writeYAMLWorkspaceStoreContents(root string, workspaces, collections, requests, environments []map[string]any, workspaceCookies map[string][]map[string]any, preserveDirs []string, hints *workspaceSaveHints) error {
 	if err := os.MkdirAll(root, 0755); err != nil {
 		return err
 	}

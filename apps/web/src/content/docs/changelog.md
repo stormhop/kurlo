@@ -33,6 +33,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Concurrent workspace saves** no longer mistake a file being replaced by another save for a missing file.
 - **Smoother scrolling in large collections**: request rows no longer rebuild the collection tree as they appear, and sidebar data is reused until it changes.
 - Imported collections and their folders start collapsed and remember your later expand and collapse choices.
 - **Request hover after dragging**: unrelated rows no longer keep their hover background, drag handle or action buttons after reordering requests.
