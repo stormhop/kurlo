@@ -71,6 +71,11 @@ function hostFor(options: {
 } = {}) {
   const host = {
     ...examplesFeature,
+    requests: [],
+    activeRequestId: 'req-1',
+    requestExamplesLoaded: true,
+    savedRequestSnapshots: new Map(),
+    unsavedRequestSnapshots: new Map(),
     requestExamples: options.examples ?? [],
     selectedExampleId: '',
     requestTab: 'body',

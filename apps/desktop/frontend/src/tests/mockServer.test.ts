@@ -141,6 +141,7 @@ describe('mockRouteConflicts', () => {
 
 function makeHost(overrides: Record<string, unknown> = {}) {
   const host = {
+    ensureCollectionExamples: vi.fn(async () => {}),
     collections: [{ id: 'col-1', name: 'Petstore' }],
     requests: [requestWithExamples({ collectionId: 'col-1' }, [okExample])],
     activeWorkspaceId: 'workspace-main',

@@ -6,6 +6,7 @@ import { downloadTextFile } from '../../utils';
 
 export type KurloBackupPreferences = {
   autosave?: boolean;
+  autosaveDelayMs?: number;
   appTheme?: AppTheme | AppThemeMode;
   shortcuts?: Record<string, string>;
   requestSettings?: Partial<RequestSettings>;
@@ -20,10 +21,12 @@ export type KurloBackupPayload = {
 };
 
 type DataBackupHost = {
+  ensureAllRequestExamples: () => Promise<void>;
   dataTransferStatus: string;
   dataTransferStatusTimer: ReturnType<typeof setTimeout> | null;
   collectionImportToast: string;
   autosave: boolean;
+  autosaveDelayMs: number;
   appTheme: AppTheme;
   shortcutOverrides: Record<string, string>;
   proxyConfig: ProxyConfig;
@@ -43,6 +46,7 @@ type DataBackupHost = {
   applySavedRequest: (req: SavedRequest) => void;
   setProxyConfig: (config: ProxyConfig) => void;
   setAutosave: (value: boolean) => void;
+  setAutosaveDelay: (value: number) => void;
   isRecord: (value: unknown) => value is Record<string, unknown>;
   closeFloatingMenus: () => void;
   hasUnsavedRequestChanges: () => boolean;
@@ -81,6 +85,7 @@ export const dataBackupFeature = {
       store,
       preferences: {
         autosave: this.autosave,
+        autosaveDelayMs: this.autosaveDelayMs,
         appTheme: this.appTheme,
         shortcuts: { ...this.shortcutOverrides },
         requestSettings: this.currentRequestSettings(),
@@ -131,6 +136,9 @@ export const dataBackupFeature = {
     if (typeof preferences.autosave === 'boolean') {
       this.setAutosave(preferences.autosave);
     }
+    if (typeof preferences.autosaveDelayMs === 'number') {
+      this.setAutosaveDelay(preferences.autosaveDelayMs);
+    }
   },
   async exportAllData(this: DataBackupHost) {
     this.closeFloatingMenus();
@@ -144,6 +152,7 @@ export const dataBackupFeature = {
     if (!confirmed) return;
 
     await this.persistActiveRequestNow();
+    await this.ensureAllRequestExamples();
     const storeRequests = this.requestsForStore(this.requests);
     const store = this.requestStorePayload(storeRequests, this.activeRequestId, this.openRequestIds);
     const payload = this.kurloBackupPayload(store);

@@ -203,8 +203,16 @@ export function cloneRequestExample(example: RequestExample): RequestExample {
   };
 }
 
+export function requestExamplesPending(req: Pick<SavedRequest, 'examples' | 'exampleCount'> | undefined): boolean {
+  return Boolean(req) && req!.examples === undefined && (req!.exampleCount ?? 0) > 0;
+}
+
+export function requestExampleCount(req: Pick<SavedRequest, 'examples' | 'exampleCount'> | undefined): number {
+  return req?.examples?.length ?? req?.exampleCount ?? 0;
+}
+
 export function normalizeRequestExamples(input: unknown, requestId: string): RequestExample[] | undefined {
-  if (!Array.isArray(input) || input.length === 0) return undefined;
+  if (!Array.isArray(input)) return undefined;
   return input
     .filter((item): item is Partial<RequestExample> => Boolean(item) && typeof item === 'object')
     .map(item => normalizeRequestExample(item, requestId));

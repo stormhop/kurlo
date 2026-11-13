@@ -1,8 +1,16 @@
-import type { HttpResponse } from '../../backend';
-import { cloneRequestExample, exampleFromResponse, exampleHasRawSecret, mediaTypeOf } from '../../examples';
+import { loadRequestExamples, type HttpResponse } from '../../backend';
+import { cloneRequestExample, exampleFromResponse, exampleHasRawSecret, mediaTypeOf, normalizeRequestExamples, requestExamplesPending } from '../../examples';
 import type { RequestExample, RequestTab, SavedRequest } from '../../types/models';
 
 type ExamplesHost = {
+  requests: SavedRequest[];
+  activeRequestId: string;
+  requestExamplesLoaded: boolean;
+  savedRequestSnapshots: Map<string, SavedRequest>;
+  unsavedRequestSnapshots: Map<string, SavedRequest>;
+  ensureRequestExamples: (ids: string[]) => Promise<void>;
+  ensureCollectionExamples: (collectionId: string) => Promise<void>;
+  ensureAllRequestExamples: () => Promise<void>;
   requestExamples: RequestExample[];
   selectedExampleId: string;
   requestTab: RequestTab;
@@ -16,7 +24,7 @@ type ExamplesHost = {
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
-  addCapturedExample: (example: RequestExample) => void;
+  addCapturedExample: (example: RequestExample) => Promise<void>;
   selectedExample: () => RequestExample | null;
   selectExample: (id: string) => void;
   saveResponseAsExample: () => Promise<void>;
@@ -30,6 +38,14 @@ type ExamplesHost = {
 
 const EXAMPLE_TOAST_MS = 2200;
 const EXAMPLE_WARNING_TOAST_MS = 5000;
+
+const examplesInFlight = new WeakMap<object, Map<string, Promise<void>>>();
+
+function withLoadedExamples(req: SavedRequest, examples: RequestExample[]): SavedRequest {
+  const next: SavedRequest = { ...req, examples: examples.map(cloneRequestExample) };
+  delete next.exampleCount;
+  return next;
+}
 
 function showExampleToast(host: ExamplesHost, message: string, ms: number) {
   host.collectionImportToast = message;
@@ -48,6 +64,64 @@ function uniqueExampleName(existing: RequestExample[], desired: string): string 
 }
 
 export const examplesFeature = {
+  async ensureRequestExamples(this: ExamplesHost, ids: string[]) {
+    let inFlight = examplesInFlight.get(this);
+    if (!inFlight) {
+      inFlight = new Map();
+      examplesInFlight.set(this, inFlight);
+    }
+    const waiting: Promise<void>[] = [];
+    const pending: string[] = [];
+    for (const id of new Set(ids)) {
+      const running = inFlight.get(id);
+      if (running) waiting.push(running);
+      else if (requestExamplesPending(this.requests.find(req => req.id === id))) pending.push(id);
+    }
+    if (pending.length) {
+      const job = (async () => {
+        const loaded = await loadRequestExamples(pending);
+        const byId = new Map<string, RequestExample[]>();
+        for (const id of pending) {
+          if (!Object.prototype.hasOwnProperty.call(loaded, id)) continue;
+          byId.set(id, normalizeRequestExamples(loaded[id], id) ?? []);
+        }
+        if (!byId.size) return;
+        this.requests = this.requests.map(req => {
+          const examples = byId.get(req.id);
+          return examples && requestExamplesPending(req) ? withLoadedExamples(req, examples) : req;
+        });
+        const saved = new Map(this.savedRequestSnapshots);
+        for (const [id, examples] of byId) {
+          const snapshot = saved.get(id);
+          if (snapshot && requestExamplesPending(snapshot)) saved.set(id, withLoadedExamples(snapshot, examples));
+          const unsaved = this.unsavedRequestSnapshots.get(id);
+          if (unsaved && requestExamplesPending(unsaved)) this.unsavedRequestSnapshots.set(id, withLoadedExamples(unsaved, examples));
+        }
+        this.savedRequestSnapshots = saved;
+        const active = byId.get(this.activeRequestId);
+        if (active && !this.requestExamplesLoaded) {
+          this.requestExamples = active.map(cloneRequestExample);
+          if (!this.requestExamples.some(example => example.id === this.selectedExampleId)) this.selectedExampleId = this.requestExamples[0]?.id ?? '';
+          this.requestExamplesLoaded = true;
+        }
+      })();
+      for (const id of pending) inFlight.set(id, job);
+      waiting.push(job);
+      void job.finally(() => {
+        for (const id of pending) if (inFlight!.get(id) === job) inFlight!.delete(id);
+      }).catch(() => {});
+    }
+    await Promise.all(waiting);
+  },
+
+  async ensureCollectionExamples(this: ExamplesHost, collectionId: string) {
+    await this.ensureRequestExamples(this.requests.filter(req => req.collectionId === collectionId).map(req => req.id));
+  },
+
+  async ensureAllRequestExamples(this: ExamplesHost) {
+    await this.ensureRequestExamples(this.requests.map(req => req.id));
+  },
+
   selectedExample(this: ExamplesHost): RequestExample | null {
     if (!this.requestExamples.length) return null;
     return this.requestExamples.find(example => example.id === this.selectedExampleId) ?? this.requestExamples[0];
@@ -57,7 +131,9 @@ export const examplesFeature = {
     this.selectedExampleId = id;
   },
 
-  addCapturedExample(this: ExamplesHost, example: RequestExample) {
+  async addCapturedExample(this: ExamplesHost, example: RequestExample) {
+    if (!this.requestExamplesLoaded) await this.ensureRequestExamples([this.activeRequestId]);
+    if (!this.requestExamplesLoaded) return;
     const captured = cloneRequestExample(example);
     captured.requestId = this.snapshotActiveRequest().id;
     captured.name = uniqueExampleName(this.requestExamples, captured.name || String(captured.response.statusCode));
@@ -78,7 +154,7 @@ export const examplesFeature = {
     const response = this.response;
     if (!response) return;
 
-    this.addCapturedExample(exampleFromResponse(this.snapshotActiveRequest(), response, {
+    await this.addCapturedExample(exampleFromResponse(this.snapshotActiveRequest(), response, {
       secretValues: this.activeSecretEnvironmentValues(),
     }));
   },

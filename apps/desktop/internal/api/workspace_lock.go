@@ -106,7 +106,8 @@ func loadKurloStorePayloadRemembering(localStorePath, root string) (string, []Wo
 	if err != nil {
 		return "", diagnostics, err
 	}
-	payload, err := json.MarshalIndent(store, "", "  ")
+	loadedRequestExamples.replace(root, moveRequestExamplesOut(store))
+	payload, err := json.Marshal(store)
 	if err != nil {
 		return "", diagnostics, err
 	}

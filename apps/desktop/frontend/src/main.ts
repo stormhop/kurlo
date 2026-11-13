@@ -12,6 +12,10 @@ applyUiScale();
 
 const target = document.getElementById('app') as HTMLElement;
 
+if (import.meta.env.DEV) {
+  void import('./lib/devRecovery').then(({ installDevRecovery }) => installDevRecovery(target));
+}
+
 const app = mount(App, {
   target
 });

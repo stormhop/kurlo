@@ -36,7 +36,7 @@ var gitCredentialURLPattern = regexp.MustCompile(`(https?://)[^/\s:@]+:[^/\s@]+@
 
 var kurloRunnerReportArtifactPattern = regexp.MustCompile(`-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.html$`)
 
-var gitOperationMu sync.RWMutex
+var gitOperationMu workspaceOperationLock
 var workspaceGitignoreMu sync.Mutex
 
 type GitFileStatus struct {

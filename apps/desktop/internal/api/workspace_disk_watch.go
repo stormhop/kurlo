@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -328,6 +330,10 @@ func (t *workspaceDiskTracker) markAnnounced(root string) {
 	}
 }
 
+var workspaceWindowMinimised = func(ctx context.Context) bool {
+	return ctx != nil && runtime.WindowIsMinimised(ctx)
+}
+
 func (a *App) watchWorkspaceDisk(ctx context.Context) {
 	ticker := time.NewTicker(workspaceDiskPollInterval)
 	defer ticker.Stop()
@@ -337,18 +343,26 @@ func (a *App) watchWorkspaceDisk(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if seen := a.globalsRevision.Load(); seen != nil {
-				revision := currentProfileGlobalsRevision()
-				if revision != "" && revision != *seen && revision != announcedGlobals {
-					announcedGlobals = revision
-					a.emitWorkspaceChanged(workspaceAgentChangeNote)
-				}
-			}
-			if changed, reason := a.workspaceChangedOutside(); changed {
-				a.emitWorkspaceChanged(reason)
-			}
+			a.pollWorkspaceDisk(ctx, &announcedGlobals)
 		}
 	}
+}
+
+func (a *App) pollWorkspaceDisk(ctx context.Context, announcedGlobals *string) bool {
+	if workspaceWindowMinimised(ctx) {
+		return false
+	}
+	if seen := a.globalsRevision.Load(); seen != nil {
+		revision := currentProfileGlobalsRevision()
+		if revision != "" && revision != *seen && revision != *announcedGlobals {
+			*announcedGlobals = revision
+			a.emitWorkspaceChanged(workspaceAgentChangeNote)
+		}
+	}
+	if changed, reason := a.workspaceChangedOutside(); changed {
+		a.emitWorkspaceChanged(reason)
+	}
+	return true
 }
 
 func (a *App) workspaceChangedOutside() (bool, string) {

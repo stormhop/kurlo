@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
 )
 
 const (
@@ -92,12 +94,95 @@ func writeRequestExamples(collectionDir, requestSegment string, examples []map[s
 	return nil
 }
 
-func readRequestExamples(collectionDir, requestSegment, workspaceRoot, workspaceID, collectionID, requestID string, validator *workspaceIntegrityValidator) ([]map[string]any, []WorkspaceDiagnostic) {
+type parsedExampleFile struct {
+	doc filesystemExampleFile
+	err error
+}
+
+type requestExampleScan struct {
+	entries []os.DirEntry
+	err     error
+	files   map[string]parsedExampleFile
+}
+
+func scanRequestExampleDir(exampleDir string) requestExampleScan {
+	entries, err := readDirNoSymlink(exampleDir)
+	if err != nil {
+		return requestExampleScan{err: err}
+	}
+	files := make(map[string]parsedExampleFile, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != fileStoreYAMLExt {
+			continue
+		}
+		path := filepath.Join(exampleDir, entry.Name())
+		var parsed parsedExampleFile
+		if entry.Type()&os.ModeSymlink != 0 {
+			parsed.err = fmt.Errorf("read %s: refusing to read symlink", path)
+		} else {
+			parsed.err = readYAMLRegularFile(path, &parsed.doc)
+		}
+		files[entry.Name()] = parsed
+	}
+	return requestExampleScan{entries: entries, files: files}
+}
+
+func scanRequestExampleDirs(dirs []string) map[string]requestExampleScan {
+	scans := make(map[string]requestExampleScan, len(dirs))
+	if len(dirs) == 0 {
+		return scans
+	}
+	workers := runtime.GOMAXPROCS(0) * 2
+	if workers > 16 {
+		workers = 16
+	}
+	if workers > len(dirs) {
+		workers = len(dirs)
+	}
+	type result struct {
+		dir  string
+		scan requestExampleScan
+	}
+	jobs := make(chan string)
+	results := make(chan result)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for dir := range jobs {
+				results <- result{dir: dir, scan: scanRequestExampleDir(dir)}
+			}
+		}()
+	}
+	go func() {
+		for _, dir := range dirs {
+			jobs <- dir
+		}
+		close(jobs)
+		wg.Wait()
+		close(results)
+	}()
+	for item := range results {
+		scans[item.dir] = item.scan
+	}
+	return scans
+}
+
+func requestExampleDir(collectionDir, requestSegment string) string {
+	return filepath.Join(collectionDir, fileStoreExamplesDir, requestSegment)
+}
+
+func readRequestExamples(collectionDir, requestSegment, workspaceRoot, workspaceID, collectionID, requestID string, validator *workspaceIntegrityValidator, scanned map[string]requestExampleScan) ([]map[string]any, []WorkspaceDiagnostic) {
 	if requestSegment == "" {
 		return nil, nil
 	}
-	exampleDir := filepath.Join(collectionDir, fileStoreExamplesDir, requestSegment)
-	entries, err := readDirNoSymlink(exampleDir)
+	exampleDir := requestExampleDir(collectionDir, requestSegment)
+	scan, ok := scanned[exampleDir]
+	if !ok {
+		scan = scanRequestExampleDir(exampleDir)
+	}
+	entries, err := scan.entries, scan.err
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
@@ -121,8 +206,12 @@ func readRequestExamples(collectionDir, requestSegment, workspaceRoot, workspace
 			continue
 		}
 		path := filepath.Join(exampleDir, entry.Name())
-		var doc filesystemExampleFile
-		if err := readYAMLFile(path, &doc); err != nil {
+		parsed, ok := scan.files[entry.Name()]
+		if !ok {
+			parsed.err = readYAMLFile(path, &parsed.doc)
+		}
+		doc := parsed.doc
+		if err := parsed.err; err != nil {
 			diagnostics = append(diagnostics, workspaceDiagnostic{
 				scope: workspaceIntegrityScope, blocking: true, path: path, root: workspaceRoot, err: err,
 				workspaceID: workspaceID, collectionID: collectionID, requestID: requestID,

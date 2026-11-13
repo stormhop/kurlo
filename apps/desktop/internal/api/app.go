@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -25,26 +26,27 @@ var appVersion = "dev"
 const maxTextFileReadSize = 100 * 1024 * 1024
 
 type App struct {
-	ctx             context.Context
-	quit            *quitGate
-	requestMu       sync.Mutex
-	requestSeq      uint64
-	requestCancels  map[string]requestCancel
-	state           *state.Manager
-	cookieJars      *cookieJarRegistry
-	preflightCache  *preflightCache
-	sse             *sseManager
-	ws              *websocketManager
-	sio             *socketIOManager
-	mock            *mockServer
-	cookieSync      *cookieSyncServer
-	binaryBodies    *binaryResponseCache
-	mcpSessions     *mcpSessionRegistry
-	loadRuns        loadRunManager
-	agentOnce       sync.Once
-	agent           *agentRuntime
-	agentEmit       aiEmitter
-	globalsRevision atomic.Pointer[string]
+	ctx               context.Context
+	workspacePrefetch workspacePrefetchSlot
+	quit              *quitGate
+	requestMu         sync.Mutex
+	requestSeq        uint64
+	requestCancels    map[string]requestCancel
+	state             *state.Manager
+	cookieJars        *cookieJarRegistry
+	preflightCache    *preflightCache
+	sse               *sseManager
+	ws                *websocketManager
+	sio               *socketIOManager
+	mock              *mockServer
+	cookieSync        *cookieSyncServer
+	binaryBodies      *binaryResponseCache
+	mcpSessions       *mcpSessionRegistry
+	loadRuns          loadRunManager
+	agentOnce         sync.Once
+	agent             *agentRuntime
+	agentEmit         aiEmitter
+	globalsRevision   atomic.Pointer[string]
 }
 
 type SaveRequestStoreResult struct {
@@ -77,6 +79,7 @@ func NewApp() *App {
 
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	a.prefetchWorkspace()
 	go a.watchWorkspaceDisk(ctx)
 	repairStaleBundleInBackground(ctx)
 	go refreshInstalledBrowserExtensions()
@@ -258,22 +261,41 @@ func (a *App) SaveFileDialog(defaultName string, content string) string {
 	return path
 }
 
+type WorkspaceLoadResult struct {
+	Payload     string                `json:"payload"`
+	Diagnostics []WorkspaceDiagnostic `json:"diagnostics"`
+}
+
 func (a *App) LoadRequestStore() string {
+	return a.LoadWorkspace().Payload
+}
+
+func (a *App) LoadWorkspace() WorkspaceLoadResult {
+	root := fileWorkspaceStorePath()
+	if result, ok := a.takePrefetchedWorkspace(root); ok {
+		return result
+	}
 	gitOperationMu.RLock()
 	defer gitOperationMu.RUnlock()
-	root := fileWorkspaceStorePath()
-	payload, _, err := loadKurloStorePayloadRemembering(requestStorePath(), root)
+	return a.loadWorkspaceLocked(root)
+}
+
+func (a *App) loadWorkspaceLocked(root string) WorkspaceLoadResult {
+	payload, diagnostics, err := loadKurloStorePayloadRemembering(requestStorePath(), root)
+	if diagnostics == nil {
+		diagnostics = []WorkspaceDiagnostic{}
+	}
 	if errors.Is(err, os.ErrNotExist) {
 		failedStoreLoads.note(root, nil)
 	} else {
 		failedStoreLoads.note(root, err)
 	}
 	if err != nil {
-		return ""
+		return WorkspaceLoadResult{Diagnostics: diagnostics}
 	}
 	revision := profileGlobalsRevision(payload)
 	a.globalsRevision.Store(&revision)
-	return payload
+	return WorkspaceLoadResult{Payload: payload, Diagnostics: diagnostics}
 }
 
 func (a *App) LoadWorkspaceDiagnostics() []WorkspaceDiagnostic {
@@ -339,22 +361,99 @@ func (a *App) saveRequestStorePayload(payload string, replaceAll bool) error {
 		hints = workspaceDisk.saveHints(root)
 	}
 	hints.replaceAll = replaceAll
+	payload, savedExamples, err := withUnloadedRequestExamples(root, payload, replaceAll)
+	if err != nil {
+		return err
+	}
 	if err := a.writeRequestStorePayload(root, payload, hints); err != nil {
+		loadedRequestExamples.forget(root)
 		return err
 	}
 	workspaceDisk.remember(root)
 	if len(external) == 0 {
+		loadedRequestExamples.replace(root, savedExamples)
 		if hints.healthy && hints.segments != nil {
 			workspaceDisk.rememberSavedSegments(root, hints.segments)
 		}
 		return nil
 	}
+	loadedRequestExamples.forget(root)
 	reason := workspaceDisk.changeReason(root, external)
 	if err := reapplyExternalChanges(root, before, external); err != nil {
 		return err
 	}
 	a.emitWorkspaceChanged(reason)
 	return nil
+}
+
+func withUnloadedRequestExamples(root, payload string, replaceAll bool) (string, map[string]json.RawMessage, error) {
+	store, err := decodeJSONMap(payload)
+	if err != nil {
+		return "", nil, err
+	}
+	previous := map[string]json.RawMessage{}
+	if replaceAll {
+		for _, request := range mapSlice(store["requests"]) {
+			delete(request, exampleCountField)
+		}
+	} else {
+		cached, err := requestExamplesForRoot(root)
+		if err != nil {
+			return "", nil, err
+		}
+		if err := attachUnloadedRequestExamples(store, cached); err != nil {
+			return "", nil, err
+		}
+		previous = cached
+	}
+	saved := requestExamplesAfterSave(store, previous)
+	encoded, err := json.Marshal(store)
+	if err != nil {
+		return "", nil, err
+	}
+	return string(encoded), saved, nil
+}
+
+func requestExamplesForRoot(root string) (map[string]json.RawMessage, error) {
+	if cached, ok := loadedRequestExamples.snapshot(root); ok {
+		return cached, nil
+	}
+	if !hasYAMLWorkspaceStore(root) {
+		return map[string]json.RawMessage{}, nil
+	}
+	store, _, err := loadKurloStoreWithDiagnostics(requestStorePath(), root)
+	if err != nil {
+		return nil, err
+	}
+	examples := moveRequestExamplesOut(store)
+	loadedRequestExamples.replace(root, examples)
+	return examples, nil
+}
+
+func (a *App) LoadRequestExamples(requestIDs []string) map[string][]any {
+	root := fileWorkspaceStorePath()
+	result := map[string][]any{}
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		return result
+	}
+	defer unlock()
+	cached, err := requestExamplesForRoot(root)
+	if err != nil {
+		return result
+	}
+	for _, id := range requestIDs {
+		encoded, ok := cached[id]
+		if !ok {
+			result[id] = []any{}
+			continue
+		}
+		var examples []any
+		if json.Unmarshal(encoded, &examples) == nil {
+			result[id] = examples
+		}
+	}
+	return result
 }
 
 func (a *App) writeRequestStorePayload(root, payload string, hints *workspaceSaveHints) error {

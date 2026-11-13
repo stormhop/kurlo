@@ -3,11 +3,19 @@ import type { MockRequestLog, MockServerStatus } from '../../backend';
 import { EMPTY_MOCK_SERVER_STATUS } from '../../wire';
 import { DEFAULT_MOCK_PORT, mockRoutesForCollection, mockRoutesSignature } from '../../mockRoutes';
 import type { Collection, SavedRequest } from '../../types/models';
+import { requestExampleCount, requestExamplesPending } from '../../examples';
 
 const MOCK_MAX_LOG_ENTRIES = 200;
 const MOCK_RELOAD_DEBOUNCE_MS = 400;
 
+function loadPendingCollectionExamples(host: MockServerHost, collectionId: string) {
+  if (!collectionId) return;
+  if (!host.requests.some(request => request.collectionId === collectionId && requestExamplesPending(request))) return;
+  queueMicrotask(() => void host.ensureCollectionExamples(collectionId));
+}
+
 type MockServerHost = {
+  ensureCollectionExamples: (collectionId: string) => Promise<void>;
   collections: Collection[];
   requests: SavedRequest[];
   activeWorkspaceId: string;
@@ -58,15 +66,18 @@ export const mockServerFeature = {
   mockServerTargetCollectionId(this: MockServerHost) {
     if (this.mockServerCollectionId) return this.mockServerCollectionId;
     const withExamples = this.collections.find(collection =>
-      this.requests.some(request => request.collectionId === collection.id && request.examples?.length));
+      this.requests.some(request => request.collectionId === collection.id && requestExampleCount(request) > 0));
     return withExamples?.id ?? this.collections[0]?.id ?? '';
   },
 
   mockServerRoutes(this: MockServerHost) {
-    return mockRoutesForCollection(this.requests, this.mockServerTargetCollectionId());
+    const collectionId = this.mockServerTargetCollectionId();
+    loadPendingCollectionExamples(this, collectionId);
+    return mockRoutesForCollection(this.requests, collectionId);
   },
 
   mockServerRunningRoutes(this: MockServerHost) {
+    loadPendingCollectionExamples(this, this.mockServer.collectionId);
     return mockRoutesForCollection(this.requests, this.mockServer.collectionId);
   },
 
@@ -80,7 +91,7 @@ export const mockServerFeature = {
       name: collection.name,
       exampleCount: this.requests
         .filter(request => request.collectionId === collection.id)
-        .reduce((total, request) => total + (request.examples?.length ?? 0), 0),
+        .reduce((total, request) => total + requestExampleCount(request), 0),
     }));
   },
 
@@ -106,6 +117,7 @@ export const mockServerFeature = {
       return;
     }
     const reloading = Boolean(options.collectionId);
+    await this.ensureCollectionExamples(collectionId);
     const routes = mockRoutesForCollection(this.requests, collectionId);
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     this.mockServerBusy = true;
@@ -177,6 +189,7 @@ export const mockServerFeature = {
       this.scheduleMockServerReload();
       return;
     }
+    await this.ensureCollectionExamples(this.mockServer.collectionId);
     if (!this.mockServerRoutesChanged()) return;
     await this.startMockServerForCollection({ keepLog: true, collectionId: this.mockServer.collectionId });
   },

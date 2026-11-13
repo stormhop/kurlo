@@ -7,7 +7,11 @@
 </script>
 
 <div class="examples-tab">
-  {#if vm.requestExamples.length === 0}
+  {#if !vm.requestExamplesLoaded}
+    <div class="empty-state examples-empty" role="status">
+      <p class="empty-state-text examples-empty-hint">Loading examples…</p>
+    </div>
+  {:else if vm.requestExamples.length === 0}
     <div class="empty-state examples-empty">
       <p class="empty-state-title examples-empty-title">No saved examples</p>
       <p class="empty-state-text examples-empty-hint">

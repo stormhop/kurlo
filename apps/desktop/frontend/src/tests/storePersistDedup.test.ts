@@ -12,7 +12,7 @@ import { saveRequestStore } from '../lib/backend';
 import { requestCrudFeature } from '../lib/stores/features/requestCrud';
 import { requestPersistenceFeature } from '../lib/stores/features/requestPersistence';
 
-type Req = { id: string; name: string; isDraft?: boolean };
+type Req = { id: string; name: string; isDraft?: boolean; examples?: unknown[]; exampleCount?: number };
 
 function storeHost(requests: Req[]) {
   return {
@@ -31,7 +31,13 @@ function storeHost(requests: Req[]) {
     requestStorePersistEpoch: 0,
     requestStorePersistQueue: Promise.resolve() as Promise<unknown>,
     requestsForStore: (next: Req[]) => next,
-    requestStorePayload: (next: Req[]) => ({ requests: next.map(req => ({ ...req })) }),
+    requestStorePayload: (next: Req[], activeId?: string, openIds?: string[]) => ({
+      activeId: activeId ?? '',
+      openIds: openIds ?? [],
+      requests: next.map(req => ({ ...req })),
+    }),
+    writeRequestStoreView: vi.fn(async (): Promise<{ ok: boolean; error: string } | null | false> => ({ ok: true, error: '' })),
+    savedRequestSnapshots: new Map<string, Req>(),
     recordSavedRequestSnapshots: vi.fn(),
     scheduleGitStatusRefreshAfterPersist: vi.fn(),
     refreshPendingExternalWorkspaceChangeIfClean: vi.fn(),
@@ -40,8 +46,8 @@ function storeHost(requests: Req[]) {
   };
 }
 
-function persist(host: ReturnType<typeof storeHost>, requests = host.requests) {
-  return requestPersistenceFeature.persistRequestStore.call(host as never, requests as never);
+function persist(host: ReturnType<typeof storeHost>, requests = host.requests, activeId = 'r1', openIds = ['r1']) {
+  return requestPersistenceFeature.persistRequestStore.call(host as never, requests as never, activeId, openIds);
 }
 
 function savedPayloads() {
@@ -130,6 +136,71 @@ describe('request store persistence dedup', () => {
     expect(await persist(host)).toBe(true);
 
     expect(saveRequestStore).toHaveBeenCalledTimes(2);
+  });
+
+  it('saves only the open tabs when nothing else changed', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A' }, { id: 'r2', name: 'B' }]);
+
+    await persist(host, host.requests, 'r1', ['r1']);
+    expect(await persist(host, host.requests, 'r2', ['r1', 'r2'])).toBe(true);
+    expect(await persist(host, host.requests, 'r2', ['r1', 'r2'])).toBe(true);
+
+    expect(saveRequestStore).toHaveBeenCalledTimes(1);
+    expect(host.writeRequestStoreView).toHaveBeenCalledTimes(1);
+    expect(host.writeRequestStoreView).toHaveBeenCalledWith('r2', ['r1', 'r2'], '');
+  });
+
+  it('writes the whole store when saving the open tabs fails', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A' }]);
+    host.writeRequestStoreView.mockResolvedValueOnce({ ok: false, error: 'disk full' });
+
+    await persist(host, host.requests, 'r1', ['r1']);
+    expect(await persist(host, host.requests, '', [])).toBe(true);
+
+    expect(saveRequestStore).toHaveBeenCalledTimes(2);
+  });
+
+  it('writes the whole store when there is no view endpoint', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A' }]);
+    host.writeRequestStoreView.mockResolvedValueOnce(null);
+
+    await persist(host, host.requests, 'r1', ['r1']);
+    expect(await persist(host, host.requests, '', [])).toBe(true);
+
+    expect(saveRequestStore).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not write a store that was just loaded', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A' }]);
+
+    requestPersistenceFeature.rememberLoadedRequestStore.call(host as never);
+    expect(await persist(host, host.requests, '', [])).toBe(true);
+
+    expect(saveRequestStore).not.toHaveBeenCalled();
+  });
+
+  it('writes a change made after loading', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A' }]);
+
+    requestPersistenceFeature.rememberLoadedRequestStore.call(host as never);
+    await persist(host, [{ id: 'r1', name: 'B' }], '', []);
+
+    expect(savedPayloads()).toEqual(['B']);
+  });
+
+  it('does not count examples loaded from disk as a change', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A', exampleCount: 1 }]);
+    requestPersistenceFeature.rememberLoadedRequestStore.call(host as never);
+
+    const examples = [{ id: 'e1', name: '200' }];
+    host.requests = [{ id: 'r1', name: 'A', examples }];
+    host.savedRequestSnapshots.set('r1', { id: 'r1', name: 'A', examples });
+    expect(await persist(host, host.requests, '', [])).toBe(true);
+    expect(saveRequestStore).not.toHaveBeenCalled();
+
+    host.requests = [{ id: 'r1', name: 'A', examples: [{ id: 'e1', name: '201' }] }];
+    await persist(host, host.requests, '', []);
+    expect(saveRequestStore).toHaveBeenCalledTimes(1);
   });
 
   it('saves again after the store was reloaded', async () => {
