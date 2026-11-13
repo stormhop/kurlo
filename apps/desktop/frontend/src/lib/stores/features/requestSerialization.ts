@@ -5,6 +5,9 @@ import {
   collectionSecretVariableKeys,
   collectionSecretVariableValues,
   collectionVariableValues,
+  requestSecretVariableKeys,
+  requestSecretVariableValues,
+  requestVariableValues,
   valuesWithBrunoPriority,
 } from '../../collectionDefaults';
 import { serializeGraphQLPayload, type GraphQLPayload } from '../../graphql';
@@ -26,6 +29,20 @@ import type {
 
 const RAW_BODY_TYPES = ['text', 'json', 'html', 'xml'] as const;
 
+function requestVariableFieldsForSend(req: SavedRequest, values: Record<string, string>, requestType: RequestType): Pick<HttpRequest, 'requestVariables' | 'postResponseVars'> {
+  const requestVariables: Record<string, string> = {};
+  for (const key of Object.keys(requestVariableValues(req.vars))) {
+    if (Object.prototype.hasOwnProperty.call(values, key)) requestVariables[key] = values[key];
+  }
+  const postResponseVars = requestTypeSupportsAssertions(requestType)
+    ? (req.postResponseVars ?? []).filter(row => row.enabled && row.key.trim()).map(row => ({ key: row.key.trim(), value: row.value, enabled: true, isFile: false, fileName: '', contentType: '' }))
+    : [];
+  return {
+    ...(Object.keys(requestVariables).length ? { requestVariables } : {}),
+    ...(postResponseVars.length ? { postResponseVars } : {}),
+  };
+}
+
 export type RunnableHttpOptions = {
   deferTemplates?: boolean;
   workspaceId?: string;
@@ -44,7 +61,7 @@ type RequestSerializationHost = {
   activeSecretEnvironmentValues: () => string[];
   globalVariableValues?: () => Record<string, string>;
   collectionForRequest: (req: Pick<SavedRequest, 'collectionId'>) => Collection | undefined;
-  environmentValuesForRequest: (req: Pick<SavedRequest, 'collectionId'>, envValues?: Record<string, string>, globals?: Record<string, string>) => Record<string, string>;
+  environmentValuesForRequest: (req: Pick<SavedRequest, 'collectionId' | 'vars'>, envValues?: Record<string, string>, globals?: Record<string, string>) => Record<string, string>;
   graphQLBodyForSend: (payload: GraphQLPayload) => string;
   graphQLPayloadFromRequest: (req: Pick<SavedRequest, 'bodyContent'>) => GraphQLPayload;
   normalizeRequestTypeValue: (value: unknown, url?: string) => RequestType;
@@ -79,27 +96,27 @@ type RequestSerializationHost = {
 export const requestSerializationFeature = {
   environmentValuesForRequest(
     this: RequestSerializationHost,
-    req: Pick<SavedRequest, 'collectionId'>,
+    req: Pick<SavedRequest, 'collectionId' | 'vars'>,
     envValues = this.activeEnvironmentValues(),
     globals = this.globalVariableValues?.() ?? {},
   ) {
-    return valuesWithBrunoPriority(this.collectionForRequest(req), envValues, globals);
+    return valuesWithBrunoPriority(this.collectionForRequest(req), envValues, globals, req.vars);
   },
 
   secretEnvironmentKeysForRequest(
     this: RequestSerializationHost,
-    req: Pick<SavedRequest, 'collectionId'>,
+    req: Pick<SavedRequest, 'collectionId' | 'vars'>,
     secretKeys = this.activeSecretEnvironmentKeys(),
   ) {
-    return [...new Set([...collectionSecretVariableKeys(this.collectionForRequest(req)), ...secretKeys])];
+    return [...new Set([...collectionSecretVariableKeys(this.collectionForRequest(req)), ...secretKeys, ...requestSecretVariableKeys(req.vars)])];
   },
 
   secretEnvironmentValuesForRequest(
     this: RequestSerializationHost,
-    req: Pick<SavedRequest, 'collectionId'>,
+    req: Pick<SavedRequest, 'collectionId' | 'vars'>,
     secretValues = this.activeSecretEnvironmentValues(),
   ) {
-    return [...new Set([...collectionSecretVariableValues(this.collectionForRequest(req)), ...secretValues])];
+    return [...new Set([...collectionSecretVariableValues(this.collectionForRequest(req)), ...secretValues, ...requestSecretVariableValues(req.vars)])];
   },
 
   resolveProxyFields(this: RequestSerializationHost, overrideUrl: string) {
@@ -236,6 +253,7 @@ export const requestSerializationFeature = {
       mcpCursor: '', mcpInputResponses: '', mcpRequestState: '',
       mcpInputSchema: '', mcpOutputSchema: '',
       collectionVariables: collectionVariableValues(this.collectionForRequest(req)),
+      ...requestVariableFieldsForSend(req, envValues, normalizedRequestType),
       requestId,
       secretEnvironmentKeys,
       secretEnvironmentValues,

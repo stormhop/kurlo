@@ -3,7 +3,7 @@
   import { tabListKeyboard } from '../a11y';
   import type { RequestType } from '../types/models';
 
-  type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'metadata' | 'body' | 'schema' | 'service' | 'scripts' | 'settings' | 'events' | 'examples' | 'tools';
+  type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'vars' | 'metadata' | 'body' | 'schema' | 'service' | 'scripts' | 'settings' | 'events' | 'examples' | 'tools';
   type BadgeKind = 'default' | 'on';
   type TabItem = {
     id: RequestTab;
@@ -31,6 +31,7 @@
     aiPromptHasContent = false,
     aiToolCount = 0,
     exampleCount = 0,
+    varCount = 0,
   }: {
     requestTab: RequestTab;
     requestType?: RequestType;
@@ -49,6 +50,7 @@
     aiPromptHasContent?: boolean;
     aiToolCount?: number;
     exampleCount?: number;
+    varCount?: number;
   } = $props();
 
   let compactMenuOpen = $state(false);
@@ -63,6 +65,7 @@
     const headers: TabItem = { id: 'headers', label: 'Headers', badge: headerCount > 0 ? String(headerCount) : undefined };
     const scripts: TabItem = { id: 'scripts', label: 'Scripts', badge: scriptLineCount > 0 ? `${scriptLineCount} lines` : assertionCount > 0 ? `${assertionCount} ${assertionCount === 1 ? 'assertion' : 'assertions'}` : undefined, badgeKind: 'on' };
     const settings: TabItem = { id: 'settings', label: 'Settings' };
+    const vars: TabItem = { id: 'vars', label: 'Vars', badge: varCount > 0 ? String(varCount) : undefined };
     const examples: TabItem = {
       id: 'examples',
       label: 'Examples',
@@ -75,6 +78,7 @@
         { id: 'query', label: 'Query', badge: bodyHasContent ? bodyBadgeLabel : undefined, badgeKind: 'on' },
         auth,
         headers,
+        vars,
         { id: 'schema', label: 'Schema' },
         scripts,
         examples,
@@ -87,6 +91,7 @@
         { id: 'body', label: 'Arguments', badge: mcpArgumentsHaveContent ? 'On' : undefined, badgeKind: 'on' },
         auth,
         headers,
+        vars,
         scripts,
         settings,
         examples,
@@ -99,6 +104,7 @@
         { id: 'body', label: 'Prompt', badge: aiPromptHasContent ? 'On' : undefined, badgeKind: 'on' },
         auth,
         headers,
+        vars,
         { id: 'tools', label: 'Tools', badge: aiToolCount > 0 ? String(aiToolCount) : undefined },
         scripts,
         settings,
@@ -111,6 +117,7 @@
         { id: 'body', label: 'Message', badge: bodyHasContent ? bodyBadgeLabel : undefined, badgeKind: 'on' },
         auth,
         { id: 'metadata', label: 'Metadata', badge: metadataCount > 0 ? String(metadataCount) : undefined },
+        vars,
         { id: 'service', label: 'Service definition', badge: grpcMethodSelected ? 'On' : undefined, badgeKind: 'on' },
         scripts,
         settings,
@@ -125,6 +132,7 @@
         params,
         auth,
         headers,
+        vars,
         settings,
       ];
     }
@@ -136,6 +144,7 @@
         params,
         auth,
         headers,
+        vars,
         settings,
       ];
     }
@@ -146,6 +155,7 @@
         params,
         auth,
         headers,
+        vars,
         { id: 'body', label: 'Body', badge: bodyHasContent ? bodyBadgeLabel : undefined, badgeKind: 'on' },
         settings,
       ];
@@ -156,6 +166,7 @@
       params,
       auth,
       headers,
+      vars,
       { id: 'body', label: 'Body', badge: bodyHasContent ? bodyBadgeLabel : undefined, badgeKind: 'on' },
       scripts,
       examples,
@@ -219,7 +230,7 @@
   use:observeTabsWidth
 >
   <div class="tab-bar tabs" role="tablist" use:tabListKeyboard bind:this={tabsEl}>
-    {#each tabItems as item, eachIndex (eachIndex)}
+    {#each tabItems as item (item.id)}
       <button class="tab"
         role="tab"
         class:active={requestTab === item.id}
@@ -258,7 +269,7 @@
 
     {#if compactMenuOpen}
       <div class="menu request-tab-compact-list" role="listbox" aria-label="Request sections">
-        {#each tabItems as item, eachIndex (eachIndex)}
+        {#each tabItems as item (item.id)}
           <button class="menu-item"
             class:active={requestTab === item.id}
             role="option"

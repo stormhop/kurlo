@@ -696,7 +696,7 @@ func finishAiTests(ctx context.Context, req model.AiRequest, out model.AiRespons
 	resp := out.HTTP
 	resp.Llm = aiScriptView(out)
 	testReq := req.HTTP
-	scope := beginScriptScope(sm, req.HTTP.CollectionVariables)
+	scope := beginScriptScope(sm, req.HTTP.CollectionVariables, req.HTTP.RequestVariables)
 	testCtx := scope.ctx
 	testCtx.Response = &resp
 	populateScriptRequestContext(testCtx, testReq)

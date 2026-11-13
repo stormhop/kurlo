@@ -70,6 +70,7 @@ type Context struct {
 	Variables           map[string]string
 	Environment         map[string]string
 	CollectionVariables map[string]string
+	RequestVariables    map[string]string
 	IterationData       map[string]string
 
 	RequestURL     string
@@ -124,6 +125,7 @@ func NewContext(vars, env map[string]string) *Context {
 		Variables:           vars,
 		Environment:         env,
 		CollectionVariables: make(map[string]string),
+		RequestVariables:    make(map[string]string),
 		RequestHeaders:      make(map[string]string),
 		RequestParams:       make(map[string]string),
 		RemovedHeaders:      make(map[string]struct{}),
@@ -175,6 +177,9 @@ func (c *Context) UnsetRequestParam(key string) {
 
 func (c *Context) ResolveVariable(key string) (string, bool) {
 	if v, ok := c.IterationData[key]; ok {
+		return v, true
+	}
+	if v, ok := c.RequestVariables[key]; ok {
 		return v, true
 	}
 	if v, ok := c.Environment[key]; ok {

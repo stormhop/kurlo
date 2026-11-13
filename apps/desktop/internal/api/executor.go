@@ -76,7 +76,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		req = resolved
 	}
 	var envDelta environmentDelta
-	scope := beginScriptScope(sm, req.CollectionVariables)
+	scope := beginScriptScope(sm, req.CollectionVariables, req.RequestVariables)
 	ctx := scope.ctx
 	populateScriptRequestContext(ctx, req)
 	populateScriptCookies(ctx, req, jars)
@@ -136,8 +136,18 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 	resp := doRequestWithBodySink(requestCtx, req, jar, cache, sinkFactory)
 	resp.PreRequestResult = preResult
 
+	var varsResult model.ScriptResult
+	if len(req.PostResponseVars) > 0 && resp.Error == "" {
+		varsScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult), req.RequestVariables)
+		varsCtx := varsScope.ctx
+		varsCtx.Response = &resp
+		populateScriptRequestContext(varsCtx, req)
+		varsResult = redactScriptResult(script.RunPostResponseVars(req.PostResponseVars, varsCtx), req.SecretEnvironmentValues)
+		envDelta.merge(varsScope.commit(sm))
+	}
+
 	if req.TestScript != "" {
-		testScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult))
+		testScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult), req.RequestVariables)
 		testCtx := testScope.ctx
 		testCtx.Response = &resp
 		populateScriptRequestContext(testCtx, req)
@@ -147,6 +157,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		resp.TestResult = redactScriptResult(resp.TestResult, req.SecretEnvironmentValues)
 		envDelta.merge(testScope.commit(sm))
 	}
+	mergePostResponseVarsResult(&resp.TestResult, varsResult)
 	if checks := runAssertions(req.Assertions, resp); len(checks) > 0 {
 		for i := range checks {
 			checks[i].Name = redactSecrets(checks[i].Name, req.SecretEnvironmentValues)
@@ -158,6 +169,15 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 	envDelta.apply(&resp)
 
 	return resp
+}
+
+func mergePostResponseVarsResult(target *model.ScriptResult, vars model.ScriptResult) {
+	if len(vars.Logs) > 0 {
+		target.Logs = append(append([]string(nil), vars.Logs...), target.Logs...)
+	}
+	if vars.Error != "" && target.Error == "" {
+		target.Error = "post-response vars failed: " + vars.Error
+	}
 }
 
 func collectionVariablesAfter(base map[string]string, result model.ScriptResult) map[string]string {
@@ -240,7 +260,7 @@ func isolateScriptState(shared *state.Manager, variables, environment map[string
 	}
 }
 
-func beginScriptScope(sm *state.Manager, collectionVariables map[string]string) *scriptStateScope {
+func beginScriptScope(sm *state.Manager, collectionVariables, requestVariables map[string]string) *scriptStateScope {
 	vars, env := sm.Snapshot()
 	beforeVars := util.CloneMap(vars)
 	beforeEnv := util.CloneMap(env)
@@ -248,6 +268,9 @@ func beginScriptScope(sm *state.Manager, collectionVariables map[string]string) 
 	ctx.DynamicVariable = resolveDynamicCLIVariable
 	for key, value := range collectionVariables {
 		ctx.CollectionVariables[key] = value
+	}
+	for key, value := range requestVariables {
+		ctx.RequestVariables[key] = value
 	}
 	return &scriptStateScope{
 		ctx:        ctx,

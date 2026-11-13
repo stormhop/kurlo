@@ -34,6 +34,7 @@ class AppLazyComponents {
   GraphQLSchemaTabComponent = $state<LazyComponent | null>(null);
   GrpcMessageTabComponent = $state<LazyComponent | null>(null);
   GrpcMetadataTabComponent = $state<LazyComponent | null>(null);
+  VarsTabComponent = $state<LazyComponent | null>(null);
   GrpcResponsePanelComponent = $state<LazyComponent | null>(null);
   McpCallTabComponent = $state<LazyComponent | null>(null);
   McpResponsePanelComponent = $state<LazyComponent | null>(null);
@@ -120,6 +121,10 @@ class AppLazyComponents {
 
   async loadGrpcMetadataTab() {
     if (!this.GrpcMetadataTabComponent) this.GrpcMetadataTabComponent = (await import('../components/GrpcMetadataTab.svelte')).default as LazyComponent;
+  }
+
+  async loadVarsTab() {
+    if (!this.VarsTabComponent) this.VarsTabComponent = (await import('../components/VarsTab.svelte')).default as LazyComponent;
   }
 
   async loadGrpcResponsePanel() {
@@ -223,6 +228,7 @@ class AppLazyComponents {
     if (state.requestTab === 'body') void this.loadBodyTab();
     if (state.requestTab === 'docs') void this.loadDocsTab();
     if (state.requestTab === 'headers') void this.loadHeadersTab();
+    if (state.requestTab === 'vars') void this.loadVarsTab();
     if (state.requestTab === 'params') void this.loadParamsTab();
     if (state.requestTab === 'scripts') void this.loadScriptsTab();
     if (state.requestTab === 'examples') void this.loadExamplesTab();

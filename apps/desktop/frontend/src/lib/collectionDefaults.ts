@@ -110,12 +110,54 @@ export function collectionVariableValues(collection: Collection | undefined): Re
   return values;
 }
 
+const REQUEST_VARIABLE_PATTERN = /\{\{([^{}]*)\}\}/g;
+
+function substituteKnownVariables(value: string, values: Record<string, string>): string {
+  let resolved = value;
+  for (let depth = 0; depth < 20 && resolved.includes('{{'); depth += 1) {
+    const next = resolved.replace(REQUEST_VARIABLE_PATTERN, (match, raw: string) => {
+      const key = raw.trim();
+      return key && Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
+    });
+    if (next === resolved) break;
+    resolved = next;
+  }
+  return resolved;
+}
+
+export function requestVariableValues(
+  rows: KVRow[] | undefined,
+  scopeValues: Record<string, string> = {},
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  const scope = { ...scopeValues };
+  for (const row of rows ?? []) {
+    const key = row.key.trim();
+    if (!row.enabled || !key) continue;
+    const value = substituteKnownVariables(row.value, scope);
+    values[key] = value;
+    scope[key] = value;
+  }
+  return values;
+}
+
+export function requestSecretVariableKeys(rows: KVRow[] | undefined): string[] {
+  return (rows ?? []).filter(row => row.enabled && row.secret && row.key.trim()).map(row => row.key.trim());
+}
+
+export function requestSecretVariableValues(rows: KVRow[] | undefined): string[] {
+  return (rows ?? []).filter(row => row.enabled && row.secret && row.value).map(row => row.value);
+}
+
 export function valuesWithBrunoPriority(
   collection: Collection | undefined,
   environmentValues: Record<string, string>,
   globalValues: Record<string, string> = {},
+  requestVariables?: KVRow[],
 ): Record<string, string> {
-  return { ...globalValues, ...collectionVariableValues(collection), ...environmentValues };
+  const scoped = { ...globalValues, ...collectionVariableValues(collection), ...environmentValues };
+  if (!requestVariables?.length) return scoped;
+  return { ...scoped, ...requestVariableValues(requestVariables, scoped) };
 }
 
 export function collectionSecretVariableKeys(collection: Collection | undefined): string[] {

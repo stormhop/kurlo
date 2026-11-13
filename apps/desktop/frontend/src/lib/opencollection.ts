@@ -44,7 +44,7 @@ const AUTH_TYPES = new Set<AuthType>(['inherit', 'none', 'bearer', 'basic', 'api
 const BRU_METHODS = new Set(['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace', 'connect']);
 const BRU_REQUEST_BLOCKS = new Set(['graphql', 'grpc', 'websocket', 'ws', 'socketio', 'socket_io', 'sio']);
 const REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc']);
-const REQUEST_TABS = new Set<RequestTab>(['docs', 'params', 'query', 'auth', 'headers', 'metadata', 'body', 'schema', 'service', 'events', 'scripts', 'settings']);
+const REQUEST_TABS = new Set<RequestTab>(['docs', 'params', 'query', 'auth', 'headers', 'vars', 'metadata', 'body', 'schema', 'service', 'events', 'scripts', 'settings']);
 
 function basename(path: string) {
   return path.split('/').pop() ?? path;
@@ -473,6 +473,97 @@ function settingsToOpenCollection(
   }));
 }
 
+function variableRowsFromOpenCollection(value: unknown): KVRow[] {
+  return asArray(value)
+    .filter(isRecord)
+    .map(entry => {
+      const typed = isRecord(entry.value) ? entry.value : undefined;
+      const row = rowFromOpenCollection(typed ? { ...entry, value: typed.data ?? typed.value } : entry);
+      return { ...row, isFile: false };
+    })
+    .filter(row => row.key || row.value);
+}
+
+function postResponseVarsFromOpenCollection(value: unknown): KVRow[] {
+  return asArray(value)
+    .filter(isRecord)
+    .filter(action => asText(action.type) === 'set-variable' && asText(action.phase || 'after-response') === 'after-response')
+    .map(action => {
+      const selector = isRecord(action.selector) ? action.selector : {};
+      const variable = isRecord(action.variable) ? action.variable : {};
+      const description = isRecord(action.description) ? asText(action.description.content) : asText(action.description);
+      return { ...mkRow(), key: asText(variable.name), value: asText(selector.expression), description, enabled: action.disabled !== true };
+    })
+    .filter(row => row.key || row.value);
+}
+
+function requestVarsFromOpenCollection(runtime: unknown): Pick<SavedRequest, 'vars' | 'postResponseVars'> {
+  const section = isRecord(runtime) ? runtime : {};
+  const vars = variableRowsFromOpenCollection(section.variables);
+  const postResponseVars = postResponseVarsFromOpenCollection(section.actions);
+  return { ...(vars.length ? { vars } : {}), ...(postResponseVars.length ? { postResponseVars } : {}) };
+}
+
+function requestVarsFromBruBlocks(byName: Map<string, string>): Pick<SavedRequest, 'vars' | 'postResponseVars'> {
+  const vars = rowsFromBruBlock(byName.get('vars:pre-request'));
+  const postResponseVars = rowsFromBruBlock(byName.get('vars:post-response'));
+  return { ...(vars.length ? { vars } : {}), ...(postResponseVars.length ? { postResponseVars } : {}) };
+}
+
+function requestVarsToOpenCollection(req: SavedRequest, includeSecrets: boolean) {
+  const variables = (req.vars ?? []).filter(row => row.key || row.value).map(row => rowToOpenCollection(row, undefined, includeSecrets));
+  const actions = (req.postResponseVars ?? []).filter(row => row.key || row.value).map(row => ({
+    type: 'set-variable',
+    phase: 'after-response',
+    selector: { expression: row.value, method: 'jsonq' },
+    variable: { name: row.key, scope: 'runtime' },
+    ...(row.description ? { description: row.description } : {}),
+    ...(row.enabled ? {} : { disabled: true }),
+  }));
+  return { ...(variables.length ? { variables } : {}), ...(actions.length ? { actions } : {}) };
+}
+
+function mergeRowsByKey(inherited: KVRow[], own: KVRow[] | undefined): KVRow[] {
+  const ownKeys = new Set((own ?? []).map(row => row.key));
+  return [...inherited.filter(row => !ownKeys.has(row.key)), ...(own ?? [])];
+}
+
+function folderVarsFromFolderFile(file: CollectionTextFile): Pick<SavedRequest, 'vars' | 'postResponseVars'> {
+  if (basename(file.path).toLowerCase() === 'folder.bru') {
+    return requestVarsFromBruBlocks(new Map(parseBruBlocks(file.content).map(block => [block.name, block.body])));
+  }
+  const parsed = parseYaml(file.content);
+  if (!isRecord(parsed)) return {};
+  const request = isRecord(parsed.request) ? parsed.request : {};
+  return requestVarsFromOpenCollection({
+    variables: request.variables ?? parsed.variables ?? (isRecord(parsed.runtime) ? parsed.runtime.variables : undefined),
+    actions: request.actions ?? (isRecord(parsed.runtime) ? parsed.runtime.actions : undefined),
+  });
+}
+
+function applyFolderVarsToRequests(files: CollectionTextFile[], folderNames: Map<string, string>, requests: SavedRequest[]) {
+  const folders: Array<{ path: string[]; vars: KVRow[]; postResponseVars: KVRow[] }> = [];
+  for (const file of files) {
+    const base = basename(file.path).toLowerCase();
+    if (base !== 'folder.bru' && base !== 'folder.yml') continue;
+    const path = folderPathForFile(`${dirname(file.path)}/__folder__.yml`, folderNames);
+    const vars = folderVarsFromFolderFile(file);
+    if (!path.length || (!vars.vars?.length && !vars.postResponseVars?.length)) continue;
+    folders.push({ path, vars: vars.vars ?? [], postResponseVars: vars.postResponseVars ?? [] });
+  }
+  if (!folders.length) return;
+  folders.sort((left, right) => right.path.length - left.path.length);
+  for (const req of requests) {
+    for (const folder of folders) {
+      if (folder.path.length > req.folderPath.length || folder.path.some((segment, index) => req.folderPath[index] !== segment)) continue;
+      const vars = mergeRowsByKey(folder.vars.map(row => ({ ...row, id: mkRow().id })), req.vars);
+      const postResponseVars = mergeRowsByKey(folder.postResponseVars.map(row => ({ ...row, id: mkRow().id })), req.postResponseVars);
+      if (vars.length) req.vars = vars;
+      if (postResponseVars.length) req.postResponseVars = postResponseVars;
+    }
+  }
+}
+
 function scriptsFromOpenCollection(value: unknown) {
   const scripts = isRecord(value) ? asArray(value.scripts) as ScriptEntry[] : [];
   const before = scripts.filter(script => asText(script.type) === 'before-request').map(script => asText(script.code)).filter(Boolean);
@@ -516,7 +607,9 @@ function collectionDefaultsFromOpenCollectionDocument(parsed: unknown): Collecti
   const scripts = scriptsFromOpenCollection(parsed.runtime);
   return {
     headers: rowsFromOpenCollectionValue(parsed.headers ?? http.headers),
-    variables: rowsFromOpenCollectionValue(parsed.variables ?? parsed.vars ?? parsed.values),
+    variables: isRecord(parsed.request) && Array.isArray(parsed.request.variables)
+      ? variableRowsFromOpenCollection(parsed.request.variables)
+      : rowsFromOpenCollectionValue(parsed.variables ?? parsed.vars ?? parsed.values),
     ...(authStateHasData(auth, auth.type) ? { auth } : {}),
     ...(scripts.preRequestScript ? { preRequestScript: scripts.preRequestScript } : {}),
     ...(scripts.testScript ? { testScript: scripts.testScript } : {}),
@@ -559,7 +652,7 @@ function collectionDefaultsFromBruCollectionFile(file: CollectionTextFile | unde
   if (!file) return {};
   const blocks = parseBruBlocks(file.content);
   const byName = new Map(blocks.map(block => [block.name, block.body]));
-  const variables = rowsFromBruBlock(byName.get('vars'));
+  const variables = rowsFromBruBlock(byName.get('vars:pre-request') ?? byName.get('vars'));
   const secretKeys = new Set((byName.get('vars:secret') || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean));
   for (const row of variables) if (secretKeys.has(row.key)) row.secret = true;
   const authConfig = parseBruKeyValues(byName.get('auth'));
@@ -685,6 +778,7 @@ function requestFromOpenCollectionFile(file: CollectionTextFile, collectionId: s
       grpcProtoImportPaths: asArray(section.protoImportPaths).map(asText).filter(Boolean),
     } : {}),
     ...scripts,
+    ...requestVarsFromOpenCollection(parsed.runtime),
     requestNotes: asText(parsed.docs),
     settings: { ...DEFAULT_REQUEST_SETTINGS, ...requestSettingsPatch },
     settingsOverrides: requestSettingsOverridesFromPatch(requestSettingsPatch),
@@ -966,6 +1060,7 @@ function requestFromBruFile(file: CollectionTextFile, collectionId: string, coll
     } : {}),
     preRequestScript: byName.get('script:pre-request') || '',
     testScript: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
+    ...requestVarsFromBruBlocks(byName),
     requestNotes: byName.get('docs') || '',
     settings: { ...DEFAULT_REQUEST_SETTINGS, ...requestSettingsPatch },
     settingsOverrides: requestSettingsOverridesFromPatch(requestSettingsPatch),
@@ -1060,6 +1155,7 @@ export function openCollectionBundleFromFiles(files: CollectionTextFile[], colle
       : requestFromOpenCollectionFile(file, collectionId, name, folderPath);
     if (request && request.url.trim()) requests.push(request);
   }
+  applyFolderVarsToRequests(sorted, folderNames, requests);
   const folderPaths = folderPathsFromFolderFiles(folderNames);
   if (!requests.length && !folderPaths.length) throw new Error('No Bruno/OpenCollection requests found');
   const folderDefaults = folderDefaultsFromOpenCollection(sorted, folderNames);
@@ -1119,6 +1215,7 @@ function requestToOpenCollection(req: SavedRequest, seq: number, stripFn: (sourc
     req.testScript ? { type: 'tests', code: req.testScript } : undefined,
   ].filter(Boolean);
   const requestType = req.requestType ?? (req.bodyType === 'graphql' ? 'graphql' : 'http');
+  const runtimeVars = requestVarsToOpenCollection(req, includeSecrets);
   const exportParams = [
     ...req.params.filter(row => row.key || row.value).map(row => rowToOpenCollection(row, 'query', includeSecrets)),
     ...(req.pathParams ?? []).filter(row => row.key).map(row => rowToOpenCollection(row, 'path', includeSecrets)),
@@ -1164,7 +1261,7 @@ function requestToOpenCollection(req: SavedRequest, seq: number, stripFn: (sourc
   return {
     info: { name: req.name, type: requestType === 'ws' ? 'websocket' : requestType, seq },
     ...requestSection,
-    ...(runtimeScripts.length ? { runtime: { scripts: runtimeScripts } } : {}),
+    ...(runtimeScripts.length || Object.keys(runtimeVars).length ? { runtime: { ...runtimeVars, ...(runtimeScripts.length ? { scripts: runtimeScripts } : {}) } } : {}),
     ...(Object.keys(settings).length ? { settings } : {}),
     ...(examples ? { examples } : {}),
     ...(req.requestNotes ? { docs: `${req.requestNotes}\n` } : {}),

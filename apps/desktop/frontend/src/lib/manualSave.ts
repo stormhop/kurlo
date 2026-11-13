@@ -28,6 +28,8 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     requestTab,
     params,
     pathParams,
+    vars,
+    postResponseVars,
     headers,
     formRows,
     sioEvents,
@@ -35,13 +37,18 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     savedMessages,
     assertions,
     isDraft,
+    examples,
+    exampleCount,
     ...stable
   } = req;
   return stableStringify({
     ...stable,
+    examples: examples?.length ? examples : undefined,
     isDraft: Boolean(isDraft),
     params: rowsWithoutUiIds(params),
     pathParams: pathParams?.length ? rowsWithoutUiIds(pathParams) : undefined,
+    vars: vars?.length ? rowsWithoutUiIds(vars) : undefined,
+    postResponseVars: postResponseVars?.length ? rowsWithoutUiIds(postResponseVars) : undefined,
     headers: rowsWithoutUiIds(headers),
     formRows: rowsWithoutUiIds(formRows),
     sioEvents: rowsWithoutUiIds(sioEvents),

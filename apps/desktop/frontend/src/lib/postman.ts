@@ -64,6 +64,21 @@ function withoutGeneratedAssertions(scripts: PostmanScripts, assertions: Asserti
   return { ...scripts, testScript: test.slice(0, test.length - generated.length).replace(/\s+$/, '') };
 }
 
+function requestVarsToPostmanScript(rows: KVRow[] | undefined, includeSecrets = false): string {
+  return (rows ?? [])
+    .filter(row => row.enabled && row.key.trim())
+    .map(row => `pm.variables.set(${JSON.stringify(row.key.trim())}, pm.variables.replaceIn(${JSON.stringify(postmanKv(row, includeSecrets).value)}));`)
+    .join('\n');
+}
+
+function withoutGeneratedRequestVars(scripts: PostmanScripts, vars: KVRow[]): PostmanScripts {
+  const generated = requestVarsToPostmanScript(vars, true);
+  if (!generated) return scripts;
+  const pre = scripts.preRequestScript.replace(/^\s+/, '');
+  if (!pre.startsWith(generated)) return scripts;
+  return { ...scripts, preRequestScript: pre.slice(generated.length).replace(/^\s+/, '') };
+}
+
 function mergeScripts(outer: PostmanScripts, inner: PostmanScripts): PostmanScripts {
   return {
     preRequestScript: joinScripts(outer.preRequestScript, inner.preRequestScript),
@@ -442,7 +457,9 @@ export function postmanRequestsFromItems(
     const grpcMetadata = kurloRows(kurlo.grpcMetadata ?? kurlo.metadata);
     const kurloTab = kurloRequestTab(kurlo.requestTab);
     const assertions = requestTypeSupportsAssertions(requestType) ? normalizeAssertions(kurlo.assertions) : [];
-    const scripts = withoutGeneratedAssertions(mergeScripts(inheritedScripts, postmanScriptsFromEvents(item.event, req.event)), assertions);
+    const vars = kurloRows(kurlo.vars);
+    const postResponseVars = requestTypeSupportsAssertions(requestType) ? kurloRows(kurlo.postResponseVars) : [];
+    const scripts = withoutGeneratedRequestVars(withoutGeneratedAssertions(mergeScripts(inheritedScripts, postmanScriptsFromEvents(item.event, req.event)), assertions), vars);
     const id = newRequestId();
     const examples = postmanExamplesFromItem(item, id);
     const url = asText(kurlo.url) || socketIO?.url || urlData.url;
@@ -454,6 +471,8 @@ export function postmanRequestsFromItems(
       url,
       requestTab: kurloTab || (requestType === 'grpc' ? 'body' : requestType === 'socketio' ? 'events' : requestType === 'ws' ? 'body' : requestType === 'graphql' ? 'query' : 'params'),
       params, ...(pathParams.length ? { pathParams } : {}), headers: postmanKvRows(req.header),
+      ...(vars.length ? { vars } : {}),
+      ...(postResponseVars.length ? { postResponseVars } : {}),
       auth: req.auth === undefined && childAuth === undefined ? inheritAuthState() : postmanAuthConfig(req.auth, childAuth),
       bodyType: requestType === 'grpc' && body.bodyType === 'none' ? 'json' : body.bodyType,
       rawBodyType: body.rawBodyType,
@@ -745,6 +764,8 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (s: string, t: st
     requestTab: req.requestTab,
     settings: safeExportSettings(req.settings, includeSecrets),
   };
+  if ((req.vars ?? []).some(row => row.key || row.value)) extension.vars = (req.vars ?? []).filter(row => row.key || row.value).map(row => postmanKv(row, includeSecrets));
+  if ((req.postResponseVars ?? []).some(row => row.key || row.value)) extension.postResponseVars = (req.postResponseVars ?? []).filter(row => row.key || row.value).map(row => postmanKv(row, includeSecrets));
   if (requestType === 'socketio') {
     extension.sioEvents = (req.sioEvents ?? []).filter(row => row.key || row.value).map(row => postmanKv(row, includeSecrets));
     extension.sioArgs = (req.sioArgs ?? []).map(arg => ({
@@ -802,7 +823,7 @@ function postmanItemFromRequest(req: SavedRequest, stripFn: (s: string, t: strin
   const auth = postmanAuthFromKurlo(req.auth, includeSecrets);
   const body = postmanBodyFromKurlo(req, stripFn, includeSecrets);
   const name = req.name || req.url;
-  const event = postmanEventsFromScripts(req.preRequestScript, joinScripts(req.testScript, assertionsToPostmanScript(req.assertions)));
+  const event = postmanEventsFromScripts(joinScripts(requestVarsToPostmanScript(req.vars, includeSecrets), req.preRequestScript), joinScripts(req.testScript, assertionsToPostmanScript(req.assertions)));
   const response = postmanResponsesFromExamples(req, includeSecrets);
   return {
     name,

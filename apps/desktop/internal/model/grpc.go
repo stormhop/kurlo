@@ -29,6 +29,7 @@ type GrpcRequest struct {
 	SecretEnvironmentKeys   []string          `json:"secretEnvironmentKeys"`
 	SecretEnvironmentValues []string          `json:"secretEnvironmentValues"`
 	CollectionVariables     map[string]string `json:"collectionVariables"`
+	RequestVariables        map[string]string `json:"requestVariables,omitempty"`
 	ScriptEnvironment       map[string]string `json:"scriptEnvironment,omitempty"`
 	ScriptVariables         map[string]string `json:"scriptVariables,omitempty"`
 }

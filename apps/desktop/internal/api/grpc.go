@@ -211,7 +211,7 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 		resp.GlobalVariablesRemoved = globalDelta.removedKeys()
 		emitGrpcDone(emit, req.RequestID, resp)
 	}()
-	scope := beginScriptScope(sm, req.CollectionVariables)
+	scope := beginScriptScope(sm, req.CollectionVariables, req.RequestVariables)
 	ctx := scope.ctx
 	populateScriptGrpcRequestContext(ctx, req)
 	ctx.IterationData, ctx.Info.Iteration, ctx.Info.IterationCount = iteration.data, iteration.index, iteration.count
@@ -246,7 +246,7 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 	resp.PreRequestResult = preResult
 
 	if req.TestScript != "" && resp.Error != grpcStreamingRequired {
-		testScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult))
+		testScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult), req.RequestVariables)
 		testCtx := testScope.ctx
 		populateScriptGrpcRequestContext(testCtx, req)
 		testCtx.IterationData, testCtx.Info.Iteration, testCtx.Info.IterationCount = iteration.data, iteration.index, iteration.count

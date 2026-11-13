@@ -790,7 +790,10 @@ paths:
     expect(defaults.auth).toMatchObject({ type: 'bearer', bearerToken: '{{bearerToken}}' });
     expect(defaults.variables).toContainEqual(expect.objectContaining({ key: 'bearerToken', secret: true }));
     expect(requests[0].auth.type).toBe('inherit');
-    expect(defaults.variables.find(row => row.key === 'baseUrl')?.description).toContain('staging.example.test');
+    expect(defaults.variables.filter(row => row.key === 'baseUrl').map(row => [row.value, row.enabled])).toEqual([
+      ['https://api.example.test', true],
+      ['https://staging.example.test', false],
+    ]);
   });
 
   it('maps an API key scheme with its declared name and location', () => {
@@ -2207,8 +2210,99 @@ describe('OpenAPI servers on a path or operation', () => {
     const urls = Object.fromEntries(imported.requests.map(req => [req.name, req.url]));
     expect(urls).toEqual({
       list: '{{baseUrl}}/users',
-      upload: 'https://eu.files.example.test/upload',
-      report: 'https://reports.example.test/v2/report',
+      upload: '{{baseUrl}}/upload',
+      report: '{{baseUrl}}/report',
     });
+    expect(imported.defaults.variables.map(row => [row.key, row.value])).toEqual([['baseUrl', 'https://api.example.test']]);
+    const vars = Object.fromEntries(imported.requests.map(req => [req.name, req.vars?.map(row => row.value)]));
+    expect(vars).toEqual({
+      list: undefined,
+      upload: ['https://eu.files.example.test'],
+      report: ['https://reports.example.test/v2'],
+    });
+  });
+});
+
+describe('request vars import', () => {
+  it('reads Bruno .bru pre-request and post-response vars and folder vars', () => {
+    const bundle = openCollectionBundleFromFiles([
+      { path: 'bruno.json', content: '{"version":"1","name":"Bru API","type":"collection"}' },
+      { path: 'collection.bru', content: 'vars:pre-request {\n  tenant: core\n}\n' },
+      { path: 'users/folder.bru', content: 'meta {\n  name: Users\n}\n\nvars:pre-request {\n  userId: 1\n  region: eu\n}\n\nvars:post-response {\n  lastStatus: res.status\n}\n' },
+      {
+        path: 'users/get-user.bru',
+        content: 'meta {\n  name: Get User\n  type: http\n  seq: 1\n}\n\nget {\n  url: {{baseUrl}}/users/{{userId}}\n  body: none\n  auth: none\n}\n\nvars:pre-request {\n  userId: 42\n  ~debug: true\n}\n\nvars:post-response {\n  token: res.body.token\n}\n',
+      },
+    ], 'collection-1', 'Fallback', 'workspace-1');
+
+    expect(bundle.defaults.variables.map(row => [row.key, row.value])).toEqual([['tenant', 'core']]);
+    const [request] = bundle.requests;
+    expect(request.vars?.map(row => [row.key, row.value, row.enabled])).toEqual([
+      ['region', 'eu', true],
+      ['userId', '42', true],
+      ['debug', 'true', false],
+    ]);
+    expect(request.postResponseVars?.map(row => [row.key, row.value])).toEqual([
+      ['lastStatus', 'res.status'],
+      ['token', 'res.body.token'],
+    ]);
+  });
+
+  it('reads OpenCollection runtime variables, set-variable actions and folder variables', () => {
+    const bundle = openCollectionBundleFromFiles([
+      { path: 'opencollection.yml', content: 'opencollection: 1.0.0\ninfo:\n  name: YAML API\nrequest:\n  variables:\n    - name: tenant\n      value: core\n' },
+      { path: 'users/folder.yml', content: 'info:\n  name: Users\n  type: folder\nrequest:\n  variables:\n    - name: region\n      value: eu\n' },
+      {
+        path: 'users/login.yml',
+        content: 'info:\n  name: Login\n  type: http\n  seq: 1\nhttp:\n  method: POST\n  url: "{{baseUrl}}/login"\nruntime:\n  variables:\n    - name: user\n      value: ada\n    - name: off\n      value: "1"\n      disabled: true\n  actions:\n    - type: set-variable\n      phase: after-response\n      selector:\n        expression: res.body.token\n        method: jsonq\n      variable:\n        name: token\n        scope: runtime\n      description: Session token\n    - type: set-variable\n      phase: before-request\n      selector:\n        expression: ignored\n        method: jsonq\n      variable:\n        name: ignored\n',
+      },
+    ], 'collection-1', 'Fallback', 'workspace-1');
+
+    expect(bundle.defaults.variables.map(row => [row.key, row.value])).toEqual([['tenant', 'core']]);
+    const [request] = bundle.requests;
+    expect(request.vars?.map(row => [row.key, row.value, row.enabled])).toEqual([
+      ['region', 'eu', true],
+      ['user', 'ada', true],
+      ['off', '1', false],
+    ]);
+    expect(request.postResponseVars).toEqual([expect.objectContaining({ key: 'token', value: 'res.body.token', description: 'Session token', enabled: true })]);
+  });
+
+  it('writes request vars to OpenCollection the way Bruno reads them', () => {
+    const files = buildOpenCollectionFiles('API', '', emptyCollectionDefaults(), [testRequest({
+      vars: [testRow('userId', '42')],
+      postResponseVars: [testRow('token', 'res.body.token')],
+    })], [], source => source);
+    const requestFile = files.find(file => file.path.endsWith('.yml') && file.content.includes('Test request'));
+
+    expect(requestFile?.content).toContain('runtime:\n  variables:\n    - name: userId\n      value: "42"');
+    expect(requestFile?.content).toContain('type: set-variable');
+    expect(requestFile?.content).toContain('phase: after-response');
+    expect(requestFile?.content).toContain('expression: res.body.token');
+  });
+
+  it('turns Insomnia folder environments into request vars', () => {
+    const requests = insomniaRequestsFromResources({
+      resources: [
+        { _id: 'wrk', _type: 'workspace', name: 'API' },
+        { _id: 'fld_outer', _type: 'request_group', parentId: 'wrk', name: 'Outer', environment: { region: 'eu', userId: 1 } },
+        { _id: 'fld_inner', _type: 'request_group', parentId: 'fld_outer', name: 'Inner', environment: { userId: 7, filters: { active: true } } },
+        { _id: 'req_1', _type: 'request', parentId: 'fld_inner', name: 'Get user', method: 'GET', url: '{{ _.baseUrl }}/users/{{ _.userId }}' },
+      ],
+    }, 'collection-1', 'API');
+
+    expect(requests[0].folderPath).toEqual(['Outer', 'Inner']);
+    expect(requests[0].vars?.map(row => [row.key, row.value])).toEqual([
+      ['region', 'eu'],
+      ['userId', '7'],
+      ['filters', '{"active":true}'],
+    ]);
+  });
+
+  it('runs Kurlo request vars in Postman as pm.variables.set lines', () => {
+    const collection = buildPostmanCollection('API', '', [testRequest({ vars: [testRow('userId', '42'), { ...testRow('off', '1'), enabled: false }] })], source => source, true) as { item: Array<{ event?: Array<{ listen: string; script: { exec: string[] } }> }> };
+    const pre = collection.item[0].event?.find(event => event.listen === 'prerequest');
+
+    expect(pre?.script.exec).toEqual(['pm.variables.set("userId", pm.variables.replaceIn("42"));']);
   });
 });

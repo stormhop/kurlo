@@ -70,6 +70,35 @@ function folderPathFor(resource: Record<string, unknown>, byId: Map<string, Reco
   return path;
 }
 
+function folderVariableRows(resource: Record<string, unknown>, byId: Map<string, Record<string, unknown>>): KVRow[] {
+  const chain: Record<string, unknown>[] = [];
+  let currentParent = parentId(resource);
+  const seen = new Set<string>();
+  while (currentParent && !seen.has(currentParent)) {
+    seen.add(currentParent);
+    const parent = byId.get(currentParent);
+    if (!parent) break;
+    const type = resourceType(parent);
+    if (type === 'request_group' || type === 'folder') chain.unshift(parent);
+    currentParent = parentId(parent);
+  }
+  const values = new Map<string, string>();
+  for (const folder of chain) {
+    const environment = isRecord(folder.environment) ? folder.environment : {};
+    for (const [key, value] of Object.entries(environment)) {
+      if (!key) continue;
+      values.delete(key);
+      values.set(key, typeof value === 'string' ? value : JSON.stringify(value));
+    }
+  }
+  return [...values].map(([key, value]) => row(key, value));
+}
+
+function mergeVariableRows(inherited: KVRow[], own: KVRow[]): KVRow[] {
+  const ownKeys = new Set(own.map(item => item.key));
+  return [...inherited.filter(item => !ownKeys.has(item.key)), ...own];
+}
+
 function authConfig(resource: Record<string, unknown>): SavedRequest['auth'] {
   const auth = isRecord(resource.authentication) ? resource.authentication : isRecord(resource.auth) ? resource.auth : {};
   const config: SavedRequest['auth'] = emptyAuthState();
@@ -251,6 +280,8 @@ export function insomniaRequestsFromResources(payload: unknown, collectionId: st
     const kurloTab = kurloRequestTab(kurlo.requestTab);
     const requestUrl = asText(kurlo.url) || socketIO?.url || url;
     const pathParams = requestType === 'http' || requestType === 'graphql' ? pathParamsFromUrl(requestUrl, insomniaRows(resource.pathParameters)) : [];
+    const vars = mergeVariableRows(folderVariableRows(resource, byId), insomniaRows(kurlo.vars));
+    const postResponseVars = insomniaRows(kurlo.postResponseVars);
     return {
       id,
       name,
@@ -265,6 +296,8 @@ export function insomniaRequestsFromResources(payload: unknown, collectionId: st
       params,
       ...(pathParams.length ? { pathParams } : {}),
       headers,
+      ...(vars.length ? { vars } : {}),
+      ...(postResponseVars.length ? { postResponseVars } : {}),
       auth: authConfig(resource),
       bodyType: requestType === 'grpc' && body.bodyType === 'none' ? 'json' : body.bodyType,
       rawBodyType: body.rawBodyType,
@@ -418,6 +451,8 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (source: string, 
     requestTab: req.requestTab,
     settings: safeExportSettings(req.settings, includeSecrets),
   };
+  if ((req.vars ?? []).some(item => item.key || item.value)) extension.vars = (req.vars ?? []).filter(item => item.key || item.value).map(item => insomniaRow(item, includeSecrets));
+  if ((req.postResponseVars ?? []).some(item => item.key || item.value)) extension.postResponseVars = (req.postResponseVars ?? []).filter(item => item.key || item.value).map(item => insomniaRow(item, includeSecrets));
   if (requestType === 'socketio') {
     extension.sioEvents = (req.sioEvents ?? []).filter(row => row.key || row.value).map(row => insomniaRow(row, includeSecrets));
     extension.sioArgs = (req.sioArgs ?? []).map(arg => ({

@@ -89,7 +89,7 @@ var authFieldDefaults = map[string]any{
 	"jwtQueryParam":   "token",
 }
 
-var requestRowFieldsForStrip = []string{"params", "pathParams", "headers", "formRows", "sioEvents", "grpcMetadata"}
+var requestRowFieldsForStrip = []string{"params", "pathParams", "vars", "postResponseVars", "headers", "formRows", "sioEvents", "grpcMetadata"}
 
 var requestSettingFields = []string{
 	"sseDisableReconnect",
