@@ -2,6 +2,7 @@
 import SiteLayout from '../components/SiteLayout.astro';
 import Scene from '../components/Scene.astro';
 import DownloadButton from '../components/site/DownloadButton.astro';
+import { BOOSTY_URL } from '../../site.constants.mjs';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 
@@ -25,7 +26,7 @@ const tests = ['no paywall', 'no seat limit', 'no account required'];
       <div>
         <p class="k-label k-label-hero">GET /pricing → 404</p>
         <h1 id="hero-title" class="k-h1-long"><span>No</span><span>pricing.</span></h1>
-        <p class="k-lead">Every feature is in the free app, so there is nothing to sell you. No seats, no trial, no plan to outgrow. The code is MIT licensed on GitHub.</p>
+        <p class="k-lead">Every feature is in the free app, so there is nothing to sell you. No seats, no trial, no plan to outgrow. The code is MIT licensed on GitHub. If you want to pay anyway, there is <a href={BOOSTY_URL}>Boosty</a>.</p>
         <div class="k-cta">
           <DownloadButton />
           <button class="k-btn k-btn-glass" type="button" data-copy={curl} aria-label={`Copy ${curl}`}>

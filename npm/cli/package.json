@@ -15,6 +15,7 @@
   ],
   "homepage": "https://kurlo.dev",
   "bugs": "https://github.com/stormhop/kurlo/issues",
+  "funding": "https://boosty.to/kurlo",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/stormhop/kurlo.git",

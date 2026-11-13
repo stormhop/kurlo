@@ -233,6 +233,19 @@ code {
   transform: rotate(72deg) scale(1.15);
 }
 
+.k-support-icon {
+  color: #db61a2;
+  transition: transform 0.25s ease;
+}
+
+.k-support:hover .k-support-icon {
+  transform: scale(1.2);
+}
+
+.k-support + .k-star {
+  margin-left: -0.75rem;
+}
+
 .k-nav:not(.k-nav-solid) .k-nav-cta {
   background: var(--cream);
   color: #15161c;
@@ -1863,7 +1876,7 @@ code {
     display: none;
   }
 
-  .k-star {
+  .k-support {
     margin-left: auto;
   }
 
@@ -2022,7 +2035,8 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .k-star-icon {
+  .k-star-icon,
+  .k-support-icon {
     transition: none;
   }
 

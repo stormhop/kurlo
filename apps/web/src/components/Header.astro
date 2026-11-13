@@ -113,3 +113,29 @@ const links = [
     }
   }
 </style>
+
+<script>
+  const query = new URLSearchParams(window.location.search).get('q')?.trim();
+  if (query) {
+    const fill = () => {
+      const input = document.querySelector<HTMLInputElement>('#starlight__search input');
+      if (!input) return false;
+      input.value = query;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+      return true;
+    };
+    const start = () => {
+      document.querySelector<HTMLButtonElement>('site-search button[data-open-modal]')?.click();
+      if (fill()) return;
+      const observer = new MutationObserver(() => {
+        if (fill()) observer.disconnect();
+      });
+      const target = document.querySelector('#starlight__search');
+      if (target) observer.observe(target, { childList: true, subtree: true });
+      window.setTimeout(() => observer.disconnect(), 10000);
+    };
+    if (document.readyState === 'complete') start();
+    else window.addEventListener('load', start, { once: true });
+  }
+</script>
