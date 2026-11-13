@@ -42,7 +42,7 @@ type HistoryHost = {
   showHistoryResponse: (historyId: string) => Promise<void>;
   loadStoredHistoryResponse: (historyId: string) => Promise<HttpResponse | null>;
   saveHistoryEntryAsExample: (historyId: string) => Promise<void>;
-  addCapturedExample: (example: RequestExample) => void;
+  addCapturedExample: (example: RequestExample) => Promise<void>;
   activeSecretEnvironmentValues: () => string[];
   requestError: string;
   collectionImportToast: string;
@@ -261,7 +261,7 @@ export const historyFeature = {
 
     const response = await this.loadStoredHistoryResponse(historyId);
     if (!response) return;
-    this.addCapturedExample(exampleFromResponse(entry.request, response, {
+    await this.addCapturedExample(exampleFromResponse(entry.request, response, {
       secretValues: this.activeSecretEnvironmentValues(),
       name: `${response.statusCode} ${requestTabLabel(entry.request)}`.trim(),
     }));

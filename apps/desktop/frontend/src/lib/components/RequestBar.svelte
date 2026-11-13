@@ -11,9 +11,10 @@
   import type { VariableSuggestion } from '../variables';
   import type { GrpcMethodInfo, RequestType, SSEStatus, WebSocketStatus, SocketIOStatus } from '../types/models';
 
-  type UrlInputElement = HTMLInputElement | HTMLTextAreaElement;
 
   let {
+    codePanelOpen = $bindable(false),
+    codePanelAvailable = false,
     requestName,
     requestLocation = '',
     showSave = false,
@@ -26,7 +27,7 @@
     requestType,
     method = $bindable('GET'),
     url = $bindable(''),
-    urlInputRef = $bindable<UrlInputElement | undefined>(),
+    urlInputRef = $bindable<HTMLInputElement | undefined>(),
     requestTypes,
     methods,
     loading,
@@ -51,6 +52,8 @@
     onGrpcMethodChange = () => {},
     onGrpcDiscover = async () => {},
   }: {
+    codePanelOpen?: boolean;
+    codePanelAvailable?: boolean;
     requestName: string;
     requestLocation?: string;
     showSave?: boolean;
@@ -63,7 +66,7 @@
     requestType: RequestType;
     method: string;
     url: string;
-    urlInputRef?: UrlInputElement;
+    urlInputRef?: HTMLInputElement;
     requestTypes: RequestType[];
     methods: string[];
     loading: boolean;
@@ -260,7 +263,7 @@
     {/if}
   </div>
 
-  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
+  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-code={codePanelAvailable} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
     <div class="url-field">
       <div class="method-wrap" onfocusout={closeMethodMenuOnFocusOut}>
         <button
@@ -333,7 +336,7 @@
         className="url-input"
         bind:inputRef={urlInputRef}
         bind:value={url}
-        multiline
+        wheelScroll
         suggestions={variableSuggestions}
         ghost={urlGhostFor}
         placeholder={requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Base URL' : 'Enter request URL or paste cURL…'}
@@ -409,6 +412,12 @@
           </div>
         {/if}
       </div>
+    {/if}
+
+    {#if codePanelAvailable}
+      <button class="btn btn-secondary btn-icon btn-xl request-code-btn" class:active={codePanelOpen} type="button" onclick={() => (codePanelOpen = !codePanelOpen)} aria-label="Code snippet" aria-pressed={codePanelOpen}>
+        &lt;/&gt;
+      </button>
     {/if}
 
     {#if isGraphQL}

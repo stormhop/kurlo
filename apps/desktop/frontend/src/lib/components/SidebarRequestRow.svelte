@@ -4,7 +4,7 @@
   import { fileManagerLabel, requestSupportsCurl } from '../utils';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import MenuIcon from './MenuIcon.svelte';
-  import { floatingMenu as floatingMenuAction } from '../floatingMenu';
+  import { floatingMenu } from '../floatingMenu';
   import type { SavedRequest, WorkspaceDiagnostic } from '../types/models';
   import type { TopView } from '../stores/ui';
 
@@ -27,7 +27,6 @@
     deleteRequest,
     openWorkspaceDiagnostic,
     starred = false,
-    floatingMenu = false,
     disabled = false,
     dragEnabled = false,
     dragging = false,
@@ -57,7 +56,6 @@
     deleteRequest: (id: string) => void;
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
     starred?: boolean;
-    floatingMenu?: boolean;
     disabled?: boolean;
     dragEnabled?: boolean;
     dragging?: boolean;
@@ -127,7 +125,7 @@
   class:dragging
   class:hovered={hovered === true}
   class:hover-managed={hovered !== undefined}
-  data-sidebar-request-key={menuKey}
+  data-sidebar-hover-key={menuKey}
   role="listitem"
   draggable={canDrag}
   {ondragstart}
@@ -195,7 +193,7 @@
     <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleRequestMenu(menuKey, event)} aria-label="Request menu" disabled={disabled}>•••</button>
   {/if}
   {#if !req.isInvalid && openRequestMenuId === menuKey}
-    <div class="menu request-menu" use:floatingMenuAction={floatingMenu}>
+    <div class="menu request-menu" use:floatingMenu>
       <button class="menu-item" type="button" onclick={() => renameRequest(req.id)} disabled={disabled}><MenuIcon name="rename" />Rename</button>
       <button class="menu-item" type="button" onclick={() => duplicateRequest(req.id)} disabled={disabled}><MenuIcon name="duplicate" />Duplicate</button>
       {#if !req.isDraft}<button class="menu-item" type="button" onclick={() => toggleRequestPinned(req.id)} disabled={disabled}><MenuIcon name="star" />{starred ? 'Unstar' : 'Star'}</button>{/if}

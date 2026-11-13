@@ -1,25 +1,23 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
   import type { VariableSuggestion } from '../variables';
   import { variableDisplayValue } from '../variables';
   import { isDynamicVariableName } from '../dynamicVariables';
   import { escapeHtml } from '../utils';
   import type { InputGhost } from '../ghostText';
-
-  type VariableInputElement = HTMLInputElement | HTMLTextAreaElement;
+  import { horizontalWheel } from '../horizontalWheel';
 
   let {
     value = $bindable(''),
-    inputRef = $bindable<VariableInputElement | undefined>(),
+    inputRef = $bindable<HTMLInputElement | undefined>(),
     suggestions = [],
     className = '',
     placeholder = '',
     ariaLabel = '',
     list = undefined,
     type = 'text',
-    multiline = false,
     disabled = false,
     spellcheck = false,
+    wheelScroll = false,
     validationMessage = '',
     pickerOptions = [],
     pickerLabel = 'Suggestions',
@@ -32,16 +30,16 @@
     onenter,
   }: {
     value: string;
-    inputRef?: VariableInputElement;
+    inputRef?: HTMLInputElement;
     suggestions?: VariableSuggestion[];
     className?: string;
     placeholder?: string;
     ariaLabel?: string;
     list?: string;
     type?: string;
-    multiline?: boolean;
     disabled?: boolean;
     spellcheck?: boolean;
+    wheelScroll?: boolean;
     validationMessage?: string;
     pickerOptions?: string[];
     pickerLabel?: string;
@@ -64,7 +62,6 @@
   let pickerLeft = $state(0);
   let pickerWidth = $state(260);
   let pickerMaxHeight = $state(220);
-  let multilineExpanded = $state(false);
   let focused = $state(false);
   let caretAtEnd = $state(true);
   let ghostDismissedFor = $state<string | null>(null);
@@ -147,6 +144,10 @@
       });
   });
 
+  function wheelScrollAction(node: HTMLInputElement) {
+    return wheelScroll ? horizontalWheel(node, syncScroll) : undefined;
+  }
+
   function syncScroll() {
     if (!backdropEl || !inputRef) return;
     backdropEl.scrollLeft = inputRef.scrollLeft;
@@ -167,53 +168,6 @@
     backdropEl.style.lineHeight = cs.lineHeight;
     backdropEl.style.wordSpacing = cs.wordSpacing;
   });
-
-  $effect(() => {
-    value;
-    multiline;
-    multilineExpanded;
-    void resizeMultilineInput();
-  });
-
-  onMount(() => {
-    if (!multiline) return;
-    void resizeMultilineInput();
-    const observer = typeof ResizeObserver !== 'undefined' && wrap
-      ? new ResizeObserver(() => void resizeMultilineInput())
-      : undefined;
-    observer?.observe(wrap);
-    window.addEventListener('resize', resizeMultilineInput);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', resizeMultilineInput);
-    };
-  });
-
-  async function resizeMultilineInput() {
-    if (!multiline) return;
-    await tick();
-    if (!(inputRef instanceof HTMLTextAreaElement)) return;
-    if (!multilineExpanded) {
-      inputRef.style.height = '';
-      inputRef.style.overflowY = 'hidden';
-      inputRef.scrollLeft = 0;
-      inputRef.scrollTop = 0;
-      syncScroll();
-      return;
-    }
-    const cs = window.getComputedStyle(inputRef);
-    const borderHeight = inputRef.offsetHeight - inputRef.clientHeight;
-    const minHeight = Number.parseFloat(cs.minHeight) || 0;
-    const maxHeight = Number.parseFloat(cs.maxHeight);
-    inputRef.style.height = 'auto';
-    const contentHeight = inputRef.scrollHeight + borderHeight;
-    const nextHeight = Number.isFinite(maxHeight)
-      ? Math.min(Math.max(contentHeight, minHeight), maxHeight)
-      : Math.max(contentHeight, minHeight);
-    inputRef.style.height = `${nextHeight}px`;
-    inputRef.style.overflowY = contentHeight > nextHeight + 1 ? 'auto' : 'hidden';
-    syncScroll();
-  }
 
   let activeIndex = $state(0);
   let matches = $state<VariableSuggestion[]>([]);
@@ -311,33 +265,16 @@
   }
 
   function onInput(event: Event) {
-    normalizeMultilineValue(event);
     updateCaret();
     oninput?.(event);
     refreshMenu();
     refreshPicker();
   }
 
-  function normalizeMultilineValue(event: Event) {
-    if (!multiline) return;
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLTextAreaElement) || !/[\r\n]/.test(target.value)) return;
-    const selectionStart = target.selectionStart ?? target.value.length;
-    const normalizedBeforeSelection = target.value.slice(0, selectionStart).replace(/[\r\n]+/g, '');
-    const normalized = target.value.replace(/[\r\n]+/g, '');
-    target.value = normalized;
-    value = normalized;
-    target.setSelectionRange(normalizedBeforeSelection.length, normalizedBeforeSelection.length);
-  }
-
   function onFocus(event: FocusEvent) {
     focused = true;
     updateCaret();
     onfocus?.(event);
-    if (multiline) {
-      multilineExpanded = true;
-      void resizeMultilineInput();
-    }
     refreshMenu();
     refreshPicker();
   }
@@ -345,10 +282,6 @@
   function onClick(event: MouseEvent) {
     updateCaret();
     onclick?.(event);
-    if (multiline) {
-      multilineExpanded = true;
-      void resizeMultilineInput();
-    }
     refreshMenu();
     refreshPicker();
   }
@@ -396,7 +329,6 @@
     }
 
     if (event.key !== 'Enter' || event.metaKey || event.ctrlKey || event.altKey) return;
-    if (multiline) event.preventDefault();
     if (onenter && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
       onenter();
@@ -409,10 +341,6 @@
       focused = false;
       open = false;
       pickerOpen = false;
-      if (multiline) {
-        multilineExpanded = false;
-        void resizeMultilineInput();
-      }
     }
   }
 
@@ -428,8 +356,6 @@
 
 <div
   class="variable-input-wrap"
-  class:multiline
-  class:multiline-expanded={multilineExpanded}
   class:has-var-highlights={hasUnresolved}
   class:has-validation-error={Boolean(validationMessage)}
   bind:this={wrap}
@@ -439,53 +365,29 @@
     <!-- eslint-disable-next-line svelte/no-at-html-tags -->
     <div class="var-backdrop" bind:this={backdropEl} aria-hidden="true">{@html backdropHtml}</div>
   {/if}
-  {#if multiline}
-    <textarea
-      bind:this={inputRef}
-      class={className}
-      bind:value
-      {placeholder}
-      aria-label={ariaLabel || undefined}
-      aria-invalid={validationMessage ? 'true' : undefined}
-      aria-describedby={validationMessage ? validationId : undefined}
-      {disabled}
-      {spellcheck}
-      rows="1"
-      wrap="soft"
-      oninput={(event) => { onInput(event); void resizeMultilineInput(); }}
-      onfocus={onFocus}
-      onclick={onClick}
-      ondblclick={ondblclick}
-      onkeyup={() => { updateCaret(); if (!suppressRefresh) { refreshMenu(); refreshPicker(); } }}
-      onkeydown={onKeydown}
-      onpaste={(event) => { onpaste?.(event); setTimeout(() => { refreshMenu(); refreshPicker(); void resizeMultilineInput(); }, 0); }}
-      onscroll={syncScroll}
-      autocomplete="off"
-    ></textarea>
-  {:else}
-    <input
-      bind:this={inputRef}
-      class={className}
-      bind:value
-      {type}
-      {placeholder}
-      aria-label={ariaLabel || undefined}
-      aria-invalid={validationMessage ? 'true' : undefined}
-      aria-describedby={validationMessage ? validationId : undefined}
-      {list}
-      {disabled}
-      {spellcheck}
-      oninput={onInput}
-      onfocus={onFocus}
-      onclick={onClick}
-      ondblclick={ondblclick}
-      onkeyup={() => { updateCaret(); if (!suppressRefresh) { refreshMenu(); refreshPicker(); } }}
-      onkeydown={onKeydown}
-      onpaste={(event) => { onpaste?.(event); setTimeout(() => { refreshMenu(); refreshPicker(); }, 0); }}
-      onscroll={syncScroll}
-      autocomplete="off"
-    />
-  {/if}
+  <input
+    bind:this={inputRef}
+    class={className}
+    bind:value
+    {type}
+    {placeholder}
+    aria-label={ariaLabel || undefined}
+    aria-invalid={validationMessage ? 'true' : undefined}
+    aria-describedby={validationMessage ? validationId : undefined}
+    {list}
+    {disabled}
+    {spellcheck}
+    oninput={onInput}
+    onfocus={onFocus}
+    onclick={onClick}
+    ondblclick={ondblclick}
+    onkeyup={() => { updateCaret(); if (!suppressRefresh) { refreshMenu(); refreshPicker(); } }}
+    onkeydown={onKeydown}
+    onpaste={(event) => { onpaste?.(event); setTimeout(() => { refreshMenu(); refreshPicker(); }, 0); }}
+    onscroll={syncScroll}
+    use:wheelScrollAction
+    autocomplete="off"
+  />
   {#if validationMessage}
     <button class="input-validation-anchor" type="button" aria-label={validationMessage}>
       <span class="input-validation-icon" aria-hidden="true"></span>

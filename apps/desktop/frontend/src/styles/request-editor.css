@@ -113,6 +113,13 @@
   gap: var(--space-2);
   align-items: start;
 }
+.request-bar.request-bar-code {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.request-code-btn.active {
+  color: var(--accent-text);
+  background: var(--accent-dim);
+}
 .request-bar.request-bar-ws .btn-send {
   justify-self: end;
   width: auto;
@@ -125,6 +132,9 @@
 }
 .request-bar.request-bar-ai {
   grid-template-columns: minmax(12.5rem, 0.55fr) minmax(12.5rem, 0.45fr) max-content;
+}
+.request-bar.request-bar-ai.request-bar-code {
+  grid-template-columns: minmax(0, 0.55fr) minmax(0, 0.45fr) auto max-content;
 }
 .request-bar.request-bar-ai .btn-send,
 .request-bar.request-bar-grpc .btn-send {
@@ -162,10 +172,6 @@
   height: 2.125rem;
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
-.url-field textarea.url-input {
-  min-height: 2.125rem;
-}
-
 .method-wrap {
   position: relative;
   flex: 0 0 auto;
@@ -404,25 +410,6 @@
   font-size: var(--text-body);
   transition: border-color var(--dur-fast);
 }
-textarea.url-input {
-  box-sizing: border-box;
-  min-height: 2.25rem;
-  padding: var(--space-2) var(--space-3);
-  line-height: 1.125rem;
-  resize: none;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  overflow-wrap: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  word-break: normal;
-}
-.variable-input-wrap.multiline.multiline-expanded textarea.url-input {
-  overflow-wrap: anywhere;
-  text-overflow: clip;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
 .url-input:focus { outline: none; border-color: var(--accent); }
 .url-input::placeholder { color: var(--text-3); }
 
@@ -452,16 +439,6 @@ textarea.url-input {
   white-space: pre;
   pointer-events: none;
   color: transparent;
-}
-.variable-input-wrap.multiline.multiline-expanded .var-backdrop {
-  display: block;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.variable-input-wrap.multiline.multiline-expanded .input-validation-anchor {
-  top: 1.125rem;
-  transform: translateY(-50%);
 }
 .ghost-text {
   color: var(--text-3);
@@ -900,6 +877,17 @@ textarea.url-input {
   height: 2.25rem;
   padding: 0 var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.request-vars-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2-5);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.request-vars-heading--next {
+  margin-top: var(--space-4);
 }
 
 .request-section-title {

@@ -280,21 +280,22 @@ export const gitFeature = {
     } catch {
     }
   },
-  async loadMoreGitLog(this: GitHost) {
-    if (!this.gitStatus.isRepo || this.gitLogLoadingMore || !this.gitLog.hasMore) return;
+  async loadMoreGitLog(this: GitHost): Promise<boolean> {
+    if (!this.gitStatus.isRepo || this.gitLogLoadingMore || !this.gitLog.hasMore) return true;
     this.gitLogLoadingMore = true;
     const startLog = this.gitLog;
     try {
       const page = normalizeGitLog(await gitCommitLogPage(GIT_LOG_PAGE_SIZE, startLog.commits.length));
-      if (this.gitLog !== startLog) return;
+      if (this.gitLog !== startLog) return true;
+      if (page.error) return false;
       const seen = new Set(startLog.commits.map(commit => commit.hash));
       this.gitLog = {
         ...page,
         commits: [...startLog.commits, ...page.commits.filter(commit => !seen.has(commit.hash))],
       };
-      if (page.error) this.gitError = page.error;
-    } catch (error) {
-      this.gitError = error instanceof Error ? error.message : String(error);
+      return true;
+    } catch {
+      return false;
     } finally {
       this.gitLogLoadingMore = false;
     }

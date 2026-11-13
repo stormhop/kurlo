@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createRowMeasurer, virtualOverscan, virtualizeRows, windowScrollTop, type VirtualRow } from '../lib/sidebarVirtual';
+import { canGrowWindow, createRowMeasurer, createWindowGrower, GROWN_ROW_LIMIT, keptRowCount, virtualOverscan, virtualizeRows, windowScrollTop, type VirtualRow } from '../lib/sidebarVirtual';
 
 const OVERSCAN = 60;
 const MIN = 30;
@@ -93,8 +93,8 @@ describe('scrolling the window', () => {
   const viewport = 600;
   const overscan = virtualOverscan(viewport, 240);
 
-  it('keeps at least a full viewport rendered beyond each edge', () => {
-    expect(virtualOverscan(600, 240)).toBe(600);
+  it('keeps a viewport and a half rendered beyond each edge', () => {
+    expect(virtualOverscan(600, 240)).toBe(900);
     expect(virtualOverscan(100, 240)).toBe(240);
   });
 
@@ -112,15 +112,15 @@ describe('scrolling the window', () => {
     expect(windowScrollTop(1000, 1010, overscan, true)).toBe(1010);
   });
 
-  it('always covers the viewport plus half a viewport on both sides while scrolling', () => {
+  it('always covers the viewport plus three quarters of a viewport on both sides while scrolling', () => {
     const list = uniform(5000, 30);
     let rendered = 0;
     for (let actual = 0; actual <= 5000 * 30 - viewport; actual += 97) {
       rendered = windowScrollTop(rendered, actual, overscan);
       const win = virtualizeRows(list, rendered, viewport, overscan, MIN);
       const renderedBottom = win.before + win.rows.reduce((t, r) => t + r.height, 0);
-      expect(win.before).toBeLessThanOrEqual(Math.max(0, actual - viewport / 2));
-      expect(renderedBottom).toBeGreaterThanOrEqual(Math.min(win.totalHeight, actual + viewport + viewport / 2));
+      expect(win.before).toBeLessThanOrEqual(Math.max(0, actual - viewport * 0.75));
+      expect(renderedBottom).toBeGreaterThanOrEqual(Math.min(win.totalHeight, actual + viewport + viewport * 0.75));
     }
   });
 
@@ -134,7 +134,7 @@ describe('scrolling the window', () => {
       rendered = next;
     }
     expect(shifts).toBeLessThan(30000 / 20 / 10);
-    expect(virtualizeRows(list, rendered, viewport, overscan, MIN).rows.length).toBeLessThan(80);
+    expect(virtualizeRows(list, rendered, viewport, overscan, MIN).rows.length).toBeLessThan(110);
   });
 });
 
@@ -196,5 +196,93 @@ describe('createRowMeasurer', () => {
     measure(node, 'a');
     observers[0].callback([{ target: node, borderBoxSize: [{ blockSize: 0 }] }]);
     expect(heights.has('a')).toBe(false);
+  });
+});
+
+describe('sidebar scrolling', () => {
+  it('leaves wheel and trackpad scrolling to the browser', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('../lib/components/Sidebar.svelte', import.meta.url), 'utf8');
+    expect(source).not.toMatch(/wheel/i);
+    expect(source).not.toMatch(/flushSync/);
+  });
+
+  it('gives every sidebar scroller its own stacking context so WebKit paints the rows in one layer', async () => {
+    const { readFileSync } = await import('node:fs');
+    const css = readFileSync(new URL('../styles/shell-sidebar.css', import.meta.url), 'utf8');
+    const rule = css.match(/\.collection-list,\s*\.starred-list,\s*\.history-list,\s*\.environment-list\s*\{([^}]*)\}/);
+    expect(rule?.[1]).toMatch(/position:\s*relative/);
+    expect(rule?.[1]).toMatch(/z-index:\s*0/);
+    expect(css).toMatch(/\.starred-list:has\(\.menu\)[^{]*\{\s*z-index:\s*auto/);
+  });
+});
+
+describe('growing the window in the background', () => {
+  it('adds extra rows on both sides of the visible window', () => {
+    const list = uniform(1000, 30);
+    const base = virtualizeRows(list, 15000, 600, 0, MIN);
+    const grown = virtualizeRows(list, 15000, 600, 0, MIN, undefined, 1, 40);
+    expect(grown.rows.length).toBe(base.rows.length + 40);
+    expect(grown.rows[0].key).toBe(`r${Number(base.rows[0].key.slice(1)) - 20}`);
+    expect(grown.before + grown.rows.length * 30 + grown.after).toBe(grown.totalHeight);
+  });
+
+  it('spends the rows an edge cannot take on the other side', () => {
+    const list = uniform(1000, 30);
+    const base = virtualizeRows(list, 0, 600, 0, MIN);
+    const grown = virtualizeRows(list, 0, 600, 0, MIN, undefined, 1, 100);
+    expect(grown.before).toBe(0);
+    expect(grown.rows.length).toBe(base.rows.length + 100);
+  });
+
+  it('ends up rendering a whole collection the size of a large OpenAPI import', () => {
+    const list = uniform(600, 28);
+    let extra = 0;
+    let window = virtualizeRows(list, 0, 700, 700, MIN, undefined, 1, extra);
+    while (canGrowWindow(window)) {
+      extra += 40;
+      window = virtualizeRows(list, 0, 700, 700, MIN, undefined, 1, extra);
+    }
+    expect(window.rows.length).toBe(600);
+    expect(window.before).toBe(0);
+    expect(window.after).toBe(0);
+  });
+
+  it('stops growing at the row limit for very large lists', () => {
+    const list = uniform(5000, 28);
+    let extra = 0;
+    let window = virtualizeRows(list, 50000, 700, 700, MIN, undefined, 1, extra);
+    while (canGrowWindow(window)) {
+      extra += 40;
+      window = virtualizeRows(list, 50000, 700, 700, MIN, undefined, 1, extra);
+    }
+    expect(window.rows.length).toBeGreaterThanOrEqual(GROWN_ROW_LIMIT);
+    expect(window.rows.length).toBeLessThan(GROWN_ROW_LIMIT + 40);
+  });
+
+  it('counts the rendered rows that are still in the list', () => {
+    expect(keptRowCount(['r0', 'r1', 'gone'], ['r0', 'r1', 'r2'])).toBe(2);
+    expect(keptRowCount([], ['r0'])).toBe(0);
+  });
+
+  it('grows step by step and waits while the list is being scrolled', () => {
+    vi.useFakeTimers();
+    let steps = 0;
+    const grower = createWindowGrower(() => ++steps < 5, 32, 200);
+    grower.start();
+    vi.advanceTimersByTime(32);
+    expect(steps).toBe(1);
+    grower.pause();
+    vi.advanceTimersByTime(199);
+    expect(steps).toBe(1);
+    vi.advanceTimersByTime(1);
+    expect(steps).toBe(2);
+    vi.advanceTimersByTime(1000);
+    expect(steps).toBe(5);
+    grower.start();
+    grower.stop();
+    vi.advanceTimersByTime(1000);
+    expect(steps).toBe(5);
+    vi.useRealTimers();
   });
 });

@@ -28,6 +28,8 @@ The response panel shows the JSON body with syntax highlighting, response header
 
 ![Response status bar](../../../../assets/screenshots/status-bar.png)
 
+The URL bar is always one line high. A URL longer than the bar scrolls sideways as you type or move the cursor with the arrow keys, `Home` and `End`. Swipe sideways on the trackpad or turn the mouse wheel over the URL to see the rest of it without moving the cursor. The bar shows the start of the URL again when you click elsewhere.
+
 > Tip: you can paste a `curl ...` command into the URL field — Kurlo will parse method, headers, params, and body automatically.
 
 ### Bulk edit

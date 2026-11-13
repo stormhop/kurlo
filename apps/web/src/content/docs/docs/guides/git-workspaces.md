@@ -84,6 +84,8 @@ Open the Git workspace screen from the branch at the left of the status bar. The
 
 Kurlo shows ahead/behind counts, current branch, upstream status, remotes, stashes, changed files, commit history, and outgoing commits.
 
+The **History** tab loads older commits by itself as you scroll toward the end of the list, so long histories read as one list. If loading fails, the end of the list says so and offers **Retry**.
+
 Once a branch is pushed and has nothing left to push, **Create PR** appears next to **Push**. It opens the page that starts a pull request on GitHub, or a merge request on GitLab and Bitbucket, from the current branch into the remote's default branch. Kurlo builds the link from the remote URL and sends nothing itself; for other hosts it says it cannot build one.
 
 ## Branches and stashes

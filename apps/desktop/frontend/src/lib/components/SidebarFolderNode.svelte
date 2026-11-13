@@ -4,6 +4,7 @@
   import SidebarFolderNode from './SidebarFolderNode.svelte';
   import SidebarRequestRow from './SidebarRequestRow.svelte';
   import MenuIcon from './MenuIcon.svelte';
+  import { floatingMenu } from '../floatingMenu';
   import type { FolderGroup, SavedRequest, WorkspaceDiagnostic } from '../types/models';
   import type { TopView } from '../stores/ui';
 
@@ -82,7 +83,7 @@
     <span class="collection-count">{folder.requestCount}</span>
     <button class="btn btn-ghost btn-icon btn-sm folder-menu-btn" type="button" onclick={(event) => toggleFolderMenu(folder.key, event)} aria-label="Folder menu">•••</button>
     {#if openFolderMenuKey === folder.key}
-      <div class="menu request-menu folder-menu">
+      <div class="menu request-menu folder-menu" use:floatingMenu>
         <button class="menu-item"
           type="button"
           disabled={!folderCanAcceptRequest(folder)}
