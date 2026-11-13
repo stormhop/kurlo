@@ -110,6 +110,7 @@
     width: var(--rail-w);
     padding: var(--space-2-5) 0;
     position: relative;
+    z-index: 47;
     background: var(--surface);
     overflow: hidden;
   }

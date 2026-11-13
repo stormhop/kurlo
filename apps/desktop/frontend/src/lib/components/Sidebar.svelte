@@ -1,14 +1,16 @@
 <script lang="ts">
   import AddCloseIcon from './AddCloseIcon.svelte';
   import KurloBird from './KurloBird.svelte';
+  import { untrack } from 'svelte';
   import { SvelteMap, SvelteSet } from 'svelte/reactivity';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import SidebarRequestRow from './SidebarRequestRow.svelte';
   import MenuIcon from './MenuIcon.svelte';
+  import { floatingMenu } from '../floatingMenu';
   import AgentSidebar from './AgentSidebar.svelte';
   import CookieSidebar from './CookieSidebar.svelte';
-  import { frameSyncedWheel } from '../frameSyncedWheel';
-  import { createRowMeasurer, virtualOverscan, virtualizeRows, windowScrollTop } from '../sidebarVirtual';
+  import { canGrowWindow, createRowMeasurer, virtualOverscan, virtualizeRows, windowScrollTop, type VirtualRow, type VirtualWindow } from '../sidebarVirtual';
+  import { WindowGrowth } from '../windowGrowth.svelte';
   import { uiScale } from '../uiScale';
   import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS, NAME_MAX_LENGTH } from '../constants';
   import type {
@@ -84,6 +86,8 @@
     renameCollection,
     openCollectionSettings,
     openFolderSettings = () => {},
+    openOpenApiSettings,
+    openApiUpdates = () => '',
     exportCollection,
     deleteCollection,
     moveCollection,
@@ -168,6 +172,8 @@
     renameCollection: (id: string, name?: string) => void | Promise<void>;
     openCollectionSettings: (id: string) => void | Promise<void>;
     openFolderSettings?: (collectionId: string, folderPath: string[]) => void | Promise<void>;
+    openOpenApiSettings: (collectionId: string) => void | Promise<void>;
+    openApiUpdates?: (collectionId: string) => string;
     exportCollection: (id: string) => void;
     deleteCollection: (id: string) => void;
     moveCollection: (sourceId: string, targetId: string, placement: DropPlacement) => void;
@@ -230,7 +236,7 @@
     workspaceBlocked?: boolean;
   } = $props();
 
-  let hoveredRequestKey = $state('');
+  let hoveredRowKey = $state('');
   let draggingRequest = $state<SavedRequest | undefined>();
   let dragOverRequestId = $state('');
   let requestDropPlacement = $state<DropPlacement>('before');
@@ -291,7 +297,8 @@
   let starredExpanded = $derived(!pinnedCollapsed || Boolean(sidebarSearch.trim()));
   let starredRows = $derived(pinnedRequests.map(req => ({ key: `pinned:${req.id}`, height: REQUEST_ROW_HEIGHT, req })));
   let starredOverscan = $derived(virtualOverscan(starredViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
-  let visibleStarredRows = $derived(virtualizeRows(starredRows, starredScrollTop, starredViewportHeight, starredOverscan, ROW_HEIGHT * $uiScale, starredRowHeights, $uiScale));
+  const starredGrowth = new WindowGrowth((): boolean => canGrowWindow(visibleStarredRows));
+  let visibleStarredRows = $derived(virtualizeRows(starredRows, starredScrollTop, starredViewportHeight, starredOverscan, ROW_HEIGHT * $uiScale, starredRowHeights, $uiScale, starredGrowth.extra));
 
   function readStarredCollapsed(): boolean {
     try {
@@ -318,6 +325,7 @@
   }
 
   function onStarredScroll() {
+    if (starredListEl) starredGrowth.scrolled(starredListEl.scrollTop, starredListEl.clientHeight, visibleStarredRows.before, visibleStarredRows.totalHeight - visibleStarredRows.after);
     clearRequestHover();
     syncStarredViewport(false);
   }
@@ -326,7 +334,8 @@
   let collectionsById = $derived(new Map(collectionGroups.map(group => [group.collection.id, group.collection])));
   let collectionRows = $derived(buildCollectionRows());
   let collectionOverscan = $derived(virtualOverscan(collectionViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
-  let visibleCollectionRows = $derived(virtualizeRows(collectionRows, collectionScrollTop, collectionViewportHeight, collectionOverscan, ROW_HEIGHT * $uiScale, collectionRowHeights, $uiScale));
+  const collectionGrowth = new WindowGrowth((): boolean => canGrowWindow(visibleCollectionRows));
+  let visibleCollectionRows = $derived(virtualizeRows(collectionRows, collectionScrollTop, collectionViewportHeight, collectionOverscan, ROW_HEIGHT * $uiScale, collectionRowHeights, $uiScale, collectionGrowth.extra));
   let historyRows = $derived(buildHistoryRows());
 
   const LOAD_RUN_STATUS: Record<string, string> = { passed: 'passed', failed: 'failed', stopped: 'stopped', error: 'did not finish' };
@@ -337,10 +346,33 @@
     }
   });
   let historyOverscan = $derived(virtualOverscan(historyViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
-  let visibleHistoryRows = $derived(virtualizeRows(historyRows, historyScrollTop, historyViewportHeight, historyOverscan, ROW_HEIGHT * $uiScale, undefined, $uiScale));
+  const historyGrowth = new WindowGrowth((): boolean => canGrowWindow(visibleHistoryRows));
+  let visibleHistoryRows = $derived(virtualizeRows(historyRows, historyScrollTop, historyViewportHeight, historyOverscan, ROW_HEIGHT * $uiScale, undefined, $uiScale, historyGrowth.extra));
   let environmentRows = $derived(buildEnvironmentRows());
   let environmentOverscan = $derived(virtualOverscan(environmentViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
-  let visibleEnvironmentRows = $derived(virtualizeRows(environmentRows, environmentScrollTop, environmentViewportHeight, environmentOverscan, ROW_HEIGHT * $uiScale, undefined, $uiScale));
+  const environmentGrowth = new WindowGrowth((): boolean => canGrowWindow(visibleEnvironmentRows));
+  let visibleEnvironmentRows = $derived(virtualizeRows(environmentRows, environmentScrollTop, environmentViewportHeight, environmentOverscan, ROW_HEIGHT * $uiScale, undefined, $uiScale, environmentGrowth.extra));
+
+  const windowGrowths: Array<[WindowGrowth, () => VirtualRow[], () => VirtualWindow<VirtualRow>]> = [
+    [starredGrowth, () => starredRows, () => visibleStarredRows],
+    [collectionGrowth, () => collectionRows, () => visibleCollectionRows],
+    [historyGrowth, () => historyRows, () => visibleHistoryRows],
+    [environmentGrowth, () => environmentRows, () => visibleEnvironmentRows],
+  ];
+
+  for (const [growth, rows, visible] of windowGrowths) {
+    $effect.pre(() => {
+      const next = rows();
+      untrack(() => growth.rowsChanged(next.map(row => row.key)));
+    });
+    $effect(() => {
+      growth.rendered(visible().rows.map(row => row.key));
+    });
+  }
+
+  $effect(() => () => {
+    for (const [growth] of windowGrowths) growth.destroy();
+  });
 
   $effect(() => {
     if (!editingCollectionId || !editingCollectionInput) return;
@@ -391,15 +423,18 @@
   }
 
   function onCollectionScroll() {
+    if (collectionListEl) collectionGrowth.scrolled(collectionListEl.scrollTop, collectionListEl.clientHeight, visibleCollectionRows.before, visibleCollectionRows.totalHeight - visibleCollectionRows.after);
     clearRequestHover();
     syncCollectionViewport(false);
   }
 
   function onHistoryScroll() {
+    if (historyListEl) historyGrowth.scrolled(historyListEl.scrollTop, historyListEl.clientHeight, visibleHistoryRows.before, visibleHistoryRows.totalHeight - visibleHistoryRows.after);
     syncHistoryViewport(false);
   }
 
   function onEnvironmentScroll() {
+    if (environmentListEl) environmentGrowth.scrolled(environmentListEl.scrollTop, environmentListEl.clientHeight, visibleEnvironmentRows.before, visibleEnvironmentRows.totalHeight - visibleEnvironmentRows.after);
     syncEnvironmentViewport(false);
   }
 
@@ -586,12 +621,12 @@
   }
 
   function updateRequestHover(event: PointerEvent) {
-    const row = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-sidebar-request-key]') : null;
-    hoveredRequestKey = draggingRequest || draggingCollectionId ? '' : row?.dataset.sidebarRequestKey ?? '';
+    const row = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-sidebar-hover-key]') : null;
+    hoveredRowKey = draggingRequest || draggingCollectionId ? '' : row?.dataset.sidebarHoverKey ?? '';
   }
 
   function clearRequestHover() {
-    hoveredRequestKey = '';
+    hoveredRowKey = '';
   }
 
   function clearRequestDragState() {
@@ -751,7 +786,7 @@
             <span class="collection-count">{pinnedRequests.length}</span>
           </button>
           {#if starredExpanded}
-            <div class="starred-list" role="list" bind:this={starredListEl} use:trackViewport={syncStarredViewport} use:frameSyncedWheel={onStarredScroll} onscroll={onStarredScroll}>
+            <div class="starred-list" role="list" bind:this={starredListEl} use:trackViewport={syncStarredViewport} onscroll={onStarredScroll}>
               <div class="sidebar-virtual-spacer" style={`height: ${visibleStarredRows.before}px`}></div>
               {#each visibleStarredRows.rows as row (row.key)}
                 <div class="sidebar-vrow" role="listitem" use:measureStarredRow={row.key}>
@@ -759,7 +794,7 @@
                     req={row.req}
                     depth={PINNED_REQUEST_DEPTH}
                     menuKey={row.key}
-                    hovered={hoveredRequestKey === row.key}
+                    hovered={hoveredRowKey === row.key}
                     {activeRequestId}
                     {topView}
                     {openRequestMenuId}
@@ -775,7 +810,6 @@
                     {deleteRequest}
                     {openWorkspaceDiagnostic}
                     starred
-                    floatingMenu
                     disabled={workspaceBlocked}
                   />
                 </div>
@@ -795,7 +829,7 @@
           <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createCollection} aria-label="New collection" disabled={workspaceBlocked}><AddCloseIcon add /></button>
         </div>
       </div>
-      <div class="collection-list" role="list" bind:this={collectionListEl} use:trackViewport={syncCollectionViewport} use:frameSyncedWheel={onCollectionScroll} onscroll={onCollectionScroll}>
+      <div class="collection-list" role="list" bind:this={collectionListEl} use:trackViewport={syncCollectionViewport} onscroll={onCollectionScroll}>
         <div class="sidebar-virtual-spacer" style={`height: ${visibleCollectionRows.before}px`}></div>
         {#each visibleCollectionRows.rows as row (row.key)}
           <div class="sidebar-vrow" use:measureRow={row.key}>
@@ -816,7 +850,7 @@
               req={row.req}
               depth={row.depth}
               menuKey={row.menuKey}
-              hovered={hoveredRequestKey === row.menuKey}
+              hovered={hoveredRowKey === row.menuKey}
               dragEnabled={!collectionDragDisabled() && !collectionById(row.req.collectionId)?.isInvalid}
               dragging={draggingRequest?.id === row.req.id}
               dropPlacement={dragOverRequestId === row.req.id ? requestDropPlacement : undefined}
@@ -857,7 +891,7 @@
               ondrop={(event) => onCollectionDrop(row.group.collection.id, event)}
               ondragend={clearCollectionDragState}
             >
-              <div class="collection-folder" role="presentation" oncontextmenu={(event) => { if (workspaceBlocked || row.group.collection.isInvalid || event.target instanceof HTMLInputElement) return; event.preventDefault(); toggleCollectionMenu(row.group.collection.id, event); }}>
+              <div class="collection-folder hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation" oncontextmenu={(event) => { if (workspaceBlocked || row.group.collection.isInvalid || event.target instanceof HTMLInputElement) return; event.preventDefault(); toggleCollectionMenu(row.group.collection.id, event); }}>
                 <span class="collection-drag-handle" aria-hidden="true">
                   <svg width="0.625rem" height="0.875rem" viewBox="0 0 10 14" fill="none">
                     <circle cx="3" cy="3" r="1" fill="currentColor"/>
@@ -906,12 +940,21 @@
                     onclick={(event) => { event.stopPropagation(); openWorkspaceDiagnostic(row.group.collection.workspaceDiagnostics ?? []); }}
                   >!</button>
                 {/if}
+                {#if openApiUpdates(row.group.collection.id)}
+                  <button
+                    class="openapi-update-dot"
+                    type="button"
+                    aria-label={`OpenAPI spec changed: ${openApiUpdates(row.group.collection.id)}`}
+                    onclick={(event) => { event.stopPropagation(); void openOpenApiSettings(row.group.collection.id); }}
+                    disabled={workspaceBlocked}
+                  ></button>
+                {/if}
                 <span class="collection-count">{row.group.requests.length}</span>
                 {#if !row.group.collection.isInvalid}
                   <button class="btn btn-ghost btn-icon btn-sm collection-menu-btn" type="button" onclick={(event) => toggleCollectionMenu(row.group.collection.id, event)} aria-label="Collection menu" disabled={workspaceBlocked}>•••</button>
                 {/if}
                 {#if !row.group.collection.isInvalid && openCollectionMenuId === row.group.collection.id}
-                  <div class="menu request-menu collection-menu">
+                  <div class="menu request-menu collection-menu" use:floatingMenu>
                     <button class="menu-item" type="button" onclick={() => createNewRequest(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="request" />Add request</button>
                     <button class="menu-item" type="button" onclick={() => createFolderInCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="folder" />Add folder</button>
                     <button class="menu-item" type="button" onclick={() => createLoadTest(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="load" />New load test</button>
@@ -919,6 +962,7 @@
                     <button class="menu-item" type="button" onclick={() => openCollectionSettings(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="settings" />Settings</button>
                     <button class="menu-item" type="button" onclick={() => renameCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                     <button class="menu-item" type="button" onclick={() => openFindReplace(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
+                    <button class="menu-item" type="button" onclick={() => openOpenApiSettings(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="import" />OpenAPI sync…</button>
                     <button class="menu-item" type="button" onclick={() => exportCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="export" />Export…</button>
                     {#if revealInFileManager && fileManagerLabel()}<button class="menu-item" type="button" onclick={() => revealInFileManager('collection', row.group.collection.id)}><MenuIcon name="open" />{fileManagerLabel()}</button>{/if}
                     <div class="menu-separator" role="separator"></div>
@@ -929,7 +973,7 @@
             </div>
           {:else if row.type === 'loadtest-group'}
             <div class="collection-tree-node" style={`--tree-depth: ${row.depth}`}>
-              <div class="collection-subfolder sidebar-loadtest-group" role="presentation">
+              <div class="collection-subfolder sidebar-loadtest-group hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation">
                 <button class="subfolder-collapse" type="button" onclick={() => toggleLoadTestGroup(row.collectionId)} aria-label={row.collapsed ? 'Expand load tests' : 'Collapse load tests'} aria-expanded={!row.collapsed}>
                   <svg class:collapsed={row.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                     <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -942,7 +986,9 @@
             </div>
           {:else if row.type === 'loadtest'}
             <div
-              class="collection-request-wrap"
+              class="collection-request-wrap hover-managed"
+              class:hovered={hoveredRowKey === row.key}
+              data-sidebar-hover-key={row.key}
               class:in-folder={true}
               class:active={row.loadTest.id === activeLoadTestId && topView === 'loadtest'}
               style={`--tree-depth: ${row.depth}`}
@@ -973,7 +1019,7 @@
               {/if}
               <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleLoadTestMenu(row.loadTest.id, event)} aria-label="Load test menu" disabled={workspaceBlocked}>•••</button>
               {#if openLoadTestMenuId === row.loadTest.id}
-                <div class="menu request-menu">
+                <div class="menu request-menu" use:floatingMenu>
                   <button class="menu-item" type="button" onclick={() => runLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked || Boolean(runningLoadTestId)}><MenuIcon name="play" />Run with k6</button>
                   <button class="menu-item" type="button" onclick={() => exportLoadTest(row.collectionId, row.loadTest.id)}><MenuIcon name="export" />Export k6 script</button>
                   <div class="menu-separator" role="separator"></div>
@@ -997,7 +1043,7 @@
             </div>
           {:else if row.type === 'folder'}
             <div class="collection-tree-node" style={`--tree-depth: ${row.depth}`}>
-              <div class="collection-subfolder" role="presentation" oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleFolderMenu(row.folder.key, event); }}>
+              <div class="collection-subfolder hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation" oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleFolderMenu(row.folder.key, event); }}>
                 <button class="subfolder-collapse" type="button" onclick={() => toggleFolderCollapsed(row.collectionId, row.folder.path)} aria-label={row.folder.collapsed ? 'Expand folder' : 'Collapse folder'} disabled={workspaceBlocked}>
                   <svg class:collapsed={row.folder.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                     <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1009,7 +1055,7 @@
                 <button class="btn btn-ghost btn-icon btn-sm folder-menu-btn" type="button" onclick={(event) => toggleFolderMenu(row.folder.key, event)} aria-label="Folder menu" disabled={workspaceBlocked}>•••</button>
                 {#if openFolderMenuKey === row.folder.key}
                   {@const folderLoadIds = folderLoadTestRequestIds(row.folder)}
-                  <div class="menu request-menu folder-menu">
+                  <div class="menu request-menu folder-menu" use:floatingMenu>
                     <button class="menu-item"
                       type="button"
                       disabled={workspaceBlocked || !folderCanAcceptRequest(row.folder)}
@@ -1059,7 +1105,7 @@
         <span>History</span>
         <button class="btn btn-ghost btn-icon btn-sm history-menu-btn" type="button" onclick={toggleHistoryHeaderMenu} aria-label="History menu" disabled={workspaceBlocked}>•••</button>
         {#if historyHeaderMenuOpen}
-          <div class="menu request-menu history-header-menu">
+          <div class="menu request-menu history-header-menu" use:floatingMenu>
             <button class="menu-item danger" type="button" onclick={clearRequestHistory} disabled={workspaceBlocked}><MenuIcon name="trash" />Clear all</button>
           </div>
         {/if}
@@ -1079,7 +1125,7 @@
         </div>
       {/if}
       {#if historyRows.length}
-        <div class="history-list" bind:this={historyListEl} use:trackViewport={syncHistoryViewport} use:frameSyncedWheel={onHistoryScroll} onscroll={onHistoryScroll}>
+        <div class="history-list" bind:this={historyListEl} use:trackViewport={syncHistoryViewport} onscroll={onHistoryScroll}>
           <div class="sidebar-virtual-spacer" style={`height: ${visibleHistoryRows.before}px`}></div>
           {#each visibleHistoryRows.rows as row (row.key)}
             {#if row.type === 'day'}
@@ -1104,7 +1150,7 @@
                 </button>
                 <button class="btn btn-ghost btn-icon btn-sm history-entry-menu-btn" type="button" onclick={(event) => toggleHistoryEntryMenu(row.entry.id, event)} aria-label="History request menu" disabled={workspaceBlocked}>•••</button>
                 {#if openHistoryMenuId === row.entry.id}
-                  <div class="menu request-menu history-entry-menu">
+                  <div class="menu request-menu history-entry-menu" use:floatingMenu>
                     <button class="menu-item" type="button" onclick={() => openHistoryEntry(row.entry.id)} disabled={workspaceBlocked}><MenuIcon name="open" />Open in editor</button>
                     {#if row.entry.responseStored && activeRequestId}
                       <button class="menu-item" type="button" onclick={() => saveHistoryEntryAsExample(row.entry.id)} disabled={workspaceBlocked}><MenuIcon name="example" />Save as example</button>
@@ -1159,7 +1205,7 @@
         </span>
       </button>
       {#if activeWorkspaceEnvironments.length}
-        <div class="environment-list" bind:this={environmentListEl} use:trackViewport={syncEnvironmentViewport} use:frameSyncedWheel={onEnvironmentScroll} onscroll={onEnvironmentScroll}>
+        <div class="environment-list" bind:this={environmentListEl} use:trackViewport={syncEnvironmentViewport} onscroll={onEnvironmentScroll}>
           <div class="sidebar-virtual-spacer" style={`height: ${visibleEnvironmentRows.before}px`}></div>
           {#each visibleEnvironmentRows.rows as row (row.key)}
             {#if row.type === 'none'}

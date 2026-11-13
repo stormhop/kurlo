@@ -32,6 +32,7 @@
   import { METHODS, REQUEST_TYPES, DEFAULT_WORKSPACE, RAW_BODY_TYPES } from './lib/constants';
   import { installQuitShortcut, installTitlebarDoubleClickHandler } from './lib/windowControls';
   import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
+  import { requestTypeSupportsAssertions } from './lib/assertions';
   import type { SnippetLanguage } from './lib/stores/ui';
   import type { ResponseTab } from './lib/types/models';
   import type { LoadTest } from './lib/wire';
@@ -160,10 +161,40 @@
   let destroyed = false;
   let focusedBeforeWindowBlur: HTMLElement | null = null;
   let codePanelAvailable = $derived(vm.codePanelAvailable);
+  $effect(() => {
+    if (!vm.codePanelOpen || !codePanelAvailable) vm.snippetMenuOpen = false;
+  });
   let windowWidth = $state(window.innerWidth);
   let runtimePlatform = $state(document.documentElement.dataset.platform ?? 'browser');
   let agentDetailsDocked = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity && !vm.sidebarHidden);
-  let shownSidebarWidth = $derived(vm.sidebarHidden ? 0 : agentDetailsDocked ? Math.min(vm.sidebarWidth, agentSidebarMaxWidth(toLogicalPx(windowWidth))) : vm.sidebarWidth);
+  let slideSidebarWidth = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity ? Math.min(vm.sidebarWidth, agentSidebarMaxWidth(toLogicalPx(windowWidth))) : vm.sidebarWidth);
+  let shownSidebarWidth = $derived(vm.sidebarHidden ? 0 : slideSidebarWidth);
+  let switcherInSidebar = $state(!vm.sidebarHidden);
+  $effect(() => {
+    const hidden = vm.sidebarHidden;
+    if (!hidden) {
+      switcherInSidebar = true;
+      return;
+    }
+    const shell = document.querySelector<HTMLElement>('.shell');
+    const sliding = shell ? parseFloat(getComputedStyle(shell).transitionDuration) > 0 : false;
+    if (!sliding) {
+      switcherInSidebar = false;
+      return;
+    }
+    const finish = () => {
+      if (vm.sidebarHidden) switcherInSidebar = false;
+    };
+    const onEnd = (event: TransitionEvent) => {
+      if (event.target === shell && event.propertyName === 'grid-template-columns') finish();
+    };
+    shell!.addEventListener('transitionend', onEnd);
+    const timer = window.setTimeout(finish, 400);
+    return () => {
+      shell!.removeEventListener('transitionend', onEnd);
+      window.clearTimeout(timer);
+    };
+  });
   $effect(() => {
     if (agentDetailsDocked && vm.sidebarWidth > shownSidebarWidth) vm.sidebarWidth = shownSidebarWidth;
   });
@@ -346,6 +377,7 @@
 
   onMount(() => {
     const uninstallTitlebarDoubleClick = installTitlebarDoubleClickHandler();
+    vm.startOpenApiScheduler();
     let uninstallQuitShortcut = () => {};
     const offBeforeQuit = window.runtime?.EventsOn?.('kurlo:before-quit', () => {
       void ackQuit();
@@ -469,6 +501,7 @@
       }
       uninstallTitlebarDoubleClick();
       uninstallQuitShortcut();
+      vm.stopOpenApiScheduler();
       offBeforeQuit?.();
       offMockRequest?.();
       offZoom?.();
@@ -532,7 +565,7 @@
   class:resizing-code={vm.codePanelResizing}
   class:code-open={vm.codePanelOpen && codePanelAvailable}
   class:sidebar-hidden={vm.sidebarHidden}
-  style="--sidebar-w: {rem(shownSidebarWidth)}; --code-requested-w: {rem(vm.codePanelOpen && codePanelAvailable ? vm.codePanelWidth : 0)}"
+  style="--sidebar-w: {rem(shownSidebarWidth)}; --sidebar-slide-w: {rem(slideSidebarWidth)}; --code-requested-w: {rem(vm.codePanelWidth)}"
 >
   <input
     class="hidden-file-input"
@@ -580,6 +613,8 @@
     createNewRequest={vm.createNewRequest}
     renameCollection={vm.renameCollection}
     openCollectionSettings={vm.openCollectionSettings}
+    openOpenApiSettings={vm.openOpenApiSettings}
+    openApiUpdates={(id: string) => vm.openApiHasUpdates(id) ? vm.openApiStatus(id).summary : ''}
     openFolderSettings={vm.openFolderSettings}
     exportCollection={vm.exportCollection}
     deleteCollection={vm.deleteCollection}
@@ -658,9 +693,7 @@
       bind:topView={vm.topView}
       bind:environmentMenuOpen={vm.environmentMenuOpen}
       bind:sidebarView={vm.sidebarView}
-      bind:codePanelOpen={vm.codePanelOpen}
-      codePanelAvailable={codePanelAvailable}
-      switcherDocked={runtimePlatform === 'darwin' && !vm.sidebarHidden}
+      switcherDocked={runtimePlatform === 'darwin' && switcherInSidebar}
       defaultWorkspace={DEFAULT_WORKSPACE}
       activeWorkspace={vm.activeWorkspace}
       workspaces={vm.workspaces}
@@ -689,7 +722,6 @@
       mockRunning={vm.mockServer.running}
       gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
       autosave={vm.autosave}
-      appRuntime={vm.appRuntime}
       workspaceBlocked={vm.workspaceBlocked}
       toggleWorkspaceMenu={vm.toggleWorkspaceMenu}
       createWorkspace={vm.createWorkspace}
@@ -697,7 +729,6 @@
       workspaceCollectionCountFor={vm.workspaceCollectionCountFor}
       workspaceRequestCountFor={vm.workspaceRequestCountFor}
       deleteWorkspace={vm.deleteWorkspace}
-      openGlobalSearch={vm.openGlobalSearch}
       closeCollectionRunner={vm.closeCollectionRunnerTab}
       closeCollectionSettings={vm.closeCollectionSettingsTab}
       closeHistoryDetail={vm.closeHistoryDetail}
@@ -864,6 +895,7 @@
         onOpenRunner={vm.openCollectionRunner}
         bind:collectionSettingsTab={vm.collectionSettingsTab}
         autosave={vm.autosave}
+        autosaveDelayMs={vm.autosaveDelayMs}
         saveState={vm.collectionSettingsSaveState}
         workspaceBlocked={vm.workspaceBlocked}
         variableSuggestions={vm.variableSuggestions}
@@ -909,9 +941,11 @@
         loadTest={active?.loadTest}
         isDraft={active?.isDraft ?? false}
         requests={active ? vm.loadTestRequestOptions(active.collection.id) : []}
-        environments={vm.environments.filter(environment => environment.workspaceId === vm.activeWorkspaceId)}
+        environments={vm.activeWorkspaceEnvironments}
+        activeEnvironmentId={vm.activeEnvironmentId}
         bind:loadTestTab={vm.loadTestTab}
         autosave={vm.autosave}
+        autosaveDelayMs={vm.autosaveDelayMs}
         saveState={vm.loadTestSaveState}
         workspaceBlocked={vm.workspaceBlocked}
         onSave={vm.saveLoadTest}
@@ -1011,6 +1045,8 @@
       {/if}
     {:else}
       <RequestBar
+        bind:codePanelOpen={vm.codePanelOpen}
+        {codePanelAvailable}
         requestName={vm.requestHeaderName()}
         requestLocation={activeRequestLocation}
         showSave={!vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
@@ -1068,7 +1104,8 @@
           mcpArgumentsHaveContent={Boolean(vm.mcpArguments.trim())}
           aiPromptHasContent={Boolean(vm.aiPrompt.trim())}
           aiToolCount={vm.aiToolRequestIds.length + (vm.aiKurloTools ? 1 : 0)}
-          exampleCount={vm.requestExamples.length}
+          varCount={activeCount(vm.requestVars) + (requestTypeSupportsAssertions(vm.requestType) ? activeCount(vm.postResponseVars) : 0)}
+          exampleCount={vm.requestExamplesLoaded ? vm.requestExamples.length : (vm.requestsById.get(vm.activeRequestId)?.exampleCount ?? 0)}
         />
 
         {#if vm.requestTab === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
@@ -1098,6 +1135,8 @@
             {#if lazy.AuthTabComponent}<lazy.AuthTabComponent />{/if}
           {:else if vm.requestTab === 'headers'}
             {#if lazy.HeadersTabComponent}<lazy.HeadersTabComponent />{/if}
+          {:else if vm.requestTab === 'vars'}
+            {#if lazy.VarsTabComponent}<lazy.VarsTabComponent />{/if}
           {:else if vm.requestTab === 'metadata'}
             {#if lazy.GrpcMetadataTabComponent}<lazy.GrpcMetadataTabComponent />{/if}
           {:else if vm.requestTab === 'body'}
@@ -1269,8 +1308,6 @@
 
   <StatusBar
     sidebarHidden={vm.sidebarHidden}
-    codePanelOpen={vm.codePanelOpen}
-    codePanelAvailable={codePanelAvailable}
     {responseOnRight}
     {responseRightTooNarrow}
     topView={vm.topView}
@@ -1283,22 +1320,23 @@
     onOpenGit={vm.openGitTab}
     onOpenAbout={() => vm.openSettings('about')}
     onToggleSidebar={() => (vm.sidebarHidden = !vm.sidebarHidden)}
-    onToggleCodePanel={() => { if (codePanelAvailable) vm.codePanelOpen = !vm.codePanelOpen; }}
   />
 
-  {#if vm.codePanelOpen && codePanelAvailable && lazy.CodeSnippetPanelComponent}
-    <lazy.CodeSnippetPanelComponent
-      lines={vm.snippetRenderedLines}
-      codePanelOpen={vm.codePanelOpen}
-      snippetLanguage={vm.snippetLanguage}
-      bind:snippetMenuOpen={vm.snippetMenuOpen}
-      copiedSnippet={vm.copiedSnippet}
-      onSnippetLanguageChange={(lang: SnippetLanguage) => (vm.snippetLanguage = lang)}
-      onCopy={vm.copySnippet}
-      onResizeStart={vm.startCodePanelResize}
-      onDividerKeydown={vm.onCodePanelDividerKeydown}
-    />
-  {/if}
+  <aside class="code-snippet-panel" aria-label="Code snippet panel" aria-hidden={!vm.codePanelOpen || !codePanelAvailable} inert={!vm.codePanelOpen || !codePanelAvailable}>
+    {#if lazy.CodeSnippetPanelComponent}
+      <lazy.CodeSnippetPanelComponent
+        lines={vm.codePanelOpen && codePanelAvailable ? vm.snippetRenderedLines : vm.snippetRenderedLinesCache}
+        codePanelOpen={vm.codePanelOpen && codePanelAvailable}
+        snippetLanguage={vm.snippetLanguage}
+        bind:snippetMenuOpen={vm.snippetMenuOpen}
+        copiedSnippet={vm.copiedSnippet}
+        onSnippetLanguageChange={(lang: SnippetLanguage) => (vm.snippetLanguage = lang)}
+        onCopy={vm.copySnippet}
+        onResizeStart={vm.startCodePanelResize}
+        onDividerKeydown={vm.onCodePanelDividerKeydown}
+      />
+    {/if}
+  </aside>
 
   {#if textMenu}
     <TextContextMenu menu={textMenu} onclose={() => (textMenu = null)} />

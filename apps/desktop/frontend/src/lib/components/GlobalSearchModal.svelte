@@ -9,6 +9,7 @@
   import type { SavedRequest, ShortcutId } from '../types/models';
   import type { AgentChatSummary } from '../backend';
   import { agentFilterChats } from '../agent';
+  import { kurloDocsURL, openExternalURL } from '../externalLinks';
 
   const EMPTY_QUERY_REQUESTS = 6;
   const MAX_REQUESTS = 50;
@@ -44,7 +45,8 @@
   type Item =
     | { kind: 'request'; key: string; heading: string; request: SavedRequest }
     | { kind: 'chat'; key: string; heading: string; chat: AgentChatSummary }
-    | { kind: 'command'; key: string; heading: string; command: PaletteCommand };
+    | { kind: 'command'; key: string; heading: string; command: PaletteCommand }
+    | { kind: 'docs'; key: string; heading: string; label: string; url: string };
 
   let input: HTMLInputElement;
   let list: HTMLDivElement;
@@ -68,7 +70,16 @@
   let chatItems = $derived<Item[]>(parsed.commandsOnly ? [] : agentFilterChats(chats, parsed.text)
     .slice(0, parsed.text ? MAX_REQUESTS : EMPTY_QUERY_REQUESTS)
     .map((chat, index) => ({ kind: 'chat', key: `chat:${chat.id}`, heading: index === 0 ? 'Chats in this workspace' : '', chat })));
-  let items = $derived([...requestItems, ...chatItems, ...commandItems]);
+  let docsItems = $derived<Item[]>(parsed.commandsOnly ? [] : [{
+    kind: 'docs',
+    key: 'docs',
+    heading: 'Documentation',
+    label: parsed.text ? `Search Kurlo docs for “${parsed.text}”` : 'Kurlo documentation',
+    url: kurloDocsURL(parsed.text),
+  }]);
+  let items = $derived(parsed.text
+    ? [...requestItems, ...chatItems, ...commandItems, ...docsItems]
+    : [...docsItems, ...requestItems, ...chatItems, ...commandItems]);
 
   $effect(() => {
     void query;
@@ -84,6 +95,7 @@
     onClose();
     if (item.kind === 'request') onSwitchRequest(item.request.id);
     else if (item.kind === 'chat') onOpenChat(item.chat);
+    else if (item.kind === 'docs') openExternalURL(item.url);
     else void item.command.run();
   }
 
@@ -185,6 +197,28 @@
             <div class="gsr-info"><span class="gsr-name">{item.chat.title || 'Untitled chat'}</span></div>
             <span class="gsr-collection">{item.chat.driver === 'codex' ? 'Codex' : item.chat.driver === 'claude-code' ? 'Claude Code' : 'Kurlo agent'}</span>
           </button>
+        {:else if item.kind === 'docs'}
+          <button
+            id={optionId(index)}
+            class="palette-command palette-docs"
+            class:selected={index === selectedIndex}
+            type="button"
+            role="option"
+            aria-selected={index === selectedIndex}
+            data-palette-index={index}
+            data-docs-url={item.url}
+            tabindex="-1"
+            onmousemove={() => (selectedIndex = index)}
+            onclick={() => run(item)}
+          >
+            <svg class="palette-docs-icon" width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M2.5 3.2c1.9-.6 3.7-.4 5.5.8v9.3c-1.8-1.2-3.6-1.4-5.5-.8V3.2zM13.5 3.2c-1.9-.6-3.7-.4-5.5.8v9.3c1.8-1.2 3.6-1.4 5.5-.8V3.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+            <span class="palette-command-label">{item.label}</span>
+            <svg class="palette-docs-external" width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M6.5 3.5h-3v9h9v-3M9.5 2.5h4v4M13.5 2.5 7.5 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         {:else}
           <button
             id={optionId(index)}
@@ -220,6 +254,12 @@
 </div>
 
 <style>
+  .palette-docs-icon,
+  .palette-docs-external {
+    flex-shrink: 0;
+    color: var(--text-3);
+  }
+
   .global-search-chat-icon {
     display: inline-flex;
     align-items: center;

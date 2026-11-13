@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
 
-  type PickerOption = { value: string; label: string; hint?: string };
+  type PickerOption = { value: string; label: string; hint?: string; color?: string };
 
   let {
     options = [],
@@ -193,7 +193,7 @@
               onmousemove={() => (highlighted = index)}
               onclick={() => choose(option)}
             >
-              <span class="search-picker-option-label">{option.label}</span>
+              <span class="search-picker-option-label">{#if option.color}<span class="env-color-dot" style:--env-color={option.color} aria-hidden="true"></span>{/if}{option.label}</span>
               {#if option.hint}<span class="search-picker-option-hint">{option.hint}</span>{/if}
             </button>
           {/each}

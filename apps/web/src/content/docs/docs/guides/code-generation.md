@@ -3,7 +3,7 @@ title: Code generation
 description: Copy the current HTTP or AI request as a runnable snippet in one of 14 targets.
 ---
 
-The **Code** side panel turns the currently-open request into a runnable snippet. Open it with the code-snippet icon in the status bar, the workspace overview quick action, or the right-sidebar shortcut from [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
+The **Code** side panel turns the currently-open request into a runnable snippet. Open it with the **Code snippet** (`</>`) button in the URL row, immediately before **Send**, or the right-sidebar shortcut from [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
 
 ![Code generation side panel](../../../../assets/screenshots/code-snippets.png)
 

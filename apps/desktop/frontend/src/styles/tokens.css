@@ -837,6 +837,9 @@ html, body, #app {
 }
 
 @supports (-webkit-backdrop-filter: blur(1px)) {
+  :root[data-platform="darwin"] .workspace-searchbar {
+    transition: background var(--dur-base) ease, padding-left var(--sidebar-slide-dur, 0s) var(--sidebar-slide-ease, ease);
+  }
   :root[data-platform="darwin"] .shell.sidebar-hidden .workspace-searchbar {
     padding-left: calc(var(--mac-traffic-w, 80px) - var(--rail-w, 3.25rem));
   }
@@ -849,7 +852,6 @@ html, body, #app {
   :root[data-platform="darwin"] .workspace-searchbar a,
   :root[data-platform="darwin"] .workspace-searchbar select,
   :root[data-platform="darwin"] .workspace-searchbar-left > .workspace-switcher,
-  :root[data-platform="darwin"] .global-search,
   :root[data-platform="darwin"] .saved-request-tab,
   :root[data-platform="darwin"] .environment-switcher {
     -webkit-app-region: no-drag;
@@ -870,7 +872,6 @@ html, body, #app {
 :root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar a,
 :root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar select,
 :root:is([data-platform="windows"], [data-platform="linux"]) .workspace-searchbar-left > .workspace-switcher,
-:root:is([data-platform="windows"], [data-platform="linux"]) .global-search,
 :root:is([data-platform="windows"], [data-platform="linux"]) .saved-request-tab,
 :root:is([data-platform="windows"], [data-platform="linux"]) .environment-switcher,
 :root:is([data-platform="windows"], [data-platform="linux"]) .win-controls,

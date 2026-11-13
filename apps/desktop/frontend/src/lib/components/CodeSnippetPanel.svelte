@@ -38,7 +38,7 @@
   }
 </script>
 
-<aside class="code-snippet-panel" aria-hidden={!codePanelOpen}>
+<div class="code-snippet-content">
   {#if codePanelOpen}
     <button
       class="code-panel-resizer"
@@ -96,4 +96,4 @@
       </div>
     {/each}
   </div>
-</aside>
+</div>

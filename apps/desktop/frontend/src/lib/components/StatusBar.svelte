@@ -18,8 +18,6 @@
 
   let {
     sidebarHidden,
-    codePanelOpen,
-    codePanelAvailable = true,
     responseOnRight = false,
     responseRightTooNarrow = false,
     topView,
@@ -32,11 +30,8 @@
     onOpenGit,
     onOpenAbout,
     onToggleSidebar,
-    onToggleCodePanel,
   }: {
     sidebarHidden: boolean;
-    codePanelOpen: boolean;
-    codePanelAvailable?: boolean;
     responseOnRight?: boolean;
     responseRightTooNarrow?: boolean;
     topView: TopView;
@@ -49,7 +44,6 @@
     onOpenGit: () => void;
     onOpenAbout?: () => void;
     onToggleSidebar: () => void;
-    onToggleCodePanel: () => void;
   } = $props();
 
   let themeMenuOpen = $state(false);
@@ -141,6 +135,19 @@
     </button>
   </div>
   <div class="status-bar-right">
+    <button
+      class="btn btn-ghost btn-xs status-search-btn"
+      type="button"
+      onclick={() => vm.openGlobalSearch()}
+      disabled={vm.workspaceBlocked}
+      aria-label="Search requests, chats and commands"
+    >
+      <svg width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="11" cy="11" r="7.5" stroke="currentColor" stroke-width="2"/>
+        <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span class="status-search-label">Search</span>
+    </button>
     {#if vm.starPromptVisible}
       <span class="star-prompt">
         <button class="btn btn-ghost btn-xs star-prompt-btn" type="button" onclick={starKurlo}>
@@ -269,20 +276,6 @@
         onclick={toggleAgentDetails}
         aria-label="Toggle chat details"
         aria-pressed={agentNavigation.detailsOpen}
-      >
-        <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-          <rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.2"/>
-          <line x1="9" y1="1" x2="9" y2="13" stroke="currentColor" stroke-width="1.2"/>
-        </svg>
-      </button>
-    {/if}
-    {#if codePanelAvailable}
-      <button
-        class="btn btn-ghost btn-icon btn-xs layout-btn"
-        class:active={codePanelOpen}
-        type="button"
-        onclick={onToggleCodePanel}
-        aria-label="Toggle code snippet panel"
       >
         <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none" aria-hidden="true">
           <rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.2"/>

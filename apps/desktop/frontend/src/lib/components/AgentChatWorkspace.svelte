@@ -7,6 +7,7 @@
   import VirtualAgentHistory from './VirtualAgentHistory.svelte';
   import Markdown from './Markdown.svelte';
   import Select from './Select.svelte';
+  import { environmentColorVar } from '../environmentColors';
   import Disclosure from './Disclosure.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import { agentNotesEditor } from '../stores/agentNotes.svelte';
@@ -212,7 +213,9 @@
     const chosen = (agentStore.activeChat?.id === agentStore.activeChatId ? agentStore.activeChat?.model : '') || agentStore.model || connection?.model;
     return connection ? `${connection.label} · ${chosen || 'default model'}` : 'Kurlo agent';
   });
-  const environmentProtected = $derived(vm.activeWorkspaceEnvironments.some(environment => environment.name === agentStore.environment && environment.protected));
+  const selectedEnvironment = $derived(vm.activeWorkspaceEnvironments.find(environment => environment.name === agentStore.environment));
+  const environmentProtected = $derived(Boolean(selectedEnvironment?.protected));
+  const environmentColor = $derived(environmentColorVar(selectedEnvironment));
   const contextRuns = $derived.by(() => turns.flatMap(turn => turn.steps.flatMap(step => step.blocks.filter(block => block.type === 'tool_use' && (block.name === 'run_request' || block.name === 'send_request')).flatMap(block => {
     const result = step.toolResults.find(item => item.id === block.id);
     if (!result) return [];
@@ -292,7 +295,7 @@
   ]);
   const environmentOptions = $derived([
     { value: '', label: 'No environment' },
-    ...vm.activeWorkspaceEnvironments.map(environment => ({ value: environment.name, label: environment.protected ? `${environment.name} (protected)` : environment.name })),
+    ...vm.activeWorkspaceEnvironments.map(environment => ({ value: environment.name, label: environment.protected ? `${environment.name} (protected)` : environment.name, color: environmentColorVar(environment) })),
   ]);
   const collectionLabel = $derived(collectionOptions.find(option => option.value === agentStore.collection)?.label ?? agentStore.collection);
   const environmentLabel = $derived(environmentOptions.find(option => option.value === agentStore.environment)?.label ?? agentStore.environment);
@@ -720,8 +723,9 @@
       </div>
     {/if}
 
-    <div class="agent-body">
-      <div class="agent-main" class:covered={agentNavigation.detailsOpen && detailsCover}>
+    <div class="agent-body" class:details-open={agentNavigation.detailsOpen} class:details-cover={detailsCover}>
+      <div class="agent-main-slot" class:covered={agentNavigation.detailsOpen && detailsCover} inert={agentNavigation.detailsOpen && detailsCover}>
+      <div class="agent-main">
         <div class="agent-chat" bind:this={scroller}>
           {#if agentStore.loadError}
             {@render errorCard(agentStore.loadError)}
@@ -943,7 +947,7 @@
                     <Select value={agentStore.collection} options={collectionOptions} className="agent-chip" ariaLabel="Collection" disabled={agentStore.running} onChange={(value) => (agentStore.collection = value)} />
                   </span>
                   <span class="agent-composer-chip" class:compact={composerCompact}>
-                    <svg class="agent-composer-chip-icon" width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+                    <svg class="agent-composer-chip-icon" style:color={environmentColor} width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
                     <Select value={agentStore.environment} options={environmentOptions} className="agent-chip" searchable={environmentOptions.length > 8} searchPlaceholder="Search environments" ariaLabel="Environment" disabled={agentStore.running} onChange={(value) => (agentStore.environment = value)} />
                   </span>
                   {#if vm.gitStatus.isRepo}
@@ -1024,7 +1028,8 @@
         {/if}
       </div>
 
-      {#if agentNavigation.detailsOpen}
+      </div>
+      <div class="agent-details-shell" class:closed={!agentNavigation.detailsOpen} aria-hidden={!agentNavigation.detailsOpen} inert={!agentNavigation.detailsOpen}>
         <aside class="agent-context-panel" class:cover={detailsCover} aria-label="Chat details" tabindex="-1" bind:this={detailsPanel} use:escapeKey={onDetailsKeydown}>
           <div class="agent-details-head">
             <span>Chat details</span>
@@ -1034,7 +1039,7 @@
           </div>
           <Disclosure title="Context" summary={contextSummary} storageKey="agent-details-context">
             <div class="agent-kv"><span>Collection</span><span>{agentStore.collection || 'Any'}</span></div>
-            <div class="agent-kv"><span>Environment</span><span>{agentStore.environment || 'None'}{#if environmentProtected}<svg class="agent-kv-lock" width="0.6875rem" height="0.6875rem" viewBox="0 0 16 16" fill="none" aria-label="Protected" role="img"><rect x="3.5" y="7" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.4"/></svg>{/if}</span></div>
+            <div class="agent-kv"><span>Environment</span><span>{#if environmentColor}<span class="env-color-dot" style:--env-color={environmentColor} aria-hidden="true"></span>{/if}{agentStore.environment || 'None'}{#if environmentProtected}<svg class="agent-kv-lock" width="0.6875rem" height="0.6875rem" viewBox="0 0 16 16" fill="none" aria-label="Protected" role="img"><rect x="3.5" y="7" width="9" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.4"/></svg>{/if}</span></div>
             <div class="agent-kv"><span>Agent</span><span>{headerAgent}</span></div>
             <div class="agent-kv"><span>Team notes</span><span><button class="btn-link agent-notes-link" type="button" onclick={() => void agentNotesEditor.show()} disabled={workspaceBlocked}>kurlo-agent.md</button></span></div>
             {#if agentStore.driver}<div class="agent-kv"><span>Effort</span><span>{agentEffortLabel(agentStore.effort || selectedCodexDefaultEffort)}</span></div>{/if}
@@ -1135,7 +1140,7 @@
             </Disclosure>
           {/if}
         </aside>
-      {/if}
+      </div>
     </div>
 {/if}
 </div>
@@ -1199,10 +1204,38 @@
     font-size: var(--text-caption);
   }
   .agent-body {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 0rem;
+    grid-template-rows: minmax(0, 1fr);
+    --agent-details-w: 16rem;
+    transition: grid-template-columns var(--panel-slide-dur) var(--panel-slide-ease);
     flex: 1 1 auto;
     min-height: 0;
     min-width: 0;
+  }
+  .agent-body.details-open {
+    grid-template-columns: minmax(0, 1fr) var(--agent-details-w);
+  }
+  .agent-body.details-cover {
+    --agent-details-w: var(--shell-content-w);
+  }
+  .agent-main-slot,
+  .agent-details-shell {
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .agent-main-slot {
+    display: flex;
+  }
+  .agent-details-shell.closed,
+  .agent-main-slot.covered {
+    visibility: hidden;
+    pointer-events: none;
+    transition: visibility 0s linear var(--panel-slide-dur);
+  }
+  .agent-body.details-cover .agent-main {
+    min-width: var(--agent-details-w);
   }
   .agent-main {
     display: flex;
@@ -1862,11 +1895,13 @@
     padding: 0 var(--space-2);
     border: 1px solid transparent;
     border-radius: var(--radius-md);
-    background: transparent;
     color: var(--text-2);
     font-size: var(--text-label);
   }
-  .agent-composer-chip :global(.agent-chip .app-select-trigger > span) {
+  .agent-composer-chip :global(.agent-chip .app-select-trigger:not(.env-colored)) {
+    background: transparent;
+  }
+  .agent-composer-chip :global(.agent-chip .app-select-trigger > span:not(.env-color-dot)) {
     flex: 1 1 auto;
     text-align: left;
     min-width: 0;
@@ -1915,7 +1950,7 @@
     min-width: 0;
     margin-left: auto;
   }
-  .agent-composer-chip :global(.agent-chip .app-select-trigger:hover:not(:disabled)),
+  .agent-composer-chip :global(.agent-chip .app-select-trigger:hover:not(:disabled):not(.env-colored)),
   .agent-composer :global(.agent-effort .app-select-trigger:hover:not(:disabled)) {
     background: var(--hover);
     color: var(--text);
@@ -2077,7 +2112,8 @@
   }
   .agent-context-panel {
     display: flex;
-    flex: 0 0 16rem;
+    width: var(--agent-details-w);
+    height: 100%;
     flex-direction: column;
     gap: var(--space-3);
     min-width: 0;
@@ -2091,11 +2127,7 @@
     outline: none;
   }
   .agent-context-panel.cover {
-    flex: 1 1 auto;
     border-left: none;
-  }
-  .agent-main.covered {
-    display: none;
   }
 
 

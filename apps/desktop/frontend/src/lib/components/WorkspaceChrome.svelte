@@ -1,7 +1,5 @@
 <script lang="ts">
   import AddCloseIcon from './AddCloseIcon.svelte';
-  import { vm } from '../stores/app.svelte';
-  import Keycaps from './Keycaps.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import { tabListKeyboard } from '../a11y';
   import { middleClick } from '../middleClick';
@@ -20,8 +18,6 @@
     environmentMenuOpen = $bindable(false),
     // eslint-disable-next-line no-useless-assignment
     sidebarView = $bindable<SidebarView>('collections'),
-    codePanelOpen = $bindable(false),
-    codePanelAvailable = true,
     switcherDocked = false,
     defaultWorkspace,
     activeWorkspace,
@@ -51,7 +47,6 @@
     mockRunning = false,
     gitChangeCount = 0,
     autosave,
-    appRuntime = '',
     workspaceBlocked = false,
     toggleWorkspaceMenu,
     createWorkspace,
@@ -59,7 +54,6 @@
     workspaceCollectionCountFor,
     workspaceRequestCountFor,
     deleteWorkspace,
-    openGlobalSearch,
     closeCollectionRunner,
     closeCollectionSettings,
     closeHistoryDetail,
@@ -82,8 +76,6 @@
     topView: TopView;
     environmentMenuOpen: boolean;
     sidebarView: SidebarView;
-    codePanelOpen: boolean;
-    codePanelAvailable?: boolean;
     switcherDocked?: boolean;
     defaultWorkspace: string;
     activeWorkspace: Workspace | undefined;
@@ -113,7 +105,6 @@
     mockRunning?: boolean;
     gitChangeCount?: number;
     autosave: boolean;
-    appRuntime?: string;
     workspaceBlocked?: boolean;
     toggleWorkspaceMenu: (event: MouseEvent) => void;
     createWorkspace: () => void;
@@ -121,7 +112,6 @@
     workspaceCollectionCountFor: (workspaceId: string) => number;
     workspaceRequestCountFor: (workspaceId: string) => number;
     deleteWorkspace: (workspaceId: string) => void;
-    openGlobalSearch: () => void;
     closeCollectionRunner: () => void;
     closeCollectionSettings: () => void;
     closeHistoryDetail: () => void;
@@ -236,9 +226,18 @@
     const place = (dock: boolean) => {
       const shell = home.closest('.shell');
       if (dock && shell) {
-        if (node.parentElement !== shell) shell.appendChild(node);
+        if (node.parentElement !== shell) {
+          node.classList.remove('undocked');
+          node.style.clipPath = 'inset(-1rem calc(var(--sidebar-slide-w, var(--sidebar-w, 17.5rem)) - var(--space-2)) -100vh -100vw)';
+          shell.appendChild(node);
+          node.classList.add('docked');
+          void node.offsetWidth;
+          node.style.clipPath = '';
+        }
       } else if (node.parentElement !== home) {
+        const wasDocked = node.classList.contains('docked');
         home.appendChild(node);
+        node.classList.toggle('undocked', wasDocked);
       }
       node.classList.toggle('docked', dock && Boolean(shell));
     };
@@ -484,14 +483,6 @@
     {/if}
   </div>
   <div class="titlebar-grab" aria-hidden="true"></div>
-  <button class="global-search" type="button" onclick={openGlobalSearch} disabled={workspaceBlocked}>
-    <svg width="1rem" height="1rem" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="11" cy="11" r="7.5" stroke="currentColor" stroke-width="2"/>
-      <path d="m16.5 16.5 4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-    </svg>
-    <span class="global-search-label">Search requests…</span>
-    {#if vm.shortcutCombo('search')}<Keycaps combo={vm.shortcutCombo('search')} runtime={appRuntime} />{/if}
-  </button>
   <div class="searchbar-right">
     <div class="environment-switcher">
       <button class="btn btn-ghost select-trigger environment-select" class:env-none={!activeEnvironmentId} class:env-colored={Boolean(activeEnvironmentColor)} style:--env-color={activeEnvironmentColor} type="button" onclick={toggleEnvironmentMenu} aria-expanded={environmentMenuOpen} disabled={workspaceBlocked}>
@@ -552,11 +543,6 @@
         </div>
       {/if}
     </div>
-    {#if codePanelAvailable}
-      <button class="btn btn-ghost btn-icon tabbar-icon" class:active={codePanelOpen} type="button" onclick={() => (codePanelOpen = !codePanelOpen)} aria-label="Code snippet">
-        &lt;/&gt;
-      </button>
-    {/if}
     <WindowControls />
   </div>
 </div>

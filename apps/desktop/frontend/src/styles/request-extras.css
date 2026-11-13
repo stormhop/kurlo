@@ -319,6 +319,13 @@
   max-width: 100%;
   white-space: nowrap;
 }
+.app-select-trigger.env-colored {
+  background: color-mix(in srgb, var(--env-color, var(--text-3)) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--env-color, var(--text-3)) 55%, transparent);
+}
+.app-select-trigger.env-colored:hover {
+  background: color-mix(in srgb, var(--env-color, var(--text-3)) 22%, transparent);
+}
 .app-select-trigger > span {
   min-width: 0;
   overflow: hidden;

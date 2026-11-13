@@ -152,6 +152,8 @@ Stars are personal. They are kept in your local workspace data, not in the reque
 
 Deleting a request, folder, collection or environment shows a message with **Undo** for a few seconds. Undo puts it back where it was, with the same requests, folders, folder defaults and order; a restored environment gets back its child environments and the collections it was pinned to.
 
+![The Recently deleted list with a deleted collection ready to restore](../../../../assets/screenshots/recently-deleted.png)
+
 After the message is gone, the trash button appears in the **Collections** header (requests, folders and collections) or the **Environments** header (environments). It lists the last 20 deletions of the current workspace, newest first; click one to restore it, or choose **Clear list** to forget them. A request or folder whose collection was deleted too can be restored once the collection is back.
 
 The list lives only while Kurlo is open: after you quit, deleted items are gone from Kurlo. In a [Git workspace](/docs/guides/git-workspaces/) you can still get the files back from Git until you commit the deletion. Deleting a workspace is not covered.
@@ -176,7 +178,7 @@ Secret values are never searched or rewritten: secret rows, tokens, passwords, c
 
 ## Command palette
 
-Press `Cmd/Ctrl K` — or click the search field in the title bar — to open the command palette. Type to search the saved requests of the workspace by name, URL, method, collection or folder; the same query also filters Kurlo's commands:
+Press `Cmd/Ctrl K` — or click **Search** at the bottom right of the window — to open the command palette. Type to search the saved requests of the workspace by name, URL, method, collection or folder; the same query also filters Kurlo's commands:
 
 - **Request** — send, save, edit the URL, duplicate, rename, copy as cURL, close or reopen a tab. Shown while a request is open.
 - **Create** — a new request, collection or environment, or an import.
@@ -186,7 +188,9 @@ Press `Cmd/Ctrl K` — or click the search field in the title bar — to open th
 The response layout also has a button in the status bar, next to the sidebar toggle. Kurlo puts the response beside the request on its own when the editor is at least 1000 px wide; once you choose the side-by-side layout yourself, it keeps it down to 760 px. Dragging the divider stops before either side gets too narrow to use.
 - **Help** — what's new, reporting an issue, about Kurlo.
 
-Start the query with `>` to list commands only. `↑` and `↓` move through the list, `Enter` runs the selection, `Esc` closes the palette. A command bound to a shortcut shows it, including one you reassigned in *Settings → Shortcuts*.
+**Kurlo documentation** sits at the top of the empty palette and opens the docs in your browser. Once you type, the last row becomes **Search Kurlo docs for “…”** and opens the docs with that search already run, so `Enter` still picks the best request or command.
+
+Start the query with `>` to list commands only; the docs row is hidden then. `↑` and `↓` move through the list, `Enter` runs the selection, `Esc` closes the palette. A command bound to a shortcut shows it, including one you reassigned in *Settings → Shortcuts*.
 
 ![Command palette listing saved requests above the commands](../../../../assets/screenshots/global-search.png)
 

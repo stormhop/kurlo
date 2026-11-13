@@ -14,12 +14,26 @@
   border-left: 1px solid transparent;
   box-shadow: none;
   pointer-events: none;
-  transition: border-color var(--dur-fast) ease;
+  transition: width var(--panel-slide-dur) var(--panel-slide-ease), border-color var(--dur-fast) ease;
 }
 
 .shell.code-open .code-snippet-panel {
   border-left-color: var(--border);
   pointer-events: auto;
+}
+
+.shell:not(.code-open) .code-snippet-panel {
+  visibility: hidden;
+  transition: width var(--panel-slide-dur) var(--panel-slide-ease), border-color var(--dur-fast) ease, visibility 0s linear var(--panel-slide-dur);
+}
+
+.code-snippet-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: calc(var(--code-slide-w) - 1px);
+  width: calc(var(--code-slide-w) - 1px);
 }
 
 .code-panel-resizer {
@@ -59,7 +73,7 @@
 
 .snippet-select-trigger {
   display: inline-flex;
-  max-width: calc(var(--code-w, 20.625rem) - 6rem);
+  max-width: calc(var(--code-slide-w, 20.625rem) - 6rem);
 }
 
 .snippet-select-trigger span {

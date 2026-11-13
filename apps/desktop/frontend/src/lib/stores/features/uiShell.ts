@@ -88,7 +88,7 @@ type UiShellHost = {
   saveGlobals: () => Promise<boolean>;
   saveWorkspaceReadmes: () => Promise<boolean>;
   _sidebarSearchInput: HTMLInputElement | undefined;
-  _urlInputRef: HTMLInputElement | HTMLTextAreaElement | undefined;
+  _urlInputRef: HTMLInputElement | undefined;
   activeRequestId: string;
   appDialog: AppDialogState | null;
   autosave: boolean;

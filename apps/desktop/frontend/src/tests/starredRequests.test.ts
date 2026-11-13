@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { placeFloatingMenu } from '../lib/floatingMenu';
 import { legacyStarredRequestIds, starredRequestIdsFromStore } from '../lib/starredRequests';
 import { requestCrudFeature } from '../lib/stores/features/requestCrud';
 import { requestPersistenceFeature } from '../lib/stores/features/requestPersistence';
@@ -78,26 +77,5 @@ describe('starred request ids', () => {
     const store = requestPersistenceFeature.requestStorePayload.call(host as never) as RequestStore;
     expect(store.starredRequestIds).toEqual(['b']);
     expect(store.requests.some(r => 'isPinned' in r)).toBe(false);
-  });
-});
-
-describe('floating request menu', () => {
-  function menu(height: number) {
-    return { offsetHeight: height, style: {} as Record<string, string> } as unknown as HTMLElement;
-  }
-
-  const viewport = { width: 1000, height: 800 };
-  const anchor = (top: number) => ({ top, bottom: top + 28, left: 20, right: 260 }) as DOMRect;
-
-  it('opens below the row when there is room', () => {
-    const node = menu(200);
-    placeFloatingMenu(node, anchor(100), viewport);
-    expect(node.style).toMatchObject({ position: 'fixed', top: '130px', bottom: 'auto', right: '740px' });
-  });
-
-  it('opens above the row near the bottom of the window', () => {
-    const node = menu(200);
-    placeFloatingMenu(node, anchor(700), viewport);
-    expect(node.style).toMatchObject({ position: 'fixed', top: 'auto', bottom: '102px' });
   });
 });

@@ -11,7 +11,7 @@
     onChange = () => {},
   }: {
     value: string;
-    options: Array<{ value: string; label: string }>;
+    options: Array<{ value: string; label: string; color?: string }>;
     className?: string;
     disabled?: boolean;
     searchable?: boolean;
@@ -142,6 +142,8 @@
 <div class="app-select {className}" class:open bind:this={wrap} onfocusout={onFocusOut}>
   <button
     class="field select-trigger app-select-trigger"
+    class:env-colored={Boolean(selected?.color)}
+    style:--env-color={selected?.color}
     type="button"
     bind:this={triggerButton}
     {disabled}
@@ -151,6 +153,7 @@
     onclick={() => void toggle()}
     onkeydown={navigate}
   >
+    {#if selected?.color}<span class="env-color-dot" aria-hidden="true"></span>{/if}
     <span>{selected?.label ?? value}</span>
     <svg class="app-select-chevron" width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
       <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -172,6 +175,7 @@
           onclick={(event) => { event.preventDefault(); choose(opt.value); }}
         >
           <span class="app-select-check">{opt.value === value ? '✓' : ''}</span>
+          {#if opt.color}<span class="env-color-dot" style:--env-color={opt.color} aria-hidden="true"></span>{/if}
           <span>{opt.label}</span>
         </button>
       {/each}

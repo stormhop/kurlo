@@ -348,7 +348,7 @@
                 onclick={(event) => { if (inUse) event.preventDefault(); }}
                 onchange={() => toggleColumn(environment.id)}
               />
-              <span class="env-matrix-columns-name">{environment.name}</span>
+              <span class="env-matrix-columns-name">{#if environment.color}<span class="env-color-dot" style:--env-color={environmentColorVar(environment)} aria-hidden="true"></span>{/if}{environment.name}</span>
               {#if inUse}<span class="env-matrix-columns-hint">in use</span>{/if}
             </label>
           {:else}

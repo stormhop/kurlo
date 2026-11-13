@@ -126,7 +126,7 @@
   let parent = $derived(activeEnvironment ? parentEnvironment(environments, activeEnvironment) : undefined);
   let protectedBy = $derived(activeEnvironment ? protectingAncestor(environments, activeEnvironment.id) : undefined);
   let parentOptions = $derived(activeEnvironment
-    ? [{ value: '', label: 'Nothing' }, ...environmentParentCandidates(environments, activeEnvironment).map(environment => ({ value: environment.id, label: environment.name }))]
+    ? [{ value: '', label: 'Nothing' }, ...environmentParentCandidates(environments, activeEnvironment).map(environment => ({ value: environment.id, label: environment.name, color: environmentColorVar(environment) }))]
     : []);
   let inheritedRows = $derived.by(() => {
     if (!activeEnvironment || !parent) return [];

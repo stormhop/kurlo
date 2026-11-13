@@ -71,6 +71,24 @@
   flex-shrink: 0;
 }
 
+.btn.status-search-btn {
+  gap: var(--space-1-5);
+  padding: 0 var(--space-2);
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-3);
+  font-size: var(--text-caption);
+}
+
+.btn.status-search-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.status-search-btn > svg {
+  display: block;
+  flex: 0 0 0.875rem;
+}
+
 .version-pill {
   display: inline-flex;
   align-items: center;
