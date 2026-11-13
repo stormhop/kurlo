@@ -9,7 +9,7 @@ const kurlo = apps[0];
 export const RELEASE_VERSION = kurlo.version;
 export const RELEASE_PAGE = `${GITHUB_RELEASES}/tag/v${RELEASE_VERSION}`;
 
-export const PORTABLE_SINCE = '3.0.5';
+export const PORTABLE_SINCE = '3.1.0';
 
 export function versionAtLeast(version: string, minimum: string): boolean {
   const parts = (value: string) => value.split('-')[0].split('.').map(part => Number.parseInt(part, 10) || 0);
