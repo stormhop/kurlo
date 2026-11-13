@@ -56,7 +56,7 @@ Pick **OpenAPI / Swagger** and choose a JSON or YAML spec. Kurlo builds one requ
 
 The point is a collection you can send straight away, so three things land on the collection rather than being baked into each request:
 
-- **The server** becomes a `baseUrl` collection variable, and every request URL starts with `{{baseUrl}}`. Retargeting the whole import at staging is one edit. When the spec declares more than one server, the others are recorded in the variable's description.
+- **Servers** become a `baseUrl` variable, as in Bruno, and every request URL starts with `{{baseUrl}}`. Servers declared on the document go to the collection's **Vars** tab. Servers declared on a path or operation go to that request's [**Vars**](/docs/guides/environments/#request-variables) tab instead; the operation's list wins over the path's. A request whose servers match the document's has no row of its own. The first server is switched on; alternatives such as Sandbox are switched-off `baseUrl` rows, and the description of each row names the server, for example *Sandbox server from the spec*. To switch, untick the first row and tick the alternative. Request variables win over the environment, so a `baseUrl` in an environment changes only requests without their own row. Server template variables use their defaults or first enum value; a missing value stays a `{{variable}}` for you to fill in. Imports from a URL resolve relative server addresses against the spec URL.
 - **Path parameters** become [path variables](/docs/guides/request-types/#path-variables): `/users/{userId}` imports as `/users/:userId`, with the value seeded from the spec's `example` or `default` in the request's **Params** tab. A parameter that is only part of a segment, such as `/files/{name}.json`, cannot be a path variable and becomes a collection variable instead.
 - **Security schemes** become auth. A scheme declared for the whole document lands on the collection and each request is set to **Inherit auth**; an operation with its own `security` carries that instead, and `security: []` means the operation is public. HTTP basic, digest and bearer, API keys (with the name and location the spec gives), and OAuth 2.0 (with its token and authorization URLs and scopes) are mapped. The credentials themselves are not in a spec, so each one points at a collection variable — `{{bearerToken}}`, `{{apiKey}}`, `{{oauth2ClientSecret}}` — giving you one place to fill in.
 
@@ -71,6 +71,8 @@ Pick **OpenAPI / Swagger from URL** and paste the link. A spec URL is what teams
 The document is fetched by Kurlo itself rather than by the embedded browser, so a spec host that sends no CORS headers still works, redirects are followed, and your [proxy](/docs/guides/proxy/) and TLS settings apply. A link with no scheme is read as `https`, and no cookies are sent.
 
 If the server uses a self-signed, internal or expired certificate, tick **Skip TLS certificate check** in the same dialog. Kurlo then fetches the spec without verifying the certificate, so anyone between you and the server could change what you import: use it only for a server you trust. The box applies to that one import and is unticked every time the dialog opens; when a certificate is rejected, the error message points to it.
+
+**Keep in sync with this URL** is ticked by default. Kurlo then remembers the URL, checks it for changes and shows them for review before anything changes. See [OpenAPI sync](/docs/guides/openapi-sync/).
 
 The collection is named from the spec's `info.title`. When the spec has none, Kurlo falls back to the host rather than to a path segment like `/v3/api-docs`, which names the format instead of the API.
 
@@ -117,11 +119,16 @@ URL-only curl commands work too — `curl https://api.example.com/users` becomes
 
 Kurlo imports OpenCollection-style folders and request files. Empty folders are preserved explicitly, so a folder can exist before it contains a request. Headers, auth, and scripts in a `folder.yml` or Bruno `folder.bru` become that folder's [defaults](/docs/guides/collection-defaults/#folder-defaults); a folder without an auth block inherits.
 
+Request variables come across to the request's [**Vars**](/docs/guides/environments/#request-variables) tab: `vars:pre-request` and `vars:post-response` in `.bru` files, `runtime.variables` and `set-variable` actions in YAML. Kurlo has no folder variables, so a folder's variables are copied into the Vars tab of every request in it; a request's own variable with the same name wins. Collection variables from `vars:pre-request` in `collection.bru` or `request.variables` in `opencollection.yml` become collection variables.
+
 Kurlo's OpenCollection export writes:
 
 - `folder.yml` files for explicit folder paths, with the folder's headers, auth, and scripts.
 - HTTP and GraphQL requests.
 - Request-level scripts, settings, auth, params, headers, and bodies where the format supports them.
+- Request variables as `runtime.variables` and post-response variables as `set-variable` actions, which Bruno reads back into its Vars tab.
+
+Postman and Insomnia have no request variables. A Postman export writes Pre Request variables as `pm.variables.set(...)` lines at the top of the pre-request script, so the request behaves the same in Postman. Variables in an Insomnia folder's environment are copied into the Vars tab of every request in the folder. Both exports also keep the variables in Kurlo's own field, so they import back into Kurlo unchanged.
 
 ## Git-backed YAML workspaces
 

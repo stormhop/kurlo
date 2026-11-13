@@ -1,0 +1,1141 @@
+[
+  {
+    "name": "document alternatives",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "https://prod.test/v1/",
+          "description": "Production"
+        },
+        {
+          "url": "https://sandbox.test/v1/",
+          "description": "Sandbox"
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://prod.test/v1",
+        "enabled": true
+      },
+      {
+        "key": "baseUrl",
+        "value": "https://sandbox.test/v1",
+        "enabled": false
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "operation servers without document server",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/recalculate": {
+          "post": {
+            "summary": "recalculate",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "https://gost.test",
+                "description": "Production"
+              },
+              {
+                "url": "https://sandbox.test/secured",
+                "description": "Sandbox"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sourceUrl": "",
+    "variables": [],
+    "urls": {
+      "recalculate": "{{baseUrl}}/recalculate"
+    },
+    "requestVars": {
+      "recalculate": [
+        {
+          "key": "baseUrl",
+          "value": "https://gost.test",
+          "enabled": true
+        },
+        {
+          "key": "baseUrl",
+          "value": "https://sandbox.test/secured",
+          "enabled": false
+        }
+      ]
+    }
+  },
+  {
+    "name": "operation path document precedence",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/a": {
+          "get": {
+            "summary": "a",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        },
+        "/b": {
+          "servers": [
+            {
+              "url": "https://files.test"
+            }
+          ],
+          "get": {
+            "summary": "b",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          },
+          "post": {
+            "summary": "c",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "https://reports.test"
+              }
+            ]
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "https://api.test"
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://api.test",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "a": "{{baseUrl}}/a",
+      "b": "{{baseUrl}}/b",
+      "c": "{{baseUrl}}/b"
+    },
+    "requestVars": {
+      "b": [
+        {
+          "key": "baseUrl",
+          "value": "https://files.test",
+          "enabled": true
+        }
+      ],
+      "c": [
+        {
+          "key": "baseUrl",
+          "value": "https://reports.test",
+          "enabled": true
+        }
+      ]
+    }
+  },
+  {
+    "name": "empty and malformed servers inherit",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/a": {
+          "servers": [
+            null,
+            {},
+            {
+              "url": ""
+            }
+          ],
+          "get": {
+            "summary": "a",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": []
+          }
+        },
+        "/b": {
+          "servers": [
+            {
+              "url": "https://files.test"
+            }
+          ],
+          "get": {
+            "summary": "b",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              null,
+              {}
+            ]
+          }
+        }
+      },
+      "servers": [
+        null,
+        {},
+        {
+          "url": ""
+        },
+        {
+          "url": "https://api.test"
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://api.test",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "a": "{{baseUrl}}/a",
+      "b": "{{baseUrl}}/b"
+    },
+    "requestVars": {
+      "b": [
+        {
+          "key": "baseUrl",
+          "value": "https://files.test",
+          "enabled": true
+        }
+      ]
+    }
+  },
+  {
+    "name": "each operation keeps its own alternatives",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/a": {
+          "get": {
+            "summary": "a",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "https://api.test/",
+                "description": "Production"
+              },
+              {
+                "url": "https://one.test",
+                "description": "Sandbox"
+              }
+            ]
+          }
+        },
+        "/b": {
+          "get": {
+            "summary": "b",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "https://api.test",
+                "description": "Primary"
+              },
+              {
+                "url": "https://two.test",
+                "description": "Staging"
+              }
+            ]
+          }
+        },
+        "/c": {
+          "get": {
+            "summary": "c",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "https://one.test/"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sourceUrl": "",
+    "variables": [],
+    "urls": {
+      "a": "{{baseUrl}}/a",
+      "b": "{{baseUrl}}/b",
+      "c": "{{baseUrl}}/c"
+    },
+    "requestVars": {
+      "a": [
+        {
+          "key": "baseUrl",
+          "value": "https://api.test",
+          "enabled": true
+        },
+        {
+          "key": "baseUrl",
+          "value": "https://one.test",
+          "enabled": false
+        }
+      ],
+      "b": [
+        {
+          "key": "baseUrl",
+          "value": "https://api.test",
+          "enabled": true
+        },
+        {
+          "key": "baseUrl",
+          "value": "https://two.test",
+          "enabled": false
+        }
+      ],
+      "c": [
+        {
+          "key": "baseUrl",
+          "value": "https://one.test",
+          "enabled": true
+        }
+      ]
+    }
+  },
+  {
+    "name": "same host different prefixes remain distinct",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/a": {
+          "get": {
+            "summary": "a",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "https://api.test/v1"
+              }
+            ]
+          }
+        },
+        "/b": {
+          "get": {
+            "summary": "b",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "https://api.test/v2"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sourceUrl": "",
+    "variables": [],
+    "urls": {
+      "a": "{{baseUrl}}/a",
+      "b": "{{baseUrl}}/b"
+    },
+    "requestVars": {
+      "a": [
+        {
+          "key": "baseUrl",
+          "value": "https://api.test/v1",
+          "enabled": true
+        }
+      ],
+      "b": [
+        {
+          "key": "baseUrl",
+          "value": "https://api.test/v2",
+          "enabled": true
+        }
+      ]
+    }
+  },
+  {
+    "name": "duplicate alternatives and trailing slashes",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": " https://api.test/// ",
+          "description": "Production"
+        },
+        {
+          "url": "https://api.test/",
+          "description": "Primary"
+        },
+        {
+          "url": "https://sandbox.test/",
+          "description": "Sandbox"
+        },
+        {
+          "url": "https://sandbox.test",
+          "description": "Test"
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://api.test",
+        "enabled": true
+      },
+      {
+        "key": "baseUrl",
+        "value": "https://sandbox.test",
+        "enabled": false
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "Swagger host scheme and base path",
+    "spec": {
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "swagger": "2.0",
+      "host": "legacy.test",
+      "schemes": [
+        "http",
+        "https"
+      ],
+      "basePath": "/api/"
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "http://legacy.test/api",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "Swagger default scheme",
+    "spec": {
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "swagger": "2.0",
+      "host": "legacy.test"
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://legacy.test",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "Swagger relative base path",
+    "spec": {
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "swagger": "2.0",
+      "basePath": "/api/"
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "/api",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "relative servers from URL",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "/v1/"
+        },
+        {
+          "url": "../sandbox/"
+        }
+      ]
+    },
+    "sourceUrl": "https://api.test/docs/spec/openapi.yaml",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://api.test/v1",
+        "enabled": true
+      },
+      {
+        "key": "baseUrl",
+        "value": "https://api.test/docs/sandbox",
+        "enabled": false
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "relative operation and network path servers",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/a": {
+          "get": {
+            "summary": "a",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "../api/"
+              }
+            ]
+          }
+        },
+        "/b": {
+          "get": {
+            "summary": "b",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            },
+            "servers": [
+              {
+                "url": "//other.test/v2/"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sourceUrl": "https://api.test/docs/spec/openapi.yaml",
+    "variables": [],
+    "urls": {
+      "a": "{{baseUrl}}/a",
+      "b": "{{baseUrl}}/b"
+    },
+    "requestVars": {
+      "a": [
+        {
+          "key": "baseUrl",
+          "value": "https://api.test/docs/api",
+          "enabled": true
+        }
+      ],
+      "b": [
+        {
+          "key": "baseUrl",
+          "value": "https://other.test/v2",
+          "enabled": true
+        }
+      ]
+    }
+  },
+  {
+    "name": "root slash server from URL",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "/"
+        }
+      ]
+    },
+    "sourceUrl": "https://api.test/docs/openapi.yaml",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://api.test",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "root slash server from file",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "/"
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "no servers in file",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sourceUrl": "",
+    "variables": [],
+    "urls": {
+      "ping": "/ping"
+    }
+  },
+  {
+    "name": "no servers from URL",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sourceUrl": "https://api.test/docs/openapi.yaml",
+    "variables": [],
+    "urls": {
+      "ping": "https://api.test/ping"
+    }
+  },
+  {
+    "name": "server variable defaults",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "https://{region}.api.test/{version}",
+          "variables": {
+            "region": {
+              "default": "eu"
+            },
+            "version": {
+              "default": "v3"
+            }
+          }
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://eu.api.test/v3",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "server variable enum and missing default",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "https://{region}.api.test/{version}",
+          "variables": {
+            "version": {
+              "enum": [
+                "v2",
+                "v3"
+              ]
+            }
+          }
+        },
+        {
+          "url": "https://sandbox.test"
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://{{region}}.api.test/v2",
+        "enabled": true
+      },
+      {
+        "key": "baseUrl",
+        "value": "https://sandbox.test",
+        "enabled": false
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "falsy defaults are preserved",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "https://api.test/{zero}/{flag}/{empty}",
+          "variables": {
+            "zero": {
+              "default": 0,
+              "enum": [
+                7
+              ]
+            },
+            "flag": {
+              "default": false
+            },
+            "empty": {
+              "default": "",
+              "enum": [
+                "wrong"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://api.test/0/false",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "relative server template from URL",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/ping": {
+          "get": {
+            "summary": "ping",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "/{region}/v1"
+        }
+      ]
+    },
+    "sourceUrl": "https://api.test/docs/openapi.yaml",
+    "variables": [
+      {
+        "key": "baseUrl",
+        "value": "https://api.test/{{region}}/v1",
+        "enabled": true
+      }
+    ],
+    "urls": {
+      "ping": "{{baseUrl}}/ping"
+    }
+  },
+  {
+    "name": "generated names avoid template and path variables",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/a/{baseUrl4}": {
+          "get": {
+            "summary": "a",
+            "responses": {
+              "200": {
+                "description": "OK"
+              }
+            }
+          }
+        }
+      },
+      "servers": [
+        {
+          "url": "https://{baseUrl}.test/{baseUrl2}"
+        },
+        {
+          "url": "https://sandbox.test"
+        }
+      ]
+    },
+    "sourceUrl": "",
+    "variables": [
+      {
+        "key": "baseUrl3",
+        "value": "https://{{baseUrl}}.test/{{baseUrl2}}",
+        "enabled": true
+      },
+      {
+        "key": "baseUrl3",
+        "value": "https://sandbox.test",
+        "enabled": false
+      }
+    ],
+    "urls": {
+      "a": "{{baseUrl3}}/a/:baseUrl4"
+    }
+  },
+  {
+    "name": "shared operation references retain path servers",
+    "spec": {
+      "openapi": "3.0.3",
+      "info": {
+        "title": "Server cases",
+        "version": "1"
+      },
+      "paths": {
+        "/a": {
+          "servers": [
+            {
+              "url": "https://one.test"
+            }
+          ],
+          "get": {
+            "$ref": "#/x-operation"
+          }
+        },
+        "/b": {
+          "servers": [
+            {
+              "url": "https://two.test"
+            }
+          ],
+          "get": {
+            "$ref": "#/x-operation"
+          }
+        }
+      },
+      "x-operation": {
+        "summary": "shared",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "sourceUrl": "",
+    "urlsByPath": true,
+    "variables": [],
+    "urls": {
+      "GET /a": "{{baseUrl}}/a",
+      "GET /b": "{{baseUrl}}/b"
+    },
+    "requestVars": {
+      "GET /a": [
+        {
+          "key": "baseUrl",
+          "value": "https://one.test",
+          "enabled": true
+        }
+      ],
+      "GET /b": [
+        {
+          "key": "baseUrl",
+          "value": "https://two.test",
+          "enabled": true
+        }
+      ]
+    }
+  }
+]

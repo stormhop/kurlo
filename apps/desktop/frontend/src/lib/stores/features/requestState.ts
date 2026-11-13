@@ -6,7 +6,7 @@ import {
   DEFAULT_GRAPHQL_QUERY,
   DEFAULT_GRAPHQL_VARIABLES,
 } from '../../graphql';
-import { cloneRequestExample } from '../../examples';
+import { cloneRequestExample, requestExamplesPending } from '../../examples';
 import { AI_DEFAULT_PRESET, aiDefaultAuthFor } from './ai';
 import { filesystemNameFromName, normalizeSavedRequest, normalizeSioArgs } from '../../normalizers';
 import { pathParamsFromUrl } from '../../pathParams';
@@ -141,6 +141,8 @@ type RequestStateHost = {
   oauth2AssertionAudience: string;
   params: KVRow[];
   pathParams: KVRow[];
+  requestVars: KVRow[];
+  postResponseVars: KVRow[];
   preRequestScript: string;
   preRequestScriptJs: string;
   rawBodyType: RawBodyType;
@@ -150,6 +152,8 @@ type RequestStateHost = {
   requestNameAuto: boolean;
   requestNotes: string;
   requestExamples: RequestExample[];
+  requestExamplesLoaded: boolean;
+  ensureRequestExamples: (ids: string[]) => Promise<void>;
   selectedExampleId: string;
   requestSettingsOverrides: RequestSettingsOverrides;
   requestTab: RequestTab;
@@ -196,6 +200,11 @@ type RequestStateHost = {
   applyRequestSettings: (settings: Partial<RequestSettings>) => void;
 };
 
+function rowsIfAny<K extends 'vars' | 'postResponseVars'>(key: K, rows: KVRow[]): Partial<Record<K, KVRow[]>> {
+  const cleaned = cloneRowsForStore(rows);
+  return cleaned.length ? { [key]: cleaned } as Partial<Record<K, KVRow[]>> : {};
+}
+
 export const requestStateFeature = {
   requestEditSignal(this: RequestStateHost): string {
     void this.bodyContent; void this.graphqlSchema; void this.graphqlQuery;
@@ -205,6 +214,7 @@ export const requestStateFeature = {
       id: this.activeRequestId, requestType: this.requestType,
       requestNameAuto: this.requestNameAuto, method: this.method,
       params: this.params, pathParams: this.pathParams, reqHeaders: this.reqHeaders,
+      requestVars: this.requestVars, postResponseVars: this.postResponseVars,
 	      auth: this.currentAuthState(),
 	      bodyType: this.bodyType, rawBodyType: this.rawBodyType,
 	      bodyFilePath: this.bodyFilePath, bodyFileName: this.bodyFileName, formRows: this.formRows,
@@ -276,8 +286,10 @@ export const requestStateFeature = {
       isDraft: existing?.isDraft ?? false,
       collectionId,
       collection: collectionId ? this.collectionNameById(collectionId) : '',
+      ...(existing?.openapi && collectionId && existing.collectionId === collectionId ? { openapi: existing.openapi } : {}),
       folderPath: [...(draftTarget?.folderPath ?? existing?.folderPath ?? [])], method: isGraphQL || isGrpc ? 'POST' : this.method, url: this.url,
       requestTab: this.requestTab, params: cloneRowsForStore(this.params), pathParams: cloneRowsForStore(this.pathParams), headers: cloneRowsForStore(this.reqHeaders),
+      ...rowsIfAny('vars', this.requestVars), ...rowsIfAny('postResponseVars', requestTypeSupportsAssertions(normalizedType) ? this.postResponseVars : []),
       auth: options.forPersistence ? this.authForPersistence(auth) : auth,
       bodyType: isGraphQL ? 'graphql' : this.bodyType, rawBodyType: isGraphQL ? 'json' : this.rawBodyType, bodyContent: isGraphQL ? this.graphQLBodyContentForStore() : this.bodyContent,
       bodyFilePath: this.bodyFilePath, bodyFileName: this.bodyFileName,
@@ -285,7 +297,9 @@ export const requestStateFeature = {
       preRequestScript: this.preRequestScript, testScript: this.testScript,
       preRequestScriptJs: this.preRequestScriptJs, testScriptJs: this.testScriptJs,
       requestNotes: this.requestNotes,
-      ...(this.requestExamples.length ? { examples: this.requestExamples.map(cloneRequestExample) } : {}),
+      ...(this.requestExamplesLoaded
+        ? { examples: this.requestExamples.map(cloneRequestExample) }
+        : existing?.exampleCount ? { exampleCount: existing.exampleCount } : {}),
       settings: this.currentRequestSettings(),
       settingsOverrides: this.currentRequestSettingsOverrides(),
       sioEvents: cloneRowsForStore(this.sioEvents),
@@ -338,6 +352,7 @@ export const requestStateFeature = {
     const hasBodyContent = req.bodyContent.trim() || req.bodyFilePath || req.bodyFileName || req.formRows.some(rowHasContent);
     const hasSharedContent =
       req.params.some(rowHasContent) || (req.pathParams ?? []).some(r => r.value.trim()) || req.headers.some(rowHasContent) ||
+      (req.vars ?? []).some(rowHasContent) || (req.postResponseVars ?? []).some(rowHasContent) ||
       this.authStateHasData(req.auth, req.auth.type) || req.preRequestScript.trim() || req.testScript.trim() ||
       req.requestNotes.trim() || Boolean(req.assertions?.some(row => row.target.trim()));
     const hasSavedMessages = Boolean(req.savedMessages?.length);
@@ -393,11 +408,11 @@ export const requestStateFeature = {
     this.requestNameAuto = req.nameAuto ?? (!req.name || req.name === 'New Request');
     this.requestName = this.requestNameAuto ? '' : req.name;
     this.method = this.requestType === 'graphql' || this.requestType === 'grpc' ? 'POST' : req.method; this.url = req.url; this.requestTab = req.requestTab ?? (this.requestType === 'graphql' ? 'query' : this.requestType === 'grpc' ? 'body' : 'params');
-    if (this.requestType === 'graphql' && !['docs', 'query', 'auth', 'headers', 'schema', 'scripts'].includes(this.requestTab)) this.requestTab = 'query';
-    if (this.requestType === 'ws' && !['docs', 'body', 'params', 'headers', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'socketio' && !['docs', 'body', 'events', 'params', 'headers', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'grpc' && !['docs', 'body', 'auth', 'metadata', 'service', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'ai' && !['docs', 'body', 'auth', 'headers', 'tools', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
+    if (this.requestType === 'graphql' && !['docs', 'query', 'auth', 'headers', 'vars', 'schema', 'scripts'].includes(this.requestTab)) this.requestTab = 'query';
+    if (this.requestType === 'ws' && !['docs', 'body', 'params', 'headers', 'vars', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
+    if (this.requestType === 'socketio' && !['docs', 'body', 'events', 'params', 'headers', 'vars', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
+    if (this.requestType === 'grpc' && !['docs', 'body', 'auth', 'metadata', 'vars', 'service', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
+    if (this.requestType === 'ai' && !['docs', 'body', 'auth', 'headers', 'vars', 'tools', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
     this.sioEvents = this.restoreSioEventRows(req.sioEvents ?? []);
     this.sioEventName = req.sioEventName ?? '';
     this.sioArgs = normalizeSioArgs(req.sioArgs);
@@ -430,6 +445,7 @@ export const requestStateFeature = {
     this.grpcProtoFileName = req.grpcProtoFileName ?? '';
     this.grpcProtoImportPaths = [...(req.grpcProtoImportPaths ?? [])];
     this.params = restoreRows(req.params); this.pathParams = pathParamsFromUrl(req.url, restoreRows(req.pathParams)); this.reqHeaders = restoreRows(req.headers); this.formRows = restoreRows(req.formRows);
+    this.requestVars = restoreRows(req.vars ?? []); this.postResponseVars = restoreRows(req.postResponseVars ?? []);
     this.authType = req.auth.type; this.bearerToken = req.auth.bearerToken; this.basicUser = req.auth.basicUser; this.basicPass = req.auth.basicPass;
     this.apiKeyName = req.auth.apiKeyName; this.apiKeyValue = req.auth.apiKeyValue; this.apiKeyIn = req.auth.apiKeyIn;
     this.oauth2TokenURL = req.auth.oauth2TokenURL; this.oauth2ClientID = req.auth.oauth2ClientID; this.oauth2Secret = req.auth.oauth2Secret;
@@ -467,8 +483,11 @@ export const requestStateFeature = {
     this.preRequestScript = req.preRequestScript; this.testScript = req.testScript;
     this.preRequestScriptJs = req.preRequestScriptJs ?? ''; this.testScriptJs = req.testScriptJs ?? '';
     this.requestNotes = req.requestNotes ?? '';
-    this.requestExamples = (req.examples ?? []).map(cloneRequestExample);
+    const examplesPending = requestExamplesPending(req);
+    this.requestExamples = examplesPending ? [] : (req.examples ?? []).map(cloneRequestExample);
+    this.requestExamplesLoaded = !examplesPending;
     this.selectedExampleId = this.requestExamples[0]?.id ?? '';
+    if (examplesPending) void this.ensureRequestExamples([req.id]);
     this.applyRequestSettings(req.settings);
     this.requestSettingsOverrides = normalizeRequestSettingsOverrides(req.settingsOverrides, req.settings, this.collections.find(collection => collection.id === req.collectionId)?.defaults?.settings);
     this.response = this.requestType !== 'grpc' ? (this.responses.get(req.id) ?? null) : null;

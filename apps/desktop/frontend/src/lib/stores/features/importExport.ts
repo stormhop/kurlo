@@ -29,7 +29,7 @@ function headerValue(headers: Array<{ key: string; value: string }> | undefined,
   return headers?.find(header => header.key.toLowerCase() === name.toLowerCase())?.value ?? '';
 }
 
-export type UrlImportOptions = { skipTlsVerification?: boolean };
+export type UrlImportOptions = { skipTlsVerification?: boolean; keepInSync?: boolean };
 
 export function looksLikeTlsCertificateError(message: string): boolean {
   return /x509|certificate|tls: failed to verify|unknown authority/i.test(message);
@@ -86,6 +86,7 @@ function fileSegmentForExport(name: string) {
 }
 
 type ImportExportHost = {
+  ensureCollectionExamples: (collectionId: string) => Promise<void>;
   changeGlobalsEverywhere: (change: (rows: KVRow[]) => KVRow[]) => void;
   collectionImportSource: ImportSource;
   collectionImportToast: string;
@@ -128,9 +129,10 @@ type ImportExportHost = {
   importHttpFilePayload: (text: string, fileName: string) => Promise<number>;
   importPostmanPayload: (payload: unknown, fileName: string) => Promise<number>;
   importInsomniaPayload: (payload: unknown, fileName: string) => Promise<number>;
-  importOpenApiPayload: (payload: unknown, fileName: string) => Promise<number>;
+  importOpenApiPayload: (payload: unknown, fileName: string, sourceUrl?: string) => Promise<number>;
   importOpenApiFromUrl: (specUrl: string, options?: UrlImportOptions) => Promise<number>;
-  openPromptWithToggleDialog: (title: string, message: string, placeholder: string, confirmLabel: string, toggle: { label: string; hint?: string }) => Promise<{ value: string; checked: boolean } | null>;
+  openPromptWithToggleDialog: (title: string, message: string, placeholder: string, confirmLabel: string, toggle: { label: string; hint?: string; checked?: boolean; warn?: boolean } | Array<{ label: string; hint?: string; checked?: boolean; warn?: boolean }>) => Promise<{ value: string; checked: boolean; checks: boolean[] } | null>;
+  linkImportedOpenApiCollection: (collectionId: string, source: { url: string; skipTlsVerification?: boolean }, spec: unknown) => Promise<void>;
   openOpenApiUrlImport: () => Promise<void>;
   exportCollectionToOpenCollection: (collectionId: string) => Promise<void>;
   exportCollectionToPostman: (collectionId: string) => Promise<void>;
@@ -187,12 +189,16 @@ export const importExportFeature = {
       'Paste a link to an OpenAPI 3.x or Swagger 2.0 document. Kurlo fetches it and builds a collection from the paths it declares.',
       'https://api.example.com/openapi.json',
       'Import',
-      { label: 'Skip TLS certificate check', hint: 'For self-signed or internal certificates. Only use it for a server you trust.' },
+      [
+        { label: 'Keep in sync with this URL', hint: 'Kurlo checks the spec every 15 minutes and asks before changing requests.', checked: true, warn: false },
+        { label: 'Skip TLS certificate check', hint: 'For self-signed or internal certificates. Only use it for a server you trust.' },
+      ],
     );
     if (!entered?.value.trim()) return;
+    const [keepInSync = false, skipTlsVerification = false] = entered.checks;
     this.collectionImportToast = 'Fetching spec…';
     try {
-      const count = await this.importOpenApiFromUrl(entered.value, { skipTlsVerification: entered.checked });
+      const count = await this.importOpenApiFromUrl(entered.value, { skipTlsVerification, keepInSync });
       this.collectionImportToast = this.collectionImportSummary
         || (count ? `Imported ${count} request${count === 1 ? '' : 's'}` : 'Imported empty collection');
       this.collectionImportSummary = '';
@@ -212,7 +218,13 @@ export const importExportFeature = {
     const { parseOpenApiResponse, openApiNameFromUrl } = await import('../../openapi');
     const { body, contentType } = await fetchImportDocument(url, options);
     const spec = parseOpenApiResponse(body, contentType);
-    return this.importOpenApiPayload(spec, openApiNameFromUrl(url));
+    const known = new Set(this.collections.map(collection => collection.id));
+    const count = await this.importOpenApiPayload(spec, openApiNameFromUrl(url), url);
+    const created = this.collections.find(collection => !known.has(collection.id));
+    if (options.keepInSync && created) {
+      await this.linkImportedOpenApiCollection(created.id, { url, skipTlsVerification: options.skipTlsVerification }, spec);
+    }
+    return count;
   },
   async onPostmanImportFile(this: ImportExportHost, e: Event) {
     const input = e.currentTarget as HTMLInputElement;
@@ -361,14 +373,14 @@ export const importExportFeature = {
     const collectionName = insomniaCollectionName(payload, fileName);
     return this.importRequestsPayload(collectionName, (collectionId, name) => insomniaRequestsFromResources(payload, collectionId, name));
   },
-  async importOpenApiPayload(this: ImportExportHost, payload: unknown, fileName: string) {
+  async importOpenApiPayload(this: ImportExportHost, payload: unknown, fileName: string, sourceUrl = '') {
     const { openApiCollectionName, openApiImportFromSpec } = await import('../../openapi');
     const collectionName = openApiCollectionName(payload, fileName);
     let defaults: ImportedCollectionDefaults | undefined;
     return this.importRequestsPayload(
       collectionName,
       (collectionId, name) => {
-        const imported = openApiImportFromSpec(payload, collectionId, name);
+        const imported = openApiImportFromSpec(payload, collectionId, name, sourceUrl);
         defaults = imported.defaults;
         return imported.requests;
       },
@@ -402,6 +414,7 @@ export const importExportFeature = {
     return this.exportCollectionToOpenApi(collectionId, format as OpenApiExportFormat);
   },
   async exportCollectionToOpenCollection(this: ImportExportHost, collectionId: string) {
+    await this.ensureCollectionExamples(collectionId);
     const col = this.collections.find(c => c.id === collectionId); if (!col) return;
     const reqs = this.requests.filter(r => r.collectionId === collectionId && !r.isDraft);
     const folderPaths = col.folderPaths ?? [];
@@ -432,6 +445,7 @@ export const importExportFeature = {
     setTimeout(() => (this.collectionImportToast = ''), 3000);
   },
   async exportCollectionToPostman(this: ImportExportHost, collectionId: string) {
+    await this.ensureCollectionExamples(collectionId);
     const col = this.collections.find(c => c.id === collectionId); if (!col) return;
     const reqs = this.requests.filter(r => r.collectionId === collectionId && !r.isDraft);
     if (!reqs.length) {
@@ -454,6 +468,7 @@ export const importExportFeature = {
     finally { setTimeout(() => (this.collectionImportToast = ''), 2600); }
   },
   async exportCollectionToInsomnia(this: ImportExportHost, collectionId: string) {
+    await this.ensureCollectionExamples(collectionId);
     const col = this.collections.find(c => c.id === collectionId); if (!col) return;
     const reqs = this.requests.filter(r => r.collectionId === collectionId && !r.isDraft);
     if (!reqs.length) {
@@ -475,6 +490,7 @@ export const importExportFeature = {
     finally { setTimeout(() => (this.collectionImportToast = ''), 2600); }
   },
   async exportCollectionToOpenApi(this: ImportExportHost, collectionId: string, format: OpenApiExportFormat) {
+    await this.ensureCollectionExamples(collectionId);
     const col = this.collections.find(c => c.id === collectionId); if (!col) return;
     const reqs = this.requests.filter(r => r.collectionId === collectionId && !r.isDraft);
     this.closeFloatingMenus();

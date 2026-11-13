@@ -13,6 +13,7 @@ const usage = `Kurlo command-line tools
 Usage:
   kurlo run [workspace] [flags]   Run a workspace's requests and test scripts
   kurlo load list|export|run     Manage and run collection load tests with k6
+  kurlo openapi check [collection] Check a synced collection's OpenAPI spec for drift
   kurlo mcp [workspace] [flags]   Serve a workspace to AI agents over MCP
   kurlo mcp install [client...]   Add Kurlo to Claude Code, Cursor, Codex and other AI clients
   kurlo version                   Print the version
@@ -35,6 +36,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return api.RunCLI(args[1:])
 	case "load":
 		return api.RunLoadCLI(args[1:], stdout, stderr)
+	case "openapi":
+		return api.RunOpenAPICLI(args[1:], stdout, stderr)
 	case "mcp":
 		return api.RunMCPServer(args[1:])
 	case "version", "--version", "-version", "-v":

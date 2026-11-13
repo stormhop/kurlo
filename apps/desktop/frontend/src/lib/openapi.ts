@@ -297,18 +297,22 @@ function resolveServerUrl(server: Record<string, unknown>) {
   return asText(server.url).replace(/\{([^}]+)\}/g, (_, key) => {
     const variable = variables[key];
     const fallback = `{{${key}}}`;
-    if (isRecord(variable)) return asText(variable.default || asArray(variable.enum)[0] || fallback);
+    if (isRecord(variable)) return asText(variable.default ?? asArray(variable.enum)[0] ?? fallback);
     return fallback;
   });
 }
 
-function operationServerUrl(item: Record<string, unknown>): string {
-  return asArray(item.servers).filter(isRecord).map(resolveServerUrl).find(Boolean) ?? '';
+type ImportedServer = { url: string; description: string };
+
+function declaredServers(spec: Record<string, unknown>): ImportedServer[] {
+  return asArray(spec.servers).filter(isRecord)
+    .map(server => ({ url: resolveServerUrl(server).trim(), description: asText(server.description).trim() }))
+    .filter(server => server.url);
 }
 
-function serverUrls(spec: Record<string, unknown>): string[] {
+function serverUrls(spec: Record<string, unknown>): ImportedServer[] {
   if (Array.isArray(spec.servers)) {
-    const urls = spec.servers.filter(isRecord).map(resolveServerUrl).filter(Boolean);
+    const urls = declaredServers(spec);
     if (urls.length) return urls;
   }
   const schemes = asArray(spec.schemes).map(asText);
@@ -316,9 +320,50 @@ function serverUrls(spec: Record<string, unknown>): string[] {
   const host = asText(spec.host);
   const basePath = asText(spec.basePath);
   const single = host ? `${scheme}://${host}${basePath}` : basePath;
-  return single ? [single] : [];
+  return single ? [{ url: single, description: '' }] : [];
 }
 
+function resolveServerSource(target: string, sourceUrl: string): string {
+  if (!sourceUrl || /^[a-z][a-z\d+.-]*:/i.test(target) || target.startsWith('{{')) return target;
+  try {
+    return new URL(target, sourceUrl).href.replace(/%7B/gi, '{').replace(/%7D/gi, '}');
+  } catch {
+    return target;
+  }
+}
+
+function serverVariableName(groups: ImportedServer[][], paths: string[]) {
+  const reserved = new Set<string>();
+  for (const text of [...groups.flat().map(server => server.url), ...paths]) {
+    for (const match of text.matchAll(/\{([^{}]+)\}/g)) reserved.add(match[1]);
+  }
+  for (let sequence = 1; ; sequence++) {
+    const key = sequence === 1 ? OPENAPI_BASE_URL_VARIABLE : `${OPENAPI_BASE_URL_VARIABLE}${sequence}`;
+    if (!reserved.has(key)) return key;
+  }
+}
+
+function serverRows(group: ImportedServer[], key: string, sourceUrl: string): KVRow[] {
+  const rows: KVRow[] = [];
+  const labels = new Map<string, string[]>();
+  for (const server of group) {
+    const value = resolveServerSource(server.url, sourceUrl).replace(/\/+$/, '');
+    if (!labels.has(value)) {
+      labels.set(value, []);
+      rows.push({ ...mkRow(), key, value, enabled: rows.length === 0 });
+    }
+    if (server.description && !labels.get(value)!.includes(server.description)) labels.get(value)!.push(server.description);
+  }
+  for (const row of rows) {
+    const names = labels.get(row.value)!;
+    row.description = names.length ? `${names.join(', ')} server from the spec` : 'Server from the spec';
+  }
+  return rows;
+}
+
+function sameServerRows(left: KVRow[], right: KVRow[]) {
+  return left.length === right.length && left.every((row, index) => row.value === right[index].value);
+}
 
 function joinUrl(base: string, path: string) {
   const templatedPath = path
@@ -517,7 +562,7 @@ export type OpenApiImport = {
   defaults: OpenApiCollectionDefaults;
 };
 
-export function openApiImportFromSpec(specValue: unknown, collectionId: string, collectionName: string): OpenApiImport {
+export function openApiImportFromSpec(specValue: unknown, collectionId: string, collectionName: string, sourceUrl = ''): OpenApiImport {
   const spec = isRecord(specValue) ? specValue : {};
   const paths = isRecord(spec.paths) ? spec.paths : {};
   if (!Object.keys(paths).length) throw new Error('Expected an OpenAPI/Swagger document with paths');
@@ -528,15 +573,23 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
   const requests: SavedRequest[] = [];
   const variables = new Map<string, KVRow>();
 
-  if (servers.length) {
-    const alternatives = servers.slice(1);
-    variables.set(OPENAPI_BASE_URL_VARIABLE, {
-      ...mkRow(),
-      key: OPENAPI_BASE_URL_VARIABLE,
-      value: servers[0],
-      description: alternatives.length ? `Also declared: ${alternatives.join(', ')}` : 'Server declared by the spec',
-    });
+  const operationServers = new Map<string, ImportedServer[]>();
+  const groups = [servers];
+  for (const path of Object.keys(paths).sort()) {
+    const pathItem = deref(spec, paths[path]);
+    if (!isRecord(pathItem)) continue;
+    const pathServers = declaredServers(pathItem);
+    for (const method of HTTP_METHODS) {
+      const operation = deref(spec, pathItem[method]);
+      if (!isRecord(operation)) continue;
+      const own = declaredServers(operation);
+      const group = own.length ? own : pathServers.length ? pathServers : servers;
+      operationServers.set(`${method} ${path}`, group);
+      if (!groups.includes(group)) groups.push(group);
+    }
   }
+  const serverKey = serverVariableName(groups, Object.keys(paths));
+  const collectionServerRows = serverRows(servers, serverKey, sourceUrl);
 
   const collectionSchemeName = firstSecuritySchemeName(spec.security);
   const collectionAuth = collectionSchemeName
@@ -561,8 +614,9 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
       const name = asText(operation.summary) || asText(operation.operationId) || `${method.toUpperCase()} ${path}`;
       const methodUpper = method.toUpperCase() as Method;
       const id = newRequestId();
-      const ownServer = operationServerUrl(operation) || operationServerUrl(pathItem);
-      const url = joinUrl(ownServer || (servers.length ? `{{${OPENAPI_BASE_URL_VARIABLE}}}` : ''), path);
+      const ownServerRows = serverRows(operationServers.get(`${method} ${path}`) ?? servers, serverKey, sourceUrl);
+      const requestServerRows = sameServerRows(ownServerRows, collectionServerRows) ? [] : ownServerRows;
+      const url = resolveServerSource(joinUrl(ownServerRows.length ? `{{${serverKey}}}` : '', path), sourceUrl);
       const pathParams = pathParamsFromUrl(url, pathRows.map(r => ({ ...r, enabled: true })));
       const pathNames = new Set(pathParams.map(r => r.key));
       for (const pathParam of pathRows) {
@@ -577,6 +631,7 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
         id,
         name,
         filesystemName: filesystemNameFromName(name, id),
+        openapi: openApiOperationKey(methodUpper, path),
         collectionId,
         collection: collectionName,
         folderPath: tags.length ? [tags[0]] : [],
@@ -586,6 +641,7 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
         params,
         ...(pathParams.length ? { pathParams } : {}),
         headers,
+        ...(requestServerRows.length ? { vars: requestServerRows } : {}),
         auth: operationAuth(operation, spec, schemes, variables, Boolean(collectionAuth)),
         bodyType: body.bodyType,
         rawBodyType: body.rawBodyType,
@@ -605,7 +661,7 @@ export function openApiImportFromSpec(specValue: unknown, collectionId: string, 
   return {
     requests,
     defaults: {
-      variables: [...variables.values()],
+      variables: [...collectionServerRows, ...[...variables.values()].filter(row => row.key !== serverKey)],
       ...(collectionAuth ? { auth: collectionAuth } : {}),
     },
   };
@@ -626,6 +682,27 @@ function operationAuth(
   const auth = authFromSecurityScheme(deref(spec, schemes[name]), variables);
   if (!auth) return hasCollectionAuth ? { ...emptyAuthState(), type: 'inherit' } : emptyAuthState();
   return auth;
+}
+
+export function openApiOperationKey(method: string, path: string) {
+  return `${method.toUpperCase()} ${path}`;
+}
+
+export function openApiOperationIds(specValue: unknown): Map<string, string> {
+  const spec = isRecord(specValue) ? specValue : {};
+  const paths = isRecord(spec.paths) ? spec.paths : {};
+  const ids = new Map<string, string>();
+  for (const [path, pathValue] of Object.entries(paths)) {
+    const pathItem = deref(spec, pathValue);
+    if (!isRecord(pathItem)) continue;
+    for (const method of HTTP_METHODS) {
+      const operation = deref(spec, pathItem[method]);
+      if (!isRecord(operation)) continue;
+      const operationId = asText(operation.operationId).trim();
+      if (operationId) ids.set(openApiOperationKey(method, path), operationId);
+    }
+  }
+  return ids;
 }
 
 export function openApiRequestsFromSpec(specValue: unknown, collectionId: string, collectionName: string): SavedRequest[] {

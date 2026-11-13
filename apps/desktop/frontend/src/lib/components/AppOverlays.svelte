@@ -10,6 +10,7 @@
   import GitAuthModal from './GitAuthModal.svelte';
   import FindReplaceModal from './FindReplaceModal.svelte';
   import MissingSecretsModal from './MissingSecretsModal.svelte';
+  import OpenApiReviewModal from './OpenApiReviewModal.svelte';
   import WorkspaceYAMLEditor from './WorkspaceYAMLEditor.svelte';
 
   $effect(() => {
@@ -111,6 +112,18 @@
   />
 {/if}
 
+{#if vm.openApiReview}
+  <OpenApiReviewModal
+    review={vm.openApiReview}
+    collectionName={vm.collections.find(collection => collection.id === vm.openApiReview?.collectionId)?.name ?? 'Collection'}
+    onSelection={vm.setOpenApiReviewSelection}
+    onApply={() => void vm.applyOpenApiReview('selected')}
+    onAcceptAll={() => void vm.applyOpenApiReview('all')}
+    onSkip={vm.skipOpenApiReview}
+    onClose={vm.closeOpenApiReview}
+  />
+{/if}
+
 {#if vm.settingsOpen}
   {#if lazy.SettingsModalComponent}
     <lazy.SettingsModalComponent
@@ -122,6 +135,7 @@
       {appRuntime}
       appTheme={vm.appTheme}
       autosave={vm.autosave}
+      autosaveDelayMs={vm.autosaveDelayMs}
       startupView={vm.startupView}
       setStartupView={vm.setStartupView}
       scriptEngine={vm.scriptEngine}
@@ -136,6 +150,7 @@
       proxyConfig={vm.proxyConfig}
       setProxyConfig={vm.setProxyConfig}
       setAutosave={vm.setAutosave}
+      setAutosaveDelay={vm.setAutosaveDelay}
       defaultWorkspaceLocationDraft={vm.defaultWorkspaceLocationDraft}
       defaultWorkspaceLocationStatus={vm.defaultWorkspaceLocationStatus}
       setDefaultWorkspaceLocationDraft={vm.setDefaultWorkspaceLocationDraft}

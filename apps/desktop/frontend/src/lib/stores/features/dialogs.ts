@@ -1,6 +1,8 @@
 import { NAME_MAX_LENGTH, clampName } from '../../constants';
 import type { AppDialogState, DialogOption, DialogToggle } from '../../types/dialog';
 
+type DialogToggleInput = Omit<DialogToggle, 'checked'> & { checked?: boolean };
+
 type DialogHost = {
   appDialog: AppDialogState | null;
   dialogInputValue: string;
@@ -28,15 +30,21 @@ export const dialogFeature = {
       this.appDialog = { mode: 'prompt', title, message, confirmLabel, cancelLabel: 'Cancel', danger: false, placeholder, maxLength, resolve: (value) => resolve(typeof value === 'string' ? value : null) };
     });
   },
-  openPromptWithToggleDialog(this: DialogHost, title: string, message: string, placeholder: string, confirmLabel: string, toggle: Omit<DialogToggle, 'checked'>) {
+  openPromptWithToggleDialog(this: DialogHost, title: string, message: string, placeholder: string, confirmLabel: string, toggle: DialogToggleInput | DialogToggleInput[]) {
     this.closeFloatingMenus();
     this.dialogSelectOpen = false;
     this.dialogInputValue = '';
-    return new Promise<{ value: string; checked: boolean } | null>((resolve) => {
+    const inputs = Array.isArray(toggle) ? toggle : [toggle];
+    return new Promise<{ value: string; checked: boolean; checks: boolean[] } | null>((resolve) => {
       let live: AppDialogState | null = null;
       this.appDialog = {
-        mode: 'prompt', title, message, confirmLabel, cancelLabel: 'Cancel', danger: false, placeholder, toggle: { ...toggle, checked: false },
-        resolve: (value) => resolve(typeof value === 'string' ? { value, checked: live?.mode === 'prompt' && live.toggle?.checked === true } : null),
+        mode: 'prompt', title, message, confirmLabel, cancelLabel: 'Cancel', danger: false, placeholder,
+        toggles: inputs.map(item => ({ ...item, checked: item.checked ?? false })),
+        resolve: (value) => {
+          if (typeof value !== 'string') return resolve(null);
+          const checks = live?.mode === 'prompt' ? (live.toggles ?? []).map(item => item.checked === true) : [];
+          resolve({ value, checked: checks[0] ?? false, checks });
+        },
       };
       live = this.appDialog;
     });

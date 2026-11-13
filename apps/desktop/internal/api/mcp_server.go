@@ -472,6 +472,19 @@ func mcpServerTools(readOnly bool) []map[string]any {
 			"annotations": readOnlyTool,
 		},
 		{
+			"name":        "check_openapi_sync",
+			"title":       "Check a collection against its OpenAPI spec",
+			"description": "For a collection connected to an OpenAPI source, download the current spec and list operations added, changed, moved or removed since the last sync applied in Kurlo. Changes are applied in the app.",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"collection":  map[string]any{"type": "string", "description": "Collection name. Optional when only one collection is synced."},
+					"environment": map[string]any{"type": "string", "description": "Environment whose variables resolve {{variables}} in the source URL and headers."},
+				},
+			},
+			"annotations": map[string]any{"readOnlyHint": true, "openWorldHint": true},
+		},
+		{
 			"name":        "run_request",
 			"title":       "Run a saved request",
 			"description": "Send one saved HTTP, GraphQL, unary gRPC, MCP or AI request. Use open_session in Agent Mode for live connections.",
@@ -586,6 +599,8 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 		run = s.toolGetRequest
 	case "list_environments":
 		run = s.toolListEnvironments
+	case "check_openapi_sync":
+		run = s.toolCheckOpenAPISync
 	case "list_globals":
 		run = s.toolListGlobals
 	case "run_request":

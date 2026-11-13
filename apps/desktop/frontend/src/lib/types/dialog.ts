@@ -8,7 +8,7 @@ export type DialogOption = {
 
 type DialogResult = string | boolean | null;
 
-export type DialogToggle = { label: string; hint?: string; checked: boolean };
+export type DialogToggle = { label: string; hint?: string; checked: boolean; warn?: boolean };
 
 type AppDialogBase = {
   title: string;
@@ -22,7 +22,7 @@ type AppDialogBase = {
 };
 
 export type AppDialogState =
-  | (AppDialogBase & { mode: 'prompt'; options?: never; toggle?: DialogToggle })
+  | (AppDialogBase & { mode: 'prompt'; options?: never; toggles?: DialogToggle[] })
   | (AppDialogBase & { mode: 'confirm'; options?: never })
   | (AppDialogBase & { mode: 'select'; options: DialogOption[] })
   | (AppDialogBase & { mode: 'alert'; options?: never })

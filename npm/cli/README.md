@@ -70,6 +70,16 @@ npx -y @kurlo/cli run ./api --env CI --reporters cli,junit
 
 The run exits non-zero when a request fails or a test does not pass.
 
+## Check OpenAPI drift
+
+For a collection synced with an OpenAPI spec in the app, compare the spec at its source with the last applied sync:
+
+```bash
+kurlo openapi check "Pets API" --workspace ./api --env CI
+```
+
+Exit codes: `0` in sync, `1` the spec changed, `2` the check could not run.
+
 ## Load tests with k6
 
 List the load tests saved in your collections, export a script without installing k6, or run the test with your installed k6:

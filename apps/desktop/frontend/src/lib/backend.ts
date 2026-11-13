@@ -214,6 +214,23 @@ export async function loadRequestStore(): Promise<string> {
   return app.LoadRequestStore();
 }
 
+export async function loadWorkspace(): Promise<{ payload: string; diagnostics: WorkspaceDiagnostic[] }> {
+  const app = window.go?.api?.App;
+  if (app?.LoadWorkspace) {
+    const result = await app.LoadWorkspace();
+    return { payload: result?.payload ?? '', diagnostics: Array.isArray(result?.diagnostics) ? result.diagnostics : [] };
+  }
+  const diagnostics = await loadWorkspaceDiagnostics();
+  return { payload: await loadRequestStore(), diagnostics };
+}
+
+export async function loadRequestExamples(requestIds: string[]): Promise<Record<string, unknown[]>> {
+  const app = window.go?.api?.App;
+  if (!app?.LoadRequestExamples || requestIds.length === 0) return {};
+  const result = await app.LoadRequestExamples(requestIds);
+  return result && typeof result === 'object' ? result as Record<string, unknown[]> : {};
+}
+
 export async function loadWorkspaceDiagnostics(): Promise<WorkspaceDiagnostic[]> {
   const app = window.go?.api?.App;
   if (!app?.LoadWorkspaceDiagnostics) return [];
@@ -336,6 +353,26 @@ export async function saveResponseBody(requestId: string, defaultName: string): 
 
 export async function saveFileDialog(name: string, content: string): Promise<string> {
   return (await window.go?.api?.App?.SaveFileDialog?.(name, content)) ?? '';
+}
+
+export type OpenApiSpecFile = { content: string; exists: boolean; path: string; error?: string };
+
+const NO_BRIDGE_SPEC: OpenApiSpecFile = { content: '', exists: false, path: '', error: 'OpenAPI sync is only available in the desktop app.' };
+
+export async function readOpenApiBaseSpec(collectionId: string): Promise<OpenApiSpecFile> {
+  return (await window.go?.api?.App?.ReadOpenAPIBaseSpec?.(collectionId)) ?? NO_BRIDGE_SPEC;
+}
+
+export async function writeOpenApiBaseSpec(collectionId: string, content: string): Promise<string> {
+  return (await window.go?.api?.App?.WriteOpenAPIBaseSpec?.(collectionId, content)) ?? NO_BRIDGE_SPEC.error!;
+}
+
+export async function deleteOpenApiBaseSpec(collectionId: string): Promise<string> {
+  return (await window.go?.api?.App?.DeleteOpenAPIBaseSpec?.(collectionId)) ?? '';
+}
+
+export async function readOpenApiSourceFile(source: string): Promise<OpenApiSpecFile> {
+  return (await window.go?.api?.App?.ReadOpenAPISourceFile?.(source)) ?? NO_BRIDGE_SPEC;
 }
 
 export async function readCollectionTextFiles(root: string): Promise<CollectionTextFilesResult> {

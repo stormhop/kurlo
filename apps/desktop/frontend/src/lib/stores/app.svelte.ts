@@ -1,10 +1,11 @@
 import {
-  loadRequestStore, loadWorkspaceDiagnostics, storedHistoryResponseIds,
+  loadRequestStore, loadWorkspace, loadWorkspaceDiagnostics, storedHistoryResponseIds,
   openDirectoryDialog, saveFileDialog, defaultWorkspaceLocation, setDefaultWorkspaceLocation,
   gitStatus, gitCommitLogPage, gitListBranches,
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
   emptyLoadRunState, revealWorkspaceItem,
 } from '../backend';
+import { DEFAULT_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
 import { agentStore, codexAgentStore, claudeAgentStore } from './agent.svelte';
 import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../backend';
 import { EMPTY_COOKIE_SYNC_STATUS, EMPTY_MOCK_SERVER_STATUS } from '../wire';
@@ -83,6 +84,7 @@ import { savedMessagesFeature } from './features/savedMessages';
 import { trashFeature, type TrashEntry } from './features/trash';
 import { mkSioEventRow, socketioFormFeature } from './features/socketioForm';
 import { mockServerFeature } from './features/mockServer';
+import { openApiSyncFeature, type OpenApiReviewState, type OpenApiSyncStatus } from './features/openapiSync';
 import { dialogFeature } from './features/dialogs';
 import { environmentFeature, readEnvironmentView, type EnvironmentView } from './features/environments';
 import { environmentMenuGroups, type EnvironmentMenuGroups } from '../collectionEnvironments';
@@ -90,6 +92,7 @@ import { globalsFeature, withTrailingRow as withTrailingGlobalRow } from './feat
 import { historyFeature } from './features/history';
 import { normalizeCollectionRuns, type CollectionRunRecord } from '../collectionRuns';
 import { menuFeature } from './features/menus';
+import { setFloatingMenuDismiss } from '../floatingMenu';
 import { loadTestFeature, type LoadTestTab } from './features/loadTests';
 import { loadRunFeature } from './features/loadRuns';
 import { preferencesFeature } from './features/preferences';
@@ -157,6 +160,7 @@ class AppVM {
         (this as unknown as Record<string, unknown>)[name] = desc.value.bind(this);
       }
     }
+    setFloatingMenuDismiss(() => this.closeFloatingMenus());
   }
 
   declare activeRequestCookieDomain: typeof cookieFeature.activeRequestCookieDomain;
@@ -285,6 +289,27 @@ class AppVM {
   agentReturnSidebar: Exclude<SidebarView, 'agent'> = 'collections';
   mockServerRunningSignature = $state('');
   mockServerReloadTimer: ReturnType<typeof setTimeout> | null = null;
+  declare setOpenApiStatus: typeof openApiSyncFeature.setOpenApiStatus;
+  declare openApiStatus: typeof openApiSyncFeature.openApiStatus;
+  declare openApiHasUpdates: typeof openApiSyncFeature.openApiHasUpdates;
+  declare fetchOpenApiSpec: typeof openApiSyncFeature.fetchOpenApiSpec;
+  declare openApiPlanFor: typeof openApiSyncFeature.openApiPlanFor;
+  declare storeOpenApiBase: typeof openApiSyncFeature.storeOpenApiBase;
+  declare checkOpenApiSync: typeof openApiSyncFeature.checkOpenApiSync;
+  declare runOpenApiCheck: typeof openApiSyncFeature.runOpenApiCheck;
+  declare reviewOpenApiChanges: typeof openApiSyncFeature.reviewOpenApiChanges;
+  declare setOpenApiReviewSelection: typeof openApiSyncFeature.setOpenApiReviewSelection;
+  declare closeOpenApiReview: typeof openApiSyncFeature.closeOpenApiReview;
+  declare skipOpenApiReview: typeof openApiSyncFeature.skipOpenApiReview;
+  declare applyOpenApiReview: typeof openApiSyncFeature.applyOpenApiReview;
+  declare saveOpenApiSource: typeof openApiSyncFeature.saveOpenApiSource;
+  declare connectOpenApiSource: typeof openApiSyncFeature.connectOpenApiSource;
+  declare disconnectOpenApiSource: typeof openApiSyncFeature.disconnectOpenApiSource;
+  declare linkImportedOpenApiCollection: typeof openApiSyncFeature.linkImportedOpenApiCollection;
+  declare openApiSchedulerTick: typeof openApiSyncFeature.openApiSchedulerTick;
+  declare startOpenApiScheduler: typeof openApiSyncFeature.startOpenApiScheduler;
+  declare stopOpenApiScheduler: typeof openApiSyncFeature.stopOpenApiScheduler;
+  declare openOpenApiSettings: typeof openApiSyncFeature.openOpenApiSettings;
   declare mockServerTargetCollectionId: typeof mockServerFeature.mockServerTargetCollectionId;
   declare mockServerRoutes: typeof mockServerFeature.mockServerRoutes;
   declare mockServerRunningRoutes: typeof mockServerFeature.mockServerRunningRoutes;
@@ -639,6 +664,8 @@ class AppVM {
   declare flushPendingPersist: typeof requestPersistenceFeature.flushPendingPersist;
   declare requestStorePayload: typeof requestPersistenceFeature.requestStorePayload;
   declare persistRequestStore: typeof requestPersistenceFeature.persistRequestStore;
+  declare rememberLoadedRequestStore: typeof requestPersistenceFeature.rememberLoadedRequestStore;
+  declare writeRequestStoreView: typeof requestPersistenceFeature.writeRequestStoreView;
   declare persistRequestStoreView: typeof requestPersistenceFeature.persistRequestStoreView;
   declare scheduleRequestStorePersist: typeof requestPersistenceFeature.scheduleRequestStorePersist;
   declare persistActiveRequestNow: typeof requestPersistenceFeature.persistActiveRequestNow;
@@ -856,6 +883,7 @@ class AppVM {
   declare setThemeMode: typeof preferencesFeature.setThemeMode;
   declare setThemeVariant: typeof preferencesFeature.setThemeVariant;
   declare loadAutosaveSettings: typeof preferencesFeature.loadAutosaveSettings;
+  declare setAutosaveDelay: typeof preferencesFeature.setAutosaveDelay;
   declare setAutosave: typeof preferencesFeature.setAutosave;
   declare loadStartupViewPreference: typeof preferencesFeature.loadStartupViewPreference;
   declare setStartupView: typeof preferencesFeature.setStartupView;
@@ -879,6 +907,9 @@ class AppVM {
   declare loadStoredHistoryResponse: typeof historyFeature.loadStoredHistoryResponse;
   declare saveHistoryEntryAsExample: typeof historyFeature.saveHistoryEntryAsExample;
   declare addCapturedExample: typeof examplesFeature.addCapturedExample;
+  declare ensureRequestExamples: typeof examplesFeature.ensureRequestExamples;
+  declare ensureCollectionExamples: typeof examplesFeature.ensureCollectionExamples;
+  declare ensureAllRequestExamples: typeof examplesFeature.ensureAllRequestExamples;
   declare saveHistoryEntryToCollection: typeof historyFeature.saveHistoryEntryToCollection;
   declare saveHistoryEntryToNewCollection: typeof historyFeature.saveHistoryEntryToNewCollection;
   declare openHistoryEntry: typeof historyFeature.openHistoryEntry;
@@ -1081,6 +1112,8 @@ class AppVM {
 
   params = $state<KVRow[]>([mkRow()]);
   pathParams = $state<KVRow[]>([]);
+  requestVars = $state<KVRow[]>([mkRow()]);
+  postResponseVars = $state<KVRow[]>([mkRow()]);
   reqHeaders = $state<KVRow[]>([mkRow()]);
   formRows = $state<KVRow[]>([mkRow()]);
   bulkEditTables = $state<{ params: boolean; headers: boolean; form: boolean }>({ params: false, headers: false, form: false });
@@ -1144,6 +1177,7 @@ class AppVM {
   scriptEngine = $state<ScriptEngine>('js');
   requestNotes = $state('');
   requestExamples = $state<RequestExample[]>([]);
+  requestExamplesLoaded = $state(true);
   selectedExampleId = $state('');
 
   responseSearchOpen = $state(false);
@@ -1289,7 +1323,7 @@ class AppVM {
   openCollectionMenuId = $state('');
   activeCollectionSettingsId = $state('');
   activeFolderSettingsPath = $state<string[]>([]);
-  collectionSettingsTab = $state<'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy'>('overview');
+  collectionSettingsTab = $state<'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy' | 'openapi'>('overview');
   collectionSettingsSaveState = $state<'idle' | 'saving' | 'saved'>('idle');
   openFolderMenuKey = $state('');
   openLoadTestMenuId = $state('');
@@ -1404,6 +1438,8 @@ class AppVM {
   resolvedAppTheme = $state<ResolvedAppTheme>(initialThemeState.resolvedAppTheme);
   headerValueSuggestions = $state<string[]>([]);
   collectionImportToast = $state('');
+  openApiSync = $state<Record<string, OpenApiSyncStatus>>({});
+  openApiReview = $state<OpenApiReviewState | null>(null);
   trash = $state<TrashEntry[]>([]);
   undoEntryId = $state('');
   collectionImportSummary = $state('');
@@ -1463,6 +1499,7 @@ class AppVM {
   responseBodyPage = $state(0);
   quitReviewInProgress = $state(false);
   autosave = $state(false);
+  autosaveDelayMs = $state(DEFAULT_AUTOSAVE_DELAY_MS);
   startupView = $state<StartupView>(DEFAULT_STARTUP_VIEW);
   startupViewApplied = false;
   saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -1515,7 +1552,7 @@ class AppVM {
 
   _postmanImportInput: HTMLInputElement | undefined = undefined;
   _sidebarSearchInput: HTMLInputElement | undefined = undefined;
-  _urlInputRef: HTMLInputElement | HTMLTextAreaElement | undefined = undefined;
+  _urlInputRef: HTMLInputElement | undefined = undefined;
 
   collectionGroups: CollectionGroup[] = $derived.by(() => this.buildCollectionGroups());
   historyGroups: HistoryDayGroup[] = $derived.by(() => this.buildHistoryGroups());
@@ -1603,7 +1640,12 @@ class AppVM {
       description: row.description || 'Global',
       secret: row.secret ?? false,
     }));
-    const rows = [...this.environmentVariableSuggestions(), ...collectionSuggestions, ...globalSuggestions];
+    const requestSuggestions = this.topView === 'request'
+      ? this.requestVars
+        .filter(row => row.enabled && row.key.trim())
+        .map(row => ({ key: row.key.trim(), value: row.value, description: row.description || 'Request', secret: row.secret ?? false }))
+      : [];
+    const rows = [...requestSuggestions, ...this.environmentVariableSuggestions(), ...collectionSuggestions, ...globalSuggestions];
     return rows.filter((row, index) => rows.findIndex(candidate => candidate.key === row.key) === index);
   }
   async copyHistoryEntryCurl(historyId: string) {
@@ -1641,9 +1683,10 @@ class AppVM {
     let requestStoreParsed: Partial<RequestStore> | null = null;
     let requestStoreReadFailed = false;
     const savedTopViewState = this.loadTopViewState();
-    this.workspaceDiagnostics = normalizeWorkspaceDiagnostics(diagnosticsOverride ?? await loadWorkspaceDiagnostics());
+    const loaded = rawOverride === undefined && diagnosticsOverride === undefined ? await loadWorkspace().catch(() => null) : null;
+    this.workspaceDiagnostics = normalizeWorkspaceDiagnostics(diagnosticsOverride ?? loaded?.diagnostics ?? await loadWorkspaceDiagnostics());
     try {
-      const raw = rawOverride ?? await loadRequestStore();
+      const raw = rawOverride ?? loaded?.payload ?? await loadRequestStore();
       requestStoreRaw = raw;
       if (raw.trim()) {
         const parsed = JSON.parse(raw) as Partial<RequestStore>;
@@ -1724,6 +1767,7 @@ class AppVM {
       this.applySavedRequest(active);
       this.requestStoreLoaded = true;
     }
+    if (!requestStoreReadFailed) this.rememberLoadedRequestStore();
     const launchTopView = launching ? startupTopView(this.startupView, { workspaceBlocked: this.workspaceBlocked, hasActiveRequest: Boolean(this.activeRequestId) }) : null;
     if (launchTopView) {
       if (savedTopViewState?.sidebarView) this.sidebarView = savedTopViewState.sidebarView;
@@ -2070,6 +2114,7 @@ applyFeatures(
   savedMessagesFeature,
   trashFeature,
   mockServerFeature,
+  openApiSyncFeature,
   realtimeFeature,
   collectionRunnerDerivedFeature,
   collectionRunnerFeature,

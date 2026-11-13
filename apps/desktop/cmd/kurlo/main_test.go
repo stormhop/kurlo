@@ -45,3 +45,10 @@ func TestRunLoadHelp(t *testing.T) {
 		t.Fatalf("load help missing: %q", stderr.String())
 	}
 }
+
+func TestRunDispatchesOpenAPIHelp(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"openapi", "--help"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "kurlo openapi check") {
+		t.Fatalf("code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+}

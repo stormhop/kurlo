@@ -215,7 +215,20 @@
           "$ref": "#/definitions/id",
           "description": "Pinned environment selected when the collection is opened. Defaults to the first pinned environment."
         },
-        "defaults": { "$ref": "#/definitions/collectionDefaults" }
+        "defaults": { "$ref": "#/definitions/collectionDefaults" },
+        "openapi": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["source"],
+          "description": "OpenAPI spec this collection is kept in sync with. The spec from the last applied sync is stored next to collection.yml as openapi/spec.json.",
+          "properties": {
+            "source": { "type": "string", "description": "URL or path relative to the workspace folder. May use {{variables}}." },
+            "headers": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } },
+            "intervalMinutes": { "type": "integer", "minimum": 0, "description": "How often the app checks while it is open. 0 checks only by hand." },
+            "skipTlsVerification": { "type": "boolean" },
+            "ignored": { "type": "array", "description": "Operations not to offer again, as METHOD /path.", "items": { "type": "string" } }
+          }
+        }
       }
     },
     "collectionDefaults": {
@@ -257,12 +270,20 @@
         },
         "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "SSE"] },
         "url": { "type": "string" },
-        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
+        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "vars", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
         "params": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
         },
         "pathParams": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "vars": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "postResponseVars": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
         },
@@ -286,6 +307,7 @@
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },
         "requestNotes": { "type": "string" },
+        "openapi": { "type": "string", "description": "OpenAPI operation this request is linked to, as METHOD /path/{template}." },
         "settings": { "$ref": "#/definitions/requestSettings" },
         "settingsOverrides": {
           "type": "object",

@@ -1,4 +1,5 @@
-import { cancelQuit, confirmQuit } from '../../backend';
+import { cancelQuit, confirmQuit, loadRequestExamples } from '../../backend';
+import { normalizeRequestExamples, requestExamplesPending } from '../../examples';
 import type { HttpResponse, McpResponse } from '../../backend';
 import { DEFAULT_COLLECTION, clampName } from '../../constants';
 import { addCollectionFolderPath } from '../../collections';
@@ -34,6 +35,7 @@ import type { TopView } from '../ui';
 export type DraftTarget = { collectionId: string; folderPath: string[] };
 
 type RequestCrudHost = {
+  ensureRequestExamples: (ids: string[]) => Promise<void>;
   draftTargets: Map<string, DraftTarget>;
   draftBaselines: Map<string, SavedRequest>;
   trashRequest: (request: import('../../types/models').SavedRequest, workspaceId: string) => void;
@@ -816,11 +818,12 @@ export const requestCrudFeature = {
   async duplicateRequest(this: RequestCrudHost, id: string) {
     if (!this.guardWorkspaceWritable('Duplicating requests')) return;
     await this.persistActiveRequestNow();
+    await this.ensureRequestExamples([id]);
     const req = id === this.activeRequestId
       ? this.snapshotActiveRequest({ forPersistence: true })
       : this.requestForEditing(id) ?? this.requestsById.get(id);
     if (!req) return;
-    const copy = this.normalizeSavedRequestCtx({ ...req, id: newRequestId(), filesystemName: undefined, name: `${requestTabLabel(req)} Copy`, nameAuto: false });
+    const copy = this.normalizeSavedRequestCtx({ ...req, id: newRequestId(), filesystemName: undefined, openapi: undefined, name: `${requestTabLabel(req)} Copy`, nameAuto: false });
     this.requests = [...this.requests, copy];
     this.openRequestIds = [...new Set([...this.openRequestIds, copy.id])];
     this.openRequestMenuId = '';
@@ -893,8 +896,16 @@ export const requestCrudFeature = {
     if (!this.guardWorkspaceWritable('Pasting requests')) return;
     if (!this.copiedRequestItem) return;
     await this.persistActiveRequestNow();
-    const colId = this.activeCollectionId() || this.copiedRequestItem.collectionId;
-    const copy = this.normalizeSavedRequestCtx({ ...this.copiedRequestItem, id: newRequestId(), filesystemName: undefined, collectionId: colId, collection: this.collectionNameById(colId), name: `${requestTabLabel(this.copiedRequestItem)} Copy`, nameAuto: false });
+    let source = this.copiedRequestItem;
+    if (requestExamplesPending(source)) {
+      const loaded = await loadRequestExamples([source.id]);
+      if (Object.prototype.hasOwnProperty.call(loaded, source.id)) {
+        source = { ...source, examples: normalizeRequestExamples(loaded[source.id], source.id) ?? [] };
+        delete source.exampleCount;
+      }
+    }
+    const colId = this.activeCollectionId() || source.collectionId;
+    const copy = this.normalizeSavedRequestCtx({ ...source, id: newRequestId(), filesystemName: undefined, collectionId: colId, collection: this.collectionNameById(colId), name: `${requestTabLabel(source)} Copy`, nameAuto: false });
     this.requests = [...this.requests, copy];
     this.openRequestIds = [...new Set([...this.openRequestIds, copy.id])];
     this.applySavedRequest(copy);

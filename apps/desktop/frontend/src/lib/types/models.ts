@@ -129,7 +129,7 @@ export type BodyType = 'none' | 'json' | 'text' | 'xml' | 'html' | 'form' | 'url
 export type BodyMode = 'none' | 'form' | 'urlencoded' | 'raw' | 'binary' | 'graphql';
 export type RawBodyType = 'text' | 'json' | 'html' | 'xml';
 export type HttpVersion = 'auto' | '1.1' | '2';
-export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'metadata' | 'body' | 'schema' | 'service' | 'events' | 'scripts' | 'settings' | 'examples' | 'tools';
+export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'vars' | 'metadata' | 'body' | 'schema' | 'service' | 'events' | 'scripts' | 'settings' | 'examples' | 'tools';
 export type ScriptTab = 'pre-request' | 'tests' | 'assertions';
 export type ResponseTab = 'body' | 'preview' | 'headers' | 'test-results' | 'timeline' | 'diff';
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
@@ -217,8 +217,16 @@ export type Collection = {
   environmentIds?: string[];
   defaultEnvironmentId?: string;
   loadTests?: LoadTest[];
+  openapi?: OpenApiSource;
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;
+};
+export type OpenApiSource = {
+  source: string;
+  headers?: KVRow[];
+  intervalMinutes?: number;
+  skipTlsVerification?: boolean;
+  ignored?: string[];
 };
 export type EnvironmentColor = 'red' | 'amber' | 'green' | 'blue' | 'gray';
 export type Environment = {
@@ -280,10 +288,12 @@ export type RequestExample = {
 };
 export type SavedRequest = {
   id: string; name: string; filesystemName: string; nameAuto?: boolean; requestType?: RequestType; isDraft?: boolean; collectionId: string; collection: string;
+  openapi?: string;
   workspaceDiagnostics?: WorkspaceDiagnostic[];
   isInvalid?: boolean;
   folderPath: string[]; method: Method; url: string; requestTab: RequestTab;
   params: KVRow[]; pathParams?: KVRow[]; headers: KVRow[];
+  vars?: KVRow[]; postResponseVars?: KVRow[];
   auth: AuthState;
   bodyType: BodyType; rawBodyType: RawBodyType; bodyContent: string;
   bodyFilePath: string; bodyFileName: string; formRows: KVRow[];
@@ -320,6 +330,7 @@ export type SavedRequest = {
   aiKurloTools?: boolean;
   aiConnectionId?: string;
   examples?: RequestExample[];
+  exampleCount?: number;
 };
 
 export type GrpcMethodInfo = {

@@ -16,7 +16,7 @@ import type { TopView } from '../ui';
 
 const FOLDER_MAP_SEPARATOR = '\u001f';
 
-type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy';
+type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy' | 'openapi';
 
 type CollectionHost = {
   trashCollection: (collection: import('../../types/models').Collection, requestIds: string[]) => void;

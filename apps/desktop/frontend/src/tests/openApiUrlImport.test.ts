@@ -104,10 +104,16 @@ describe('openApiNameFromUrl', () => {
 });
 
 function urlImportHost() {
-  return {
+  const host = {
+    collections: [{ id: 'existing' }] as Array<{ id: string }>,
     guardWorkspaceWritable: () => true,
-    importOpenApiPayload: vi.fn(async () => 1),
+    importOpenApiPayload: vi.fn(async () => {
+      host.collections = [...host.collections, { id: 'imported' }];
+      return 1;
+    }),
+    linkImportedOpenApiCollection: vi.fn(async () => {}),
   };
+  return host;
 }
 
 function lastSentRequest() {
@@ -129,6 +135,21 @@ describe('importOpenApiFromUrl TLS verification', () => {
     expect(lastSentRequest().enableSSLVerification).toBe(false);
     expect(count).toBe(1);
     expect(host.importOpenApiPayload).toHaveBeenCalledOnce();
+    expect(host.importOpenApiPayload).toHaveBeenCalledWith(JSON.parse(minimalSpec), 'self-signed.example.test', 'https://self-signed.example.test/openapi.json');
+  });
+
+  it('links the new collection to the URL when asked to keep it in sync', async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, body: minimalSpec, headers: [] } as never);
+    const host = urlImportHost();
+    await importExportFeature.importOpenApiFromUrl.call(host as never, 'https://api.example.test/openapi.json', { keepInSync: true, skipTlsVerification: true });
+    expect(host.linkImportedOpenApiCollection).toHaveBeenCalledWith('imported', { url: 'https://api.example.test/openapi.json', skipTlsVerification: true }, JSON.parse(minimalSpec));
+  });
+
+  it('does not link the collection when sync is off', async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, body: minimalSpec, headers: [] } as never);
+    const host = urlImportHost();
+    await importExportFeature.importOpenApiFromUrl.call(host as never, 'https://api.example.test/openapi.json');
+    expect(host.linkImportedOpenApiCollection).not.toHaveBeenCalled();
   });
 
   it('points at the skip option when the certificate is rejected', async () => {
@@ -166,11 +187,23 @@ describe('openPromptWithToggleDialog', () => {
   it('starts unticked and reports the ticked state with the value', async () => {
     const host = dialogHost();
     const pending = dialogFeature.openPromptWithToggleDialog.call(host as never, 'Import from URL', '', 'URL', 'Import', { label: 'Skip TLS certificate check' });
-    expect(host.appDialog?.mode === 'prompt' && host.appDialog.toggle?.checked).toBe(false);
+    expect(host.appDialog?.mode === 'prompt' && host.appDialog.toggles?.[0]?.checked).toBe(false);
     host.dialogInputValue = 'https://self-signed.example.test/openapi.json';
-    if (host.appDialog?.mode === 'prompt' && host.appDialog.toggle) host.appDialog.toggle.checked = true;
+    if (host.appDialog?.mode === 'prompt' && host.appDialog.toggles?.[0]) host.appDialog.toggles[0].checked = true;
     host.submitDialog();
-    await expect(pending).resolves.toEqual({ value: 'https://self-signed.example.test/openapi.json', checked: true });
+    await expect(pending).resolves.toEqual({ value: 'https://self-signed.example.test/openapi.json', checked: true, checks: [true] });
+  });
+
+  it('reports every toggle and honours a ticked default', async () => {
+    const host = dialogHost();
+    const pending = dialogFeature.openPromptWithToggleDialog.call(host as never, 'Import from URL', '', 'URL', 'Import', [
+      { label: 'Keep in sync with this URL', checked: true },
+      { label: 'Skip TLS certificate check' },
+    ]);
+    expect(host.appDialog?.mode === 'prompt' && host.appDialog.toggles?.map(toggle => toggle.checked)).toEqual([true, false]);
+    host.dialogInputValue = 'https://api.example.test/openapi.json';
+    host.submitDialog();
+    await expect(pending).resolves.toEqual({ value: 'https://api.example.test/openapi.json', checked: true, checks: [true, false] });
   });
 
   it('resolves to null when dismissed', async () => {

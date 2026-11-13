@@ -132,6 +132,7 @@ export const competitors: Competitor[] = [
       { label: 'Commit and push in the app', kurlo: { mark: 'yes', text: 'Included' }, other: { mark: 'part', text: 'Pro', note: 'Free can clone, diff and pull' } },
       { label: 'Workspaces', kurlo: { mark: 'yes', text: 'Unlimited' }, other: { mark: 'part', text: '2 on free' } },
       { label: 'Data-driven runs', kurlo: { mark: 'yes', text: 'CSV and JSON data files' }, other: { mark: 'part', text: 'Pro' } },
+      { label: 'OpenAPI sync from a URL or file', kurlo: { mark: 'yes', text: 'Unlimited, with review' }, other: { mark: 'part', text: '5 syncs a month on free', note: 'Beta; unlimited on Pro' } },
       { label: 'Source code', kurlo: kurlo.license, other: { mark: 'yes', text: 'MIT core', note: 'Paid editions on top' } },
       { label: 'Built on', kurlo: kurlo.runtime, other: { mark: 'part', text: 'Electron' } },
       { label: 'Postman scripts', kurlo: kurlo.scripts, other: { mark: 'part', text: 'Converted to bru.* on import', note: 'Complex scripts need rewriting' } },

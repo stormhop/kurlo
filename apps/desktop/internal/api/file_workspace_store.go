@@ -68,6 +68,8 @@ var requestSettingSecretFields = []string{
 var requestSecretRowFields = []string{
 	"params",
 	"pathParams",
+	"vars",
+	"postResponseVars",
 	"headers",
 	"formRows",
 	"sioEvents",
@@ -617,6 +619,11 @@ func writeYAMLWorkspaceStoreContents(root string, workspaces, collections, reque
 				return err
 			}
 			desiredFiles[collectionPath] = struct{}{}
+			if _, synced := collection["openapi"]; synced {
+				if err := carryCollectionOpenAPISpec(workspaceDir, collectionID, collectionDir, journal); err != nil {
+					return err
+				}
+			}
 			if err := writeCollectionLoadTests(collectionDir, loadTests, desiredFiles, journal); err != nil {
 				return err
 			}
@@ -721,6 +728,16 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		}
 		if entry.IsDir() {
 			dirs = append(dirs, path)
+			return nil
+		}
+		if isOpenAPIBaseSpecPath(path) {
+			owner := filepath.Join(filepath.Dir(filepath.Dir(path)), fileStoreCollection)
+			if _, kept := desiredFiles[owner]; kept || pathInsideAnyDir(path, preserveDirs) {
+				return nil
+			}
+			if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() {
+				stale = append(stale, path)
+			}
 			return nil
 		}
 		_, isExampleBody := legacyBodies[path]
@@ -1128,6 +1145,13 @@ func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, col
 			}
 			validator.order(collectionPath, "requestOrder", collectionEntry.requestOrder, requestItems)
 		}
+		exampleDirs := make([]string, 0, len(requestEntries))
+		for _, requestEntry := range requestEntries {
+			if segment := stringValue(requestEntry.request, filesystemNameField); segment != "" {
+				exampleDirs = append(exampleDirs, requestExampleDir(collectionEntry.path, segment))
+			}
+		}
+		scannedExamples := scanRequestExampleDirs(exampleDirs)
 		for _, requestEntry := range requestEntries {
 			validator.item("request", requestEntry.path, requestEntry.request)
 			validator.reference(requestEntry.path, "request", requestEntry.request, "collectionId", collectionID)
@@ -1135,7 +1159,7 @@ func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, col
 			examples, exampleDiagnostics := readRequestExamples(
 				collectionEntry.path,
 				stringValue(requestEntry.request, filesystemNameField),
-				root, workspaceID, collectionID, requestID, validator,
+				root, workspaceID, collectionID, requestID, validator, scannedExamples,
 			)
 			diagnostics = append(diagnostics, exampleDiagnostics...)
 			if len(examples) > 0 {
@@ -2150,6 +2174,10 @@ func readYAMLFile(path string, out any) error {
 	if info.Mode()&os.ModeSymlink != 0 {
 		return fmt.Errorf("read %s: refusing to read symlink", path)
 	}
+	return readYAMLRegularFile(path, out)
+}
+
+func readYAMLRegularFile(path string, out any) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err

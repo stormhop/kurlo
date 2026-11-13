@@ -246,7 +246,7 @@ func TestMCPServerHandshakeAndToolList(t *testing.T) {
 			t.Errorf("%s inputSchema type = %v", tool.Name, tool.InputSchema["type"])
 		}
 	}
-	if got := strings.Join(names, ","); got != "list_requests,get_request,list_globals,list_environments,run_request,run_collection,send_request,authorize_oauth2,list_history,get_history_entry,diagnose_last_failure,clear_cookie_jar,code_snippet,compare_load_runs,cover_endpoint,get_docs,get_load_test,import_apply,import_preview,list_cookies,list_files,list_load_runs,list_load_tests,load_test_result,load_test_status,mock_server_log,read_file,save_docs,save_load_test,search_code,start_load_test,start_mock_server,stop_load_test,stop_mock_server,sync_collection,create_collection,save_request,patch_request,apply_changes,delete_request,save_example,set_variable,generate_tests,git_status,git_diff,pull_request_url,git_create_branch,git_commit,git_push" {
+	if got := strings.Join(names, ","); got != "list_requests,get_request,list_globals,list_environments,check_openapi_sync,run_request,run_collection,send_request,authorize_oauth2,list_history,get_history_entry,diagnose_last_failure,clear_cookie_jar,code_snippet,compare_load_runs,cover_endpoint,get_docs,get_load_test,import_apply,import_preview,list_cookies,list_files,list_load_runs,list_load_tests,load_test_result,load_test_status,mock_server_log,read_file,save_docs,save_load_test,search_code,start_load_test,start_mock_server,stop_load_test,stop_mock_server,sync_collection,create_collection,save_request,patch_request,apply_changes,delete_request,save_example,set_variable,generate_tests,git_status,git_diff,pull_request_url,git_create_branch,git_commit,git_push" {
 		t.Errorf("tools = %s", got)
 	}
 	if list.ResultType != "" {

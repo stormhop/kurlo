@@ -91,6 +91,8 @@ export function DeleteAgentMcpServer(arg1:string):Promise<model.AgentMcpServersS
 
 export function DeleteCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 
+export function DeleteOpenAPIBaseSpec(arg1:string):Promise<string>;
+
 export function DeleteVariable(arg1:string):Promise<void>;
 
 export function DenyCookieSyncPairing(arg1:string):Promise<model.CookieSyncStatus>;
@@ -213,6 +215,8 @@ export function ListCookies(arg1:string):Promise<Array<model.Cookie>>;
 
 export function LoadHistoryResponse(arg1:string):Promise<api.HistoryResponseResult>;
 
+export function LoadRequestExamples(arg1:Array<string>):Promise<Record<string, Array<any>>>;
+
 export function LoadRequestStore():Promise<string>;
 
 export function LoadRunLog():Promise<Array<string>>;
@@ -222,6 +226,8 @@ export function LoadRunStatus():Promise<model.LoadRunState>;
 export function LoadRunSummaryJSON(arg1:string):Promise<string>;
 
 export function LoadTestTargets(arg1:string):Promise<Array<string>>;
+
+export function LoadWorkspace():Promise<api.WorkspaceLoadResult>;
 
 export function LoadWorkspaceDiagnostics():Promise<Array<api.WorkspaceDiagnostic>>;
 
@@ -256,6 +262,10 @@ export function PruneHistoryResponses(arg1:Array<string>):Promise<string>;
 export function Quit():Promise<void>;
 
 export function ReadCollectionTextFiles(arg1:string):Promise<api.CollectionTextFilesResult>;
+
+export function ReadOpenAPIBaseSpec(arg1:string):Promise<api.OpenAPISpecFileResult>;
+
+export function ReadOpenAPISourceFile(arg1:string):Promise<api.OpenAPISpecFileResult>;
 
 export function ReadTextFile(arg1:string):Promise<string>;
 
@@ -396,5 +406,7 @@ export function WebSocketDisconnect(arg1:string):Promise<void>;
 export function WebSocketSend(arg1:string,arg2:model.WebSocketSendMessage):Promise<model.WebSocketSendResult>;
 
 export function WriteCollectionTextFiles(arg1:string,arg2:Array<api.CollectionTextFile>):Promise<string>;
+
+export function WriteOpenAPIBaseSpec(arg1:string,arg2:string):Promise<string>;
 
 export function WriteWorkspaceYAMLFile(arg1:string,arg2:string):Promise<api.WorkspaceOpenResult>;

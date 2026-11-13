@@ -1,6 +1,7 @@
 import type {
     Collection,
     Environment,
+    KVRow,
     Method,
     RequestHistoryEntry,
     RequestTab,
@@ -24,6 +25,7 @@ import { normalizeLoadTests } from './loadTests';
 import { normalizeCollectionFolderPaths } from './collections';
 import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
 import { normalizeEnvironmentColor } from './environmentColors';
+import { normalizeOpenApiSource } from './openapiSource';
 import { defaultSocketIOArgs, requestBodyDefaultsFor } from './requestBodyDefaults';
 import {
     asText,
@@ -62,6 +64,11 @@ function sanitizeFields<T>(input: Partial<T> | null | undefined, fields: FieldTy
     return clean as Partial<T>;
 }
 
+function optionalRows<K extends 'vars' | 'postResponseVars'>(key: K, rows: KVRow[] | undefined): Partial<Record<K, KVRow[]>> {
+    const cleaned = cloneRowsForStore(rows ?? []);
+    return cleaned.length ? { [key]: cleaned } as Partial<Record<K, KVRow[]>> : {};
+}
+
 const ENTITY_STRINGS = ['id', 'name', 'filesystemName', 'description', 'workspaceId'];
 
 const REQUEST_FIELDS: FieldTypes = {
@@ -70,10 +77,10 @@ const REQUEST_FIELDS: FieldTypes = {
         'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema', 'preRequestScript', 'testScript',
         'preRequestScriptJs', 'testScriptJs', 'requestNotes', 'sioEventName', 'grpcMethod', 'grpcProtoFilePath',
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
-        'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId',
+        'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId', 'openapi',
     ],
     booleans: ['nameAuto', 'isDraft', 'sioAck', 'grpcUseReflection', 'aiStream', 'aiKurloTools'],
-    arrays: ['folderPath', 'params', 'pathParams', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'savedMessages', 'assertions', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
+    arrays: ['folderPath', 'params', 'pathParams', 'vars', 'postResponseVars', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'savedMessages', 'assertions', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
 
@@ -162,11 +169,12 @@ export function normalizeWorkspace(raw: Partial<Workspace>): Workspace {
 }
 
 export function normalizeCollection(raw: Partial<Collection>, workspaceId: string): Collection {
-    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['collapsed'], arrays: ['folderPaths', 'loadTests', 'folderDefaults'], objects: ['defaults'] });
+    const input = sanitizeFields(raw, { strings: ENTITY_STRINGS, booleans: ['collapsed'], arrays: ['folderPaths', 'loadTests', 'folderDefaults'], objects: ['defaults', 'openapi'] });
     const id = input.id || newEntityId('collection');
     const name = input.name || DEFAULT_COLLECTION;
     const loadTests = normalizeLoadTests(input.loadTests);
     const folderDefaults = normalizeFolderDefaultsList(input.folderDefaults);
+    const openapi = normalizeOpenApiSource(input.openapi);
     return {
         id,
         workspaceId: input.workspaceId || workspaceId,
@@ -179,6 +187,7 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
         ...(folderDefaults.length ? { folderDefaults } : {}),
         ...normalizeCollectionEnvironmentPins(input),
         ...(loadTests ? { loadTests } : {}),
+        ...(openapi ? { openapi } : {}),
     };
 }
 
@@ -222,15 +231,15 @@ export function normalizeSavedRequest(
     const isAi = normalizedRequestType === 'ai';
     const bodyDefaults = requestBodyDefaultsFor(normalizedRequestType);
     const rawRequestTab = input.requestTab || (isMcp || isAi ? 'body' : isGrpc ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params');
-    const requestTab = isGraphQL && !['docs', 'query', 'auth', 'headers', 'schema', 'scripts'].includes(rawRequestTab)
+    const requestTab = isGraphQL && !['docs', 'query', 'auth', 'headers', 'vars', 'schema', 'scripts'].includes(rawRequestTab)
         ? 'query'
-        : isMcp && !['docs', 'body', 'auth', 'headers', 'scripts', 'settings', 'examples'].includes(rawRequestTab)
+        : isMcp && !['docs', 'body', 'auth', 'headers', 'vars', 'scripts', 'settings', 'examples'].includes(rawRequestTab)
         ? 'body'
-        : isAi && !['docs', 'body', 'auth', 'headers', 'tools', 'scripts', 'settings'].includes(rawRequestTab)
+        : isAi && !['docs', 'body', 'auth', 'headers', 'vars', 'tools', 'scripts', 'settings'].includes(rawRequestTab)
         ? 'body'
         : !isAi && rawRequestTab === 'tools'
         ? 'params'
-        : isGrpc && !['docs', 'body', 'auth', 'metadata', 'service', 'scripts', 'settings'].includes(rawRequestTab)
+        : isGrpc && !['docs', 'body', 'auth', 'metadata', 'vars', 'service', 'scripts', 'settings'].includes(rawRequestTab)
         ? 'body'
         : isRealtime && ['scripts', 'query', 'schema'].includes(rawRequestTab)
         ? 'body'
@@ -270,6 +279,7 @@ export function normalizeSavedRequest(
         isDraft,
         collectionId,
         collection: isDraft ? '' : input.collection || collectionName,
+        ...(!isDraft && input.openapi?.trim() ? { openapi: input.openapi.trim() } : {}),
         folderPath,
         method: (isGraphQL || isGrpc || isAi ? 'POST' : input.method || 'GET') as Method,
         url: input.url || '',
@@ -277,6 +287,8 @@ export function normalizeSavedRequest(
         params: cloneRowsForStore(input.params ?? []),
         pathParams: cloneRowsForStore(input.pathParams ?? []),
         headers: cloneRowsForStore(input.headers ?? []),
+        ...optionalRows('vars', input.vars),
+        ...optionalRows('postResponseVars', input.postResponseVars),
         auth: {...emptyAuthState(), ...sanitizeLike(input.auth, emptyAuthState())},
         bodyType: isGraphQL || isGrpc ? bodyDefaults.bodyType : normalizeBodyTypeForUi(input.bodyType ?? bodyDefaults.bodyType),
         rawBodyType: isGraphQL || isGrpc ? bodyDefaults.rawBodyType : normalizeRawBodyTypeForUi(input.rawBodyType ?? bodyDefaults.rawBodyType),
@@ -323,6 +335,7 @@ export function normalizeSavedRequest(
         aiKurloTools: input.aiKurloTools === true,
         aiConnectionId: input.aiConnectionId || '',
         ...(normalizedExamples ? { examples: normalizedExamples } : {}),
+        ...(!normalizedExamples && typeof input.exampleCount === 'number' && input.exampleCount > 0 ? { exampleCount: input.exampleCount } : {}),
     };
 }
 

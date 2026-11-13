@@ -20,6 +20,7 @@ var agentReadTools = map[string]bool{
 	"list_requests":         true,
 	"get_request":           true,
 	"list_environments":     true,
+	"check_openapi_sync":    true,
 	"list_globals":          true,
 	"list_history":          true,
 	"get_history_entry":     true,

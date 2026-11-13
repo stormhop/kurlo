@@ -14,7 +14,7 @@ var openAPIPathParam = regexp.MustCompile(`\{([A-Za-z0-9_.-]+)\}`)
 
 var importMethods = []string{"get", "post", "put", "patch", "delete", "head", "options"}
 
-func importOpenAPI(doc map[string]any, name string) (workspaceImport, error) {
+func importOpenAPI(doc map[string]any, name string, sourceURL ...string) (workspaceImport, error) {
 	paths := nestedMap(doc, "paths")
 	if len(paths) == 0 || (doc["openapi"] == nil && doc["swagger"] == nil) {
 		return workspaceImport{}, fmt.Errorf("expected an OpenAPI or Swagger document with paths")
@@ -28,16 +28,9 @@ func importOpenAPI(doc map[string]any, name string) (workspaceImport, error) {
 	if auth := openAPIAuth(doc, schemes, doc["security"]); auth != nil {
 		out.defaults["auth"] = auth
 	}
-	base := openAPIServer(doc)
-	if base == "" && stringValue(doc, "host") != "" {
-		scheme := "https"
-		if items := importArray(doc["schemes"]); len(items) > 0 {
-			scheme = importText(items[0])
-		}
-		base = scheme + "://" + stringValue(doc, "host") + stringValue(doc, "basePath")
-	}
-	if base != "" {
-		out.defaults["variables"] = []any{importRow("baseUrl", base)}
+	servers := newOpenAPIImportServers(doc, sourceURL...)
+	if len(servers.variables) > 0 {
+		out.defaults["variables"] = servers.variables
 	}
 	for _, path := range sortedKeysAny(paths) {
 		item := openAPIObject(doc, paths[path])
@@ -46,13 +39,19 @@ func importOpenAPI(doc map[string]any, name string) (workspaceImport, error) {
 			if operation == nil {
 				continue
 			}
-			server := defaultString(openAPIServer(operation), openAPIServer(item))
-			if server == "" && base != "" {
-				server = "{{baseUrl}}"
+			server := servers.operations[verb+" "+path]
+			target := server.base + openAPIPathParam.ReplaceAllString(path, ":${1}")
+			if len(sourceURL) > 0 && server.base == "" {
+				if base, err := url.Parse(sourceURL[0]); err == nil {
+					target = resolveImportURL(base, target)
+				}
 			}
-			target := strings.TrimRight(server, "/") + openAPIPathParam.ReplaceAllString(path, ":${1}")
 			req := importRequest(defaultString(stringValue(operation, "summary"), stringValue(operation, "operationId")), verb, target)
 			req["requestNotes"] = stringValue(operation, "description")
+			req["openapi"] = openAPIOperationKey(verb, path)
+			if len(server.vars) > 0 {
+				req["vars"] = server.vars
+			}
 			if tags := importArray(operation["tags"]); len(tags) > 0 && importText(tags[0]) != "" {
 				req["folderPath"] = []any{importText(tags[0])}
 			}
@@ -366,21 +365,6 @@ func openAPIFirstMedia(operation, doc map[string]any, key, fallback string) stri
 		}
 	}
 	return fallback
-}
-
-func openAPIServer(item map[string]any) string {
-	for _, server := range mapSlice(item["servers"]) {
-		target := stringValue(server, "url")
-		for key, raw := range nestedMap(server, "variables") {
-			if variable, ok := raw.(map[string]any); ok {
-				target = strings.ReplaceAll(target, "{"+key+"}", importText(variable["default"]))
-			}
-		}
-		if target != "" {
-			return target
-		}
-	}
-	return ""
 }
 
 func openAPIAuth(doc, schemes map[string]any, requirements any) map[string]any {

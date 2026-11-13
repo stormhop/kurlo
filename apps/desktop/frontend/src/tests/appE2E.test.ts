@@ -53,6 +53,7 @@ import { buildGraphQLRequestBody } from '../lib/graphql';
 import { historyFeature } from '../lib/stores/features/history';
 import { requestBodyFeature } from '../lib/stores/features/requestBody';
 import { requestCrudFeature } from '../lib/stores/features/requestCrud';
+import { examplesFeature } from '../lib/stores/features/examples';
 import { requestDirtyFeature } from '../lib/stores/features/requestDirty';
 import { requestExecutionFeature } from '../lib/stores/features/requestExecution';
 import { requestHeadersFeature } from '../lib/stores/features/requestHeaders';
@@ -280,6 +281,8 @@ class TestApp {
   params: KVRow[] = [];
   reqHeaders: KVRow[] = [];
   formRows: KVRow[] = [];
+  requestVars: KVRow[] = [];
+  postResponseVars: KVRow[] = [];
   authType = 'none' as const;
   bearerToken = '';
   basicUser = '';
@@ -327,6 +330,7 @@ class TestApp {
   scriptEngine: ScriptEngine = 'js';
   requestNotes = '';
   requestExamples: RequestExample[] = [];
+  requestExamplesLoaded = true;
   diffBaselineExampleIds = new Map<string, string>();
   selectedExampleId = '';
   response: HttpResponse | null = null;
@@ -444,7 +448,8 @@ class TestApp {
   toggles: boolean[] = [];
   openPromptWithToggleDialog() {
     const value = this.prompts.shift() ?? '';
-    return Promise.resolve(value ? { value, checked: this.toggles.shift() ?? false } : null);
+    const checked = this.toggles.shift() ?? false;
+    return Promise.resolve(value ? { value, checked, checks: [false, checked] } : null);
   }
   openSelectDialog(_title: string, _message: string, options: Array<{ value: string }>) {
     return Promise.resolve(this.selects.shift() ?? options[0]?.value ?? null);
@@ -507,6 +512,7 @@ applyFeatures(
   requestPersistenceFeature,
   requestStateFeature,
   requestCrudFeature,
+  examplesFeature,
   requestSerializationFeature,
   requestHeadersFeature,
   requestBodyFeature,
@@ -817,6 +823,65 @@ describe('full application e2e smoke', () => {
       method: 'PATCH',
       bodyContent: '{"name":"Grace"}',
     });
+  });
+
+  it('resolves request vars above the environment and sends them with post-response vars', () => {
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.method = 'GET';
+    app.url = '{{baseUrl}}/users/{{userId}}';
+    app.reqHeaders = [{ ...mkRow(), key: 'X-Tenant', value: '{{tenant}}' }];
+    app.requestVars = [
+      { ...mkRow(), key: 'userId', value: '42' },
+      { ...mkRow(), key: 'tenant', value: '{{tenant}}-eu' },
+      { ...mkRow(), key: 'skipped', value: 'nope', enabled: false },
+    ];
+    app.postResponseVars = [
+      { ...mkRow(), key: 'token', value: 'res.body.token' },
+      { ...mkRow(), key: 'unused', value: 'res.status', enabled: false },
+    ];
+
+    const snapshot = app.snapshotActiveRequest();
+    expect(snapshot.vars?.map((row: KVRow) => row.key)).toEqual(['userId', 'tenant', 'skipped']);
+    expect(snapshot.postResponseVars?.map((row: KVRow) => row.key)).toEqual(['token', 'unused']);
+
+    const values = app.environmentValuesForRequest(snapshot, { baseUrl: 'https://api.example.test', userId: '7', tenant: 'acme' });
+    expect(values).toMatchObject({ userId: '42', tenant: 'acme-eu', baseUrl: 'https://api.example.test' });
+    expect(values.skipped).toBeUndefined();
+
+    const req = app.savedRequestToRunnableHttpRequest(snapshot, { baseUrl: 'https://api.example.test', userId: '7', tenant: 'acme' }, [], [], 'request-vars');
+    expect(req.url).toBe('https://api.example.test/users/42');
+    expect(req.headers).toEqual([expect.objectContaining({ key: 'X-Tenant', value: 'acme-eu' })]);
+    expect(req.requestVariables).toEqual({ userId: '42', tenant: 'acme-eu' });
+    expect(req.postResponseVars).toEqual([expect.objectContaining({ key: 'token', value: 'res.body.token', enabled: true })]);
+  });
+
+  it('restores request vars when a saved request is reopened', () => {
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.url = 'https://api.example.test';
+    app.requestVars = [{ ...mkRow(), key: 'userId', value: '42' }];
+    app.postResponseVars = [{ ...mkRow(), key: 'token', value: 'res.body.token' }];
+    const saved = normalizeSavedRequest(JSON.parse(JSON.stringify(app.snapshotActiveRequest({ forPersistence: true }))), []);
+    app.requestVars = [];
+    app.postResponseVars = [];
+
+    app.applySavedRequest(saved);
+
+    expect(app.requestVars.filter((row: KVRow) => row.key).map((row: KVRow) => [row.key, row.value])).toEqual([['userId', '42']]);
+    expect(app.postResponseVars.filter((row: KVRow) => row.key).map((row: KVRow) => [row.key, row.value])).toEqual([['token', 'res.body.token']]);
+  });
+
+  it('leaves post-response vars out of requests that cannot run them', () => {
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.requestType = 'ws';
+    app.savedMessages = [];
+    app.url = 'wss://echo.example.test';
+    app.requestVars = [{ ...mkRow(), key: 'room', value: 'lobby' }];
+    app.postResponseVars = [{ ...mkRow(), key: 'token', value: 'res.body.token' }];
+
+    const snapshot = app.snapshotActiveRequest();
+
+    expect(snapshot.vars?.map((row: KVRow) => row.key)).toEqual(['room']);
+    expect(snapshot.postResponseVars).toBeUndefined();
   });
 
   it('strips CodeEditor comments before building runnable raw request bodies', () => {
@@ -1829,17 +1894,56 @@ describe('manual save mode keeps workspace edits off disk until Save', () => {
     expect(app.hasUnsavedEnvironmentChanges()).toBe(true);
   });
 
-  it('stores the environment color right away without saving pending edits, and clears it', async () => {
+  it.each(['red', ''] as const)('keeps the environment color edit %j unsaved until Save', async color => {
     const app = await manualApp();
-    app.updateEnvironmentRow('dev', 0, { value: 'typed' });
-    await app.setEnvironmentColor('dev', 'red');
+    if (!color) {
+      app.environments = app.environments.map(environment => environment.id === 'dev' ? { ...environment, color: 'red' } : environment);
+      await app.persistRequestStore();
+    }
+    const previousColor = storedEnvironment('dev')?.color;
+    const savedCount = backend.state.savedStores.length;
+    await app.setEnvironmentColor('dev', color);
 
-    expect(storedEnvironment('dev')).toMatchObject({ color: 'red', values: [expect.objectContaining({ value: 'dev.example.test' })] });
-    expect(app.environments.find(environment => environment.id === 'dev')?.color).toBe('red');
+    expect(backend.state.savedStores).toHaveLength(savedCount);
+    expect(app.environmentSaveState).toBe('dirty');
+    expect(app.environments.find(environment => environment.id === 'dev')?.color).toBe(color || undefined);
     expect(app.hasUnsavedEnvironmentChanges()).toBe(true);
 
+    app.updateEnvironmentRow('dev', 0, { value: 'typed' });
+    await app.selectEnvironment('prod');
+    expect(storedEnvironment('dev')?.color).toBe(previousColor);
+    expect(storedEnvironment('dev')?.values[0].value).toBe('dev.example.test');
+
+    expect(await app.saveEnvironment()).toBe(true);
+    expect(storedEnvironment('dev')?.color).toBe(color || undefined);
+    expect(storedEnvironment('dev')?.values[0].value).toBe('typed');
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(false);
+  });
+
+  it('reverts environment colors and clears the unsaved mark when the original color is selected', async () => {
+    const app = await manualApp();
+    await app.setEnvironmentColor('dev', 'red');
+    await app.discardEnvironmentChanges();
+
+    expect(app.environments.find(environment => environment.id === 'dev')).not.toHaveProperty('color');
+    expect(app.environmentSaveState).toBe('idle');
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(false);
+
+    await app.setEnvironmentColor('dev', 'blue');
+    await app.setEnvironmentColor('dev', '');
+    expect(app.environmentSaveState).toBe('idle');
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(false);
+    expect(storedEnvironment('dev')).not.toHaveProperty('color');
+  });
+
+  it('saves and clears environment colors with autosave enabled', async () => {
+    const app = await manualApp();
+    app.autosave = true;
+    await app.setEnvironmentColor('dev', 'red');
+    expect(storedEnvironment('dev')?.color).toBe('red');
     await app.setEnvironmentColor('dev', '');
     expect(storedEnvironment('dev')).not.toHaveProperty('color');
+    expect(app.hasUnsavedEnvironmentChanges()).toBe(false);
   });
 
   it('restores a deleted request, folder, collection and environment in place', async () => {

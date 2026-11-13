@@ -178,6 +178,10 @@ export function DeleteCookie(arg1, arg2) {
   return window['go']['api']['App']['DeleteCookie'](arg1, arg2);
 }
 
+export function DeleteOpenAPIBaseSpec(arg1) {
+  return window['go']['api']['App']['DeleteOpenAPIBaseSpec'](arg1);
+}
+
 export function DeleteVariable(arg1) {
   return window['go']['api']['App']['DeleteVariable'](arg1);
 }
@@ -422,6 +426,10 @@ export function LoadHistoryResponse(arg1) {
   return window['go']['api']['App']['LoadHistoryResponse'](arg1);
 }
 
+export function LoadRequestExamples(arg1) {
+  return window['go']['api']['App']['LoadRequestExamples'](arg1);
+}
+
 export function LoadRequestStore() {
   return window['go']['api']['App']['LoadRequestStore']();
 }
@@ -440,6 +448,10 @@ export function LoadRunSummaryJSON(arg1) {
 
 export function LoadTestTargets(arg1) {
   return window['go']['api']['App']['LoadTestTargets'](arg1);
+}
+
+export function LoadWorkspace() {
+  return window['go']['api']['App']['LoadWorkspace']();
 }
 
 export function LoadWorkspaceDiagnostics() {
@@ -508,6 +520,14 @@ export function Quit() {
 
 export function ReadCollectionTextFiles(arg1) {
   return window['go']['api']['App']['ReadCollectionTextFiles'](arg1);
+}
+
+export function ReadOpenAPIBaseSpec(arg1) {
+  return window['go']['api']['App']['ReadOpenAPIBaseSpec'](arg1);
+}
+
+export function ReadOpenAPISourceFile(arg1) {
+  return window['go']['api']['App']['ReadOpenAPISourceFile'](arg1);
 }
 
 export function ReadTextFile(arg1) {
@@ -788,6 +808,10 @@ export function WebSocketSend(arg1, arg2) {
 
 export function WriteCollectionTextFiles(arg1, arg2) {
   return window['go']['api']['App']['WriteCollectionTextFiles'](arg1, arg2);
+}
+
+export function WriteOpenAPIBaseSpec(arg1, arg2) {
+  return window['go']['api']['App']['WriteOpenAPIBaseSpec'](arg1, arg2);
 }
 
 export function WriteWorkspaceYAMLFile(arg1, arg2) {

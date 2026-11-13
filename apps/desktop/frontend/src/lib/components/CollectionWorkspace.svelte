@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { environmentColorVar } from '../environmentColors';
+  import { DEFAULT_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
   import SaveActions from './SaveActions.svelte';
   import { useClock } from '../clock.svelte';
   const now = useClock();
@@ -17,12 +19,14 @@
   import SearchPicker from './SearchPicker.svelte';
   import VariableInput from './VariableInput.svelte';
   import CollapsibleMarkdown from './CollapsibleMarkdown.svelte';
+  import OpenApiSyncPanel from './OpenApiSyncPanel.svelte';
+  import { vm } from '../stores/app.svelte';
   import { markdownSizeLabel, markdownTooLongToPreview } from '../markdown';
   import MenuIcon from './MenuIcon.svelte';
   import { tick } from 'svelte';
   import { relativeTime, type CollectionRunTally } from '../collectionRuns';
 
-  type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy';
+  type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy' | 'openapi';
   type CollectionSettingsPatch = Pick<Collection, 'name' | 'description' | 'defaults' | 'environmentIds' | 'defaultEnvironmentId'> & { baseFingerprint?: string };
 
   const HTTP_VERSION_OPTIONS = [
@@ -33,7 +37,6 @@
 
 
 
-  const AUTOSAVE_DEBOUNCE_MS = 1200;
 
   let {
     collection,
@@ -43,6 +46,7 @@
     onOpenRunner,
     collectionSettingsTab = $bindable<CollectionSettingsTab>('overview'),
     autosave = false,
+    autosaveDelayMs = DEFAULT_AUTOSAVE_DELAY_MS,
     saveState = 'idle',
     workspaceBlocked = false,
     variableSuggestions = [],
@@ -65,6 +69,7 @@
     onOpenRunner: (collectionId: string) => void;
     collectionSettingsTab: CollectionSettingsTab;
     autosave?: boolean;
+    autosaveDelayMs?: number;
     saveState?: 'idle' | 'saving' | 'saved';
     workspaceBlocked?: boolean;
     variableSuggestions?: VariableSuggestion[];
@@ -107,7 +112,7 @@
   }
 
   $effect(() => {
-    if (isFolder && (collectionSettingsTab === 'overview' || collectionSettingsTab === 'vars' || collectionSettingsTab === 'proxy')) {
+    if (isFolder && (collectionSettingsTab === 'overview' || collectionSettingsTab === 'vars' || collectionSettingsTab === 'proxy' || collectionSettingsTab === 'openapi')) {
       collectionSettingsTab = 'headers';
     }
   });
@@ -132,7 +137,7 @@
   const pinnedEnvironments = $derived(environments.filter(environment => pinnedEnvironmentIds.includes(environment.id)));
   const unpinnedEnvironmentOptions = $derived(environments.filter(environment => !pinnedEnvironmentIds.includes(environment.id)).map(environment => {
     const count = (environment.values ?? []).filter(row => row.key?.trim()).length;
-    return { value: environment.id, label: environment.name, hint: `${count} ${count === 1 ? 'variable' : 'variables'}` };
+    return { value: environment.id, label: environment.name, hint: `${count} ${count === 1 ? 'variable' : 'variables'}`, color: environmentColorVar(environment) };
   }));
 
   const engineLabel = $derived(scriptEngine === 'js' ? 'JavaScript' : 'Tengo');
@@ -171,7 +176,7 @@
     autosaveTimer = setTimeout(() => {
       autosaveTimer = null;
       void save();
-    }, AUTOSAVE_DEBOUNCE_MS);
+    }, autosaveDelayMs);
     return () => {
       if (autosaveTimer) {
         clearTimeout(autosaveTimer);
@@ -560,6 +565,7 @@
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'tests'} aria-selected={collectionSettingsTab === 'tests'} tabindex={collectionSettingsTab === 'tests' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'tests')}>Tests{#if scriptLineCount(activeTest) > 0}<span class="badge badge-on">{scriptLineCount(activeTest)} lines</span>{/if}</button>
         {#if !isFolder}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'proxy'} aria-selected={collectionSettingsTab === 'proxy'} tabindex={collectionSettingsTab === 'proxy' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'proxy')}>Proxy</button>
+        <button class="tab" role="tab" class:active={collectionSettingsTab === 'openapi'} aria-selected={collectionSettingsTab === 'openapi'} tabindex={collectionSettingsTab === 'openapi' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'openapi')}>OpenAPI{#if vm.openApiHasUpdates(collection.id)}<span class="badge badge-on">{vm.openApiStatus(collection.id).pending}</span>{:else if collection.openapi}<span class="badge">On</span>{/if}</button>
         {/if}
       </div>
 
@@ -613,7 +619,7 @@
                     <div class="collection-environment-list" role="list" aria-label="Pinned environments">
                       {#each pinnedEnvironments as environment (environment.id)}
                         <div class="collection-environment-row" role="listitem">
-                          <span class="collection-environment-name">{environment.name}</span>
+                          <span class="collection-environment-name">{#if environment.color}<span class="env-color-dot" style:--env-color={environmentColorVar(environment)} aria-hidden="true"></span>{/if}{environment.name}</span>
                           <span class="collection-environment-actions">
                             {#if environment.id === effectiveDefaultEnvironmentId}
                               <span class="collection-environment-default">Default</span>
@@ -853,6 +859,8 @@
               <CodeEditor bind:value={testScript} language="javascript" placeholder={'// Collection test script (Tengo) pm.test("No server error", pm.response.code < 500)'} minHeight="17.5rem" maxHeight="32.5rem" />
             {/if}
           </div>
+        {:else if collectionSettingsTab === 'openapi'}
+          <OpenApiSyncPanel {collection} {workspaceBlocked} />
         {:else if collectionSettingsTab === 'proxy'}
           <div class="settings-section collection-proxy-section">
             <div class="settings-list">

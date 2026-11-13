@@ -611,6 +611,24 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class OpenAPISpecFileResult {
+	    content: string;
+	    exists: boolean;
+	    path: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new OpenAPISpecFileResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.content = source["content"];
+	        this.exists = source["exists"];
+	        this.path = source["path"];
+	        this.error = source["error"];
+	    }
+	}
 	export class SaveRequestStoreResult {
 	    ok: boolean;
 	    error?: string;
@@ -668,6 +686,38 @@ export namespace api {
 	        this.column = source["column"];
 	        this.blocking = source["blocking"];
 	    }
+	}
+	export class WorkspaceLoadResult {
+	    payload: string;
+	    diagnostics: WorkspaceDiagnostic[];
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceLoadResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.payload = source["payload"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], WorkspaceDiagnostic);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class WorkspaceSecretRef {
 	    key: string;
@@ -2494,6 +2544,8 @@ export namespace model {
 	    secretEnvironmentKeys: string[];
 	    secretEnvironmentValues: string[];
 	    collectionVariables: Record<string, string>;
+	    requestVariables?: Record<string, string>;
+	    postResponseVars?: KeyValue[];
 	    scriptEnvironment?: Record<string, string>;
 	    scriptVariables?: Record<string, string>;
 	    iterationData?: Record<string, string>;
@@ -2573,6 +2625,8 @@ export namespace model {
 	        this.secretEnvironmentKeys = source["secretEnvironmentKeys"];
 	        this.secretEnvironmentValues = source["secretEnvironmentValues"];
 	        this.collectionVariables = source["collectionVariables"];
+	        this.requestVariables = source["requestVariables"];
+	        this.postResponseVars = this.convertValues(source["postResponseVars"], KeyValue);
 	        this.scriptEnvironment = source["scriptEnvironment"];
 	        this.scriptVariables = source["scriptVariables"];
 	        this.iterationData = source["iterationData"];
@@ -3257,6 +3311,7 @@ export namespace model {
 	    secretEnvironmentKeys: string[];
 	    secretEnvironmentValues: string[];
 	    collectionVariables: Record<string, string>;
+	    requestVariables?: Record<string, string>;
 	    scriptEnvironment?: Record<string, string>;
 	    scriptVariables?: Record<string, string>;
 	
@@ -3290,6 +3345,7 @@ export namespace model {
 	        this.secretEnvironmentKeys = source["secretEnvironmentKeys"];
 	        this.secretEnvironmentValues = source["secretEnvironmentValues"];
 	        this.collectionVariables = source["collectionVariables"];
+	        this.requestVariables = source["requestVariables"];
 	        this.scriptEnvironment = source["scriptEnvironment"];
 	        this.scriptVariables = source["scriptVariables"];
 	    }

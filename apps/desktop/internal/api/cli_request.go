@@ -149,6 +149,7 @@ type cliSavedRequest struct {
 	CollectionSecretValues []string          `json:"-"`
 
 	WorkspaceID          string   `json:"-"`
+	OpenAPI              string   `json:"openapi"`
 	GrpcMethod           string   `json:"grpcMethod"`
 	GrpcMetadata         []cliKV  `json:"grpcMetadata"`
 	GrpcUseReflection    *bool    `json:"grpcUseReflection"`
@@ -185,6 +186,8 @@ type cliSavedRequest struct {
 	IsDraft            bool              `json:"isDraft"`
 	Params             []cliKV           `json:"params"`
 	PathParams         []cliKV           `json:"pathParams"`
+	Vars               []cliKV           `json:"vars"`
+	PostResponseVars   []cliKV           `json:"postResponseVars"`
 	Headers            []cliKV           `json:"headers"`
 	Auth               cliAuth           `json:"auth"`
 	BodyType           string            `json:"bodyType"`
@@ -232,6 +235,7 @@ type cliCollection struct {
 	ID             string                `json:"id"`
 	Name           string                `json:"name"`
 	Defaults       cliCollectionDefaults `json:"defaults"`
+	OpenAPI        *cliOpenAPISource     `json:"openapi"`
 }
 
 type cliEnvironment struct {
@@ -444,10 +448,12 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		BrowserEnforceCORS:      req.Settings.BrowserEnforceCORS,
 		BrowserEnforceCSP:       req.Settings.BrowserEnforceCSP,
 		BrowserCSP:              req.Settings.BrowserCSP,
-		SecretEnvironmentValues: append(append([]string(nil), secretValues...), req.CollectionSecretValues...),
+		SecretEnvironmentValues: append(append(append([]string(nil), secretValues...), req.CollectionSecretValues...), cliRequestVariableSecrets(req.Vars)...),
 		ResolveTemplates:        true,
 		TemplateValues:          values,
 		CollectionVariables:     req.CollectionVariables,
+		RequestVariables:        cliRequestVariablesForSend(req.Vars, values),
+		PostResponseVars:        cliPostResponseVars(req.PostResponseVars),
 	}
 }
 

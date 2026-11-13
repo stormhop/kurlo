@@ -114,7 +114,7 @@ func importHTTPURL(u *url.URL) bool {
 	return u != nil && (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil
 }
 
-func decodeWorkspaceImport(content, format, name string) (workspaceImport, error) {
+func decodeWorkspaceImport(content, format, name string, sourceURL ...string) (workspaceImport, error) {
 	content = strings.TrimPrefix(strings.TrimSpace(content), "\ufeff")
 	if content == "" || len(content) > mcpImportLimit || !utf8.ValidString(content) {
 		return workspaceImport{}, fmt.Errorf("import source must be nonempty UTF-8 text of at most 8 MiB")
@@ -147,7 +147,7 @@ func decodeWorkspaceImport(content, format, name string) (workspaceImport, error
 	}
 	switch format {
 	case "openapi", "swagger":
-		return importOpenAPI(doc, defaultString(name, "OpenAPI import"))
+		return importOpenAPI(doc, defaultString(name, "OpenAPI import"), sourceURL...)
 	case "postman":
 		return importPostman(doc, defaultString(name, "Postman import"))
 	case "insomnia":
@@ -199,17 +199,12 @@ func (s *mcpServer) toolImportPreview(ctx context.Context, arguments json.RawMes
 	if args.URL != "" {
 		args.Format = "openapi"
 	}
-	bundle, err := decodeWorkspaceImport(content, args.Format, name)
+	bundle, err := decodeWorkspaceImport(content, args.Format, name, args.URL)
 	if err != nil {
 		return nil, err
 	}
 	if args.URL != "" {
 		base, _ := url.Parse(args.URL)
-		for _, row := range mapSlice(bundle.defaults["variables"]) {
-			if row["key"] == "baseUrl" {
-				row["value"] = resolveImportURL(base, stringValue(row, "value"))
-			}
-		}
 		for _, request := range bundle.requests {
 			request["url"] = resolveImportURL(base, stringValue(request, "url"))
 		}
@@ -288,14 +283,14 @@ func (plan *mcpImportPlan) page(offset, limit int) map[string]any {
 }
 
 func resolveImportURL(base *url.URL, target string) string {
-	if strings.Contains(target, "{{") {
+	if strings.HasPrefix(target, "{{") {
 		return target
 	}
 	parsed, err := url.Parse(target)
 	if err != nil || parsed.IsAbs() {
 		return target
 	}
-	return base.ResolveReference(parsed).String()
+	return strings.NewReplacer("%7B", "{", "%7D", "}").Replace(base.ResolveReference(parsed).String())
 }
 
 func (s *mcpServer) toolImportApply(ctx context.Context, arguments json.RawMessage) (any, error) {
@@ -588,7 +583,7 @@ func scrubImportValue(value any) {
 					node[key] = importPlaceholder(key)
 				case (slices.Contains(requestAuthSecretFields, key) || slices.Contains(requestSettingSecretFields, key)) && secretFieldNeedsVault(raw):
 					node[key] = importPlaceholder(key)
-				case key == "url" || key == "oauth2TokenURL" || key == "oauth2AuthURL" || key == "proxyUrl" || (key == "value" && stringValue(node, "key") == "baseUrl"):
+				case key == "url" || key == "oauth2TokenURL" || key == "oauth2AuthURL" || key == "proxyUrl" || (key == "value" && openAPIImportVariable.MatchString(stringValue(node, "key"))):
 					node[key] = scrubImportURL(raw)
 				case key == "body" || key == "bodyContent":
 					var body any
