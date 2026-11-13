@@ -98,6 +98,8 @@ type OpenApiSyncHost = {
   applySavedRequest: (request: SavedRequest) => void;
   trashRequest: (request: SavedRequest, workspaceId: string) => void;
   removeDirtyRequest: (id: string) => void;
+  requestForEditing: (id: string) => SavedRequest | undefined;
+  updateRequestDirtyState: (id: string, request?: SavedRequest) => void;
   activeEnvironmentValues: () => Record<string, string>;
   resolveTemplate: (value: string, values?: Record<string, string>) => string;
   openAlertDialog: (title: string, message: string) => Promise<void>;
@@ -188,7 +190,8 @@ export const openApiSyncFeature = {
       }
     }
     await this.ensureCollectionExamples(collection.id);
-    const plan = planOpenApiSync({ collection, requests: this.requests, baseSpec, nextSpec: spec, sourceUrl });
+    const requests = this.requests.map(request => this.requestForEditing(request.id) ?? request);
+    const plan = planOpenApiSync({ collection, requests, baseSpec, nextSpec: spec, sourceUrl });
     return { plan, firstSync: baseSpec === null };
   },
 
@@ -299,7 +302,9 @@ export const openApiSyncFeature = {
       const { acceptAllOpenApiSelection, applyOpenApiPlan } = await import('../../openapiSync');
       await this.persistActiveRequestNow();
       const selection = mode === 'all' ? acceptAllOpenApiSelection(review.plan) : review.selection;
-      const result = applyOpenApiPlan(review.plan, selection, this.requests, collection);
+      const linkedIds = new Set(review.plan.links.map(link => link.requestId));
+      const requests = this.requests.map(request => linkedIds.has(request.id) ? this.requestForEditing(request.id) ?? request : request);
+      const result = applyOpenApiPlan(review.plan, selection, requests, collection);
       const workspaceId = collection.workspaceId;
       for (const request of result.removed) {
         this.trashRequest(request, workspaceId);
@@ -311,17 +316,23 @@ export const openApiSyncFeature = {
         ...(result.defaults ? { defaults: result.defaults } : {}),
         openapi: normalizeOpenApiSource({ ...candidate.openapi, ignored: result.ignored }) ?? candidate.openapi,
       });
-      const nextRequests = result.requests.map(request => result.added.includes(request)
+      const previousRequests = new Map(this.requests.map(request => [request.id, request]));
+      const nextRequests = result.requests.map(request => previousRequests.get(request.id) !== request
         ? normalizeSavedRequest(request, nextCollections, workspaceId)
         : request);
+      const updatedRequests = nextRequests.filter(request => previousRequests.get(request.id) !== request);
+      for (const request of updatedRequests) this.removeDirtyRequest(request.id);
       this.collections = nextCollections;
       this.requests = nextRequests;
       this.openRequestIds = this.openRequestIds.filter(id => !removedIds.has(id));
-      const active = nextRequests.find(request => request.id === this.activeRequestId);
+      const active = this.requestForEditing(this.activeRequestId);
       if (removedIds.has(this.activeRequestId)) this.activeRequestId = '';
       else if (active && active.collectionId === collection.id) this.applySavedRequest(active);
       const saved = await this.persistRequestStore(nextRequests, undefined, this.openRequestIds, this.workspaces, nextCollections);
-      if (!saved) throw new Error('Kurlo could not save the workspace.');
+      if (!saved) {
+        for (const request of updatedRequests) this.updateRequestDirtyState(request.id, request);
+        throw new Error('Kurlo could not save the workspace.');
+      }
       if (!await this.storeOpenApiBase(collection.id, pending.text)) return;
       pendingSpecs.delete(collection.id);
       writeLocal(collection.id, { skippedHash: undefined });

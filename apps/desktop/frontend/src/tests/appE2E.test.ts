@@ -43,6 +43,7 @@ import { collectionFeature } from '../lib/stores/features/collections';
 import { collectionRunnerDerivedFeature } from '../lib/stores/features/collectionRunnerDerived';
 import { collectionRunnerFeature } from '../lib/stores/features/collectionRunner';
 import { importExportFeature } from '../lib/stores/features/importExport';
+import { openApiSyncFeature } from '../lib/stores/features/openapiSync';
 import { normalizeRequestExample } from '../lib/examples';
 import { environmentFeature } from '../lib/stores/features/environments';
 import { folderFeature } from '../lib/stores/features/folders';
@@ -154,6 +155,9 @@ const backend = vi.hoisted(() => {
       return true;
     }),
     getEnvironmentState: () => state.environment,
+    readOpenApiBaseSpec: vi.fn(),
+    writeOpenApiBaseSpec: vi.fn(async () => ''),
+    deleteOpenApiBaseSpec: vi.fn(async () => ''),
   };
 });
 
@@ -527,6 +531,7 @@ applyFeatures(
   socketioFormFeature,
   importExportFeature,
   trashFeature,
+  openApiSyncFeature,
 );
 
 async function settleMicrotasks() {
@@ -2129,6 +2134,59 @@ describe('imported requests stay unchanged when opened', () => {
       expect(app.dirtyRequestIds.has(id), app.requestsById.get(id)?.name).toBe(false);
     }
   });
+});
+
+describe('OpenAPI sync persistence with manual saving', () => {
+  for (const [localEdit, saveFails] of [[false, false], [true, false], [true, true]]) {
+    it(saveFails ? 'keeps accepted changes recoverable when saving fails' : `saves accepted parameters without leaving a dirty request with local edits ${localEdit}`, async () => {
+      backend.state.savedStores = [];
+      const app = new TestApp() as TestApp & Record<string, any>;
+      app.autosave = false;
+      app.openApiSync = {};
+      app.openApiReview = null;
+      const first = { openapi: '3.0.3', info: { title: 'Pets' }, paths: { '/pets': { get: { operationId: 'listPets', summary: 'List pets' } } } };
+      const second = { ...first, paths: { '/pets': { get: { ...first.paths['/pets'].get, parameters: [{ name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } }] } } } };
+      await app.importOpenApiPayload(first, 'pets.json');
+      const request = app.requests.find((req: SavedRequest) => !req.isDraft)!;
+      const collection = app.collections.find((entry: Collection) => entry.id === request.collectionId)!;
+      collection.openapi = { source: 'https://spec.test/pets.json', intervalMinutes: 15 };
+      const unrelated = normalizeSavedRequest({ ...request, id: 'unrelated', name: 'Local request', url: 'https://local.test/other', openapi: undefined }, app.collections, app.activeWorkspaceId);
+      app.requests = [...app.requests, unrelated];
+      await app.persistRequestStore();
+      app.updateRequestDirtyState(unrelated.id, { ...unrelated, requestNotes: 'Keep this unsaved' });
+      await app.switchRequest(request.id);
+      if (localEdit) {
+        app.requestNotes = 'My local notes';
+        await app.persistActiveRequestNow();
+      }
+      backend.readOpenApiBaseSpec.mockResolvedValue({ content: JSON.stringify(first), exists: true, path: '' });
+      app.fetchOpenApiSpec = async () => ({ kind: 'spec', spec: second, text: JSON.stringify(second), hash: 'v2', etag: '', lastModified: '', sourceUrl: '' });
+      await app.checkOpenApiSync(collection.id, { manual: true, review: true });
+      backend.writeOpenApiBaseSpec.mockClear();
+      if (saveFails) backend.saveRequestStore.mockResolvedValueOnce({ ok: false, error: 'Disk full' });
+      await app.applyOpenApiReview();
+      expect(app.isRequestDirty(unrelated.id)).toBe(true);
+      expect(app.requestForEditing(unrelated.id)?.requestNotes).toBe('Keep this unsaved');
+      expect(backend.state.savedStores.at(-1)!.requests.find(req => req.id === unrelated.id)?.requestNotes).toBe('');
+      if (saveFails) {
+        expect(app.alerts).toContainEqual({ title: 'OpenAPI sync failed', message: 'Kurlo could not save the workspace.' });
+        expect(app.isRequestDirty(request.id)).toBe(true);
+        expect(app.requestForEditing(request.id)?.params).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'limit', value: '20' })]));
+        expect(app.savedRequestSnapshots.get(request.id)?.params).toEqual([]);
+        expect(backend.writeOpenApiBaseSpec).not.toHaveBeenCalled();
+        expect(app.openApiReview).not.toBeNull();
+        return;
+      }
+      expect(app.alerts).toEqual([]);
+      const saved = backend.state.savedStores.at(-1)!.requests.find(req => req.id === request.id)!;
+      expect(saved.params).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'limit', value: '20' })]));
+      expect(saved.requestNotes).toBe(localEdit ? 'My local notes' : '');
+      app.updateRequestDirtyState(request.id, app.snapshotActiveRequest({ forPersistence: true }));
+      expect(app.isRequestDirty(request.id)).toBe(false);
+      await app.discardRequestChanges(request.id);
+      expect(app.snapshotActiveRequest().params).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'limit', value: '20' })]));
+    });
+  }
 });
 
 describe('request reordering persistence', () => {

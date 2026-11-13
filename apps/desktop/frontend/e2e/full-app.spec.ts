@@ -13004,7 +13004,7 @@ test('keeps an imported OpenAPI collection in sync with its URL and applies revi
   const second = {
     ...first,
     paths: {
-      '/pets/{id}': { get: { ...getPet, description: 'Returns one pet by id.' } },
+      '/pets/{id}': { get: { ...getPet, description: 'Returns one pet by id.', parameters: [...getPet.parameters, { name: 'limit', in: 'query', schema: { type: 'integer', default: 20 } }] } },
       '/owners': { get: { operationId: 'listOwners', summary: 'List owners', tags: ['Owners'] } },
     },
   };
@@ -13066,7 +13066,7 @@ test('keeps an imported OpenAPI collection in sync with its URL and applies revi
   await expect(removed).toContainText('/pets');
   await expect(removed.getByRole('checkbox')).not.toBeChecked();
   await review.getByRole('button', { name: /\/pets\/\{id\}/ }).click();
-  await expect(review.locator('.openapi-review-field')).toContainText('Returns one pet by id.');
+  await expect(review.locator('.openapi-review-field').filter({ hasText: 'Docs' })).toContainText('Returns one pet by id.');
   await page.screenshot({ path: join(tmpdir(), 'kurlo-openapi-sync-review.png'), animations: 'disabled' });
   await captureDocsScreenshot(page, 'openapi-sync-review');
   await removed.getByRole('checkbox').check();
@@ -13087,6 +13087,29 @@ test('keeps an imported OpenAPI collection in sync with its URL and applies revi
   await page.getByRole('button', { name: 'Check now', exact: true }).click();
   await expect(page.locator('.openapi-sync-status')).toContainText('In sync');
   await expect(page.getByRole('dialog', { name: 'Spec changes · Synced Pets' })).toHaveCount(0);
+  await collection.getByLabel('Expand collection').click();
+  await folderRow(page, 'Pets').getByLabel('Expand folder').click();
+  await page.locator('.collection-request').filter({ hasText: 'Get pet' }).click();
+  const syncedTab = page.locator('.saved-request-tab.active');
+  await chooseRequestSection(page, 'Params');
+  await expect.poll(() => page.locator('.kv-row input').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).toContain('limit');
+  await page.waitForTimeout(500);
+  await expect(syncedTab).not.toHaveClass(/unsaved/);
+  await clickTabClose(syncedTab.getByRole('button', { name: 'Close tab', exact: true }));
+  await expect(page.getByRole('dialog', { name: 'Unsaved changes' })).toHaveCount(0);
+  await page.locator('.collection-request').filter({ hasText: 'Get pet' }).click();
+  await chooseRequestSection(page, 'Params');
+  await expect.poll(() => page.locator('.kv-row input').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).toContain('limit');
+  await page.evaluate(() => sessionStorage.setItem('openapi-sync-store', JSON.stringify(window.__kurloE2E.store)));
+  await page.addInitScript(() => {
+    const app = (window as unknown as { go: { api: { App: Record<string, (...args: unknown[]) => Promise<unknown>> } } }).go.api.App;
+    app.LoadRequestStore = async () => sessionStorage.getItem('openapi-sync-store');
+  });
+  await page.reload();
+  await chooseRequestSection(page, 'Params');
+  await expect.poll(() => page.locator('.kv-row input').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).toContain('limit');
+  await expect(page.locator('.saved-request-tab.active')).not.toHaveClass(/unsaved/);
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-openapi-sync-saved-params.png'), animations: 'disabled' });
 });
 
 for (const protocol of [
