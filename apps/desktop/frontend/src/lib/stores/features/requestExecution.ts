@@ -248,6 +248,7 @@ export const requestExecutionFeature = {
       if (resp.error && !resp.statusCode) {
         if (this.requestForEditing(requestId)) this.setActiveResponse(resp, requestId);
         if (this.requestIsActive(requestId)) this.requestError = resp.error;
+        if (isCurrent()) this.markRequestLoading(requestId, false);
         if (resp.error !== REQUEST_CANCELED_ERROR) await this.recordRequestHistory(resp, requestSnapshot);
         return;
       }

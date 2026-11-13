@@ -18,6 +18,7 @@ type GlobalsHost = {
   globalsPersistTimer: ReturnType<typeof setTimeout> | null;
   globalsSavedTimer: ReturnType<typeof setTimeout> | null;
   autosave: boolean;
+  autosaveDelayMs: number;
   persistRequestStore: () => Promise<boolean>;
   guardWorkspaceWritable: (action?: string) => boolean;
   globalVariableRows: () => KVRow[];
@@ -153,7 +154,7 @@ export const globalsFeature = {
     void setGlobalVariables(this.globalVariableValues());
   },
 
-  scheduleGlobalsPersist(this: GlobalsHost, delay = 360) {
+  scheduleGlobalsPersist(this: GlobalsHost, delay = this.autosaveDelayMs) {
     if (!this.guardWorkspaceWritable('Global variables')) return;
     const clearTimers = () => {
       if (this.globalsPersistTimer) {

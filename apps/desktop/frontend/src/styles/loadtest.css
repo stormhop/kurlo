@@ -52,7 +52,13 @@
 }
 
 .loadtest-environment {
-  min-width: 11rem;
+  flex: 0 0 8.625rem;
+  width: 8.625rem;
+}
+
+.loadtest-environment .app-select-trigger > span:last-of-type {
+  flex: 1 1 auto;
+  text-align: left;
 }
 
 .loadtest-errors {

@@ -12,10 +12,32 @@ import type {
 } from '../../types/models';
 import { cloneRowsForStore } from '../../utils';
 import type { CookieJarEntry } from '../../backend';
+import type { SaveRequestStoreResult } from '../../wire';
 import type { CollectionRunRecord } from '../../collectionRuns';
 
 const saveFailures = new WeakMap<object, number>();
-const queuedStorePayloads = new WeakMap<object, { epoch: number; serialized: string; result: Promise<boolean> }>();
+type QueuedStorePayload = { epoch: number; content: string; view: string; result: Promise<boolean> };
+const queuedStorePayloads = new WeakMap<object, QueuedStorePayload>();
+
+function withoutSavedExamples(requests: SavedRequest[], saved: Map<string, SavedRequest>) {
+  return requests.map(req => {
+    const { exampleCount: _count, ...counted } = req;
+    if (!('examples' in counted)) return counted;
+    const snapshot = saved.get(req.id);
+    if (!snapshot || !('examples' in snapshot)) return counted;
+    if (snapshot.examples !== counted.examples && JSON.stringify(snapshot.examples) !== JSON.stringify(counted.examples)) return counted;
+    const { examples: _examples, ...rest } = counted;
+    return rest;
+  });
+}
+
+function storePayloadKeys(payload: RequestStore, saved: Map<string, SavedRequest>) {
+  const { activeId, openIds, ...content } = payload;
+  return {
+    content: JSON.stringify({ ...content, requests: withoutSavedExamples(content.requests, saved) }),
+    view: JSON.stringify([activeId, openIds]),
+  };
+}
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -38,6 +60,7 @@ type RequestPersistenceHost = {
   folderCollapseState: Record<string, boolean>;
   openRequestIds: string[];
   persistTimer: ReturnType<typeof setTimeout> | null;
+  autosaveDelayMs: number;
   requestHistory: RequestHistoryEntry[];
   requestStoreLoaded: boolean;
   requestStorePersistEpoch: number;
@@ -58,6 +81,7 @@ type RequestPersistenceHost = {
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: PersistRequestStore;
   persistRequestStoreView: (activeId?: string, openIds?: string[], workspaceId?: string) => Promise<boolean>;
+  writeRequestStoreView: (activeId?: string, openIds?: string[], workspaceId?: string) => Promise<SaveRequestStoreResult | null | false>;
   persistWorkspaceNow: () => Promise<boolean>;
   pruneHistory: (history: RequestHistoryEntry[]) => RequestHistoryEntry[];
   recordSavedRequestSnapshots: (requestsForStore: SavedRequest[]) => void;
@@ -203,22 +227,32 @@ export const requestPersistenceFeature = {
     }
     const storeRequests = this.requestsForStore(nextRequests);
     const payload = this.requestStorePayload(storeRequests, activeId, nextOpenIds, nextWorkspaces, nextCollections, workspaceId, nextHistory, nextEnvironments, nextActiveEnvId);
-    const serialized = JSON.stringify(payload);
+    const keys = storePayloadKeys(payload, this.savedRequestSnapshots);
     const persistEpoch = this.requestStorePersistEpoch;
     const queued = queuedStorePayloads.get(this);
-    if (queued && queued.epoch === persistEpoch && queued.serialized === serialized) {
+    if (queued && queued.epoch === persistEpoch && queued.content === keys.content) {
       if (await queued.result && persistEpoch === this.requestStorePersistEpoch && queuedStorePayloads.get(this) === queued) {
-        this.recordSavedRequestSnapshots(storeRequests);
-        return true;
+        let viewSaved = queued.view === keys.view;
+        if (!viewSaved) {
+          const written = await this.writeRequestStoreView(activeId, nextOpenIds, workspaceId);
+          if (written === false) return false;
+          viewSaved = Boolean(written?.ok);
+          if (viewSaved) queued.view = keys.view;
+        }
+        if (viewSaved) {
+          this.recordSavedRequestSnapshots(storeRequests);
+          return true;
+        }
       }
     }
+    const serialized = JSON.stringify(payload);
     const persistJob = this.requestStorePersistQueue.then(async () => {
       if (persistEpoch !== this.requestStorePersistEpoch) return false;
       const saved = await saveRequestStore(serialized);
       if (!saved.ok) throw new Error(saved.error || 'request store save failed');
       return saved.ok;
     });
-    const entry = { epoch: persistEpoch, serialized, result: persistJob.then(saved => saved, () => false) };
+    const entry: QueuedStorePayload = { epoch: persistEpoch, ...keys, result: persistJob.then(saved => saved, () => false) };
     queuedStorePayloads.set(this, entry);
     void entry.result.then(saved => {
       if (!saved && queuedStorePayloads.get(this) === entry) queuedStorePayloads.delete(this);
@@ -232,6 +266,7 @@ export const requestPersistenceFeature = {
       if (saved && persistEpoch === this.requestStorePersistEpoch) {
         saveFailures.delete(this);
         this.recordSavedRequestSnapshots(storeRequests);
+        if (queuedStorePayloads.get(this) === entry) entry.content = storePayloadKeys(payload, this.savedRequestSnapshots).content;
         this.scheduleGitStatusRefreshAfterPersist();
         return true;
       }
@@ -246,7 +281,12 @@ export const requestPersistenceFeature = {
     }
   },
 
-  async persistRequestStoreView(
+  rememberLoadedRequestStore(this: RequestPersistenceHost) {
+    const payload = this.requestStorePayload(this.requestsForStore(this.requests));
+    queuedStorePayloads.set(this, { epoch: this.requestStorePersistEpoch, ...storePayloadKeys(payload, this.savedRequestSnapshots), result: Promise.resolve(true) });
+  },
+
+  async writeRequestStoreView(
     this: RequestPersistenceHost,
     activeId = this.activeRequestId,
     nextOpenIds = this.openRequestIds,
@@ -266,12 +306,20 @@ export const requestPersistenceFeature = {
       return await saveRequestStoreView(view);
     });
     this.requestStorePersistQueue = viewJob.catch(() => undefined);
-    let saved: Awaited<typeof viewJob>;
     try {
-      saved = await viewJob;
+      return await viewJob;
     } catch {
-      saved = { ok: false, error: '' };
+      return { ok: false, error: '' };
     }
+  },
+
+  async persistRequestStoreView(
+    this: RequestPersistenceHost,
+    activeId = this.activeRequestId,
+    nextOpenIds = this.openRequestIds,
+    workspaceId = this.activeWorkspaceId,
+  ) {
+    const saved = await this.writeRequestStoreView(activeId, nextOpenIds, workspaceId);
     if (saved === null) return await this.persistRequestStore(this.requests, activeId, nextOpenIds);
     if (saved === false) return false;
     return saved.ok || await this.persistRequestStore(this.requests, activeId, nextOpenIds);
@@ -425,6 +473,6 @@ export const requestPersistenceFeature = {
     this.persistTimer = setTimeout(() => {
       this.persistTimer = null;
       void this.persistActiveRequestNow();
-    }, Math.min(60000, 1200 * 2 ** (saveFailures.get(this) ?? 0)));
+    }, Math.min(60000, this.autosaveDelayMs * 2 ** (saveFailures.get(this) ?? 0)));
   },
 };

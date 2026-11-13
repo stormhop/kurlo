@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { DEFAULT_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
   import { NAME_MAX_LENGTH } from '../constants';
   import { tabListKeyboard } from '../a11y';
   import { loadTestFingerprint, normalizeLoadTest } from '../loadTests';
@@ -13,10 +14,10 @@
   import LoadFlowEditor from './LoadFlowEditor.svelte';
   import LoadProfileEditor from './LoadProfileEditor.svelte';
   import Select from './Select.svelte';
+  import { environmentColorVar } from '../environmentColors';
   import SaveActions from './SaveActions.svelte';
   import LoadValidationMessages from './LoadValidationMessages.svelte';
 
-  const AUTOSAVE_DEBOUNCE_MS = 1200;
   const VALIDATE_DEBOUNCE_MS = 300;
 
   let {
@@ -25,8 +26,10 @@
     isDraft = false,
     requests,
     environments,
+    activeEnvironmentId = '',
     loadTestTab = $bindable<LoadTestTab>('flow'),
     autosave = false,
+    autosaveDelayMs = DEFAULT_AUTOSAVE_DELAY_MS,
     saveState = 'idle',
     workspaceBlocked = false,
     onSave,
@@ -63,8 +66,10 @@
     isDraft?: boolean;
     requests: SavedRequest[];
     environments: Environment[];
+    activeEnvironmentId?: string;
     loadTestTab: LoadTestTab;
     autosave?: boolean;
+    autosaveDelayMs?: number;
     saveState?: 'idle' | 'saving' | 'saved';
     workspaceBlocked?: boolean;
     onSave: (collectionId: string, draft: LoadTest, baseFingerprint: string) => Promise<boolean>;
@@ -133,8 +138,8 @@
   const dataName = $derived(draft.data?.path.trim().split(/[\\/]/).at(-1) ?? '');
 
   const environmentOptions = $derived([
-    { value: '', label: 'Active environment' },
-    ...environments.map(environment => ({ value: environment.name, label: environment.name })),
+    { value: '', label: 'Active environment', color: environmentColorVar(environments.find(environment => environment.id === activeEnvironmentId)) },
+    ...environments.map(environment => ({ value: environment.name, label: environment.name, color: environmentColorVar(environment) })),
   ]);
 
   $effect(() => {
@@ -155,7 +160,7 @@
     autosaveTimer = setTimeout(() => {
       autosaveTimer = null;
       void save();
-    }, AUTOSAVE_DEBOUNCE_MS);
+    }, autosaveDelayMs);
     return () => {
       if (autosaveTimer) {
         clearTimeout(autosaveTimer);

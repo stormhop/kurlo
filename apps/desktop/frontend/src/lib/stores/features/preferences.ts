@@ -1,4 +1,5 @@
 import { openFileDialog } from '../../backend';
+import { loadAutosaveDelay, normalizeAutosaveDelay, saveAutosaveDelay } from '../../autosaveDelay';
 import { DEFAULT_PROXY_CONFIG, DEFAULT_REQUEST_SETTINGS, SHORTCUT_DEFINITIONS } from '../../constants';
 import { normalizeProxyConfig, proxyConfigForPersistence } from '../../proxy';
 import { loadStartupView, saveStartupView, type StartupView } from '../../startupView';
@@ -23,6 +24,7 @@ type PreferencesHost = {
   saveGlobals: () => Promise<boolean>;
   saveWorkspaceReadmes: () => Promise<boolean>;
   autosave: boolean;
+  autosaveDelayMs: number;
   startupView: StartupView;
   scriptEngine: ScriptEngine;
   dirtyRequestIds: Set<string>;
@@ -471,6 +473,11 @@ export const preferencesFeature = {
       const raw = localStorage.getItem(AUTOSAVE_STORAGE_KEY);
       if (raw !== null) this.autosave = raw !== 'false';
     } catch {}
+    this.autosaveDelayMs = loadAutosaveDelay();
+  },
+  setAutosaveDelay(this: PreferencesHost, value: number) {
+    this.autosaveDelayMs = normalizeAutosaveDelay(value);
+    saveAutosaveDelay(this.autosaveDelayMs);
   },
   setAutosave(this: PreferencesHost, value: boolean) {
     this.autosave = value;

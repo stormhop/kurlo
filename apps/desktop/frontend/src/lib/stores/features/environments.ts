@@ -53,6 +53,7 @@ type EnvironmentHost = {
   activeEnvironmentId: string;
   activeWorkspaceId: string;
   autosave: boolean;
+  autosaveDelayMs: number;
   environmentMenuOpen: boolean;
   environmentToast: string;
   environmentToastTimer: ReturnType<typeof setTimeout> | null;
@@ -285,12 +286,12 @@ export const environmentFeature = {
   async setEnvironmentColor(this: EnvironmentHost, environmentId: string, color: EnvironmentColor | '') {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
     const next = normalizeEnvironmentColor(color);
-    this.changeEnvironmentsEverywhere(candidate => {
+    this.editEnvironments(this.environments.map(candidate => {
       if (candidate.id !== environmentId) return candidate;
       const { color: _previous, ...rest } = candidate;
       return next ? { ...rest, color: next } : rest;
-    });
-    await this.persistRequestStore();
+    }));
+    if (this.autosave) await this.saveEnvironment();
   },
   async setEnvironmentParent(this: EnvironmentHost, environmentId: string, parentId: string) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
@@ -360,7 +361,7 @@ export const environmentFeature = {
   environmentsForStore(this: EnvironmentHost, environments: Environment[]) {
     return environmentsForStore(environments, this.environmentBaselines);
   },
-  scheduleEnvironmentPersist(this: EnvironmentHost, delay = 360) {
+  scheduleEnvironmentPersist(this: EnvironmentHost, delay = this.autosaveDelayMs) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
     if (!this.autosave) {
       if (this.environmentPersistTimer) {

@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { DEFAULT_AUTOSAVE_DELAY_MS, MAX_AUTOSAVE_DELAY_MS, MIN_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import AiConnectionsSettings from './AiConnectionsSettings.svelte';
   import Keycaps from './Keycaps.svelte';
   import Select from './Select.svelte';
-  import { openExternalURL } from '../externalLinks';
+  import { KURLO_BOOSTY_URL, openExternalURL } from '../externalLinks';
   import { KURLO_REPO_URL } from '../starPrompt';
   import { vm } from '../stores/app.svelte';
   import { untrack } from 'svelte';
@@ -76,7 +77,7 @@
   }
 
   const NAV_ITEMS: SettingsNavItem[] = [
-    { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave manual save default location workspace collection folder data export import backup script engine javascript tengo' },
+    { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave delay interval manual save default location workspace collection folder data export import backup script engine javascript tengo' },
     { id: 'theme', label: 'Appearance', keywords: 'appearance theme dark light system color scheme zoom scale size interface text font bigger smaller' },
     { id: 'proxy', label: 'Proxy', keywords: 'proxy http https socks5 system bypass network hostname port credentials' },
     { id: 'ai', label: 'AI', keywords: 'ai agent model llm openrouter anthropic claude openai gpt key api byok ollama lm studio local connection' },
@@ -92,6 +93,7 @@
     appRuntime = '',
     appTheme,
     autosave,
+    autosaveDelayMs = DEFAULT_AUTOSAVE_DELAY_MS,
     startupView,
     setStartupView,
     scriptEngine,
@@ -106,6 +108,7 @@
     proxyConfig,
     setProxyConfig,
     setAutosave,
+    setAutosaveDelay = () => {},
     defaultWorkspaceLocationDraft,
     defaultWorkspaceLocationStatus,
     setDefaultWorkspaceLocationDraft,
@@ -130,6 +133,7 @@
     appRuntime?: string;
     appTheme: AppTheme;
     autosave: boolean;
+    autosaveDelayMs?: number;
     startupView: StartupView;
     setStartupView: (value: StartupView) => void;
     scriptEngine: ScriptEngine;
@@ -144,6 +148,7 @@
     proxyConfig: ProxyConfig;
     setProxyConfig: (next: ProxyConfig) => void;
     setAutosave: (value: boolean) => void;
+    setAutosaveDelay?: (value: number) => void;
     defaultWorkspaceLocationDraft: string;
     defaultWorkspaceLocationStatus: string;
     setDefaultWorkspaceLocationDraft: (path: string) => void;
@@ -740,23 +745,42 @@
         <div class="settings-body general-tab" id="settings-panel-general" role="tabpanel">
           {@render pageHead('General', 'How Kurlo saves your work, what it opens first and how scripts run.')}
 
-          {#if matchesQuery('Saving', 'autosave', 'manual save', 'On launch', 'startup start screen open request overview restore')}
+          {#if matchesQuery('Saving', 'autosave', 'manual save', 'Autosave delay', 'interval', 'On launch', 'startup start screen open request overview restore')}
             <section class="settings-block">
               <h4 class="settings-group-label">Editing</h4>
               <div class="settings-group">
-                {#if matchesQuery('Saving', 'autosave', 'manual save')}
+                {#if matchesQuery('Saving', 'autosave', 'manual save', 'Autosave delay', 'autosave interval debounce milliseconds')}
                   <div class="settings-row">
                     <div class="settings-row-text">
                       <span class="settings-row-title" id="settings-saving-title">Saving</span>
                       <span class="settings-row-desc">
                         {#if autosave}
-                          Changes save as you type.
+                          Changes save this many milliseconds after your last edit ({MIN_AUTOSAVE_DELAY_MS}–{MAX_AUTOSAVE_DELAY_MS}).
                         {:else}
                           Changes wait until you press <Keycaps combo={shortcutCombo('save-request')} runtime={appRuntime} /> or Save; the tab shows a dot meanwhile.
                         {/if}
                       </span>
                     </div>
-                    <div class="settings-row-control">
+                    <div class="settings-row-control settings-saving-control">
+                      {#if autosave}
+                        <span class="autosave-delay-field">
+                          <input
+                            id="settings-autosave-delay"
+                            class="field autosave-delay-input"
+                            type="number"
+                            aria-label="Autosave delay"
+                            min={MIN_AUTOSAVE_DELAY_MS}
+                            max={MAX_AUTOSAVE_DELAY_MS}
+                            step="100"
+                            value={autosaveDelayMs}
+                            onchange={(event) => {
+                              setAutosaveDelay(Number(inputValue(event)));
+                              (event.currentTarget as HTMLInputElement).value = String(autosaveDelayMs);
+                            }}
+                          />
+                          <span class="autosave-delay-unit">ms</span>
+                        </span>
+                      {/if}
                       <div class="segmented" role="radiogroup" aria-labelledby="settings-saving-title">
                         <button class="segmented-item" type="button" role="radio" aria-checked={autosave} onclick={() => setAutosave(true)}>Autosave</button>
                         <button class="segmented-item" type="button" role="radio" aria-checked={!autosave} onclick={() => setAutosave(false)}>Manual save</button>
@@ -878,6 +902,21 @@
               <span class="support-link-copy">
                 <span class="support-link-title">Star Kurlo on GitHub</span>
                 <span class="support-link-meta">Free and open source; a star helps other people find it</span>
+              </span>
+              <svg width="0.6875rem" height="0.6875rem" viewBox="0 0 10 10" fill="none" aria-hidden="true" class="support-link-arrow">
+                <path d="M2 8L8 2M8 2H4M8 2v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+
+            <button class="settings-row support-link-card" type="button" onclick={() => openExternalURL(KURLO_BOOSTY_URL)}>
+              <span class="support-link-icon" aria-hidden="true">
+                <svg width="1.0625rem" height="1.0625rem" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 13.6S2.4 10.3 2.4 6.3c0-1.9 1.4-3.3 3.1-3.3 1.1 0 2 .6 2.5 1.5.5-.9 1.4-1.5 2.5-1.5 1.7 0 3.1 1.4 3.1 3.3 0 4-5.6 7.3-5.6 7.3z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span class="support-link-copy">
+                <span class="support-link-title">Support Kurlo on Boosty</span>
+                <span class="support-link-meta">Kurlo stays free; a subscription pays for its development</span>
               </span>
               <svg width="0.6875rem" height="0.6875rem" viewBox="0 0 10 10" fill="none" aria-hidden="true" class="support-link-arrow">
                 <path d="M2 8L8 2M8 2H4M8 2v4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1268,6 +1307,26 @@
 
   .proxy-input-sm {
     max-width: 7.5rem;
+  }
+
+  .settings-saving-control {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .autosave-delay-field {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    color: var(--text-3);
+    font-size: var(--text-label);
+  }
+
+  .autosave-delay-input {
+    box-sizing: border-box;
+    width: 5.5rem;
+    font: 0.8125rem var(--font-ui);
   }
 
   .proxy-password {
