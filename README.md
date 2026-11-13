@@ -79,6 +79,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
 - Postman, Insomnia, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and all-data backup import paths
 - OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the collection
+- OpenAPI sync — keep a collection linked to its spec URL or file, review new, changed and removed endpoints with a three-way merge that keeps your edits, with no monthly limit; `kurlo openapi check` flags drift in CI
 - Postman, OpenAPI, OpenCollection, and all-data backup export paths
 
 **Authentication**
@@ -281,6 +282,12 @@ The full surface — every method, the variable-scope precedence rules, and the 
 | `pm.log(...values)` | Output to the Scripts panel |
 
 `require` resolves bundled stand-ins for `lodash`, `ajv`, `tv4`, `uuid`, `crypto-js`, and `chai`. There is no event loop: `setTimeout`, `async` and `await` are not available, and `pm.sendRequest`'s callback runs immediately.
+
+---
+
+## Support Kurlo
+
+Kurlo is free for teams of any size and will stay that way. If it saves you time, you can support development on [Boosty](https://boosty.to/kurlo): it pays for the server, macOS code signing and the hours that go into new features. Supporters get dev updates and early release candidates.
 
 ---
 

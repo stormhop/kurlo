@@ -35,6 +35,7 @@ export const DOCS_SIDEBAR = [
       { label: 'MCP server (kurlo mcp)', link: '/docs/guides/mcp-server/' },
       { label: 'Git-backed workspaces', link: '/docs/guides/git-workspaces/' },
       { label: 'Import & export', link: '/docs/guides/import-export/' },
+      { label: 'OpenAPI sync', link: '/docs/guides/openapi-sync/' },
       { label: 'Backup & recovery', link: '/docs/guides/backup-recovery/' },
       { label: 'Code generation', link: '/docs/guides/code-generation/' },
     ],
@@ -53,6 +54,7 @@ export const DOCS_SIDEBAR = [
     items: [
       { label: 'Troubleshooting', link: '/docs/troubleshooting/' },
       { label: 'FAQ', link: '/docs/faq/' },
+      { label: 'Support Kurlo', link: '/docs/support/' },
       { label: 'Privacy & security', link: '/privacy/' },
       { label: 'Changelog', link: '/changelog/' },
       { label: 'Releases', link: GITHUB_RELEASES, attrs: { target: '_blank' } },

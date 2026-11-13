@@ -14,39 +14,54 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Added
 
-- **Reorder requests by dragging** above or below another request in the same collection or folder. Order persists between sessions. See [Reordering requests](/docs/guides/workspaces/#reordering-requests).
+- **OpenAPI sync**: keep a collection linked to its spec URL or file, with no sync limit. Kurlo checks it in the background, shows new, changed, conflicting and removed endpoints for review, and merges three ways so your edits, scripts and tests stay. See [OpenAPI sync](/docs/guides/openapi-sync/).
+- **`kurlo openapi check`**: flag spec drift in CI with exit code `1`, or ask an agent through the `check_openapi_sync` MCP tool. See [Contract drift](/docs/guides/cli-runner/#contract-drift-with-kurlo-openapi-check).
+- **Request variables**: a **Vars** tab on every request with Pre Request variables that override the environment and Post Response variables taken from the response with expressions such as `res.body.token`. Imported from Bruno and Insomnia folders. See [Request variables](/docs/guides/environments/#request-variables).
 - **JWT Bearer auth**: Kurlo signs a fresh JWT on every send from a secret or a private key, with claims, an optional lifetime and a token preview. See [JWT Bearer](/docs/guides/authentication/#jwt-bearer).
 - **Assertions**: check the status, time, size, a header or a JSON field of a response without code, in **Scripts → Assertions**. Results show with the tests and count in the runner, `kurlo run` and `kurlo mcp`. See [Assertions](/docs/guides/scripting/#assertions).
 - **Undo deletes**: a deleted request, folder, collection or environment can be brought back with **Undo** or from **Recently deleted** until you quit Kurlo. See [Restoring deleted items](/docs/guides/workspaces/#restoring-deleted-items).
-- **Environment colors**: mark an environment red, amber, green, blue or gray, and the title bar switcher shows it while it is in use. See [Coloring an environment](/docs/guides/environments/#coloring-an-environment).
-- **Edit menu in text fields**: right-click a field or a code editor for Cut, Copy, Paste and Select all. See [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
+- **Environment colors**: mark an environment red, amber, green, blue or gray, and the title bar switcher, environment lists and pickers show it. See [Coloring an environment](/docs/guides/environments/#coloring-an-environment).
+- **Reorder requests by dragging** above or below another request in the same collection or folder. See [Reordering requests](/docs/guides/workspaces/#reordering-requests).
+- **Autosave delay**: choose how long Kurlo waits after an edit before saving. See [Saving](/docs/guides/settings/#saving).
+- **Skip TLS check on URL import** for specs served with a self-signed or internal certificate. See [From a URL](/docs/guides/import-export/#from-a-url).
 - **Show in Finder / Explorer**: open the YAML file of a request or the folder of a collection from its menu. See [The request ⋯ menu](/docs/guides/workspaces/#the-request--menu).
-- **Skip TLS check on URL import**: import an OpenAPI spec from a server with a self-signed or internal certificate by ticking **Skip TLS certificate check**. See [From a URL](/docs/guides/import-export/#from-a-url).
+- **Edit menu in text fields**: right-click a field or a code editor for Cut, Copy, Paste and Select all. See [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
+- **Kurlo docs in search**: the search palette offers the documentation first, and with a query it searches the docs in your browser. See [Command palette](/docs/guides/workspaces/#command-palette).
+
+### Performance
+
+Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples, are faster at every step:
+
+- **Opening**: the workspace is read once, while the window is still loading, and examples load only when needed. The sidebar is filled about 0.5 s after launch.
+- **Saving**: a save sends about a tenth of the data and opens about a fifth as many files.
+- **Quitting and closing tabs**: nothing is written when nothing changed, and a closed tab disappears at once. Quitting a 1,300-request workspace takes about 0.3 s on macOS instead of 1–7 s.
+- **Scrolling**: the sidebar and the Git panel no longer show blank patches on a fast fling, draw the visible rows first, and keep native trackpad momentum. Git history loads older commits as you scroll.
+- **Idle**: a minimised window stops checking the workspace folder until you come back.
 
 ### Changed
 
-- **New requests start as drafts with manual saving**: **Add request** opens a draft that already uses the collection's and folder's settings, and **Save** puts it there. See [Creating a request](/docs/guides/workspaces/#creating-a-request).
-- **Closing a draft asks only after you changed it**, for requests and load tests alike.
-- **Starred requests are personal**: stars stay on your machine instead of in request files and Git. See [Starred (favourites)](/docs/guides/workspaces/#starred-favourites).
-- **The Starred group shows up to ten requests** and scrolls within that space, so collections stay in view. Its collapsed state is remembered.
-- **A free spot to drag the window by**: on Windows and Linux the title bar keeps an empty space between the tabs and the search field, however many tabs are open. See [Window title bar](/docs/guides/settings/#appearance).
+- **Portable app for Windows**: the standalone `.exe` is now named `kurlo-<version>-windows-<arch>-portable.exe` and is on the download page. See [Installation](/docs/getting-started/installation/#windows).
+- **OpenAPI servers import like Bruno**: requests use `{{baseUrl}}`; document servers become a collection variable, path and operation servers go into the request's **Vars** tab, and alternatives such as Sandbox are switched-off rows you can tick instead. See [From OpenAPI / Swagger](/docs/guides/import-export/#from-openapi--swagger).
+- **Imported collections start collapsed**, and remember your later expand and collapse choices.
+- **New requests start as drafts with manual saving**: **Add request** opens a draft that already uses the collection's and folder's settings, and **Save** puts it there. Untouched drafts close without asking. See [Creating a request](/docs/guides/workspaces/#creating-a-request).
+- **Starred requests are personal**: stars stay on your machine instead of in request files and Git, and the group scrolls within ten rows. See [Starred (favourites)](/docs/guides/workspaces/#starred-favourites).
+- **Search moved to the status bar**: open it from **Search** at the bottom right or with `Cmd/Ctrl K`. See [Command palette](/docs/guides/workspaces/#command-palette).
+- **More room in the tab row**: close buttons appear on hover or keyboard focus without moving the tabs, and on Windows and Linux there is always a free spot to drag the window by. See [Window title bar](/docs/guides/settings/#appearance).
+- **Code snippet is next to Send** in the URL row.
+- **Panels fold in and out**: the sidebar, Agent mode's **Chat details** and **Code snippet** open and close smoothly; reduced motion disables the animation.
+- **Sidebar context menus open right under their row**, and above it near the bottom of the window.
 
 ### Fixed
 
-- **Concurrent workspace saves** no longer mistake a file being replaced by another save for a missing file.
-- **Smoother scrolling in large collections**: request rows no longer rebuild the collection tree as they appear, and sidebar data is reused until it changes.
-- Imported collections and their folders start collapsed and remember your later expand and collapse choices.
-- **Request hover after dragging**: unrelated rows no longer keep their hover background, drag handle or action buttons after reordering requests.
-- **No false unsaved dot**: opening a request with path variables, for example one imported from OpenAPI, no longer marks it as changed.
-- **Locked workspaces explain themselves**: a missing workspace or collection file now locks only its own workspace, and the overview shows which file needs fixing with a button to edit it.
-- **Protection against wiping a workspace**: Kurlo will not save over a workspace it could not read, or save a state that drops every workspace in the folder. Full backup import still replaces everything.
-- **Imported requests that would not load**: a request whose description or notes began with a line break, for example from an OpenAPI import, is now saved so it loads again after a restart.
-- **Sidebar scrolling**: fast scrolling through a long collection, history or environment list no longer shows blank patches before the rows appear.
-- **Saving, quitting and closing tabs on large workspaces.** Kurlo no longer writes the workspace again when you quit or close a tab and nothing changed since the last save, and a closed request tab disappears at once while its last edit is saved in the background. Each save also stops re-reading every workspace file: it skips files whose content is already known and reuses what it learned from the last load or save, so saving one change opens about a fifth as many files. On workspaces with over a thousand requests, especially on Windows, quitting and autosave used to take several seconds.
-- On Windows, **Open log folder** in Settings opens the folder again.
-- The **All open tabs** button at the end of the tab row shows its list again.
-- **OpenAPI import reads generator-written YAML**: specs from Jackson, springdoc and similar tools no longer fail with *Expected an OpenAPI/Swagger document with paths* or lose operations. See [OpenAPI / Swagger](/docs/guides/import-export/#from-openapi--swagger).
-- On macOS, the workspace switcher icons no longer shift by a pixel when you change sidebar screens.
+- **Protection against wiping a workspace**: Kurlo will not save over a workspace it could not read, or save a state that drops every workspace in the folder.
+- **Locked workspaces explain themselves**: a missing workspace or collection file locks only its own workspace, and the overview shows which file needs fixing.
+- **Imported requests that would not load**: a request whose description began with a line break, for example from an OpenAPI import, loads again after a restart.
+- **OpenAPI import reads generator-written YAML** from Jackson, springdoc and similar tools. See [OpenAPI / Swagger](/docs/guides/import-export/#from-openapi--swagger).
+- **No false unsaved dot** when opening a request with path variables.
+- **Send errors** such as a TLS certificate error show at once.
+- **Long URLs stay on one line**: the URL bar scrolls the text sideways instead of growing downwards. See [Your first request](/docs/getting-started/first-request/).
+- **Concurrent saves** no longer mistake a file being replaced for a missing one.
+- Sidebar rows no longer keep their hover look after dragging, the load test environment selector keeps a fixed width, **Open log folder** works on Windows again, **All open tabs** shows its list again, and the macOS workspace switcher icons no longer shift by a pixel.
 
 ## 3.0.4
 
