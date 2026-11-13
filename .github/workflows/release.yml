@@ -180,8 +180,8 @@ jobs:
           Copy-Item $msix.FullName "release\kurlo-$env:VERSION-windows-${{ matrix.arch }}.msix"
 
           $raw = Get-ChildItem apps\desktop\build\bin\*.exe -Exclude *installer* -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $raw) { throw "Raw Windows binary not found in build\bin — auto-update artifact is required" }
-          Copy-Item $raw.FullName "release\kurlo-windows-${{ matrix.arch }}.exe"
+          if (-not $raw) { throw "Raw Windows binary not found in build\bin — the portable app and auto-update artifact is required" }
+          Copy-Item $raw.FullName "release\kurlo-$env:VERSION-windows-${{ matrix.arch }}-portable.exe"
 
       - name: Package Linux raw binary
         if: runner.os == 'Linux'
@@ -254,7 +254,7 @@ jobs:
         shell: pwsh
         run: |
           $out = Join-Path $env:RUNNER_TEMP "kurlo-version.txt"
-          $process = Start-Process -FilePath "release\kurlo-windows-${{ matrix.arch }}.exe" `
+          $process = Start-Process -FilePath "release\kurlo-$env:VERSION-windows-${{ matrix.arch }}-portable.exe" `
             -ArgumentList "--version" -Wait -PassThru -NoNewWindow -RedirectStandardOutput $out
           if ($process.ExitCode -ne 0) {
             throw "built binary exited with $($process.ExitCode)"
@@ -363,7 +363,7 @@ jobs:
           key_file="$(mktemp)"
           printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key_file"
           trap 'rm -f "$key_file"' EXIT
-          for asset in release/kurlo-darwin-universal release/kurlo-darwin-universal.app.zip release/kurlo-windows-amd64.exe release/kurlo-windows-arm64.exe release/kurlo-linux-amd64 "release/kurlo-${GITHUB_REF_NAME#v}-linux-amd64.AppImage"; do
+          for asset in release/kurlo-darwin-universal release/kurlo-darwin-universal.app.zip "release/kurlo-${GITHUB_REF_NAME#v}-windows-amd64-portable.exe" "release/kurlo-${GITHUB_REF_NAME#v}-windows-arm64-portable.exe" release/kurlo-linux-amd64 "release/kurlo-${GITHUB_REF_NAME#v}-linux-amd64.AppImage"; do
             if [ ! -f "$asset" ]; then
               echo "::error::missing asset for signing: $asset"
               exit 1

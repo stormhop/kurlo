@@ -1,5 +1,5 @@
 ---
-import { RELEASE_PAGE, RELEASE_VERSION, assetName, assetUrl, primaryDownloads } from '../lib/downloads';
+import { RELEASE_PAGE, RELEASE_VERSION, assetName, assetUrl, portableDownload, primaryDownloads } from '../lib/downloads';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 
@@ -8,6 +8,8 @@ interface PlatformFile {
   match: string;
   arch?: 'x86' | 'arm';
   primary?: boolean;
+  name?: string;
+  url?: string;
 }
 
 interface Platform {
@@ -35,10 +37,12 @@ const platforms: Platform[] = [
     files: [
       { label: 'Installer', match: '-windows-amd64-installer.exe', arch: 'x86', primary: true },
       { label: 'MSIX package', match: '-windows-amd64.msix', arch: 'x86' },
+      { label: 'Portable app', ...portableDownload('amd64'), arch: 'x86' },
       { label: 'Installer', match: '-windows-arm64-installer.exe', arch: 'arm', primary: true },
       { label: 'MSIX package', match: '-windows-arm64.msix', arch: 'arm' },
+      { label: 'Portable app', ...portableDownload('arm64'), arch: 'arm' },
     ],
-    note: 'SmartScreen may warn: the installer is not Authenticode-signed yet.',
+    note: 'The portable app runs without installing and updates itself. SmartScreen may warn: Kurlo is not Authenticode-signed yet.',
   },
   {
     id: 'linux',
@@ -52,7 +56,7 @@ const platforms: Platform[] = [
 ];
 
 const sizes = new Map(primaryDownloads.map(item => [item.suffix, item.size]));
-const fileLabel = (suffix: string) => [assetName(suffix), sizes.get(suffix)].filter(Boolean).join(' · ');
+const fileLabel = (item: PlatformFile) => [item.name ?? assetName(item.match), sizes.get(item.match)].filter(Boolean).join(' · ');
 const primaryUrl = (platform: Platform) => assetUrl(platform.files.find(item => item.primary)?.match ?? platform.files[0].match);
 ---
 
@@ -67,10 +71,10 @@ const primaryUrl = (platform: Platform) => assetUrl(platform.files.find(item => 
       <ul>
         {platform.files.map(item => (
           <li data-arch={item.arch} hidden={item.arch === 'arm'}>
-            <a href={assetUrl(item.match)} data-asset={item.match} data-primary={item.primary ? '' : undefined}>
+            <a href={item.url ?? assetUrl(item.match)} data-asset={item.match} data-primary={item.primary ? '' : undefined}>
               {item.label}
             </a>
-            <code data-asset-name>{fileLabel(item.match)}</code>
+            <code data-asset-name>{fileLabel(item)}</code>
           </li>
         ))}
       </ul>

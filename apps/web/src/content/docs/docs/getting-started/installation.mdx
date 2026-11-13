@@ -36,7 +36,13 @@ Current builds are not Apple-notarized, so macOS blocks the first launch. Click 
     <span class="kurlo-tile-title">MSIX package</span>
     <span class="kurlo-tile-text"><code>kurlo-&lt;version&gt;-windows-amd64.msix</code> installs through App Installer, which lists one permission — <em>Uses all system resources</em> — that every packaged desktop app needs.</span>
   </div>
+  <div class="kurlo-tile">
+    <span class="kurlo-tile-title">Portable app</span>
+    <span class="kurlo-tile-text"><code>kurlo-&lt;version&gt;-windows-amd64-portable.exe</code> runs from any folder without installing, for a machine where you cannot or do not want to install software. It updates itself in place.</span>
+  </div>
 </div>
+
+The portable app adds no Start menu entry and keeps your workspaces and settings in your user profile, in the same place as an installed Kurlo, so the two share data. It needs the Microsoft Edge WebView2 Runtime, which Windows 11 and up-to-date Windows 10 already include; the installer adds it when it is missing. Releases up to 3.0.4 publish the same program as `kurlo-windows-amd64.exe`.
 
 If an older copy installed for all users in Program Files is found, the installer offers to remove it; Windows asks for permission once for that, and your data is kept. SmartScreen may warn because the installer is not Authenticode-signed yet. The MSIX package is signed only when the release job had the publisher certificate; an unsigned package needs extra trust setup before Windows installs it.
 

@@ -21,11 +21,24 @@ const primary = {
   windows: url('-windows-amd64-installer.exe'),
   linux: url('-linux-amd64.AppImage'),
 };
+const atLeast = (value, minimum) => {
+  const parts = text => text.split('-')[0].split('.').map(part => Number.parseInt(part, 10) || 0);
+  const [left, right] = [parts(value), parts(minimum)];
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference) return difference > 0;
+  }
+  return true;
+};
+const portableSince = readFileSync(join(webRoot, 'src/lib/downloads.ts'), 'utf8').match(/PORTABLE_SINCE = '([^']+)'/)?.[1] ?? '';
 const allFiles = [
   ...Object.values(primary),
   url('-windows-amd64.msix'),
   url('-windows-arm64-installer.exe'),
   url('-windows-arm64.msix'),
+  ...(portableSince && atLeast(version, portableSince)
+    ? [url('-windows-amd64-portable.exe'), url('-windows-arm64-portable.exe')]
+    : ['amd64', 'arm64'].map(arch => `${repo}/releases/download/v${version}/kurlo-windows-${arch}.exe`)),
 ];
 
 const errors = [];

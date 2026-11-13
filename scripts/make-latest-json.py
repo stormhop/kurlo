@@ -29,8 +29,8 @@ from pathlib import Path
 DEFAULT_ASSETS = {
     "darwin-universal": "kurlo-darwin-universal",
     "darwin-universal-app": "kurlo-darwin-universal.app.zip",
-    "windows-amd64": "kurlo-windows-amd64.exe",
-    "windows-arm64": "kurlo-windows-arm64.exe",
+    "windows-amd64": "kurlo-{version}-windows-amd64-portable.exe",
+    "windows-arm64": "kurlo-{version}-windows-arm64-portable.exe",
     "linux-amd64": "kurlo-linux-amd64",
     "linux-amd64-appimage": "kurlo-{version}-linux-amd64.AppImage",
 }

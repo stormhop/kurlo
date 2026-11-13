@@ -41,8 +41,8 @@ func buildFakeRelease(t *testing.T, withSignatures bool) (dir string, checksums 
 	assets := map[string]string{
 		"darwin-universal":     "kurlo-darwin-universal",
 		"darwin-universal-app": "kurlo-darwin-universal.app.zip",
-		"windows-amd64":        "kurlo-windows-amd64.exe",
-		"windows-arm64":        "kurlo-windows-arm64.exe",
+		"windows-amd64":        "kurlo-9.9.9-windows-amd64-portable.exe",
+		"windows-arm64":        "kurlo-9.9.9-windows-arm64-portable.exe",
 		"linux-amd64":          "kurlo-linux-amd64",
 		"linux-amd64-appimage": "kurlo-9.9.9-linux-amd64.AppImage",
 	}
@@ -162,6 +162,26 @@ func TestGeneratedManifestPointsAppImagesAtTheVersionedAppImage(t *testing.T) {
 	}
 	if !strings.HasSuffix(info.SignatureURL, "/kurlo-9.9.9-linux-amd64.AppImage.minisig") {
 		t.Fatalf("expected the AppImage signature, got %q", info.SignatureURL)
+	}
+}
+
+func TestGeneratedManifestPointsWindowsAtThePortableApp(t *testing.T) {
+	releaseDir, checksums := buildFakeRelease(t, true)
+
+	manifest := generateManifest(t, releaseDir, "--require-signature")
+
+	for _, arch := range []string{"amd64", "arm64"} {
+		info, err := updateInfoFromManifestFor(manifest, updatePlatformKeys("windows", "", `C:\Users\u\Kurlo.exe`, "windows-"+arch))
+		if err != nil {
+			t.Fatalf("windows-%s found no update: %v", arch, err)
+		}
+		want := "kurlo-9.9.9-windows-" + arch + "-portable.exe"
+		if info.AssetName != want || !strings.HasSuffix(info.DownloadURL, "/v9.9.9/"+want) {
+			t.Fatalf("windows-%s update = %q (%s), want %s", arch, info.AssetName, info.DownloadURL, want)
+		}
+		if info.SHA256 != checksums["windows-"+arch] || !strings.HasSuffix(info.SignatureURL, "/"+want+".minisig") {
+			t.Fatalf("windows-%s checksum or signature does not match the portable app", arch)
+		}
 	}
 }
 

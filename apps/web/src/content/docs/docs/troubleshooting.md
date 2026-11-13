@@ -32,7 +32,7 @@ then open from Finder normally.
 
 ### Windows: SmartScreen warning "Windows protected your PC"
 
-Confirm the installer came from the official release repository and verify its SHA-256 checksum, then click **More info** → **Run anyway**. The NSIS installer is not currently Authenticode-signed. In-app updater binaries are separately verified by SHA-256 and minisign before installation.
+Confirm the installer or the portable app came from the official release repository and verify its SHA-256 checksum, then click **More info** → **Run anyway**. Neither the NSIS installer nor the portable `.exe` is currently Authenticode-signed. In-app updater binaries are separately verified by SHA-256 and minisign before installation.
 
 ### Linux: AppImage won't launch
 
