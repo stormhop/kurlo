@@ -29,7 +29,7 @@ Ask in plain words and the agent runs your requests and collections, explains wh
 - **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request as the API change.
 - **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
 - **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
-- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.1 MB and the Linux one is 13.3 MB.
+- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.4 MB and the Linux one is 13.4 MB.
 
 | | Kurlo | Postman | Insomnia | Bruno |
 |---|---|---|---|---|

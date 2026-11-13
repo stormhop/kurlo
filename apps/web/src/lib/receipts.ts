@@ -13,12 +13,12 @@ export const platforms: { id: Platform; label: string }[] = [
 export const apps: App[] = [
   {
     name: 'Kurlo',
-    version: '3.0.4',
-    source: 'https://github.com/stormhop/kurlo/releases/tag/v3.0.4',
+    version: '3.1.0',
+    source: 'https://github.com/stormhop/kurlo/releases/tag/v3.1.0',
     downloads: {
-      macos: { file: 'Universal DMG', bytes: 26321659 },
-      windows: { file: 'x64 installer', bytes: 15774311 },
-      linux: { file: 'x64 AppImage', bytes: 13894848 },
+      macos: { file: 'Universal DMG', bytes: 26584635 },
+      windows: { file: 'x64 installer', bytes: 15906665 },
+      linux: { file: 'x64 AppImage', bytes: 14034112 },
     },
   },
   {
