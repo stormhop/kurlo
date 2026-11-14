@@ -75,6 +75,26 @@ describe('request store delta saves', () => {
     vi.mocked(saveRequestStoreDelta).mockImplementation(async () => ({ ok: true, error: '', revision: ++revision }));
   });
 
+  it('sends the first edit after loading as a delta against the loaded revision', async () => {
+    const host = storeHost([one, two]);
+    requestPersistenceFeature.rememberLoadedRequestStore.call(host as never, 41);
+    const edited = { ...one, url: 'https://one/edited' };
+    expect(await persist(host, [edited, two])).toBe(true);
+    expect(saveRequestStore).not.toHaveBeenCalled();
+    const [delta] = deltaCalls();
+    expect(delta.base).toBe(41);
+    expect(delta.requestIds).toEqual(['r1', 'r2']);
+    expect(delta.requests.map((req: Req) => req.id)).toEqual(['r1']);
+  });
+
+  it('saves everything after loading when the backend gave no revision', async () => {
+    const host = storeHost([one, two]);
+    requestPersistenceFeature.rememberLoadedRequestStore.call(host as never, undefined);
+    expect(await persist(host, [{ ...one, url: 'https://one/edited' }, two])).toBe(true);
+    expect(saveRequestStoreDelta).not.toHaveBeenCalled();
+    expect(saveRequestStore).toHaveBeenCalledTimes(1);
+  });
+
   it('sends only the edited request once the backend confirmed a full save', async () => {
     const host = storeHost([one, two]);
     expect(await persist(host)).toBe(true);

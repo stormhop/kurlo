@@ -24,13 +24,6 @@ func (c *requestExamplesCache) replace(root string, examples map[string]json.Raw
 	c.roots[root] = examples
 }
 
-func (c *requestExamplesCache) snapshot(root string) (map[string]json.RawMessage, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	examples, ok := c.roots[root]
-	return examples, ok
-}
-
 func (c *requestExamplesCache) forget(root string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

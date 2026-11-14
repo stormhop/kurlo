@@ -313,3 +313,57 @@ func TestDeltaSaveKeepsTheNextFullSaveHonest(t *testing.T) {
 		t.Fatal("a full save back to the earlier state must rewrite what the delta changed")
 	}
 }
+
+func TestTheFirstEditAfterLoadingGoesThroughTheDelta(t *testing.T) {
+	app, root := appWorkspaceForTest(t)
+	saver := newDeltaSaver(t, app)
+	saver.full(saveFlowStoreForTest(t), "start")
+	for _, op := range deltaOps() {
+		loaded := app.LoadWorkspace()
+		if loaded.Revision == 0 {
+			t.Fatalf("%s: a healthy workspace should load with a revision", op.name)
+		}
+		store, err := decodeJSONMap(loaded.Payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		saver.revision = loaded.Revision
+		saver.remember(store)
+		before := saver.deltas
+		op.apply(store)
+		saver.save(store, op.name)
+		afterDelta := workspaceTreeForTest(t, root)
+		saver.full(store, op.name+" again in full")
+		if afterFull := workspaceTreeForTest(t, root); !reflect.DeepEqual(afterDelta, afterFull) {
+			for path, content := range afterFull {
+				if afterDelta[path] != content {
+					t.Errorf("%s: %s differs\n--- full save\n%s\n--- delta save\n%s", op.name, path, content, afterDelta[path])
+				}
+			}
+			t.Fatalf("%s: a full save after the delta changed files", op.name)
+		}
+		t.Logf("%s: delta=%v", op.name, saver.deltas > before)
+	}
+	if saver.deltas < 9 {
+		t.Fatalf("expected the first edit after loading to go through the delta path, got %d deltas", saver.deltas)
+	}
+}
+
+func TestALoadedRevisionIsRefusedAfterTheDiskChanges(t *testing.T) {
+	app, root := appWorkspaceForTest(t)
+	saver := newDeltaSaver(t, app)
+	saver.full(saveFlowStoreForTest(t), "start")
+	loaded := app.LoadWorkspace()
+	store, err := decodeJSONMap(loaded.Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saver.revision = loaded.Revision
+	saver.remember(store)
+	agentAddsRequest(t, root, "Orders")
+	workspaceDisk.remember(root)
+	storeItem(store, "requests", "req-main")["url"] = "https://after-agent.example.test"
+	if result := saver.save(store, "after an outside change"); !result.NeedFull {
+		t.Fatal("a delta against a load from before an outside change must be refused")
+	}
+}

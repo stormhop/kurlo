@@ -214,11 +214,12 @@ export async function loadRequestStore(): Promise<string> {
   return app.LoadRequestStore();
 }
 
-export async function loadWorkspace(): Promise<{ payload: string; diagnostics: WorkspaceDiagnostic[] }> {
+export async function loadWorkspace(): Promise<{ payload: string; diagnostics: WorkspaceDiagnostic[]; revision?: number }> {
   const app = window.go?.api?.App;
   if (app?.LoadWorkspace) {
     const result = await app.LoadWorkspace();
-    return { payload: result?.payload ?? '', diagnostics: Array.isArray(result?.diagnostics) ? result.diagnostics : [] };
+    const revision = typeof result?.revision === 'number' && result.revision > 0 ? result.revision : undefined;
+    return { payload: result?.payload ?? '', diagnostics: Array.isArray(result?.diagnostics) ? result.diagnostics : [], revision };
   }
   const diagnostics = await loadWorkspaceDiagnostics();
   return { payload: await loadRequestStore(), diagnostics };

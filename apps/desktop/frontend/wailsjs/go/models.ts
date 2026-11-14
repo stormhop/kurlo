@@ -734,6 +734,7 @@ export namespace api {
 	export class WorkspaceLoadResult {
 	    payload: string;
 	    diagnostics: WorkspaceDiagnostic[];
+	    revision?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceLoadResult(source);
@@ -743,6 +744,7 @@ export namespace api {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.payload = source["payload"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], WorkspaceDiagnostic);
+	        this.revision = source["revision"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

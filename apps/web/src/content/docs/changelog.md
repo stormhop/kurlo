@@ -16,7 +16,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 - **One loader everywhere**: every wait in the app — responses, gRPC and MCP calls, diffs, history, cookies, examples, the mock server, model lists, settings checks and the Cancel button — shows the flying Kurlo bird instead of spinners and *Loading…* captions.
 - **Claude Code models stay current**: models, the default and effort levels come from your installed CLI. Kurlo keeps the last successful list for temporary failures and preserves the model in existing chats.
-- **Saving an edit writes only what changed**: Kurlo sends and rewrites just the edited requests, so an autosave in a workspace with 1,300 requests takes about 20 ms instead of 280 ms. Structural changes and files edited outside Kurlo still use the full save.
+- **Saving an edit writes only what changed**: from the first edit after opening, Kurlo sends and rewrites just the edited requests, so an autosave in a workspace with 1,300 requests takes about 20 ms instead of 280 ms. Structural changes and files edited outside Kurlo still use the full save.
 - **Large workspaces open and save faster**: examples are read in the background after a workspace opens, so a 1,300-request workspace opens in about 190 ms instead of 430 ms; the full save takes about 170 ms instead of 290 ms, and typing no longer rebuilds the sidebar.
 - **Git status after a save checks only the saved files**, without refreshing the branch list on every edit.
 - **File changes are noticed through the system**: FSEvents, `ReadDirectoryChangesW` and inotify replace the scan every second, which remains only as a fallback.

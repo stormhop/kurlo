@@ -353,9 +353,10 @@ export const requestPersistenceFeature = {
     }
   },
 
-  rememberLoadedRequestStore(this: RequestPersistenceHost) {
+  rememberLoadedRequestStore(this: RequestPersistenceHost, revision?: number) {
     const payload = this.requestStorePayload(this.requestsForStore(this.requests));
     queuedStorePayloads.set(this, { ...storeSnapshot(payload, this.requestStorePersistEpoch), result: Promise.resolve(true) });
+    confirmStore(this, this.requestStorePersistEpoch, revision, payload);
   },
 
   async writeRequestStoreView(

@@ -270,6 +270,7 @@ func (a *App) SaveFileDialog(defaultName string, content string) string {
 type WorkspaceLoadResult struct {
 	Payload     string                `json:"payload"`
 	Diagnostics []WorkspaceDiagnostic `json:"diagnostics"`
+	Revision    int64                 `json:"revision,omitempty"`
 }
 
 func (a *App) LoadRequestStore() string {
@@ -287,7 +288,7 @@ func (a *App) LoadWorkspace() WorkspaceLoadResult {
 }
 
 func (a *App) loadWorkspaceLocked(root string) WorkspaceLoadResult {
-	payload, diagnostics, err := loadKurloStorePayloadRemembering(requestStorePath(), root, func() { a.emitWorkspaceChanged(workspaceExternalChangeNote) })
+	payload, diagnostics, revision, err := loadKurloStoreRemembering(requestStorePath(), root, func() { a.emitWorkspaceChanged(workspaceExternalChangeNote) })
 	if diagnostics == nil {
 		diagnostics = []WorkspaceDiagnostic{}
 	}
@@ -299,9 +300,9 @@ func (a *App) loadWorkspaceLocked(root string) WorkspaceLoadResult {
 	if err != nil {
 		return WorkspaceLoadResult{Diagnostics: diagnostics}
 	}
-	revision := profileGlobalsRevision(payload)
-	a.globalsRevision.Store(&revision)
-	return WorkspaceLoadResult{Payload: payload, Diagnostics: diagnostics}
+	globals := profileGlobalsRevision(payload)
+	a.globalsRevision.Store(&globals)
+	return WorkspaceLoadResult{Payload: payload, Diagnostics: diagnostics, Revision: revision}
 }
 
 func (a *App) LoadWorkspaceDiagnostics() []WorkspaceDiagnostic {

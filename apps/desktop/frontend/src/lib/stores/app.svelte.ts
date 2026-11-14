@@ -1771,7 +1771,7 @@ class AppVM {
       this.applySavedRequest(active);
       this.requestStoreLoaded = true;
     }
-    if (!requestStoreReadFailed) this.rememberLoadedRequestStore();
+    if (!requestStoreReadFailed) this.rememberLoadedRequestStore(loaded?.revision);
     const launchTopView = launching ? startupTopView(this.startupView, { workspaceBlocked: this.workspaceBlocked, hasActiveRequest: Boolean(this.activeRequestId) }) : null;
     if (launchTopView) {
       if (savedTopViewState?.sidebarView) this.sidebarView = savedTopViewState.sidebarView;

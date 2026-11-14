@@ -46,10 +46,20 @@ func canonicalJSON(value any) string {
 	return string(encoded)
 }
 
+func workspacesOnDisk(value any) string {
+	return canonicalJSON(sanitizeWorkspacesForFilesystem(mapSlice(value)))
+}
+
+func collectionsOnDisk(value any) string {
+	secrets := map[string]string{}
+	collections := sanitizeCollectionsForFilesystem(mapSlice(value), map[string]string{}, secrets)
+	return canonicalJSON([]any{collections, secrets})
+}
+
 func storeShapeFromPayload(store map[string]any) *storeSaveShape {
 	shape := &storeSaveShape{
-		workspaces:   canonicalJSON(store["workspaces"]),
-		collections:  canonicalJSON(store["collections"]),
+		workspaces:   workspacesOnDisk(store["workspaces"]),
+		collections:  collectionsOnDisk(store["collections"]),
 		requests:     map[string]storeRequestShape{},
 		environments: map[string]storeEnvironmentShape{},
 	}
@@ -78,12 +88,14 @@ func sameStringList(left, right []string) bool {
 	return true
 }
 
-func (t *workspaceDiskTracker) rememberSavedShape(root string, shape *storeSaveShape) {
+func (t *workspaceDiskTracker) rememberSavedShape(root string, shape *storeSaveShape) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if sameWorkspaceRoot(t.root, root) && t.known != nil && t.savedSegments != nil {
 		t.savedShape = shape
+		return true
 	}
+	return false
 }
 
 func (t *workspaceDiskTracker) forgetSavedShape() {
@@ -189,7 +201,7 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, []string, error) {
 	}
 	store := delta.Store
 	delete(store, "requests")
-	if canonicalJSON(store["workspaces"]) != disk.shape.workspaces || canonicalJSON(store["collections"]) != disk.shape.collections {
+	if workspacesOnDisk(store["workspaces"]) != disk.shape.workspaces || collectionsOnDisk(store["collections"]) != disk.shape.collections {
 		return 0, nil, errStoreDeltaStale
 	}
 	if !sameStringList(delta.RequestIDs, disk.shape.requestOrder) {
@@ -204,8 +216,8 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, []string, error) {
 	if err := validateWorkspaceStorePayload(map[string]any{"workspaces": store["workspaces"], "collections": store["collections"], "requests": anySlice(delta.Requests), "environments": store["environments"]}); err != nil {
 		return 0, nil, err
 	}
-	examples, ok := loadedRequestExamples.snapshot(root)
-	if !ok {
+	examples, ok, err := loadedRequestExamples.await(root)
+	if err != nil || !ok {
 		return 0, nil, errStoreDeltaStale
 	}
 	seen := map[string]bool{}

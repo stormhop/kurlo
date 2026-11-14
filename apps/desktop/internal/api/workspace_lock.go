@@ -91,9 +91,14 @@ func loadKurloStorePayloadLocked(localStorePath, root string) (string, []Workspa
 }
 
 func loadKurloStorePayloadRemembering(localStorePath, root string, examplesBroken func()) (string, []WorkspaceDiagnostic, error) {
+	payload, diagnostics, _, err := loadKurloStoreRemembering(localStorePath, root, examplesBroken)
+	return payload, diagnostics, err
+}
+
+func loadKurloStoreRemembering(localStorePath, root string, examplesBroken func()) (string, []WorkspaceDiagnostic, int64, error) {
 	unlock, err := lockWorkspaceWrites(root)
 	if err != nil {
-		return "", nil, err
+		return "", nil, 0, err
 	}
 	defer unlock()
 	var deferred *deferredRequestExamples
@@ -101,14 +106,20 @@ func loadKurloStorePayloadRemembering(localStorePath, root string, examplesBroke
 		deferred = &deferredRequestExamples{}
 	}
 	store, diagnostics, err := loadKurloStoreDeferring(localStorePath, root, deferred)
+	var revision int64
 	if hasYAMLWorkspaceStore(root) {
 		workspaceDisk.remember(root)
 		if err == nil && len(diagnostics) == 0 {
 			workspaceDisk.rememberSavedSegments(root, diskItemSegments(mapSlice(store["workspaces"]), mapSlice(store["collections"]), mapSlice(store["requests"]), mapSlice(store["environments"])))
+			shape := storeShapeFromPayload(store)
+			shape.revision = storeSaveRevision.Add(1)
+			if workspaceDisk.rememberSavedShape(root, shape) {
+				revision = shape.revision
+			}
 		}
 	}
 	if err != nil {
-		return "", diagnostics, err
+		return "", diagnostics, 0, err
 	}
 	if deferred != nil {
 		loadedRequestExamples.loadLater(root, deferred, examplesBroken)
@@ -120,7 +131,7 @@ func loadKurloStorePayloadRemembering(localStorePath, root string, examplesBroke
 	}
 	payload, err := json.Marshal(store)
 	if err != nil {
-		return "", diagnostics, err
+		return "", diagnostics, 0, err
 	}
-	return string(payload), diagnostics, nil
+	return string(payload), diagnostics, revision, nil
 }
