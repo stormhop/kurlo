@@ -34,6 +34,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Git paths with spaces**: such files show without quotes in the Git panel and their diffs open.
 - **No macOS suggestions in text fields**: filters and search boxes no longer show autocorrect or autocomplete pop-ups.
 - **Settings open at once**: settings and search are prepared in the background after start-up.
+- **Straight selection edge in editors**: a multi-line selection starts at the text column on every line instead of stepping out into the indent.
 
 ## 3.1.0
 

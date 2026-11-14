@@ -76,12 +76,12 @@
       height: fillHeight ? '100%' : 'auto',
     },
     '.cm-content': {
-      padding: compact ? 'var(--space-2) 0' : 'var(--space-2-5) 0',
+      padding: compact ? 'var(--space-2) 0 var(--space-2) var(--space-3)' : 'var(--space-2-5) 0 var(--space-2-5) var(--space-3)',
       caretColor: 'var(--accent)',
       minHeight: fillHeight ? '100%' : minHeight,
     },
     '.cm-line': {
-      padding: '0 var(--space-3)',
+      padding: '0 var(--space-3) 0 0',
       minHeight: compact ? '1.42em' : '1.65em',
     },
     '.cm-scroller': {
@@ -95,6 +95,7 @@
     },
     '.cm-activeLine': {
       backgroundColor: 'color-mix(in srgb, var(--text) 4%, transparent)',
+      boxShadow: 'calc(-1 * var(--space-3)) 0 0 0 color-mix(in srgb, var(--text) 4%, transparent)',
     },
     '.cm-activeLineGutter': {
       backgroundColor: 'color-mix(in srgb, var(--text) 5%, transparent)',

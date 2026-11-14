@@ -29,6 +29,7 @@ All notable changes to Kurlo are documented here. This project follows
 - **No macOS suggestions in text fields.** Filters, search boxes and other fields no longer show autocorrect, autocomplete or capitalisation pop-ups while you type.
 - **Settings open at once.** Settings and search are prepared in the background after start-up, so the first open no longer waits.
 - **Git paths with spaces.** Files whose path contains spaces or other characters Git quotes now show without quotes in the Git panel, so their diffs open and Kurlo recognises its own files among them.
+- **Straight selection edge in editors.** Selecting several lines in a request body, response or script no longer highlights the indent before the text on every line after the first, so the selection starts at the same column on every line.
 
 ## [3.1.0] - 2026-11-13
 
