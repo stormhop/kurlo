@@ -430,22 +430,48 @@ test('keeps the first visible mock route in place when the sidebar slides away a
   });
   const before = await firstVisible();
   expect(await list.locator('.mock-row-warning').first().evaluate(node => node.getClientRects().length)).toBeGreaterThan(0);
-  const slide = () => list.evaluate((node, key) => new Promise<Array<number | null>>((resolve) => {
-    const offsets: Array<number | null> = [];
+  const slide = () => list.evaluate((node, anchor) => new Promise<{ frames: number; shifts: Array<number | null> }>((resolve) => {
+    const row = [...node.querySelectorAll<HTMLElement>('.mock-row')].find(item => `${item.querySelector('.mock-path')!.textContent} ${item.querySelector('.status-badge')!.textContent}` === anchor.key)!;
+    const position = row.style.position;
+    row.style.position = 'relative';
+    const marker = document.createElement('span');
+    marker.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none';
+    row.append(marker);
+    const shifts: Array<number | null> = [];
+    let observer: IntersectionObserver | undefined;
+    let height = -1;
+    const observe = () => {
+      if (height === node.clientHeight) return;
+      height = node.clientHeight;
+      observer?.disconnect();
+      observer = new IntersectionObserver(entries => {
+        for (const entry of entries) {
+          if (entry.intersectionRatio < 1) shifts.push(entry.rootBounds ? Math.round(entry.boundingClientRect.top - entry.rootBounds.top - 2.5) : null);
+        }
+      }, { root: node, rootMargin: `${2.5 - anchor.offset}px 0px ${anchor.offset + 3.5 - height}px 0px`, threshold: 1 });
+      observer.observe(marker);
+    };
+    observe();
+    const resize = new ResizeObserver(observe);
+    resize.observe(node);
     const started = performance.now();
+    let frames = 0;
     const sample = () => {
-      const top = node.getBoundingClientRect().top;
-      const row = [...node.querySelectorAll<HTMLElement>('.mock-row')].find(item => `${item.querySelector('.mock-path')!.textContent} ${item.querySelector('.status-badge')!.textContent}` === key);
-      offsets.push(row ? Math.round(row.getBoundingClientRect().top - top) : null);
-      if (performance.now() - started > 1500) resolve(offsets);
-      else requestAnimationFrame(() => setTimeout(sample, 0));
+      frames++;
+      if (performance.now() - started > 1500) {
+        observer?.disconnect();
+        resize.disconnect();
+        marker.remove();
+        row.style.position = position;
+        resolve({ frames, shifts });
+      } else requestAnimationFrame(sample);
     };
     document.querySelector<HTMLElement>('[aria-label="Toggle sidebar"]')!.click();
-    requestAnimationFrame(() => setTimeout(sample, 0));
-  }), before.key);
-  for (const offsets of [await slide(), await slide()]) {
-    expect(offsets.length).toBeGreaterThan(20);
-    expect(offsets.filter(offset => offset === null || Math.abs(offset - before.offset) > 2)).toEqual([]);
+    requestAnimationFrame(sample);
+  }), before);
+  for (const sample of [await slide(), await slide()]) {
+    expect(sample.frames).toBeGreaterThan(20);
+    expect(sample.shifts).toEqual([]);
   }
   expect(await firstVisible()).toEqual(before);
 });
