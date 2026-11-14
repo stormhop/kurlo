@@ -24,12 +24,12 @@ type saveJournal struct {
 	segments map[string]string
 }
 
-func (j *saveJournal) unchanged(path string, data []byte) bool {
+func (j *saveJournal) knownHash(path string) (string, bool) {
 	if j == nil || j.known == nil {
-		return false
+		return "", false
 	}
 	hash, ok := j.known[path]
-	return ok && hash == contentHash(data)
+	return hash, ok
 }
 
 func (j *saveJournal) knows(path string) bool {

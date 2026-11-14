@@ -175,6 +175,8 @@ func (t *workspaceDiskTracker) rememberStamps(root string, stamps workspaceSnaps
 	var previous workspaceSnapshot
 	if sameWorkspaceRoot(t.root, root) {
 		previous = t.known
+	} else {
+		resetWorkspaceYAMLMemo()
 	}
 	var snapshot workspaceSnapshot
 	var err error

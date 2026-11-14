@@ -298,7 +298,8 @@ test('loads saved examples only when a request or the mock server needs them', a
   let payload = await lastPayload();
   const sentOrders = payload.requests.find(req => req.id === 'orders')!;
   const sentUsers = payload.requests.find(req => req.id === 'users')!;
-  expect((sentOrders.examples as unknown[]).length).toBe(2);
+  expect('examples' in sentOrders).toBe(false);
+  expect(sentOrders.exampleCount).toBe(2);
   expect('examples' in sentUsers).toBe(false);
   expect(sentUsers.exampleCount).toBe(1);
   await expect.poll(() => page.evaluate(() => {

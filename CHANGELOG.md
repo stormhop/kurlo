@@ -28,6 +28,9 @@ All notable changes to Kurlo are documented here. This project follows
 - **Links without underlines.** Links, such as the example names in the mock server, change colour on hover instead of being underlined, like the rest of the app.
 - **No macOS suggestions in text fields.** Filters, search boxes and other fields no longer show autocorrect, autocomplete or capitalisation pop-ups while you type.
 - **Settings open at once.** Settings and search are prepared in the background after start-up, so the first open no longer waits.
+- **Saving a response as an example stays on its request.** If you opened another request while the saved examples were still loading, the response could be added to the newly opened request. Kurlo now leaves the example out and says so, and examples that finish loading after the workspace was reloaded are ignored instead of replacing the fresh ones.
+- **Editing a request with large examples stays light.** Changing the URL or body of a request no longer sends its unchanged examples to the backend on every save.
+- **Less memory after deleting requests.** Deleting a request, folder or collection, or discarding a draft, also frees the previous responses kept for comparison, and the backend no longer keeps a copy of every file it has written.
 - **Git paths with spaces.** Files whose path contains spaces or other characters Git quotes now show without quotes in the Git panel, so their diffs open and Kurlo recognises its own files among them.
 - **Straight selection edge in editors.** Selecting several lines in a request body, response or script no longer highlights the indent before the text on every line after the first, so the selection starts at the same column on every line.
 

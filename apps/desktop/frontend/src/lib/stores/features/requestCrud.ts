@@ -83,6 +83,8 @@ type RequestCrudHost = {
   savedRequestSnapshots: Map<string, SavedRequest>;
   sidebarSearch: string;
   responses: Map<string, HttpResponse>;
+  previousResponses: Map<string, HttpResponse>;
+  forgetRequestResponses: (ids: string[]) => void;
   topView: TopView;
   quitReviewInProgress: boolean;
   url: string;
@@ -504,6 +506,7 @@ export const requestCrudFeature = {
   discardDraftRequest(this: RequestCrudHost, id: string) {
     this.forgetDraft(id);
     this.requests = this.requests.filter(r => r.id !== id);
+    this.forgetRequestResponses([id]);
     this.draftRequestIds = new Set([...this.draftRequestIds].filter(did => did !== id));
     this.openRequestIds = this.openRequestIds.filter(oid => oid !== id);
     if (id === this.activeRequestId) {
@@ -646,6 +649,7 @@ export const requestCrudFeature = {
     if (isDraft && force) {
       this.forgetDraft(id);
       this.requests = this.requests.filter(r => r.id !== id);
+      this.forgetRequestResponses([id]);
       this.draftRequestIds = new Set([...this.draftRequestIds].filter(did => did !== id));
     } else if (isDraft) {
       if (id === this.activeRequestId) await this.persistActiveRequestNow();
@@ -657,6 +661,7 @@ export const requestCrudFeature = {
       }
       this.forgetDraft(id);
       this.requests = this.requests.filter(r => r.id !== id);
+      this.forgetRequestResponses([id]);
       this.draftRequestIds = new Set([...this.draftRequestIds].filter(did => did !== id));
     } else if (force && !this.autosave) {
       await this.discardRequestChanges(id);
@@ -835,6 +840,19 @@ export const requestCrudFeature = {
     await this.persistRequestStore(this.requests, copy.id, this.openRequestIds);
   },
 
+  forgetRequestResponses(this: RequestCrudHost, ids: string[]) {
+    const gone = new Set(ids);
+    if (!gone.size) return;
+    const keep = <V>(map: Map<string, V>) => [...map.keys()].some(id => gone.has(id)) ? new Map([...map].filter(([id]) => !gone.has(id))) : map;
+    this.responses = keep(this.responses);
+    this.previousResponses = keep(this.previousResponses);
+    this.responseTabs = keep(this.responseTabs);
+    this.grpcResponses = keep(this.grpcResponses);
+    this.mcpResponses = keep(this.mcpResponses);
+    this.grpcResponseTabs = keep(this.grpcResponseTabs);
+    this.aiConversations = keep(this.aiConversations);
+  },
+
   async deleteRequest(this: RequestCrudHost, id: string) {
     if (!this.guardWorkspaceWritable('Deleting requests')) return;
     const req = this.requestsById.get(id);
@@ -852,12 +870,7 @@ export const requestCrudFeature = {
     this.requests = this.requests.filter(r => r.id !== id);
     this.openRequestIds = this.openRequestIds.filter(oid => oid !== id);
     this.disposeRealtimeSession(id);
-    this.responses = new Map([...this.responses].filter(([requestId]) => requestId !== id));
-    this.responseTabs = new Map([...this.responseTabs].filter(([requestId]) => requestId !== id));
-    this.grpcResponses = new Map([...this.grpcResponses].filter(([requestId]) => requestId !== id));
-    this.mcpResponses = new Map([...this.mcpResponses].filter(([requestId]) => requestId !== id));
-    this.grpcResponseTabs = new Map([...this.grpcResponseTabs].filter(([requestId]) => requestId !== id));
-    this.aiConversations = new Map([...this.aiConversations].filter(([requestId]) => requestId !== id));
+    this.forgetRequestResponses([id]);
     if (id === this.activeRequestId) {
       const next = this.requests.find(r => this.openRequestIds.includes(r.id)) ?? this.requests[0];
       if (next) {

@@ -794,6 +794,7 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 			return nil, err
 		}
 		children[filepath.Dir(path)]--
+		forgetWorkspaceYAML(path)
 		if rel, err := filepath.Rel(root, path); err == nil {
 			delete(stamps, filepath.ToSlash(rel))
 		}
@@ -2063,11 +2064,11 @@ func writeCanonicalYAMLFile(path string, value any, journal *saveJournal, canoni
 			return err
 		}
 	}
-	data, err := marshalWorkspaceYAMLFor(path, value)
+	data, unchanged, err := workspaceYAMLForWrite(path, value, journal)
 	if err != nil {
 		return err
 	}
-	if journal.unchanged(path, data) {
+	if unchanged {
 		return nil
 	}
 	if info, err := os.Lstat(path); err == nil {

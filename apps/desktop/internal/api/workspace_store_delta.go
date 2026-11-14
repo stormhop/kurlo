@@ -348,11 +348,11 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, []string, error) {
 	}
 	var writes []storeDeltaWrite
 	for _, candidate := range candidates {
-		data, err := marshalWorkspaceYAMLFor(candidate.path, candidate.value)
+		_, unchanged, err := workspaceYAMLForWrite(candidate.path, candidate.value, journal)
 		if err != nil {
 			return 0, nil, err
 		}
-		if journal.unchanged(candidate.path, data) {
+		if unchanged {
 			continue
 		}
 		stamp, tracked := disk.known[candidate.rel]

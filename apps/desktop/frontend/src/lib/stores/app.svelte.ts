@@ -63,7 +63,7 @@ import { grpcFeature } from './features/grpc';
 import { mcpFeature } from './features/mcp';
 import { aiFeature, type AiModelsProblem, type AiTurn } from './features/ai';
 import { importExportFeature } from './features/importExport';
-import { examplesFeature } from './features/examples';
+import { examplesFeature, forgetLoadingExamples } from './features/examples';
 import { requestBodyFeature } from './features/requestBody';
 import { requestCrudFeature } from './features/requestCrud';
 import { requestDirtyFeature } from './features/requestDirty';
@@ -608,6 +608,7 @@ class AppVM {
   declare renameRequest: typeof requestCrudFeature.renameRequest;
   declare duplicateRequest: typeof requestCrudFeature.duplicateRequest;
   declare deleteRequest: typeof requestCrudFeature.deleteRequest;
+  declare forgetRequestResponses: typeof requestCrudFeature.forgetRequestResponses;
   declare toggleRequestPinned: typeof requestCrudFeature.toggleRequestPinned;
   declare copyActiveRequestItem: typeof requestCrudFeature.copyActiveRequestItem;
   declare pasteCopiedRequestItem: typeof requestCrudFeature.pasteCopiedRequestItem;
@@ -1179,6 +1180,7 @@ class AppVM {
   scriptEngine = $state<ScriptEngine>('js');
   requestNotes = $state('');
   requestExamples = $state<RequestExample[]>([]);
+  requestExamplesSource: { view: RequestExample[]; source: RequestExample[] } | null = null;
   requestExamplesLoaded = $state(true);
   selectedExampleId = $state('');
 
@@ -1678,6 +1680,7 @@ class AppVM {
   }
 
   async loadRequestWorkspace(rawOverride?: string, diagnosticsOverride?: WorkspaceDiagnostic[]) {
+    forgetLoadingExamples(this);
     let lReqs: SavedRequest[] = [], lWs: Workspace[] = [], lCols: Collection[] = [], lEnvs: Environment[] = [];
     let lActiveId = '', lWsId = '', lEnvId = '', lOpenIds: string[] = [], lFolderCollapsed: Record<string, boolean> = {}, lStarredIds: string[] = [], lHistory: RequestHistoryEntry[] = [];
     let lCollectionRuns: Record<string, CollectionRunRecord> = {};

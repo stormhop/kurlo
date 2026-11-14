@@ -48,6 +48,7 @@ type CollectionHost = {
   diagnosticsForCollection: (collectionId: string) => WorkspaceDiagnostic[];
   diagnosticsForRequest: (requestId: string) => WorkspaceDiagnostic[];
   disposeRealtimeSession: (id: string) => void;
+  forgetRequestResponses: (ids: string[]) => void;
   folderCollapseKey: (collectionId: string, path: string[]) => string;
   folderDisplayName: (path: string[]) => string;
   guardWorkspaceWritable: (action?: string) => boolean;
@@ -287,6 +288,7 @@ export const collectionFeature = {
     this.requests = this.requests.filter(request => request.collectionId !== collectionId);
     if (this.activeCollectionSettingsId === collectionId) this.closeCollectionSettingsTab();
     for (const requestId of requestIds) this.disposeRealtimeSession(requestId);
+    this.forgetRequestResponses(requestIds);
     this.openRequestIds = this.openRequestIds.filter(id => !requestIds.includes(id));
     if (requestIds.includes(this.activeRequestId)) {
       const workspaceCollectionIds = this.collections.filter(candidate => candidate.workspaceId === collection.workspaceId).map(candidate => candidate.id);

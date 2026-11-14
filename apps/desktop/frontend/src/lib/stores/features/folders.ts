@@ -27,6 +27,7 @@ type FolderHost = {
   blankSavedRequest: (collectionId?: string, requestType?: RequestType) => SavedRequest;
   closeFloatingMenus: () => void;
   disposeRealtimeSession: (id: string) => void;
+  forgetRequestResponses: (ids: string[]) => void;
   guardWorkspaceWritable: (action?: string) => boolean;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
@@ -168,6 +169,7 @@ export const folderFeature = {
       this.closeCollectionSettingsTab();
     }
     for (const requestId of removed) this.disposeRealtimeSession(requestId);
+    this.forgetRequestResponses(removed);
     if (removed.includes(this.activeRequestId)) {
       const fallback = this.requests.find(request => !request.isDraft);
       if (fallback) {

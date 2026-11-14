@@ -55,6 +55,14 @@ import {
   type JwtFields,
 } from '../../utils';
 
+function examplesForSnapshot(host: RequestStateHost): RequestExample[] {
+  const tracked = host.requestExamplesSource;
+  if (tracked && tracked.view === host.requestExamples) return tracked.source;
+  const source = host.requestExamples.map(cloneRequestExample);
+  host.requestExamplesSource = { view: host.requestExamples, source };
+  return source;
+}
+
 type RequestStateHost = {
   draftTargets?: Map<string, { collectionId: string; folderPath: string[] }>;
   activeRequestId: string;
@@ -152,6 +160,7 @@ type RequestStateHost = {
   requestNameAuto: boolean;
   requestNotes: string;
   requestExamples: RequestExample[];
+  requestExamplesSource: { view: RequestExample[]; source: RequestExample[] } | null;
   requestExamplesLoaded: boolean;
   ensureRequestExamples: (ids: string[]) => Promise<void>;
   selectedExampleId: string;
@@ -298,7 +307,7 @@ export const requestStateFeature = {
       preRequestScriptJs: this.preRequestScriptJs, testScriptJs: this.testScriptJs,
       requestNotes: this.requestNotes,
       ...(this.requestExamplesLoaded
-        ? { examples: this.requestExamples.map(cloneRequestExample) }
+        ? { examples: examplesForSnapshot(this) }
         : existing?.exampleCount ? { exampleCount: existing.exampleCount } : {}),
       settings: this.currentRequestSettings(),
       settingsOverrides: this.currentRequestSettingsOverrides(),
@@ -485,6 +494,7 @@ export const requestStateFeature = {
     this.requestNotes = req.requestNotes ?? '';
     const examplesPending = requestExamplesPending(req);
     this.requestExamples = examplesPending ? [] : (req.examples ?? []).map(cloneRequestExample);
+    this.requestExamplesSource = !examplesPending && req.examples ? { view: this.requestExamples, source: req.examples } : null;
     this.requestExamplesLoaded = !examplesPending;
     this.selectedExampleId = this.requestExamples[0]?.id ?? '';
     if (examplesPending) void this.ensureRequestExamples([req.id]);

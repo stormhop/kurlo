@@ -13,6 +13,7 @@ type ExamplesHost = {
   ensureCollectionExamples: (collectionId: string) => Promise<void>;
   ensureAllRequestExamples: () => Promise<void>;
   requestExamples: RequestExample[];
+  requestExamplesSource: { view: RequestExample[]; source: RequestExample[] } | null;
   selectedExampleId: string;
   requestTab: RequestTab;
   response: HttpResponse | null;
@@ -41,6 +42,12 @@ const EXAMPLE_TOAST_MS = 2200;
 const EXAMPLE_WARNING_TOAST_MS = 5000;
 
 const examplesInFlight = new WeakMap<object, Map<string, Promise<void>>>();
+const exampleLoadGenerations = new WeakMap<object, number>();
+
+export function forgetLoadingExamples(host: object) {
+  exampleLoadGenerations.set(host, (exampleLoadGenerations.get(host) ?? 0) + 1);
+  examplesInFlight.delete(host);
+}
 
 function withLoadedExamples(req: SavedRequest, examples: RequestExample[]): SavedRequest {
   const next: SavedRequest = { ...req, examples: examples.map(cloneRequestExample) };
@@ -79,19 +86,23 @@ export const examplesFeature = {
       else if (requestExamplesPending(this.requests.find(req => req.id === id))) pending.push(id);
     }
     if (pending.length) {
+      const generation = exampleLoadGenerations.get(this) ?? 0;
       const job = (async () => {
         const loaded = await loadRequestExamples(pending);
+        if ((exampleLoadGenerations.get(this) ?? 0) !== generation) return;
         const byId = new Map<string, RequestExample[]>();
         for (const id of pending) {
           if (!Object.prototype.hasOwnProperty.call(loaded, id)) continue;
           byId.set(id, normalizeRequestExamples(loaded[id], id) ?? []);
         }
         if (!byId.size) return;
+        const stored = new Map<string, RequestExample[]>();
         this.requests = this.requests.map(req => {
           const examples = byId.get(req.id);
           if (!examples || !requestExamplesPending(req)) return req;
           const loadedRequest = withLoadedExamples(req, examples);
           markExamplesOnDisk(loadedRequest.examples);
+          if (loadedRequest.examples) stored.set(req.id, loadedRequest.examples);
           return loadedRequest;
         });
         const saved = new Map(this.savedRequestSnapshots);
@@ -105,14 +116,17 @@ export const examplesFeature = {
         const active = byId.get(this.activeRequestId);
         if (active && !this.requestExamplesLoaded) {
           this.requestExamples = active.map(cloneRequestExample);
+          const source = stored.get(this.activeRequestId);
+          this.requestExamplesSource = source ? { view: this.requestExamples, source } : null;
           if (!this.requestExamples.some(example => example.id === this.selectedExampleId)) this.selectedExampleId = this.requestExamples[0]?.id ?? '';
           this.requestExamplesLoaded = true;
         }
       })();
       for (const id of pending) inFlight.set(id, job);
       waiting.push(job);
+      const running = inFlight;
       void job.finally(() => {
-        for (const id of pending) if (inFlight!.get(id) === job) inFlight!.delete(id);
+        for (const id of pending) if (running.get(id) === job) running.delete(id);
       }).catch(() => {});
     }
     await Promise.all(waiting);
@@ -136,10 +150,15 @@ export const examplesFeature = {
   },
 
   async addCapturedExample(this: ExamplesHost, example: RequestExample) {
-    if (!this.requestExamplesLoaded) await this.ensureRequestExamples([this.activeRequestId]);
+    const requestId = this.activeRequestId;
+    if (!this.requestExamplesLoaded) await this.ensureRequestExamples([requestId]);
+    if (this.activeRequestId !== requestId) {
+      showExampleToast(this, 'The example was not saved because another request was opened — open the request and save it again', EXAMPLE_WARNING_TOAST_MS);
+      return;
+    }
     if (!this.requestExamplesLoaded) return;
     const captured = cloneRequestExample(example);
-    captured.requestId = this.snapshotActiveRequest().id;
+    captured.requestId = requestId;
     captured.name = uniqueExampleName(this.requestExamples, captured.name || String(captured.response.statusCode));
 
     this.requestExamples = [...this.requestExamples, captured];

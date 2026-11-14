@@ -31,6 +31,9 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Long lists scroll the same way everywhere**: the collection runner has no page buttons any more, and agent activity loads older calls as you scroll; its search and summary cover the whole log.
 - **Chats and Git history load more as you scroll**: a long agent chat loads earlier messages as you scroll up instead of through a button, and Git history loads 100 older commits at a time.
 - **Links without underlines**: links change colour on hover instead of being underlined.
+- **Saving a response as an example stays on its request**, even if you open another request while examples are loading.
+- **Editing a request with large examples stays light**: unchanged examples are no longer resent on every save.
+- **Less memory after deleting requests**: previous responses of deleted requests are freed.
 - **Git paths with spaces**: such files show without quotes in the Git panel and their diffs open.
 - **No macOS suggestions in text fields**: filters and search boxes no longer show autocorrect or autocomplete pop-ups.
 - **Settings open at once**: settings and search are prepared in the background after start-up.
