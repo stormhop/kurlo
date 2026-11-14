@@ -101,6 +101,8 @@
     } catch {  }
   });
 
+  const LAZY_WARM_DELAY_MS = 2500;
+
   async function loadChangelog(): Promise<string> {
     return (await import('virtual:kurlo-changelog')).default;
   }
@@ -408,6 +410,10 @@
     vm.initCookieSyncListeners();
     vm.initLoadRunListeners();
     void vm.refreshMockServerStatus();
+    const warmLazyTimer = setTimeout(() => {
+      void lazy.loadSettingsModal();
+      void lazy.loadGlobalSearchModal();
+    }, LAZY_WARM_DELAY_MS);
     const beforeUnload = (event: BeforeUnloadEvent) => {
       vm.flushPendingPersist();
       if (!vm.hasUnsavedDrafts() && !vm.hasUnsavedRequestChanges()) return;
@@ -506,6 +512,7 @@
 
     return () => {
       destroyed = true;
+      clearTimeout(warmLazyTimer);
       if (updateCheckTimer !== null) {
         clearTimeout(updateCheckTimer);
         updateCheckTimer = null;

@@ -33,6 +33,18 @@
   let diagnosticsError = $state('');
   let logFolderError = $state('');
   let diagnosticsCopyTimer: ReturnType<typeof setTimeout> | null = null;
+  let releaseNotesTruncated = $state(false);
+
+  function measureReleaseNotes(node: HTMLDivElement) {
+    const measure = () => {
+      releaseNotesTruncated = node.scrollHeight > node.clientHeight;
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    if (node.firstElementChild) observer.observe(node.firstElementChild);
+    measure();
+    return { destroy: () => observer.disconnect() };
+  }
 
   async function copyDiagnostics() {
     diagnosticsError = '';
@@ -1105,7 +1117,21 @@
             {#if cleanReleaseNotes(updateInfo.releaseNotes)}
               <div class="updates-notes">
                 <p class="settings-group-label">What's new in {updateInfo.version}</p>
-                <ReleaseNotes body={cleanReleaseNotes(updateInfo.releaseNotes)} />
+                <div class="updates-notes-preview" use:measureReleaseNotes>
+                  <ReleaseNotes body={cleanReleaseNotes(updateInfo.releaseNotes)} />
+                </div>
+                {#if releaseNotesTruncated}
+                  <a
+                    class="updates-notes-link"
+                    href="https://kurlo.dev/changelog/"
+                    onclick={(event) => { event.preventDefault(); openExternalURL('https://kurlo.dev/changelog/'); }}
+                  >
+                    Read the full changelog
+                    <svg width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                      <path d="M3 7l4-4M4 3h3v3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </a>
+                {/if}
               </div>
             {/if}
           {/if}
@@ -1159,6 +1185,26 @@
     width: 100%;
     max-width: 26.25rem;
     margin-top: var(--space-5);
+    flex-shrink: 0;
+  }
+
+  .updates-notes-preview {
+    max-height: calc(var(--text-body) * var(--leading-normal) * 10);
+    overflow: hidden;
+  }
+
+  .updates-notes-link {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--space-1-5);
+    color: var(--accent-text);
+    font-size: var(--text-body);
+    text-decoration: none;
+  }
+
+  .updates-notes-link:hover {
+    color: var(--accent-hover);
   }
 
   .about-item-copy .updates-error-text {

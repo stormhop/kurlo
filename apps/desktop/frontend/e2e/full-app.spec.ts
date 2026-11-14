@@ -32,6 +32,7 @@ const stepPauseMs = Number.parseInt(process.env.KURLO_E2E_STEP_PAUSE_MS ?? '0', 
 const responseScreenshotPath = process.env.KURLO_E2E_RESPONSE_SCREENSHOT ?? '';
 const docsScreenshotDir = process.env.KURLO_DOCS_SCREENSHOT_DIR ?? '';
 const readmeScreenshotPath = process.env.KURLO_README_SCREENSHOT ?? '';
+const aboutScreenshotDir = process.env.KURLO_ABOUT_SCREENSHOT_DIR ?? '';
 
 const DOCS_VIEWPORT = { width: 1200, height: 780 };
 const DOCS_CROP_PADDING = 26;
@@ -7832,7 +7833,8 @@ test.describe('README screenshot', () => {
 });
 
 test.describe('Update release notes', () => {
-  test('long notes scroll under the update status instead of squeezing it away', async ({ page }) => {
+  test('About limits long release notes to ten lines and opens the full website changelog', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 900 });
     await installKurloBridge(page);
     await page.addInitScript(() => {
       const app = (window as any).go.api.App;
@@ -7841,7 +7843,12 @@ test.describe('Update release notes', () => {
       app.CheckForUpdate = async () => ({
         info: {
           version: '2.3.0',
-          releaseNotes: ['### Added', ...Array.from({ length: 8 }, (_, i) => item(i)), '### Fixed', item(9)].join('\n'),
+          releaseNotes: ['### Added',
+            '- **OpenAPI sync.** Keep a collection in step with its spec. Review new, changed and removed endpoints before applying updates, while keeping your edits, scripts and tests.',
+            '- **Request variables.** Set variables before sending a request, or take values from the response to use in later requests.',
+            '- **JWT Bearer auth.** Sign a fresh token on every send with your own claims, secret or private key.',
+            '- **Assertions.** Check a response without code and see the results alongside your tests.',
+            ...Array.from({ length: 8 }, (_, i) => item(i)), '### Fixed', item(9)].join('\n'),
           publishedAt: '2026-10-14T10:00:00Z',
           downloadUrl: 'https://github.com/stormhop/kurlo/releases/download/v2.3.0/kurlo-darwin-universal.app.zip',
           assetName: 'kurlo-darwin-universal.app.zip',
@@ -7867,8 +7874,65 @@ test.describe('Update release notes', () => {
     expect(list?.height ?? 0).toBeGreaterThan(box?.height ?? 0);
     await about.getByRole('button', { name: 'Install', exact: true }).click({ trial: true });
 
-    const scrolls = await about.evaluate(element => element.scrollHeight > element.clientHeight);
-    expect(scrolls).toBe(true);
+    const preview = about.locator('.updates-notes-preview');
+    const link = about.getByRole('link', { name: 'Read the full changelog' });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute('href', 'https://kurlo.dev/changelog/');
+    const metrics = await preview.evaluate(element => ({
+      height: element.clientHeight,
+      contentHeight: element.scrollHeight,
+      lineHeight: Number.parseFloat(getComputedStyle(element.querySelector('li')!).lineHeight),
+      overflow: getComputedStyle(element).overflowY,
+    }));
+    expect(metrics.height).toBeLessThanOrEqual(Math.ceil(metrics.lineHeight * 10));
+    expect(metrics.contentHeight).toBeGreaterThan(metrics.height * 3);
+    expect(metrics.overflow).toBe('hidden');
+    expect(await about.evaluate(element => element.scrollHeight - element.clientHeight)).toBeLessThan(160);
+    await link.click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls)).toContain('open:https://kurlo.dev/changelog/');
+
+    if (aboutScreenshotDir) {
+      await waitForTransientToasts(page);
+      await link.scrollIntoViewIfNeeded();
+      await about.locator('.updates-notes').screenshot({ path: join(aboutScreenshotDir, 'about-changelog-preview.png'), animations: 'disabled' });
+      await page.locator('.settings-modal').screenshot({ path: join(aboutScreenshotDir, 'about-long-changelog.png'), animations: 'disabled' });
+      await page.screenshot({ path: join(aboutScreenshotDir, 'about-full-screen.png'), animations: 'disabled' });
+    }
+
+    await page.getByRole('tab', { name: 'Appearance', exact: true }).click();
+    await page.getByRole('tab', { name: 'About', exact: true }).click();
+    await expect(link).toBeVisible();
+    await page.setViewportSize({ width: 900, height: 650 });
+    await link.scrollIntoViewIfNeeded();
+    await expect(link).toBeInViewport();
+    await page.emulateMedia({ colorScheme: 'dark' });
+    if (aboutScreenshotDir) {
+      await page.locator('.settings-modal').screenshot({ path: join(aboutScreenshotDir, 'about-long-changelog-small-dark.png'), animations: 'disabled' });
+    }
+  });
+
+  test('About shows short release notes in full without a changelog link', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 900 });
+    await installKurloBridge(page);
+    await page.addInitScript(() => {
+      const app = (window as any).go.api.App;
+      app.AppInfo = async () => ({ name: 'Kurlo', version: '2.2.6', runtime: 'darwin/e2e', goVersion: 'e2e', packaged: false });
+      app.CheckForUpdate = async () => ({
+        info: { version: '2.3.0', releaseNotes: '### Fixed\n- Updates install cleanly.', publishedAt: '2026-10-14T10:00:00Z' },
+        error: '',
+      });
+    });
+    await page.goto('/');
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'About', exact: true }).click();
+    const about = page.locator('#settings-panel-about');
+    await expect(about.locator('.updates-notes-preview')).toHaveText('Fixed Updates install cleanly.');
+    await expect(about.getByRole('link', { name: 'Read the full changelog' })).toHaveCount(0);
+    expect(await about.locator('.updates-notes-preview').evaluate(element => element.scrollHeight === element.clientHeight)).toBe(true);
+    if (aboutScreenshotDir) {
+      await waitForTransientToasts(page);
+      await page.locator('.settings-modal').screenshot({ path: join(aboutScreenshotDir, 'about-short-changelog.png'), animations: 'disabled' });
+    }
   });
 
   test('About shows the bird perched on the wire in the night scene', async ({ page }) => {
@@ -13477,3 +13541,13 @@ test('slides the sidebar without restyling the rest of the window', async ({ pag
 });
 
 
+test('warms the settings and search dialogs after startup so the first open does not wait for them', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await expect(page.locator('.collection-list')).toBeVisible();
+  const loaded = () => page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => /\/(SettingsModal|GlobalSearchModal)-[^/]*\.js$/.test(name)).length);
+  expect(await loaded()).toBe(0);
+  await expect.poll(loaded, { timeout: 6000 }).toBe(2);
+  await page.getByLabel('Settings', { exact: true }).click();
+  await expect(page.locator('.settings-nav-list')).toBeVisible();
+});

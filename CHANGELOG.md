@@ -14,11 +14,13 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Compact release notes in About.** Long update notes show a preview of about ten lines with a link to the full website changelog, keeping Settings easy to scroll.
 - **Mock server with thousands of examples.** The mock server no longer pulls every saved response into the editor: the route list reads only methods, paths and statuses, and the server reads the responses from disk when it starts. The list draws only the rows on screen, so it opens quickly, scrolls without blank gaps and the sidebar slides smoothly beside it. Hiding or showing the sidebar keeps the route at the top of the list in place even when long warnings rewrap to the new width.
 - **The sidebar hides and shows at once.** Toggling the sidebar no longer restyles the whole window: in workspaces with hundreds of requests the slide starts without a pause, and the hidden sidebar keeps only the rows on screen until it comes back.
 - **Large workspaces stay responsive.** Saving a request no longer re-encodes or resends examples that are already on disk, and the request list is kept as plain data, so typing, saving and switching requests do not stall in workspaces with hundreds of requests and thousands of examples.
 - **Long lists scroll the same way everywhere.** The collection runner drops its page buttons: requests and results are continuous lists that draw only the rows on screen, like the sidebar and the mock server. Agent activity shows the newest 100 calls and loads older ones as you scroll, so the whole log is reachable; its search, client filter and seven-day summary cover every stored call, not only the loaded ones.
 - **Chats and Git history load more as you scroll.** A long agent chat loads earlier messages when you scroll up, without the *Load earlier messages* button, and fills a short first page up to the window by itself; the conversation can be focused with `Tab` and scrolled with the keyboard. Git history loads older commits 100 at a time, like agent activity.
+- **Settings open at once.** Settings and search are prepared in the background after start-up, so the first open no longer waits.
 
 ## [3.1.0] - 2026-11-13
 
