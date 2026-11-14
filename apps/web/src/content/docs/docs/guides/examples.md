@@ -45,7 +45,7 @@ A multi-line body is written as a YAML block, so a JSON body still diffs line by
 
 See the [Kurlo YAML format](/docs/reference/kurlo-yaml-format/) for the field-by-field reference.
 
-Kurlo reads every example when a workspace opens, so a broken example file is reported right away, but it hands an example to the editor only when you open its request, start the mock server or export the collection. A workspace with thousands of imported examples therefore opens about as fast as one without them; the **Examples** tab shows *Loading examples…* for the moment it takes the first time.
+Kurlo reads every example when a workspace opens, so a broken example file is reported right away, but it hands an example to the editor only when you open its request or export the collection. The mock server lists routes from their method, path and status alone and reads the responses from disk when it starts. A workspace with thousands of imported examples therefore opens about as fast as one without them; the **Examples** tab shows the flying Kurlo bird for the moment it takes the first time.
 
 ## Examples arrive with your imports
 

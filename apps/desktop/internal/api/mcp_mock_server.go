@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"mime"
-	"strings"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
@@ -44,28 +42,7 @@ func (s *mcpServer) toolStartMock(ctx context.Context, arguments json.RawMessage
 			continue
 		}
 		for _, example := range req.Examples {
-			resp := example.Response
-			route := model.MockRoute{
-				ExampleID: example.ID, ExampleName: example.Name, RequestID: req.ID, RequestName: mcpRequestLabel(req),
-				Method: defaultString(example.Snapshot.Method, defaultString(req.Method, "GET")), PathTemplate: defaultString(example.Match.PathTemplate, "/"),
-				StatusCode: resp.StatusCode, Status: resp.Status, Body: resp.Body, BodyMediaType: resp.BodyMediaType, DelayMs: resp.DurationMs,
-			}
-			if route.StatusCode == 0 {
-				route.StatusCode = 200
-			}
-			for _, key := range sortedKeys(example.Match.Query) {
-				route.Query = append(route.Query, model.KeyValue{Key: key, Value: example.Match.Query[key], Enabled: true})
-			}
-			for _, header := range resp.Headers {
-				if strings.TrimSpace(header.Key) == "" {
-					continue
-				}
-				route.Headers = append(route.Headers, model.KeyValue{Key: header.Key, Value: header.Value, Enabled: true})
-				if resp.BodyMediaType == "" && strings.EqualFold(header.Key, "Content-Type") {
-					route.BodyMediaType, _, _ = mime.ParseMediaType(header.Value)
-				}
-			}
-			config.Routes = append(config.Routes, route)
+			config.Routes = append(config.Routes, mockRouteFromExample(req.ID, mcpRequestLabel(req), req.Method, example))
 		}
 	}
 	if err := ctx.Err(); err != nil {

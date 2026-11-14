@@ -288,6 +288,7 @@ class AppVM {
   agentTabOpen = $state(false);
   agentReturnSidebar: Exclude<SidebarView, 'agent'> = 'collections';
   mockServerRunningSignature = $state('');
+  mockRoutesVersion = $state(0);
   mockServerReloadTimer: ReturnType<typeof setTimeout> | null = null;
   declare setOpenApiStatus: typeof openApiSyncFeature.setOpenApiStatus;
   declare openApiStatus: typeof openApiSyncFeature.openApiStatus;
@@ -312,7 +313,8 @@ class AppVM {
   declare openOpenApiSettings: typeof openApiSyncFeature.openOpenApiSettings;
   declare mockServerTargetCollectionId: typeof mockServerFeature.mockServerTargetCollectionId;
   declare mockServerRoutes: typeof mockServerFeature.mockServerRoutes;
-  declare mockServerRunningRoutes: typeof mockServerFeature.mockServerRunningRoutes;
+  declare mockServerLiveSignature: typeof mockServerFeature.mockServerLiveSignature;
+  declare mockServerRoutesPending: typeof mockServerFeature.mockServerRoutesPending;
   declare scheduleMockServerReload: typeof mockServerFeature.scheduleMockServerReload;
   declare mockServerRouteCount: typeof mockServerFeature.mockServerRouteCount;
   declare mockServerCollectionOptions: typeof mockServerFeature.mockServerCollectionOptions;

@@ -335,7 +335,7 @@
   });
 
   $effect(() => {
-    if (vm.mockServer.running) vm.mockServerRunningRoutes();
+    if (vm.mockServer.running) vm.mockServerLiveSignature();
     untrack(() => vm.scheduleMockServerReload());
   });
 
@@ -930,6 +930,7 @@
       <lazy.MockServerWorkspaceComponent
         status={vm.mockServer}
         routes={vm.mockServerRoutes()}
+        routesPending={vm.mockServerRoutesPending()}
         collections={vm.mockServerCollectionOptions()}
         selectedCollectionId={vm.mockServerTargetCollectionId()}
         port={vm.mockServerPort}
@@ -943,7 +944,7 @@
         onSimulateLatencyChange={(value: boolean) => (vm.mockServerSimulateLatency = value)}
         onClearLog={vm.clearMockServerLog}
         onCopy={(text: string) => void clipboardSet(text)}
-        onOpenExample={(exampleId: string) => void vm.openMockRouteExample(exampleId)}
+        onOpenExample={(exampleId: string, requestId: string) => void vm.openMockRouteExample(exampleId, requestId)}
       />
       {/if}
     {:else if vm.topView === 'loadtest'}

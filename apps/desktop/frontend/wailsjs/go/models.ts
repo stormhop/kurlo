@@ -4360,6 +4360,7 @@ export namespace model {
 	    exampleId?: string;
 	    exampleName?: string;
 	    requestName?: string;
+	    requestId?: string;
 	    note?: string;
 	    statusCode: number;
 	    durationMs: number;
@@ -4379,6 +4380,7 @@ export namespace model {
 	        this.exampleId = source["exampleId"];
 	        this.exampleName = source["exampleName"];
 	        this.requestName = source["requestName"];
+	        this.requestId = source["requestId"];
 	        this.note = source["note"];
 	        this.statusCode = source["statusCode"];
 	        this.durationMs = source["durationMs"];
@@ -4439,11 +4441,51 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class MockRequestRef {
+	    requestId: string;
+	    requestName: string;
+	    method: string;
+	    loaded: boolean;
+	    routes: MockRoute[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MockRequestRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requestId = source["requestId"];
+	        this.requestName = source["requestName"];
+	        this.method = source["method"];
+	        this.loaded = source["loaded"];
+	        this.routes = this.convertValues(source["routes"], MockRoute);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class MockServerConfig {
 	    port: number;
 	    collectionId: string;
 	    collectionName: string;
 	    routes: MockRoute[];
+	    requests: MockRequestRef[];
 	    simulateLatency: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -4456,6 +4498,7 @@ export namespace model {
 	        this.collectionId = source["collectionId"];
 	        this.collectionName = source["collectionName"];
 	        this.routes = this.convertValues(source["routes"], MockRoute);
+	        this.requests = this.convertValues(source["requests"], MockRequestRef);
 	        this.simulateLatency = source["simulateLatency"];
 	    }
 	

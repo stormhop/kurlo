@@ -973,6 +973,14 @@ func (a *App) StartMockServer(config model.MockServerConfig) model.MockServerSta
 	if a.mock == nil {
 		return model.MockServerStatus{Error: "mock server is unavailable"}
 	}
+	if len(config.Requests) > 0 {
+		routes, err := mockRoutesFromWorkspace(config.Requests, true)
+		if err != nil {
+			return model.MockServerStatus{Error: err.Error()}
+		}
+		config.Routes = append(config.Routes, routes...)
+		config.Requests = nil
+	}
 	return a.mock.start(config, a.emitMockRequest)
 }
 

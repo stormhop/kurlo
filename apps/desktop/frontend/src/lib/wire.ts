@@ -53,6 +53,7 @@ export type LoadTestRequest = Wire<model.LoadTestRequest>;
 export type LoadThreshold = Wire<model.LoadThreshold>;
 export type MockRoute = Wire<model.MockRoute>;
 export type MockServerConfig = Wire<model.MockServerConfig>;
+export type MockRequestRef = Wire<model.MockRequestRef>;
 export type MockServerStatus = Wire<model.MockServerStatus>;
 export type MockRequestLog = Wire<model.MockRequestLog>;
 export type AiRequest = Wire<model.AiRequest>;

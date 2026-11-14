@@ -215,6 +215,8 @@ export function ListCookies(arg1:string):Promise<Array<model.Cookie>>;
 
 export function LoadHistoryResponse(arg1:string):Promise<api.HistoryResponseResult>;
 
+export function LoadMockRoutes(arg1:Array<model.MockRequestRef>):Promise<Array<model.MockRoute>>;
+
 export function LoadRequestExamples(arg1:Array<string>):Promise<Record<string, Array<any>>>;
 
 export function LoadRequestStore():Promise<string>;

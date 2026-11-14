@@ -1,21 +1,101 @@
-import { mockServerLog, mockServerStatus, startMockServer, stopMockServer } from '../../backend';
-import type { MockRequestLog, MockServerStatus } from '../../backend';
+import { loadMockRoutes, mockServerLog, mockServerStatus, startMockServer, stopMockServer } from '../../backend';
+import type { MockRequestLog, MockRequestRef, MockRoute, MockServerStatus } from '../../backend';
 import { EMPTY_MOCK_SERVER_STATUS } from '../../wire';
-import { DEFAULT_MOCK_PORT, mockRoutesForCollection, mockRoutesSignature } from '../../mockRoutes';
+import { DEFAULT_MOCK_PORT, mockRequestRef, mockRoutesSignature } from '../../mockRoutes';
 import type { Collection, SavedRequest } from '../../types/models';
 import { requestExampleCount, requestExamplesPending } from '../../examples';
 
 const MOCK_MAX_LOG_ENTRIES = 200;
 const MOCK_RELOAD_DEBOUNCE_MS = 400;
 
-function loadPendingCollectionExamples(host: MockServerHost, collectionId: string) {
-  if (!collectionId) return;
-  if (!host.requests.some(request => request.collectionId === collectionId && requestExamplesPending(request))) return;
-  queueMicrotask(() => void host.ensureCollectionExamples(collectionId));
+const storedRoutes = new WeakMap<SavedRequest, MockRoute[]>();
+const lastStoredRoutes = new Map<string, MockRoute[]>();
+const storedRoutesLoading = new WeakSet<SavedRequest>();
+const requestGenerations = new WeakMap<SavedRequest, number>();
+let nextGeneration = 0;
+
+function generationOf(request: SavedRequest) {
+  let generation = requestGenerations.get(request);
+  if (generation === undefined) {
+    generation = ++nextGeneration;
+    requestGenerations.set(request, generation);
+  }
+  return generation;
+}
+
+function collectionRequests(host: MockServerHost, collectionId: string) {
+  return collectionId ? host.requests.filter(request => request.collectionId === collectionId) : [];
+}
+
+function loadStoredRoutes(host: MockServerHost, requests: SavedRequest[]) {
+  const wanted = requests.filter(request => !storedRoutesLoading.has(request));
+  if (!wanted.length) return;
+  for (const request of wanted) storedRoutesLoading.add(request);
+  queueMicrotask(async () => {
+    const refs = wanted.map(request => mockRequestRef(request)).filter((ref): ref is MockRequestRef => Boolean(ref));
+    let routes: MockRoute[] = [];
+    try {
+      routes = await loadMockRoutes(refs);
+    } finally {
+      const byRequest = new Map<string, MockRoute[]>();
+      for (const route of routes) {
+        const list = byRequest.get(route.requestId);
+        if (list) list.push(route);
+        else byRequest.set(route.requestId, [route]);
+      }
+      for (const request of wanted) {
+        storedRoutesLoading.delete(request);
+        const list = byRequest.get(request.id) ?? [];
+        storedRoutes.set(request, list);
+        lastStoredRoutes.set(request.id, list);
+      }
+      host.mockRoutesVersion += 1;
+    }
+  });
+}
+
+function collectionRoutes(host: MockServerHost, collectionId: string) {
+  void host.mockRoutesVersion;
+  const routes: MockRoute[] = [];
+  const missing: SavedRequest[] = [];
+  let pending = false;
+  for (const request of collectionRequests(host, collectionId)) {
+    if (requestExamplesPending(request)) {
+      const stored = storedRoutes.get(request);
+      if (stored) {
+        routes.push(...stored);
+        continue;
+      }
+      missing.push(request);
+      const previous = lastStoredRoutes.get(request.id);
+      if (previous) routes.push(...previous);
+      else pending = true;
+      continue;
+    }
+    const ref = mockRequestRef(request);
+    if (ref) routes.push(...ref.routes);
+  }
+  if (missing.length) loadStoredRoutes(host, missing);
+  return { routes, pending };
+}
+
+function collectionPlan(host: MockServerHost, collectionId: string) {
+  return collectionRequests(host, collectionId)
+    .map(request => mockRequestRef(request))
+    .filter((ref): ref is MockRequestRef => Boolean(ref));
+}
+
+function planSignature(host: MockServerHost, collectionId: string) {
+  return JSON.stringify(collectionRequests(host, collectionId).map(request => {
+    const ref = mockRequestRef(request);
+    if (!ref) return null;
+    if (ref.loaded) return [ref.requestId, ref.requestName, mockRoutesSignature(ref.routes)];
+    return [ref.requestId, ref.requestName, ref.method, request.exampleCount ?? 0, generationOf(request)];
+  }).filter(Boolean));
 }
 
 type MockServerHost = {
-  ensureCollectionExamples: (collectionId: string) => Promise<void>;
+  mockRoutesVersion: number;
   collections: Collection[];
   requests: SavedRequest[];
   activeWorkspaceId: string;
@@ -37,8 +117,8 @@ type MockServerHost = {
   requestTab: string;
   guardWorkspaceWritable: (action?: string) => boolean;
   openAlertDialog: (title: string, message: string) => Promise<void>;
-  mockServerRoutes: () => ReturnType<typeof mockRoutesForCollection>;
-  mockServerRunningRoutes: () => ReturnType<typeof mockRoutesForCollection>;
+  mockServerRoutes: () => MockRoute[];
+  mockServerLiveSignature: () => string;
   mockServerTargetCollectionId: () => string;
   mockServerRoutesChanged: () => boolean;
   startMockServerForCollection: (options?: { keepLog?: boolean; collectionId?: string }) => Promise<void>;
@@ -71,14 +151,16 @@ export const mockServerFeature = {
   },
 
   mockServerRoutes(this: MockServerHost) {
-    const collectionId = this.mockServerTargetCollectionId();
-    loadPendingCollectionExamples(this, collectionId);
-    return mockRoutesForCollection(this.requests, collectionId);
+    return collectionRoutes(this, this.mockServerTargetCollectionId()).routes;
   },
 
-  mockServerRunningRoutes(this: MockServerHost) {
-    loadPendingCollectionExamples(this, this.mockServer.collectionId);
-    return mockRoutesForCollection(this.requests, this.mockServer.collectionId);
+  mockServerRoutesPending(this: MockServerHost) {
+    return collectionRoutes(this, this.mockServerTargetCollectionId()).pending;
+  },
+
+  mockServerLiveSignature(this: MockServerHost) {
+    if (!this.mockServer.running || !this.mockServer.collectionId) return '';
+    return planSignature(this, this.mockServer.collectionId);
   },
 
   mockServerRouteCount(this: MockServerHost) {
@@ -117,8 +199,8 @@ export const mockServerFeature = {
       return;
     }
     const reloading = Boolean(options.collectionId);
-    await this.ensureCollectionExamples(collectionId);
-    const routes = mockRoutesForCollection(this.requests, collectionId);
+    const requests = collectionPlan(this, collectionId);
+    const signature = planSignature(this, collectionId);
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     this.mockServerBusy = true;
     this.mockServerError = '';
@@ -127,7 +209,8 @@ export const mockServerFeature = {
         port: (reloading ? this.mockServer.port : this.mockServerPort) || DEFAULT_MOCK_PORT,
         collectionId,
         collectionName: collection?.name ?? '',
-        routes,
+        routes: [],
+        requests,
         simulateLatency: this.mockServerSimulateLatency,
       });
       if (reloading && !status.running) {
@@ -141,7 +224,7 @@ export const mockServerFeature = {
         if (!options.keepLog) this.mockServerLog = [];
         if (!options.collectionId) this.mockServerCollectionId = collectionId;
         this.mockServerPort = status.port;
-        this.mockServerRunningSignature = mockRoutesSignature(routes);
+        this.mockServerRunningSignature = signature;
       }
     } catch (error) {
       this.mockServerError = error instanceof Error ? error.message : String(error);
@@ -180,7 +263,7 @@ export const mockServerFeature = {
 
   mockServerRoutesChanged(this: MockServerHost) {
     if (!this.mockServer.running || !this.mockServer.collectionId) return false;
-    return mockRoutesSignature(this.mockServerRunningRoutes()) !== this.mockServerRunningSignature;
+    return this.mockServerLiveSignature() !== this.mockServerRunningSignature;
   },
 
   async reloadMockServerRoutes(this: MockServerHost) {
@@ -189,7 +272,6 @@ export const mockServerFeature = {
       this.scheduleMockServerReload();
       return;
     }
-    await this.ensureCollectionExamples(this.mockServer.collectionId);
     if (!this.mockServerRoutesChanged()) return;
     await this.startMockServerForCollection({ keepLog: true, collectionId: this.mockServer.collectionId });
   },
@@ -213,9 +295,10 @@ export const mockServerFeature = {
       : next;
   },
 
-  async openMockRouteExample(this: MockServerHost, exampleId: string) {
+  async openMockRouteExample(this: MockServerHost, exampleId: string, requestId = '') {
     if (!exampleId) return;
-    const owner = this.requests.find(request => request.examples?.some(example => example.id === exampleId));
+    const owner = this.requests.find(request => request.id === requestId)
+      ?? this.requests.find(request => request.examples?.some(example => example.id === exampleId));
     if (!owner) return;
     await this.switchRequest(owner.id);
     this.requestTab = 'examples';

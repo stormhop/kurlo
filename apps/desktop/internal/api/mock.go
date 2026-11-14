@@ -466,6 +466,7 @@ func (m *mockServer) handle(w http.ResponseWriter, r *http.Request) {
 	entry.ExampleID = matched.route.ExampleID
 	entry.ExampleName = matched.route.ExampleName
 	entry.RequestName = matched.route.RequestName
+	entry.RequestID = matched.route.RequestID
 
 	if config.SimulateLatency && matched.route.DelayMs > 0 {
 		delay := time.Duration(matched.route.DelayMs) * time.Millisecond

@@ -1,6 +1,6 @@
-import type { MockRoute } from './backend';
+import type { MockRequestRef, MockRoute } from './backend';
 import type { RequestExample, SavedRequest } from './types/models';
-import { mediaTypeOf } from './examples';
+import { mediaTypeOf, requestExamplesPending } from './examples';
 
 export const DEFAULT_MOCK_PORT = 3100;
 
@@ -19,7 +19,7 @@ function headerRows(example: RequestExample) {
 
 function queryRows(example: RequestExample) {
   const query = example.match.query ?? {};
-  return Object.entries(query).map(([key, value]) => ({
+  return Object.keys(query).sort().map(key => [key, query[key]] as const).map(([key, value]) => ({
     key,
     value,
     enabled: true,
@@ -62,6 +62,13 @@ export function mockRoutesForCollection(requests: SavedRequest[], collectionId: 
     }
   }
   return routes;
+}
+
+export function mockRequestRef(request: SavedRequest): MockRequestRef | null {
+  const head = { requestId: request.id, requestName: request.name, method: request.method || 'GET' };
+  if (requestExamplesPending(request)) return { ...head, loaded: false, routes: [] };
+  if (!request.examples?.length) return null;
+  return { ...head, loaded: true, routes: request.examples.map(example => mockRouteFromExample(request, example)) };
 }
 
 export function collectionsWithExamples(requests: SavedRequest[]): Set<string> {

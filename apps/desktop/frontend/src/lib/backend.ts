@@ -6,7 +6,7 @@ import type {
   GitWorkspaceStatus, GrpcRequest, GrpcResponse, GrpcServiceDefinition, HttpRequest, HttpResponse,
   JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
-  WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog,
+  WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
   McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
@@ -736,6 +736,13 @@ export async function startMockServer(config: MockServerConfig): Promise<MockSer
     return { ...EMPTY_MOCK_SERVER_STATUS, error: 'The mock server is only available in the desktop app.' };
   }
   return app.StartMockServer(config);
+}
+
+export async function loadMockRoutes(refs: MockRequestRef[]): Promise<MockRoute[]> {
+  const app = window.go?.api?.App;
+  if (!app?.LoadMockRoutes || refs.length === 0) return [];
+  const routes = await app.LoadMockRoutes(refs);
+  return Array.isArray(routes) ? routes : [];
 }
 
 export async function stopMockServer(): Promise<MockServerStatus> {

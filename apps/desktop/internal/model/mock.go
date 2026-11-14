@@ -16,12 +16,21 @@ type MockRoute struct {
 	DelayMs       int        `json:"delayMs"`
 }
 
+type MockRequestRef struct {
+	RequestID   string      `json:"requestId"`
+	RequestName string      `json:"requestName"`
+	Method      string      `json:"method"`
+	Loaded      bool        `json:"loaded"`
+	Routes      []MockRoute `json:"routes"`
+}
+
 type MockServerConfig struct {
-	Port            int         `json:"port"`
-	CollectionID    string      `json:"collectionId"`
-	CollectionName  string      `json:"collectionName"`
-	Routes          []MockRoute `json:"routes"`
-	SimulateLatency bool        `json:"simulateLatency"`
+	Port            int              `json:"port"`
+	CollectionID    string           `json:"collectionId"`
+	CollectionName  string           `json:"collectionName"`
+	Routes          []MockRoute      `json:"routes"`
+	Requests        []MockRequestRef `json:"requests"`
+	SimulateLatency bool             `json:"simulateLatency"`
 }
 
 type MockServerStatus struct {
@@ -43,6 +52,7 @@ type MockRequestLog struct {
 	ExampleID   string `json:"exampleId,omitempty"`
 	ExampleName string `json:"exampleName,omitempty"`
 	RequestName string `json:"requestName,omitempty"`
+	RequestID   string `json:"requestId,omitempty"`
 	Note        string `json:"note,omitempty"`
 	StatusCode  int    `json:"statusCode"`
 	DurationMs  int64  `json:"durationMs"`

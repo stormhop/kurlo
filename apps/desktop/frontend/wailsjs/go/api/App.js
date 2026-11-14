@@ -426,6 +426,10 @@ export function LoadHistoryResponse(arg1) {
   return window['go']['api']['App']['LoadHistoryResponse'](arg1);
 }
 
+export function LoadMockRoutes(arg1) {
+  return window['go']['api']['App']['LoadMockRoutes'](arg1);
+}
+
 export function LoadRequestExamples(arg1) {
   return window['go']['api']['App']['LoadRequestExamples'](arg1);
 }

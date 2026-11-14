@@ -1071,15 +1071,26 @@ export default function () {
           ],
         };
       },
+      LoadMockRoutes: async (refs) => {
+        const stored = new Map((state.store.requests ?? []).map(request => [request.id, request]));
+        return clone(refs.flatMap(ref => (stored.get(ref.requestId)?.examples ?? []).map(example => ({
+          exampleId: example.id, exampleName: example.name, requestId: ref.requestId, requestName: ref.requestName,
+          method: example.snapshot?.method || ref.method || 'GET', pathTemplate: example.match?.pathTemplate || '/',
+          query: Object.keys(example.match?.query ?? {}).sort().map(key => ({ key, value: example.match.query[key], enabled: true })),
+          statusCode: example.response?.statusCode || 200, status: example.response?.status ?? '', headers: [], body: '', bodyMediaType: '', delayMs: 0,
+        }))));
+      },
       StartMockServer: async (config) => {
-        state.calls.push(`StartMockServer:${config.collectionName}:${config.routes.length}`);
+        const stored = new Map((state.store.requests ?? []).map(request => [request.id, request]));
+        const routeCount = config.routes.length + (config.requests ?? []).reduce((total, ref) => total + (ref.loaded ? ref.routes.length : (stored.get(ref.requestId)?.examples ?? []).length), 0);
+        state.calls.push(`StartMockServer:${config.collectionName}:${routeCount}`);
         state.mockServer = {
           running: true,
           port: config.port,
           url: `http://127.0.0.1:${config.port}`,
           collectionId: config.collectionId,
           collectionName: config.collectionName,
-          routeCount: config.routes.length,
+          routeCount,
           error: '',
         };
         return clone(state.mockServer);
@@ -13296,6 +13307,117 @@ for (const protocol of [
     await expect(page.getByRole('button', { name: 'Request section', exact: true })).toContainText('Vars');
   });
 }
+
+test('keeps a mock server with thousands of examples to a window of rendered routes', async ({ page }) => {
+  const col = { id: 'big-col', workspaceId: 'workspace-e2e', name: 'Big API' };
+  const requests = Array.from({ length: 1150 }, (_, r) => ({
+    id: `r${r}`, name: `Operation ${r}`, url: `https://api.kurlo.test/v1/things/${r}`, collectionId: col.id, collection: col.name, requestType: 'http', method: 'GET', auth: { type: 'none' },
+    examples: [200, 422, 500].map(code => ({
+      id: `e${r}-${code}`, requestId: `r${r}`, name: String(code), filesystemName: String(code), source: 'openapi', createdAt: 1,
+      snapshot: { method: 'GET', url: `https://api.kurlo.test/v1/things/${r}`, params: [], headers: [], bodyType: 'none', bodyContent: '' },
+      response: { statusCode: code, status: String(code), headers: [], body: `{"id":${r}}`, bodyMediaType: 'application/json' },
+      match: { pathTemplate: `/v1/things/${r}` },
+    })),
+  }));
+  await installKurloBridge(page, '', 'browser/e2e', false, { collections: [col], requests, activeId: 'r0', openIds: ['r0'], folderCollapsed: {} });
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, (...args: unknown[]) => Promise<unknown>>;
+    const cache: Record<string, unknown[]> = {};
+    const gate: { open?: () => void } = {};
+    const opened = new Promise<void>(resolve => { gate.open = resolve; });
+    (window as unknown as { __openExamples: () => void }).__openExamples = () => gate.open!();
+    const loadStore = app.LoadRequestStore;
+    app.LoadWorkspace = async () => {
+      const store = JSON.parse(await loadStore() as string) as { requests: Array<Record<string, unknown>> };
+      for (const req of store.requests ?? []) {
+        const list = req.examples as unknown[] | undefined;
+        if (Array.isArray(list) && list.length) { cache[req.id as string] = list; req.exampleCount = list.length; }
+        delete req.examples;
+      }
+      return { payload: JSON.stringify(store), diagnostics: [] };
+    };
+    const loadRoutes = app.LoadMockRoutes;
+    app.LoadMockRoutes = async (refs: unknown) => {
+      await opened;
+      return loadRoutes(refs);
+    };
+    (window as unknown as { __exampleLoads: string[] }).__exampleLoads = [];
+    app.LoadRequestExamples = async (ids: unknown) => {
+      (window as unknown as { __exampleLoads: string[] }).__exampleLoads.push(...(ids as string[]));
+      return JSON.parse(JSON.stringify(Object.fromEntries((ids as string[]).map(id => [id, cache[id] ?? []]))));
+    };
+  });
+  await page.goto('/');
+  await page.getByLabel('Mock server', { exact: true }).click();
+  const panel = page.locator('section[aria-label="Mock server"]');
+  await expect(panel.locator('.mock-route-list').getByRole('status', { name: 'Loading examples' }).locator('.kurlo-bird-flying')).toBeVisible();
+  await expect(panel.locator('.mock-route-list')).toHaveText('');
+  await expect(panel.getByText(/Loading|No examples in this collection/)).toHaveCount(0);
+  await page.evaluate(() => (window as unknown as { __openExamples: () => void }).__openExamples());
+  await expect(panel.locator('.mock-count').first()).toHaveText('3450');
+  const list = panel.locator('.mock-route-list');
+  await expect(list.locator('.mock-group').first()).toHaveText('Operation 0');
+  expect(await list.locator('.mock-row').count()).toBeLessThan(300);
+  expect(await list.evaluate(node => getComputedStyle(node).zIndex)).toBe('0');
+  await expect.poll(async () => {
+    await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    return list.evaluate(node => node.scrollTop + node.clientHeight >= node.scrollHeight - 1
+      && [...node.querySelectorAll('.mock-path')].at(-1)?.textContent);
+  }).toBe('/v1/things/1149');
+  await expect(list.locator('.mock-group', { hasText: /^Operation 1149$/ })).toBeVisible();
+  expect(await list.locator('.mock-row').count()).toBeLessThan(300);
+  await panel.getByLabel('Filter routes').fill('things/77');
+  await expect(list.locator('.mock-group')).toHaveText(['Operation 77', 'Operation 770', 'Operation 771', 'Operation 772', 'Operation 773', 'Operation 774', 'Operation 775', 'Operation 776', 'Operation 777', 'Operation 778', 'Operation 779']);
+  await expect(list.locator('.mock-row')).toHaveCount(33);
+  expect(await page.evaluate(() => (window as unknown as { __exampleLoads: string[] }).__exampleLoads.length)).toBeLessThanOrEqual(1);
+});
+
+test('keeps the first visible mock route in place when the sidebar slides away and back', async ({ page }) => {
+  const col = { id: 'wrap-col', workspaceId: 'workspace-e2e', name: 'Wrap API' };
+  const requests = Array.from({ length: 400 }, (_, r) => ({
+    id: `r${r}`, name: `Получить результат добавления самозанятого по реквизитам ${r}`, url: `https://api.kurlo.test/v1/self-employed/recipients/${r}`, collectionId: col.id, collection: col.name, requestType: 'http', method: 'GET', auth: { type: 'none' },
+    examples: [200, 400, 401, 403, 422, 500].map(code => ({
+      id: `e${r}-${code}`, requestId: `r${r}`, name: String(code), filesystemName: String(code), source: 'openapi', createdAt: 1,
+      snapshot: { method: 'GET', url: `https://api.kurlo.test/v1/self-employed/recipients/${r}`, params: [], headers: [], bodyType: 'none', bodyContent: '' },
+      response: { statusCode: code, status: String(code), headers: [], body: `{"id":${r}}`, bodyMediaType: 'application/json' },
+      match: { pathTemplate: `/v1/self-employed/recipients/${r}` },
+    })),
+  }));
+  await installKurloBridge(page, '', 'browser/e2e', false, { collections: [col], requests, activeId: 'r0', openIds: ['r0'], folderCollapsed: {} });
+  await page.setViewportSize({ width: 1100, height: 760 });
+  await page.goto('/');
+  await page.getByLabel('Mock server', { exact: true }).click();
+  const panel = page.locator('section[aria-label="Mock server"]');
+  await expect(panel.locator('.mock-count').first()).toHaveText('2400');
+  const list = panel.locator('.mock-route-list');
+  await list.evaluate(node => { node.scrollTop = node.scrollHeight * 0.4; });
+  await page.waitForTimeout(600);
+  const firstVisible = () => list.evaluate(node => {
+    const top = node.getBoundingClientRect().top;
+    const row = [...node.querySelectorAll<HTMLElement>('.mock-row')].find(item => item.getBoundingClientRect().top >= top - 0.5)!;
+    return { key: `${row.querySelector('.mock-path')!.textContent} ${row.querySelector('.status-badge')!.textContent}`, offset: Math.round(row.getBoundingClientRect().top - top) };
+  });
+  const before = await firstVisible();
+  expect(await list.locator('.mock-row-warning').first().evaluate(node => node.getClientRects().length)).toBeGreaterThan(0);
+  const slide = () => list.evaluate((node, key) => new Promise<Array<number | null>>((resolve) => {
+    const offsets: Array<number | null> = [];
+    const started = performance.now();
+    const sample = () => {
+      const top = node.getBoundingClientRect().top;
+      const row = [...node.querySelectorAll<HTMLElement>('.mock-row')].find(item => `${item.querySelector('.mock-path')!.textContent} ${item.querySelector('.status-badge')!.textContent}` === key);
+      offsets.push(row ? Math.round(row.getBoundingClientRect().top - top) : null);
+      if (performance.now() - started > 1500) resolve(offsets);
+      else requestAnimationFrame(() => setTimeout(sample, 0));
+    };
+    document.querySelector<HTMLElement>('[aria-label="Toggle sidebar"]')!.click();
+    requestAnimationFrame(() => setTimeout(sample, 0));
+  }), before.key);
+  for (const offsets of [await slide(), await slide()]) {
+    expect(offsets.length).toBeGreaterThan(20);
+    expect(offsets.filter(offset => offset === null || Math.abs(offset - before.offset) > 2)).toEqual([]);
+  }
+  expect(await firstVisible()).toEqual(before);
+});
 
 test('slides the sidebar without restyling the rest of the window', async ({ page }) => {
   const col = { id: 'big-col', workspaceId: 'workspace-e2e', name: 'Big API' };

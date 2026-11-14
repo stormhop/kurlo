@@ -5,6 +5,7 @@ vi.mock('../lib/backend', async () => {
   return {
     ...wire,
     startMockServer: vi.fn(),
+    loadMockRoutes: vi.fn(async () => []),
     stopMockServer: vi.fn(),
     mockServerStatus: vi.fn(),
     mockServerLog: vi.fn(async () => []),
@@ -141,7 +142,7 @@ describe('mockRouteConflicts', () => {
 
 function makeHost(overrides: Record<string, unknown> = {}) {
   const host = {
-    ensureCollectionExamples: vi.fn(async () => {}),
+    mockRoutesVersion: 0,
     collections: [{ id: 'col-1', name: 'Petstore' }],
     requests: [requestWithExamples({ collectionId: 'col-1' }, [okExample])],
     activeWorkspaceId: 'workspace-main',
@@ -459,5 +460,66 @@ describe('mock server feature', () => {
     await requestCrudFeature.closeActiveTab.call(host as never);
     expect(host.mockServerTabOpen).toBe(false);
     expect(host.topView).toBe('overview');
+  });
+});
+
+describe('mock server without loaded examples', () => {
+  const stored = (id: string, name: string, exampleCount: number) => ({
+    ...requestWithExamples({ id, name, collectionId: 'col-1' }, []),
+    examples: undefined,
+    exampleCount,
+  }) as SavedRequest;
+  const flush = () => new Promise(resolve => setTimeout(resolve, 0));
+
+  it('lists stored examples from light routes and never loads their bodies', async () => {
+    vi.mocked(backend.loadMockRoutes).mockResolvedValueOnce([
+      { exampleId: 'e1', exampleName: '200', requestId: 'r1', requestName: 'Orders', method: 'GET', pathTemplate: '/orders', query: [], statusCode: 200, status: '200', headers: [], body: '', bodyMediaType: '', delayMs: 0 },
+    ]);
+    const host = makeHost({ requests: [stored('r1', 'Orders', 1)] });
+
+    expect(host.mockServerRoutes()).toEqual([]);
+    expect(host.mockServerRoutesPending()).toBe(true);
+    await flush();
+
+    expect(backend.loadMockRoutes).toHaveBeenCalledWith([{ requestId: 'r1', requestName: 'Orders', method: 'GET', loaded: false, routes: [] }]);
+    expect(host.mockRoutesVersion).toBe(1);
+    expect((host.mockServerRoutes() as Array<{ pathTemplate: string }>).map(route => route.pathTemplate)).toEqual(['/orders']);
+    expect(host.mockServerRoutesPending()).toBe(false);
+    host.mockServerRoutes();
+    await flush();
+    expect(backend.loadMockRoutes).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the server from the stored examples and sends only the edited ones', async () => {
+    vi.mocked(backend.startMockServer).mockResolvedValueOnce({
+      running: true, port: 3100, url: 'http://127.0.0.1:3100', collectionId: 'col-1', collectionName: 'Petstore', routeCount: 2,
+    });
+    const host = makeHost({ requests: [stored('r1', 'Orders', 1), requestWithExamples({ id: 'r2', collectionId: 'col-1' }, [okExample])] });
+
+    await host.startMockServerForCollection();
+
+    const config = vi.mocked(backend.startMockServer).mock.calls.at(-1)![0];
+    expect(config.routes).toEqual([]);
+    expect(config.requests.map(ref => [ref.requestId, ref.loaded, ref.routes.length])).toEqual([['r1', false, 0], ['r2', true, 1]]);
+    expect(host.mockServerRoutesChanged()).toBe(false);
+  });
+
+  it('reloads after the stored examples were read again from disk', async () => {
+    vi.mocked(backend.startMockServer).mockResolvedValue({
+      running: true, port: 3100, url: 'http://127.0.0.1:3100', collectionId: 'col-1', collectionName: 'Petstore', routeCount: 1,
+    });
+    const host = makeHost({ requests: [stored('r1', 'Orders', 1)] });
+    await host.startMockServerForCollection();
+    expect(host.mockServerRoutesChanged()).toBe(false);
+
+    host.requests = [stored('r1', 'Orders', 1)];
+    expect(host.mockServerRoutesChanged()).toBe(true);
+  });
+
+  it('opens the example behind a route by its request', async () => {
+    const host = makeHost({ requests: [stored('r1', 'Orders', 1)] });
+    await host.openMockRouteExample('e1', 'r1');
+    expect(host.switchedTo).toBe('r1');
+    expect(host.selectedExampleId).toBe('e1');
   });
 });
