@@ -3269,6 +3269,40 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(trigger).toContainText('Billing');
   });
 
+  test('scrolls a runner with hundreds of requests and results without pages', async ({ page }) => {
+    const requests = Array.from({ length: 1000 }, (_, index) => ({
+      id: `big-${index}`, collectionId: 'col-big', name: `Request ${index}`, method: 'GET', url: `https://api.kurlo.test/slow?ms=1&n=${index}`, folderPath: [`Group ${Math.floor(index / 50)}`],
+    }));
+    await installKurloBridge(page, '', 'browser/e2e', false, { collections: [{ id: 'col-big', workspaceId: 'workspace-e2e', name: 'Big runner' }], requests });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+    const runner = page.getByRole('region', { name: 'Collection runner' });
+    await runner.locator('.runner-select .app-select-trigger').click();
+    await runner.getByRole('option', { name: 'Big runner' }).click();
+    await expect(runner.getByTestId('runner-request-row').first()).toContainText('Request 0');
+    await expect(runner.getByRole('button', { name: /^(Next|Prev)$/ })).toHaveCount(0);
+    expect(await runner.getByTestId('runner-request-row').count()).toBeLessThan(320);
+    const body = runner.locator('.runner-page-body');
+    const scrollToEnd = () => body.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await expect.poll(async () => {
+      await scrollToEnd();
+      return runner.getByTestId('runner-request-row').last().textContent();
+    }).toContain('Request 999');
+    await expect(runner.locator('.runner-folder').last()).toHaveText('Group 19');
+
+    await body.evaluate(node => { node.scrollTop = 0; });
+    await runner.getByRole('button', { name: 'Deselect all' }).click();
+    for (const index of [0, 1, 2]) await runner.getByRole('checkbox', { name: `Select Request ${index}`, exact: true }).check();
+    await runner.getByLabel('Iterations').fill('100');
+    await runner.getByRole('button', { name: 'Run 300 requests' }).click();
+    await expect(runner.locator('.runner-results-summary')).toContainText('Requests 300/300', { timeout: 60_000 });
+    expect(await runner.getByTestId('runner-result-row').count()).toBeLessThan(320);
+    await expect.poll(async () => {
+      await body.evaluate(node => { node.scrollTop = node.querySelector<HTMLElement>('.runner-selection')!.offsetTop - node.clientHeight; });
+      return runner.getByTestId('runner-result-row').last().textContent();
+    }).toMatch(/Request 2.*iteration 100/);
+  });
+
   test('keeps a running collection on its original environment after switching to production', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       activeEnvironmentId: 'dev',
@@ -4278,15 +4312,16 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(page.getByRole('button', { name: /Load more/ })).toHaveCount(0);
 
     await list.evaluate(element => element.scrollTo(0, element.scrollHeight));
-    await expect(list.getByRole('status')).toHaveText('Loading older commits…');
+    await expect(list.getByRole('status', { name: 'Loading older commits' }).locator('.kurlo-bird-flying')).toBeVisible();
+    await expect(list.locator('.virtual-list-more')).toHaveText('');
     await list.evaluate(element => element.scrollTo(0, element.scrollHeight));
     await list.screenshot({ path: join(tmpdir(), 'kurlo-git-history-loading.png'), animations: 'disabled' });
     await expect(page.getByRole('button', { name: 'Fetch', exact: true })).toBeEnabled();
-    await expect.poll(loadedOffsets).toEqual([60]);
+    await expect.poll(loadedOffsets).toEqual([100]);
     await expect(list.getByRole('status')).toHaveCount(0);
 
     await list.evaluate(element => element.scrollTo(0, element.scrollHeight - element.clientHeight * 2));
-    await expect.poll(loadedOffsets).toEqual([60, 120]);
+    await expect.poll(loadedOffsets).toEqual([100, 200]);
     expect(await list.locator('.git-commit-row').count()).toBeLessThan(700);
   });
 
@@ -5260,7 +5295,6 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(saveButton).toBeEnabled();
     await saveButton.click();
     await expect(saveButton).toBeDisabled();
-
     await expect.poll(async () => {
       const store = await page.evaluate(() => window.__kurloE2E.store as {
         requests: Array<{ url?: string; examples?: Array<{ name: string; response: { statusCode: number } }> }>;
@@ -10240,6 +10274,40 @@ test.describe('Agent', () => {
     await expect(approval).toHaveCount(0);
   });
 
+  test('loads older agent activity as you scroll and searches all of it', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      const app = window.go!.api!.App as Record<string, unknown>;
+      const now = Date.now();
+      const all = Array.from({ length: 250 }, (_, index) => ({ id: `${String(now - index * 3_600_000).padStart(13, '0')}-${String(index).padStart(4, '0')}`, time: now - index * 3_600_000, client: 'Kurlo agent', tool: `tool_${index}`, status: 'ok', files: [], reverted: false, workspace: '/e2e', here: true }));
+      const calls: Array<Record<string, unknown>> = [];
+      (window as unknown as { __activityCalls: unknown[] }).__activityCalls = calls;
+      app.AgentActivity = async (filter: { limit: number; before?: string; text?: string }) => {
+        calls.push(structuredClone(filter));
+        const words = (filter.text ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+        const matching = all.filter(entry => (!filter.before || entry.id < filter.before) && words.every(word => entry.tool.includes(word)));
+        return structuredClone({ entries: matching.slice(0, filter.limit), hasMore: matching.length > filter.limit, enabled: true, overview: { today: 1, week: 168, errors: 0, changed: 0, changes: [], problems: [] } });
+      };
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await page.getByRole('button', { name: 'Activity', exact: true }).click();
+    const list = page.getByRole('list', { name: 'Agent activity' });
+    await expect(list.locator('.agent-activity-tool').first()).toHaveText('tool_0');
+    const calls = () => page.evaluate(() => (window as unknown as { __activityCalls: Array<{ before?: string }> }).__activityCalls);
+    expect((await calls()).every(call => !call.before)).toBe(true);
+    await expect.poll(async () => {
+      await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+      return list.locator('.agent-activity-tool').last().textContent();
+    }, { timeout: 15_000 }).toBe('tool_249');
+    expect((await calls()).filter(call => call.before).length).toBe(2);
+    expect(await list.locator('.agent-activity-row').count()).toBeLessThan(250);
+
+    await page.getByLabel('Filter activity').fill('tool_248');
+    await expect(list.locator('.agent-activity-tool')).toHaveText(['tool_248']);
+  });
+
   test('shows agent activity, restores a file and commits on an agent branch', async ({ page }) => {
     if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
     await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
@@ -10269,11 +10337,24 @@ test.describe('Agent', () => {
       const elsewhere = { id: '0005-other', time: now - 20 * 60_000, client: 'Kurlo agent', chatId: 'chat-9', tool: 'save_request', status: 'ok', files: ['workspaces/Billing-team/collections/Billing/requests/List-invoices.yml'], reverted: false, workspace: '/e2e', workspaceId: 'workspace-billing', workspaceName: 'Billing team' };
       const filters: unknown[] = [];
       e2e.activityFilters = filters;
-      app.AgentActivity = async (filter: { workspaceId: string; allWorkspaces: boolean }) => {
+      app.AgentActivity = async (filter: { workspaceId: string; allWorkspaces: boolean; text?: string; client?: string; overviewSince?: number; todaySince?: number }) => {
         filters.push(structuredClone(filter));
         const mine = summaries.map(entry => ({ ...entry, here: true, workspaceId: filter.workspaceId }));
-        const entries = filter.allWorkspaces ? [...mine, elsewhere].sort((a, b) => b.time - a.time) : mine;
-        return { entries: structuredClone(entries), enabled: enabled.at(-1) ?? true };
+        const scoped: Array<Record<string, unknown> & { time: number; status: string; files: string[] }> = filter.allWorkspaces ? [...mine, elsewhere].sort((a, b) => b.time - a.time) : mine;
+        const words = (filter.text ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+        const entries = scoped.filter(entry => (!filter.client || entry.client === filter.client)
+          && words.every(word => [entry.tool, entry.client, entry.status, entry.error ?? '', entry.branch ?? '', entry.commit ?? '', ...entry.files].join(' ').toLowerCase().includes(word)));
+        const week = filter.overviewSince ? scoped.filter(entry => entry.time >= filter.overviewSince!) : [];
+        const changed = week.filter(entry => entry.files.length && entry.status !== 'declined');
+        const overview = filter.overviewSince ? {
+          today: week.filter(entry => entry.time >= (filter.todaySince ?? 0)).length,
+          week: week.length,
+          errors: week.filter(entry => entry.status === 'error').length,
+          changed: changed.length,
+          changes: changed.slice(0, 5),
+          problems: week.filter(entry => entry.status === 'error' || entry.status === 'declined').slice(0, 5),
+        } : undefined;
+        return structuredClone({ entries, enabled: enabled.at(-1) ?? true, hasMore: false, overview });
       };
       details['0005-other'] = { ...elsewhere, arguments: '{}', result: '', changes: [] };
       app.AgentActivityEntry = async (id: string) => structuredClone(details[id] ?? { ...summaries.find(entry => entry.id === id), arguments: '{}', result: '', changes: [] });
@@ -11031,7 +11112,7 @@ async function installLongAgentHistory(page: Page) {
     app.AgentChat = async () => { throw new Error('The full history must not be requested'); };
     const pageOf = (id: string, before: number) => {
       const end = before < 0 ? total : before;
-      const start = Math.max(0, end - 80);
+      const start = Math.max(0, end - (before < 0 && (window as unknown as { __shortFirstPage?: boolean }).__shortFirstPage ? 2 : 80));
       const messages = Array.from({ length: end - start }, (_, offset) => {
         const index = start + offset;
         const turn = Math.floor(index / 2);
@@ -11110,7 +11191,8 @@ test('pages and virtualizes a long Codex chat while preserving the reading posit
       e2e.releaseHistory?.();
       delete e2e.releaseHistory;
     });
-    await expect(page.getByRole('button', { name: 'Load earlier messages', exact: true })).toBeEnabled();
+    await expect(chat.getByRole('status', { name: 'Loading earlier messages' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Load earlier messages' })).toHaveCount(0);
     await expect.poll(async () => {
       return page.locator(`[data-turn-id="${anchor.id}"]`).evaluate((element, expected) => Math.abs(element.getBoundingClientRect().top - element.closest('.agent-chat')!.getBoundingClientRect().top - expected), anchor.top);
     }).toBeLessThan(2);
@@ -11127,19 +11209,27 @@ test('pages and virtualizes a long Codex chat while preserving the reading posit
   await expect(page.locator('.agent-text').last()).toContainText('Answer 9999');
 });
 
-test('keeps the viewport when loading earlier history with the keyboard', async ({ page }) => {
+test('loads earlier history when the keyboard scrolls to the top', async ({ page }) => {
   await installLongAgentHistory(page);
-  const button = page.getByRole('button', { name: 'Load earlier messages', exact: true });
-  const anchor = await visibleHistoryAnchor(page);
-  await button.evaluate(element => {
-    element.focus({ preventScroll: true });
-  });
-  await page.keyboard.press('Enter');
-  await expect.poll(() => page.evaluate(() => (window.__kurloE2E as unknown as { historyRequests: unknown[] }).historyRequests.length)).toBe(2);
-  await expect.poll(async () => {
-    const current = await visibleHistoryAnchor(page);
-    return current.id === anchor.id ? Math.abs(current.top - anchor.top) : Infinity;
-  }).toBeLessThan(2);
+  const chat = page.locator('.agent-main > .agent-chat');
+  await chat.focus();
+  const requests = () => page.evaluate(() => (window.__kurloE2E as unknown as { historyRequests: unknown[] }).historyRequests.length);
+  for (let press = 0; press < 80 && (await requests()) < 2; press++) {
+    await page.keyboard.press('PageUp');
+    await page.waitForTimeout(50);
+  }
+  await expect.poll(requests).toBeGreaterThanOrEqual(2);
+});
+
+test('fills a short first page of history up to the window by itself', async ({ page }) => {
+  await page.addInitScript(() => { (window as unknown as { __shortFirstPage: boolean }).__shortFirstPage = true; });
+  await installLongAgentHistory(page);
+  const chat = page.locator('.agent-main > .agent-chat');
+  const requests = () => page.evaluate(() => (window.__kurloE2E as unknown as { historyRequests: Array<{ before: number }> }).historyRequests.map(request => request.before));
+  await expect.poll(requests).toEqual([-1, 19998]);
+  await expect.poll(() => chat.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(160);
+  await expect(page.locator('.agent-text').last()).toContainText('Answer 9999');
+  await expect(page.getByRole('button', { name: 'Load earlier messages' })).toHaveCount(0);
 });
 
 test('keeps paged history failures and delayed pages separate from another chat', async ({ page }) => {
@@ -11149,7 +11239,7 @@ test('keeps paged history failures and delayed pages separate from another chat'
   await expect(page.locator('.agent-main > .agent-chat').getByRole('alert')).toHaveText('History temporarily unavailable');
   await expect(page.locator('.agent-text').first()).toContainText('Answer 9960');
   await page.evaluate(() => { (window.__kurloE2E as unknown as Record<string, unknown>).deferEarlier = true; });
-  await page.getByRole('button', { name: 'Load earlier messages', exact: true }).click();
+  await page.locator('.agent-main > .agent-chat').getByRole('button', { name: 'Retry', exact: true }).click();
   await expect.poll(() => page.evaluate(() => Boolean((window.__kurloE2E as unknown as Record<string, unknown>).releaseHistory))).toBe(true);
   await page.locator('.agent-sidebar').getByRole('button', { name: /Small chat/ }).click();
   await expect(page.locator('.agent-text')).toHaveText('Small answer');

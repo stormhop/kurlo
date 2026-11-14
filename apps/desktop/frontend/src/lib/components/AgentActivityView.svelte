@@ -8,7 +8,7 @@
   import { agentActivityStore as activity } from '../stores/agentActivity.svelte';
   import { focusFirstMenuItem, handleMenuKeydown } from '../menuKeyboard';
   import {
-    agentActivityCanRestore, agentActivityChangeStatus, agentActivityChatMode, agentActivityFileName, agentActivityFullTime, agentActivityOverview,
+    agentActivityCanRestore, agentActivityChangeStatus, agentActivityChatMode, agentActivityFileName, agentActivityFullTime,
     agentActivityPlace, agentActivityPretty, agentActivityRestorable, agentActivityStatus, agentActivityTime,
   } from '../agentActivity';
   import type { AgentActivitySummary } from '../backend';
@@ -27,7 +27,7 @@
   const argumentsText = $derived(entry ? agentActivityPretty(entry.arguments) : '');
   const resultText = $derived(entry ? agentActivityPretty(entry.result) : '');
   const hasArguments = $derived(Boolean(argumentsText) && argumentsText !== '{}');
-  const overview = $derived(agentActivityOverview(activity.entries));
+  const overview = $derived(activity.overview ?? { today: 0, week: 0, errors: 0, changed: 0, changes: [], problems: [] });
   const scopeLabel = $derived(activity.allWorkspaces ? 'all workspaces' : 'this workspace');
   const agentsRunning = $derived(kurloAgentStore.anyRunning || codexAgentStore.anyRunning || claudeAgentStore.anyRunning);
 

@@ -19,6 +19,8 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Fixed
 
 - **The sidebar hides and shows at once**: toggling it no longer restyles the whole window, so the slide starts without a pause in large workspaces.
+- **Long lists scroll the same way everywhere**: the collection runner has no page buttons any more, and agent activity loads older calls as you scroll; its search and summary cover the whole log.
+- **Chats and Git history load more as you scroll**: a long agent chat loads earlier messages as you scroll up instead of through a button, and Git history loads 100 older commits at a time.
 
 ## 3.1.0
 

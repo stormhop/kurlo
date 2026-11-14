@@ -408,7 +408,7 @@ export async function gitCommitLog(limit = 50): Promise<GitLogResult> {
   return (await window.go?.api?.App?.GitCommitLog?.(limit)) ?? EMPTY_GIT_LOG;
 }
 
-export async function gitCommitLogPage(limit = 60, offset = 0): Promise<GitLogResult> {
+export async function gitCommitLogPage(limit = 100, offset = 0): Promise<GitLogResult> {
   const page = await window.go?.api?.App?.GitCommitLogPage?.(limit, offset);
   if (page) return page;
   const fallback = await gitCommitLog(limit + Math.max(0, offset));

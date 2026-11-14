@@ -45,6 +45,29 @@ export function virtualizeRows<T extends VirtualRow>(
   };
 }
 
+export type RowAnchor = { key: string; delta: number };
+
+export function rowAnchor<T extends VirtualRow>(rows: T[], top: number, measured?: Map<string, number>, scale = 1): RowAnchor | null {
+  let offset = 0;
+  let covering: RowAnchor | null = null;
+  for (const row of rows) {
+    if (offset >= top) return { key: row.key, delta: top - offset };
+    const height = measured?.get(row.key) ?? row.height * scale;
+    if (offset + height > top) covering = { key: row.key, delta: top - offset };
+    offset += height;
+  }
+  return covering;
+}
+
+export function anchorOffset<T extends VirtualRow>(rows: T[], anchor: RowAnchor, measured?: Map<string, number>, scale = 1): number | null {
+  let offset = 0;
+  for (const row of rows) {
+    if (row.key === anchor.key) return offset + anchor.delta;
+    offset += measured?.get(row.key) ?? row.height * scale;
+  }
+  return null;
+}
+
 export const GROWN_ROW_LIMIT = 600;
 
 export function canGrowWindow(window: { rows: unknown[]; before: number; after: number }, limit = GROWN_ROW_LIMIT): boolean {
@@ -115,6 +138,7 @@ export function createRowMeasurer(heights: Map<string, number>) {
   return (node: HTMLElement, key: string) => {
     keys.set(node, key);
     ensureObserver().observe(node);
+    record(node, node.getBoundingClientRect().height);
     return {
       update(nextKey: string) {
         if (keys.get(node) === nextKey) return;

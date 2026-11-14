@@ -181,27 +181,78 @@ func readAgentActivity(id string) (model.AgentActivityEntry, error) {
 	return entry, nil
 }
 
+const agentActivityOverviewItems = 5
+
 func listAgentActivity(filter model.AgentActivityFilter) ([]model.AgentActivitySummary, error) {
+	page, err := pageAgentActivity(filter)
+	return page.Entries, err
+}
+
+func agentActivityMatchesText(entry model.AgentActivitySummary, words []string) bool {
+	if len(words) == 0 {
+		return true
+	}
+	haystack := strings.ToLower(strings.Join(append([]string{entry.Tool, entry.Client, entry.Status, entry.Error, entry.Branch, entry.Commit}, entry.Files...), " "))
+	for _, word := range words {
+		if !strings.Contains(haystack, word) {
+			return false
+		}
+	}
+	return true
+}
+
+func countAgentActivityOverview(overview *model.AgentActivityOverview, entry model.AgentActivitySummary, todaySince int64) {
+	overview.Week++
+	if entry.Time >= todaySince {
+		overview.Today++
+	}
+	if entry.Status == "error" {
+		overview.Errors++
+	}
+	if len(entry.Files) > 0 && entry.Status != "declined" {
+		overview.Changed++
+		if len(overview.Changes) < agentActivityOverviewItems {
+			overview.Changes = append(overview.Changes, entry)
+		}
+	}
+	if (entry.Status == "error" || entry.Status == "declined") && len(overview.Problems) < agentActivityOverviewItems {
+		overview.Problems = append(overview.Problems, entry)
+	}
+}
+
+func pageAgentActivity(filter model.AgentActivityFilter) (model.AgentActivityList, error) {
 	agentActivityMu.Lock()
 	defer agentActivityMu.Unlock()
+	page := model.AgentActivityList{Entries: []model.AgentActivitySummary{}}
 	ids, err := agentActivityIDs()
 	if err != nil {
-		return nil, err
+		return page, err
 	}
 	limit := filter.Limit
 	if limit <= 0 || limit > agentActivityMaxEntries {
 		limit = agentActivityDefaultLimit
 	}
-	out := []model.AgentActivitySummary{}
+	var overview *model.AgentActivityOverview
+	if filter.OverviewSince > 0 {
+		overview = &model.AgentActivityOverview{Changes: []model.AgentActivitySummary{}, Problems: []model.AgentActivitySummary{}}
+		page.Overview = overview
+	}
+	words := strings.Fields(strings.ToLower(filter.Text))
 	currentRoot := agentWorkspaceKey(fileWorkspaceStorePath())
 	names := activityWorkspaceNames{}
 	for _, id := range ids {
 		at := agentActivityTime(id)
-		if filter.Until > 0 && at > filter.Until {
-			continue
-		}
-		if filter.Since > 0 && at < filter.Since {
+		pageDone := page.HasMore
+		if pageDone && (overview == nil || at < filter.OverviewSince) {
 			break
+		}
+		if filter.Since > 0 && at < filter.Since && (overview == nil || at < filter.OverviewSince) {
+			break
+		}
+		inOverview := overview != nil && at >= filter.OverviewSince
+		inPage := !pageDone && (filter.Before == "" || id < filter.Before) && (filter.Until <= 0 || at <= filter.Until) && (filter.Since <= 0 || at >= filter.Since)
+		if !inOverview && !inPage {
+			continue
 		}
 		entry, err := readAgentActivity(id)
 		if err != nil {
@@ -214,18 +265,28 @@ func listAgentActivity(filter model.AgentActivityFilter) ([]model.AgentActivityS
 		if !entry.Here {
 			entry.WorkspaceName = names.lookup(entry.Workspace, entry.WorkspaceID)
 		}
+		if inOverview {
+			countAgentActivityOverview(overview, entry.AgentActivitySummary, filter.TodaySince)
+		}
+		if !inPage {
+			continue
+		}
 		if filter.Client != "" && !strings.EqualFold(entry.Client, filter.Client) {
 			continue
 		}
 		if filter.Tool != "" && entry.Tool != filter.Tool {
 			continue
 		}
-		out = append(out, entry.AgentActivitySummary)
-		if len(out) >= limit {
-			break
+		if !agentActivityMatchesText(entry.AgentActivitySummary, words) {
+			continue
 		}
+		if len(page.Entries) >= limit {
+			page.HasMore = true
+			continue
+		}
+		page.Entries = append(page.Entries, entry.AgentActivitySummary)
 	}
-	return out, nil
+	return page, nil
 }
 
 func revertAgentActivity(id, path string) (model.AgentActivityEntry, error) {
@@ -342,11 +403,8 @@ func (n activityWorkspaceNames) lookup(root, workspaceID string) string {
 }
 
 func (a *App) AgentActivity(filter model.AgentActivityFilter) model.AgentActivityList {
-	entries, err := listAgentActivity(filter)
-	out := model.AgentActivityList{Entries: entries, Enabled: agentActivityEnabled()}
-	if out.Entries == nil {
-		out.Entries = []model.AgentActivitySummary{}
-	}
+	out, err := pageAgentActivity(filter)
+	out.Enabled = agentActivityEnabled()
 	if err != nil {
 		out.Error = err.Error()
 	}

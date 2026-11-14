@@ -1,16 +1,25 @@
 <script lang="ts">
   import Select from './Select.svelte';
+  import VirtualList from './VirtualList.svelte';
   import { vm } from '../stores/app.svelte';
   import { agentActivityStore as activity } from '../stores/agentActivity.svelte';
   import {
     AGENT_ACTIVITY_SCOPES, agentActivityClients, agentActivityPlace, agentActivityFilesLabel, agentActivityGroups, agentActivityStatus,
-    agentActivityTime, filterAgentActivity,
+    agentActivityTime,
   } from '../agentActivity';
+  import type { AgentActivitySummary } from '../backend';
 
-  const clientOptions = $derived([{ value: '', label: 'All clients' }, ...agentActivityClients(activity.entries).map(client => ({ value: client, label: client }))]);
-  const visible = $derived(filterAgentActivity(activity.entries, { text: activity.text, client: activity.client }));
-  const groups = $derived(agentActivityGroups(visible));
+  const clients = $derived(agentActivityClients(activity.client ? [...activity.entries, { client: activity.client } as AgentActivitySummary] : activity.entries));
+  const clientOptions = $derived([{ value: '', label: 'All clients' }, ...clients.map(client => ({ value: client, label: client }))]);
+  const groups = $derived(agentActivityGroups(activity.entries));
   const filtered = $derived(Boolean(activity.text.trim() || activity.client));
+  type ActivityRow =
+    | { key: string; height: number; kind: 'group'; label: string }
+    | { key: string; height: number; kind: 'entry'; entry: AgentActivitySummary };
+  const rows = $derived(groups.flatMap(group => [
+    { key: `group:${group.label}`, height: 30, kind: 'group', label: group.label } as ActivityRow,
+    ...group.entries.map(entry => ({ key: `entry:${entry.id}`, height: 52, kind: 'entry', entry }) as ActivityRow),
+  ]));
 
   function open(id: string) {
     vm.openAgentTab();
@@ -18,8 +27,7 @@
   }
 
   function clearFilters() {
-    activity.text = '';
-    activity.client = '';
+    activity.clearFilters();
   }
 </script>
 
@@ -29,21 +37,32 @@
       <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
       <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
     </svg>
-    <input bind:value={activity.text} placeholder="Search tools and files" aria-label="Filter activity" spellcheck="false" />
+    <input value={activity.text} oninput={(event) => activity.setText(event.currentTarget.value)} placeholder="Search tools and files" aria-label="Filter activity" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
   </div>
   <div class="agent-activity-selects">
     <Select value={activity.allWorkspaces ? 'all' : 'workspace'} options={AGENT_ACTIVITY_SCOPES} className="agent-activity-select" ariaLabel="Workspaces" onChange={value => activity.setAllWorkspaces(value === 'all')} />
-    <Select value={activity.client} options={clientOptions} className="agent-activity-select" ariaLabel="Client" onChange={value => (activity.client = value)} />
+    <Select value={activity.client} options={clientOptions} className="agent-activity-select" ariaLabel="Client" onChange={value => activity.setClient(value)} />
   </div>
 </div>
 
 {#if activity.error}<div class="agent-activity-error" role="alert">{activity.error}</div>{/if}
 
-{#if groups.length}
-  <div class="history-list agent-activity-list" role="list" aria-label="Agent activity">
-    {#each groups as group (group.label)}
-      <div class="agent-activity-group" role="presentation">{group.label}</div>
-      {#each group.entries as entry (entry.id)}
+{#if rows.length}
+  <VirtualList
+    {rows}
+    rowHeight={52}
+    className="history-list agent-activity-list"
+    role="list"
+    ariaLabel="Agent activity"
+    hasMore={activity.hasMore}
+    loadingMore={activity.loadingMore}
+    onEndReached={() => void activity.loadMore()}
+  >
+    {#snippet row(item)}
+      {#if item.kind === 'group'}
+        <div class="agent-activity-group" role="presentation">{item.label}</div>
+      {:else}
+        {@const entry = item.entry}
         {@const status = agentActivityStatus(entry)}
         <div class="history-entry agent-activity-row" class:active={activity.selectedId === entry.id} role="listitem">
           <button class="history-entry-main agent-activity-main" type="button" onclick={() => open(entry.id)} aria-current={activity.selectedId === entry.id ? 'true' : undefined}>
@@ -53,13 +72,13 @@
             <span class="agent-activity-meta">{[activity.allWorkspaces ? agentActivityPlace(entry) : '', entry.client, agentActivityFilesLabel(entry), entry.reverted ? 'restored' : ''].filter(Boolean).join(' · ')}</span>
           </button>
         </div>
-      {/each}
-    {/each}
-  </div>
-{:else if activity.entries.length}
+      {/if}
+    {/snippet}
+  </VirtualList>
+{:else if filtered}
   <div class="empty-state history-empty">
     <span class="empty-state-title">Nothing matches these filters.</span>
-    {#if filtered}<button class="btn btn-secondary" type="button" onclick={clearFilters}>Clear filters</button>{/if}
+    <button class="btn btn-secondary" type="button" onclick={clearFilters}>Clear filters</button>
   </div>
 {:else if activity.loaded}
   <div class="empty-state history-empty">

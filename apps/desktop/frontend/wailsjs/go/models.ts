@@ -993,6 +993,10 @@ export namespace model {
 	    since: number;
 	    until: number;
 	    limit: number;
+	    text?: string;
+	    before?: string;
+	    overviewSince?: number;
+	    todaySince?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentActivityFilter(source);
@@ -1007,7 +1011,51 @@ export namespace model {
 	        this.since = source["since"];
 	        this.until = source["until"];
 	        this.limit = source["limit"];
+	        this.text = source["text"];
+	        this.before = source["before"];
+	        this.overviewSince = source["overviewSince"];
+	        this.todaySince = source["todaySince"];
 	    }
+	}
+	export class AgentActivityOverview {
+	    today: number;
+	    week: number;
+	    errors: number;
+	    changed: number;
+	    changes: AgentActivitySummary[];
+	    problems: AgentActivitySummary[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentActivityOverview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.today = source["today"];
+	        this.week = source["week"];
+	        this.errors = source["errors"];
+	        this.changed = source["changed"];
+	        this.changes = this.convertValues(source["changes"], AgentActivitySummary);
+	        this.problems = this.convertValues(source["problems"], AgentActivitySummary);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class AgentActivitySummary {
 	    id: string;
@@ -1053,6 +1101,8 @@ export namespace model {
 	    entries: AgentActivitySummary[];
 	    enabled: boolean;
 	    error?: string;
+	    hasMore?: boolean;
+	    overview?: AgentActivityOverview;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentActivityList(source);
@@ -1063,6 +1113,8 @@ export namespace model {
 	        this.entries = this.convertValues(source["entries"], AgentActivitySummary);
 	        this.enabled = source["enabled"];
 	        this.error = source["error"];
+	        this.hasMore = source["hasMore"];
+	        this.overview = this.convertValues(source["overview"], AgentActivityOverview);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1083,6 +1135,7 @@ export namespace model {
 		    return a;
 		}
 	}
+	
 	
 	export class AgentPlanCall {
 	    tool: string;

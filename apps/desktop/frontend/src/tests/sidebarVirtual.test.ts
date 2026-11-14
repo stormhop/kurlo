@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { canGrowWindow, createRowMeasurer, createWindowGrower, GROWN_ROW_LIMIT, keptRowCount, virtualOverscan, virtualizeRows, windowScrollTop, type VirtualRow } from '../lib/sidebarVirtual';
+import { anchorOffset, canGrowWindow, createRowMeasurer, createWindowGrower, GROWN_ROW_LIMIT, keptRowCount, rowAnchor, virtualOverscan, virtualizeRows, windowScrollTop, type VirtualRow } from '../lib/sidebarVirtual';
 
 const OVERSCAN = 60;
 const MIN = 30;
@@ -188,6 +188,14 @@ describe('createRowMeasurer', () => {
     expect(heights.get('b')).toBe(44);
   });
 
+  it('measures a row as soon as it is mounted, before the observer reports, so rows drawn above the viewport cannot shift the list for a frame', () => {
+    stubResizeObserver();
+    const heights = new Map<string, number>([['a', 41]]);
+    const measure = createRowMeasurer(heights);
+    measure(row(120), 'a');
+    expect(heights.get('a')).toBe(120);
+  });
+
   it('ignores zero heights from hidden rows', () => {
     stubResizeObserver();
     const heights = new Map<string, number>();
@@ -284,5 +292,32 @@ describe('growing the window in the background', () => {
     vi.advanceTimersByTime(1000);
     expect(steps).toBe(5);
     vi.useRealTimers();
+  });
+});
+
+describe('row anchors', () => {
+  it('anchors to the first row that starts inside the viewport, so a half-hidden row growing does not push the rest down', () => {
+    const list = rows([40, 40, 40]);
+    expect(rowAnchor(list, 0)).toEqual({ key: 'r0', delta: 0 });
+    expect(rowAnchor(list, 55)).toEqual({ key: 'r2', delta: -25 });
+    expect(rowAnchor(list, 100)).toEqual({ key: 'r2', delta: 20 });
+    expect(rowAnchor(list, 500)).toBeNull();
+  });
+
+  it('puts the anchored row back under the viewport top after rows above it change height', () => {
+    const list = rows([40, 40, 40, 40]);
+    const measured = new Map<string, number>();
+    const anchor = rowAnchor(list, 90, measured)!;
+    expect(anchor).toEqual({ key: 'r3', delta: -30 });
+    measured.set('r0', 100);
+    measured.set('r1', 60);
+    expect(anchorOffset(list, anchor, measured)).toBe(170);
+    expect(anchorOffset(rows([40]), anchor, measured)).toBeNull();
+  });
+
+  it('scales estimated heights like the window does', () => {
+    const list = rows([40, 40]);
+    expect(rowAnchor(list, 50, undefined, 2)).toEqual({ key: 'r1', delta: -30 });
+    expect(anchorOffset(list, { key: 'r1', delta: 5 }, undefined, 2)).toBe(85);
   });
 });

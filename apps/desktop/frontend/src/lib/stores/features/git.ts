@@ -19,7 +19,7 @@ import { formatGitCommitToast, formatGitFetchToast, formatGitPullToast, formatGi
 import type { DialogOption } from '../../types/dialog';
 import type { TopView } from '../ui';
 
-export const GIT_LOG_PAGE_SIZE = 60;
+export const GIT_LOG_PAGE_SIZE = 100;
 const GIT_REMOTE_HELP = 'For a private repository Kurlo asks for a personal access token or an SSH key when it needs one. The token is kept encrypted on this device. SSH URLs look like git@gitlab.com:team/project.git.';
 
 export { EMPTY_GIT_STATUS };

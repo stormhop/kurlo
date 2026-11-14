@@ -86,6 +86,7 @@ export type AgentApprovalClosed = { id: string; chatId: string; decision: string
 export type AgentFileChange = Wire<model.AgentFileChange>;
 export type AgentResult = Wire<model.AgentResult>;
 export type AgentActivitySummary = Wire<model.AgentActivitySummary>;
+export type AgentActivityOverview = Wire<model.AgentActivityOverview>;
 export type AgentActivityEntry = Wire<model.AgentActivityEntry>;
 export type AgentActivityFilter = Wire<model.AgentActivityFilter>;
 export type AgentActivityList = Wire<model.AgentActivityList>;

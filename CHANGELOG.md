@@ -14,6 +14,8 @@ All notable changes to Kurlo are documented here. This project follows
 ### Fixed
 
 - **The sidebar hides and shows at once.** Toggling the sidebar no longer restyles the whole window: in workspaces with hundreds of requests the slide starts without a pause, and the hidden sidebar keeps only the rows on screen until it comes back.
+- **Long lists scroll the same way everywhere.** The collection runner drops its page buttons: requests and results are continuous lists that draw only the rows on screen, like the sidebar and the mock server. Agent activity shows the newest 100 calls and loads older ones as you scroll, so the whole log is reachable; its search, client filter and seven-day summary cover every stored call, not only the loaded ones.
+- **Chats and Git history load more as you scroll.** A long agent chat loads earlier messages when you scroll up, without the *Load earlier messages* button, and fills a short first page up to the window by itself; the conversation can be focused with `Tab` and scrolled with the keyboard. Git history loads older commits 100 at a time, like agent activity.
 
 ## [3.1.0] - 2026-11-13
 

@@ -1,9 +1,6 @@
 <script lang="ts">
+  import VirtualList from './VirtualList.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
-  import { untrack } from 'svelte';
-  import { uiScale } from '../uiScale';
-  import { canGrowWindow } from '../sidebarVirtual';
-  import { WindowGrowth } from '../windowGrowth.svelte';
   import { tabListKeyboard } from '../a11y';
   import { gitDiffRows, type GitDiffRow } from '../gitDiffRows';
   import { kurloChangedFiles, otherChangedFileCount } from '../gitFiles';
@@ -123,7 +120,6 @@
 
   const FILE_ROW_HEIGHT = 30;
   const COMMIT_ROW_HEIGHT = 56;
-  const VIRTUAL_OVERSCAN = 8;
   const YAML_PAGE_SIZE = 6;
 
   type BranchRow = {
@@ -161,15 +157,11 @@
   let branchPickerOpen = $state(false);
   let branchPopoverEl = $state<HTMLElement | null>(null);
   let moreMenuOpen = $state(false);
-  let fileScrollTop = $state(0);
-  let fileListHeight = $state(320);
   let branchActionMenuKey = $state('');
   let branchActionMenuTop = $state(0);
   let branchActionMenuRight = $state(0);
   let localBranchesCollapsed = $state(false);
   let remoteBranchesCollapsed = $state(false);
-  let commitScrollTop = $state(0);
-  let commitListHeight = $state(320);
   let sideTab = $state<'changes' | 'history'>('changes');
   let yamlDiagnosticTotal = $derived(workspaceDiagnostics.length);
   let visibleYamlDiagnostics = $derived(workspaceDiagnostics.slice(0, yamlVisibleCount));
@@ -249,34 +241,10 @@
     ...(!remoteBranchesCollapsed ? visibleRemoteBranchRows.map(row => ({ kind: 'branch' as const, key: row.key, row })) : []),
   ] satisfies BranchListItem[]);
   let commitRows = $derived(commits.commits ?? []);
-  let commitListEl = $state<HTMLElement | undefined>();
   let olderCommitsFailedFor = $state.raw<GitLogResult | null>(null);
   let selectedCommitInfo = $derived(commitRows.find(commit => commit.hash === selectedCommit));
-  const fileGrowth = new WindowGrowth((): boolean => canGrowWindow({ rows: virtualChangedFiles, before: fileWindow.before, after: fileWindow.after }));
-  const commitGrowth = new WindowGrowth((): boolean => canGrowWindow({ rows: virtualCommitRows, before: commitWindow.before, after: commitWindow.after }));
-  let fileWindow = $derived(virtualWindow(changedFiles.length, FILE_ROW_HEIGHT * $uiScale, fileScrollTop, fileListHeight, fileGrowth.extra));
-  let commitWindow = $derived(virtualWindow(commitRows.length, COMMIT_ROW_HEIGHT * $uiScale, commitScrollTop, commitListHeight, commitGrowth.extra));
-  let virtualChangedFiles = $derived(changedFiles.slice(fileWindow.start, fileWindow.end));
-  let virtualCommitRows = $derived(commitRows.slice(commitWindow.start, commitWindow.end));
-
-  $effect.pre(() => {
-    const keys = changedFiles.map(file => file.path);
-    untrack(() => fileGrowth.rowsChanged(keys));
-  });
-  $effect.pre(() => {
-    const keys = commitRows.map(commit => commit.hash);
-    untrack(() => commitGrowth.rowsChanged(keys));
-  });
-  $effect(() => {
-    fileGrowth.rendered(virtualChangedFiles.map(file => file.path));
-  });
-  $effect(() => {
-    commitGrowth.rendered(virtualCommitRows.map(commit => commit.hash));
-  });
-  $effect(() => () => {
-    fileGrowth.destroy();
-    commitGrowth.destroy();
-  });
+  let fileRows = $derived(changedFiles.map(file => ({ key: file.path, height: FILE_ROW_HEIGHT, file })));
+  let commitListRows = $derived(commitRows.map(commit => ({ key: commit.hash, height: COMMIT_ROW_HEIGHT, commit })));
   let conflictOursLines = $derived(conflict.oursContent ? conflict.oursContent.split('\n') : []);
   let conflictTheirsLines = $derived(conflict.theirsContent ? conflict.theirsContent.split('\n') : []);
   let conflictBlocks = $derived(parseGitConflictBlocks(conflictDraft));
@@ -455,30 +423,6 @@
     queueMicrotask(focusCurrentConflict);
   }
 
-  function virtualWindow(total: number, rowHeight: number, scrollTop: number, viewportHeight: number, extraRows = 0) {
-    const safeTotal = Math.max(0, total);
-    const safeRowHeight = Math.max(1, rowHeight);
-    const safeViewport = Math.max(safeRowHeight, viewportHeight || safeRowHeight * 8);
-    const maxStart = Math.max(0, safeTotal - 1);
-    const overscan = Math.max(VIRTUAL_OVERSCAN, Math.ceil((safeViewport * 1.5) / safeRowHeight));
-    let start = Math.min(maxStart, Math.max(0, Math.floor(scrollTop / safeRowHeight) - overscan));
-    const visibleCount = Math.ceil(safeViewport / safeRowHeight) + overscan * 2;
-    let end = Math.min(safeTotal, start + visibleCount);
-    let budget = Math.max(0, Math.floor(extraRows));
-    const above = Math.min(start, Math.ceil(budget / 2));
-    start -= above;
-    budget -= above;
-    const below = Math.min(safeTotal - end, budget);
-    end += below;
-    start -= Math.min(start, budget - below);
-    return {
-      start,
-      end,
-      before: start * safeRowHeight,
-      after: Math.max(0, (safeTotal - end) * safeRowHeight),
-    };
-  }
-
   let olderCommitsPending = $state(false);
 
   async function loadOlderCommits() {
@@ -491,25 +435,6 @@
     } finally {
       olderCommitsPending = false;
     }
-  }
-
-  function loadMoreCommitsNearEnd(node: HTMLElement | undefined) {
-    if (!node || !commits.hasMore || logLoadingMore || olderCommitsPending || olderCommitsFailedFor === commits) return;
-    if (node.scrollHeight - node.scrollTop - node.clientHeight <= node.clientHeight * 1.5) void loadOlderCommits();
-  }
-
-  $effect(() => {
-    if (sideTab !== 'history' || !commitListEl || !commits.hasMore || logLoadingMore || olderCommitsPending || commitListHeight <= 0) return;
-    commitRows.length;
-    const node = commitListEl;
-    untrack(() => loadMoreCommitsNearEnd(node));
-  });
-
-  function updateVirtualScroll(event: Event, setScrollTop: (value: number) => void, setHeight: (value: number) => void) {
-    const target = event.currentTarget;
-    if (!(target instanceof HTMLElement)) return;
-    setScrollTop(target.scrollTop);
-    setHeight(target.clientHeight);
   }
 
   function pathName(path: string) {
@@ -1305,14 +1230,17 @@
           {#if commits.error}
             <div class="git-empty error">{commits.error}</div>
           {:else if commitRows.length}
-            <div
-              class="git-commit-list virtual"
-              bind:this={commitListEl}
-              bind:clientHeight={commitListHeight}
-              onscroll={(event) => { commitGrowth.scrolled(event.currentTarget.scrollTop, event.currentTarget.clientHeight, commitWindow.before, commitWindow.before + (commitWindow.end - commitWindow.start) * COMMIT_ROW_HEIGHT * $uiScale); updateVirtualScroll(event, value => (commitScrollTop = value), value => (commitListHeight = value)); loadMoreCommitsNearEnd(commitListEl); }}
+            <VirtualList
+              rows={commitListRows}
+              rowHeight={COMMIT_ROW_HEIGHT}
+              className="git-commit-list virtual"
+              growLimit={600}
+              loadingLabel="Loading older commits"
+              hasMore={commits.hasMore && olderCommitsFailedFor !== commits}
+              loadingMore={commits.hasMore && (logLoadingMore || olderCommitsPending) && olderCommitsFailedFor !== commits}
+              onEndReached={() => void loadOlderCommits()}
             >
-              <div class="git-list-spacer" style={`height: ${commitWindow.before}px`}></div>
-              {#each virtualCommitRows as commit (commit.hash)}
+              {#snippet row({ commit })}
                 <button
                   class="git-commit-row"
                   class:active={selectedCommit === commit.hash}
@@ -1324,17 +1252,16 @@
                     <small>{commit.shortHash} · {commit.author} · {commitDateLabel(commit.date)}</small>
                   </span>
                 </button>
-              {/each}
-              <div class="git-list-spacer" style={`height: ${commitWindow.after}px`}></div>
-              {#if commits.hasMore && olderCommitsFailedFor === commits}
-                <div class="git-list-more error" role="alert">
-                  <span>Older commits could not be loaded.</span>
-                  <button class="btn btn-ghost btn-sm" type="button" onclick={loadOlderCommits}>Retry</button>
-                </div>
-              {:else if commits.hasMore && logLoadingMore}
-                <div class="git-list-more" role="status"><GitIcon name="download" busy />Loading older commits…</div>
-              {/if}
-            </div>
+              {/snippet}
+              {#snippet footer()}
+                {#if commits.hasMore && olderCommitsFailedFor === commits}
+                  <div class="git-list-more error" role="alert">
+                    <span>Older commits could not be loaded.</span>
+                    <button class="btn btn-ghost btn-sm" type="button" onclick={loadOlderCommits}>Retry</button>
+                  </div>
+                {/if}
+              {/snippet}
+            </VirtualList>
           {:else}
             <div class="empty-state git-empty">No commits yet</div>
           {/if}
@@ -1402,14 +1329,8 @@
             <div class="empty-state git-empty"><span class="empty-state-title">No changed files</span></div>
             {#if otherChangeCount}<p class="git-other-changes">{otherChangeCount} other {otherChangeCount === 1 ? 'change' : 'changes'} in this repository {otherChangeCount === 1 ? "isn't a Kurlo file" : "aren't Kurlo files"}. Commit {otherChangeCount === 1 ? 'it' : 'them'} with your usual Git tool.</p>{/if}
           {:else}
-            <div
-              class="git-file-list virtual"
-              role="list"
-              bind:clientHeight={fileListHeight}
-              onscroll={(event) => { fileGrowth.scrolled(event.currentTarget.scrollTop, event.currentTarget.clientHeight, fileWindow.before, fileWindow.before + (fileWindow.end - fileWindow.start) * FILE_ROW_HEIGHT * $uiScale); updateVirtualScroll(event, value => (fileScrollTop = value), value => (fileListHeight = value)); }}
-            >
-              <div class="git-list-spacer" style={`height: ${fileWindow.before}px`}></div>
-              {#each virtualChangedFiles as file (file.path)}
+            <VirtualList rows={fileRows} rowHeight={FILE_ROW_HEIGHT} className="git-file-list virtual" role="list" growLimit={600}>
+              {#snippet row({ file })}
                 <div class="git-file-row" class:active={selectedPath === file.path} class:selected={selectedFileSet.has(file.path)} role="listitem">
                   <input
                     class="git-file-check check"
@@ -1430,9 +1351,8 @@
                     <span class="sr-only">{file.status}</span>
                   </button>
                 </div>
-              {/each}
-              <div class="git-list-spacer" style={`height: ${fileWindow.after}px`}></div>
-            </div>
+              {/snippet}
+            </VirtualList>
             {#if otherChangeCount}<p class="git-other-changes">{otherChangeCount} other {otherChangeCount === 1 ? 'change' : 'changes'} in this repository {otherChangeCount === 1 ? "isn't a Kurlo file" : "aren't Kurlo files"}. Commit {otherChangeCount === 1 ? 'it' : 'them'} with your usual Git tool.</p>{/if}
           {/if}
         {/if}

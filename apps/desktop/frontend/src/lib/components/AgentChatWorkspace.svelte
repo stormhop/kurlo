@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { autoSizeTextarea } from '../textareaSizing';
   import { agentEffortChoice, agentEffortToStore } from '../agent';
@@ -372,6 +373,8 @@
     approvalCount = count;
   });
 
+  const EARLIER_EDGE = 160;
+
   function loadEarlier() {
     history?.captureAnchor();
     stickToBottom = false;
@@ -381,8 +384,19 @@
   function onScroll() {
     if (!scroller) return;
     stickToBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 48;
-    if (!stickToBottom && scroller.scrollTop < 160 && !agentStore.historyError) void agentStore.loadEarlier();
+    if (!stickToBottom && scroller.scrollTop < EARLIER_EDGE && !agentStore.historyError) void agentStore.loadEarlier();
   }
+
+  $effect(() => {
+    const node = scroller;
+    const offset = agentStore.activeChat?.messageOffset ?? 0;
+    turns.length;
+    if (!node || !offset || agentStore.loadingEarlier || agentStore.historyError) return;
+    const frame = requestAnimationFrame(() => {
+      if (node.scrollHeight - node.clientHeight < EARLIER_EDGE) void agentStore.loadEarlier();
+    });
+    return () => cancelAnimationFrame(frame);
+  });
 
   function prettyJSON(text: string | undefined) {
     const value = (text ?? '').trim();
@@ -728,7 +742,8 @@
     <div class="agent-body" class:details-open={agentNavigation.detailsOpen} class:details-cover={detailsCover} style:--agent-details-w={detailsCover ? `calc(100vw - var(--rail-w) - ${rem(shellLayout.sidebarWidth)})` : undefined}>
       <div class="agent-main-slot" class:covered={agentNavigation.detailsOpen && detailsCover} inert={agentNavigation.detailsOpen && detailsCover}>
       <div class="agent-main">
-        <div class="agent-chat" bind:this={scroller}>
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <div class="agent-chat" bind:this={scroller} role="region" aria-label="Conversation" tabindex="0">
           {#if agentStore.loadError}
             {@render errorCard(agentStore.loadError)}
           {:else if !turns.length && !agentStore.activeChatId}
@@ -755,10 +770,10 @@
             </div>
           {/if}
 
-          {#if agentStore.activeChat?.messageOffset}
-            <button class="btn btn-ghost btn-sm agent-earlier" type="button" disabled={agentStore.loadingEarlier} onclick={loadEarlier}>{agentStore.loadingEarlier ? 'Loading earlier messages…' : 'Load earlier messages'}</button>
+          {#if agentStore.activeChat?.messageOffset && agentStore.loadingEarlier}
+            <div class="agent-earlier"><BirdSpinner size="1.5rem" label="Loading earlier messages" /></div>
           {/if}
-          {#if agentStore.historyError}<div class="agent-note" role="alert">{agentStore.historyError}</div>{/if}
+          {#if agentStore.historyError}<div class="agent-note agent-history-error"><span role="alert">{agentStore.historyError}</span><button class="btn btn-ghost btn-sm" type="button" onclick={loadEarlier}>Retry</button></div>{/if}
           {#key `${agentStore.workspaceId}:${agentStore.activeChatId}`}
           <VirtualAgentHistory bind:this={history} items={turns} {scroller} follow={stickToBottom} {onScroll}>
             {#snippet children(turn)}
@@ -2106,8 +2121,14 @@
     -webkit-user-select: text;
   }
   .agent-earlier {
-    align-self: center;
-    color: var(--text-2);
+    display: flex;
+    justify-content: center;
+    padding: var(--space-2) 0;
+  }
+  .agent-history-error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
   .agent-context-panel {
     display: flex;

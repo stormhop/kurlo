@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AgentActivitySummary, AgentApproval } from '../lib/backend';
 import {
   agentActivityChangeStatus, agentActivityChatMode, agentActivityClients, agentActivityGroups, agentActivityPretty,
-  agentActivityFileName, agentActivityOverview, agentActivityPlace, agentActivityRestorable, agentActivityStatus, filterAgentActivity,
+  agentActivityFileName, agentActivityPlace, agentActivityRestorable, agentActivityStatus,
 } from '../lib/agentActivity';
 import { agentApprovalAction, agentApprovalTitle, agentToolLabel } from '../lib/agent';
 
@@ -20,24 +20,7 @@ describe('agent activity', () => {
     entry('c', { client: 'Codex via Kurlo', tool: 'git_push', status: 'declined', time: now - 10 * 24 * hour }),
   ];
 
-  it('filters by words and client', () => {
-    expect(filterAgentActivity(entries, { text: 'create order', client: '' }).map(item => item.id)).toEqual(['a']);
-    expect(filterAgentActivity(entries, { text: 'delete', client: '' })).toEqual([]);
-    expect(filterAgentActivity(entries, { text: 'create-order', client: '' }).map(item => item.id)).toEqual(['a']);
-    expect(filterAgentActivity(entries, { text: 'orders-1a2b3c', client: '' }).map(item => item.id)).toEqual(['a']);
-    expect(filterAgentActivity(entries, { text: '', client: 'Claude Code' }).map(item => item.id)).toEqual(['b']);
-  });
-
-  it('sums up the last seven days for the overview', () => {
-    const recent = [
-      ...entries,
-      entry('d', { tool: 'run_request', status: 'error', error: 'timeout', time: now - 2 * hour }),
-      entry('e', { tool: 'save_request', status: 'declined', files: ['workspaces/Demo/collections/Shop/requests/Delete.yml'], time: now - 3 * hour }),
-    ].sort((a, b) => b.time - a.time);
-    const overview = agentActivityOverview(recent, now);
-    expect(overview).toMatchObject({ today: 3, week: 4, errors: 1, changed: 1 });
-    expect(overview.changes.map(item => item.id)).toEqual(['a']);
-    expect(overview.problems.map(item => item.id)).toEqual(['d', 'e']);
+  it('names an activity file by its request', () => {
     expect(agentActivityFileName('workspaces/Demo/collections/Shop/requests/Create-order.yml')).toBe('Create-order');
     expect(agentActivityFileName('notes.md')).toBe('notes.md');
   });

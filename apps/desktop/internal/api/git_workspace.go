@@ -24,7 +24,7 @@ import (
 const (
 	gitCommandTimeout    = 2 * time.Minute
 	maxGitDiffBytes      = 768 * 1024
-	defaultGitLogPageLen = 60
+	defaultGitLogPageLen = 100
 	maxGitLogPageLen     = 200
 )
 

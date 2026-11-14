@@ -2166,12 +2166,6 @@
   overflow: auto;
 }
 
-.git-list-spacer {
-  display: block;
-  min-height: 0;
-  pointer-events: none;
-}
-
 .git-file-row {
   display: grid;
   align-items: center;
@@ -4301,30 +4295,6 @@
   max-height: 48%;
   flex: 0 1 48%;
   border-bottom: 1px solid var(--border-subtle);
-}
-
-.runner-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  min-height: 2.375rem;
-  padding: 0 var(--space-4);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--surface);
-  color: var(--text-3);
-  font-size: var(--text-label);
-  font-weight: var(--weight-semibold);
-}
-
-.runner-results-pagination {
-  border-top: 1px solid var(--border-subtle);
-}
-
-.runner-page-buttons {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .runner-request-row {

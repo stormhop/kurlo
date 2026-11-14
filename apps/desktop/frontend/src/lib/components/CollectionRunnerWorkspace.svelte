@@ -1,4 +1,5 @@
 <script lang="ts">
+  import VirtualList from './VirtualList.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { useClock } from '../clock.svelte';
   const now = useClock();
@@ -97,26 +98,25 @@
   let runnableCount = $derived(filteredRequests.filter(request => !isRequestSkipped(request)).length);
   let runCount = $derived(selectedCount * Math.max(1, iterations));
   let hasResults = $derived(results.length > 0);
-  const RUNNER_REQUEST_PAGE_SIZE = 100;
-  const RUNNER_RESULT_PAGE_SIZE = 100;
-  let requestPage = $state(0);
-  let resultPage = $state(0);
-  let requestPageCount = $derived(pageCount(filteredRequests.length, RUNNER_REQUEST_PAGE_SIZE));
+  const RUNNER_ROW_HEIGHT = 38;
+  let pageBody = $state<HTMLElement | undefined>();
   let failedOnly = $state(false);
   let failedCount = $derived(results.filter(isFailure).length);
   let shownResults = $derived(failedOnly && failedCount ? results.filter(isFailure) : results);
-  let resultPageCount = $derived(pageCount(shownResults.length, RUNNER_RESULT_PAGE_SIZE));
-  let visibleRequests = $derived(filteredRequests.slice(requestPage * RUNNER_REQUEST_PAGE_SIZE, (requestPage + 1) * RUNNER_REQUEST_PAGE_SIZE));
-  let visibleResults = $derived(shownResults.slice(resultPage * RUNNER_RESULT_PAGE_SIZE, (resultPage + 1) * RUNNER_RESULT_PAGE_SIZE));
-
-  $effect(() => {
-    filteredRequests.length;
-    if (requestPage >= requestPageCount) requestPage = Math.max(0, requestPageCount - 1);
-  });
-
-  $effect(() => {
-    shownResults.length;
-    if (resultPage >= resultPageCount) resultPage = Math.max(0, resultPageCount - 1);
+  let resultRows = $derived(shownResults.map(result => ({ key: `result:${result.runId}`, height: RUNNER_ROW_HEIGHT, result })));
+  type RequestListRow =
+    | { key: string; height: number; kind: 'folder'; folder: string }
+    | { key: string; height: number; kind: 'request'; request: SavedRequest };
+  let requestRows = $derived.by(() => {
+    const rows: RequestListRow[] = [];
+    let previous = '';
+    for (const request of filteredRequests) {
+      const folder = folderOf(request);
+      if (folder && folder !== previous) rows.push({ key: `folder:${request.id}`, height: 30, kind: 'folder', folder });
+      previous = folder;
+      rows.push({ key: `request:${request.id}`, height: 46, kind: 'request', request });
+    }
+    return rows;
   });
 
   function isFailure(result: CollectionRunnerResult) {
@@ -127,20 +127,8 @@
     return request.folderPath.join(' / ');
   }
 
-  function pageCount(total: number, size: number): number {
-    return Math.max(1, Math.ceil(total / size));
-  }
-
   function inputValue(event: Event): string {
     return event.currentTarget instanceof HTMLInputElement ? event.currentTarget.value : '';
-  }
-
-
-  function rangeLabel(page: number, size: number, total: number): string {
-    if (!total) return '0 of 0';
-    const start = page * size + 1;
-    const end = Math.min(total, (page + 1) * size);
-    return `${start}-${end} of ${total}`;
   }
 
   function statusLabel(result: CollectionRunnerResult) {
@@ -262,7 +250,7 @@
         {/if}
       </div>
     </header>
-    <div class="runner-page-body">
+    <div class="runner-page-body" bind:this={pageBody}>
     {#if hasResults}
       {@const verdict = running ? 'running' : summary.allPassed ? 'pass' : summary.failed > 0 ? 'fail' : 'stopped'}
       <section class="runner-results-panel" aria-label="Run results">
@@ -313,21 +301,12 @@
             <p class="runner-last-run">Last run {relativeTime(lastRunAt, now())}{#if results.length < summary.total} · {results.length} of {summary.total} results kept{/if}</p>
           {/if}
         </div>
-        {#if shownResults.length > RUNNER_RESULT_PAGE_SIZE}
-          <div class="runner-pagination runner-results-pagination" aria-label="Runner result pages">
-            <span>Results {rangeLabel(resultPage, RUNNER_RESULT_PAGE_SIZE, shownResults.length)}</span>
-            <div class="runner-page-buttons">
-              <button class="btn btn-secondary btn-sm" type="button" onclick={() => (resultPage = Math.max(0, resultPage - 1))} disabled={resultPage === 0}>Prev</button>
-              <span>{resultPage + 1}/{resultPageCount}</span>
-              <button class="btn btn-secondary btn-sm" type="button" onclick={() => (resultPage = Math.min(resultPageCount - 1, resultPage + 1))} disabled={resultPage + 1 >= resultPageCount}>Next</button>
-            </div>
-          </div>
-        {/if}
         <div class="runner-results-table">
           <div class="runner-result-row runner-result-head" aria-hidden="true">
             <span></span><span>Request</span><span>Status</span><span>Time</span><span>Checks</span>
           </div>
-          {#each visibleResults as result (result.runId)}
+          <VirtualList rows={resultRows} rowHeight={RUNNER_ROW_HEIGHT} scroller={pageBody}>
+            {#snippet row({ result })}
             <div class="runner-result-row" data-testid="runner-result-row" class:running={result.status === 'running'} class:pass={result.status === 'passed'} class:fail={result.status === 'failed' || result.status === 'error'}>
               <span class="collection-method {methodColor(result.method)}">{requestKindShortLabel(result.method)}</span>
               <div class="runner-request-main">
@@ -349,7 +328,8 @@
                 </ul>
               {/if}
             </div>
-          {/each}
+            {/snippet}
+          </VirtualList>
         </div>
       </section>
     {/if}
@@ -362,30 +342,21 @@
           <button class="btn btn-ghost btn-sm" type="button" onclick={onDeselectAll} disabled={running || !selectedCount}>Deselect all</button>
         </div>
       </div>
-      {#if filteredRequests.length > RUNNER_REQUEST_PAGE_SIZE}
-        <div class="runner-pagination" aria-label="Runner request pages">
-          <span>Requests {rangeLabel(requestPage, RUNNER_REQUEST_PAGE_SIZE, filteredRequests.length)}</span>
-          <div class="runner-page-buttons">
-            <button class="btn btn-secondary btn-sm" type="button" onclick={() => (requestPage = Math.max(0, requestPage - 1))} disabled={requestPage === 0}>Prev</button>
-            <span>{requestPage + 1}/{requestPageCount}</span>
-            <button class="btn btn-secondary btn-sm" type="button" onclick={() => (requestPage = Math.min(requestPageCount - 1, requestPage + 1))} disabled={requestPage + 1 >= requestPageCount}>Next</button>
-          </div>
-        </div>
-      {/if}
       <div class="runner-request-list">
         {#if !collections.length}
           <div class="empty-state runner-empty"><span class="empty-state-title">No collections in this workspace</span></div>
         {:else if !filteredRequests.length}
           <div class="empty-state runner-empty"><span class="empty-state-title">No requests match the current filters</span></div>
         {:else}
-          {#each visibleRequests as request, index (request.id)}
+          <VirtualList rows={requestRows} rowHeight={46} scroller={pageBody}>
+            {#snippet row(item)}
+            {#if item.kind === 'folder'}
+              <div class="runner-folder">{item.folder}</div>
+            {:else}
+            {@const request = item.request}
             {@const skipped = isRequestSkipped(request)}
             {@const tags = requestTags(request)}
             {@const transportLabel = requestTransportLabel(request)}
-            {@const folder = folderOf(request)}
-            {#if folder && (index === 0 || folderOf(visibleRequests[index - 1]) !== folder)}
-              <div class="runner-folder">{folder}</div>
-            {/if}
             <label class="runner-request-row" data-testid="runner-request-row" class:selected={selectedSet.has(request.id)} class:skipped={skipped}>
               <input
                 type="checkbox"
@@ -408,7 +379,9 @@
                 {/if}
               </span>
             </label>
-          {/each}
+            {/if}
+            {/snippet}
+          </VirtualList>
         {/if}
       </div>
     </section>

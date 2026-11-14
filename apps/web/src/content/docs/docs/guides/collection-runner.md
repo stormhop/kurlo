@@ -93,6 +93,8 @@ Reports are local files; Kurlo does not upload them anywhere.
 
 Kurlo remembers the most recent finished run of each collection — every request's status, time, checks and error, up to 500 results. Open the runner on that collection, or switch its *Collection* picker back to it, and the results are there with *Last run* and when it happened above them, until you run again. The collection's own page shows the same run as one line — *Last run 2 hours ago · 12 of 13 passed* — and the link opens the runner.
 
+The request list and the results are one continuous list each, however many requests the collection has: scroll through them, there are no pages.
+
 After a run, **Failed** above the results narrows the list to the requests that failed or errored, with their failed checks; **All** shows everything again.
 
 A run where every request was skipped is not recorded. The results live in the encrypted local profile next to your history, never in the workspace YAML, so they are not committed to Git and stay on this device.

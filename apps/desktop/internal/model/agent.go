@@ -256,12 +256,27 @@ type AgentActivityFilter struct {
 	Since         int64  `json:"since"`
 	Until         int64  `json:"until"`
 	Limit         int    `json:"limit"`
+	Text          string `json:"text,omitempty"`
+	Before        string `json:"before,omitempty"`
+	OverviewSince int64  `json:"overviewSince,omitempty"`
+	TodaySince    int64  `json:"todaySince,omitempty"`
+}
+
+type AgentActivityOverview struct {
+	Today    int                    `json:"today"`
+	Week     int                    `json:"week"`
+	Errors   int                    `json:"errors"`
+	Changed  int                    `json:"changed"`
+	Changes  []AgentActivitySummary `json:"changes"`
+	Problems []AgentActivitySummary `json:"problems"`
 }
 
 type AgentActivityList struct {
-	Entries []AgentActivitySummary `json:"entries"`
-	Enabled bool                   `json:"enabled"`
-	Error   string                 `json:"error,omitempty"`
+	Entries  []AgentActivitySummary `json:"entries"`
+	Enabled  bool                   `json:"enabled"`
+	Error    string                 `json:"error,omitempty"`
+	HasMore  bool                   `json:"hasMore,omitempty"`
+	Overview *AgentActivityOverview `json:"overview,omitempty"`
 }
 
 type AgentResult struct {

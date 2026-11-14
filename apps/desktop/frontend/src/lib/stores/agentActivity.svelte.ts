@@ -1,16 +1,26 @@
 import {
   agentActivity, agentActivityEntry, clearAgentActivity, revertAgentActivity, setAgentActivityEnabled,
-  type AgentActivityEntry, type AgentActivitySummary,
+  type AgentActivityEntry, type AgentActivityOverview, type AgentActivitySummary,
 } from '../backend';
 
-const ACTIVITY_LIMIT = 500;
+const ACTIVITY_PAGE = 100;
+const FILTER_DELAY_MS = 250;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
 class AgentActivityStore {
-  entries = $state<AgentActivitySummary[]>([]);
+  entries = $state.raw<AgentActivitySummary[]>([]);
+  overview = $state.raw<AgentActivityOverview | null>(null);
+  hasMore = $state(false);
+  loadingMore = $state(false);
   enabled = $state(true);
   loaded = $state(false);
   loading = $state(false);
@@ -26,18 +36,26 @@ class AgentActivityStore {
   busy = $state('');
   private request = 0;
   private detailRequest = 0;
+  private filterTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private filter() {
+    return { limit: ACTIVITY_PAGE, workspaceId: this.workspaceId, allWorkspaces: this.allWorkspaces, text: this.text.trim(), client: this.client };
+  }
 
   async refresh(workspaceId = this.workspaceId) {
     const request = ++this.request;
     this.workspaceId = workspaceId;
     this.loading = true;
+    this.loadingMore = false;
     try {
-      const list = await agentActivity({ limit: ACTIVITY_LIMIT, workspaceId, allWorkspaces: this.allWorkspaces });
+      const list = await agentActivity({ ...this.filter(), overviewSince: Date.now() - 7 * DAY_MS, todaySince: startOfToday() });
       if (request !== this.request) return;
       this.entries = list.entries ?? [];
+      this.hasMore = Boolean(list.hasMore);
+      this.overview = list.overview ?? null;
       this.enabled = list.enabled;
       this.error = list.error ?? '';
-      if (this.selectedId && !this.entries.some(entry => entry.id === this.selectedId)) this.deselect();
+      if (this.selectedId && !this.hasMore && !this.text.trim() && !this.client && !this.entries.some(entry => entry.id === this.selectedId)) this.deselect();
     } catch (error) {
       if (request === this.request) this.error = message(error);
     } finally {
@@ -46,6 +64,48 @@ class AgentActivityStore {
         this.loaded = true;
       }
     }
+  }
+
+  async loadMore() {
+    if (!this.hasMore || this.loadingMore || this.loading) return;
+    const last = this.entries[this.entries.length - 1];
+    if (!last) return;
+    const request = this.request;
+    this.loadingMore = true;
+    try {
+      const list = await agentActivity({ ...this.filter(), before: last.id });
+      if (request !== this.request) return;
+      const known = new Set(this.entries.map(entry => entry.id));
+      this.entries = [...this.entries, ...(list.entries ?? []).filter(entry => !known.has(entry.id))];
+      this.hasMore = Boolean(list.hasMore);
+      this.error = list.error ?? '';
+    } catch (error) {
+      if (request === this.request) this.error = message(error);
+    } finally {
+      if (request === this.request) this.loadingMore = false;
+    }
+  }
+
+  setText(text: string) {
+    this.text = text;
+    if (this.filterTimer) clearTimeout(this.filterTimer);
+    this.filterTimer = setTimeout(() => {
+      this.filterTimer = null;
+      void this.refresh();
+    }, FILTER_DELAY_MS);
+  }
+
+  setClient(client: string) {
+    this.client = client;
+    void this.refresh();
+  }
+
+  clearFilters() {
+    if (this.filterTimer) clearTimeout(this.filterTimer);
+    this.filterTimer = null;
+    this.text = '';
+    this.client = '';
+    void this.refresh();
   }
 
   setAllWorkspaces(all: boolean) {
@@ -117,6 +177,8 @@ class AgentActivityStore {
     }
     this.deselect();
     this.entries = [];
+    this.hasMore = false;
+    this.overview = null;
   }
 }
 
