@@ -5,17 +5,19 @@
     mode = 'perched',
     envelope = false,
     size = '3rem',
+    tone = 'brand',
   }: {
     mode?: 'perched' | 'flying';
     envelope?: boolean;
     size?: string;
+    tone?: 'brand' | 'current';
   } = $props();
 
   let height = $derived(envelope ? 560 : 460);
 </script>
 
 <svg
-  class="kurlo-bird kurlo-bird-{mode}"
+  class="kurlo-bird kurlo-bird-{mode} kurlo-bird-tone-{tone}"
   viewBox="220 290 580 {height}"
   style={`width: ${size}; aspect-ratio: 580 / ${height}`}
   aria-hidden="true"
@@ -63,6 +65,15 @@
     transform-box: fill-box;
     transform-origin: center;
     animation: kurlo-bird-blink 4.5s infinite;
+  }
+  .kurlo-bird-tone-current .kurlo-bird-body {
+    fill: currentColor;
+  }
+  .kurlo-bird-tone-current .kurlo-bird-stripe {
+    stroke: color-mix(in srgb, currentColor 45%, transparent);
+  }
+  .kurlo-bird-tone-current .kurlo-bird-wing {
+    fill: color-mix(in srgb, currentColor 45%, transparent);
   }
   .kurlo-bird-envelope {
     fill: #f7f3ea;
