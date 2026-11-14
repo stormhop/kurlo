@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { tick } from 'svelte';
   import { SvelteSet } from 'svelte/reactivity';
@@ -267,7 +268,7 @@
                         <pre class="ai-tool-body">{result.text}</pre>
                       </div>
                     {:else if step.done && step.stopReason === 'tool_use' && streaming}
-                      <div class="ai-tool-result ai-tool-pending"><span class="spinner spinner-inline"></span>Running…</div>
+                      <div class="ai-tool-result ai-tool-pending"><BirdSpinner />Running…</div>
                     {/if}
                   </div>
                 {/if}

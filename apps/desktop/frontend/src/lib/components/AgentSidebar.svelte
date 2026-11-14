@@ -228,7 +228,7 @@
         <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
         <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
       </svg>
-      <input bind:value={query} placeholder="Search chats" aria-label="Filter chats" spellcheck="false" />
+      <input bind:value={query} placeholder="Search chats" aria-label="Filter chats" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
     </div>
   {/if}
 
@@ -252,6 +252,9 @@
                   spellcheck="false"
                   onkeydown={onRenameKeydown}
                   onblur={() => void commitRename()}
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="none"
                 />
                 {#if renameError}<span class="agent-rename-error" role="alert">{renameError}</span>{/if}
               </div>

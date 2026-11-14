@@ -377,6 +377,9 @@
     {list}
     {disabled}
     {spellcheck}
+    autocomplete="off"
+    autocorrect="off"
+    autocapitalize="none"
     oninput={onInput}
     onfocus={onFocus}
     onclick={onClick}
@@ -386,7 +389,6 @@
     onpaste={(event) => { onpaste?.(event); setTimeout(() => { refreshMenu(); refreshPicker(); }, 0); }}
     onscroll={syncScroll}
     use:wheelScrollAction
-    autocomplete="off"
   />
   {#if validationMessage}
     <button class="input-validation-anchor" type="button" aria-label={validationMessage}>

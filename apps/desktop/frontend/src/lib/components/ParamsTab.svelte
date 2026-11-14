@@ -36,7 +36,7 @@
       <input type="checkbox" class="check" bind:checked={row.enabled} onchange={() => vm.syncUrlFromParams()} aria-label="Enable" disabled={!row.key && !row.value} />
       <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={vm.variableSuggestions} placeholder="Key" oninput={() => { guardTrailing(vm.params, i); vm.syncUrlFromParams(); }} />
       <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => { guardTrailing(vm.params, i); vm.syncUrlFromParams(); }} />
-      <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+      <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
       <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => { removeRow(vm.params, i); vm.syncUrlFromParams(); }} aria-label="Remove">✕</button>
     </div>
   {/each}
@@ -59,9 +59,9 @@
     {#each vm.pathParams as row (row.id)}
       <div class="kv-row" data-testid="path-var-row">
         <span></span>
-        <input class="field field-bare kv-input path-var-key" value={row.key} readonly tabindex="-1" aria-label="Path variable name" />
+        <input class="field field-bare kv-input path-var-key" value={row.key} readonly tabindex="-1" aria-label="Path variable name" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
         <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" />
-        <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+        <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
         <span></span>
       </div>
     {/each}

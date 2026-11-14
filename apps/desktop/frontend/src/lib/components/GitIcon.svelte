@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   type GitIconName =
     | 'archive'
     | 'branch'
@@ -34,7 +35,7 @@
 </script>
 
 {#if busy}
-  <span class="git-action-spinner"></span>
+  <BirdSpinner />
 {:else}
   <svg class="git-action-icon" width="{size / 16}rem" height="{size / 16}rem" viewBox="0 0 16 16" aria-hidden="true">
     {#if name === 'refresh'}

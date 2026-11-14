@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KurloBird from './KurloBird.svelte';
   import Keycaps from './Keycaps.svelte';
   import { tabListKeyboard } from '../a11y';
   import { renderResponseBodyLines } from '../response-render';
@@ -163,9 +164,8 @@
 
 <div class="response-area ws-panel grpc-response-area">
   {#if vm.loading && !response}
-    <div class="response-placeholder" role="status">
-      <span class="response-spinner"></span>
-      <span class="response-placeholder-text">Invoking gRPC method…</span>
+    <div class="response-placeholder response-loading-state" role="status" aria-label="Invoking gRPC method">
+      <span class="response-waiting-bird"><KurloBird mode="flying" envelope size="3.25rem" /></span>
     </div>
 
   {:else if vm.requestError && !response}

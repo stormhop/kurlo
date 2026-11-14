@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdLoader from './BirdLoader.svelte';
   import type { HttpResponse } from '../backend';
   import { AUTH_OPTIONS } from '../constants';
   import type { ResponseRenderMode } from '../response-render';
@@ -145,7 +146,7 @@
       <section class="history-detail-section history-detail-response" aria-label="Response">
         <h2>Response</h2>
         {#if loading}
-          <p class="history-detail-note">Loading the stored response…</p>
+          <BirdLoader label="Loading the stored response" />
         {:else if error}
           <p class="history-detail-note history-detail-error">{error}</p>
         {:else if response}

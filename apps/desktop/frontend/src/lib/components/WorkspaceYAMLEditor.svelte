@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdLoader from './BirdLoader.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import { checkWorkspaceYAML } from '../backend';
@@ -44,7 +45,7 @@
     </div>
     <div class="yaml-editor-body">
       {#if vm.yamlEditorLoading}
-        <div class="yaml-editor-loading">Loading YAML&hellip;</div>
+        <BirdLoader label="Loading YAML" />
       {:else}
         <CodeEditor
           bind:value={vm.yamlEditorContent}

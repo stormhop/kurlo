@@ -307,9 +307,9 @@
 
       <div class="date-picker-time">
         <span class="date-picker-label">Time</span>
-        <input class="field field-sm field-mono date-picker-time-input" bind:value={hourText} inputmode="numeric" maxlength="2" spellcheck="false" aria-label="Hour" onblur={commitTime} onkeydown={(event) => onTimeKeydown(event, 'hour')} />
+        <input class="field field-sm field-mono date-picker-time-input" bind:value={hourText} inputmode="numeric" maxlength="2" spellcheck="false" aria-label="Hour" onblur={commitTime} onkeydown={(event) => onTimeKeydown(event, 'hour')} autocomplete="off" autocorrect="off" autocapitalize="none" />
         <span class="date-picker-colon" aria-hidden="true">:</span>
-        <input class="field field-sm field-mono date-picker-time-input" bind:value={minuteText} inputmode="numeric" maxlength="2" spellcheck="false" aria-label="Minute" onblur={commitTime} onkeydown={(event) => onTimeKeydown(event, 'minute')} />
+        <input class="field field-sm field-mono date-picker-time-input" bind:value={minuteText} inputmode="numeric" maxlength="2" spellcheck="false" aria-label="Minute" onblur={commitTime} onkeydown={(event) => onTimeKeydown(event, 'minute')} autocomplete="off" autocorrect="off" autocapitalize="none" />
       </div>
 
       {#if presets.length}

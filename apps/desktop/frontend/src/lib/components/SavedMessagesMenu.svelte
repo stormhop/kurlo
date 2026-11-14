@@ -153,6 +153,8 @@
           placeholder="Message name"
           autocomplete="off"
           spellcheck="false"
+          autocorrect="off"
+          autocapitalize="none"
         />
         <button class="btn btn-primary btn-sm" type="submit" disabled={!name.trim() || Boolean(problem)}>Save current</button>
       </form>
@@ -164,7 +166,7 @@
             <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
             <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
           </svg>
-          <input bind:value={query} type="search" aria-label="Search saved messages" placeholder={`Search ${messages.length} messages`} autocomplete="off" spellcheck="false" />
+          <input bind:value={query} type="search" aria-label="Search saved messages" placeholder={`Search ${messages.length} messages`} autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" />
         </div>
       {/if}
 

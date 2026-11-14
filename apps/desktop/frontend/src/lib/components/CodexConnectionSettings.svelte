@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import AgentGlyph from './AgentGlyph.svelte';
   import { onMount } from 'svelte';
   import { aiErrorView, aiConnectionProblem } from '../stores/features/ai';
@@ -16,7 +17,7 @@
   const status = $derived(codexConnectionStore.status);
   const working = $derived(busy || codexConnectionStore.checking);
   const ready = $derived(status.authenticated && status.models.length > 0 && !status.error);
-  const connectionLabel = $derived(codexConnectionStore.checking ? 'Checking…' : status.waiting ? 'Signing in…' : status.error && status.installed ? 'Unavailable' : status.connected && ready ? 'Connected' : status.authenticated ? 'Signed in' : status.installed ? 'CLI detected' : codexConnectionStore.loaded ? 'Not installed' : 'Not checked');
+  const connectionLabel = $derived(status.waiting ? 'Signing in…' : status.error && status.installed ? 'Unavailable' : status.connected && ready ? 'Connected' : status.authenticated ? 'Signed in' : status.installed ? 'CLI detected' : codexConnectionStore.loaded ? 'Not installed' : 'Not checked');
   const quotaWindows = $derived(agentQuotaWindows(status.rateLimits ?? []));
   const options = $derived(status.models.map(item => ({ value: item.id, label: item.name || item.id })));
 
@@ -72,9 +73,9 @@
   <div class="settings-row">
     <span class="settings-glyph codex-glyph" aria-hidden="true"><AgentGlyph driver="codex" size="1.25rem" /></span>
     <div class="settings-row-text">
-      <span class="settings-row-title codex-title">Codex <span class="settings-pill" class:ok={status.connected && ready} class:warn={!status.installed && codexConnectionStore.loaded}>{connectionLabel}</span></span>
+      <span class="settings-row-title codex-title">Codex <span class="settings-pill" class:ok={status.connected && ready} class:warn={!status.installed && codexConnectionStore.loaded}>{#if codexConnectionStore.checking}<BirdSpinner size="0.875rem" />{:else}{connectionLabel}{/if}</span></span>
       {#if codexConnectionStore.checking}
-        <span class="settings-row-desc" role="status">Checking Codex…</span>
+        <span class="settings-row-desc"><BirdSpinner label="Checking Codex" /></span>
       {:else if status.installed}
         <span class="settings-row-desc">Codex CLI detected · {status.version}{#if status.authenticated}{' · '}Signed in: {status.account || status.authType}{/if}</span>
       {:else if codexConnectionStore.loaded}
@@ -137,7 +138,7 @@
   <details class="codex-advanced" open={!status.connected}>
     <summary class="codex-advanced-summary">Executable <span class="codex-path-hint">{status.path || 'codex'}</span></summary>
     <div class="codex-advanced-body">
-      <input class="field field-md codex-path" bind:value={path} placeholder={status.path || 'codex'} aria-label="Codex executable" disabled={working || status.waiting} />
+      <input class="field field-md codex-path" bind:value={path} placeholder={status.path || 'codex'} aria-label="Codex executable" disabled={working || status.waiting} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
       <button class="btn btn-secondary btn-sm" type="button" onclick={() => void codexConnectionStore.refresh(path)} disabled={working}>Check again</button>
       <button class="btn btn-ghost btn-sm" type="button" onclick={() => void act(chooseExecutable)} disabled={working}>Choose executable</button>
     </div>

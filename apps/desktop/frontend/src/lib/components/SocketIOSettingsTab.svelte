@@ -49,7 +49,7 @@
         <strong>Handshake path</strong>
         <span>Set the server path that should be used during the handshake request.</span>
       </span>
-      <input class="field setting-number sio-text-input" type="text" bind:value={vm.sioPath} placeholder="/socket.io" spellcheck="false" oninput={() => vm.markRequestSettingOverride('sioPath')} />
+      <input class="field setting-number sio-text-input" type="text" bind:value={vm.sioPath} placeholder="/socket.io" spellcheck="false" oninput={() => vm.markRequestSettingOverride('sioPath')} autocomplete="off" autocorrect="off" autocapitalize="none" />
     </label>
 
     <label class="postman-setting">
@@ -57,7 +57,7 @@
         <strong>Namespace</strong>
         <span>The Socket.IO namespace to connect to.</span>
       </span>
-      <input class="field setting-number sio-text-input" type="text" bind:value={vm.sioNamespace} placeholder="/" spellcheck="false" oninput={() => vm.markRequestSettingOverride('sioNamespace')} />
+      <input class="field setting-number sio-text-input" type="text" bind:value={vm.sioNamespace} placeholder="/" spellcheck="false" oninput={() => vm.markRequestSettingOverride('sioNamespace')} autocomplete="off" autocorrect="off" autocapitalize="none" />
     </label>
 
     <label class="postman-setting">

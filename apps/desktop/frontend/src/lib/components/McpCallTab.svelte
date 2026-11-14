@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import Select from './Select.svelte';
   import { vm } from '../stores/app.svelte';
@@ -98,6 +99,8 @@
             aria-label={nameLabel}
             placeholder={vm.mcpMethod === 'resources/read' ? 'file:///path/to/resource' : 'Discover the server, or type a name'}
             bind:value={vm.mcpName}
+            autocorrect="off"
+            autocapitalize="none"
           />
         {/if}
       </div>
@@ -109,7 +112,7 @@
       onclick={() => void vm.discoverMcpServer()}
       disabled={vm.mcpCatalogLoading}
     >
-      {#if vm.mcpCatalogLoading}<span class="spinner spinner-inline"></span>{/if}
+      {#if vm.mcpCatalogLoading}<BirdSpinner />{/if}
       Discover
     </button>
   </div>

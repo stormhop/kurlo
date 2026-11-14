@@ -156,11 +156,11 @@
       </label>
       <label class="runner-field">
         <span>Only requests tagged</span>
-        <input class="field" value={includeTags} placeholder="e.g. smoke, regression" aria-label="Include tags" oninput={(event) => onSetIncludeTags(inputValue(event))} disabled={running} />
+        <input class="field" value={includeTags} placeholder="e.g. smoke, regression" aria-label="Include tags" oninput={(event) => onSetIncludeTags(inputValue(event))} disabled={running} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
       </label>
       <label class="runner-field">
         <span>Skip requests tagged</span>
-        <input class="field" value={excludeTags} placeholder="e.g. slow, local" aria-label="Exclude tags" oninput={(event) => onSetExcludeTags(inputValue(event))} disabled={running} />
+        <input class="field" value={excludeTags} placeholder="e.g. slow, local" aria-label="Exclude tags" oninput={(event) => onSetExcludeTags(inputValue(event))} disabled={running} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
       </label>
     </div>
     <div class="runner-group">

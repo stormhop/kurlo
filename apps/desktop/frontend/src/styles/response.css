@@ -589,15 +589,6 @@
   gap: var(--space-2);
 }
 
-.response-spinner {
-  width: 1.5rem;
-  height: 1.5rem;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
 .timeline-panel {
   overflow: auto;
   padding: var(--space-3) var(--space-4) var(--space-4);

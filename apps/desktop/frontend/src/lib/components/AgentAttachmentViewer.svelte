@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdLoader from './BirdLoader.svelte';
   import { onMount } from 'svelte';
   import { trapFocus } from '../a11y';
   import { agentAttachmentData, type AgentAttachment } from '../backend';
@@ -66,7 +67,7 @@
     </div>
     {#if error}<p class="attachment-status" role="alert">{error}</p>{/if}
     {#if source === undefined && !error}
-      <p class="attachment-status" role="status">Opening attachment…</p>
+      <BirdLoader label="Opening attachment" />
     {:else if source !== undefined && image}
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="attachment-canvas" role="region" aria-label="Image preview" tabindex="0" bind:clientWidth={width} bind:clientHeight={height}>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import VirtualList from './VirtualList.svelte';
+  import BirdLoader from './BirdLoader.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { tabListKeyboard } from '../a11y';
   import { gitDiffRows, type GitDiffRow } from '../gitDiffRows';
@@ -406,7 +407,6 @@
 
   function sideFallbackLabel(side: ConflictSide) {
     const available = side === 'ours' ? hasOursVersion : hasTheirsVersion;
-    if (!conflictLoaded) return side === 'ours' ? 'Loading local version...' : 'Loading remote version...';
     if (conflict.error) return conflict.error;
     if (available) return side === 'ours' ? '(empty local version)' : '(empty remote version)';
     return side === 'ours'
@@ -707,6 +707,9 @@
                   spellcheck="false"
                   use:focusOnMount
                   onkeydown={(event) => event.key === 'Escape' && closeBranchPicker()}
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="none"
                 />
                 <button
                   class="btn btn-secondary btn-sm git-action-btn"
@@ -1425,21 +1428,21 @@
                   <strong>Ours</strong>
                   {#if conflict.oursTruncated}<small>truncated</small>{/if}
                 </div>
-                <pre>{conflictOursLines.slice(0, 80).join('\n') || sideFallbackLabel('ours')}</pre>
+                {#if !conflictLoaded && !conflictOursLines.length}<BirdLoader label="Loading local version" />{:else}<pre>{conflictOursLines.slice(0, 80).join('\n') || sideFallbackLabel('ours')}</pre>{/if}
               </div>
               <div class="git-conflict-side incoming">
                 <div class="git-conflict-side-head">
                   <strong>Theirs</strong>
                   {#if conflict.theirsTruncated}<small>truncated</small>{/if}
                 </div>
-                <pre>{conflictTheirsLines.slice(0, 80).join('\n') || sideFallbackLabel('theirs')}</pre>
+                {#if !conflictLoaded && !conflictTheirsLines.length}<BirdLoader label="Loading remote version" />{:else}<pre>{conflictTheirsLines.slice(0, 80).join('\n') || sideFallbackLabel('theirs')}</pre>{/if}
               </div>
             </div>
             <textarea class="git-conflict-editor" bind:value={conflictDraft} spellcheck="false" aria-label="Conflict file content"></textarea>
           {/if}
         {/if}
         {#if diffLoading}
-          <div class="empty-state git-empty">Loading diff...</div>
+          <BirdLoader label="Loading diff" />
         {:else if diff.error}
           <div class="git-empty error">{diff.error}</div>
         {:else if diff.binary}
@@ -1494,7 +1497,7 @@
         {:else if expandedPanel === 'diff'}
           <div class="git-review-body">
             {#if diffLoading}
-              <div class="empty-state git-empty">Loading diff...</div>
+              <BirdLoader label="Loading diff" />
             {:else if diff.error}
               <div class="git-empty error">{diff.error}</div>
             {:else if diff.binary}
@@ -1582,7 +1585,7 @@
                         <strong>Ours</strong>
                         {#if conflict.oursTruncated}<small>truncated</small>{/if}
                       </div>
-                      <pre class="git-conflict-code">{conflict.oursContent || sideFallbackLabel('ours')}</pre>
+                      {#if !conflictLoaded && !conflict.oursContent}<BirdLoader label="Loading local version" />{:else}<pre class="git-conflict-code">{conflict.oursContent || sideFallbackLabel('ours')}</pre>{/if}
                     </section>
                     <section class="git-conflict-pane result" aria-label="Resolved result">
                       <div class="git-conflict-pane-head">
@@ -1655,7 +1658,7 @@
                         <strong>Theirs</strong>
                         {#if conflict.theirsTruncated}<small>truncated</small>{/if}
                       </div>
-                      <pre class="git-conflict-code">{conflict.theirsContent || sideFallbackLabel('theirs')}</pre>
+                      {#if !conflictLoaded && !conflict.theirsContent}<BirdLoader label="Loading remote version" />{:else}<pre class="git-conflict-code">{conflict.theirsContent || sideFallbackLabel('theirs')}</pre>{/if}
                     </section>
                   </div>
                 </div>

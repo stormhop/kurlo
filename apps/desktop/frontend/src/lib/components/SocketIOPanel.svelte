@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { tick, untrack } from 'svelte';
   import { byteLength, formatSize } from '../utils';
   import { renderResponseBodyLines } from '../response-render';
@@ -261,7 +262,7 @@
       {/if}
       {#if status === 'reconnecting'}
         <span class="sse-summary-dot"></span>
-        <span class="sse-spinner-sm"></span>
+        <BirdSpinner size="0.875rem" />
         <span>Reconnecting</span>
       {/if}
       {#if status === 'error' && error}
@@ -624,7 +625,7 @@
     word-break: break-all;
     text-decoration: none;
   }
-  .sio-hs-url:hover { text-decoration: underline; }
+  .sio-hs-url:hover { color: var(--accent-hover); }
   .sio-hs-method { color: var(--success); }
   .sio-hs-status { color: var(--danger); }
   .sio-hs-val { word-break: break-all; }

@@ -733,6 +733,9 @@
             onkeydown={onTitleKeydown}
             disabled={workspaceBlocked}
             readonly={archived}
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
         </div>
         {#if titleError}<span class="agent-title-error" role="alert">{titleError}</span>{/if}
@@ -849,7 +852,7 @@
                             {:else if approval}
                               <span class="agent-tool-state agent-tool-waiting" role="img" aria-label="Waiting for you"><svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 1.75 2.75 4v3.6c0 3.2 2.2 5.7 5.25 6.65 3.05-.95 5.25-3.45 5.25-6.65V4L8 1.75Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
                             {:else if turn.live}
-                              <span class="agent-tool-state" role="img" aria-label="Running"><span class="spinner spinner-inline"></span></span>
+                              <span class="agent-tool-state" role="img" aria-label="Running"><BirdSpinner /></span>
                             {:else}
                               <span class="agent-tool-state" aria-hidden="true"></span>
                             {/if}
@@ -877,7 +880,7 @@
                 {/if}
               {/each}
               {#if turn.live && !agentStore.compacting && !turn.steps.some(step => step.blocks.length)}
-                <div class="agent-waiting"><span class="spinner spinner-inline"></span>Thinking…</div>
+                <div class="agent-waiting"><BirdSpinner />Thinking…</div>
               {/if}
               {#if !turn.live && agentTurnAnswer(turn.steps)}
                 <div class="agent-message-actions agent-answer-actions">{@render copyButton(`${turn.id}:answer`, agentTurnAnswer(turn.steps), 'Copy answer')}</div>
@@ -914,7 +917,7 @@
             {#if runningElsewhere}
               <div class="agent-note" role="status">The agent is working in another chat. You can send here when it finishes.</div>
             {:else if agentStore.compacting && agentStore.liveInActiveChat}
-              <div class="agent-status" role="status"><span class="spinner spinner-inline"></span>Compacting context…</div>
+              <div class="agent-status" role="status"><BirdSpinner />Compacting context…</div>
             {:else if approvals.length && agentStore.liveInActiveChat}
               <div class="agent-status agent-status-wait" role="status"><span class="agent-status-dot"></span>{agentStore.driver === 'codex' ? 'Codex' : agentStore.driver === 'claude-code' ? 'Claude Code' : 'The agent'} is waiting for your approval</div>
             {/if}
@@ -1067,18 +1070,18 @@
               <p class="agent-detail-note">{modeNote} Change it next to the model in the message box.</p>
               <label class="agent-detail-field agent-detail-stack">
                 <span>Trusted hosts</span>
-                <input class="field field-sm" type="text" value={hostsDraft} placeholder="localhost, *.staging.example.com" spellcheck="false" aria-label="Trusted hosts" disabled={agentStore.running || agentStore.mode === 'ask'} oninput={event => (hostsDraft = event.currentTarget.value)} onchange={commitHosts} />
+                <input class="field field-sm" type="text" value={hostsDraft} placeholder="localhost, *.staging.example.com" spellcheck="false" aria-label="Trusted hosts" disabled={agentStore.running || agentStore.mode === 'ask'} oninput={event => (hostsDraft = event.currentTarget.value)} onchange={commitHosts} autocomplete="off" autocorrect="off" autocapitalize="none" />
               </label>
               <p class="agent-detail-note">POST, PUT, PATCH and DELETE to these hosts, and any request in a sandbox environment, run without asking.</p>
             </Disclosure>
             <Disclosure title="Budget" summary={budgetSummary} storageKey="agent-details-budget">
               <label class="agent-detail-field">
                 <span>Tokens</span>
-                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="13" value={agentStore.budgetTokens ? String(agentStore.budgetTokens) : ''} placeholder="No limit" aria-label="Token budget" disabled={agentStore.running} oninput={digitsOnly} onchange={commitTokenBudget} onblur={commitTokenBudget} />
+                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="13" value={agentStore.budgetTokens ? String(agentStore.budgetTokens) : ''} placeholder="No limit" aria-label="Token budget" disabled={agentStore.running} oninput={digitsOnly} onchange={commitTokenBudget} onblur={commitTokenBudget} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
               </label>
               <label class="agent-detail-field">
                 <span>Sent requests</span>
-                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="7" value={agentStore.budgetRequests ? String(agentStore.budgetRequests) : ''} placeholder="No limit" aria-label="Request budget" disabled={agentStore.running} oninput={digitsOnly} onchange={commitRequestBudget} onblur={commitRequestBudget} />
+                <input class="field field-sm agent-detail-number" type="text" inputmode="numeric" maxlength="7" value={agentStore.budgetRequests ? String(agentStore.budgetRequests) : ''} placeholder="No limit" aria-label="Request budget" disabled={agentStore.running} oninput={digitsOnly} onchange={commitRequestBudget} onblur={commitRequestBudget} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
               </label>
               {#if agentStore.activeChat && agentStore.activeChat.id === agentStore.activeChatId}
                 <div class="agent-kv"><span>Used</span><span>{formatTokens(chatTokens)} tokens · {requestsSent} {requestsSent === 1 ? 'request' : 'requests'}</span></div>

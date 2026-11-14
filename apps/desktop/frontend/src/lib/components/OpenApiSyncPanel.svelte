@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { vm } from '../stores/app.svelte';
   import { openFileDialog } from '../backend';
   import { useClock } from '../clock.svelte';
@@ -49,7 +50,6 @@
 
   const statusLabel = $derived.by(() => {
     switch (status.state) {
-      case 'checking': return 'Checking the spec…';
       case 'in-sync': return 'In sync';
       case 'updates': return status.summary;
       case 'skipped': return `${status.summary} (skipped)`;
@@ -89,7 +89,7 @@
     <div class="openapi-sync-status" data-state={status.state} role="status">
       <span class="openapi-sync-dot" aria-hidden="true"></span>
       <span class="openapi-sync-status-text">
-        <strong>{statusLabel}</strong>
+        <strong>{#if status.state === 'checking'}<BirdSpinner label="Checking the spec" />{:else}{statusLabel}{/if}</strong>
         {#if status.state === 'error'}<span class="openapi-sync-error">{status.message}</span>{:else if checkedLabel}<span>{checkedLabel}</span>{/if}
       </span>
       <span class="openapi-sync-actions">
@@ -108,7 +108,7 @@
     <div class="postman-setting openapi-source-setting">
       <span class="setting-copy"><strong>Spec source</strong><span>A URL, or a file path relative to the workspace folder. <code>&#123;&#123;variables&#125;&#125;</code> work.</span></span>
       <span class="openapi-source-input">
-        <input class="field field-mono kv-input" type="text" placeholder="https://api.example.com/openapi.json" bind:value={source} spellcheck="false" autocomplete="off" aria-label="Spec source" />
+        <input class="field field-mono kv-input" type="text" placeholder="https://api.example.com/openapi.json" bind:value={source} spellcheck="false" autocomplete="off" aria-label="Spec source" autocorrect="off" autocapitalize="none" />
         <button class="btn btn-secondary" type="button" onclick={chooseFile}>Choose file…</button>
       </span>
     </div>
@@ -127,8 +127,8 @@
           {#each headers as row, i (row.id)}
             <div class="kv-row openapi-header-row">
               <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Send header" disabled={!row.key && !row.value} />
-              <input class="field field-bare kv-input" bind:value={row.key} placeholder="Header" spellcheck="false" oninput={() => guardTrailing(headers, i)} />
-              <input class="field field-bare kv-input" bind:value={row.value} placeholder="Value" spellcheck="false" autocomplete="off" oninput={() => guardTrailing(headers, i)} />
+              <input class="field field-bare kv-input" bind:value={row.key} placeholder="Header" spellcheck="false" oninput={() => guardTrailing(headers, i)} autocomplete="off" autocorrect="off" autocapitalize="none" />
+              <input class="field field-bare kv-input" bind:value={row.value} placeholder="Value" spellcheck="false" autocomplete="off" oninput={() => guardTrailing(headers, i)} autocorrect="off" autocapitalize="none" />
               <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(headers, i)} aria-label="Remove header">✕</button>
             </div>
           {/each}

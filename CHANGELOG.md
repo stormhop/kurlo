@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
+- **One loader everywhere.** Every place that waits — the response panel, gRPC and MCP calls, diffs, history, cookies, examples, the mock server, model lists, settings checks and buttons such as Cancel — now shows the flying Kurlo bird instead of spinners and *Loading…* captions. Screen readers still hear what is loading.
 - **Claude Code models stay current.** Kurlo reads the available models, default model and supported effort levels from your installed Claude Code CLI instead of a fixed list. The last successful list is kept for temporary connection failures, and existing chats keep their selected model.
 - **Saving an edit writes only what changed.** After the first save, Kurlo sends just the edited requests and the rest of the small workspace state, and rewrites only their files instead of the whole workspace. In a workspace with 1,300 requests one autosave goes from about 280 ms to about 20 ms and from 5 MB to under 20 KB over the bridge, so switching tabs or opening examples right after typing no longer waits. Adding, removing, renaming, reordering or moving requests, editing collections or examples, and any file changed outside Kurlo still go through the full save.
 
@@ -20,6 +21,8 @@ All notable changes to Kurlo are documented here. This project follows
 - **Large workspaces stay responsive.** Saving a request no longer re-encodes or resends examples that are already on disk, and the request list is kept as plain data, so typing, saving and switching requests do not stall in workspaces with hundreds of requests and thousands of examples.
 - **Long lists scroll the same way everywhere.** The collection runner drops its page buttons: requests and results are continuous lists that draw only the rows on screen, like the sidebar and the mock server. Agent activity shows the newest 100 calls and loads older ones as you scroll, so the whole log is reachable; its search, client filter and seven-day summary cover every stored call, not only the loaded ones.
 - **Chats and Git history load more as you scroll.** A long agent chat loads earlier messages when you scroll up, without the *Load earlier messages* button, and fills a short first page up to the window by itself; the conversation can be focused with `Tab` and scrolled with the keyboard. Git history loads older commits 100 at a time, like agent activity.
+- **Links without underlines.** Links, such as the example names in the mock server, change colour on hover instead of being underlined, like the rest of the app.
+- **No macOS suggestions in text fields.** Filters, search boxes and other fields no longer show autocorrect, autocomplete or capitalisation pop-ups while you type.
 - **Settings open at once.** Settings and search are prepared in the background after start-up, so the first open no longer waits.
 
 ## [3.1.0] - 2026-11-13

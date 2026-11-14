@@ -185,7 +185,7 @@
     cursor: pointer;
   }
   .md-link:hover {
-    text-decoration: underline;
+    color: var(--accent-hover);
   }
   .md-image {
     display: block;

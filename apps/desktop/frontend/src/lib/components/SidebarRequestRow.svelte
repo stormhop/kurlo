@@ -163,6 +163,9 @@
         spellcheck="false"
         onblur={commitRequestInlineRename}
         onkeydown={onRequestNameKeydown}
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="none"
       />
     </div>
   {:else}

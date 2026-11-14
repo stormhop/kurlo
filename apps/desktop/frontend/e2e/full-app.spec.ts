@@ -6054,7 +6054,7 @@ test.describe('Kurlo desktop browser E2E', () => {
     await expect(editor.getByRole('table', { name: 'Test data preview' })).toContainText('ada@shop.test');
     await editor.getByRole('radio', { name: 'Next row each iteration' }).click();
     await expect(editor.getByRole('radio', { name: 'Next row each iteration' })).toHaveAttribute('aria-checked', 'true');
-    await expect(editor.getByText('Reading test data…')).toBeHidden();
+    await expect(editor.getByRole('status', { name: 'Reading test data' })).toBeHidden();
     await expect(editor.getByRole('table', { name: 'Test data preview' })).toBeVisible();
     await page.screenshot({ path: join(tmpdir(), 'kurlo-load-data-preview.png'), fullPage: true, animations: 'disabled' });
     await editor.getByRole('textbox', { name: 'File', exact: true }).fill('data/missing.csv');

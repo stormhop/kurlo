@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdLoader from './BirdLoader.svelte';
   import { onMount, tick } from 'svelte';
   import AgentFileDiff from './AgentFileDiff.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
@@ -172,7 +173,7 @@
       {/if}
     </div>
   {:else if activity.selectedId}
-    <div class="history-detail-body"><p class="history-detail-note">Loading…</p></div>
+    <div class="history-detail-body"><BirdLoader /></div>
   {:else}
     <header class="history-detail-head">
       <div class="history-detail-title">

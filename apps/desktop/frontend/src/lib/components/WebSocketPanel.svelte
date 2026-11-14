@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { tick, untrack } from 'svelte';
   import { tabListKeyboard } from '../a11y';
   import { renderResponseBodyLines } from '../response-render';
@@ -319,7 +320,7 @@
         <span class="status-badge {status === 'error' ? 'status-5xx' : status === 'connected' ? 'status-2xx' : 'sse-status-neutral'}">{statusLabel()}</span>
       {/if}
       {#if status === 'connected'}<span class="sse-summary-dot"></span><span>{elapsed}</span>{/if}
-      {#if status === 'reconnecting'}<span class="sse-summary-dot"></span><span class="sse-spinner-sm"></span><span>Reconnecting</span>{/if}
+      {#if status === 'reconnecting'}<span class="sse-summary-dot"></span><BirdSpinner size="0.875rem" /><span>Reconnecting</span>{/if}
       {#if status === 'error' && error}<span class="sse-summary-dot"></span><span class="sse-status-error">{friendlyWebSocketError(error)}</span>{/if}
       {#if status !== 'idle'}<span class="sse-summary-dot"></span>{/if}<span>{messages.length} {messages.length === 1 ? 'message' : 'messages'}</span>
       <span class="sse-summary-dot"></span><span>{formatSize(streamSize)}</span>

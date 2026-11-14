@@ -65,6 +65,10 @@
         placeholder="201 Created"
         oninput={(event) =>
           vm.updateExampleResponse(example.id, { status: (event.currentTarget as HTMLInputElement).value })}
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="none"
+        spellcheck={false}
       />
     </label>
     <span class="examples-source">{sourceLabel(example.source)}</span>

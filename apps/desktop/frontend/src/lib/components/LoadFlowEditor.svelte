@@ -436,9 +436,9 @@
           {@const errors = loadExtractErrors(selectedProblems, extract)}
           <div class="loadtest-rule">
             <div class="loadtest-rule-line loadtest-extract-line">
-              <input class="field field-mono loadtest-var" value={extract.var} placeholder="token" aria-label="Variable name" aria-invalid={errors.name.length > 0} spellcheck="false" {disabled} oninput={(event) => (extract.var = inputValue(event))} />
+              <input class="field field-mono loadtest-var" value={extract.var} placeholder="token" aria-label="Variable name" aria-invalid={errors.name.length > 0} spellcheck="false" {disabled} oninput={(event) => (extract.var = inputValue(event))} autocomplete="off" autocorrect="off" autocapitalize="none" />
               <Select className="loadtest-source" ariaLabel="Source" value={extract.from} options={EXTRACT_SOURCES} {disabled} onChange={(value) => (extract.from = value)} />
-              <input class="field field-mono loadtest-grow" value={extract.path} placeholder={extract.from === 'header' ? 'X-Request-Id' : extract.from === 'regex' ? 'id=(\\w+)' : '$.access_token'} aria-label="Path" aria-invalid={errors.path.length > 0} spellcheck="false" {disabled} oninput={(event) => (extract.path = inputValue(event))} />
+              <input class="field field-mono loadtest-grow" value={extract.path} placeholder={extract.from === 'header' ? 'X-Request-Id' : extract.from === 'regex' ? 'id=(\\w+)' : '$.access_token'} aria-label="Path" aria-invalid={errors.path.length > 0} spellcheck="false" {disabled} oninput={(event) => (extract.path = inputValue(event))} autocomplete="off" autocorrect="off" autocapitalize="none" />
               <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove saved value" {disabled} onclick={() => removeExtract(step, index)}>✕</button>
             </div>
             <LoadValidationMessages problems={[...errors.name, ...errors.path, ...errors.source]} />
@@ -456,7 +456,7 @@
           <div class="loadtest-rule">
             <div class="loadtest-rule-line loadtest-check-line">
               <Select className="loadtest-check-type" ariaLabel="Check" value={check.type} options={CHECK_TYPES} {disabled} onChange={(value) => setCheckType(check, value)} />
-              <input class="field field-mono loadtest-grow" value={check.type === 'jsonExists' ? check.path ?? '' : check.value ?? ''} aria-label="Expected value" aria-invalid={errors.length > 0} spellcheck="false" {disabled} oninput={(event) => setCheckInput(check, inputValue(event))} />
+              <input class="field field-mono loadtest-grow" value={check.type === 'jsonExists' ? check.path ?? '' : check.value ?? ''} aria-label="Expected value" aria-invalid={errors.length > 0} spellcheck="false" {disabled} oninput={(event) => setCheckInput(check, inputValue(event))} autocomplete="off" autocorrect="off" autocapitalize="none" />
               <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove check" {disabled} onclick={() => removeCheck(step, index)}>✕</button>
             </div>
             <LoadValidationMessages problems={errors} />
@@ -467,9 +467,9 @@
       <div class="loadtest-field">
         <span class="loadtest-inspector-label">Wait after this step</span>
         <div class="loadtest-row">
-          <input class="field field-mono loadtest-duration" value={formatDuration(step.thinkTimeMs ?? 0)} aria-label="Wait" aria-invalid={(step.thinkTimeMs ?? 0) < 0} spellcheck="false" {disabled} onchange={(event) => setDuration(step, 'thinkTimeMs', event)} />
+          <input class="field field-mono loadtest-duration" value={formatDuration(step.thinkTimeMs ?? 0)} aria-label="Wait" aria-invalid={(step.thinkTimeMs ?? 0) < 0} spellcheck="false" {disabled} onchange={(event) => setDuration(step, 'thinkTimeMs', event)} autocomplete="off" autocorrect="off" autocapitalize="none" />
           <span class="loadtest-hint">plus up to</span>
-          <input class="field field-mono loadtest-duration" value={formatDuration(step.thinkJitterMs ?? 0)} aria-label="Random extra wait" aria-invalid={(step.thinkJitterMs ?? 0) < 0} spellcheck="false" {disabled} onchange={(event) => setDuration(step, 'thinkJitterMs', event)} />
+          <input class="field field-mono loadtest-duration" value={formatDuration(step.thinkJitterMs ?? 0)} aria-label="Random extra wait" aria-invalid={(step.thinkJitterMs ?? 0) < 0} spellcheck="false" {disabled} onchange={(event) => setDuration(step, 'thinkJitterMs', event)} autocomplete="off" autocorrect="off" autocapitalize="none" />
           <span class="loadtest-hint">at random</span>
         </div>
         <LoadValidationMessages problems={selectedProblems.filter(problem => problem.includes('wait after the step'))} />

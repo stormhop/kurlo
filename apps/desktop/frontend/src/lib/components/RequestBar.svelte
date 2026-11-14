@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { NAME_MAX_LENGTH } from '../constants';
   import { onMount } from 'svelte';
   import SaveActions from './SaveActions.svelte';
@@ -257,6 +258,9 @@
       oninput={(event) => onRequestNameInput(inputValue(event))}
       onblur={onRequestNameCommit}
       onkeydown={onNameKeydown}
+      autocomplete="off"
+      autocorrect="off"
+      autocapitalize="none"
     />
     {#if showSave}
       <SaveActions {saveDirty} {canRevert} {onSave} {onRevert} />
@@ -378,11 +382,11 @@
                 <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
                 <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
               </svg>
-              <input bind:value={grpcMethodFilter} onkeydown={onGrpcMethodSearchKeydown} placeholder="Search methods" aria-label="Search gRPC methods" />
+              <input bind:value={grpcMethodFilter} onkeydown={onGrpcMethodSearchKeydown} placeholder="Search methods" aria-label="Search gRPC methods" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
             </div>
 
             <button class="btn btn-secondary grpc-method-refresh" type="button" disabled={grpcServiceLoading} onclick={() => onGrpcDiscover()}>
-              {#if grpcServiceLoading}<span class="spinner spinner-inline"></span>{/if}
+              {#if grpcServiceLoading}<BirdSpinner tone="current" />{/if}
               <span>{grpcMethods.length ? 'Refresh methods' : 'Load methods'}</span>
             </button>
 
@@ -427,7 +431,7 @@
         onclick={onSend}
         type="button"
       >
-        {#if loading}<span class="spinner"></span>Cancel
+        {#if loading}<BirdSpinner tone="current" />Cancel
         {:else}
           Query
         {/if}
@@ -439,7 +443,7 @@
         onclick={onSend}
         type="button"
       >
-        {#if loading}<span class="spinner"></span>Cancel
+        {#if loading}<BirdSpinner tone="current" />Cancel
         {:else}
           Invoke
         {/if}
@@ -451,7 +455,7 @@
         onclick={onSend}
         type="button"
       >
-        {#if loading}<span class="spinner"></span>Stop
+        {#if loading}<BirdSpinner tone="current" />Stop
         {:else}
           Send{#if sendShortcut && sendShortcutInline}<kbd class="btn-send-kbd">{sendShortcut}</kbd>{/if}
         {/if}
@@ -460,7 +464,7 @@
       {#if sioConnected || sioConnecting}
         <button class="btn-send btn-ws-disconnect" onclick={onSend} type="button">
           {#if sioConnecting}
-            <span class="spinner"></span>
+            <BirdSpinner tone="current" />
           {:else}
             <span class="sse-dot-live"></span>
             Disconnect
@@ -473,7 +477,7 @@
       {#if wsConnected || wsConnecting}
         <button class="btn-send btn-ws-disconnect" onclick={onSend} type="button">
           {#if wsConnecting}
-            <span class="spinner"></span>
+            <BirdSpinner tone="current" />
           {:else}
             <span class="sse-dot-live"></span>
             Disconnect
@@ -486,7 +490,7 @@
       {#if sseConnected || sseConnecting}
         <button class="btn-send btn-sse-disconnect" onclick={onSend} type="button">
           {#if sseConnecting}
-            <span class="spinner"></span>
+            <BirdSpinner tone="current" />
           {:else}
             <span class="sse-dot-live"></span>
             Disconnect
@@ -503,7 +507,7 @@
           onclick={onSend}
           type="button"
         >
-          {#if loading}<span class="spinner"></span>Cancel
+          {#if loading}<BirdSpinner tone="current" />Cancel
           {:else}
             Send{#if sendShortcut && sendShortcutInline}<kbd class="btn-send-kbd">{sendShortcut}</kbd>{/if}
           {/if}

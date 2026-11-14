@@ -178,6 +178,8 @@
         aria-label={searchPlaceholder}
         autocomplete="off"
         spellcheck="false"
+        autocorrect="off"
+        autocapitalize="none"
       />
       {#if filtered.length}
         <div class="search-picker-list" bind:this={list} role="listbox" aria-label={ariaLabel} style:max-height={listMaxHeight || undefined}>

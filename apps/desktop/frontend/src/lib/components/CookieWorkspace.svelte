@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdLoader from './BirdLoader.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import Select from './Select.svelte';
@@ -422,6 +423,9 @@
                 spellcheck="false"
                 aria-label="Domain to share"
                 onkeydown={(event) => event.key === 'Enter' && addSyncDomain()}
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="none"
               />
               <button class="btn btn-secondary" type="button" onclick={addSyncDomain} disabled={syncBusy}>Add domain</button>
             </div>
@@ -567,9 +571,7 @@
       </p>
     </div>
   {:else if loading && jarEmpty}
-    <div class="empty-state cookie-empty-state" role="status">
-      <p class="empty-state-text">Loading cookies…</p>
-    </div>
+    <BirdLoader label="Loading cookies" />
   {:else if jarEmpty || !currentGroup}
     <div class="environment-workspace-head">
       <div class="environment-title">
@@ -588,7 +590,7 @@
           <button class="btn btn-primary" type="button" onclick={() => addDomain(openRequestDomain)}><AddCloseIcon add /> Add cookie for {openRequestDomain}</button>
         {/if}
         <form class="cookie-empty-domain" onsubmit={(event) => { event.preventDefault(); addDomain(emptyDomainInput); }}>
-          <input class="field field-md" bind:value={emptyDomainInput} placeholder="example.com" spellcheck="false" aria-label="Cookie domain" />
+          <input class="field field-md" bind:value={emptyDomainInput} placeholder="example.com" spellcheck="false" aria-label="Cookie domain" autocomplete="off" autocorrect="off" autocapitalize="none" />
           <button class="btn btn-secondary" type="submit">Add cookie</button>
         </form>
         <button class="btn btn-ghost" type="button" onclick={selectCookieSync}>Sync from browser</button>
@@ -706,15 +708,15 @@
           <div class="cookie-form-grid">
             <label class="cookie-form-field">
               <span>Name</span>
-              <input class="field field-mono" bind:value={form.name} spellcheck="false" use:focusOnMount />
+              <input class="field field-mono" bind:value={form.name} spellcheck="false" use:focusOnMount autocomplete="off" autocorrect="off" autocapitalize="none" />
             </label>
             <label class="cookie-form-field cookie-form-wide">
               <span>Value</span>
-              <input class="field field-mono" bind:value={form.value} spellcheck="false" placeholder={selectedValueMissing ? 'Not on this computer' : ''} />
+              <input class="field field-mono" bind:value={form.value} spellcheck="false" placeholder={selectedValueMissing ? 'Not on this computer' : ''} autocomplete="off" autocorrect="off" autocapitalize="none" />
             </label>
             <label class="cookie-form-field">
               <span>Path</span>
-              <input class="field field-mono" bind:value={form.path} spellcheck="false" />
+              <input class="field field-mono" bind:value={form.path} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
             </label>
             <div class="cookie-form-field">
               <span>Expires</span>

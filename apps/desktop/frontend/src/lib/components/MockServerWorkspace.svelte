@@ -229,6 +229,10 @@
           aria-label="Filter routes"
           value={filter}
           oninput={(event) => (filter = event.currentTarget instanceof HTMLInputElement ? event.currentTarget.value : '')}
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="none"
+          spellcheck={false}
         />
       </div>
       {#if routeRows.length && !loadingRoutes}

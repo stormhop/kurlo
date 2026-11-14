@@ -311,7 +311,7 @@
       <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
       <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
     </svg>
-    <input bind:value={filter} placeholder="Find variable" aria-label="Find variable" spellcheck="false" />
+    <input bind:value={filter} placeholder="Find variable" aria-label="Find variable" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
   </div>
   {#if renameError}
     <span class="env-matrix-error" role="alert">{renameError.message}</span>
@@ -334,7 +334,7 @@
             <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
             <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
           </svg>
-          <input bind:value={columnsQuery} placeholder="Find environment" aria-label="Find environment" spellcheck="false" use:focusOnMount />
+          <input bind:value={columnsQuery} placeholder="Find environment" aria-label="Find environment" spellcheck="false" use:focusOnMount autocomplete="off" autocorrect="off" autocapitalize="none" />
         </div>
         <div class="env-matrix-columns-list">
           {#each columnChoices as environment (environment.id)}
@@ -395,6 +395,9 @@
             spellcheck="false"
             onblur={(event) => commitRename(row, event)}
             onkeydown={onNameKeydown}
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
           <button
             class="btn btn-ghost btn-icon btn-sm env-matrix-icon"
@@ -428,6 +431,8 @@
                 spellcheck="false"
                 autocomplete="off"
                 oninput={(event) => onSetValue(environment.id, row.key, inputValue(event))}
+                autocorrect="off"
+                autocapitalize="none"
               />
               {#if (setCounts.get(row.key) ?? 0) > 1}
                 <button class="env-matrix-unset" type="button" aria-label={`Unset ${row.key} in ${environment.name}`} onclick={() => onUnsetValue(environment.id, row.key)}><AddCloseIcon /></button>
@@ -444,6 +449,8 @@
                 autocomplete="off"
                 oninput={(event) => onUnsetInput(environment.id, row.key, event)}
                 onblur={() => (editingUnset = null)}
+                autocorrect="off"
+                autocapitalize="none"
               />
             {:else if inherited}
               <button class="env-matrix-inherited" type="button" data-testid="environment-matrix-inherited" aria-label={`Override ${row.key} in ${environment.name}, now inherited from ${inherited.sourceName}`} onclick={() => startSetting(environment.id, row.key)}>

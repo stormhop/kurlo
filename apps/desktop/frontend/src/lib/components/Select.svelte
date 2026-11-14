@@ -162,7 +162,7 @@
   {#if open}
     <div class="menu app-select-menu" role="listbox" tabindex="-1" bind:this={menu} style={menuStyle} onkeydown={navigate} aria-label={ariaLabel}>
       {#if searchable}
-        <input class="field field-sm" type="search" bind:value={search} bind:this={searchInput} aria-label={`Search ${ariaLabel || 'options'}`} placeholder={searchPlaceholder} spellcheck="false" />
+        <input class="field field-sm" type="search" bind:value={search} bind:this={searchInput} aria-label={`Search ${ariaLabel || 'options'}`} placeholder={searchPlaceholder} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
       {/if}
       {#each filteredOptions as opt (opt.value)}
         <button

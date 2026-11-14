@@ -94,6 +94,8 @@
             value={vm.clientKeyPassword}
             oninput={(event) => { vm.clientKeyPassword = event.currentTarget.value; vm.markRequestSettingOverride('clientKeyPassword'); }}
             disabled={!vm.clientCertPath}
+            autocorrect="off"
+            autocapitalize="none"
           />
         </div>
         <p class="client-cert-hint">The key file defaults to the certificate file when left blank (combined PEM). Use <code>&#123;&#123;variable&#125;&#125;</code> in any field to keep the passphrase in workspace secrets.</p>
@@ -230,7 +232,7 @@
         <span>Route this request through a proxy. Leave empty to use the system proxy (HTTP_PROXY env var).</span>
         {#if vm.collectionSettingDefaultNote('proxyUrl')}<em class:setting-default-muted={!vm.collectionSettingIsInherited('proxyUrl')}>{vm.collectionSettingDefaultNote('proxyUrl')}</em>{/if}
       </span>
-      <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:8080" bind:value={vm.proxyUrl} spellcheck="false" autocomplete="off" oninput={() => vm.markRequestSettingOverride('proxyUrl')} />
+      <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:8080" bind:value={vm.proxyUrl} spellcheck="false" autocomplete="off" oninput={() => vm.markRequestSettingOverride('proxyUrl')} autocorrect="off" autocapitalize="none" />
     </label>
 
     {#if vm.method === 'SSE'}

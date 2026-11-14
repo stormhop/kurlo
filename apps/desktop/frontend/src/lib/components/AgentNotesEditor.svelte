@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdLoader from './BirdLoader.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import Markdown from './Markdown.svelte';
@@ -69,7 +70,7 @@
     {/if}
     <div class="yaml-editor-body agent-notes-body">
       {#if notes.loading}
-        <div class="yaml-editor-loading">Loading {AGENT_NOTES_FILE}&hellip;</div>
+        <BirdLoader label={`Loading ${AGENT_NOTES_FILE}`} />
       {:else if notes.tooLarge}
         <div class="yaml-editor-loading">{AGENT_NOTES_FILE} is over 32 KB, so Kurlo does not edit it here. Shorten it in another editor.</div>
       {:else if notes.preview}

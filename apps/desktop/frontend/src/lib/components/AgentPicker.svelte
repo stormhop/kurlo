@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import AgentGlyph from './AgentGlyph.svelte';
   import { tick } from 'svelte';
@@ -175,10 +176,10 @@
   <div class="agent-pick-nested agent-pick-models">
     <label class="agent-model-search">
       <svg width="0.75rem" height="0.75rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/><path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      <input type="search" bind:value={modelQuery} placeholder="Search models" aria-label={`Search ${label} models`} spellcheck="false" data-pick />
+      <input type="search" bind:value={modelQuery} placeholder="Search models" aria-label={`Search ${label} models`} spellcheck="false" data-pick autocomplete="off" autocorrect="off" autocapitalize="none" />
     </label>
     {#if loading}
-      <span class="agent-pick-meta agent-model-note" role="status"><span class="spinner spinner-inline"></span> Loading models…</span>
+      <span class="agent-pick-meta agent-model-note"><BirdSpinner size="1.5rem" label="Loading models" /></span>
     {:else if error}
       <span class="agent-model-note agent-model-error" role="alert">{error} <button class="btn-link" type="button" onclick={retry}>Retry</button></span>
     {:else}
@@ -248,7 +249,7 @@
             <span class="agent-glyph agent-glyph-codex agent-glyph-lg" aria-hidden="true"><AgentGlyph driver="codex" size="1rem" /></span>
             <span class="agent-pick-text">
               <span class="agent-pick-title">Codex</span>
-              <span class="agent-pick-meta">{codex.installed ? 'Not connected' : codexConnectionStore.loaded ? 'Not installed' : 'Checking…'}</span>
+              <span class="agent-pick-meta">{#if codex.installed}Not connected{:else if codexConnectionStore.loaded}Not installed{:else}<BirdSpinner size="0.875rem" label="Checking Codex" />{/if}</span>
             </span>
             <button class="btn btn-secondary btn-xs" type="button" data-pick onclick={() => manage()}>Connect</button>
           </div>
@@ -271,7 +272,7 @@
         {:else}
           <div class="agent-pick-agent">
             <span class="agent-glyph agent-glyph-codex agent-glyph-claude agent-glyph-lg" aria-hidden="true"><AgentGlyph driver="claude-code" size="1rem" /></span>
-            <span class="agent-pick-text"><span class="agent-pick-title">Claude Code</span><span class="agent-pick-meta">{!claude.loaded ? 'Checking…' : claude.status.authenticated ? 'Not connected' : claude.status.installed ? 'Not signed in' : 'Not installed'}</span></span>
+            <span class="agent-pick-text"><span class="agent-pick-title">Claude Code</span><span class="agent-pick-meta">{#if !claude.loaded}<BirdSpinner size="0.875rem" label="Checking Claude Code" />{:else}{claude.status.authenticated ? 'Not connected' : claude.status.installed ? 'Not signed in' : 'Not installed'}{/if}</span></span>
             <button class="btn btn-secondary btn-xs" type="button" data-pick onclick={() => manage()}>Connect</button>
           </div>
         {/if}

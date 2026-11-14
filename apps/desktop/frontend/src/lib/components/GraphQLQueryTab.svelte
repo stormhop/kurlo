@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { onMount } from 'svelte';
   import { vm } from '../stores/app.svelte';
   import CodeEditor from '../CodeEditor.svelte';
@@ -87,7 +88,7 @@
       <div class="graphql-explorer-toolbar">
         <span>Explore</span>
         <button class="btn btn-secondary" type="button" onclick={() => vm.fetchGraphQLSchema()} disabled={vm.graphqlSchemaLoading || !vm.url.trim()}>
-          {#if vm.graphqlSchemaLoading}<span class="spinner spinner-inline"></span>{/if}
+          {#if vm.graphqlSchemaLoading}<BirdSpinner />{/if}
           Refresh
         </button>
       </div>
@@ -129,7 +130,7 @@
               onclick={useGraphQLIntrospection}
               disabled={vm.graphqlSchemaLoading}
             >
-              {#if vm.graphqlSchemaLoading}<span class="spinner spinner-inline"></span>{/if}
+              {#if vm.graphqlSchemaLoading}<BirdSpinner />{/if}
               Try again
             </button>
           </div>
@@ -143,7 +144,7 @@
             disabled={vm.graphqlSchemaLoading}
           >
             {#if vm.graphqlSchemaLoading}
-              <span class="spinner spinner-inline"></span>
+              <BirdSpinner />
             {:else}
               <svg width="1.25rem" height="1.25rem" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                 <path d="M10 3v3M10 14v3M3 10h3M14 10h3M5.8 5.8l2.1 2.1M12.1 12.1l2.1 2.1M14.2 5.8l-2.1 2.1M7.9 12.1l-2.1 2.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>

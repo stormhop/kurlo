@@ -14,6 +14,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Changed
 
+- **One loader everywhere**: every wait in the app — responses, gRPC and MCP calls, diffs, history, cookies, examples, the mock server, model lists, settings checks and the Cancel button — shows the flying Kurlo bird instead of spinners and *Loading…* captions.
 - **Claude Code models stay current**: models, the default and effort levels come from your installed CLI. Kurlo keeps the last successful list for temporary failures and preserves the model in existing chats.
 - **Saving an edit writes only what changed**: Kurlo sends and rewrites just the edited requests, so an autosave in a workspace with 1,300 requests takes about 20 ms instead of 280 ms. Structural changes and files edited outside Kurlo still use the full save.
 
@@ -25,6 +26,8 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Large workspaces stay responsive**: saving no longer re-encodes or resends examples already on disk, so typing, saving and switching requests do not stall with hundreds of requests.
 - **Long lists scroll the same way everywhere**: the collection runner has no page buttons any more, and agent activity loads older calls as you scroll; its search and summary cover the whole log.
 - **Chats and Git history load more as you scroll**: a long agent chat loads earlier messages as you scroll up instead of through a button, and Git history loads 100 older commits at a time.
+- **Links without underlines**: links change colour on hover instead of being underlined.
+- **No macOS suggestions in text fields**: filters and search boxes no longer show autocorrect or autocomplete pop-ups.
 - **Settings open at once**: settings and search are prepared in the background after start-up.
 
 ## 3.1.0

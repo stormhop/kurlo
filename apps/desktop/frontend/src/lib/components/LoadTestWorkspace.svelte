@@ -264,6 +264,9 @@
               onkeydown={(event) => {
                 if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
               }}
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
             />
             {#if isDraft}
               <span class="loadtest-draft-note">Unsaved draft</span>

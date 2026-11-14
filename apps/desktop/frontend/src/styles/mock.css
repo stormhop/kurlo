@@ -436,7 +436,6 @@
 
 .mock-row-name:hover {
   color: var(--accent-hover);
-  text-decoration: underline;
 }
 
 .mock-row-note {

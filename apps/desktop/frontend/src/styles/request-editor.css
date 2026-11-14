@@ -619,11 +619,6 @@
 .btn-send-cancel:hover:not(:disabled) {
   background: var(--danger-bg-strong);
 }
-.btn-send-cancel .spinner {
-  border-color: var(--danger-border);
-  border-top-color: var(--danger);
-}
-
 .send-split {
   position: relative;
   display: flex;
@@ -676,16 +671,6 @@
   letter-spacing: 0;
 }
 
-.spinner {
-  width: 0.875rem;
-  height: 0.875rem;
-  border: 2px solid color-mix(in srgb, var(--on-accent) 30%, transparent);
-  border-top-color: var(--on-accent);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .request-editor {
   container: editor / inline-size;
@@ -1899,14 +1884,6 @@
 .graphql-schema-status--standalone {
   display: block;
   font-size: var(--text-label);
-}
-
-.spinner-inline {
-  width: 0.75rem;
-  height: 0.75rem;
-  border-width: 2px;
-  border-color: color-mix(in srgb, currentColor 25%, transparent);
-  border-top-color: currentColor;
 }
 
 .visually-hidden-file {

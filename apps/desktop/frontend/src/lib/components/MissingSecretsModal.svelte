@@ -72,6 +72,8 @@
                   aria-label={`${group.title}: ${item.title}`}
                   data-autofocus={item.key === firstKey ? '' : undefined}
                   oninput={(event) => onUpdate(item.key, event.currentTarget.value)}
+                  autocorrect="off"
+                  autocapitalize="none"
                 />
               </label>
             {/each}

@@ -180,9 +180,8 @@
   {/if}
 
   {#if loading && !response}
-    <div class="response-placeholder response-loading-state" role="status">
+    <div class="response-placeholder response-loading-state" role="status" aria-label="Sending request">
       <span class="response-waiting-bird"><KurloBird mode="flying" envelope size="3.25rem" /></span>
-      <span class="response-placeholder-text">Sending request…</span>
       {#if waitingSeconds >= 1}<span class="response-placeholder-hint response-waiting-time">{waitingSeconds.toFixed(1)} s</span>{/if}
     </div>
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { vm } from '../stores/app.svelte';
   import CodeEditor from '../CodeEditor.svelte';
 
@@ -68,7 +69,7 @@
           onclick={() => vm.fetchGraphQLSchema()}
           disabled={vm.graphqlSchemaLoading || !vm.url.trim()}
         >
-          {#if vm.graphqlSchemaLoading}<span class="spinner spinner-inline"></span>{/if}
+          {#if vm.graphqlSchemaLoading}<BirdSpinner />{/if}
           Refresh introspection
         </button>
         <button
@@ -123,7 +124,7 @@
             onclick={() => vm.fetchGraphQLSchema()}
             disabled={vm.graphqlSchemaLoading}
           >
-            {#if vm.graphqlSchemaLoading}<span class="spinner spinner-inline"></span>{/if}
+            {#if vm.graphqlSchemaLoading}<BirdSpinner />{/if}
             Try again
           </button>
         </div>
@@ -140,6 +141,8 @@
                 spellcheck="false"
                 autocomplete="off"
                 onkeydown={onUrlKeydown}
+                autocorrect="off"
+                autocapitalize="none"
               />
               <button
                 class="btn btn-ghost btn-icon btn-sm graphql-select-toggle"
@@ -160,7 +163,7 @@
                 onclick={importUrl}
                 disabled={vm.graphqlSchemaLoading}
               >
-                {#if vm.graphqlSchemaLoading}<span class="spinner spinner-inline"></span>{/if}
+                {#if vm.graphqlSchemaLoading}<BirdSpinner />{/if}
                 Import
               </button>
             {/if}
@@ -197,6 +200,8 @@
               spellcheck="false"
               autocomplete="off"
               onkeydown={onImportPanelUrlKeydown}
+              autocorrect="off"
+              autocapitalize="none"
             />
             {#if importPanelUrl.trim()}
               <button
@@ -223,7 +228,7 @@
           disabled={vm.graphqlSchemaLoading}
         >
           {#if vm.graphqlSchemaLoading}
-            <span class="spinner spinner-inline"></span>
+            <BirdSpinner />
           {:else}
             <span class="graphql-introspection-check" aria-hidden="true">
               <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none">

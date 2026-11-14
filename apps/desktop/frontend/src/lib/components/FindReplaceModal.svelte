@@ -119,7 +119,7 @@
 
     <div class="find-replace-form">
       <div class="find-replace-row">
-        <input class="field field-input" bind:this={findInput} bind:value={query} placeholder="Find" aria-label="Find" spellcheck="false" data-autofocus />
+        <input class="field field-input" bind:this={findInput} bind:value={query} placeholder="Find" aria-label="Find" spellcheck="false" data-autofocus autocomplete="off" autocorrect="off" autocapitalize="none" />
         <div class="find-replace-toggles" role="group" aria-label="Search options">
           <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.matchCase} aria-pressed={options.matchCase} aria-label="Match case" onclick={() => toggle('matchCase')}>Aa</button>
           <button type="button" class="btn btn-ghost btn-sm find-replace-toggle" class:active={options.wholeWord} aria-pressed={options.wholeWord} aria-label="Whole word" onclick={() => toggle('wholeWord')}><u>ab</u></button>
@@ -127,7 +127,7 @@
         </div>
       </div>
       <div class="find-replace-row">
-        <input class="field field-input" bind:value={replacement} placeholder="Replace" aria-label="Replace" spellcheck="false" />
+        <input class="field field-input" bind:value={replacement} placeholder="Replace" aria-label="Replace" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
         <button type="button" class="btn btn-primary" disabled={busy || !result.total || Boolean(result.error)} onclick={() => apply(searchable)}>
           Replace all{result.total ? ` (${result.total})` : ''}
         </button>

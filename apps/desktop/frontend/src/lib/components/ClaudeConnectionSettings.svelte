@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { onMount } from 'svelte';
   import AgentGlyph from './AgentGlyph.svelte';
   import Select from './Select.svelte';
@@ -16,7 +17,7 @@
   const working = $derived(busy || claude.checking || claude.signingIn);
   const ready = $derived(status.authenticated && !status.error);
   const signedOut = $derived(status.connected && status.installed && !status.authenticated && !status.error);
-  const label = $derived(claude.checking ? 'Checking…' : claude.signingIn ? 'Signing in…' : status.error && status.installed ? 'Unavailable' : status.connected && ready ? 'Connected' : signedOut ? 'Signed out' : status.authenticated ? 'Signed in' : status.installed ? 'CLI detected' : claude.loaded ? 'Not installed' : 'Not checked');
+  const label = $derived(claude.signingIn ? 'Signing in…' : status.error && status.installed ? 'Unavailable' : status.connected && ready ? 'Connected' : signedOut ? 'Signed out' : status.authenticated ? 'Signed in' : status.installed ? 'CLI detected' : claude.loaded ? 'Not installed' : 'Not checked');
   const quotaWindows = $derived(agentQuotaWindows(status.rateLimits ?? []));
   const options = $derived(claude.models.map(item => ({ value: item.id, label: item.name || item.id })));
 
@@ -60,11 +61,11 @@
   <div class="settings-row">
     <span class="settings-glyph claude-glyph" aria-hidden="true"><AgentGlyph driver="claude-code" size="1.25rem" /></span>
     <div class="settings-row-text">
-      <span class="settings-row-title claude-title">Claude Code <span class="settings-pill" class:ok={status.connected && ready} class:warn={(!status.installed && claude.loaded) || signedOut} role="status">{label}</span></span>
+      <span class="settings-row-title claude-title">Claude Code <span class="settings-pill" class:ok={status.connected && ready} class:warn={(!status.installed && claude.loaded) || signedOut} role="status">{#if claude.checking}<BirdSpinner size="0.875rem" />{:else}{label}{/if}</span></span>
       {#if claude.signingIn}
         <span class="settings-row-desc">Complete sign-in with Claude in your browser.</span>
       {:else if claude.checking && !claude.loaded}
-        <span class="settings-row-desc">Checking Claude Code…</span>
+        <span class="settings-row-desc"><BirdSpinner label="Checking Claude Code" /></span>
       {:else if status.installed}
         <span class="settings-row-desc">Claude Code CLI detected · {status.version}{#if status.authenticated}{' · '}Signed in: {status.account}{:else if signedOut}{' · '}Signed out. Sign in to use your Claude subscription again.{/if}</span>
       {:else if claude.loaded}
@@ -127,7 +128,7 @@
   <details class="claude-advanced" open={!status.connected}>
     <summary class="claude-advanced-summary">Executable <span class="claude-path-hint">{status.path || 'claude'}</span></summary>
     <div class="claude-advanced-body">
-      <input class="field field-md claude-path" bind:value={path} placeholder={status.path || 'claude'} aria-label="Claude Code executable" disabled={working} />
+      <input class="field field-md claude-path" bind:value={path} placeholder={status.path || 'claude'} aria-label="Claude Code executable" disabled={working} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
       <button class="btn btn-secondary btn-sm" type="button" onclick={() => void claude.refresh(path)} disabled={working}>Check again</button>
       <button class="btn btn-ghost btn-sm" type="button" onclick={() => void act(chooseExecutable)} disabled={working}>Choose executable</button>
     </div>

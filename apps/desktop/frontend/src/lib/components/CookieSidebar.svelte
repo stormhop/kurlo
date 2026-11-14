@@ -105,6 +105,9 @@
           if (event.key === 'Enter') { event.preventDefault(); addDomain(); }
           if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); stopAddingDomain(); }
         }}
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="none"
       />
       {#if addError}<span class="cookie-domain-new-error" role="alert">{addError}</span>{/if}
       <div class="cookie-domain-new-actions">
@@ -120,7 +123,7 @@
         <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
         <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
       </svg>
-      <input bind:value={cookieView.filter} placeholder="Filter domains" aria-label="Filter domains" spellcheck="false" />
+      <input bind:value={cookieView.filter} placeholder="Filter domains" aria-label="Filter domains" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
     </div>
   {/if}
 

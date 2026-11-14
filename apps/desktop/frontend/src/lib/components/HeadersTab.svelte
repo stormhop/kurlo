@@ -206,7 +206,7 @@
         onfocus={() => { vm.onHeaderKeyInput(row); }}
         ondblclick={(event) => maybeOpenCustomHeaderDetailFromEvent(row, i, event)}
       />
-      <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+      <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
       <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.reqHeaders, i)} aria-label="Remove">✕</button>
     </div>
   {/each}

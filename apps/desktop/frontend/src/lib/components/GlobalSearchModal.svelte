@@ -150,6 +150,9 @@
         aria-activedescendant={items.length ? optionId(selectedIndex) : undefined}
         onkeydown={onInputKeydown}
         data-autofocus
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="none"
       />
       <kbd>Esc</kbd>
     </div>

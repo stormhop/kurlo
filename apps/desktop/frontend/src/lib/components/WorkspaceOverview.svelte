@@ -228,6 +228,9 @@
           onblur={() => finishRename(true)}
           aria-label="Workspace name"
           spellcheck="false"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="none"
         />
       {:else}
         <h1>

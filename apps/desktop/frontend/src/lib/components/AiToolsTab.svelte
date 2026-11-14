@@ -48,7 +48,7 @@
 
   <label class="ai-tools-steps">
     <span>Step limit</span>
-    <input class="field field-md field-mono" class:ai-invalid={stepError} inputmode="numeric" placeholder="8" aria-invalid={Boolean(stepError)} bind:value={vm.aiMaxSteps} />
+    <input class="field field-md field-mono" class:ai-invalid={stepError} inputmode="numeric" placeholder="8" aria-invalid={Boolean(stepError)} bind:value={vm.aiMaxSteps} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
     <span class="ai-tools-hint">Model calls in one send, counting each round of tool calls.</span>
     {#if stepError}<span class="ai-field-error" role="alert">{stepError}</span>{/if}
   </label>

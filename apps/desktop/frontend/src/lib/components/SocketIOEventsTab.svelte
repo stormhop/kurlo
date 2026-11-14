@@ -26,6 +26,9 @@
             placeholder="Add event…"
             spellcheck="false"
             oninput={(event) => vm.updateSioEventRow(row.id, { key: inputValue(event) })}
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
         </div>
         <div class="sio-col-listen">
@@ -47,6 +50,9 @@
             placeholder="Description"
             spellcheck="false"
             oninput={(event) => vm.updateSioEventRow(row.id, { description: inputValue(event) })}
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
         </div>
         <div class="sio-col-del">

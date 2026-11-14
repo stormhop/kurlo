@@ -116,6 +116,10 @@
                       bind:value={row.contentType}
                       placeholder={row.isFile ? 'application/octet-stream' : 'auto'}
                       oninput={() => guardTrailing(vm.formRows, i)}
+                      autocomplete="off"
+                      autocorrect="off"
+                      autocapitalize="none"
+                      spellcheck={false}
                     />
                   </div>
                 </div>
@@ -134,7 +138,7 @@
           {:else}
             <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => guardTrailing(vm.formRows, i)} />
           {/if}
-          <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+          <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
           <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.formRows, i)} aria-label="Remove">✕</button>
         </div>
       {/each}
@@ -166,7 +170,7 @@
           <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable" disabled={!row.key && !row.value} />
           <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={vm.variableSuggestions} placeholder="Key" oninput={() => guardTrailing(vm.formRows, i)} />
           <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => { row.isFile = false; row.fileName = undefined; guardTrailing(vm.formRows, i); }} />
-          <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+          <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
           <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.formRows, i)} aria-label="Remove">✕</button>
         </div>
       {/each}

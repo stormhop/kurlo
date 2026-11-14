@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { DEFAULT_AUTOSAVE_DELAY_MS, MAX_AUTOSAVE_DELAY_MS, MIN_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import AiConnectionsSettings from './AiConnectionsSettings.svelte';
@@ -428,6 +429,9 @@
             aria-label="Search settings"
             type="search"
             data-autofocus
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
         </div>
         <div class="settings-nav-list" role="tablist" aria-orientation="vertical" tabindex="-1" use:tabListKeyboard>
@@ -687,7 +691,7 @@
                     <span class="settings-row-desc">Host name and port of the proxy.</span>
                   </div>
                   <div class="settings-row-control">
-                    <input id="proxy-hostname" class="field proxy-input" type="text" spellcheck="false" autocomplete="off" placeholder="proxy.example.com" aria-label="Hostname" value={proxyConfig.hostname} oninput={(event) => updateProxy({ hostname: inputValue(event) })} />
+                    <input id="proxy-hostname" class="field proxy-input" type="text" spellcheck="false" autocomplete="off" placeholder="proxy.example.com" aria-label="Hostname" value={proxyConfig.hostname} oninput={(event) => updateProxy({ hostname: inputValue(event) })} autocorrect="off" autocapitalize="none" />
                     <input id="proxy-port" class="field proxy-input proxy-input-sm" type="number" min="0" max="65535" step="1" placeholder="Port" aria-label="Port" value={proxyConfig.port || ''} oninput={proxyPortInput} />
                   </div>
                 </div>
@@ -697,7 +701,7 @@
                     <span class="settings-row-desc">Hosts that connect directly, separated by commas.</span>
                   </div>
                   <div class="settings-row-control">
-                    <input id="proxy-bypass" class="field proxy-input" type="text" spellcheck="false" autocomplete="off" placeholder="localhost, 127.0.0.1, .internal" value={proxyConfig.bypass} oninput={(event) => updateProxy({ bypass: inputValue(event) })} />
+                    <input id="proxy-bypass" class="field proxy-input" type="text" spellcheck="false" autocomplete="off" placeholder="localhost, 127.0.0.1, .internal" value={proxyConfig.bypass} oninput={(event) => updateProxy({ bypass: inputValue(event) })} autocorrect="off" autocapitalize="none" />
                   </div>
                 </div>
               </div>
@@ -724,14 +728,14 @@
                   <div class="settings-row">
                     <div class="settings-row-text"><label class="settings-row-title" for="proxy-username">Username</label></div>
                     <div class="settings-row-control">
-                      <input id="proxy-username" class="field proxy-input" type="text" spellcheck="false" autocomplete="off" value={proxyConfig.auth.username} oninput={(event) => updateProxyAuth({ username: inputValue(event) })} />
+                      <input id="proxy-username" class="field proxy-input" type="text" spellcheck="false" autocomplete="off" value={proxyConfig.auth.username} oninput={(event) => updateProxyAuth({ username: inputValue(event) })} autocorrect="off" autocapitalize="none" />
                     </div>
                   </div>
                   <div class="settings-row">
                     <div class="settings-row-text"><label class="settings-row-title" for="proxy-password">Password</label></div>
                     <div class="settings-row-control">
                       <span class="proxy-password">
-                        <input id="proxy-password" class="field proxy-input" type={proxyPasswordVisible ? 'text' : 'password'} autocomplete="off" value={proxyConfig.auth.password} oninput={(event) => updateProxyAuth({ password: inputValue(event) })} />
+                        <input id="proxy-password" class="field proxy-input" type={proxyPasswordVisible ? 'text' : 'password'} autocomplete="off" value={proxyConfig.auth.password} oninput={(event) => updateProxyAuth({ password: inputValue(event) })} autocorrect="off" autocapitalize="none" spellcheck={false} />
                         <button type="button" class="btn btn-ghost btn-icon btn-xs proxy-eye" aria-label={proxyPasswordVisible ? 'Hide password' : 'Show password'} onclick={() => (proxyPasswordVisible = !proxyPasswordVisible)}>
                           {#if proxyPasswordVisible}
                             <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 8s2.5-4.5 6-4.5S14 8 14 8s-2.5 4.5-6 4.5S2 8 2 8z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="1.8" stroke="currentColor" stroke-width="1.3"/><path d="M3 13L13 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -854,6 +858,9 @@
                       onblur={() => saveDefaultWorkspaceLocation()}
                       onkeydown={handleDefaultLocationKeydown}
                       aria-describedby="settings-default-location-help"
+                      autocomplete="off"
+                      autocorrect="off"
+                      autocapitalize="none"
                     />
                     <button class="btn btn-secondary" type="button" onclick={browseDefaultWorkspaceLocation}>Browse</button>
                     <button class="btn btn-secondary" type="button" onclick={() => saveDefaultWorkspaceLocation()}>Save</button>
@@ -1015,7 +1022,7 @@
             {#if aboutInfo}
               <p class="about-meta">Version {aboutInfo.version} · {aboutInfo.platform}</p>
             {:else}
-              <span class="updates-spinner about-loading" aria-hidden="true"></span>
+              <span class="about-loading"><BirdSpinner /></span>
             {/if}
           </div>
 
@@ -1026,8 +1033,7 @@
                   <strong>Development build</strong>
                   <span>Updates come with release builds.</span>
                 {:else if updateState === 'checking'}
-                  <strong>Checking for updates…</strong>
-                  <span>This takes a few seconds.</span>
+                  <strong>Updates</strong>
                 {:else if updateState === 'up-to-date'}
                   <strong class="updates-inline">
                     <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 15 15" fill="none" aria-hidden="true" class="updates-ok-icon">
@@ -1074,7 +1080,7 @@
                 {:else if updateState === 'error'}
                   <button class="btn btn-secondary" type="button" onclick={handleCheck}>Try again</button>
                 {:else}
-                  <span class="updates-spinner" aria-hidden="true"></span>
+                  <BirdSpinner size="1.5rem" label={updateState === 'checking' ? 'Checking for updates' : 'Installing update'} />
                 {/if}
               {/if}
             </div>
@@ -1108,7 +1114,7 @@
           </div>
           {#if isDevBuild}
             <p class="about-update-note">
-              Local <code>make dev</code> or <code>go run</code> builds don't update. Install a release from the <a href="https://github.com/stormhop/kurlo/releases/latest" onclick={(e) => { e.preventDefault(); openExternalURL('https://github.com/stormhop/kurlo/releases/latest'); }}>releases page</a>.
+              Local <code>make dev</code> or <code>go run</code> builds don't update. Install a release from the <a class="btn-link" href="https://github.com/stormhop/kurlo/releases/latest" onclick={(e) => { e.preventDefault(); openExternalURL('https://github.com/stormhop/kurlo/releases/latest'); }}>releases page</a>.
             </p>
           {:else if updateState === 'available' && updateInfo}
             {#if manualUpdateURL}
@@ -1155,26 +1161,6 @@
   .updates-ok-icon {
     color: var(--s2xx);
     flex-shrink: 0;
-  }
-
-  .updates-spinner {
-    width: 0.75rem;
-    height: 0.75rem;
-    border: 1.5px solid var(--border);
-    border-top-color: var(--text-2);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    flex-shrink: 0;
-  }
-
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .updates-spinner {
-      animation-duration: 2s;
-    }
   }
 
   .updates-notes {
@@ -1447,8 +1433,7 @@
   }
 
   .about-item .switch-control,
-  .about-item .btn,
-  .about-item .updates-spinner {
+  .about-item .btn {
     flex-shrink: 0;
   }
 

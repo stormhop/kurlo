@@ -26,9 +26,9 @@
   {#each vm.requestVars as row, i (row.id)}
     <div class="kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
       <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable variable" disabled={!row.key && !row.value} />
-      <input class="field field-bare kv-input" bind:value={row.key} placeholder="userId" oninput={() => guardTrailing(vm.requestVars, i)} spellcheck="false" />
+      <input class="field field-bare kv-input" bind:value={row.key} placeholder="userId" oninput={() => guardTrailing(vm.requestVars, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
       <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => guardTrailing(vm.requestVars, i)} />
-      <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+      <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
       <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.requestVars, i)} aria-label="Remove variable">✕</button>
     </div>
   {/each}
@@ -53,9 +53,9 @@
     {#each vm.postResponseVars as row, i (row.id)}
       <div class="kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
         <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable variable" disabled={!row.key && !row.value} />
-        <input class="field field-bare kv-input" bind:value={row.key} placeholder="token" oninput={() => guardTrailing(vm.postResponseVars, i)} spellcheck="false" />
-        <input class="field field-bare kv-input field-mono" bind:value={row.value} placeholder="res.body.token" oninput={() => guardTrailing(vm.postResponseVars, i)} spellcheck="false" autocomplete="off" />
-        <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+        <input class="field field-bare kv-input" bind:value={row.key} placeholder="token" oninput={() => guardTrailing(vm.postResponseVars, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+        <input class="field field-bare kv-input field-mono" bind:value={row.value} placeholder="res.body.token" oninput={() => guardTrailing(vm.postResponseVars, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+        <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
         <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.postResponseVars, i)} aria-label="Remove variable">✕</button>
       </div>
     {/each}

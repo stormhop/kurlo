@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { vm } from '../stores/app.svelte';
 
@@ -44,6 +45,8 @@
             aria-label="Protobuf schema"
             oninput={onSchemaInput}
             onkeydown={onSchemaKeydown}
+            autocorrect="off"
+            autocapitalize="none"
           />
           <button
             class="btn btn-ghost btn-icon btn-sm graphql-select-toggle"
@@ -85,7 +88,7 @@
           <button class="btn btn-secondary btn-sm toolbar-btn" type="button" onclick={vm.addGrpcProtoImportPath} disabled={vm.grpcServiceLoading}>Add import path</button>
           {#if vm.grpcProtoFilePath.trim()}
             <button class="btn btn-secondary btn-sm toolbar-btn" type="button" onclick={vm.discoverGrpcServices} disabled={vm.grpcServiceLoading}>
-              {#if vm.grpcServiceLoading}<span class="spinner spinner-inline"></span>{/if}
+              {#if vm.grpcServiceLoading}<BirdSpinner />{/if}
               Refresh proto
             </button>
           {/if}
@@ -116,7 +119,7 @@
         disabled={vm.grpcServiceLoading}
       >
         {#if vm.grpcServiceLoading}
-          <span class="spinner spinner-inline"></span>
+          <BirdSpinner />
         {:else}
           <span class="graphql-introspection-check" aria-hidden="true">
             <svg width="0.875rem" height="0.875rem" viewBox="0 0 14 14" fill="none">

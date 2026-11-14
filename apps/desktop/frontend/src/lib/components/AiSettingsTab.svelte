@@ -54,7 +54,7 @@
         <span>How random the answer is, from 0 to 2. Lower is more predictable, which helps tests.</span>
       </span>
       <span class="ai-setting-control">
-        <input id="ai-temperature" class="field ai-number" class:ai-invalid={errors.aiTemperature} inputmode="decimal" placeholder="default" aria-invalid={Boolean(errors.aiTemperature)} aria-describedby={errors.aiTemperature ? 'ai-temperature-error' : undefined} bind:value={vm.aiTemperature} />
+        <input id="ai-temperature" class="field ai-number" class:ai-invalid={errors.aiTemperature} inputmode="decimal" placeholder="default" aria-invalid={Boolean(errors.aiTemperature)} aria-describedby={errors.aiTemperature ? 'ai-temperature-error' : undefined} bind:value={vm.aiTemperature} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
         {#if errors.aiTemperature}<span id="ai-temperature-error" class="ai-field-error" role="alert">{errors.aiTemperature}</span>{/if}
       </span>
     </label>
@@ -65,7 +65,7 @@
         <span>The longest answer the model may write. {vm.aiProvider === 'anthropic' ? 'Anthropic requires a limit; Kurlo sends 8192 when this is empty.' : 'Reasoning models count their thinking against it too.'}</span>
       </span>
       <span class="ai-setting-control">
-        <input id="ai-max-tokens" class="field ai-number" class:ai-invalid={errors.aiMaxTokens} inputmode="numeric" placeholder={vm.aiProvider === 'anthropic' ? '8192' : 'default'} aria-invalid={Boolean(errors.aiMaxTokens)} aria-describedby={errors.aiMaxTokens ? 'ai-max-tokens-error' : undefined} bind:value={vm.aiMaxTokens} />
+        <input id="ai-max-tokens" class="field ai-number" class:ai-invalid={errors.aiMaxTokens} inputmode="numeric" placeholder={vm.aiProvider === 'anthropic' ? '8192' : 'default'} aria-invalid={Boolean(errors.aiMaxTokens)} aria-describedby={errors.aiMaxTokens ? 'ai-max-tokens-error' : undefined} bind:value={vm.aiMaxTokens} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
         {#if errors.aiMaxTokens}<span id="ai-max-tokens-error" class="ai-field-error" role="alert">{errors.aiMaxTokens}</span>{/if}
       </span>
     </label>
@@ -76,7 +76,7 @@
         <span>Sample only from the most likely words, from 0 to 1. Change this or temperature, not both.</span>
       </span>
       <span class="ai-setting-control">
-        <input id="ai-top-p" class="field ai-number" class:ai-invalid={errors.aiTopP} inputmode="decimal" placeholder="default" aria-invalid={Boolean(errors.aiTopP)} aria-describedby={errors.aiTopP ? 'ai-top-p-error' : undefined} bind:value={vm.aiTopP} />
+        <input id="ai-top-p" class="field ai-number" class:ai-invalid={errors.aiTopP} inputmode="decimal" placeholder="default" aria-invalid={Boolean(errors.aiTopP)} aria-describedby={errors.aiTopP ? 'ai-top-p-error' : undefined} bind:value={vm.aiTopP} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
         {#if errors.aiTopP}<span id="ai-top-p-error" class="ai-field-error" role="alert">{errors.aiTopP}</span>{/if}
       </span>
     </label>
@@ -110,7 +110,7 @@
       </span>
       <span class="ai-setting-control">
         <span class="ai-number-unit">
-          <input id="ai-idle-timeout" class="field ai-number" class:ai-invalid={errors.aiIdleTimeoutSec} inputmode="numeric" placeholder="300" aria-invalid={Boolean(errors.aiIdleTimeoutSec)} aria-describedby={errors.aiIdleTimeoutSec ? 'ai-idle-timeout-error' : undefined} bind:value={vm.aiIdleTimeoutSec} />
+          <input id="ai-idle-timeout" class="field ai-number" class:ai-invalid={errors.aiIdleTimeoutSec} inputmode="numeric" placeholder="300" aria-invalid={Boolean(errors.aiIdleTimeoutSec)} aria-describedby={errors.aiIdleTimeoutSec ? 'ai-idle-timeout-error' : undefined} bind:value={vm.aiIdleTimeoutSec} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
           <span>s</span>
         </span>
         {#if errors.aiIdleTimeoutSec}<span id="ai-idle-timeout-error" class="ai-field-error" role="alert">{errors.aiIdleTimeoutSec}</span>{/if}
@@ -143,7 +143,7 @@
         <strong>HTTP proxy</strong>
         <span>Leave empty to use the system proxy.</span>
       </span>
-      <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:8080" bind:value={vm.proxyUrl} spellcheck="false" autocomplete="off" oninput={() => vm.markRequestSettingOverride('proxyUrl')} />
+      <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:8080" bind:value={vm.proxyUrl} spellcheck="false" autocomplete="off" oninput={() => vm.markRequestSettingOverride('proxyUrl')} autocorrect="off" autocapitalize="none" />
     </label>
   </div>
 </div>

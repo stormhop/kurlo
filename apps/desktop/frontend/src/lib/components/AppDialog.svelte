@@ -58,6 +58,9 @@
         maxlength={dialog.maxLength}
         spellcheck="false"
         data-autofocus
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="none"
       />
       {#each dialog.toggles ?? [] as toggle, index (index)}
         <label class="dialog-toggle">

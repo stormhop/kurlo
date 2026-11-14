@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { tick } from 'svelte';
   import type { AiConnectionModel } from '../backend';
 
@@ -135,9 +136,11 @@
         aria-label="Search models"
         autocomplete="off"
         spellcheck="false"
+        autocorrect="off"
+        autocapitalize="none"
       />
       {#if loading}
-        <div class="ai-combo-empty"><span class="spinner spinner-inline"></span> Loading models…</div>
+        <div class="ai-combo-empty"><BirdSpinner size="1.5rem" label="Loading models" /></div>
       {:else if error}
         <div class="ai-combo-empty ai-combo-error" role="alert">{error}</div>
       {:else if !filtered.length}

@@ -165,6 +165,9 @@
             bind:value={vm.sioEventName}
             placeholder='Event name'
             spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
           <label class="check-label sio-ack-label">
             <input type="checkbox" bind:checked={vm.sioAck} class="check" />

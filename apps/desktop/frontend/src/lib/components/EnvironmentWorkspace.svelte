@@ -256,7 +256,7 @@
         <h1 aria-label={activeEnvironment.name}>
           {#if activeEnvironment.color}<span class="env-color-dot env-title-color" style:--env-color={environmentColorVar(activeEnvironment)} aria-hidden="true"></span>{/if}
           <span class="env-name-fit" data-value={nameDraft}>
-            <input class="request-title-input env-name" size="1" maxlength={NAME_MAX_LENGTH} bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} />
+            <input class="request-title-input env-name" size="1" maxlength={NAME_MAX_LENGTH} bind:this={nameInput} bind:value={nameDraft} aria-label="Environment name" spellcheck="false" onfocus={() => { nameEditing = true; }} onblur={commitName} onkeydown={onNameKeydown} autocomplete="off" autocorrect="off" autocapitalize="none" />
           </span>
           {#if activeEnvironment.protected}
             <span class="env-protected"><MenuIcon name="lock" />Protected</span>
@@ -324,7 +324,7 @@
         {@const i = item.index}
         <div class="kv-row env-kv-row" data-testid="environment-variable-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
           <input type="checkbox" class="check" checked={row.enabled} onchange={(event) => updateEnvironmentRow(activeEnvironment.id, i, { enabled: inputChecked(event) })} aria-label="Enable variable" disabled={!row.key && !row.value} />
-          <input class="field field-bare kv-input" value={row.key} placeholder="Add variable" aria-label="Environment variable key" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { key: inputValue(event) })} spellcheck="false" />
+          <input class="field field-bare kv-input" value={row.key} placeholder="Add variable" aria-label="Environment variable key" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { key: inputValue(event) })} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
           <button
             class="env-type-toggle"
             class:secret={row.secret}
@@ -334,8 +334,8 @@
           >
             {row.secret ? 'Secret' : 'Default'}
           </button>
-          <input class="field field-bare kv-input" type={row.secret ? 'password' : 'text'} value={row.value} placeholder="Value" aria-label="Environment variable value" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { value: inputValue(event) })} spellcheck="false" autocomplete="off" />
-          <input class="field field-bare kv-input kv-desc" value={row.description} placeholder="Description" aria-label="Environment variable description" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { description: inputValue(event) })} />
+          <input class="field field-bare kv-input" type={row.secret ? 'password' : 'text'} value={row.value} placeholder="Value" aria-label="Environment variable value" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { value: inputValue(event) })} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          <input class="field field-bare kv-input kv-desc" value={row.description} placeholder="Description" aria-label="Environment variable description" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { description: inputValue(event) })} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
           <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeEnvironmentRow(activeEnvironment.id, i)} aria-label="Remove variable">✕</button>
         </div>
       {/each}

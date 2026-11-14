@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdLoader from './BirdLoader.svelte';
   import { vm } from '../stores/app.svelte';
   import { statusClass } from '../utils';
   import ExampleDetail from './ExampleDetail.svelte';
@@ -8,9 +9,7 @@
 
 <div class="examples-tab">
   {#if !vm.requestExamplesLoaded}
-    <div class="empty-state examples-empty" role="status">
-      <p class="empty-state-text examples-empty-hint">Loading examples…</p>
-    </div>
+    <BirdLoader label="Loading examples" />
   {:else if vm.requestExamples.length === 0}
     <div class="empty-state examples-empty">
       <p class="empty-state-title examples-empty-title">No saved examples</p>

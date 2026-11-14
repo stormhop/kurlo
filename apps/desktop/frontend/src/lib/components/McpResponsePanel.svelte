@@ -1,4 +1,5 @@
 <script lang="ts">
+  import KurloBird from './KurloBird.svelte';
   import Keycaps from './Keycaps.svelte';
   import { tabListKeyboard } from '../a11y';
   import { vm } from '../stores/app.svelte';
@@ -28,9 +29,8 @@
 
 <div class="response-area ws-panel mcp-response-area">
   {#if vm.loading && !response}
-    <div class="response-placeholder" role="status">
-      <span class="response-spinner"></span>
-      <span class="response-placeholder-text">Sending the call…</span>
+    <div class="response-placeholder response-loading-state" role="status" aria-label="Sending the call">
+      <span class="response-waiting-bird"><KurloBird mode="flying" envelope size="3.25rem" /></span>
     </div>
 
   {:else if vm.requestError && !response}

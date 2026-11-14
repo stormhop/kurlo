@@ -70,11 +70,11 @@
       {#if method === 'token'}
         <label class="gitauth-field">
           <span>Username</span>
-          <input class="field" type="text" bind:value={username} spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="(provider default)" />
+          <input class="field" type="text" bind:value={username} spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="(provider default)" autocorrect="off" />
         </label>
         <label class="gitauth-field">
           <span>Personal access token</span>
-          <input class="field" type="password" bind:value={token} spellcheck="false" autocomplete="off" placeholder="ghp_… / glpat-…" />
+          <input class="field" type="password" bind:value={token} spellcheck="false" autocomplete="off" placeholder="ghp_… / glpat-…" autocorrect="off" autocapitalize="none" />
         </label>
         <p class="gitauth-hint">Stored encrypted in your OS keychain. Never written to the repo, <code>.git/config</code>, or process arguments.</p>
       {:else}

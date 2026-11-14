@@ -5,6 +5,7 @@
 </script>
 
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { tick } from 'svelte';
   import { vm } from '../stores/app.svelte';
   import { AI_PRESETS, type AiPresetId } from '../stores/features/ai';
@@ -140,11 +141,13 @@
         placeholder={`e.g. ${preset.modelExample}`}
         autocomplete="off"
         spellcheck="false"
+        autocorrect="off"
+        autocapitalize="none"
       />
       <p class="ai-model-hint">The model's name at {preset.id === 'custom' ? 'your server' : preset.label}. Pick one from the list or type it.</p>
 
       {#if vm.aiModelsLoading}
-        <div class="grpc-method-empty"><span class="spinner spinner-inline"></span> Loading the provider's models…</div>
+        <div class="grpc-method-empty"><BirdSpinner size="1.5rem" label="Loading the provider's models" /></div>
       {:else if vm.aiModelsError}
         <div class="ai-model-problem" role="alert">
           <svg class="ai-model-problem-icon" width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">

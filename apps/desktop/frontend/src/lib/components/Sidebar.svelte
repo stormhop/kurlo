@@ -780,7 +780,7 @@
           <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
           <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
-        <input bind:this={sidebarSearchInput} bind:value={sidebarSearch} placeholder="Filter requests" aria-label="Filter requests" spellcheck="false" disabled={workspaceBlocked} />
+        <input bind:this={sidebarSearchInput} bind:value={sidebarSearch} placeholder="Filter requests" aria-label="Filter requests" spellcheck="false" disabled={workspaceBlocked} autocomplete="off" autocorrect="off" autocapitalize="none" />
       </div>
       {#if pinnedRequests.length}
         <section class="starred-section" aria-label="Starred requests">
@@ -934,6 +934,9 @@
                     onkeydown={onCollectionNameKeydown}
                     onclick={(event) => event.stopPropagation()}
                     ondblclick={(event) => event.stopPropagation()}
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="none"
                   />
                 {:else}
                   <button
@@ -1009,7 +1012,11 @@
                 <input class="field field-sm sidebar-request-title-input" maxlength={NAME_MAX_LENGTH} bind:this={editingLoadTestInput} bind:value={editingLoadTestName} aria-label="Load test name" spellcheck="false" onblur={commitLoadTestRename} onkeydown={(event) => {
                   if (event.key === 'Enter') { event.preventDefault(); void commitLoadTestRename(); }
                   else if (event.key === 'Escape') { event.preventDefault(); cancelLoadTestRename(); }
-                }} />
+                }}
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="none"
+                />
               {:else}
               <button
                 class="collection-request"
@@ -1128,7 +1135,7 @@
             <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
             <path d="M8.7 8.7l2.7 2.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
           </svg>
-          <input bind:value={historyQuery} placeholder="Filter by URL or name" aria-label="Filter history" spellcheck="false" />
+          <input bind:value={historyQuery} placeholder="Filter by URL or name" aria-label="Filter history" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
         </div>
         <div class="segmented history-status-filter" role="radiogroup" aria-label="Status">
           {#each HISTORY_STATUS_FILTERS as filter, eachIndex (eachIndex)}
@@ -1234,7 +1241,7 @@
                 <div class="environment-item-main">
                   <span class="environment-dot" class:env-colored={Boolean(row.environment.color)} style:--env-color={environmentColorVar(row.environment)} aria-hidden="true"></span>
                   <span class="environment-item-text">
-                    <input class="sidebar-request-title-input" maxlength={NAME_MAX_LENGTH} bind:this={editingEnvironmentInput} bind:value={editingEnvironmentName} aria-label="Sidebar environment name" spellcheck="false" onblur={commitEnvironmentRename} onkeydown={onEnvironmentNameKeydown} />
+                    <input class="sidebar-request-title-input" maxlength={NAME_MAX_LENGTH} bind:this={editingEnvironmentInput} bind:value={editingEnvironmentName} aria-label="Sidebar environment name" spellcheck="false" onblur={commitEnvironmentRename} onkeydown={onEnvironmentNameKeydown} autocomplete="off" autocorrect="off" autocapitalize="none" />
                     <small>{environmentValueCount(row.environment)} {environmentValueCount(row.environment) === 1 ? 'variable' : 'variables'}</small>
                   </span>
                 </div>

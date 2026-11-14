@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { NAME_MAX_LENGTH } from '../constants';
   import { onMount } from 'svelte';
   import Select from './Select.svelte';
@@ -177,7 +178,7 @@
     <form class="settings-group agent-mcp-form" aria-label={editing.id ? `Edit ${editing.name}` : 'Add an MCP server'} onsubmit={event => { event.preventDefault(); void save(); }}>
       <div class="agent-mcp-row">
         <label class="agent-mcp-label" for="agent-mcp-name">Name</label>
-        <input id="agent-mcp-name" class="field agent-mcp-input" type="text" maxlength={NAME_MAX_LENGTH} spellcheck="false" autocomplete="off" placeholder="GitHub" bind:value={name} />
+        <input id="agent-mcp-name" class="field agent-mcp-input" type="text" maxlength={NAME_MAX_LENGTH} spellcheck="false" autocomplete="off" placeholder="GitHub" bind:value={name} autocorrect="off" autocapitalize="none" />
       </div>
       <div class="agent-mcp-row">
         <span class="agent-mcp-label">Type</span>
@@ -186,7 +187,7 @@
       {#if kind === 'http'}
         <div class="agent-mcp-row">
           <label class="agent-mcp-label" for="agent-mcp-url">URL</label>
-          <input id="agent-mcp-url" class="field agent-mcp-input agent-mcp-mono" type="url" spellcheck="false" autocomplete="off" placeholder="https://mcp.example.com/mcp" bind:value={url} />
+          <input id="agent-mcp-url" class="field agent-mcp-input agent-mcp-mono" type="url" spellcheck="false" autocomplete="off" placeholder="https://mcp.example.com/mcp" bind:value={url} autocorrect="off" autocapitalize="none" />
         </div>
         <div class="agent-mcp-row">
           <span class="agent-mcp-label">Sign-in</span>
@@ -195,7 +196,7 @@
         {#if authMode === 'oauth'}
           <div class="agent-mcp-row">
             <label class="agent-mcp-label" for="agent-mcp-client">Client ID</label>
-            <input id="agent-mcp-client" class="field agent-mcp-input agent-mcp-mono" type="text" spellcheck="false" autocomplete="off" placeholder="Optional" bind:value={clientId} />
+            <input id="agent-mcp-client" class="field agent-mcp-input agent-mcp-mono" type="text" spellcheck="false" autocomplete="off" placeholder="Optional" bind:value={clientId} autocorrect="off" autocapitalize="none" />
           </div>
           <p class="agent-mcp-note">Save, then choose Sign in. Kurlo finds the server's sign-in page and registers itself there; enter a client ID only if the server asks for one you created.</p>
         {/if}
@@ -206,7 +207,7 @@
       {:else}
         <div class="agent-mcp-row">
           <label class="agent-mcp-label" for="agent-mcp-command">Command</label>
-          <input id="agent-mcp-command" class="field agent-mcp-input agent-mcp-mono" type="text" spellcheck="false" autocomplete="off" placeholder="npx" bind:value={command} />
+          <input id="agent-mcp-command" class="field agent-mcp-input agent-mcp-mono" type="text" spellcheck="false" autocomplete="off" placeholder="npx" bind:value={command} autocorrect="off" autocapitalize="none" />
         </div>
         <div class="agent-mcp-row agent-mcp-top">
           <label class="agent-mcp-label" for="agent-mcp-args">Arguments</label>
@@ -222,7 +223,7 @@
       {#if formError}<p class="agent-mcp-error" role="alert">{formError}</p>{/if}
       <div class="agent-mcp-actions">
         <button class="btn btn-ghost btn-sm" type="button" onclick={() => (editing = null)}>Cancel</button>
-        <button class="btn btn-secondary btn-sm" type="button" disabled={busy} onclick={() => void test()}>{busy ? 'Checking…' : 'Test'}</button>
+        <button class="btn btn-secondary btn-sm" type="button" disabled={busy} onclick={() => void test()}>{#if busy}<BirdSpinner />{/if}Test</button>
         <button class="btn btn-primary btn-sm" type="submit" disabled={busy}>Save</button>
       </div>
     </form>

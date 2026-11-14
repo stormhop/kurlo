@@ -495,17 +495,6 @@
 .sse-footer-muted   { color: var(--text-3); }
 .sse-footer-error-text { color: var(--danger); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.sse-spinner-sm {
-  display: inline-block;
-  width: 0.5625rem;
-  height: 0.5625rem;
-  border: 1.5px solid var(--text-3);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: sse-spin 0.7s linear infinite;
-  flex-shrink: 0;
-}
-@keyframes sse-spin { to { transform: rotate(360deg); } }
 
 .sse-headers-table {
   min-height: 0;

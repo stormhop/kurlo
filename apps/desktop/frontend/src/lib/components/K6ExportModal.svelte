@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { tabListKeyboard, trapFocus } from '../a11y';
   import CodeEditor from '../CodeEditor.svelte';
@@ -153,7 +154,7 @@
     </div>
 
     <div class="modal-foot">
-      <span class="loadtest-hint k6-export-file">{loading ? 'Generating…' : result?.fileName ?? ''}</span>
+      <span class="loadtest-hint k6-export-file">{#if loading}<BirdSpinner label="Generating the script" />{:else}{result?.fileName ?? ''}{/if}</span>
       <button class="btn btn-secondary" class:feedback-ok={copied} type="button" disabled={loading || saving || !result?.script} onclick={copy}>{copied ? 'Copied' : 'Copy'}</button>
       <button class="btn btn-secondary" class:feedback-ok={saved} type="button" disabled={loading || saving || !result?.script} onclick={save}>{saving ? 'Saving…' : saved ? 'Saved' : folder ? 'Save folder…' : 'Save script…'}</button>
       <button class="btn btn-primary" type="button" disabled={runDisabled || loading || saving || !result?.script} onclick={onRun}>Run with local k6</button>

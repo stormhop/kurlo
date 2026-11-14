@@ -162,11 +162,10 @@
   font: inherit;
   cursor: pointer;
   text-decoration: none;
-  text-underline-offset: 0.125rem;
 }
 
 .btn-link:hover:not(:disabled) {
-  text-decoration: underline;
+  color: color-mix(in srgb, var(--accent-hover) 70%, var(--text));
 }
 
 .btn-link:focus-visible {

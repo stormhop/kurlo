@@ -272,7 +272,7 @@
       {#if workspaceMenuOpen}
         <div class="workspace-menu">
           <div class="workspace-menu-top">
-            <input class="field field-md" bind:value={workspaceSearch} placeholder="Search workspaces..." spellcheck="false" />
+            <input class="field field-md" bind:value={workspaceSearch} placeholder="Search workspaces..." spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
             <button class="btn btn-secondary"
               type="button"
               onclick={createWorkspace}
@@ -497,7 +497,7 @@
       {#if environmentMenuOpen}
         <div class="menu environment-menu">
           {#if environmentSearchVisible}
-            <input class="field field-sm environment-menu-search" type="search" bind:value={environmentQuery} onkeydown={onEnvironmentSearchKeydown} placeholder="Search environments" aria-label="Search environments" autocomplete="off" spellcheck="false" />
+            <input class="field field-sm environment-menu-search" type="search" bind:value={environmentQuery} onkeydown={onEnvironmentSearchKeydown} placeholder="Search environments" aria-label="Search environments" autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" />
           {/if}
           <div class="environment-menu-list" use:revealActiveEnvironment>
             {#if environmentMatches}

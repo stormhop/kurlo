@@ -73,6 +73,9 @@
             spellcheck="false"
             aria-label="Variable name"
             oninput={event => updateRow(index, { key: event.currentTarget.value })}
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
         </span>
         <span role="cell">
@@ -84,6 +87,9 @@
             spellcheck="false"
             aria-label="Variable value"
             oninput={event => updateRow(index, { value: event.currentTarget.value })}
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
           />
         </span>
         <span role="cell" class="globals-col-actions">

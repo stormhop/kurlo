@@ -500,6 +500,9 @@
               onblur={() => finishRename(true)}
               aria-label="Collection name"
               spellcheck="false"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
             />
           {:else}
             <h1>
@@ -682,7 +685,7 @@
                 <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable header" disabled={!row.key && !row.value} />
                 <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={variableSuggestions} placeholder="Header" pickerOptions={HEADER_PICKER_NAMES} pickerLabel="Header names" oninput={() => guardTrailing(headers, i)} />
                 <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={variableSuggestions} placeholder="Value" pickerOptions={getHeaderValues(row.key)} pickerLabel="Header values" oninput={() => guardTrailing(headers, i)} />
-                <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+                <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
                 <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(headers, i)} aria-label="Remove header">✕</button>
               </div>
             {/each}
@@ -704,10 +707,10 @@
             {#each variables as row, i (row.id)}
               <div class="kv-row env-kv-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
                 <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Enable variable" disabled={!row.key && !row.value} />
-                <input class="field field-bare kv-input" bind:value={row.key} placeholder="baseUrl" oninput={() => guardTrailing(variables, i)} spellcheck="false" />
+                <input class="field field-bare kv-input" bind:value={row.key} placeholder="baseUrl" oninput={() => guardTrailing(variables, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                 <button class="env-type-toggle" class:secret={row.secret} type="button" onclick={() => (row.secret = !row.secret)} disabled={!row.key && !row.value}>{row.secret ? 'Secret' : 'Default'}</button>
-                <input class="field field-bare kv-input" type={row.secret ? 'password' : 'text'} bind:value={row.value} placeholder="https://api.example.com" oninput={() => guardTrailing(variables, i)} spellcheck="false" autocomplete="off" />
-                <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" />
+                <input class="field field-bare kv-input" type={row.secret ? 'password' : 'text'} bind:value={row.value} placeholder="https://api.example.com" oninput={() => guardTrailing(variables, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+                <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
                 <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(variables, i)} aria-label="Remove variable">✕</button>
               </div>
             {/each}
@@ -736,17 +739,17 @@
             <div class="auth-fields">
               {#if auth.type === 'bearer'}
                 <label class="field-label" for="collection-bearer-token">Token</label>
-                <input id="collection-bearer-token" class="field field-input field-mono" type="password" bind:value={auth.bearerToken} placeholder="Bearer token" spellcheck="false" />
+                <input id="collection-bearer-token" class="field field-input field-mono" type="password" bind:value={auth.bearerToken} placeholder="Bearer token" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
               {:else if auth.type === 'basic' || auth.type === 'digest' || auth.type === 'ntlm'}
                 <label class="field-label" for="collection-auth-user">Username</label>
-                <input id="collection-auth-user" class="field field-input" bind:value={auth.basicUser} spellcheck="false" />
+                <input id="collection-auth-user" class="field field-input" bind:value={auth.basicUser} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                 <label class="field-label" for="collection-auth-pass">Password</label>
-                <input id="collection-auth-pass" class="field field-input" bind:value={auth.basicPass} type="password" />
+                <input id="collection-auth-pass" class="field field-input" bind:value={auth.basicPass} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
               {:else if auth.type === 'apikey'}
                 <label class="field-label" for="collection-apikey-name">Key name</label>
-                <input id="collection-apikey-name" class="field field-input" bind:value={auth.apiKeyName} spellcheck="false" />
+                <input id="collection-apikey-name" class="field field-input" bind:value={auth.apiKeyName} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                 <label class="field-label" for="collection-apikey-value">Key value</label>
-                <input id="collection-apikey-value" class="field field-input field-mono" type="password" bind:value={auth.apiKeyValue} spellcheck="false" />
+                <input id="collection-apikey-value" class="field field-input field-mono" type="password" bind:value={auth.apiKeyValue} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                 <span class="field-label">Add to</span>
                 <div class="segmented radio-group" role="radiogroup">
                   <label class="segmented-item radio-label"><input type="radio" bind:group={auth.apiKeyIn} value="header" /> Header</label>
@@ -754,13 +757,13 @@
                 </div>
               {:else if auth.type === 'oauth2'}
                 <label class="field-label" for="collection-oauth-url">Token URL</label>
-                <input id="collection-oauth-url" class="field field-input" bind:value={auth.oauth2TokenURL} spellcheck="false" />
+                <input id="collection-oauth-url" class="field field-input" bind:value={auth.oauth2TokenURL} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                 <label class="field-label" for="collection-oauth-id">Client ID</label>
-                <input id="collection-oauth-id" class="field field-input" bind:value={auth.oauth2ClientID} spellcheck="false" />
+                <input id="collection-oauth-id" class="field field-input" bind:value={auth.oauth2ClientID} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                 <label class="field-label" for="collection-oauth-secret">Client secret</label>
-                <input id="collection-oauth-secret" class="field field-input" bind:value={auth.oauth2Secret} type="password" />
+                <input id="collection-oauth-secret" class="field field-input" bind:value={auth.oauth2Secret} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
                 <label class="field-label" for="collection-oauth-scope">Scope</label>
-                <input id="collection-oauth-scope" class="field field-input" bind:value={auth.oauth2Scope} spellcheck="false" />
+                <input id="collection-oauth-scope" class="field field-input" bind:value={auth.oauth2Scope} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
               {:else if auth.type === 'oauth1'}
                 <div class="auth-grid-2">
                   <div>
@@ -775,17 +778,17 @@
                       {/each}
                     </div>
                   </div>
-                  <div><label class="field-label" for="collection-oauth1-key">Consumer key</label><input id="collection-oauth1-key" class="field field-input field-mono" bind:value={auth.oauth1ConsumerKey} spellcheck="false" /></div>
+                  <div><label class="field-label" for="collection-oauth1-key">Consumer key</label><input id="collection-oauth1-key" class="field field-input field-mono" bind:value={auth.oauth1ConsumerKey} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
                   {#if (auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
                     <div class="auth-grid-span"><label class="field-label" for="collection-oauth1-private-key">Private key (PEM)</label><textarea id="collection-oauth1-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.oauth1PrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
                   {:else}
-                    <div><label class="field-label" for="collection-oauth1-secret">Consumer secret</label><input id="collection-oauth1-secret" class="field field-input field-mono" bind:value={auth.oauth1ConsumerSecret} type="password" /></div>
+                    <div><label class="field-label" for="collection-oauth1-secret">Consumer secret</label><input id="collection-oauth1-secret" class="field field-input field-mono" bind:value={auth.oauth1ConsumerSecret} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} /></div>
                   {/if}
-                  <div><label class="field-label" for="collection-oauth1-token">Access token</label><input id="collection-oauth1-token" class="field field-input field-mono" bind:value={auth.oauth1Token} type="password" /></div>
+                  <div><label class="field-label" for="collection-oauth1-token">Access token</label><input id="collection-oauth1-token" class="field field-input field-mono" bind:value={auth.oauth1Token} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} /></div>
                   {#if !(auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
-                    <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><input id="collection-oauth1-token-secret" class="field field-input field-mono" bind:value={auth.oauth1TokenSecret} type="password" /></div>
+                    <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><input id="collection-oauth1-token-secret" class="field field-input field-mono" bind:value={auth.oauth1TokenSecret} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} /></div>
                   {/if}
-                  <div><label class="field-label" for="collection-oauth1-realm">Realm</label><input id="collection-oauth1-realm" class="field field-input" bind:value={auth.oauth1Realm} spellcheck="false" /></div>
+                  <div><label class="field-label" for="collection-oauth1-realm">Realm</label><input id="collection-oauth1-realm" class="field field-input" bind:value={auth.oauth1Realm} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
                 </div>
               {:else if auth.type === 'jwt'}
                 <div class="auth-grid-2">
@@ -804,18 +807,18 @@
                   {#if jwtAlgorithmUsesSecret(auth.jwtAlgorithm)}
                     <div class="auth-grid-span">
                       <label class="field-label" for="collection-jwt-secret">Secret</label>
-                      <input id="collection-jwt-secret" class="field field-input field-mono" bind:value={auth.jwtSecret} type="password" spellcheck="false" />
+                      <input id="collection-jwt-secret" class="field field-input field-mono" bind:value={auth.jwtSecret} type="password" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                       <label class="check-label jwt-secret-base64"><input class="check" type="checkbox" bind:checked={auth.jwtSecretBase64} /> Secret is base64-encoded</label>
                     </div>
                   {:else}
                     <div class="auth-grid-span"><label class="field-label" for="collection-jwt-private-key">Private key (PEM)</label><textarea id="collection-jwt-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.jwtPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
                   {/if}
                   {#if auth.jwtAddTo === 'query'}
-                    <div><label class="field-label" for="collection-jwt-query-param">Query parameter</label><input id="collection-jwt-query-param" class="field field-input field-mono" bind:value={auth.jwtQueryParam} placeholder="token" spellcheck="false" /></div>
+                    <div><label class="field-label" for="collection-jwt-query-param">Query parameter</label><input id="collection-jwt-query-param" class="field field-input field-mono" bind:value={auth.jwtQueryParam} placeholder="token" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
                   {:else}
-                    <div><label class="field-label" for="collection-jwt-header-prefix">Header prefix</label><input id="collection-jwt-header-prefix" class="field field-input field-mono" bind:value={auth.jwtHeaderPrefix} placeholder="Bearer" spellcheck="false" /></div>
+                    <div><label class="field-label" for="collection-jwt-header-prefix">Header prefix</label><input id="collection-jwt-header-prefix" class="field field-input field-mono" bind:value={auth.jwtHeaderPrefix} placeholder="Bearer" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
                   {/if}
-                  <div><label class="field-label" for="collection-jwt-expires-in">Expires in, seconds <span class="field-label-hint">(adds iat and exp)</span></label><input id="collection-jwt-expires-in" class="field field-input field-mono" bind:value={auth.jwtExpiresIn} inputmode="numeric" placeholder="Not set" spellcheck="false" /></div>
+                  <div><label class="field-label" for="collection-jwt-expires-in">Expires in, seconds <span class="field-label-hint">(adds iat and exp)</span></label><input id="collection-jwt-expires-in" class="field field-input field-mono" bind:value={auth.jwtExpiresIn} inputmode="numeric" placeholder="Not set" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
                 </div>
                 <span class="field-label">Payload <span class="field-label-hint">— JSON claims</span></span>
                 <div class="jwt-editor">
@@ -827,10 +830,10 @@
                 </div>
               {:else if auth.type === 'aws'}
                 <div class="auth-grid-2">
-                  <div><label class="field-label" for="collection-aws-key">Access key ID</label><input id="collection-aws-key" class="field field-input field-mono" bind:value={auth.awsAccessKey} spellcheck="false" /></div>
-                  <div><label class="field-label" for="collection-aws-secret">Secret access key</label><input id="collection-aws-secret" class="field field-input field-mono" bind:value={auth.awsSecretKey} type="password" /></div>
-                  <div><label class="field-label" for="collection-aws-region">Region</label><input id="collection-aws-region" class="field field-input" bind:value={auth.awsRegion} spellcheck="false" /></div>
-                  <div><label class="field-label" for="collection-aws-service">Service</label><input id="collection-aws-service" class="field field-input" bind:value={auth.awsService} spellcheck="false" /></div>
+                  <div><label class="field-label" for="collection-aws-key">Access key ID</label><input id="collection-aws-key" class="field field-input field-mono" bind:value={auth.awsAccessKey} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
+                  <div><label class="field-label" for="collection-aws-secret">Secret access key</label><input id="collection-aws-secret" class="field field-input field-mono" bind:value={auth.awsSecretKey} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} /></div>
+                  <div><label class="field-label" for="collection-aws-region">Region</label><input id="collection-aws-region" class="field field-input" bind:value={auth.awsRegion} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
+                  <div><label class="field-label" for="collection-aws-service">Service</label><input id="collection-aws-service" class="field field-input" bind:value={auth.awsService} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" /></div>
                 </div>
               {:else if auth.type === 'inherit'}
                 <p class="auth-none-hint">Requests in this folder that inherit auth take it from {parentAuthSource}.</p>
@@ -894,7 +897,7 @@
               </label>
               <label class="postman-setting">
                 <span class="setting-copy"><strong>HTTP proxy</strong><span>Route requests through a proxy. Leave empty to use system proxy settings.</span></span>
-                <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:8080" bind:value={settings.proxyUrl} spellcheck="false" autocomplete="off" />
+                <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:8080" bind:value={settings.proxyUrl} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
               </label>
               <div class="postman-setting client-cert-setting">
                 <span class="setting-copy">
@@ -930,6 +933,8 @@
                       spellcheck="false"
                       bind:value={settings.clientKeyPassword}
                       disabled={!settings.clientCertPath}
+                      autocorrect="off"
+                      autocapitalize="none"
                     />
                   </div>
                   <p class="client-cert-hint">The key file defaults to the certificate file when left blank (combined PEM). Use <code>&#123;&#123;variable&#125;&#125;</code> in the passphrase to keep it in workspace secrets.</p>
@@ -941,7 +946,7 @@
               </label>
               <label class="postman-setting">
                 <span class="setting-copy"><strong>Browser origin</strong><span>Default page origin for CORS and CSP checks.</span></span>
-                <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:5173" bind:value={settings.browserOrigin} spellcheck="false" autocomplete="off" />
+                <input class="field field-mono kv-input setting-proxy" type="text" placeholder="http://localhost:5173" bind:value={settings.browserOrigin} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
               </label>
               <label class="postman-setting">
                 <span class="setting-copy"><strong>Include browser credentials</strong><span>Require credentialed CORS rules by default.</span></span>

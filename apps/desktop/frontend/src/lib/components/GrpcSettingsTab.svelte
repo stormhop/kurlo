@@ -60,7 +60,7 @@
         <span>Use this value for TLS SNI, authority, and certificate hostname checks.</span>
         {#if vm.collectionSettingDefaultNote('grpcServerName')}<em class:setting-default-muted={!vm.collectionSettingIsInherited('grpcServerName')}>{vm.collectionSettingDefaultNote('grpcServerName')}</em>{/if}
       </span>
-      <input class="field field-input" type="text" bind:value={vm.grpcServerName} placeholder="api.example.com" spellcheck="false" autocomplete="off" oninput={() => vm.markRequestSettingOverride('grpcServerName')} />
+      <input class="field field-input" type="text" bind:value={vm.grpcServerName} placeholder="api.example.com" spellcheck="false" autocomplete="off" oninput={() => vm.markRequestSettingOverride('grpcServerName')} autocorrect="off" autocapitalize="none" />
     </label>
 
     <label class="postman-setting">

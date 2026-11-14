@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import AgentMcpSettings from './AgentMcpSettings.svelte';
   import Disclosure from './Disclosure.svelte';
   import { codexConnectionStore } from '../stores/codex.svelte';
@@ -60,7 +61,7 @@
     ].filter(Boolean);
     const parts = [connected.length ? `${connected.join(' · ')} connected` : '', signedOut.length ? `${signedOut.join(' · ')} signed out` : ''].filter(Boolean);
     if (parts.length) return parts.join(' · ');
-    return codexConnectionStore.loaded && claudeConnectionStore.loaded ? 'Not connected' : 'Checking…';
+    return codexConnectionStore.loaded && claudeConnectionStore.loaded ? 'Not connected' : '';
   });
   const kurloSummary = $derived.by(() => {
     if (!loaded) return '';
@@ -363,7 +364,7 @@
             <span class="settings-row-desc">Sign in and pay OpenRouter directly. Claude, GPT, Gemini and more with one account.</span>
             {#if openRouter.status === 'failed' && openRouter.error}<span class="ai-error" role="alert">{openRouter.error}</span>{/if}
             {#if openRouter.status === 'connected'}<span class="ai-ok" role="status">Connected to OpenRouter</span>{/if}
-            {#if openRouter.status === 'waiting'}<span class="ai-waiting" role="status"><span class="spinner spinner-inline"></span> Finish signing in in your browser</span>{/if}
+            {#if openRouter.status === 'waiting'}<span class="ai-waiting" role="status"><BirdSpinner /> Finish signing in in your browser</span>{/if}
           </div>
           <div class="settings-row-control">
             {#if openRouter.status === 'waiting'}
@@ -397,12 +398,12 @@
               {#if keyKind === 'compatible'}
                 <div class="ai-form-row">
                   <label class="ai-form-label" for="ai-key-base-url">Base URL</label>
-                  <input id="ai-key-base-url" class="field ai-form-input" type="url" spellcheck="false" autocomplete="off" placeholder="https://llm.example.com/v1" bind:value={keyBaseURL} />
+                  <input id="ai-key-base-url" class="field ai-form-input" type="url" spellcheck="false" autocomplete="off" placeholder="https://llm.example.com/v1" bind:value={keyBaseURL} autocorrect="off" autocapitalize="none" />
                 </div>
               {/if}
               <div class="ai-form-row">
                 <label class="ai-form-label" for="ai-key-value">API key</label>
-                <input id="ai-key-value" class="field ai-form-input ai-mono" type="password" spellcheck="false" autocomplete="off" placeholder={KEY_PLACEHOLDERS[keyKind]} bind:value={keyValue} oninput={() => { keyModels = []; }} />
+                <input id="ai-key-value" class="field ai-form-input ai-mono" type="password" spellcheck="false" autocomplete="off" placeholder={KEY_PLACEHOLDERS[keyKind]} bind:value={keyValue} oninput={() => { keyModels = []; }} autocorrect="off" autocapitalize="none" />
               </div>
               {#if keyModels.length}
                 <div class="ai-form-row">
@@ -414,7 +415,7 @@
               {#if keyError}<span class="ai-error ai-form-note" role="alert">{keyError}</span>{/if}
               <div class="ai-form-actions">
                 <button class="btn btn-ghost btn-sm" type="button" onclick={() => { resetKeyForm(); addMode = 'none'; }}>Cancel</button>
-                <button class="btn btn-secondary btn-sm" type="button" disabled={keyBusy} onclick={testKey}>{keyBusy ? 'Checking…' : 'Test'}</button>
+                <button class="btn btn-secondary btn-sm" type="button" disabled={keyBusy} onclick={testKey}>{#if keyBusy}<BirdSpinner />{/if}Test</button>
                 <button class="btn btn-primary btn-sm" type="submit" disabled={keyBusy}>Save</button>
               </div>
             </form>
@@ -435,7 +436,7 @@
           {#if addMode === 'local'}
             <div class="settings-row-block ai-form" bind:this={addForm} aria-label="Local models">
               {#if localBusy && !localSearched}
-                <span class="ai-waiting" role="status"><span class="spinner spinner-inline"></span> Looking for Ollama and LM Studio…</span>
+                <span class="ai-waiting" role="status"><BirdSpinner /> Looking for Ollama and LM Studio…</span>
               {:else if localSearched && !localServers.length}
                 <span class="ai-option-text">No Ollama or LM Studio found on this machine. Start one, or enter the URL of an OpenAI-compatible server.</span>
               {/if}
@@ -455,7 +456,7 @@
               {/each}
               <div class="ai-form-row">
                 <label class="ai-form-label" for="ai-local-url">Server URL</label>
-                <input id="ai-local-url" class="field ai-form-input" type="url" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:8080/v1" bind:value={localManualURL} />
+                <input id="ai-local-url" class="field ai-form-input" type="url" spellcheck="false" autocomplete="off" placeholder="http://127.0.0.1:8080/v1" bind:value={localManualURL} autocorrect="off" autocapitalize="none" />
                 <button class="btn btn-secondary btn-sm" type="button" disabled={localBusy || !localManualURL.trim()} onclick={checkManualLocal}>Check</button>
               </div>
               {#if localManualModels.length}
@@ -468,7 +469,7 @@
               {#if localError}<span class="ai-error ai-form-note" role="alert">{localError}</span>{/if}
               <div class="ai-form-actions">
                 <button class="btn btn-ghost btn-sm" type="button" onclick={() => (addMode = 'none')}>Close</button>
-                <button class="btn btn-secondary btn-sm" type="button" disabled={localBusy} onclick={findLocal}>{localBusy ? 'Searching…' : 'Search again'}</button>
+                <button class="btn btn-secondary btn-sm" type="button" disabled={localBusy} onclick={findLocal}>{#if localBusy}<BirdSpinner />{/if}Search again</button>
               </div>
             </div>
           {/if}

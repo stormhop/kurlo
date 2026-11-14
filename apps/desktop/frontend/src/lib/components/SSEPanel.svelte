@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BirdSpinner from './BirdSpinner.svelte';
   import { tick, untrack } from 'svelte';
   import { tabListKeyboard } from '../a11y';
   import { renderResponseBodyLines } from '../response-render';
@@ -299,7 +300,7 @@
         <span class="sse-summary-url">{connectedUrl}</span>
       {:else if status === 'connecting'}
         <span class="sse-summary-dot"></span>
-        <span class="sse-spinner-sm"></span>
+        <BirdSpinner size="0.875rem" />
         <span>Opening stream</span>
       {:else if status === 'error'}
         <span class="sse-summary-dot"></span>

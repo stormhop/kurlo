@@ -256,7 +256,7 @@
             {@const previous = index ? executor.stages?.[index - 1]?.target ?? 0 : 0}
             <div class="loadtest-stage" class:active={highlightedStage === index} role="row" tabindex="-1" onmouseenter={() => (highlightedStage = index)} onmouseleave={() => (highlightedStage = -1)} onfocusin={() => (highlightedStage = index)} onfocusout={() => (highlightedStage = -1)}>
               <span role="cell" class="loadtest-stage-name">{index + 1}<small>{previous} → {stage.target}</small></span>
-              <span role="cell"><input class="field field-mono loadtest-duration" value={formatDuration(stage.durationMs)} aria-label={`Stage ${index + 1} duration`} aria-invalid={problems.includes(`Stage ${index + 1} needs a duration.`)} spellcheck="false" {disabled} onchange={(event) => durationInput(event, stage.durationMs, ms => (stage.durationMs = ms))} /></span>
+              <span role="cell"><input class="field field-mono loadtest-duration" value={formatDuration(stage.durationMs)} aria-label={`Stage ${index + 1} duration`} aria-invalid={problems.includes(`Stage ${index + 1} needs a duration.`)} spellcheck="false" {disabled} onchange={(event) => durationInput(event, stage.durationMs, ms => (stage.durationMs = ms))} autocomplete="off" autocorrect="off" autocapitalize="none" /></span>
               <span role="cell"><input class="field field-mono loadtest-number" type="number" min="0" value={stage.target} aria-label={`Stage ${index + 1} target`} {disabled} oninput={(event) => (stage.target = Math.max(0, Math.round(Number(inputValue(event)) || 0)))} /></span>
               <span role="cell"><button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Remove stage ${index + 1}`} {disabled} onclick={() => removeStage(index)}>✕</button></span>
             </div>
@@ -273,7 +273,7 @@
           </label>
           <label class="loadtest-field">
             <span class="loadtest-label">Duration</span>
-            <input class="field field-mono loadtest-duration" value={formatDuration(executor.durationMs ?? 0)} aria-label="Duration" aria-invalid={problems.includes('Set how long the test runs.')} spellcheck="false" {disabled} onchange={(event) => durationInput(event, executor.durationMs ?? 0, ms => (executor.durationMs = ms))} />
+            <input class="field field-mono loadtest-duration" value={formatDuration(executor.durationMs ?? 0)} aria-label="Duration" aria-invalid={problems.includes('Set how long the test runs.')} spellcheck="false" {disabled} onchange={(event) => durationInput(event, executor.durationMs ?? 0, ms => (executor.durationMs = ms))} autocomplete="off" autocorrect="off" autocapitalize="none" />
             <LoadValidationMessages problems={problems.filter(problem => problem === 'Set how long the test runs.')} />
           </label>
         </div>

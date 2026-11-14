@@ -1636,15 +1636,6 @@
   pointer-events: none;
 }
 
-.git-action-spinner {
-  width: 0.6875rem;
-  height: 0.6875rem;
-  border: 1.5px solid currentColor;
-  border-top-color: transparent;
-  border-radius: var(--radius-full);
-  animation: spin 0.7s linear infinite;
-}
-
 .git-action-icon {
   flex: 0 0 auto;
   color: currentColor;
@@ -5013,14 +5004,6 @@
   font-size: var(--text-body);
 }
 
-.history-detail-link {
-  text-decoration-color: var(--border);
-}
-
-.history-detail-link:hover:not(:disabled) {
-  text-decoration-color: currentColor;
-}
-
 .history-detail-actions {
   display: flex;
   align-items: center;
@@ -5222,14 +5205,6 @@
 
 .collection-last-run-dot.fail {
   background: var(--s5xx);
-}
-
-.collection-last-run-link {
-  text-decoration-color: var(--border);
-}
-
-.collection-last-run-link:hover:not(:disabled) {
-  text-decoration-color: currentColor;
 }
 
 .git-branch-popover {
