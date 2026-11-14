@@ -8,6 +8,8 @@ import (
 )
 
 func TestScriptEnginesSharePreRequestContract(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		engine Engine
@@ -83,6 +85,8 @@ pm.log("pre", pm.request.method)
 }
 
 func TestScriptEnginesShareTestScriptContract(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name   string
 		engine Engine

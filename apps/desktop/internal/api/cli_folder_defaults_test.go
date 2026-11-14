@@ -73,7 +73,7 @@ func TestApplyCollectionDefaultsHonoursAFolderWithoutAuth(t *testing.T) {
 }
 
 func TestKurloStoreKeepsFolderDefaultSecretsOutOfWorkspaceYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")

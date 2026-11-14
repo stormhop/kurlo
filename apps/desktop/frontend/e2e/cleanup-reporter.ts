@@ -24,7 +24,7 @@ class KurloCleanupReporter implements Reporter {
     this.passed = result.status === 'passed';
   }
 
-  onExit() {
+  async onExit() {
     if (process.env.CI || process.env.KURLO_E2E_KEEP_ARTIFACTS === '1' || process.env.KURLO_E2E_HTML_REPORT === '1') return;
     if (!this.ranTests || !this.passed || !this.isSafeArtifactDir()) return;
 

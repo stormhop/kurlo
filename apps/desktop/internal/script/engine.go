@@ -16,7 +16,7 @@ const (
 	EngineJS    Engine = "js"
 )
 
-var scriptExecutionTimeout = 2 * time.Second
+const scriptExecutionTimeout = 2 * time.Second
 
 const maxScriptExecutionTimeout = 60 * time.Second
 

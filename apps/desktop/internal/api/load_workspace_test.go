@@ -9,7 +9,6 @@ import (
 )
 
 func TestLoadWorkspaceReturnsStoreAndDiagnosticsFromOneRead(t *testing.T) {
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	root := fileWorkspaceStorePath()
 	app := NewApp()

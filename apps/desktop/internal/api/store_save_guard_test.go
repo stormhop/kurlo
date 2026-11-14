@@ -137,7 +137,6 @@ func diskWorkspaceIDs(root string) []string {
 }
 
 func TestSaveWaitsForWorkspaceWritesBeforeCheckingMissingParents(t *testing.T) {
-	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")

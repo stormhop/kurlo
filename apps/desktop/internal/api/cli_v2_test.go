@@ -447,18 +447,21 @@ func TestRunCLIScriptTimeoutFlag(t *testing.T) {
 	defer server.Close()
 
 	pre := `const start = Date.now()
-while (Date.now() - start < 2400) { }`
+while (Date.now() - start < 250) { }`
 	root := writeScriptWorkspace(t, server.URL, pre, "")
 
 	var out bytes.Buffer
-	if code := runCLI(cliOptions{workspace: root, env: "Local", reporters: []string{"cli"}, iterations: 1, stdout: &out, stderr: &out}); code == 0 {
-		t.Fatalf("expected the default 2s script cap to fail the run\n%s", out.String())
+	if code := runCLI(cliOptions{workspace: root, env: "Local", reporters: []string{"cli"}, iterations: 1, scriptTimeoutMs: 20, stdout: &out, stderr: &out}); code == 0 {
+		t.Fatalf("expected the configured script cap to fail the run\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "script timed out after 20ms") {
+		t.Fatalf("configured timeout did not reach the script engine\n%s", out.String())
 	}
 
 	out.Reset()
 	code := runCLI(cliOptions{
 		workspace: root, env: "Local", reporters: []string{"cli"}, iterations: 1,
-		scriptTimeoutMs: 10_000, stdout: &out, stderr: &out,
+		scriptTimeoutMs: 5000, stdout: &out, stderr: &out,
 	})
 	if code != 0 {
 		t.Fatalf("expected exit 0 with --script-timeout, got %d\n%s", code, out.String())

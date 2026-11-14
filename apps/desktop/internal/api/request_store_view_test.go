@@ -97,7 +97,7 @@ func TestInvalidViewPayloadIsRefused(t *testing.T) {
 }
 
 func TestCachedStorePlaintextFollowsTheFileOnDisk(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	path := t.TempDir() + "/requests.json"
 	if err := saveRequestStorePayload(path, `{"activeId":"one"}`); err != nil {
 		t.Fatal(err)

@@ -7,6 +7,8 @@ WAILS_VERSION := v2.16.0
 WAILS_CMD   := $(shell command -v wails 2>/dev/null || printf '%s' 'go run github.com/wailsapp/wails/v2/cmd/wails@$(WAILS_VERSION)')
 GO_ENV      := GOCACHE=$(ROOT_DIR)/.cache/go-build
 DEV_ENV     := $(GO_ENV) KURLO_DISABLE_KEYCHAIN=1
+GO_TEST_PARALLEL ?= 4
+GO_TEST_FLAGS ?=
 
 VERSION     := $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
 ifeq ($(VERSION),)
@@ -70,10 +72,10 @@ tidy:
 
 check:
 	cd $(ROOT_DIR) && npm run frontend:check
-	cd $(ROOT_DIR) && $(GO_ENV) go test ./apps/desktop/...
+	cd $(ROOT_DIR) && $(GO_ENV) go test -parallel=$(GO_TEST_PARALLEL) $(GO_TEST_FLAGS) ./apps/desktop/...
 
 test:
-	cd $(ROOT_DIR) && $(GO_ENV) go test ./apps/desktop/...
+	cd $(ROOT_DIR) && $(GO_ENV) go test -parallel=$(GO_TEST_PARALLEL) $(GO_TEST_FLAGS) ./apps/desktop/...
 
 build: build-desktop
 

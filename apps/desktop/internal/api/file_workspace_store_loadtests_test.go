@@ -69,7 +69,7 @@ func collectionLoadTestsFromPayload(t *testing.T, payload string) []model.LoadTe
 }
 
 func TestLoadTestsRoundTripThroughWorkspace(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -123,7 +123,7 @@ func TestLoadTestsRoundTripThroughWorkspace(t *testing.T) {
 }
 
 func TestLoadTestsKeepTheirOrder(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -146,7 +146,7 @@ func TestLoadTestsKeepTheirOrder(t *testing.T) {
 }
 
 func TestDeletedLoadTestFileIsRemoved(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -170,7 +170,7 @@ func TestDeletedLoadTestFileIsRemoved(t *testing.T) {
 }
 
 func TestLoadTestNamesDifferingOnlyInCaseGetSeparateFiles(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -200,7 +200,7 @@ func TestLoadTestNamesDifferingOnlyInCaseGetSeparateFiles(t *testing.T) {
 }
 
 func TestBrokenLoadTestFileIsReportedNotFatal(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	cases := map[string]string{
 		"invalid yaml": "version: 1\nloadTest: [\n",
 		"no load test": "version: 1\norder: 0\n",
@@ -235,7 +235,7 @@ func TestBrokenLoadTestFileIsReportedNotFatal(t *testing.T) {
 }
 
 func TestLoadTestFolderWithoutCollectionFileIsReported(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")

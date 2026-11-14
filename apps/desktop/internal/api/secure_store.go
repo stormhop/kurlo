@@ -36,21 +36,20 @@ type requestStoreEnvelope struct {
 	Ciphertext string `json:"ciphertext"`
 }
 
-var (
-	requestStoreKeyProvider = cachedRequestStoreKey
-	requestStoreKeyLoader   = cachedExistingRequestStoreKey
-)
+var defaultRequestStoreKeyCache requestStoreKeyState
 
-var (
-	requestStoreKeyMu          sync.Mutex
-	requestStoreKeyCache       []byte
-	requestStoreKeyInitializer = func(createIfMissing bool) ([]byte, error) {
-		if createIfMissing {
-			return loadOrCreateRequestStoreKey()
-		}
-		return loadRequestStoreKey()
+type requestStoreKeyState struct {
+	mu    sync.Mutex
+	key   []byte
+	scope string
+}
+
+func initializeRequestStoreKey(createIfMissing bool) ([]byte, error) {
+	if createIfMissing {
+		return loadOrCreateRequestStoreKey()
 	}
-)
+	return loadRequestStoreKey()
+}
 
 func cachedRequestStoreKey() ([]byte, error) {
 	return cachedRequestStoreKeyFromStore(true)
@@ -61,23 +60,56 @@ func cachedExistingRequestStoreKey() ([]byte, error) {
 }
 
 func cachedRequestStoreKeyFromStore(createIfMissing bool) ([]byte, error) {
-	requestStoreKeyMu.Lock()
-	defer requestStoreKeyMu.Unlock()
-	if requestStoreKeyCache != nil {
-		return append([]byte(nil), requestStoreKeyCache...), nil
+	return defaultRequestStoreKeyCache.loadForScope(requestStoreKeyPath(), createIfMissing, initializeRequestStoreKey)
+}
+
+func (s *requestStoreKeyState) load(createIfMissing bool, initialize func(bool) ([]byte, error)) ([]byte, error) {
+	return s.loadForScope("", createIfMissing, initialize)
+}
+
+func (s *requestStoreKeyState) loadForScope(scope string, createIfMissing bool, initialize func(bool) ([]byte, error)) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.scope != scope {
+		s.key = nil
+		s.scope = scope
 	}
-	key, err := requestStoreKeyInitializer(createIfMissing)
+	if s.key != nil {
+		return append([]byte(nil), s.key...), nil
+	}
+	key, err := initialize(createIfMissing)
 	if err != nil {
 		return nil, err
 	}
-	requestStoreKeyCache = append([]byte(nil), key...)
-	return append([]byte(nil), requestStoreKeyCache...), nil
+	s.key = append([]byte(nil), key...)
+	return append([]byte(nil), s.key...), nil
 }
 
 func cacheRequestStoreKey(key []byte) {
-	requestStoreKeyMu.Lock()
-	defer requestStoreKeyMu.Unlock()
-	requestStoreKeyCache = append([]byte(nil), key...)
+	defaultRequestStoreKeyCache.mu.Lock()
+	defer defaultRequestStoreKeyCache.mu.Unlock()
+	defaultRequestStoreKeyCache.scope = requestStoreKeyPath()
+	defaultRequestStoreKeyCache.key = append([]byte(nil), key...)
+}
+
+func (s *requestStoreKeyState) remember(key []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.key = append([]byte(nil), key...)
+}
+
+type requestStoreCodec struct {
+	plaintextMu sync.Mutex
+	plaintext   map[string]requestStorePlaintext
+	provideKey  func() ([]byte, error)
+	loadKey     func() ([]byte, error)
+	fallback    func([]byte, []byte) ([]byte, error)
+}
+
+var defaultRequestStoreCodec = &requestStoreCodec{
+	provideKey: cachedRequestStoreKey,
+	loadKey:    cachedExistingRequestStoreKey,
+	fallback:   decryptRequestStorePayloadWithFileKey,
 }
 
 type requestStorePlaintext struct {
@@ -89,76 +121,79 @@ type requestStorePlaintext struct {
 	storageKnown bool
 }
 
-var (
-	requestStorePlaintextMu    sync.Mutex
-	requestStorePlaintextCache = map[string]requestStorePlaintext{}
-)
-
-func cachedRequestStorePlaintext(path string) (string, bool) {
+func (s *requestStoreCodec) cachedPlaintext(path string) (string, bool) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return "", false
 	}
-	key, err := requestStoreKeyLoader()
+	key, err := s.loadKey()
 	if err != nil {
 		return "", false
 	}
-	requestStorePlaintextMu.Lock()
-	defer requestStorePlaintextMu.Unlock()
-	entry, ok := requestStorePlaintextCache[filepath.Clean(path)]
+	s.plaintextMu.Lock()
+	defer s.plaintextMu.Unlock()
+	entry, ok := s.plaintext[filepath.Clean(path)]
 	if !ok || entry.size != info.Size() || !entry.modTime.Equal(info.ModTime()) || entry.key != string(key) {
 		return "", false
 	}
 	return entry.payload, true
 }
 
-func rememberRequestStorePlaintext(path string, payload string) {
+func (s *requestStoreCodec) rememberPlaintext(path string, payload string) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return
 	}
-	key, err := requestStoreKeyLoader()
+	key, err := s.loadKey()
 	if err != nil {
 		return
 	}
-	requestStorePlaintextMu.Lock()
-	defer requestStorePlaintextMu.Unlock()
-	requestStorePlaintextCache = map[string]requestStorePlaintext{
+	s.plaintextMu.Lock()
+	defer s.plaintextMu.Unlock()
+	s.plaintext = map[string]requestStorePlaintext{
 		filepath.Clean(path): {size: info.Size(), modTime: info.ModTime(), key: string(key), payload: payload},
 	}
 }
 
 func loadLocalRequestStoreStorage(path string) (map[string]any, error) {
-	payload, err := loadRequestStorePayload(path)
+	return defaultRequestStoreCodec.storage(path)
+}
+
+func (s *requestStoreCodec) storage(path string) (map[string]any, error) {
+	payload, err := s.loadPayload(path)
 	if err != nil {
 		return nil, err
 	}
 	key := filepath.Clean(path)
-	requestStorePlaintextMu.Lock()
-	entry, ok := requestStorePlaintextCache[key]
+	s.plaintextMu.Lock()
+	entry, ok := s.plaintext[key]
 	if ok && entry.storageKnown && entry.payload == payload {
-		requestStorePlaintextMu.Unlock()
+		s.plaintextMu.Unlock()
 		return cloneMap(entry.storage), nil
 	}
-	requestStorePlaintextMu.Unlock()
+	s.plaintextMu.Unlock()
 	var head struct {
 		Storage map[string]any `json:"storage"`
 	}
 	if err := json.Unmarshal([]byte(payload), &head); err != nil {
 		return nil, err
 	}
-	requestStorePlaintextMu.Lock()
-	if entry, ok := requestStorePlaintextCache[key]; ok && entry.payload == payload {
+	s.plaintextMu.Lock()
+	if entry, ok := s.plaintext[key]; ok && entry.payload == payload {
 		entry.storage = cloneMap(head.Storage)
 		entry.storageKnown = true
-		requestStorePlaintextCache[key] = entry
+		s.plaintext[key] = entry
 	}
-	requestStorePlaintextMu.Unlock()
+	s.plaintextMu.Unlock()
 	return head.Storage, nil
 }
 
 func loadRequestStorePayload(path string) (string, error) {
-	if payload, ok := cachedRequestStorePlaintext(path); ok {
+	return defaultRequestStoreCodec.loadPayload(path)
+}
+
+func (s *requestStoreCodec) loadPayload(path string) (string, error) {
+	if payload, ok := s.cachedPlaintext(path); ok {
 		return payload, nil
 	}
 	data, err := os.ReadFile(path)
@@ -168,20 +203,24 @@ func loadRequestStorePayload(path string) (string, error) {
 	if !isEncryptedRequestStore(data) {
 		return "", fmt.Errorf("request store is not encrypted")
 	}
-	plaintext, err := decryptRequestStorePayload(data)
+	plaintext, err := s.decrypt(data)
 	if err != nil {
 		return "", err
 	}
-	rememberRequestStorePlaintext(path, string(plaintext))
+	s.rememberPlaintext(path, string(plaintext))
 	return string(plaintext), nil
 }
 
 func saveRequestStorePayload(path string, payload string) error {
+	return defaultRequestStoreCodec.savePayload(path, payload)
+}
+
+func (s *requestStoreCodec) savePayload(path string, payload string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	data, err := encryptRequestStorePayload([]byte(payload))
+	data, err := s.encrypt([]byte(payload))
 	if err != nil {
 		return err
 	}
@@ -223,7 +262,7 @@ func saveRequestStorePayload(path string, payload string) error {
 	if err := syncDir(dir); err != nil {
 		return err
 	}
-	rememberRequestStorePlaintext(path, payload)
+	s.rememberPlaintext(path, payload)
 	return nil
 }
 
@@ -239,7 +278,11 @@ func isEncryptedRequestStore(data []byte) bool {
 }
 
 func encryptRequestStorePayload(payload []byte) ([]byte, error) {
-	key, err := requestStoreKeyProvider()
+	return defaultRequestStoreCodec.encrypt(payload)
+}
+
+func (s *requestStoreCodec) encrypt(payload []byte) ([]byte, error) {
+	key, err := s.provideKey()
 	if err != nil {
 		return nil, err
 	}
@@ -261,6 +304,10 @@ func encryptRequestStorePayload(payload []byte) ([]byte, error) {
 }
 
 func decryptRequestStorePayload(data []byte) ([]byte, error) {
+	return defaultRequestStoreCodec.decrypt(data)
+}
+
+func (s *requestStoreCodec) decrypt(data []byte) ([]byte, error) {
 	var envelope requestStoreEnvelope
 	if err := json.Unmarshal(data, &envelope); err != nil {
 		return nil, err
@@ -268,7 +315,7 @@ func decryptRequestStorePayload(data []byte) ([]byte, error) {
 	if envelope.Version != requestStoreEnvelopeVersion || envelope.Algorithm != requestStoreAlgorithm {
 		return nil, fmt.Errorf("unsupported request store encryption envelope")
 	}
-	key, err := requestStoreKeyLoader()
+	key, err := s.loadKey()
 	if err != nil {
 		return nil, err
 	}
@@ -288,8 +335,10 @@ func decryptRequestStorePayload(data []byte) ([]byte, error) {
 	if err == nil {
 		return plaintext, nil
 	}
-	if plaintext, fallbackErr := decryptRequestStorePayloadWithFileKey(nonce, ciphertext); fallbackErr == nil {
-		return plaintext, nil
+	if s.fallback != nil {
+		if plaintext, fallbackErr := s.fallback(nonce, ciphertext); fallbackErr == nil {
+			return plaintext, nil
+		}
 	}
 	return nil, err
 }
@@ -306,7 +355,11 @@ func requestStoreCipher(key []byte) (cipher.AEAD, error) {
 }
 
 func decryptRequestStorePayloadWithFileKey(nonce []byte, ciphertext []byte) ([]byte, error) {
-	material, err := loadRequestStoreFileKeyMaterial()
+	return decryptRequestStorePayloadWithFallbackKey(nonce, ciphertext, loadRequestStoreFileKeyMaterial, cacheRequestStoreKey)
+}
+
+func decryptRequestStorePayloadWithFallbackKey(nonce, ciphertext []byte, load func() (string, error), remember func([]byte)) ([]byte, error) {
+	material, err := load()
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +375,7 @@ func decryptRequestStorePayloadWithFileKey(nonce []byte, ciphertext []byte) ([]b
 	if err != nil {
 		return nil, err
 	}
-	cacheRequestStoreKey(key)
+	remember(key)
 	return plaintext, nil
 }
 
@@ -372,7 +425,11 @@ func backupRequestStoreForRecovery(path string) (string, error) {
 }
 
 func loadOrCreateRequestStoreKey() ([]byte, error) {
-	key, err := loadRequestStoreKey()
+	return loadOrCreateRequestStoreKeyUsing(loadRequestStoreKey, saveRequestStoreKeyMaterial)
+}
+
+func loadOrCreateRequestStoreKeyUsing(load func() ([]byte, error), save func(string) error) ([]byte, error) {
+	key, err := load()
 	if err == nil {
 		return key, nil
 	}
@@ -380,7 +437,7 @@ func loadOrCreateRequestStoreKey() ([]byte, error) {
 	if _, readErr := io.ReadFull(rand.Reader, key); readErr != nil {
 		return nil, readErr
 	}
-	if saveErr := saveRequestStoreKeyMaterial(base64.StdEncoding.EncodeToString(key)); saveErr != nil {
+	if saveErr := save(base64.StdEncoding.EncodeToString(key)); saveErr != nil {
 		return nil, errors.Join(err, saveErr)
 	}
 	return key, nil
@@ -537,7 +594,11 @@ func saveRequestStoreKeychainMaterial(material string) error {
 }
 
 func loadRequestStoreFileKeyMaterial() (string, error) {
-	data, err := os.ReadFile(requestStoreKeyPath())
+	return loadRequestStoreFileKeyMaterialAt(requestStoreKeyPath())
+}
+
+func loadRequestStoreFileKeyMaterialAt(path string) (string, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}

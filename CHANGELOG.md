@@ -15,6 +15,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Tengo script timeouts.** Tengo scripts now respect the configured script timeout instead of always stopping after two seconds.
 - **Compact release notes in About.** Long update notes show a preview of about ten lines with a link to the full website changelog, keeping Settings easy to scroll.
 - **Mock server with thousands of examples.** The mock server no longer pulls every saved response into the editor: the route list reads only methods, paths and statuses, and the server reads the responses from disk when it starts. The list draws only the rows on screen, so it opens quickly, scrolls without blank gaps and the sidebar slides smoothly beside it. Hiding or showing the sidebar keeps the route at the top of the list in place even when long warnings rewrap to the new width.
 - **The sidebar hides and shows at once.** Toggling the sidebar no longer restyles the whole window: in workspaces with hundreds of requests the slide starts without a pause, and the hidden sidebar keeps only the rows on screen until it comes back.

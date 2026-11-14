@@ -55,10 +55,24 @@ type gitWorkspaceAuth struct {
 	SSHKeyPath string `json:"sshKeyPath"`
 }
 
-var gitCredentialsMu sync.Mutex
+type gitCredentialStore struct {
+	mu    sync.Mutex
+	dir   func() string
+	codec *requestStoreCodec
+}
 
-func gitCredentialsPath() string { return filepath.Join(requestStoreDir(), gitCredentialsFileName) }
-func gitAuthConfigPath() string  { return filepath.Join(requestStoreDir(), gitAuthConfigFileName) }
+var defaultGitCredentialStore = &gitCredentialStore{dir: requestStoreDir, codec: defaultRequestStoreCodec}
+
+func (a *App) gitCredentials() *gitCredentialStore {
+	if a.credentialStore != nil {
+		return a.credentialStore
+	}
+	return defaultGitCredentialStore
+}
+
+func (s *gitCredentialStore) path() string { return filepath.Join(s.dir(), gitCredentialsFileName) }
+
+func gitAuthConfigPath() string { return filepath.Join(requestStoreDir(), gitAuthConfigFileName) }
 
 func normalizeGitHost(host string) string {
 	host = strings.TrimSpace(strings.ToLower(host))
@@ -74,9 +88,9 @@ func normalizeGitHost(host string) string {
 	return host
 }
 
-func loadGitCredentials() (map[string]gitCredential, error) {
+func (s *gitCredentialStore) load() (map[string]gitCredential, error) {
 	creds := map[string]gitCredential{}
-	data, err := os.ReadFile(gitCredentialsPath())
+	data, err := os.ReadFile(s.path())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return creds, nil
@@ -86,7 +100,7 @@ func loadGitCredentials() (map[string]gitCredential, error) {
 	if len(data) == 0 {
 		return creds, nil
 	}
-	plaintext, err := decryptRequestStorePayload(data)
+	plaintext, err := s.codec.decrypt(data)
 	if err != nil {
 		return creds, err
 	}
@@ -96,35 +110,35 @@ func loadGitCredentials() (map[string]gitCredential, error) {
 	return creds, nil
 }
 
-func saveGitCredentials(creds map[string]gitCredential) error {
+func (s *gitCredentialStore) save(creds map[string]gitCredential) error {
 	payload, err := json.Marshal(creds)
 	if err != nil {
 		return err
 	}
-	envelope, err := encryptRequestStorePayload(payload)
+	envelope, err := s.codec.encrypt(payload)
 	if err != nil {
 		return err
 	}
-	dir := requestStoreDir()
+	dir := s.dir()
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	return writeFileAtomic(gitCredentialsPath(), envelope)
+	return writeFileAtomic(s.path(), envelope)
 }
 
-func gitCredentialLookup(host string) (gitCredential, bool) {
-	cred, ok, _ := gitCredentialLookupErr(host)
+func (s *gitCredentialStore) lookup(host string) (gitCredential, bool) {
+	cred, ok, _ := s.lookupErr(host)
 	return cred, ok
 }
 
-func gitCredentialLookupErr(host string) (gitCredential, bool, error) {
+func (s *gitCredentialStore) lookupErr(host string) (gitCredential, bool, error) {
 	host = normalizeGitHost(host)
 	if host == "" {
 		return gitCredential{}, false, nil
 	}
-	gitCredentialsMu.Lock()
-	defer gitCredentialsMu.Unlock()
-	creds, err := loadGitCredentials()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	creds, err := s.load()
 	if err != nil {
 		return gitCredential{}, false, err
 	}
@@ -135,7 +149,7 @@ func gitCredentialLookupErr(host string) (gitCredential, bool, error) {
 	return cred, true, nil
 }
 
-func gitCredentialSet(host, username, token string) error {
+func (s *gitCredentialStore) set(host, username, token string) error {
 	host = normalizeGitHost(host)
 	if host == "" {
 		return fmt.Errorf("host is required")
@@ -143,24 +157,24 @@ func gitCredentialSet(host, username, token string) error {
 	if strings.TrimSpace(token) == "" {
 		return fmt.Errorf("token is required")
 	}
-	gitCredentialsMu.Lock()
-	defer gitCredentialsMu.Unlock()
-	creds, err := loadGitCredentials()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	creds, err := s.load()
 	if err != nil {
 		return fmt.Errorf("could not read existing git credentials: %w", err)
 	}
 	creds[host] = gitCredential{Username: strings.TrimSpace(username), Token: token}
-	return saveGitCredentials(creds)
+	return s.save(creds)
 }
 
-func gitCredentialErase(host string) error {
+func (s *gitCredentialStore) erase(host string) error {
 	host = normalizeGitHost(host)
 	if host == "" {
 		return nil
 	}
-	gitCredentialsMu.Lock()
-	defer gitCredentialsMu.Unlock()
-	creds, err := loadGitCredentials()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	creds, err := s.load()
 	if err != nil {
 		return err
 	}
@@ -171,13 +185,19 @@ func gitCredentialErase(host string) error {
 		return nil
 	}
 	delete(creds, host)
-	return saveGitCredentials(creds)
+	return s.save(creds)
 }
 
-func gitCredentialHasToken(host string) bool {
-	_, ok := gitCredentialLookup(host)
+func (s *gitCredentialStore) hasToken(host string) bool {
+	_, ok := s.lookup(host)
 	return ok
 }
+
+func gitCredentialLookupErr(host string) (gitCredential, bool, error) {
+	return defaultGitCredentialStore.lookupErr(host)
+}
+func gitCredentialErase(host string) error   { return defaultGitCredentialStore.erase(host) }
+func gitCredentialHasToken(host string) bool { return defaultGitCredentialStore.hasToken(host) }
 
 func loadWorkspaceAuthAll() map[string]gitWorkspaceAuth {
 	out := map[string]gitWorkspaceAuth{}
@@ -202,8 +222,8 @@ func saveWorkspaceAuth(root string, cfg gitWorkspaceAuth) error {
 	if root == "" {
 		return fmt.Errorf("workspace root is required")
 	}
-	gitCredentialsMu.Lock()
-	defer gitCredentialsMu.Unlock()
+	defaultGitCredentialStore.mu.Lock()
+	defer defaultGitCredentialStore.mu.Unlock()
 	all := loadWorkspaceAuthAll()
 	if cfg.Method == "" && cfg.SSHKeyPath == "" {
 		delete(all, root)

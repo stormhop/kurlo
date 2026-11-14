@@ -9,6 +9,7 @@ import (
 )
 
 func TestNormalizeGitHost(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"https://github.com/org/repo.git":                "github.com",
 		"https://gitlab.com/group/sub/repo.git":          "gitlab.com",
@@ -27,84 +28,76 @@ func TestNormalizeGitHost(t *testing.T) {
 }
 
 func TestAnnotateGitAuthFailure(t *testing.T) {
+	t.Parallel()
 	t.Run("ssh publickey", func(t *testing.T) {
 		var s GitWorkspaceStatus
-		annotateGitAuthFailure(&s, "git@github.com: Permission denied (publickey).", "git@github.com:org/repo.git")
+		annotateGitAuthFailureWithLookup(&s, "git@github.com: Permission denied (publickey).", "git@github.com:org/repo.git", func(string) bool { return false })
 		if !s.AuthRequired || s.AuthScheme != "ssh" || s.AuthHost != "github.com" {
 			t.Fatalf("got %+v", s)
 		}
 	})
 	t.Run("https no creds", func(t *testing.T) {
 		var s GitWorkspaceStatus
-		annotateGitAuthFailure(&s, "fatal: could not read Username for 'https://gitlab.com': terminal prompts disabled", "https://gitlab.com/g/r.git")
+		annotateGitAuthFailureWithLookup(&s, "fatal: could not read Username for 'https://gitlab.com': terminal prompts disabled", "https://gitlab.com/g/r.git", func(string) bool { return false })
 		if !s.AuthRequired || s.AuthScheme != "https" || s.AuthHost != "gitlab.com" || s.TokenRejected {
 			t.Fatalf("got %+v", s)
 		}
 	})
 	t.Run("non-auth error untouched", func(t *testing.T) {
 		var s GitWorkspaceStatus
-		annotateGitAuthFailure(&s, "fatal: not a git repository", "https://github.com/o/r.git")
+		annotateGitAuthFailureWithLookup(&s, "fatal: not a git repository", "https://github.com/o/r.git", func(string) bool { return false })
 		if s.AuthRequired {
 			t.Fatalf("should not be auth: %+v", s)
 		}
 	})
 }
 
-func withIsolatedStore(t *testing.T) {
+func withIsolatedStore(t *testing.T) *gitCredentialStore {
 	t.Helper()
-	tmp := t.TempDir()
-	useTempConfigDir(t, tmp)
-	key := make([]byte, requestStoreKeySize)
-	for i := range key {
-		key[i] = byte(i + 1)
-	}
-	prevProvider := requestStoreKeyProvider
-	prevLoader := requestStoreKeyLoader
-	requestStoreKeyProvider = func() ([]byte, error) { return key, nil }
-	requestStoreKeyLoader = requestStoreKeyProvider
-	t.Cleanup(func() {
-		requestStoreKeyProvider = prevProvider
-		requestStoreKeyLoader = prevLoader
-	})
+	dir := t.TempDir()
+	return &gitCredentialStore{dir: func() string { return dir }, codec: isolatedRequestStoreCodec(t)}
 }
 
 func TestGitCredentialRoundtrip(t *testing.T) {
-	withIsolatedStore(t)
+	t.Parallel()
+	store := withIsolatedStore(t)
 
-	if _, ok := gitCredentialLookup("gitlab.com"); ok {
+	if _, ok := store.lookup("gitlab.com"); ok {
 		t.Fatal("expected no credential before set")
 	}
-	if err := gitCredentialSet("https://gitlab.com/g/r.git", "oauth2", "glpat-xxx"); err != nil {
+	if err := store.set("https://gitlab.com/g/r.git", "oauth2", "glpat-xxx"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
-	cred, ok := gitCredentialLookup("gitlab.com")
+	cred, ok := store.lookup("gitlab.com")
 	if !ok || cred.Username != "oauth2" || cred.Token != "glpat-xxx" {
 		t.Fatalf("lookup mismatch: %+v ok=%v", cred, ok)
 	}
 
-	if _, ok := gitCredentialLookup("github.com"); ok {
+	if _, ok := store.lookup("github.com"); ok {
 		t.Fatal("github.com should not resolve to gitlab token")
 	}
 
-	gitCredentialErase("gitlab.com")
-	if _, ok := gitCredentialLookup("gitlab.com"); ok {
+	store.erase("gitlab.com")
+	if _, ok := store.lookup("gitlab.com"); ok {
 		t.Fatal("credential should be gone after erase")
 	}
 }
 
 func TestTokenRejectedWhenStoredTokenFails(t *testing.T) {
-	withIsolatedStore(t)
-	if err := gitCredentialSet("github.com", "x-access-token", "ghp_dead"); err != nil {
+	t.Parallel()
+	store := withIsolatedStore(t)
+	if err := store.set("github.com", "x-access-token", "ghp_dead"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
 	var s GitWorkspaceStatus
-	annotateGitAuthFailure(&s, "remote: HTTP Basic: Access denied\nfatal: Authentication failed for 'https://github.com/o/r.git/'", "https://github.com/o/r.git")
+	annotateGitAuthFailureWithLookup(&s, "remote: HTTP Basic: Access denied\nfatal: Authentication failed for 'https://github.com/o/r.git/'", "https://github.com/o/r.git", store.hasToken)
 	if !s.AuthRequired || s.AuthScheme != "https" || !s.TokenRejected {
 		t.Fatalf("expected tokenRejected, got %+v", s)
 	}
 }
 
 func TestHttpsToSSHRemoteURL(t *testing.T) {
+	t.Parallel()
 	ok := map[string]string{
 		"https://github.com/org/repo.git":                "git@github.com:org/repo.git",
 		"https://gitlab.com/group/sub/repo.git":          "git@gitlab.com:group/sub/repo.git",
@@ -126,6 +119,7 @@ func TestHttpsToSSHRemoteURL(t *testing.T) {
 }
 
 func TestGitAuthGlobalArgsShape(t *testing.T) {
+	t.Parallel()
 	args := gitAuthGlobalArgs()
 
 	if len(args) != 2 || args[0] != "-c" {
@@ -137,6 +131,7 @@ func TestGitAuthGlobalArgsShape(t *testing.T) {
 }
 
 func TestShellQuoteDoesNotAllowShellExpansion(t *testing.T) {
+	t.Parallel()
 	got := shellQuote(`/tmp/key-$(touch /tmp/kurlo-pwn)-'quoted'`)
 	want := `'/tmp/key-$(touch /tmp/kurlo-pwn)-'\''quoted'\'''`
 	if got != want {
@@ -148,6 +143,7 @@ func TestShellQuoteDoesNotAllowShellExpansion(t *testing.T) {
 }
 
 func TestGitSSHCommandEnvQuotesKeyPath(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	keyPath := filepath.Join(dir, `id_$(touch kurlo-pwn)`)
 	if err := os.WriteFile(keyPath, []byte("x"), 0o600); err != nil {
@@ -167,79 +163,83 @@ func TestGitSSHCommandEnvQuotesKeyPath(t *testing.T) {
 }
 
 func TestGitSSHCommandEnvRejectsMissingKeyFile(t *testing.T) {
+	t.Parallel()
 	if env := gitSSHCommandEnv("/does/not/exist/kurlo-key"); env != nil {
 		t.Fatalf("expected nil env for missing key file, got %v", env)
 	}
 }
 
 func TestGitCredentialSetPreservesOnLoadError(t *testing.T) {
-	withIsolatedStore(t)
-	workingProvider := requestStoreKeyProvider
-	workingLoader := requestStoreKeyLoader
+	t.Parallel()
+	store := withIsolatedStore(t)
+	workingProvider := store.codec.provideKey
+	workingLoader := store.codec.loadKey
 
-	if err := gitCredentialSet("gitlab.com", "oauth2", "glpat-1"); err != nil {
+	if err := store.set("gitlab.com", "oauth2", "glpat-1"); err != nil {
 		t.Fatalf("seed gitlab: %v", err)
 	}
-	if err := gitCredentialSet("github.com", "x-access-token", "ghp-2"); err != nil {
+	if err := store.set("github.com", "x-access-token", "ghp-2"); err != nil {
 		t.Fatalf("seed github: %v", err)
 	}
 
-	requestStoreKeyProvider = func() ([]byte, error) {
+	store.codec.provideKey = func() ([]byte, error) {
 		return nil, errors.New("keychain temporarily unavailable")
 	}
-	requestStoreKeyLoader = requestStoreKeyProvider
-	if err := gitCredentialSet("example.com", "user", "tok-3"); err == nil {
+	store.codec.loadKey = store.codec.provideKey
+	if err := store.set("example.com", "user", "tok-3"); err == nil {
 		t.Fatal("expected gitCredentialSet to fail when the store is unreadable")
 	}
 
-	requestStoreKeyProvider = workingProvider
-	requestStoreKeyLoader = workingLoader
-	if cred, ok := gitCredentialLookup("gitlab.com"); !ok || cred.Token != "glpat-1" {
+	store.codec.provideKey = workingProvider
+	store.codec.loadKey = workingLoader
+	if cred, ok := store.lookup("gitlab.com"); !ok || cred.Token != "glpat-1" {
 		t.Fatalf("gitlab credential lost: %+v ok=%v", cred, ok)
 	}
-	if cred, ok := gitCredentialLookup("github.com"); !ok || cred.Token != "ghp-2" {
+	if cred, ok := store.lookup("github.com"); !ok || cred.Token != "ghp-2" {
 		t.Fatalf("github credential lost: %+v ok=%v", cred, ok)
 	}
-	if _, ok := gitCredentialLookup("example.com"); ok {
+	if _, ok := store.lookup("example.com"); ok {
 		t.Fatal("example.com should not have been persisted after a failed set")
 	}
 }
 
 func TestGitClearTokenReportsStoreFailure(t *testing.T) {
-	withIsolatedStore(t)
-	if err := gitCredentialSet("github.com", "x-access-token", "ghp-1"); err != nil {
+	t.Parallel()
+	store := withIsolatedStore(t)
+	if err := store.set("github.com", "x-access-token", "ghp-1"); err != nil {
 		t.Fatalf("seed github token: %v", err)
 	}
 
-	workingProvider := requestStoreKeyProvider
-	workingLoader := requestStoreKeyLoader
-	requestStoreKeyProvider = func() ([]byte, error) {
+	workingProvider := store.codec.provideKey
+	workingLoader := store.codec.loadKey
+	store.codec.provideKey = func() ([]byte, error) {
 		return nil, errors.New("credential store unavailable")
 	}
-	requestStoreKeyLoader = requestStoreKeyProvider
+	store.codec.loadKey = store.codec.provideKey
 	t.Cleanup(func() {
-		requestStoreKeyProvider = workingProvider
-		requestStoreKeyLoader = workingLoader
+		store.codec.provideKey = workingProvider
+		store.codec.loadKey = workingLoader
 	})
 
-	result := NewApp().GitClearToken("github.com")
+	result := (&App{credentialStore: store}).GitClearToken("github.com")
 	if result.Ok || !strings.Contains(result.Error, "could not clear token") {
 		t.Fatalf("expected token clear failure, got %+v", result)
 	}
 }
 
 func TestGitCredentialLookupReportsAnUnreadableStore(t *testing.T) {
-	withIsolatedStore(t)
-	if err := gitCredentialSet("https://gitlab.com/g/r.git", "oauth2", "glpat-xxx"); err != nil {
+	t.Parallel()
+	store := withIsolatedStore(t)
+	if err := store.set("https://gitlab.com/g/r.git", "oauth2", "glpat-xxx"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
-	if err := os.WriteFile(gitCredentialsPath(), []byte("not an encrypted store"), 0600); err != nil {
+	if err := os.WriteFile(store.path(), []byte("not an encrypted store"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok, err := gitCredentialLookupErr("gitlab.com"); ok || err == nil {
+	if _, ok, err := store.lookupErr("gitlab.com"); ok || err == nil {
 		t.Fatalf("ok=%v err=%v, want the read error", ok, err)
 	}
-	if _, ok := gitCredentialLookup("gitlab.com"); ok {
+	if _, ok := store.lookup("gitlab.com"); ok {
 		t.Fatal("an unreadable store has no token")
 	}
 }

@@ -28,12 +28,13 @@ func runTengo(src string, ctx *Context, hasResponse bool) string {
 		return "setup error: " + err.Error()
 	}
 
-	runCtx, cancel := context.WithTimeout(context.Background(), scriptExecutionTimeout)
+	timeout := resolveTimeout(ctx.Timeout)
+	runCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	if _, err := s.RunContext(runCtx); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return "script timed out after " + scriptExecutionTimeout.String()
+			return "script timed out after " + timeout.String()
 		}
 		return err.Error()
 	}

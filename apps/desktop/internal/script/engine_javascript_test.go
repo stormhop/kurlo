@@ -18,6 +18,8 @@ func jsTests(src string, ctx *Context) model.ScriptResult {
 }
 
 func TestJSModernSyntaxAndVariables(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
 const base = "https://api.example.com";
@@ -42,6 +44,8 @@ pm.variables.set("count", 42);
 }
 
 func TestJSEnvironmentGetSetUnsetClear(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, map[string]string{"token": "secret", "keep": "yes"})
 	res := jsPre(`
 pm.variables.set("echo", pm.environment.get("token"));
@@ -63,6 +67,8 @@ pm.environment.unset("keep");
 }
 
 func TestJSIterationDataIsReadable(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.IterationData = map[string]string{"user": "ada", "role": "admin"}
 	res := jsPre(`
@@ -81,6 +87,8 @@ pm.variables.set("missing", String(pm.iterationData.get("nope") === undefined));
 }
 
 func TestJSMissingValueIsUndefined(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
 pm.variables.set("missingIsUndefined", String(pm.environment.get("nope") === undefined));
@@ -94,6 +102,8 @@ pm.variables.set("missingIsUndefined", String(pm.environment.get("nope") === und
 }
 
 func TestJSRequestMutation(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestURL = "https://old.example.com"
 	ctx.RequestMethod = "GET"
@@ -131,6 +141,8 @@ pm.request.params.set("page", "2");
 }
 
 func TestJSResponseJSONAndDotAccess(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.Response = &model.HttpResponse{
 		StatusCode: 200,
@@ -162,6 +174,8 @@ pm.variables.set("ct", pm.response.headers.get("content-type"));
 }
 
 func TestJSTestCallbackPassAndFail(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.Response = &model.HttpResponse{StatusCode: 200, Body: `{"ok": true}`, Duration: 10}
 
@@ -193,6 +207,8 @@ pm.test("deliberately fails", function () {
 }
 
 func TestJSTestBooleanFormParity(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.Response = &model.HttpResponse{StatusCode: 201}
 	res := jsTests(`
@@ -208,6 +224,8 @@ pm.test("bool fail", pm.response.code === 200);
 }
 
 func TestJSChaiMatchers(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsTests(`
 pm.test("deep eql", () => pm.expect({a: [1, 2], b: "x"}).to.eql({a: [1, 2], b: "x"}));
@@ -234,6 +252,8 @@ pm.test("oneOf", () => pm.expect("b").to.be.oneOf(["a", "b", "c"]));
 }
 
 func TestJSChaiKeys(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsTests(`
 const order = {id: "ord_1", status: "confirmed", total: 228};
@@ -264,6 +284,8 @@ pm.test("no key fails", () => pm.expect(order).to.have.any.keys("missing"));
 }
 
 func TestJSLogging(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
 console.log("hello", 42, {a: 1});
@@ -284,12 +306,13 @@ pm.log("via pm.log");
 }
 
 func TestJSTimesOut(t *testing.T) {
-	previous := scriptExecutionTimeout
-	scriptExecutionTimeout = 20 * time.Millisecond
-	t.Cleanup(func() { scriptExecutionTimeout = previous })
+	t.Parallel()
+
+	ctx := NewContext(nil, nil)
+	ctx.Timeout = 20 * time.Millisecond
 
 	start := time.Now()
-	res := jsPre(`while (true) {}`, NewContext(nil, nil))
+	res := jsPre(`while (true) {}`, ctx)
 	if !strings.Contains(res.Error, "timed out") {
 		t.Fatalf("expected timeout error, got %q", res.Error)
 	}
@@ -299,6 +322,8 @@ func TestJSTimesOut(t *testing.T) {
 }
 
 func TestJSRejectsOversizedScripts(t *testing.T) {
+	t.Parallel()
+
 	res := jsPre(strings.Repeat("a", scriptMaxSourceBytes+1), NewContext(nil, nil))
 	if res.Error != "script is too large" {
 		t.Fatalf("expected source size guard, got %q", res.Error)
@@ -306,6 +331,8 @@ func TestJSRejectsOversizedScripts(t *testing.T) {
 }
 
 func TestJSLimitsRecursiveCallStack(t *testing.T) {
+	t.Parallel()
+
 	start := time.Now()
 	res := jsPre(`function recur() { return recur(); } recur();`, NewContext(nil, nil))
 	if res.Error == "" {
@@ -317,6 +344,8 @@ func TestJSLimitsRecursiveCallStack(t *testing.T) {
 }
 
 func TestJSSandboxBlocksRequireAndImport(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`var fs = require("fs");`, ctx)
 	if res.Error == "" || !strings.Contains(res.Error, "require") {
@@ -330,6 +359,8 @@ func TestJSSandboxBlocksRequireAndImport(t *testing.T) {
 }
 
 func TestJSSyntaxErrorReported(t *testing.T) {
+	t.Parallel()
+
 	res := jsPre(`this is not valid javascript {{{`, NewContext(nil, nil))
 	if res.Error == "" {
 		t.Fatalf("expected a syntax error message")
@@ -337,6 +368,8 @@ func TestJSSyntaxErrorReported(t *testing.T) {
 }
 
 func TestJSEmptyScriptNoop(t *testing.T) {
+	t.Parallel()
+
 	res := jsPre("   \n  ", NewContext(nil, nil))
 	if res.Error != "" {
 		t.Fatalf("empty script should be a no-op, got %q", res.Error)
@@ -344,6 +377,8 @@ func TestJSEmptyScriptNoop(t *testing.T) {
 }
 
 func TestJSRequestBodyReadAndRewrite(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBody = `{"amount":10}`
 	ctx.RequestBodyType = "json"
@@ -372,6 +407,8 @@ pm.request.body.update(parsed);
 }
 
 func TestJSRequestBodyAssignmentAndSigning(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBody = "payload"
 	res := jsPre(`
@@ -390,6 +427,8 @@ pm.request.body.raw = "replaced";
 }
 
 func TestJSRequestBodyUntouchedStaysUnchanged(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBody = "keep"
 	if res := jsPre(`pm.variables.set("seen", pm.request.body.toString());`, ctx); res.Error != "" {
@@ -404,6 +443,8 @@ func TestJSRequestBodyUntouchedStaysUnchanged(t *testing.T) {
 }
 
 func TestJSBodyModeUsesPostmanNames(t *testing.T) {
+	t.Parallel()
+
 	for bodyType, want := range map[string]string{
 		"json":       "raw",
 		"text":       "raw",
@@ -427,6 +468,8 @@ func TestJSBodyModeUsesPostmanNames(t *testing.T) {
 }
 
 func TestJSUrlencodedBodyEdits(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBodyType = "urlencoded"
 	ctx.RequestFormData = []model.KeyValue{
@@ -464,6 +507,8 @@ pm.variables.set("formdata", String(pm.request.body.formdata));
 }
 
 func TestJSFormDataKeepsAttachments(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBodyType = "form"
 	ctx.RequestFormData = []model.KeyValue{
@@ -490,6 +535,8 @@ pm.variables.set("kind", pm.request.body.formdata.one("avatar").type);
 }
 
 func TestJSRawWriteOnFormBodyWarns(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBodyType = "urlencoded"
 	res := jsPre(`pm.request.body.raw = "a=1"; pm.request.body.raw = "a=2";`, ctx)
@@ -505,6 +552,8 @@ func TestJSRawWriteOnFormBodyWarns(t *testing.T) {
 }
 
 func TestJSBodyUpdateWithModeObject(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBodyType = "urlencoded"
 	res := jsPre(`pm.request.body.update({ mode: "urlencoded", urlencoded: [{ key: "a", value: "1" }, { key: "b", value: "2", disabled: true }] });`, ctx)
@@ -521,6 +570,8 @@ func TestJSBodyUpdateWithModeObject(t *testing.T) {
 }
 
 func TestJSTestScriptSeesTheSentBody(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.RequestBody = `{"id":7}`
 	ctx.Response = &model.HttpResponse{Status: "200 OK", StatusCode: 200, Body: `{"ok":true}`}
@@ -540,6 +591,8 @@ func jsonResponseCtx(body string) *Context {
 }
 
 func TestJSResponseJSONSchemaAssertion(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsonResponseCtx(`{"id":7,"name":"Ada"}`)
 	res := jsTests(`
 const schema = { type: "object", required: ["id", "name"], properties: { id: { type: "integer" }, name: { type: "string" } } };
@@ -561,6 +614,8 @@ pm.test("rejects", () => pm.response.to.have.jsonSchema({ type: "object", requir
 }
 
 func TestJSJsonBodyAssertion(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsonResponseCtx(`{"user":{"id":7},"ok":true}`)
 	res := jsTests(`
 pm.test("has path", () => pm.response.to.have.jsonBody("user.id"));
@@ -576,6 +631,8 @@ pm.test("wrong value", () => pm.response.to.have.jsonBody("user.id", 8));
 }
 
 func TestJSTv4AndAjvModules(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsonResponseCtx(`{"id":7}`)
 	res := jsTests(`
 const schema = { type: "object", required: ["id"], properties: { id: { type: "integer" } } };
@@ -602,6 +659,8 @@ pm.variables.set("errText", ajv.errorsText());
 }
 
 func TestJSRequireLodashAndUuid(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
 const _ = require("lodash");
@@ -633,6 +692,8 @@ pm.variables.set("id", require("uuid").v4());
 }
 
 func TestJSRequireUnknownModuleFailsClearly(t *testing.T) {
+	t.Parallel()
+
 	res := jsPre(`require("cheerio")`, NewContext(nil, nil))
 	if !strings.Contains(res.Error, "cheerio") || !strings.Contains(res.Error, "sandbox") {
 		t.Fatalf("error = %q", res.Error)
@@ -640,6 +701,8 @@ func TestJSRequireUnknownModuleFailsClearly(t *testing.T) {
 }
 
 func TestJSUnsupportedLodashMemberFailsClearly(t *testing.T) {
+	t.Parallel()
+
 	res := jsPre(`require("lodash").debounce(function () {}, 10)`, NewContext(nil, nil))
 	if !strings.Contains(res.Error, "lodash.debounce") {
 		t.Fatalf("error = %q", res.Error)
@@ -647,6 +710,8 @@ func TestJSUnsupportedLodashMemberFailsClearly(t *testing.T) {
 }
 
 func TestJSBase64Globals(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
 pm.variables.set("encoded", btoa("user:pass"));
@@ -664,6 +729,8 @@ pm.variables.set("decoded", atob(btoa("user:pass")));
 }
 
 func TestJSScriptCanRedeclareSandboxGlobals(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
 const _ = require("lodash");

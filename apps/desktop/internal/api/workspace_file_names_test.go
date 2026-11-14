@@ -53,7 +53,7 @@ func loadStoreForTest(t *testing.T, local, root string) map[string]any {
 }
 
 func TestRenamingInTheAppMovesFilesAndFolders(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -89,7 +89,7 @@ func TestRenamingInTheAppMovesFilesAndFolders(t *testing.T) {
 }
 
 func TestOlderPathsAndNamesEditedInYAMLAreBroughtInLineOnSave(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -118,7 +118,7 @@ func TestOlderPathsAndNamesEditedInYAMLAreBroughtInLineOnSave(t *testing.T) {
 }
 
 func TestDuplicateNamesKeepTheirNumberedFiles(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -151,7 +151,7 @@ func TestDuplicateNamesKeepTheirNumberedFiles(t *testing.T) {
 }
 
 func TestNewItemsAvoidNamesTakenOnDiskIgnoringCase(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -174,7 +174,7 @@ func TestNewItemsAvoidNamesTakenOnDiskIgnoringCase(t *testing.T) {
 }
 
 func TestFileNamesStayPutWhileAFileIsBroken(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -212,7 +212,6 @@ func keysOf(tree map[string]string) []string {
 }
 
 func TestPulledRenameMovesTheFolderOnTheNextSave(t *testing.T) {
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	dir, peer := setupGitPullRemoteForTest(t)
 	app := NewApp()

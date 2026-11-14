@@ -130,7 +130,7 @@ func richWorkspacePayloadForTest(t *testing.T) string {
 }
 
 func TestEveryFileKurloWritesMatchesThePublishedSchema(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	schema := compileWorkspaceSchemaForTest(t)
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")

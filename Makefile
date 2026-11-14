@@ -47,7 +47,7 @@ _NEXT_MAJOR := $(shell printf '%d' $$(( $(_V_MAJOR) + 1 )))
 
 GITHUB_REPO := $(shell git remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]\(.*\)\.git|\1|;s|.*github.com[:/]\(.*\)$$|\1|')
 
-.PHONY: help version dev dev-go dev-run frontend install tidy check test check-full check-lint check-types test-unit test-race test-e2e test-e2e-all test-watch \
+.PHONY: help version dev dev-go dev-run frontend install tidy check test check-full check-lint check-types test-unit test-scripts test-race test-e2e test-e2e-all test-watch \
         build build-desktop build-macos build-windows build-windows-msix build-linux build-all build-frontend \
         open clean wails-install bindings screenshots readme-screenshot test-extension mcp-schemas \
         release release-patch release-minor release-major _do-release _guard-clean \
@@ -59,11 +59,12 @@ help:
 	@printf '  %-24s %s\n' 'make dev' 'Run Wails dev mode'
 	@printf '  %-24s %s\n' 'make frontend' 'Run only Svelte/Vite frontend'
 	@printf '  %-24s %s\n' 'make install' 'Install npm deps and tidy Go deps'
-	@printf '  %-24s %s\n' 'make check' 'Run lint, types, unit and Go tests in parallel'
+	@printf '  %-24s %s\n' 'make check' 'Run lint, types, frontend, Python and Go tests in parallel'
 	@printf '  %-24s %s\n' 'make check-full' 'Run lint, types, unit, Go with -race and both browsers'
 	@printf '  %-24s %s\n' 'make test' 'Run Go tests (GO_TEST_FLAGS=...)'
 	@printf '  %-24s %s\n' 'make test-race' 'Run Go tests with the race detector'
 	@printf '  %-24s %s\n' 'make test-unit' 'Run frontend unit tests (UNIT_ARGS=...)'
+	@printf '  %-24s %s\n' 'make test-scripts' 'Run Python release script tests'
 	@printf '  %-24s %s\n' 'make test-e2e' 'Run Chromium tests (E2E_ARGS=...)'
 	@printf '  %-24s %s\n' 'make test-e2e-all' 'Run Chromium and WebKit tests (E2E_ARGS=...)'
 	@printf '  %-24s %s\n' 'make test-watch' 'Watch frontend unit tests'
@@ -380,12 +381,13 @@ tidy:
 	cd $(DESKTOP_DIR) && $(GO_ENV) go mod tidy
 
 CHECK_JOBS ?= 3
+GO_TEST_PARALLEL ?= 4
 GO_TEST_FLAGS ?=
 UNIT_ARGS ?=
 E2E_ARGS ?=
 
 check:
-	$(MAKE) -j$(CHECK_JOBS) check-lint check-types test-unit test
+	$(MAKE) -j$(CHECK_JOBS) check-lint check-types test-unit test-scripts test
 
 check-lint:
 	cd $(ROOT_DIR) && npm run lint
@@ -396,14 +398,17 @@ check-types:
 test-unit:
 	cd $(ROOT_DIR) && npm run test:unit -- $(UNIT_ARGS)
 
+test-scripts:
+	cd $(ROOT_DIR) && python3 -m unittest discover -s scripts -p 'test_*.py'
+
 test-watch:
 	cd $(ROOT_DIR) && npm run test:watch -- $(UNIT_ARGS)
 
 test:
-	cd $(ROOT_DIR) && $(GO_ENV) go test $(GO_TEST_FLAGS) ./apps/desktop/...
+	cd $(ROOT_DIR) && $(GO_ENV) go test -parallel=$(GO_TEST_PARALLEL) $(GO_TEST_FLAGS) ./apps/desktop/...
 
 test-race:
-	cd $(ROOT_DIR) && $(GO_ENV) go test -race $(GO_TEST_FLAGS) ./apps/desktop/...
+	cd $(ROOT_DIR) && $(GO_ENV) go test -race -parallel=$(GO_TEST_PARALLEL) $(GO_TEST_FLAGS) ./apps/desktop/...
 
 test-e2e:
 	cd $(ROOT_DIR) && npm run test:e2e -- $(E2E_ARGS)
@@ -412,7 +417,7 @@ test-e2e-all:
 	cd $(ROOT_DIR) && npm run test:e2e:all -- $(E2E_ARGS)
 
 check-full:
-	$(MAKE) -j$(CHECK_JOBS) check-lint check-types test-unit
+	$(MAKE) -j$(CHECK_JOBS) check-lint check-types test-unit test-scripts
 	$(MAKE) test-race
 	$(MAKE) test-e2e-all
 
@@ -482,9 +487,9 @@ bindings:
 	@printf '\n\033[32m✓\033[0m Bindings regenerated in apps/desktop/frontend/wailsjs.\n'
 
 screenshots:
-	cd $(DESKTOP_DIR)/frontend && KURLO_DOCS_SCREENSHOT_DIR=$(CURDIR)/apps/web/src/assets/screenshots npx playwright test e2e/full-app.spec.ts --project=chromium
+	cd $(DESKTOP_DIR)/frontend && KURLO_DOCS_SCREENSHOT_DIR=$(CURDIR)/apps/web/src/assets/screenshots npx playwright test --project=chromium
 	@printf '\n\033[32m✓\033[0m Documentation screenshots retaken in apps/web/src/assets/screenshots.\n'
 
 readme-screenshot:
-	cd $(DESKTOP_DIR)/frontend && KURLO_README_SCREENSHOT=$(CURDIR)/.github/assets/screenshot.png npx playwright test e2e/full-app.spec.ts --project=chromium -g "README screenshot"
+	cd $(DESKTOP_DIR)/frontend && KURLO_README_SCREENSHOT=$(CURDIR)/.github/assets/screenshot.png npx playwright test e2e/shell.spec.ts --project=chromium -g "README screenshot"
 	@printf '\n\033[32m✓\033[0m README screenshot retaken in .github/assets/screenshot.png.\n'

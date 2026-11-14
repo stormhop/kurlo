@@ -9,7 +9,6 @@ import (
 
 func setUpPrefetchWorkspace(t *testing.T) (*App, string) {
 	t.Helper()
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	app := NewApp()
 	if result := app.SaveRequestStoreWithError(examplesTestPayload("Orders", "Orders", "")); !result.Ok {

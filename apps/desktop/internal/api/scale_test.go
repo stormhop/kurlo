@@ -51,7 +51,6 @@ func TestTenThousandRequestsWithDeepFoldersAndUnicode(t *testing.T) {
 	if testing.Short() {
 		t.Skip("writes ten thousand files")
 	}
-	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")

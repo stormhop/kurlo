@@ -14,7 +14,7 @@ func (a *App) GitTokenInfo(remoteOrHost string) GitTokenInfoResult {
 	if host == "" {
 		return info
 	}
-	if cred, ok := gitCredentialLookup(host); ok {
+	if cred, ok := a.gitCredentials().lookup(host); ok {
 		info.HasToken = true
 		info.Username = cred.Username
 	}
@@ -29,7 +29,7 @@ func (a *App) GitStoreToken(remoteOrHost, username, token string) GitOperationRe
 	if strings.TrimSpace(token) == "" {
 		return GitOperationResult{Ok: false, Error: "token is required"}
 	}
-	if err := gitCredentialSet(host, username, token); err != nil {
+	if err := a.gitCredentials().set(host, username, token); err != nil {
 		return GitOperationResult{Ok: false, Error: "could not save token: " + err.Error()}
 	}
 	return GitOperationResult{Ok: true}
@@ -40,7 +40,7 @@ func (a *App) GitClearToken(remoteOrHost string) GitOperationResult {
 	if host == "" {
 		return GitOperationResult{Ok: false, Error: "could not determine host"}
 	}
-	if err := gitCredentialErase(host); err != nil {
+	if err := a.gitCredentials().erase(host); err != nil {
 		return GitOperationResult{Ok: false, Error: "could not clear token: " + err.Error()}
 	}
 	return GitOperationResult{Ok: true}

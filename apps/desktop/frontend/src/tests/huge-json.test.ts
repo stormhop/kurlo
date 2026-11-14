@@ -1,30 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-function escapeHtml(str: string) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function syntaxHighlightJsonLine(line: string): string {
-  return line.replace(
-    /("(?:[^"\\]|\\.)*")(\s*:)?|(\btrue\b|\bfalse\b)|\bnull\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
-    (match, strVal, colon, bool, num) => {
-      if (strVal && colon) return `<span class="jk">${escapeHtml(strVal)}</span>${colon}`;
-      if (strVal) return `<span class="js">${escapeHtml(strVal)}</span>`;
-      if (bool) return `<span class="jb">${bool}</span>`;
-      if (match === 'null') return `<span class="jnull">null</span>`;
-      if (num !== undefined) return `<span class="jn">${num}</span>`;
-      return match;
-    }
-  );
-}
-
-function renderResponseBodyLines(body: string, isJson: boolean): { number: number; html: string }[] {
-  const lines = body.split('\n');
-  return lines.map((line, idx) => ({
-    number: idx + 1,
-    html: isJson ? syntaxHighlightJsonLine(line) : escapeHtml(line),
-  }));
-}
+import { renderResponseBodyLines } from '../lib/response-render';
 
 function generateHugeJson(entryCount: number): string {
   const entries = Array.from({ length: entryCount }, (_, i) => ({
@@ -89,14 +65,14 @@ describe('Huge JSON parsing', () => {
 describe('Line rendering with huge JSON', () => {
   it('renders 500-entry JSON into correct line count', () => {
     const json = generateHugeJson(500);
-    const lines = renderResponseBodyLines(json, true);
+    const lines = renderResponseBodyLines(json, 'json', '', 0);
     const rawLines = json.split('\n');
     expect(lines).toHaveLength(rawLines.length);
   });
 
   it('all lines have a number and html property', () => {
     const json = generateHugeJson(100);
-    const lines = renderResponseBodyLines(json, true);
+    const lines = renderResponseBodyLines(json, 'json', '', 0);
     for (const line of lines) {
       expect(typeof line.number).toBe('number');
       expect(typeof line.html).toBe('string');
@@ -105,14 +81,14 @@ describe('Line rendering with huge JSON', () => {
 
   it('line numbers are sequential from 1', () => {
     const json = generateHugeJson(50);
-    const lines = renderResponseBodyLines(json, true);
+    const lines = renderResponseBodyLines(json, 'json', '', 0);
     expect(lines[0].number).toBe(1);
     expect(lines[lines.length - 1].number).toBe(lines.length);
   });
 
   it('syntax highlighting spans are present in JSON mode', () => {
     const json = JSON.stringify({ key: 'value', count: 42, active: true, nothing: null }, null, 2);
-    const lines = renderResponseBodyLines(json, true);
+    const lines = renderResponseBodyLines(json, 'json', '', 0);
     const combined = lines.map(l => l.html).join('\n');
     expect(combined).toContain('class="jk"');
     expect(combined).toContain('class="js"');
@@ -123,7 +99,7 @@ describe('Line rendering with huge JSON', () => {
 
   it('no HTML injection from user data', () => {
     const json = JSON.stringify({ xss: '<script>alert(1)</script>', url: 'a&b' }, null, 2);
-    const lines = renderResponseBodyLines(json, true);
+    const lines = renderResponseBodyLines(json, 'json', '', 0);
     const combined = lines.map(l => l.html).join('\n');
     expect(combined).not.toContain('<script>');
     expect(combined).toContain('&lt;script&gt;');
@@ -133,7 +109,7 @@ describe('Line rendering with huge JSON', () => {
   it('renders 2000-entry JSON under 500ms', () => {
     const json = generateHugeJson(2000);
     const start = performance.now();
-    const lines = renderResponseBodyLines(json, true);
+    const lines = renderResponseBodyLines(json, 'json', '', 0);
     const elapsed = performance.now() - start;
     expect(lines.length).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(500);
@@ -142,7 +118,7 @@ describe('Line rendering with huge JSON', () => {
   it('renders 5000-entry JSON under 2000ms', () => {
     const json = generateHugeJson(5000);
     const start = performance.now();
-    const lines = renderResponseBodyLines(json, true);
+    const lines = renderResponseBodyLines(json, 'json', '', 0);
     const elapsed = performance.now() - start;
     expect(lines.length).toBeGreaterThan(0);
     expect(elapsed).toBeLessThan(2000);

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -154,7 +155,6 @@ func assertCrashState(t testing.TB, label, local, root string, before, after cra
 }
 
 func TestInterruptedImportOverExistingWorkspaceKeepsEveryRequest(t *testing.T) {
-	withRequestStoreTestKey(t)
 	before, after := crashBaseline(), crashAfterImport()
 	t.Cleanup(func() { beforeYAMLWrite = nil })
 	for cut := 0; ; cut++ {
@@ -182,7 +182,6 @@ func TestInterruptedImportOverExistingWorkspaceKeepsEveryRequest(t *testing.T) {
 }
 
 func TestSaveCutBeforeTheLocalStoreKeepsNewSecrets(t *testing.T) {
-	withRequestStoreTestKey(t)
 	before, after := crashBaseline(), crashAfterImport()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
@@ -218,7 +217,6 @@ func TestCrashHelperProcess(t *testing.T) {
 	if dir == "" {
 		t.Skip("helper for TestKillDuringSaveLeavesALoadableWorkspace")
 	}
-	withRequestStoreTestKey(t)
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
 	payloads := []string{crashAfterImport().payload(t), crashBaseline().payload(t)}
@@ -236,11 +234,17 @@ func TestKillDuringSaveLeavesALoadableWorkspace(t *testing.T) {
 	if testing.Short() {
 		t.Skip("spawns and kills processes")
 	}
-	withRequestStoreTestKey(t)
 	before := crashBaseline()
+	key, err := cachedRequestStoreKey()
+	if err != nil {
+		t.Fatal(err)
+	}
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 	for round := 0; round < 15; round++ {
 		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, requestStoreKeyFileName), []byte(base64.StdEncoding.EncodeToString(key)), 0600); err != nil {
+			t.Fatal(err)
+		}
 		root := filepath.Join(dir, "workspace")
 		local := filepath.Join(dir, "requests.json")
 		if err := saveKurloStorePayload(local, root, before.payload(t)); err != nil {

@@ -8,7 +8,7 @@ import (
 )
 
 func TestCookieTimestampsStayOutOfWorkspaceFiles(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")

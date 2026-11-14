@@ -26,6 +26,19 @@ func TestMain(m *testing.M) {
 			panic(err)
 		}
 	}
+	if dir := os.Getenv(crashHelperEnv); dir != "" {
+		material, err := os.ReadFile(filepath.Join(dir, requestStoreKeyFileName))
+		if err != nil {
+			panic(err)
+		}
+		if err := saveRequestStoreFileKeyMaterial(string(material)); err != nil {
+			panic(err)
+		}
+	}
+	if _, err := cachedRequestStoreKey(); err != nil {
+		_ = os.RemoveAll(home)
+		panic(err)
+	}
 	code := m.Run()
 	_ = os.RemoveAll(home)
 	os.Exit(code)

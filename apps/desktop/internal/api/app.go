@@ -26,6 +26,8 @@ var appVersion = "dev"
 const maxTextFileReadSize = 100 * 1024 * 1024
 
 type App struct {
+	historyStore      *historyResponseStore
+	credentialStore   *gitCredentialStore
 	ctx               context.Context
 	workspacePrefetch workspacePrefetchSlot
 	quit              *quitGate

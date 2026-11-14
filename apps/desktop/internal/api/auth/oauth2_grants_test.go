@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -21,6 +22,28 @@ import (
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
+
+type deviceFlowTestClock struct {
+	current time.Time
+	waits   []time.Duration
+}
+
+func newDeviceFlowTestClock() *deviceFlowTestClock {
+	return &deviceFlowTestClock{current: time.Unix(1700000000, 0)}
+}
+
+func (c *deviceFlowTestClock) clock() deviceAuthorizationClock {
+	return deviceAuthorizationClock{
+		now: func() time.Time { return c.current },
+		after: func(interval time.Duration) <-chan time.Time {
+			c.waits = append(c.waits, interval)
+			c.current = c.current.Add(interval)
+			timer := make(chan time.Time, 1)
+			timer <- c.current
+			return timer
+		},
+	}
+}
 
 func TestFetchTokenPassword(t *testing.T) {
 	var gotForm url.Values
@@ -64,6 +87,7 @@ func TestFetchTokenPasswordRequiresUsername(t *testing.T) {
 }
 
 func TestAuthorizeDeviceHappyPath(t *testing.T) {
+	clock := newDeviceFlowTestClock()
 	var polls int32
 	var prompt model.OAuth2DevicePrompt
 	var openedURL string
@@ -99,14 +123,14 @@ func TestAuthorizeDeviceHappyPath(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	resp := AuthorizeDevice(context.Background(), model.AuthConfig{
+	resp := authorizeDevice(context.Background(), model.AuthConfig{
 		OAuth2DeviceAuthURL: server.URL + "/device",
 		OAuth2TokenURL:      server.URL + "/token",
 		OAuth2ClientID:      "cid",
 	}, func(p model.OAuth2DevicePrompt) { prompt = p }, func(target string) error {
 		openedURL = target
 		return nil
-	})
+	}, clock.clock())
 
 	if resp.Error != "" {
 		t.Fatalf("unexpected error: %s", resp.Error)
@@ -126,9 +150,13 @@ func TestAuthorizeDeviceHappyPath(t *testing.T) {
 	if openedURL != "https://example.com/activate?user_code=WXYZ-1234" {
 		t.Errorf("opened %q, want the verification_uri_complete", openedURL)
 	}
+	if !slices.Equal(clock.waits, []time.Duration{time.Second, time.Second}) {
+		t.Errorf("poll intervals = %v, want [1s 1s]", clock.waits)
+	}
 }
 
 func TestAuthorizeDeviceSlowDownBacksOff(t *testing.T) {
+	clock := newDeviceFlowTestClock()
 	var polls int32
 	mux := http.NewServeMux()
 	mux.HandleFunc("/device", func(w http.ResponseWriter, r *http.Request) {
@@ -145,21 +173,21 @@ func TestAuthorizeDeviceSlowDownBacksOff(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	start := time.Now()
-	resp := AuthorizeDevice(context.Background(), model.AuthConfig{
+	resp := authorizeDevice(context.Background(), model.AuthConfig{
 		OAuth2DeviceAuthURL: server.URL + "/device",
 		OAuth2TokenURL:      server.URL + "/token",
 		OAuth2ClientID:      "cid",
-	}, nil, nil)
+	}, nil, nil, clock.clock())
 	if resp.AccessToken != "ok" {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	if elapsed := time.Since(start); elapsed < 6*time.Second {
-		t.Errorf("slow_down should have added 5s of backoff, total elapsed %s", elapsed)
+	if !slices.Equal(clock.waits, []time.Duration{time.Second, 6 * time.Second}) {
+		t.Errorf("poll intervals = %v, want [1s 6s]", clock.waits)
 	}
 }
 
 func TestAuthorizeDeviceAccessDenied(t *testing.T) {
+	clock := newDeviceFlowTestClock()
 	mux := http.NewServeMux()
 	mux.HandleFunc("/device", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"device_code":"d","user_code":"U","verification_uri":"https://e/x","expires_in":600,"interval":1}`)
@@ -171,11 +199,11 @@ func TestAuthorizeDeviceAccessDenied(t *testing.T) {
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
-	resp := AuthorizeDevice(context.Background(), model.AuthConfig{
+	resp := authorizeDevice(context.Background(), model.AuthConfig{
 		OAuth2DeviceAuthURL: server.URL + "/device",
 		OAuth2TokenURL:      server.URL + "/token",
 		OAuth2ClientID:      "cid",
-	}, nil, nil)
+	}, nil, nil, clock.clock())
 	if resp.AccessToken != "" {
 		t.Fatal("denied authorization must not yield a token")
 	}
@@ -196,15 +224,97 @@ func TestAuthorizeDeviceCancellation(t *testing.T) {
 	defer server.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() { time.Sleep(100 * time.Millisecond); cancel() }()
+	defer cancel()
+	waiting := make(chan struct{})
+	clock := deviceAuthorizationClock{
+		now: time.Now,
+		after: func(interval time.Duration) <-chan time.Time {
+			if interval != 30*time.Second {
+				t.Errorf("poll interval = %s, want 30s", interval)
+			}
+			close(waiting)
+			return nil
+		},
+	}
+	go func() {
+		select {
+		case <-waiting:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 
-	resp := AuthorizeDevice(ctx, model.AuthConfig{
+	resp := authorizeDevice(ctx, model.AuthConfig{
 		OAuth2DeviceAuthURL: server.URL + "/device",
 		OAuth2TokenURL:      server.URL + "/token",
 		OAuth2ClientID:      "cid",
-	}, nil, nil)
+	}, nil, nil, clock)
 	if !strings.Contains(resp.Error, "cancelled") {
 		t.Errorf("error = %q, want a cancellation message", resp.Error)
+	}
+}
+
+func TestAuthorizeDeviceDefaultIntervalAndRepeatedSlowDown(t *testing.T) {
+	clock := newDeviceFlowTestClock()
+	var polls atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/device", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"device_code":"d","verification_uri":"https://e/x","expires_in":600}`)
+	})
+	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		if polls.Add(1) <= 2 {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, `{"error":"slow_down"}`)
+			return
+		}
+		fmt.Fprint(w, `{"access_token":"ok"}`)
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp := authorizeDevice(t.Context(), model.AuthConfig{
+		OAuth2DeviceAuthURL: server.URL + "/device",
+		OAuth2TokenURL:      server.URL + "/token",
+		OAuth2ClientID:      "cid",
+	}, nil, nil, clock.clock())
+	if resp.AccessToken != "ok" {
+		t.Fatalf("unexpected response: %#v", resp)
+	}
+	if !slices.Equal(clock.waits, []time.Duration{5 * time.Second, 10 * time.Second, 15 * time.Second}) {
+		t.Errorf("poll intervals = %v, want [5s 10s 15s]", clock.waits)
+	}
+}
+
+func TestAuthorizeDeviceExpiryStopsBeforePolling(t *testing.T) {
+	for _, tc := range []struct {
+		name, response string
+	}{
+		{name: "device expiry", response: `{"device_code":"d","verification_uri":"https://e/x","expires_in":1,"interval":2}`},
+		{name: "maximum flow duration", response: `{"device_code":"d","verification_uri":"https://e/x","interval":901}`},
+		{name: "device expiry above maximum", response: `{"device_code":"d","verification_uri":"https://e/x","expires_in":1800,"interval":901}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			clock := newDeviceFlowTestClock()
+			mux := http.NewServeMux()
+			mux.HandleFunc("/device", func(w http.ResponseWriter, r *http.Request) {
+				fmt.Fprint(w, tc.response)
+			})
+			mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+				t.Error("expired authorization must not reach the token endpoint")
+				fmt.Fprint(w, `{"access_token":"unexpected"}`)
+			})
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			resp := authorizeDevice(t.Context(), model.AuthConfig{
+				OAuth2DeviceAuthURL: server.URL + "/device",
+				OAuth2TokenURL:      server.URL + "/token",
+				OAuth2ClientID:      "cid",
+			}, nil, nil, clock.clock())
+			if resp.AccessToken != "" || !strings.Contains(resp.Error, "expired") {
+				t.Fatalf("expected an expiry error without a token, got %#v", resp)
+			}
+		})
 	}
 }
 

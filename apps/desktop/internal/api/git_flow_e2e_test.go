@@ -60,7 +60,7 @@ func (f *gitFlow) throughAppStore(frontend, payload, label string) string {
 	if err := os.WriteFile(in, []byte(payload), 0600); err != nil {
 		f.t.Fatal(err)
 	}
-	cmd := exec.Command("npx", "playwright", "test", "e2e/full-app.spec.ts", "-g", "real workspace round trip", "--project=chromium", "--workers=1")
+	cmd := exec.Command("npx", "playwright", "test", "e2e/workspace.spec.ts", "-g", "real workspace round trip", "--project=chromium", "--workers=1")
 	cmd.Dir = frontend
 	cmd.Env = append(os.Environ(), "HOME="+f.home, "KURLO_ROUNDTRIP_IN="+in, "KURLO_ROUNDTRIP_OUT="+out)
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -184,7 +184,6 @@ func TestGitFlowOnARealWorkspace(t *testing.T) {
 	}
 	realHome := os.Getenv("HOME")
 	useTempConfigDir(t, t.TempDir())
-	withRequestStoreTestKey(t)
 	for key, value := range map[string]string{"GIT_AUTHOR_NAME": "Kurlo E2E", "GIT_AUTHOR_EMAIL": "e2e@kurlo.test", "GIT_COMMITTER_NAME": "Kurlo E2E", "GIT_COMMITTER_EMAIL": "e2e@kurlo.test"} {
 		t.Setenv(key, value)
 	}
@@ -370,7 +369,6 @@ func TestGitFlowAgainstARealRemote(t *testing.T) {
 		t.Fatal(err)
 	}
 	useTempConfigDir(t, sandbox)
-	withRequestStoreTestKey(t)
 	t.Setenv("GIT_TERMINAL_PROMPT", "0")
 	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(realHome, ".gitconfig"))
 	t.Setenv("GH_CONFIG_DIR", filepath.Join(realHome, ".config", "gh"))

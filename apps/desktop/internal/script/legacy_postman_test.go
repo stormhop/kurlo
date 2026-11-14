@@ -20,6 +20,8 @@ func responseContext() *Context {
 }
 
 func TestJSLegacyTestsObjectBecomesTestResults(t *testing.T) {
+	t.Parallel()
+
 	ctx := responseContext()
 	res := jsTests(`
 tests["status is 200"] = responseCode.code === 200;
@@ -43,6 +45,8 @@ tests["json header"] = responseHeaders["Content-Type"] === "application/json";
 }
 
 func TestJSLegacyTestsSurviveALaterError(t *testing.T) {
+	t.Parallel()
+
 	res := jsTests(`tests["before"] = true; throw new Error("boom");`, responseContext())
 	if !strings.Contains(res.Error, "boom") || len(res.Tests) != 1 || !res.Tests[0].Passed {
 		t.Fatalf("expected the error and the earlier test, got %q %+v", res.Error, res.Tests)
@@ -50,6 +54,8 @@ func TestJSLegacyTestsSurviveALaterError(t *testing.T) {
 }
 
 func TestJSLegacyPostmanVariableHelpers(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	res := jsPre(`
 postman.setEnvironmentVariable("token", "abc");
@@ -75,6 +81,8 @@ postman.clearGlobalVariable("g");
 }
 
 func TestJSSetNextRequestExplainsItIsUnsupported(t *testing.T) {
+	t.Parallel()
+
 	res := jsTests(`postman.setNextRequest("Login")`, responseContext())
 	if !strings.Contains(res.Error, "setNextRequest is not supported") {
 		t.Fatalf("unexpected error %q", res.Error)
@@ -82,6 +90,8 @@ func TestJSSetNextRequestExplainsItIsUnsupported(t *testing.T) {
 }
 
 func TestJSVariablesReplaceIn(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(map[string]string{"g": "global"}, map[string]string{"base": "https://{{host}}", "host": "api.test"})
 	ctx.CollectionVariables["токен"] = "ru"
 	ctx.DynamicVariable = func(name string) (string, bool) {
@@ -97,6 +107,8 @@ func TestJSVariablesReplaceIn(t *testing.T) {
 }
 
 func TestJSXML2Json(t *testing.T) {
+	t.Parallel()
+
 	res := jsTests(`
 const doc = xml2Json('<?xml version="1.0"?><order id="9"><item>a</item><item>b</item><note lang="en">hi</note><empty/></order>');
 pm.test("xml", () => {

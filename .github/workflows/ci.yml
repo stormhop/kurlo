@@ -44,6 +44,9 @@ jobs:
       - name: Test frontend
         run: npm --workspace @kurlo/desktop-frontend run test
 
+      - name: Test release scripts
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: Build frontend
         run: npm run frontend:build
 
@@ -147,9 +150,23 @@ jobs:
         if: ${{ matrix.race }}
         run: go test -race ./apps/desktop/...
 
-  e2e:
-    name: E2E (Playwright)
+  e2e-tests:
+    name: E2E (${{ matrix.suite }})
     runs-on: ubuntu-22.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: chromium
+            browsers: chromium
+            args: --project=chromium --grep-invert @scale --workers=2
+          - suite: webkit
+            browsers: webkit
+            args: --project=webkit --grep-invert @scale --workers=2
+          - suite: scale
+            browsers: chromium webkit
+            args: --grep @scale --workers=1
 
     steps:
       - name: Checkout
@@ -166,33 +183,36 @@ jobs:
         run: npm install
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps ${{ matrix.browsers }}
         working-directory: apps/desktop/frontend
 
       - name: Run E2E tests
-        run: npm run frontend:e2e -- --grep-invert @scale
+        run: npm exec --workspace @kurlo/desktop-frontend -- playwright test ${{ matrix.args }}
         env:
-          KURLO_E2E_ARTIFACT_DIR: ${{ runner.temp }}/playwright
-
-      - name: Run E2E tests in WebKit
-        run: npm run frontend:e2e:webkit -- --grep-invert @scale
-        env:
-          KURLO_E2E_ARTIFACT_DIR: ${{ runner.temp }}/playwright-webkit
-
-      - name: Run scale tests with one worker
-        run: npm exec --workspace @kurlo/desktop-frontend -- playwright test --grep @scale --workers=1
-        env:
-          KURLO_E2E_ARTIFACT_DIR: ${{ runner.temp }}/playwright-scale
+          KURLO_E2E_ARTIFACT_DIR: ${{ runner.temp }}/playwright-${{ matrix.suite }}
 
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
-          path: |
-            ${{ runner.temp }}/playwright/html-report
-            ${{ runner.temp }}/playwright-webkit/html-report
-            ${{ runner.temp }}/playwright-scale/html-report
+          name: playwright-report-${{ matrix.suite }}
+          path: ${{ runner.temp }}/playwright-${{ matrix.suite }}/html-report
           retention-days: 3
           if-no-files-found: ignore
+
+  e2e:
+    name: E2E (Playwright)
+    needs: e2e-tests
+    if: ${{ always() }}
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Require all E2E suites to pass
+        env:
+          E2E_RESULT: ${{ needs.e2e-tests.result }}
+        run: |
+          if [ "$E2E_RESULT" != "success" ]; then
+            echo "::error::E2E suites finished with '$E2E_RESULT'"
+            exit 1
+          fi

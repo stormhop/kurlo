@@ -3512,6 +3512,10 @@ func gitRemoteURLForRoot(root, remoteName string) string {
 }
 
 func annotateGitAuthFailure(status *GitWorkspaceStatus, message, remoteURL string) {
+	annotateGitAuthFailureWithLookup(status, message, remoteURL, gitCredentialHasToken)
+}
+
+func annotateGitAuthFailureWithLookup(status *GitWorkspaceStatus, message, remoteURL string, hasToken func(string) bool) {
 	if status == nil || status.AuthRequired {
 		return
 	}
@@ -3542,7 +3546,7 @@ func annotateGitAuthFailure(status *GitWorkspaceStatus, message, remoteURL strin
 	status.AuthRequired = true
 	status.AuthScheme = scheme
 	status.AuthHost = host
-	if scheme == "https" && host != "" && gitCredentialHasToken(host) &&
+	if scheme == "https" && host != "" && hasToken(host) &&
 		(strings.Contains(lower, "authentication failed") ||
 			strings.Contains(lower, "invalid username or password") ||
 			strings.Contains(lower, "http basic: access denied") ||

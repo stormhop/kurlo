@@ -14,13 +14,26 @@ const (
 	maxHistoryResponseBytes = 2 * 1024 * 1024
 )
 
-var historyStoreMu sync.Mutex
+type historyResponseStore struct {
+	mu    sync.Mutex
+	dir   func() string
+	codec *requestStoreCodec
+}
+
+var defaultHistoryResponseStore = &historyResponseStore{dir: historyResponseDir, codec: defaultRequestStoreCodec}
+
+func (a *App) historyResponses() *historyResponseStore {
+	if a.historyStore != nil {
+		return a.historyStore
+	}
+	return defaultHistoryResponseStore
+}
 
 func historyResponseDir() string {
 	return filepath.Join(requestStoreDir(), historyResponseDirName)
 }
 
-func historyResponsePath(id string) (string, error) {
+func (s *historyResponseStore) path(id string) (string, error) {
 	if id == "" {
 		return "", fmt.Errorf("history id is empty")
 	}
@@ -31,7 +44,7 @@ func historyResponsePath(id string) (string, error) {
 			return "", fmt.Errorf("invalid history id %q", id)
 		}
 	}
-	return filepath.Join(historyResponseDir(), id+".json"), nil
+	return filepath.Join(s.dir(), id+".json"), nil
 }
 
 type HistoryResponseResult struct {
@@ -41,21 +54,21 @@ type HistoryResponseResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
-func (a *App) SaveHistoryResponse(id string, payload string) HistoryResponseResult {
-	historyStoreMu.Lock()
-	defer historyStoreMu.Unlock()
+func (s *historyResponseStore) save(id string, payload string) HistoryResponseResult {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	path, err := historyResponsePath(id)
+	path, err := s.path(id)
 	if err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
 	if len(payload) > maxHistoryResponseBytes {
 		return HistoryResponseResult{Stored: false, Truncated: true}
 	}
-	if err := os.MkdirAll(historyResponseDir(), 0o700); err != nil {
+	if err := os.MkdirAll(s.dir(), 0o700); err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
-	encrypted, err := encryptRequestStorePayload([]byte(payload))
+	encrypted, err := s.codec.encrypt([]byte(payload))
 	if err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
@@ -65,12 +78,8 @@ func (a *App) SaveHistoryResponse(id string, payload string) HistoryResponseResu
 	return HistoryResponseResult{Stored: true}
 }
 
-func (a *App) LoadHistoryResponse(id string) HistoryResponseResult {
-	return readHistoryResponse(id)
-}
-
-func readHistoryResponse(id string) HistoryResponseResult {
-	path, err := historyResponsePath(id)
+func (s *historyResponseStore) load(id string) HistoryResponseResult {
+	path, err := s.path(id)
 	if err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
@@ -81,25 +90,25 @@ func readHistoryResponse(id string) HistoryResponseResult {
 	if err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
-	payload, err := decryptRequestStorePayload(data)
+	payload, err := s.codec.decrypt(data)
 	if err != nil {
 		return HistoryResponseResult{Error: err.Error()}
 	}
 	return HistoryResponseResult{Stored: true, Payload: string(payload)}
 }
 
-func (a *App) StoredHistoryResponseIDs() []string {
+func (s *historyResponseStore) ids() []string {
 	ids := make([]string, 0)
-	for id := range storedHistoryResponseIDs() {
+	for id := range s.storedIDs() {
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
 	return ids
 }
 
-func storedHistoryResponseIDs() map[string]bool {
+func (s *historyResponseStore) storedIDs() map[string]bool {
 	stored := map[string]bool{}
-	entries, err := os.ReadDir(historyResponseDir())
+	entries, err := os.ReadDir(s.dir())
 	if err != nil {
 		return stored
 	}
@@ -113,11 +122,11 @@ func storedHistoryResponseIDs() map[string]bool {
 	return stored
 }
 
-func (a *App) PruneHistoryResponses(keepIDs []string) string {
-	historyStoreMu.Lock()
-	defer historyStoreMu.Unlock()
+func (s *historyResponseStore) prune(keepIDs []string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	entries, err := os.ReadDir(historyResponseDir())
+	entries, err := os.ReadDir(s.dir())
 	if os.IsNotExist(err) {
 		return ""
 	}
@@ -138,7 +147,7 @@ func (a *App) PruneHistoryResponses(keepIDs []string) string {
 		if _, wanted := keep[strings.TrimSuffix(name, ".json")]; wanted {
 			continue
 		}
-		if err := os.Remove(filepath.Join(historyResponseDir(), name)); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(filepath.Join(s.dir(), name)); err != nil && !os.IsNotExist(err) {
 			failures = append(failures, err.Error())
 		}
 	}
@@ -149,14 +158,38 @@ func (a *App) PruneHistoryResponses(keepIDs []string) string {
 	return strings.Join(failures, "; ")
 }
 
-func (a *App) ClearHistoryResponses() string {
-	historyStoreMu.Lock()
-	defer historyStoreMu.Unlock()
+func (s *historyResponseStore) clear() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if err := os.RemoveAll(historyResponseDir()); err != nil && !os.IsNotExist(err) {
+	if err := os.RemoveAll(s.dir()); err != nil && !os.IsNotExist(err) {
 		return err.Error()
 	}
 	return ""
+}
+
+func (a *App) SaveHistoryResponse(id string, payload string) HistoryResponseResult {
+	return a.historyResponses().save(id, payload)
+}
+
+func (a *App) LoadHistoryResponse(id string) HistoryResponseResult {
+	return a.historyResponses().load(id)
+}
+
+func (a *App) StoredHistoryResponseIDs() []string { return a.historyResponses().ids() }
+
+func (a *App) PruneHistoryResponses(keepIDs []string) string {
+	return a.historyResponses().prune(keepIDs)
+}
+
+func (a *App) ClearHistoryResponses() string { return a.historyResponses().clear() }
+
+func readHistoryResponse(id string) HistoryResponseResult {
+	return defaultHistoryResponseStore.load(id)
+}
+
+func storedHistoryResponseIDs() map[string]bool {
+	return defaultHistoryResponseStore.storedIDs()
 }
 
 func writeFileAtomic(path string, data []byte) error {

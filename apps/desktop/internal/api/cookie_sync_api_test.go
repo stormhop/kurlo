@@ -20,12 +20,7 @@ func isolateAppData(t *testing.T) {
 	for i := range key {
 		key[i] = byte(i + 7)
 	}
-	previousProvider, previousLoader := requestStoreKeyProvider, requestStoreKeyLoader
-	requestStoreKeyProvider = func() ([]byte, error) { return key, nil }
-	requestStoreKeyLoader = func() ([]byte, error) { return key, nil }
-	t.Cleanup(func() {
-		requestStoreKeyProvider, requestStoreKeyLoader = previousProvider, previousLoader
-	})
+	seedRequestStoreTestKey(t, key)
 }
 
 func readCookieSyncPreferences(t *testing.T) cookieSyncPreferences {

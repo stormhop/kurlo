@@ -19,6 +19,7 @@ Requirements:
 
 - Go 1.25+
 - Node.js 22.12+
+- Python 3 for release script tests
 - [Wails v2](https://wails.io/docs/gettingstarted/installation) — `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
 - macOS: Xcode Command Line Tools
 - Linux: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`
@@ -47,6 +48,33 @@ Run this before pushing — it covers most of what CI checks:
 make check
 ```
 
+Local `make` targets run up to four parallel Go tests per package. Use
+`make test GO_TEST_PARALLEL=2` to reduce concurrency, or
+`make test GO_TEST_FLAGS="-run TestGit"` to select tests. Independent Git tests use
+their own temporary repositories. Crypto, history and Git credential tests use
+explicit store instances, paths and key sources. Filesystem tests share a read-only
+key created in the temporary test home; they do not replace process-wide providers.
+Tests that change process environment or global fault injection hooks, and the
+scale benchmark, remain sequential. Crash helpers receive their key through an
+explicit temporary fixture file.
+
+Browser tests live in `apps/desktop/frontend/e2e`, grouped by feature. Shared bridge,
+fixtures and UI helpers live in `e2e/support`. Run a feature on its own with
+`npm run test:e2e -- e2e/git.spec.ts --workers=2`, or filter by test title with `-g`.
+The normal configuration already runs tests within each file in parallel.
+`00-workflows.spec.ts` runs first in serial screenshot mode: later feature tests
+refine some documentation captures from that initial walkthrough.
+
+Frontend unit tests live in `src/tests`. Import/export tests are grouped by format
+in `importers*.test.ts`; application integration tests use `appIntegration*.test.ts`.
+Their shared fixtures live in `src/tests/support` and remain isolated per test file.
+Large JSON tests call the response renderer used by the application.
+
+`npm run frontend:check` checks both the application and Playwright TypeScript.
+Use `npm run test:e2e:check` to check only the browser tests and their configuration.
+The test bridge uses generated Wails argument types and permits partial mock
+responses, since the frontend normalizes incomplete wire data.
+
 The full pipeline in [`ci.yml`](.github/workflows/ci.yml) runs:
 
 | Check | Command |
@@ -54,6 +82,7 @@ The full pipeline in [`ci.yml`](.github/workflows/ci.yml) runs:
 | Lint | `npm run lint` |
 | Frontend types | `npm run frontend:check` |
 | Frontend unit tests | `npm --workspace @kurlo/desktop-frontend run test` |
+| Release script tests | `make test-scripts` (Python 3 standard library) |
 | Frontend build | `npm run frontend:build` |
 | Docs site build | `npm run web:build` |
 | Docs consistency | `npm run web:check-docs` |
@@ -62,7 +91,12 @@ The full pipeline in [`ci.yml`](.github/workflows/ci.yml) runs:
 | Go tests | `go test -race ./apps/desktop/...` on Linux, repeated on macOS (with `-race`) and Windows (without) |
 | Generated bindings | `make bindings` must produce no diff |
 | Dead code | `golang.org/x/tools/cmd/deadcode` must report nothing |
-| End-to-end | `npm run frontend:e2e` (Playwright) |
+| End-to-end | `npm run test:e2e:all` (Playwright, Chromium and WebKit) |
+
+CI runs Chromium and WebKit in separate jobs with two workers each. A third job
+runs only `@scale` tests in both browsers with one worker. Each job uploads its own
+`playwright-report-<suite>` artifact. The required `E2E (Playwright)` check succeeds
+only when all three jobs pass; a failure in one suite does not cancel the others.
 
 `make test-extension` is not in that list: it drives the real Cookie Sync extension in a
 headless Chromium against a Go-hosted bridge, and it is run locally when `apps/desktop/extension`

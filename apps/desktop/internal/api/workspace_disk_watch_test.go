@@ -12,7 +12,6 @@ import (
 )
 
 func TestAgentWritesLeaveEveryAppSavedFileAlone(t *testing.T) {
-	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -50,7 +49,6 @@ func TestAgentWritesLeaveEveryAppSavedFileAlone(t *testing.T) {
 }
 
 func TestPureVariableReferencesStayInTheSharedFile(t *testing.T) {
-	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -79,7 +77,6 @@ func TestPureVariableReferencesStayInTheSharedFile(t *testing.T) {
 
 func appWorkspaceForTest(t *testing.T) (*App, string) {
 	t.Helper()
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	app := NewApp()
 	if result := app.SaveRequestStoreWithError(kurloSaveFlowPayload("https://api.example.test", "secret-token", []string{"req-main"}, "")); !result.Ok {

@@ -1,38 +1,24 @@
 package api
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func withHistoryStore(t *testing.T) {
+func withHistoryStore(t *testing.T) *App {
 	t.Helper()
-	configDir := t.TempDir()
-	useTempConfigDir(t, configDir)
-
-	key := bytes.Repeat([]byte{7}, requestStoreKeySize)
-	previousProvider := requestStoreKeyProvider
-	previousLoader := requestStoreKeyLoader
-	requestStoreKeyMu.Lock()
-	requestStoreKeyCache = nil
-	requestStoreKeyMu.Unlock()
-	requestStoreKeyProvider = func() ([]byte, error) { return append([]byte(nil), key...), nil }
-	requestStoreKeyLoader = requestStoreKeyProvider
-	t.Cleanup(func() {
-		requestStoreKeyProvider = previousProvider
-		requestStoreKeyLoader = previousLoader
-		requestStoreKeyMu.Lock()
-		requestStoreKeyCache = nil
-		requestStoreKeyMu.Unlock()
-	})
+	dir := t.TempDir()
+	return &App{historyStore: &historyResponseStore{
+		dir:   func() string { return dir },
+		codec: isolatedRequestStoreCodec(t),
+	}}
 }
 
 func TestHistoryResponseRoundTrip(t *testing.T) {
-	withHistoryStore(t)
-	app := &App{}
+	t.Parallel()
+	app := withHistoryStore(t)
 
 	payload := `{"statusCode":200,"body":"{\"token\":\"secret\"}"}`
 	if result := app.SaveHistoryResponse("history-1", payload); !result.Stored || result.Error != "" {
@@ -49,12 +35,12 @@ func TestHistoryResponseRoundTrip(t *testing.T) {
 }
 
 func TestHistoryResponseIsEncryptedOnDisk(t *testing.T) {
-	withHistoryStore(t)
-	app := &App{}
+	t.Parallel()
+	app := withHistoryStore(t)
 
 	app.SaveHistoryResponse("history-1", `{"body":"super-secret-token"}`)
 
-	raw, err := os.ReadFile(filepath.Join(historyResponseDir(), "history-1.json"))
+	raw, err := os.ReadFile(filepath.Join(app.historyResponses().dir(), "history-1.json"))
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
@@ -64,8 +50,8 @@ func TestHistoryResponseIsEncryptedOnDisk(t *testing.T) {
 }
 
 func TestMissingHistoryResponseIsNotAnError(t *testing.T) {
-	withHistoryStore(t)
-	app := &App{}
+	t.Parallel()
+	app := withHistoryStore(t)
 
 	result := app.LoadHistoryResponse("never-stored")
 	if result.Error != "" {
@@ -77,8 +63,8 @@ func TestMissingHistoryResponseIsNotAnError(t *testing.T) {
 }
 
 func TestOversizedHistoryResponseIsNotStoredHalfCut(t *testing.T) {
-	withHistoryStore(t)
-	app := &App{}
+	t.Parallel()
+	app := withHistoryStore(t)
 
 	oversized := strings.Repeat("x", maxHistoryResponseBytes+4096)
 	result := app.SaveHistoryResponse("history-1", oversized)
@@ -91,8 +77,8 @@ func TestOversizedHistoryResponseIsNotStoredHalfCut(t *testing.T) {
 }
 
 func TestPruneHistoryResponsesKeepsOnlyLiveEntries(t *testing.T) {
-	withHistoryStore(t)
-	app := &App{}
+	t.Parallel()
+	app := withHistoryStore(t)
 
 	for _, id := range []string{"keep-1", "keep-2", "expired"} {
 		app.SaveHistoryResponse(id, `{"statusCode":200}`)
@@ -110,8 +96,8 @@ func TestPruneHistoryResponsesKeepsOnlyLiveEntries(t *testing.T) {
 }
 
 func TestClearHistoryResponsesRemovesEverything(t *testing.T) {
-	withHistoryStore(t)
-	app := &App{}
+	t.Parallel()
+	app := withHistoryStore(t)
 
 	app.SaveHistoryResponse("history-1", `{"statusCode":200}`)
 	if err := app.ClearHistoryResponses(); err != "" {
@@ -126,8 +112,8 @@ func TestClearHistoryResponsesRemovesEverything(t *testing.T) {
 }
 
 func TestHistoryResponseIdCannotEscapeTheDirectory(t *testing.T) {
-	withHistoryStore(t)
-	app := &App{}
+	t.Parallel()
+	app := withHistoryStore(t)
 
 	for _, id := range []string{"../escape", "sub/dir", "", "..", `..\windows`, "with space"} {
 		if result := app.SaveHistoryResponse(id, `{"statusCode":200}`); result.Error == "" {

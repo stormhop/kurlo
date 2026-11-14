@@ -25,7 +25,6 @@ const twoExamples = `[` +
 
 func setUpExamplesWorkspace(t *testing.T) (*App, string) {
 	t.Helper()
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	root := fileWorkspaceStorePath()
 	t.Cleanup(func() { loadedRequestExamples.forget(root) })

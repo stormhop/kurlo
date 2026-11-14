@@ -11,17 +11,18 @@ import (
 )
 
 func TestRequestStorePayloadRoundTrip(t *testing.T) {
-	withIsolatedStore(t)
+	t.Parallel()
+	codec := isolatedRequestStoreCodec(t)
 
 	plaintext := `{"hello":"world","n":42}`
-	enc, err := encryptRequestStorePayload([]byte(plaintext))
+	enc, err := codec.encrypt([]byte(plaintext))
 	if err != nil {
 		t.Fatalf("encrypt: %v", err)
 	}
 	if !isEncryptedRequestStore(enc) {
 		t.Fatal("encrypted payload should be recognized as an encrypted envelope")
 	}
-	dec, err := decryptRequestStorePayload(enc)
+	dec, err := codec.decrypt(enc)
 	if err != nil {
 		t.Fatalf("decrypt: %v", err)
 	}
@@ -31,12 +32,13 @@ func TestRequestStorePayloadRoundTrip(t *testing.T) {
 }
 
 func TestRequestStorePayloadRandomNonce(t *testing.T) {
-	withIsolatedStore(t)
-	e1, err := encryptRequestStorePayload([]byte("same"))
+	t.Parallel()
+	codec := isolatedRequestStoreCodec(t)
+	e1, err := codec.encrypt([]byte("same"))
 	if err != nil {
 		t.Fatalf("encrypt 1: %v", err)
 	}
-	e2, err := encryptRequestStorePayload([]byte("same"))
+	e2, err := codec.encrypt([]byte("same"))
 	if err != nil {
 		t.Fatalf("encrypt 2: %v", err)
 	}
@@ -46,31 +48,22 @@ func TestRequestStorePayloadRandomNonce(t *testing.T) {
 }
 
 func TestRequestStorePayloadTamperDetected(t *testing.T) {
-	withIsolatedStore(t)
-	enc, err := encryptRequestStorePayload([]byte("secret data"))
+	t.Parallel()
+	codec := isolatedRequestStoreCodec(t)
+	enc, err := codec.encrypt([]byte("secret data"))
 	if err != nil {
 		t.Fatalf("encrypt: %v", err)
 	}
 	tampered := bytes.Replace(enc, []byte(`"ciphertext": "`), []byte(`"ciphertext": "A`), 1)
-	if _, err := decryptRequestStorePayload(tampered); err == nil {
+	if _, err := codec.decrypt(tampered); err == nil {
 		t.Fatal("expected decrypt of tampered payload to fail authentication")
 	}
 }
 
 func TestDecryptDoesNotCreateReplacementKeyWhenExistingKeyIsMissing(t *testing.T) {
-	tmp := t.TempDir()
-	useTempConfigDir(t, tmp)
-	t.Setenv(requestStoreDisableKeychain, "1")
-	prevProvider := requestStoreKeyProvider
-	prevLoader := requestStoreKeyLoader
-	requestStoreKeyProvider = cachedRequestStoreKey
-	requestStoreKeyLoader = cachedExistingRequestStoreKey
-	t.Cleanup(func() {
-		requestStoreKeyProvider = prevProvider
-		requestStoreKeyLoader = prevLoader
-	})
+	t.Parallel()
+	codec, keys, keyPath := fileRequestStoreCodec(t)
 
-	clearRequestStoreKeyCacheForTest(t)
 	key := bytes.Repeat([]byte{9}, requestStoreKeySize)
 	gcm, err := requestStoreCipher(key)
 	if err != nil {
@@ -86,39 +79,28 @@ func TestDecryptDoesNotCreateReplacementKeyWhenExistingKeyIsMissing(t *testing.T
 	if err != nil {
 		t.Fatalf("marshal encrypted envelope: %v", err)
 	}
-	if err := os.Remove(requestStoreKeyPath()); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(keyPath); err != nil && !os.IsNotExist(err) {
 		t.Fatalf("remove key file: %v", err)
 	}
-	clearRequestStoreKeyCacheForTest(t)
+	keys.remember(nil)
 
-	if _, err := decryptRequestStorePayload(enc); err == nil {
+	if _, err := codec.decrypt(enc); err == nil {
 		t.Fatal("expected decrypt to fail when the existing key is missing")
 	}
-	if _, err := os.Stat(requestStoreKeyPath()); !os.IsNotExist(err) {
+	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
 		t.Fatalf("decrypt should not create a replacement key, stat err=%v", err)
 	}
 }
 
 func TestCachedRequestStoreKeyMemoizes(t *testing.T) {
-	tmp := t.TempDir()
-	useTempConfigDir(t, tmp)
-	t.Setenv(requestStoreDisableKeychain, "1")
+	t.Parallel()
+	codec, _, keyPath := fileRequestStoreCodec(t)
 
-	requestStoreKeyMu.Lock()
-	prev := requestStoreKeyCache
-	requestStoreKeyCache = nil
-	requestStoreKeyMu.Unlock()
-	t.Cleanup(func() {
-		requestStoreKeyMu.Lock()
-		requestStoreKeyCache = prev
-		requestStoreKeyMu.Unlock()
-	})
-
-	k1, err := cachedRequestStoreKey()
+	k1, err := codec.provideKey()
 	if err != nil {
 		t.Fatalf("first load: %v", err)
 	}
-	k2, err := cachedRequestStoreKey()
+	k2, err := codec.provideKey()
 	if err != nil {
 		t.Fatalf("second load: %v", err)
 	}
@@ -126,10 +108,10 @@ func TestCachedRequestStoreKeyMemoizes(t *testing.T) {
 		t.Fatal("cached key changed between calls")
 	}
 
-	if err := os.Remove(requestStoreKeyPath()); err != nil {
+	if err := os.Remove(keyPath); err != nil {
 		t.Fatalf("remove key file: %v", err)
 	}
-	k3, err := cachedRequestStoreKey()
+	k3, err := codec.provideKey()
 	if err != nil {
 		t.Fatalf("third load: %v", err)
 	}
@@ -139,17 +121,14 @@ func TestCachedRequestStoreKeyMemoizes(t *testing.T) {
 }
 
 func TestCachedRequestStoreKeyInitializesOnce(t *testing.T) {
-	clearRequestStoreKeyCacheForTest(t)
-	previousInitializer := requestStoreKeyInitializer
-	t.Cleanup(func() {
-		requestStoreKeyInitializer = previousInitializer
-	})
+	t.Parallel()
+	keys := &requestStoreKeyState{}
 
 	key := bytes.Repeat([]byte{7}, requestStoreKeySize)
 	var calls atomic.Int32
 	entered := make(chan struct{}, 2)
 	release := make(chan struct{})
-	requestStoreKeyInitializer = func(createIfMissing bool) ([]byte, error) {
+	initialize := func(createIfMissing bool) ([]byte, error) {
 		calls.Add(1)
 		entered <- struct{}{}
 		<-release
@@ -158,7 +137,7 @@ func TestCachedRequestStoreKeyInitializesOnce(t *testing.T) {
 
 	results := make(chan []byte, 2)
 	start := func() {
-		result, err := cachedRequestStoreKeyFromStore(true)
+		result, err := keys.load(true, initialize)
 		if err != nil {
 			t.Errorf("load key: %v", err)
 			results <- nil
@@ -195,17 +174,4 @@ func TestCachedRequestStoreKeyInitializesOnce(t *testing.T) {
 	if !bytes.Equal(first, key) || !bytes.Equal(second, key) {
 		t.Fatalf("callers received different keys: %x %x", first, second)
 	}
-}
-
-func clearRequestStoreKeyCacheForTest(t *testing.T) {
-	t.Helper()
-	requestStoreKeyMu.Lock()
-	previous := requestStoreKeyCache
-	requestStoreKeyCache = nil
-	requestStoreKeyMu.Unlock()
-	t.Cleanup(func() {
-		requestStoreKeyMu.Lock()
-		requestStoreKeyCache = previous
-		requestStoreKeyMu.Unlock()
-	})
 }

@@ -25,6 +25,8 @@ func runPre(t *testing.T, ctx *Context, src string) model.ScriptResult {
 }
 
 func TestJSCollectionVariablesRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.CollectionVariables["baseUrl"] = "https://staging.example.com"
 	runPre(t, ctx, `pm.request.set_url(pm.collectionVariables.get("baseUrl") + "/v1")`)
@@ -34,6 +36,8 @@ func TestJSCollectionVariablesRead(t *testing.T) {
 }
 
 func TestJSCollectionVariablesWriteIsReported(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.CollectionVariables["keep"] = "untouched"
 	ctx.CollectionVariables["drop"] = "gone-soon"
@@ -54,6 +58,8 @@ func TestJSCollectionVariablesWriteIsReported(t *testing.T) {
 }
 
 func TestJSCollectionVariablesAreSeparateFromGlobals(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	runPre(t, ctx, `
 		pm.collectionVariables.set("scoped", "collection")
@@ -68,6 +74,8 @@ func TestJSCollectionVariablesAreSeparateFromGlobals(t *testing.T) {
 }
 
 func TestJSGlobalsAliasTheSessionScope(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Variables["existing"] = "from-session"
 	result := runPre(t, ctx, `
@@ -86,6 +94,8 @@ func TestJSGlobalsAliasTheSessionScope(t *testing.T) {
 }
 
 func TestJSVariablesResolutionOrder(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Variables["k"] = "global"
 	ctx.CollectionVariables["k"] = "collection"
@@ -130,6 +140,8 @@ func assertAllPassed(t *testing.T, result model.ScriptResult) {
 }
 
 func TestJSInfo(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Info = Info{RequestName: "Create user", Iteration: 2, IterationCount: 5}
 	result := runPre(t, ctx, `
@@ -142,6 +154,8 @@ func TestJSInfo(t *testing.T) {
 }
 
 func TestJSInfoEventNameInTestScript(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Response = &model.HttpResponse{StatusCode: 200, Body: "{}"}
 	result := RunTests("js", `pm.test("event", () => pm.expect(pm.info.eventName).to.equal("test"))`, ctx)
@@ -152,6 +166,8 @@ func TestJSInfoEventNameInTestScript(t *testing.T) {
 }
 
 func TestJSCookies(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Cookies = []model.Cookie{{Name: "session", Value: "s-1"}, {Name: "csrf", Value: "c-9"}}
 	result := runPre(t, ctx, `
@@ -165,6 +181,8 @@ func TestJSCookies(t *testing.T) {
 }
 
 func TestJSSkipRequest(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := runPre(t, ctx, `if (pm.variables.get("mode") !== "live") pm.execution.skipRequest()`)
 	if !result.SkippedRequest {
@@ -176,6 +194,8 @@ func TestJSSkipRequest(t *testing.T) {
 }
 
 func TestJSSkipRequestNotSetWhenNotCalled(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := runPre(t, ctx, `pm.variables.set("x", "1")`)
 	if result.SkippedRequest {
@@ -184,6 +204,8 @@ func TestJSSkipRequestNotSetWhenNotCalled(t *testing.T) {
 }
 
 func TestJSSkipRequestIgnoredInTestScript(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Response = &model.HttpResponse{StatusCode: 200}
 	result := RunTests("js", `pm.execution.skipRequest()`, ctx)
@@ -193,6 +215,8 @@ func TestJSSkipRequestIgnoredInTestScript(t *testing.T) {
 }
 
 func TestJSCryptoHashes(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := runPre(t, ctx, `
 		pm.test("md5", () => pm.expect(pm.crypto.md5("")).to.equal("d41d8cd98f00b204e9800998ecf8427e"))
@@ -206,6 +230,8 @@ func TestJSCryptoHashes(t *testing.T) {
 }
 
 func TestJSCryptoHMACVector(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := runPre(t, ctx, `
 		pm.test("rfc4231 case 2", () => pm.expect(pm.crypto.hmacSha256("what do ya want for nothing?", "Jefe"))
@@ -217,6 +243,8 @@ func TestJSCryptoHMACVector(t *testing.T) {
 }
 
 func TestJSCryptoBase64AndRandom(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := runPre(t, ctx, `
 		pm.test("encode", () => pm.expect(pm.crypto.base64Encode("kurlo")).to.equal("a3VybG8="))
@@ -229,6 +257,8 @@ func TestJSCryptoBase64AndRandom(t *testing.T) {
 }
 
 func TestJSCryptoUnknownAlgorithmThrows(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := RunPreRequest("js", `pm.crypto.hash("sha3", "x")`, ctx)
 	if result.Error == "" {
@@ -240,6 +270,8 @@ func TestJSCryptoUnknownAlgorithmThrows(t *testing.T) {
 }
 
 func TestJSCryptoJSShim(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := runPre(t, ctx, `
 		pm.test("SHA256 hex", () => pm.expect(CryptoJS.SHA256("abc").toString())
@@ -256,6 +288,8 @@ func TestJSCryptoJSShim(t *testing.T) {
 }
 
 func TestJSCryptoJSSigningPattern(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Environment["apiSecret"] = "top-secret"
 	runPre(t, ctx, `
@@ -282,18 +316,18 @@ func TestJSCryptoJSSigningPattern(t *testing.T) {
 }
 
 func TestJSTimeoutOverrideAllowsLongerScript(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	src := `
 		const start = Date.now()
 		while (Date.now() - start < 250) { }
 		pm.variables.set("done", "yes")
 	`
-	previous := scriptExecutionTimeout
-	scriptExecutionTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { scriptExecutionTimeout = previous })
-
-	if result := RunPreRequest("js", src, jsCtx()); result.Error == "" {
-		t.Error("expected the script to hit the default timeout")
+	short := jsCtx()
+	short.Timeout = 50 * time.Millisecond
+	if result := RunPreRequest("js", src, short); result.Error == "" {
+		t.Error("expected the script to hit the configured timeout")
 	}
 
 	ctx.Timeout = 5 * time.Second
@@ -306,9 +340,7 @@ func TestJSTimeoutOverrideAllowsLongerScript(t *testing.T) {
 }
 
 func TestResolveTimeout(t *testing.T) {
-	previous := scriptExecutionTimeout
-	scriptExecutionTimeout = 2 * time.Second
-	t.Cleanup(func() { scriptExecutionTimeout = previous })
+	t.Parallel()
 
 	if got := resolveTimeout(0); got != 2*time.Second {
 		t.Errorf("zero should mean the default, got %s", got)
@@ -325,6 +357,8 @@ func TestResolveTimeout(t *testing.T) {
 }
 
 func TestJSSendRequestDisabledByDefault(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	result := RunPreRequest("js", `pm.sendRequest("https://example.com")`, ctx)
 	if result.Error == "" {
@@ -336,6 +370,8 @@ func TestJSSendRequestDisabledByDefault(t *testing.T) {
 }
 
 func TestJSSendRequestSynchronousForm(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	var got SendRequest
 	ctx.Send = func(req SendRequest) SendResponse {
@@ -376,6 +412,8 @@ func TestJSSendRequestSynchronousForm(t *testing.T) {
 }
 
 func TestJSSendRequestCallbackForm(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Send = func(SendRequest) SendResponse {
 		return SendResponse{StatusCode: 201, Status: "201 Created", Body: `{"id":7}`}
@@ -396,6 +434,8 @@ func TestJSSendRequestCallbackForm(t *testing.T) {
 }
 
 func TestJSSendRequestStringURLDefaultsToGET(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	var got SendRequest
 	ctx.Send = func(req SendRequest) SendResponse {
@@ -412,6 +452,8 @@ func TestJSSendRequestStringURLDefaultsToGET(t *testing.T) {
 }
 
 func TestJSSendRequestTransportError(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Send = func(SendRequest) SendResponse {
 		return SendResponse{Error: "dial tcp: connection refused"}
@@ -431,6 +473,8 @@ func TestJSSendRequestTransportError(t *testing.T) {
 }
 
 func TestJSSendRequestNon2xxIsNotAnError(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Send = func(SendRequest) SendResponse {
 		return SendResponse{StatusCode: 404, Status: "404 Not Found", Body: `{"error":"nope"}`}
@@ -444,6 +488,8 @@ func TestJSSendRequestNon2xxIsNotAnError(t *testing.T) {
 }
 
 func TestJSSendRequestHeaderArrayForm(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	var got SendRequest
 	ctx.Send = func(req SendRequest) SendResponse {
@@ -467,6 +513,8 @@ func TestJSSendRequestHeaderArrayForm(t *testing.T) {
 }
 
 func TestJSSendRequestRequiresURL(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Send = func(SendRequest) SendResponse { return SendResponse{StatusCode: 200} }
 	result := RunPreRequest("js", `pm.sendRequest({ method: "GET" })`, ctx)

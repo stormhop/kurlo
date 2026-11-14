@@ -1235,7 +1235,7 @@ func TestApplyQueryParamsLeavesExistingQueryAloneWhenManual(t *testing.T) {
 }
 
 func TestRequestStoreSavesEncryptedPayloadAndLoadsPlaintext(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "requests.json")
 	payload := `{"auth":{"bearerToken":"secret-token","awsSecretKey":"aws-secret"}}`
 
@@ -1263,7 +1263,7 @@ func TestRequestStoreSavesEncryptedPayloadAndLoadsPlaintext(t *testing.T) {
 }
 
 func TestRequestStoreRejectsPlaintextPayload(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "requests.json")
 	payload := `{"requests":[]}`
 	if err := os.WriteFile(path, []byte(payload), 0600); err != nil {
@@ -1276,7 +1276,6 @@ func TestRequestStoreRejectsPlaintextPayload(t *testing.T) {
 }
 
 func TestSaveRequestStoreWithErrorReportsCause(t *testing.T) {
-	withRequestStoreTestKey(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 
@@ -1293,7 +1292,7 @@ func TestSaveRequestStoreWithErrorReportsCause(t *testing.T) {
 }
 
 func TestRequestStoreSaveReplacesExistingPayload(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "requests.json")
 
 	if err := saveRequestStorePayload(path, `{"requests":["old"]}`); err != nil {
@@ -1320,50 +1319,30 @@ func TestRequestStoreSaveReplacesExistingPayload(t *testing.T) {
 }
 
 func TestRequestStoreDecryptFallsBackToFileKey(t *testing.T) {
-	configDir := t.TempDir()
-	useTempConfigDir(t, configDir)
-
+	t.Parallel()
+	codec, keys, keyPath := fileRequestStoreCodec(t)
 	rightKey := bytes.Repeat([]byte{3}, requestStoreKeySize)
 	wrongKey := bytes.Repeat([]byte{4}, requestStoreKeySize)
-	previousProvider := requestStoreKeyProvider
-	previousLoader := requestStoreKeyLoader
-	t.Cleanup(func() {
-		requestStoreKeyProvider = previousProvider
-		requestStoreKeyLoader = previousLoader
-		requestStoreKeyMu.Lock()
-		requestStoreKeyCache = nil
-		requestStoreKeyMu.Unlock()
-	})
-	setTestRequestStoreKey := func(key []byte) {
-		requestStoreKeyMu.Lock()
-		requestStoreKeyCache = nil
-		requestStoreKeyMu.Unlock()
-		requestStoreKeyProvider = func() ([]byte, error) {
-			return append([]byte(nil), key...), nil
-		}
-		requestStoreKeyLoader = requestStoreKeyProvider
-	}
-
+	keys.remember(rightKey)
 	path := filepath.Join(t.TempDir(), "requests.json")
 	payload := `{"requests":["saved"]}`
-	setTestRequestStoreKey(rightKey)
-	if err := saveRequestStorePayload(path, payload); err != nil {
-		t.Fatalf("save request store: %v", err)
+	if err := codec.savePayload(path, payload); err != nil {
+		t.Fatal(err)
 	}
-	if err := os.MkdirAll(requestStoreDir(), 0755); err != nil {
-		t.Fatalf("create request store dir: %v", err)
+	if err := os.WriteFile(keyPath, []byte(base64.StdEncoding.EncodeToString(rightKey)), 0600); err != nil {
+		t.Fatal(err)
 	}
-	if err := os.WriteFile(requestStoreKeyPath(), []byte(base64.StdEncoding.EncodeToString(rightKey)), 0600); err != nil {
-		t.Fatalf("write fallback key: %v", err)
-	}
-
-	setTestRequestStoreKey(wrongKey)
-	loaded, err := loadRequestStorePayload(path)
+	keys.remember(wrongKey)
+	loaded, err := codec.loadPayload(path)
 	if err != nil {
 		t.Fatalf("load request store with fallback key: %v", err)
 	}
 	if loaded != payload {
 		t.Fatalf("expected %q, got %q", payload, loaded)
+	}
+	loadedKey, err := codec.loadKey()
+	if err != nil || !bytes.Equal(loadedKey, rightKey) {
+		t.Fatalf("fallback key was not cached: %x, %v", loadedKey, err)
 	}
 }
 
@@ -1373,24 +1352,7 @@ func TestSaveRequestStoreRecoversUnreadableLocalMetadataForYAMLWorkspace(t *test
 
 	oldKey := bytes.Repeat([]byte{5}, requestStoreKeySize)
 	newKey := bytes.Repeat([]byte{6}, requestStoreKeySize)
-	previousProvider := requestStoreKeyProvider
-	previousLoader := requestStoreKeyLoader
-	t.Cleanup(func() {
-		requestStoreKeyProvider = previousProvider
-		requestStoreKeyLoader = previousLoader
-		requestStoreKeyMu.Lock()
-		requestStoreKeyCache = nil
-		requestStoreKeyMu.Unlock()
-	})
-	setTestRequestStoreKey := func(key []byte) {
-		requestStoreKeyMu.Lock()
-		requestStoreKeyCache = nil
-		requestStoreKeyMu.Unlock()
-		requestStoreKeyProvider = func() ([]byte, error) {
-			return append([]byte(nil), key...), nil
-		}
-		requestStoreKeyLoader = requestStoreKeyProvider
-	}
+	setTestRequestStoreKey := func(key []byte) { seedRequestStoreTestKey(t, key) }
 
 	setTestRequestStoreKey(oldKey)
 	if err := saveKurloStorePayload(requestStorePath(), defaultFileWorkspaceStorePath(), kurloSaveFlowPayload("/old", "token-a", []string{"req-main"}, "")); err != nil {
@@ -1455,7 +1417,7 @@ func TestRequestStoreKeychainDisabledEnvValues(t *testing.T) {
 }
 
 func TestKurloStoreSplitsRequestsIntoWorkspaceYAMLAndLocalEncryptedState(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1563,7 +1525,7 @@ func TestKurloStoreSplitsRequestsIntoWorkspaceYAMLAndLocalEncryptedState(t *test
 }
 
 func TestKurloStorePreservesMissingSecretPlaceholdersAfterCloneLoad(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	sourceLocalPath := filepath.Join(dir, "source-requests.json")
 	clonedLocalPath := filepath.Join(dir, "clone-requests.json")
@@ -1609,7 +1571,7 @@ func TestKurloStorePreservesMissingSecretPlaceholdersAfterCloneLoad(t *testing.T
 }
 
 func TestKurloStorePersistsCollectionFolderPathsInWorkspaceYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1668,7 +1630,7 @@ func TestKurloStorePersistsCollectionFolderPathsInWorkspaceYAML(t *testing.T) {
 }
 
 func TestKurloStoreUsesFilesystemNamesForDuplicateRequestNames(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1715,7 +1677,7 @@ func TestKurloStoreUsesFilesystemNamesForDuplicateRequestNames(t *testing.T) {
 }
 
 func TestKurloStorePreservesEmptyFilesystemStoreAsArrays(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1737,7 +1699,7 @@ func TestKurloStorePreservesEmptyFilesystemStoreAsArrays(t *testing.T) {
 }
 
 func TestKurloStoreLocalOnlySaveDoesNotRewriteWorkspaceYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1765,7 +1727,7 @@ func TestKurloStoreLocalOnlySaveDoesNotRewriteWorkspaceYAML(t *testing.T) {
 }
 
 func TestKurloStoreManualAndAutosaveUpdatesReachWorkspaceYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1791,7 +1753,7 @@ func TestKurloStoreManualAndAutosaveUpdatesReachWorkspaceYAML(t *testing.T) {
 }
 
 func TestKurloStoreDerivesFilesystemNameFromPathWhenAbsentInBody(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1855,7 +1817,7 @@ request:
 }
 
 func TestKurloStoreLoadsValidDataWithDiagnosticsForInvalidRequestYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1890,7 +1852,7 @@ func TestKurloStoreLoadsValidDataWithDiagnosticsForInvalidRequestYAML(t *testing
 }
 
 func TestKurloStoreKeepsDiagnosticsWhenWorkspaceYAMLIsInvalid(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1922,7 +1884,7 @@ func TestKurloStoreKeepsDiagnosticsWhenWorkspaceYAMLIsInvalid(t *testing.T) {
 }
 
 func TestKurloStoreSavePreservesInvalidWorkspaceDirectory(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -1975,7 +1937,7 @@ func TestKurloStoreSavePreservesInvalidWorkspaceDirectory(t *testing.T) {
 }
 
 func TestKurloStoreSaveKeepsOnlyTheBrokenFile(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -2030,7 +1992,6 @@ func TestKurloStoreSaveKeepsOnlyTheBrokenFile(t *testing.T) {
 }
 
 func TestWorkspaceYAMLEditorRepairsBlockingDiagnostic(t *testing.T) {
-	withRequestStoreTestKey(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 	workspaceRoot := filepath.Join(t.TempDir(), "workspace")
@@ -2067,7 +2028,7 @@ func TestWorkspaceYAMLEditorRepairsBlockingDiagnostic(t *testing.T) {
 }
 
 func TestKurloStoreIgnoresDanglingOrderEntries(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -2100,8 +2061,8 @@ func TestKurloStoreIgnoresDanglingOrderEntries(t *testing.T) {
 }
 
 func TestKurloStoreRejectsSymlinkedYAMLFiles(t *testing.T) {
+	t.Parallel()
 	requireSymlinks(t)
-	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -2164,8 +2125,8 @@ request:
 }
 
 func TestKurloStoreRejectsSymlinkedManagedDirectory(t *testing.T) {
+	t.Parallel()
 	requireSymlinks(t)
-	withRequestStoreTestKey(t)
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -2238,7 +2199,7 @@ func TestFilesystemSegmentsUseNamesAndDisambiguateDuplicates(t *testing.T) {
 }
 
 func TestKurloStoreSecretOnlySaveUpdatesEncryptedLocalStateWithoutRewritingWorkspaceYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -2266,7 +2227,7 @@ func TestKurloStoreSecretOnlySaveUpdatesEncryptedLocalStateWithoutRewritingWorks
 }
 
 func TestKurloStoreImportedCollectionWritesAllRequestsToWorkspaceYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -2313,7 +2274,7 @@ func TestKurloStoreImportedCollectionWritesAllRequestsToWorkspaceYAML(t *testing
 }
 
 func TestKurloStoreConcurrentSavesUseIsolatedTemporaryDirectories(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces")
@@ -2579,18 +2540,17 @@ func TestKurloYAMLFormatPublicContractFiles(t *testing.T) {
 	}
 }
 
-func withRequestStoreTestKey(t *testing.T) {
+func seedRequestStoreTestKey(t *testing.T, key []byte) {
 	t.Helper()
-	previousProvider := requestStoreKeyProvider
-	previousLoader := requestStoreKeyLoader
-	requestStoreKeyProvider = func() ([]byte, error) {
-		return bytes.Repeat([]byte{7}, requestStoreKeySize), nil
+	if err := os.MkdirAll(requestStoreDir(), 0700); err != nil {
+		t.Fatal(err)
 	}
-	requestStoreKeyLoader = requestStoreKeyProvider
-	t.Cleanup(func() {
-		requestStoreKeyProvider = previousProvider
-		requestStoreKeyLoader = previousLoader
-	})
+	if err := os.WriteFile(requestStoreKeyPath(), []byte(base64.StdEncoding.EncodeToString(key)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	defaultRequestStoreKeyCache.mu.Lock()
+	defaultRequestStoreKeyCache.key = nil
+	defaultRequestStoreKeyCache.mu.Unlock()
 }
 
 func readAllText(t *testing.T, root string) string {

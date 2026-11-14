@@ -20,6 +20,7 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **Tengo script timeouts**: Tengo scripts respect the configured script timeout instead of always using two seconds.
 - **Compact release notes in About**: long update notes show about ten lines and a link to the full changelog on the website.
 - **Mock server with thousands of examples**: the route list reads only methods, paths and statuses and the server reads responses from disk, so it opens quickly, scrolls without blank gaps and keeps the sidebar animation smooth; hiding the sidebar no longer moves the list away from the route you were looking at.
 - **The sidebar hides and shows at once**: toggling it no longer restyles the whole window, so the slide starts without a pause in large workspaces.

@@ -24,6 +24,8 @@ func varRow(key, value string, enabled bool) model.KeyValue {
 }
 
 func TestPostResponseVarsReadTheResponse(t *testing.T) {
+	t.Parallel()
+
 	ctx := responseCtx(`{"token":"t-1","data":{"items":[{"id":7}]},"meta":{"page":2}}`)
 	result := RunPostResponseVars([]model.KeyValue{
 		varRow("token", "res.body.token", true),
@@ -49,6 +51,8 @@ func TestPostResponseVarsReadTheResponse(t *testing.T) {
 }
 
 func TestPostResponseVarsReportBadExpressionsAndKeepGoing(t *testing.T) {
+	t.Parallel()
+
 	ctx := responseCtx(`plain text`)
 	ctx.Variables["kept"] = "old"
 	result := RunPostResponseVars([]model.KeyValue{
@@ -72,6 +76,8 @@ func TestPostResponseVarsReportBadExpressionsAndKeepGoing(t *testing.T) {
 }
 
 func TestPostResponseVarsSkipWithoutRows(t *testing.T) {
+	t.Parallel()
+
 	ctx := responseCtx(`{}`)
 	result := RunPostResponseVars([]model.KeyValue{varRow("x", "", true)}, ctx)
 	if result.Error != "" || len(result.Logs) != 0 || len(ctx.Variables) != 0 {
@@ -80,6 +86,8 @@ func TestPostResponseVarsSkipWithoutRows(t *testing.T) {
 }
 
 func TestRequestVariablesSitAboveEnvironmentAndCollection(t *testing.T) {
+	t.Parallel()
+
 	ctx := jsCtx()
 	ctx.Variables["userId"] = "global"
 	ctx.Environment["userId"] = "env"

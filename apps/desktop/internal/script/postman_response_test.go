@@ -7,6 +7,8 @@ import (
 )
 
 func TestPostmanResponseBodyIsAString(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	ctx.Response = &model.HttpResponse{StatusCode: 200, Body: `{"id":7}`}
 	res := jsTests(`pm.test("body compatibility", () => {

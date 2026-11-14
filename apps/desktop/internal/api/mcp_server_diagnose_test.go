@@ -10,7 +10,6 @@ import (
 )
 
 func TestMCPServerDiagnosesTheLastFailure(t *testing.T) {
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	app := NewApp()
 

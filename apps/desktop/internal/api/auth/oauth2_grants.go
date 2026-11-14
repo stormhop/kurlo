@@ -50,7 +50,16 @@ type deviceAuthorizationResponse struct {
 	VerificationURL string `json:"verification_url"`
 }
 
+type deviceAuthorizationClock struct {
+	now   func() time.Time
+	after func(time.Duration) <-chan time.Time
+}
+
 func AuthorizeDevice(ctx context.Context, cfg model.AuthConfig, onPrompt func(model.OAuth2DevicePrompt), openBrowser func(string) error) model.OAuth2TokenResponse {
+	return authorizeDevice(ctx, cfg, onPrompt, openBrowser, deviceAuthorizationClock{now: time.Now, after: time.After})
+}
+
+func authorizeDevice(ctx context.Context, cfg model.AuthConfig, onPrompt func(model.OAuth2DevicePrompt), openBrowser func(string) error, clock deviceAuthorizationClock) model.OAuth2TokenResponse {
 	if cfg.OAuth2DeviceAuthURL == "" {
 		return model.OAuth2TokenResponse{Error: "device authorization URL is required"}
 	}
@@ -95,9 +104,9 @@ func AuthorizeDevice(ctx context.Context, cfg model.AuthConfig, onPrompt func(mo
 		}
 	}
 
-	deadline := time.Now().Add(maxDeviceFlowDuration)
+	deadline := clock.now().Add(maxDeviceFlowDuration)
 	if device.ExpiresIn > 0 {
-		if expiry := time.Now().Add(time.Duration(device.ExpiresIn) * time.Second); expiry.Before(deadline) {
+		if expiry := clock.now().Add(time.Duration(device.ExpiresIn) * time.Second); expiry.Before(deadline) {
 			deadline = expiry
 		}
 	}
@@ -106,10 +115,10 @@ func AuthorizeDevice(ctx context.Context, cfg model.AuthConfig, onPrompt func(mo
 		select {
 		case <-ctx.Done():
 			return model.OAuth2TokenResponse{Error: "device authorization cancelled"}
-		case <-time.After(interval):
+		case <-clock.after(interval):
 		}
 
-		if time.Now().After(deadline) {
+		if clock.now().After(deadline) {
 			return model.OAuth2TokenResponse{Error: "device authorization expired — the code timed out before it was approved"}
 		}
 

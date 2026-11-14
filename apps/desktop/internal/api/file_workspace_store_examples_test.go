@@ -80,7 +80,7 @@ func requestExamplesFromPayload(t *testing.T, payload string) []map[string]any {
 }
 
 func TestExamplesRoundTripThroughWorkspace(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -166,7 +166,7 @@ func writeLegacyExampleBodyForTest(t *testing.T, root, bodyFile, body string) {
 }
 
 func TestLegacyExampleBodyFileIsInlinedOnNextSave(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -208,7 +208,7 @@ func TestLegacyExampleBodyFileIsInlinedOnNextSave(t *testing.T) {
 }
 
 func TestWorkspaceWithoutExamplesLoadsUnchanged(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -229,7 +229,7 @@ func TestWorkspaceWithoutExamplesLoadsUnchanged(t *testing.T) {
 }
 
 func TestExampleBodyFileEscapingIsRefused(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -256,7 +256,7 @@ func TestExampleBodyFileEscapingIsRefused(t *testing.T) {
 }
 
 func TestExampleNamesAreMadeUniqueOnDisk(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")
@@ -295,7 +295,7 @@ func TestExampleNamesAreMadeUniqueOnDisk(t *testing.T) {
 }
 
 func TestExampleNamesDifferingOnlyInCaseGetSeparateFiles(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	localPath := filepath.Join(dir, "requests.json")
 	workspaceRoot := filepath.Join(dir, "workspaces-root")

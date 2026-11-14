@@ -53,6 +53,7 @@ func replaceWorkspaceTextForTest(t *testing.T, root, path, before, after string)
 }
 
 func TestWorkspaceIntegrityBlocksInvalidDiskWithoutWriting(t *testing.T) {
+	t.Parallel()
 	workspace := "workspaces/Main/workspace.yml"
 	collection := "workspaces/Main/collections/Core/collection.yml"
 	request := "workspaces/Main/collections/Core/requests/Main-request.yml"
@@ -70,7 +71,6 @@ func TestWorkspaceIntegrityBlocksInvalidDiskWithoutWriting(t *testing.T) {
 		{name: "duplicate environment", path: environment, after: "workspaces/Main/environments/Duplicate.yml", duplicate: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			withRequestStoreTestKey(t)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "workspace")
 			local := filepath.Join(dir, "requests.json")
@@ -131,9 +131,9 @@ func TestWorkspaceIntegrityBlocksInvalidDiskWithoutWriting(t *testing.T) {
 }
 
 func TestWorkspaceIntegrityAllowsConsistentExternalChanges(t *testing.T) {
+	t.Parallel()
 	for _, change := range []string{"name", "rekey"} {
 		t.Run(change, func(t *testing.T) {
-			withRequestStoreTestKey(t)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "workspace")
 			local := filepath.Join(dir, "requests.json")
@@ -197,7 +197,6 @@ func TestWorkspaceIntegrityRejectsInvalidPayloadBeforeCreatingFiles(t *testing.T
 }
 
 func TestGitPullChangedWorkspaceIDKeepsFolderContents(t *testing.T) {
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	dir, peer := setupGitPullRemoteForTest(t)
 	app := NewApp()
@@ -233,6 +232,7 @@ func TestGitPullChangedWorkspaceIDKeepsFolderContents(t *testing.T) {
 }
 
 func TestWorkspaceIntegrityFollowsFoldersWhenReferencesDisagree(t *testing.T) {
+	t.Parallel()
 	workspace := "workspaces/Main/workspace.yml"
 	collection := "workspaces/Main/collections/Core/collection.yml"
 	request := "workspaces/Main/collections/Core/requests/Main-request.yml"
@@ -248,7 +248,6 @@ func TestWorkspaceIntegrityFollowsFoldersWhenReferencesDisagree(t *testing.T) {
 		{name: "environment points elsewhere", path: environment, before: "workspaceId: workspace-main", after: "workspaceId: workspace-other", workspaceID: "workspace-main", collectionID: "collection-main"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			withRequestStoreTestKey(t)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "workspace")
 			local := filepath.Join(dir, "requests.json")
@@ -304,9 +303,9 @@ func TestWorkspaceIntegrityFollowsFoldersWhenReferencesDisagree(t *testing.T) {
 }
 
 func TestWorkspaceIntegrityReportsCopiedFolderOnce(t *testing.T) {
+	t.Parallel()
 	for _, folder := range []string{"workspaces/Main", "workspaces/Main/collections/Core"} {
 		t.Run(folder, func(t *testing.T) {
-			withRequestStoreTestKey(t)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "workspace")
 			local := filepath.Join(dir, "requests.json")
@@ -348,9 +347,9 @@ func TestWorkspaceIntegrityReportsCopiedFolderOnce(t *testing.T) {
 }
 
 func TestWorkspaceIntegrityDetectsMissingParentFiles(t *testing.T) {
+	t.Parallel()
 	for _, path := range []string{"kurlo.yml", "workspaces/Main/workspace.yml", "workspaces/Main/collections/Core/collection.yml"} {
 		t.Run(path, func(t *testing.T) {
-			withRequestStoreTestKey(t)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "workspace")
 			local := filepath.Join(dir, "requests.json")
@@ -386,9 +385,9 @@ func TestWorkspaceIntegrityDetectsMissingParentFiles(t *testing.T) {
 }
 
 func TestWorkspaceIntegrityDetectsExampleReferencesAndDuplicates(t *testing.T) {
+	t.Parallel()
 	for _, change := range []string{"duplicate", "missing body", "missing request", "invalid YAML"} {
 		t.Run(change, func(t *testing.T) {
-			withRequestStoreTestKey(t)
 			dir := t.TempDir()
 			root := filepath.Join(dir, "workspace")
 			local := filepath.Join(dir, "requests.json")
@@ -435,7 +434,7 @@ func TestWorkspaceIntegrityDetectsExampleReferencesAndDuplicates(t *testing.T) {
 }
 
 func TestWorkspaceIDChangedAndRestoredLeavesNoDiff(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -478,7 +477,7 @@ func TestWorkspaceIDChangedAndRestoredLeavesNoDiff(t *testing.T) {
 }
 
 func TestReferenceRepairWaitsForBrokenFiles(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")
@@ -496,7 +495,6 @@ func TestReferenceRepairWaitsForBrokenFiles(t *testing.T) {
 }
 
 func TestInterruptedSaveNeverLeavesABlockedWorkspace(t *testing.T) {
-	withRequestStoreTestKey(t)
 	payload := exampleStorePayload(t, createdExample)
 	t.Cleanup(func() { beforeYAMLWrite = nil })
 	for cut := 1; ; cut++ {
@@ -530,7 +528,7 @@ func TestInterruptedSaveNeverLeavesABlockedWorkspace(t *testing.T) {
 }
 
 func TestWorkspaceIDChangeKeepsWorkspaceOrder(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	root := filepath.Join(dir, "workspace")
 	local := filepath.Join(dir, "requests.json")

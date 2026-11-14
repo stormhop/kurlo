@@ -7,6 +7,8 @@ import (
 )
 
 func TestRunPreRequestRejectsTengoImports(t *testing.T) {
+	t.Parallel()
+
 	result := RunPreRequest(string(EngineTengo), `mod := import("os")`, NewContext(nil, nil))
 	if !strings.Contains(result.Error, "imports are disabled") {
 		t.Fatalf("expected import sandbox error, got %q", result.Error)
@@ -14,6 +16,8 @@ func TestRunPreRequestRejectsTengoImports(t *testing.T) {
 }
 
 func TestRunPreRequestAllowsImportTextInStringsAndComments(t *testing.T) {
+	t.Parallel()
+
 	ctx := NewContext(nil, nil)
 	result := RunPreRequest(string(EngineTengo), `
 // import("os")
@@ -29,15 +33,14 @@ pm.variables.set("message", message)
 }
 
 func TestRunPreRequestTimesOut(t *testing.T) {
-	previous := scriptExecutionTimeout
-	scriptExecutionTimeout = 10 * time.Millisecond
-	t.Cleanup(func() {
-		scriptExecutionTimeout = previous
-	})
+	t.Parallel()
+
+	ctx := NewContext(nil, nil)
+	ctx.Timeout = 10 * time.Millisecond
 
 	start := time.Now()
-	result := RunPreRequest(string(EngineTengo), `for true {}`, NewContext(nil, nil))
-	if !strings.Contains(result.Error, "script timed out") {
+	result := RunPreRequest(string(EngineTengo), `for true {}`, ctx)
+	if !strings.Contains(result.Error, "script timed out after 10ms") {
 		t.Fatalf("expected timeout error, got %q", result.Error)
 	}
 	if elapsed := time.Since(start); elapsed > time.Second {

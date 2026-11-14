@@ -16,7 +16,6 @@ func TestPerfFixtureWorkspace(t *testing.T) {
 	if storePath == "" || root == "" {
 		t.Skip("run through npm run perf:fixtures")
 	}
-	withRequestStoreTestKey(t)
 	payload, err := os.ReadFile(storePath)
 	if err != nil {
 		t.Fatal(err)

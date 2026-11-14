@@ -240,13 +240,16 @@ func TestSendRequestCollectionVariablesRoundTrip(t *testing.T) {
 
 func TestSendRequestScriptTimeoutOverride(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Slow"); got != "done" {
+			t.Errorf("script did not finish before sending: X-Slow = %q", got)
+		}
 		fmt.Fprint(w, "ok")
 	}))
 	defer server.Close()
 
 	src := `
 		const start = Date.now()
-		while (Date.now() - start < 2400) { }
+		while (Date.now() - start < 250) { }
 		pm.request.headers.set("X-Slow", "done")
 	`
 	req := model.HttpRequest{
@@ -255,17 +258,39 @@ func TestSendRequestScriptTimeoutOverride(t *testing.T) {
 		EnableSSLVerification: true,
 		ScriptEngine:          "js",
 		PreRequestScript:      src,
+		ScriptTimeoutMs:       20,
 	}
 
 	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
-	if resp.Error == "" {
-		t.Error("expected the default 2s script timeout to trip")
+	if !strings.Contains(resp.Error, "script timed out after 20ms") {
+		t.Errorf("expected the configured script timeout, got %q", resp.Error)
 	}
 
-	req.ScriptTimeoutMs = 10_000
+	req.ScriptTimeoutMs = 5000
 	resp = sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
 	if resp.Error != "" {
 		t.Errorf("override should have allowed the script to finish, got %q", resp.Error)
+	}
+}
+
+func TestSendRequestTengoScriptTimeout(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("a timed out pre-request script must not send the request")
+	}))
+	defer server.Close()
+
+	resp := NewApp().SendRequest(model.HttpRequest{
+		Method:                http.MethodGet,
+		URL:                   server.URL,
+		EnableSSLVerification: true,
+		ScriptEngine:          "tengo",
+		PreRequestScript:      "for true {}",
+		ScriptTimeoutMs:       20,
+	})
+	if !strings.Contains(resp.Error, "script timed out after 20ms") {
+		t.Fatalf("configured Tengo timeout did not reach the script engine: %q", resp.Error)
 	}
 }
 

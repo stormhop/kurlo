@@ -8,7 +8,6 @@ import (
 )
 
 func TestMCPServerReadsWhatTheAppSent(t *testing.T) {
-	withRequestStoreTestKey(t)
 	useTempConfigDir(t, t.TempDir())
 	app := NewApp()
 

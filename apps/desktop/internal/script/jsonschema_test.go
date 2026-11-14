@@ -15,6 +15,8 @@ func schemaCheck(t *testing.T, schemaJSON, dataJSON string) []string {
 }
 
 func TestSchemaAcceptsAValidDocument(t *testing.T) {
+	t.Parallel()
+
 	schema := `{
 		"type": "object",
 		"required": ["id", "name", "tags"],
@@ -32,6 +34,8 @@ func TestSchemaAcceptsAValidDocument(t *testing.T) {
 }
 
 func TestSchemaReportsEveryFailure(t *testing.T) {
+	t.Parallel()
+
 	schema := `{
 		"type": "object",
 		"required": ["id", "name"],
@@ -51,6 +55,8 @@ func TestSchemaReportsEveryFailure(t *testing.T) {
 }
 
 func TestSchemaChecksNestedArraysAndRefs(t *testing.T) {
+	t.Parallel()
+
 	schema := `{
 		"definitions": {"item": {"type": "object", "required": ["sku"], "properties": {"sku": {"type": "string"}}}},
 		"type": "object",
@@ -63,6 +69,8 @@ func TestSchemaChecksNestedArraysAndRefs(t *testing.T) {
 }
 
 func TestSchemaIntegerIsAlsoANumberButNotTheReverse(t *testing.T) {
+	t.Parallel()
+
 	if errs := schemaCheck(t, `{"type":"number"}`, `4`); len(errs) != 0 {
 		t.Fatalf("an integer should satisfy number: %v", errs)
 	}
@@ -72,6 +80,8 @@ func TestSchemaIntegerIsAlsoANumberButNotTheReverse(t *testing.T) {
 }
 
 func TestSchemaCombinators(t *testing.T) {
+	t.Parallel()
+
 	oneOf := `{"oneOf":[{"type":"string"},{"type":"number"}]}`
 	if errs := schemaCheck(t, oneOf, `"text"`); len(errs) != 0 {
 		t.Fatalf("errors = %v", errs)
@@ -88,12 +98,16 @@ func TestSchemaCombinators(t *testing.T) {
 }
 
 func TestSchemaHonoursOpenAPINullable(t *testing.T) {
+	t.Parallel()
+
 	if errs := schemaCheck(t, `{"type":"string","nullable":true}`, `null`); len(errs) != 0 {
 		t.Fatalf("errors = %v", errs)
 	}
 }
 
 func TestSchemaSaysWhenItStoppedListingFailures(t *testing.T) {
+	t.Parallel()
+
 	items := make([]string, 0, 30)
 	for i := 0; i < 30; i++ {
 		items = append(items, `1`)
@@ -109,6 +123,8 @@ func TestSchemaSaysWhenItStoppedListingFailures(t *testing.T) {
 }
 
 func TestSchemaRejectsMalformedInput(t *testing.T) {
+	t.Parallel()
+
 	if _, err := ValidateJSONSchemaText(`{`, `{}`); err == nil {
 		t.Fatal("expected an error for a malformed schema")
 	}

@@ -104,7 +104,7 @@ func TestProxyDNSErrorNamesFailingProxy(t *testing.T) {
 }
 
 func TestSaveRefusesUnreadableLocalStoreBeforeChangingYAML(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	local, root := filepath.Join(dir, "local.json"), filepath.Join(dir, "root")
 	if err := saveKurloStorePayload(local, root, exampleStorePayload(t, createdExample)); err != nil {
@@ -132,7 +132,7 @@ func TestSaveRefusesUnreadableLocalStoreBeforeChangingYAML(t *testing.T) {
 }
 
 func TestExamplePrunePreservesUnrelatedFiles(t *testing.T) {
-	withRequestStoreTestKey(t)
+	t.Parallel()
 	dir := t.TempDir()
 	local, root := filepath.Join(dir, "local.json"), filepath.Join(dir, "root")
 	payload := exampleStorePayload(t, createdExample)
