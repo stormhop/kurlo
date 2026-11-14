@@ -10,6 +10,14 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Changed
+
+- **Claude Code models stay current**: models, the default and effort levels come from your installed CLI. Kurlo keeps the last successful list for temporary failures and preserves the model in existing chats.
+
+### Fixed
+
 ## 3.1.0
 
 ### Added

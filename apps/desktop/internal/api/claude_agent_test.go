@@ -21,6 +21,7 @@ func TestClaudeAgentStreamsAndResumes(t *testing.T) {
 	t.Setenv("KURLO_CLAUDE_EXPECT_RESUME", "")
 	t.Setenv("KURLO_CLAUDE_READY", "")
 	script := `#!/bin/sh
+` + claudeModelsFixture + `
 if [ "$1" = "--version" ]; then
   echo "2.1.0 (Claude Code)"
   exit 0
@@ -53,7 +54,7 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 [ "$resume" = "$KURLO_CLAUDE_EXPECT_RESUME" ] || exit 2
-[ "$chosen" = "claude-sonnet-5-5" ] || exit 3
+[ "$chosen" = "${KURLO_CLAUDE_EXPECT_MODEL:-claude-sonnet-5-5}" ] || exit 3
 [ "$effort" = "$KURLO_CLAUDE_EXPECT_EFFORT" ] || exit 4
 cat >/dev/null
 if [ -n "$KURLO_CLAUDE_READY" ]; then
@@ -72,7 +73,7 @@ printf '%s\n' '{"type":"system","subtype":"init","session_id":"claude-session","
 		t.Fatalf("unconnected Claude Code should be rejected, got %+v", blocked)
 	}
 	status := app.ClaudeCodeStatus("")
-	if !status.Installed || !status.Authenticated || status.Connected || status.Account != "dev@example.com · pro" || status.AuthMethod != "subscription" || status.Version != "2.1.0 (Claude Code)" || status.Model != "claude-sonnet-5-5" || status.DefaultModel != "claude-sonnet-5-5" || len(status.Models) != 5 || status.Models[0].ID != "claude-fable-5-2" || status.Models[0].Name != "Fable 5.2" || len(status.RateLimits) != 1 {
+	if !status.Installed || !status.Authenticated || status.Connected || status.Account != "dev@example.com · pro" || status.AuthMethod != "subscription" || status.Version != "2.1.0 (Claude Code)" || status.Model != "claude-sonnet-5-5" || status.DefaultModel != "claude-sonnet-5-5" || len(status.Models) != 3 || status.Models[0].ID != "claude-sonnet-5-5" || status.Models[0].Name != "Sonnet" || !status.Models[0].Recommended || len(status.RateLimits) != 1 {
 		t.Fatalf("unexpected status before connect: %+v", status)
 	}
 	usageLimits := status.RateLimits[0]
@@ -110,6 +111,22 @@ printf '%s\n' '{"type":"system","subtype":"init","session_id":"claude-session","
 	second := NewApp().SendAgentMessage(input)
 	if second.Error != "" || second.Text != "Hello" || second.Chat.ID != first.Chat.ID {
 		t.Fatalf("unexpected resumed turn: %+v", second)
+	}
+	t.Setenv("KURLO_CLAUDE_EXPECT_MODEL", "claude-nova-9[1m]")
+	t.Setenv("KURLO_CLAUDE_EXPECT_EFFORT", "low")
+	input.Model = "claude-nova-9[1m]"
+	input.Effort = "high"
+	if future := app.SendAgentMessage(input); future.Error != "" || future.Chat.Model != input.Model {
+		t.Fatalf("new model and its supported effort were not used: %+v", future)
+	}
+	t.Setenv("KURLO_CLAUDE_EXPECT_MODEL", "claude-retired-1")
+	t.Setenv("KURLO_CLAUDE_EXPECT_EFFORT", "")
+	if _, err := updateAgentChat(input.ChatID, func(chat *model.AgentChat) { chat.Model = "claude-retired-1" }); err != nil {
+		t.Fatal(err)
+	}
+	input.Model = ""
+	if older := app.SendAgentMessage(input); older.Error != "" || older.Chat.Model != "claude-retired-1" {
+		t.Fatalf("existing chat model should be preserved: %+v", older)
 	}
 	ready := filepath.Join(bin, "ready")
 	t.Setenv("KURLO_CLAUDE_READY", ready)
@@ -187,6 +204,7 @@ func TestClaudeStatusUsesChosenExecutable(t *testing.T) {
 	}
 	custom := filepath.Join(t.TempDir(), "my-claude")
 	script := `#!/bin/sh
+` + claudeModelsFixture + `
 if [ "$1" = "--version" ]; then echo "2.2.0 (Claude Code)"; exit 0; fi
 printf '%s\n' '{"loggedIn":true,"authMethod":"api_key"}'
 `

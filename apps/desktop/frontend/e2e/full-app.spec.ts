@@ -11656,6 +11656,54 @@ test('connects Claude Code like Codex and sends a workspace chat', async ({ page
   await expect(connection.getByLabel('Claude plan limits')).toHaveCount(0);
 });
 
+test('uses discovered Claude Code models and their own effort levels', async ({ page }, testInfo) => {
+  await installKurloBridge(page);
+  await page.addInitScript(() => {
+    const app = window.go!.api!.App as Record<string, unknown>;
+    const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+    app.ClaudeCodeStatus = async () => ({
+      installed: true, connected: true, authenticated: true, path: '/test/claude', version: '2.1.308 (Claude Code)',
+      account: 'dev@example.com · max', authMethod: 'subscription', model: 'custom-fast', defaultModel: 'custom-fast',
+      models: [
+        { id: 'claude-future-42[1m]', name: 'Future 42', recommended: false, efforts: ['low', 'max'], defaultEffort: 'low' },
+        { id: 'custom-fast', name: 'Custom Fast', recommended: true },
+      ],
+    });
+    app.SendAgentMessage = async (input: Record<string, string>) => {
+      e2e.claudeInput = input;
+      const messages = [{ role: 'user', blocks: [{ type: 'text', text: input.text }] }, { role: 'assistant', blocks: [{ type: 'text', text: 'Future model replied.' }] }];
+      const chat = { ...input, id: 'future-chat', title: 'Check models', externalThreadId: 'future-session', messages, allowedTools: [], usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, reasoning: 0, cost: 0 }, createdAt: Date.now(), updatedAt: Date.now() };
+      return { chat, messages, steps: [], warnings: [], text: 'Future model replied.' };
+    };
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Agent', exact: true }).click();
+  const picker = page.getByRole('button', { name: /^Agent:/ });
+  await picker.click();
+  await page.getByRole('radio', { name: /Claude Code/ }).click();
+  await expect(page.getByRole('radiogroup', { name: 'Claude Code model' }).getByRole('radio')).toHaveText([/Future 42/, /Custom Fast/]);
+  await page.getByRole('radio', { name: /^Future 42/ }).click();
+  await expect(picker).toHaveAccessibleName('Agent: Claude Code · Future 42');
+  const effortPicker = page.getByRole('button', { name: /^Effort:/ });
+  await expect(effortPicker).toHaveAccessibleName('Effort: Low');
+  await effortPicker.click();
+  const effortList = page.getByRole('listbox', { name: 'Effort', exact: true });
+  await expect(effortList.getByRole('option')).toHaveText([/Low/, /Max/]);
+  await effortList.getByRole('option', { name: 'Max', exact: true }).click();
+  await picker.click();
+  await page.getByRole('radio', { name: /^Custom Fast/ }).click();
+  await expect(effortPicker).toHaveCount(0);
+  await picker.click();
+  await page.getByRole('radio', { name: /^Future 42/ }).click();
+  await expect(effortPicker).toHaveAccessibleName('Effort: Max');
+  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-discovered-models-${testInfo.project.name}.png`), animations: 'disabled' });
+  const composer = page.getByRole('textbox', { name: 'Message the agent' });
+  await composer.fill('Check models');
+  await composer.press('Enter');
+  await expect(page.locator('.agent-text')).toContainText('Future model replied.');
+  expect(await page.evaluate(() => (window.__kurloE2E as unknown as { claudeInput: Record<string, string> }).claudeInput)).toMatchObject({ driver: 'claude-code', model: 'claude-future-42[1m]', effort: 'max' });
+});
+
 test('keeps streaming chat history and restores failed drafts only in their original chat', async ({ page }) => {
   await installKurloBridge(page);
   await page.addInitScript(() => {

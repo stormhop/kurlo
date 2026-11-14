@@ -5,6 +5,14 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Changed
+
+- **Claude Code models stay current.** Kurlo reads the available models, default model and supported effort levels from your installed Claude Code CLI instead of a fixed list. The last successful list is kept for temporary connection failures, and existing chats keep their selected model.
+
+### Fixed
+
 ## [3.1.0] - 2026-11-13
 
 ### Added

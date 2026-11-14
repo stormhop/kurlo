@@ -51,14 +51,14 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 	var connection model.CodexConnection
 	var err error
 	if input.Driver == "claude-code" {
-		var saved model.ClaudeConnection
+		var saved claudeConnectionPreferences
 		var connected bool
 		saved, connected, err = savedClaudeConnection()
 		if err == nil && !connected {
 			err = errors.New("Connect Claude Code in Settings → AI first.")
 		}
 		if err == nil {
-			connection.Model = claudeChosenModel(saved.Model, saved.DefaultModel)
+			connection.Model = claudeChosenModel(saved.Model, saved.DefaultModel, saved.Models)
 			connection.Path, err = claudeExecutable(saved.Path)
 		}
 	} else {
@@ -118,7 +118,7 @@ func (a *App) sendExternalAgentMessage(input model.AgentSendInput) model.AgentTu
 		}
 		chat.Model = strings.TrimSpace(input.Model)
 	}
-	if chat.Model == "" || (input.Driver == "claude-code" && !claudeKnownModel(chat.Model)) {
+	if chat.Model == "" {
 		chat.Model = connection.Model
 	}
 	chat.Messages = append(chat.Messages, userMessage)

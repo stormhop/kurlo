@@ -13,13 +13,19 @@ import (
 const appPreferencesFileName = "preferences.json"
 
 type appPreferences struct {
-	DefaultWorkspaceLocation string                  `json:"defaultWorkspaceLocation,omitempty"`
-	CookieSync               *cookieSyncPreferences  `json:"cookieSync,omitempty"`
-	AiConnections            []savedAiConnection     `json:"aiConnections,omitempty"`
-	AgentActivityOff         bool                    `json:"agentActivityOff,omitempty"`
-	AgentMcpServers          []savedAgentMcpServer   `json:"agentMcpServers,omitempty"`
-	Codex                    *model.CodexConnection  `json:"codex,omitempty"`
-	Claude                   *model.ClaudeConnection `json:"claude,omitempty"`
+	DefaultWorkspaceLocation string                       `json:"defaultWorkspaceLocation,omitempty"`
+	CookieSync               *cookieSyncPreferences       `json:"cookieSync,omitempty"`
+	AiConnections            []savedAiConnection          `json:"aiConnections,omitempty"`
+	AgentActivityOff         bool                         `json:"agentActivityOff,omitempty"`
+	AgentMcpServers          []savedAgentMcpServer        `json:"agentMcpServers,omitempty"`
+	Codex                    *model.CodexConnection       `json:"codex,omitempty"`
+	Claude                   *claudeConnectionPreferences `json:"claude,omitempty"`
+}
+
+type claudeConnectionPreferences struct {
+	model.ClaudeConnection
+	Models        []model.AiConnectionModel `json:"models,omitempty"`
+	ModelsAccount string                    `json:"modelsAccount,omitempty"`
 }
 
 type cookieSyncPreferences struct {
