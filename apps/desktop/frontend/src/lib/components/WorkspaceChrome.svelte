@@ -228,7 +228,7 @@
       if (dock && shell) {
         if (node.parentElement !== shell) {
           node.classList.remove('undocked');
-          node.style.clipPath = 'inset(-1rem calc(var(--sidebar-slide-w, var(--sidebar-w, 17.5rem)) - var(--space-2)) -100vh -100vw)';
+          node.style.clipPath = 'inset(-1rem calc(var(--sidebar-slide-w, 17.5rem) - var(--space-2)) -100vh -100vw)';
           shell.appendChild(node);
           node.classList.add('docked');
           void node.offsetWidth;

@@ -18,6 +18,8 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ### Fixed
 
+- **The sidebar hides and shows at once**: toggling it no longer restyles the whole window, so the slide starts without a pause in large workspaces.
+
 ## 3.1.0
 
 ### Added

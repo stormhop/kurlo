@@ -148,6 +148,7 @@
     exportLoadTest = () => {},
     loadLoadTestResult = () => {},
     workspaceBlocked = false,
+    gone = false,
   }: {
     sidebarView: SidebarView;
     sidebarSearch: string;
@@ -234,6 +235,7 @@
     exportLoadTest?: (collectionId: string, loadTestId: string) => void;
     loadLoadTestResult?: (loadTestId: string) => void;
     workspaceBlocked?: boolean;
+    gone?: boolean;
   } = $props();
 
   let hoveredRowKey = $state('');
@@ -372,6 +374,16 @@
 
   $effect(() => () => {
     for (const [growth] of windowGrowths) growth.destroy();
+  });
+
+  $effect.pre(() => {
+    const suspended = gone;
+    untrack(() => {
+      for (const [growth] of windowGrowths) {
+        if (suspended) growth.suspend();
+        else growth.resume();
+      }
+    });
   });
 
   $effect(() => {

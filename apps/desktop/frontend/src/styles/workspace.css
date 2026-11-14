@@ -49,13 +49,17 @@
   position: absolute;
   z-index: 46;
   top: calc((2.8125rem - var(--control-md)) / 2);
-  right: calc(100% - var(--rail-w) - var(--sidebar-slide-w, var(--sidebar-w, 17.5rem)) + var(--space-2));
-  max-width: calc(var(--rail-w) + var(--sidebar-slide-w, var(--sidebar-w, 17.5rem)) - var(--mac-traffic-w, 80px) - var(--space-3));
-  clip-path: inset(-1rem calc(var(--sidebar-slide-w, var(--sidebar-w, 17.5rem)) - var(--sidebar-w, 17.5rem) - var(--space-2)) -100vh -100vw);
+  right: calc(100% - var(--rail-w) - var(--sidebar-slide-w, 17.5rem) + var(--space-2));
+  max-width: calc(var(--rail-w) + var(--sidebar-slide-w, 17.5rem) - var(--mac-traffic-w, 80px) - var(--space-3));
+  clip-path: inset(-1rem calc(0px - var(--space-2)) -100vh -100vw);
   will-change: transform;
   transition: clip-path var(--sidebar-slide-dur, 0s) var(--sidebar-slide-ease, ease);
   -webkit-app-region: no-drag;
   --wails-draggable: no-drag;
+}
+
+.shell.sidebar-hidden > .workspace-switcher.docked {
+  clip-path: inset(-1rem calc(var(--sidebar-slide-w, 17.5rem) - var(--space-2)) -100vh -100vw);
 }
 
 .shell > .workspace-switcher.docked:has(.workspace-menu) {

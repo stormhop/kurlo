@@ -1,3 +1,27 @@
+@property --sidebar-w {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --shell-content-w {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --code-max-w {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --code-slide-w {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
 .shell {
   position: relative;
   --status-bar-h: 1.75rem;
@@ -53,13 +77,11 @@
 }
 
 .shell > .sidebar > * {
-  min-width: calc(var(--sidebar-slide-w, var(--sidebar-w, 17.5rem)) - 2 * var(--space-2-5) - 1px);
+  min-width: calc(var(--sidebar-slide-w, 17.5rem) - 2 * var(--space-2-5) - 1px);
 }
 
-.shell.sidebar-hidden > .sidebar {
-  pointer-events: none;
+.shell.sidebar-gone > .sidebar {
   visibility: hidden;
-  transition: background var(--dur-base) ease, visibility 0s linear var(--sidebar-slide-dur);
 }
 
 .sidebar-titlebar {

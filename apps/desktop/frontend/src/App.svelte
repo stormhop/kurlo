@@ -39,6 +39,8 @@
   import { openExternalURL } from './lib/externalLinks';
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from './lib/response-render';
   import { tallyCollectionRun } from './lib/collectionRuns';
+  import { announceShellResize } from './lib/shellResize';
+  import { shellLayout } from './lib/shellLayout.svelte';
 
   $effect(() => {
     if (!vm.requestStoreLoaded) return;
@@ -170,6 +172,15 @@
   let slideSidebarWidth = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity ? Math.min(vm.sidebarWidth, agentSidebarMaxWidth(toLogicalPx(windowWidth))) : vm.sidebarWidth);
   let shownSidebarWidth = $derived(vm.sidebarHidden ? 0 : slideSidebarWidth);
   let switcherInSidebar = $state(!vm.sidebarHidden);
+  let shellLayoutKey = '';
+  $effect.pre(() => {
+    const next = `${vm.sidebarHidden}:${vm.codePanelOpen && codePanelAvailable}`;
+    if (shellLayoutKey && next !== shellLayoutKey) untrack(announceShellResize);
+    shellLayoutKey = next;
+  });
+  $effect.pre(() => {
+    shellLayout.sidebarWidth = shownSidebarWidth;
+  });
   $effect(() => {
     const hidden = vm.sidebarHidden;
     if (!hidden) {
@@ -565,6 +576,7 @@
   class:resizing-code={vm.codePanelResizing}
   class:code-open={vm.codePanelOpen && codePanelAvailable}
   class:sidebar-hidden={vm.sidebarHidden}
+  class:sidebar-gone={!switcherInSidebar}
   style="--sidebar-w: {rem(shownSidebarWidth)}; --sidebar-slide-w: {rem(slideSidebarWidth)}; --code-requested-w: {rem(vm.codePanelWidth)}"
 >
   <input
@@ -591,6 +603,7 @@
   />
 
   <Sidebar
+    gone={!switcherInSidebar}
     bind:sidebarView={vm.sidebarView}
     bind:sidebarSearch={vm.sidebarSearch}
     bind:sidebarSearchInput={vm._sidebarSearchInput}

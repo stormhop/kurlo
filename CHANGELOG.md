@@ -13,6 +13,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **The sidebar hides and shows at once.** Toggling the sidebar no longer restyles the whole window: in workspaces with hundreds of requests the slide starts without a pause, and the hidden sidebar keeps only the rows on screen until it comes back.
+
 ## [3.1.0] - 2026-11-13
 
 ### Added

@@ -16,6 +16,8 @@
   import AgentAttachmentViewer from './AgentAttachmentViewer.svelte';
   import AgentPicker from './AgentPicker.svelte';
   import { vm } from '../stores/app.svelte';
+  import { rem } from '../uiScale';
+  import { shellLayout } from '../shellLayout.svelte';
   import { agentNavigation, agentStore as defaultAgentStore, toggleAgentDetails, type AgentStore } from '../stores/agent.svelte';
   import { codexConnectionStore } from '../stores/codex.svelte';
   import { claudeConnectionStore } from '../stores/claude.svelte';
@@ -723,7 +725,7 @@
       </div>
     {/if}
 
-    <div class="agent-body" class:details-open={agentNavigation.detailsOpen} class:details-cover={detailsCover}>
+    <div class="agent-body" class:details-open={agentNavigation.detailsOpen} class:details-cover={detailsCover} style:--agent-details-w={detailsCover ? `calc(100vw - var(--rail-w) - ${rem(shellLayout.sidebarWidth)})` : undefined}>
       <div class="agent-main-slot" class:covered={agentNavigation.detailsOpen && detailsCover} inert={agentNavigation.detailsOpen && detailsCover}>
       <div class="agent-main">
         <div class="agent-chat" bind:this={scroller}>
@@ -1215,9 +1217,6 @@
   }
   .agent-body.details-open {
     grid-template-columns: minmax(0, 1fr) var(--agent-details-w);
-  }
-  .agent-body.details-cover {
-    --agent-details-w: var(--shell-content-w);
   }
   .agent-main-slot,
   .agent-details-shell {

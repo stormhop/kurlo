@@ -12,8 +12,10 @@ export class WindowGrowth {
     this.#canGrow = canGrow;
   }
 
+  #suspended = false;
+
   #grow() {
-    if (!this.#canGrow()) return false;
+    if (this.#suspended || !this.#canGrow()) return false;
     this.extra += GROW_STEP_ROWS;
     return true;
   }
@@ -36,6 +38,23 @@ export class WindowGrowth {
     const jumped = last !== null && Math.abs(top - last) > viewportHeight;
     const outside = top < renderedTop || top + viewportHeight > renderedBottom;
     if (jumped && outside && this.extra > 0) this.extra = 0;
+    this.#grower.pause();
+  }
+
+  suspend() {
+    this.#suspended = true;
+    this.extra = 0;
+    this.#grower.stop();
+  }
+
+  resume() {
+    if (!this.#suspended) return;
+    this.#suspended = false;
+    this.#grower.pause();
+  }
+
+  resized() {
+    this.extra = 0;
     this.#grower.pause();
   }
 

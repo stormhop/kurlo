@@ -10647,16 +10647,22 @@ test.describe('Agent', () => {
     await expect(newChat.locator('.agent-new-chat-label')).toBeVisible();
     const wide = await headEdges();
     expect(wide.newChat).toBeLessThanOrEqual(wide.searchRight);
-    await page.locator('.shell').evaluate((shell) => {
-      (shell as HTMLElement).style.setProperty('--sidebar-w', '16.25rem');
-      (shell as HTMLElement).style.setProperty('--sidebar-slide-w', '16.25rem');
+    const shellWidths = await page.locator('.shell').evaluate((shell) => {
+      const style = (shell as HTMLElement).style;
+      const previous = [style.getPropertyValue('--sidebar-w'), style.getPropertyValue('--sidebar-slide-w')];
+      style.setProperty('--sidebar-w', '16.25rem');
+      style.setProperty('--sidebar-slide-w', '16.25rem');
+      return previous;
     });
     await expect(newChat.locator('.agent-new-chat-label')).toBeHidden();
     const narrow = await headEdges();
     expect(narrow.newChat).toBeLessThanOrEqual(narrow.searchRight);
     expect(narrow.lists).toBeLessThan(narrow.newChatLeft);
     await page.locator('.agent-sidebar-head').screenshot({ path: join(tmpdir(), `kurlo-agent-head-narrow-${testInfo.project.name}.png`), animations: 'disabled' });
-    await page.locator('.shell').evaluate(shell => (shell as HTMLElement).style.removeProperty('--sidebar-w'));
+    await page.locator('.shell').evaluate((shell, [sidebarWidth, slideWidth]) => {
+      (shell as HTMLElement).style.setProperty('--sidebar-w', sidebarWidth);
+      (shell as HTMLElement).style.setProperty('--sidebar-slide-w', slideWidth);
+    }, shellWidths);
 
     await page.locator('.agent-tool-toggle').first().click();
     await expect(page.locator('.agent-tool-body').first()).toContainText('Shop API/Orders/List orders');
@@ -13200,3 +13206,41 @@ for (const protocol of [
     await expect(page.getByRole('button', { name: 'Request section', exact: true })).toContainText('Vars');
   });
 }
+
+test('slides the sidebar without restyling the rest of the window', async ({ page }) => {
+  const col = { id: 'big-col', workspaceId: 'workspace-e2e', name: 'Big API' };
+  const requests = Array.from({ length: 400 }, (_, r) => ({
+    id: `r${r}`, name: `Operation ${r}`, url: `https://api.kurlo.test/v1/things/${r}`, collectionId: col.id, collection: col.name, requestType: 'http', method: 'GET', auth: { type: 'none' },
+  }));
+  await installKurloBridge(page, '', 'browser/e2e', false, { collections: [col], requests, activeId: 'r0', openIds: ['r0'], folderCollapsed: {} });
+  await page.goto('/');
+  const sidebar = page.locator('.shell > .sidebar');
+  const rendered = () => sidebar.evaluate(node => node.querySelectorAll('*').length);
+  await expect.poll(rendered).toBeGreaterThan(3000);
+  const grown = await rendered();
+  const inherited = () => page.evaluate(() => {
+    const names = new Set<string>();
+    const walk = (rules: CSSRuleList) => {
+      for (const rule of rules) {
+        if (rule instanceof CSSStyleRule) for (const name of rule.style) if (name.startsWith('--')) names.add(name);
+        if ('cssRules' in rule) walk((rule as CSSGroupingRule).cssRules);
+      }
+    };
+    for (const sheet of document.styleSheets) walk(sheet.cssRules);
+    for (const name of document.querySelector<HTMLElement>('.shell')!.style) if (name.startsWith('--')) names.add(name);
+    const style = getComputedStyle(document.querySelector('.workspace')!);
+    return Object.fromEntries([...names].sort().map(name => [name, style.getPropertyValue(name)]));
+  });
+  const before = await inherited();
+  const toggle = page.getByLabel('Toggle sidebar', { exact: true });
+  await toggle.click();
+  await expect(sidebar).toBeHidden();
+  expect(await inherited()).toEqual(before);
+  await expect.poll(rendered).toBeLessThan(grown / 3);
+  await toggle.click();
+  await expect(sidebar).toBeVisible();
+  expect(await inherited()).toEqual(before);
+  await expect.poll(rendered).toBeGreaterThanOrEqual(grown);
+});
+
+
