@@ -50,7 +50,7 @@ import { authFeature } from './features/auth';
 import { cookieFeature } from './features/cookies';
 import { cookieSyncFeature, DEFAULT_COOKIE_SYNC_PORT } from './features/cookieSync';
 import { collectionDefaultsFeature } from './features/collectionDefaults';
-import { collectionFeature } from './features/collections';
+import { collectionFeature, SidebarRequestMemo } from './features/collections';
 import { collectionRunnerFeature } from './features/collectionRunner';
 import { collectionRunnerDerivedFeature } from './features/collectionRunnerDerived';
 import { dataBackupFeature } from './features/dataBackup';
@@ -1556,6 +1556,8 @@ class AppVM {
   _sidebarSearchInput: HTMLInputElement | undefined = undefined;
   _urlInputRef: HTMLInputElement | undefined = undefined;
 
+  sidebarRequestMemo = new SidebarRequestMemo();
+  sidebarRequests: SavedRequest[] = $derived.by(() => this.sidebarRequestMemo.pick(this.requests, Boolean(this.sidebarSearch.trim())));
   collectionGroups: CollectionGroup[] = $derived.by(() => this.buildCollectionGroups());
   historyGroups: HistoryDayGroup[] = $derived.by(() => this.buildHistoryGroups());
   get activeWorkspace(): Workspace | undefined {

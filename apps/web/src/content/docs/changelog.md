@@ -17,6 +17,9 @@ This page summarizes the notable-change log maintained in the source repository.
 - **One loader everywhere**: every wait in the app — responses, gRPC and MCP calls, diffs, history, cookies, examples, the mock server, model lists, settings checks and the Cancel button — shows the flying Kurlo bird instead of spinners and *Loading…* captions.
 - **Claude Code models stay current**: models, the default and effort levels come from your installed CLI. Kurlo keeps the last successful list for temporary failures and preserves the model in existing chats.
 - **Saving an edit writes only what changed**: Kurlo sends and rewrites just the edited requests, so an autosave in a workspace with 1,300 requests takes about 20 ms instead of 280 ms. Structural changes and files edited outside Kurlo still use the full save.
+- **Large workspaces open and save faster**: examples are read in the background after a workspace opens, so a 1,300-request workspace opens in about 190 ms instead of 430 ms; the full save takes about 170 ms instead of 290 ms, and typing no longer rebuilds the sidebar.
+- **Git status after a save checks only the saved files**, without refreshing the branch list on every edit.
+- **File changes are noticed through the system**: FSEvents, `ReadDirectoryChangesW` and inotify replace the scan every second, which remains only as a fallback.
 
 ### Fixed
 
@@ -28,6 +31,7 @@ This page summarizes the notable-change log maintained in the source repository.
 - **Long lists scroll the same way everywhere**: the collection runner has no page buttons any more, and agent activity loads older calls as you scroll; its search and summary cover the whole log.
 - **Chats and Git history load more as you scroll**: a long agent chat loads earlier messages as you scroll up instead of through a button, and Git history loads 100 older commits at a time.
 - **Links without underlines**: links change colour on hover instead of being underlined.
+- **Git paths with spaces**: such files show without quotes in the Git panel and their diffs open.
 - **No macOS suggestions in text fields**: filters and search boxes no longer show autocorrect or autocomplete pop-ups.
 - **Settings open at once**: settings and search are prepared in the background after start-up.
 

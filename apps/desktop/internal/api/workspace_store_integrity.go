@@ -19,6 +19,7 @@ type workspaceIntegrityValidator struct {
 	duplicateDirs []string
 	diagnostics   []WorkspaceDiagnostic
 	fixes         []workspaceReferenceFix
+	deferred      *deferredRequestExamples
 }
 
 type workspaceReferenceFix struct {

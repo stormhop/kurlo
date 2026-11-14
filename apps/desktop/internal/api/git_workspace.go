@@ -1095,31 +1095,7 @@ func gitStatusForWorkspace(workspaceRoot string) GitWorkspaceStatus {
 		status.Error = friendlyGitError("status", output, err)
 		return status
 	}
-	lines := strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n")
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "## ") {
-			parseGitBranchLine(strings.TrimPrefix(line, "## "), &status)
-			continue
-		}
-		if len(line) < 3 {
-			continue
-		}
-		index, worktree := string(line[0]), string(line[1])
-		path := strings.TrimSpace(line[3:])
-		if arrow := strings.LastIndex(path, " -> "); arrow >= 0 {
-			path = strings.TrimSpace(path[arrow+4:])
-		}
-		status.Files = append(status.Files, GitFileStatus{
-			Path:     path,
-			Index:    index,
-			Worktree: worktree,
-			Status:   gitStatusLabel(index, worktree),
-			Managed:  isDiscardableKurloGitPath(workspaceRoot, status.Root, path),
-		})
-	}
+	status.Files = parseGitPorcelainStatus(workspaceRoot, status.Root, output, &status)
 	status.Clean = len(status.Files) == 0
 	if status.Branch == "" {
 		if branch, err := gitOutput(status.Root, "rev-parse", "--abbrev-ref", "HEAD"); err == nil {
@@ -1131,6 +1107,48 @@ func gitStatusForWorkspace(workspaceRoot string) GitWorkspaceStatus {
 	status.PushCommitCount = gitStatusPushCommitCount(status)
 	status.Stashes = gitStashesForRoot(status.Root)
 	return status
+}
+
+func parseGitPorcelainStatus(workspaceRoot, repoRoot, output string, branch *GitWorkspaceStatus) []GitFileStatus {
+	files := []GitFileStatus{}
+	for _, line := range strings.Split(strings.ReplaceAll(output, "\r\n", "\n"), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "## ") {
+			if branch != nil {
+				parseGitBranchLine(strings.TrimPrefix(line, "## "), branch)
+			}
+			continue
+		}
+		if len(line) < 3 {
+			continue
+		}
+		index, worktree := string(line[0]), string(line[1])
+		path := strings.TrimSpace(line[3:])
+		if arrow := strings.LastIndex(path, " -> "); arrow >= 0 {
+			path = strings.TrimSpace(path[arrow+4:])
+		}
+		path = unquoteGitPath(path)
+		files = append(files, GitFileStatus{
+			Path:     path,
+			Index:    index,
+			Worktree: worktree,
+			Status:   gitStatusLabel(index, worktree),
+			Managed:  isDiscardableKurloGitPath(workspaceRoot, repoRoot, path),
+		})
+	}
+	return files
+}
+
+func unquoteGitPath(path string) string {
+	if len(path) < 2 || path[0] != '"' || path[len(path)-1] != '"' {
+		return path
+	}
+	if unquoted, err := strconv.Unquote(path); err == nil {
+		return unquoted
+	}
+	return path
 }
 
 func gitInitWorkspaceForRoot(root string) GitOperationResult {

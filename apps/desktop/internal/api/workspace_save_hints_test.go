@@ -73,6 +73,13 @@ func workspaceTreesForOps(t *testing.T, cached bool) []map[string]string {
 			forgetWorkspaceDiskState()
 		}
 		saveAppStoreForTest(t, app, store, op.name)
+		scanned, err := scanWorkspaceFiles(root, nil, true)
+		if err != nil {
+			t.Fatalf("%s: scan: %v", op.name, err)
+		}
+		if known := workspaceDisk.knownFor(root); !reflect.DeepEqual(known, scanned) {
+			t.Fatalf("%s: the snapshot after the save differs from the disk\nremembered: %v\non disk:    %v", op.name, known, scanned)
+		}
 		tree := workspaceTreeForTest(t, root)
 		for _, dir := range workspaceDirsForTest(t, root) {
 			tree[dir+"/"] = "dir"

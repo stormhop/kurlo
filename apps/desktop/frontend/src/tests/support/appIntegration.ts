@@ -373,6 +373,10 @@ class TestApp {
     return this.workspaces.find(workspace => workspace.id === this.activeWorkspaceId);
   }
 
+  get sidebarRequests() {
+    return this.requests;
+  }
+
   get collectionGroups() {
     return this.buildCollectionGroups();
   }

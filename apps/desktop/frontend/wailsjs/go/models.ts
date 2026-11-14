@@ -450,6 +450,42 @@ export namespace api {
 	    }
 	}
 	
+	export class GitFileStatusResult {
+	    ok: boolean;
+	    scoped: boolean;
+	    paths: string[];
+	    files: GitFileStatus[];
+	
+	    static createFrom(source: any = {}) {
+	        return new GitFileStatusResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.scoped = source["scoped"];
+	        this.paths = source["paths"];
+	        this.files = this.convertValues(source["files"], GitFileStatus);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class GitLogResult {
 	    ok: boolean;
 	    git: GitWorkspaceStatus;
@@ -634,6 +670,8 @@ export namespace api {
 	    error?: string;
 	    revision?: number;
 	    needFull?: boolean;
+	    delta?: boolean;
+	    written?: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new SaveRequestStoreResult(source);
@@ -645,6 +683,8 @@ export namespace api {
 	        this.error = source["error"];
 	        this.revision = source["revision"];
 	        this.needFull = source["needFull"];
+	        this.delta = source["delta"];
+	        this.written = source["written"];
 	    }
 	}
 	export class SaveResponseBodyResult {

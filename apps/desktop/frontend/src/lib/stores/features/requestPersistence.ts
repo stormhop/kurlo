@@ -1,4 +1,5 @@
 import { examplesOnDisk, markExamplesOnDisk } from '../../examplesOnDisk';
+import { noteSavedWorkspacePaths } from './git';
 import { loadRequestStore, saveRequestStore, saveRequestStoreDelta, saveRequestStoreView } from '../../backend';
 import { normalizeSavedRequest } from '../../normalizers';
 import type {
@@ -307,6 +308,7 @@ export const requestPersistenceFeature = {
       if (delta) {
         const result = await saveRequestStoreDelta(delta);
         if (result.ok) {
+          noteSavedWorkspacePaths(this, result.delta ? result.written ?? [] : null);
           confirmStore(this, persistEpoch, result.revision, frozen);
           return true;
         }
@@ -318,6 +320,7 @@ export const requestPersistenceFeature = {
       confirmedStores.delete(this);
       const saved = await saveRequestStore(JSON.stringify({ ...frozen, requests: withoutExamplesOnDisk(frozen.requests) }));
       if (!saved.ok) throw new Error(saved.error || 'request store save failed');
+      noteSavedWorkspacePaths(this, null);
       confirmStore(this, persistEpoch, saved.revision, frozen);
       return saved.ok;
     });

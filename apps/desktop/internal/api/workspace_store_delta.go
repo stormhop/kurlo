@@ -152,7 +152,7 @@ type storeDeltaWrite struct {
 func (a *App) SaveRequestStoreDelta(payload string) SaveRequestStoreResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	revision, err := a.saveRequestStoreDelta(payload)
+	revision, written, err := a.saveRequestStoreDelta(payload)
 	if errors.Is(err, errStoreDeltaStale) {
 		return SaveRequestStoreResult{Ok: false, NeedFull: true}
 	}
@@ -160,64 +160,64 @@ func (a *App) SaveRequestStoreDelta(payload string) SaveRequestStoreResult {
 		workspaceDisk.forgetSavedShape()
 		return SaveRequestStoreResult{Ok: false, Error: err.Error()}
 	}
-	return SaveRequestStoreResult{Ok: true, Revision: revision}
+	return SaveRequestStoreResult{Ok: true, Revision: revision, Delta: true, Written: written}
 }
 
-func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
+func (a *App) saveRequestStoreDelta(payload string) (int64, []string, error) {
 	root := fileWorkspaceStorePath()
 	unlock, err := lockWorkspaceWrites(root)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	defer unlock()
 	if failedStoreLoads.failed(root) {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	if seen := a.globalsRevision.Load(); seen != nil && *seen != currentProfileGlobalsRevision() {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	var delta storeDeltaPayload
 	if err := json.Unmarshal([]byte(payload), &delta); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if delta.Store == nil {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	disk, ok := workspaceDisk.deltaDisk(root)
 	if !ok || disk.shape.revision != delta.Base {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	store := delta.Store
 	delete(store, "requests")
 	if canonicalJSON(store["workspaces"]) != disk.shape.workspaces || canonicalJSON(store["collections"]) != disk.shape.collections {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	if !sameStringList(delta.RequestIDs, disk.shape.requestOrder) {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	workspaces := mapSlice(store["workspaces"])
 	collections := mapSlice(store["collections"])
 	environments := mapSlice(store["environments"])
 	if !sameStringList(idsFor(environments), disk.shape.environmentOrder) {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	if err := validateWorkspaceStorePayload(map[string]any{"workspaces": store["workspaces"], "collections": store["collections"], "requests": anySlice(delta.Requests), "environments": store["environments"]}); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	examples, ok := loadedRequestExamples.snapshot(root)
 	if !ok {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	seen := map[string]bool{}
 	for _, request := range delta.Requests {
 		id := stringValue(request, "id")
 		shape, known := disk.shape.requests[id]
 		if id == "" || seen[id] || !known || shape.collectionID != stringValue(request, "collectionId") {
-			return 0, errStoreDeltaStale
+			return 0, nil, errStoreDeltaStale
 		}
 		seen[id] = true
 		if !segmentKeepsName(disk.segments["request:"+id], stringValue(request, "name")) {
-			return 0, errStoreDeltaStale
+			return 0, nil, errStoreDeltaStale
 		}
 		delete(request, exampleCountField)
 		if raw, sent := request["examples"]; sent {
@@ -227,7 +227,7 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 			case hasCached && bytes.Equal([]byte(canonicalJSON(raw)), cached):
 			case !hasCached && isList && len(list) == 0:
 			default:
-				return 0, errStoreDeltaStale
+				return 0, nil, errStoreDeltaStale
 			}
 			delete(request, "examples")
 		}
@@ -235,14 +235,14 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 	for _, environment := range environments {
 		id := stringValue(environment, "id")
 		if disk.shape.environments[id].workspaceID != stringValue(environment, "workspaceId") || !segmentKeepsName(disk.segments["environment:"+id], stringValue(environment, "name")) {
-			return 0, errStoreDeltaStale
+			return 0, nil, errStoreDeltaStale
 		}
 	}
 
 	local := requestStorePath()
 	existingStore, _, err := loadLocalRequestStore(local)
 	if err != nil {
-		return 0, errStoreDeltaStale
+		return 0, nil, errStoreDeltaStale
 	}
 	existingSecrets := stringMap(existingStore["secrets"])
 	if existingSecrets == nil {
@@ -288,7 +288,7 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 		id := stringValue(workspace, "id")
 		dir, ok := workspaceDir(id)
 		if !ok {
-			return 0, errStoreDeltaStale
+			return 0, nil, errStoreDeltaStale
 		}
 		delete(workspace, filesystemNameField)
 		if err := add(filepath.Join(dir, fileStoreRootFileName), filesystemWorkspaceFile{
@@ -297,18 +297,18 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 			CollectionOrder: idsFor(collectionsByWorkspace[id]),
 			Cookies:         sanitizedCookies[id],
 		}, nil); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 	}
 	for _, environment := range sanitizedEnvironments {
 		dir, ok := workspaceDir(stringValue(environment, "workspaceId"))
 		if !ok {
-			return 0, errStoreDeltaStale
+			return 0, nil, errStoreDeltaStale
 		}
 		segment := disk.segments["environment:"+stringValue(environment, "id")]
 		delete(environment, filesystemNameField)
 		if err := add(filepath.Join(dir, fileStoreEnvironmentsDir, segment+fileStoreYAMLExt), filesystemEnvironmentFile{Version: fileStoreVersion, Environment: environment}, nil); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 	}
 	for _, request := range sanitizedRequests {
@@ -316,7 +316,7 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 		dir, ok := workspaceDir(stringValue(collection, "workspaceId"))
 		collectionSegment := disk.segments["collection:"+stringValue(collection, "id")]
 		if collection == nil || !ok || collectionSegment == "" {
-			return 0, errStoreDeltaStale
+			return 0, nil, errStoreDeltaStale
 		}
 		segment := disk.segments["request:"+stringValue(request, "id")]
 		delete(request, "examples")
@@ -324,7 +324,7 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 		dropInferableSettingsOverrides(request, collection)
 		path := filepath.Join(dir, fileStoreCollectionsDir, collectionSegment, fileStoreRequestsDir, segment+fileStoreYAMLExt)
 		if err := add(path, filesystemRequestFile{Version: fileStoreVersion, Request: request}, canonicalRequestFile(collection)); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 	}
 
@@ -336,9 +336,9 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 	}
 	var writes []storeDeltaWrite
 	for _, candidate := range candidates {
-		data, err := marshalWorkspaceYAML(candidate.value)
+		data, err := marshalWorkspaceYAMLFor(candidate.path, candidate.value)
 		if err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 		if journal.unchanged(candidate.path, data) {
 			continue
@@ -346,7 +346,7 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 		stamp, tracked := disk.known[candidate.rel]
 		info, err := os.Lstat(candidate.path)
 		if !tracked || err != nil || !info.Mode().IsRegular() || !sameStamp(stamp, workspaceFileStamp{size: info.Size(), mod: info.ModTime().UnixNano()}) {
-			return 0, errStoreDeltaStale
+			return 0, nil, errStoreDeltaStale
 		}
 		writes = append(writes, candidate)
 	}
@@ -354,33 +354,33 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, error) {
 	yamlStoreWriteMu.Lock()
 	defer yamlStoreWriteMu.Unlock()
 	if err := recoverInterruptedSave(root); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if len(writes) > 0 && secretsChanged {
 		if err := saveLocalKurloStore(local, buildLocalKurloStore(store, root, secrets, "", storageMode)); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 	}
 	defer journal.close()
 	rels := make([]string, 0, len(writes))
 	for _, write := range writes {
 		if err := writeCanonicalYAMLFile(write.path, write.value, journal, write.canonical); err != nil {
-			return 0, err
+			return 0, nil, err
 		}
 		rels = append(rels, write.rel)
 	}
 	if err := journal.finish(); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	if err := saveLocalKurloStore(local, buildLocalKurloStore(store, root, secrets, "", storageMode)); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
 	next := *disk.shape
 	next.revision = storeSaveRevision.Add(1)
 	if err := workspaceDisk.noteDeltaWrites(root, rels, &next); err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	return next.revision, nil
+	return next.revision, rels, nil
 }
 
 func segmentKeepsName(segment, name string) bool {

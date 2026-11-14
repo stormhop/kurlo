@@ -121,6 +121,7 @@ export type GitCommitEntry = Wire<api.GitCommitEntry>;
 export type GitConflictFileResult = Wire<api.GitConflictFileResult>;
 export type GitDiffResult = Wire<api.GitDiffResult>;
 export type GitFileStatus = Wire<api.GitFileStatus>;
+export type GitFileStatusResult = Wire<api.GitFileStatusResult>;
 export type GitLogResult = Wire<api.GitLogResult>;
 export type GitOperationResult = Wire<api.GitOperationResult>;
 export type GitPullSummary = Wire<api.GitPullSummary>;

@@ -43,6 +43,40 @@ describe('sidebar derived data', () => {
     expect(build).not.toHaveBeenCalled();
   });
 
+  it('keeps the tree when an edit leaves every sidebar row unchanged', () => {
+    const groups = vm.collectionGroups;
+    const build = vi.spyOn(vm, 'buildCollectionGroups');
+
+    vm.requests = [{ ...vm.requests[0], url: 'https://example.test/accounts?page=2', body: '{"a":1}' }];
+    expect(vm.collectionGroups).toBe(groups);
+    expect(build).not.toHaveBeenCalled();
+
+    vm.requests = [{ ...vm.requests[0], method: 'POST' }];
+    expect(vm.collectionGroups).not.toBe(groups);
+    expect(vm.collectionGroups[0].folders[0].requests[0].method).toBe('POST');
+
+    const renamed = vm.collectionGroups;
+    vm.requests = [{ ...vm.requests[0], name: '' }];
+    expect(vm.collectionGroups).not.toBe(renamed);
+    const unnamed = vm.collectionGroups;
+    vm.requests = [{ ...vm.requests[0], url: 'https://example.test/customers' }];
+    expect(vm.collectionGroups).not.toBe(unnamed);
+
+    vm.sidebarSearch = 'customers';
+    const searched = vm.collectionGroups;
+    vm.requests = [{ ...vm.requests[0], name: 'Named', url: 'https://example.test/customers/1' }];
+    expect(vm.collectionGroups).not.toBe(searched);
+    expect(vm.collectionGroups[0].requests[0].name).toBe('Named');
+    vm.requests = [{ ...vm.requests[0], url: 'https://example.test/orders' }];
+    expect(vm.collectionGroups).toEqual([]);
+
+    vm.sidebarSearch = '';
+    const cleared = vm.collectionGroups;
+    vm.requests = [...vm.requests, normalizeSavedRequest({ id: 'sidebar-second', name: 'Second', collectionId: 'sidebar-collection', method: 'GET', url: '' }, vm.collections, vm.activeWorkspaceId)];
+    expect(vm.collectionGroups).not.toBe(cleared);
+    expect(vm.collectionGroups[0].rootRequests.map(request => request.id)).toEqual(['sidebar-second']);
+  });
+
   it('refreshes the tree after folder, filter, collapse and collection changes', () => {
     expect(vm.collectionGroups[0].folders[0].name).toBe('Accounts');
     vm.requests = [{ ...vm.requests[0], folderPath: ['Customers'] }];

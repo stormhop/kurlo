@@ -11,7 +11,7 @@ import {
 import { normalizeCollectionEnvironmentPins } from '../../collectionEnvironments';
 import { makeCollection } from '../../normalizers';
 import type { Collection, CollectionGroup, FolderDefaults, FolderGroup, PersistRequestStore, RequestType, SavedRequest, SidebarView } from '../../types/models';
-import { requestTabLabel } from '../../utils';
+import { requestKindFor, requestTabLabel } from '../../utils';
 import type { TopView } from '../ui';
 
 const FOLDER_MAP_SEPARATOR = '\u001f';
@@ -33,6 +33,7 @@ type CollectionHost = {
   openCollectionMenuId: string;
   openRequestIds: string[];
   requests: SavedRequest[];
+  sidebarRequests: SavedRequest[];
   sidebarSearch: string;
   sidebarView: SidebarView;
   topView: TopView;
@@ -72,6 +73,44 @@ function sortFolders(folders: FolderGroup[]) {
 function updateRequestCount(folder: FolderGroup): number {
   folder.requestCount = folder.requests.length + folder.children.reduce((sum, child) => sum + updateRequestCount(child), 0);
   return folder.requestCount;
+}
+
+const SHAPE_SEPARATOR = '\u001e';
+
+function sidebarRequestShape(request: SavedRequest, searching: boolean): string {
+  const parts = [
+    request.id,
+    request.collectionId,
+    (request.folderPath ?? []).join(FOLDER_MAP_SEPARATOR),
+    requestTabLabel(request),
+    requestKindFor(request),
+    request.method,
+    request.requestType ?? '',
+    request.isDraft ? 'd' : '',
+    request.isInvalid ? 'i' : '',
+    String(request.workspaceDiagnostics?.length ?? 0),
+  ];
+  if (searching) parts.push(request.url, request.grpcMethod ?? '', request.grpcProtoFileName ?? '');
+  return parts.join(SHAPE_SEPARATOR);
+}
+
+export class SidebarRequestMemo {
+  private requests: SavedRequest[] = [];
+  private shapes: string[] = [];
+  private searching = false;
+
+  pick(requests: SavedRequest[], searching: boolean): SavedRequest[] {
+    if (requests === this.requests && searching === this.searching) return this.requests;
+    const shapes = requests.map(request => sidebarRequestShape(request, searching));
+    const same = searching === this.searching
+      && shapes.length === this.shapes.length
+      && shapes.every((shape, index) => shape === this.shapes[index]);
+    this.shapes = shapes;
+    this.searching = searching;
+    if (same) return this.requests;
+    this.requests = requests;
+    return requests;
+  }
 }
 
 export function requestMatchesSidebarQuery(request: SavedRequest, query: string): boolean {
@@ -316,7 +355,7 @@ export const collectionFeature = {
   },
   buildCollectionGroups(this: CollectionHost): CollectionGroup[] {
     const query = this.sidebarSearch.trim().toLowerCase();
-    const requests = this.requests;
+    const requests = this.sidebarRequests;
     const collections = [...this.collections.filter(collection => collection.workspaceId === this.activeWorkspaceId)];
     const existingCollectionIds = new Set(collections.map(collection => collection.id));
     for (const diagnostic of this.workspaceDiagnostics) {

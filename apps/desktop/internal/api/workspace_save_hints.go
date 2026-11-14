@@ -12,6 +12,7 @@ type workspaceSaveHints struct {
 	healthy    bool
 	replaceAll bool
 	kept       map[string]json.RawMessage
+	written    workspaceSnapshot
 }
 
 func (h *workspaceSaveHints) keptExamples(requestID string) (json.RawMessage, bool) {

@@ -197,6 +197,8 @@ export function GitStashWorkspace(arg1:string):Promise<api.WorkspaceOpenResult>;
 
 export function GitStatus():Promise<api.GitWorkspaceStatus>;
 
+export function GitStatusFiles(arg1:Array<string>):Promise<api.GitFileStatusResult>;
+
 export function GitStoreToken(arg1:string,arg2:string,arg3:string):Promise<api.GitOperationResult>;
 
 export function GitTestRemote(arg1:string):Promise<api.GitOperationResult>;

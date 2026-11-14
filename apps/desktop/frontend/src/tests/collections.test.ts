@@ -97,6 +97,7 @@ describe('collection folder paths', () => {
       }],
       folderCollapseState: {},
       requests: [],
+      sidebarRequests: [],
       sidebarSearch: '',
       workspaceDiagnostics: [],
       diagnosticsForCollection: () => [],

@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,7 +28,10 @@ func setUpExamplesWorkspace(t *testing.T) (*App, string) {
 	t.Helper()
 	useTempConfigDir(t, t.TempDir())
 	root := fileWorkspaceStorePath()
-	t.Cleanup(func() { loadedRequestExamples.forget(root) })
+	t.Cleanup(func() {
+		loadedRequestExamples.forget(root)
+		loadedRequestExamples.healthy(root)
+	})
 	app := NewApp()
 	if result := app.SaveRequestStoreWithError(examplesTestPayload("Orders", "Orders", twoExamples)); !result.Ok {
 		t.Fatalf("initial save: %s", result.Error)
@@ -266,6 +270,10 @@ func TestASymlinkedExampleFileIsRefusedWithADiagnostic(t *testing.T) {
 	}
 	if err := os.Symlink(outside, files[0]); err != nil {
 		t.Skipf("symlinks unavailable: %v", err)
+	}
+	app.LoadWorkspace()
+	if _, err := requestExamplesForRoot(root); !errors.Is(err, errRequestExamplesNeedReload) {
+		t.Fatalf("examples with a symlinked file: %v", err)
 	}
 	result := app.LoadWorkspace()
 	found := false

@@ -52,10 +52,12 @@ type App struct {
 }
 
 type SaveRequestStoreResult struct {
-	Ok       bool   `json:"ok"`
-	Error    string `json:"error,omitempty"`
-	Revision int64  `json:"revision,omitempty"`
-	NeedFull bool   `json:"needFull,omitempty"`
+	Ok       bool     `json:"ok"`
+	Error    string   `json:"error,omitempty"`
+	Revision int64    `json:"revision,omitempty"`
+	NeedFull bool     `json:"needFull,omitempty"`
+	Delta    bool     `json:"delta,omitempty"`
+	Written  []string `json:"written,omitempty"`
 }
 
 type requestCancel struct {
@@ -285,7 +287,7 @@ func (a *App) LoadWorkspace() WorkspaceLoadResult {
 }
 
 func (a *App) loadWorkspaceLocked(root string) WorkspaceLoadResult {
-	payload, diagnostics, err := loadKurloStorePayloadRemembering(requestStorePath(), root)
+	payload, diagnostics, err := loadKurloStorePayloadRemembering(requestStorePath(), root, func() { a.emitWorkspaceChanged(workspaceExternalChangeNote) })
 	if diagnostics == nil {
 		diagnostics = []WorkspaceDiagnostic{}
 	}
@@ -368,17 +370,17 @@ func (a *App) saveRequestStorePayload(payload string, replaceAll bool) (int64, e
 		hints = workspaceDisk.saveHints(root)
 	}
 	hints.replaceAll = replaceAll
-	payload, savedExamples, kept, shape, err := withUnloadedRequestExamples(root, payload, replaceAll, len(external) == 0 && !hints.mayHoldLegacyExampleBodies())
+	store, savedExamples, kept, shape, err := withUnloadedRequestExamples(root, payload, replaceAll, len(external) == 0 && !hints.mayHoldLegacyExampleBodies())
 	if err != nil {
 		return 0, err
 	}
 	hints.kept = kept
-	if err := a.writeRequestStorePayload(root, payload, hints); err != nil {
+	if err := a.writeRequestStorePayload(root, store, hints); err != nil {
 		loadedRequestExamples.forget(root)
 		return 0, err
 	}
 	revision := storeSaveRevision.Add(1)
-	workspaceDisk.remember(root)
+	workspaceDisk.rememberStamps(root, hints.written)
 	if len(external) == 0 {
 		loadedRequestExamples.replace(root, savedExamples)
 		if hints.healthy && hints.segments != nil {
@@ -397,10 +399,10 @@ func (a *App) saveRequestStorePayload(payload string, replaceAll bool) (int64, e
 	return revision, nil
 }
 
-func withUnloadedRequestExamples(root, payload string, replaceAll, keepUnchanged bool) (string, map[string]json.RawMessage, map[string]json.RawMessage, *storeSaveShape, error) {
+func withUnloadedRequestExamples(root, payload string, replaceAll, keepUnchanged bool) (map[string]any, map[string]json.RawMessage, map[string]json.RawMessage, *storeSaveShape, error) {
 	store, err := decodeJSONMap(payload)
 	if err != nil {
-		return "", nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	shape := storeShapeFromPayload(store)
 	previous := map[string]json.RawMessage{}
@@ -412,25 +414,25 @@ func withUnloadedRequestExamples(root, payload string, replaceAll, keepUnchanged
 	} else {
 		cached, err := requestExamplesForRoot(root)
 		if err != nil {
-			return "", nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		if keepUnchanged {
 			kept = keepUnchangedRequestExamples(store, cached)
 		} else if err := attachUnloadedRequestExamples(store, cached); err != nil {
-			return "", nil, nil, nil, err
+			return nil, nil, nil, nil, err
 		}
 		previous = cached
 	}
 	saved := requestExamplesAfterSave(store, previous)
-	encoded, err := json.Marshal(store)
-	if err != nil {
-		return "", nil, nil, nil, err
-	}
-	return string(encoded), saved, kept, shape, nil
+	return store, saved, kept, shape, nil
 }
 
 func requestExamplesForRoot(root string) (map[string]json.RawMessage, error) {
-	if cached, ok := loadedRequestExamples.snapshot(root); ok {
+	cached, ok, err := loadedRequestExamples.await(root)
+	if err != nil {
+		return nil, err
+	}
+	if ok {
 		return cached, nil
 	}
 	if !hasYAMLWorkspaceStore(root) {
@@ -471,7 +473,7 @@ func (a *App) LoadRequestExamples(requestIDs []string) map[string][]any {
 	return result
 }
 
-func (a *App) writeRequestStorePayload(root, payload string, hints *workspaceSaveHints) error {
+func (a *App) writeRequestStorePayload(root string, store map[string]any, hints *workspaceSaveHints) error {
 	localStoreAuthFailed := false
 	if _, err := loadRequestStorePayload(requestStorePath()); err != nil && isRequestStoreAuthenticationError(err) {
 		localStoreAuthFailed = true
@@ -481,11 +483,11 @@ func (a *App) writeRequestStorePayload(root, payload string, hints *workspaceSav
 			if _, backupErr := backupRequestStoreForRecovery(requestStorePath()); backupErr != nil {
 				return fmt.Errorf("request store could not be decrypted and backup failed: %w", backupErr)
 			}
-			return saveKurloStorePayloadPreserving(requestStorePath(), root, payload, nil)
+			return saveKurloStoreWithHints(requestStorePath(), root, store, nil, nil)
 		}
 		if hints.cachedDisk() != nil {
 			hints.healthy = true
-			return saveKurloStorePayloadWithHints(requestStorePath(), root, payload, nil, hints)
+			return saveKurloStoreWithHints(requestStorePath(), root, store, nil, hints)
 		}
 		_, diagnostics, err := loadKurloStoreWithDiagnostics(requestStorePath(), root)
 		if err != nil {
@@ -493,16 +495,16 @@ func (a *App) writeRequestStorePayload(root, payload string, hints *workspaceSav
 				if _, backupErr := backupRequestStoreForRecovery(requestStorePath()); backupErr != nil {
 					return fmt.Errorf("request store could not be decrypted and backup failed: %w", backupErr)
 				}
-				return saveKurloStorePayloadPreserving(requestStorePath(), root, payload, nil)
+				return saveKurloStoreWithHints(requestStorePath(), root, store, nil, nil)
 			}
 			return err
 		}
 		if hints != nil {
 			hints.healthy = len(diagnostics) == 0
 		}
-		return saveKurloStorePayloadWithHints(requestStorePath(), root, payload, diagnosticPreserveDirs(root, diagnostics), hints)
+		return saveKurloStoreWithHints(requestStorePath(), root, store, diagnosticPreserveDirs(root, diagnostics), hints)
 	}
-	return saveKurloStorePayload(requestStorePath(), root, payload)
+	return saveKurloStoreWithHints(requestStorePath(), root, store, nil, nil)
 }
 
 func (a *App) GetVariables() map[string]string         { return a.state.GetVariables() }

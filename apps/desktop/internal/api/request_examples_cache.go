@@ -9,8 +9,10 @@ import (
 const exampleCountField = "exampleCount"
 
 type requestExamplesCache struct {
-	mu    sync.Mutex
-	roots map[string]map[string]json.RawMessage
+	mu      sync.Mutex
+	roots   map[string]map[string]json.RawMessage
+	pending map[string]chan struct{}
+	broken  map[string]bool
 }
 
 var loadedRequestExamples = &requestExamplesCache{roots: map[string]map[string]json.RawMessage{}}
@@ -18,6 +20,7 @@ var loadedRequestExamples = &requestExamplesCache{roots: map[string]map[string]j
 func (c *requestExamplesCache) replace(root string, examples map[string]json.RawMessage) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	delete(c.pending, root)
 	c.roots[root] = examples
 }
 
@@ -31,7 +34,73 @@ func (c *requestExamplesCache) snapshot(root string) (map[string]json.RawMessage
 func (c *requestExamplesCache) forget(root string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	delete(c.pending, root)
 	delete(c.roots, root)
+}
+
+func (c *requestExamplesCache) loadLater(root string, deferred *deferredRequestExamples, broken func()) {
+	done := make(chan struct{})
+	c.mu.Lock()
+	delete(c.roots, root)
+	if c.pending == nil {
+		c.pending = map[string]chan struct{}{}
+	}
+	c.pending[root] = done
+	c.mu.Unlock()
+	go func() {
+		examples, healthy := deferred.load(root)
+		c.mu.Lock()
+		current := c.pending[root] == done
+		if current {
+			delete(c.pending, root)
+			if healthy {
+				c.roots[root] = examples
+			} else {
+				if c.broken == nil {
+					c.broken = map[string]bool{}
+				}
+				c.broken[root] = true
+			}
+		}
+		c.mu.Unlock()
+		close(done)
+		if current && !healthy && broken != nil {
+			broken()
+		}
+	}()
+}
+
+func (c *requestExamplesCache) await(root string) (map[string]json.RawMessage, bool, error) {
+	for {
+		c.mu.Lock()
+		if examples, ok := c.roots[root]; ok {
+			c.mu.Unlock()
+			return examples, true, nil
+		}
+		done, loading := c.pending[root]
+		broken := c.broken[root]
+		c.mu.Unlock()
+		if loading {
+			<-done
+			continue
+		}
+		if broken {
+			return nil, false, errRequestExamplesNeedReload
+		}
+		return nil, false, nil
+	}
+}
+
+func (c *requestExamplesCache) needsEagerLoad(root string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.broken[root]
+}
+
+func (c *requestExamplesCache) healthy(root string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.broken, root)
 }
 
 func moveRequestExamplesOut(store map[string]any) map[string]json.RawMessage {

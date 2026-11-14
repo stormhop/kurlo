@@ -390,6 +390,10 @@ export function GitStatus() {
   return window['go']['api']['App']['GitStatus']();
 }
 
+export function GitStatusFiles(arg1) {
+  return window['go']['api']['App']['GitStatusFiles'](arg1);
+}
+
 export function GitStoreToken(arg1, arg2, arg3) {
   return window['go']['api']['App']['GitStoreToken'](arg1, arg2, arg3);
 }

@@ -258,7 +258,7 @@ The mark is saved in the environment's file as `protected: true`, so in a Git-ba
 
 ## Working alongside the app
 
-The app and `kurlo mcp` can have the same workspace open. They take turns writing it, so neither reads the other's half-written save. The app checks for files changed outside it about once a second and reloads them, with a short notice. If the app saves before it has reloaded, for example because you were typing in a request at that moment, it writes your edits and then puts back every file changed outside it that your edits did not touch. Only when both changed the same file does the app's version win.
+The app and `kurlo mcp` can have the same workspace open. They take turns writing it, so neither reads the other's half-written save. The app learns about files changed outside it from the operating system (FSEvents on macOS, `ReadDirectoryChangesW` on Windows, inotify on Linux) and reloads them within about a second, with a short notice; where that is unavailable it checks the folder once a second instead. If the app saves before it has reloaded, for example because you were typing in a request at that moment, it writes your edits and then puts back every file changed outside it that your edits did not touch. Only when both changed the same file does the app's version win.
 
 The same protection covers files changed by an editor or by `git pull` in a terminal.
 

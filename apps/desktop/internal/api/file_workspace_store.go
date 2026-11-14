@@ -213,6 +213,10 @@ func loadKurloStorePayloadWithDiagnostics(localStorePath, workspaceRoot string) 
 }
 
 func loadKurloStoreWithDiagnostics(localStorePath, workspaceRoot string) (map[string]any, []WorkspaceDiagnostic, error) {
+	return loadKurloStoreDeferring(localStorePath, workspaceRoot, nil)
+}
+
+func loadKurloStoreDeferring(localStorePath, workspaceRoot string, deferred *deferredRequestExamples) (map[string]any, []WorkspaceDiagnostic, error) {
 	localStore, _, localErr := loadLocalRequestStore(localStorePath)
 	localStoreAuthFailed := false
 	if localErr != nil && !errors.Is(localErr, os.ErrNotExist) {
@@ -241,7 +245,7 @@ func loadKurloStoreWithDiagnostics(localStorePath, workspaceRoot string) (map[st
 		return nil, nil, err
 	}
 	secrets := stringMap(localStore["secrets"])
-	workspaces, collections, requests, environments, workspaceCookies, diagnostics, err := loadFilesystemWorkspaceStoreRepairing(workspaceRoot, secrets)
+	workspaces, collections, requests, environments, workspaceCookies, diagnostics, err := loadFilesystemWorkspaceStoreRepairing(workspaceRoot, secrets, deferred)
 	if err != nil {
 		return nil, diagnostics, err
 	}
@@ -289,7 +293,10 @@ func saveKurloStorePayloadWithHints(localStorePath, workspaceRoot, payload strin
 	if err != nil {
 		return err
 	}
+	return saveKurloStoreWithHints(localStorePath, workspaceRoot, store, preserveDirs, hints)
+}
 
+func saveKurloStoreWithHints(localStorePath, workspaceRoot string, store map[string]any, preserveDirs []string, hints *workspaceSaveHints) error {
 	if err := validateWorkspaceStorePayload(store); err != nil {
 		return err
 	}
@@ -305,6 +312,7 @@ func saveKurloStorePayloadWithHints(localStorePath, workspaceRoot, payload strin
 	}
 	disk := hints.cachedDisk()
 	if disk == nil {
+		var err error
 		disk, err = inspectWorkspaceStoreOnDisk(workspaceRoot)
 		if err != nil {
 			return err
@@ -678,7 +686,8 @@ func writeYAMLWorkspaceStoreContents(root string, workspaces, collections, reque
 
 	}
 
-	if err := pruneYAMLWorkspaceStore(root, desiredFiles, preserveDirs, legacyBodies); err != nil {
+	written, err := pruneYAMLWorkspaceStore(root, desiredFiles, preserveDirs, legacyBodies)
+	if err != nil {
 		return err
 	}
 	if err := journal.finish(); err != nil {
@@ -686,6 +695,7 @@ func writeYAMLWorkspaceStoreContents(root string, workspaces, collections, reque
 	}
 	if hints != nil {
 		hints.segments = journal.segments
+		hints.written = written
 	}
 	return ensureWorkspaceGitignore(root)
 }
@@ -714,14 +724,15 @@ func mergePreservedWorkspaceOrder(root string, desired []string) []string {
 	return merged
 }
 
-func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, preserveDirs []string, legacyBodies map[string]struct{}) error {
+func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, preserveDirs []string, legacyBodies map[string]struct{}) (workspaceSnapshot, error) {
 	managedRoot := filepath.Join(root, fileStoreWorkspacesDir)
 	if _, err := readDirNoSymlink(managedRoot); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil
+			return nil, nil
 		}
-		return err
+		return nil, err
 	}
+	stamps := workspaceSnapshot{}
 	var stale []string
 	var dirs []string
 	children := map[string]int{}
@@ -735,6 +746,13 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		if entry.IsDir() {
 			dirs = append(dirs, path)
 			return nil
+		}
+		if entry.Type()&os.ModeSymlink == 0 {
+			if rel, err := filepath.Rel(root, path); err == nil && workspaceTrackedFile(filepath.ToSlash(rel)) {
+				if info, err := entry.Info(); err == nil && info.Mode().IsRegular() {
+					stamps[filepath.ToSlash(rel)] = workspaceFileStamp{size: info.Size(), mod: info.ModTime().UnixNano()}
+				}
+			}
 		}
 		if isOpenAPIBaseSpecPath(path) {
 			owner := filepath.Join(filepath.Dir(filepath.Dir(path)), fileStoreCollection)
@@ -765,7 +783,7 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 		stale = append(stale, path)
 		return nil
 	}); err != nil {
-		return err
+		return nil, err
 	}
 	stale = append(stale, staleWorkspaceReadmes(managedRoot, stale)...)
 	sort.SliceStable(stale, func(i, j int) bool {
@@ -773,9 +791,12 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 	})
 	for _, path := range stale {
 		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
+			return nil, err
 		}
 		children[filepath.Dir(path)]--
+		if rel, err := filepath.Rel(root, path); err == nil {
+			delete(stamps, filepath.ToSlash(rel))
+		}
 	}
 	sort.Slice(dirs, func(i, j int) bool {
 		return len(dirs[i]) > len(dirs[j])
@@ -785,11 +806,16 @@ func pruneYAMLWorkspaceStore(root string, desiredFiles map[string]struct{}, pres
 			continue
 		}
 		if err := os.Remove(dir); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return err
+			return nil, err
 		}
 		children[filepath.Dir(dir)]--
 	}
-	return nil
+	if info, err := os.Lstat(filepath.Join(root, fileStoreRootIndex)); err == nil && info.Mode().IsRegular() {
+		stamps[fileStoreRootIndex] = workspaceFileStamp{size: info.Size(), mod: info.ModTime().UnixNano()}
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	return stamps, nil
 }
 
 func pruneRank(path string) int {
@@ -1047,24 +1073,25 @@ func loadFilesystemWorkspaceStoreWithDiagnostics(root string, secrets map[string
 	return loadYAMLWorkspaceStoreWithDiagnostics(root, secrets)
 }
 
-func loadFilesystemWorkspaceStoreRepairing(root string, secrets map[string]string) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, error) {
-	workspaces, collections, requests, environments, cookies, diagnostics, fixes, err := loadYAMLWorkspaceStoreWithFixes(root, secrets)
+func loadFilesystemWorkspaceStoreRepairing(root string, secrets map[string]string, deferred *deferredRequestExamples) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, error) {
+	workspaces, collections, requests, environments, cookies, diagnostics, fixes, err := loadYAMLWorkspaceStoreWithFixes(root, secrets, deferred)
 	if err != nil || len(fixes) == 0 || workspaceIntegrityError(diagnostics) != nil {
 		return workspaces, collections, requests, environments, cookies, diagnostics, err
 	}
 	if applyWorkspaceReferenceFixes(fixes) != nil {
 		return workspaces, collections, requests, environments, cookies, diagnostics, nil
 	}
-	workspaces, collections, requests, environments, cookies, diagnostics, _, err = loadYAMLWorkspaceStoreWithFixes(root, secrets)
+	deferred.reset()
+	workspaces, collections, requests, environments, cookies, diagnostics, _, err = loadYAMLWorkspaceStoreWithFixes(root, secrets, deferred)
 	return workspaces, collections, requests, environments, cookies, diagnostics, err
 }
 
 func loadYAMLWorkspaceStoreWithDiagnostics(root string, secrets map[string]string) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, error) {
-	workspaces, collections, requests, environments, cookies, diagnostics, _, err := loadYAMLWorkspaceStoreWithFixes(root, secrets)
+	workspaces, collections, requests, environments, cookies, diagnostics, _, err := loadYAMLWorkspaceStoreWithFixes(root, secrets, nil)
 	return workspaces, collections, requests, environments, cookies, diagnostics, err
 }
 
-func loadYAMLWorkspaceStoreWithFixes(root string, secrets map[string]string) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, []workspaceReferenceFix, error) {
+func loadYAMLWorkspaceStoreWithFixes(root string, secrets map[string]string, deferred *deferredRequestExamples) ([]map[string]any, []map[string]any, []map[string]any, []map[string]any, map[string][]map[string]any, []WorkspaceDiagnostic, []workspaceReferenceFix, error) {
 	workspaceEntries, invalidWorkspaceFolders, diagnostics, err := readYAMLWorkspaceEntriesWithDiagnostics(root, secrets)
 	if err != nil {
 		return nil, nil, nil, nil, nil, diagnostics, nil, err
@@ -1076,6 +1103,7 @@ func loadYAMLWorkspaceStoreWithFixes(root string, secrets map[string]string) ([]
 	workspaceCookies := map[string][]map[string]any{}
 
 	validator := newWorkspaceIntegrityValidator(root)
+	validator.deferred = deferred
 	for _, workspaceEntry := range workspaceEntries {
 		validator.item("workspace", filepath.Join(workspaceEntry.path, fileStoreRootFileName), workspaceEntry.workspace)
 		workspaceID := stringValue(workspaceEntry.workspace, "id")
@@ -1150,6 +1178,16 @@ func collectWorkspaceFolderChildren(workspacePath, root, workspaceID string, col
 				requestItems = append(requestItems, requestEntry.request)
 			}
 			validator.order(collectionPath, "requestOrder", collectionEntry.requestOrder, requestItems)
+		}
+		if validator != nil && validator.deferred != nil {
+			segments := collectionExampleSegments(collectionEntry.path)
+			for _, requestEntry := range requestEntries {
+				validator.item("request", requestEntry.path, requestEntry.request)
+				validator.reference(requestEntry.path, "request", requestEntry.request, "collectionId", collectionID)
+				validator.deferred.note(collectionEntry.path, workspaceID, collectionID, requestEntry.request, segments)
+				requests = append(requests, requestEntry.request)
+			}
+			continue
 		}
 		exampleDirs := make([]string, 0, len(requestEntries))
 		for _, requestEntry := range requestEntries {
@@ -2025,7 +2063,7 @@ func writeCanonicalYAMLFile(path string, value any, journal *saveJournal, canoni
 			return err
 		}
 	}
-	data, err := marshalWorkspaceYAML(value)
+	data, err := marshalWorkspaceYAMLFor(path, value)
 	if err != nil {
 		return err
 	}

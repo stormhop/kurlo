@@ -122,6 +122,26 @@ func scanWorkspaceFiles(root string, previous workspaceSnapshot, withHash bool) 
 	return snapshot, nil
 }
 
+func hashWorkspaceStamps(root string, stamps, previous workspaceSnapshot) (workspaceSnapshot, error) {
+	snapshot := make(workspaceSnapshot, len(stamps))
+	for rel, stamp := range stamps {
+		if prev, ok := previous[rel]; ok && prev.hash != "" && sameStamp(prev, stamp) {
+			stamp.hash = prev.hash
+		} else {
+			data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					continue
+				}
+				return nil, err
+			}
+			stamp.hash = contentHash(data)
+		}
+		snapshot[rel] = stamp
+	}
+	return snapshot, nil
+}
+
 func contentHash(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
@@ -146,13 +166,23 @@ func sameStamp(left, right workspaceFileStamp) bool {
 }
 
 func (t *workspaceDiskTracker) remember(root string) {
+	t.rememberStamps(root, nil)
+}
+
+func (t *workspaceDiskTracker) rememberStamps(root string, stamps workspaceSnapshot) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	var previous workspaceSnapshot
 	if sameWorkspaceRoot(t.root, root) {
 		previous = t.known
 	}
-	snapshot, err := scanWorkspaceFiles(root, previous, true)
+	var snapshot workspaceSnapshot
+	var err error
+	if stamps != nil {
+		snapshot, err = hashWorkspaceStamps(root, stamps, previous)
+	} else {
+		snapshot, err = scanWorkspaceFiles(root, previous, true)
+	}
 	if err != nil {
 		t.root, t.known, t.announced, t.savedSegments, t.savedShape = "", nil, "", nil, nil
 		return
@@ -339,54 +369,89 @@ var workspaceWindowMinimised = func(ctx context.Context) bool {
 func (a *App) watchWorkspaceDisk(ctx context.Context) {
 	ticker := time.NewTicker(workspaceDiskPollInterval)
 	defer ticker.Stop()
+	loop := newWorkspaceDiskLoop()
+	defer loop.stop()
 	var announcedGlobals string
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case _, open := <-loop.changes():
+			loop.changed(open)
 		case <-ticker.C:
-			a.pollWorkspaceDisk(ctx, &announcedGlobals)
+			loop.follow(workspaceDisk.trackedRoot())
+			a.pollWorkspaceDisk(ctx, &announcedGlobals, loop)
 		}
 	}
 }
 
-func (a *App) pollWorkspaceDisk(ctx context.Context, announcedGlobals *string) bool {
+func (a *App) pollWorkspaceDisk(ctx context.Context, announcedGlobals *string, loop *workspaceDiskLoop) bool {
 	if workspaceWindowMinimised(ctx) {
 		return false
 	}
 	if seen := a.globalsRevision.Load(); seen != nil {
-		revision := currentProfileGlobalsRevision()
+		revision := cachedProfileGlobalsRevision()
 		if revision != "" && revision != *seen && revision != *announcedGlobals {
 			*announcedGlobals = revision
 			a.emitWorkspaceChanged(workspaceAgentChangeNote)
 		}
 	}
-	if changed, reason := a.workspaceChangedOutside(); changed {
+	now := time.Now()
+	if loop != nil && !loop.due(now) {
+		return true
+	}
+	changed, reason, checked := a.checkWorkspaceChangedOutside()
+	if checked && loop != nil {
+		loop.scanned(now)
+	}
+	if changed {
 		a.emitWorkspaceChanged(reason)
 	}
 	return true
 }
 
+var profileGlobalsCache struct {
+	sync.Mutex
+	payload  string
+	revision string
+}
+
+func cachedProfileGlobalsRevision() string {
+	payload, _ := loadRequestStorePayload(requestStorePath())
+	profileGlobalsCache.Lock()
+	defer profileGlobalsCache.Unlock()
+	if payload != profileGlobalsCache.payload || profileGlobalsCache.revision == "" {
+		profileGlobalsCache.payload = payload
+		profileGlobalsCache.revision = profileGlobalsRevision(payload)
+	}
+	return profileGlobalsCache.revision
+}
+
 func (a *App) workspaceChangedOutside() (bool, string) {
+	changed, reason, _ := a.checkWorkspaceChangedOutside()
+	return changed, reason
+}
+
+func (a *App) checkWorkspaceChangedOutside() (bool, string, bool) {
 	if !gitOperationMu.TryRLock() {
-		return false, ""
+		return false, "", false
 	}
 	defer gitOperationMu.RUnlock()
 	root := workspaceDisk.trackedRoot()
 	if root == "" {
-		return false, ""
+		return false, "", true
 	}
 	unlock, ok := tryLockWorkspaceWrites(root)
 	if !ok {
-		return false, ""
+		return false, "", false
 	}
 	defer unlock()
 	if !workspaceDisk.unannouncedChange(root) {
-		return false, ""
+		return false, "", true
 	}
 	_, changes, err := workspaceDisk.externalChanges(root)
 	if err != nil {
-		return true, workspaceExternalChangeNote
+		return true, workspaceExternalChangeNote, true
 	}
-	return true, workspaceDisk.changeReason(root, changes)
+	return true, workspaceDisk.changeReason(root, changes), true
 }

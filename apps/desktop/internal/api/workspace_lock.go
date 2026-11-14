@@ -90,13 +90,17 @@ func loadKurloStorePayloadLocked(localStorePath, root string) (string, []Workspa
 	return loadKurloStorePayloadWithDiagnostics(localStorePath, root)
 }
 
-func loadKurloStorePayloadRemembering(localStorePath, root string) (string, []WorkspaceDiagnostic, error) {
+func loadKurloStorePayloadRemembering(localStorePath, root string, examplesBroken func()) (string, []WorkspaceDiagnostic, error) {
 	unlock, err := lockWorkspaceWrites(root)
 	if err != nil {
 		return "", nil, err
 	}
 	defer unlock()
-	store, diagnostics, err := loadKurloStoreWithDiagnostics(localStorePath, root)
+	var deferred *deferredRequestExamples
+	if !loadedRequestExamples.needsEagerLoad(root) {
+		deferred = &deferredRequestExamples{}
+	}
+	store, diagnostics, err := loadKurloStoreDeferring(localStorePath, root, deferred)
 	if hasYAMLWorkspaceStore(root) {
 		workspaceDisk.remember(root)
 		if err == nil && len(diagnostics) == 0 {
@@ -106,7 +110,14 @@ func loadKurloStorePayloadRemembering(localStorePath, root string) (string, []Wo
 	if err != nil {
 		return "", diagnostics, err
 	}
-	loadedRequestExamples.replace(root, moveRequestExamplesOut(store))
+	if deferred != nil {
+		loadedRequestExamples.loadLater(root, deferred, examplesBroken)
+	} else {
+		loadedRequestExamples.replace(root, moveRequestExamplesOut(store))
+		if len(diagnostics) == 0 {
+			loadedRequestExamples.healthy(root)
+		}
+	}
 	payload, err := json.Marshal(store)
 	if err != nil {
 		return "", diagnostics, err

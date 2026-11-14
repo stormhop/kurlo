@@ -1,7 +1,7 @@
 import { kurloChangedFiles } from '../../gitFiles';
 import {
   gitStatus, gitDiff, gitOutgoingChanges, gitCommitLogPage, gitCommitDiff, gitConflictFile,
-  gitResolveConflictFile, gitContinueOperation, gitAbortOperation, gitStashWorkspace, gitStashPopWorkspace,
+  gitStatusFiles, gitResolveConflictFile, gitContinueOperation, gitAbortOperation, gitStashWorkspace, gitStashPopWorkspace,
   gitFetchWorkspace, gitPullWorkspace, gitPullBranch, gitCloneWorkspace, gitInitWorkspace, gitAddRemote,
   gitTestRemote, gitListBranches, gitCheckoutBranch, gitCreateBranch, gitCreateTrackingBranch,
   gitDeleteBranch, gitRenameBranch, gitStageWorkspaceFiles, gitCommitWorkspace, gitCommitWorkspaceFiles,
@@ -11,7 +11,7 @@ import {
 } from '../../backend';
 import { EMPTY_GIT_STATUS } from '../../wire';
 import type {
-  GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitOperationResult, GitPullSummary,
+  GitBranchListResult, GitConflictFileResult, GitDiffResult, GitFileStatus, GitLogResult, GitOperationResult, GitPullSummary,
   GitWorkspaceStatus, WorkspaceOpenResult,
 } from '../../backend';
 import { fastForwardPullDivergedMessage, normalizeGitPullStrategy, shouldPromptForDivergedPull } from '../../gitPullStrategy';
@@ -71,6 +71,36 @@ export const EMPTY_GIT_LOG: GitLogResult = {
   error: '',
   output: '',
 };
+
+type SavedGitPaths = { all: boolean; paths: Set<string> };
+const savedGitPaths = new WeakMap<object, SavedGitPaths>();
+
+export function noteSavedWorkspacePaths(host: object, written: string[] | null) {
+  const pending = savedGitPaths.get(host) ?? { all: false, paths: new Set<string>() };
+  if (written === null) pending.all = true;
+  else for (const path of written) pending.paths.add(path);
+  savedGitPaths.set(host, pending);
+}
+
+function gitPathCovered(scopes: string[], path: string): boolean {
+  return scopes.some(scope => path === scope || path.startsWith(`${scope}/`));
+}
+
+export function mergeGitFileStatus(files: GitFileStatus[], scopes: string[], updates: GitFileStatus[]): GitFileStatus[] {
+  const fresh = new Map(updates.map(file => [file.path, file]));
+  const merged: GitFileStatus[] = [];
+  for (const file of files) {
+    if (!gitPathCovered(scopes, file.path)) {
+      merged.push(file);
+      continue;
+    }
+    const update = fresh.get(file.path);
+    if (!update) continue;
+    merged.push(update);
+    fresh.delete(file.path);
+  }
+  return [...merged, ...fresh.values()];
+}
 
 export function cloneDirectoryNameFromUrl(remoteUrl: string): string {
   let value = remoteUrl.trim().replace(/\/+$/, '');
@@ -205,21 +235,34 @@ export const gitFeature = {
     }, 180);
   },
   async refreshGitStatusAfterPersist(this: GitHost) {
+    const pending = savedGitPaths.get(this);
+    savedGitPaths.delete(this);
+    if (!pending || (!pending.all && !pending.paths.size)) return;
     try {
-      const status = normalizeGitStatus(await gitStatus());
-      this.gitStatus = status;
-      if (status.isRepo) {
-        this.gitBranches = normalizeGitBranches(await gitListBranches());
+      let affected = (_path: string) => true;
+      const scoped = this.gitStatus.isRepo ? await gitStatusFiles(pending.all ? null : [...pending.paths]) : null;
+      if (scoped?.ok && this.gitStatus.isRepo) {
+        const current = this.gitStatus;
+        const files = scoped.scoped ? mergeGitFileStatus(current.files, scoped.paths, scoped.files) : scoped.files;
+        if (scoped.scoped) affected = path => gitPathCovered(scoped.paths, path);
+        this.gitStatus = { ...current, files, clean: files.length === 0 };
       } else {
-        this.gitBranches = { ...EMPTY_GIT_BRANCHES };
+        const wasRepo = this.gitStatus.isRepo;
+        const status = normalizeGitStatus(await gitStatus());
+        this.gitStatus = status;
+        if (status.isRepo && !wasRepo) this.gitBranches = normalizeGitBranches(await gitListBranches());
+        else if (!status.isRepo) this.gitBranches = { ...EMPTY_GIT_BRANCHES };
       }
-      if (this.gitSelectedPath && status.files.some(file => file.path === this.gitSelectedPath)) {
-        void this.selectGitFile(this.gitSelectedPath);
-      } else if (this.gitSelectedPath) {
+      const selected = this.gitSelectedPath;
+      if (!selected || !affected(selected)) return;
+      if (this.gitStatus.files.some(file => file.path === selected)) {
+        void this.selectGitFile(selected);
+      } else {
         this.gitSelectedPath = '';
         this.gitDiff = { ...EMPTY_GIT_DIFF };
       }
     } catch {
+      noteSavedWorkspacePaths(this, pending.all ? null : [...pending.paths]);
     }
   },
   async refreshGitStatus(this: GitHost) {

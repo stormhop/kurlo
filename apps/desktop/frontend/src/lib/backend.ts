@@ -2,7 +2,7 @@ import type {
   CodexStatus, CodexConnection, ClaudeStatus, ClaudeConnection, AppInfo, AuthConfig, CollectionTextFile, CollectionTextFilesResult, CookieJarEntry, CookieJarResult,
   CookieSyncConfig, CookieSyncStatus,
   DefaultWorkspaceLocationResult, DownloadResult, GitAuthConfigResult, GitBranchListResult,
-  GitConflictFileResult, GitDiffResult, GitLogResult, GitOperationResult, GitTokenInfoResult,
+  GitConflictFileResult, GitDiffResult, GitFileStatusResult, GitLogResult, GitOperationResult, GitTokenInfoResult,
   GitWorkspaceStatus, GrpcRequest, GrpcResponse, GrpcServiceDefinition, HttpRequest, HttpResponse,
   JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
@@ -275,7 +275,7 @@ export async function saveRequestStoreDelta(payload: string): Promise<SaveReques
   const app = window.go?.api?.App;
   if (!app?.SaveRequestStoreDelta) return { ok: false, error: '', needFull: true };
   const result = await app.SaveRequestStoreDelta(payload);
-  return { ok: Boolean(result?.ok), error: result?.error ?? '', revision: result?.revision, needFull: Boolean(result?.needFull) };
+  return { ok: Boolean(result?.ok), error: result?.error ?? '', revision: result?.revision, needFull: Boolean(result?.needFull), delta: Boolean(result?.delta), written: Array.isArray(result?.written) ? result.written : [] };
 }
 
 export type RequestStoreView = { activeId: string; activeWorkspaceId: string; openIds: string[] };
@@ -401,6 +401,12 @@ export async function setDefaultWorkspaceLocation(path: string): Promise<Default
 
 export async function gitStatus(): Promise<GitWorkspaceStatus> {
   return (await window.go?.api?.App?.GitStatus?.()) ?? EMPTY_GIT_STATUS;
+}
+
+export async function gitStatusFiles(paths: string[] | null): Promise<GitFileStatusResult | null> {
+  const app = window.go?.api?.App;
+  if (!app?.GitStatusFiles) return null;
+  return (await app.GitStatusFiles(paths as string[])) ?? null;
 }
 
 export async function gitDiff(path: string): Promise<GitDiffResult> {

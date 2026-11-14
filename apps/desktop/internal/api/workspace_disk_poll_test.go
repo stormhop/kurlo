@@ -21,7 +21,7 @@ func TestDiskPollingWaitsWhileTheWindowIsMinimised(t *testing.T) {
 	before := announcedWorkspaceFingerprint()
 	var globals string
 
-	if app.pollWorkspaceDisk(context.Background(), &globals) {
+	if app.pollWorkspaceDisk(context.Background(), &globals, nil) {
 		t.Fatal("a minimised window should not scan the workspace")
 	}
 	if announcedWorkspaceFingerprint() != before {
@@ -29,7 +29,7 @@ func TestDiskPollingWaitsWhileTheWindowIsMinimised(t *testing.T) {
 	}
 
 	minimised = false
-	if !app.pollWorkspaceDisk(context.Background(), &globals) {
+	if !app.pollWorkspaceDisk(context.Background(), &globals, nil) {
 		t.Fatal("a restored window should scan the workspace")
 	}
 	if announcedWorkspaceFingerprint() == before {

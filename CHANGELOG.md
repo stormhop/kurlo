@@ -12,6 +12,9 @@ All notable changes to Kurlo are documented here. This project follows
 - **One loader everywhere.** Every place that waits — the response panel, gRPC and MCP calls, diffs, history, cookies, examples, the mock server, model lists, settings checks and buttons such as Cancel — now shows the flying Kurlo bird instead of spinners and *Loading…* captions. Screen readers still hear what is loading.
 - **Claude Code models stay current.** Kurlo reads the available models, default model and supported effort levels from your installed Claude Code CLI instead of a fixed list. The last successful list is kept for temporary connection failures, and existing chats keep their selected model.
 - **Saving an edit writes only what changed.** After the first save, Kurlo sends just the edited requests and the rest of the small workspace state, and rewrites only their files instead of the whole workspace. In a workspace with 1,300 requests one autosave goes from about 280 ms to about 20 ms and from 5 MB to under 20 KB over the bridge, so switching tabs or opening examples right after typing no longer waits. Adding, removing, renaming, reordering or moving requests, editing collections or examples, and any file changed outside Kurlo still go through the full save.
+- **Large workspaces open and save faster.** Kurlo no longer reads every response example when a workspace opens: the request list needs only how many examples each request has, and the examples themselves are read in the background right after. In a workspace with 1,300 requests opening goes from about 430 ms to about 190 ms. The full save, used for the first edit after opening and for structural changes, decodes the workspace once, rebuilds files only for what changed and walks the folder one time fewer, about 170 ms instead of 290 ms. Typing in a request no longer rebuilds the sidebar unless a name, method, folder or other visible part of a row changes.
+- **Git status after a save checks only the saved files.** After an autosave Kurlo asks Git about the files it just wrote instead of refreshing the whole status and the branch list, so the Git panel stays current without running half a dozen Git commands per edit.
+- **File changes are noticed through the system.** Kurlo watches the workspace folder with FSEvents on macOS, `ReadDirectoryChangesW` on Windows and inotify on Linux instead of scanning it every second, so a large idle workspace no longer costs CPU. Changes from Git, editors and agents still show up within a second; the scan every second remains as a fallback where native watching is unavailable, plus a check every 15 seconds.
 
 ### Fixed
 
@@ -25,6 +28,7 @@ All notable changes to Kurlo are documented here. This project follows
 - **Links without underlines.** Links, such as the example names in the mock server, change colour on hover instead of being underlined, like the rest of the app.
 - **No macOS suggestions in text fields.** Filters, search boxes and other fields no longer show autocorrect, autocomplete or capitalisation pop-ups while you type.
 - **Settings open at once.** Settings and search are prepared in the background after start-up, so the first open no longer waits.
+- **Git paths with spaces.** Files whose path contains spaces or other characters Git quotes now show without quotes in the Git panel, so their diffs open and Kurlo recognises its own files among them.
 
 ## [3.1.0] - 2026-11-13
 

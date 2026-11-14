@@ -135,6 +135,8 @@ Some changes leave Kurlo unable to tell which file is right, and these pause sav
 - `kurlo.yml`, `workspace.yml`, or `collection.yml` was deleted but files inside its folder remain.
 - A response example has no matching request file.
 
+Response examples are read in the background just after a workspace opens. If one of them turns out to be unreadable, Kurlo refuses to save until it reloads the workspace, which it does by itself, and then lists the file like any other problem.
+
 When this happens, the Git screen lists one entry per problem and pauses editing and commits for the open workspace folder. Fix the listed file with **Edit YAML**, or pull a commit that fixes it. Kurlo does not guess a replacement.
 
 ## Safety rules
