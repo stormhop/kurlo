@@ -313,6 +313,8 @@ export function SaveLoadTestK6Folder(arg1:string,arg2:boolean,arg3:string):Promi
 
 export function SaveRequestStore(arg1:string):Promise<boolean>;
 
+export function SaveRequestStoreDelta(arg1:string):Promise<api.SaveRequestStoreResult>;
+
 export function SaveRequestStoreView(arg1:string):Promise<api.SaveRequestStoreResult>;
 
 export function SaveRequestStoreWithError(arg1:string):Promise<api.SaveRequestStoreResult>;

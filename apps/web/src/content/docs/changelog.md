@@ -15,11 +15,13 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Changed
 
 - **Claude Code models stay current**: models, the default and effort levels come from your installed CLI. Kurlo keeps the last successful list for temporary failures and preserves the model in existing chats.
+- **Saving an edit writes only what changed**: Kurlo sends and rewrites just the edited requests, so an autosave in a workspace with 1,300 requests takes about 20 ms instead of 280 ms. Structural changes and files edited outside Kurlo still use the full save.
 
 ### Fixed
 
 - **Mock server with thousands of examples**: the route list reads only methods, paths and statuses and the server reads responses from disk, so it opens quickly, scrolls without blank gaps and keeps the sidebar animation smooth; hiding the sidebar no longer moves the list away from the route you were looking at.
 - **The sidebar hides and shows at once**: toggling it no longer restyles the whole window, so the slide starts without a pause in large workspaces.
+- **Large workspaces stay responsive**: saving no longer re-encodes or resends examples already on disk, so typing, saving and switching requests do not stall with hundreds of requests.
 - **Long lists scroll the same way everywhere**: the collection runner has no page buttons any more, and agent activity loads older calls as you scroll; its search and summary cover the whole log.
 - **Chats and Git history load more as you scroll**: a long agent chat loads earlier messages as you scroll up instead of through a button, and Git history loads 100 older commits at a time.
 

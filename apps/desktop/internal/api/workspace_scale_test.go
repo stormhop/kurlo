@@ -133,6 +133,36 @@ func TestWorkspaceScaleTimings(t *testing.T) {
 		}
 	})
 
+	last, _ := json.Marshal(edited)
+	baseResult := app.SaveRequestStoreWithError(string(last))
+	if !baseResult.Ok {
+		t.Fatal(baseResult.Error)
+	}
+	base := baseResult.Revision
+	top := map[string]any{}
+	for key, value := range edited {
+		if key != "requests" {
+			top[key] = value
+		}
+	}
+	ids := make([]string, 0, len(editedRequests))
+	for _, request := range editedRequests {
+		ids = append(ids, request.(map[string]any)["id"].(string))
+	}
+	timeScalePhase(t, "autosave delta: one request URL changed", 5, func() {
+		edit++
+		editedRequests[11].(map[string]any)["url"] = fmt.Sprintf("{{baseUrl}}/job/v1/edited/%d", edit)
+		delta, _ := json.Marshal(map[string]any{"base": base, "store": top, "requestIds": ids, "requests": []any{editedRequests[11]}})
+		if edit == 7 {
+			t.Logf("delta payload %.1f KB", float64(len(delta))/1e3)
+		}
+		result := app.SaveRequestStoreDelta(string(delta))
+		if !result.Ok {
+			t.Fatalf("delta save: %+v", result)
+		}
+		base = result.Revision
+	})
+
 	timeScalePhase(t, "tab close: SaveRequestStoreView", 5, func() {
 		if result := app.SaveRequestStoreView(`{"activeId":"req-00008","activeWorkspaceId":"workspace-main","openIds":["req-00005","req-00008"]}`); !result.Ok {
 			t.Fatal(result.Error)

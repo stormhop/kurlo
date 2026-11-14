@@ -32,6 +32,14 @@ func (j *saveJournal) unchanged(path string, data []byte) bool {
 	return ok && hash == contentHash(data)
 }
 
+func (j *saveJournal) knows(path string) bool {
+	if j == nil || j.known == nil {
+		return false
+	}
+	_, ok := j.known[path]
+	return ok
+}
+
 func (j *saveJournal) segment(kind, id, segment string) {
 	if j == nil || j.segments == nil {
 		return

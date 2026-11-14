@@ -642,6 +642,12 @@ func writeYAMLWorkspaceStoreContents(root string, workspaces, collections, reque
 					return err
 				}
 				desiredFiles[requestPath] = struct{}{}
+				if raw, kept := hints.keptExamples(requestID); kept && len(examples) == 0 {
+					if err := keepRequestExamples(collectionDir, requestFiles[requestID], raw, desiredFiles, journal); err != nil {
+						return err
+					}
+					continue
+				}
 				if err := writeRequestExamples(collectionDir, requestFiles[requestID], examples, desiredFiles, journal); err != nil {
 					return err
 				}

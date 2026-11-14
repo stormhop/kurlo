@@ -50,8 +50,10 @@ type App struct {
 }
 
 type SaveRequestStoreResult struct {
-	Ok    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
+	Ok       bool   `json:"ok"`
+	Error    string `json:"error,omitempty"`
+	Revision int64  `json:"revision,omitempty"`
+	NeedFull bool   `json:"needFull,omitempty"`
 }
 
 type requestCancel struct {
@@ -315,19 +317,21 @@ func (a *App) SaveRequestStore(payload string) bool {
 func (a *App) SaveRequestStoreWithError(payload string) SaveRequestStoreResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	if err := a.saveRequestStorePayload(payload, false); err != nil {
+	revision, err := a.saveRequestStorePayload(payload, false)
+	if err != nil {
 		return SaveRequestStoreResult{Ok: false, Error: err.Error()}
 	}
-	return SaveRequestStoreResult{Ok: true}
+	return SaveRequestStoreResult{Ok: true, Revision: revision}
 }
 
 func (a *App) ReplaceRequestStoreWithError(payload string) SaveRequestStoreResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	if err := a.saveRequestStorePayload(payload, true); err != nil {
+	revision, err := a.saveRequestStorePayload(payload, true)
+	if err != nil {
 		return SaveRequestStoreResult{Ok: false, Error: err.Error()}
 	}
-	return SaveRequestStoreResult{Ok: true}
+	return SaveRequestStoreResult{Ok: true, Revision: revision}
 }
 
 func (a *App) SaveRequestStoreView(payload string) SaveRequestStoreResult {
@@ -339,59 +343,66 @@ func (a *App) SaveRequestStoreView(payload string) SaveRequestStoreResult {
 	return SaveRequestStoreResult{Ok: true}
 }
 
-func (a *App) saveRequestStorePayload(payload string, replaceAll bool) error {
+func (a *App) saveRequestStorePayload(payload string, replaceAll bool) (int64, error) {
+	workspaceDisk.forgetSavedShape()
 	root := fileWorkspaceStorePath()
 	unlock, err := lockWorkspaceWrites(root)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer unlock()
 	if !replaceAll && failedStoreLoads.failed(root) {
-		return fmt.Errorf("Kurlo could not read this workspace when it opened, so it will not save over it. Reload the workspace and try again")
+		return 0, fmt.Errorf("Kurlo could not read this workspace when it opened, so it will not save over it. Reload the workspace and try again")
 	}
 	if seen := a.globalsRevision.Load(); seen != nil && *seen != currentProfileGlobalsRevision() {
-		return fmt.Errorf("global variables changed outside the editor; reload the workspace before saving")
+		return 0, fmt.Errorf("global variables changed outside the editor; reload the workspace before saving")
 	}
 	before, external, err := workspaceDisk.externalChanges(root)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	hints := &workspaceSaveHints{}
 	if len(external) == 0 {
 		hints = workspaceDisk.saveHints(root)
 	}
 	hints.replaceAll = replaceAll
-	payload, savedExamples, err := withUnloadedRequestExamples(root, payload, replaceAll)
+	payload, savedExamples, kept, shape, err := withUnloadedRequestExamples(root, payload, replaceAll, len(external) == 0 && !hints.mayHoldLegacyExampleBodies())
 	if err != nil {
-		return err
+		return 0, err
 	}
+	hints.kept = kept
 	if err := a.writeRequestStorePayload(root, payload, hints); err != nil {
 		loadedRequestExamples.forget(root)
-		return err
+		return 0, err
 	}
+	revision := storeSaveRevision.Add(1)
 	workspaceDisk.remember(root)
 	if len(external) == 0 {
 		loadedRequestExamples.replace(root, savedExamples)
 		if hints.healthy && hints.segments != nil {
 			workspaceDisk.rememberSavedSegments(root, hints.segments)
+			shape.revision = revision
+			workspaceDisk.rememberSavedShape(root, shape)
 		}
-		return nil
+		return revision, nil
 	}
 	loadedRequestExamples.forget(root)
 	reason := workspaceDisk.changeReason(root, external)
 	if err := reapplyExternalChanges(root, before, external); err != nil {
-		return err
+		return 0, err
 	}
 	a.emitWorkspaceChanged(reason)
-	return nil
+	return revision, nil
 }
 
-func withUnloadedRequestExamples(root, payload string, replaceAll bool) (string, map[string]json.RawMessage, error) {
+func withUnloadedRequestExamples(root, payload string, replaceAll, keepUnchanged bool) (string, map[string]json.RawMessage, map[string]json.RawMessage, *storeSaveShape, error) {
 	store, err := decodeJSONMap(payload)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, nil, err
 	}
+	shape := storeShapeFromPayload(store)
 	previous := map[string]json.RawMessage{}
+	var kept map[string]json.RawMessage
 	if replaceAll {
 		for _, request := range mapSlice(store["requests"]) {
 			delete(request, exampleCountField)
@@ -399,19 +410,21 @@ func withUnloadedRequestExamples(root, payload string, replaceAll bool) (string,
 	} else {
 		cached, err := requestExamplesForRoot(root)
 		if err != nil {
-			return "", nil, err
+			return "", nil, nil, nil, err
 		}
-		if err := attachUnloadedRequestExamples(store, cached); err != nil {
-			return "", nil, err
+		if keepUnchanged {
+			kept = keepUnchangedRequestExamples(store, cached)
+		} else if err := attachUnloadedRequestExamples(store, cached); err != nil {
+			return "", nil, nil, nil, err
 		}
 		previous = cached
 	}
 	saved := requestExamplesAfterSave(store, previous)
 	encoded, err := json.Marshal(store)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, nil, err
 	}
-	return string(encoded), saved, nil
+	return string(encoded), saved, kept, shape, nil
 }
 
 func requestExamplesForRoot(root string) (map[string]json.RawMessage, error) {

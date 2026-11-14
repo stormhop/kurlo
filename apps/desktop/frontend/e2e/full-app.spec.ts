@@ -268,6 +268,15 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       }
     }
 
+    function keepStoredExamples(next, previous) {
+      const stored = new Map((previous?.requests ?? []).map(request => [request.id, request.examples]));
+      for (const request of next.requests ?? []) {
+        delete request.exampleCount;
+        if (!('examples' in request) && stored.get(request.id)) request.examples = stored.get(request.id);
+      }
+      return next;
+    }
+
     function clone(value) {
       return JSON.parse(JSON.stringify(value));
     }
@@ -486,7 +495,7 @@ async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 
       SaveRequestStoreWithError: async (payload) => {
         state.calls.push('SaveRequestStore');
         if (state.failSaves) return { ok: false, error: 'Workspace folder no longer exists.' };
-        state.store = parseStore(payload);
+        state.store = keepStoredExamples(parseStore(payload), state.store);
         state.savedStores.push(clone(state.store));
         return { ok: true, error: '' };
       },
@@ -13056,13 +13065,25 @@ test('loads saved examples only when a request or the mock server needs them', a
   expect(payload.requests.find(req => req.id === 'orders')!.examples).toEqual([]);
   expect(await page.evaluate(() => Object.keys((window as unknown as { __lazy: { cache: Record<string, unknown> } }).__lazy.cache))).toEqual(['users']);
 
+  await row('Users').locator('.collection-request').click();
+  await expect(examplesTab).toContainText('1');
+  await row('Plain').locator('.collection-request').click();
+  await page.getByLabel('Request URL').fill('https://api.kurlo.test/plain?v=2');
+  await saveButton.click();
+  await expect(saveButton).toBeDisabled();
+  payload = await lastPayload();
+  const resentUsers = payload.requests.find(req => req.id === 'users')!;
+  expect('examples' in resentUsers).toBe(false);
+  expect(resentUsers.exampleCount).toBe(1);
+
+  const loadsBeforeMock = (await loads()).length;
   await page.getByLabel('Mock server', { exact: true }).click();
   const panel = page.locator('section[aria-label="Mock server"]');
   await panel.locator('.mock-select').getByRole('button').first().click();
   await page.getByRole('option', { name: 'Lazy API — 1 example' }).click();
   await panel.getByRole('button', { name: 'Start server' }).click();
   await expect(panel.locator('.mock-live-label')).toHaveText('Running');
-  expect(await loads()).toContain('users');
+  expect((await loads()).length).toBe(loadsBeforeMock);
   expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('StartMockServer')))).toEqual(['StartMockServer:Lazy API:1']);
 });
 

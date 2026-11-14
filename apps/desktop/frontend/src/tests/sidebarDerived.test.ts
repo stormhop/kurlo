@@ -45,7 +45,7 @@ describe('sidebar derived data', () => {
 
   it('refreshes the tree after folder, filter, collapse and collection changes', () => {
     expect(vm.collectionGroups[0].folders[0].name).toBe('Accounts');
-    vm.requests[0].folderPath = ['Customers'];
+    vm.requests = [{ ...vm.requests[0], folderPath: ['Customers'] }];
     expect(vm.collectionGroups[0].folders[0].name).toBe('Customers');
 
     const folder = vm.collectionGroups[0].folders[0];
@@ -54,7 +54,7 @@ describe('sidebar derived data', () => {
 
     vm.sidebarSearch = 'missing';
     expect(vm.collectionGroups).toEqual([]);
-    vm.requests[0].name = 'Missing account';
+    vm.requests = [{ ...vm.requests[0], name: 'Missing account' }];
     expect(vm.collectionGroups[0].requests[0].name).toBe('Missing account');
 
     vm.sidebarSearch = '';
@@ -81,9 +81,9 @@ describe('sidebar derived data', () => {
 
   it('updates request order, membership and diagnostics without keeping stale rows', () => {
     const first = vm.requests[0];
-    vm.requests.push({ ...first, id: 'second-request', name: 'Second request' });
+    vm.requests = [...vm.requests, { ...first, id: 'second-request', name: 'Second request' }];
     expect(vm.collectionGroups[0].folders[0].requests.map(request => request.id)).toEqual(['sidebar-request', 'second-request']);
-    vm.requests.reverse();
+    vm.requests = [...vm.requests].reverse();
     expect(vm.collectionGroups[0].folders[0].requests.map(request => request.id)).toEqual(['second-request', 'sidebar-request']);
     vm.workspaceDiagnostics = [{ scope: 'request', severity: 'error', path: '/API/request.yml', message: 'Invalid YAML', requestId: first.id, collectionId: first.collectionId, blocking: false }];
     expect(vm.collectionGroups[0].requests.find(request => request.id === first.id)?.workspaceDiagnostics?.[0].message).toBe('Invalid YAML');

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -92,6 +93,48 @@ func writeRequestExamples(collectionDir, requestSegment string, examples []map[s
 		desiredFiles[examplePath] = struct{}{}
 	}
 	return nil
+}
+
+func keepRequestExamples(collectionDir, requestSegment string, raw json.RawMessage, desiredFiles map[string]struct{}, journal *saveJournal) error {
+	var names []struct {
+		ID             string `json:"id"`
+		Name           string `json:"name"`
+		FilesystemName string `json:"filesystemName"`
+	}
+	if err := json.Unmarshal(raw, &names); err != nil {
+		return err
+	}
+	items := make([]map[string]any, 0, len(names))
+	for _, name := range names {
+		items = append(items, map[string]any{"id": name.ID, "name": name.Name, filesystemNameField: name.FilesystemName})
+	}
+	exampleDir := filepath.Join(collectionDir, fileStoreExamplesDir, requestSegment)
+	segments := filesystemSegmentsForItems(items)
+	paths := make([]string, 0, len(items))
+	for _, item := range items {
+		segment := segments[stringValue(item, "id")]
+		if segment == "" {
+			continue
+		}
+		path := filepath.Join(exampleDir, segment+fileStoreYAMLExt)
+		if !journal.knows(path) && !plainFileExists(path) {
+			var examples []map[string]any
+			if err := json.Unmarshal(raw, &examples); err != nil {
+				return err
+			}
+			return writeRequestExamples(collectionDir, requestSegment, examples, desiredFiles, journal)
+		}
+		paths = append(paths, path)
+	}
+	for _, path := range paths {
+		desiredFiles[path] = struct{}{}
+	}
+	return nil
+}
+
+func plainFileExists(path string) bool {
+	info, err := os.Lstat(path)
+	return err == nil && info.Mode().IsRegular()
 }
 
 type parsedExampleFile struct {

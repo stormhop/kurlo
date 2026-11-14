@@ -45,6 +45,7 @@ type workspaceDiskTracker struct {
 	announced     string
 	agentFiles    map[string]string
 	savedSegments map[string]string
+	savedShape    *storeSaveShape
 }
 
 var workspaceDisk = &workspaceDiskTracker{}
@@ -153,7 +154,7 @@ func (t *workspaceDiskTracker) remember(root string) {
 	}
 	snapshot, err := scanWorkspaceFiles(root, previous, true)
 	if err != nil {
-		t.root, t.known, t.announced, t.savedSegments = "", nil, "", nil
+		t.root, t.known, t.announced, t.savedSegments, t.savedShape = "", nil, "", nil, nil
 		return
 	}
 	t.root = root
@@ -161,6 +162,7 @@ func (t *workspaceDiskTracker) remember(root string) {
 	t.announced = snapshot.fingerprint()
 	t.agentFiles = nil
 	t.savedSegments = nil
+	t.savedShape = nil
 }
 
 func trackOpenedWorkspace(root string) {

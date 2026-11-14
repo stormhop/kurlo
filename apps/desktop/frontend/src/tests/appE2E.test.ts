@@ -91,6 +91,7 @@ const backend = vi.hoisted(() => {
       state.savedStores.push(JSON.parse(payload) as RequestStore);
       return { ok: true, error: '' };
     }),
+    saveRequestStoreDelta: vi.fn(async (): Promise<SaveRequestStoreResult> => ({ ok: false, error: '', needFull: true })),
     loadRequestStore: vi.fn(async () => JSON.stringify(state.savedStores.at(-1) ?? {})),
     setEnvironment: vi.fn(async (values: Record<string, string>) => {
       state.environment = { ...values };

@@ -1,3 +1,4 @@
+import { markExamplesOnDisk } from '../../examplesOnDisk';
 import { loadRequestExamples, type HttpResponse } from '../../backend';
 import { cloneRequestExample, exampleFromResponse, exampleHasRawSecret, mediaTypeOf, normalizeRequestExamples, requestExamplesPending } from '../../examples';
 import type { RequestExample, RequestTab, SavedRequest } from '../../types/models';
@@ -88,7 +89,10 @@ export const examplesFeature = {
         if (!byId.size) return;
         this.requests = this.requests.map(req => {
           const examples = byId.get(req.id);
-          return examples && requestExamplesPending(req) ? withLoadedExamples(req, examples) : req;
+          if (!examples || !requestExamplesPending(req)) return req;
+          const loadedRequest = withLoadedExamples(req, examples);
+          markExamplesOnDisk(loadedRequest.examples);
+          return loadedRequest;
         });
         const saved = new Map(this.savedRequestSnapshots);
         for (const [id, examples] of byId) {

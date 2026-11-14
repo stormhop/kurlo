@@ -1291,7 +1291,7 @@ class AppVM {
 
   topView = $state<TopView>('request');
   starPromptVisible = $state(starPromptDue(loadStarPromptState()));
-  requests = $state<SavedRequest[]>([]);
+  requests = $state.raw<SavedRequest[]>([]);
   requestsById = $derived(new Map(this.requests.map(request => [request.id, request])));
   workspaces = $state<Workspace[]>([]);
   collections = $state<Collection[]>([]);
@@ -1377,7 +1377,7 @@ class AppVM {
   declare openLoadTestReport: typeof loadRunFeature.openLoadTestReport;
   declare saveLoadTestSummary: typeof loadRunFeature.saveLoadTestSummary;
   sidebarView = $state<SidebarView>('collections');
-  requestHistory = $state<RequestHistoryEntry[]>([]);
+  requestHistory = $state.raw<RequestHistoryEntry[]>([]);
   historyHeaderMenuOpen = $state(false);
   openHistoryMenuId = $state('');
   historyDetailId = $state('');

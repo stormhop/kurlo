@@ -1,4 +1,5 @@
-import { loadRequestStore, saveRequestStore, saveRequestStoreView } from '../../backend';
+import { examplesOnDisk, markExamplesOnDisk } from '../../examplesOnDisk';
+import { loadRequestStore, saveRequestStore, saveRequestStoreDelta, saveRequestStoreView } from '../../backend';
 import { normalizeSavedRequest } from '../../normalizers';
 import type {
   Collection,
@@ -16,8 +17,15 @@ import type { SaveRequestStoreResult } from '../../wire';
 import type { CollectionRunRecord } from '../../collectionRuns';
 
 const saveFailures = new WeakMap<object, number>();
-type QueuedStorePayload = { epoch: number; content: string; view: string; result: Promise<boolean> };
+type StoreSnapshot = { epoch: number; top: string; view: string; requests: SavedRequest[] };
+type QueuedStorePayload = StoreSnapshot & { result: Promise<boolean> };
+type ConfirmedStore = { epoch: number; revision: number; structure: string; order: string; byId: Map<string, SavedRequest> };
 const queuedStorePayloads = new WeakMap<object, QueuedStorePayload>();
+const confirmedStores = new WeakMap<object, ConfirmedStore>();
+
+function requestContentKey(req: SavedRequest, saved: Map<string, SavedRequest>) {
+  return JSON.stringify(withoutSavedExamples([req], saved)[0]);
+}
 
 function withoutSavedExamples(requests: SavedRequest[], saved: Map<string, SavedRequest>) {
   return requests.map(req => {
@@ -31,12 +39,57 @@ function withoutSavedExamples(requests: SavedRequest[], saved: Map<string, Saved
   });
 }
 
-function storePayloadKeys(payload: RequestStore, saved: Map<string, SavedRequest>) {
-  const { activeId, openIds, ...content } = payload;
-  return {
-    content: JSON.stringify({ ...content, requests: withoutSavedExamples(content.requests, saved) }),
-    view: JSON.stringify([activeId, openIds]),
-  };
+function withoutExamplesOnDisk(requests: SavedRequest[]) {
+  return requests.map(req => {
+    if (!req.examples || !examplesOnDisk(req.examples)) return req;
+    const { examples, ...rest } = req;
+    return { ...rest, exampleCount: examples.length };
+  });
+}
+
+function storeSnapshot(payload: RequestStore, epoch: number): StoreSnapshot {
+  const { activeId, openIds, requests, ...content } = payload;
+  return { epoch, top: JSON.stringify(content), view: JSON.stringify([activeId, openIds]), requests };
+}
+
+function sameStoreContent(left: StoreSnapshot, right: StoreSnapshot, saved: Map<string, SavedRequest>) {
+  if (left.epoch !== right.epoch || left.top !== right.top || left.requests.length !== right.requests.length) return false;
+  return left.requests.every((req, index) => {
+    const other = right.requests[index];
+    return req === other || (req.id === other.id && requestContentKey(req, saved) === requestContentKey(other, saved));
+  });
+}
+
+function storeStructure(payload: RequestStore) {
+  return JSON.stringify([payload.workspaces, payload.collections, (payload.environments ?? []).map(environment => environment.id)]);
+}
+
+function requestOrder(requests: SavedRequest[]) {
+  return requests.map(req => req.id).join('\n');
+}
+
+function confirmStore(host: object, epoch: number, revision: number | undefined, payload: RequestStore) {
+  if (!revision) {
+    confirmedStores.delete(host);
+    return;
+  }
+  confirmedStores.set(host, {
+    epoch,
+    revision,
+    structure: storeStructure(payload),
+    order: requestOrder(payload.requests),
+    byId: new Map(payload.requests.map(req => [req.id, req])),
+  });
+}
+
+function storeDeltaPayload(confirmed: ConfirmedStore, payload: RequestStore, saved: Map<string, SavedRequest>) {
+  if (confirmed.order !== requestOrder(payload.requests) || confirmed.structure !== storeStructure(payload)) return null;
+  const changed = payload.requests.filter(req => {
+    const previous = confirmed.byId.get(req.id);
+    return previous !== req && (!previous || requestContentKey(previous, saved) !== requestContentKey(req, saved));
+  });
+  const { requests, ...store } = payload;
+  return JSON.stringify({ base: confirmed.revision, store, requestIds: requests.map(req => req.id), requests: withoutExamplesOnDisk(changed) });
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -227,17 +280,17 @@ export const requestPersistenceFeature = {
     }
     const storeRequests = this.requestsForStore(nextRequests);
     const payload = this.requestStorePayload(storeRequests, activeId, nextOpenIds, nextWorkspaces, nextCollections, workspaceId, nextHistory, nextEnvironments, nextActiveEnvId);
-    const keys = storePayloadKeys(payload, this.savedRequestSnapshots);
     const persistEpoch = this.requestStorePersistEpoch;
+    const snapshot = storeSnapshot(payload, persistEpoch);
     const queued = queuedStorePayloads.get(this);
-    if (queued && queued.epoch === persistEpoch && queued.content === keys.content) {
+    if (queued && sameStoreContent(queued, snapshot, this.savedRequestSnapshots)) {
       if (await queued.result && persistEpoch === this.requestStorePersistEpoch && queuedStorePayloads.get(this) === queued) {
-        let viewSaved = queued.view === keys.view;
+        let viewSaved = queued.view === snapshot.view;
         if (!viewSaved) {
           const written = await this.writeRequestStoreView(activeId, nextOpenIds, workspaceId);
           if (written === false) return false;
           viewSaved = Boolean(written?.ok);
-          if (viewSaved) queued.view = keys.view;
+          if (viewSaved) queued.view = snapshot.view;
         }
         if (viewSaved) {
           this.recordSavedRequestSnapshots(storeRequests);
@@ -245,14 +298,30 @@ export const requestPersistenceFeature = {
         }
       }
     }
-    const serialized = JSON.stringify(payload);
+    const frozen: RequestStore = JSON.parse(JSON.stringify({ ...payload, requests: [] }));
+    frozen.requests = payload.requests;
     const persistJob = this.requestStorePersistQueue.then(async () => {
       if (persistEpoch !== this.requestStorePersistEpoch) return false;
-      const saved = await saveRequestStore(serialized);
+      const confirmed = confirmedStores.get(this);
+      const delta = confirmed && confirmed.epoch === persistEpoch ? storeDeltaPayload(confirmed, frozen, this.savedRequestSnapshots) : null;
+      if (delta) {
+        const result = await saveRequestStoreDelta(delta);
+        if (result.ok) {
+          confirmStore(this, persistEpoch, result.revision, frozen);
+          return true;
+        }
+        if (!result.needFull) {
+          confirmedStores.delete(this);
+          throw new Error(result.error || 'request store save failed');
+        }
+      }
+      confirmedStores.delete(this);
+      const saved = await saveRequestStore(JSON.stringify({ ...frozen, requests: withoutExamplesOnDisk(frozen.requests) }));
       if (!saved.ok) throw new Error(saved.error || 'request store save failed');
+      confirmStore(this, persistEpoch, saved.revision, frozen);
       return saved.ok;
     });
-    const entry: QueuedStorePayload = { epoch: persistEpoch, ...keys, result: persistJob.then(saved => saved, () => false) };
+    const entry: QueuedStorePayload = { ...snapshot, result: persistJob.then(saved => saved, () => false) };
     queuedStorePayloads.set(this, entry);
     void entry.result.then(saved => {
       if (!saved && queuedStorePayloads.get(this) === entry) queuedStorePayloads.delete(this);
@@ -265,8 +334,8 @@ export const requestPersistenceFeature = {
       const saved = await persistJob;
       if (saved && persistEpoch === this.requestStorePersistEpoch) {
         saveFailures.delete(this);
+        for (const request of payload.requests) markExamplesOnDisk(request.examples);
         this.recordSavedRequestSnapshots(storeRequests);
-        if (queuedStorePayloads.get(this) === entry) entry.content = storePayloadKeys(payload, this.savedRequestSnapshots).content;
         this.scheduleGitStatusRefreshAfterPersist();
         return true;
       }
@@ -283,7 +352,7 @@ export const requestPersistenceFeature = {
 
   rememberLoadedRequestStore(this: RequestPersistenceHost) {
     const payload = this.requestStorePayload(this.requestsForStore(this.requests));
-    queuedStorePayloads.set(this, { epoch: this.requestStorePersistEpoch, ...storePayloadKeys(payload, this.savedRequestSnapshots), result: Promise.resolve(true) });
+    queuedStorePayloads.set(this, { ...storeSnapshot(payload, this.requestStorePersistEpoch), result: Promise.resolve(true) });
   },
 
   async writeRequestStoreView(

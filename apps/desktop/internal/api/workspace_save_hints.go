@@ -1,6 +1,9 @@
 package api
 
-import "path/filepath"
+import (
+	"encoding/json"
+	"path/filepath"
+)
 
 type workspaceSaveHints struct {
 	disk       map[string]string
@@ -8,6 +11,15 @@ type workspaceSaveHints struct {
 	segments   map[string]string
 	healthy    bool
 	replaceAll bool
+	kept       map[string]json.RawMessage
+}
+
+func (h *workspaceSaveHints) keptExamples(requestID string) (json.RawMessage, bool) {
+	if h == nil || h.kept == nil {
+		return nil, false
+	}
+	raw, ok := h.kept[requestID]
+	return raw, ok
 }
 
 func (h *workspaceSaveHints) cachedDisk() map[string]string {

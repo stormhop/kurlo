@@ -632,6 +632,8 @@ export namespace api {
 	export class SaveRequestStoreResult {
 	    ok: boolean;
 	    error?: string;
+	    revision?: number;
+	    needFull?: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new SaveRequestStoreResult(source);
@@ -641,6 +643,8 @@ export namespace api {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ok = source["ok"];
 	        this.error = source["error"];
+	        this.revision = source["revision"];
+	        this.needFull = source["needFull"];
 	    }
 	}
 	export class SaveResponseBodyResult {

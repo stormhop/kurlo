@@ -622,6 +622,10 @@ export function SaveRequestStore(arg1) {
   return window['go']['api']['App']['SaveRequestStore'](arg1);
 }
 
+export function SaveRequestStoreDelta(arg1) {
+  return window['go']['api']['App']['SaveRequestStoreDelta'](arg1);
+}
+
 export function SaveRequestStoreView(arg1) {
   return window['go']['api']['App']['SaveRequestStoreView'](arg1);
 }

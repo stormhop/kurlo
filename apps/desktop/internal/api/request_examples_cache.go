@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"sync"
 )
@@ -57,6 +58,28 @@ func moveRequestExamplesOut(store map[string]any) map[string]json.RawMessage {
 		request[exampleCountField] = count
 	}
 	return examples
+}
+
+func keepUnchangedRequestExamples(store map[string]any, cached map[string]json.RawMessage) map[string]json.RawMessage {
+	kept := map[string]json.RawMessage{}
+	for _, request := range mapSlice(store["requests"]) {
+		delete(request, exampleCountField)
+		id := stringValue(request, "id")
+		encoded, ok := cached[id]
+		if !ok {
+			continue
+		}
+		raw, sent := request["examples"]
+		if sent {
+			again, err := json.Marshal(raw)
+			if err != nil || !bytes.Equal(again, encoded) {
+				continue
+			}
+			delete(request, "examples")
+		}
+		kept[id] = encoded
+	}
+	return kept
 }
 
 func attachUnloadedRequestExamples(store map[string]any, cached map[string]json.RawMessage) error {

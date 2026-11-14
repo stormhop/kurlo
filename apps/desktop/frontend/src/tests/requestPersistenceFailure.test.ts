@@ -5,6 +5,7 @@ vi.mock('../lib/backend', () => ({
   confirmQuit: vi.fn(),
   loadRequestStore: vi.fn(),
   saveRequestStore: vi.fn(),
+  saveRequestStoreDelta: vi.fn(async () => ({ ok: false, error: '', needFull: true })),
 }));
 
 import { cancelQuit, confirmQuit } from '../lib/backend';

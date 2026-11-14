@@ -254,14 +254,14 @@ export async function replaceRequestStore(payload: string): Promise<SaveRequestS
   const app = window.go?.api?.App;
   if (!app?.ReplaceRequestStoreWithError) return saveRequestStore(payload);
   const result = await app.ReplaceRequestStoreWithError(payload);
-  return { ok: Boolean(result?.ok), error: result?.error ?? '' };
+  return { ok: Boolean(result?.ok), error: result?.error ?? '', revision: result?.revision };
 }
 
 export async function saveRequestStore(payload: string): Promise<SaveRequestStoreResult> {
   const app = window.go?.api?.App;
   if (app?.SaveRequestStoreWithError) {
     const result = await app.SaveRequestStoreWithError(payload);
-    return { ok: Boolean(result?.ok), error: result?.error ?? '' };
+    return { ok: Boolean(result?.ok), error: result?.error ?? '', revision: result?.revision };
   }
   if (!app?.SaveRequestStore) {
     localStorage.setItem(REQUEST_STORE_FALLBACK_KEY, payload);
@@ -269,6 +269,13 @@ export async function saveRequestStore(payload: string): Promise<SaveRequestStor
   }
   const ok = await app.SaveRequestStore(payload);
   return { ok, error: ok ? '' : 'request store save failed' };
+}
+
+export async function saveRequestStoreDelta(payload: string): Promise<SaveRequestStoreResult> {
+  const app = window.go?.api?.App;
+  if (!app?.SaveRequestStoreDelta) return { ok: false, error: '', needFull: true };
+  const result = await app.SaveRequestStoreDelta(payload);
+  return { ok: Boolean(result?.ok), error: result?.error ?? '', revision: result?.revision, needFull: Boolean(result?.needFull) };
 }
 
 export type RequestStoreView = { activeId: string; activeWorkspaceId: string; openIds: string[] };

@@ -196,9 +196,11 @@ export const requestCrudFeature = {
   get pinnedRequests(): SavedRequest[] {
     const host = this as unknown as RequestCrudHost;
     host.dirtyRequestIdList;
+    const starred = host.starredRequestIds;
+    if (!starred.size) return [];
     const collectionIds = new Set(host.collections.filter(collection => collection.workspaceId === host.activeWorkspaceId).map(collection => collection.id));
     const query = host.sidebarSearch.trim().toLowerCase();
-    return host.requests.filter(request => !request.isDraft && host.starredRequestIds.has(request.id) && collectionIds.has(request.collectionId) && requestMatchesSidebarQuery(request, query));
+    return host.requests.filter(request => starred.has(request.id) && !request.isDraft && collectionIds.has(request.collectionId) && requestMatchesSidebarQuery(request, query));
   },
 
   requestsForDisplay(this: RequestCrudHost): SavedRequest[] {
