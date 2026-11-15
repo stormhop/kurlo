@@ -181,3 +181,36 @@ func TestSaveWaitsForWorkspaceWritesBeforeCheckingMissingParents(t *testing.T) {
 		t.Fatal("save did not finish after the workspace write completed")
 	}
 }
+
+func TestFirstLaunchWithoutAWorkspaceSavesEdits(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	forgetWorkspaceDiskState()
+	root := fileWorkspaceStorePath()
+	app := NewApp()
+	if result := app.LoadWorkspace(); result.Payload != "" {
+		t.Fatalf("fresh profile should load nothing, got %d bytes", len(result.Payload))
+	}
+	if failedStoreLoads.failed(root) {
+		t.Fatal("a profile with no workspace yet must not count as a failed load")
+	}
+	if delta := app.SaveRequestStoreDelta(`{"store":{}}`); delta.Ok || !delta.NeedFull {
+		t.Fatalf("first delta on a fresh profile should ask for a full save, got %+v", delta)
+	}
+	store := `{"workspaces":[{"id":"ws","name":"My Workspace"}],"activeWorkspaceId":"ws","collections":[{"id":"col","workspaceId":"ws","name":"auth"}],"requests":[{"id":"req","name":"Login","collectionId":"col","method":"POST","url":"https://example.test/login"}]}`
+	if result := app.SaveRequestStoreWithError(store); !result.Ok {
+		t.Fatalf("first save on a fresh profile failed: %s", result.Error)
+	}
+	if got := workspaceYAMLCount(t, root); got == 0 {
+		t.Fatal("nothing was written to disk")
+	}
+
+	forgetWorkspaceDiskState()
+	restarted := NewApp()
+	reloaded := restarted.LoadWorkspace()
+	if !strings.Contains(reloaded.Payload, `"Login"`) {
+		t.Fatalf("saved request missing after restart: %s", reloaded.Payload)
+	}
+	if failedStoreLoads.failed(root) {
+		t.Fatal("reload after the first save must not count as failed")
+	}
+}

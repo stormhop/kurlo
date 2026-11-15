@@ -18,6 +18,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Edits save on the first launch.** On a new installation Kurlo treated the not-yet-created workspace folder as a workspace it had failed to read, so it refused every save and showed *changes could not be saved*. Nothing reached the disk and the work was lost on restart. An empty profile now counts as a fresh start; a workspace that exists but cannot be read is still protected from being overwritten.
 - **Tengo script timeouts.** Tengo scripts now respect the configured script timeout instead of always stopping after two seconds.
 - **Compact release notes in About.** Long update notes show a preview of about ten lines with a link to the full website changelog, keeping Settings easy to scroll.
 - **Mock server with thousands of examples.** The mock server no longer pulls every saved response into the editor: the route list reads only methods, paths and statuses, and the server reads the responses from disk when it starts. The list draws only the rows on screen, so it opens quickly, scrolls without blank gaps and the sidebar slides smoothly beside it. Hiding or showing the sidebar keeps the route at the top of the list in place even when long warnings rewrap to the new width.

@@ -212,6 +212,8 @@ func loadKurloStorePayloadWithDiagnostics(localStorePath, workspaceRoot string) 
 	return string(payload), diagnostics, nil
 }
 
+var errNoKurloWorkspace = errors.New("workspace does not contain a Kurlo YAML workspace")
+
 func loadKurloStoreWithDiagnostics(localStorePath, workspaceRoot string) (map[string]any, []WorkspaceDiagnostic, error) {
 	return loadKurloStoreDeferring(localStorePath, workspaceRoot, nil)
 }
@@ -234,7 +236,7 @@ func loadKurloStoreDeferring(localStorePath, workspaceRoot string, deferred *def
 		if localStoreAuthFailed {
 			return nil, nil, localErr
 		}
-		return nil, nil, fmt.Errorf("workspace does not contain a Kurlo YAML workspace")
+		return nil, nil, errNoKurloWorkspace
 	}
 
 	if localStore == nil {

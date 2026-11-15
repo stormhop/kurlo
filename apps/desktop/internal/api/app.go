@@ -292,7 +292,7 @@ func (a *App) loadWorkspaceLocked(root string) WorkspaceLoadResult {
 	if diagnostics == nil {
 		diagnostics = []WorkspaceDiagnostic{}
 	}
-	if errors.Is(err, os.ErrNotExist) {
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, errNoKurloWorkspace) {
 		failedStoreLoads.note(root, nil)
 	} else {
 		failedStoreLoads.note(root, err)
