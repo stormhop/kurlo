@@ -35,7 +35,7 @@ static kurloWorkspaceStream *kurloWorkspaceStreamStart(const char *path, uintptr
 	}
 	FSEventStreamContext context = {0, (void *)handle, NULL, NULL, NULL};
 	FSEventStreamRef stream = FSEventStreamCreate(NULL, kurloWorkspaceFSEventsCallback, &context, paths, kFSEventStreamEventIdSinceNow, 0.2,
-		kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagWatchRoot);
+		kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer);
 	CFRelease(paths);
 	if (stream == NULL) {
 		return NULL;

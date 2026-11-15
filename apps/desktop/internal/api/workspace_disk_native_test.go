@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -185,4 +186,14 @@ func TestNativeWorkspaceWatchReportsWorkspaceFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitWorkspaceWatch(t, watch, true, 5*time.Second)
+}
+
+func TestDarwinWorkspaceWatchDoesNotWatchParentFolders(t *testing.T) {
+	source, err := os.ReadFile("workspace_disk_native_darwin.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(source), "WatchRoot") {
+		t.Fatal("kFSEventStreamCreateFlagWatchRoot watches every parent folder, so macOS asks for Documents access when the workspace lives there")
+	}
 }

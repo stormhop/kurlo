@@ -10,6 +10,12 @@ head:
 
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Fixed
+
+- **No Documents permission prompt on macOS**: 3.1.1 watched every folder above the workspace, so macOS asked again for access to Documents at start-up. Kurlo now watches only the workspace folder.
+
 ## 3.1.1
 
 ### Added

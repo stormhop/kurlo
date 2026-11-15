@@ -5,6 +5,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **No Documents permission prompt after updating to 3.1.1 on macOS.** The new file watcher also watched every folder above the workspace, so with a workspace in Documents macOS asked again for access to the whole Documents folder at start-up. Kurlo now watches only the workspace folder itself; a renamed or deleted workspace folder is still noticed by the regular check.
+
 ## [3.1.1] - 2026-11-15
 
 ### Added
