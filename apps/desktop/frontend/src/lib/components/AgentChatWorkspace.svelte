@@ -27,6 +27,7 @@
   import { openExternalURL } from '../externalLinks';
   import { AI_PROMPT_MAX_CHARS, aiComposerSends, aiErrorView, aiConnectionProblem, type AiStepView } from '../stores/features/ai';
   import { AGENT_STARTERS, AGENT_TEMPLATES, AGENT_WRITE_TOOLS, agentEffortLabel, agentStepSummary, agentTurnSegments, agentContextPercent, agentQuotaWindows, agentFindRequest, agentTemplatePlaceholder, agentToolLabel, agentToolTarget, agentTurnAnswer, agentTurnsFromMessages, type AgentTemplate, type AgentToolTarget, type AgentTurnView } from '../agent';
+  import { addFileDropZone } from '../fileDrop';
   import { agentWorkspaceNotes, clipboardSet, openDirectoryDialog, openFileDialog } from '../backend';
 
   let { workspaceBlocked = false, agentStore = defaultAgentStore, codexReady = false }: { workspaceBlocked?: boolean; agentStore?: AgentStore; codexReady?: boolean } = $props();
@@ -68,13 +69,10 @@
 
   $effect(() => {
     const box = composerBox;
-    const runtime = window.runtime;
-    if (!box || !runtime?.OnFileDrop) return;
-    runtime.OnFileDrop((x, y, paths) => {
-      if (attachmentDisabled || !box.contains(document.elementFromPoint(x, y))) return;
-      addAttachments(paths);
-    }, true);
-    return () => runtime.OnFileDropOff?.();
+    if (!box) return;
+    return addFileDropZone(box, paths => {
+      if (!attachmentDisabled) addAttachments(paths);
+    });
   });
   let templatesMenu = $state<HTMLDivElement>();
   let composerContext = $state<HTMLDivElement>();

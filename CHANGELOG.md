@@ -7,6 +7,11 @@ All notable changes to Kurlo are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Drop files to import.** Dropping a `.http`, `.rest`, Postman, Insomnia, OpenAPI or HAR file anywhere in the Kurlo window imports it; Kurlo tells the format from the file. Before, a dropped file replaced the whole window with its raw text.
+- **JetBrains HTTP Client scripts run.** The script sandbox understands the JetBrains `client`, `request` and `response` objects (`client.global.set`, `client.test`, `client.assert`, `request.variables`, `response.body`, `response.status` and the rest), so scripts imported from `.http` files keep working without rewriting.
+
 ### Changed
 
 - **One loader everywhere.** Every place that waits — the response panel, gRPC and MCP calls, diffs, history, cookies, examples, the mock server, model lists, settings checks and buttons such as Cancel — now shows the flying Kurlo bird instead of spinners and *Loading…* captions. Screen readers still hear what is loading.
@@ -19,6 +24,8 @@ All notable changes to Kurlo are documented here. This project follows
 ### Fixed
 
 - **Edits save on the first launch.** On a new installation Kurlo treated the not-yet-created workspace folder as a workspace it had failed to read, so it refused every save and showed *changes could not be saved*. Nothing reached the disk and the work was lost on restart. An empty profile now counts as a fresh start; a workspace that exists but cannot be read is still protected from being overwritten.
+- **`.http` import keeps scripts out of requests.** A pre-request script (`< {% … %}`) above the request line no longer makes the importer skip that request, and response handlers (`> {% … %}`) no longer end up in the body. Both are imported as the request's scripts. XML bodies that start with `<` are no longer mistaken for file references.
+- **Import dialog shows `.http` and `.rest` files on Linux.** Import now opens the system file dialog filtered to the chosen format, so the GTK dialog lists `.http`, `.rest` and `.har` files instead of hiding them.
 - **Tengo script timeouts.** Tengo scripts now respect the configured script timeout instead of always stopping after two seconds.
 - **Compact release notes in About.** Long update notes show a preview of about ten lines with a link to the full website changelog, keeping Settings easy to scroll.
 - **Mock server with thousands of examples.** The mock server no longer pulls every saved response into the editor: the route list reads only methods, paths and statuses, and the server reads the responses from disk when it starts. The list draws only the rows on screen, so it opens quickly, scrolls without blank gaps and the sidebar slides smoothly beside it. Hiding or showing the sidebar keeps the route at the top of the list in place even when long warnings rewrap to the new width.

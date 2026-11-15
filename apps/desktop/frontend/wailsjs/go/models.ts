@@ -647,6 +647,24 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class ImportFileResult {
+	    path: string;
+	    name: string;
+	    content: string;
+	    error: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportFileResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.name = source["name"];
+	        this.content = source["content"];
+	        this.error = source["error"];
+	    }
+	}
 	export class OpenAPISpecFileResult {
 	    content: string;
 	    exists: boolean;

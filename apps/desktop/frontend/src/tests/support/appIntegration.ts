@@ -121,6 +121,9 @@ const backend = vi.hoisted(() => {
     socketIODisconnect: vi.fn(async () => undefined),
     openFileDialog: vi.fn(async () => ''),
     readTextFile: vi.fn(async () => ''),
+    hasNativeImportDialog: vi.fn(() => false),
+    chooseImportFile: vi.fn(async () => ({ path: '', name: '', content: '', error: '' })),
+    readImportFile: vi.fn(async (path: string) => ({ path, name: '', content: '', error: 'missing' })),
     saveFileDialog: vi.fn(async (name: string, content: string) => {
       state.savedFiles.push({ name, content });
       return true;

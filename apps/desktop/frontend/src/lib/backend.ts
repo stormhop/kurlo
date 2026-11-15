@@ -349,6 +349,28 @@ export async function chooseEnvFileToImport(): Promise<EnvFileImportResult> {
   return { path: result?.path ?? '', values: result?.values ?? [], error: result?.error ?? '' };
 }
 
+export type ImportFileResult = { path: string; name: string; content: string; error: string };
+
+export function hasNativeImportDialog(): boolean {
+  return Boolean(window.go?.api?.App?.ChooseImportFile);
+}
+
+function importFileResult(result: Partial<ImportFileResult> | undefined): ImportFileResult {
+  return { path: result?.path ?? '', name: result?.name ?? '', content: result?.content ?? '', error: result?.error ?? '' };
+}
+
+export async function chooseImportFile(source: string): Promise<ImportFileResult> {
+  const app = window.go?.api?.App;
+  if (!app?.ChooseImportFile) return importFileResult({ error: 'The import dialog needs the desktop app.' });
+  return importFileResult(await app.ChooseImportFile(source));
+}
+
+export async function readImportFile(path: string): Promise<ImportFileResult> {
+  const app = window.go?.api?.App;
+  if (!app?.ReadImportFile) return importFileResult({ path, error: 'Importing dropped files needs the desktop app.' });
+  return importFileResult(await app.ReadImportFile(path));
+}
+
 export async function readTextFile(path: string): Promise<string> {
   return (await window.go?.api?.App?.ReadTextFile?.(path)) ?? '';
 }

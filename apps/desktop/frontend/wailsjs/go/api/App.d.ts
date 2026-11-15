@@ -55,6 +55,8 @@ export function CheckWorkspaceYAML(arg1:string,arg2:string):Promise<api.Workspac
 
 export function ChooseEnvFileToImport():Promise<api.EnvFileImportResult>;
 
+export function ChooseImportFile(arg1:string):Promise<api.ImportFileResult>;
+
 export function ClaudeCodeStatus(arg1:string):Promise<model.ClaudeStatus>;
 
 export function ClearAgentActivity():Promise<model.AgentResult>;
@@ -266,6 +268,8 @@ export function PruneHistoryResponses(arg1:Array<string>):Promise<string>;
 export function Quit():Promise<void>;
 
 export function ReadCollectionTextFiles(arg1:string):Promise<api.CollectionTextFilesResult>;
+
+export function ReadImportFile(arg1:string):Promise<api.ImportFileResult>;
 
 export function ReadOpenAPIBaseSpec(arg1:string):Promise<api.OpenAPISpecFileResult>;
 

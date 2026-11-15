@@ -340,6 +340,26 @@ JavaScript scripts written for Postman's older API run unchanged:
 
 `postman.setNextRequest` throws, because the Collection Runner always runs requests in their declared order.
 
+## JetBrains HTTP Client globals
+
+Scripts imported from `.http` files, written for the JetBrains HTTP Client, run in the JavaScript engine as well:
+
+| Name | Meaning |
+|------|---------|
+| `client.global.set` / `get` / `clear` / `clearAll` / `isEmpty` | Same as `pm.globals`; `get` returns `null` for a missing name |
+| `client.test(name, fn)` | Same as `pm.test` |
+| `client.assert(condition, message)` | Throws `message` when the condition is false |
+| `client.log(...values)` | Same as `pm.log` |
+| `request.variables.set` / `get` | Same as `pm.variables` |
+| `request.environment.get(name)` | Same as `pm.environment.get` |
+| `request.method`, `request.url.getRaw()`, `request.url.tryGetSubstituted()` | The request being sent |
+| `request.headers.findByName(name)` | A header with `getRawValue()` and `tryGetSubstituted()`, or `null` |
+| `response.status`, `response.body` | The status code and the body, parsed when it is JSON, in post-response scripts |
+| `response.headers.valueOf(name)` / `valuesOf(name)` | A response header |
+| `response.contentType.mimeType` / `charset` | The parsed `Content-Type` header |
+
+A script may declare its own `client`, `request` or `response` (`const response = pm.response.json()` works). `client.exit()` throws, because Kurlo cannot stop a script part-way.
+
 ## Logging
 
 **`pm.log(...values)`** — prints to the Scripts panel. Accepts any number of arguments, joined with spaces. Useful for debugging — the panel clears on each send.

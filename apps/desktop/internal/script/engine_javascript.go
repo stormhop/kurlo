@@ -211,6 +211,8 @@ func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool) map[string]in
 			}
 		},
 
+		"varCount": func() int { return len(ctx.Variables) },
+
 		"globalGet": func(k string) goja.Value {
 			if v, ok := ctx.Variables[k]; ok {
 				return vm.ToValue(v)
@@ -980,6 +982,68 @@ var __kurloAPI = (function (host) {
     legacy.responseCode = { code: host.resCode(), name: host.resStatus(), detail: host.resStatus() };
     legacy.responseHeaders = JSON.parse(host.resHeadersJSON());
     legacy.responseTime = host.resTime();
+  }
+
+  function jetbrainsHeader(name, value) {
+    return { name: name, value: value, getRawValue: function () { return value; }, tryGetSubstituted: function () { return host.replaceIn(valStr(value)); } };
+  }
+  legacy.client = {
+    global: {
+      get: function (k) { var v = pm.globals.get(k); return v === undefined ? null : v; },
+      set: function (k, v) { pm.globals.set(k, v); },
+      isEmpty: function () { return host.varCount() === 0; },
+      clear: function (k) { pm.globals.unset(k); },
+      clearAll: function () { pm.globals.clear(); }
+    },
+    test: function (name, fn) { pm.test(name, fn); },
+    assert: function (condition, message) { if (!condition) throw new Error(message === undefined ? 'Assertion failed' : String(message)); },
+    log: function () { pm.log.apply(null, arguments); },
+    exit: function () { throw new Error('client.exit() is not supported in Kurlo'); }
+  };
+  legacy.request = {
+    variables: {
+      get: function (k) { var v = pm.variables.get(k); return v === undefined ? null : v; },
+      set: function (k, v) { pm.variables.set(k, v); }
+    },
+    environment: {
+      get: function (k) { var v = pm.environment.get(k); return v === undefined ? null : v; }
+    },
+    url: {
+      getRaw: function () { return host.reqGetUrl(); },
+      tryGetSubstituted: function () { return host.replaceIn(host.reqGetUrl()); }
+    },
+    headers: {
+      findByName: function (k) { var v = host.reqHeaderGet(String(k)); return v === undefined ? null : jetbrainsHeader(String(k), v); }
+    }
+  };
+  Object.defineProperty(legacy.request, 'method', { get: function () { return host.reqGetMethod(); }, enumerable: true, configurable: true });
+  if (host.hasResponse) {
+    legacy.response = {
+      headers: {
+        valueOf: function (k) { var v = host.resHeaderGet(String(k)); return v === undefined ? null : v; },
+        valuesOf: function (k) { var v = host.resHeaderGet(String(k)); return v === undefined ? [] : [v]; }
+      }
+    };
+    Object.defineProperty(legacy.response, 'status', { get: function () { return host.resCode(); }, enumerable: true, configurable: true });
+    Object.defineProperty(legacy.response, 'body', {
+      get: function () { var raw = host.resBody(); try { return JSON.parse(raw); } catch (e) { return raw; } },
+      enumerable: true,
+      configurable: true
+    });
+    Object.defineProperty(legacy.response, 'contentType', {
+      get: function () {
+        var header = host.resHeaderGet('Content-Type') || '';
+        var parts = String(header).split(';');
+        var charset = '';
+        for (var i = 1; i < parts.length; i++) {
+          var pair = parts[i].split('=');
+          if (pair[0].trim().toLowerCase() === 'charset') charset = (pair[1] || '').trim();
+        }
+        return { mimeType: parts[0].trim(), charset: charset };
+      },
+      enumerable: true,
+      configurable: true
+    });
   }
 
   function wordArray(hex) {

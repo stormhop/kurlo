@@ -14,6 +14,7 @@
   import AppOverlays from './lib/components/AppOverlays.svelte';
   import AppToasts from './lib/components/AppToasts.svelte';
   import TextContextMenu from './lib/components/TextContextMenu.svelte';
+  import { installFileDrop } from './lib/fileDrop';
   import { textTargetFrom, type TextMenuState } from './lib/textEditing';
   import BodyModeSelector from './lib/components/BodyModeSelector.svelte';
   import RequestBar from './lib/components/RequestBar.svelte';
@@ -390,6 +391,7 @@
 
   onMount(() => {
     const uninstallTitlebarDoubleClick = installTitlebarDoubleClickHandler();
+    const uninstallFileDrop = installFileDrop(window.runtime, vm.importDroppedFiles);
     vm.startOpenApiScheduler();
     let uninstallQuitShortcut = () => {};
     const offBeforeQuit = window.runtime?.EventsOn?.('kurlo:before-quit', () => {
@@ -518,6 +520,7 @@
         updateCheckTimer = null;
       }
       uninstallTitlebarDoubleClick();
+      uninstallFileDrop();
       uninstallQuitShortcut();
       vm.stopOpenApiScheduler();
       offBeforeQuit?.();

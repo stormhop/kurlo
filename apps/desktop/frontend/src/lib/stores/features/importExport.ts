@@ -1,4 +1,5 @@
-import { openDirectoryDialog, readCollectionTextFiles, sendHttpRequest, writeCollectionTextFiles } from '../../backend';
+import { chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles } from '../../backend';
+import { detectImportSource, type ImportSource } from '../../importSource';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
 import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, ScriptEngine, Workspace } from '../../types/models';
 import { mergeGlobalRowsWithImportedRows } from './globals';
@@ -13,8 +14,6 @@ import { flattenedEnvironment } from '../../environmentInheritance';
 import type { OpenApiExportFormat } from '../../openapi';
 
 type ImportedCollectionDefaults = { variables?: KVRow[]; auth?: import('../../types/models').AuthState };
-
-type ImportSource = 'bruno' | 'postman' | 'insomnia' | 'openapi' | 'har' | 'httpfile';
 
 type DialogOptionInput = { value: string; label: string; icon?: string; description?: string };
 
@@ -120,6 +119,7 @@ type ImportExportHost = {
   isRecord: (value: unknown) => value is Record<string, unknown>;
   importBrunoOpenCollectionFolder: () => Promise<void>;
   importCollectionPayload: (text: string, fileName: string, source: ImportSource) => Promise<number>;
+  runCollectionFileImport: (text: string, fileName: string, source: ImportSource) => Promise<void>;
   importOpenCollectionFiles: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<number>;
   importHarPayload: (payload: unknown, fileName: string) => Promise<number>;
   importRequestsPayload: (collectionName: string, buildRequests: (collectionId: string, collectionName: string) => SavedRequest[], collectionDefaults?: ImportedCollectionDefaults | (() => ImportedCollectionDefaults | undefined)) => Promise<number>;
@@ -180,7 +180,30 @@ export const importExportFeature = {
       await this.importBrunoOpenCollectionFolder();
       return;
     }
-    this._postmanImportInput?.click();
+    if (!hasNativeImportDialog()) {
+      this._postmanImportInput?.click();
+      return;
+    }
+    const file = await chooseImportFile(this.collectionImportSource);
+    if (file.error) {
+      this.collectionImportToast = `Import failed: ${file.error}`;
+      setTimeout(() => (this.collectionImportToast = ''), 3200);
+      return;
+    }
+    if (file.path) await this.runCollectionFileImport(file.content, file.name, this.collectionImportSource);
+  },
+  async importDroppedFiles(this: ImportExportHost, paths: string[]) {
+    for (const path of paths) {
+      const file = await readImportFile(path);
+      const name = file.name || path.split(/[\\/]/).pop() || path;
+      const source = file.error ? null : detectImportSource(name, file.content);
+      if (!source) {
+        this.collectionImportToast = file.error ? `Import failed: ${file.error}` : `Kurlo can't import ${name}`;
+        setTimeout(() => (this.collectionImportToast = ''), 3200);
+        continue;
+      }
+      await this.runCollectionFileImport(file.content, name, source);
+    }
   },
   async openOpenApiUrlImport(this: ImportExportHost) {
     if (!this.guardWorkspaceWritable('Importing')) return;
@@ -229,10 +252,12 @@ export const importExportFeature = {
   async onPostmanImportFile(this: ImportExportHost, e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0]; input.value = ''; if (!file) return;
+    await this.runCollectionFileImport(await file.text(), file.name, this.collectionImportSource);
+  },
+  async runCollectionFileImport(this: ImportExportHost, text: string, fileName: string, source: ImportSource) {
     try {
-      const text = await file.text();
       this.collectionImportSummary = '';
-      const count = await this.importCollectionPayload(text, file.name, this.collectionImportSource);
+      const count = await this.importCollectionPayload(text, fileName, source);
       this.collectionImportToast = this.collectionImportSummary
         || (count ? `Imported ${count} request${count === 1 ? '' : 's'}` : 'Imported empty collection');
       this.collectionImportSummary = '';

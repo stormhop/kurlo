@@ -100,25 +100,71 @@ type ParsedBlock = {
   url: string;
   headers: KVRow[];
   body: string;
+  preRequestScripts: string[];
+  responseScripts: string[];
   notes: string[];
 };
+
+function dedent(lines: string[]): string {
+  const filled = lines.filter(line => line.trim());
+  const indent = filled.length ? Math.min(...filled.map(line => line.match(/^\s*/)?.[0].length ?? 0)) : 0;
+  return lines.map(line => line.slice(Math.min(indent, line.match(/^\s*/)?.[0].length ?? 0))).join('\n').trim();
+}
+
+function readInlineScript(lines: string[], start: number, prefix: RegExp): { code: string; next: number } | null {
+  const opening = lines[start].trim().match(prefix);
+  if (!opening) return null;
+  const first = lines[start].trim().slice(opening[0].length);
+  const closeOnFirst = first.indexOf('%}');
+  if (closeOnFirst >= 0) return { code: first.slice(0, closeOnFirst).trim(), next: start + 1 };
+  const code: string[] = first.trim() ? [first] : [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const closeAt = lines[index].indexOf('%}');
+    if (closeAt >= 0) {
+      const tail = lines[index].slice(0, closeAt);
+      if (tail.trim()) code.push(tail);
+      return { code: dedent(code), next: index + 1 };
+    }
+    code.push(lines[index]);
+  }
+  return { code: dedent(code), next: lines.length };
+}
+
+const PRE_SCRIPT = /^<\s*\{%/;
+const RESPONSE_SCRIPT = /^>\s*\{%/;
 
 function parseBlock(lines: string[], label: string, variables: HttpFileVariable[]): ParsedBlock | null {
   let name = label;
   const notes: string[] = [];
+  const preRequestScripts: string[] = [];
+  const responseScripts: string[] = [];
   let index = 0;
 
-  for (; index < lines.length; index += 1) {
+  while (index < lines.length) {
     const line = lines[index];
-    if (!line.trim()) continue;
+    const trimmed = line.trim();
+    if (!trimmed) { index += 1; continue; }
+    const script = readInlineScript(lines, index, PRE_SCRIPT);
+    if (script) {
+      if (script.code) preRequestScripts.push(script.code);
+      index = script.next;
+      continue;
+    }
+    if (/^<\s+\S/.test(trimmed)) {
+      notes.push(`The pre-request script ${trimmed.replace(/^<\s*/, '')} was a separate file in the source .http file and was not imported.`);
+      index += 1;
+      continue;
+    }
     const variable = fileVariable(line);
     if (variable) {
       variables.push(variable);
+      index += 1;
       continue;
     }
     if (isComment(line)) {
       const found = directive(line);
       if (found?.key === 'name' && found.value) name = found.value;
+      index += 1;
       continue;
     }
     break;
@@ -145,28 +191,43 @@ function parseBlock(lines: string[], label: string, variables: HttpFileVariable[
   }
 
   const bodyLines: string[] = [];
-  for (; index < lines.length; index += 1) {
+  let bodyEnded = false;
+  while (index < lines.length) {
     const line = lines[index];
     const trimmed = line.trim();
-    if (/^<\s*\S/.test(trimmed)) {
+    const script = readInlineScript(lines, index, RESPONSE_SCRIPT);
+    if (script) {
+      if (script.code) responseScripts.push(script.code);
+      bodyEnded = true;
+      index = script.next;
+      continue;
+    }
+    if (/^>>!?\s*\S/.test(trimmed)) {
+      notes.push(`Response was written to ${trimmed.replace(/^>>!?\s*/, '')} in the source .http file.`);
+      bodyEnded = true;
+    } else if (/^<>\s*\S/.test(trimmed)) {
+      bodyEnded = true;
+    } else if (/^>\s+\S/.test(trimmed)) {
+      notes.push(`The response handler ${trimmed.replace(/^>\s*/, '')} was a separate file in the source .http file and was not imported.`);
+      bodyEnded = true;
+    } else if (/^<\s+\S/.test(trimmed) && !bodyEnded) {
       notes.push(`Body was loaded from ${trimmed.replace(/^<\s*/, '')} in the source .http file.`);
-      continue;
+    } else if (!bodyEnded) {
+      bodyLines.push(line);
     }
-    if (/^>>?\s*\S/.test(trimmed) && !trimmed.startsWith('> {%')) {
-      notes.push(`Response was written to ${trimmed.replace(/^>>?\s*/, '')} in the source .http file.`);
-      continue;
-    }
-    bodyLines.push(line);
+    index += 1;
   }
 
-  let body = bodyLines.join('\n').trim();
-  const handlerAt = body.indexOf('> {%');
-  if (handlerAt >= 0) {
-    notes.push('The source file had a JetBrains response handler script, which Kurlo does not run.');
-    body = body.slice(0, handlerAt).trim();
-  }
-
-  return { name: name || nameFromUrl(requestLine.method, url), method: requestLine.method, url, headers, body, notes };
+  return {
+    name: name || nameFromUrl(requestLine.method, url),
+    method: requestLine.method,
+    url,
+    headers,
+    body: bodyLines.join('\n').trim(),
+    preRequestScripts,
+    responseScripts,
+    notes,
+  };
 }
 
 export function httpFileCollectionName(fileName: string): string {
@@ -233,8 +294,8 @@ export function parseHttpFile(text: string, collectionId: string, collectionName
       bodyFilePath: '',
       bodyFileName: '',
       formRows: [],
-      preRequestScript: '',
-      testScript: '',
+      preRequestScript: parsed.preRequestScripts.join('\n\n'),
+      testScript: parsed.responseScripts.join('\n\n'),
       requestNotes: parsed.notes.join('\n'),
       settings: { ...DEFAULT_REQUEST_SETTINGS, ...(socketIO?.settings ?? {}) },
     });

@@ -26,7 +26,7 @@ Kurlo supports both one-off interchange formats and full Kurlo backups. Imports 
 Kurlo reads Postman Collection v2.1 — the JSON export, not the cloud-sync format.
 
 1. In Postman: right-click the collection → **Export** → choose v2.1.
-2. In Kurlo: click the **import** icon in the sidebar header (next to **+**) and pick the JSON file — or drag the file onto the sidebar.
+2. In Kurlo: click the **import** icon in the sidebar header (next to **+**) and pick the JSON file — or drop the file anywhere in the Kurlo window.
 3. Kurlo creates a new collection in the current workspace, preserving the folder tree.
 
 What carries over:
@@ -101,7 +101,10 @@ Content-Type: application/json
 - File variables (`@baseUrl = …`) become collection variables, so `{{baseUrl}}` keeps resolving after import.
 - A bare URL line is treated as `GET`, and a trailing `HTTP/1.1` is ignored.
 - `WEBSOCKET` requests and the `X-REQUEST-TYPE: GraphQL` header map to Kurlo's WebSocket and GraphQL request types.
-- `< ./body.json` and `> ./out.json` reference files the importer cannot read. Kurlo records them in the request's Docs tab instead of dropping them silently, as it does for JetBrains response-handler scripts (`> {% … %}`), which use an API Kurlo does not run.
+- JetBrains pre-request scripts (`< {% … %}` above the request line) and response handlers (`> {% … %}` after the body) become the request's pre-request and post-response scripts. They keep running as written: Kurlo's script sandbox understands the JetBrains `client`, `request` and `response` objects (see [JetBrains HTTP Client globals](/docs/reference/scripting-api/#jetbrains-http-client-globals)).
+- `< ./body.json`, `> ./handler.js` and `>> ./out.json` reference files the importer cannot read. Kurlo records them in the request's Docs tab instead of dropping them silently.
+
+You can also drop a `.http` or `.rest` file anywhere in the Kurlo window to import it.
 
 ## From curl
 

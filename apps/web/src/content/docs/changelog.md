@@ -12,6 +12,11 @@ This page summarizes the notable-change log maintained in the source repository.
 
 ## Unreleased
 
+### Added
+
+- **Drop files to import**: drop a `.http`, `.rest`, Postman, Insomnia, OpenAPI or HAR file anywhere in the window to import it, instead of the window showing the file's text.
+- **JetBrains HTTP Client scripts run**: the sandbox understands `client`, `request` and `response`, so scripts imported from `.http` files work as written. See [JetBrains HTTP Client globals](/docs/reference/scripting-api/#jetbrains-http-client-globals).
+
 ### Changed
 
 - **One loader everywhere**: every wait in the app — responses, gRPC and MCP calls, diffs, history, cookies, examples, the mock server, model lists, settings checks and the Cancel button — shows the flying Kurlo bird instead of spinners and *Loading…* captions.
@@ -24,6 +29,8 @@ This page summarizes the notable-change log maintained in the source repository.
 ### Fixed
 
 - **Edits save on the first launch**: on a new installation Kurlo refused every save with *changes could not be saved*, so nothing reached the disk. An empty profile now counts as a fresh start.
+- **`.http` import keeps scripts out of requests**: pre-request scripts no longer make a request disappear, response handlers no longer land in the body, and XML bodies starting with `<` are kept.
+- **Import dialog shows `.http` and `.rest` files on Linux**: import opens the system dialog filtered to the chosen format.
 - **Tengo script timeouts**: Tengo scripts respect the configured script timeout instead of always using two seconds.
 - **Compact release notes in About**: long update notes show about ten lines and a link to the full changelog on the website.
 - **Mock server with thousands of examples**: the route list reads only methods, paths and statuses and the server reads responses from disk, so it opens quickly, scrolls without blank gaps and keeps the sidebar animation smooth; hiding the sidebar no longer moves the list away from the route you were looking at.

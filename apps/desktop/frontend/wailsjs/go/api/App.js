@@ -106,6 +106,10 @@ export function ChooseEnvFileToImport() {
   return window['go']['api']['App']['ChooseEnvFileToImport']();
 }
 
+export function ChooseImportFile(arg1) {
+  return window['go']['api']['App']['ChooseImportFile'](arg1);
+}
+
 export function ClaudeCodeStatus(arg1) {
   return window['go']['api']['App']['ClaudeCodeStatus'](arg1);
 }
@@ -528,6 +532,10 @@ export function Quit() {
 
 export function ReadCollectionTextFiles(arg1) {
   return window['go']['api']['App']['ReadCollectionTextFiles'](arg1);
+}
+
+export function ReadImportFile(arg1) {
+  return window['go']['api']['App']['ReadImportFile'](arg1);
 }
 
 export function ReadOpenAPIBaseSpec(arg1) {
