@@ -14,3 +14,7 @@ export function variableDisplayValue(variable: VariableSuggestion) {
 export function variableTemplate(key: string) {
   return `{{${key}}}`;
 }
+
+export function isVariableReferenceOnly(value: string | undefined) {
+  return !!value && /^(\s*\{\{[^{}]+}}\s*)+$/.test(value);
+}

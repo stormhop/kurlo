@@ -4,11 +4,14 @@
   import { AUTH_OPTIONS, JWT_ALGORITHM_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
   import Select from './Select.svelte';
   import CodeEditor from '../CodeEditor.svelte';
+  import VariableInput from './VariableInput.svelte';
+  import { isVariableReferenceOnly } from '../variables';
   import { decodeJwt, formatJwtClaimValue, formatJwtNumericDate, jwtClaimRows, jwtHeaderRows, jwtTokenState, type JwtDecodeResult } from '../jwt';
   import { clipboardCopy, jwtAlgorithmUsesSecret } from '../utils';
 
   let jwtInspectorOpen = $state(false);
   let bearerTokenVisible = $state(false);
+  const secretInputType = (value: string) => (isVariableReferenceOnly(value) ? 'text' : 'password');
   let bearerTokenForJwt = $derived(vm.resolveTemplate(vm.bearerToken, vm.activeEnvironmentValues()));
   let jwtDecoded = $derived(decodeJwt(bearerTokenForJwt));
   let jwtState = $derived(jwtDecoded.ok ? jwtTokenState(jwtDecoded.payload) : null);
@@ -176,7 +179,7 @@
       <label class="field-label" for="bearer-token">Token</label>
       <div class="bearer-token-row">
         <div class="bearer-token-input-wrap">
-          <input id="bearer-token" class="field field-input field-mono" type={bearerTokenVisible ? 'text' : 'password'} bind:value={vm.bearerToken} placeholder="Enter bearer token" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          <VariableInput id="bearer-token" className="field field-input field-mono" bind:value={vm.bearerToken} suggestions={vm.variableSuggestions} placeholder="Enter bearer token" type={bearerTokenVisible || isVariableReferenceOnly(vm.bearerToken) ? 'text' : 'password'} />
           <button
             class="btn btn-ghost btn-icon btn-xs token-visibility-btn"
             type="button"
@@ -208,15 +211,15 @@
 
     {:else if vm.authType === 'basic' || vm.authType === 'digest' || vm.authType === 'ntlm'}
       <label class="field-label" for="auth-user">Username</label>
-      <input id="auth-user" class="field field-input" bind:value={vm.basicUser} placeholder="Enter username" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+      <VariableInput id="auth-user" className="field field-input" bind:value={vm.basicUser} suggestions={vm.variableSuggestions} placeholder="Enter username" />
       <label class="field-label" for="auth-pass">Password</label>
-      <input id="auth-pass" class="field field-input" bind:value={vm.basicPass} type="password" placeholder="Enter password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+      <VariableInput id="auth-pass" className="field field-input" bind:value={vm.basicPass} suggestions={vm.variableSuggestions} placeholder="Enter password" type={secretInputType(vm.basicPass)} />
 
     {:else if vm.authType === 'apikey'}
       <label class="field-label" for="apikey-name">Key name</label>
-      <input id="apikey-name" class="field field-input" bind:value={vm.apiKeyName} placeholder="e.g. X-API-Key" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+      <VariableInput id="apikey-name" className="field field-input" bind:value={vm.apiKeyName} suggestions={vm.variableSuggestions} placeholder="e.g. X-API-Key" />
       <label class="field-label" for="apikey-val">Key value</label>
-      <input id="apikey-val" class="field field-input field-mono" type="password" bind:value={vm.apiKeyValue} placeholder="Enter value" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+      <VariableInput id="apikey-val" className="field field-input field-mono" bind:value={vm.apiKeyValue} suggestions={vm.variableSuggestions} placeholder="Enter value" type={secretInputType(vm.apiKeyValue)} />
       <span class="field-label">Add to</span>
       <div class="segmented radio-group" role="radiogroup">
         {#if vm.requestType === 'grpc'}
@@ -232,33 +235,33 @@
       <Select bind:value={vm.oauth2GrantType} options={OAUTH2_GRANT_OPTIONS} className="auth-field-select" ariaLabel="Grant type" />
       {#if vm.oauth2GrantType === 'authorization_code'}
         <label class="field-label" for="oauth2-auth-url">Authorization URL</label>
-        <input id="oauth2-auth-url" class="field field-input" bind:value={vm.oauth2AuthURL} placeholder="https://auth.example.com/oauth/authorize" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+        <VariableInput id="oauth2-auth-url" className="field field-input" bind:value={vm.oauth2AuthURL} suggestions={vm.variableSuggestions} placeholder="https://auth.example.com/oauth/authorize" />
       {/if}
       {#if vm.oauth2GrantType === 'device_code'}
         <label class="field-label" for="oauth2-device-url">Device authorization URL</label>
-        <input id="oauth2-device-url" class="field field-input" bind:value={vm.oauth2DeviceAuthURL} placeholder="https://auth.example.com/oauth/device/code" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+        <VariableInput id="oauth2-device-url" className="field field-input" bind:value={vm.oauth2DeviceAuthURL} suggestions={vm.variableSuggestions} placeholder="https://auth.example.com/oauth/device/code" />
       {/if}
       <label class="field-label" for="oauth2-url">Token URL</label>
-      <input id="oauth2-url" class="field field-input" bind:value={vm.oauth2TokenURL} placeholder="https://auth.example.com/oauth/token" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+      <VariableInput id="oauth2-url" className="field field-input" bind:value={vm.oauth2TokenURL} suggestions={vm.variableSuggestions} placeholder="https://auth.example.com/oauth/token" />
       {#if vm.oauth2GrantType === 'password'}
         <div class="auth-grid-2">
           <div>
             <label class="field-label" for="oauth2-username">Username</label>
-            <input id="oauth2-username" class="field field-input" bind:value={vm.oauth2Username} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth2-username" className="field field-input" bind:value={vm.oauth2Username} suggestions={vm.variableSuggestions} />
           </div>
           <div>
             <label class="field-label" for="oauth2-password">Password</label>
-            <input id="oauth2-password" class="field field-input" bind:value={vm.oauth2Password} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+            <VariableInput id="oauth2-password" className="field field-input" bind:value={vm.oauth2Password} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth2Password)} />
           </div>
         </div>
       {/if}
       <label class="field-label" for="oauth2-id">Client ID</label>
-      <input id="oauth2-id" class="field field-input" bind:value={vm.oauth2ClientID} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+      <VariableInput id="oauth2-id" className="field field-input" bind:value={vm.oauth2ClientID} suggestions={vm.variableSuggestions} />
       <span class="field-label">Client authentication</span>
       <Select bind:value={vm.oauth2ClientAuth} options={OAUTH2_CLIENT_AUTH_OPTIONS} className="auth-field-select" ariaLabel="Client authentication method" />
       {#if vm.oauth2ClientAuth !== 'private_key_jwt'}
         <label class="field-label" for="oauth2-secret">Client secret{#if vm.oauth2GrantType === 'authorization_code'} <span class="field-label-hint">(optional with PKCE)</span>{/if}</label>
-        <input id="oauth2-secret" class="field field-input" bind:value={vm.oauth2Secret} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+        <VariableInput id="oauth2-secret" className="field field-input" bind:value={vm.oauth2Secret} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth2Secret)} />
       {/if}
       {#if vm.oauth2ClientAuth === 'private_key_jwt'}
         <label class="field-label" for="oauth2-private-key">Private key (PEM) <span class="field-label-hint">— accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
@@ -266,22 +269,22 @@
         <div class="auth-grid-2">
           <div>
             <label class="field-label" for="oauth2-kid">Key ID <span class="field-label-hint">(optional)</span></label>
-            <input id="oauth2-kid" class="field field-input field-mono" bind:value={vm.oauth2AssertionKeyID} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth2-kid" className="field field-input field-mono" bind:value={vm.oauth2AssertionKeyID} suggestions={vm.variableSuggestions} />
           </div>
           <div>
             <label class="field-label" for="oauth2-alg">Algorithm <span class="field-label-hint">(auto)</span></label>
-            <input id="oauth2-alg" class="field field-input field-mono" bind:value={vm.oauth2AssertionAlgorithm} placeholder="RS256" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth2-alg" className="field field-input field-mono" bind:value={vm.oauth2AssertionAlgorithm} suggestions={vm.variableSuggestions} placeholder="RS256" />
           </div>
         </div>
       {/if}
       {#if vm.oauth2ClientAuth === 'client_secret_jwt' || vm.oauth2ClientAuth === 'private_key_jwt'}
         <label class="field-label" for="oauth2-assertion-aud">Assertion audience <span class="field-label-hint">(defaults to the token URL)</span></label>
-        <input id="oauth2-assertion-aud" class="field field-input" bind:value={vm.oauth2AssertionAudience} placeholder="https://auth.example.com/oauth/token" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+        <VariableInput id="oauth2-assertion-aud" className="field field-input" bind:value={vm.oauth2AssertionAudience} suggestions={vm.variableSuggestions} placeholder="https://auth.example.com/oauth/token" />
       {/if}
       <label class="field-label" for="oauth2-scope">Scope</label>
-      <input id="oauth2-scope" class="field field-input" bind:value={vm.oauth2Scope} placeholder="e.g. read write" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+      <VariableInput id="oauth2-scope" className="field field-input" bind:value={vm.oauth2Scope} suggestions={vm.variableSuggestions} placeholder="e.g. read write" />
       <label class="field-label" for="oauth2-audience">Audience <span class="field-label-hint">(optional — required by some providers)</span></label>
-      <input id="oauth2-audience" class="field field-input" bind:value={vm.oauth2Audience} placeholder="https://api.example.com" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+      <VariableInput id="oauth2-audience" className="field field-input" bind:value={vm.oauth2Audience} suggestions={vm.variableSuggestions} placeholder="https://api.example.com" />
       {#if vm.oauth2GrantType === 'authorization_code'}
         <label class="check-label oauth2-pkce-row"><input class="check" type="checkbox" bind:checked={vm.oauth2UsePKCE} /> Use PKCE (recommended)</label>
       {/if}
@@ -328,7 +331,7 @@
         {#if jwtUsesSecret}
           <div class="auth-grid-span">
             <label class="field-label" for="jwt-secret">Secret</label>
-            <input id="jwt-secret" class="field field-input field-mono" bind:value={vm.jwt.secret} type="password" placeholder={'Shared secret or {{variable}}'} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="jwt-secret" className="field field-input field-mono" bind:value={vm.jwt.secret} suggestions={vm.variableSuggestions} placeholder={'Shared secret or {{variable}}'} type={secretInputType(vm.jwt.secret)} />
             <label class="check-label jwt-secret-base64"><input class="check" type="checkbox" bind:checked={vm.jwt.secretBase64} /> Secret is base64-encoded</label>
           </div>
         {:else}
@@ -340,12 +343,12 @@
         {#if vm.jwt.addTo === 'query' && vm.requestType !== 'grpc'}
           <div>
             <label class="field-label" for="jwt-query-param">Query parameter</label>
-            <input id="jwt-query-param" class="field field-input field-mono" bind:value={vm.jwt.queryParam} placeholder="token" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="jwt-query-param" className="field field-input field-mono" bind:value={vm.jwt.queryParam} suggestions={vm.variableSuggestions} placeholder="token" />
           </div>
         {:else}
           <div>
             <label class="field-label" for="jwt-header-prefix">Header prefix</label>
-            <input id="jwt-header-prefix" class="field field-input field-mono" bind:value={vm.jwt.headerPrefix} placeholder="Bearer" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="jwt-header-prefix" className="field field-input field-mono" bind:value={vm.jwt.headerPrefix} suggestions={vm.variableSuggestions} placeholder="Bearer" />
           </div>
         {/if}
         <div>
@@ -409,12 +412,12 @@
         </div>
         <div>
           <label class="field-label" for="oauth1-consumer-key">Consumer key</label>
-          <input id="oauth1-consumer-key" class="field field-input field-mono" bind:value={vm.oauth1.consumerKey} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          <VariableInput id="oauth1-consumer-key" className="field field-input field-mono" bind:value={vm.oauth1.consumerKey} suggestions={vm.variableSuggestions} />
         </div>
         {#if !oauth1UsesRsa}
           <div>
             <label class="field-label" for="oauth1-consumer-secret">Consumer secret</label>
-            <input id="oauth1-consumer-secret" class="field field-input field-mono" bind:value={vm.oauth1.consumerSecret} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+            <VariableInput id="oauth1-consumer-secret" className="field field-input field-mono" bind:value={vm.oauth1.consumerSecret} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth1.consumerSecret)} />
           </div>
         {/if}
         {#if oauth1UsesRsa}
@@ -425,12 +428,12 @@
         {/if}
         <div>
           <label class="field-label" for="oauth1-token">Access token <span class="field-label-hint">(optional)</span></label>
-          <input id="oauth1-token" class="field field-input field-mono" bind:value={vm.oauth1.token} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+          <VariableInput id="oauth1-token" className="field field-input field-mono" bind:value={vm.oauth1.token} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth1.token)} />
         </div>
         {#if !oauth1UsesRsa}
           <div>
             <label class="field-label" for="oauth1-token-secret">Token secret <span class="field-label-hint">(optional)</span></label>
-            <input id="oauth1-token-secret" class="field field-input field-mono" bind:value={vm.oauth1.tokenSecret} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+            <VariableInput id="oauth1-token-secret" className="field field-input field-mono" bind:value={vm.oauth1.tokenSecret} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth1.tokenSecret)} />
           </div>
         {/if}
       </div>
@@ -439,27 +442,27 @@
         <div class="auth-grid-2">
           <div>
             <label class="field-label" for="oauth1-realm">Realm</label>
-            <input id="oauth1-realm" class="field field-input" bind:value={vm.oauth1.realm} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth1-realm" className="field field-input" bind:value={vm.oauth1.realm} suggestions={vm.variableSuggestions} />
           </div>
           <div>
             <label class="field-label" for="oauth1-callback">Callback URL</label>
-            <input id="oauth1-callback" class="field field-input" bind:value={vm.oauth1.callback} placeholder="https://example.com/callback" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth1-callback" className="field field-input" bind:value={vm.oauth1.callback} suggestions={vm.variableSuggestions} placeholder="https://example.com/callback" />
           </div>
           <div>
             <label class="field-label" for="oauth1-verifier">Verifier</label>
-            <input id="oauth1-verifier" class="field field-input field-mono" bind:value={vm.oauth1.verifier} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth1-verifier" className="field field-input field-mono" bind:value={vm.oauth1.verifier} suggestions={vm.variableSuggestions} />
           </div>
           <div>
             <label class="field-label" for="oauth1-version">Version</label>
-            <input id="oauth1-version" class="field field-input field-mono" bind:value={vm.oauth1.version} placeholder="1.0" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth1-version" className="field field-input field-mono" bind:value={vm.oauth1.version} suggestions={vm.variableSuggestions} placeholder="1.0" />
           </div>
           <div>
             <label class="field-label" for="oauth1-timestamp">Timestamp</label>
-            <input id="oauth1-timestamp" class="field field-input field-mono" bind:value={vm.oauth1.timestamp} placeholder="Generated on send" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth1-timestamp" className="field field-input field-mono" bind:value={vm.oauth1.timestamp} suggestions={vm.variableSuggestions} placeholder="Generated on send" />
           </div>
           <div>
             <label class="field-label" for="oauth1-nonce">Nonce</label>
-            <input id="oauth1-nonce" class="field field-input field-mono" bind:value={vm.oauth1.nonce} placeholder="Generated on send" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+            <VariableInput id="oauth1-nonce" className="field field-input field-mono" bind:value={vm.oauth1.nonce} suggestions={vm.variableSuggestions} placeholder="Generated on send" />
           </div>
         </div>
         <div class="oauth1-checks">
@@ -472,23 +475,23 @@
       <div class="auth-grid-2">
         <div>
           <label class="field-label" for="aws-key">Access key ID</label>
-          <input id="aws-key" class="field field-input field-mono" bind:value={vm.awsAccessKey} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          <VariableInput id="aws-key" className="field field-input field-mono" bind:value={vm.awsAccessKey} suggestions={vm.variableSuggestions} />
         </div>
         <div>
           <label class="field-label" for="aws-secret">Secret access key</label>
-          <input id="aws-secret" class="field field-input field-mono" bind:value={vm.awsSecretKey} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+          <VariableInput id="aws-secret" className="field field-input field-mono" bind:value={vm.awsSecretKey} suggestions={vm.variableSuggestions} type={secretInputType(vm.awsSecretKey)} />
         </div>
         <div class="auth-grid-span">
           <label class="field-label" for="aws-session-token">Session token <span class="field-label-hint">(temporary credentials from STS / SSO)</span></label>
-          <input id="aws-session-token" class="field field-input field-mono" bind:value={vm.awsSessionToken} type="password" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
+          <VariableInput id="aws-session-token" className="field field-input field-mono" bind:value={vm.awsSessionToken} suggestions={vm.variableSuggestions} type={secretInputType(vm.awsSessionToken)} />
         </div>
         <div>
           <label class="field-label" for="aws-region">Region</label>
-          <input id="aws-region" class="field field-input" bind:value={vm.awsRegion} placeholder="us-east-1" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          <VariableInput id="aws-region" className="field field-input" bind:value={vm.awsRegion} suggestions={vm.variableSuggestions} placeholder="us-east-1" />
         </div>
         <div>
           <label class="field-label" for="aws-service">Service</label>
-          <input id="aws-service" class="field field-input" bind:value={vm.awsService} placeholder="execute-api" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          <VariableInput id="aws-service" className="field field-input" bind:value={vm.awsService} suggestions={vm.variableSuggestions} placeholder="execute-api" />
         </div>
       </div>
 

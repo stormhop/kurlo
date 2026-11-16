@@ -7,6 +7,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **`{{variables}}` in every auth field.** Auth fields on requests and collections suggest variables as you type `{{` and underline undefined ones. A secret field holding only a variable, such as `{{token}}`, is shown as text instead of dots.
+
 ### Fixed
 
 - **`pm.sendRequest` works like Postman.** Headers given as `"Name: value"` strings are sent instead of dropped, disabled headers are skipped, `urlencoded`, `formdata` and `graphql` bodies are encoded instead of sent as JSON text, and `Content-Type` follows the body (`raw` with `language: "json"`, form modes, GraphQL), so servers no longer answer 415 Unsupported Media Type. A call that runs past the script timeout is now canceled at the cap instead of finishing first.

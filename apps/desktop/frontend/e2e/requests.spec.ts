@@ -745,3 +745,33 @@ for (const count of [200, 250]) {
     if (count - 1 < 200) await expect(page.getByRole('button', { name: 'Assertion', exact: true })).toBeEnabled();
   });
 }
+
+test('takes a {{variable}} in the bearer token and shows it instead of dots', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    activeEnvironmentId: 'env-local',
+    environments: [{ id: 'env-local', workspaceId: 'workspace-e2e', name: 'Local', filesystemName: 'Local', values: [{ id: 'v1', key: 'token', value: 'secret-123', enabled: true }] }],
+  });
+  await page.goto('/');
+  await page.getByLabel('New unsaved request').click();
+  await page.getByLabel('Request URL').fill('https://api.kurlo.test/me');
+  await page.getByRole('tab', { name: /^Auth/ }).click();
+  await page.getByRole('button', { name: 'Auth type' }).click();
+  await page.locator('.auth-select-menu').getByRole('button', { name: 'Bearer token' }).click();
+
+  const token = page.locator('#bearer-token');
+  await token.pressSequentially('{{tok');
+  const menu = page.getByRole('listbox', { name: 'Environment variables' });
+  await expect(menu).toContainText('token');
+  await menu.getByRole('option', { name: /token/ }).first().click();
+  await expect(token).toHaveValue('{{token}}');
+  await expect(token).toHaveAttribute('type', 'text');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-bearer-variable.png'), animations: 'disabled' });
+
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window.__kurloE2E.sentRequests.at(-1) as { auth?: { token?: string } } | undefined)?.auth?.token)).toBe('secret-123');
+
+  await token.fill('raw-secret');
+  await expect(token).toHaveAttribute('type', 'password');
+  await token.fill('{{missing}}');
+  await expect(page.locator('.auth-fields .var-token-err')).toHaveText('{{missing}}');
+});

@@ -8,6 +8,7 @@
 
   let {
     value = $bindable(''),
+    id = undefined,
     inputRef = $bindable<HTMLInputElement | undefined>(),
     suggestions = [],
     className = '',
@@ -29,7 +30,8 @@
     onpaste,
     onenter,
   }: {
-    value: string;
+    value?: string;
+    id?: string;
     inputRef?: HTMLInputElement;
     suggestions?: VariableSuggestion[];
     className?: string;
@@ -94,6 +96,7 @@
   });
 
   const backdropHtml = $derived.by(() => {
+    if (type === 'password') return '';
     if (!activeGhost) return highlightHtml;
     return `${highlightHtml || escapeHtml(value)}<span class="ghost-text" data-testid="ghost-text">${escapeHtml(activeGhost.text)}</span>`;
   });
@@ -367,6 +370,7 @@
   {/if}
   <input
     bind:this={inputRef}
+    {id}
     class={className}
     bind:value
     {type}

@@ -13,6 +13,11 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ## Unreleased
 
+### Added
+
+- **`{{variables}}` in every auth field**: auth fields suggest variables after `{{` and flag undefined ones; a secret
+  field holding only `{{token}}` shows it as text. See [Authentication](/docs/guides/authentication/#bearer-token).
+
 ### Fixed
 
 - **`pm.sendRequest` works like Postman**: string headers, disabled headers, `urlencoded`, `formdata` and `graphql`

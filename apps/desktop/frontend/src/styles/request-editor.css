@@ -2170,3 +2170,10 @@
   color: var(--text-2);
   font-size: var(--text-label);
 }
+.variable-input-wrap .field-input {
+  width: 100%;
+  position: relative;
+}
+.variable-input-wrap.has-var-highlights .field-input {
+  background: transparent;
+}
