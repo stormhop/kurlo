@@ -107,7 +107,7 @@ They differ in which scope they touch:
 
 | Scope | Reads | Writes |
 |-------|-------|--------|
-| `pm.variables` | All scopes, in precedence order: data row → environment → collection → session | The session scope |
+| `pm.variables` | All scopes, in precedence order: data row → request → environment → collection → session | The session scope |
 | `pm.globals` | The session scope | The session scope |
 | `pm.environment` | The active environment | The active environment |
 | `pm.collectionVariables` | The request's collection | The request's collection, saved back to the collection after the send |
@@ -212,17 +212,50 @@ const res = pm.sendRequest("https://api.example.com/health")
 pm.test("dependency is up", () => pm.expect(res.code).to.equal(200))
 ```
 
+Options follow Postman's request format:
+
+| Option | Accepted forms |
+|---|---|
+| `url` | A string, or an object with `raw` |
+| `header` (or `headers`) | An object, an array of `{ key, value, disabled }`, an array of `"Name: value"` strings, or one `"Name: value"` string with one header per line. Disabled entries are skipped. |
+| `body` | A string, or `{ mode, … }` with `raw`, `urlencoded`, `formdata` or `graphql`. A plain object is sent as JSON. |
+
+Kurlo sets `Content-Type` from the body when you do not set it yourself:
+
+| Body | `Content-Type` |
+|---|---|
+| `{ mode: "raw", options: { raw: { language: "json" } } }` | `application/json` (`xml`, `html`, `javascript` and `text` map the same way) |
+| `{ mode: "urlencoded", urlencoded: [{ key, value }] }` | `application/x-www-form-urlencoded`; the fields are URL-encoded |
+| `{ mode: "formdata", formdata: [{ key, value }] }` | `multipart/form-data` with a generated boundary, always; text fields only |
+| `{ mode: "graphql", graphql: { query, variables } }` | `application/json` |
+| A plain object | `application/json` |
+
+```js
+pm.sendRequest({
+  url: "https://auth.example.com/token",
+  method: "POST",
+  body: {
+    mode: "urlencoded",
+    urlencoded: [
+      { key: "grant_type", value: "password" },
+      { key: "username", value: pm.environment.get("user") },
+    ],
+  },
+}, (err, res) => pm.environment.set("token", res.json().access_token))
+```
+
 The response object mirrors `pm.response`: `.code`, `.status`, `.responseTime`, `.size`, `.text()`, `.json()`, `.headers.get(name)`, and `.to` for assertions.
 
 Limits and deliberate omissions:
 
 - 30 second timeout, 8 MB response cap, at most 5 redirects.
-- The call does **not** inherit the parent request's auth, client certificate, or cookie jar, and does not run scripts of its own. It is a plain HTTP request — anything more would be a hidden second request carrying your credentials.
+- The call does **not** inherit the parent request's auth or cookie jar, and does not run scripts of its own. It does use the request's transport settings: proxy, TLS verification, and client certificate. Anything more would be a hidden second request carrying your credentials.
 - A non-2xx status is a normal response, not an error; only a transport failure produces one.
+- File bodies (`mode: "file"`) and file fields in `formdata` are not supported; the call throws and says so.
 
 ## Script timeout
 
-A script is capped at **2000 ms** by default. Raise it per request with **Script timeout** in the Settings tab, or for a whole run with `kurlo run --script-timeout`. The ceiling is 60000 ms, so a runaway loop can never wedge a send or a CI job.
+A script is capped at **2000 ms** by default. Raise it per request with **Script timeout** in the Settings tab, or for a whole run with `kurlo run --script-timeout`. The ceiling is 60000 ms, so a runaway loop can never wedge a send or a CI job. The same cap bounds a [`pm.sendRequest`](#pmsendrequest) call: a call that would run past the script deadline is canceled at that deadline.
 
 ## `pm.iterationData`
 

@@ -25,20 +25,26 @@ func runJS(src string, ctx *Context, hasResponse bool) string {
 	vm := goja.New()
 	vm.SetMaxCallStackSize(jsMaxCallStackSize)
 
-	if err := vm.Set("__kurloHost", buildJSHost(vm, ctx, hasResponse)); err != nil {
+	timeout := resolveTimeout(ctx.Timeout)
+	deadline := time.Now().Add(timeout)
+
+	if err := vm.Set("__kurloHost", buildJSHost(vm, ctx, hasResponse, deadline, timeout)); err != nil {
 		return "setup error: " + err.Error()
 	}
 	if _, err := vm.RunString(jsPrelude); err != nil {
 		return "setup error: " + err.Error()
 	}
 
-	timeout := resolveTimeout(ctx.Timeout)
 	timer := time.AfterFunc(timeout, func() {
 		vm.Interrupt("script timed out after " + timeout.String())
 	})
 	defer timer.Stop()
 
 	_, runErr := vm.RunString(src)
+	if ctx.droppedLogs > 0 {
+		ctx.Logs = append(ctx.Logs, fmt.Sprintf("[warn] %d more log %s not shown: a script keeps its first %d log lines", ctx.droppedLogs, pluralLines(ctx.droppedLogs), jsMaxLogEntries))
+		ctx.droppedLogs = 0
+	}
 	var interrupted *goja.InterruptedError
 	if !errors.As(runErr, &interrupted) {
 		func() {
@@ -50,6 +56,13 @@ func runJS(src string, ctx *Context, hasResponse bool) string {
 		return jsErrorMessage(runErr)
 	}
 	return ""
+}
+
+func pluralLines(n int) string {
+	if n == 1 {
+		return "line was"
+	}
+	return "lines were"
 }
 
 func recordLegacyTests(vm *goja.Runtime, ctx *Context) {
@@ -84,17 +97,18 @@ func limitJSHostString(s string) string {
 const maxScriptFormRows = 500
 
 type scriptFormRow struct {
-	Key      string `json:"key"`
-	Value    string `json:"value"`
-	Disabled bool   `json:"disabled,omitempty"`
-	Type     string `json:"type,omitempty"`
-	FileName string `json:"fileName,omitempty"`
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Disabled    bool   `json:"disabled,omitempty"`
+	Type        string `json:"type,omitempty"`
+	FileName    string `json:"fileName,omitempty"`
+	ContentType string `json:"contentType,omitempty"`
 }
 
 func encodeScriptFormData(rows []model.KeyValue) string {
 	out := make([]scriptFormRow, 0, len(rows))
 	for _, row := range rows {
-		entry := scriptFormRow{Key: row.Key, Value: row.Value, Disabled: !row.Enabled, Type: "text"}
+		entry := scriptFormRow{Key: row.Key, Value: row.Value, Disabled: !row.Enabled, Type: "text", ContentType: row.ContentType}
 		if row.IsFile {
 			entry.Type = "file"
 			entry.FileName = row.FileName
@@ -125,10 +139,11 @@ func decodeScriptFormData(payload string, previous []model.KeyValue) ([]model.Ke
 	rows := make([]model.KeyValue, 0, len(incoming))
 	for _, entry := range incoming {
 		row := model.KeyValue{
-			Key:     limitJSHostString(entry.Key),
-			Value:   limitJSHostString(entry.Value),
-			Enabled: !entry.Disabled,
-			IsFile:  strings.EqualFold(entry.Type, "file"),
+			Key:         limitJSHostString(entry.Key),
+			Value:       limitJSHostString(entry.Value),
+			Enabled:     !entry.Disabled,
+			IsFile:      strings.EqualFold(entry.Type, "file"),
+			ContentType: limitJSHostString(entry.ContentType),
 		}
 		if row.IsFile {
 			row.FileName = entry.FileName
@@ -184,7 +199,7 @@ func jsErrorMessage(err error) string {
 	}
 }
 
-func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool) map[string]interface{} {
+func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool, deadline time.Time, timeout time.Duration) map[string]interface{} {
 	undef := goja.Undefined()
 
 	headerGet := func(store map[string]string, key string) goja.Value {
@@ -346,6 +361,7 @@ func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool) map[string]in
 		},
 		"log": func(msg string) {
 			if len(ctx.Logs) >= jsMaxLogEntries {
+				ctx.droppedLogs++
 				return
 			}
 			ctx.Logs = append(ctx.Logs, limitJSHostString(msg))
@@ -447,10 +463,12 @@ func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool) map[string]in
 	if ctx.Send != nil {
 		host["sendRequest"] = func(method, url string, headers map[string]string, body string) goja.Value {
 			resp := ctx.Send(SendRequest{
-				Method:  method,
-				URL:     url,
-				Headers: headers,
-				Body:    body,
+				Method:        method,
+				URL:           url,
+				Headers:       headers,
+				Body:          body,
+				Deadline:      deadline,
+				ScriptTimeout: timeout,
 			})
 			out := map[string]any{
 				"code":         resp.StatusCode,
@@ -783,6 +801,7 @@ var __kurloAPI = (function (host) {
     if (typeof item === 'string') return { key: item, value: valStr(fallbackValue === undefined ? '' : fallbackValue), type: 'text' };
     var row = { key: String(item.key === undefined ? '' : item.key), value: valStr(item.value === undefined ? '' : item.value) };
     if (item.disabled === true) row.disabled = true;
+    if (item.contentType !== undefined) row.contentType = String(item.contentType);
     if (item.type === 'file' || item.src !== undefined) {
       row.type = 'file';
       if (item.src !== undefined) row.value = valStr(item.src);
@@ -810,6 +829,7 @@ var __kurloAPI = (function (host) {
         for (var i = 0; i < rows.length; i++) {
           if (rows[i].key === next.key) {
             if (rows[i].type === 'file' && next.type !== 'file') { next.type = 'file'; next.fileName = rows[i].fileName; }
+            if (next.contentType === undefined && rows[i].contentType !== undefined) next.contentType = rows[i].contentType;
             rows[i] = next; replaced = true; break;
           }
         }
@@ -835,10 +855,24 @@ var __kurloAPI = (function (host) {
   }
 
   var formList = makeFormList();
+  function graphqlBody(value, label) {
+    label = label || 'pm.request.body';
+    if (value === null || typeof value !== 'object') throw new Error(label + ': a GraphQL body needs a graphql object');
+    var variables = value.variables;
+    if (typeof variables === 'string') {
+      try { variables = variables.trim() === '' ? {} : JSON.parse(variables); }
+      catch (e) { throw new Error(label + ': GraphQL variables must be a JSON object'); }
+    }
+    if (variables === undefined || variables === null) variables = {};
+    var body = { query: valStr(value.query), variables: variables };
+    if (value.operationName !== undefined && String(value.operationName).trim() !== '') body.operationName = String(value.operationName);
+    return JSON.stringify(body);
+  }
   var requestBody = {
     update: function (v) {
       if (v !== null && typeof v === 'object' && typeof v.mode === 'string') {
         if (v.mode === 'urlencoded' || v.mode === 'formdata') { writeFormRows((v[v.mode] || []).map(function (item) { return asFormRow(item); })); return; }
+        if (v.mode === 'graphql') { host.reqSetBody(graphqlBody(v.graphql)); return; }
         host.reqSetBody(valStr(v.raw === undefined ? '' : v.raw));
         return;
       }
@@ -889,6 +923,104 @@ var __kurloAPI = (function (host) {
     return res;
   }
 
+  function sendRequestURL(u) {
+    if (u === undefined || u === null) return '';
+    if (typeof u === 'string') return u;
+    if (typeof u === 'object' && typeof u.raw === 'string') return u.raw;
+    return String(u);
+  }
+  function headerValue(headers, name) {
+    var want = String(name).toLowerCase();
+    for (var key in headers) { if (String(key).toLowerCase() === want) return headers[key]; }
+    return undefined;
+  }
+  function setHeader(headers, name, value) {
+    var want = String(name).toLowerCase();
+    for (var key in headers) { if (String(key).toLowerCase() === want) delete headers[key]; }
+    headers[name] = value;
+  }
+  function addHeaderLine(headers, line) {
+    var text = String(line);
+    var colon = text.indexOf(':');
+    if (colon <= 0) return;
+    var key = text.slice(0, colon).trim();
+    if (key) setHeader(headers, key, text.slice(colon + 1).trim());
+  }
+  function sendRequestHeaders(h) {
+    var out = {};
+    if (h === undefined || h === null) return out;
+    if (typeof h === 'string') {
+      var lines = h.split(/\r?\n/);
+      for (var l = 0; l < lines.length; l++) addHeaderLine(out, lines[l]);
+      return out;
+    }
+    if (typeof h.toJSON === 'function' && !Array.isArray(h)) h = h.toJSON();
+    if (Array.isArray(h)) {
+      for (var i = 0; i < h.length; i++) {
+        var item = h[i];
+        if (item === null || item === undefined) continue;
+        if (typeof item === 'string') { addHeaderLine(out, item); continue; }
+        if (item.disabled === true || item.key === undefined || String(item.key) === '') continue;
+        setHeader(out, String(item.key), valStr(item.value));
+      }
+      return out;
+    }
+    if (typeof h === 'object') {
+      for (var k in h) setHeader(out, String(k), valStr(h[k]));
+    }
+    return out;
+  }
+  function sendRequestFields(fields) {
+    var rows = [];
+    if (fields === undefined || fields === null) return rows;
+    if (typeof fields.toJSON === 'function' && !Array.isArray(fields)) fields = fields.toJSON();
+    if (Array.isArray(fields)) {
+      for (var i = 0; i < fields.length; i++) {
+        var f = fields[i];
+        if (f === null || f === undefined || f.disabled === true || f.key === undefined) continue;
+        rows.push(f);
+      }
+    } else if (typeof fields === 'object') {
+      for (var k in fields) rows.push({ key: k, value: fields[k] });
+    }
+    return rows;
+  }
+  var rawLanguageTypes = { json: 'application/json', javascript: 'application/javascript', html: 'text/html', xml: 'application/xml', text: 'text/plain' };
+  function sendRequestBody(b) {
+    if (typeof b === 'string') return { body: b };
+    if (typeof b !== 'object') return { body: String(b) };
+    var mode = typeof b.mode === 'string' ? b.mode : (b.raw !== undefined ? 'raw' : '');
+    if (b.disabled === true) return { body: '' };
+    if (mode === 'raw') {
+      var language = b.options && b.options.raw && b.options.raw.language;
+      return { body: valStr(b.raw), contentType: rawLanguageTypes[String(language || '').toLowerCase()] };
+    }
+    if (mode === 'urlencoded') {
+      if (typeof b.urlencoded === 'string') return { body: b.urlencoded, contentType: 'application/x-www-form-urlencoded' };
+      var pairs = sendRequestFields(b.urlencoded);
+      var encoded = [];
+      for (var i = 0; i < pairs.length; i++) encoded.push(encodeURIComponent(String(pairs[i].key)) + '=' + encodeURIComponent(valStr(pairs[i].value)));
+      return { body: encoded.join('&'), contentType: 'application/x-www-form-urlencoded' };
+    }
+    if (mode === 'formdata') {
+      var parts = sendRequestFields(b.formdata);
+      var boundary = '----KurloFormBoundary' + Math.random().toString(16).slice(2) + Date.now().toString(16);
+      var chunks = [];
+      for (var j = 0; j < parts.length; j++) {
+        var part = parts[j];
+        if (part.type === 'file' || part.src !== undefined) throw new Error('pm.sendRequest: file fields in formdata are not supported, send text fields only');
+        var head = '--' + boundary + '\r\nContent-Disposition: form-data; name="' + String(part.key).replace(/"/g, '%22') + '"\r\n';
+        if (part.contentType) head += 'Content-Type: ' + String(part.contentType) + '\r\n';
+        chunks.push(head + '\r\n' + valStr(part.value) + '\r\n');
+      }
+      return { body: chunks.join('') + '--' + boundary + '--\r\n', contentType: 'multipart/form-data; boundary=' + boundary, force: true };
+    }
+    if (mode === 'graphql') return { body: graphqlBody(b.graphql, 'pm.sendRequest'), contentType: 'application/json' };
+    if (mode === 'file') throw new Error('pm.sendRequest: file bodies are not supported');
+    if (mode) throw new Error('pm.sendRequest: unknown body mode "' + mode + '"');
+    return { body: valStr(b), contentType: 'application/json' };
+  }
+
   pm.sendRequest = function (options, callback) {
     if (!host.canSend) {
       var disabled = new Error('pm.sendRequest is disabled — turn on "Allow pm.sendRequest" in the Settings tab of this request, or pass --allow-send-request to kurlo run');
@@ -900,22 +1032,13 @@ var __kurloAPI = (function (host) {
     if (typeof options === 'string') {
       url = options;
     } else if (options && typeof options === 'object') {
-      url = String(options.url || '');
+      url = sendRequestURL(options.url);
       if (options.method) method = String(options.method).toUpperCase();
-      var h = options.header || options.headers;
-      if (Array.isArray(h)) {
-        for (var i = 0; i < h.length; i++) {
-          if (h[i] && h[i].key !== undefined) headers[String(h[i].key)] = valStr(h[i].value);
-        }
-      } else if (h && typeof h === 'object') {
-        for (var k in h) headers[String(k)] = valStr(h[k]);
-      }
+      headers = sendRequestHeaders(options.header !== undefined ? options.header : options.headers);
       if (options.body !== undefined && options.body !== null) {
-        var b = options.body;
-        if (typeof b === 'string') body = b;
-        else if (b.raw !== undefined) body = valStr(b.raw);
-        else if (b.mode === 'raw') body = valStr(b.raw);
-        else body = valStr(b);
+        var built = sendRequestBody(options.body);
+        body = built.body;
+        if (built.contentType && (!headerValue(headers, 'content-type') || built.force)) setHeader(headers, 'Content-Type', built.contentType);
       }
     } else {
       throw new Error('pm.sendRequest expects a URL string or an options object');
@@ -924,10 +1047,12 @@ var __kurloAPI = (function (host) {
 
     var raw = host.sendRequest(method, url, headers, body);
     if (raw.error) {
+      host.log('[error] pm.sendRequest ' + method + ' ' + url + ' failed: ' + raw.error);
       var err = new Error(raw.error);
       if (typeof callback === 'function') return callback(err, undefined);
       throw err;
     }
+    host.log((raw.code >= 400 ? '[warn] ' : '[request] ') + 'pm.sendRequest ' + method + ' ' + url + ' → ' + (raw.status || String(raw.code)) + ' · ' + raw.responseTime + ' ms');
     var wrapped = wrapSentResponse(raw);
     if (typeof callback === 'function') return callback(null, wrapped);
     return wrapped;
@@ -954,7 +1079,10 @@ var __kurloAPI = (function (host) {
     pm.response = resp;
   }
 
-  var console = { log: pm.log, info: pm.log, warn: pm.log, error: pm.log, debug: pm.log };
+  function leveledLog(prefix) {
+    return function () { var a = []; for (var i = 0; i < arguments.length; i++) a.push(fmt(arguments[i])); host.log(prefix + a.join(' ')); };
+  }
+  var console = { log: pm.log, info: pm.log, warn: leveledLog('[warn] '), error: leveledLog('[error] '), debug: pm.log };
 
   pm.variables.replaceIn = function (value) { return host.replaceIn(valStr(value)); };
 

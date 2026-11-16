@@ -1,7 +1,10 @@
 package api
 
 import (
+	"strings"
 	"testing"
+
+	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
 
 func TestRedactSecretsLongestFirst(t *testing.T) {
@@ -18,5 +21,29 @@ func TestRedactSecretsLongestFirst(t *testing.T) {
 func TestRedactSecretsNoSecrets(t *testing.T) {
 	if got := redactSecrets("nothing to hide", nil); got != "nothing to hide" {
 		t.Fatalf("expected passthrough, got %q", got)
+	}
+}
+
+func TestRedactScriptResultMasksTestNames(t *testing.T) {
+	result := redactScriptResult(model.ScriptResult{
+		Error: "failed with secret-1",
+		Logs:  []string{"log secret-1"},
+		Tests: []model.TestResult{{
+			Name:  "uses secret-1",
+			Error: "expected secret-1",
+		}},
+	}, []string{"secret-1"})
+
+	if strings.Contains(result.Error, "secret-1") {
+		t.Errorf("script error leaked the secret: %q", result.Error)
+	}
+	if strings.Contains(result.Logs[0], "secret-1") {
+		t.Errorf("script log leaked the secret: %q", result.Logs[0])
+	}
+	if strings.Contains(result.Tests[0].Name, "secret-1") {
+		t.Errorf("test name leaked the secret: %q", result.Tests[0].Name)
+	}
+	if strings.Contains(result.Tests[0].Error, "secret-1") {
+		t.Errorf("test error leaked the secret: %q", result.Tests[0].Error)
 	}
 }

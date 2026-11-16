@@ -302,7 +302,7 @@ export const grpcFeature = {
       duration: payload.duration ?? existing.duration,
       timestamp: payload.timestamp ?? existing.timestamp,
     }, payload.requestId);
-    if (this.grpcResponseTab !== 'messages' && !existing.testResult?.tests?.length) this.setActiveGrpcResponseTab('messages', payload.requestId);
+    if (this.grpcResponseTab !== 'messages' && !existing.testResult?.tests?.length && !existing.preRequestResult?.tests?.length) this.setActiveGrpcResponseTab('messages', payload.requestId);
   },
 
   applyGrpcTrailersEvent(this: GrpcHost, payload: GrpcTrailersEvent) {
@@ -336,7 +336,7 @@ export const grpcFeature = {
       preRequestResult: response.preRequestResult ?? { tests: [] },
       testResult: response.testResult ?? { tests: [] },
     }, payload.requestId);
-    this.setActiveGrpcResponseTab(response.testResult?.tests?.length ? 'scripts' : 'messages', payload.requestId);
+    this.setActiveGrpcResponseTab(response.testResult?.tests?.length || response.preRequestResult?.tests?.length ? 'scripts' : 'messages', payload.requestId);
   },
 
   async discoverGrpcServices(this: GrpcHost) {
@@ -453,7 +453,7 @@ export const grpcFeature = {
           preRequestResult: resp.preRequestResult ?? emptyScriptResult(),
           testResult: resp.testResult ?? emptyScriptResult(),
         }, requestId);
-        this.setActiveGrpcResponseTab(resp.testResult?.tests?.length ? 'scripts' : 'messages', requestId);
+        this.setActiveGrpcResponseTab(resp.testResult?.tests?.length || resp.preRequestResult?.tests?.length ? 'scripts' : 'messages', requestId);
       }
       await this.recordRequestHistory({
         ...emptyHttpResponse(),

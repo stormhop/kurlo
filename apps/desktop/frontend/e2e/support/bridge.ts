@@ -368,6 +368,9 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         };
       const bodyText = JSON.stringify(body, null, 2);
       const testName = req.testScript?.includes('status is 200') ? 'status is 200' : 'backend smoke assertion';
+      const preRequestTests = req.preRequestScript?.includes('preRequestMarker')
+        ? [{ name: 'pre-request token', passed: false, error: 'expected "failing" to equal "passing"' }]
+        : [];
       return {
         statusCode: 200,
         status: '200 OK',
@@ -380,7 +383,7 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         duration: isGraphQL ? 31 : 27,
         size: bodyText.length,
         preRequestResult: {
-          tests: [],
+          tests: preRequestTests,
           logs: req.preRequestScript ? ['pre-request script accepted'] : [],
         },
         testResult: {

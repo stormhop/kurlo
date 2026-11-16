@@ -5,6 +5,13 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **`pm.sendRequest` works like Postman.** Headers given as `"Name: value"` strings are sent instead of dropped, disabled headers are skipped, `urlencoded`, `formdata` and `graphql` bodies are encoded instead of sent as JSON text, and `Content-Type` follows the body (`raw` with `language: "json"`, form modes, GraphQL), so servers no longer answer 415 Unsupported Media Type. A call that runs past the script timeout is now canceled at the cap instead of finishing first.
+- **Scripts behave as written.** A `pm.test` in a pre-request script now shows in the Scripts panel and counts in the collection runner, `kurlo run` (and its JUnit report) and `kurlo mcp`, so a failing check fails the request instead of passing silently. `pm.request.body.update({ mode: "graphql", … })` writes the query and variables instead of clearing the body, editing one form field no longer drops the `Content-Type` of the others, `pm.globals.unset` during an HTTP or GraphQL request removes the variable for good, and a test name built from a secret is shown as `[secret]`.
+
 ## [3.1.2] - 2026-11-15
 
 ### Fixed

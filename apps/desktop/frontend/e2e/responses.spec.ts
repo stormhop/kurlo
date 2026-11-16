@@ -1,5 +1,5 @@
 import type { E2EWindow } from './support/bridge';
-import { chooseRequestType, collectionRow, fillPrompt } from './support/actions';
+import { chooseRequestSection, chooseRequestType, collectionRow, fillCodeEditor, fillPrompt } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -560,3 +560,31 @@ test.describe('Huge responses', () => {
     expect(nextPageMs).toBeLessThan(2_000);
   });
 });
+
+test.describe('Script results', () => {
+  test('shows a failing pre-request test and opens the scripts panel', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/pre-request-test');
+    await chooseRequestSection(page, 'Scripts');
+    await fillCodeEditor(
+      page,
+      'pre-request-script-editor',
+      'const preRequestMarker = "failing"\npm.test("pre-request token", () => pm.expect(preRequestMarker).to.equal("passing"))',
+    );
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect(page.getByText('200 OK')).toBeVisible();
+
+    const panel = page.locator('.test-results-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('Pre-request');
+    await expect(panel.locator('.test-row.fail')).toContainText('pre-request token');
+    await expect(panel).toContainText('0/1 passed');
+    await expect(panel).toContainText('expected "failing" to equal "passing"');
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-pre-request-tests.png'), animations: 'disabled' });
+  });
+});
+

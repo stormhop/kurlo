@@ -12,6 +12,7 @@ import type {
 } from '../../types/models';
 import { newRequestId } from '../../utils';
 import type { RunnableHttpOptions } from './requestSerialization';
+import type { GlobalVariableChanges } from './globals';
 import type { SSEConnectOptions } from './sse';
 
 const REQUEST_CANCELED_ERROR = 'Request canceled';
@@ -72,6 +73,7 @@ type RequestExecutionHost = {
   markRequestLoading: (requestId: string, loading: boolean) => void;
   activeEnvironmentId: string;
   applyEnvironmentChangesFromResponse: (resp: HttpResponse, environmentId: string) => Promise<void>;
+  applyGlobalVariableChangesFromResponse: (changes: GlobalVariableChanges) => Promise<boolean>;
   applyCollectionVariableUpdates: (
     req: Pick<SavedRequest, 'collectionId'>,
     updates: Record<string, string> | undefined,
@@ -230,6 +232,7 @@ export const requestExecutionFeature = {
       }
       completedResponse = resp;
       try { await this.applyEnvironmentChangesFromResponse(resp, sentEnvironmentId); } catch {}
+      try { await this.applyGlobalVariableChangesFromResponse(resp); } catch {}
       try { await this.applyCollectionVariableUpdates(requestSnapshot, resp.collectionVariableUpdates, resp.collectionVariablesRemoved); } catch {}
       try { await this.syncGlobalsFromBackend(); } catch {}
       if (!isCurrent()) return;
@@ -258,7 +261,7 @@ export const requestExecutionFeature = {
           this.responseBodyPage = 0;
           this.responseSearchIndex = 0;
         }
-        const defaultTab = resp.testResult?.tests?.length
+        const defaultTab = resp.testResult?.tests?.length || resp.preRequestResult?.tests?.length
           ? 'test-results'
           : (resp.previewImageBase64 ? 'preview' : 'body');
         this.setActiveResponseTab(defaultTab, requestId);

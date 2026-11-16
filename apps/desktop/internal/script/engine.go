@@ -112,6 +112,8 @@ type Context struct {
 
 	Tests []model.TestResult
 	Logs  []string
+
+	droppedLogs int
 }
 
 func NewContext(vars, env map[string]string) *Context {

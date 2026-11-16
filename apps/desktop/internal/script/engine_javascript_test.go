@@ -534,6 +534,69 @@ pm.variables.set("kind", pm.request.body.formdata.one("avatar").type);
 	}
 }
 
+func TestJSFormDataEditKeepsContentTypes(t *testing.T) {
+	t.Parallel()
+
+	ctx := NewContext(nil, nil)
+	ctx.RequestBodyType = "form"
+	ctx.RequestFormData = []model.KeyValue{
+		{Key: "payload", Value: `{"a":1}`, Enabled: true, ContentType: "application/json"},
+		{Key: "note", Value: "hi", Enabled: true},
+	}
+	res := jsPre(`pm.request.body.formdata.upsert({ key: "note", value: "signed" })`, ctx)
+	if res.Error != "" {
+		t.Fatalf("unexpected error: %s", res.Error)
+	}
+	want := []model.KeyValue{
+		{Key: "payload", Value: `{"a":1}`, Enabled: true, ContentType: "application/json"},
+		{Key: "note", Value: "signed", Enabled: true},
+	}
+	if !reflect.DeepEqual(ctx.RequestFormData, want) {
+		t.Fatalf("form data = %+v, want %+v", ctx.RequestFormData, want)
+	}
+
+	typed := NewContext(nil, nil)
+	typed.RequestBodyType = "form"
+	typed.RequestFormData = []model.KeyValue{{Key: "csv", Value: "a,b", Enabled: true}}
+	res = jsPre(`pm.request.body.formdata.upsert({ key: "csv", value: "1,2", contentType: "text/csv" })`, typed)
+	if res.Error != "" {
+		t.Fatalf("unexpected error: %s", res.Error)
+	}
+	if got := typed.RequestFormData[0].ContentType; got != "text/csv" {
+		t.Fatalf("content type = %q, want text/csv", got)
+	}
+}
+
+func TestJSGraphQLBodyUpdate(t *testing.T) {
+	t.Parallel()
+
+	ctx := NewContext(nil, nil)
+	ctx.RequestBodyType = "graphql"
+	ctx.RequestBody = `{"query":"query { a }","variables":{}}`
+	res := jsPre(`pm.request.body.update({ mode: "graphql", graphql: { query: "query { b }", variables: '{"id":1}', operationName: "B" } })`, ctx)
+	if res.Error != "" {
+		t.Fatalf("unexpected error: %s", res.Error)
+	}
+	want := `{"query":"query { b }","variables":{"id":1},"operationName":"B"}`
+	if ctx.RequestBody != want {
+		t.Fatalf("body = %q, want %q", ctx.RequestBody, want)
+	}
+	if !ctx.RequestBodyChanged {
+		t.Fatal("RequestBodyChanged should be set")
+	}
+}
+
+func TestJSGraphQLBodyUpdateRequiresGraphQLObject(t *testing.T) {
+	t.Parallel()
+
+	ctx := NewContext(nil, nil)
+	ctx.RequestBodyType = "graphql"
+	res := jsPre(`pm.request.body.update({ mode: "graphql" })`, ctx)
+	if res.Error == "" || !strings.Contains(res.Error, "graphql object") {
+		t.Fatalf("expected a clear error, got %q", res.Error)
+	}
+}
+
 func TestJSRawWriteOnFormBodyWarns(t *testing.T) {
 	t.Parallel()
 

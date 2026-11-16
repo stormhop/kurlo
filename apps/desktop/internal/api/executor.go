@@ -343,6 +343,7 @@ func redactScriptResult(result model.ScriptResult, secrets []string) model.Scrip
 		result.Logs[i] = redactSecrets(log, secrets)
 	}
 	for i, test := range result.Tests {
+		result.Tests[i].Name = redactSecrets(test.Name, secrets)
 		result.Tests[i].Error = redactSecrets(test.Error, secrets)
 	}
 	return result

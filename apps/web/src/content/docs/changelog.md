@@ -11,6 +11,16 @@ head:
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts
 attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Fixed
+
+- **`pm.sendRequest` works like Postman**: string headers, disabled headers, `urlencoded`, `formdata` and `graphql`
+  bodies and `Content-Type` from the body are handled, so servers no longer answer 415, and the script timeout cancels a
+  running call. See [`pm.sendRequest`](/docs/reference/scripting-api/#pmsendrequest).
+- **Scripts behave as written**: pre-request `pm.test` results show and count everywhere, GraphQL body updates, form
+  edits and `pm.globals.unset` keep what they should, and secret values in test names are masked.
+
 ## 3.1.2
 
 ### Fixed

@@ -102,9 +102,11 @@ func (s *mcpServer) toolDiagnoseLastFailure(_ context.Context, arguments json.Ra
 		if !resp.BodyIsBinary && resp.Body != "" {
 			diagnosis.Body, _ = mcpTruncate(redactSecrets(resp.Body, secrets), mcpDiagnoseBodyLimit)
 		}
-		for _, test := range resp.TestResult.Tests {
-			if !test.Passed {
-				diagnosis.FailedTests = append(diagnosis.FailedTests, cliTestResult{Name: test.Name, Error: redactSecrets(test.Error, secrets)})
+		for _, result := range []model.ScriptResult{resp.PreRequestResult, resp.TestResult} {
+			for _, test := range result.Tests {
+				if !test.Passed {
+					diagnosis.FailedTests = append(diagnosis.FailedTests, cliTestResult{Name: test.Name, Error: redactSecrets(test.Error, secrets)})
+				}
 			}
 		}
 		for _, scriptErr := range []string{resp.PreRequestResult.Error, resp.TestResult.Error} {

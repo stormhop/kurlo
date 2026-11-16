@@ -278,7 +278,7 @@ export const collectionRunnerFeature = {
     };
   },
   runnerResultFromResponse(this: CollectionRunnerHost, req: SavedRequest, resp: HttpResponse, runId: string, iteration: number): CollectionRunnerResult {
-    const tests = resp.testResult?.tests ?? [];
+    const tests = [...(resp.preRequestResult?.tests ?? []), ...(resp.testResult?.tests ?? [])];
     const testsPassed = tests.filter(test => test.passed).length;
     const testsTotal = tests.length;
     const scriptError = resp.preRequestResult?.error || resp.testResult?.error || '';
@@ -302,7 +302,7 @@ export const collectionRunnerFeature = {
     };
   },
   runnerResultFromGrpcResponse(this: CollectionRunnerHost, req: SavedRequest, resp: GrpcResponse, runId: string, iteration: number): CollectionRunnerResult {
-    const tests = resp.testResult?.tests ?? [];
+    const tests = [...(resp.preRequestResult?.tests ?? []), ...(resp.testResult?.tests ?? [])];
     const testsPassed = tests.filter(test => test.passed).length;
     const testsTotal = tests.length;
     const scriptError = resp.preRequestResult?.error || resp.testResult?.error || '';

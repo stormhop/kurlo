@@ -69,6 +69,8 @@ Kurlo combines scripts in a defined order:
 
 JavaScript and Tengo defaults are kept separately and combined only with request scripts from the active engine.
 
+The combined script shares one scope. A top-level `const`, `let` or `class` with the same name at two levels is a redeclaration error that fails the whole request; give each level its own names, or use `var` for a helper you want to share. Postman combines its scripts the same way.
+
 ### Transport settings
 
 Transport settings inherit per field. Editing a field in the request Settings tab marks only that field as overridden. Other fields can continue to inherit from the collection.

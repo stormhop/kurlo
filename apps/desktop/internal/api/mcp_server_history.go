@@ -325,10 +325,12 @@ func mcpHistoryResponse(resp model.HttpResponse, entry mcpStoredHistoryEntry, se
 	}
 	var tests []cliTestResult
 	passed := 0
-	for _, test := range resp.TestResult.Tests {
-		tests = append(tests, cliTestResult{Name: test.Name, Passed: test.Passed, Error: redactSecrets(test.Error, secrets)})
-		if test.Passed {
-			passed++
+	for _, result := range []model.ScriptResult{resp.PreRequestResult, resp.TestResult} {
+		for _, test := range result.Tests {
+			tests = append(tests, cliTestResult{Name: test.Name, Passed: test.Passed, Error: redactSecrets(test.Error, secrets)})
+			if test.Passed {
+				passed++
+			}
 		}
 	}
 	if len(tests) > 0 {

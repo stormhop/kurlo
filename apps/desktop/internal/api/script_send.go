@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,6 +30,13 @@ func newScriptSender(parent context.Context, allow bool, transportCfg model.Http
 	}
 }
 
+func scriptSendTimeoutMessage(timeout time.Duration) string {
+	if timeout > 0 {
+		return "script timed out after " + timeout.String()
+	}
+	return "script timed out"
+}
+
 func performScriptSend(parent context.Context, req script.SendRequest, transportCfg model.HttpRequest) script.SendResponse {
 	method := strings.ToUpper(strings.TrimSpace(req.Method))
 	if method == "" {
@@ -53,7 +61,19 @@ func performScriptSend(parent context.Context, req script.SendRequest, transport
 	if parent == nil {
 		parent = context.Background()
 	}
-	ctx, cancel := context.WithTimeout(parent, scriptSendTimeout)
+	sendTimeout := scriptSendTimeout
+	limitedByScript := false
+	if !req.Deadline.IsZero() {
+		remaining := time.Until(req.Deadline)
+		if remaining <= 0 {
+			return script.SendResponse{Error: scriptSendTimeoutMessage(req.ScriptTimeout)}
+		}
+		if remaining < sendTimeout {
+			sendTimeout = remaining
+			limitedByScript = true
+		}
+	}
+	ctx, cancel := context.WithTimeout(parent, sendTimeout)
 	defer cancel()
 
 	var body io.Reader
@@ -94,12 +114,18 @@ func performScriptSend(parent context.Context, req script.SendRequest, transport
 	start := time.Now()
 	resp, err := client.Do(httpReq)
 	if err != nil {
+		if limitedByScript && (errors.Is(err, context.DeadlineExceeded) || errors.Is(ctx.Err(), context.DeadlineExceeded)) {
+			return script.SendResponse{Error: scriptSendTimeoutMessage(req.ScriptTimeout)}
+		}
 		return script.SendResponse{Error: "pm.sendRequest: " + err.Error()}
 	}
 	defer resp.Body.Close()
 
 	raw, truncated, readErr := readResponseBodyWithLimit(resp.Body, scriptSendMaxBodyBytes)
 	if readErr != nil {
+		if limitedByScript && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return script.SendResponse{Error: scriptSendTimeoutMessage(req.ScriptTimeout)}
+		}
 		return script.SendResponse{Error: "pm.sendRequest: failed to read response: " + readErr.Error()}
 	}
 	elapsed := time.Since(start)

@@ -522,3 +522,212 @@ func TestJSSendRequestRequiresURL(t *testing.T) {
 		t.Fatal("expected an error when no url is given")
 	}
 }
+
+func captureSend(t *testing.T, src string) SendRequest {
+	t.Helper()
+	ctx := jsCtx()
+	var got SendRequest
+	ctx.Send = func(req SendRequest) SendResponse {
+		got = req
+		return SendResponse{StatusCode: 200, Body: "{}"}
+	}
+	runPre(t, ctx, src)
+	return got
+}
+
+func TestJSSendRequestPostmanHeaderForms(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"string":          `header: "Content-Type: application/json\nX-Trace: 1"`,
+		"string array":    `header: ["Content-Type: application/json", "X-Trace: 1"]`,
+		"key value array": `header: [{ key: "Content-Type", value: "application/json" }, { key: "X-Trace", value: 1 }]`,
+		"object":          `header: { "Content-Type": "application/json", "X-Trace": "1" }`,
+		"headers alias":   `headers: { "Content-Type": "application/json", "X-Trace": "1" }`,
+	}
+	for name, header := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := captureSend(t, `pm.sendRequest({ url: "https://example.com", method: "POST", `+header+`, body: { mode: "raw", raw: "{}" } })`)
+			if got.Headers["Content-Type"] != "application/json" || got.Headers["X-Trace"] != "1" {
+				t.Errorf("headers = %#v", got.Headers)
+			}
+		})
+	}
+}
+
+func TestJSSendRequestSkipsDisabledHeaders(t *testing.T) {
+	t.Parallel()
+
+	got := captureSend(t, `pm.sendRequest({
+		url: "https://example.com", method: "POST",
+		header: [{ key: "Content-Type", value: "application/json" }, { key: "Content-Type", value: "text/xml", disabled: true }],
+		body: { mode: "raw", raw: "{}" }
+	})`)
+	if got.Headers["Content-Type"] != "application/json" {
+		t.Errorf("disabled header was sent: %#v", got.Headers)
+	}
+}
+
+func TestJSSendRequestRawLanguageSetsContentType(t *testing.T) {
+	t.Parallel()
+
+	got := captureSend(t, `pm.sendRequest({ url: "https://example.com", method: "POST", body: { mode: "raw", raw: "{\"a\":1}", options: { raw: { language: "json" } } } })`)
+	if got.Headers["Content-Type"] != "application/json" {
+		t.Errorf("headers = %#v", got.Headers)
+	}
+
+	got = captureSend(t, `pm.sendRequest({ url: "https://example.com", method: "POST", header: { "content-type": "application/vnd.api+json" }, body: { mode: "raw", raw: "{}", options: { raw: { language: "json" } } } })`)
+	if len(got.Headers) != 1 || got.Headers["content-type"] != "application/vnd.api+json" {
+		t.Errorf("explicit Content-Type was overridden: %#v", got.Headers)
+	}
+}
+
+func TestJSSendRequestURLEncodedBody(t *testing.T) {
+	t.Parallel()
+
+	got := captureSend(t, `pm.sendRequest({
+		url: "https://auth.example.com/token", method: "POST",
+		body: { mode: "urlencoded", urlencoded: [
+			{ key: "grant_type", value: "password" },
+			{ key: "username", value: "a b&c" },
+			{ key: "skip", value: "x", disabled: true }
+		] }
+	})`)
+	if got.Body != "grant_type=password&username=a%20b%26c" {
+		t.Errorf("body = %q", got.Body)
+	}
+	if got.Headers["Content-Type"] != "application/x-www-form-urlencoded" {
+		t.Errorf("headers = %#v", got.Headers)
+	}
+}
+
+func TestJSSendRequestFormDataBody(t *testing.T) {
+	t.Parallel()
+
+	got := captureSend(t, `pm.sendRequest({
+		url: "https://example.com/upload", method: "POST",
+		header: { "Content-Type": "multipart/form-data" },
+		body: { mode: "formdata", formdata: [{ key: "name", value: "kurlo" }, { key: "off", value: "x", disabled: true }] }
+	})`)
+	contentType := got.Headers["Content-Type"]
+	boundary, ok := strings.CutPrefix(contentType, "multipart/form-data; boundary=")
+	if !ok || boundary == "" {
+		t.Fatalf("Content-Type = %q", contentType)
+	}
+	want := "--" + boundary + "\r\nContent-Disposition: form-data; name=\"name\"\r\n\r\nkurlo\r\n--" + boundary + "--\r\n"
+	if got.Body != want {
+		t.Errorf("body = %q, want %q", got.Body, want)
+	}
+}
+
+func TestJSSendRequestGraphQLAndObjectBodies(t *testing.T) {
+	t.Parallel()
+
+	got := captureSend(t, `pm.sendRequest({ url: "https://example.com/graphql", method: "POST", body: { mode: "graphql", graphql: { query: "{ me { id } }", variables: "{\"a\":1}" } } })`)
+	if got.Body != `{"query":"{ me { id } }","variables":{"a":1}}` || got.Headers["Content-Type"] != "application/json" {
+		t.Errorf("graphql: body = %q headers = %#v", got.Body, got.Headers)
+	}
+
+	got = captureSend(t, `pm.sendRequest({ url: "https://example.com", method: "POST", body: { a: 1 } })`)
+	if got.Body != `{"a":1}` || got.Headers["Content-Type"] != "application/json" {
+		t.Errorf("object: body = %q headers = %#v", got.Body, got.Headers)
+	}
+}
+
+func TestJSSendRequestURLObject(t *testing.T) {
+	t.Parallel()
+
+	got := captureSend(t, `pm.sendRequest({ url: { raw: "https://example.com/a?b=1" } })`)
+	if got.URL != "https://example.com/a?b=1" {
+		t.Errorf("url = %q", got.URL)
+	}
+}
+
+func TestJSSendRequestUnsupportedBodiesFail(t *testing.T) {
+	t.Parallel()
+
+	for _, body := range []string{
+		`{ mode: "file", file: { src: "/tmp/x" } }`,
+		`{ mode: "formdata", formdata: [{ key: "f", type: "file", src: "/tmp/x" }] }`,
+	} {
+		ctx := jsCtx()
+		ctx.Send = func(SendRequest) SendResponse { return SendResponse{StatusCode: 200} }
+		result := RunPreRequest("js", `pm.sendRequest({ url: "https://example.com", method: "POST", body: `+body+` })`, ctx)
+		if !strings.Contains(result.Error, "not supported") {
+			t.Errorf("body %s: error = %q", body, result.Error)
+		}
+	}
+}
+
+func TestJSConsoleLevelsAreMarked(t *testing.T) {
+	t.Parallel()
+
+	ctx := jsCtx()
+	result := runPre(t, ctx, `
+		console.log("plain", 1)
+		console.info("info")
+		console.warn("careful")
+		console.error("broken", { a: 1 })
+	`)
+	want := []string{"plain 1", "info", "[warn] careful", `[error] broken {"a":1}`}
+	if strings.Join(result.Logs, "\n") != strings.Join(want, "\n") {
+		t.Errorf("logs = %#v, want %#v", result.Logs, want)
+	}
+}
+
+func TestJSSendRequestCallsAreLogged(t *testing.T) {
+	t.Parallel()
+
+	ctx := jsCtx()
+	ctx.Send = func(req SendRequest) SendResponse {
+		switch req.URL {
+		case "https://example.com/ok":
+			return SendResponse{StatusCode: 200, Status: "200 OK", DurationMs: 7}
+		case "https://example.com/bad":
+			return SendResponse{StatusCode: 415, Status: "415 Unsupported Media Type", DurationMs: 3}
+		}
+		return SendResponse{Error: "dial tcp: connection refused"}
+	}
+	result := runPre(t, ctx, `
+		pm.sendRequest("https://example.com/ok")
+		pm.sendRequest({ url: "https://example.com/bad", method: "POST" })
+		pm.sendRequest("https://down.example.com", function () {})
+	`)
+	want := []string{
+		"[request] pm.sendRequest GET https://example.com/ok → 200 OK · 7 ms",
+		"[warn] pm.sendRequest POST https://example.com/bad → 415 Unsupported Media Type · 3 ms",
+		"[error] pm.sendRequest GET https://down.example.com failed: dial tcp: connection refused",
+	}
+	if strings.Join(result.Logs, "\n") != strings.Join(want, "\n") {
+		t.Errorf("logs = %#v, want %#v", result.Logs, want)
+	}
+}
+
+func TestJSDroppedLogLinesAreReported(t *testing.T) {
+	t.Parallel()
+
+	ctx := jsCtx()
+	result := runPre(t, ctx, `for (let i = 1; i <= 250; i++) console.log("line", i)`)
+	if len(result.Logs) != jsMaxLogEntries+1 {
+		t.Fatalf("got %d log lines, want %d plus a notice", len(result.Logs), jsMaxLogEntries)
+	}
+	if result.Logs[jsMaxLogEntries-1] != "line 200" {
+		t.Errorf("last kept line = %q", result.Logs[jsMaxLogEntries-1])
+	}
+	want := "[warn] 50 more log lines were not shown: a script keeps its first 200 log lines"
+	if got := result.Logs[jsMaxLogEntries]; got != want {
+		t.Errorf("notice = %q, want %q", got, want)
+	}
+
+	ctx = jsCtx()
+	result = runPre(t, ctx, `for (let i = 1; i <= 201; i++) console.log(i)`)
+	if got := result.Logs[len(result.Logs)-1]; !strings.HasPrefix(got, "[warn] 1 more log line was not shown") {
+		t.Errorf("singular notice = %q", got)
+	}
+
+	ctx = jsCtx()
+	result = runPre(t, ctx, `for (let i = 1; i <= 200; i++) console.log(i)`)
+	if len(result.Logs) != jsMaxLogEntries {
+		t.Errorf("a script at the limit got a notice: %d lines", len(result.Logs))
+	}
+}

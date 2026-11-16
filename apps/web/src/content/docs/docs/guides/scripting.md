@@ -3,7 +3,7 @@ title: Scripting
 description: Pre-request and test scripts in JavaScript or Tengo — inject headers, assert responses, set variables.
 ---
 
-Kurlo scripts run in a sandboxed JavaScript VM by default. Existing requests can still use the legacy [Tengo](https://github.com/d5/tengo) engine. Both engines expose the same `pm.*` API and execution caps at **2 seconds**.
+Kurlo scripts run in a sandboxed JavaScript VM by default. Existing requests can still use the legacy [Tengo](https://github.com/d5/tengo) engine. Both engines share the core `pm.*` API — variables, environment, request mutation, response, tests, expectations and logs — and the 2-second cap (configurable per request). The JavaScript engine also adds collection variables, globals, iteration data, cookies, `pm.crypto` and `pm.sendRequest`.
 
 There are two script hooks per request:
 
@@ -43,7 +43,7 @@ pm.environment.set("userId", body.user.id)
 pm.log("captured userId:", body.user.id)
 ```
 
-Test results appear in the response **Scripts** panel with pass/fail counts.
+Test results appear in the response **Scripts** panel with pass/fail counts. A `pm.test` in a pre-request script is reported too: it appears in the **Pre-request** block and counts in the collection runner, `kurlo run` and `kurlo mcp`.
 
 ## Assertions
 
@@ -64,7 +64,7 @@ Checks: **equals**, **does not equal**, **is greater than**, **is at least**, **
 
 The expected value is read as JSON when it is valid JSON, so `201`, `true`, `null` and `{"a": 1}` compare as values, and as text otherwise. Numbers compare exactly, including integers larger than JavaScript can hold. Header values are always text. `{{variables}}` work in both the target and the expected value.
 
-Assertions run after the test script and show up next to its tests, named after the check, such as `status equals 201`, with the reason when one fails, such as `got 404`. A failed or skipped request fails every assertion. The same results count in the collection runner, in `kurlo run` (and its JUnit report) and in `kurlo mcp`. Untick a row to keep it without running it. A request can have up to 200 assertions; the add buttons turn off at the limit. A request file written by hand with more keeps all of them, and they all run.
+Assertions run after the test script and show up next to its tests, named after the check, such as `status equals 201`, with the reason when one fails, such as `got 404`. A failed request fails every assertion. A request skipped with `pm.execution.skipRequest()` is reported as skipped, and its assertions do not run. The same results count in the collection runner, in `kurlo run` (and its JUnit report) and in `kurlo mcp`. Untick a row to keep it without running it. A request can have up to 200 assertions; the add buttons turn off at the limit. A request file written by hand with more keeps all of them, and they all run.
 
 Assertions are saved in the request file as `assertions`. A Postman export turns them into `pm.test` code so Postman runs the same checks; importing that export back into Kurlo restores the rows without doubling the tests. Insomnia and OpenCollection exports leave them out.
 

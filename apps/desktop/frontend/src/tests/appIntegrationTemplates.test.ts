@@ -57,6 +57,18 @@ describe('request templates reach the backend unresolved', () => {
     expect(app.requests.find(request => request.id === sourceId)?.auth.oauth2RefreshToken).toBe('rotated-a');
   });
 
+  it('applies globals a script removed during an ordinary request', async () => {
+    const app = await appWithRequest('https://example.test/ping');
+    app.globalVariables = [row('keep', '1'), row('remove', '2')];
+    backend.state.globals = { keep: '1', remove: '2' };
+    backend.sendHttpRequest.mockImplementationOnce(async () => {
+      backend.state.globals = { keep: 'changed' };
+      return { ...httpResponse(200, {}), globalVariableUpdates: { keep: 'changed' }, globalVariablesRemoved: ['remove'] };
+    });
+    await app.runActiveRequest();
+    expect(app.globalVariableValues()).toEqual({ keep: 'changed' });
+  });
+
   it('keeps an inactive OAuth result unsaved until its request is saved in manual mode', async () => {
     const app = await appWithRequest('https://source.example.test');
     const sourceId = app.activeRequestId;

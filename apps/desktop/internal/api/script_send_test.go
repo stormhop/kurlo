@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
@@ -434,5 +435,131 @@ func readAllString(r *http.Request) (string, error) {
 		if err != nil {
 			return sb.String(), nil
 		}
+	}
+}
+
+func TestSendRequestScriptTimeoutBoundsPmSendRequest(t *testing.T) {
+	canceled := make(chan struct{}, 1)
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+			canceled <- struct{}{}
+		case <-time.After(2 * time.Second):
+		}
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
+	defer slow.Close()
+
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{}`)
+	}))
+	defer apiSrv.Close()
+
+	req := model.HttpRequest{
+		Method:                http.MethodGet,
+		URL:                   apiSrv.URL,
+		EnableSSLVerification: true,
+		AllowSendRequest:      true,
+		ScriptEngine:          "js",
+		ScriptTimeoutMs:       100,
+		PreRequestScript:      fmt.Sprintf(`const r = pm.sendRequest(%q)`, slow.URL),
+	}
+	start := time.Now()
+	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
+	elapsed := time.Since(start)
+	if !strings.Contains(resp.Error, "script timed out") {
+		t.Fatalf("expected the script timeout to stop pm.sendRequest, got %q", resp.Error)
+	}
+	if elapsed > 500*time.Millisecond {
+		t.Errorf("pm.sendRequest kept running for %s with a 100ms script timeout", elapsed)
+	}
+	select {
+	case <-canceled:
+	case <-time.After(time.Second):
+		t.Error("the script deadline did not cancel the pm.sendRequest connection")
+	}
+}
+
+func TestPerformScriptSendHonoursTheScriptDeadline(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Error("the request must not be sent after the script deadline")
+	}))
+	defer server.Close()
+
+	resp := performScriptSend(context.Background(), script.SendRequest{
+		URL:           server.URL,
+		Deadline:      time.Now().Add(-time.Millisecond),
+		ScriptTimeout: time.Second,
+	}, model.HttpRequest{EnableSSLVerification: true})
+	if !strings.Contains(resp.Error, "script timed out after 1s") {
+		t.Fatalf("error = %q", resp.Error)
+	}
+}
+
+func TestSendRequestPostmanFormBodiesReachTheServer(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mediaType := strings.Split(r.Header.Get("Content-Type"), ";")[0]
+		switch r.URL.Path {
+		case "/form":
+			if mediaType != "application/x-www-form-urlencoded" {
+				w.WriteHeader(http.StatusUnsupportedMediaType)
+				return
+			}
+			if err := r.ParseForm(); err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			fmt.Fprintf(w, `{"access_token":"form-%s-%s"}`, r.PostForm.Get("grant_type"), r.PostForm.Get("username"))
+		case "/multipart":
+			if err := r.ParseMultipartForm(1 << 20); err != nil {
+				w.WriteHeader(http.StatusUnsupportedMediaType)
+				return
+			}
+			fmt.Fprintf(w, `{"access_token":"multi-%s"}`, r.FormValue("client"))
+		case "/json":
+			if mediaType != "application/json" {
+				w.WriteHeader(http.StatusUnsupportedMediaType)
+				return
+			}
+			fmt.Fprint(w, `{"access_token":"json"}`)
+		}
+	}))
+	defer tokenServer.Close()
+
+	var sawAuth []string
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sawAuth = []string{r.Header.Get("X-Form"), r.Header.Get("X-Multipart"), r.Header.Get("X-Json")}
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
+	defer apiServer.Close()
+
+	req := model.HttpRequest{
+		Method:                "GET",
+		URL:                   apiServer.URL,
+		EnableSSLVerification: true,
+		AllowSendRequest:      true,
+		ScriptEngine:          "js",
+		PreRequestScript: fmt.Sprintf(`
+			const base = %q
+			pm.sendRequest({ url: base + "/form", method: "POST", header: "Accept: application/json",
+				body: { mode: "urlencoded", urlencoded: [{ key: "grant_type", value: "password" }, { key: "username", value: "a b" }] } },
+				(err, res) => pm.request.headers.add({ key: "X-Form", value: err ? "error" : res.code + ":" + res.text() }))
+			pm.sendRequest({ url: base + "/multipart", method: "POST", body: { mode: "formdata", formdata: [{ key: "client", value: "kurlo" }] } },
+				(err, res) => pm.request.headers.add({ key: "X-Multipart", value: err ? "error" : res.code + ":" + res.text() }))
+			pm.sendRequest({ url: base + "/json", method: "POST", body: { mode: "raw", raw: "{}", options: { raw: { language: "json" } } } },
+				(err, res) => pm.request.headers.add({ key: "X-Json", value: err ? "error" : res.code + ":" + res.text() }))
+		`, tokenServer.URL),
+	}
+
+	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
+	if resp.Error != "" {
+		t.Fatalf("unexpected error: %s", resp.Error)
+	}
+	want := []string{`200:{"access_token":"form-password-a b"}`, `200:{"access_token":"multi-kurlo"}`, `200:{"access_token":"json"}`}
+	if strings.Join(sawAuth, "\n") != strings.Join(want, "\n") {
+		t.Errorf("token calls = %#v, want %#v", sawAuth, want)
+	}
+	if len(resp.PreRequestResult.Logs) != 3 || !strings.HasPrefix(resp.PreRequestResult.Logs[0], "[request] pm.sendRequest POST ") {
+		t.Errorf("sendRequest calls were not logged: %#v", resp.PreRequestResult.Logs)
 	}
 }
