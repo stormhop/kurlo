@@ -14,6 +14,10 @@ All notable changes to Kurlo are documented here. This project follows
 - **`{{variables}}` in every auth field.** Auth fields on requests and collections suggest variables as you type `{{` and underline undefined ones. A secret field holding only a variable, such as `{{token}}`, is shown as text instead of dots.
 - **Preview request tabs.** Enable **Settings → General → Preview tabs** to browse requests in one temporary tab. Double-click the tab to keep it open; editing or running a request keeps its tab automatically. The setting is off by default, and your preview tab is restored after restarting Kurlo.
 
+### Changed
+
+- **Less JavaScript on the first load.** The code editor is no longer part of the start-up bundle — about 350 KB less JavaScript before the window is ready. Kurlo warms it in the background right after the first paint, so opening the Body or Scripts tab for the first time still does not wait.
+
 ### Fixed
 
 - **`pm.sendRequest` works like Postman.** Headers given as `"Name: value"` strings are sent instead of dropped, disabled headers are skipped, `urlencoded`, `formdata` and `graphql` bodies are encoded instead of sent as JSON text, and `Content-Type` follows the body (`raw` with `language: "json"`, form modes, GraphQL), so servers no longer answer 415 Unsupported Media Type. A call that runs past the script timeout is now canceled at the cap instead of finishing first.

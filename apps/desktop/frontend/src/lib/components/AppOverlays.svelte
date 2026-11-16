@@ -11,7 +11,10 @@
   import FindReplaceModal from './FindReplaceModal.svelte';
   import MissingSecretsModal from './MissingSecretsModal.svelte';
   import OpenApiReviewModal from './OpenApiReviewModal.svelte';
-  import WorkspaceYAMLEditor from './WorkspaceYAMLEditor.svelte';
+
+  $effect(() => {
+    if (vm.yamlEditorOpen) void lazy.loadWorkspaceYAMLEditor();
+  });
 
   $effect(() => {
     if (!vm.globalSearchOpen) return;
@@ -191,8 +194,8 @@
   {/if}
 {/if}
 
-{#if vm.yamlEditorOpen}
-  <WorkspaceYAMLEditor />
+{#if vm.yamlEditorOpen && lazy.WorkspaceYAMLEditorComponent}
+  <lazy.WorkspaceYAMLEditorComponent />
 {/if}
 
 {#if vm.appDialog}

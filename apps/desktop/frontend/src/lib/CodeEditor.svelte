@@ -15,6 +15,7 @@
   import { variableDisplayValue } from './variables';
   import { DYNAMIC_VARIABLES } from './dynamicVariables';
   import { maxLength as maxLengthFilter } from './editorLimit';
+  import { registerEditorView, unregisterEditorView } from './editorViews';
   import type { EditorGhost } from './ghostText';
 
   type Lang = 'json' | 'javascript' | 'html' | 'xml' | 'graphql' | 'yaml' | 'text';
@@ -713,6 +714,7 @@
       }),
       parent: container,
     });
+    registerEditorView(view.dom, view);
     lastLoadedLanguage = language;
     lastPlaceholder = singleLinePlaceholder;
     void reconfigureLanguage(language);
@@ -751,6 +753,7 @@
 
   onDestroy(() => {
     languageLoadVersion += 1;
+    if (view) unregisterEditorView(view.dom);
     view?.destroy();
     view = undefined;
   });

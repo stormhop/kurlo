@@ -8,6 +8,7 @@ export default [
   {
     ignores: [
       '.claude/**',
+      '.cache/**',
       '**/node_modules/**',
       '**/dist/**',
       '**/.astro/**',

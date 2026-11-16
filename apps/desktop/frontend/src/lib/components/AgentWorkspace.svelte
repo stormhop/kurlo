@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import AgentChatWorkspace from './AgentChatWorkspace.svelte';
   import AgentActivityView from './AgentActivityView.svelte';
-  import AgentNotesEditor from './AgentNotesEditor.svelte';
   import { agentNotesEditor } from '../stores/agentNotes.svelte';
+  import { appLazyComponents as lazy } from '../stores/lazyComponents.svelte';
   import { agentNavigation, agentStoreFor, codexAgentStore, switchAgent } from '../stores/agent.svelte';
   import { claudeConnectionStore as claude } from '../stores/claude.svelte';
   import { codexConnectionStore } from '../stores/codex.svelte';
@@ -28,6 +28,10 @@
       else if (claude.usable) switchAgent('claude');
     }
   });
+
+  $effect(() => {
+    if (agentNotesEditor.open) void lazy.loadAgentNotesEditor();
+  });
 </script>
 
 <div class="agent-mode-workspace">
@@ -38,7 +42,9 @@
   {/if}
 </div>
 
-{#if agentNotesEditor.open}<AgentNotesEditor />{/if}
+{#if agentNotesEditor.open && lazy.AgentNotesEditorComponent}
+  <lazy.AgentNotesEditorComponent />
+{/if}
 
 <style>
   .agent-mode-workspace { display: flex; flex-direction: column; min-height: 0; height: 100%; flex: 1; }

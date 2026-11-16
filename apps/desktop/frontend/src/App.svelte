@@ -423,6 +423,11 @@
       void lazy.loadSettingsModal();
       void lazy.loadGlobalSearchModal();
     }, LAZY_WARM_DELAY_MS);
+    const warmEditor = () => void lazy.warmEditor();
+    const warmEditorIdle = typeof window.requestIdleCallback === 'function'
+      ? window.requestIdleCallback(warmEditor, { timeout: 1500 })
+      : undefined;
+    const warmEditorTimer = warmEditorIdle === undefined ? setTimeout(warmEditor, 800) : undefined;
     const beforeUnload = (event: BeforeUnloadEvent) => {
       vm.flushPendingPersist();
       if (!vm.hasUnsavedDrafts() && !vm.hasUnsavedRequestChanges()) return;
@@ -523,6 +528,8 @@
     return () => {
       destroyed = true;
       clearTimeout(warmLazyTimer);
+      if (warmEditorIdle !== undefined) window.cancelIdleCallback?.(warmEditorIdle);
+      if (warmEditorTimer !== undefined) clearTimeout(warmEditorTimer);
       if (updateCheckTimer !== null) {
         clearTimeout(updateCheckTimer);
         updateCheckTimer = null;

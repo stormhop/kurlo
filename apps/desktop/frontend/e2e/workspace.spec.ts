@@ -348,6 +348,29 @@ test.describe('Text fields and workspace files', () => {
     await expect(menu).toBeHidden();
   });
 
+  test('edits the code editor through the right-click menu', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Editor API');
+    await collectionRow(page, 'Editor API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Editor API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestSection(page, 'Body');
+    await page.locator('label.body-mode-label').filter({ hasText: 'raw' }).click();
+    await fillCodeEditor(page, 'request-body-editor', '{"a":1}');
+
+    const editor = page.getByTestId('request-body-editor').locator('.cm-content');
+    const menu = page.getByRole('menu', { name: 'Edit' });
+    await editor.click({ button: 'right' });
+    await expect(menu).toBeVisible();
+    await menu.getByRole('menuitem', { name: /Select all/ }).click();
+    await expect(menu).toBeHidden();
+
+    await editor.click({ button: 'right' });
+    await menu.getByRole('menuitem', { name: /Copy/ }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.clipboard)).toBe('{"a":1}');
+  });
+
   test('shows a saved request and its collection in the file manager', async ({ page }, testInfo) => {
     await installKurloBridge(page, '', 'darwin/e2e');
     await page.goto('/');

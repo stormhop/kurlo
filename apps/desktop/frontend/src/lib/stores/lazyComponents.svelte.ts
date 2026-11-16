@@ -58,6 +58,8 @@ class AppLazyComponents {
   WebSocketMessageTabComponent = $state<LazyComponent | null>(null);
   WebSocketPanelComponent = $state<LazyComponent | null>(null);
   WebSocketSettingsTabComponent = $state<LazyComponent | null>(null);
+  WorkspaceYAMLEditorComponent = $state<LazyComponent | null>(null);
+  AgentNotesEditorComponent = $state<LazyComponent | null>(null);
 
   async loadAuthTab() {
     if (!this.AuthTabComponent) this.AuthTabComponent = (await import('../components/AuthTab.svelte')).default as LazyComponent;
@@ -221,6 +223,18 @@ class AppLazyComponents {
 
   async loadWebSocketSettingsTab() {
     if (!this.WebSocketSettingsTabComponent) this.WebSocketSettingsTabComponent = (await import('../components/WebSocketSettingsTab.svelte')).default as LazyComponent;
+  }
+
+  async loadWorkspaceYAMLEditor() {
+    if (!this.WorkspaceYAMLEditorComponent) this.WorkspaceYAMLEditorComponent = (await import('../components/WorkspaceYAMLEditor.svelte')).default as LazyComponent;
+  }
+
+  async loadAgentNotesEditor() {
+    if (!this.AgentNotesEditorComponent) this.AgentNotesEditorComponent = (await import('../components/AgentNotesEditor.svelte')).default as LazyComponent;
+  }
+
+  async warmEditor() {
+    await import('../CodeEditor.svelte');
   }
 
   preloadForAppShell(state: AppLazyComponentState) {

@@ -27,6 +27,12 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   Double-clicking, editing or running the request keeps its tab open. Off by default; the preference and preview survive
   a restart. See [App settings](/docs/guides/settings/#preview-tabs).
 
+### Changed
+
+- **Less JavaScript on the first load**: the code editor is not loaded at start-up, which removes about 350 KB of
+  JavaScript before the window is ready. Kurlo warms it in the background right after the first paint, so the first
+  visit to the Body or Scripts tab does not wait.
+
 ### Fixed
 
 - **`pm.sendRequest` works like Postman**: string headers, disabled headers, `urlencoded`, `formdata` and `graphql`

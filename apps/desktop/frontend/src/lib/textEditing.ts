@@ -1,5 +1,6 @@
-import { EditorView } from '@codemirror/view';
+import type { EditorView } from '@codemirror/view';
 import { clipboardGet, clipboardSet } from './backend';
+import { editorViewFor } from './editorViews';
 import { clipboardCopy } from './utils';
 
 export type TextField = HTMLInputElement | HTMLTextAreaElement;
@@ -26,7 +27,7 @@ export function textTargetFrom(target: EventTarget | null): TextTarget | null {
   if (!(target instanceof Element)) return null;
   const editor = target.closest('.cm-editor');
   if (editor instanceof HTMLElement) {
-    const view = EditorView.findFromDOM(editor);
+    const view = editorViewFor(editor);
     if (view) return { kind: 'code', view };
   }
   if (target instanceof HTMLTextAreaElement) return target.disabled ? null : { kind: 'field', el: target };
