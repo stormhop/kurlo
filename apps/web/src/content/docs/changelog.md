@@ -47,6 +47,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 - **Environment pages behave**: editing on page 2 or later stays on that page, and the page count is right.
 - **Idle windows stop burning CPU**: the perched bird and the status indicators settle after a few moves instead of
   redrawing the window every frame.
+- **Imported names keep their slashes**: `Billing / Invoices` stays one request instead of becoming a folder.
 
 ## 3.1.2
 

@@ -35,6 +35,24 @@ describe('normalizeSavedRequest', () => {
     expect(request.collection).toBe('');
   });
 
+  it('keeps slashes in request names instead of turning them into folders', () => {
+    const request = normalizeSavedRequest(
+      {
+        id: 'request-billing',
+        name: 'Billing / Invoices',
+        collectionId: collection.id,
+        collection: collection.name,
+        method: 'GET',
+        url: 'https://example.test/invoices',
+      },
+      [collection],
+      collection.workspaceId,
+    );
+
+    expect(request.name).toBe('Billing / Invoices');
+    expect(request.folderPath).toEqual([]);
+  });
+
   it('drops the legacy starred flag from request files', () => {
     const request = normalizeSavedRequest(
       {

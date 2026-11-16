@@ -148,6 +148,27 @@ describe('importing .http files from disk', () => {
     expect(request.testScriptJs).toBe('client.global.set("token", response.body.token);');
   });
 
+  it('keeps slashes in imported Postman request names', async () => {
+    const app = newApp();
+    vi.mocked(backend.hasNativeImportDialog).mockReturnValue(true);
+    vi.mocked(backend.chooseImportFile).mockResolvedValueOnce({
+      path: '/work/billing.postman_collection.json',
+      name: 'billing.postman_collection.json',
+      content: JSON.stringify({
+        info: { name: 'Billing API', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+        item: [{ name: 'Billing / Invoices', request: { method: 'GET', url: 'https://api.example.com/invoices' } }],
+      }),
+      error: '',
+    });
+
+    app.selects.push('postman');
+    await app.openPostmanImport();
+
+    const [request] = app.requests as SavedRequest[];
+    expect(request.name).toBe('Billing / Invoices');
+    expect(request.folderPath).toEqual([]);
+  });
+
   it('imports a dropped .http file and reports files it cannot import', async () => {
     const app = newApp();
     vi.mocked(backend.readImportFile).mockImplementation(async (path: string) => (

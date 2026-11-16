@@ -247,18 +247,8 @@ export function normalizeSavedRequest(
         ? 'params'
         : rawRequestTab;
     const realtimeLabel = normalizedRequestType === 'ai' ? 'AI' : normalizedRequestType === 'mcp' ? 'MCP' : normalizedRequestType === 'grpc' ? 'gRPC' : normalizedRequestType === 'socketio' ? 'Socket.IO' : normalizedRequestType === 'ws' ? 'WS' : normalizedRequestType === 'graphql' ? 'GraphQL' : '';
-    const rawName = input.name || requestTitleFrom(realtimeLabel || (input.method || 'GET'), input.url || '');
-    let folderPath = Array.isArray(input.folderPath) ? input.folderPath.map(asText).filter(Boolean) : [];
-    let normalizedName = rawName;
-    if (!folderPath.length && rawName.includes(' / ')) {
-        const parts = rawName.split(' / ').map(p => p.trim()).filter(Boolean);
-        const looksLikeAutoTitle = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|GRAPHQL|GQL|WS|WEBSOCKET|SIO|SOCKET\.IO|GRPC|MCP|AI|SSE)\b/i.test(parts[0] ?? '')
-            || (parts[0] ?? '').includes('/');
-        if (parts.length > 1 && !looksLikeAutoTitle) {
-            folderPath = parts.slice(0, -1);
-            normalizedName = parts.at(-1) ?? rawName;
-        }
-    }
+    const normalizedName = input.name || requestTitleFrom(realtimeLabel || (input.method || 'GET'), input.url || '');
+    const folderPath = Array.isArray(input.folderPath) ? input.folderPath.map(asText).filter(Boolean) : [];
     const id = input.id || newRequestId();
     const settings = {...DEFAULT_REQUEST_SETTINGS, ...sanitizeLike(input.settings, DEFAULT_REQUEST_SETTINGS)};
     if (
