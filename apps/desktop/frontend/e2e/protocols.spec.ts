@@ -466,3 +466,39 @@ for (const protocol of [
     await expect(page.getByRole('button', { name: 'Request section', exact: true })).toContainText('Vars');
   });
 }
+
+test('inherits collection auth in a gRPC request', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{
+      id: 'col-grpc-auth', workspaceId: 'workspace-e2e', name: 'gRPC API',
+      defaults: { headers: [], variables: [], auth: { type: 'bearer', bearerToken: 'collection-token' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', settings: {} },
+    }],
+    requests: [{
+      id: 'grpc-auth', collectionId: 'col-grpc-auth', collection: 'gRPC API', name: 'Inventory', folderPath: [],
+      requestType: 'grpc', method: 'POST', url: 'grpc.kurlo.test:443', grpcMethod: 'shop.Inventory/GetItem', auth: { type: 'inherit' },
+    }],
+    activeId: 'grpc-auth', openIds: ['grpc-auth'],
+  });
+  await page.goto('/');
+  await page.getByRole('tab', { name: /^Authorization/ }).click();
+  await expect(page.getByRole('button', { name: 'Auth type' })).toHaveText('Inherit auth');
+  await page.getByRole('button', { name: 'Invoke', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const sent = window.__kurloE2E.sentGrpcRequests.at(-1) as { auth?: { type?: string; token?: string } } | undefined;
+    return sent && { type: sent.auth?.type, token: sent.auth?.token };
+  })).toEqual({ type: 'bearer', token: 'collection-token' });
+});
+
+test('keeps Inherit auth when an HTTP request is switched to gRPC', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'col-switch', workspaceId: 'workspace-e2e', name: 'Switch API' }],
+    requests: [{ id: 'req-switch', collectionId: 'col-switch', collection: 'Switch API', name: 'Switch', folderPath: [], requestType: 'http', method: 'GET', url: '', auth: { type: 'inherit' } }],
+    activeId: 'req-switch', openIds: ['req-switch'],
+  });
+  await page.goto('/');
+  await page.getByLabel('Method and protocol').click();
+  await page.getByRole('option', { name: 'gRPC', exact: true }).click();
+  await page.getByRole('tab', { name: /^Authorization/ }).click();
+  await expect(page.getByRole('button', { name: 'Auth type' })).toHaveText('Inherit auth');
+});
+

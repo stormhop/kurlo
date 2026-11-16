@@ -20,6 +20,8 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   running call. See [`pm.sendRequest`](/docs/reference/scripting-api/#pmsendrequest).
 - **Scripts behave as written**: pre-request `pm.test` results show and count everywhere, GraphQL body updates, form
   edits and `pm.globals.unset` keep what they should, and secret values in test names are masked.
+- **gRPC requests inherit collection auth**: **Inherit auth** now uses the collection's or nearest folder's credentials
+  and is offered in the gRPC Auth tab.
 
 ## 3.1.2
 

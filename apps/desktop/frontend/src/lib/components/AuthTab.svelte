@@ -13,6 +13,7 @@
   let jwtDecoded = $derived(decodeJwt(bearerTokenForJwt));
   let jwtState = $derived(jwtDecoded.ok ? jwtTokenState(jwtDecoded.payload) : null);
   const GRPC_AUTH_OPTIONS = [
+    { value: 'inherit', label: 'Inherit auth' },
     { value: 'apikey', label: 'API key' },
     { value: 'basic', label: 'Basic auth' },
     { value: 'bearer', label: 'Bearer token' },
@@ -491,6 +492,8 @@
         </div>
       </div>
 
+    {:else if vm.authType === 'inherit'}
+      <p class="auth-none-hint">Uses the auth of the nearest folder or the collection that sets one. With no parent auth, none is sent.</p>
     {:else}
       <p class="auth-none-hint">No authentication will be added to this request.</p>
     {/if}

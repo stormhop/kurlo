@@ -469,7 +469,7 @@ export const requestStateFeature = {
     this.awsAccessKey = req.auth.awsAccessKey; this.awsSecretKey = req.auth.awsSecretKey; this.awsSessionToken = req.auth.awsSessionToken ?? ''; this.awsRegion = req.auth.awsRegion; this.awsService = req.auth.awsService;
     this.oauth1 = oauth1FieldsFromAuth(req.auth);
     this.jwt = jwtFieldsFromAuth(req.auth);
-    if (this.requestType === 'grpc' && !['none', 'apikey', 'basic', 'bearer', 'jwt', 'oauth2'].includes(this.authType)) this.authType = 'none';
+    if (this.requestType === 'grpc' && !['none', 'inherit', 'apikey', 'basic', 'bearer', 'jwt', 'oauth2'].includes(this.authType)) this.authType = 'none';
     if (this.requestType === 'grpc') this.apiKeyIn = 'header';
     if (this.requestType === 'graphql') {
       const graphql = this.graphQLPayloadFromRequest(req);
