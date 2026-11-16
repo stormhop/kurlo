@@ -3416,6 +3416,9 @@ export namespace model {
 	    useTls: boolean;
 	    enableSSLVerification: boolean;
 	    serverName: string;
+	    clientCertPath: string;
+	    clientKeyPath: string;
+	    clientKeyPassword: string;
 	    includeDefaultValues: boolean;
 	    maxResponseMessageSizeMb: number;
 	    timeoutMs: number;
@@ -3450,6 +3453,9 @@ export namespace model {
 	        this.useTls = source["useTls"];
 	        this.enableSSLVerification = source["enableSSLVerification"];
 	        this.serverName = source["serverName"];
+	        this.clientCertPath = source["clientCertPath"];
+	        this.clientKeyPath = source["clientKeyPath"];
+	        this.clientKeyPassword = source["clientKeyPassword"];
 	        this.includeDefaultValues = source["includeDefaultValues"];
 	        this.maxResponseMessageSizeMb = source["maxResponseMessageSizeMb"];
 	        this.timeoutMs = source["timeoutMs"];

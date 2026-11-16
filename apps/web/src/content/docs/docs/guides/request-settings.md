@@ -48,7 +48,7 @@ For corporate root CAs, the cleaner fix is to install the CA into your system tr
 
 ## Client certificate (mutual TLS)
 
-For servers that require **mutual TLS**, present a client certificate under *Settings → Client certificate (mTLS)*:
+For servers that require **mutual TLS**, present a client certificate under *Settings → Client certificate (mTLS)*. HTTP, GraphQL, SSE, MCP and gRPC requests all have it; a gRPC call sends it when it uses TLS.
 
 - **Certificate (CRT/PEM)** — the client certificate file, in PEM format.
 - **Private key (optional)** — the key file. Leave it blank when the key is in the same file as the certificate (a combined PEM).
@@ -133,7 +133,7 @@ A request whose method is set to **SSE** gets two more:
 - **Reconnect automatically** — on by default, matching a browser `EventSource`: the stream resumes from the last event id it saw. Turn it off to watch a failing stream stop instead of retrying, which is what you usually want while debugging the server end.
 - **Reconnect interval (ms)** — how long to wait before reconnecting. `0` follows the interval the server sends in its `retry:` field.
 
-gRPC requests also show gRPC-specific settings: TLS, reflection, server name, default-value inclusion, and max response message size. See [Request types](/docs/guides/request-types/) for how the protocol-specific editors differ.
+gRPC requests also show gRPC-specific settings: TLS, reflection, server name, client certificate, default-value inclusion, and max response message size. See [Request types](/docs/guides/request-types/) for how the protocol-specific editors differ.
 
 ## Reset to defaults
 

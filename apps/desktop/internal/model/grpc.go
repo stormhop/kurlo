@@ -16,6 +16,9 @@ type GrpcRequest struct {
 	UseTLS                   bool   `json:"useTls"`
 	EnableSSLVerification    bool   `json:"enableSSLVerification"`
 	ServerName               string `json:"serverName"`
+	ClientCertPath           string `json:"clientCertPath"`
+	ClientKeyPath            string `json:"clientKeyPath"`
+	ClientKeyPassword        string `json:"clientKeyPassword"`
 	IncludeDefaultValues     bool   `json:"includeDefaultValues"`
 	MaxResponseMessageSizeMb int    `json:"maxResponseMessageSizeMb"`
 	TimeoutMs                int    `json:"timeoutMs"`

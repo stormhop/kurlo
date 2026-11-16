@@ -502,3 +502,32 @@ test('keeps Inherit auth when an HTTP request is switched to gRPC', async ({ pag
   await expect(page.getByRole('button', { name: 'Auth type' })).toHaveText('Inherit auth');
 });
 
+test('sends the client certificate with a gRPC call', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'col-grpc-mtls', workspaceId: 'workspace-e2e', name: 'gRPC API' }],
+    requests: [{
+      id: 'grpc-mtls', collectionId: 'col-grpc-mtls', collection: 'gRPC API', name: 'Secure call', folderPath: [],
+      requestType: 'grpc', method: 'POST', url: 'grpcs://grpc.kurlo.test:443', grpcMethod: 'shop.Inventory/GetItem',
+    }],
+    activeId: 'grpc-mtls', openIds: ['grpc-mtls'],
+  });
+  await page.goto('/');
+  await page.evaluate(() => {
+    (window as E2EWindow).go.api.App.OpenFileDialog = async (title: string) => (title.includes('key') ? '/certs/client.key' : '/certs/client.crt');
+  });
+  await page.getByRole('tab', { name: /^Settings/ }).click();
+  const certSetting = page.locator('.client-cert-setting');
+  await expect(certSetting).toContainText('Client certificate (mTLS)');
+  await certSetting.getByRole('button', { name: 'Choose file…' }).first().click();
+  await expect(certSetting).toContainText('/certs/client.crt');
+  await certSetting.getByRole('button', { name: 'Choose file…' }).click();
+  await expect(certSetting).toContainText('/certs/client.key');
+  await certSetting.getByPlaceholder('Leave blank if the key is unencrypted').fill('{{keyPassword}}');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-grpc-client-cert.png'), animations: 'disabled' });
+
+  await page.getByRole('button', { name: 'Invoke', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const sent = window.__kurloE2E.sentGrpcRequests.at(-1) as { clientCertPath?: string; clientKeyPath?: string; clientKeyPassword?: string } | undefined;
+    return sent && { cert: sent.clientCertPath, key: sent.clientKeyPath, password: sent.clientKeyPassword };
+  })).toEqual({ cert: '/certs/client.crt', key: '/certs/client.key', password: '{{keyPassword}}' });
+});

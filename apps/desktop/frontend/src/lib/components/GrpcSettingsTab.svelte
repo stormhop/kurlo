@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ClientCertSetting from './ClientCertSetting.svelte';
   import { vm } from '../stores/app.svelte';
 </script>
 
@@ -62,6 +63,8 @@
       </span>
       <input class="field field-input" type="text" bind:value={vm.grpcServerName} placeholder="api.example.com" spellcheck="false" autocomplete="off" oninput={() => vm.markRequestSettingOverride('grpcServerName')} autocorrect="off" autocapitalize="none" />
     </label>
+
+    <ClientCertSetting description="Present a certificate for servers that require mutual TLS. Used when TLS is on. Set it on a collection to reuse it across requests." />
 
     <label class="postman-setting">
       <span class="setting-copy">

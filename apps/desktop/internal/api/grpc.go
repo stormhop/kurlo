@@ -500,7 +500,10 @@ func grpcDial(ctx context.Context, req model.GrpcRequest) (*grpc.ClientConn, err
 	if err != nil {
 		return nil, err
 	}
-	creds := grpcCredentials(req, useTLS)
+	creds, err := grpcCredentials(req, useTLS)
+	if err != nil {
+		return nil, err
+	}
 	opts := grpcDialOptions(req)
 	cc, err := grpcurl.BlockingDial(ctx, "tcp", target, creds, opts...)
 	if err != nil {
@@ -509,9 +512,9 @@ func grpcDial(ctx context.Context, req model.GrpcRequest) (*grpc.ClientConn, err
 	return cc, nil
 }
 
-func grpcCredentials(req model.GrpcRequest, useTLS bool) credentials.TransportCredentials {
+func grpcCredentials(req model.GrpcRequest, useTLS bool) (credentials.TransportCredentials, error) {
 	if !useTLS {
-		return nil
+		return nil, nil
 	}
 	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
 	if !req.EnableSSLVerification {
@@ -520,7 +523,20 @@ func grpcCredentials(req model.GrpcRequest, useTLS bool) credentials.TransportCr
 	if strings.TrimSpace(req.ServerName) != "" {
 		cfg.ServerName = strings.TrimSpace(req.ServerName)
 	}
-	return credentials.NewTLS(cfg)
+	certConfig := clientCertConfig{
+		certPath: strings.TrimSpace(req.ClientCertPath),
+		keyPath:  strings.TrimSpace(req.ClientKeyPath),
+		password: req.ClientKeyPassword,
+	}
+	if certConfig.enabled() {
+		cert, err := clientCerts.load(certConfig)
+		if err != nil {
+			clientCerts.forget(certConfig)
+			return nil, err
+		}
+		cfg.Certificates = []tls.Certificate{cert}
+	}
+	return credentials.NewTLS(cfg), nil
 }
 
 func grpcDialOptions(req model.GrpcRequest) []grpc.DialOption {

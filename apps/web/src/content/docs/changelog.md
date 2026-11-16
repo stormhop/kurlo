@@ -15,6 +15,8 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Client certificates for gRPC**: the gRPC **Settings** tab has **Client certificate (mTLS)**, like HTTP, used for the
+  call and for reflection whenever TLS is on. See [Request types](/docs/guides/request-types/#grpc).
 - **Script output you cannot miss**: a failing script puts a red banner above the response body and a count on the
   **Scripts** tab, the output stays visible under "Could not send request", `console.warn` / `console.error` are
   coloured, every `pm.sendRequest` call is logged, and long or dropped log lines are marked. See
