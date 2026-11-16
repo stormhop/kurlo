@@ -456,6 +456,90 @@ func TestMCPServerRedactsSecretsAndTruncatesBodies(t *testing.T) {
 	}
 }
 
+func TestMCPServerScopesRunEnvironmentToTheWorkspace(t *testing.T) {
+	server := newMCPServer(mcpServerOptions{workspace: t.TempDir()}, io.Discard)
+	environments := []cliEnvironment{
+		{WorkspaceID: "w1", Name: "Local", Values: []cliKV{{Key: "baseUrl", Value: "a", Enabled: true}}},
+		{WorkspaceID: "w2", Name: "Local", Values: []cliKV{{Key: "baseUrl", Value: "b", Enabled: true}}},
+	}
+	ambiguous := mcpWorkspace{
+		collections:  []cliCollection{{ID: "c1", WorkspaceID: "w1"}, {ID: "c2", WorkspaceID: "w2"}},
+		environments: environments,
+	}
+	if _, err := server.prepareRun(ambiguous, "Local", nil); err == nil || !strings.Contains(err.Error(), "more than one workspace") {
+		t.Fatalf("an environment name shared by two workspaces should be an error, got %v", err)
+	}
+	scoped := mcpWorkspace{collections: []cliCollection{{ID: "c2", WorkspaceID: "w2"}}, environments: environments}
+	run, err := server.prepareRun(scoped, "Local", nil)
+	if err != nil {
+		t.Fatalf("scoped run: %v", err)
+	}
+	if run.values["baseUrl"] != "b" {
+		t.Fatalf("scoped run used baseUrl %q, want b", run.values["baseUrl"])
+	}
+}
+
+func TestMCPServerRedactsSecretRequestHeaders(t *testing.T) {
+	server := echoServer(t)
+	root := writeYAMLWorkspace(t, server.URL)
+	collectionPath := filepath.Join(root, "workspaces", "Demo", "collections", "Smoke", "collection.yml")
+	data, err := os.ReadFile(collectionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(data), "    - req-fail\n", "    - req-fail\n    - req-secret-header\n", 1)
+	if updated == string(data) {
+		t.Fatal("requestOrder anchor not found")
+	}
+	if err := os.WriteFile(collectionPath, []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	request := strings.Join([]string{
+		"version: 1",
+		"request:",
+		"  id: req-secret-header",
+		"  name: Secret header",
+		"  filesystemName: GET-secret-header",
+		"  requestType: http",
+		"  isDraft: false",
+		"  collectionId: col-smoke",
+		"  collection: Smoke",
+		"  folderPath: []",
+		"  method: GET",
+		"  url: \"{{baseUrl}}/echo\"",
+		"  headers:",
+		"    - key: Authorization",
+		"      value: Bearer mcp-header-secret",
+		"      enabled: true",
+		"      secret: true",
+		"  auth:",
+		"    type: none",
+		"  bodyType: none",
+		"  bodyContent: \"\"",
+		"  settings: {}",
+		"",
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(root, "workspaces", "Demo", "collections", "Smoke", "requests", "GET-secret-header.yml"), []byte(request), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	h := startMCPHarness(t, mcpServerOptions{workspace: root, env: "Local"})
+	var out mcpRequestOutcome
+	result := h.tool("run_request", map[string]any{"request": "Secret header"}, &out)
+	raw := result.Content[0].Text + string(result.StructuredContent)
+	if strings.Contains(raw, "mcp-header-secret") {
+		t.Fatalf("a secret request header reached the model: %s", raw)
+	}
+	if !strings.Contains(out.Body, `"auth":"[secret]"`) {
+		t.Errorf("the echoed secret header should be masked in the body: %s", out.Body)
+	}
+	for _, header := range out.Headers {
+		if header.Name == "X-Seen-Auth" && header.Value != "[secret]" {
+			t.Errorf("the echoed secret header should be masked in response headers: %+v", header)
+		}
+	}
+}
+
 func TestMCPServerRunsACollection(t *testing.T) {
 	server := echoServer(t)
 	h := startMCPHarness(t, mcpServerOptions{workspace: writeYAMLWorkspace(t, server.URL)})

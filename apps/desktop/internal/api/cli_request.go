@@ -448,7 +448,7 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		BrowserEnforceCORS:      req.Settings.BrowserEnforceCORS,
 		BrowserEnforceCSP:       req.Settings.BrowserEnforceCSP,
 		BrowserCSP:              req.Settings.BrowserCSP,
-		SecretEnvironmentValues: append(append(append([]string(nil), secretValues...), req.CollectionSecretValues...), cliRequestVariableSecrets(req.Vars)...),
+		SecretEnvironmentValues: cliRequestSecretValues(req, values, secretValues),
 		ResolveTemplates:        true,
 		TemplateValues:          values,
 		CollectionVariables:     req.CollectionVariables,

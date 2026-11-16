@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 )
 
 func TestParseCLIArgsLeadingWorkspaceAndFlags(t *testing.T) {
@@ -25,6 +27,45 @@ func TestParseCLIArgsLeadingWorkspaceAndFlags(t *testing.T) {
 	}
 	if opts.vars["a"] != "1" || opts.vars["b"] != "2" {
 		t.Fatalf("vars = %v", opts.vars)
+	}
+}
+
+func TestParseCLIArgsAcceptsFlagsBeforeAndAroundTheWorkspace(t *testing.T) {
+	for _, args := range [][]string{
+		{"--env", "Local", "--collection", "Core", "./ws"},
+		{"./ws", "--env", "Local", "--collection", "Core"},
+		{"--env", "Local", "./ws", "--collection", "Core"},
+	} {
+		opts, err := parseCLIArgs(args, &bytes.Buffer{}, &bytes.Buffer{})
+		if err != nil {
+			t.Fatalf("parse %v: %v", args, err)
+		}
+		if opts.workspace != "./ws" || opts.env != "Local" || opts.collection != "Core" {
+			t.Fatalf("parse %v = workspace %q env %q collection %q", args, opts.workspace, opts.env, opts.collection)
+		}
+	}
+}
+
+func TestParseCLIArgsRejectsExtraPositionals(t *testing.T) {
+	if _, err := parseCLIArgs([]string{"./ws", "extra", "--env", "Local"}, &bytes.Buffer{}, &bytes.Buffer{}); err == nil {
+		t.Fatal("expected an error for a second positional argument")
+	}
+}
+
+func TestExportScopesWritesPostRunGlobals(t *testing.T) {
+	exportPath := filepath.Join(t.TempDir(), "globals.json")
+	sm := state.New()
+	sm.SetVariables(map[string]string{"seed": "1"})
+	sm.SetVariable("setByScript", "from-script")
+	if err := exportScopes(cliOptions{exportGlobals: exportPath}, sm); err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	data, err := os.ReadFile(exportPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "setByScript") || !strings.Contains(string(data), "from-script") {
+		t.Fatalf("exported globals should include values set during the run:\n%s", data)
 	}
 }
 
@@ -324,6 +365,135 @@ func TestRunCLIMissingWorkspace(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "not a Kurlo YAML workspace") {
 		t.Fatalf("expected a clear error, got %q", out.String())
+	}
+}
+
+func addSecretEnvironmentRow(t *testing.T, root, key, value string) {
+	t.Helper()
+	path := filepath.Join(root, "workspaces", "Demo", "environments", "Local.yml")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := strings.TrimRight(string(data), "\n") + "\n" +
+		"    - id: 2\n" +
+		"      enabled: true\n" +
+		"      key: " + key + "\n" +
+		"      value: " + value + "\n" +
+		"      secret: true\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func addRequestToSmokeCollection(t *testing.T, root, requestID, filename, content string) {
+	t.Helper()
+	collectionPath := filepath.Join(root, "workspaces", "Demo", "collections", "Smoke", "collection.yml")
+	data, err := os.ReadFile(collectionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(data), "    - req-fail\n", "    - req-fail\n    - "+requestID+"\n", 1)
+	if updated == string(data) {
+		t.Fatal("requestOrder anchor not found")
+	}
+	if err := os.WriteFile(collectionPath, []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "workspaces", "Demo", "collections", "Smoke", "requests", filename), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunCLIRedactsEnvironmentSecretsFromReports(t *testing.T) {
+	httpTransports.closeAll()
+	t.Cleanup(httpTransports.closeAll)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	root := writeYAMLWorkspace(t, server.URL)
+	addSecretEnvironmentRow(t, root, "apiToken", "super-secret-token")
+	requestPath := filepath.Join(root, "workspaces", "Demo", "collections", "Smoke", "requests", "GET-1-ok.yml")
+	data, err := os.ReadFile(requestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(data), "{{baseUrl}}/ok?v={{apiVersion}}", "{{baseUrl}}/ok?token={{apiToken}}", 1)
+	if updated == string(data) {
+		t.Fatal("request URL anchor not found")
+	}
+	if err := os.WriteFile(requestPath, []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, reporter := range []string{"json", "cli"} {
+		var out bytes.Buffer
+		code := runCLI(cliOptions{workspace: root, env: "Local", reporters: []string{reporter}, iterations: 1, stdout: &out, stderr: &out})
+		if code != 0 {
+			t.Fatalf("%s: expected exit 0, got %d:\n%s", reporter, code, out.String())
+		}
+		if strings.Contains(out.String(), "super-secret-token") {
+			t.Fatalf("%s: a declared secret leaked into the report:\n%s", reporter, out.String())
+		}
+		if !strings.Contains(out.String(), "[secret]") {
+			t.Fatalf("%s: expected the URL to show [secret]:\n%s", reporter, out.String())
+		}
+	}
+}
+
+func TestRunCLIRedactsSecretHeadersFromTestErrors(t *testing.T) {
+	httpTransports.closeAll()
+	t.Cleanup(httpTransports.closeAll)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer server.Close()
+
+	root := writeYAMLWorkspace(t, server.URL)
+	addRequestToSmokeCollection(t, root, "req-secret-header", "GET-secret-header.yml", strings.Join([]string{
+		"version: 1",
+		"request:",
+		"  id: req-secret-header",
+		"  name: Secret header",
+		"  filesystemName: GET-secret-header",
+		"  requestType: http",
+		"  isDraft: false",
+		"  collectionId: col-smoke",
+		"  collection: Smoke",
+		"  folderPath: []",
+		"  method: GET",
+		"  url: \"{{baseUrl}}/ok\"",
+		"  headers:",
+		"    - key: X-Secret",
+		"      value: header-secret-value",
+		"      enabled: true",
+		"      secret: true",
+		"  auth:",
+		"    type: none",
+		"  bodyType: none",
+		"  bodyContent: \"\"",
+		"  testScriptJs: |",
+		"    pm.test(\"leak\", () => { throw new Error(\"value=\" + pm.request.headers.get(\"X-Secret\")); });",
+		"  settings: {}",
+		"",
+	}, "\n"))
+
+	var out bytes.Buffer
+	code := runCLI(cliOptions{workspace: root, env: "Local", reporters: []string{"json"}, iterations: 1, stdout: &out, stderr: &out})
+	if code != 1 {
+		t.Fatalf("expected the failing test to exit 1, got %d:\n%s", code, out.String())
+	}
+	if strings.Contains(out.String(), "header-secret-value") {
+		t.Fatalf("a secret request header leaked into the report:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "[secret]") {
+		t.Fatalf("expected the test error to show [secret]:\n%s", out.String())
 	}
 }
 

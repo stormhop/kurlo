@@ -1145,16 +1145,47 @@ type mcpRunContext struct {
 	collections map[string]map[string]string
 }
 
+func mcpWorkspaceID(ws mcpWorkspace) string {
+	id := ""
+	for _, collection := range ws.collections {
+		if collection.WorkspaceID == "" {
+			continue
+		}
+		if id == "" {
+			id = collection.WorkspaceID
+			continue
+		}
+		if id != collection.WorkspaceID {
+			return ""
+		}
+	}
+	return id
+}
+
 func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[string]any) (*mcpRunContext, error) {
 	envName = strings.TrimSpace(envName)
 	if envName == "" {
 		envName = s.opts.env
 	}
-	if env, ok := findEnvironment(ws.environments, envName); ok && env.Protected {
-		return nil, fmt.Errorf("environment %s is protected: Kurlo does not send requests with it for AI agents; ask the user to run this in the app, or use another environment", env.Name)
+	workspaceID := mcpWorkspaceID(ws)
+	if workspaceID == "" && envName != "" {
+		matches := 0
+		for _, env := range ws.environments {
+			if strings.EqualFold(strings.TrimSpace(env.Name), strings.TrimSpace(envName)) {
+				matches++
+			}
+		}
+		if matches > 1 {
+			return nil, fmt.Errorf("environment %q exists in more than one workspace; use run_request or run_collection, or pass a unique environment name", envName)
+		}
+	}
+	if envName != "" {
+		if env, err := findEnvironmentForWorkspace(ws.environments, envName, workspaceID); err == nil && env.Protected {
+			return nil, fmt.Errorf("environment %s is protected: Kurlo does not send requests with it for AI agents; ask the user to run this in the app, or use another environment", env.Name)
+		}
 	}
 	globals, globalSecrets := mcpGlobalValues(s.opts.workspace, s.opts.loadAppSecrets)
-	values, secrets, err := resolveCLIValues(cliOptions{env: envName}, nil, ws.environments, nil)
+	values, secrets, err := resolveCLIValuesForWorkspace(cliOptions{env: envName}, ws.environments, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -1523,7 +1554,18 @@ func (s *mcpServer) toolRunCollection(ctx context.Context, arguments json.RawMes
 	for i, req := range selected {
 		selected[i] = ws.withDefaults(req)
 	}
-	run, err := s.prepareRun(ws, args.Environment, args.Variables)
+	workspaceIDs := map[string]bool{}
+	for _, req := range selected {
+		workspaceIDs[req.WorkspaceID] = true
+	}
+	if len(workspaceIDs) > 1 {
+		return nil, fmt.Errorf("the selected requests belong to more than one workspace; use a unique collection name or a folder")
+	}
+	runWorkspace := ws
+	if len(workspaceIDs) == 1 {
+		runWorkspace = ws.forRequest(selected[0])
+	}
+	run, err := s.prepareRun(runWorkspace, args.Environment, args.Variables)
 	if err != nil {
 		return nil, err
 	}

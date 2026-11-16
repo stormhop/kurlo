@@ -15,6 +15,45 @@ import (
 	"testing"
 )
 
+func TestCLIInputFilesIgnoreUTF8BOM(t *testing.T) {
+	dir := t.TempDir()
+	csvPath := filepath.Join(dir, "data.csv")
+	if err := os.WriteFile(csvPath, []byte("\ufeffuser\nada\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := loadDataFile(csvPath)
+	if err != nil {
+		t.Fatalf("CSV with BOM: %v", err)
+	}
+	if len(rows) != 1 || rows[0]["user"] != "ada" {
+		t.Fatalf("CSV with BOM parsed as %v", rows)
+	}
+
+	jsonPath := filepath.Join(dir, "data.json")
+	if err := os.WriteFile(jsonPath, []byte("\ufeff"+`[{"user":"grace"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rows, err = loadDataFile(jsonPath)
+	if err != nil {
+		t.Fatalf("JSON with BOM: %v", err)
+	}
+	if len(rows) != 1 || rows[0]["user"] != "grace" {
+		t.Fatalf("JSON with BOM parsed as %v", rows)
+	}
+
+	envPath := filepath.Join(dir, "ci.env")
+	if err := os.WriteFile(envPath, []byte("\ufeffbaseUrl=https://api.test\ntoken=secret\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	values, err := readVariableFile(envPath)
+	if err != nil {
+		t.Fatalf("env file with BOM: %v", err)
+	}
+	if values["baseUrl"] != "https://api.test" || values["token"] != "secret" {
+		t.Fatalf("env file with BOM parsed as %v", values)
+	}
+}
+
 func TestLoadDataFileCSV(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "data.csv")

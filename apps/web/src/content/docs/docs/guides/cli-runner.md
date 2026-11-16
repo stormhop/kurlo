@@ -57,6 +57,8 @@ The first argument is the workspace directory (the folder that contains `kurlo.y
 - **Variable chaining**: a value a test writes with `pm.environment.set(...)` is visible to later requests in the same run, so a login step can hand a token to the requests after it.
 - **Browser checks**: a request with [browser emulation](/docs/guides/browser-security/) turned on, by itself or through its collection, is sent the way the browser would send it, and a CORS or CSP refusal fails the run. Keep it on for the requests your frontend makes, and CI catches a CORS change before the frontend ships.
 
+A request can keep both JavaScript and Tengo scripts. `kurlo run` runs the JavaScript fields when either is present; the app runs the engine selected in **Settings → General → Script engine**, because the workspace file does not record that choice.
+
 Realtime request types (WebSocket, SSE, Socket.IO, gRPC) need a live session and are skipped, and so are MCP and AI requests. A request whose pre-request script calls `pm.execution.skipRequest()` is also skipped — reported as such, and it does not fail the run.
 
 Scripts get the same sandbox as the app, including [`pm.crypto` and `CryptoJS`](/docs/reference/scripting-api/#pmcrypto) for request signing. Two capabilities are opt-in because they change what a run can do:
@@ -97,6 +99,8 @@ Variables resolve exactly as they do in the app, in ascending priority:
 5. **`--var KEY=VALUE`** — repeatable, highest priority.
 
 The full set of dynamic variables (`{{$guid}}`, `{{$timestamp}}`, `{{$randomEmail}}`, and the rest — see [Environments & variables](/docs/guides/environments/#dynamic-variables)) is generated per use, identical to the desktop app.
+
+Environment names are resolved in each collection's own workspace, so two workspaces in one store can both have a `Local` or `CI` environment. A variable marked secret is shown as `[secret]` in the terminal and JSON report, including when it appears in the request URL; a request header marked secret is masked the same way in test errors and script output.
 
 Secrets are the reason `--var` and `--env-file` exist: keep them out of the committed workspace and inject them from the CI environment.
 
@@ -186,7 +190,7 @@ kurlo run . --env CI --folder "Billing/Refunds"      # a folder subtree
 | `--iterations <n>` | Run the selected set `n` times (ignored with `--data`). |
 | `--fail-fast`, `--bail` | Stop at the first failing request. |
 | `--insecure`, `-k` | Disable TLS certificate verification for every request. |
-| `--verbose` | Print request/response detail for each request. |
+| `--verbose` | Print request/response detail and script output for each request. |
 
 ## Exit codes
 

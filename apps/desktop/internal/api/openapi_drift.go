@@ -390,6 +390,11 @@ func (s *mcpServer) toolCheckOpenAPISync(ctx context.Context, arguments json.Raw
 		if err != nil {
 			return nil, err
 		}
+		collection, err := findOpenAPICollection(ws.collections, strings.TrimSpace(args.Collection))
+		if err != nil {
+			return nil, err
+		}
+		ws = ws.forRequest(cliSavedRequest{CollectionID: collection.ID})
 		for _, env := range ws.environments {
 			if env.Name == envName && env.Protected {
 				return nil, fmt.Errorf("environment %q is protected; ask the user to check the spec in Kurlo", envName)
@@ -459,12 +464,17 @@ func RunOpenAPICLI(args []string, stdout, stderr io.Writer) int {
 	}
 	values := map[string]string{}
 	if *envName != "" || *envFile != "" {
-		_, _, _, environments, err := loadCLIWorkspace(root)
+		_, collections, _, environments, err := loadCLIWorkspace(root)
 		if err != nil {
 			fmt.Fprintln(stderr, "kurlo openapi check:", err)
 			return 2
 		}
-		resolved, _, err := resolveCLIValues(cliOptions{env: *envName, envFile: *envFile, vars: map[string]string{}}, nil, environments, nil)
+		selected, err := findOpenAPICollection(collections, *collection)
+		if err != nil {
+			fmt.Fprintln(stderr, "kurlo openapi check:", err)
+			return 2
+		}
+		resolved, _, err := resolveCLIValuesForWorkspace(cliOptions{env: *envName, envFile: *envFile, vars: map[string]string{}}, environments, selected.WorkspaceID)
 		if err != nil {
 			fmt.Fprintln(stderr, "kurlo openapi check:", err)
 			return 2

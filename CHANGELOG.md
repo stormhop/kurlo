@@ -27,6 +27,7 @@ All notable changes to Kurlo are documented here. This project follows
 - **Environment pages behave.** Editing a value on page 2 or later keeps you on that page with focus in the field, and an environment with exactly 100 variables shows one page and the right count.
 - **Idle windows stop burning CPU.** The perched bird in empty panels, the mock-server, SSE, load-test, AI and saving indicators, and the About scene animated forever, so the window was redrawn every frame — about a fifth of a CPU core on macOS. They now move a few times and settle; loaders still animate while something is loading.
 - **Imported names keep their slashes.** A Postman, Insomnia or `.http` request named `Billing / Invoices` no longer turns into a `Billing` folder with an `Invoices` request after import or the next start-up.
+- **`kurlo run` fixes.** Flags work before or after the workspace folder, and a second folder argument is rejected instead of silently ignored. When two workspaces both have an environment named `CI`, each collection uses its own (so do `kurlo openapi check` and MCP runs; `--export-environment` asks for a single workspace). `--export-globals` includes values scripts set, data, env and globals files saved with a UTF-8 BOM read correctly, `--verbose` prints script `console.log` output (also as `logs` in the JSON report), and secrets in the result URL and in headers repeated by test errors or logs are shown as `[secret]`.
 
 ## [3.1.2] - 2026-11-15
 

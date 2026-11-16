@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"encoding/xml"
@@ -124,16 +125,37 @@ func parseCLIArgs(args []string, stdout, stderr io.Writer) (cliOptions, error) {
 		fs.PrintDefaults()
 	}
 
-	positional := ""
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		positional = args[0]
-		args = args[1:]
+	var flags, positional []string
+	for index := 0; index < len(args); index++ {
+		arg := args[index]
+		if arg == "--" {
+			positional = append(positional, args[index+1:]...)
+			break
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			positional = append(positional, arg)
+			continue
+		}
+		flags = append(flags, arg)
+		name, _, assigned := strings.Cut(strings.TrimLeft(arg, "-"), "=")
+		if option := fs.Lookup(name); option != nil && !assigned {
+			boolean, ok := option.Value.(interface{ IsBoolFlag() bool })
+			if !ok || !boolean.IsBoolFlag() {
+				if index+1 < len(args) {
+					index++
+					flags = append(flags, args[index])
+				}
+			}
+		}
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := fs.Parse(flags); err != nil {
 		return opts, err
 	}
-	if positional != "" {
-		opts.workspace = positional
+	if len(positional) > 1 {
+		return opts, fmt.Errorf("expected at most one workspace argument, got %d", len(positional))
+	}
+	if len(positional) == 1 {
+		opts.workspace = positional[0]
 	}
 
 	if err := collectKeyValues(varFlags, opts.vars, "--var"); err != nil {
@@ -227,11 +249,6 @@ func runCLI(opts cliOptions) int {
 		fmt.Fprintln(opts.stderr, "kurlo run:", err)
 		return 2
 	}
-	values, secretValues, err := resolveCLIValues(opts, nil, environments, nil)
-	if err != nil {
-		fmt.Fprintln(opts.stderr, "kurlo run:", err)
-		return 2
-	}
 
 	var dataRows []map[string]string
 	if opts.dataFile != "" {
@@ -260,8 +277,26 @@ func runCLI(opts cliOptions) int {
 		selected[i] = applyCollectionDefaults(selected[i], collectionsByID[selected[i].CollectionID])
 	}
 
+	envValues := make(map[string]map[string]string)
+	envSecrets := make(map[string][]string)
+	for _, req := range selected {
+		if _, ok := envValues[req.WorkspaceID]; ok {
+			continue
+		}
+		values, secretValues, err := resolveCLIValuesForWorkspace(opts, environments, req.WorkspaceID)
+		if err != nil {
+			fmt.Fprintln(opts.stderr, "kurlo run:", err)
+			return 2
+		}
+		envValues[req.WorkspaceID] = values
+		envSecrets[req.WorkspaceID] = secretValues
+	}
+	if opts.exportEnvironment != "" && len(envValues) > 1 {
+		fmt.Fprintln(opts.stderr, "kurlo run: --export-environment needs a run in one workspace; select one with --collection or --folder")
+		return 2
+	}
+
 	sm := state.New()
-	sm.SetEnvironment(values)
 	sm.SetVariables(globals)
 	jars := newCookieJarRegistry()
 	cache := newPreflightCache()
@@ -284,7 +319,9 @@ runLoop:
 			}
 			firstRequest = false
 
-			result := runCLIRequest(sm, jars, cache, tokens, req, iteration, dataRow, opts, secretValues)
+			sm.SetEnvironment(envValues[req.WorkspaceID])
+			result := runCLIRequest(sm, jars, cache, tokens, req, iteration, dataRow, opts, envSecrets[req.WorkspaceID])
+			envValues[req.WorkspaceID] = sm.GetEnvironment()
 			results = append(results, result)
 			if opts.verbose {
 				printVerbose(opts.stdout, result)
@@ -300,7 +337,7 @@ runLoop:
 		fmt.Fprintln(opts.stderr, "kurlo run:", err)
 		return 2
 	}
-	if err := exportScopes(opts, sm, globals); err != nil {
+	if err := exportScopes(opts, sm); err != nil {
 		fmt.Fprintln(opts.stderr, "kurlo run:", err)
 		return 2
 	}
@@ -355,31 +392,33 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 	base.URL = resolveTemplateValue(httpReq.URL, values)
 
 	resolvedAuth := resolveAuthTemplates(httpReq.Auth, values)
+	base.secrets = append([]string(nil), httpReq.SecretEnvironmentValues...)
+	base.secrets = append(base.secrets, authCLISecrets(resolvedAuth)...)
 	if err := tokens.resolveOAuth2Token(&resolvedAuth); err != nil {
 		base.Error = err.Error()
+		redactCLIResult(&base)
 		return base, model.HttpResponse{}
 	}
 	if err := auth.PrepareJWTBearer(&resolvedAuth); err != nil {
 		base.Error = err.Error()
+		redactCLIResult(&base)
 		return base, model.HttpResponse{}
 	}
 	httpReq.Auth.Token = resolvedAuth.Token
-	base.secrets = []string{
-		resolvedAuth.Token, resolvedAuth.Password, resolvedAuth.KeyValue,
-		resolvedAuth.OAuth2Secret, resolvedAuth.OAuth2Password, resolvedAuth.OAuth2RefreshToken,
-		resolvedAuth.OAuth2AssertionPrivateKey, resolvedAuth.OAuth1ConsumerSecret,
-		resolvedAuth.OAuth1Token, resolvedAuth.OAuth1TokenSecret, resolvedAuth.OAuth1PrivateKey,
-		resolvedAuth.AWSSecretKey, resolvedAuth.AWSSessionToken,
-		resolvedAuth.JWTSecret, resolvedAuth.JWTPrivateKey,
-	}
-	httpReq.SecretEnvironmentValues = append(httpReq.SecretEnvironmentValues, base.secrets...)
+	authSecrets := authCLISecrets(resolvedAuth)
+	base.secrets = append(base.secrets, authSecrets...)
+	httpReq.SecretEnvironmentValues = append(httpReq.SecretEnvironmentValues, authSecrets...)
 
 	resp := sendRequest(ctx, httpReq, sm, jars, cache)
 	applyCLICollectionUpdates(sm, req.CollectionID, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
+	for _, logs := range [][]string{resp.PreRequestResult.Logs, resp.TestResult.Logs} {
+		base.Logs = append(base.Logs, logs...)
+	}
 
 	if resp.Skipped {
 		base.Skipped = true
 		base.SkipReason = resp.SkipReason
+		redactCLIResult(&base)
 		return base, resp
 	}
 
@@ -398,14 +437,42 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 		base.Error = scriptErr
 	}
 
-	for _, test := range resp.TestResult.Tests {
+	for _, test := range append(append([]model.TestResult{}, resp.PreRequestResult.Tests...), resp.TestResult.Tests...) {
 		base.Tests = append(base.Tests, cliTestResult{Name: test.Name, Passed: test.Passed, Error: test.Error})
 		base.TestsTotal++
 		if test.Passed {
 			base.TestsPassed++
 		}
 	}
+	redactCLIResult(&base)
 	return base, resp
+}
+
+func authCLISecrets(auth model.AuthConfig) []string {
+	return []string{
+		auth.Token, auth.Password, auth.KeyValue,
+		auth.OAuth2Secret, auth.OAuth2Password, auth.OAuth2RefreshToken,
+		auth.OAuth2AssertionPrivateKey, auth.OAuth1ConsumerSecret,
+		auth.OAuth1Token, auth.OAuth1TokenSecret, auth.OAuth1PrivateKey,
+		auth.AWSSecretKey, auth.AWSSessionToken,
+		auth.JWTSecret, auth.JWTPrivateKey,
+	}
+}
+
+func redactCLIResult(result *cliRunResult) {
+	if len(result.secrets) == 0 {
+		return
+	}
+	result.URL = redactSecrets(result.URL, result.secrets)
+	result.Error = redactSecrets(result.Error, result.secrets)
+	result.SkipReason = redactSecrets(result.SkipReason, result.secrets)
+	for i := range result.Tests {
+		result.Tests[i].Name = redactSecrets(result.Tests[i].Name, result.secrets)
+		result.Tests[i].Error = redactSecrets(result.Tests[i].Error, result.secrets)
+	}
+	for i := range result.Logs {
+		result.Logs[i] = redactSecrets(result.Logs[i], result.secrets)
+	}
 }
 
 func headerLookup(headers []model.KeyValue, key string) string {
@@ -463,12 +530,23 @@ func resolveCLIValues(opts cliOptions, collections []cliCollection, environments
 			values[key] = value
 		}
 	}
+	envValues, secretValues, err := resolveCLIValuesForWorkspace(opts, environments, "")
+	if err != nil {
+		return nil, nil, err
+	}
+	for key, value := range envValues {
+		values[key] = value
+	}
+	return values, secretValues, nil
+}
 
+func resolveCLIValuesForWorkspace(opts cliOptions, environments []cliEnvironment, workspaceID string) (map[string]string, []string, error) {
+	values := map[string]string{}
 	var secretValues []string
 	if opts.env != "" {
-		env, ok := findEnvironment(environments, opts.env)
-		if !ok {
-			return nil, nil, fmt.Errorf("environment %q not found (available: %s)", opts.env, environmentNames(environments))
+		env, err := findEnvironmentForWorkspace(environments, opts.env, workspaceID)
+		if err != nil {
+			return nil, nil, err
 		}
 		for _, row := range env.Values {
 			if row.Enabled && strings.TrimSpace(row.Key) != "" {
@@ -521,6 +599,47 @@ func findEnvironment(environments []cliEnvironment, name string) (cliEnvironment
 	return cliEnvironment{}, false
 }
 
+func findEnvironmentForWorkspace(environments []cliEnvironment, name, workspaceID string) (cliEnvironment, error) {
+	if workspaceID == "" {
+		env, ok := findEnvironment(environments, name)
+		if !ok {
+			return cliEnvironment{}, fmt.Errorf("environment %q not found (available: %s)", name, environmentNames(environments))
+		}
+		return env, nil
+	}
+	var matches []cliEnvironment
+	for _, env := range environments {
+		if env.WorkspaceID != workspaceID {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(env.Name), strings.TrimSpace(name)) {
+			matches = append(matches, env)
+		}
+	}
+	switch len(matches) {
+	case 1:
+		return matches[0], nil
+	case 0:
+		return cliEnvironment{}, fmt.Errorf("environment %q not found in workspace %q (available: %s)", name, workspaceID, environmentNamesForWorkspace(environments, workspaceID))
+	default:
+		return cliEnvironment{}, fmt.Errorf("environment %q is ambiguous in workspace %q", name, workspaceID)
+	}
+}
+
+func environmentNamesForWorkspace(environments []cliEnvironment, workspaceID string) string {
+	names := make([]string, 0, len(environments))
+	for _, env := range environments {
+		if env.WorkspaceID == workspaceID {
+			names = append(names, env.Name)
+		}
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return "none"
+	}
+	return strings.Join(names, ", ")
+}
+
 func environmentNames(environments []cliEnvironment) string {
 	names := make([]string, 0, len(environments))
 	for _, env := range environments {
@@ -546,6 +665,7 @@ func readVariableFile(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	data = bytes.TrimPrefix(data, utf8BOM)
 	trimmed := strings.TrimSpace(string(data))
 	values := map[string]string{}
 	if strings.HasPrefix(trimmed, "{") {
@@ -621,14 +741,14 @@ func loadCLIWorkspaceWithSecrets(root string, secrets map[string]string) ([]map[
 	return workspaces, collections, requests, flattenCLIEnvironments(environments), nil
 }
 
-func exportScopes(opts cliOptions, sm *state.Manager, globals map[string]string) error {
+func exportScopes(opts cliOptions, sm *state.Manager) error {
 	if opts.exportEnvironment != "" {
 		if err := writeVariableExport(opts.exportEnvironment, opts.env, sm.GetEnvironment()); err != nil {
 			return fmt.Errorf("export environment: %w", err)
 		}
 	}
 	if opts.exportGlobals != "" {
-		if err := writeVariableExport(opts.exportGlobals, "Globals", globals); err != nil {
+		if err := writeVariableExport(opts.exportGlobals, "Globals", sm.GetVariables()); err != nil {
 			return fmt.Errorf("export globals: %w", err)
 		}
 	}
@@ -730,13 +850,16 @@ func printVerbose(w io.Writer, r cliRunResult) {
 	fmt.Fprintf(w, "→ %s %s\n", r.Method, r.URL)
 	if r.Error != "" {
 		fmt.Fprintf(w, "  ✗ %s\n", r.Error)
-		return
+	} else {
+		ct := r.ContentType
+		if ct == "" {
+			ct = "—"
+		}
+		fmt.Fprintf(w, "  ← %d  %dms  %s  %s\n", r.StatusCode, r.DurationMs, humanSize(r.Size), ct)
 	}
-	ct := r.ContentType
-	if ct == "" {
-		ct = "—"
+	for _, line := range r.Logs {
+		fmt.Fprintf(w, "  log: %s\n", line)
 	}
-	fmt.Fprintf(w, "  ← %d  %dms  %s  %s\n", r.StatusCode, r.DurationMs, humanSize(r.Size), ct)
 }
 
 func reportPretty(w io.Writer, results []cliRunResult, elapsed time.Duration) {

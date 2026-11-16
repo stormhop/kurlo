@@ -48,6 +48,9 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 - **Idle windows stop burning CPU**: the perched bird and the status indicators settle after a few moves instead of
   redrawing the window every frame.
 - **Imported names keep their slashes**: `Billing / Invoices` stays one request instead of becoming a folder.
+- **`kurlo run` fixes**: flags around the workspace folder, environments scoped to their workspace, `--export-globals`
+  with script values, UTF-8 BOM in data files, `--verbose` script output and masked secrets in reports. See
+  [CLI runner](/docs/guides/cli-runner/).
 
 ## 3.1.2
 

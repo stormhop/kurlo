@@ -105,6 +105,42 @@ func writeDriftWorkspace(t *testing.T, source string, base map[string]any) strin
 	return root
 }
 
+func TestOpenAPICheckUsesTheCollectionsWorkspaceEnvironment(t *testing.T) {
+	base := driftSpec(map[string]any{"/pets": map[string]any{"get": map[string]any{"operationId": "listPets"}}})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/b/spec.json" {
+			http.Error(w, "wrong environment", http.StatusInternalServerError)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(base)
+	}))
+	defer server.Close()
+
+	root := t.TempDir()
+	workspaces := []map[string]any{{"id": "w1", "name": "Alpha"}, {"id": "w2", "name": "Beta"}}
+	collections := []map[string]any{
+		{"id": "c-a", "workspaceId": "w1", "name": "Alpha", "defaults": map[string]any{}},
+		{"id": "c-b", "workspaceId": "w2", "name": "Beta", "defaults": map[string]any{}, "openapi": map[string]any{"source": "{{specBase}}/spec.json", "headers": []any{}}},
+	}
+	environments := []map[string]any{
+		{"id": "e-a", "workspaceId": "w1", "name": "Local", "values": []any{map[string]any{"key": "specBase", "value": server.URL + "/a", "enabled": true}}},
+		{"id": "e-b", "workspaceId": "w2", "name": "Local", "values": []any{map[string]any{"key": "specBase", "value": server.URL + "/b", "enabled": true}}},
+	}
+	if err := writeYAMLWorkspaceStore(root, workspaces, collections, nil, environments, nil, nil); err != nil {
+		t.Fatalf("write workspace: %v", err)
+	}
+	data, _ := json.Marshal(base)
+	if err := writeOpenAPIBaseSpec(root, "c-b", string(data)); err != nil {
+		t.Fatalf("write base: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	code := RunOpenAPICLI([]string{"check", "Beta", "--workspace", root, "--env", "Local"}, &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "Beta is in sync") {
+		t.Fatalf("check used the wrong workspace environment: code %d\n%s%s", code, stdout.String(), stderr.String())
+	}
+}
+
 func TestOpenAPICheckCommandExitCodes(t *testing.T) {
 	base := driftSpec(map[string]any{"/pets/{id}": map[string]any{"get": getPetOperation("one pet")}})
 	current := base

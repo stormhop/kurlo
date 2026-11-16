@@ -98,6 +98,32 @@ func cliRequestVariableSecrets(rows []cliKV) []string {
 	return out
 }
 
+func cliRequestSecretValues(req cliSavedRequest, values map[string]string, extra []string) []string {
+	out := append([]string(nil), extra...)
+	out = append(out, req.CollectionSecretValues...)
+	out = append(out, cliRequestVariableSecrets(req.Vars)...)
+	out = append(out, cliRowSecretValues(req.Vars, values)...)
+	out = append(out, cliRowSecretValues(req.Headers, values)...)
+	out = append(out, cliRowSecretValues(req.Params, values)...)
+	out = append(out, cliRowSecretValues(req.PathParams, values)...)
+	out = append(out, cliRowSecretValues(req.FormRows, values)...)
+	return out
+}
+
+func cliRowSecretValues(rows []cliKV, values map[string]string) []string {
+	var out []string
+	for _, row := range rows {
+		if !row.Enabled || !row.Secret || strings.TrimSpace(row.Value) == "" {
+			continue
+		}
+		out = append(out, row.Value)
+		if resolved := resolveTemplateValue(row.Value, values); resolved != row.Value && resolved != "" {
+			out = append(out, resolved)
+		}
+	}
+	return out
+}
+
 func cliPostResponseVars(rows []cliKV) []model.KeyValue {
 	var out []model.KeyValue
 	for _, row := range rows {

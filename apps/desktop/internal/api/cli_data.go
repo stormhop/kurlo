@@ -18,6 +18,7 @@ func loadDataFile(path string) ([]map[string]string, error) {
 }
 
 func parseCLIData(data, path string) ([]map[string]string, error) {
+	data = strings.TrimPrefix(data, "\ufeff")
 	trimmed := strings.TrimSpace(data)
 	if trimmed == "" {
 		return nil, fmt.Errorf("data file is empty")
