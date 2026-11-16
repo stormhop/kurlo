@@ -6,6 +6,7 @@
   import EnvironmentMatrix from './EnvironmentMatrix.svelte';
   import Select from './Select.svelte';
   import { effectiveEnvironmentRows, environmentParentCandidates, parentEnvironment, protectingAncestor } from '../environmentInheritance';
+  import { rowHasContent } from '../utils';
   import type { Environment, EnvironmentColor, KVRow } from '../types/models';
   import { ENVIRONMENT_COLORS, environmentColorVar } from '../environmentColors';
 
@@ -169,22 +170,43 @@
 
   const ENVIRONMENT_ROW_PAGE_SIZE = 100;
   let valuePage = $state(0);
-  let valuePageCount = $derived(pageCount(activeEnvironment?.values.length ?? 0, ENVIRONMENT_ROW_PAGE_SIZE));
-  let visibleEnvironmentRows = $derived.by(() => {
+  let previousPagedRowCount = 0;
+  const activeEnvironmentKey = $derived(activeEnvironment?.id ?? '');
+  let pagedEnvironmentRows = $derived.by(() => {
     const values = activeEnvironment?.values ?? [];
+    const last = values.at(-1);
+    const trailing = last && !rowHasContent(last) ? last : null;
+    return { values, data: trailing ? values.slice(0, -1) : values, trailing };
+  });
+  let valuePageCount = $derived(pageCount(pagedEnvironmentRows.data.length, ENVIRONMENT_ROW_PAGE_SIZE));
+  let visibleEnvironmentRows = $derived.by(() => {
+    const { values, data, trailing } = pagedEnvironmentRows;
     const start = valuePage * ENVIRONMENT_ROW_PAGE_SIZE;
-    return values.slice(start, start + ENVIRONMENT_ROW_PAGE_SIZE).map((row, index) => ({ row, index: start + index }));
+    const rows = data.slice(start, start + ENVIRONMENT_ROW_PAGE_SIZE).map((row, index) => ({ row, index: start + index }));
+    if (trailing && start + ENVIRONMENT_ROW_PAGE_SIZE >= data.length) rows.push({ row: trailing, index: values.length - 1 });
+    return rows;
   });
 
   $effect(() => {
-    activeEnvironment?.id;
+    activeEnvironmentKey;
     environmentView;
     moreMenuOpen = false;
+    previousPagedRowCount = 0;
     valuePage = 0;
   });
 
   $effect(() => {
-    activeEnvironment?.values.length;
+    const count = pagedEnvironmentRows.data.length;
+    if (
+      previousPagedRowCount > 0
+      && count === previousPagedRowCount + 1
+      && count > ENVIRONMENT_ROW_PAGE_SIZE
+      && previousPagedRowCount % ENVIRONMENT_ROW_PAGE_SIZE === 0
+      && valuePage === previousPagedRowCount / ENVIRONMENT_ROW_PAGE_SIZE - 1
+    ) {
+      valuePage = Math.min(valuePageCount - 1, valuePage + 1);
+    }
+    previousPagedRowCount = count;
     if (valuePage >= valuePageCount) valuePage = Math.max(0, valuePageCount - 1);
   });
 
@@ -339,9 +361,9 @@
           <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeEnvironmentRow(activeEnvironment.id, i)} aria-label="Remove variable">✕</button>
         </div>
       {/each}
-      {#if activeEnvironment.values.length > ENVIRONMENT_ROW_PAGE_SIZE}
+      {#if pagedEnvironmentRows.data.length > ENVIRONMENT_ROW_PAGE_SIZE}
         <div class="environment-pagination" aria-label="Environment variable pages">
-          <span>Variables {rangeLabel(valuePage, ENVIRONMENT_ROW_PAGE_SIZE, activeEnvironment.values.length)}</span>
+          <span>Variables {rangeLabel(valuePage, ENVIRONMENT_ROW_PAGE_SIZE, pagedEnvironmentRows.data.length)}</span>
           <div class="environment-page-buttons">
             <button class="btn btn-secondary btn-sm" type="button" onclick={() => (valuePage = Math.max(0, valuePage - 1))} disabled={valuePage === 0}>Prev</button>
             <span>{valuePage + 1}/{valuePageCount}</span>

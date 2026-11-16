@@ -44,6 +44,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   and is offered in the gRPC Auth tab.
 - **Saves no longer lose or undo edits**: collection settings are written when you leave early, Reset defaults clears
   JavaScript scripts too, and an older queued save cannot overwrite a newer one.
+- **Environment pages behave**: editing on page 2 or later stays on that page, and the page count is right.
 - **Idle windows stop burning CPU**: the perched bird and the status indicators settle after a few moves instead of
   redrawing the window every frame.
 

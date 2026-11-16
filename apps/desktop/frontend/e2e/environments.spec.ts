@@ -686,3 +686,53 @@ test('colors an environment and shows it in the switcher, sidebar and matrix', a
   await expect(parent.locator('.env-color-dot')).toBeVisible();
   await page.screenshot({ path: join(tmpdir(), `kurlo-environment-parent-${testInfo.project.name}.png`), animations: 'disabled' });
 });
+
+test('keeps a later environment page while editing a variable there', async ({ page }) => {
+  const values = Array.from({ length: 120 }, (_, index) => ({ id: index + 1, key: `v${index + 1}`, value: `val${index + 1}`, enabled: true }));
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    environments: [{ id: 'env-pages', workspaceId: 'workspace-e2e', name: 'Pages', values }],
+    activeEnvironmentId: 'env-pages',
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  await page.locator('.environment-item-main').filter({ hasText: 'Pages' }).click();
+  await expect(page.locator('.environment-pagination')).toContainText('Variables 1-100 of 120');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await expect(page.locator('.environment-pagination')).toContainText('Variables 101-120 of 120');
+  const rows = page.getByTestId('environment-variable-row');
+  await expect(rows.first().getByLabel('Environment variable key')).toHaveValue('v101');
+  await rows.first().getByLabel('Environment variable value').fill('changed-101');
+  await expect(page.locator('.environment-pagination')).toContainText('Variables 101-120 of 120');
+  await expect(rows.first().getByLabel('Environment variable key')).toHaveValue('v101');
+  await rows.nth(19).getByLabel('Environment variable value').fill('changed-120');
+  await page.locator('.environment-workspace').getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const store = window.__kurloE2E.store as { environments: Array<{ id: string; values: Array<{ key: string; value: string }> }> };
+    const env = store.environments.find(environment => environment.id === 'env-pages')!;
+    return { first: env.values.find(row => row.key === 'v101')?.value, last: env.values.find(row => row.key === 'v120')?.value };
+  })).toEqual({ first: 'changed-101', last: 'changed-120' });
+});
+
+test('shows one hundred variables with the add row and no empty page', async ({ page }) => {
+  const values = Array.from({ length: 100 }, (_, index) => ({ id: index + 1, key: `v${index + 1}`, value: `val${index + 1}`, enabled: true }));
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    environments: [{ id: 'env-hundred', workspaceId: 'workspace-e2e', name: 'Hundred', values }],
+    activeEnvironmentId: 'env-hundred',
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  await page.locator('.environment-item-main').filter({ hasText: 'Hundred' }).click();
+  await expect(page.locator('.environment-pagination')).toHaveCount(0);
+  const rows = page.getByTestId('environment-variable-row');
+  await expect(rows).toHaveCount(101);
+  const addRow = rows.last().getByLabel('Environment variable key');
+  await expect(addRow).toHaveValue('');
+  await addRow.fill('v101');
+  await expect(page.locator('.environment-pagination')).toContainText('Variables 101-101 of 101');
+  await expect(page.getByTestId('environment-variable-row').first().getByLabel('Environment variable key')).toHaveValue('v101');
+  await page.locator('.environment-workspace').getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const store = window.__kurloE2E.store as { environments: Array<{ id: string; values: Array<{ key: string }> }> };
+    return store.environments.find(environment => environment.id === 'env-hundred')!.values.some(row => row.key === 'v101');
+  })).toBe(true);
+});
