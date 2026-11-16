@@ -24,6 +24,8 @@
     workspaces,
     activeWorkspaceId,
     openRequests,
+    previewRequestId,
+    keepRequestTab,
     activeRequestId,
     activeWorkspaceEnvironments,
     environmentMenu = undefined,
@@ -82,6 +84,8 @@
     workspaces: Workspace[];
     activeWorkspaceId: string;
     openRequests: SavedRequest[];
+    previewRequestId: string;
+    keepRequestTab: (id: string) => void;
     activeRequestId: string;
     activeWorkspaceEnvironments: Environment[];
     environmentMenu?: EnvironmentMenuGroups;
@@ -413,11 +417,12 @@
       {/if}
       {#each openRequests as req, eachIndex (eachIndex)}
         {@const unsaved = req.isDraft ? 'Unsaved draft' : !autosave && dirtyRequestIdSet.has(req.id) ? 'Unsaved changes' : ''}
-        <div class="saved-request-tab" class:active={req.id === activeRequestId && topView === 'request'} class:draft={req.isDraft} class:dirty={!autosave && !req.isDraft && dirtyRequestIdSet.has(req.id)} class:unsaved={Boolean(unsaved)} use:middleClick={workspaceBlocked ? undefined : () => closeRequestTab(req.id)}>
-          <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={req.id === activeRequestId && topView === 'request'} tabindex={req.id === activeRequestId && topView === 'request' ? 0 : -1} onclick={() => switchRequest(req.id)} disabled={workspaceBlocked}>
+        <div class="saved-request-tab" class:active={req.id === activeRequestId && topView === 'request'} class:preview={req.id === previewRequestId} class:draft={req.isDraft} class:dirty={!autosave && !req.isDraft && dirtyRequestIdSet.has(req.id)} class:unsaved={Boolean(unsaved)} use:middleClick={workspaceBlocked ? undefined : () => closeRequestTab(req.id)}>
+          <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={req.id === activeRequestId && topView === 'request'} tabindex={req.id === activeRequestId && topView === 'request' ? 0 : -1} onclick={() => switchRequest(req.id)} ondblclick={() => keepRequestTab(req.id)} disabled={workspaceBlocked}>
             <RequestTypeBadge request={req} variant="tab" />
             <span class="tab-title">{requestTabLabel(req)}</span>
             {#if unsaved}<span class="sr-only">({unsaved})</span>{/if}
+            {#if req.id === previewRequestId}<span class="sr-only">(Preview)</span>{/if}
           </button>
           <button class="tab-close" type="button" onclick={() => closeRequestTab(req.id)} aria-label="Close tab" disabled={workspaceBlocked}><AddCloseIcon /></button>
         </div>

@@ -23,6 +23,9 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   [Logging](/docs/reference/scripting-api/#logging).
 - **`{{variables}}` in every auth field**: auth fields suggest variables after `{{` and flag undefined ones; a secret
   field holding only `{{token}}` shows it as text. See [Authentication](/docs/guides/authentication/#bearer-token).
+- **Preview tabs**: enable **Settings → General → Preview tabs** to reuse one temporary request tab while browsing.
+  Double-clicking, editing or running the request keeps its tab open. Off by default; the preference and preview survive
+  a restart. See [App settings](/docs/guides/settings/#preview-tabs).
 
 ### Fixed
 

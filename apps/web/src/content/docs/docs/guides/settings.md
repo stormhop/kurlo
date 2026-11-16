@@ -5,7 +5,7 @@ description: Configure saving, scripts, themes, proxying, shortcuts, updates, su
 
 Open app settings from the gear at the bottom of the activity rail — the strip of icons on the far left — or with the **Settings** keyboard shortcut. Every page has the same layout: a title and a line on what it covers, then settings grouped in boxes, each row with its name and description on the left and its control on the right. The search field filters the settings navigation and the groups shown on the General page.
 
-![Kurlo General settings with saving, launch screen, script engine, default location and data rows](../../../../assets/screenshots/settings-general.png)
+![Kurlo General settings with saving, preview tabs, launch screen, script engine, default location and data rows](../../../../assets/screenshots/settings-general.png)
 
 App settings are different from the settings attached to API data:
 
@@ -33,6 +33,14 @@ The mode covers every editor that has a **Save** button: requests, collection an
 Some things are saved right away in both modes, because they are actions rather than edits: creating, renaming from the sidebar, moving and deleting collections, folders and workspaces; **Protect from AI agents** and **Sandbox for the agent**; the environment in use; history, cookies and run results; and values that scripts write with `pm.environment.set(...)`, `pm.globals.set(...)` and similar calls. A value a script writes is saved on its own, without the unsaved edits next to it.
 
 In manual-save mode, an all-data export contains the last saved version of each request, not unsaved editor changes. Kurlo warns you before exporting when dirty requests exist.
+
+### Preview tabs
+
+Under **Editing**, enable **Preview tabs** to browse saved requests without accumulating tabs. Each newly opened request replaces the temporary tab, whose name is italic. Requests that already have an open tab switch to that tab.
+
+Double-click the temporary tab to keep it open. Editing or running its request also keeps the tab automatically, including active WebSocket, Socket.IO, SSE and gRPC requests. New unsaved requests always have their own tabs.
+
+The switch is off by default. Turning it on leaves existing tabs open; turning it off keeps the current preview as a regular tab. The preference and the preview tab are restored after a restart, and the preference is included in **Export all data**.
 
 ### On launch
 

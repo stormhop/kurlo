@@ -16,6 +16,23 @@
   font-style: italic;
   opacity: 0.75;
 }
+
+.saved-request-tab.preview .tab-title {
+  font-style: italic;
+}
+
+.general-tab {
+  gap: var(--space-4);
+}
+
+.general-tab .settings-row {
+  padding-block: var(--space-2);
+}
+
+.general-tab .switch-control input:focus-visible + .switch-track {
+  outline: var(--focus-outline);
+  outline-offset: 0.125rem;
+}
 .rgb-sliders {
   display: flex;
   flex-direction: column;

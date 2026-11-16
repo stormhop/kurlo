@@ -136,6 +136,8 @@
       appTheme={vm.appTheme}
       autosave={vm.autosave}
       autosaveDelayMs={vm.autosaveDelayMs}
+      previewTabs={vm.previewTabs}
+      setPreviewTabs={vm.setPreviewTabs}
       startupView={vm.startupView}
       setStartupView={vm.setStartupView}
       scriptEngine={vm.scriptEngine}

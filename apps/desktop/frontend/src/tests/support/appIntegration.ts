@@ -20,6 +20,7 @@ import { requestDirtyFeature } from '../../lib/stores/features/requestDirty';
 import { requestPersistenceFeature } from '../../lib/stores/features/requestPersistence';
 import { requestStateFeature } from '../../lib/stores/features/requestState';
 import { requestCrudFeature } from '../../lib/stores/features/requestCrud';
+import { requestTabsFeature } from '../../lib/stores/features/requestTabs';
 import { examplesFeature } from '../../lib/stores/features/examples';
 import { requestSerializationFeature } from '../../lib/stores/features/requestSerialization';
 import { requestHeadersFeature } from '../../lib/stores/features/requestHeaders';
@@ -161,6 +162,8 @@ function httpResponse(statusCode: number, body: unknown): HttpResponse {
 }
 
 class TestApp {
+  previewTabs = false;
+  previewRequestId = '';
   prompts: string[] = [];
   selects: string[] = [];
   activeWorkspaceId = '';
@@ -494,6 +497,7 @@ applyFeatures(
   requestPersistenceFeature,
   requestStateFeature,
   requestCrudFeature,
+  requestTabsFeature,
   examplesFeature,
   requestSerializationFeature,
   requestHeadersFeature,

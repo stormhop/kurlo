@@ -7,6 +7,7 @@ import { downloadTextFile } from '../../utils';
 export type KurloBackupPreferences = {
   autosave?: boolean;
   autosaveDelayMs?: number;
+  previewTabs?: boolean;
   appTheme?: AppTheme | AppThemeMode;
   shortcuts?: Record<string, string>;
   requestSettings?: Partial<RequestSettings>;
@@ -27,6 +28,7 @@ type DataBackupHost = {
   collectionImportToast: string;
   autosave: boolean;
   autosaveDelayMs: number;
+  previewTabs: boolean;
   appTheme: AppTheme;
   shortcutOverrides: Record<string, string>;
   proxyConfig: ProxyConfig;
@@ -47,6 +49,7 @@ type DataBackupHost = {
   setProxyConfig: (config: ProxyConfig) => void;
   setAutosave: (value: boolean) => void;
   setAutosaveDelay: (value: number) => void;
+  setPreviewTabs: (value: boolean) => void;
   isRecord: (value: unknown) => value is Record<string, unknown>;
   closeFloatingMenus: () => void;
   hasUnsavedRequestChanges: () => boolean;
@@ -86,6 +89,7 @@ export const dataBackupFeature = {
       preferences: {
         autosave: this.autosave,
         autosaveDelayMs: this.autosaveDelayMs,
+        previewTabs: this.previewTabs,
         appTheme: this.appTheme,
         shortcuts: { ...this.shortcutOverrides },
         requestSettings: this.currentRequestSettings(),
@@ -139,6 +143,7 @@ export const dataBackupFeature = {
     if (typeof preferences.autosaveDelayMs === 'number') {
       this.setAutosaveDelay(preferences.autosaveDelayMs);
     }
+    if (typeof preferences.previewTabs === 'boolean') this.setPreviewTabs(preferences.previewTabs);
   },
   async exportAllData(this: DataBackupHost) {
     this.closeFloatingMenus();

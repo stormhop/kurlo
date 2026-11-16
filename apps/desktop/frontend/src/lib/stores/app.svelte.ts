@@ -66,6 +66,7 @@ import { importExportFeature } from './features/importExport';
 import { examplesFeature, forgetLoadingExamples } from './features/examples';
 import { requestBodyFeature } from './features/requestBody';
 import { requestCrudFeature } from './features/requestCrud';
+import { requestTabsFeature } from './features/requestTabs';
 import { requestDirtyFeature } from './features/requestDirty';
 import { requestExecutionFeature } from './features/requestExecution';
 import { finishStarPrompt, loadStarPromptState, recordSuccessfulSend, starPromptDue } from '../starPrompt';
@@ -593,6 +594,12 @@ class AppVM {
   declare hasUnsavedRequestChanges: typeof requestCrudFeature.hasUnsavedRequestChanges;
   declare reviewDraftsBeforeQuit: typeof requestCrudFeature.reviewDraftsBeforeQuit;
   declare switchRequest: typeof requestCrudFeature.switchRequest;
+  declare loadRequestTabPreferences: typeof requestTabsFeature.loadRequestTabPreferences;
+  declare setPreviewTabs: typeof requestTabsFeature.setPreviewTabs;
+  declare setPreviewRequestId: typeof requestTabsFeature.setPreviewRequestId;
+  declare keepRequestTab: typeof requestTabsFeature.keepRequestTab;
+  declare requestTabNeedsKeeping: typeof requestTabsFeature.requestTabNeedsKeeping;
+  declare openRequestTab: typeof requestTabsFeature.openRequestTab;
   declare closeRequestTab: typeof requestCrudFeature.closeRequestTab;
   declare closeActiveRequestTab: typeof requestCrudFeature.closeActiveRequestTab;
   declare closeRequestTabs: typeof requestCrudFeature.closeRequestTabs;
@@ -1307,6 +1314,8 @@ class AppVM {
   environmentScopePinnedIds: string[] = [];
   environmentOutsideScopeId: string | null = null;
   openRequestIds = $state<string[]>([]);
+  previewTabs = $state(false);
+  previewRequestId = $state('');
   requestStoreLoaded = $state(false);
   folderCollapseState = $state<Record<string, boolean>>({});
   starredRequestIds = $state<Set<string>>(new Set());
@@ -1777,6 +1786,7 @@ class AppVM {
       this.requestStoreLoaded = true;
     }
     if (!requestStoreReadFailed) this.rememberLoadedRequestStore(loaded?.revision);
+    if (this.previewRequestId && !this.openRequestIds.includes(this.previewRequestId)) this.setPreviewRequestId('');
     const launchTopView = launching ? startupTopView(this.startupView, { workspaceBlocked: this.workspaceBlocked, hasActiveRequest: Boolean(this.activeRequestId) }) : null;
     if (launchTopView) {
       if (savedTopViewState?.sidebarView) this.sidebarView = savedTopViewState.sidebarView;
@@ -2140,6 +2150,7 @@ applyFeatures(
   examplesFeature,
   requestBodyFeature,
   requestCrudFeature,
+  requestTabsFeature,
   requestDirtyFeature,
   requestSerializationFeature,
   requestStateFeature,

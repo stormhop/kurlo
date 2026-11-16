@@ -113,6 +113,8 @@ type RequestPersistenceHost = {
   externalWorkspaceChangePending: boolean;
   folderCollapseState: Record<string, boolean>;
   openRequestIds: string[];
+  previewRequestId: string;
+  keepRequestTab: (id: string) => void;
   persistTimer: ReturnType<typeof setTimeout> | null;
   autosaveDelayMs: number;
   requestHistory: RequestHistoryEntry[];
@@ -421,6 +423,7 @@ export const requestPersistenceFeature = {
     }
     const id = this.activeRequestId;
     const current = this.snapshotActiveRequest({ forPersistence: true });
+    if (this.previewRequestId === id && this.requestDiffersFromStored(current)) this.keepRequestTab(id);
     const idx = this.requests.findIndex(r => r.id === id);
     if (!this.autosave && !forceDisk) {
       if (current.isDraft || this.draftRequestIds.has(id)) {
@@ -470,6 +473,7 @@ export const requestPersistenceFeature = {
     }
     const current = id === this.activeRequestId ? this.snapshotActiveRequest() : this.requestForEditing(id);
     if (!current || current.isDraft) return false;
+    if (this.previewRequestId === id && this.requestDiffersFromStored(current)) this.keepRequestTab(id);
     const updatedRequests = this.requests.map(r => r.id === id ? current : r);
     this.requests = updatedRequests;
     this.removeDirtyRequest(id);
@@ -525,6 +529,9 @@ export const requestPersistenceFeature = {
   scheduleActiveRequestPersist(this: RequestPersistenceHost) {
     if (this.workspaceBlocked) return;
     if (!this.requestStoreLoaded || this.applyingSavedRequest || !this.activeRequestId) return;
+    if (this.previewRequestId === this.activeRequestId && this.requestDiffersFromStored(this.snapshotActiveRequest({ forPersistence: true }))) {
+      this.keepRequestTab(this.activeRequestId);
+    }
     if (!this.autosave) {
       const id = this.activeRequestId;
       const isDraft = this.draftRequestIds.has(id) || (this.requestForEditing(id)?.isDraft ?? false);

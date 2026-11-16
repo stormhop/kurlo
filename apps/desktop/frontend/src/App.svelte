@@ -334,6 +334,13 @@
   });
 
   $effect(() => {
+    const id = vm.previewRequestId;
+    if (id && vm.requestStoreLoaded && (!vm.openRequestIds.includes(id) || vm.requestTabNeedsKeeping(id))) {
+      untrack(() => vm.keepRequestTab(id));
+    }
+  });
+
+  $effect(() => {
     vm.clampResponseSearchIndex();
   });
 
@@ -472,6 +479,7 @@
       vm.loadShortcutSettings();
       vm.loadAutosaveSettings();
       vm.loadStartupViewPreference();
+      vm.loadRequestTabPreferences();
       vm.loadProxyConfig();
       vm.loadScriptEngine();
       void vm.loadDefaultWorkspaceLocation();
@@ -722,6 +730,8 @@
       workspaces={vm.workspaces}
       activeWorkspaceId={vm.activeWorkspaceId}
       openRequests={vm.openRequestsForTabs}
+      previewRequestId={vm.previewRequestId}
+      keepRequestTab={vm.keepRequestTab}
       activeRequestId={vm.activeRequestId}
       activeWorkspaceEnvironments={vm.activeWorkspaceEnvironments}
       environmentMenu={vm.environmentMenu}

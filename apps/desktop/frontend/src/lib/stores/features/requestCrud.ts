@@ -69,6 +69,8 @@ type RequestCrudHost = {
   lastClosedRequestIds: string[];
   method: Method;
   openRequestIds: string[];
+  openRequestTab: (id: string) => void;
+  keepRequestTab: (id: string) => void;
   openRequestMenuId: string;
   rawBodyType: RawBodyType;
   renamingRequestId: string;
@@ -608,7 +610,7 @@ export const requestCrudFeature = {
     await this.persistActiveRequestNow();
     const next = this.requestForEditing(id);
     if (!next) return;
-    this.openRequestIds = [...new Set([...this.openRequestIds, id])];
+    this.openRequestTab(id);
     this.activeWorkspaceId = this.workspaceIdForCollection(next.collectionId);
     this.applySavedRequest(next);
     this.topView = 'request';
@@ -672,6 +674,7 @@ export const requestCrudFeature = {
     if (idx >= 0 && !isDraft) this.lastClosedRequestIds = [id, ...this.lastClosedRequestIds.filter(i => i !== id)].slice(0, 12);
     const nextOpenIds = this.openRequestIds.filter(oid => oid !== id);
     this.openRequestIds = nextOpenIds;
+    this.keepRequestTab(id);
     this.disposeRealtimeSession(id);
     if (id === this.activeRequestId) {
       const fallbackId = nextOpenIds[Math.max(0, idx - 1)] ?? nextOpenIds[0] ?? '';

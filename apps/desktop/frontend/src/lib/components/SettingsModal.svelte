@@ -90,7 +90,7 @@
   }
 
   const NAV_ITEMS: SettingsNavItem[] = [
-    { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave delay interval manual save default location workspace collection folder data export import backup script engine javascript tengo' },
+    { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave delay interval manual save preview tabs temporary reuse double click keep default location workspace collection folder data export import backup script engine javascript tengo' },
     { id: 'theme', label: 'Appearance', keywords: 'appearance theme dark light system color scheme zoom scale size interface text font bigger smaller' },
     { id: 'proxy', label: 'Proxy', keywords: 'proxy http https socks5 system bypass network hostname port credentials' },
     { id: 'ai', label: 'AI', keywords: 'ai agent model llm openrouter anthropic claude openai gpt key api byok ollama lm studio local connection' },
@@ -107,6 +107,8 @@
     appTheme,
     autosave,
     autosaveDelayMs = DEFAULT_AUTOSAVE_DELAY_MS,
+    previewTabs,
+    setPreviewTabs,
     startupView,
     setStartupView,
     scriptEngine,
@@ -147,6 +149,8 @@
     appTheme: AppTheme;
     autosave: boolean;
     autosaveDelayMs?: number;
+    previewTabs: boolean;
+    setPreviewTabs: (value: boolean) => void;
     startupView: StartupView;
     setStartupView: (value: StartupView) => void;
     scriptEngine: ScriptEngine;
@@ -761,7 +765,7 @@
         <div class="settings-body general-tab" id="settings-panel-general" role="tabpanel">
           {@render pageHead('General', 'How Kurlo saves your work, what it opens first and how scripts run.')}
 
-          {#if matchesQuery('Saving', 'autosave', 'manual save', 'Autosave delay', 'interval', 'On launch', 'startup start screen open request overview restore')}
+          {#if matchesQuery('Saving', 'autosave', 'manual save', 'Autosave delay', 'interval', 'Preview tabs', 'temporary reuse double click keep', 'On launch', 'startup start screen open request overview restore')}
             <section class="settings-block">
               <h4 class="settings-group-label">Editing</h4>
               <div class="settings-group">
@@ -801,6 +805,21 @@
                         <button class="segmented-item" type="button" role="radio" aria-checked={autosave} onclick={() => setAutosave(true)}>Autosave</button>
                         <button class="segmented-item" type="button" role="radio" aria-checked={!autosave} onclick={() => setAutosave(false)}>Manual save</button>
                       </div>
+                    </div>
+                  </div>
+                {/if}
+                {#if matchesQuery('Preview tabs', 'temporary reuse double click keep')}
+                  <div class="settings-row">
+                    <div class="settings-row-text">
+                      <span class="settings-row-title" id="settings-preview-tabs-title">Preview tabs</span>
+                      <span class="settings-row-desc" id="settings-preview-tabs-desc">Reuse one temporary request tab. Double-click, edit or run to keep it open.</span>
+                    </div>
+                    <div class="settings-row-control">
+                      <label class="switch-control">
+                        <input type="checkbox" checked={previewTabs} onchange={(event) => setPreviewTabs(inputChecked(event))} aria-labelledby="settings-preview-tabs-title" aria-describedby="settings-preview-tabs-desc" />
+                        <span class="switch-track"></span>
+                        <span class="switch-state">{previewTabs ? 'ON' : 'OFF'}</span>
+                      </label>
                     </div>
                   </div>
                 {/if}

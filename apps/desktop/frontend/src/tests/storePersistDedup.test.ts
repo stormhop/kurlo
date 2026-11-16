@@ -238,6 +238,7 @@ describe('closing a request tab', () => {
         });
       }),
       disposeRealtimeSession: vi.fn(),
+      keepRequestTab: vi.fn(),
       workspaceIdForCollection: () => 'w1',
       applySavedRequest: vi.fn((req: typeof other) => {
         order.push(`switched to ${req.id}`);
