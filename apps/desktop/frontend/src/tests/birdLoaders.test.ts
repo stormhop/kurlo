@@ -38,4 +38,16 @@ describe('loaders', () => {
     expect(loader).toMatch(/role="status" aria-label=\{label\}/);
     expect(loader).toMatch(/<KurloBird mode="flying"/);
   });
+
+  it('settles the perched bird instead of animating it forever', () => {
+    const bird = readFileSync(join(SRC, 'lib/components/KurloBird.svelte'), 'utf8');
+    const rules = (selector: string) => [...bird.matchAll(new RegExp(`${selector}[^{]*\\{[^}]*\\}`, 'g'))].map(match => match[0]).join('\n');
+    const perched = rules('\\.kurlo-bird-perched');
+    const flying = rules('\\.kurlo-bird-flying');
+    expect(perched).not.toMatch(/infinite/);
+    expect(perched).toMatch(/animation:\s*kurlo-bird-bob[^;]*\s3;/);
+    expect(perched).toMatch(/animation-iteration-count:\s*2/);
+    expect(flying).toMatch(/infinite/);
+    expect(bird).toMatch(/<svg[^>]*class="[^"]*kurlo-bird-bob/);
+  });
 });

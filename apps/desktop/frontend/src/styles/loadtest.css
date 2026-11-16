@@ -534,7 +534,7 @@
 .sidebar-loadtest-status.running {
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-dim);
-  animation: sidebar-loadtest-pulse 1.4s ease-in-out infinite;
+  animation: sidebar-loadtest-pulse 1.4s ease-in-out 3;
 }
 
 @keyframes sidebar-loadtest-pulse {

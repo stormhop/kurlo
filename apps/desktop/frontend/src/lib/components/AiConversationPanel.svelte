@@ -438,7 +438,7 @@
     height: 0.375rem;
     border-radius: var(--radius-full);
     background: var(--accent);
-    animation: ai-pulse 1.2s ease-in-out infinite;
+    animation: ai-pulse 1.2s ease-in-out 3;
   }
   .ai-metrics {
     display: inline-flex;
@@ -635,7 +635,7 @@
     margin-left: var(--space-0-5);
     vertical-align: -0.125rem;
     background: var(--accent);
-    animation: ai-blink 1s steps(1) infinite;
+    animation: ai-blink 1s steps(1) 6;
   }
   .ai-waiting {
     min-height: var(--control-sm);

@@ -17,13 +17,13 @@
 </script>
 
 <svg
-  class="kurlo-bird kurlo-bird-{mode} kurlo-bird-tone-{tone}"
+  class="kurlo-bird kurlo-bird-bob kurlo-bird-{mode} kurlo-bird-tone-{tone}"
   viewBox="220 290 580 {height}"
   style={`width: ${size}; aspect-ratio: 580 / ${height}`}
   aria-hidden="true"
   focusable="false"
 >
-  <g class="kurlo-bird-bob">
+  <g>
     {#if envelope}
       <g transform="translate(495 752) rotate(-5)">
         <rect class="kurlo-bird-envelope" x="-62" y="0" width="124" height="82" rx="6" />
@@ -86,10 +86,13 @@
     stroke-width: 6;
     stroke-linejoin: round;
   }
-  .kurlo-bird-perched .kurlo-bird-bob {
-    animation: kurlo-bird-bob 2.6s ease-in-out infinite;
+  .kurlo-bird-perched.kurlo-bird-bob {
+    animation: kurlo-bird-bob 2.6s ease-in-out 3;
   }
-  .kurlo-bird-flying .kurlo-bird-bob {
+  .kurlo-bird-perched .kurlo-bird-eye {
+    animation-iteration-count: 2;
+  }
+  .kurlo-bird-flying.kurlo-bird-bob {
     animation: kurlo-bird-bob 0.9s ease-in-out infinite;
   }
   .kurlo-bird-flying .kurlo-bird-wing {

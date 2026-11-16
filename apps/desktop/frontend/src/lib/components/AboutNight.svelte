@@ -73,12 +73,12 @@
     fill: #ffffff;
     transform-box: fill-box;
     transform-origin: center;
-    animation: about-night-blink 5s infinite;
+    animation: about-night-blink 5s 2;
   }
   .about-night-bird {
     transform-box: fill-box;
     transform-origin: 50% 100%;
-    animation: about-night-breathe 3.2s ease-in-out infinite;
+    animation: about-night-breathe 3.2s ease-in-out 3;
   }
 
   @keyframes about-night-blink {

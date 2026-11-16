@@ -42,6 +42,8 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   edits and `pm.globals.unset` keep what they should, and secret values in test names are masked.
 - **gRPC requests inherit collection auth**: **Inherit auth** now uses the collection's or nearest folder's credentials
   and is offered in the gRPC Auth tab.
+- **Idle windows stop burning CPU**: the perched bird and the status indicators settle after a few moves instead of
+  redrawing the window every frame.
 
 ## 3.1.2
 

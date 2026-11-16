@@ -104,7 +104,7 @@
   height: 0.5rem;
   border-radius: var(--radius-full);
   background: var(--success);
-  animation: mock-pulse 2.4s ease-out infinite;
+  animation: mock-pulse 2.4s ease-out 3;
 }
 
 @keyframes mock-pulse {

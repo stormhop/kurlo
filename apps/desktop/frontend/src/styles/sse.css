@@ -640,7 +640,7 @@
   border-radius: 50%;
   background: var(--s2xx);
   flex-shrink: 0;
-  animation: sse-pulse 1.2s ease-in-out infinite;
+  animation: sse-pulse 1.2s ease-in-out 3;
 }
 
 @keyframes sse-pulse {
