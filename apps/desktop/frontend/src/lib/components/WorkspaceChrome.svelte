@@ -20,6 +20,7 @@
     sidebarView = $bindable<SidebarView>('collections'),
     switcherDocked = false,
     defaultWorkspace,
+    overviewLabel = 'Overview',
     activeWorkspace,
     workspaces,
     activeWorkspaceId,
@@ -80,6 +81,7 @@
     sidebarView: SidebarView;
     switcherDocked?: boolean;
     defaultWorkspace: string;
+    overviewLabel?: string;
     activeWorkspace: Workspace | undefined;
     workspaces: Workspace[];
     activeWorkspaceId: string;
@@ -325,9 +327,9 @@
   <div class="request-tab-strip">
     <div class="saved-request-tabs" class:fade-start={tabsHiddenBefore} class:fade-end={tabsHiddenAfter} role="tablist" use:tabListKeyboard bind:this={tabListEl}>
       <div class="saved-request-tab overview-request-tab" class:active={topView === 'overview'}>
-        <button class="saved-request-tab-btn" role="tab" type="button" aria-label="Overview" aria-selected={topView === 'overview'} tabindex={topView === 'overview' ? 0 : -1} onclick={() => (topView = 'overview')}>
+        <button class="saved-request-tab-btn" role="tab" type="button" aria-label={overviewLabel} aria-selected={topView === 'overview'} tabindex={topView === 'overview' ? 0 : -1} onclick={() => (topView = 'overview')}>
           <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 15 15" fill="none" aria-hidden="true"><path d="M2 8.2h4.5M2 4.2h11M2 12.2h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-          <span class="tab-title">Overview</span>
+          <span class="tab-title">{overviewLabel}</span>
         </button>
       </div>
       {#if collectionRunnerOpen}

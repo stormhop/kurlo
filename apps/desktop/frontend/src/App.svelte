@@ -27,6 +27,8 @@
   import StatusBar from './lib/components/StatusBar.svelte';
   import WorkspaceChrome from './lib/components/WorkspaceChrome.svelte';
   import WorkspaceOverview from './lib/components/WorkspaceOverview.svelte';
+  import WelcomeWorkspace from './lib/components/WelcomeWorkspace.svelte';
+  import { WELCOME_SEEN_KEY, shouldShowWelcome } from './lib/welcome';
   import GlobalsWorkspace from './lib/components/GlobalsWorkspace.svelte';
   import HistoryDetail from './lib/components/HistoryDetail.svelte';
   import AgentWorkspace from './lib/components/AgentWorkspace.svelte';
@@ -37,7 +39,7 @@
   import type { SnippetLanguage } from './lib/stores/ui';
   import type { ResponseTab } from './lib/types/models';
   import type { LoadTest } from './lib/wire';
-  import { openExternalURL } from './lib/externalLinks';
+  import { KURLO_DOCS_URL, openExternalURL } from './lib/externalLinks';
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from './lib/response-render';
   import { tallyCollectionRun } from './lib/collectionRuns';
   import { announceShellResize } from './lib/shellResize';
@@ -70,6 +72,56 @@
   let whatsNewSection = $state<ChangelogSection | null>(null);
   let whatsNewSpotlight = $state(false);
   let agentSeen = $state(readAgentSeen());
+  let welcomeOpen = $state(false);
+  let welcomeWorkspaceId = $state('');
+
+  function showWelcome() {
+    dismissWhatsNew();
+    vm.topView = 'overview';
+    welcomeWorkspaceId = vm.activeWorkspaceId;
+    welcomeOpen = true;
+    writeStoredValue(WELCOME_SEEN_KEY, '1');
+  }
+
+  function dismissWelcome() {
+    welcomeOpen = false;
+  }
+
+  async function welcomeNewRequest(example = false) {
+    const reusableDraft = vm.activeRequest?.isDraft && !vm.draftWasEdited(vm.activeRequest);
+    if (reusableDraft) {
+      if (example) vm.url = 'https://httpbin.org/get';
+      vm.topView = 'request';
+      dismissWelcome();
+      return;
+    }
+    const previousId = vm.activeRequestId;
+    await vm.createDraftRequest('http');
+    if (vm.activeRequestId === previousId) return;
+    if (example) vm.url = 'https://httpbin.org/get';
+    dismissWelcome();
+  }
+
+  async function welcomeImport() {
+    const collections = vm.collections;
+    await vm.openPostmanImport();
+    if (vm.collections !== collections) dismissWelcome();
+  }
+
+  async function welcomeOpenWorkspace() {
+    const workspace = vm.activeWorkspace;
+    await vm.openGitWorkspace();
+    if (vm.gitError) {
+      dismissWelcome();
+      vm.openGitTab(false);
+    } else if (vm.activeWorkspace !== workspace) {
+      dismissWelcome();
+    }
+  }
+
+  $effect(() => {
+    if (vm.topView !== 'overview' || vm.activeWorkspaceId !== welcomeWorkspaceId) welcomeOpen = false;
+  });
 
   function readAgentSeen() {
     try {
@@ -496,9 +548,22 @@
       vm.initWorkspaceListeners();
       try {
         await vm.loadRequestWorkspace();
+        const forceWelcome = new URLSearchParams(window.location.search).get('welcome') === '1';
+        if (forceWelcome || shouldShowWelcome({
+          seen: readStoredFlag(WELCOME_SEEN_KEY) === '1',
+          lastSeenVersion: readStoredFlag(LAST_SEEN_VERSION_KEY),
+          requestCount: vm.requests.filter(request => !request.isDraft || vm.draftWasEdited(request)).length,
+          historyCount: vm.requestHistory.length,
+          environmentCount: vm.environments.length,
+          collectionCount: vm.collections.length,
+          workspaceCount: vm.workspaces.length,
+          blocked: vm.workspaceBlocked,
+        })) showWelcome();
+        else writeStoredValue(WELCOME_SEEN_KEY, '1');
       } finally {
         hideBootScreen();
       }
+      const welcomedOnStartup = welcomeOpen;
       void vm.loadCookieSyncStatus();
       const info = await getAppInfo();
       vm.appRuntime = info.runtime;
@@ -506,7 +571,11 @@
       setRuntimePlatform(info.runtime);
       if (!destroyed) uninstallQuitShortcut = installQuitShortcut(document.documentElement.dataset.platform ?? '');
       const updatePendingRestart = syncUpdateReadyForVersion(info.version);
-      void checkWhatsNew(info.version);
+      if (welcomedOnStartup) {
+        if (isReleaseVersion(info.version)) writeStoredValue(LAST_SEEN_VERSION_KEY, info.version);
+      } else {
+        void checkWhatsNew(info.version);
+      }
 
       if (info.version && info.version !== 'dev' && !updatePendingRestart) {
         updateCheckTimer = setTimeout(async () => {
@@ -587,6 +656,7 @@
   onUpdateInstalled={markUpdateReady}
   {whatsNewAvailable}
   onShowWhatsNew={showWhatsNew}
+  onShowWelcome={showWelcome}
 />
 
 {#if whatsNewSection}
@@ -733,6 +803,7 @@
       bind:sidebarView={vm.sidebarView}
       switcherDocked={runtimePlatform === 'darwin' && switcherInSidebar}
       defaultWorkspace={DEFAULT_WORKSPACE}
+      overviewLabel={welcomeOpen ? 'Welcome' : 'Overview'}
       activeWorkspace={vm.activeWorkspace}
       workspaces={vm.workspaces}
       activeWorkspaceId={vm.activeWorkspaceId}
@@ -787,7 +858,20 @@
       environmentValueCount={vm.environmentValueCount}
     />
 
-    {#if vm.topView === 'overview'}
+    {#if vm.topView === 'overview' && welcomeOpen}
+      <WelcomeWorkspace
+        shortcut={vm.shortcutCombo('new-request')}
+        appRuntime={vm.appRuntime}
+        workspaceBlocked={vm.workspaceBlocked}
+        onNewRequest={() => void welcomeNewRequest()}
+        onImport={() => void welcomeImport()}
+        onOpenWorkspace={() => void welcomeOpenWorkspace()}
+        onSetUpAgent={() => vm.openSettings('ai')}
+        onExample={() => void welcomeNewRequest(true)}
+        onDocumentation={() => openExternalURL(KURLO_DOCS_URL)}
+        onDismiss={dismissWelcome}
+      />
+    {:else if vm.topView === 'overview'}
       <WorkspaceOverview
         activeWorkspace={vm.activeWorkspace}
         workspaceBlocked={vm.workspaceBlocked}
@@ -1165,7 +1249,7 @@
           />
         {/if}
 
-        <div class="tab-content" class:body-editor-mode={(vm.requestTab === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || vm.requestType === 'ai' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (vm.requestTab === 'query' || vm.requestTab === 'schema'))}>
+        <div class="tab-content" class:script-editor-mode={vm.requestTab === 'scripts' && (vm.scriptTab !== 'assertions' || !requestTypeSupportsAssertions(vm.requestType))} class:body-editor-mode={(vm.requestTab === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || vm.requestType === 'ai' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (vm.requestTab === 'query' || vm.requestTab === 'schema'))}>
           {#if vm.requestTab === 'docs'}
             {#if lazy.DocsTabComponent}<lazy.DocsTabComponent />{/if}
           {:else if vm.requestTab === 'query'}

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
+import { chooseRequestSection, fillCodeEditor } from './support/actions';
 import { captureDocsScreenshot } from './support/screenshots';
 import { DOCS_VIEWPORT, docsScreenshotDir } from './support/config';
 
@@ -190,4 +191,46 @@ test('restores the preview preference and identity after a restart', async ({ pa
   await openRequest(page, 'Three');
   await expect(requestTabs(page)).toHaveText(['One', 'Three']);
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.openIds)).toEqual(['one', 'three']);
+});
+
+
+test('script editors fill resized panels and scroll throughout the available area', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await start(page, false);
+  await page.getByRole('button', { name: 'Show the response below the request', exact: true }).click();
+  await chooseRequestSection(page, 'Scripts');
+  const divider = page.getByRole('button', { name: 'Resize panels', exact: true });
+  const dragDivider = async (y: number) => {
+    const box = await divider.boundingBox();
+    if (!box) throw new Error('Panel divider is missing');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2, y, { steps: 8 });
+    await page.mouse.up();
+  };
+  await dragDivider(1000);
+  for (const [tab, id] of [['Pre-request', 'pre-request-script-editor'], ['Tests', 'test-script-editor']]) {
+    await page.locator('.script-section').getByRole('tab', { name: new RegExp(`^${tab}`) }).click();
+    await fillCodeEditor(page, id, Array.from({ length: 100 }, (_, i) => `console.log(${i + 1});`).join('\n'));
+    const scroller = page.getByTestId(id).locator('.cm-scroller');
+    const fillsPanel = () => scroller.evaluate(node => {
+      const panel = node.closest('.tab-content')!.getBoundingClientRect();
+      return Math.abs(node.getBoundingClientRect().bottom - panel.bottom) < 3;
+    });
+    await expect.poll(fillsPanel).toBe(true);
+    await scroller.evaluate(node => { node.scrollTop = 0; });
+    const box = await scroller.boundingBox();
+    if (!box) throw new Error('Script scroller is missing');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height - 30);
+    await page.mouse.wheel(0, 550);
+    await expect.poll(() => scroller.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
+    await page.screenshot({ path: join(tmpdir(), `kurlo-${id}-resized.png`), animations: 'disabled' });
+    const expandedHeight = await scroller.evaluate(node => node.clientHeight);
+    await dragDivider(550);
+    await expect.poll(() => scroller.evaluate(node => node.clientHeight)).toBeLessThan(expandedHeight - 100);
+    await expect.poll(fillsPanel).toBe(true);
+    await expect(scroller).toBeVisible();
+    await dragDivider(1000);
+    await expect.poll(fillsPanel).toBe(true);
+  }
 });

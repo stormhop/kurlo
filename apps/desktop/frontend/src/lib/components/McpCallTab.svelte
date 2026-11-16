@@ -283,6 +283,8 @@
   }
 
   .mcp-editor {
+    display: flex;
+    flex-direction: column;
     flex: 1 1 auto;
     min-height: 0;
     border: 1px solid var(--border);

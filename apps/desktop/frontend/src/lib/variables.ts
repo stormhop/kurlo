@@ -16,5 +16,5 @@ export function variableTemplate(key: string) {
 }
 
 export function isVariableReferenceOnly(value: string | undefined) {
-  return !!value && /^(\s*\{\{[^{}]+}}\s*)+$/.test(value);
+  return !!value && /^(\s*\{\{[^{}]+}})+\s*$/.test(value);
 }

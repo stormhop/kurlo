@@ -52,9 +52,10 @@ declare global {
   }
 }
 
-export async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 'browser/e2e', docsMode = Boolean(docsScreenshotDir), storeOverride: Record<string, unknown> | null = null) {
-  await page.addInitScript(({ largeResponseBody, runtime, docsMode, storeOverride }) => {
-    localStorage.clear();
+export async function installKurloBridge(page: Page, largeResponseBody = '', runtime = 'browser/e2e', docsMode = Boolean(docsScreenshotDir), storeOverride: Record<string, unknown> | null = null, options: { firstLaunch?: boolean; preserveStorage?: boolean } = {}) {
+  await page.addInitScript(({ largeResponseBody, runtime, docsMode, storeOverride, options }) => {
+    if (!options.preserveStorage) localStorage.clear();
+    if (!options.firstLaunch) localStorage.setItem('kurlo:welcome-seen', '1');
     localStorage.setItem('kurlo:agent-seen', '1');
     localStorage.setItem('kurlo.disclosure.settings-ai-agents', '1');
     localStorage.setItem('kurlo.disclosure.settings-ai-kurlo', '1');
@@ -1061,5 +1062,5 @@ export default function () {
       WindowSetDarkTheme: async () => { },
       WindowSetBackgroundColour: async () => { },
     };
-  }, { largeResponseBody, runtime, docsMode, storeOverride });
+  }, { largeResponseBody, runtime, docsMode, storeOverride, options });
 }

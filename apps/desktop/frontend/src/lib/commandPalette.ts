@@ -41,6 +41,7 @@ export type PaletteContext = {
   setResponseLayout: (layout: ResponseLayout) => unknown;
   setThemeMode: (mode: AppThemeMode) => unknown;
   showWhatsNew: () => unknown;
+  showWelcome?: () => unknown;
 };
 
 const GROUP_ORDER: PaletteGroup[] = ['Request', 'Create', 'Go to', 'View', 'Help'];
@@ -130,6 +131,9 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     commands.push({ id: `theme-${theme.mode}`, group: 'View', label: theme.label, keywords: 'appearance colour color mode', run: () => ctx.setThemeMode(theme.mode) });
   }
 
+  if (ctx.showWelcome) {
+    commands.push({ id: 'help-welcome', group: 'Help', label: 'Welcome screen', keywords: 'start onboarding getting started', run: ctx.showWelcome });
+  }
   if (ctx.whatsNewAvailable) {
     commands.push({ id: 'help-whats-new', group: 'Help', label: "What's new", keywords: 'release notes changelog', run: ctx.showWhatsNew });
   }

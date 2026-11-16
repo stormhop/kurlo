@@ -5,6 +5,17 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Welcome screen.** New profiles open a welcome screen with shortcuts for requests, imports and workspaces. Reopen it from the command palette.
+
+### Fixed
+
+- **Script editors fill the request panel.** Request, collection and folder script editors use the available height instead of leaving unused space below a fixed-height editor. Request scripts resize with the response panel. MCP arguments, YAML files and agent notes stay inside their visible scroll area.
+- **Auth fields stay responsive.** Crafted values containing many variable references no longer freeze the interface when opening request or collection authentication settings.
+
 ## [3.1.3] - 2026-11-16
 
 ### Added

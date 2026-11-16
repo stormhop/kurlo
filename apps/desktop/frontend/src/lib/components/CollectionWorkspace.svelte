@@ -540,7 +540,7 @@
 
 <svelte:document onpointerdowncapture={closeMoreMenuOnOutsidePointer} onkeydowncapture={closeMoreMenuOnEscape} />
 
-<section class="collection-workspace">
+<section class="collection-workspace" class:collection-script-mode={collectionSettingsTab === 'script' || collectionSettingsTab === 'tests'}>
   {#if collection}
     <div class="collection-workspace-head">
       <div class="overview-title">
@@ -906,18 +906,18 @@
           <div class="script-section collection-script-section">
             <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after the collection and parent folder scripts, before each request’s own pre-request script' : 'runs before each request\'s own pre-request script'}</span></div>
             {#if scriptEngine === 'js'}
-              <CodeEditor bind:value={preRequestScriptJs} language="javascript" placeholder={'// Collection pre-request script (JavaScript) pm.variables.set("traceId", "kurlo-001")'} minHeight="17.5rem" maxHeight="32.5rem" />
+              <CodeEditor bind:value={preRequestScriptJs} language="javascript" placeholder={'// Collection pre-request script (JavaScript) pm.variables.set("traceId", "kurlo-001")'} fillHeight />
             {:else}
-              <CodeEditor bind:value={preRequestScript} language="javascript" placeholder={'// Collection pre-request script (Tengo) pm.variables.set("traceId", "kurlo-001")'} minHeight="17.5rem" maxHeight="32.5rem" />
+              <CodeEditor bind:value={preRequestScript} language="javascript" placeholder={'// Collection pre-request script (Tengo) pm.variables.set("traceId", "kurlo-001")'} fillHeight />
             {/if}
           </div>
         {:else if collectionSettingsTab === 'tests'}
           <div class="script-section collection-script-section">
             <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after each request’s own test script, before the parent folder and collection tests' : 'runs after each request\'s own test script, after the response arrives'}</span></div>
             {#if scriptEngine === 'js'}
-              <CodeEditor bind:value={testScriptJs} language="javascript" placeholder={'// Collection test script (JavaScript) pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} minHeight="17.5rem" maxHeight="32.5rem" />
+              <CodeEditor bind:value={testScriptJs} language="javascript" placeholder={'// Collection test script (JavaScript) pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} fillHeight />
             {:else}
-              <CodeEditor bind:value={testScript} language="javascript" placeholder={'// Collection test script (Tengo) pm.test("No server error", pm.response.code < 500)'} minHeight="17.5rem" maxHeight="32.5rem" />
+              <CodeEditor bind:value={testScript} language="javascript" placeholder={'// Collection test script (Tengo) pm.test("No server error", pm.response.code < 500)'} fillHeight />
             {/if}
           </div>
         {:else if collectionSettingsTab === 'openapi'}

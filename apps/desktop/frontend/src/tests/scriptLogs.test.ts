@@ -24,6 +24,28 @@ describe('isVariableReferenceOnly', () => {
     expect(isVariableReferenceOnly('eyJhbGciOi')).toBe(false);
     expect(isVariableReferenceOnly('')).toBe(false);
   });
+
+  it.each([
+    ['\t{{token}}\n {{other}}\r\n', true],
+    ['{{ token with spaces }}', true],
+    ['{{ }}', true],
+    [undefined, false],
+    [' \t\n', false],
+    ['{{}}', false],
+    ['{{{token}}}', false],
+    ['{{token}', false],
+    ['{{token}}suffix', false],
+    ['{{token}} {{}}', false],
+  ])('checks the complete value %j', (value, expected) => {
+    expect(isVariableReferenceOnly(value)).toBe(expected);
+  });
+
+  it('handles long variable sequences and whitespace without backtracking', () => {
+    const references = '{{token}} '.repeat(10000);
+    expect(isVariableReferenceOnly(references)).toBe(true);
+    expect(isVariableReferenceOnly(`${references}!`)).toBe(false);
+    expect(isVariableReferenceOnly(`${' '.repeat(100000)}!`)).toBe(false);
+  }, 1000);
 });
 
 describe('scriptLogPreview', () => {

@@ -67,8 +67,7 @@
       bind:value={vm.activePreRequestScript}
       language="javascript"
       placeholder={prePlaceholder}
-      minHeight="8.75rem"
-      maxHeight="15rem"
+      fillHeight
       testId="pre-request-script-editor"
       ariaLabel="Pre-request script editor"
     />
@@ -93,8 +92,7 @@
       bind:value={vm.activeTestScript}
       language="javascript"
       placeholder={testPlaceholder}
-      minHeight="8.75rem"
-      maxHeight="15rem"
+      fillHeight
       testId="test-script-editor"
       ariaLabel="Test script editor"
     />

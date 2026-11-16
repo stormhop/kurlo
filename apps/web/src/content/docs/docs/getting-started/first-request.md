@@ -10,6 +10,8 @@ This walkthrough takes about five minutes. By the end you'll have:
 3. An environment with a base URL variable.
 4. A test script asserting the response.
 
+On a new profile, the **Welcome to Kurlo** screen offers **New request**, **Import a collection**, and **Open a workspace**. **Try an example** opens a `GET https://httpbin.org/get` draft; click **Send** when you're ready. You can skip the screen and reopen it later with `Cmd/Ctrl K` → **Welcome screen**.
+
 ## 1. Create a workspace
 
 Workspaces are top-level containers — think one per project or per client. On first launch Kurlo creates a **Default** workspace; you can rename it or add more from the workspace switcher in the top-left.

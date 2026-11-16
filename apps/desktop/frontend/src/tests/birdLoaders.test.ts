@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { parse } from 'svelte/compiler';
 import { describe, expect, it } from 'vitest';
 
 const SRC = join(import.meta.dirname, '..');
@@ -14,10 +15,16 @@ function walk(dir: string, pattern: RegExp): string[] {
 }
 
 function markup(source: string) {
-  return source.replace(/<script[^>]*>[\s\S]*?<\/script>/g, '').replace(/<style[^>]*>[\s\S]*?<\/style>/g, '');
+  return parse(source, { modern: true }).fragment.nodes.map(node => source.slice(node.start, node.end)).join('\n');
 }
 
 describe('loaders', () => {
+  it('checks markup without script or style contents', () => {
+    const source = '<script lang="ts">const caption: string = "Loading…";</script><style>div::before { content: "Loading…"; }</style><div>Ready</div>';
+    expect(markup(source)).toBe('<div>Ready</div>');
+    expect(markup('<div>Loading…</div>')).toMatch(LOADING_TEXT);
+  });
+
   it('uses the flying bird instead of spinners', () => {
     const offenders = walk(SRC, /\.(svelte|css)$/)
       .filter(file => /class="[^"]*\bspinner\b|\.spinner\b|-spinner\b(?![-\w]*bird)|@keyframes (sse-)?spin\b/.test(readFileSync(file, 'utf8').replace(/bird-spinner/g, '')))

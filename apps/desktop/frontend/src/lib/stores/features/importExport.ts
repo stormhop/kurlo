@@ -12,10 +12,9 @@ import { downloadTextFile, safeFileName } from '../../utils';
 import { requestsHaveExportSecrets } from '../../secretExport';
 import { flattenedEnvironment } from '../../environmentInheritance';
 import type { OpenApiExportFormat } from '../../openapi';
+import type { DialogOption } from '../../types/dialog';
 
 type ImportedCollectionDefaults = { variables?: KVRow[]; auth?: import('../../types/models').AuthState };
-
-type DialogOptionInput = { value: string; label: string; icon?: string; description?: string };
 
 export function normalizeSpecUrl(raw: string): string {
   const trimmed = raw.trim();
@@ -105,9 +104,9 @@ type ImportExportHost = {
   _postmanImportInput: HTMLInputElement | undefined;
   guardWorkspaceWritable: (action?: string) => boolean;
   closeFloatingMenus: () => void;
-  openSelectDialog: (title: string, message: string, options: DialogOptionInput[], confirmLabel?: string, cancelLabel?: string) => Promise<string>;
+  openSelectDialog: (title: string, message: string, options: DialogOption[], confirmLabel?: string, cancelLabel?: string) => Promise<string | false | null>;
   openAlertDialog: (title: string, message: string) => Promise<void>;
-  openPromptDialog: (title: string, initialValue?: string, message?: string, placeholder?: string, confirmLabel?: string) => Promise<string>;
+  openPromptDialog: (title: string, initialValue?: string, message?: string, placeholder?: string, confirmLabel?: string) => Promise<string | null>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: (nextRequests?: SavedRequest[], activeId?: string, nextOpenIds?: string[], nextWorkspaces?: Workspace[], nextCollections?: Collection[], workspaceId?: string, nextHistory?: RequestHistoryEntry[], nextEnvironments?: Environment[], nextActiveEnvId?: string) => Promise<boolean>;
   applySavedRequest: (req: SavedRequest) => void;

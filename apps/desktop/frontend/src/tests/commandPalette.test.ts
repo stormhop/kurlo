@@ -59,6 +59,14 @@ describe('parsePaletteQuery', () => {
 });
 
 describe('buildPaletteCommands', () => {
+  it('reopens the welcome screen through Help', () => {
+    const showWelcome = vi.fn();
+    const command = buildPaletteCommands(context({ showWelcome })).find(item => item.id === 'help-welcome');
+    expect(command?.group).toBe('Help');
+    command?.run();
+    expect(showWelcome).toHaveBeenCalledOnce();
+  });
+
   it('offers request commands only with a request open', () => {
     expect(ids(context())).toContain('request-send');
     const without = ids(context({ hasActiveRequest: false }));

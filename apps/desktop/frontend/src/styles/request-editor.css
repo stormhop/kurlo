@@ -1245,6 +1245,23 @@
   flex-direction: column;
 }
 
+.tab-content.script-editor-mode {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.script-editor-mode > .script-section {
+  flex: 1;
+  min-height: 0;
+}
+
+.script-editor-mode .script-head,
+.script-editor-mode .script-ref {
+  flex-shrink: 0;
+}
+
 .script-head {
   display: flex;
   align-items: center;

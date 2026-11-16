@@ -7,7 +7,7 @@
     size = '3rem',
     tone = 'brand',
   }: {
-    mode?: 'perched' | 'flying';
+    mode?: 'perched' | 'flying' | 'still';
     envelope?: boolean;
     size?: string;
     tone?: 'brand' | 'current';
@@ -85,6 +85,9 @@
     stroke: #b9ad93;
     stroke-width: 6;
     stroke-linejoin: round;
+  }
+  .kurlo-bird-still .kurlo-bird-eye {
+    animation: none;
   }
   .kurlo-bird-perched.kurlo-bird-bob {
     animation: kurlo-bird-bob 2.6s ease-in-out 3;

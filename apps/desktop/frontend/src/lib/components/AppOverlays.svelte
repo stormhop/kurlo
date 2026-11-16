@@ -39,6 +39,7 @@
     onUpdateInstalled: (info: UpdateInfo) => void;
     whatsNewAvailable: boolean;
     onShowWhatsNew: () => void;
+    onShowWelcome: () => void;
   };
 
   let {
@@ -51,6 +52,7 @@
     onUpdateInstalled,
     whatsNewAvailable,
     onShowWhatsNew,
+    onShowWelcome,
   }: Props = $props();
 
   let paletteCommands = $derived(vm.globalSearchOpen ? buildPaletteCommands({
@@ -85,6 +87,7 @@
     setResponseLayout: (layout) => vm.setResponseLayout(layout),
     setThemeMode: (mode) => vm.setThemeMode(mode),
     showWhatsNew: onShowWhatsNew,
+    showWelcome: onShowWelcome,
   }) : []);
 </script>
 

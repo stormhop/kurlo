@@ -1296,6 +1296,8 @@
 }
 
 .yaml-editor-body {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -4070,8 +4072,25 @@
   min-height: 22.5rem;
 }
 
+.collection-workspace.collection-script-mode {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.collection-script-mode > .collection-workspace-head,
+.collection-script-mode .collection-tabs,
+.collection-script-mode .script-head {
+  flex-shrink: 0;
+}
+
+.collection-script-mode .collection-settings-shell,
+.collection-script-mode .collection-settings-content,
 .collection-script-section {
-  min-height: 26.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .collection-proxy-section {
