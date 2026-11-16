@@ -23,6 +23,9 @@ func importCurl(content string) (map[string]any, error) {
 	getData, binary, rawData := false, false, false
 	data := []string{}
 	for i := 1; i < len(words); i++ {
+		if expanded, ok := expandCurlShortCluster(words[i]); ok {
+			words = append(append(append([]string{}, words[:i]...), expanded...), words[i+1:]...)
+		}
 		flag, value, inline := strings.Cut(words[i], "=")
 		if !strings.HasPrefix(flag, "-") {
 			if target != "" {
@@ -251,4 +254,28 @@ func curlShellWords(input string) ([]string, error) {
 	}
 	flush()
 	return words, nil
+}
+
+const curlShortBooleanFlags = "GkLsSvfgi"
+
+const curlShortValueFlags = "XHduFbAxmTo"
+
+func expandCurlShortCluster(word string) ([]string, bool) {
+	if len(word) <= 2 || !strings.HasPrefix(word, "-") || strings.HasPrefix(word, "--") {
+		return nil, false
+	}
+	expanded := make([]string, 0, len(word)-1)
+	for i := 1; i < len(word); i++ {
+		flag := word[i]
+		if strings.ContainsRune(curlShortBooleanFlags, rune(flag)) {
+			expanded = append(expanded, "-"+string(flag))
+			continue
+		}
+		if strings.ContainsRune(curlShortValueFlags, rune(flag)) {
+			expanded = append(expanded, "-"+word[i:])
+			break
+		}
+		return nil, false
+	}
+	return expanded, len(expanded) > 1
 }

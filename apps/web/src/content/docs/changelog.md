@@ -51,6 +51,8 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 - **`kurlo run` fixes**: flags around the workspace folder, environments scoped to their workspace, `--export-globals`
   with script values, UTF-8 BOM in data files, `--verbose` script output and masked secrets in reports. See
   [CLI runner](/docs/guides/cli-runner/).
+- **`kurlo mcp` fixes**: combined curl flags import, echoed secret headers are masked, and `kurlo mcp install` rejects
+  an unknown `--env`. See [MCP server](/docs/guides/mcp-server/).
 
 ## 3.1.2
 

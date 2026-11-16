@@ -81,6 +81,20 @@ func readTestFile(t *testing.T, path string) string {
 	return string(data)
 }
 
+func TestMCPInstallValidatesTheEnvironmentAgainstTheWorkspace(t *testing.T) {
+	host := newFakeMCPInstallHost(t, "darwin")
+	workspace := writeYAMLWorkspace(t, "http://127.0.0.1:1")
+
+	out, code := runInstallForTest(t, host, []string{"cursor", "--dry-run", "--workspace", workspace, "--env", "Ghost"}, false)
+	if code == 0 || !strings.Contains(out, "Ghost") {
+		t.Fatalf("an unknown environment should fail the install:\ncode %d\n%s", code, out)
+	}
+	out, code = runInstallForTest(t, host, []string{"cursor", "--dry-run", "--workspace", workspace, "--env", "Local"}, false)
+	if code != 0 {
+		t.Fatalf("a known environment should install:\ncode %d\n%s", code, out)
+	}
+}
+
 func TestMCPInstallSetsUpEveryClientItFinds(t *testing.T) {
 	host := newFakeMCPInstallHost(t, "darwin")
 	host.paths["claude"] = "/usr/local/bin/claude"

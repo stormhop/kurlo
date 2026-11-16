@@ -261,6 +261,15 @@ func mcpInstallLaunch(opts mcpInstallOptions, host *mcpInstallHost) (mcpLaunch, 
 	if err != nil {
 		return mcpLaunch{}, err
 	}
+	if opts.env != "" && workspace != "" {
+		workspacePath := workspace
+		if !filepath.IsAbs(workspacePath) {
+			workspacePath = filepath.Join(host.cwd, workspacePath)
+		}
+		if err := validateMCPInstallEnvironment(workspacePath, opts.env); err != nil {
+			return mcpLaunch{}, err
+		}
+	}
 	if workspace != "" {
 		args = append(args, workspace)
 	}
@@ -283,6 +292,19 @@ func mcpInstallLaunch(opts mcpInstallOptions, host *mcpInstallHost) (mcpLaunch, 
 		return mcpLaunch{command: "npx", args: append([]string{"-y", mcpNpmPackage}, args...)}, nil
 	}
 	return mcpLaunch{command: command, args: args}, nil
+}
+
+func validateMCPInstallEnvironment(workspace, env string) error {
+	_, _, _, environments, err := loadCLIWorkspace(workspace)
+	if err != nil || len(environments) == 0 {
+		return nil
+	}
+	for _, candidate := range environments {
+		if strings.EqualFold(strings.TrimSpace(candidate.Name), strings.TrimSpace(env)) {
+			return nil
+		}
+	}
+	return fmt.Errorf("environment %q not found in %s (available: %s)", env, workspace, environmentNames(environments))
 }
 
 func mcpInstalledAppCandidates(home string) []string {
