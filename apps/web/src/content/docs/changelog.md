@@ -15,6 +15,10 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Script output you cannot miss**: a failing script puts a red banner above the response body and a count on the
+  **Scripts** tab, the output stays visible under "Could not send request", `console.warn` / `console.error` are
+  coloured, every `pm.sendRequest` call is logged, and long or dropped log lines are marked. See
+  [Logging](/docs/reference/scripting-api/#logging).
 - **`{{variables}}` in every auth field**: auth fields suggest variables after `{{` and flag undefined ones; a secret
   field holding only `{{token}}` shows it as text. See [Authentication](/docs/guides/authentication/#bearer-token).
 

@@ -861,3 +861,33 @@
 .status-left > * {
   flex-shrink: 0;
 }
+.script-error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--s5xx);
+  background: var(--danger-bg);
+  border-bottom-color: var(--danger-border);
+}
+.script-error-banner > span {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  word-break: break-word;
+}
+.request-error-scripts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  color: var(--text);
+  text-align: left;
+  cursor: auto;
+}
+.response-placeholder.error.has-script-output {
+  justify-content: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: none;
+  padding-block: var(--space-6);
+}

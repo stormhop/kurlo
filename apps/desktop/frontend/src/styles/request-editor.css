@@ -2177,3 +2177,21 @@
 .variable-input-wrap.has-var-highlights .field-input {
   background: transparent;
 }
+.script-log-row.log-request .log-icon { color: var(--accent-text); }
+.script-log-row.log-warn .log-icon,
+.script-log-row.log-warn .log-msg { color: var(--s4xx); }
+.script-log-row.log-error .log-icon,
+.script-log-row.log-error .log-msg { color: var(--s5xx); }
+.log-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.log-body .log-msg {
+  white-space: pre-wrap;
+}
+.log-toggle {
+  font-family: var(--font-ui);
+}

@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Script output you cannot miss.** When a pre-request or post-response script throws, a red banner with the error appears above the response body, with **Open Scripts** to jump to the output, and the **Scripts** tab counts the errors. When the request could not be sent at all — a failing pre-request script or a network error — the script output is shown under the error instead of disappearing. `console.warn` and `console.error` lines are coloured, every `pm.sendRequest` call logs its method, URL, status and time or why it failed, a log past the 200-line limit says how many lines were left out, and a line over 600 characters or 8 lines folds behind **Show all**.
 - **`{{variables}}` in every auth field.** Auth fields on requests and collections suggest variables as you type `{{` and underline undefined ones. A secret field holding only a variable, such as `{{token}}`, is shown as text instead of dots.
 
 ### Fixed

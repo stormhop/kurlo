@@ -1291,7 +1291,6 @@
           bind:responseSearchOpen={vm.responseSearchOpen}
           bind:responseSearch={vm.responseSearch}
           bind:responseSearchIndex={vm.responseSearchIndex}
-          responseTestSummary={vm.responseTestSummary}
           responseDiffSummary={vm.responseDiff()}
           diffBaseline={vm.diffBaselineResponse()}
           diffBaselineLabel={vm.diffBaselineLabel()}

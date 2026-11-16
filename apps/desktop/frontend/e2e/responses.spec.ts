@@ -588,3 +588,107 @@ test.describe('Script results', () => {
   });
 });
 
+test('surfaces script errors, console levels and pm.sendRequest calls', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false);
+  await page.goto('/');
+  await page.evaluate(() => {
+    (window as E2EWindow).go.api.App.SendRequest = async () => ({
+      statusCode: 200, status: '200 OK', headers: [], body: '{}', duration: 12, size: 2,
+      preRequestResult: {
+        tests: [],
+        logs: ['token fetched', '[request] pm.sendRequest POST https://auth.kurlo.test/token → 415 Unsupported Media Type · 4 ms', '[warn] retrying', '[error] login failed'],
+        error: 'TypeError: Cannot read properties of undefined (reading \'access_token\')',
+      },
+      testResult: { tests: [], logs: [] },
+    });
+  });
+  await page.getByLabel('New unsaved request').click();
+  await page.getByLabel('Request URL').fill('https://api.kurlo.test/me');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+  const banner = page.locator('.script-error-banner');
+  await expect(banner).toContainText('Pre-request script failed: TypeError');
+  const scriptsTab = page.locator('.tab-script');
+  await expect(scriptsTab.locator('.badge')).toHaveText('2');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-error-banner.png'), animations: 'disabled' });
+
+  await banner.getByRole('button', { name: 'Open Scripts' }).click();
+  await expect(scriptsTab).toHaveAttribute('aria-selected', 'true');
+  const rows = page.locator('.script-log-row');
+  await expect(rows).toHaveCount(4);
+  expect(await rows.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-level')))).toEqual(['log', 'request', 'warn', 'error']);
+  await expect(rows.nth(3)).toContainText('login failed');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-console.png'), animations: 'disabled' });
+});
+
+test('keeps the script output visible when a failing pre-request script stops the send', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false);
+  await page.goto('/');
+  await page.evaluate(() => {
+    (window as E2EWindow).go.api.App.SendRequest = async () => ({
+      statusCode: 0, status: '', headers: [], body: '', duration: 0, size: 0, timings: {}, connection: {},
+      error: 'pre-request script failed: ReferenceError: undefinedFn is not defined',
+      preRequestResult: {
+        tests: [],
+        logs: ['старт', '[warn] предупреждение', '[error] ошибка в логике', '[warn] pm.sendRequest POST https://httpbin.org/status/415 → 415 Unsupported Media Type · 310 ms', '[error] pm.sendRequest GET https://127.0.0.1:1 failed: connection refused'],
+        error: 'ReferenceError: undefinedFn is not defined',
+      },
+      testResult: { tests: [], logs: [] },
+    });
+  });
+  await page.getByLabel('New unsaved request').click();
+  await page.getByLabel('Request URL').fill('https://httpbin.org/get');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+  await expect(page.getByText('Could not send request')).toBeVisible();
+  const output = page.getByLabel('Script output');
+  await expect(output).toContainText('ReferenceError: undefinedFn is not defined');
+  const rows = output.locator('.script-log-row');
+  expect(await rows.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-level')))).toEqual(['log', 'warn', 'error', 'warn', 'error']);
+  await expect(rows.nth(3)).toContainText('415 Unsupported Media Type');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-output-on-send-error.png'), animations: 'disabled' });
+  await rows.nth(4).scrollIntoViewIfNeeded();
+  await expect(rows.nth(4)).toBeInViewport();
+  await expect(page.locator('.response-placeholder.error')).toHaveCSS('overflow-y', 'auto');
+});
+
+test('collapses long script log lines and reports dropped ones', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false);
+  await page.goto('/');
+  await page.evaluate(() => {
+    const big = JSON.stringify(Array.from({ length: 3000 }, (_, id) => ({ id, name: `item-${id}`, tags: ['a', 'b', 'c'] })));
+    const pretty = JSON.stringify({ user: { id: 42, roles: ['admin', 'dev'], profile: { city: 'Riga', zip: '1010', phone: '+371' } }, ok: true }, null, 2);
+    (window as E2EWindow).go.api.App.SendRequest = async () => ({
+      statusCode: 200, status: '200 OK', headers: [], body: '{}', duration: 12, size: 2,
+      preRequestResult: {
+        tests: [],
+        logs: ['short line', `большой JSON: ${big}`, pretty, '[warn] 50 more log lines were not shown: a script keeps its first 200 log lines'],
+      },
+      testResult: { tests: [], logs: [] },
+    });
+  });
+  await page.getByLabel('New unsaved request').click();
+  await page.getByLabel('Request URL').fill('https://api.kurlo.test/me');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await page.locator('.tab-script').click();
+
+  const rows = page.locator('.script-log-row');
+  await expect(rows).toHaveCount(4);
+  await expect(rows.nth(0).getByRole('button')).toHaveCount(0);
+  const bigRow = rows.nth(1);
+  const toggle = bigRow.getByRole('button', { name: /^Show all · / });
+  await expect(toggle).toBeVisible();
+  expect((await bigRow.locator('.log-msg').textContent())!.length).toBeLessThan(700);
+  await expect(rows.nth(2).getByRole('button', { name: /^Show all/ })).toBeVisible();
+  await expect(rows.nth(2).locator('.log-msg')).toContainText('"roles": [');
+  await expect(rows.nth(3)).toHaveAttribute('data-level', 'warn');
+  await expect(rows.nth(3)).toContainText('50 more log lines were not shown');
+  await page.setViewportSize({ width: 1280, height: 1200 });
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-log-collapsed.png'), animations: 'disabled' });
+
+  await toggle.click();
+  expect((await bigRow.locator('.log-msg').textContent())!.length).toBeGreaterThan(100000);
+  await expect(bigRow.getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+  await bigRow.getByRole('button', { name: 'Show less' }).click();
+  expect((await bigRow.locator('.log-msg').textContent())!.length).toBeLessThan(700);
+});

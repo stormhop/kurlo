@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ScriptResults from './ScriptResults.svelte';
+  import { scriptProblemCount } from '../scriptLogs';
   import { untrack } from 'svelte';
   import { vm } from '../stores/app.svelte';
   import Keycaps from './Keycaps.svelte';
@@ -24,7 +26,6 @@
     responseSearchOpen = $bindable(false),
     responseSearch = $bindable(''),
     responseSearchIndex = $bindable(0),
-    responseTestSummary,
     responseDiffSummary = null,
     diffBaseline = null,
     diffBaselineLabel = 'previous',
@@ -64,7 +65,6 @@
     responseSearchOpen: boolean;
     responseSearch: string;
     responseSearchIndex: number;
-    responseTestSummary: { passed: number; total: number; allPassed: boolean } | null;
     responseDiffSummary?: ResponseDiff | null;
     diffBaseline?: HttpResponse | null;
     diffBaselineLabel?: string;
@@ -109,6 +109,25 @@
     return count === 1 ? '1 match' : `${count} matches`;
   });
   let responsePreview = $derived(responsePreviewFor(response));
+
+  function testSummaryFor(tests: Array<{ passed: boolean }>) {
+    if (!tests.length) return null;
+    const passed = tests.filter(test => test.passed).length;
+    return { passed, total: tests.length, allPassed: passed === tests.length };
+  }
+
+  let preRequestTests = $derived(response?.preRequestResult?.tests ?? []);
+  let scriptProblems = $derived(scriptProblemCount(response?.preRequestResult, response?.testResult));
+  let scriptLogCount = $derived((response?.preRequestResult?.logs?.length ?? 0) + (response?.testResult?.logs?.length ?? 0));
+  let hasScriptOutput = $derived(Boolean(scriptProblems || scriptLogCount || response?.preRequestResult?.tests?.length || response?.testResult?.tests?.length));
+  let scriptErrorMessage = $derived(
+    response?.preRequestResult?.error
+      ? `Pre-request script failed: ${response.preRequestResult.error}`
+      : response?.testResult?.error
+        ? `Post-response script failed: ${response.testResult.error}`
+        : '',
+  );
+  let allTestSummary = $derived(testSummaryFor([...preRequestTests, ...(response?.testResult?.tests ?? [])]));
   let browserHiddenHeaders = $derived(new Set((response?.browserHiddenHeaders ?? []).map(name => name.toLowerCase())));
   let binaryBodyDescription = $derived.by(() => {
     const type = response?.bodySniffedType || responseMediaType(response as HttpResponse);
@@ -186,7 +205,7 @@
     </div>
 
   {:else if requestError}
-    <div class="response-placeholder error" role="textbox" aria-readonly="true" tabindex="0">
+    <div class="response-placeholder error" class:has-script-output={hasScriptOutput} role="textbox" aria-readonly="true" tabindex="0">
       <div class="request-error-shell">
         <div class="request-error-title">Could not send request</div>
         <div class="request-error-card">
@@ -196,6 +215,11 @@
           </svg>
           <span>{requestError}</span>
         </div>
+        {#if hasScriptOutput}
+          <div class="request-error-scripts" aria-label="Script output">
+            <ScriptResults preRequestResult={response?.preRequestResult} testResult={response?.testResult} />
+          </div>
+        {/if}
       </div>
     </div>
 
@@ -207,8 +231,8 @@
         </span>
         <ResponseTimeTooltip timings={response.timings} total={response.duration} />
         <span class="status-meta">{formatSize(response.size)}</span>
-        {#if responseTestSummary}
-          <span class="test-summary-pill" class:all-passed={responseTestSummary.allPassed}>{responseTestSummary.passed}/{responseTestSummary.total} tests</span>
+        {#if allTestSummary}
+          <span class="test-summary-pill" class:all-passed={allTestSummary.allPassed}>{allTestSummary.passed}/{allTestSummary.total} tests</span>
         {/if}
       </div>
       <div class="status-right">
@@ -296,11 +320,15 @@
         {#if response.timeline?.length || response.sentRequests?.length}
           <button class="tab" role="tab" class:active={responseTab === 'timeline'} aria-selected={responseTab === 'timeline'} aria-controls="response-panel-timeline" tabindex={responseTab === 'timeline' ? 0 : -1} onclick={() => setResponseTab('timeline')} type="button">Timeline</button>
         {/if}
-        {#if response.testResult?.tests?.length || response.preRequestResult?.logs?.length || response.testResult?.logs?.length || response.preRequestResult?.error || response.testResult?.error}
+        {#if response.testResult?.tests?.length || response.preRequestResult?.tests?.length || response.preRequestResult?.logs?.length || response.testResult?.logs?.length || response.preRequestResult?.error || response.testResult?.error}
           <button role="tab" class:active={responseTab === 'test-results'} class="tab tab-script" aria-selected={responseTab === 'test-results'} aria-controls="response-panel-scripts" tabindex={responseTab === 'test-results' ? 0 : -1} onclick={() => setResponseTab('test-results')} type="button">
             Scripts
-            {#if responseTestSummary}
-              <span class="badge" class:badge-pass={responseTestSummary.allPassed} class:badge-fail={!responseTestSummary.allPassed}>{responseTestSummary.passed}/{responseTestSummary.total}</span>
+            {#if scriptProblems}
+              <span class="badge badge-fail" aria-label={`${scriptProblems} script ${scriptProblems === 1 ? 'error' : 'errors'}`}>{scriptProblems}</span>
+            {:else if allTestSummary}
+              <span class="badge" class:badge-pass={allTestSummary.allPassed} class:badge-fail={!allTestSummary.allPassed}>{allTestSummary.passed}/{allTestSummary.total}</span>
+            {:else if scriptLogCount}
+              <span class="badge">{scriptLogCount}</span>
             {/if}
           </button>
         {/if}
@@ -312,6 +340,12 @@
         {#each response.warnings ?? [] as warning, eachIndex (eachIndex)}
           <div class="response-warning" role="status">{warning}</div>
         {/each}
+        {#if scriptErrorMessage}
+          <div class="response-warning script-error-banner" role="alert">
+            <span>{scriptErrorMessage}</span>
+            <button class="btn btn-ghost btn-xs" type="button" onclick={() => setResponseTab('test-results')}>Open Scripts</button>
+          </div>
+        {/if}
         {#if response.error}
           <div class="response-error" role="textbox" aria-readonly="true" tabindex="0">{response.error}</div>
       {:else if !response.body && !response.bodyIsBinary}
@@ -428,60 +462,7 @@
 
     {:else if responseTab === 'test-results'}
       <div class="test-results-panel" id="response-panel-scripts" role="tabpanel">
-        {#if response.preRequestResult?.error || response.preRequestResult?.logs?.length}
-          <div class="script-result-block">
-            <div class="script-result-header">
-              <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M1.5 2.5h3l2 8h3.5M7.5 6h2.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Pre-request
-              {#if response.preRequestResult.error}
-                <span class="script-error-badge">Error</span>
-              {:else}
-                <span class="script-ok-badge">OK</span>
-              {/if}
-            </div>
-            {#if response.preRequestResult.error}
-              <div class="script-error-msg">{response.preRequestResult.error}</div>
-            {/if}
-            {#each (response.preRequestResult.logs ?? []) as log, eachIndex (eachIndex)}
-              <div class="script-log-row"><span class="log-icon">›</span><span class="log-msg">{log}</span></div>
-            {/each}
-          </div>
-        {/if}
-
-        {#if response.testResult?.tests?.length || response.testResult?.error || response.testResult?.logs?.length}
-          <div class="script-result-block">
-            <div class="script-result-header">
-              <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l2.5 2.5 6.5-5.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Tests
-              {#if responseTestSummary}
-                <span class:script-ok-badge={responseTestSummary.allPassed} class:script-fail-badge={!responseTestSummary.allPassed}>{responseTestSummary.passed}/{responseTestSummary.total} passed</span>
-              {/if}
-            </div>
-            {#if response.testResult.error}
-              <div class="script-error-msg">{response.testResult.error}</div>
-            {/if}
-            {#each (response.testResult.tests ?? []) as t, eachIndex (eachIndex)}
-              <div class="test-row" class:pass={t.passed} class:fail={!t.passed}>
-                <span class="test-icon">
-                  {#if t.passed}
-                    <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 6.5l2 2 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  {:else}
-                    <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 4.5l4 4M8.5 4.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                  {/if}
-                </span>
-                <span class="test-name">{t.name}</span>
-                {#if t.error}<span class="test-err">{t.error}</span>{/if}
-              </div>
-            {/each}
-            {#each (response.testResult.logs ?? []) as log, eachIndex (eachIndex)}
-              <div class="script-log-row"><span class="log-icon">›</span><span class="log-msg">{log}</span></div>
-            {/each}
-          </div>
-        {/if}
-
-        {#if !response.testResult?.tests?.length && !response.testResult?.error && !response.preRequestResult?.error && !response.preRequestResult?.logs?.length && !response.testResult?.logs?.length}
-          <div class="test-results-empty">No scripts ran for this request.</div>
-        {/if}
+        <ScriptResults preRequestResult={response.preRequestResult} testResult={response.testResult} />
       </div>
     {/if}
 

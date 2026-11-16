@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ScriptResults from './ScriptResults.svelte';
+  import { scriptProblemCount } from '../scriptLogs';
   import KurloBird from './KurloBird.svelte';
   import Keycaps from './Keycaps.svelte';
   import { tabListKeyboard } from '../a11y';
@@ -31,12 +33,28 @@
   let expandedIds = $state<Set<string>>(new Set());
   let hasScripts = $derived(Boolean(
     response?.testResult?.tests?.length ||
+    response?.preRequestResult?.tests?.length ||
     response?.preRequestResult?.logs?.length ||
     response?.testResult?.logs?.length ||
     response?.preRequestResult?.error ||
     response?.testResult?.error,
   ));
-  let responseTestSummary = $derived(vm.grpcResponseTestSummary);
+  let preRequestTests = $derived(response?.preRequestResult?.tests ?? []);
+  let scriptProblems = $derived(scriptProblemCount(response?.preRequestResult, response?.testResult));
+  let scriptLogCount = $derived((response?.preRequestResult?.logs?.length ?? 0) + (response?.testResult?.logs?.length ?? 0));
+  let scriptErrorMessage = $derived(
+    response?.preRequestResult?.error
+      ? `Pre-request script failed: ${response.preRequestResult.error}`
+      : response?.testResult?.error
+        ? `Post-response script failed: ${response.testResult.error}`
+        : '',
+  );
+  let allTestSummary = $derived.by(() => {
+    const tests = [...preRequestTests, ...(response?.testResult?.tests ?? [])];
+    if (!tests.length) return null;
+    const passed = tests.filter(test => test.passed).length;
+    return { passed, total: tests.length, allPassed: passed === tests.length };
+  });
   let grpcRows = $derived.by(() => {
     const current = response;
     if (!current) return [];
@@ -192,8 +210,8 @@
         <span class="status-meta">{response.duration} ms</span>
         <span class="status-meta">{formatSize(response.size)}</span>
         {#if response.method?.fullName}<span class="status-meta grpc-status-method">{response.method.fullName}</span>{/if}
-        {#if responseTestSummary}
-          <span class="test-summary-pill" class:all-passed={responseTestSummary.allPassed}>{responseTestSummary.passed}/{responseTestSummary.total} tests</span>
+        {#if allTestSummary}
+          <span class="test-summary-pill" class:all-passed={allTestSummary.allPassed}>{allTestSummary.passed}/{allTestSummary.total} tests</span>
         {/if}
       </div>
       <div class="status-right">
@@ -256,9 +274,13 @@
         </button>
         {#if hasScripts}
           <button role="tab" class:active={vm.grpcResponseTab === 'scripts'} class="tab tab-script" aria-selected={vm.grpcResponseTab === 'scripts'} aria-controls="grpc-response-scripts" tabindex={vm.grpcResponseTab === 'scripts' ? 0 : -1} onclick={() => vm.setActiveGrpcResponseTab('scripts')} type="button">
-            Test results
-            {#if responseTestSummary}
-              <span class="badge" class:badge-pass={responseTestSummary.allPassed} class:badge-fail={!responseTestSummary.allPassed}>{responseTestSummary.passed}/{responseTestSummary.total}</span>
+            Scripts
+            {#if scriptProblems}
+              <span class="badge badge-fail" aria-label={`${scriptProblems} script ${scriptProblems === 1 ? 'error' : 'errors'}`}>{scriptProblems}</span>
+            {:else if allTestSummary}
+              <span class="badge" class:badge-pass={allTestSummary.allPassed} class:badge-fail={!allTestSummary.allPassed}>{allTestSummary.passed}/{allTestSummary.total}</span>
+            {:else if scriptLogCount}
+              <span class="badge">{scriptLogCount}</span>
             {/if}
           </button>
         {/if}
@@ -267,6 +289,12 @@
 
     {#if vm.grpcResponseTab === 'messages'}
       <div class="response-tab-panel" id="grpc-response-messages" role="tabpanel">
+        {#if scriptErrorMessage}
+          <div class="response-warning script-error-banner" role="alert">
+            <span>{scriptErrorMessage}</span>
+            <button class="btn btn-ghost btn-xs" type="button" onclick={() => vm.setActiveGrpcResponseTab('scripts')}>Open Scripts</button>
+          </div>
+        {/if}
         {#if grpcRows.length === 0}
           <div class="response-placeholder response-empty-state" role="status">
             <span class="response-placeholder-text">{response.skipped ? 'Request skipped before sending' : 'No response messages'}</span>
@@ -385,58 +413,7 @@
 
     {:else if vm.grpcResponseTab === 'scripts'}
       <div class="test-results-panel" id="grpc-response-scripts" role="tabpanel">
-        {#if response.preRequestResult?.error || response.preRequestResult?.logs?.length}
-          <div class="script-result-block">
-            <div class="script-result-header">
-              Pre-request
-              {#if response.preRequestResult.error}
-                <span class="script-error-badge">Error</span>
-              {:else}
-                <span class="script-ok-badge">OK</span>
-              {/if}
-            </div>
-            {#if response.preRequestResult.error}
-              <div class="script-error-msg">{response.preRequestResult.error}</div>
-            {/if}
-            {#each (response.preRequestResult.logs ?? []) as log, eachIndex (eachIndex)}
-              <div class="script-log-row"><span class="log-icon">›</span><span class="log-msg">{log}</span></div>
-            {/each}
-          </div>
-        {/if}
-
-        {#if response.testResult?.tests?.length || response.testResult?.error || response.testResult?.logs?.length}
-          <div class="script-result-block">
-            <div class="script-result-header">
-              Tests
-              {#if responseTestSummary}
-                <span class:script-ok-badge={responseTestSummary.allPassed} class:script-fail-badge={!responseTestSummary.allPassed}>{responseTestSummary.passed}/{responseTestSummary.total} passed</span>
-              {/if}
-            </div>
-            {#if response.testResult.error}
-              <div class="script-error-msg">{response.testResult.error}</div>
-            {/if}
-            {#each (response.testResult.tests ?? []) as t, eachIndex (eachIndex)}
-              <div class="test-row" class:pass={t.passed} class:fail={!t.passed}>
-                <span class="test-icon">
-                  {#if t.passed}
-                    <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M4 6.5l2 2 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  {:else}
-                    <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M4.5 4.5l4 4M8.5 4.5l-4 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                  {/if}
-                </span>
-                <span class="test-name">{t.name}</span>
-                {#if t.error}<span class="test-err">{t.error}</span>{/if}
-              </div>
-            {/each}
-            {#each (response.testResult.logs ?? []) as log, eachIndex (eachIndex)}
-              <div class="script-log-row"><span class="log-icon">›</span><span class="log-msg">{log}</span></div>
-            {/each}
-          </div>
-        {/if}
-
-        {#if !hasScripts}
-          <div class="test-results-empty">No scripts ran for this request.</div>
-        {/if}
+        <ScriptResults preRequestResult={response.preRequestResult} testResult={response.testResult} />
       </div>
     {/if}
 
