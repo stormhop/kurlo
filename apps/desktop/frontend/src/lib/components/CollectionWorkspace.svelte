@@ -23,11 +23,14 @@
   import { vm } from '../stores/app.svelte';
   import { markdownSizeLabel, markdownTooLongToPreview } from '../markdown';
   import MenuIcon from './MenuIcon.svelte';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { relativeTime, type CollectionRunTally } from '../collectionRuns';
 
   type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy' | 'openapi';
   type CollectionSettingsPatch = Pick<Collection, 'name' | 'description' | 'defaults' | 'environmentIds' | 'defaultEnvironmentId'> & { baseFingerprint?: string };
+  type AutosaveDraft =
+    | { kind: 'collection'; collectionId: string; patch: CollectionSettingsPatch }
+    | { kind: 'folder'; collectionId: string; folder: FolderDefaults; baseFingerprint: string };
 
   const HTTP_VERSION_OPTIONS = [
     { value: 'auto', label: 'Auto' },
@@ -146,6 +149,7 @@
   let authMenuOpen = $state(false);
   let savingInFlight = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingAutosave: AutosaveDraft | null = null;
 
   const draftDirty = $derived(Boolean(collection) && draftFingerprint() !== loadedFingerprint);
 
@@ -153,6 +157,7 @@
     if (!collection) return;
     const incoming = incomingFingerprint(collection);
     if (settingsKey(collection) !== loadedCollectionId) {
+      void flushAutosave();
       loadCollection(collection);
       return;
     }
@@ -169,12 +174,22 @@
   });
 
   $effect(() => {
-    if (!autosave || !collection || workspaceBlocked || externalUpdate || savingInFlight) return;
+    if (!autosave || workspaceBlocked || externalUpdate) {
+      pendingAutosave = null;
+      return;
+    }
+    if (!collection) return;
+    if (savingInFlight) return;
 
-    if (draftFingerprint() === loadedFingerprint) return;
+    if (draftFingerprint() === loadedFingerprint) {
+      pendingAutosave = null;
+      return;
+    }
+    pendingAutosave = captureAutosaveDraft();
     if (autosaveTimer) clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(() => {
       autosaveTimer = null;
+      pendingAutosave = null;
       void save();
     }, autosaveDelayMs);
     return () => {
@@ -183,6 +198,10 @@
         autosaveTimer = null;
       }
     };
+  });
+
+  onDestroy(() => {
+    void flushAutosave();
   });
 
   function loadCollection(next: Collection) {
@@ -289,6 +308,38 @@
     return description.trim() ? description : '';
   }
 
+  function captureAutosaveDraft(): AutosaveDraft | null {
+    if (!collection) return null;
+    if (isFolder) {
+      return { kind: 'folder', collectionId: collection.id, folder: draftFolder(), baseFingerprint: loadedFingerprint };
+    }
+    const pins = draftPins();
+    return {
+      kind: 'collection',
+      collectionId: collection.id,
+      patch: {
+        name,
+        description: savedDescription(),
+        defaults: draftDefaults(),
+        environmentIds: pins.environmentIds ?? [],
+        defaultEnvironmentId: pins.defaultEnvironmentId ?? '',
+        baseFingerprint: loadedFingerprint,
+      },
+    };
+  }
+
+  async function flushAutosave() {
+    const draft = pendingAutosave;
+    pendingAutosave = null;
+    if (autosaveTimer) {
+      clearTimeout(autosaveTimer);
+      autosaveTimer = null;
+    }
+    if (!draft) return;
+    if (draft.kind === 'folder') await onSaveFolder(draft.collectionId, draft.folder, draft.baseFingerprint);
+    else await onSave(draft.collectionId, draft.patch);
+  }
+
   function draftFingerprint(): string {
     if (isFolder) return folderDefaultsFingerprint(draftFolder());
     return collectionSettingsFingerprint({
@@ -301,6 +352,11 @@
 
   async function save() {
     if (!collection || savingInFlight) return;
+    pendingAutosave = null;
+    if (autosaveTimer) {
+      clearTimeout(autosaveTimer);
+      autosaveTimer = null;
+    }
     const baseFingerprint = loadedFingerprint;
     savingInFlight = true;
     try {
@@ -471,6 +527,8 @@
       auth = { ...defaults.auth };
       preRequestScript = '';
       testScript = '';
+      preRequestScriptJs = '';
+      testScriptJs = '';
       settings = { ...defaults.settings };
       loadedFingerprint = collectionSettingsFingerprint(collection);
       externalUpdate = false;

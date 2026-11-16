@@ -287,7 +287,11 @@ export const requestPersistenceFeature = {
     const snapshot = storeSnapshot(payload, persistEpoch);
     const queued = queuedStorePayloads.get(this);
     if (queued && sameStoreContent(queued, snapshot, this.savedRequestSnapshots)) {
-      if (await queued.result && persistEpoch === this.requestStorePersistEpoch && queuedStorePayloads.get(this) === queued) {
+      const queuedSaved = await queued.result;
+      if (persistEpoch !== this.requestStorePersistEpoch) return false;
+      const current = queuedStorePayloads.get(this);
+      if (queuedSaved && current !== queued) return current ? await current.result : false;
+      if (queuedSaved && current === queued) {
         let viewSaved = queued.view === snapshot.view;
         if (!viewSaved) {
           const written = await this.writeRequestStoreView(activeId, nextOpenIds, workspaceId);

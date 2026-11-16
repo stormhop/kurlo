@@ -110,6 +110,23 @@ describe('request store persistence dedup', () => {
     expect(savedPayloads()).toEqual(['A', 'B', 'A']);
   });
 
+  it('does not write an older state after a newer one was queued while waiting', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A' }]);
+    let finishA: (value: { ok: boolean; error: string }) => void = () => {};
+    vi.mocked(saveRequestStore).mockImplementationOnce(() => new Promise(resolve => { finishA = resolve; }));
+
+    const first = persist(host, [{ id: 'r1', name: 'A' }]);
+    const duplicate = persist(host, [{ id: 'r1', name: 'A' }]);
+    const newer = persist(host, [{ id: 'r1', name: 'B' }]);
+    await vi.waitFor(() => expect(saveRequestStore).toHaveBeenCalledTimes(1));
+    finishA({ ok: true, error: '' });
+
+    expect(await first).toBe(true);
+    expect(await duplicate).toBe(true);
+    expect(await newer).toBe(true);
+    expect(savedPayloads()).toEqual(['A', 'B']);
+  });
+
   it('waits for the queued save of the same state instead of sending it twice', async () => {
     const host = storeHost([{ id: 'r1', name: 'A' }]);
     let finish: (value: { ok: boolean; error: string }) => void = () => {};

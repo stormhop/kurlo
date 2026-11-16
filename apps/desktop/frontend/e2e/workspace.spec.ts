@@ -1,5 +1,5 @@
 import type { E2EWindow } from './support/bridge';
-import { chooseRequestSection, chooseRequestType, collectionRow, fillPrompt } from './support/actions';
+import { chooseRequestSection, chooseRequestType, clickTabClose, collectionRow, fillCodeEditor, fillPrompt } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -301,6 +301,100 @@ test.describe('Collection overview', () => {
     await expect(page.locator('.overview-actions')).not.toContainText('Updated elsewhere');
     await page.waitForTimeout(1500);
     await expect(page.locator('.overview-actions')).not.toContainText('Updated elsewhere');
+  });
+
+  test('Reset defaults clears JavaScript scripts and leaves the form clean', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{
+        id: 'col-reset', workspaceId: 'workspace-e2e', name: 'Reset API',
+        defaults: {
+          headers: [], variables: [], auth: { type: 'none' },
+          preRequestScript: '', testScript: '', preRequestScriptJs: 'console.log("pre");', testScriptJs: 'console.log("test");',
+          settings: { timeoutMs: 9000 },
+        },
+      }],
+      requests: [{ id: 'req-reset', collectionId: 'col-reset', collection: 'Reset API', name: 'Ping', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/ping', auth: { type: 'inherit' } }],
+      activeId: 'req-reset', openIds: ['req-reset'],
+    });
+    await page.goto('/');
+    await collectionRow(page, 'Reset API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Reset API').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'More collection actions' }).click();
+    await page.getByRole('menuitem', { name: 'Reset defaults' }).click();
+    await page.getByRole('dialog', { name: 'Reset collection defaults' }).getByRole('button', { name: 'Reset' }).click();
+
+    await page.locator('.collection-tabs').getByRole('tab', { name: /^Script/ }).click();
+    await expect(page.locator('.collection-script-section .cm-placeholder')).toBeVisible();
+    await page.locator('.collection-tabs').getByRole('tab', { name: /^Tests/ }).click();
+    await expect(page.locator('.collection-script-section .cm-placeholder')).toBeVisible();
+    await page.locator('.collection-tabs').getByRole('tab', { name: 'Overview' }).click();
+    await expect(page.getByRole('complementary', { name: 'Applied to every request' }).locator('.collection-default-row')).toHaveText([
+      /Headers\s*None/, /Variables\s*None/, /Auth\s*None/, /Pre-request script\s*None/, /Tests\s*None/, /Proxy and settings\s*Defaults/,
+    ]);
+    await expect(page.locator('.overview-actions').getByRole('button', { name: 'Saved', exact: true })).toBeDisabled();
+    await expect.poll(() => page.evaluate(() => {
+      const collection = (window.__kurloE2E.store.collections as Array<Record<string, any>>).find(item => item.id === 'col-reset');
+      return {
+        pre: collection?.defaults?.preRequestScriptJs ?? '',
+        test: collection?.defaults?.testScriptJs ?? '',
+        timeout: collection?.defaults?.settings?.timeoutMs,
+      };
+    })).toEqual({ pre: '', test: '', timeout: 30000 });
+  });
+
+  test('autosaved collection settings save when leaving before the delay', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{
+        id: 'col-autosave', workspaceId: 'workspace-e2e', name: 'Autosave API',
+        defaults: { headers: [{ id: 1, enabled: true, key: 'X-Saved', value: 'yes' }], variables: [], auth: { type: 'none' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '' },
+      }],
+      requests: [{ id: 'req-autosave', collectionId: 'col-autosave', collection: 'Autosave API', name: 'Ping', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/ping', auth: { type: 'inherit' } }],
+      activeId: 'req-autosave', openIds: ['req-autosave'],
+    });
+    await page.addInitScript(() => {
+      localStorage.setItem('kurlo.autosave.v1', 'true');
+      localStorage.setItem('kurlo.autosaveDelay.v1', '1000');
+    });
+    await page.goto('/');
+    await collectionRow(page, 'Autosave API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Autosave API').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    await page.locator('.collection-tabs').getByRole('tab', { name: /^Headers/ }).click();
+    await page.locator('.collection-kv-table .kv-row').nth(0).locator('input[placeholder="Header"]').fill('X-Autosaved');
+    await clickTabClose(page.getByRole('button', { name: 'Close collection settings' }));
+    await expect.poll(() => page.evaluate(() => {
+      const collection = (window.__kurloE2E.store.collections as Array<Record<string, any>>).find(item => item.id === 'col-autosave');
+      return collection?.defaults?.headers?.[0]?.key;
+    })).toBe('X-Autosaved');
+  });
+
+  test('autosaved collection settings save when opening another collection', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [
+        { id: 'col-switch-a', workspaceId: 'workspace-e2e', name: 'Switch A', defaults: { headers: [], variables: [], auth: { type: 'none' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '' } },
+        { id: 'col-switch-b', workspaceId: 'workspace-e2e', name: 'Switch B', defaults: { headers: [], variables: [], auth: { type: 'none' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '' } },
+      ],
+      requests: [
+        { id: 'req-switch-a', collectionId: 'col-switch-a', collection: 'Switch A', name: 'A', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/a', auth: { type: 'inherit' } },
+        { id: 'req-switch-b', collectionId: 'col-switch-b', collection: 'Switch B', name: 'B', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/b', auth: { type: 'inherit' } },
+      ],
+      activeId: 'req-switch-a', openIds: ['req-switch-a'],
+    });
+    await page.addInitScript(() => {
+      localStorage.setItem('kurlo.autosave.v1', 'true');
+      localStorage.setItem('kurlo.autosaveDelay.v1', '1000');
+    });
+    await page.goto('/');
+    await collectionRow(page, 'Switch A').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Switch A').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    await page.locator('.collection-tabs').getByRole('tab', { name: /^Headers/ }).click();
+    await page.locator('.collection-kv-table .kv-row').nth(0).locator('input[placeholder="Header"]').fill('X-Switch');
+    await collectionRow(page, 'Switch B').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Switch B').locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Switch B');
+    await expect.poll(() => page.evaluate(() => {
+      const collections = window.__kurloE2E.store.collections as Array<Record<string, any>>;
+      return collections.find(item => item.id === 'col-switch-a')?.defaults?.headers?.[0]?.key;
+    })).toBe('X-Switch');
   });
 });
 
