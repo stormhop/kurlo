@@ -9,20 +9,26 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
-- **Performance dock.** Inspect CPU, resident memory, uptime and application processes from the status bar or Cmd/Ctrl Alt P in a compact panel without a redundant tab bar. Filter by main, webview or child processes and follow two-minute resource charts. Drag the upper edge, styled like the request/response divider and matching the dock background, to resize the dock up to half the window height; its height is remembered and scrolling does not shift the content. The dock opens with its first snapshot, without flashing an empty dashboard. Keyboard focus highlights only the resize grip, without a full-width stripe after dragging. Sampling stops when the dock is closed and pauses while the window is minimized.
+- **Postman v3 collections.** Import the folder of `.request.yaml` files that Postman v12 keeps in Git: pick **Postman v3 collection folder**, or drop the folder or a single request file into the window. Collections, folder order, every request kind Kurlo runs, auth, bodies, scripts, settings, examples, environments and globals come across; requests Kurlo cannot run, such as MQTT or Kafka, are skipped and counted.
+- **Move requests between folders.** Drag a saved request onto a folder in its collection, including empty and nested folders, or onto the collection header to return it to the root.
+- **PFX/P12 client certificates.** Use PKCS#12 containers directly for mTLS, with a password and certificate chain, for HTTP and gRPC including reflection.
+- **Performance dock.** Open it from the gauge in the status bar or with Cmd/Ctrl Alt P to see CPU, memory, uptime and Kurlo's processes, with two-minute charts. Drag its top edge to resize it; sampling stops while it is closed.
 
 ### Fixed
 
-- **No false unsaved changes after renaming a collection.** In manual-save mode, opening an untouched request after renaming its collection no longer marks it as changed or asks to save when closing it.
-
-- **Stable runner scrolling.** The request list and results use the same scroll container as virtualization. Redundant nested scroll areas no longer swallow wheel and trackpad scrolling or snap the list back, with or without Performance open. Scrolling over request names and URLs reaches the list instead of getting trapped in clipped text. Visible rows also retain their position when their heights are measured.
-
-- **No drift at the end of long lists.** Dragging the scrollbar to the bottom of the runner, mock server routes, agent activity or sidebar history no longer makes the list creep or jump while rows are measured: row spacing is counted in full and the estimated sizes match the real rows. Toggling the sidebar also keeps the first visible mock route in place while its width changes.
-
-- **Cleanly truncated update notes.** Long release notes in Settings → About end with an ellipsis on a complete line, with the full changelog linked below.
-
-- **Script editors fill the request panel.** Request, collection and folder script editors use the available height instead of leaving unused space below a fixed-height editor. Request scripts resize with the response panel. MCP arguments, YAML files and agent notes stay inside their visible scroll area.
-- **Auth fields stay responsive.** Crafted values containing many variable references no longer freeze the interface when opening request or collection authentication settings.
+- **cURL paste keeps what the command sends.** `-T file`, `--oauth2-bearer`, `--digest`, `--ntlm`, `--aws-sigv4` and `--url-query` now carry the upload, auth and query over, and combined flags such as `-sSLo out.json` no longer turn the output file into the URL. Options Kurlo cannot import, such as `-H @file`, stop the paste with a message instead of being dropped silently.
+- **YAML imports read multi-line collections.** OpenAPI, Bruno and Postman v3 files with `[...]` or `{...}` written over several lines are read in full instead of becoming a truncated string, and a file with several `---` documents is rejected with a message instead of being merged.
+- **No false unsaved changes after renaming a collection.** In manual-save mode, untouched requests no longer turn dirty or ask to be saved after their collection is renamed.
+- **Safer Git actions.** An autosave queued just before a checkout, pull, stash or discard no longer writes the previous branch's requests over the new ones, and Git actions in the app wait while `kurlo mcp` or another Kurlo process is writing the workspace.
+- **Responses and chats stay where they belong.** A response opened from history or saved as an example while you switch requests stays on its own request, and restoring a deleted AI request, folder or collection brings its chat back.
+- **Requests and connections always end.** A cancel the backend fails to confirm still stops the request, a WebSocket close the server never answers finishes after one second, and deleting a workspace closes its live WebSocket, SSE and Socket.IO sessions.
+- **Lower memory use.** A server stream in gRPC keeps its latest 500 messages, interrupted compressed downloads release their decoder, AWS Signature v4 hashes a file body as it reads it, and OAuth 1.0 refuses bodies over 32 MB instead of loading them.
+- **Fewer places secrets show.** `get_request` over MCP shows literal `Authorization`, `Proxy-Authorization`, `Cookie` and `X-API-Key` headers as `[secret]`, and `kurlo run` masks credential-like values from `--env-file` and `--var` in output, reports and logs.
+- **Scripts behave the same everywhere.** A regular expression that backtracks without end times out after 2 seconds instead of hanging the app or CI, MCP runs return each `console.log` line once, and `$isoTimestamp` includes milliseconds in `kurlo run` and `kurlo mcp` as it does in the app.
+- **Faster with large workspaces and responses.** Git diffs over 1,500 lines render only what is on screen, the JSONPath filter waits for a pause in typing, the sidebar filter is about four times faster on thousands of requests, and typing in long bodies, auth fields, variables and headers no longer redoes work across the whole request.
+- **Steady scrolling in long lists.** The runner, mock routes, agent activity and history no longer swallow wheel scrolling, snap back or creep while rows are measured, including at the very end of the list.
+- **Script editors fill the request panel.** Request, collection and folder script editors use the available height and resize with the response panel.
+- **Cleanly truncated update notes.** Long release notes in Settings → About end on a complete line, with the full changelog linked below.
 
 ## [3.1.3] - 2026-11-16
 
