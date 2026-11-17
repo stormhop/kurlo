@@ -428,6 +428,7 @@ class AppVM {
   declare deleteCollection: typeof collectionFeature.deleteCollection;
   declare moveCollection: typeof collectionFeature.moveCollection;
   declare moveRequest: typeof collectionFeature.moveRequest;
+  declare moveRequestToFolder: typeof collectionFeature.moveRequestToFolder;
   declare invalidCollectionFromDiagnostic: typeof collectionFeature.invalidCollectionFromDiagnostic;
   declare invalidRequestFromDiagnostic: typeof collectionFeature.invalidRequestFromDiagnostic;
   declare buildCollectionGroups: typeof collectionFeature.buildCollectionGroups;

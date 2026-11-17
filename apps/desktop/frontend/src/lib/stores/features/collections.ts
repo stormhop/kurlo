@@ -1,8 +1,10 @@
-import { clampName } from '../../constants';
+import { clampName, MAX_FOLDER_REQUESTS } from '../../constants';
 import type { WorkspaceDiagnostic } from '../../backend';
 import { collectionDefaultsHaveContent, collectionSettingsFingerprint, emptyCollectionDefaults, folderDefaultsFingerprint, folderDefaultsFor, folderDefaultsHaveContent, normalizeCollectionDefaults, normalizeFolderDefaults, withFolderDefaults } from '../../collectionDefaults';
 import {
   folderCollapsedByDefault,
+  folderPathKey,
+  addCollectionFolderPath,
   normalizeCollectionFolderPaths,
   reorderWorkspaceCollections,
   reorderCollectionRequests,
@@ -33,6 +35,8 @@ type CollectionHost = {
   openCollectionMenuId: string;
   openRequestIds: string[];
   requests: SavedRequest[];
+  unsavedRequestSnapshots: Map<string, SavedRequest>;
+  savedRequestSnapshots: Map<string, SavedRequest>;
   sidebarRequests: SavedRequest[];
   sidebarSearch: string;
   sidebarView: SidebarView;
@@ -324,6 +328,30 @@ export const collectionFeature = {
     this.closeFloatingMenus();
     await this.persistRequestStore();
   },
+  async moveRequestToFolder(this: CollectionHost, sourceId: string, collectionId: string, folderPath: string[]) {
+    if (this.sidebarSearch.trim() || !this.guardWorkspaceWritable('Moving requests')) return;
+    const source = this.requests.find(request => request.id === sourceId);
+    const collection = this.collections.find(candidate => candidate.id === collectionId);
+    if (!source || source.isDraft || source.isInvalid || !collection || collection.isInvalid
+      || collection.workspaceId !== this.activeWorkspaceId || source.collectionId !== collectionId) return;
+    const targetKey = folderPathKey(folderPath);
+    if (folderPathKey(source.folderPath) === targetKey) return;
+    const group = this.collectionGroups.find(candidate => candidate.collection.id === collectionId);
+    if (folderPath.length && (!group || !this.allFolderGroups([group]).some(folder => folderPathKey(folder.path) === targetKey))) return;
+    if (folderPath.length && this.requests.filter(request => !request.isDraft && request.collectionId === collectionId && folderPathKey(request.folderPath) === targetKey).length >= MAX_FOLDER_REQUESTS) {
+      await this.openAlertDialog('Folder limit', `A folder can contain up to ${MAX_FOLDER_REQUESTS} requests.`);
+      return;
+    }
+    this.collections = this.collections.map(candidate => candidate.id === collectionId ? addCollectionFolderPath(addCollectionFolderPath(candidate, source.folderPath ?? []), folderPath) : candidate);
+    this.requests = this.requests.map(request => request.id === sourceId ? { ...request, folderPath: [...folderPath] } : request);
+    const saved = this.savedRequestSnapshots.get(sourceId);
+    if (saved) this.savedRequestSnapshots = new Map(this.savedRequestSnapshots).set(sourceId, { ...saved, folderPath: [...folderPath] });
+    const unsaved = this.unsavedRequestSnapshots.get(sourceId);
+    if (unsaved) this.unsavedRequestSnapshots = new Map(this.unsavedRequestSnapshots).set(sourceId, { ...unsaved, folderPath: [...folderPath] });
+    this.folderCollapseState = { ...this.folderCollapseState, [this.folderCollapseKey(collectionId, folderPath)]: false };
+    this.closeFloatingMenus();
+    await this.persistRequestStore();
+  },
   invalidCollectionFromDiagnostic(this: CollectionHost, diagnostic: WorkspaceDiagnostic): Collection {
     const id = diagnostic.collectionId || `invalid-collection-${this.workspaceDiagnosticKey(diagnostic)}`;
     const name = diagnostic.path.split('/').filter(Boolean).at(-2) || 'Invalid collection';
@@ -368,18 +396,29 @@ export const collectionFeature = {
       collections.push(invalidCollection);
       existingCollectionIds.add(invalidCollection.id);
     }
+    const requestsByCollection = new Map<string, SavedRequest[]>();
+    for (const request of requests) {
+      if (request.isDraft || !requestMatchesSidebarQuery(request, query)) continue;
+      const bucket = requestsByCollection.get(request.collectionId);
+      if (bucket) bucket.push(request);
+      else requestsByCollection.set(request.collectionId, [request]);
+    }
+    const diagnosticsByRequest = new Map<string, WorkspaceDiagnostic[]>();
+    for (const diagnostic of this.workspaceDiagnostics) {
+      if (!diagnostic.requestId) continue;
+      const bucket = diagnosticsByRequest.get(diagnostic.requestId);
+      if (bucket) bucket.push(diagnostic);
+      else diagnosticsByRequest.set(diagnostic.requestId, [diagnostic]);
+    }
     return collections.map(collection => {
       const collectionDiagnostics = [
         ...(collection.workspaceDiagnostics ?? []),
         ...this.diagnosticsForCollection(collection.id),
       ];
       collection = collectionDiagnostics.length ? { ...collection, workspaceDiagnostics: collectionDiagnostics } : collection;
-      const groupRequests = requests.filter(request => {
-        if (request.isDraft || request.collectionId !== collection.id) return false;
-        return requestMatchesSidebarQuery(request, query);
-      }).map(request => {
-        const requestDiagnostics = this.diagnosticsForRequest(request.id);
-        return requestDiagnostics.length ? { ...request, workspaceDiagnostics: requestDiagnostics } : request;
+      const groupRequests = (requestsByCollection.get(collection.id) ?? []).map(request => {
+        const requestDiagnostics = diagnosticsByRequest.get(request.id);
+        return requestDiagnostics?.length ? { ...request, workspaceDiagnostics: requestDiagnostics } : request;
       });
       const existingRequestIds = new Set(groupRequests.map(request => request.id));
       for (const diagnostic of this.workspaceDiagnostics) {

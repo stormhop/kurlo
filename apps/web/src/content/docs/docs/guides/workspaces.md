@@ -138,7 +138,9 @@ Right-click (or click the `⋯` button on hover) on any request to reveal:
 
 Hover a request to reveal its `⋮⋮` handle on the left. Drag it onto another request in the same collection or folder: the top half places it above, and the bottom half places it below. A line shows the insertion point. The order is saved in `collection.yml` and persists between sessions.
 
-Clear the sidebar search before dragging. Requests stay in their current folder and collection; dragging changes their order among siblings.
+To move a saved request, drop it onto a folder header or an empty folder in the same collection. Nested and collapsed folders accept drops too. Drop onto the collection header to move it back to the root. Empty source folders are kept.
+
+Clear the sidebar search before dragging. Dragging onto another request changes the order among siblings; dragging onto a folder changes the parent.
 
 ## Starred (favourites)
 

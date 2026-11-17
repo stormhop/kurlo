@@ -732,6 +732,7 @@
     deleteCollection={vm.deleteCollection}
     moveCollection={vm.moveCollection}
     moveRequest={vm.moveRequest}
+    moveRequestToFolder={vm.moveRequestToFolder}
     switchRequest={vm.switchRequest}
     {requestTabLabel}
     toggleRequestMenu={vm.toggleRequestMenu}

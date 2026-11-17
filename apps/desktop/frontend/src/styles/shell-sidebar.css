@@ -1551,3 +1551,9 @@
   background: var(--info);
   cursor: pointer;
 }
+
+.request-drop-target {
+  background: var(--accent-dim);
+  outline: 0.0625rem solid var(--accent);
+  outline-offset: -0.0625rem;
+}

@@ -93,6 +93,7 @@
     deleteCollection,
     moveCollection,
     moveRequest,
+    moveRequestToFolder,
     switchRequest,
     requestTabLabel,
     toggleRequestMenu,
@@ -179,6 +180,7 @@
     exportCollection: (id: string) => void;
     deleteCollection: (id: string) => void;
     moveCollection: (sourceId: string, targetId: string, placement: DropPlacement) => void;
+    moveRequestToFolder: (sourceId: string, collectionId: string, folderPath: string[]) => void;
     moveRequest: (sourceId: string, targetId: string, placement: DropPlacement) => void;
     switchRequest: (id: string) => void;
     requestTabLabel: (request: SavedRequest) => string;
@@ -242,6 +244,7 @@
   let hoveredRowKey = $state('');
   let draggingRequest = $state<SavedRequest | undefined>();
   let dragOverRequestId = $state('');
+  let dragOverFolderKey = $state('');
   let requestDropPlacement = $state<DropPlacement>('before');
   let draggingCollectionId = $state('');
   let dragOverCollectionId = $state('');
@@ -645,6 +648,7 @@
   function clearRequestDragState() {
     clearRequestHover();
     draggingRequest = undefined;
+    dragOverFolderKey = '';
     dragOverRequestId = '';
     requestDropPlacement = 'before';
   }
@@ -665,6 +669,7 @@
 
   function onRequestDragOver(request: SavedRequest, event: DragEvent) {
     if (collectionDragDisabled() || !canReorderRequests(draggingRequest, request)) return;
+    dragOverFolderKey = '';
     event.preventDefault();
     event.stopPropagation();
     const target = currentElement(event);
@@ -686,6 +691,39 @@
     event.preventDefault();
     event.stopPropagation();
     moveRequest(draggingRequest.id, request.id, requestDropPlacement);
+    clearRequestDragState();
+  }
+
+  function folderDropKey(collectionId: string, path: string[]) {
+    return JSON.stringify([collectionId, path]);
+  }
+
+  function canDropRequestInFolder(collectionId: string, path: string[]) {
+    return !collectionDragDisabled() && draggingRequest && !draggingRequest.isDraft && !draggingRequest.isInvalid
+      && draggingRequest.collectionId === collectionId && !collectionById(collectionId)?.isInvalid
+      && JSON.stringify(draggingRequest.folderPath ?? []) !== JSON.stringify(path);
+  }
+
+  function onFolderDragOver(collectionId: string, path: string[], event: DragEvent) {
+    if (!canDropRequestInFolder(collectionId, path)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragOverRequestId = '';
+    dragOverFolderKey = folderDropKey(collectionId, path);
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  }
+
+  function onFolderDragLeave(event: DragEvent) {
+    const target = currentElement(event);
+    if (target && event.relatedTarget instanceof Node && target.contains(event.relatedTarget)) return;
+    dragOverFolderKey = '';
+  }
+
+  function onFolderDrop(collectionId: string, path: string[], event: DragEvent) {
+    if (!canDropRequestInFolder(collectionId, path) || !draggingRequest) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moveRequestToFolder(draggingRequest.id, collectionId, path);
     clearRequestDragState();
   }
 
@@ -742,6 +780,7 @@
   }
 
   function onCollectionDragOver(collectionId: string, event: DragEvent) {
+    if (draggingRequest) { onFolderDragOver(collectionId, [], event); return; }
     if (collectionDragDisabled() || !draggingCollectionId || draggingCollectionId === collectionId) return;
     event.preventDefault();
     const target = currentElement(event);
@@ -753,6 +792,7 @@
   }
 
   function onCollectionDragLeave(event: DragEvent) {
+    onFolderDragLeave(event);
     const target = currentElement(event);
     const nextTarget = event.relatedTarget;
     if (target && nextTarget instanceof Node && target.contains(nextTarget)) return;
@@ -760,6 +800,7 @@
   }
 
   function onCollectionDrop(collectionId: string, event: DragEvent) {
+    if (draggingRequest) { onFolderDrop(collectionId, [], event); return; }
     if (collectionDragDisabled()) return;
     event.preventDefault();
     const sourceId = event.dataTransfer?.getData('application/x-kurlo-collection-id') || draggingCollectionId;
@@ -904,7 +945,7 @@
               ondrop={(event) => onCollectionDrop(row.group.collection.id, event)}
               ondragend={clearCollectionDragState}
             >
-              <div class="collection-folder hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation" oncontextmenu={(event) => { if (workspaceBlocked || row.group.collection.isInvalid || event.target instanceof HTMLInputElement) return; event.preventDefault(); toggleCollectionMenu(row.group.collection.id, event); }}>
+              <div class="collection-folder hover-managed" class:request-drop-target={dragOverFolderKey === folderDropKey(row.group.collection.id, [])} class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation" oncontextmenu={(event) => { if (workspaceBlocked || row.group.collection.isInvalid || event.target instanceof HTMLInputElement) return; event.preventDefault(); toggleCollectionMenu(row.group.collection.id, event); }}>
                 <span class="collection-drag-handle" aria-hidden="true">
                   <svg width="0.625rem" height="0.875rem" viewBox="0 0 10 14" fill="none">
                     <circle cx="3" cy="3" r="1" fill="currentColor"/>
@@ -1063,7 +1104,7 @@
             </div>
           {:else if row.type === 'folder'}
             <div class="collection-tree-node" style={`--tree-depth: ${row.depth}`}>
-              <div class="collection-subfolder hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation" oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleFolderMenu(row.folder.key, event); }}>
+              <div ondragover={(event) => onFolderDragOver(row.collectionId, row.folder.path, event)} ondragleave={onFolderDragLeave} ondrop={(event) => onFolderDrop(row.collectionId, row.folder.path, event)} class:request-drop-target={dragOverFolderKey === folderDropKey(row.collectionId, row.folder.path)} class="collection-subfolder hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation" oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleFolderMenu(row.folder.key, event); }}>
                 <button class="subfolder-collapse" type="button" onclick={() => toggleFolderCollapsed(row.collectionId, row.folder.path)} aria-label={row.folder.collapsed ? 'Expand folder' : 'Collapse folder'} disabled={workspaceBlocked}>
                   <svg class:collapsed={row.folder.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
                     <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1099,7 +1140,7 @@
               </div>
             </div>
           {:else if row.type === 'folder-empty'}
-            <div class="collection-empty folder-empty" role="status" style={`--tree-depth: ${row.depth}`}>
+            <div ondragover={(event) => onFolderDragOver(row.collectionId, row.folder.path, event)} ondragleave={onFolderDragLeave} ondrop={(event) => onFolderDrop(row.collectionId, row.folder.path, event)} class="collection-empty folder-empty" role="status" style={`--tree-depth: ${row.depth}`}>
               <div class="folder-empty-copy">
                 <span>Folder is empty</span>
                 <small>Add a request, a folder, or drag items here to group them together.</small>

@@ -335,3 +335,87 @@ describe('imported requests stay unchanged when opened', () => {
     }
   });
 });
+
+describe('moving requests between folders', () => {
+  it('persists root, nested and empty-folder moves without losing request data or an empty source folder', async () => {
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Move API');
+    await app.createCollection();
+    const collection = app.collections[0];
+    app.collections = [{ ...collection, folderPaths: [['Empty'], ['Nested', 'Child']] }];
+    await app.createNewRequest(collection.id);
+    const id = app.activeRequestId;
+    app.url = 'https://example.test/kept';
+    await app.persistActiveRequestNow();
+    const original = app.requestsById.get(id);
+    app.autosave = false;
+    await app.moveRequestToFolder(id, collection.id, ['Nested', 'Child']);
+    expect(app.requestsById.get(id)).toEqual({ ...original, folderPath: ['Nested', 'Child'] });
+    await app.moveRequestToFolder(id, collection.id, ['Empty']);
+    expect(app.collections[0].folderPaths).toContainEqual(['Nested', 'Child']);
+    expect(app.snapshotActiveRequest().folderPath).toEqual(['Empty']);
+    await app.moveRequestToFolder(id, collection.id, []);
+    expect(app.requestsById.get(id)?.folderPath).toEqual([]);
+    app.updateRequestDirtyState(id, app.snapshotActiveRequest({ forPersistence: true }));
+    expect(app.isRequestDirty(id)).toBe(false);
+    expect(backend.state.savedStores.at(-1)?.requests.find((request: SavedRequest) => request.id === id)?.folderPath).toEqual([]);
+    const persist = vi.spyOn(app, 'persistRequestStore');
+    await app.moveRequestToFolder(id, collection.id, ['Missing']);
+    await app.moveRequestToFolder(id, collection.id, []);
+    app.sidebarSearch = 'filter';
+    await app.moveRequestToFolder(id, collection.id, ['Empty']);
+    expect(persist).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('folder move safeguards', () => {
+  it('keeps manual edits unsaved and moves their cached editing snapshot too', async () => {
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Manual move');
+    await app.createCollection();
+    const collection = app.collections[0];
+    app.collections = [{ ...collection, folderPaths: [['Target']] }];
+    await app.createNewRequest(collection.id);
+    app.url = 'https://example.test/saved';
+    await app.saveActiveRequest();
+    const id = app.activeRequestId;
+    app.autosave = false;
+    app.url = 'https://example.test/unsaved';
+    app.updateRequestDirtyState(id, app.snapshotActiveRequest());
+    await app.moveRequestToFolder(id, collection.id, ['Target']);
+    expect(app.url).toBe('https://example.test/unsaved');
+    expect(app.requestForEditing(id)).toMatchObject({ url: 'https://example.test/unsaved', folderPath: ['Target'] });
+    expect(backend.state.savedStores.at(-1)?.requests.find((request: SavedRequest) => request.id === id)).toMatchObject({ url: 'https://example.test/saved', folderPath: ['Target'] });
+    expect(app.isRequestDirty(id)).toBe(true);
+    await app.saveActiveRequest();
+    expect(backend.state.savedStores.at(-1)?.requests.find((request: SavedRequest) => request.id === id)).toMatchObject({ url: 'https://example.test/unsaved', folderPath: ['Target'] });
+    expect(app.isRequestDirty(id)).toBe(false);
+  });
+
+  it('rejects full folders, drafts, invalid requests, other collections and a blocked workspace', async () => {
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Limits');
+    await app.createCollection();
+    const collection = app.collections[0];
+    app.collections = [{ ...collection, folderPaths: [['Full'], ['Empty']] }];
+    await app.createNewRequest(collection.id);
+    const id = app.activeRequestId;
+    const original = app.requestsById.get(id);
+    app.requests = [...app.requests, ...Array.from({ length: 50 }, (_, index) => ({ ...original, id: `full-${index}`, folderPath: ['Full'] }))];
+    const alert = vi.spyOn(app, 'openAlertDialog').mockResolvedValue(undefined);
+    const persist = vi.spyOn(app, 'persistRequestStore');
+    await app.moveRequestToFolder(id, collection.id, ['Full']);
+    expect(alert).toHaveBeenCalledWith('Folder limit', expect.any(String));
+    await app.moveRequestToFolder(id, 'other-collection', ['Empty']);
+    app.requests = app.requests.map((request: SavedRequest) => request.id === id ? { ...request, isDraft: true } : request);
+    await app.moveRequestToFolder(id, collection.id, ['Empty']);
+    app.requests = app.requests.map((request: SavedRequest) => request.id === id ? { ...request, isDraft: false, isInvalid: true } : request);
+    await app.moveRequestToFolder(id, collection.id, ['Empty']);
+    app.requests = app.requests.map((request: SavedRequest) => request.id === id ? { ...request, isInvalid: false } : request);
+    vi.spyOn(app, 'guardWorkspaceWritable').mockReturnValue(false);
+    await app.moveRequestToFolder(id, collection.id, ['Empty']);
+    expect(persist).not.toHaveBeenCalled();
+    expect(app.requestsById.get(id)?.folderPath).toEqual([]);
+  });
+});

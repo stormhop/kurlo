@@ -780,3 +780,38 @@ test('reorders requests by dragging above and below siblings and restores the sa
     await cdp.detach();
   }
 });
+
+test('moves requests into empty and nested folders and back to the collection root', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'move-api', workspaceId: 'workspace-e2e', name: 'Move API', folderPaths: [['Empty'], ['Parent', 'Child']] }],
+    folderCollapsed: {},
+    requests: [{ id: 'move-me', name: 'Move me', collectionId: 'move-api', folderPath: [], method: 'GET', url: 'https://example.test/move' }],
+  });
+  await page.goto('/');
+  const request = page.locator('.collection-request-wrap').filter({ has: page.locator('.collection-title', { hasText: /^Move me$/ }) });
+  const folder = (name: string) => page.locator('.collection-subfolder').filter({ has: page.locator('.folder-title', { hasText: new RegExp(`^${name}$`) }) });
+  const savedPath = () => page.evaluate(() => (window.__kurloE2E.store.requests as Array<{ id: string; folderPath: string[] }>).find(request => request.id === 'move-me')?.folderPath);
+  await expect(request).toBeVisible();
+  const transfer = await page.evaluateHandle(() => new DataTransfer());
+  await request.dispatchEvent('dragstart', { dataTransfer: transfer });
+  await folder('Empty').dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(folder('Empty')).toHaveClass(/request-drop-target/);
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-folder-drop.png'), animations: 'disabled' });
+  await folder('Empty').dispatchEvent('drop', { dataTransfer: transfer });
+  await expect.poll(savedPath).toEqual(['Empty']);
+  await request.dragTo(folder('Child'));
+  await expect.poll(savedPath).toEqual(['Parent', 'Child']);
+  await request.dragTo(page.locator('.collection-folder').filter({ hasText: 'Move API' }));
+  await expect.poll(savedPath).toEqual([]);
+  await expect(folder('Empty')).toBeVisible();
+  await expect(folder('Child')).toBeVisible();
+  await request.dragTo(folder('Empty'));
+  await expect.poll(savedPath).toEqual(['Empty']);
+  const saved = await page.evaluate(() => window.__kurloE2E.store);
+  await page.addInitScript(store => { window.__kurloE2E.store = store; }, saved);
+  await page.reload();
+  await expect(request).toBeVisible();
+  await expect.poll(savedPath).toEqual(['Empty']);
+  await expect(request).toHaveAttribute('style', /--tree-depth: 1/);
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-folder-moved.png'), animations: 'disabled' });
+});
