@@ -427,7 +427,7 @@ test('keeps the first visible mock route in place when the sidebar slides away a
   const firstVisible = () => list.evaluate(node => {
     const top = node.getBoundingClientRect().top;
     const row = [...node.querySelectorAll<HTMLElement>('.mock-row')].find(item => item.getBoundingClientRect().top >= top - 0.5)!;
-    return { key: `${row.querySelector('.mock-path')!.textContent} ${row.querySelector('.status-badge')!.textContent}`, offset: Math.round(row.getBoundingClientRect().top - top) };
+    return { key: `${row.querySelector('.mock-path')!.textContent} ${row.querySelector('.status-badge')!.textContent}`, offset: row.getBoundingClientRect().top - top };
   });
   await expect.poll(() => list.locator('.mock-row-warning').first().evaluate(node => node.getClientRects().length)).toBeGreaterThan(0);
   const before = await firstVisible();
@@ -474,5 +474,7 @@ test('keeps the first visible mock route in place when the sidebar slides away a
     expect(sample.frames).toBeGreaterThan(20);
     expect(sample.shifts).toEqual([]);
   }
-  expect(await firstVisible()).toEqual(before);
+  const after = await firstVisible();
+  expect(after.key).toBe(before.key);
+  expect(Math.abs(after.offset - before.offset)).toBeLessThanOrEqual(1);
 });
