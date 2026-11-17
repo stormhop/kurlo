@@ -351,7 +351,9 @@ func TestAppGitOperationsWaitForAnotherProcessWritingTheWorkspace(t *testing.T) 
 	if result := <-done; !result.Ok {
 		t.Fatalf("result = %+v", result)
 	}
-	if _, ok := tryLockWorkspaceWrites(root); !ok {
+	relock, ok := tryLockWorkspaceWrites(root)
+	if !ok {
 		t.Fatal("the Git operation kept the workspace locked")
 	}
+	relock()
 }
