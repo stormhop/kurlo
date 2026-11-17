@@ -326,3 +326,32 @@ func TestAgentTurnTracksTheStoreItWritesTo(t *testing.T) {
 		t.Fatalf("tracked %q, want %q", tracked, root)
 	}
 }
+
+func TestAppGitOperationsWaitForAnotherProcessWritingTheWorkspace(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	root := t.TempDir()
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ran := make(chan struct{})
+	done := make(chan GitOperationResult)
+	go func() {
+		done <- withWorkspaceGitLock(root, func(string) GitOperationResult {
+			close(ran)
+			return GitOperationResult{Ok: true}
+		})
+	}()
+	select {
+	case <-ran:
+		t.Fatal("the Git operation ran while another writer held the workspace")
+	case <-time.After(150 * time.Millisecond):
+	}
+	unlock()
+	if result := <-done; !result.Ok {
+		t.Fatalf("result = %+v", result)
+	}
+	if _, ok := tryLockWorkspaceWrites(root); !ok {
+		t.Fatal("the Git operation kept the workspace locked")
+	}
+}

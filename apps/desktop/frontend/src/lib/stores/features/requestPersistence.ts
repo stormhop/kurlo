@@ -272,6 +272,7 @@ export const requestPersistenceFeature = {
     nextEnvironments = this.environments,
     nextActiveEnvId = this.activeEnvironmentId,
   ) {
+    if (!this.requestStoreLoaded) return false;
     if (this.externalWorkspaceChangePending) {
       if (await this.refreshPendingExternalWorkspaceChangeIfClean()) return true;
       this.showExternalWorkspacePendingToast('Saving');

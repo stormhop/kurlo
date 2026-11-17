@@ -1840,6 +1840,7 @@ class AppVM {
     this.gitConflict = { ...EMPTY_GIT_CONFLICT_FILE };
     this.gitConflictContent = '';
     const wasInGitView = this.topView === 'git';
+    this.cancelPersistTimersOnly();
     this.requestStoreLoaded = false;
     await this.loadRequestWorkspace(result.payload, result.diagnostics ?? []);
     if (wasInGitView) this.openGitTab(false);
@@ -2009,6 +2010,7 @@ class AppVM {
     if (this.persistTimer) { clearTimeout(this.persistTimer); this.persistTimer = null; }
     if (this.requestStorePersistTimer) { clearTimeout(this.requestStorePersistTimer); this.requestStorePersistTimer = null; }
     if (this.gitPersistRefreshTimer) { clearTimeout(this.gitPersistRefreshTimer); this.gitPersistRefreshTimer = null; }
+    if (this.workspacePersistTimer) { clearTimeout(this.workspacePersistTimer); this.workspacePersistTimer = null; }
   }
 
   cancelPendingPersistTimers() {

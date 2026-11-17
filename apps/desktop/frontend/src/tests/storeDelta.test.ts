@@ -16,6 +16,7 @@ type Req = { id: string; name: string; url?: string; collectionId?: string };
 
 function storeHost(requests: Req[]) {
   return {
+    requestStoreLoaded: true,
     externalWorkspaceChangePending: false,
     workspaceBlocked: false,
     requests,

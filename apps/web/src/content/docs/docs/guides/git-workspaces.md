@@ -145,4 +145,5 @@ When this happens, the Git screen lists one entry per problem and pauses editing
 - Local secret values remain in the encrypted Kurlo profile and are not staged by the Git workspace UI.
 - Kurlo does not discard unrelated repository files.
 - Destructive actions such as discard and force-push are explicit UI actions.
+- Pull, checkout, stash, commit, discard and conflict resolution wait while `kurlo mcp` or another Kurlo process is writing the workspace, so a commit never captures half of an agent's batch of changes.
 - Unknown YAML fields are preserved where possible so future versions and third-party tools can coexist.

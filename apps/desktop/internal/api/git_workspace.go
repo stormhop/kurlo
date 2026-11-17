@@ -284,14 +284,16 @@ func (a *App) GitConflictFile(path string) GitConflictFileResult {
 func (a *App) GitResolveConflictFile(path, resolution, content string) GitOperationResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	return gitResolveConflictFileForRoot(fileWorkspaceStorePath(), path, resolution, content)
+	return withWorkspaceGitLock(fileWorkspaceStorePath(), func(root string) GitOperationResult {
+		return gitResolveConflictFileForRoot(root, path, resolution, content)
+	})
 }
 
 func (a *App) GitContinueOperation(message string) WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitContinueOperationForRoot(root, message)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitContinueOperationForRoot(root, message) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -308,7 +310,7 @@ func (a *App) GitAbortOperation() WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitAbortOperationForRoot(root)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitAbortOperationForRoot(root) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -325,7 +327,7 @@ func (a *App) GitStashWorkspace(message string) WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitStashWorkspaceForRoot(root, message)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitStashWorkspaceForRoot(root, message) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -342,7 +344,7 @@ func (a *App) GitStashPopWorkspace(ref string) WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitStashPopWorkspaceForRoot(root, ref)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitStashPopWorkspaceForRoot(root, ref) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -371,6 +373,15 @@ func (a *App) GitFetchWorkspace() GitWorkspaceStatus {
 	return gitStatusForWorkspace(root)
 }
 
+func withWorkspaceGitLock(root string, run func(string) GitOperationResult) GitOperationResult {
+	unlock, err := lockWorkspaceWrites(root)
+	if err != nil {
+		return GitOperationResult{Ok: false, Git: gitStatusForWorkspace(root), Error: err.Error()}
+	}
+	defer unlock()
+	return run(root)
+}
+
 func gitFetchWorkspaceOnOpen(repoRoot string) (string, error) {
 	if strings.TrimSpace(repoRoot) == "" || gitOperationState(repoRoot) != "" || !gitRepositoryHasRemote(repoRoot) {
 		return "", nil
@@ -382,7 +393,7 @@ func (a *App) GitInitWorkspace() GitOperationResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitInitWorkspaceForRoot(root)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitInitWorkspaceForRoot(root) })
 	if result.Ok {
 		if err := persistActiveWorkspaceRootMode(root, workspaceStorageModeGit); err != nil {
 			return GitOperationResult{Ok: false, Git: gitStatusForWorkspace(root), Error: err.Error(), Output: result.Output, Files: result.Files}
@@ -410,7 +421,7 @@ func (a *App) GitCheckoutBranch(branchName string) WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitCheckoutBranchForRoot(root, branchName)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitCheckoutBranchForRoot(root, branchName) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -427,7 +438,7 @@ func (a *App) GitCreateBranch(branchName, startPoint string) WorkspaceOpenResult
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitCreateBranchForRoot(root, branchName, startPoint)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitCreateBranchForRoot(root, branchName, startPoint) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -443,7 +454,9 @@ func (a *App) GitCreateTrackingBranch(branchName, startPoint string) WorkspaceOp
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitCreateTrackingBranchForRoot(root, branchName, startPoint)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult {
+		return gitCreateTrackingBranchForRoot(root, branchName, startPoint)
+	})
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -470,19 +483,19 @@ func (a *App) GitRenameBranch(branchName, newName string, remote bool) GitOperat
 func (a *App) GitStageWorkspaceFiles() GitOperationResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	return gitStageWorkspaceFilesForRoot(fileWorkspaceStorePath())
+	return withWorkspaceGitLock(fileWorkspaceStorePath(), func(root string) GitOperationResult { return gitStageWorkspaceFilesForRoot(root) })
 }
 
 func (a *App) GitCommitWorkspace(message string) GitOperationResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	return gitCommitWorkspaceForRoot(fileWorkspaceStorePath(), message)
+	return withWorkspaceGitLock(fileWorkspaceStorePath(), func(root string) GitOperationResult { return gitCommitWorkspaceForRoot(root, message) })
 }
 
 func (a *App) GitCommitWorkspaceFiles(paths []string, message string) GitOperationResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	return gitCommitWorkspaceFilesForRoot(fileWorkspaceStorePath(), paths, message)
+	return withWorkspaceGitLock(fileWorkspaceStorePath(), func(root string) GitOperationResult { return gitCommitWorkspaceFilesForRoot(root, paths, message) })
 }
 
 func (a *App) GitPushWorkspace(remoteName string) GitOperationResult {
@@ -501,7 +514,7 @@ func (a *App) GitDiscardWorkspaceFile(path string) WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitDiscardWorkspaceFileForRoot(root, path)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitDiscardWorkspaceFileForRoot(root, path) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -517,7 +530,7 @@ func (a *App) GitDiscardWorkspaceChanges() WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitDiscardWorkspaceChangesForRoot(root)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitDiscardWorkspaceChangesForRoot(root) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -533,7 +546,7 @@ func (a *App) GitDiscardWorkspaceFiles(paths []string) WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitDiscardWorkspaceFilesForRoot(root, paths)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitDiscardWorkspaceFilesForRoot(root, paths) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output}
 	}
@@ -556,14 +569,14 @@ func (a *App) GitPullWorkspaceWithStrategy(strategy string) WorkspaceOpenResult 
 func (a *App) GitPullBranch(branchName string) GitOperationResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
-	return gitPullBranchForRoot(fileWorkspaceStorePath(), branchName)
+	return withWorkspaceGitLock(fileWorkspaceStorePath(), func(root string) GitOperationResult { return gitPullBranchForRoot(root, branchName) })
 }
 
 func (a *App) gitPullWorkspace(strategy string) WorkspaceOpenResult {
 	gitOperationMu.Lock()
 	defer gitOperationMu.Unlock()
 	root := fileWorkspaceStorePath()
-	result := gitPullWorkspaceForRoot(root, strategy)
+	result := withWorkspaceGitLock(root, func(root string) GitOperationResult { return gitPullWorkspaceForRoot(root, strategy) })
 	if !result.Ok {
 		return WorkspaceOpenResult{Ok: false, Root: root, Git: result.Git, Error: result.Error, Output: result.Output, PullSummary: result.PullSummary}
 	}

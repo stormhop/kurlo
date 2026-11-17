@@ -17,6 +17,7 @@ type Req = { id: string; name: string; isDraft?: boolean; examples?: unknown[]; 
 
 function storeHost(requests: Req[]) {
   return {
+    requestStoreLoaded: true,
     externalWorkspaceChangePending: false,
     workspaceBlocked: false,
     requests,
@@ -229,6 +230,14 @@ describe('request store persistence dedup', () => {
     await persist(host);
 
     expect(saveRequestStore).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not write while the workspace is being reloaded', async () => {
+    const host = storeHost([{ id: 'r1', name: 'A' }]);
+    host.requestStoreLoaded = false;
+
+    expect(await persist(host)).toBe(false);
+    expect(saveRequestStore).not.toHaveBeenCalled();
   });
 });
 
