@@ -125,6 +125,8 @@ const backend = vi.hoisted(() => {
     hasNativeImportDialog: vi.fn(() => false),
     chooseImportFile: vi.fn(async () => ({ path: '', name: '', content: '', error: '' })),
     readImportFile: vi.fn(async (path: string) => ({ path, name: '', content: '', error: 'missing' })),
+    openDirectoryDialog: vi.fn(async () => ''),
+    readCollectionTextFiles: vi.fn(async (root: string) => ({ root, name: '', files: [] as Array<{ path: string; content: string }>, error: 'missing' })),
     saveFileDialog: vi.fn(async (name: string, content: string) => {
       state.savedFiles.push({ name, content });
       return true;

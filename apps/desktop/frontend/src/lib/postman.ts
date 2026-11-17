@@ -1,4 +1,4 @@
-import type { KVRow, SavedRequest, CollectionDefaults, Environment, FolderDefaults, AuthType, BodyType, JwtAlgorithm, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SIOArg } from './types/models';
+import type { KVRow, SavedRequest, CollectionDefaults, Environment, FolderDefaults, AuthType, BodyType, JwtAlgorithm, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SavedRealtimeMessage, SIOArg } from './types/models';
 import { DEFAULT_REQUEST_SETTINGS, JWT_ALGORITHMS } from './constants';
 import { assertionsToPostmanScript, assertionsWithoutUiIds, normalizeAssertions, requestTypeSupportsAssertions, type AssertionRow } from './assertions';
 import { isRecord, asArray, asText, newRequestId } from './utils';
@@ -481,6 +481,14 @@ export function postmanRequestsFromItems(
       ...(sioArgs ? { sioArgs } : {}),
       ...(Array.isArray(kurlo.sioEvents) ? { sioEvents: kurloRows(kurlo.sioEvents) } : {}),
       ...(typeof kurlo.sioAck === 'boolean' ? { sioAck: kurlo.sioAck } : {}),
+      ...(asText(kurlo.sioEventName) ? { sioEventName: asText(kurlo.sioEventName) } : {}),
+      ...(Array.isArray(kurlo.savedMessages) ? { savedMessages: kurlo.savedMessages as SavedRealtimeMessage[] } : {}),
+      ...(requestType === 'mcp' ? {
+        mcpMethod: asText(kurlo.mcpMethod),
+        mcpName: asText(kurlo.mcpName),
+        mcpArguments: asText(kurlo.mcpArguments),
+        mcpProtocolVersion: asText(kurlo.mcpProtocolVersion),
+      } : {}),
       ...(requestType === 'grpc' ? {
         grpcMethod,
         grpcMetadata,

@@ -9,7 +9,8 @@ Kurlo supports both one-off interchange formats and full Kurlo backups. Imports 
 
 | Source | What Kurlo imports |
 |--------|--------------------|
-| Postman Collection v2.1 | Collections, nested folders, requests, auth, bodies, GraphQL, scripts, collection variables, and request documentation. Environment and globals exports import through the same picker. |
+| Postman Collection v2.0 / v2.1 | Collections, nested folders, requests, auth, bodies, GraphQL, scripts, collection variables, and request documentation. Environment and globals exports import through the same picker. |
+| Postman Collection v3 (folder) | Postman v12 Native Git folders of `.request.yaml` files: collections, folders and their order, HTTP, GraphQL, gRPC, WebSocket, Socket.IO and MCP requests, auth, bodies, scripts, settings, examples, environments and globals. |
 | Insomnia v4 JSON | Workspaces, folders, requests, auth, bodies, and environments. |
 | Bruno/OpenCollection | Collections, explicit empty folders, requests, GraphQL, and supported metadata. |
 | OpenAPI/Swagger | From a file or a URL. HTTP/SSE requests generated from operations, plus the collection defaults that make them sendable: the server becomes a `{{baseUrl}}` variable, path parameters become the request's path variables seeded from the spec's examples, and declared security schemes become the request's auth. |
@@ -23,7 +24,10 @@ Kurlo supports both one-off interchange formats and full Kurlo backups. Imports 
 
 ## From Postman
 
-Kurlo reads Postman Collection v2.1 — the JSON export, not the cloud-sync format.
+Kurlo reads both Postman formats and tells them apart on its own:
+
+- **v2.0 / v2.1** — the single JSON file Postman exports. Both versions go through the same **Postman collection** option, so there is no version to choose.
+- **v3** — the folder of YAML files Postman v12 keeps in a Git repository (Native Git). See [Postman v3 folders](#postman-v3-folders).
 
 1. In Postman: right-click the collection → **Export** → choose v2.1.
 2. In Kurlo: click the **import** icon in the sidebar header (next to **+**) and pick the JSON file — or drop the file anywhere in the Kurlo window.
@@ -43,6 +47,23 @@ Postman folders can carry their own auth and scripts. They become the folder's [
 ### Environments and globals
 
 Postman exports environments and globals as separate JSON files. Pick **Postman collection** in the import dialog and choose one of those files — Kurlo recognises it and imports it as an environment (made active) or merges it into **Globals**. Values Postman marked as secrets stay marked as secrets.
+
+### Postman v3 folders
+
+Postman v12 stores a collection as a folder: each request is a `*.request.yaml` file, folder and collection settings live in `.resources/definition.yaml`, and saved responses in `.resources/<request>.resources/examples/`. To import one, pick **Postman v3 collection folder** in the import dialog and choose the folder, or drop the folder anywhere in the Kurlo window. Dropping a single `.request.yaml` file imports just that request.
+
+You can pick a single collection folder or the whole `postman/` folder of a repository. Kurlo finds every collection inside it, imports each one as its own collection, and also imports the environments (`*.environment.yaml`) and globals (`*.globals.yaml`) next to them. A folder with no `definition.yaml` at all becomes one collection named after the folder.
+
+What carries over, in addition to everything listed above for v2.1:
+
+- The `order` of folders and requests. Items without one go last, sorted by name.
+- Headers, query parameters, path variables and collection variables written either as a list or as a `key: value` map.
+- Request settings: SSL verification, redirects, HTTP version, URL encoding and the cookie jar.
+- gRPC requests with their method, message, metadata and TLS settings; WebSocket requests with their saved messages; Socket.IO requests with their events, the first message to send and every saved message; MCP requests over HTTP with the JSON-RPC call split into method, name and arguments.
+- Saved examples of HTTP and GraphQL requests.
+- Scripts written for HTTP requests at collection and folder level. Collection and folder scripts that Postman runs only for gRPC or Kafka are left out, so they cannot run on your HTTP requests.
+
+Kurlo cannot run MQTT, Kafka, LLM and data requests, or MCP servers started over stdio. The import skips them and says how many it skipped; the rest of the collection imports as usual. Secrets that Postman keeps in a vault are imported as empty secret variables for you to fill in.
 
 What doesn't carry over:
 

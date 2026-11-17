@@ -7,7 +7,7 @@ If you already have collections in Postman, Insomnia, or another HTTP client, Ku
 
 ## From Postman
 
-Kurlo imports **Postman Collection v2.1** — the format produced by every modern Postman version.
+Kurlo imports **Postman Collection v2.0 and v2.1** — the JSON file Postman exports — and the **Postman v3** folder format that Postman v12 keeps in Git. You don't pick a version: Kurlo recognises the format from the file or folder you give it. For v3 folders, see [Postman v3 folders](/docs/guides/import-export/#postman-v3-folders).
 
 ### Export from Postman
 

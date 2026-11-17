@@ -70,6 +70,13 @@ describe('file drop dispatch', () => {
     expect(zoneDrop).toHaveBeenCalledWith(['/tmp/a.png']);
     expect(fallback).toHaveBeenCalledWith(['/tmp/api.http']);
 
+    dispatchFileDrop(outside, ['']);
+    dispatchFileDrop(inside, ['', '  ']);
+    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(zoneDrop).toHaveBeenCalledTimes(1);
+    dispatchFileDrop(outside, ['', '/tmp/d.http']);
+    expect(fallback).toHaveBeenLastCalledWith(['/tmp/d.http']);
+
     removeZone();
     dispatchFileDrop(inside, ['/tmp/b.http']);
     expect(fallback).toHaveBeenLastCalledWith(['/tmp/b.http']);
@@ -79,7 +86,7 @@ describe('file drop dispatch', () => {
     expect(host.removeEventListener).toHaveBeenCalledTimes(host.addEventListener.mock.calls.length);
     expect(properties.has('--wails-drop-target')).toBe(false);
     dispatchFileDrop(outside, ['/tmp/c.http']);
-    expect(fallback).toHaveBeenCalledTimes(2);
+    expect(fallback).toHaveBeenCalledTimes(3);
   });
 });
 

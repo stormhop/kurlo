@@ -764,6 +764,11 @@ class AppVM {
   declare importDroppedFiles: typeof importExportFeature.importDroppedFiles;
   declare importCollectionPayload: typeof importExportFeature.importCollectionPayload;
   declare importBrunoOpenCollectionFolder: typeof importExportFeature.importBrunoOpenCollectionFolder;
+  declare importBrunoFolderFiles: typeof importExportFeature.importBrunoFolderFiles;
+  declare importDroppedFolder: typeof importExportFeature.importDroppedFolder;
+  declare importCollectionFolder: typeof importExportFeature.importCollectionFolder;
+  declare runPostmanV3Import: typeof importExportFeature.runPostmanV3Import;
+  declare importPostmanV3Files: typeof importExportFeature.importPostmanV3Files;
   declare importOpenCollectionFiles: typeof importExportFeature.importOpenCollectionFiles;
   declare importHarPayload: typeof importExportFeature.importHarPayload;
   declare importRequestsPayload: typeof importExportFeature.importRequestsPayload;

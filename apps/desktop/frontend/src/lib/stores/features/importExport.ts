@@ -1,5 +1,6 @@
+import type { CollectionTextFilesResult } from '../../wire';
 import { chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles } from '../../backend';
-import { detectImportSource, type ImportSource } from '../../importSource';
+import { detectImportSource, isBrunoFolder, isPostmanV3Document, isPostmanV3Folder, type ImportSource } from '../../importSource';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
 import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, ScriptEngine, Workspace } from '../../types/models';
 import { mergeGlobalRowsWithImportedRows } from './globals';
@@ -117,6 +118,11 @@ type ImportExportHost = {
   saveTextFile: (name: string, content: string) => Promise<boolean>;
   isRecord: (value: unknown) => value is Record<string, unknown>;
   importBrunoOpenCollectionFolder: () => Promise<void>;
+  importBrunoFolderFiles: (root: string, result: CollectionTextFilesResult) => Promise<void>;
+  importDroppedFolder: (path: string) => Promise<boolean>;
+  importCollectionFolder: (root: string, preloaded?: CollectionTextFilesResult) => Promise<void>;
+  runPostmanV3Import: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<void>;
+  importPostmanV3Files: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<number>;
   importCollectionPayload: (text: string, fileName: string, source: ImportSource) => Promise<number>;
   runCollectionFileImport: (text: string, fileName: string, source: ImportSource) => Promise<void>;
   importOpenCollectionFiles: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<number>;
@@ -162,7 +168,8 @@ export const importExportFeature = {
     this.closeFloatingMenus();
     const source = await this.openSelectDialog('Import collection', 'Choose the source format to import:', [
       { value: 'bruno', label: 'Bruno / OpenCollection', icon: 'bruno', description: 'Import a Bruno collection folder with opencollection.yml or legacy .bru files.' },
-      { value: 'postman', label: 'Postman collection', icon: 'postman', description: 'Import a Postman v2.1 collection, environment, or globals JSON file.' },
+      { value: 'postman', label: 'Postman collection', icon: 'postman', description: 'Import a Postman v2.0/v2.1 collection, environment, or globals JSON file.' },
+      { value: 'postman-v3', label: 'Postman v3 collection folder', icon: 'postman', description: 'Import a Postman v12 collection folder with .request.yaml files, environments and globals.' },
       { value: 'insomnia', label: 'Insomnia export', icon: 'insomnia', description: 'Import an Insomnia workspace or collection export JSON file.' },
       { value: 'openapi', label: 'OpenAPI / Swagger', icon: 'openapi', description: 'Import OpenAPI 3.x or Swagger 2.0 JSON/YAML specs.' },
       { value: 'openapi-url', label: 'OpenAPI / Swagger from URL', icon: 'openapi', description: 'Fetch a spec from a link — https://api.example.com/openapi.json' },
@@ -172,6 +179,11 @@ export const importExportFeature = {
     if (!source) return;
     if (source === 'openapi-url') {
       await this.openOpenApiUrlImport();
+      return;
+    }
+    if (source === 'postman-v3') {
+      const root = await openDirectoryDialog('Import Postman v3 collection folder');
+      if (root) await this.importCollectionFolder(root);
       return;
     }
     this.collectionImportSource = source as ImportSource;
@@ -195,6 +207,11 @@ export const importExportFeature = {
     for (const path of paths) {
       const file = await readImportFile(path);
       const name = file.name || path.split(/[\\/]/).pop() || path;
+      if (file.error && await this.importDroppedFolder(path)) continue;
+      if (!file.error && isPostmanV3Document(name, file.content)) {
+        await this.runPostmanV3Import([{ path: name, content: file.content }], name.replace(/\.request\.ya?ml$/i, '').replace(/\.ya?ml$/i, ''));
+        continue;
+      }
       const source = file.error ? null : detectImportSource(name, file.content);
       if (!source) {
         this.collectionImportToast = file.error ? `Import failed: ${file.error}` : `Kurlo can't import ${name}`;
@@ -277,12 +294,69 @@ export const importExportFeature = {
     const spec = parseOpenApiDocument(text);
     return this.importOpenApiPayload(spec, fileName);
   },
+  async importDroppedFolder(this: ImportExportHost, path: string) {
+    const result = await readCollectionTextFiles(path);
+    if (result.error || !(isPostmanV3Folder(result.files) || isBrunoFolder(result.files))) return false;
+    await this.importCollectionFolder(path, result);
+    return true;
+  },
+  async importCollectionFolder(this: ImportExportHost, root: string, preloaded?: CollectionTextFilesResult) {
+    if (!this.guardWorkspaceWritable('Importing')) return;
+    const result = preloaded ?? await readCollectionTextFiles(root);
+    const name = result.name || root.split(/[\\/]/).pop() || '';
+    if (!result.error && isPostmanV3Folder(result.files)) {
+      await this.runPostmanV3Import(result.files, name || 'Postman Collection');
+      return;
+    }
+    await this.importBrunoFolderFiles(root, result);
+  },
+  async runPostmanV3Import(this: ImportExportHost, files: Array<{ path: string; content: string }>, fallbackName: string) {
+    try {
+      this.collectionImportSummary = '';
+      await this.importPostmanV3Files(files, fallbackName);
+      this.collectionImportToast = this.collectionImportSummary || 'Imported empty collection';
+    } catch (err) {
+      this.collectionImportToast = `Import failed: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      this.collectionImportSummary = '';
+      setTimeout(() => (this.collectionImportToast = ''), 3600);
+    }
+  },
+  async importPostmanV3Files(this: ImportExportHost, files: Array<{ path: string; content: string }>, fallbackName: string) {
+    if (!this.guardWorkspaceWritable('Importing')) return 0;
+    const wsId = this.activeWorkspaceId || this.workspaces[0]?.id; if (!wsId) throw new Error('No workspace available');
+    const { postmanV3FromFiles } = await import('../../postmanV3');
+    const { postmanCollectionBundle } = await import('../../postman');
+    const imported = postmanV3FromFiles(files, fallbackName);
+    if (!imported.collections.length && !imported.variableSets.length) {
+      const reason = imported.skipped[0] ? `${imported.skipped[0].path}: ${imported.skipped[0].reason}` : 'no Postman v3 collection found';
+      throw new Error(reason);
+    }
+    let requestCount = 0;
+    for (const collection of imported.collections) {
+      const collectionId = makeCollection(wsId, collection.name).id;
+      const bundle = postmanCollectionBundle(collection.payload, collectionId, collection.name);
+      requestCount += await this.importCollectionBundle({ ...bundle, id: collectionId });
+    }
+    const environments = imported.variableSets.filter(set => set.scope === 'environment');
+    for (const set of imported.variableSets) {
+      await this.importPostmanVariableBundle(set);
+    }
+    const parts = [`Imported ${requestCount} request${requestCount === 1 ? '' : 's'}`];
+    if (imported.collections.length > 1) parts.push(`from ${imported.collections.length} collections`);
+    if (environments.length) parts.push(`and ${environments.length} environment${environments.length === 1 ? '' : 's'}`);
+    const skipped = imported.skipped.length ? ` · skipped ${imported.skipped.length} unsupported item${imported.skipped.length === 1 ? '' : 's'}` : '';
+    this.collectionImportSummary = `${parts.join(' ')}${skipped}`;
+    return requestCount;
+  },
   async importBrunoOpenCollectionFolder(this: ImportExportHost) {
     if (!this.guardWorkspaceWritable('Importing')) return;
     const root = await openDirectoryDialog('Import Bruno / OpenCollection folder');
     if (!root) return;
+    await this.importCollectionFolder(root);
+  },
+  async importBrunoFolderFiles(this: ImportExportHost, root: string, result: CollectionTextFilesResult) {
     try {
-      const result = await readCollectionTextFiles(root);
       if (result.error) throw new Error(result.error);
       const count = await this.importOpenCollectionFiles(result.files, result.name || root.split(/[\\/]/).pop() || 'Bruno Collection');
       this.collectionImportToast = count ? `Imported ${count} Bruno request${count === 1 ? '' : 's'}` : 'Imported empty Bruno collection';

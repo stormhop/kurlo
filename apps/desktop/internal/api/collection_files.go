@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maxCollectionTextFiles = 2000
+	maxCollectionTextFiles = 20000
 	maxCollectionTextBytes = 100 * 1024 * 1024
 )
 

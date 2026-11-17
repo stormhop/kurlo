@@ -12,7 +12,8 @@ export function addFileDropZone(element: HTMLElement, onDrop: FileDropHandler): 
   return () => zones.delete(zone);
 }
 
-export function dispatchFileDrop(target: Element | null, paths: string[]) {
+export function dispatchFileDrop(target: Element | null, dropped: string[]) {
+  const paths = dropped.filter(path => path.trim() !== '');
   if (!paths.length) return;
   for (const zone of zones) {
     if (target && zone.element.contains(target)) {
