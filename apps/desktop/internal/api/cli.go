@@ -565,12 +565,30 @@ func resolveCLIValuesForWorkspace(opts cliOptions, environments []cliEnvironment
 		}
 		for key, value := range fileValues {
 			values[key] = value
+			if value != "" && cliSecretName(key) {
+				secretValues = append(secretValues, value)
+			}
 		}
 	}
 	for key, value := range opts.vars {
 		values[key] = value
+		if value != "" && cliSecretName(key) {
+			secretValues = append(secretValues, value)
+		}
 	}
 	return values, secretValues, nil
+}
+
+var cliSecretNameParts = []string{"token", "secret", "password", "passwd", "apikey", "privatekey", "credential", "sessionid", "cookie", "authorization", "bearer", "jwt"}
+
+func cliSecretName(key string) bool {
+	normalized := strings.NewReplacer("-", "", "_", "", ".", "", " ", "").Replace(strings.ToLower(key))
+	for _, part := range cliSecretNameParts {
+		if strings.Contains(normalized, part) {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveGlobals(opts cliOptions) (map[string]string, error) {

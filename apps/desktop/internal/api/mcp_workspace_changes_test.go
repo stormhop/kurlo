@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -357,5 +358,22 @@ func TestMCPWorkspaceBatchCreatesEnvironmentsWithVariables(t *testing.T) {
 	}
 	if _, err := mcpFindByName(st.environments, "refused", "environment"); err == nil {
 		t.Fatal("a refused environment was saved")
+	}
+}
+
+func TestMCPRunReportsEachScriptLogOnce(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	echo := echoServer(t)
+	root := writeYAMLWorkspace(t, echo.URL)
+	h := startMCPHarness(t, mcpServerOptions{workspace: root})
+	h.tool("save_request", map[string]any{"collection": "Smoke", "name": "Logged", "url": echo.URL}, nil)
+	h.tool("patch_request", map[string]any{"request": "Smoke/Logged", "patch": map[string]any{
+		"preRequestScriptJs": `console.log("before")`,
+		"testScriptJs":       `console.log("after")`,
+	}}, nil)
+	var run mcpRequestOutcome
+	h.tool("run_request", map[string]any{"request": "Smoke/Logged"}, &run)
+	if !reflect.DeepEqual(run.Logs, []string{"before", "after"}) {
+		t.Fatalf("logs = %q", run.Logs)
 	}
 }

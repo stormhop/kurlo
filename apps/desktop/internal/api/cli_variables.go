@@ -108,7 +108,7 @@ var dynamicGenerators = map[string]func() string{
 	"$guid":               randomUUID,
 	"$randomUUID":         randomUUID,
 	"$timestamp":          func() string { return fmt.Sprintf("%d", time.Now().Unix()) },
-	"$isoTimestamp":       func() string { return time.Now().UTC().Format(time.RFC3339) },
+	"$isoTimestamp":       func() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00") },
 	"$randomInt":          func() string { return fmt.Sprintf("%d", randInt(0, 1000)) },
 	"$randomBoolean":      func() string { return map[bool]string{true: "true", false: "false"}[randInt(0, 1) == 1] },
 	"$randomAlphaNumeric": alphaNumeric,

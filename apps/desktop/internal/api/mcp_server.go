@@ -963,13 +963,15 @@ type mcpKeyValue struct {
 	Value string `json:"value"`
 }
 
-func mcpEnabledRows(rows []cliKV) []mcpKeyValue {
+func mcpEnabledRows(rows []cliKV, sensitive map[string]bool) []mcpKeyValue {
 	out := make([]mcpKeyValue, 0, len(rows))
 	for _, row := range rows {
 		if row.Enabled && strings.TrimSpace(row.Key) != "" {
 			value := row.Value
 			if row.Secret {
 				value = "<secret>"
+			} else if sensitive[strings.ToLower(strings.TrimSpace(row.Key))] && secretFieldNeedsVault(value) {
+				value = "[secret]"
 			} else if row.IsFile {
 				value = "<file " + defaultString(row.FileName, row.Value) + ">"
 			}
@@ -1008,19 +1010,19 @@ func (s *mcpServer) toolGetRequest(_ context.Context, arguments json.RawMessage)
 		"type":     mcpRequestType(req),
 		"method":   strings.ToUpper(req.Method),
 		"url":      req.URL,
-		"params":   mcpEnabledRows(req.Params),
-		"headers":  mcpEnabledRows(req.Headers),
+		"params":   mcpEnabledRows(req.Params, nil),
+		"headers":  mcpEnabledRows(req.Headers, mcpSensitiveRequestHeaders),
 		"bodyType": defaultString(req.BodyType, "none"),
 		"auth":     map[string]any{"type": defaultString(req.Auth.Type, "none")},
 		"runnable": cliRunnable(req),
 	}
-	if rows := mcpEnabledRows(req.PathParams); len(rows) > 0 {
+	if rows := mcpEnabledRows(req.PathParams, nil); len(rows) > 0 {
 		detail["pathVariables"] = rows
 	}
 	if req.BodyContent != "" {
 		detail["body"] = req.BodyContent
 	}
-	if rows := mcpEnabledRows(req.FormRows); len(rows) > 0 {
+	if rows := mcpEnabledRows(req.FormRows, nil); len(rows) > 0 {
 		detail["form"] = rows
 	}
 	if script := cliPreScript(req); strings.TrimSpace(script) != "" {
@@ -1245,10 +1247,8 @@ func (s *mcpServer) execute(ctx context.Context, run *mcpRunContext, req cliSave
 func (s *mcpServer) executeIteration(ctx context.Context, run *mcpRunContext, req cliSavedRequest, iteration int, data map[string]string, opts cliOptions) (cliRunResult, model.HttpResponse) {
 	result, resp := executeCLIRequest(ctx, run.sm, s.jars, s.cache, s.tokens, req, iteration, data, opts, run.secrets)
 	run.secrets = append(run.secrets, result.secrets...)
-	for _, logs := range [][]string{resp.PreRequestResult.Logs, resp.TestResult.Logs} {
-		for _, line := range logs {
-			result.Logs = append(result.Logs, redactSecrets(line, run.secrets))
-		}
+	for i, line := range result.Logs {
+		result.Logs[i] = redactSecrets(line, run.secrets)
 	}
 	return result, resp
 }

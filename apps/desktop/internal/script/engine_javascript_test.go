@@ -321,6 +321,22 @@ func TestJSTimesOut(t *testing.T) {
 	}
 }
 
+func TestJSBacktrackingRegexTimesOut(t *testing.T) {
+	t.Parallel()
+
+	ctx := NewContext(nil, nil)
+	ctx.Timeout = 20 * time.Millisecond
+
+	start := time.Now()
+	res := jsPre(`/^(a+)+(?=b)/.test("a".repeat(40) + "!")`, ctx)
+	if !strings.Contains(res.Error, "timed out") {
+		t.Fatalf("expected timeout error, got %q", res.Error)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("regex timeout took too long: %s", elapsed)
+	}
+}
+
 func TestJSRejectsOversizedScripts(t *testing.T) {
 	t.Parallel()
 

@@ -83,6 +83,8 @@ Every occurrence is generated independently — two `{{$guid}}` in one request p
 | Business | `$randomCompanyName`, `$randomBankAccount`, `$randomCreditCardMask`, `$randomPrice`, `$randomCurrencyCode`, `$randomCurrencyName`, `$randomCurrencySymbol` |
 | Files & colour | `$randomMimeType`, `$randomFileName`, `$randomFileExt`, `$randomColor`, `$randomHexColor` |
 
+`$isoTimestamp` is the current UTC time with milliseconds, such as `2026-11-17T09:30:00.123Z`, the same in the app, `kurlo run` and `kurlo mcp`.
+
 The editor's `{{` autocomplete lists them alongside your own variables. A `{{$name}}` Kurlo doesn't implement is left as-is rather than sent as an empty value.
 
 ## Comparing environments

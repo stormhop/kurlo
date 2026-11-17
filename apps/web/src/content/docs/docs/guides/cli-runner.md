@@ -102,7 +102,7 @@ The full set of dynamic variables (`{{$guid}}`, `{{$timestamp}}`, `{{$randomEmai
 
 Environment names are resolved in each collection's own workspace, so two workspaces in one store can both have a `Local` or `CI` environment. A variable marked secret is shown as `[secret]` in the terminal and JSON report, including when it appears in the request URL; a request header marked secret is masked the same way in test errors and script output.
 
-Secrets are the reason `--var` and `--env-file` exist: keep them out of the committed workspace and inject them from the CI environment.
+Secrets are the reason `--var` and `--env-file` exist: keep them out of the committed workspace and inject them from the CI environment. A value from `--var` or `--env-file` whose name contains `token`, `secret`, `password`, `passwd`, `apikey`, `privatekey`, `credential`, `sessionid`, `cookie`, `authorization`, `bearer` or `jwt` (ignoring case, `-`, `_` and `.`) is masked as `[secret]` in the terminal, the JSON and JUnit reports and script logs. Other values, such as `baseUrl`, are printed as they are.
 
 ```bash
 kurlo run . --env CI --var authToken="$API_TOKEN" --env-file .ci.env

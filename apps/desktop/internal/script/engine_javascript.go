@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/dlclark/regexp2"
 	"github.com/dop251/goja"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
@@ -20,6 +21,10 @@ const (
 	jsMaxLogEntries     = 200
 	jsMaxTestEntries    = 1000
 )
+
+func init() {
+	regexp2.DefaultMatchTimeout = scriptExecutionTimeout
+}
 
 func runJS(src string, ctx *Context, hasResponse bool) string {
 	vm := goja.New()
