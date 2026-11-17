@@ -73,7 +73,7 @@ What doesn't carry over:
 
 ## From OpenAPI / Swagger
 
-Pick **OpenAPI / Swagger** and choose a JSON or YAML spec. Kurlo builds one request per operation, grouped into folders by the operation's first tag, with the summary as the request name and the description as its Docs tab. The YAML that spec generators such as Jackson and springdoc write is read as is, including lists at the same indent as their key and quoted strings that continue over several lines.
+Pick **OpenAPI / Swagger** and choose a JSON or YAML spec. Kurlo builds one request per operation, grouped into folders by the operation's first tag, with the summary as the request name and the description as its Docs tab. The YAML that spec generators such as Jackson and springdoc write is read as is, including lists at the same indent as their key, quoted strings that continue over several lines and `[...]` or `{...}` collections split over several lines. A YAML file with several documents separated by `---` is rejected with a message rather than merged.
 
 The point is a collection you can send straight away, so three things land on the collection rather than being baked into each request:
 
@@ -134,10 +134,14 @@ Paste a curl command directly into the URL bar of a new request. Kurlo parses:
 - Method (`-X`)
 - Headers (`-H`)
 - Body (`-d`, `--data-raw`, `--data-binary`)
-- Basic auth (`-u`)
+- File uploads (`-T`), sent as a binary body with `PUT`
+- Query parameters (`--url-query`)
+- Auth: Basic (`-u`), Digest (`--digest -u`), NTLM (`--ntlm -u`), Bearer (`--oauth2-bearer`) and AWS Signature v4 (`--aws-sigv4`)
 - Multipart fields (`-F`)
 
-URL-only curl commands work too — `curl https://api.example.com/users` becomes a GET request.
+Combined short flags such as `-sSL` or `-sSLo out.json` are read the way curl reads them. URL-only curl commands work too — `curl https://api.example.com/users` becomes a GET request.
+
+When a command uses an option Kurlo cannot carry over, such as headers read from a file (`-H @headers.txt`) or `--negotiate`, the paste stops with a message naming the option instead of importing a request that would send something different.
 
 ## From Bruno/OpenCollection
 

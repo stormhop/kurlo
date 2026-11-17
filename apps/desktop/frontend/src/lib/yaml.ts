@@ -70,9 +70,61 @@ function joinQuoted(rows: string[], start: number, first: string, firstScan: Quo
   return [text, cursor];
 }
 
+function flowBalance(value: string) {
+  let quote = '';
+  let escaped = false;
+  let depth = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quote) {
+      if (ch === '\\' && quote === '"') escaped = true;
+      else if (ch === quote) {
+        if (quote === "'" && value[i + 1] === "'") i += 1;
+        else quote = '';
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '[' || ch === '{') depth += 1;
+    else if (ch === ']' || ch === '}') depth -= 1;
+  }
+  return depth;
+}
+
+function openFlowDepth(text: string) {
+  const item = text.replace(/^(?:-\s+)*/, '');
+  const value = /^[[{]/.test(item) ? item : (splitKeyValue(item)?.[1] ?? '').replace(/^&\S+\s+/, '');
+  return /^[[{]/.test(value) ? flowBalance(value) : 0;
+}
+
+function joinFlow(rows: string[], start: number, first: string, indent: number): [string, number] {
+  let text = first.trimEnd();
+  let cursor = start;
+  let depth = openFlowDepth(text.trim());
+  while (depth > 0 && cursor + 1 < rows.length) {
+    cursor += 1;
+    const row = rows[cursor].replace(/\t/g, '  ');
+    const part = row.slice(0, scanQuotes(row, '').comment).trim();
+    if (!part) continue;
+    const rowIndent = leadingSpaces(row);
+    if (rowIndent < indent || (rowIndent === indent && !/^[\]}]/.test(part))) {
+      cursor -= 1;
+      break;
+    }
+    depth += flowBalance(part);
+    text += (/[[{,]$/.test(text) || /^[\]}]/.test(part) ? '' : ' ') + part;
+  }
+  return [text, cursor];
+}
+
 function preprocess(source: string): YamlLine[] {
   const rows = source.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/);
   const out: YamlLine[] = [];
+  let documentEnded = false;
   for (let i = 0; i < rows.length; i += 1) {
     const first = rows[i].replace(/\t/g, '  ');
     const indent = leadingSpaces(first);
@@ -83,8 +135,14 @@ function preprocess(source: string): YamlLine[] {
       if (joined) [raw, i] = joined;
       else raw = stripUnclosed(first);
     }
+    if (openFlowDepth(raw.trim()) > 0) [raw, i] = joinFlow(rows, i, raw, indent);
     const text = raw.trim();
-    if (!text || text === '---' || text === '...') continue;
+    if (!text) continue;
+    if (text === '---' || text === '...') {
+      documentEnded = out.length > 0;
+      continue;
+    }
+    if (documentEnded) throw new Error('YAML files with several documents are not supported; keep one document per file');
     out.push({ indent, text, raw });
     if (!BLOCK_HEADER_LINE.test(text)) continue;
     while (i + 1 < rows.length) {

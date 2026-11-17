@@ -337,3 +337,58 @@ describe('parseCurl --data-raw', () => {
     expect(parsed.bodyFilePath).toBe('payload.json');
   });
 });
+
+describe('parseCurl options that change the request', () => {
+  it('expands combined short flags so a value flag keeps its argument', () => {
+    const parsed = parseCurl('curl -sSLo out.json localhost:3000/config');
+    expect(parsed.url).toBe('localhost:3000/config');
+    expect(parsed.followRedirects).toBe(true);
+    expect(parseCurl('curl -sXPUT https://api.example.test/x').method).toBe('PUT');
+  });
+
+  it('uploads the file given to -T with PUT', () => {
+    expect(parseCurl('curl -T file.bin https://example.com/upload')).toMatchObject({
+      method: 'PUT', url: 'https://example.com/upload', bodyType: 'binary', bodyFilePath: 'file.bin',
+    });
+    expect(parseCurl('curl --upload-file ./dir/file.bin https://example.com/files/').url).toBe('https://example.com/files/file.bin');
+    expect(parseCurl('curl -X POST -T file.bin https://example.com/upload').method).toBe('POST');
+    expect(parseCurl('curl -T - https://example.com/upload').error).toMatch(/standard input/);
+  });
+
+  it('keeps the bearer token from --oauth2-bearer', () => {
+    expect(parseCurl('curl --oauth2-bearer SECRET https://api.example.com')).toMatchObject({ authType: 'bearer', bearerToken: 'SECRET' });
+  });
+
+  it('keeps Digest and NTLM instead of falling back to Basic', () => {
+    expect(parseCurl('curl --digest -u user:pass https://api.example.com')).toMatchObject({ authType: 'digest', username: 'user', password: 'pass' });
+    expect(parseCurl('curl -u user:pass --ntlm https://api.example.com').authType).toBe('ntlm');
+    expect(parseCurl('curl -u user:pass https://api.example.com').authType).toBe('basic');
+  });
+
+  it('reads AWS Signature v4 written by Copy as cURL', () => {
+    const exported = toCurl({
+      method: 'GET', url: 'https://api.example.com', params: [], headers: [], body: '', bodyType: 'none', formData: [],
+      auth: { type: 'aws', awsAccessKey: 'AKIA', awsSecretKey: 'shh', awsRegion: 'eu-west-1', awsService: 's3' },
+    });
+    expect(parseCurl(exported)).toMatchObject({ authType: 'aws', username: 'AKIA', password: 'shh', awsRegion: 'eu-west-1', awsService: 's3' });
+  });
+
+  it('adds --url-query parts to the URL', () => {
+    expect(parseCurl('curl --url-query token=abc --url-query "q=a b" --url-query +raw=%41 https://api.example.com/x?a=1').url)
+      .toBe('https://api.example.com/x?a=1&token=abc&q=a%20b&raw=%41');
+    expect(parseCurl('curl --url-query name@file.txt https://api.example.com').error).toMatch(/file/);
+  });
+
+  it('refuses what it cannot import instead of dropping it', () => {
+    expect(parseCurl('curl -H @headers.txt https://api.example.com').error).toMatch(/-H @file/);
+    expect(parseCurl('curl --negotiate -u : https://api.example.com').error).toBe('curl option --negotiate is not supported');
+    expect(parseCurl('curl https://a.example.com --next https://b.example.com').error).toMatch(/one request/);
+    expect(parseCurl('curl -sS').error).toBe('the command has no URL');
+  });
+
+  it('still accepts browser Copy as cURL output', () => {
+    const parsed = parseCurl(`curl 'https://api.example.com/x' -H 'accept: */*' -b 'a=1' --data-raw '{"a":1}' --compressed --insecure`);
+    expect(parsed.error).toBeUndefined();
+    expect(parsed).toMatchObject({ method: 'POST', url: 'https://api.example.com/x', insecure: true });
+  });
+});

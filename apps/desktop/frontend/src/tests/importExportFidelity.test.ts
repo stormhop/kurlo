@@ -3,7 +3,7 @@ import { buildPostmanCollection, postmanCollectionBundle } from '../lib/postman'
 import { buildInsomniaExport, insomniaRequestsFromResources } from '../lib/insomnia';
 import { harRequestsFromLog } from '../lib/har';
 import { parseCurl } from '../lib/curl';
-import { buildOpenApiDocument, openApiImportFromSpec, parseOpenApiResponse } from '../lib/openapi';
+import { buildOpenApiDocument, openApiImportFromSpec, openApiRequestsFromSpec, parseOpenApiDocument, parseOpenApiResponse } from '../lib/openapi';
 import { openCollectionBundleFromFiles } from '../lib/opencollection';
 import { parseYaml } from '../lib/yaml';
 import { expandReplacement } from '../lib/findReplace';
@@ -135,7 +135,7 @@ describe('curl import', () => {
   it('does not take a flag value for the URL', () => {
     expect(parseCurl('curl --tls-max 1.3 https://api.example.test/x').url).toBe('https://api.example.test/x');
     expect(parseCurl('curl --pubkey id_rsa.pub https://api.example.test/x').url).toBe('https://api.example.test/x');
-    expect(parseCurl('curl --some-new-flag 2.0 https://api.example.test/x').url).toBe('https://api.example.test/x');
+    expect(parseCurl('curl --some-new-flag 2.0 https://api.example.test/x')).toEqual({ error: 'curl option --some-new-flag is not supported' });
   });
 
   it('keeps backslashes in double quotes that bash keeps', () => {
@@ -374,5 +374,51 @@ describe('Find and replace', () => {
     const match = /(a)(b)/.exec('ab')!;
     expect(expandReplacement('[$10]', match)).toBe('ab'.replace(/(a)(b)/, '[$10]'));
     expect(expandReplacement('[$30]', match)).toBe('ab'.replace(/(a)(b)/, '[$30]'));
+  });
+});
+
+describe('YAML flow collections and documents', () => {
+  it('reads flow collections that span lines', () => {
+    expect(parseYaml([
+      'info: {',
+      '  title: Pets,  # name',
+      "  version: '1'",
+      '}',
+      'tags:',
+      '  - [',
+      '      a,',
+      '      "b, c"',
+      '    ]',
+      '  - d',
+      'summary: [draft',
+      'after: 1',
+    ].join('\n'))).toEqual({
+      info: { title: 'Pets', version: '1' },
+      tags: [['a', 'b, c'], 'd'],
+      summary: '[draft',
+      after: 1,
+    });
+  });
+
+  it('keeps OpenAPI parameters written as a multi-line flow sequence', () => {
+    const spec = parseOpenApiDocument([
+      'openapi: 3.0.0',
+      'info: {title: Pets, version: "1"}',
+      'paths:',
+      '  /pets:',
+      '    get:',
+      '      parameters: [',
+      '        {name: limit, in: query},',
+      '        {name: tag, in: query}',
+      '      ]',
+      '      responses: {}',
+    ].join('\n'));
+    const [request] = openApiRequestsFromSpec(spec, 'c1', 'Pets');
+    expect(request.params.filter(p => p.key).map(p => p.key)).toEqual(['limit', 'tag']);
+  });
+
+  it('refuses several documents in one file instead of merging them', () => {
+    expect(parseYaml('---\na: 1\n...\n')).toEqual({ a: 1 });
+    expect(() => parseYaml('openapi: 3.0.0\n---\nfoo: bar\n')).toThrow(/several documents/);
   });
 });

@@ -27,7 +27,7 @@
     <button class="btn btn-ghost btn-icon btn-xs" type="button" aria-label="Dismiss" onclick={() => vm.dismissUndo()}>✕</button>
   </div>
 {/if}
-{#if vm.curlPasteToast}<div class="curl-toast">cURL imported</div>{/if}
+{#if vm.curlPasteToast}<div class="curl-toast" role="status" aria-live="polite">{vm.curlPasteToast}</div>{/if}
 {#if vm.collectionImportToast}<div class="curl-toast">{vm.collectionImportToast}</div>{/if}
 {#if vm.environmentToast}<div class="curl-toast">{vm.environmentToast}</div>{/if}
 {#if vm.gitToast}<div class="git-toast" role="status" aria-live="polite"><span class="git-toast-dot"></span><span>{vm.gitToast}</span></div>{/if}

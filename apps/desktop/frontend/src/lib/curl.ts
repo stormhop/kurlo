@@ -163,12 +163,18 @@ export type ParsedCurl = Partial<{
   insecure: boolean;
   timeoutMs: number;
   proxyUrl: string;
+  authType: 'basic' | 'digest' | 'ntlm' | 'bearer' | 'aws';
+  bearerToken: string;
+  awsRegion: string;
+  awsService: string;
+  error: string;
 }>;
 
 export function parseCurl(input: string): ParsedCurl {
   const raw = normalizeCurlInput(input);
   const tokens = tokenise(raw);
   if (!tokens.length || !/^curl(?:\.exe)?$/i.test(tokens[0])) return {};
+  const fail = (error: string): ParsedCurl => ({ error });
 
   const result: ParsedCurl = { method: 'GET', headers: [], formData: [] };
   const getQueryParts: string[] = [];
@@ -176,9 +182,15 @@ export function parseCurl(input: string): ParsedCurl {
   let useGet = false;
   let sentAsForm = false;
   let sentAsJson = false;
+  let authScheme: 'digest' | 'ntlm' | '' = '';
+  let awsSigning = '';
+  let uploadFile = '';
+  const urlQueryParts: string[] = [];
 
   let i = 1;
   while (i < tokens.length) {
+    const expanded = expandShortCluster(tokens[i]);
+    if (expanded) tokens.splice(i, 1, ...expanded);
     const t = tokens[i];
     const request = readOptionValue(tokens, i, ['-X', '--request']);
     const header = readOptionValue(tokens, i, ['-H', '--header']);
@@ -195,6 +207,10 @@ export function parseCurl(input: string): ParsedCurl {
     const referer = readOptionValue(tokens, i, ['-e', '--referer']);
     const maxTime = readOptionValue(tokens, i, ['-m', '--max-time']);
     const proxy = readOptionValue(tokens, i, ['-x', '--proxy']);
+    const upload = readOptionValue(tokens, i, ['-T', '--upload-file']);
+    const urlQuery = readOptionValue(tokens, i, ['--url-query']);
+    const bearer = readOptionValue(tokens, i, ['--oauth2-bearer']);
+    const awsSigv4 = readOptionValue(tokens, i, ['--aws-sigv4']);
     const ignored = readOptionValue(tokens, i, IGNORED_VALUE_FLAGS);
 
     if (request) {
@@ -203,6 +219,7 @@ export function parseCurl(input: string): ParsedCurl {
       i = request.index;
     } else if (header) {
       const raw = header.value;
+      if (raw.startsWith('@')) return fail('headers read from a file (-H @file) are not supported; paste them inline');
       const colon = raw.indexOf(':');
       if (colon > 0) {
         result.headers!.push({ key: raw.slice(0, colon).trim(), value: raw.slice(colon + 1).trim() });
@@ -294,6 +311,27 @@ export function parseCurl(input: string): ParsedCurl {
     } else if (proxy) {
       if (proxy.value) result.proxyUrl = proxy.value;
       i = proxy.index;
+    } else if (upload) {
+      if (!upload.value || upload.value === '-' || upload.value === '.') return fail('uploading from standard input (-T -) is not supported');
+      uploadFile = upload.value;
+      i = upload.index;
+    } else if (urlQuery) {
+      const part = encodeUrlQuery(urlQuery.value);
+      if (part === null) return fail('--url-query values read from a file are not supported');
+      if (part) urlQueryParts.push(part);
+      i = urlQuery.index;
+    } else if (bearer) {
+      result.bearerToken = bearer.value;
+      i = bearer.index;
+    } else if (awsSigv4) {
+      awsSigning = awsSigv4.value;
+      i = awsSigv4.index;
+    } else if (t === '--digest' || t === '--ntlm') {
+      authScheme = t === '--digest' ? 'digest' : 'ntlm';
+    } else if (t === '--basic') {
+      authScheme = '';
+    } else if (t === '--next' || t === '-:') {
+      return fail('paste one request at a time; --next starts another request');
     } else if (t === '-L' || t === '--location' || t === '--location-trusted') {
       result.followRedirects = true;
     } else if (t === '-k' || t === '--insecure') {
@@ -307,8 +345,32 @@ export function parseCurl(input: string): ParsedCurl {
       i = ignored.index;
     } else if (!t.startsWith('-')) {
       setUrlCandidate(result, t);
+    } else if (!isIgnorableFlag(t)) {
+      return fail(`curl option ${t.split('=')[0]} is not supported`);
     }
     i++;
+  }
+
+  if (!result.url) return fail('the command has no URL');
+  if (urlQueryParts.length) result.url = appendQueryParts(result.url, urlQueryParts);
+  if (uploadFile) {
+    const baseName = uploadFile.split(/[\\/]/).pop() ?? uploadFile;
+    if (/^[a-z][a-z\d+.-]*:\/\/[^/?#]+\/(?:[^?#]*\/)?$/i.test(result.url)) result.url += encodeURIComponent(baseName);
+    delete result.body;
+    result.formData = [];
+    result.bodyType = 'binary';
+    result.bodyFilePath = uploadFile;
+    if (!explicitMethod) result.method = 'PUT';
+  }
+  if (awsSigning) {
+    const [, , region = '', service = ''] = awsSigning.split(':');
+    result.authType = 'aws';
+    if (region) result.awsRegion = region;
+    if (service) result.awsService = service;
+  } else if (result.bearerToken !== undefined) {
+    result.authType = 'bearer';
+  } else if (result.username !== undefined) {
+    result.authType = authScheme || 'basic';
   }
 
   if (useGet && getQueryParts.length && result.url) {
@@ -345,6 +407,108 @@ function looksUrlencoded(body: string) {
   return body.split('&').every(part => /^[^=&]+=[^=]*$/.test(part));
 }
 
+const SHORT_BOOLEAN_FLAGS = 'LkGIsSvfgiNqjnORZJlB0123468#';
+const SHORT_VALUE_FLAGS = 'XHdFuAemxbocCDEKPQrTwyYztU';
+
+function expandShortCluster(token: string): string[] | null {
+  if (token.length <= 2 || !token.startsWith('-') || token.startsWith('--')) return null;
+  const expanded: string[] = [];
+  for (let index = 1; index < token.length; index += 1) {
+    const flag = token[index];
+    if (SHORT_BOOLEAN_FLAGS.includes(flag)) {
+      expanded.push(`-${flag}`);
+      continue;
+    }
+    if (SHORT_VALUE_FLAGS.includes(flag)) {
+      expanded.push(`-${token.slice(index)}`);
+      break;
+    }
+    return null;
+  }
+  return expanded.length > 1 ? expanded : null;
+}
+
+const IGNORED_BOOLEAN_FLAGS = new Set([
+  '--anyauth',
+  '--append',
+  '--cert-status',
+  '--compressed',
+  '--compressed-ssh',
+  '--create-dirs',
+  '--crlf',
+  '--disable',
+  '--disable-eprt',
+  '--disable-epsv',
+  '--fail',
+  '--fail-early',
+  '--fail-with-body',
+  '--false-start',
+  '--globoff',
+  '--http0.9',
+  '--http1.0',
+  '--http1.1',
+  '--http2',
+  '--http2-prior-knowledge',
+  '--http3',
+  '--http3-only',
+  '--ignore-content-length',
+  '--include',
+  '--ipv4',
+  '--ipv6',
+  '--junk-session-cookies',
+  '--list-only',
+  '--location-trusted',
+  '--netrc',
+  '--netrc-optional',
+  '--no-buffer',
+  '--path-as-is',
+  '--post301',
+  '--post302',
+  '--post303',
+  '--progress-bar',
+  '--proxy-insecure',
+  '--raw',
+  '--remote-header-name',
+  '--remote-name',
+  '--remote-name-all',
+  '--remote-time',
+  '--retry-all-errors',
+  '--retry-connrefused',
+  '--show-error',
+  '--silent',
+  '--ssl',
+  '--ssl-reqd',
+  '--sslv2',
+  '--sslv3',
+  '--suppress-connect-headers',
+  '--tcp-fastopen',
+  '--tcp-nodelay',
+  '--tlsv1',
+  '--tlsv1.0',
+  '--tlsv1.1',
+  '--tlsv1.2',
+  '--tlsv1.3',
+  '--tr-encoding',
+  '--verbose',
+  '--xattr',
+]);
+
+function isIgnorableFlag(token: string): boolean {
+  if (/^-[A-Za-z0-9#]$/.test(token)) return SHORT_BOOLEAN_FLAGS.includes(token[1]);
+  return IGNORED_BOOLEAN_FLAGS.has(token) || /^--no-[a-z0-9-]+$/.test(token);
+}
+
+function encodeUrlQuery(value: string): string | null {
+  if (value.startsWith('+')) return value.slice(1);
+  const eq = value.indexOf('=');
+  const at = value.indexOf('@');
+  if (at >= 0 && (eq < 0 || at < eq)) return null;
+  if (eq < 0) return encodeURIComponent(value);
+  const name = value.slice(0, eq);
+  const content = encodeURIComponent(value.slice(eq + 1));
+  return name ? `${name}=${content}` : content;
+}
+
 const IGNORED_VALUE_FLAGS = [
   '-c',
   '-C',
@@ -355,7 +519,8 @@ const IGNORED_VALUE_FLAGS = [
   '-P',
   '-Q',
   '-r',
-  '-T',
+  '-t',
+  '-U',
   '-w',
   '-y',
   '-Y',
@@ -423,7 +588,6 @@ const IGNORED_VALUE_FLAGS = [
   '--trace',
   '--trace-ascii',
   '--unix-socket',
-  '--upload-file',
   '--write-out',
 ];
 

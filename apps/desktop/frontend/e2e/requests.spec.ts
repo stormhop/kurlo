@@ -775,3 +775,47 @@ test('takes a {{variable}} in the bearer token and shows it instead of dots', as
   await token.fill('{{missing}}');
   await expect(page.locator('.auth-fields .var-token-err')).toHaveText('{{missing}}');
 });
+
+test('checks a header name built from collection and request variables', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'vars-col', workspaceId: 'workspace-e2e', name: 'Vars', defaults: { variables: [{ key: 'collectionHeader', value: 'Bad Name', enabled: true }] } }],
+    activeId: 'vars', openIds: ['vars'],
+    requests: [{ id: 'vars', name: 'Header vars', collectionId: 'vars-col', collection: 'Vars', requestType: 'http', method: 'GET', url: 'https://example.test',
+      vars: [{ key: 'requestHeader', value: 'X-Good', enabled: true }],
+      headers: [{ key: '{{collectionHeader}}', value: '1', enabled: true }, { key: '{{requestHeader}}', value: '2', enabled: true }],
+      auth: { type: 'none' } }],
+  });
+  await page.goto('/');
+  await chooseRequestSection(page, 'Headers');
+  const names = page.getByTestId('request-header-row').locator('input[placeholder="Key"]');
+  await expect(names.nth(0)).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByRole('button', { name: 'Header name contains invalid characters.' })).toHaveCount(1);
+  await expect(names.nth(1)).not.toHaveAttribute('aria-invalid', 'true');
+});
+
+test.describe('Pasting cURL', () => {
+  async function pasteIntoUrl(page: Page, text: string) {
+    await page.getByLabel('Request URL').evaluate((input, value) => {
+      const data = new DataTransfer();
+      data.setData('text', value);
+      input.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }));
+    }, text);
+  }
+
+  test('imports the bearer token and refuses options it would drop', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await pasteIntoUrl(page, 'curl -sSL --oauth2-bearer SECRET https://api.example.test/me');
+    await expect(page.locator('.curl-toast')).toHaveText('cURL imported');
+    await expect(page.getByLabel('Request URL')).toHaveValue('https://api.example.test/me');
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1))).toMatchObject({
+      url: 'https://api.example.test/me',
+      auth: { type: 'bearer', token: 'SECRET' },
+    });
+
+    await pasteIntoUrl(page, 'curl -H @headers.txt https://other.example.test');
+    await expect(page.locator('.curl-toast')).toContainText("Couldn't import cURL: headers read from a file");
+    await expect(page.getByLabel('Request URL')).toHaveValue('https://api.example.test/me');
+  });
+});

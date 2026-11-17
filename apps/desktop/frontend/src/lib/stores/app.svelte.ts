@@ -560,6 +560,7 @@ class AppVM {
   declare pickFileForRow: typeof requestBodyFeature.pickFileForRow;
   declare pickBinaryFile: typeof requestBodyFeature.pickBinaryFile;
   declare applyParsedCurl: typeof requestBodyFeature.applyParsedCurl;
+  declare showCurlPasteToast: typeof requestBodyFeature.showCurlPasteToast;
   declare onUrlPaste: typeof requestBodyFeature.onUrlPaste;
   declare syncUrlFromParams: typeof requestBodyFeature.syncUrlFromParams;
   declare syncParamsFromUrl: typeof requestBodyFeature.syncParamsFromUrl;
@@ -1305,7 +1306,7 @@ class AppVM {
   beautifiedBody = $state(false);
   bodyEditorFormat: (() => boolean | void) | null = null;
   savedResponse = $state(false);
-  curlPasteToast = $state(false);
+  curlPasteToast = $state('');
   settingsSaved = $state(false);
 
   topView = $state<TopView>('request');

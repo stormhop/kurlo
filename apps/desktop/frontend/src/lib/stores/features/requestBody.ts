@@ -26,6 +26,8 @@ type RequestBodyHost = {
   authType: SavedRequest['auth']['type'];
   awsAccessKey: string;
   awsSecretKey: string;
+  awsRegion: string;
+  awsService: string;
   oauth1: import('../../utils').OAuth1Fields;
   jwt: import('../../utils').JwtFields;
   basicPass: string;
@@ -37,7 +39,7 @@ type RequestBodyHost = {
   bodyFileName: string;
   bodyFilePath: string;
   bodyType: BodyType;
-  curlPasteToast: boolean;
+  curlPasteToast: string;
   followRedirects: boolean;
   formRows: KVRow[];
   graphqlOperationName: string;
@@ -61,6 +63,7 @@ type RequestBodyHost = {
   requestType: RequestType;
   url: string;
   applyParsedCurl: (parsed: ParsedCurl) => void;
+  showCurlPasteToast: (message: string) => void;
   bodyMode: () => BodyMode;
   graphQLBodyContentForStore: () => string;
   graphQLBodyForSend: (payload?: { query: string; variables: string; operationName: string }) => string;
@@ -300,9 +303,18 @@ export const requestBodyFeature = {
     this.oauth1 = { ...this.oauth1, consumerSecret: '', token: '', tokenSecret: '', privateKey: '' };
     this.jwt = { ...this.jwt, secret: '', privateKey: '' };
     this.resetBodyState();
-    if (parsed.username) {
-      this.authType = 'basic';
-      this.basicUser = parsed.username;
+    if (parsed.authType === 'bearer') {
+      this.authType = 'bearer';
+      this.bearerToken = parsed.bearerToken ?? '';
+    } else if (parsed.authType === 'aws') {
+      this.authType = 'aws';
+      this.awsAccessKey = parsed.username ?? '';
+      this.awsSecretKey = parsed.password ?? '';
+      if (parsed.awsRegion) this.awsRegion = parsed.awsRegion;
+      if (parsed.awsService) this.awsService = parsed.awsService;
+    } else if (parsed.authType) {
+      this.authType = parsed.authType;
+      this.basicUser = parsed.username ?? '';
       this.basicPass = parsed.password ?? '';
     }
     if (parsed.bodyType) this.bodyType = normalizeBodyTypeForUi(parsed.bodyType);
@@ -348,21 +360,28 @@ export const requestBodyFeature = {
     this.pathParams = pathParamsFromUrl(this.url, this.pathParams);
   },
 
+  showCurlPasteToast(this: RequestBodyHost, message: string) {
+    this.curlPasteToast = message;
+    const duration = message === 'cURL imported' ? 2500 : 6000;
+    setTimeout(() => { if (this.curlPasteToast === message) this.curlPasteToast = ''; }, duration);
+  },
+
   async onUrlPaste(this: RequestBodyHost, e: ClipboardEvent) {
     const text = e.clipboardData?.getData('text') ?? '';
     if (/^curl(?:\.exe)?(?:\s|$)/i.test(text.trimStart())) {
       e.preventDefault();
       const { parseCurl } = await import('../../curl');
       const parsed = parseCurl(text);
-      if (parsed.url) {
+      if (parsed.error) {
+        this.showCurlPasteToast(`Couldn't import cURL: ${parsed.error}`);
+      } else if (parsed.url) {
         this.applyParsedCurl(parsed);
         const cookieHeader = parsed.headers
           ?.filter(header => header.key.trim().toLowerCase() === 'cookie' && header.value.trim())
           .map(header => header.value.trim())
           .join('; ');
         if (cookieHeader) void this.importCookieHeaderForUrl?.(parsed.url, cookieHeader);
-        this.curlPasteToast = true;
-        setTimeout(() => (this.curlPasteToast = false), 2500);
+        this.showCurlPasteToast('cURL imported');
       }
     }
   },
