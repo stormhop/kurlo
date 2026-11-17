@@ -287,7 +287,9 @@ export const requestExecutionFeature = {
     const requestId = this.activeRequestId;
     if (!requestId || !this.inFlightRequestIds.has(requestId)) return;
     nextSendGeneration(requestId);
-    await cancelHttpRequest(requestId);
+    try {
+      await cancelHttpRequest(requestId);
+    } catch {}
     this.markRequestLoading(requestId, false);
     if (this.requestIsActive(requestId)) {
       if (this.requestType === 'grpc' && this.grpcResponse) {

@@ -682,3 +682,40 @@ func TestWebSocketHandshakeHasADefaultTimeout(t *testing.T) {
 		t.Fatalf("the request's own timeout should win, got %s", got)
 	}
 }
+
+func TestWebSocketCloseFinishesWhenTheServerNeverAnswers(t *testing.T) {
+	upgrader := websocket.Upgrader{}
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		<-release
+	}))
+	defer server.Close()
+	defer close(release)
+
+	manager := newWebSocketManager(nil)
+	em := newWSTestEmitter()
+	manager.connectWithCallbacks(context.Background(), "silent", model.HttpRequest{
+		URL:                          wsURLFromHTTP(server.URL),
+		EnableSSLVerification:        true,
+		TimeoutMs:                    2000,
+		WebSocketKeepAliveIntervalMs: -1,
+	}, em.callbacks())
+	waitWSOpen(t, em.opens)
+
+	if result := manager.send("silent", model.WebSocketSendMessage{Type: "close", Code: websocket.CloseNormalClosure}); !result.OK {
+		t.Fatalf("send close failed: %+v", result)
+	}
+	select {
+	case ev := <-em.closes:
+		if ev.Code != websocket.CloseNormalClosure {
+			t.Fatalf("close = %+v", ev)
+		}
+	case <-time.After(websocketCloseGrace + 2*time.Second):
+		t.Fatal("the connection stayed open after the close frame went unanswered")
+	}
+}

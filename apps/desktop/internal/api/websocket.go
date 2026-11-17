@@ -22,6 +22,8 @@ import (
 
 const websocketWriteTimeout = 10 * time.Second
 
+const websocketCloseGrace = time.Second
+
 func websocketWriteDeadline(size int) time.Time {
 	return time.Now().Add(websocketWriteTimeout + time.Duration(size/(64<<10))*time.Second)
 }
@@ -444,6 +446,21 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 		defer close(stopKeepAlive)
 		go m.keepAlive(ctx, sess, conn, interval, stopKeepAlive)
 	}
+
+	readDone := make(chan struct{})
+	defer close(readDone)
+	go func() {
+		select {
+		case <-ctx.Done():
+		case <-readDone:
+			return
+		}
+		select {
+		case <-time.After(websocketCloseGrace):
+			_ = conn.Close()
+		case <-readDone:
+		}
+	}()
 
 	for {
 		resetReadDeadline()

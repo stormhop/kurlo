@@ -152,7 +152,7 @@ Stars are personal. They are kept in your local workspace data, not in the reque
 
 ## Restoring deleted items
 
-Deleting a request, folder, collection or environment shows a message with **Undo** for a few seconds. Undo puts it back where it was, with the same requests, folders, folder defaults and order; a restored environment gets back its child environments and the collections it was pinned to.
+Deleting a request, folder, collection or environment shows a message with **Undo** for a few seconds. Undo puts it back where it was, with the same requests, folders, folder defaults, order and AI request chats; a restored environment gets back its child environments and the collections it was pinned to.
 
 ![The Recently deleted list with a deleted collection ready to restore](../../../../assets/screenshots/recently-deleted.png)
 

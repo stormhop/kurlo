@@ -42,6 +42,9 @@ function makeHost(over: Record<string, unknown> = {}) {
     pruneStoredResponses: historyFeature.pruneStoredResponses,
     recordRequestHistory: historyFeature.recordRequestHistory,
     showHistoryResponse: historyFeature.showHistoryResponse,
+    saveHistoryEntryAsExample: historyFeature.saveHistoryEntryAsExample,
+    addCapturedExample: vi.fn(async () => undefined),
+    activeSecretEnvironmentValues: () => [],
     loadStoredHistoryResponse: historyFeature.loadStoredHistoryResponse,
     deleteHistoryEntry: historyFeature.deleteHistoryEntry,
     clearRequestHistory: historyFeature.clearRequestHistory,
@@ -124,6 +127,22 @@ describe('recording a response', () => {
 });
 
 describe('reopening a stored response', () => {
+  it('leaves a request opened while the stored response was loading alone', async () => {
+    let finish!: (value: unknown) => void;
+    mockLoad.mockReturnValue(new Promise(done => { finish = done; }) as never);
+    const host = makeHost({ requestHistory: [{ id: 'history-1', responseStored: true, request: { name: 'Req', method: 'GET', url: 'https://example.test' } }] });
+
+    const showing = host.showHistoryResponse('history-1');
+    const saving = host.saveHistoryEntryAsExample('history-1');
+    host.activeRequestId = 'req-2';
+    finish({ stored: true, truncated: false, payload: JSON.stringify(response()) });
+    await Promise.all([showing, saving]);
+
+    expect(host.setActiveResponse).not.toHaveBeenCalled();
+    expect(host.addCapturedExample).not.toHaveBeenCalled();
+    expect(host.collectionImportToast).toContain('another request was opened');
+  });
+
   it('puts the stored response in the viewer', async () => {
     mockLoad.mockResolvedValue({ stored: true, truncated: false, payload: JSON.stringify(response({ body: 'stored body' })) });
     const host = makeHost({ requestHistory: [{ id: 'history-1', responseStored: true }] });

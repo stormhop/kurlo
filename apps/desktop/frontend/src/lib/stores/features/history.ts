@@ -248,8 +248,9 @@ export const historyFeature = {
 
   async showHistoryResponse(this: HistoryHost, historyId: string) {
     this.openHistoryMenuId = '';
+    const requestId = this.activeRequestId;
     const response = await this.loadStoredHistoryResponse(historyId);
-    if (!response) return;
+    if (!response || this.activeRequestId !== requestId) return;
     this.setActiveResponse(response);
     this.setActiveResponseTab('body');
   },
@@ -259,8 +260,14 @@ export const historyFeature = {
     if (!entry || !this.activeRequestId) return;
     this.openHistoryMenuId = '';
 
+    const requestId = this.activeRequestId;
     const response = await this.loadStoredHistoryResponse(historyId);
     if (!response) return;
+    if (this.activeRequestId !== requestId) {
+      this.collectionImportToast = 'The example was not saved because another request was opened — open the request and save it again';
+      setTimeout(() => (this.collectionImportToast = ''), 5000);
+      return;
+    }
     await this.addCapturedExample(exampleFromResponse(entry.request, response, {
       secretValues: this.activeSecretEnvironmentValues(),
       name: `${response.statusCode} ${requestTabLabel(entry.request)}`.trim(),

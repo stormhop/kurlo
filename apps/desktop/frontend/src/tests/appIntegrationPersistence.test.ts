@@ -188,6 +188,19 @@ describe('manual save mode keeps workspace edits off disk until Save', () => {
     expect(storedEnvironment('dev')).toMatchObject({ name: 'Dev' });
   });
 
+  it('brings back the AI chat of a restored request', async () => {
+    const app = await manualApp();
+    const collection = app.collections[0];
+    app.requests = [normalizeSavedRequest({ id: 'r1', name: 'Chat', method: 'GET', url: 'https://api.test', collectionId: collection.id, collection: collection.name }, app.collections, app.activeWorkspaceId)];
+    const turns = [{ id: 't1', prompt: 'hello' }];
+    app.aiConversations = new Map([['r1', turns]]);
+    await app.deleteRequest('r1');
+    expect(app.aiConversations.has('r1')).toBe(false);
+
+    expect(await app.restoreDeleted(app.trash[0].id)).toBe(true);
+    expect(app.aiConversations.get('r1')).toEqual(turns);
+  });
+
   it('will not restore a request whose collection is gone, and keeps the entry', async () => {
     const app = await manualApp();
     const collection = app.collections[0];
@@ -372,5 +385,32 @@ describe('request reordering persistence', () => {
     await app.moveRequest('a', 'c', 'before');
     expect(backend.state.savedStores).toHaveLength(saveCount);
     expect(app.requests.map((req: SavedRequest) => req.id)).toEqual(['c', 'a', 'b']);
+  });
+});
+
+describe('deleting a workspace', () => {
+  it('stops its live connections and drops its cached responses', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    const keep = makeWorkspace('Keep');
+    const gone = makeWorkspace('Gone');
+    app.workspaces = [keep, gone];
+    app.activeWorkspaceId = keep.id;
+    const kept = makeCollection(keep.id, 'Kept');
+    const removed = makeCollection(gone.id, 'Removed');
+    app.collections = [kept, removed];
+    app.requests = [
+      normalizeSavedRequest({ id: 'stay', name: 'Stay', method: 'GET', url: 'https://keep.test', collectionId: kept.id, collection: kept.name }, app.collections, keep.id),
+      normalizeSavedRequest({ id: 'socket', name: 'Socket', method: 'GET', url: 'wss://gone.test', collectionId: removed.id, collection: removed.name }, app.collections, gone.id),
+    ];
+    app.responses = new Map([['stay', { body: 'a' }], ['socket', { body: 'b' }]]);
+    app.disposeRealtimeSession = vi.fn();
+    app.openConfirmDialog = async () => true;
+
+    await app.deleteWorkspace(gone.id);
+
+    expect(app.disposeRealtimeSession).toHaveBeenCalledWith('socket');
+    expect(app.disposeRealtimeSession).not.toHaveBeenCalledWith('stay');
+    expect([...app.responses.keys()]).toEqual(['stay']);
   });
 });

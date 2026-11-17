@@ -1,6 +1,7 @@
 import { addCollectionFolderPath, folderPathStartsWith } from '../../collections';
 import { normalizeCollectionEnvironmentPins } from '../../collectionEnvironments';
 import type { Collection, Environment, FolderDefaults, SavedRequest, Workspace } from '../../types/models';
+import type { AiTurn } from './ai';
 
 export const TRASH_LIMIT = 20;
 export const UNDO_TOAST_MS = 8000;
@@ -23,11 +24,13 @@ export type TrashEntry = {
   folderPaths?: string[][];
   folderDefaults?: FolderDefaults[];
   environment?: { environment: Environment; index: number; childIds: string[]; pins: { collectionId: string; isDefault: boolean }[] };
+  aiConversations?: [string, AiTurn[]][];
 };
 
 type TrashHost = {
   trash: TrashEntry[];
   undoEntryId: string;
+  aiConversations?: Map<string, AiTurn[]>;
   requests: SavedRequest[];
   collections: Collection[];
   environments: Environment[];
@@ -71,7 +74,11 @@ export function trashEntryLabel(entry: Pick<TrashEntry, 'kind' | 'name'>) {
 
 export const trashFeature = {
   rememberDeleted(this: TrashHost, entry: Omit<TrashEntry, 'id' | 'deletedAt'>) {
-    const full: TrashEntry = { ...entry, id: `trash-${Date.now()}-${++entryCounter}`, deletedAt: Date.now() };
+    const conversations = entry.requests.flatMap(({ request }) => {
+      const turns = this.aiConversations?.get(request.id);
+      return turns?.length ? [[request.id, turns] as [string, AiTurn[]]] : [];
+    });
+    const full: TrashEntry = { ...entry, ...(conversations.length ? { aiConversations: conversations } : {}), id: `trash-${Date.now()}-${++entryCounter}`, deletedAt: Date.now() };
     this.trash = [full, ...this.trash].slice(0, TRASH_LIMIT);
     this.undoEntryId = full.id;
     if (undoTimer) clearTimeout(undoTimer);
@@ -178,6 +185,9 @@ export const trashFeature = {
       });
     }
     if (requests.length) this.requests = insertAt(this.requests, requests);
+    const restoredIds = new Set(requests.map(({ item }) => item.id));
+    const conversations = (entry.aiConversations ?? []).filter(([id]) => restoredIds.has(id) && !this.aiConversations?.get(id)?.length);
+    if (conversations.length && this.aiConversations) this.aiConversations = new Map([...this.aiConversations, ...conversations]);
 
     if (entry.kind === 'environment' && entry.environment) {
       const { environment, index, childIds, pins } = entry.environment;

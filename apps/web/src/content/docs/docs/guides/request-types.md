@@ -95,7 +95,7 @@ WebSocket requests connect to `ws://` or `wss://` URLs. Kurlo shows:
 - Text, binary, ping, pong, close, reconnect, and error events.
 - Reconnect settings and a max-message-size guard.
 
-Use the Message tab to send a text or binary payload after connecting. Per-request headers and cookies are applied to the handshake, and so is the Authorization tab — Bearer, Basic, Digest and API-key auth all go out with the upgrade request, the same way they would on an ordinary send. There is no Scripts tab: the handshake does not run pre-request or test scripts.
+Sending a close frame ends the session even when the server never answers it: Kurlo waits one second for the server's reply, then closes the connection. Use the Message tab to send a text or binary payload after connecting. Per-request headers and cookies are applied to the handshake, and so is the Authorization tab — Bearer, Basic, Digest and API-key auth all go out with the upgrade request, the same way they would on an ordinary send. There is no Scripts tab: the handshake does not run pre-request or test scripts.
 
 ![WebSocket request with sent payload and echoed frame](../../../../assets/screenshots/request-websocket.png)
 

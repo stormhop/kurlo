@@ -44,6 +44,8 @@ type WorkspaceHost = {
   persistActiveRequestNow: () => Promise<void>;
   persistRequestStore: PersistRequestStore;
   captureActiveWorkspaceCookies: (workspaceId?: string) => Promise<void>;
+  disposeRealtimeSession: (id: string) => void;
+  forgetRequestResponses: (ids: string[]) => void;
   restoreWorkspaceCookieJar: (workspaceId?: string) => Promise<void>;
   scheduleActiveRequestPersist: () => void;
   scheduleWorkspacePersist: () => void;
@@ -218,6 +220,8 @@ export const workspaceFeature = {
     this.requests = nextRequests;
     this.openRequestIds = nextOpenIds;
     this.requestHistory = nextHistory;
+    for (const requestId of removedIds) this.disposeRealtimeSession(requestId);
+    this.forgetRequestResponses([...removedIds]);
     const nextWorkspaceCookies = { ...this.workspaceCookies };
     delete nextWorkspaceCookies[workspaceId];
     this.workspaceCookies = nextWorkspaceCookies;
