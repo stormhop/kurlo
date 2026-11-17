@@ -70,7 +70,9 @@ func startMCPStdio(ctx context.Context, command string, args []string, env []str
 	client := &mcpStdioClient{cmd: cmd, stdin: stdin, pending: map[string]chan mcpStdioMessage{}, done: make(chan struct{})}
 	go client.readErrors(stderr)
 	go client.read(stdout)
+	perfTrackProcess(cmd.Process.Pid, "MCP server")
 	go func() {
+		defer perfForgetProcess(cmd.Process.Pid)
 		err := cmd.Wait()
 		client.finish(err)
 	}()

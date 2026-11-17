@@ -17,6 +17,11 @@ export type AppLazyComponentState = {
 };
 
 class AppLazyComponents {
+  PerformanceDockComponent = $state<LazyComponent | null>(null);
+  async loadPerformanceDock() {
+    if (!this.PerformanceDockComponent) this.PerformanceDockComponent = (await import('../components/PerformanceDock.svelte')).default as LazyComponent;
+  }
+
   AuthTabComponent = $state<LazyComponent | null>(null);
   BodyTabComponent = $state<LazyComponent | null>(null);
   CodeSnippetPanelComponent = $state<LazyComponent | null>(null);

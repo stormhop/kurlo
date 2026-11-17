@@ -429,8 +429,8 @@ test('keeps the first visible mock route in place when the sidebar slides away a
     const row = [...node.querySelectorAll<HTMLElement>('.mock-row')].find(item => item.getBoundingClientRect().top >= top - 0.5)!;
     return { key: `${row.querySelector('.mock-path')!.textContent} ${row.querySelector('.status-badge')!.textContent}`, offset: Math.round(row.getBoundingClientRect().top - top) };
   });
+  await expect.poll(() => list.locator('.mock-row-warning').first().evaluate(node => node.getClientRects().length)).toBeGreaterThan(0);
   const before = await firstVisible();
-  expect(await list.locator('.mock-row-warning').first().evaluate(node => node.getClientRects().length)).toBeGreaterThan(0);
   const slide = () => list.evaluate((node, anchor) => new Promise<{ frames: number; shifts: Array<number | null> }>((resolve) => {
     const row = [...node.querySelectorAll<HTMLElement>('.mock-row')].find(item => `${item.querySelector('.mock-path')!.textContent} ${item.querySelector('.status-badge')!.textContent}` === anchor.key)!;
     const position = row.style.position;

@@ -26,6 +26,7 @@ var appVersion = "dev"
 const maxTextFileReadSize = 100 * 1024 * 1024
 
 type App struct {
+	performance       performanceMonitor
 	historyStore      *historyResponseStore
 	credentialStore   *gitCredentialStore
 	ctx               context.Context
@@ -111,6 +112,7 @@ func (a *App) OpenLogFolder() string {
 }
 
 func (a *App) Shutdown(_ context.Context) {
+	a.StopPerformanceStream()
 	a.CancelCodexLogin()
 	a.agentRuntime().closeMcpClients()
 	a.requestMu.Lock()

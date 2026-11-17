@@ -6,6 +6,9 @@ type Wire<T> = T extends (infer U)[]
     ? { [K in keyof T as K extends 'convertValues' ? never : K]: Wire<T[K]> }
     : T;
 
+export type PerformanceSample = Omit<Wire<model.PerformanceSample>, 'totalCpuPercent' | 'totalMemoryBytes' | 'processes'> & { totalCpuPercent?: number | null; totalMemoryBytes?: number | null; processes: PerformanceProcess[] };
+export type PerformanceProcess = Omit<Wire<model.PerformanceProcess>, 'cpuPercent' | 'memoryBytes' | 'uptimeSeconds'> & { cpuPercent?: number | null; memoryBytes?: number | null; uptimeSeconds?: number | null };
+
 export type AppInfo = Wire<model.AppInfo>;
 export type AiConnection = Wire<model.AiConnection>;
 export type AiConnectionsState = Wire<model.AiConnectionsState>;

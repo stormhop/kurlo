@@ -128,6 +128,41 @@ describe('creating a request', () => {
 });
 
 describe('opening a saved request', () => {
+  it('stays clean after its collection is renamed in the same session', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Before');
+    await app.createCollection();
+    const collection = app.collections[0];
+    await app.createNewRequest(collection.id, 'http');
+    app.url = 'https://example.test/first';
+    await app.saveActiveRequest();
+    const first = app.activeRequestId;
+    await app.createNewRequest(collection.id, 'http');
+    app.url = 'https://example.test/second';
+    await app.saveActiveRequest();
+    app.autosave = false;
+
+    await app.renameCollection(collection.id, 'After');
+    await app.switchRequest(first);
+    await settleMicrotasks();
+    const reopened = app.snapshotActiveRequest({ forPersistence: true });
+    expect(reopened.collection).toBe('After');
+    app.updateRequestDirtyState(first, reopened);
+    expect(app.isRequestDirty(first)).toBe(false);
+    const prompt = vi.spyOn(app, 'openSaveChangesDialog').mockResolvedValue('cancel');
+    await app.closeRequestTab(first);
+    expect(prompt).not.toHaveBeenCalled();
+    expect(app.openRequestIds).not.toContain(first);
+
+    await app.switchRequest(first);
+    app.url = 'https://example.test/edited';
+    await app.closeRequestTab(first);
+    expect(prompt).toHaveBeenCalledTimes(1);
+    expect(app.isRequestDirty(first)).toBe(true);
+    expect(app.openRequestIds).toContain(first);
+  });
+
   it('does not mark it dirty', async () => {
     backend.state.savedStores = [];
     const app = new TestApp() as TestApp & Record<string, any>;

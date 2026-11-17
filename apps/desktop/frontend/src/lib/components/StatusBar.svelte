@@ -171,6 +171,9 @@
         <path fill="currentColor" fill-rule="evenodd" clip-rule="evenodd" d="M8 .9a7.1 7.1 0 00-2.25 13.84c.36.07.49-.16.49-.35v-1.25c-2 .43-2.42-.86-2.42-.86-.33-.82-.79-1.04-.79-1.04-.64-.44.05-.43.05-.43.71.05 1.09.73 1.09.73.63 1.08 1.65.77 2.05.59.06-.46.25-.77.45-.95-1.6-.18-3.28-.8-3.28-3.55 0-.78.28-1.42.73-1.92-.07-.18-.32-.91.07-1.9 0 0 .6-.19 1.96.73A6.8 6.8 0 018 4.3c.61 0 1.22.08 1.79.24 1.36-.92 1.95-.73 1.95-.73.39.99.14 1.72.07 1.9.46.5.73 1.14.73 1.92 0 2.76-1.68 3.36-3.28 3.54.26.22.49.66.49 1.34v1.88c0 .19.13.42.5.35A7.1 7.1 0 008 .9z"/>
       </svg>
     </button>
+    <button class="btn btn-ghost btn-icon btn-xs layout-btn" class:active={vm.perfDockOpen} type="button" aria-label="Toggle performance dock" aria-pressed={vm.perfDockOpen} onclick={() => void vm.togglePerformanceDock()}>
+      <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 12a6 6 0 1112 0M8 9l3-4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="10" r="1.2" fill="currentColor"/></svg>
+    </button>
     <div class="theme-switcher">
       {#if themeMenuOpen}
         <button class="theme-menu-scrim" type="button" aria-label="Close theme menu" onclick={() => (themeMenuOpen = false)}></button>

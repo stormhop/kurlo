@@ -249,7 +249,7 @@ test.describe('Interface size', () => {
 });
 
 test.describe('Update release notes', () => {
-  test('About limits long release notes to ten lines and opens the full website changelog', async ({ page }) => {
+  test('About truncates long release notes at a complete line and opens the full website changelog', async ({ page }) => {
     await page.setViewportSize({ width: 1200, height: 900 });
     await installKurloBridge(page);
     await page.addInitScript(() => {
@@ -294,15 +294,36 @@ test.describe('Update release notes', () => {
     const link = about.getByRole('link', { name: 'Read the full changelog' });
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', 'https://kurlo.dev/changelog/');
-    const metrics = await preview.evaluate(element => ({
+    const notes = preview.locator('.release-notes');
+    const metrics = await notes.evaluate(element => ({
       height: element.clientHeight,
       contentHeight: element.scrollHeight,
       lineHeight: Number.parseFloat(getComputedStyle(element.querySelector('li')!).lineHeight),
-      overflow: getComputedStyle(element).overflowY,
+      clamp: getComputedStyle(element).webkitLineClamp,
     }));
+    const clippedLines = await notes.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+      const clipped: number[] = [];
+      while (walker.nextNode()) {
+        if (!walker.currentNode.textContent?.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(walker.currentNode);
+        for (const rect of range.getClientRects()) {
+          if (rect.top < bounds.bottom - 1 && rect.bottom > bounds.bottom + 1) clipped.push(rect.height);
+        }
+      }
+      return clipped;
+    });
+    expect(clippedLines).toEqual([]);
+    expect(metrics.clamp).toBe('10');
     expect(metrics.height).toBeLessThanOrEqual(Math.ceil(metrics.lineHeight * 10));
-    expect(metrics.contentHeight).toBeGreaterThan(metrics.height * 3);
-    expect(metrics.overflow).toBe('hidden');
+    expect(metrics.contentHeight).toBeGreaterThan(metrics.height);
+    await preview.scrollIntoViewIfNeeded();
+    await preview.hover();
+    await page.mouse.wheel(0, metrics.contentHeight);
+    expect(await notes.evaluate(element => element.scrollTop)).toBe(0);
+    expect(await preview.evaluate(element => element.scrollTop)).toBe(0);
     expect(await about.evaluate(element => element.scrollHeight - element.clientHeight)).toBeLessThan(160);
     await link.click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls)).toContain('open:https://kurlo.dev/changelog/');

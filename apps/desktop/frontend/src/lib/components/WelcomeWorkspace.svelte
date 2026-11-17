@@ -36,12 +36,11 @@
   <div class="welcome-content">
     <header class="welcome-heading">
       <div class="welcome-heading-copy">
-        <span class="welcome-wordmark" aria-hidden="true">kurlo<span>.</span></span>
         <h1 id="welcome-title">Welcome to Kurlo</h1>
         <p>Start a request or bring your collections with you.</p>
       </div>
       <div class="welcome-illustration" aria-hidden="true">
-        <KurloBird mode="still" envelope size="6.5rem" />
+        <KurloBird mode="still" envelope size="4rem" />
       </div>
     </header>
     <div class="welcome-actions">
@@ -63,9 +62,8 @@
       </button>
     </div>
     <div class="welcome-agent">
-      <span class="welcome-agent-icon" aria-hidden="true">✧</span>
       <div><strong>Let an agent help</strong><p>Use your model, Claude Code or Codex.</p></div>
-      <button class="btn btn-secondary btn-sm" type="button" onclick={onSetUpAgent}>Set up<span aria-hidden="true">→</span></button>
+      <button class="btn-link" type="button" onclick={onSetUpAgent}>Set up<span aria-hidden="true">→</span></button>
     </div>
     <div class="welcome-links">
       <button class="btn-link" type="button" onclick={onExample} disabled={workspaceBlocked}>Try an example<MenuIcon name="open" /></button>
@@ -94,14 +92,14 @@
     width: 100%;
     max-width: 33rem;
     margin: auto;
-    padding: var(--space-6) var(--space-8) var(--space-10);
+    padding: var(--space-5) var(--space-6) var(--space-6);
   }
 
   .welcome-heading {
     display: flex;
     align-items: center;
     gap: var(--space-5);
-    margin-bottom: var(--space-6);
+    margin-bottom: var(--space-4);
   }
   .welcome-heading-copy { flex: 1; min-width: 0; }
   .welcome-illustration {
@@ -109,17 +107,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    padding-bottom: var(--space-2);
   }
   .welcome-illustration :global(.kurlo-bird) { transform: scaleX(-1); }
-  .welcome-wordmark {
-    display: block;
-    margin-bottom: var(--space-5);
-    font-size: var(--text-display);
-    font-weight: var(--weight-semibold);
-    letter-spacing: -0.0625rem;
-  }
-  .welcome-wordmark > span { color: var(--accent-text); }
   .welcome-heading h1 {
     font-size: var(--text-display);
     line-height: var(--leading-tight);
@@ -130,14 +119,14 @@
     color: var(--text-2);
     font-size: var(--text-label);
   }
-  .welcome-actions { display: flex; flex-direction: column; gap: var(--space-1); }
+  .welcome-actions { display: flex; flex-direction: column; }
   .welcome-action {
     width: 100%;
     height: auto;
-    min-height: 4.25rem;
+    min-height: 3.5rem;
     justify-content: flex-start;
     gap: var(--space-3);
-    padding: var(--space-2-5) var(--space-3);
+    padding: var(--space-2) var(--space-3);
     text-align: left;
     white-space: normal;
   }
@@ -162,21 +151,20 @@
     display: flex;
     align-items: center;
     gap: var(--space-2-5);
-    margin: var(--space-5) var(--space-3) 0;
-    padding-top: var(--space-5);
+    margin: var(--space-3) var(--space-3) 0;
+    padding-top: var(--space-3);
     border-top: 1px solid var(--border);
   }
   .welcome-agent > div { flex: 1; min-width: 0; }
   .welcome-agent strong { font-size: var(--text-label); font-weight: var(--weight-medium); }
   .welcome-agent p { margin-top: var(--space-1); color: var(--text-3); font-size: var(--text-caption); }
-  .welcome-agent-icon { font-size: var(--text-heading); color: var(--text-3); }
-  .welcome-links { display: flex; flex-wrap: wrap; gap: var(--space-5); margin: var(--space-6) var(--space-3) 0; }
+  .welcome-agent .btn-link { display: inline-flex; align-items: center; gap: var(--space-1); white-space: nowrap; }
+  .welcome-links { display: flex; flex-wrap: wrap; gap: var(--space-5); margin: var(--space-4) var(--space-3) 0; }
   .welcome-links .btn-link { display: inline-flex; align-items: center; gap: var(--space-1); }
-  .welcome-privacy { display: flex; align-items: center; gap: var(--space-1-5); margin: var(--space-8) var(--space-3) 0; color: var(--text-3); font-size: var(--text-caption); }
+  .welcome-privacy { display: flex; align-items: center; gap: var(--space-1-5); margin: var(--space-3) var(--space-3) 0; color: var(--text-3); font-size: var(--text-caption); }
   @container workspace (max-width: 30rem) {
     .welcome-content { padding: var(--space-5) var(--space-4) var(--space-6); }
     .welcome-heading { gap: var(--space-3); }
-    .welcome-illustration { width: 5rem; }
     .welcome-illustration :global(.kurlo-bird) { max-width: 100%; }
     .welcome-action { gap: var(--space-2); padding-inline: var(--space-2); }
     .welcome-action :global(.keycaps) { display: none; }

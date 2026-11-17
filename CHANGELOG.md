@@ -9,9 +9,17 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
-- **Welcome screen.** New profiles open a welcome screen with shortcuts for requests, imports and workspaces. Reopen it from the command palette.
+- **Performance dock.** Inspect CPU, resident memory, uptime and application processes from the status bar or Cmd/Ctrl Alt P in a compact panel without a redundant tab bar. Filter by main, webview or child processes and follow two-minute resource charts. Drag the upper edge, styled like the request/response divider and matching the dock background, to resize the dock up to half the window height; its height is remembered and scrolling does not shift the content. The dock opens with its first snapshot, without flashing an empty dashboard. Keyboard focus highlights only the resize grip, without a full-width stripe after dragging. Sampling stops when the dock is closed and pauses while the window is minimized.
 
 ### Fixed
+
+- **No false unsaved changes after renaming a collection.** In manual-save mode, opening an untouched request after renaming its collection no longer marks it as changed or asks to save when closing it.
+
+- **Stable runner scrolling.** The request list and results use the same scroll container as virtualization. Redundant nested scroll areas no longer swallow wheel and trackpad scrolling or snap the list back, with or without Performance open. Scrolling over request names and URLs reaches the list instead of getting trapped in clipped text. Visible rows also retain their position when their heights are measured.
+
+- **No drift at the end of long lists.** Dragging the scrollbar to the bottom of the runner, mock server routes, agent activity or sidebar history no longer makes the list creep or jump while rows are measured: row spacing is counted in full and the estimated sizes match the real rows. Toggling the sidebar also keeps the first visible mock route in place while its width changes.
+
+- **Cleanly truncated update notes.** Long release notes in Settings → About end with an ellipsis on a complete line, with the full changelog linked below.
 
 - **Script editors fill the request panel.** Request, collection and folder script editors use the available height instead of leaving unused space below a fixed-height editor. Request scripts resize with the response panel. MCP arguments, YAML files and agent notes stay inside their visible scroll area.
 - **Auth fields stay responsive.** Crafted values containing many variable references no longer freeze the interface when opening request or collection authentication settings.

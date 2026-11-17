@@ -44,6 +44,46 @@ test.describe("Kurlo desktop browser E2E", () => {
     }).toMatch(/Request 2.*iteration 100/);
   });
 
+  test('keeps the runner list still when it is scrolled to the end', async ({ page }) => {
+    const requests = Array.from({ length: 491 }, (_, index) => ({
+      id: `drift-${index}`, collectionId: 'col-drift', name: `Request ${index}`, method: 'GET', url: `https://api.kurlo.test/n/${index}`, folderPath: [`Group ${index % 37}`],
+    }));
+    await installKurloBridge(page, '', 'browser/e2e', false, { collections: [{ id: 'col-drift', workspaceId: 'workspace-e2e', name: 'Drift runner' }], requests });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+    const runner = page.getByRole('region', { name: 'Collection runner' });
+    await runner.locator('.runner-select .app-select-trigger').click();
+    await runner.getByRole('option', { name: 'Drift runner' }).click();
+    await expect(runner.getByTestId('runner-request-row').first()).toContainText('Request 0');
+    const body = runner.locator('.runner-page-body');
+    const gaps = () => body.evaluate(node => Array.from(node.querySelectorAll<HTMLElement>('.virtual-list-row')).flatMap(row => {
+      const next = row.nextElementSibling as HTMLElement | null;
+      if (!next?.classList.contains('virtual-list-row')) return [];
+      const gap = next.getBoundingClientRect().top - row.getBoundingClientRect().top - row.getBoundingClientRect().height;
+      return Math.abs(gap) > 0.5 ? [gap] : [];
+    }));
+    expect(await gaps()).toEqual([]);
+    await body.evaluate(node => { node.scrollTop = node.scrollHeight * 0.6; });
+    await page.waitForTimeout(150);
+    await body.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await page.waitForTimeout(16);
+    const lastRowTop = () => body.evaluate(node => {
+      const row = Array.from(node.querySelectorAll<HTMLElement>('[data-testid="runner-request-row"]')).find(item => item.textContent?.includes('Request 490'));
+      return row ? Math.round(row.getBoundingClientRect().top - node.getBoundingClientRect().top) : null;
+    });
+    const tops: Array<number | null> = [];
+    for (let frame = 0; frame < 20; frame++) {
+      tops.push(await lastRowTop());
+      await page.waitForTimeout(50);
+    }
+    expect(new Set(tops)).toEqual(new Set([tops[0]]));
+    expect(tops[0]).not.toBeNull();
+    expect(await body.evaluate(node => Math.round(node.scrollHeight - node.scrollTop - node.clientHeight))).toBe(0);
+    await expect(runner.getByTestId('runner-request-row').last()).toContainText('Request 490');
+    expect(await gaps()).toEqual([]);
+    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'runner-scrolled-to-end.png'), animations: 'disabled' });
+  });
+
   test('keeps a running collection on its original environment after switching to production', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       activeEnvironmentId: 'dev',
@@ -192,3 +232,48 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(await settingsSize()).toBe(inRequest.size);
   });
 });
+
+for (const dockOpen of [false, true]) {
+  for (const target of ['text', 'edge']) {
+    test(`runner keeps forward wheel scrolling ${dockOpen ? 'with Performance open' : 'without Performance'} over ${target}`, async ({ page }) => {
+      const requests = Array.from({ length: 500 }, (_, index) => ({ id: `wheel-${index}`, collectionId: 'wheel-runner', name: `Request ${index}`, method: 'GET', url: 'http://localhost:8080', folderPath: [`Group ${index}`] }));
+      await installKurloBridge(page, '', 'browser/e2e', false, { collections: [{ id: 'wheel-runner', workspaceId: 'workspace-e2e', name: 'Wheel runner' }], requests });
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto('/');
+      await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+      const runner = page.getByRole('region', { name: 'Collection runner' });
+      await runner.locator('.runner-select .app-select-trigger').click();
+      await runner.getByRole('option', { name: 'Wheel runner' }).click();
+      if (dockOpen) {
+        await page.getByRole('button', { name: 'Toggle performance dock' }).click();
+        await expect(page.getByRole('region', { name: 'Performance dock' })).toBeVisible();
+      }
+      const body = runner.locator('.runner-page-body');
+      const bodyBounds = (await body.boundingBox())!;
+      await body.hover({ position: { x: target === 'edge' ? bodyBounds.width - 24 : bodyBounds.width / 2, y: bodyBounds.height / 2 } });
+      const recording = body.evaluate(element => new Promise<Array<{ top: number; index: number }>>(resolve => {
+        const started = performance.now();
+        const frames: Array<{ top: number; index: number }> = [];
+        const record = () => {
+          const edge = element.getBoundingClientRect().top;
+          const row = Array.from(element.querySelectorAll<HTMLElement>('[data-testid="runner-request-row"]')).find(row => row.getBoundingClientRect().bottom > edge);
+          const index = Number(row?.querySelector('input')?.getAttribute('aria-label')?.match(/Request (\d+)/)?.[1] ?? -1);
+          frames.push({ top: element.scrollTop, index });
+          if (performance.now() - started > 2000) resolve(frames);
+          else requestAnimationFrame(record);
+        };
+        requestAnimationFrame(record);
+      }));
+      for (let i = 0; i < 6; i++) {
+        await page.mouse.wheel(0, 600);
+        await page.waitForTimeout(70);
+      }
+      const frames = await recording;
+      for (let i = 1; i < frames.length; i++) {
+        expect(frames[i].index, JSON.stringify(frames.slice(Math.max(0, i - 2), i + 1))).toBeGreaterThanOrEqual(frames[i - 1].index);
+      }
+      expect(frames.at(-1)!.index).toBeGreaterThan(20);
+      await page.screenshot({ path: `/tmp/kurlo-runner-wheel-${dockOpen ? 'performance' : 'plain'}-${target}.png`, animations: 'disabled' });
+    });
+  }
+}

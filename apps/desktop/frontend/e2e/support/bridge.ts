@@ -395,6 +395,12 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
     }
 
     const app: Pick<E2EAppBridge, 'SendRequest' | 'SaveFileDialog'> & Partial<E2EAppBridge> = {
+      PerformanceStatus: async () => ({ sampledAt: Date.now(), intervalMs: 1000, mainPid: 42, mainUptimeSeconds: 4951, totalCpuPercent: 0.4, totalMemoryBytes: 299892736, sensorLimited: false, processes: [
+        { pid: 42, parentPid: 1, name: 'Kurlo (main)', kind: 'main', role: 'Application', cpuPercent: 0.3, memoryBytes: 58720256, uptimeSeconds: 4951 },
+        { pid: 43, parentPid: 42, name: 'Webview', kind: 'webview', role: 'Webview', cpuPercent: 0.1, memoryBytes: 241172480, uptimeSeconds: 4950 },
+      ] }),
+      StartPerformanceStream: async () => { state.calls.push('StartPerformanceStream'); },
+      StopPerformanceStream: async () => { state.calls.push('StopPerformanceStream'); },
       AppInfo: async () => ({ name: 'Kurlo', version: 'dev', runtime, goVersion: 'e2e' }),
       LoadWorkspaceDiagnostics: async () => [],
       LoadRequestStore: async () => {

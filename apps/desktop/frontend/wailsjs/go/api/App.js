@@ -514,6 +514,10 @@ export function OpenWorkspaceRoot(arg1) {
   return window['go']['api']['App']['OpenWorkspaceRoot'](arg1);
 }
 
+export function PerformanceStatus() {
+  return window['go']['api']['App']['PerformanceStatus']();
+}
+
 export function PreviewJWTBearer(arg1) {
   return window['go']['api']['App']['PreviewJWTBearer'](arg1);
 }
@@ -770,6 +774,10 @@ export function StartOpenRouterConnect() {
   return window['go']['api']['App']['StartOpenRouterConnect']();
 }
 
+export function StartPerformanceStream(arg1) {
+  return window['go']['api']['App']['StartPerformanceStream'](arg1);
+}
+
 export function StopAgent(arg1) {
   return window['go']['api']['App']['StopAgent'](arg1);
 }
@@ -788,6 +796,10 @@ export function StopLoadRun() {
 
 export function StopMockServer() {
   return window['go']['api']['App']['StopMockServer']();
+}
+
+export function StopPerformanceStream() {
+  return window['go']['api']['App']['StopPerformanceStream']();
 }
 
 export function StoredHistoryResponseIDs() {

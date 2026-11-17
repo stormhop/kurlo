@@ -215,6 +215,8 @@ func streamClaudeTurn(ctx context.Context, path string, bridge *agentToolBridge,
 	if err := cmd.Start(); err != nil {
 		return err.Error()
 	}
+	perfTrackProcess(cmd.Process.Pid, "Agent CLI")
+	defer perfForgetProcess(cmd.Process.Pid)
 	stopReading := context.AfterFunc(ctx, func() { _ = stdout.Close() })
 	defer stopReading()
 	streamErr := readClaudeStream(stdout, handle)

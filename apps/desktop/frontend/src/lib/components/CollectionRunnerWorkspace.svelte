@@ -112,9 +112,9 @@
     let previous = '';
     for (const request of filteredRequests) {
       const folder = folderOf(request);
-      if (folder && folder !== previous) rows.push({ key: `folder:${request.id}`, height: 30, kind: 'folder', folder });
+      if (folder && folder !== previous) rows.push({ key: `folder:${request.id}`, height: 29, kind: 'folder', folder });
       previous = folder;
-      rows.push({ key: `request:${request.id}`, height: 46, kind: 'request', request });
+      rows.push({ key: `request:${request.id}`, height: 52, kind: 'request', request });
     }
     return rows;
   });
@@ -348,7 +348,7 @@
         {:else if !filteredRequests.length}
           <div class="empty-state runner-empty"><span class="empty-state-title">No requests match the current filters</span></div>
         {:else}
-          <VirtualList rows={requestRows} rowHeight={46} scroller={pageBody}>
+          <VirtualList rows={requestRows} rowHeight={52} scroller={pageBody}>
             {#snippet row(item)}
             {#if item.kind === 'folder'}
               <div class="runner-folder">{item.folder}</div>

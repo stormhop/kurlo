@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"github.com/stormhop/kurlo/apps/desktop/internal/perftrack"
 )
 
 const (
@@ -114,10 +115,12 @@ func StartK6(options RunOptions) (*Run, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
+	perftrack.Track(cmd.Process.Pid, "k6 load test")
 	run := &Run{cmd: cmd, done: make(chan struct{})}
 	go func() {
 		scanLines(stdout, options.OnLine)
 		err := cmd.Wait()
+		perftrack.Forget(cmd.Process.Pid)
 		run.exitCode = 0
 		var exit *exec.ExitError
 		if errors.As(err, &exit) {

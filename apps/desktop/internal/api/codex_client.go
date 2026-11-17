@@ -127,7 +127,9 @@ func startCodexClient(ctx context.Context, path string) (*codexClient, error) {
 	}
 	c := &codexClient{cmd: cmd, stdin: stdin, pending: map[string]chan codexMessage{}, events: make(chan codexMessage, 512), done: make(chan struct{}), exited: make(chan struct{})}
 	go c.read(stdout)
+	perfTrackProcess(cmd.Process.Pid, "Agent CLI")
 	go func() {
+		defer perfForgetProcess(cmd.Process.Pid)
 		err := cmd.Wait()
 		if err == nil {
 			err = errors.New("Codex exited. Check its installation and reconnect.")

@@ -74,9 +74,9 @@
   const canStart = $derived(routes.length > 0 && collections.length > 0);
   const loadingRoutes = $derived(routesPending);
 
-  const ROUTE_ROW_HEIGHT = 41;
-  const SHADOWED_ROW_HEIGHT = 63;
-  const GROUP_ROW_HEIGHT = 30;
+  const ROUTE_ROW_HEIGHT = 40;
+  const SHADOWED_ROW_HEIGHT = 62;
+  const GROUP_ROW_HEIGHT = 29;
 
   type RouteListRow =
     | { key: string; height: number; kind: 'group'; name: string }

@@ -1057,3 +1057,17 @@ export async function signInClaudeCode(path = ''): Promise<AgentResult> {
 export async function cancelClaudeCodeSignIn(): Promise<void> {
   await window.go?.api?.App?.CancelRequest?.('claude-code-sign-in');
 }
+
+export async function performanceStatus(): Promise<import('./wire').PerformanceSample> {
+  const app = window.go?.api?.App;
+  if (app?.PerformanceStatus) return app.PerformanceStatus();
+  return { sampledAt: Date.now(), intervalMs: 0, mainPid: 0, mainUptimeSeconds: 0, totalCpuPercent: null, totalMemoryBytes: null, processes: [], sensorLimited: true };
+}
+
+export async function startPerformanceStream(intervalMs = 1000): Promise<void> {
+  await window.go?.api?.App?.StartPerformanceStream?.(intervalMs);
+}
+
+export async function stopPerformanceStream(): Promise<void> {
+  await window.go?.api?.App?.StopPerformanceStream?.();
+}

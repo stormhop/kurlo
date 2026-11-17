@@ -6,11 +6,17 @@ function registry(): ListenerRegistry {
   return host.__kurloRuntimeListeners;
 }
 
-export function listenRuntime<T>(eventName: string, callback: (payload: T) => void): void {
+export function listenRuntime<T>(eventName: string, callback: (payload: T) => void): () => void {
   const on = window.runtime?.EventsOn;
-  if (!on) return;
+  if (!on) return () => {};
   const listeners = registry();
   listeners.get(eventName)?.();
   const off: unknown = on<T>(eventName, callback);
-  listeners.set(eventName, typeof off === 'function' ? () => off() : () => {});
+  const cleanup = typeof off === 'function' ? () => off() : () => {};
+  listeners.set(eventName, cleanup);
+  return () => {
+    if (listeners.get(eventName) !== cleanup) return;
+    cleanup();
+    listeners.delete(eventName);
+  };
 }

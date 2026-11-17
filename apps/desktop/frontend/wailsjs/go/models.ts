@@ -4676,6 +4676,76 @@ export namespace model {
 		    return a;
 		}
 	}
+	export class PerformanceProcess {
+	    pid: number;
+	    parentPid: number;
+	    name: string;
+	    kind: string;
+	    role: string;
+	    cpuPercent?: number;
+	    memoryBytes?: number;
+	    uptimeSeconds?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new PerformanceProcess(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pid = source["pid"];
+	        this.parentPid = source["parentPid"];
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.role = source["role"];
+	        this.cpuPercent = source["cpuPercent"];
+	        this.memoryBytes = source["memoryBytes"];
+	        this.uptimeSeconds = source["uptimeSeconds"];
+	    }
+	}
+	export class PerformanceSample {
+	    sampledAt: number;
+	    intervalMs: number;
+	    mainPid: number;
+	    mainUptimeSeconds: number;
+	    totalCpuPercent?: number;
+	    totalMemoryBytes?: number;
+	    processes: PerformanceProcess[];
+	    sensorLimited: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new PerformanceSample(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sampledAt = source["sampledAt"];
+	        this.intervalMs = source["intervalMs"];
+	        this.mainPid = source["mainPid"];
+	        this.mainUptimeSeconds = source["mainUptimeSeconds"];
+	        this.totalCpuPercent = source["totalCpuPercent"];
+	        this.totalMemoryBytes = source["totalMemoryBytes"];
+	        this.processes = this.convertValues(source["processes"], PerformanceProcess);
+	        this.sensorLimited = source["sensorLimited"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	

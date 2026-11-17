@@ -17,6 +17,7 @@ Right-click any text field or code editor for **Cut**, **Copy**, **Paste** and *
 |----------|--------|
 | `Cmd/Ctrl K` | Command palette — search saved requests and agent chats, and run commands |
 | `Cmd/Ctrl ,` | Open settings |
+| `Alt Cmd/Ctrl P` | Toggle performance dock |
 | `Cmd/Ctrl Backslash` | Toggle sidebar |
 | `Alt Cmd/Ctrl Backslash` | Toggle right sidebar / code snippet panel |
 | `Cmd/Ctrl =` | Zoom in — make the whole interface larger |

@@ -26,6 +26,7 @@ export function stableStringify(value: unknown): string {
 export function requestDirtyFingerprint(req: SavedRequest) {
   const {
     requestTab,
+    collection,
     params,
     pathParams,
     vars,

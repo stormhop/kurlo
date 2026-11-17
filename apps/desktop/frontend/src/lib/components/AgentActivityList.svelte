@@ -17,8 +17,8 @@
     | { key: string; height: number; kind: 'group'; label: string }
     | { key: string; height: number; kind: 'entry'; entry: AgentActivitySummary };
   const rows = $derived(groups.flatMap(group => [
-    { key: `group:${group.label}`, height: 30, kind: 'group', label: group.label } as ActivityRow,
-    ...group.entries.map(entry => ({ key: `entry:${entry.id}`, height: 52, kind: 'entry', entry }) as ActivityRow),
+    { key: `group:${group.label}`, height: 22, kind: 'group', label: group.label } as ActivityRow,
+    ...group.entries.map(entry => ({ key: `entry:${entry.id}`, height: 52.5, kind: 'entry', entry }) as ActivityRow),
   ]));
 
   function open(id: string) {
@@ -50,7 +50,7 @@
 {#if rows.length}
   <VirtualList
     {rows}
-    rowHeight={52}
+    rowHeight={52.5}
     className="history-list agent-activity-list"
     role="list"
     ariaLabel="Agent activity"

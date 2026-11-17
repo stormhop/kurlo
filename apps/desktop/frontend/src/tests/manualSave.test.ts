@@ -174,6 +174,12 @@ describe('manual save request snapshots', () => {
 });
 
 describe('requestDiffersFromSavedSnapshot', () => {
+  it('ignores collection names but detects moving to another collection', () => {
+    const saved = request();
+    expect(requestDiffersFromSavedSnapshot(request({ collection: 'Renamed' }), saved)).toBe(false);
+    expect(requestDiffersFromSavedSnapshot(request({ collectionId: 'collection-2' }), saved)).toBe(true);
+  });
+
   it('treats a missing draft flag as a saved request', () => {
     const saved = request();
     delete (saved as Partial<SavedRequest>).isDraft;

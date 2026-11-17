@@ -88,6 +88,7 @@ export const DEFAULT_PROXY_CONFIG: ProxyConfig = {
 };
 
 export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
+  { id: 'toggle-performance-dock', group: 'Interface', label: 'Toggle performance dock', defaultCombo: 'Alt+Meta+P' },
   { id: 'close-tab', group: 'Tabs', label: 'Close tab', defaultCombo: 'Meta+W' },
   { id: 'force-close-tab', group: 'Tabs', label: 'Force close tab', defaultCombo: 'Alt+Meta+W' },
   { id: 'close-other-tabs', group: 'Tabs', label: 'Close other tabs', defaultCombo: 'Alt+Shift+Meta+W' },

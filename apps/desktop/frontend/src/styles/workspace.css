@@ -4338,7 +4338,7 @@
   justify-content: flex-end;
   gap: var(--space-1-5);
   min-width: 0;
-  overflow: hidden;
+  overflow: clip;
 }
 
 .runner-request-tags span {
@@ -4578,6 +4578,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
+  overscroll-behavior-y: none;
   padding: 0 var(--space-8) var(--space-8);
 }
 
@@ -4632,6 +4634,7 @@
 
 .runner-results-table {
   border-top: 1px solid var(--border-subtle);
+  overflow: visible;
 }
 
 .runner-result-row {
@@ -4743,6 +4746,7 @@
 
 .runner-request-list {
   padding: 0;
+  overflow: visible;
 }
 
 .runner-request-row {
@@ -4782,7 +4786,7 @@
 }
 
 .runner-request-copy strong {
-  overflow: hidden;
+  overflow: clip;
   color: var(--text);
   font-size: var(--text-body);
   font-weight: var(--weight-medium);
@@ -4791,7 +4795,7 @@
 }
 
 .runner-request-copy small {
-  overflow: hidden;
+  overflow: clip;
   color: var(--text-3);
   font-size: var(--text-label);
   text-overflow: ellipsis;

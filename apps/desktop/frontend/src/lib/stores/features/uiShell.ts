@@ -176,6 +176,7 @@ type UiShellHost = {
   renameRequest: (id: string) => Promise<unknown>;
   reopenLastClosedTab: () => Promise<unknown>;
   runActiveRequest: () => Promise<unknown>;
+  togglePerformanceDock: () => Promise<void>;
   runShortcut: (id: ShortcutId) => Promise<unknown>;
   showSidebarView: (view: SidebarView) => void;
   openAgentTab: () => void;
@@ -442,11 +443,11 @@ export const uiShellFeature = {
   },
 
   isShortcutAllowedInEditable(this: UiShellHost, id: ShortcutId) {
-    return ['close-tab', 'force-close-tab', 'send-request', 'save-request', 'request-url', 'search', 'settings', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset', 'cancel-request', 'copy-curl', 'find-replace'].includes(id);
+    return ['close-tab', 'force-close-tab', 'send-request', 'save-request', 'request-url', 'search', 'settings', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset', 'cancel-request', 'copy-curl', 'find-replace', 'toggle-performance-dock'].includes(id);
   },
 
   async runShortcut(this: UiShellHost, id: ShortcutId) {
-    if (this.workspaceBlocked && !['close-tab', 'force-close-tab', 'settings', 'shortcut-help', 'toggle-left-sidebar', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset', 'toggle-response-layout'].includes(id)) {
+    if (this.workspaceBlocked && !['close-tab', 'force-close-tab', 'settings', 'shortcut-help', 'toggle-left-sidebar', 'toggle-right-sidebar', 'zoom-in', 'zoom-out', 'zoom-reset', 'toggle-response-layout', 'toggle-performance-dock'].includes(id)) {
       this.showWorkspaceBlockedToast('Workspace shortcuts');
       return;
     }
@@ -482,6 +483,7 @@ export const uiShellFeature = {
     else if (id === 'collapse-all') await this.collapseAllCollections();
     else if (id === 'settings') this.openSettings('general');
     else if (id === 'shortcut-help') this.openSettings('shortcuts');
+    else if (id === 'toggle-performance-dock') await this.togglePerformanceDock();
     else if (id === 'toggle-left-sidebar') this.sidebarHidden = !this.sidebarHidden;
     else if (id === 'toggle-right-sidebar' && this.codePanelAvailable) this.codePanelOpen = !this.codePanelOpen;
     else if (id === 'zoom-in') this.zoomIn();

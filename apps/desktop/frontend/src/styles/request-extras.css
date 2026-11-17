@@ -1200,7 +1200,8 @@ input::-webkit-calendar-picker-indicator { opacity: 0; }
   pointer-events: none;
 }
 .panel-divider:hover::after,
-.panel-divider:focus-visible::after {
+.panel-divider:focus-visible::after,
+.performance-resizing .panel-divider::after {
   background: color-mix(in srgb, var(--text-2) 88%, transparent);
   opacity: 1;
 }

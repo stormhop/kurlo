@@ -95,6 +95,8 @@ import { normalizeCollectionRuns, type CollectionRunRecord } from '../collection
 import { menuFeature } from './features/menus';
 import { setFloatingMenuDismiss } from '../floatingMenu';
 import { loadTestFeature, type LoadTestTab } from './features/loadTests';
+import { performanceFeature, type PerformanceView } from './features/performance';
+import type { PerformanceSample } from '../wire';
 import { loadRunFeature } from './features/loadRuns';
 import { preferencesFeature } from './features/preferences';
 import { DEFAULT_STARTUP_VIEW, startupNeedsDraftRequest, startupTopView, type StartupView } from '../startupView';
@@ -1373,6 +1375,15 @@ class AppVM {
   k6Path = $state('');
   k6Info = $state<K6Info | null>(null);
   k6MissingOpen = $state(false);
+  perfDockOpen = $state(false);
+  perfView = $state<PerformanceView>('all');
+  perfSample = $state.raw<PerformanceSample | null>(null);
+  perfHistory = $state.raw<PerformanceSample[]>([]);
+  perfError = $state('');
+  declare togglePerformanceDock: typeof performanceFeature.togglePerformanceDock;
+  declare setPerformanceView: typeof performanceFeature.setPerformanceView;
+  declare initPerformanceListeners: typeof performanceFeature.initPerformanceListeners;
+
   loadRun = $state<LoadRunState>(emptyLoadRunState());
   loadRunLogLines = $state<string[]>([]);
   loadRunLogTestId = $state('');
@@ -2124,6 +2135,7 @@ applyFeatures(
   AppVM.prototype,
   loadTestFeature,
   loadRunFeature,
+  performanceFeature,
   cookieFeature,
   cookieSyncFeature,
   sseFeature,

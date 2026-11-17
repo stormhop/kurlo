@@ -146,7 +146,7 @@ export type ShortcutId =
   | 'save-request' | 'cancel-request' | 'copy-curl' | 'find-replace'
   | 'close-other-tabs' | 'close-all-tabs'
   | 'go-collections' | 'go-environments' | 'go-history' | 'go-agent' | 'choose-environment'
-  | 'new-collection' | 'import-collection' | 'collection-runner' | 'toggle-response-layout';
+  | 'new-collection' | 'import-collection' | 'collection-runner' | 'toggle-response-layout' | 'toggle-performance-dock';
 
 export type ShortcutDefinition = { id: ShortcutId; group: string; label: string; defaultCombo: string };
 export type KVRow = { id: number; enabled: boolean; key: string; value: string; description: string; isFile?: boolean; fileName?: string; contentType?: string; secret?: boolean };

@@ -411,6 +411,8 @@
     untrack(() => vm.scheduleResponseSearchCount());
   });
 
+  $effect(() => { if (vm.perfDockOpen) void lazy.loadPerformanceDock(); });
+
   $effect(() => {
     lazy.preloadForAppShell({
       requestTab: vm.requestTab,
@@ -470,6 +472,7 @@
     });
     vm.initCookieSyncListeners();
     vm.initLoadRunListeners();
+    const disposePerformance = vm.initPerformanceListeners();
     void vm.refreshMockServerStatus();
     const warmLazyTimer = setTimeout(() => {
       void lazy.loadSettingsModal();
@@ -596,6 +599,7 @@
 
     return () => {
       destroyed = true;
+      disposePerformance();
       clearTimeout(warmLazyTimer);
       if (warmEditorIdle !== undefined) window.cancelIdleCallback?.(warmEditorIdle);
       if (warmEditorTimer !== undefined) clearTimeout(warmEditorTimer);
@@ -1428,6 +1432,9 @@
       </div>
     {/if}
 
+    {#if vm.perfDockOpen && (vm.perfSample || vm.perfError) && lazy.PerformanceDockComponent}
+      <lazy.PerformanceDockComponent />
+    {/if}
   </div>
 
   <StatusBar

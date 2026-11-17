@@ -55,6 +55,7 @@
   const EMPTY_ROW_HEIGHT = 58;
   const FOLDER_EMPTY_ROW_HEIGHT = 124;
   const ONBOARDING_ROW_HEIGHT = 210;
+  const HISTORY_DAY_ROW_HEIGHT = 36;
   const ENVIRONMENT_ROW_HEIGHT = 46;
   const ENVIRONMENT_NONE_ROW_HEIGHT = 46;
   const PINNED_REQUEST_DEPTH = -1;
@@ -561,7 +562,7 @@
     for (const group of historyGroups) {
       const entries = group.entries.filter(historyEntryMatches);
       if (!entries.length) continue;
-      rows.push({ type: 'day', key: `day:${group.key}`, height: ROW_HEIGHT, group });
+      rows.push({ type: 'day', key: `day:${group.key}`, height: HISTORY_DAY_ROW_HEIGHT, group });
       if (!group.collapsed) {
         for (const entry of entries) rows.push({ type: 'entry', key: `history:${entry.id}`, height: ROW_HEIGHT, entry });
       }

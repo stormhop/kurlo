@@ -259,6 +259,8 @@ export function OpenRouterConnectStatus():Promise<model.OpenRouterConnectState>;
 
 export function OpenWorkspaceRoot(arg1:string):Promise<api.WorkspaceOpenResult>;
 
+export function PerformanceStatus():Promise<model.PerformanceSample>;
+
 export function PreviewJWTBearer(arg1:model.AuthConfig):Promise<model.JWTBearerPreview>;
 
 export function PreviewLoadTestData(arg1:string):Promise<model.LoadDataPreview>;
@@ -387,6 +389,8 @@ export function StartMockServer(arg1:model.MockServerConfig):Promise<model.MockS
 
 export function StartOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 
+export function StartPerformanceStream(arg1:number):Promise<void>;
+
 export function StopAgent(arg1:string):Promise<void>;
 
 export function StopAgentTurn(arg1:string):Promise<void>;
@@ -396,6 +400,8 @@ export function StopCookieSync():Promise<model.CookieSyncStatus>;
 export function StopLoadRun():Promise<model.LoadRunState>;
 
 export function StopMockServer():Promise<model.MockServerStatus>;
+
+export function StopPerformanceStream():Promise<void>;
 
 export function StoredHistoryResponseIDs():Promise<Array<string>>;
 

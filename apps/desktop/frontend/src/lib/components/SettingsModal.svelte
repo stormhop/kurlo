@@ -38,7 +38,8 @@
 
   function measureReleaseNotes(node: HTMLDivElement) {
     const measure = () => {
-      releaseNotesTruncated = node.scrollHeight > node.clientHeight;
+      const content = node.firstElementChild;
+      releaseNotesTruncated = !!content && content.scrollHeight > content.clientHeight;
     };
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -1143,7 +1144,7 @@
               <div class="updates-notes">
                 <p class="settings-group-label">What's new in {updateInfo.version}</p>
                 <div class="updates-notes-preview" use:measureReleaseNotes>
-                  <ReleaseNotes body={cleanReleaseNotes(updateInfo.releaseNotes)} />
+                  <ReleaseNotes body={cleanReleaseNotes(updateInfo.releaseNotes)} preview />
                 </div>
                 {#if releaseNotesTruncated}
                   <a
@@ -1194,8 +1195,7 @@
   }
 
   .updates-notes-preview {
-    max-height: calc(var(--text-body) * var(--leading-normal) * 10);
-    overflow: hidden;
+    overflow: clip;
   }
 
   .updates-notes-link {

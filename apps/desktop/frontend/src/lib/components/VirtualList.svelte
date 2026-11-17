@@ -76,20 +76,26 @@
   }
 
   function captureAnchor(el: HTMLElement) {
-    anchor = rowAnchor(rows, Math.max(0, el.scrollTop - listOffset()), heights, $uiScale);
+    const edge = el.getBoundingClientRect().top + el.clientTop;
+    const rendered = Array.from(listEl?.children ?? []).filter((node): node is HTMLElement => node instanceof HTMLElement && node.dataset.virtualKey !== undefined);
+    const node = rendered.find(node => node.getBoundingClientRect().top >= edge) ?? rendered.find(node => node.getBoundingClientRect().bottom > edge);
+    anchor = node ? { key: node.dataset.virtualKey!, delta: edge - node.getBoundingClientRect().top } : rowAnchor(rows, Math.max(0, el.scrollTop - listOffset()), heights, $uiScale);
+    anchoredTop = el.scrollTop;
   }
 
   function holdAnchor() {
     const el = scrollEl;
     if (!el) return;
+    const moved = Math.abs(el.scrollTop - anchoredTop) >= 1;
     noteWidth(el);
-    const target = anchoring && anchor ? anchorOffset(rows, anchor, heights, $uiScale) : null;
+    const target = anchor && (anchoring || !moved) ? anchorOffset(rows, anchor, heights, $uiScale) : null;
     if (target === null) {
       anchoring = false;
       captureAnchor(el);
       return;
     }
-    const desired = target + listOffset();
+    const node = Array.from(listEl?.children ?? []).find((node): node is HTMLElement => node instanceof HTMLElement && node.dataset.virtualKey === anchor?.key);
+    const desired = !anchoring && node && anchor ? el.scrollTop + node.getBoundingClientRect().top - el.getBoundingClientRect().top - el.clientTop + anchor.delta : target + listOffset();
     if (Math.abs(el.scrollTop - desired) >= 1) el.scrollTop = desired;
     anchoredTop = el.scrollTop;
   }
@@ -158,7 +164,7 @@
 <div class="virtual-list {className}" class:own-scroll={!scroller} bind:this={listEl} {role} aria-label={ariaLabel}>
   <div class="virtual-list-spacer" style={`height: ${visible.before}px`}></div>
   {#each visible.rows as item (item.key)}
-    <div class="virtual-list-row" use:measure={item.key}>{@render row(item)}</div>
+    <div class="virtual-list-row" data-virtual-key={item.key} use:measure={item.key}>{@render row(item)}</div>
   {/each}
   <div class="virtual-list-spacer" style={`height: ${visible.after}px`}></div>
   {#if footer}{@render footer()}{/if}
@@ -172,6 +178,7 @@
     position: relative;
     z-index: 0;
     min-width: 0;
+    overflow-anchor: none;
   }
   .virtual-list.own-scroll {
     min-height: 0;
@@ -186,6 +193,7 @@
     pointer-events: none;
   }
   .virtual-list-row {
+    display: flow-root;
     min-width: 0;
   }
   .virtual-list-more {

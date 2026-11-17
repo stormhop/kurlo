@@ -45,6 +45,7 @@ export const DOCS_SIDEBAR = [
     items: [
       { label: 'Scripting API', link: '/docs/reference/scripting-api/' },
       { label: 'Kurlo YAML format', link: '/docs/reference/kurlo-yaml-format/' },
+      { label: 'Performance dock', link: '/docs/reference/performance/' },
       { label: 'Performance fixtures', link: '/docs/reference/performance-fixtures/' },
       { label: 'Keyboard shortcuts', link: '/docs/reference/keyboard-shortcuts/' },
     ],

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { formatSectionBlocks, releaseNoteKind, sectionIntro, stripInlineMarkdown } from '../whatsNew';
 
-  let { body }: { body: string } = $props();
+  let { body, preview = false }: { body: string; preview?: boolean } = $props();
 
   let blocks = $derived(formatSectionBlocks(body));
   let intro = $derived(blocks.length ? stripInlineMarkdown(sectionIntro(body)) : '');
@@ -9,7 +9,7 @@
 </script>
 
 {#if blocks.length}
-  <div class="release-notes">
+  <div class="release-notes" class:preview>
     {#if intro}
       <p class="release-notes-intro">{intro}</p>
     {/if}
@@ -39,7 +39,7 @@
     {/each}
   </div>
 {:else if plain.length}
-  <div class="release-notes">
+  <div class="release-notes" class:preview>
     {#each plain as line, lineIndex (lineIndex)}
       <p class="release-notes-plain">{line}</p>
     {/each}
@@ -53,6 +53,35 @@
     align-content: start;
     -webkit-user-select: text;
     user-select: text;
+  }
+
+  .release-notes.preview {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 10;
+    line-clamp: 10;
+    line-height: calc(var(--text-body) * var(--leading-normal));
+    overflow: hidden;
+  }
+
+  .preview ul {
+    display: block;
+  }
+
+  .preview .release-notes-subitems {
+    margin-top: 0;
+  }
+
+  .preview .release-notes-heading {
+    display: block;
+    margin: 0;
+    line-height: inherit;
+  }
+
+  .preview .release-notes-dot {
+    display: inline-block;
+    margin-right: var(--space-2);
+    vertical-align: middle;
   }
 
   .release-notes-heading {

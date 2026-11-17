@@ -228,6 +228,7 @@
 }
 
 .sidebar-vrow {
+  display: flow-root;
   min-width: 0;
 }
 
