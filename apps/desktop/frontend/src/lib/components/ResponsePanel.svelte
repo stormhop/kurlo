@@ -379,8 +379,8 @@
               </svg>
               <input
                 bind:this={responseFilterInput}
-                bind:value={vm.responseFilter}
-                oninput={() => (responseSearchIndex = 0)}
+                value={vm.responseFilter}
+                oninput={event => { responseSearchIndex = 0; vm.setResponseFilter(event.currentTarget.value); }}
                 onkeydown={vm.onResponseFilterKeydown}
                 placeholder="$.items[*].id  or  .items[].id"
                 aria-label="Filter response with JSONPath"

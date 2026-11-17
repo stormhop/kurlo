@@ -3,7 +3,8 @@
   import BirdLoader from './BirdLoader.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { tabListKeyboard } from '../a11y';
-  import { gitDiffRows, type GitDiffRow } from '../gitDiffRows';
+  import { gitDiffRows } from '../gitDiffRows';
+  import GitDiffView from './GitDiffView.svelte';
   import { kurloChangedFiles, otherChangedFileCount } from '../gitFiles';
   import GitIcon from './GitIcon.svelte';
   import { gitPullRequestUrl } from '../backend';
@@ -631,45 +632,10 @@
     })).sort((left, right) => left.label.localeCompare(right.label));
   }
 
-  function diffFileBlocks(rows: GitDiffRow[]): Array<{ file: string; rows: GitDiffRow[] }> {
-    const blocks: Array<{ file: string; rows: GitDiffRow[] }> = [];
-    for (const row of rows) {
-      if (row.kind === 'file') blocks.push({ file: row.text, rows: [] });
-      else if (blocks.length) blocks[blocks.length - 1].rows.push(row);
-      else blocks.push({ file: '', rows: [row] });
-    }
-    return blocks;
-  }
-
   function remoteNameOf(startPoint: string) {
     return startPoint.slice(0, startPoint.indexOf('/')) || 'remote';
   }
 </script>
-
-{#snippet diffRowList(rows: GitDiffRow[])}
-  {#each diffFileBlocks(rows) as block, blockIndex (blockIndex)}
-    <div class="git-diff-file-block">
-      {#if block.file}<div class="git-diff-file">{block.file}</div>{/if}
-      {@render diffLines(block.rows)}
-    </div>
-  {/each}
-{/snippet}
-
-{#snippet diffLines(rows: GitDiffRow[])}
-  {#each rows as row, index (index)}
-    {#if row.kind === 'hunk'}
-      <div class="git-diff-line hunk"><span class="git-diff-line-no">⋯</span><span class="git-diff-sign"></span><code>{row.text}</code></div>
-    {:else if row.kind === 'note'}
-      <div class="git-diff-line note"><span class="git-diff-line-no"></span><span class="git-diff-sign"></span><code>{row.text}</code></div>
-    {:else}
-      <div class="git-diff-line" class:added={row.kind === 'added'} class:removed={row.kind === 'removed'}>
-        <span class="git-diff-line-no">{row.line}</span>
-        <span class="git-diff-sign" aria-hidden="true">{row.kind === 'added' ? '+' : row.kind === 'removed' ? '−' : ''}</span>
-        <code>{row.text || ' '}</code>
-      </div>
-    {/if}
-  {/each}
-{/snippet}
 
 <section class="git-workspace">
   <div class="git-toolbar" class:standalone={!status.isRepo}>
@@ -1448,20 +1414,9 @@
         {:else if diff.binary}
           <div class="empty-state git-empty">Binary file</div>
         {:else if diff.diff && hasSplitDiff}
-          <div class="git-diff-code" role="region" aria-label="Git diff">
-            {#if stagedDiffRows.length}
-              <div class="git-diff-section-label">Staged</div>
-              {@render diffRowList(stagedDiffRows)}
-            {/if}
-            {#if unstagedDiffRows.length}
-              <div class="git-diff-section-label">Unstaged</div>
-              {@render diffRowList(unstagedDiffRows)}
-            {/if}
-          </div>
+          <GitDiffView sections={[{ label: 'Staged', rows: stagedDiffRows }, { label: 'Unstaged', rows: unstagedDiffRows }]} ariaLabel="Git diff" />
         {:else if diff.diff}
-          <div class="git-diff-code" role="region" aria-label="Git diff">
-            {@render diffRowList(visibleDiffRows)}
-          </div>
+          <GitDiffView sections={[{ label: '', rows: visibleDiffRows }]} ariaLabel="Git diff" />
         {:else}
           <div class="empty-state git-empty">{selectedPath ? 'No text diff' : sideTab === 'history' ? 'Select a commit' : 'Select a file'}</div>
         {/if}
@@ -1503,20 +1458,9 @@
             {:else if diff.binary}
               <div class="empty-state git-empty">Binary file</div>
             {:else if diff.diff && hasSplitDiff}
-              <div class="git-diff-code expanded" role="region" aria-label="Expanded Git diff">
-                {#if stagedDiffRows.length}
-                  <div class="git-diff-section-label">Staged</div>
-                  {@render diffRowList(stagedDiffRows)}
-                {/if}
-                {#if unstagedDiffRows.length}
-                  <div class="git-diff-section-label">Unstaged</div>
-                  {@render diffRowList(unstagedDiffRows)}
-                {/if}
-              </div>
+              <GitDiffView sections={[{ label: 'Staged', rows: stagedDiffRows }, { label: 'Unstaged', rows: unstagedDiffRows }]} expanded ariaLabel="Expanded Git diff" />
             {:else if diff.diff}
-              <div class="git-diff-code expanded" role="region" aria-label="Expanded Git diff">
-                {@render diffRowList(visibleDiffRows)}
-              </div>
+              <GitDiffView sections={[{ label: '', rows: visibleDiffRows }]} expanded ariaLabel="Expanded Git diff" />
             {:else}
               <div class="empty-state git-empty">{selectedPath ? 'No text diff' : sideTab === 'history' ? 'Select a commit' : 'Select a file'}</div>
             {/if}

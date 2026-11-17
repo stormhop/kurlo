@@ -98,3 +98,29 @@ for (const kind of ['yaml', 'notes']) {
     await page.screenshot({ path: join(tmpdir(), `kurlo-editor-audit-${kind}.png`), animations: 'disabled' });
   });
 }
+
+test('dims commented lines of a long body, including a block opened above the screen', async ({ page }) => {
+  const lines = ['{', '  // first note'];
+  for (let index = 0; index < 3000; index += 1) lines.push(`  "key${index}": ${index},`);
+  lines.push('  /* tail block', '   still inside', '   end */', '  "last": true', '}');
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'long-col', workspaceId: 'workspace-e2e', name: 'Long' }],
+    activeId: 'long', openIds: ['long'],
+    requests: [{ id: 'long', name: 'Long body', collectionId: 'long-col', collection: 'Long', requestType: 'http', method: 'POST',
+      url: 'https://example.test', bodyType: 'json', bodyContent: lines.join('\n'), auth: { type: 'none' } }],
+  });
+  await page.goto('/');
+  await chooseRequestSection(page, 'Body');
+  const editor = page.getByTestId('request-body-editor');
+  const commented = editor.locator('.cm-line.cm-kurlo-commented-line');
+  await expect(commented.filter({ hasText: 'first note' })).toHaveCount(1);
+  await expect(editor.locator('.cm-line', { hasText: '"key5": 5,' })).not.toHaveClass(/cm-kurlo-commented-line/);
+
+  await editor.locator('.cm-content').click();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+End' : 'Control+End');
+  await expect(commented.filter({ hasText: 'still inside' })).toHaveCount(1);
+  await expect(commented.filter({ hasText: 'end */' })).toHaveCount(1);
+  await expect(editor.locator('.cm-line', { hasText: '"last": true' })).not.toHaveClass(/cm-kurlo-commented-line/);
+  await expect(editor.locator('.cm-line', { hasText: '"key2999": 2999,' })).not.toHaveClass(/cm-kurlo-commented-line/);
+  await expect(commented.filter({ hasText: 'first note' })).toHaveCount(0);
+});

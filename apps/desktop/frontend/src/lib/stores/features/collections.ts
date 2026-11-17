@@ -118,13 +118,26 @@ export class SidebarRequestMemo {
   }
 }
 
+const sidebarHaystacks = new WeakMap<SavedRequest, string>();
+
+function sidebarHaystack(request: SavedRequest): string {
+  let haystack = sidebarHaystacks.get(request);
+  if (haystack === undefined) {
+    haystack = [
+      requestTabLabel(request),
+      request.url,
+      request.grpcMethod ?? '',
+      request.grpcProtoFileName ?? '',
+      (request.folderPath ?? []).join(' / '),
+    ].join('\u0000').toLowerCase();
+    sidebarHaystacks.set(request, haystack);
+  }
+  return haystack;
+}
+
 export function requestMatchesSidebarQuery(request: SavedRequest, query: string): boolean {
   if (!query) return true;
-  return requestTabLabel(request).toLowerCase().includes(query)
-    || request.url.toLowerCase().includes(query)
-    || (request.grpcMethod ?? '').toLowerCase().includes(query)
-    || (request.grpcProtoFileName ?? '').toLowerCase().includes(query)
-    || (request.folderPath ?? []).join(' / ').toLowerCase().includes(query);
+  return sidebarHaystack(request).includes(query);
 }
 
 export const collectionFeature = {

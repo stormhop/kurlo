@@ -370,16 +370,19 @@
   function commentedLineDecorations(view: EditorView) {
     const builder = new RangeSetBuilder<Decoration>();
     const lineDecoration = Decoration.line({ class: 'cm-kurlo-commented-line' });
+    const { doc } = view.state;
+    const { from, to } = view.viewport;
+    const lastLine = doc.lineAt(to).number;
+    const HTML_OPEN = '<' + '!--';
+    const HTML_CLOSE = '--' + '>';
     let inBlockComment = false;
+    let lineStart = 0;
 
-    for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo += 1) {
-      const line = view.state.doc.line(lineNo);
-      const trimmed = line.text.trimStart();
+    for (const text of doc.iterLines(1, lastLine + 1)) {
+      const trimmed = text.trimStart();
       let commented: boolean;
 
       if (language === 'html' || language === 'xml') {
-        const HTML_OPEN = '<' + '!--';
-        const HTML_CLOSE = '--' + '>';
         commented = inBlockComment || trimmed.startsWith(HTML_OPEN);
         if (trimmed.startsWith(HTML_OPEN) && !trimmed.includes(HTML_CLOSE)) inBlockComment = true;
         if (inBlockComment && trimmed.includes(HTML_CLOSE)) inBlockComment = false;
@@ -391,7 +394,8 @@
         commented = trimmed.startsWith('#') || trimmed.startsWith('//');
       }
 
-      if (commented) builder.add(line.from, line.from, lineDecoration);
+      if (commented && lineStart + text.length >= from) builder.add(lineStart, lineStart, lineDecoration);
+      lineStart += text.length + 1;
     }
 
     return builder.finish();

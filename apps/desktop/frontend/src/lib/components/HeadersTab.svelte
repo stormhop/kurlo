@@ -27,7 +27,7 @@
   let tableEl = $state<HTMLDivElement>();
   let headerPopoverEl = $state<HTMLDivElement>();
   let headerDetailTextarea = $state<HTMLTextAreaElement>();
-  let headerTemplateValues = $derived(vm.environmentValuesForRequest(vm.snapshotActiveRequest()));
+  let headerTemplateValues = $derived(vm.environmentValuesForRequest({ collectionId: vm.activeRequestCollectionId(), vars: vm.requestVars }));
 
   onMount(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {

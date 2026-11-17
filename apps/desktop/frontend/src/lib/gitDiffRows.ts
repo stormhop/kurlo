@@ -52,3 +52,37 @@ export function gitDiffRows(diff: string): GitDiffRow[] {
   while (rows.length && rows[rows.length - 1].kind === 'context' && rows[rows.length - 1].text === '') rows.pop();
   return rows;
 }
+
+export const GIT_DIFF_VIRTUAL_ROWS = 1500;
+
+export type GitDiffSection = { label: string; rows: GitDiffRow[] };
+
+export type GitDiffItem = {
+  key: string;
+  height: number;
+  kind: GitDiffRow['kind'] | 'section';
+  text: string;
+  line: number | null;
+  first: boolean;
+};
+
+function itemHeights(expanded: boolean): Record<GitDiffItem['kind'], number> {
+  const line = expanded ? 18 : 16.5;
+  return { section: 30, file: expanded ? 31.6 : 28, hunk: line + 8, note: line, added: line, removed: line, context: line };
+}
+
+export function gitDiffItems(sections: GitDiffSection[], expanded = false): GitDiffItem[] {
+  const ITEM_HEIGHTS = itemHeights(expanded);
+  const items: GitDiffItem[] = [];
+  sections.forEach((section, sectionIndex) => {
+    if (!section.rows.length) return;
+    if (section.label) items.push({ key: `s${sectionIndex}`, height: ITEM_HEIGHTS.section, kind: 'section', text: section.label, line: null, first: !items.length });
+    let fileSeen = false;
+    section.rows.forEach((row, rowIndex) => {
+      const first = row.kind === 'file' && !fileSeen && !items.length;
+      items.push({ key: `s${sectionIndex}:${rowIndex}`, height: ITEM_HEIGHTS[row.kind] - (first ? 1 : 0), kind: row.kind, text: row.text, line: row.line, first });
+      if (row.kind === 'file') fileSeen = true;
+    });
+  });
+  return items;
+}

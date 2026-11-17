@@ -661,6 +661,8 @@ class AppVM {
   declare requestIsActive: typeof requestStateFeature.requestIsActive;
   declare blankSavedRequest: typeof requestStateFeature.blankSavedRequest;
   declare snapshotActiveRequest: typeof requestStateFeature.snapshotActiveRequest;
+  declare activeRequestDraftTarget: typeof requestStateFeature.activeRequestDraftTarget;
+  declare activeRequestCollectionId: typeof requestStateFeature.activeRequestCollectionId;
   declare currentRequestName: typeof requestStateFeature.currentRequestName;
   declare snapshotRequestName: typeof requestStateFeature.snapshotRequestName;
   declare requestHasContent: typeof requestStateFeature.requestHasContent;
@@ -704,6 +706,8 @@ class AppVM {
   declare responseFilterResult: typeof responseFeature.responseFilterResult;
   declare toggleResponseFilter: typeof responseFeature.toggleResponseFilter;
   declare onResponseFilterKeydown: typeof responseFeature.onResponseFilterKeydown;
+  declare setResponseFilter: typeof responseFeature.setResponseFilter;
+  declare applyResponseFilterNow: typeof responseFeature.applyResponseFilterNow;
   declare responseBodyIsPaged: typeof responseFeature.responseBodyIsPaged;
   declare responseBodyVirtualized: typeof responseFeature.responseBodyVirtualized;
   declare responseBodyPageCount: typeof responseFeature.responseBodyPageCount;
@@ -1206,6 +1210,7 @@ class AppVM {
   responseSearch = $state('');
   responseFilterOpen = $state(false);
   responseFilter = $state('');
+  responseFilterQuery = $state('');
   responseSearchIndex = $state(0);
   responseSearchTotal = $state(0);
   responseSearchCounting = $state(false);
@@ -1681,7 +1686,8 @@ class AppVM {
         .map(row => ({ key: row.key.trim(), value: row.value, description: row.description || 'Request', secret: row.secret ?? false }))
       : [];
     const rows = [...requestSuggestions, ...this.environmentVariableSuggestions(), ...collectionSuggestions, ...globalSuggestions];
-    return rows.filter((row, index) => rows.findIndex(candidate => candidate.key === row.key) === index);
+    const firstIndex = new Map(rows.map((row, index) => [row.key, index] as const).reverse());
+    return rows.filter((row, index) => firstIndex.get(row.key) === index);
   }
   async copyHistoryEntryCurl(historyId: string) {
     const entry = this.requestHistory.find(candidate => candidate.id === historyId);

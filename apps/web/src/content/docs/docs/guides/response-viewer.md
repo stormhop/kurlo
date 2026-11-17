@@ -56,6 +56,7 @@ For a JSON response, the funnel button next to search opens a filter bar above t
 - A path that starts with a dot is read jq-style: `.items[].id` is the same as `$.items[*].id`. Pipes and jq functions are not supported.
 - Conditions compare with `==`, `!=`, `<`, `<=`, `>`, `>=` and combine with `&&`, `||` and `!`. `?(@.isbn)` keeps items that have the field.
 - If the expression has a mistake, the body stays unfiltered and the bar says what is wrong and where.
+- The filter applies once you pause typing, or at once when you press `Enter`, so a large body is not filtered again on every keystroke. **Copy** always uses what is in the bar.
 - Search, **Copy** and paging work on the filtered result. `Esc` or the **×** closes the filter and shows the whole body again.
 - Numbers larger than JavaScript can hold exactly, such as long numeric IDs, can lose their last digits in the filtered view. The unfiltered body shows them as received.
 

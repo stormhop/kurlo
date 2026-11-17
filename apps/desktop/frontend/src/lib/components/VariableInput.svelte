@@ -129,13 +129,12 @@
   const pickerMatches = $derived.by(() => {
     if (!pickerOptions.length) return [];
     const needle = value.trim().toLowerCase();
-    const keys = pickerOptions.map(option => option.toLowerCase());
-    const options = pickerOptions
-      .filter((option, index) => {
-        const key = keys[index];
-        if (!option.trim() || keys.indexOf(key) !== index) return false;
-        return !needle || key.includes(needle);
-      });
+    const filled = pickerOptions.filter(option => option.trim());
+    const firstIndex = new Map(filled.map((option, index) => [option.toLowerCase(), index] as const).reverse());
+    const options = filled.filter((option, index) => {
+      const key = option.toLowerCase();
+      return firstIndex.get(key) === index && (!needle || key.includes(needle));
+    });
     if (!needle) return options;
     return options
       .sort((a, b) => {

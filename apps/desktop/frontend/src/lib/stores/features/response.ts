@@ -18,6 +18,9 @@ const responseDisplayCache = new WeakMap<HttpResponse, {
 }>();
 
 let lastFilter: { body: string; query: string; result: JsonFilterResult } | null = null;
+let responseFilterTimer: ReturnType<typeof setTimeout> | undefined;
+
+export const RESPONSE_FILTER_DELAY_MS = 150;
 
 function cachedJsonFilter(body: string, query: string): JsonFilterResult {
   if (lastFilter && lastFilter.body === body && lastFilter.query === query) return lastFilter.result;
@@ -42,9 +45,11 @@ type ResponseHost = {
   responseBodyPageCount: number;
   responseDisplayBody: string;
   responseFilter: string;
+  responseFilterQuery: string;
   responseFilterOpen: boolean;
   responseFilterActive: boolean;
   responseFilterResult: JsonFilterResult | null;
+  applyResponseFilterNow: () => void;
   responseRenderMode: 'json' | 'html' | 'text';
   responseSearch: string;
   responseSearchCounting: boolean;
@@ -99,13 +104,13 @@ export const responseFeature = {
   get responseFilterActive(): boolean {
     const host = this as unknown as ResponseHost;
     const response = host.response;
-    return Boolean(host.responseFilterOpen && host.responseFilter.trim() && response?.body && !response.bodyIsBinary && host.isJsonResponse(response));
+    return Boolean(host.responseFilterOpen && host.responseFilterQuery.trim() && response?.body && !response.bodyIsBinary && host.isJsonResponse(response));
   },
 
   get responseFilterResult(): JsonFilterResult | null {
     const host = this as unknown as ResponseHost;
     if (!host.responseFilterActive || !host.response) return null;
-    return cachedJsonFilter(host.response.body, host.responseFilter.trim());
+    return cachedJsonFilter(host.response.body, host.responseFilterQuery.trim());
   },
 
   get responseDisplayBody(): string {
@@ -306,7 +311,29 @@ export const responseFeature = {
     this.responseSearchIndex = 0;
   },
 
+  setResponseFilter(this: ResponseHost, value: string) {
+    this.responseFilter = value;
+    clearTimeout(responseFilterTimer);
+    if (!value.trim()) {
+      this.responseFilterQuery = value;
+      return;
+    }
+    responseFilterTimer = setTimeout(() => {
+      this.responseFilterQuery = this.responseFilter;
+    }, RESPONSE_FILTER_DELAY_MS);
+  },
+
+  applyResponseFilterNow(this: ResponseHost) {
+    clearTimeout(responseFilterTimer);
+    this.responseFilterQuery = this.responseFilter;
+  },
+
   onResponseFilterKeydown(this: ResponseHost, e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.applyResponseFilterNow();
+      return;
+    }
     if (e.key === 'Escape') {
       e.preventDefault();
       this.responseFilterOpen = false;
@@ -404,6 +431,7 @@ export const responseFeature = {
 
   async copyResponseBody(this: ResponseHost) {
     if (!this.response) return;
+    if (this.responseFilterQuery !== this.responseFilter) this.applyResponseFilterNow();
     const filtered = this.responseFilterResult;
     await clipboardCopy(this.response.error || (filtered?.ok ? filtered.text : this.response.body));
     this.copiedBody = true;
@@ -477,6 +505,8 @@ export const responseFeature = {
     this.responseSearchOpen = false;
     this.responseFilterOpen = false;
     this.responseFilter = '';
+    this.responseFilterQuery = '';
+    clearTimeout(responseFilterTimer);
     this.responseSearch = '';
     this.responseSearchIndex = 0;
     this.responseBodyPage = 0;

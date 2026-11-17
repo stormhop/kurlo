@@ -295,6 +295,49 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(pinned[0].top).toBe(0);
   });
 
+  test('renders a large commit diff in a window of rows and scrolls to its end', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 820 });
+    await installKurloBridge(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
+    await setGitStatus(page, {
+      isRepo: true, root: '/workspace', workspaceRoot: '/workspace',
+      branch: 'main', head: 'a1b2c3d', upstream: 'origin/main', remotes: ['origin'], clean: true, files: [],
+    });
+    await page.evaluate(() => {
+      const app = (window as E2EWindow).go.api.App;
+      const file = (name: string) => [
+        `diff --git a/workspaces/Main/${name} b/workspaces/Main/${name}`, '--- /dev/null', `+++ b/workspaces/Main/${name}`, '@@ -0,0 +1,3000 @@',
+        ...Array.from({ length: 3000 }, (_, index) => `+${name} line ${index + 1}`),
+      ].join('\n');
+      app.GitCommitLogPage = async (limit, offset) => ({
+        git: await app.GitStatus(), limit, offset, hasMore: false, error: '', output: '',
+        commits: [{ hash: 'abc1234def', shortHash: 'abc1234', author: 'Evgeny', date: '2026-10-06', message: 'Import a large collection' }],
+      });
+      app.GitCommitDiff = async (hash) => ({ path: hash, diff: ['first.yml', 'second.yml'].map(file).join('\n'), stagedDiff: '', unstagedDiff: '', binary: false, truncated: false, error: '' });
+    });
+    await openGitPanel(page);
+    await page.getByRole('tab', { name: 'History' }).click();
+    await page.locator('.git-commit-row').first().click();
+    const code = page.getByRole('region', { name: 'Git diff', exact: true });
+    await expect(code.locator('.git-diff-file', { hasText: 'first.yml' })).toBeVisible();
+    await expect(code).toContainText('first.yml line 1');
+    expect(await code.locator('.git-diff-line').count()).toBeLessThan(400);
+    await page.getByRole('button', { name: 'Expand' }).click();
+    const big = page.getByRole('region', { name: 'Expanded Git diff', exact: true });
+    await expect(big).toContainText('first.yml line 1');
+    expect(await big.locator('.git-diff-line').count()).toBeLessThan(400);
+    await page.getByRole('button', { name: 'Close review' }).click();
+    await expect(big).toHaveCount(0);
+
+    await expect.poll(async () => {
+      await code.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+      return code.locator('.git-diff-line', { hasText: 'second.yml line 3000' }).count();
+    }).toBe(1);
+    await expect(code.locator('.git-diff-line', { hasText: 'second.yml line 3000' })).toBeInViewport();
+    expect(await code.locator('.git-diff-line').count()).toBeLessThan(400);
+  });
+
   test('Git panel shows a pulled syntax error in a workspace that is not open', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');

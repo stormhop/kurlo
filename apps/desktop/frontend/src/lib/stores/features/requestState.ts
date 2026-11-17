@@ -65,6 +65,8 @@ function examplesForSnapshot(host: RequestStateHost): RequestExample[] {
 
 type RequestStateHost = {
   draftTargets?: Map<string, { collectionId: string; folderPath: string[] }>;
+  activeRequestDraftTarget: (forPersistence?: boolean) => { collectionId: string; folderPath: string[] } | undefined;
+  activeRequestCollectionId: (forPersistence?: boolean) => string;
   activeRequestId: string;
   activeWorkspaceId: string;
   apiKeyIn: 'header' | 'query';
@@ -276,11 +278,22 @@ export const requestStateFeature = {
     return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, savedMessages: [], grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], aiKurloTools: false, aiConnectionId: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
   },
 
+  activeRequestDraftTarget(this: RequestStateHost, forPersistence = false) {
+    const existing = this.requestsById.get(this.activeRequestId);
+    const target = existing?.isDraft && !forPersistence ? this.draftTargets?.get(existing.id) : undefined;
+    return target && this.collections.some(collection => collection.id === target.collectionId) ? target : undefined;
+  },
+
+  activeRequestCollectionId(this: RequestStateHost, forPersistence = false): string {
+    const existing = this.requestsById.get(this.activeRequestId);
+    const draftTarget = this.activeRequestDraftTarget(forPersistence);
+    return draftTarget ? draftTarget.collectionId : existing?.isDraft ? '' : existing?.collectionId || this.activeCollectionId();
+  },
+
   snapshotActiveRequest(this: RequestStateHost, options: { forPersistence?: boolean } = {}): SavedRequest {
     const existing = this.requestsById.get(this.activeRequestId);
-    const target = existing?.isDraft && !options.forPersistence ? this.draftTargets?.get(existing.id) : undefined;
-    const draftTarget = target && this.collections.some(collection => collection.id === target.collectionId) ? target : undefined;
-    const collectionId = draftTarget ? draftTarget.collectionId : existing?.isDraft ? '' : existing?.collectionId || this.activeCollectionId();
+    const draftTarget = this.activeRequestDraftTarget(options.forPersistence);
+    const collectionId = this.activeRequestCollectionId(options.forPersistence);
     const normalizedType = this.normalizeRequestTypeValue(this.requestType, this.url);
     const isGraphQL = normalizedType === 'graphql';
     const isGrpc = normalizedType === 'grpc';
