@@ -49,29 +49,30 @@ test.describe('Audit regressions', () => {
   }
 
   test('sizes history day headers like the rows they render, so a long history scrolls without jumps', async ({ page }) => {
-    const requests = Array.from({ length: 300 }, (_, index) => request(`days-r-${index}`, `Request ${index}`, `https://days.test/item/${index}`));
-    const history = requests.map((item, index) => ({ id: `days-h-${index}`, request: item, sourceRequestId: item.id, statusCode: 200, status: '200 OK', createdAt: Date.now() - index * 3_600_000, duration: 5, responseSize: 1 }));
+    const requests = Array.from({ length: 900 }, (_, index) => request(`days-r-${index}`, `Request ${index}`, `https://days.test/item/${index}`));
+    const history = requests.map((item, index) => ({ id: `days-h-${index}`, request: item, sourceRequestId: item.id, statusCode: 200, status: '200 OK', createdAt: Date.now() - index * 900_000, duration: 5, responseSize: 1 }));
     await installKurloBridge(page, '', 'browser/e2e', false, { collections: [collection], requests, history });
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/');
-    await expect(page.getByRole('button', { name: 'History', exact: true })).toBeVisible();
-    const initial = await page.evaluate(() => new Promise<{ height: number; entries: number }>(resolve => {
-      const observer = new MutationObserver(() => {
-        const list = document.querySelector<HTMLElement>('.history-list');
-        const entries = list?.querySelectorAll('.history-entry-main').length ?? 0;
-        if (!list || !entries) return;
-        observer.disconnect();
-        resolve({ height: list.scrollHeight, entries });
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-      document.querySelector<HTMLButtonElement>('button[aria-label="History"]')!.click();
-    }));
+    await page.getByRole('button', { name: 'History', exact: true }).click();
     const list = page.locator('.history-list');
     await expect(list.locator('.history-day-toggle').first()).toBeVisible();
-    expect(initial.entries).toBeLessThan(requests.length);
-    await expect(list.locator('.sidebar-virtual-spacer').first()).toHaveCSS('height', '0px', { timeout: 10_000 });
-    await expect(list.locator('.sidebar-virtual-spacer').last()).toHaveCSS('height', '0px', { timeout: 10_000 });
-    expect(await list.evaluate(node => node.scrollHeight)).toBe(initial.height);
+    const expectedHeight = await list.evaluate((node, timestamps) => {
+      const outerHeight = (element: HTMLElement) => {
+        const style = getComputedStyle(element);
+        return element.getBoundingClientRect().height + parseFloat(style.marginTop) + parseFloat(style.marginBottom);
+      };
+      const days = new Set(timestamps.map(timestamp => new Date(timestamp).toDateString())).size;
+      const style = getComputedStyle(node);
+      return Math.round(timestamps.length * outerHeight(node.querySelector<HTMLElement>('.history-entry')!)
+        + days * outerHeight(node.querySelector<HTMLElement>('.history-day-toggle')!)
+        + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom));
+    }, history.map(entry => entry.createdAt));
+    expect(await list.locator('.history-entry-main').count()).toBeLessThan(requests.length);
+    await expect.poll(() => list.evaluate(node => node.scrollHeight)).toBe(expectedHeight);
+    await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    await expect(list.locator('.history-entry-main').filter({ hasText: '/item/899' })).toBeInViewport();
+    await expect.poll(() => list.evaluate(node => node.scrollHeight)).toBe(expectedHeight);
   });
 
   test('renders a collection the size of a large OpenAPI import in full once the sidebar is idle', async ({ page }) => {
