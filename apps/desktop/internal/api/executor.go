@@ -650,7 +650,8 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 				}()
 			}
 			var preview bytes.Buffer
-			decoded := newDecodingReader(httpResp.Body, httpResp)
+			decoded, closeDecoders := newDecodingReader(httpResp.Body, httpResp)
+			defer closeDecoders()
 			bodySize, truncated, readErr = copyResponseBody(&preview, sink.writer, decoded, maxResponseBodySize)
 			bodyBytes = preview.Bytes()
 			if readErr == nil && sink.commit != nil {

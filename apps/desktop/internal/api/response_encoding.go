@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
@@ -92,13 +93,19 @@ const maxStreamedDecodedBodySize int64 = 1 << 30
 
 var errDecodedBodyTooLarge = errors.New("decompressed response exceeds 1 GB")
 
-func newDecodingReader(body io.Reader, resp *http.Response) io.Reader {
+func newDecodingReader(body io.Reader, resp *http.Response) (io.Reader, func()) {
+	var closers []io.Closer
+	closeDecoders := func() {
+		for i := len(closers) - 1; i >= 0; i-- {
+			_ = closers[i].Close()
+		}
+	}
 	if resp.Uncompressed {
-		return body
+		return body, closeDecoders
 	}
 	encoding := resp.Header.Get("Content-Encoding")
 	if encoding == "" {
-		return body
+		return body, closeDecoders
 	}
 	encodings := strings.Split(encoding, ",")
 	current := body
@@ -107,13 +114,16 @@ func newDecodingReader(body io.Reader, resp *http.Response) io.Reader {
 		if name == "" || name == "identity" {
 			continue
 		}
-		next, ok := decodeStream(name, current)
+		next, closer, ok := decodeStream(name, current)
+		if closer != nil {
+			closers = append(closers, closer)
+		}
 		if !ok {
-			return next
+			return next, closeDecoders
 		}
 		current = next
 	}
-	return current
+	return current, closeDecoders
 }
 
 type sniffReader struct {
@@ -143,34 +153,42 @@ func (s *sniffReader) rewind() io.Reader {
 	return io.MultiReader(bytes.NewReader(s.buf.Bytes()), s.src)
 }
 
-func decodeStream(name string, r io.Reader) (io.Reader, bool) {
+var zstdMagic = []byte{0x28, 0xb5, 0x2f, 0xfd}
+
+func decodeStream(name string, r io.Reader) (io.Reader, io.Closer, bool) {
 	sniff := newSniffReader(r)
 	switch name {
 	case "gzip", "x-gzip":
 		zr, err := gzip.NewReader(sniff)
 		if err != nil {
-			return sniff.rewind(), false
+			return sniff.rewind(), nil, false
 		}
 		sniff.stop()
-		return cappedStream(zr), true
+		return cappedStream(zr), zr, true
 	case "br":
 		sniff.stop()
-		return cappedStream(brotli.NewReader(r)), true
+		return cappedStream(brotli.NewReader(r)), nil, true
 	case "zstd":
-		zr, err := zstd.NewReader(sniff)
-		if err != nil {
-			return sniff.rewind(), false
+		buffered := bufio.NewReader(r)
+		magic, _ := buffered.Peek(len(zstdMagic))
+		if !bytes.Equal(magic, zstdMagic) {
+			return buffered, nil, false
 		}
-		sniff.stop()
-		return cappedStream(zr.IOReadCloser()), true
+		zr, err := zstd.NewReader(buffered)
+		if err != nil {
+			return buffered, nil, false
+		}
+		decoder := zr.IOReadCloser()
+		return cappedStream(decoder), decoder, true
 	case "deflate":
 		if zr, err := zlib.NewReader(sniff); err == nil {
 			sniff.stop()
-			return cappedStream(zr), true
+			return cappedStream(zr), zr, true
 		}
-		return cappedStream(flate.NewReader(sniff.rewind())), true
+		fr := flate.NewReader(sniff.rewind())
+		return cappedStream(fr), fr, true
 	default:
-		return sniff.rewind(), false
+		return sniff.rewind(), nil, false
 	}
 }
 

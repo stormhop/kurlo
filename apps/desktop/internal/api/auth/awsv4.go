@@ -184,11 +184,16 @@ func payloadHash(req *http.Request) (string, error) {
 		return hex.EncodeToString(hashSHA256(nil)), nil
 	}
 	if req.GetBody != nil {
-		bodyData, err := ReadBodyBytes(req)
+		body, err := req.GetBody()
 		if err != nil {
 			return "", err
 		}
-		return hex.EncodeToString(hashSHA256(bodyData)), nil
+		defer body.Close()
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, body); err != nil {
+			return "", err
+		}
+		return hex.EncodeToString(hasher.Sum(nil)), nil
 	}
 
 	head, err := io.ReadAll(io.LimitReader(req.Body, maxSignedPayloadBytes+1))

@@ -99,6 +99,8 @@ type GrpcHost = {
   ) => Promise<boolean>;
 };
 
+export const GRPC_KEPT_MESSAGES = 500;
+
 export const grpcFeature = {
   buildGrpcRequest(this: GrpcHost, envValues = this.activeEnvironmentValues(), secretEnvironmentValues = this.activeSecretEnvironmentValues(), requestId = this.activeRequestId) {
     const snapshot = this.snapshotActiveRequest();
@@ -289,16 +291,17 @@ export const grpcFeature = {
   applyGrpcMessageEvent(this: GrpcHost, payload: GrpcMessageEvent) {
     const existing = this.ensureActiveGrpcResponse(payload.requestId);
     if (!existing) return;
-    const messages = existing.messages.some(message => message.index === payload.message.index)
+    const last = existing.messages.at(-1);
+    const messages = last && last.index >= payload.message.index
       ? existing.messages
-      : [...existing.messages, payload.message];
+      : [...existing.messages.slice(-(GRPC_KEPT_MESSAGES - 1)), payload.message];
     this.setActiveGrpcResponse({
       ...existing,
       grpcCode: existing.grpcCode || 'STREAMING',
       status: existing.status || 'STREAMING',
       messages,
       body: this.grpcBodyFromMessages(messages),
-      size: payload.size ?? messages.reduce((sum, message) => sum + message.size, 0),
+      size: payload.size ?? (messages === existing.messages ? existing.size : (existing.size ?? 0) + payload.message.size),
       duration: payload.duration ?? existing.duration,
       timestamp: payload.timestamp ?? existing.timestamp,
     }, payload.requestId);

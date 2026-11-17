@@ -86,7 +86,7 @@ Sign each request with OAuth 1.0a ([RFC 5849](https://www.rfc-editor.org/rfc/rfc
 - **Signature method**: `HMAC-SHA1` (the default), `HMAC-SHA256`, `HMAC-SHA512`, `RSA-SHA1`, `RSA-SHA256`, `RSA-SHA512` or `PLAINTEXT`. The RSA methods take a PEM private key instead of the two secrets.
 - **Add parameters to**: the `Authorization: OAuth …` header (the default), the query string, or the body. The body works only with a form-urlencoded body, or with no body, which then becomes one.
 
-Kurlo generates a fresh **timestamp** and **nonce** on every send and signs the method, the URL and its query, and the fields of a form-urlencoded body. **Advanced** holds the realm, the callback URL and the verifier of the three-legged flow, the version, fixed timestamp and nonce values for debugging a signature, **Include body hash** (`oauth_body_hash` for bodies that are not form-urlencoded) and **Sign empty parameters**.
+Kurlo generates a fresh **timestamp** and **nonce** on every send and signs the method, the URL and its query, and the fields of a form-urlencoded body. OAuth 1.0 reads the body into memory to sign it, so it refuses a body larger than 32 MB. **Advanced** holds the realm, the callback URL and the verifier of the three-legged flow, the version, fixed timestamp and nonce values for debugging a signature, **Include body hash** (`oauth_body_hash` for bodies that are not form-urlencoded) and **Sign empty parameters**.
 
 ## AWS Signature v4
 
@@ -95,7 +95,7 @@ Sign requests to AWS APIs (S3, API Gateway, etc.).
 - Access key + secret key (use environment variables, never hard-code).
 - Service name (e.g. `s3`, `execute-api`).
 - Region (e.g. `us-east-1`).
-Kurlo computes the canonical request, derives the signing key, and adds `Authorization`, `x-amz-date`, and `x-amz-content-sha256` headers automatically.
+Kurlo computes the canonical request, derives the signing key, and adds `Authorization`, `x-amz-date`, and `x-amz-content-sha256` headers automatically. A file body is hashed as it is read, without loading it into memory, so large S3 uploads sign without a size limit.
 
 **Session token** covers temporary credentials from STS, an assumed role, or AWS SSO. Kurlo sends it as `x-amz-security-token` and includes it in `SignedHeaders`, which is what AWS requires — a token that is sent but not signed is rejected.
 

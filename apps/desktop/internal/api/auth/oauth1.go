@@ -166,6 +166,9 @@ func oauth1BufferBody(req *http.Request) ([]byte, error) {
 		req.ContentLength = int64(len(head))
 		return head, nil
 	}
+	if req.ContentLength > maxSignedPayloadBytes {
+		return nil, fmt.Errorf("oauth 1.0 cannot sign a body larger than %d MB", maxSignedPayloadBytes/(1024*1024))
+	}
 	return ReadBodyBytes(req)
 }
 

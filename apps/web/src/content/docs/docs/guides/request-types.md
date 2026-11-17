@@ -136,6 +136,8 @@ The request body is JSON in protobuf JSON shape. Metadata lives in its own tab. 
 
 gRPC supports pre-request/test scripts, environment variables, collection defaults, and runner reports.
 
+A long server stream keeps its latest 500 messages in the Messages list and the response body. Messages keep their numbers, so the list then starts at the first one still kept; the response size still counts every message received.
+
 For servers that require mutual TLS, set a **Client certificate (mTLS)** in the gRPC **Settings** tab. It works the same way as for HTTP — see [Client certificate](/docs/guides/request-settings/#client-certificate-mutual-tls) — and is sent whenever the call uses TLS (**Use TLS** on, or a `grpcs://` target). Reflection uses the same connection, so it works against mTLS servers too.
 
 ![gRPC request with selected method and response messages](../../../../assets/screenshots/request-grpc.png)

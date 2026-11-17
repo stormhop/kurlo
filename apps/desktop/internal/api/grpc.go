@@ -86,6 +86,16 @@ type grpcInvokeHandler struct {
 
 	mu       sync.Mutex
 	response *model.GrpcResponse
+	received int
+}
+
+const grpcKeptMessages = 500
+
+func keepLatestGrpcMessages(messages []model.GrpcMessage, limit int) []model.GrpcMessage {
+	if len(messages) <= limit {
+		return messages
+	}
+	return append([]model.GrpcMessage(nil), messages[len(messages)-limit:]...)
 }
 
 func (h *grpcInvokeHandler) OnResolveMethod(md *desc.MethodDescriptor) {
@@ -113,8 +123,12 @@ func (h *grpcInvokeHandler) OnReceiveHeaders(md metadata.MD) {
 func (h *grpcInvokeHandler) appendMessage(msg model.GrpcMessage, countSize bool) model.GrpcMessageEvent {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	msg.Index = len(h.response.Messages) + 1
+	h.received++
+	msg.Index = h.received
 	h.response.Messages = append(h.response.Messages, msg)
+	if len(h.response.Messages) >= 2*grpcKeptMessages {
+		h.response.Messages = keepLatestGrpcMessages(h.response.Messages, grpcKeptMessages)
+	}
 	if countSize {
 		h.response.Size += int64(msg.Size)
 	}
@@ -360,6 +374,9 @@ func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpc
 	err = grpcurl.InvokeRPC(ctx, source, cc, normalizeGrpcMethodName(req.FullMethod), grpcMetadataHeaders(req), handler, nextRequest)
 	resp.Duration = time.Since(start).Milliseconds()
 	resp.Timestamp = time.Now().UnixMilli()
+	handler.mu.Lock()
+	resp.Messages = keepLatestGrpcMessages(resp.Messages, grpcKeptMessages)
+	handler.mu.Unlock()
 	resp.Body = grpcResponseBody(resp.Messages)
 	if err != nil {
 		resp.Error = err.Error()
