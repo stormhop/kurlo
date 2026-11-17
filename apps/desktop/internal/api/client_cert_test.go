@@ -13,10 +13,12 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 func issueCert(t *testing.T, commonName string) (certPEM, keyPEM []byte, cert tls.Certificate) {
@@ -239,4 +241,75 @@ func indexOf(haystack, needle string) int {
 		}
 	}
 	return -1
+}
+
+func TestPKCS12ClientCertificates(t *testing.T) {
+	_, _, leaf := issueCert(t, "pfx-client")
+	_, _, issuer := issueCert(t, "pfx-ca")
+	issuerTemplate := *issuer.Leaf
+	issuerTemplate.BasicConstraintsValid = true
+	issuerTemplate.IsCA = true
+	issuerDER, err := x509.CreateCertificate(rand.Reader, &issuerTemplate, &issuerTemplate, issuer.Leaf.PublicKey, issuer.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	issuer.Leaf, err = x509.ParseCertificate(issuerDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := *leaf.Leaf
+	template.Issuer = issuer.Leaf.Subject
+	der, err := x509.CreateCertificate(rand.Reader, &template, issuer.Leaf, leaf.Leaf.PublicKey, issuer.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	leaf.Leaf, err = x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := x509.NewCertPool()
+	pool.AddCert(issuer.Leaf)
+	server := mTLSServer(t, pool)
+	t.Cleanup(httpTransports.closeAll)
+	for _, tc := range []struct {
+		name, password, extension string
+		encoder                   *pkcs12.Encoder
+	}{
+		{"modern", "secret", ".pfx", pkcs12.Modern},
+		{"legacy", "secret", ".p12", pkcs12.Legacy},
+		{"empty-password", "", ".p12", pkcs12.Modern},
+		{"content-detection", "secret", ".bin", pkcs12.Modern},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data, err := tc.encoder.Encode(leaf.PrivateKey, leaf.Leaf, []*x509.Certificate{issuer.Leaf}, tc.password)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := writeTemp(t, t.TempDir(), "client"+tc.extension, data)
+			config := clientCertConfig{certPath: path, password: tc.password}
+			loaded, err := loadClientCertificate(config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(loaded.Certificate) != 2 {
+				t.Fatalf("expected client and issuer, got %d certificates", len(loaded.Certificate))
+			}
+			req := mTLSTestRequest(server.URL, path, "")
+			req.ClientKeyPassword = tc.password
+			response := NewApp().SendRequest(req)
+			if response.Error != "" || response.Body != "client=pfx-client" {
+				t.Fatalf("mTLS failed: %+v", response)
+			}
+			config.password = "wrong-password"
+			if _, err := loadClientCertificate(config); err == nil || !strings.Contains(err.Error(), "password") {
+				t.Fatalf("expected password error, got %v", err)
+			}
+		})
+	}
+	t.Run("invalid-container", func(t *testing.T) {
+		path := writeTemp(t, t.TempDir(), "invalid.pfx", []byte("broken"))
+		if _, err := loadClientCertificate(clientCertConfig{certPath: path}); err == nil {
+			t.Fatal("invalid PFX was accepted")
+		}
+	})
 }

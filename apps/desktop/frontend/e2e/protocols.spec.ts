@@ -531,3 +531,32 @@ test('sends the client certificate with a gRPC call', async ({ page }) => {
     return sent && { cert: sent.clientCertPath, key: sent.clientKeyPath, password: sent.clientKeyPassword };
   })).toEqual({ cert: '/certs/client.crt', key: '/certs/client.key', password: '{{keyPassword}}' });
 });
+
+test('persists a PFX container and passphrase for gRPC without a separate key', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'pfx-api', workspaceId: 'workspace-e2e', name: 'PFX API' }],
+    requests: [{ id: 'pfx-call', collectionId: 'pfx-api', name: 'PFX call', requestType: 'grpc', method: 'POST', url: 'grpcs://grpc.kurlo.test:443', grpcMethod: 'shop.Inventory/GetItem' }],
+    activeId: 'pfx-call', openIds: ['pfx-call'],
+  });
+  await page.goto('/');
+  await page.evaluate(() => { (window as E2EWindow).go.api.App.OpenFileDialog = async () => '/certs/client.pfx'; });
+  await page.getByRole('tab', { name: /^Settings/ }).click();
+  const certSetting = page.locator('.client-cert-setting');
+  await certSetting.getByRole('button', { name: 'Choose file…' }).first().click();
+  await certSetting.getByPlaceholder('Leave blank if the key is unencrypted').fill('{{pfxPassword}}');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.requests as Array<{ settings?: { clientCertPath?: string; clientKeyPassword?: string } }>)[0]?.settings)).toMatchObject({ clientCertPath: '/certs/client.pfx', clientKeyPassword: '{{pfxPassword}}' });
+  const saved = await page.evaluate(() => window.__kurloE2E.store);
+  await page.addInitScript(store => { window.__kurloE2E.store = store; }, saved);
+  await page.reload();
+  await page.getByRole('tab', { name: /^Settings/ }).click();
+  await expect(certSetting).toContainText('/certs/client.pfx');
+  await expect(certSetting.getByPlaceholder('Leave blank if the key is unencrypted')).toHaveValue('{{pfxPassword}}');
+  await certSetting.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-pfx-client-cert.png'), animations: 'disabled' });
+  await page.getByRole('button', { name: 'Invoke', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const sent = window.__kurloE2E.sentGrpcRequests.at(-1) as { clientCertPath?: string; clientKeyPath?: string; clientKeyPassword?: string } | undefined;
+    return sent && { cert: sent.clientCertPath, key: sent.clientKeyPath || '', password: sent.clientKeyPassword };
+  })).toEqual({ cert: '/certs/client.pfx', key: '', password: '{{pfxPassword}}' });
+});

@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	grpcTest "google.golang.org/grpc/interop/grpc_testing"
 	"google.golang.org/grpc/reflection"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 func startMutualTLSGrpcServer(t *testing.T, clientCA *x509.CertPool) string {
@@ -93,5 +94,27 @@ func TestGrpcClientCertificateErrorsAreReported(t *testing.T) {
 	resp := sendGrpcRequest(t.Context(), mutualTLSGrpcRequest("127.0.0.1:1", "/does/not/exist.crt", ""), state.New(), nil)
 	if !strings.Contains(resp.Error, "client certificate") {
 		t.Fatalf("error = %q", resp.Error)
+	}
+}
+
+func TestGrpcPKCS12ClientCertificateAndReflection(t *testing.T) {
+	certPEM, _, cert := issueCert(t, "grpc-pfx-client")
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(certPEM)
+	target := startMutualTLSGrpcServer(t, pool)
+	data, err := pkcs12.Modern.Encode(cert.PrivateKey, cert.Leaf, nil, "pfx-secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := writeTemp(t, t.TempDir(), "client.pfx", data)
+	req := mutualTLSGrpcRequest(target, path, "")
+	req.ClientKeyPassword = "pfx-secret"
+	response := sendGrpcRequest(t.Context(), req, state.New(), nil)
+	if response.Error != "" || response.GrpcCode != "OK" {
+		t.Fatalf("PFX gRPC call: code=%q error=%q", response.GrpcCode, response.Error)
+	}
+	discovered := discoverGrpcServices(t.Context(), req)
+	if discovered.Error != "" || len(discovered.Services) == 0 {
+		t.Fatalf("PFX reflection: %#v", discovered)
 	}
 }

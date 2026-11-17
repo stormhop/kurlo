@@ -6,11 +6,13 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"software.sslmate.com/src/go-pkcs12"
 )
 
 type clientCertConfig struct {
@@ -94,6 +96,9 @@ func loadClientCertificate(config clientCertConfig) (tls.Certificate, error) {
 	if err != nil {
 		return tls.Certificate{}, fmt.Errorf("client certificate: %w", err)
 	}
+	if ext := strings.ToLower(filepath.Ext(config.certPath)); ext == ".pfx" || ext == ".p12" || !strings.Contains(string(certPEM), "-----BEGIN") {
+		return loadPKCS12Certificate(certPEM, config.password)
+	}
 	keyPath := config.keyPath
 	if keyPath == "" {
 		keyPath = config.certPath
@@ -152,4 +157,27 @@ func pemHasEncryptedBlock(keyPEM []byte) bool {
 
 func pemLooksPKCS8Encrypted(block *pem.Block) bool {
 	return block != nil && strings.Contains(block.Type, "ENCRYPTED PRIVATE KEY")
+}
+
+func loadPKCS12Certificate(data []byte, password string) (tls.Certificate, error) {
+	key, leaf, chain, err := pkcs12.DecodeChain(data, password)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("client PKCS#12 certificate: could not decode container — check the file and password: %w", err)
+	}
+	if key == nil || leaf == nil {
+		return tls.Certificate{}, fmt.Errorf("client PKCS#12 certificate must contain a certificate and private key")
+	}
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("client PKCS#12 private key: %w", err)
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: leaf.Raw})
+	for _, ca := range chain {
+		certPEM = append(certPEM, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ca.Raw})...)
+	}
+	cert, err := tls.X509KeyPair(certPEM, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}))
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("client PKCS#12 certificate/key pair is invalid: %w", err)
+	}
+	return cert, nil
 }
