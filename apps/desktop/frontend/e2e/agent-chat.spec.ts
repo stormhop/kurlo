@@ -156,14 +156,13 @@ test.describe("Agent", () => {
       const main = workspace.locator('.agent-main');
       const composer = page.getByRole('textbox', { name: 'Message the agent' });
       const assertFits = async (scope: Locator, selectors: string) => {
-        const overflow = await scope.evaluate((element, selectors) => {
+        await expect.poll(() => scope.evaluate((element, selectors) => {
           const bounds = element.getBoundingClientRect();
           return [...element.querySelectorAll<HTMLElement>(selectors)].filter(item => {
             const rect = item.getBoundingClientRect();
             return rect.width > 0 && rect.height > 0 && (rect.left < bounds.left - 1 || rect.right > bounds.right + 1 || rect.bottom > window.innerHeight + 1);
           }).map(item => item.getAttribute('aria-label') || item.className);
-        }, selectors);
-        expect(overflow).toEqual([]);
+        }, selectors)).toEqual([]);
       };
       await main.getByRole('button', { name: /^Collection:/ }).click();
       await page.getByRole('option', { name: collectionName, exact: true }).click();
