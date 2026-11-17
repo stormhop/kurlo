@@ -40,11 +40,11 @@ test.describe("Kurlo desktop browser E2E", () => {
         if (frames.length >= 24) resolve(frames);
         else requestAnimationFrame(step);
       };
+      document.querySelector<HTMLButtonElement>('button[aria-label="Toggle sidebar"]')!.click();
       requestAnimationFrame(step);
     }));
     const contentOpenWidth = await sidebar.evaluate(side => side.querySelector<HTMLElement>(':scope > *:not(.sidebar-titlebar)')!.getBoundingClientRect().width);
 
-    await page.getByRole('button', { name: 'Toggle sidebar' }).click();
     const hiding = await sample();
     const moving = hiding.filter(frame => frame.docked && frame.width < open.width - 1);
     expect(moving.length).toBeGreaterThan(3);
@@ -59,9 +59,8 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(switcher).not.toHaveClass(/(^|\s)docked(\s|$)/);
     await expect(page.locator('.workspace-searchbar-left .workspace-switcher')).toHaveCount(1);
 
-    await page.getByRole('button', { name: 'Toggle sidebar' }).click();
-    await expect(switcher).toHaveClass(/(^|\s)docked(\s|$)/);
     const showing = await sample();
+    await expect(switcher).toHaveClass(/(^|\s)docked(\s|$)/);
     for (let index = 1; index < showing.length; index += 1) {
       expect(showing[index].width).toBeGreaterThanOrEqual(showing[index - 1].width - 0.5);
       expect(showing[index].mainLeft).toBeGreaterThanOrEqual(showing[index - 1].mainLeft - 0.5);

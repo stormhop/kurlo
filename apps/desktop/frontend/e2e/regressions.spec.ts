@@ -54,14 +54,24 @@ test.describe('Audit regressions', () => {
     await installKurloBridge(page, '', 'browser/e2e', false, { collections: [collection], requests, history });
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/');
-    await page.getByRole('button', { name: 'History', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'History', exact: true })).toBeVisible();
+    const initial = await page.evaluate(() => new Promise<{ height: number; entries: number }>(resolve => {
+      const observer = new MutationObserver(() => {
+        const list = document.querySelector<HTMLElement>('.history-list');
+        const entries = list?.querySelectorAll('.history-entry-main').length ?? 0;
+        if (!list || !entries) return;
+        observer.disconnect();
+        resolve({ height: list.scrollHeight, entries });
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      document.querySelector<HTMLButtonElement>('button[aria-label="History"]')!.click();
+    }));
     const list = page.locator('.history-list');
     await expect(list.locator('.history-day-toggle').first()).toBeVisible();
-    const estimated = await list.evaluate(node => node.scrollHeight);
-    expect(await list.locator('.history-entry-main').count()).toBeLessThan(300);
+    expect(initial.entries).toBeLessThan(requests.length);
     await expect(list.locator('.sidebar-virtual-spacer').first()).toHaveCSS('height', '0px', { timeout: 10_000 });
     await expect(list.locator('.sidebar-virtual-spacer').last()).toHaveCSS('height', '0px', { timeout: 10_000 });
-    expect(await list.evaluate(node => node.scrollHeight)).toBe(estimated);
+    expect(await list.evaluate(node => node.scrollHeight)).toBe(initial.height);
   });
 
   test('renders a collection the size of a large OpenAPI import in full once the sidebar is idle', async ({ page }) => {

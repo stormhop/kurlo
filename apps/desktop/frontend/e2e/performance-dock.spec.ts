@@ -156,8 +156,11 @@ test('performance samples preserve runner scroll position in a reduced workspace
   await expect(dock).toBeVisible();
   await dock.getByRole('separator').press('End');
   const body = runner.locator('.runner-page-body');
-  await body.evaluate(element => { element.scrollTop = 1800; });
-  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(1700);
+  await expect.poll(() => body.evaluate(async element => {
+    element.scrollTop = 1800;
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    return element.scrollTop;
+  })).toBeGreaterThan(1700);
   const samples = await body.evaluate(async element => {
     const app = window.go!.api!.App!;
     const sample = await app.PerformanceStatus!();
