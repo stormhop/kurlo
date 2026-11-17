@@ -81,9 +81,18 @@ test.describe('Audit regressions', () => {
       folderPath: [`Folder ${String(Math.floor(index / 8)).padStart(3, '0')}`],
     }));
     await installKurloBridge(page, '', 'browser/e2e', false, { collections: [collection], requests, folderCollapsed: {} });
+    await page.addInitScript(() => {
+      const observer = new MutationObserver(() => {
+        const rows = [...document.querySelectorAll<HTMLElement>('.collection-list .sidebar-vrow')];
+        if (!rows.some(row => row.textContent?.includes('Request 0000'))) return;
+        document.documentElement.dataset.initialCollectionRows = String(rows.length);
+        observer.disconnect();
+      });
+      observer.observe(document, { childList: true, subtree: true });
+    });
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto('/');
-    const first = await page.waitForFunction(() => document.querySelectorAll('.collection-list .sidebar-vrow').length || false, null, { polling: 'raf' });
+    const first = await page.waitForFunction(() => Number(document.documentElement.dataset.initialCollectionRows) || false);
     expect(await first.jsonValue()).toBeLessThan(300);
     const list = page.locator('.collection-list');
     await expect(list.getByRole('button', { name: /Request 0000/ })).toBeVisible();
@@ -98,8 +107,19 @@ test.describe('Audit regressions', () => {
     expect(await list.locator('.sidebar-vrow').count()).toBe(total);
     await page.getByRole('textbox', { name: 'Filter requests' }).fill('Request 0007');
     await expect(list.getByRole('button', { name: /Request 0007/ })).toBeVisible();
+    await list.evaluate(node => {
+      const before = node.querySelectorAll('.sidebar-vrow').length;
+      const observer = new MutationObserver(() => {
+        const count = node.querySelectorAll('.sidebar-vrow').length;
+        if (!count || count === before) return;
+        document.documentElement.dataset.restoredCollectionRows = String(count);
+        observer.disconnect();
+      });
+      observer.observe(node, { childList: true });
+    });
     await page.getByRole('textbox', { name: 'Filter requests' }).fill('');
-    expect(await list.locator('.sidebar-vrow').count()).toBeLessThan(150);
+    const restored = await page.waitForFunction(() => Number(document.documentElement.dataset.restoredCollectionRows) || false);
+    expect(await restored.jsonValue()).toBeLessThan(150);
     await expect.poll(() => list.locator('.sidebar-vrow').count(), { timeout: 5000 }).toBe(total);
   });
 
