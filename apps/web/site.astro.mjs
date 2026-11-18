@@ -132,6 +132,7 @@ export default defineConfig({
       customCss: ['@fontsource-variable/geist', '@fontsource-variable/geist-mono', './src/styles/custom.css'],
       components: {
         Header: './src/components/Header.astro',
+        TwoColumnContent: './src/components/DocsColumns.astro',
         PageTitle: './src/components/PageTitle.astro',
         Footer: './src/components/Footer.astro',
         Sidebar: './src/components/DocsSidebar.astro',

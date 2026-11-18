@@ -732,3 +732,13 @@ a.kurlo-tile:hover {
     transition: none !important;
   }
 }
+
+.main-frame:has(> [data-docs-winter='article']) .sl-markdown-content {
+  background-color: var(--sl-color-bg);
+}
+
+@media screen and (min-width: 50rem) {
+  .page:has([data-docs-winter='article']) .sidebar-pane {
+    background-color: color-mix(in srgb, var(--sl-color-bg-sidebar) 65%, transparent);
+  }
+}

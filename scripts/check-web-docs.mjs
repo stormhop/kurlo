@@ -144,6 +144,11 @@ function checkDocumentationNavigation(contentFiles) {
     const html = read(file);
     const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] ?? '';
     const article = main.search(/<[^>]+\bclass="[^"]*\bsl-markdown-content\b/);
+    const winterScenes = [...html.matchAll(/data-docs-winter="(hero|article)"/g)].map(match => match[1]);
+    const lights = /<svg\b[^>]*class="[^"]*\bwinter-lights\b/.test(html);
+    if (winterScenes.length !== 1 || winterScenes[0] !== (path === DOCS_HOME ? 'hero' : 'article') || lights !== (path === DOCS_HOME)) {
+      fail(`Unexpected winter decoration on ${path}`);
+    }
     if (path === DOCS_HOME) {
       if (html.includes('<docs-page-actions')) fail('The documentation homepage renders copy controls');
     } else {
