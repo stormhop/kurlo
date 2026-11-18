@@ -13,6 +13,9 @@ None of it has to be taken on trust: Kurlo is open source under the MIT license,
 
 ## What Kurlo stores on your machine
 
+Capture proxy keeps a bounded session in memory and writes larger bodies in plaintext to owner-only temporary files. Starting a new session or closing Kurlo normally removes these files. HAR exports and saved requests persist. Kurlo omits common credential headers and sensitive query keys from captures. Bodies, paths and custom fields can contain secrets. Review them before sharing. [Capture proxy](/docs/guides/capture-proxy/)
+
+
 Workspace state, requests, environments, request history, cookies, secrets, and preferences are written to local disk. Request history records what was sent and what came back, including the response body, which is stored in its own file under `history/` and encrypted with the same key as the rest of the local profile. A response over 2 MB keeps only its head, and a binary response keeps no body at all. Kurlo is a single-tenant, file-based application:
 
 | Platform | Location |

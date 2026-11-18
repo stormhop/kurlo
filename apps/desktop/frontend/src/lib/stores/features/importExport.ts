@@ -131,7 +131,7 @@ type ImportExportHost = {
   runCollectionFileImport: (text: string, fileName: string, source: ImportSource, destination?: ImportDestination) => Promise<void>;
   importOpenCollectionFiles: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<number>;
   importHarPayload: (payload: unknown, fileName: string) => Promise<number>;
-  importRequestsPayload: (collectionName: string, buildRequests: (collectionId: string, collectionName: string) => SavedRequest[], collectionDefaults?: ImportedCollectionDefaults | (() => ImportedCollectionDefaults | undefined), destination?: ImportDestination) => Promise<ImportedRequests>;
+  importRequestsPayload: (collectionName: string, buildRequests: (collectionId: string, collectionName: string) => SavedRequest[], collectionDefaults?: ImportedCollectionDefaults | (() => ImportedCollectionDefaults | undefined), destination?: ImportDestination, existingCollectionId?: string) => Promise<ImportedRequests>;
   importCollectionBundle: (bundle: ImportedCollectionBundle) => Promise<number>;
   importPostmanVariableBundle: (bundle: { scope: 'environment' | 'globals'; name: string; values: KVRow[] }) => Promise<number>;
   globalVariables: KVRow[];
@@ -447,13 +447,15 @@ export const importExportFeature = {
     const { requestCount } = await this.importRequestsPayload(collectionName, (collectionId, name) => harRequestsFromLog(payload, collectionId, name));
     return requestCount;
   },
-  async importRequestsPayload(this: ImportExportHost, collectionName: string, buildRequests: (collectionId: string, collectionName: string) => SavedRequest[], collectionDefaults?: ImportedCollectionDefaults | (() => ImportedCollectionDefaults | undefined), destination = importDestination(this)) {
+  async importRequestsPayload(this: ImportExportHost, collectionName: string, buildRequests: (collectionId: string, collectionName: string) => SavedRequest[], collectionDefaults?: ImportedCollectionDefaults | (() => ImportedCollectionDefaults | undefined), destination = importDestination(this), existingCollectionId = '') {
     requireImportDestination(this, destination);
     await this.persistActiveRequestNow();
     requireImportDestination(this, destination);
     const wsId = destination.workspaceId;
-    const collection = makeCollection(wsId, collectionName);
-    const builtRequests = buildRequests(collection.id, collectionName);
+    const existing = existingCollectionId ? this.collections.find(c => c.id === existingCollectionId && c.workspaceId === wsId) : undefined;
+    if (existingCollectionId && !existing) throw new Error('The destination collection is no longer available.');
+    const collection = existing ?? makeCollection(wsId, collectionName);
+    const builtRequests = buildRequests(collection.id, collection.name);
     const defaults = typeof collectionDefaults === 'function' ? collectionDefaults() : collectionDefaults;
     if (defaults?.variables?.length) {
       collection.defaults = { ...collection.defaults, variables: defaults.variables };
@@ -461,12 +463,12 @@ export const importExportFeature = {
     if (defaults?.auth) {
       collection.defaults = { ...collection.defaults, auth: defaults.auth };
     }
-    const importCollections = [...this.collections, collection];
+    const importCollections = existing ? this.collections : [...this.collections, collection];
     const importedReqs = builtRequests
       .map(req => routeImportedScripts(normalizeSavedRequest(req, importCollections, wsId)));
     if (!importedReqs.length) throw new Error('No requests found in import file');
-    collapseImportedCollection(this, collection, importedReqs);
-    const nextCols = [...this.collections, collection]; const nextReqs = [...this.requests, ...importedReqs];
+    if (!existing) collapseImportedCollection(this, collection, importedReqs);
+    const nextCols = importCollections; const nextReqs = [...this.requests, ...importedReqs];
     const first = importedReqs[0]; const nextOpenIds = [...new Set([...this.openRequestIds, first.id])];
     this.activeWorkspaceId = wsId; this.collections = nextCols; this.requests = nextReqs; this.openRequestIds = nextOpenIds;
     this.applySavedRequest(first); this.topView = 'request';

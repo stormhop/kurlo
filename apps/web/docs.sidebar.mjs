@@ -128,6 +128,7 @@ export const DOCS_SECTIONS = [
         items: [
           guide('Response examples', 'examples'),
           guide('Mock server', 'mock-server'),
+          guide('Capture proxy', 'capture-proxy'),
         ],
       },
       {

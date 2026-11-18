@@ -11,6 +11,7 @@
     workspaceBlocked = false,
     openCollectionRunner,
     openMockTab,
+    openProxyTab,
     openCookieJar,
     openSettings,
     openAgent,
@@ -23,6 +24,7 @@
     cookieCount?: number;
     workspaceBlocked?: boolean;
     openCollectionRunner: () => void;
+    openProxyTab: () => void;
     openMockTab: () => void;
     openCookieJar: () => void;
     openSettings: (tab?: SettingsTab) => void;
@@ -78,6 +80,9 @@
         <rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>
       </svg>
       {#if mockRunning}<span class="activity-rail-dot" aria-hidden="true"></span>{/if}
+    </button>
+    <button class="activity-rail-btn" class:active={topView === 'proxy'} type="button" aria-label="Capture proxy" onclick={openProxyTab} disabled={workspaceBlocked}>
+      <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h15m-4-4 4 4-4 4M20 16H5m4-4-4 4 4 4"/></svg>
     </button>
   </div>
 

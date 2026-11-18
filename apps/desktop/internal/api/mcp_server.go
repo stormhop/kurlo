@@ -41,6 +41,7 @@ const (
 )
 
 type mcpServerOptions struct {
+	captureHAR       string
 	projectRoot      string
 	workspace        string
 	workspaceID      string
@@ -127,6 +128,7 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 	fs := flag.NewFlagSet("kurlo mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var opts mcpServerOptions
+	fs.StringVar(&opts.captureHAR, "capture-har", "", "share endpoint metadata from this local HAR file")
 	fs.StringVar(&opts.projectRoot, "project-root", "", "read-only source directory for project and import tools")
 	fs.StringVar(&opts.env, "env", "", "environment to use when a tool call does not name one")
 	fs.IntVar(&opts.timeoutMs, "timeout", 0, "per-request timeout in milliseconds (overrides request settings)")
@@ -242,11 +244,14 @@ func (s *mcpServer) handle(line []byte) {
 	case mcpMethodDiscover:
 		s.writeResult(msg.ID, s.discoverResult())
 	case mcpMethodToolsList:
-		result := map[string]any{"tools": mcpServerTools(s.opts.readOnly)}
+		result := map[string]any{"tools": s.captureTools()}
 		if mcpServerStateless(msg.Params) {
 			result["resultType"] = "complete"
 			result["ttlMs"] = mcpServerListTTLMs
 			result["cacheScope"] = "public"
+			if s.opts.captureHAR != "" {
+				result["cacheScope"] = "private"
+			}
 		}
 		s.writeResult(msg.ID, result)
 	case mcpMethodToolsCall:
@@ -368,6 +373,9 @@ func (s *mcpServer) instructions() string {
 		"- import_preview shows the YAML diff. Use --project-root to enable read-only source tools.",
 		"- browserOrigin on run_request or send_request checks CORS the way a browser on that origin would.",
 		"- Secrets are sent but shown as [secret]. Protected environments cannot be used here: ask the user to run those requests in Kurlo.",
+	}
+	if s.opts.captureHAR != "" {
+		lines = append(lines, "- list_captured reads endpoint metadata from the supplied HAR. check_captured_openapi compares observed operations to the collection spec.")
 	}
 	if !s.opts.readOnly {
 		lines = append(lines, "- create_collection, save_request, patch_request, apply_changes, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*, or let generate_tests write them from a response. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")
@@ -593,6 +601,13 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 
 	var run func(ctx context.Context, arguments json.RawMessage) (any, error)
 	switch call.Name {
+	case "create_captured_collection":
+		run = s.createCapturedCollection
+	case "proxy_status", "list_captured", "get_captured", "check_captured_openapi":
+		if s.opts.captureHAR == "" {
+			return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "no capture session was supplied"}
+		}
+		run = s.captureHandler(call.Name)
 	case "list_requests":
 		run = s.toolListRequests
 	case "get_request":

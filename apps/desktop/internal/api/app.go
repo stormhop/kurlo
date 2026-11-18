@@ -18,6 +18,7 @@ import (
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"github.com/stormhop/kurlo/apps/desktop/internal/proxycapture"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -26,6 +27,7 @@ var appVersion = "dev"
 const maxTextFileReadSize = 100 * 1024 * 1024
 
 type App struct {
+	capture           proxycapture.Recorder
 	performance       performanceMonitor
 	historyStore      *historyResponseStore
 	credentialStore   *gitCredentialStore
@@ -112,6 +114,7 @@ func (a *App) OpenLogFolder() string {
 }
 
 func (a *App) Shutdown(_ context.Context) {
+	a.capture.Close()
 	a.StopPerformanceStream()
 	a.CancelCodexLogin()
 	a.agentRuntime().closeMcpClients()

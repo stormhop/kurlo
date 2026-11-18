@@ -1,4 +1,4 @@
-import type { api, model } from '../../wailsjs/go/models';
+import type { api, model, proxycapture } from '../../wailsjs/go/models';
 
 type Wire<T> = T extends (infer U)[]
   ? Wire<U>[]
@@ -54,6 +54,11 @@ export type LoadStep = Wire<model.LoadStep>;
 export type LoadTest = Wire<model.LoadTest>;
 export type LoadTestRequest = Wire<model.LoadTestRequest>;
 export type LoadThreshold = Wire<model.LoadThreshold>;
+export type ProxyPaused = Wire<proxycapture.Paused>;
+export type ProxyConfig = Wire<proxycapture.Config>;
+export type ProxyEntry = Wire<proxycapture.Entry>;
+export type ProxyExchange = Wire<proxycapture.Exchange>;
+export type ProxyStatus = Wire<proxycapture.Status>;
 export type MockRoute = Wire<model.MockRoute>;
 export type MockServerConfig = Wire<model.MockServerConfig>;
 export type MockRequestRef = Wire<model.MockRequestRef>;

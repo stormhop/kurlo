@@ -4879,3 +4879,236 @@ export namespace model {
 
 }
 
+export namespace proxycapture {
+
+	export class Config {
+	    port: number;
+	    include: string;
+	    service: string;
+	    certificate: string;
+	    key: string;
+	    listenIP: string;
+	    clientIP: string;
+	    identifyProcess: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new Config(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.port = source["port"];
+	        this.include = source["include"];
+	        this.service = source["service"];
+	        this.certificate = source["certificate"];
+	        this.key = source["key"];
+	        this.listenIP = source["listenIP"];
+	        this.clientIP = source["clientIP"];
+	        this.identifyProcess = source["identifyProcess"];
+	    }
+	}
+	export class Entry {
+	    stream?: string;
+	    inProgress?: boolean;
+	    process?: string;
+	    local?: boolean;
+	    id: number;
+	    started: string;
+	    method: string;
+	    host: string;
+	    url: string;
+	    path: string;
+	    status: number;
+	    duration: number;
+	    received: number;
+	    sent: number;
+	    error?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stream = source["stream"];
+	        this.inProgress = source["inProgress"];
+	        this.process = source["process"];
+	        this.local = source["local"];
+	        this.id = source["id"];
+	        this.started = source["started"];
+	        this.method = source["method"];
+	        this.host = source["host"];
+	        this.url = source["url"];
+	        this.path = source["path"];
+	        this.status = source["status"];
+	        this.duration = source["duration"];
+	        this.received = source["received"];
+	        this.sent = source["sent"];
+	        this.error = source["error"];
+	    }
+	}
+	export class Message {
+	    archived?: boolean;
+	    headers: Record<string, Array<string>>;
+	    body: string;
+	    truncated: boolean;
+	    binary: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new Message(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.archived = source["archived"];
+	        this.headers = source["headers"];
+	        this.body = source["body"];
+	        this.truncated = source["truncated"];
+	        this.binary = source["binary"];
+	    }
+	}
+	export class Frame {
+	    direction: string;
+	    kind: string;
+	    text: string;
+	    size: number;
+
+	    static createFrom(source: any = {}) {
+	        return new Frame(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.direction = source["direction"];
+	        this.kind = source["kind"];
+	        this.text = source["text"];
+	        this.size = source["size"];
+	    }
+	}
+	export class Exchange {
+	    frames?: Frame[];
+	    entry: Entry;
+	    request: Message;
+	    response: Message;
+
+	    static createFrom(source: any = {}) {
+	        return new Exchange(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.frames = this.convertValues(source["frames"], Frame);
+	        this.entry = this.convertValues(source["entry"], Entry);
+	        this.request = this.convertValues(source["request"], Message);
+	        this.response = this.convertValues(source["response"], Message);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+	export class LocalResponse {
+	    pause: boolean;
+	    script: string;
+	    entryId: number;
+	    status: number;
+	    contentType: string;
+	    body: string;
+	    rateKiB: number;
+	    delayMs: number;
+	    errorPercent: number;
+
+	    static createFrom(source: any = {}) {
+	        return new LocalResponse(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.pause = source["pause"];
+	        this.script = source["script"];
+	        this.entryId = source["entryId"];
+	        this.status = source["status"];
+	        this.contentType = source["contentType"];
+	        this.body = source["body"];
+	        this.rateKiB = source["rateKiB"];
+	        this.delayMs = source["delayMs"];
+	        this.errorPercent = source["errorPercent"];
+	    }
+	}
+
+	export class Paused {
+	    id: number;
+	    method: string;
+	    url: string;
+	    status: number;
+	    body: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Paused(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.status = source["status"];
+	        this.body = source["body"];
+	    }
+	}
+	export class Status {
+	    config: Config;
+	    rules: number;
+	    address: string;
+	    running: boolean;
+	    count: number;
+
+	    static createFrom(source: any = {}) {
+	        return new Status(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.config = this.convertValues(source["config"], Config);
+	        this.rules = source["rules"];
+	        this.address = source["address"];
+	        this.running = source["running"];
+	        this.count = source["count"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+

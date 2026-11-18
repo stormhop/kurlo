@@ -103,3 +103,7 @@ Exit codes: `0` passed, `99` thresholds failed, `1` workspace, export or runtime
 - [Git-backed workspaces](https://kurlo.dev/docs/guides/git-workspaces/)
 
 Prebuilt binaries are published for macOS, Linux and Windows on x64 and arm64. MIT licensed.
+
+## Capture development traffic
+
+Run `kurlo proxy --port 9090 --out session.har`, configure your client to use the displayed proxy, and press Ctrl+C to write the HAR. To inspect a single HTTPS development service, add `--service host:port --cert service.pem --key service-key.pem`. Run `kurlo proxy --help` for the complete flag list. Share endpoint metadata with MCP using `kurlo mcp /path/to/workspace --capture-har /path/to/session.har`. [Capture proxy guide](https://kurlo.dev/docs/guides/capture-proxy/)

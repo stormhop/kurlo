@@ -100,6 +100,7 @@ type RequestCrudHost = {
   closeAgentTab: () => void;
   closeFloatingMenus: () => void;
   closeGitTab: () => void;
+  closeProxyTab: () => void;
   closeMockServerTab: () => void;
   closeHistoryDetail: () => void;
   closeActiveRequestTab: (force?: boolean) => Promise<void>;
@@ -732,6 +733,8 @@ export const requestCrudFeature = {
       this.closeHistoryDetail();
     } else if (this.topView === 'agent') {
       this.closeAgentTab();
+    } else if (this.topView === 'proxy') {
+      this.closeProxyTab();
     } else if (this.topView === 'mock') {
       this.closeMockServerTab();
     }

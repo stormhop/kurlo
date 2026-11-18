@@ -15,6 +15,8 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Capture proxy** records development traffic, turns calls into requests and examples, and exports HAR from the desktop or CLI. See [Capture proxy](/docs/guides/capture-proxy/).
+
 - **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
 
 ### Fixed

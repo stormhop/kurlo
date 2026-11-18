@@ -126,6 +126,10 @@ export function ClearHistoryResponses() {
   return window['go']['api']['App']['ClearHistoryResponses']();
 }
 
+export function ClearProxyLocalResponses() {
+  return window['go']['api']['App']['ClearProxyLocalResponses']();
+}
+
 export function ClearVariables() {
   return window['go']['api']['App']['ClearVariables']();
 }
@@ -526,6 +530,30 @@ export function PreviewLoadTestData(arg1) {
   return window['go']['api']['App']['PreviewLoadTestData'](arg1);
 }
 
+export function ProxyCaptureEntries() {
+  return window['go']['api']['App']['ProxyCaptureEntries']();
+}
+
+export function ProxyCaptureEntry(arg1) {
+  return window['go']['api']['App']['ProxyCaptureEntry'](arg1);
+}
+
+export function ProxyCaptureHAR(arg1) {
+  return window['go']['api']['App']['ProxyCaptureHAR'](arg1);
+}
+
+export function ProxyCaptureQR() {
+  return window['go']['api']['App']['ProxyCaptureQR']();
+}
+
+export function ProxyCaptureStatus() {
+  return window['go']['api']['App']['ProxyCaptureStatus']();
+}
+
+export function ProxyPausedResponses() {
+  return window['go']['api']['App']['ProxyPausedResponses']();
+}
+
 export function PruneHistoryResponses(arg1) {
   return window['go']['api']['App']['PruneHistoryResponses'](arg1);
 }
@@ -548,6 +576,10 @@ export function ReadOpenAPIBaseSpec(arg1) {
 
 export function ReadOpenAPISourceFile(arg1) {
   return window['go']['api']['App']['ReadOpenAPISourceFile'](arg1);
+}
+
+export function ReadProxyResponseFile(arg1) {
+  return window['go']['api']['App']['ReadProxyResponseFile'](arg1);
 }
 
 export function ReadTextFile(arg1) {
@@ -588,6 +620,10 @@ export function ReplaceRequestStoreWithError(arg1) {
 
 export function RestartApp() {
   return window['go']['api']['App']['RestartApp']();
+}
+
+export function ResumeProxyResponse(arg1, arg2, arg3) {
+  return window['go']['api']['App']['ResumeProxyResponse'](arg1, arg2, arg3);
 }
 
 export function RevealWorkspaceItem(arg1, arg2) {
@@ -718,6 +754,10 @@ export function SetEnvironmentVar(arg1, arg2) {
   return window['go']['api']['App']['SetEnvironmentVar'](arg1, arg2);
 }
 
+export function SetProxyLocalResponse(arg1) {
+  return window['go']['api']['App']['SetProxyLocalResponse'](arg1);
+}
+
 export function SetVariable(arg1, arg2) {
   return window['go']['api']['App']['SetVariable'](arg1, arg2);
 }
@@ -778,6 +818,10 @@ export function StartPerformanceStream(arg1) {
   return window['go']['api']['App']['StartPerformanceStream'](arg1);
 }
 
+export function StartProxyCapture(arg1) {
+  return window['go']['api']['App']['StartProxyCapture'](arg1);
+}
+
 export function StopAgent(arg1) {
   return window['go']['api']['App']['StopAgent'](arg1);
 }
@@ -800,6 +844,10 @@ export function StopMockServer() {
 
 export function StopPerformanceStream() {
   return window['go']['api']['App']['StopPerformanceStream']();
+}
+
+export function StopProxyCapture() {
+  return window['go']['api']['App']['StopProxyCapture']();
 }
 
 export function StoredHistoryResponseIDs() {

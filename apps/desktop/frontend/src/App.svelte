@@ -19,6 +19,7 @@
   import BodyModeSelector from './lib/components/BodyModeSelector.svelte';
   import RequestBar from './lib/components/RequestBar.svelte';
   import RequestEditorTabs from './lib/components/RequestEditorTabs.svelte';
+  import ProxyWorkspace from './lib/components/ProxyWorkspace.svelte';
   import ActivityRail from './lib/components/ActivityRail.svelte';
   import { shortcutComboLabel, usesMacShortcutGlyphs } from './lib/stores/features/preferences';
   import { agentSidebarMaxWidth, responseRightMinWidth } from './lib/stores/features/uiShell';
@@ -694,6 +695,7 @@
     cookieCount={vm.cookies.length}
     workspaceBlocked={vm.workspaceBlocked}
     openCollectionRunner={vm.openCollectionRunner}
+    openProxyTab={vm.openProxyTab}
     openMockTab={vm.openMockServerTab}
     openCookieJar={vm.openCookieJar}
     openSettings={vm.openSettings}
@@ -830,6 +832,9 @@
       agentTabOpen={vm.agentTabOpen}
       openAgentTab={() => vm.openAgentTab()}
       closeAgentTab={() => vm.closeAgentTab()}
+      proxyTabOpen={vm.proxyTabOpen}
+      openProxyTab={vm.openProxyTab}
+      closeProxyTab={vm.closeProxyTab}
       mockTabOpen={vm.mockServerTabOpen}
       loadTestTabTitle={loadTestTab ? loadTestTab.title : ''}
       loadTestTabUnsaved={loadTestTab ? loadTestTab.unsaved : ''}
@@ -1041,6 +1046,8 @@
         onDelete={vm.deleteCollection}
       />
       {/if}
+    {:else if vm.topView === 'proxy'}
+      <ProxyWorkspace />
     {:else if vm.topView === 'mock'}
       {#if lazy.MockServerWorkspaceComponent}
       <lazy.MockServerWorkspaceComponent

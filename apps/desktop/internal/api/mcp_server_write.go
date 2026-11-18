@@ -18,17 +18,18 @@ import (
 )
 
 var mcpWriteToolNames = map[string]bool{
-	"import_apply":      true,
-	"save_docs":         true,
-	"create_collection": true,
-	"save_load_test":    true,
-	"save_request":      true,
-	"patch_request":     true,
-	"apply_changes":     true,
-	"delete_request":    true,
-	"save_example":      true,
-	"set_variable":      true,
-	"generate_tests":    true,
+	"create_captured_collection": true,
+	"import_apply":               true,
+	"save_docs":                  true,
+	"create_collection":          true,
+	"save_load_test":             true,
+	"save_request":               true,
+	"patch_request":              true,
+	"apply_changes":              true,
+	"delete_request":             true,
+	"save_example":               true,
+	"set_variable":               true,
+	"generate_tests":             true,
 }
 
 type mcpStore struct {

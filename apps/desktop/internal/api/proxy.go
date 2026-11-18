@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"github.com/stormhop/kurlo/apps/desktop/internal/proxycapture"
 )
 
 func requestUsesProxy(req model.HttpRequest, httpReq *http.Request) bool {
@@ -23,12 +24,12 @@ func proxyForRequest(req model.HttpRequest) func(*http.Request) (*url.URL, error
 	case "off":
 		return nil
 	case "system":
-		return http.ProxyFromEnvironment
+		return systemProxyForRequest
 	case "on":
 
 	default:
 		if strings.TrimSpace(req.ProxyURL) == "" {
-			return http.ProxyFromEnvironment
+			return systemProxyForRequest
 		}
 	}
 
@@ -53,6 +54,14 @@ func proxyForRequest(req model.HttpRequest) func(*http.Request) (*url.URL, error
 		}
 		return parsed, nil
 	}
+}
+
+func systemProxyForRequest(req *http.Request) (*url.URL, error) {
+	u, err := http.ProxyFromEnvironment(req)
+	if err == nil && proxycapture.IsActiveAddress(u) {
+		return nil, nil
+	}
+	return u, err
 }
 
 func redactProxyURL(raw string) string {

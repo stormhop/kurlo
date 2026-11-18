@@ -287,6 +287,17 @@ class AppVM {
   mockServerBusy = $state(false);
   mockServerLog = $state<MockRequestLog[]>([]);
   mockServerError = $state('');
+  proxyTabOpen = $state(false);
+  openProxyTab = () => {
+    this.closeFloatingMenus();
+    this.proxyTabOpen = true;
+    this.topView = 'proxy';
+  };
+  closeProxyTab = () => {
+    this.proxyTabOpen = false;
+    if (this.topView === 'proxy') this.topView = this.activeRequestId ? 'request' : 'overview';
+  };
+
   mockServerTabOpen = $state(false);
   agentTabOpen = $state(false);
   agentReturnSidebar: Exclude<SidebarView, 'agent'> = 'collections';

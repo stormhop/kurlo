@@ -9,6 +9,8 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Capture proxy.** Inspect HTTP traffic and a development HTTPS service, save an exchange as a request with its response example, and export a session as HAR. Includes a CLI recorder, local response rules and an optional HAR source for MCP.
+
 - **Postman v3 collection export.** Open a Kurlo collection as local files in Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available.
 
 ### Fixed

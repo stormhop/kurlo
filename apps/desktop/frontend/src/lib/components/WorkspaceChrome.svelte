@@ -42,6 +42,9 @@
     openAgentTab,
     closeAgentTab,
     gitTabOpen = false,
+    proxyTabOpen = false,
+    openProxyTab,
+    closeProxyTab,
     mockTabOpen = false,
     loadTestTabTitle = '',
     loadTestTabUnsaved = '',
@@ -103,6 +106,9 @@
     openAgentTab: () => void;
     closeAgentTab: () => void;
     gitTabOpen?: boolean;
+    proxyTabOpen?: boolean;
+    openProxyTab: () => void;
+    closeProxyTab: () => void;
     mockTabOpen?: boolean;
     loadTestTabTitle?: string;
     loadTestTabUnsaved?: string;
@@ -373,6 +379,12 @@
           <button class="tab-close" type="button" onclick={closeMockTab} aria-label="Close Mock tab"><AddCloseIcon /></button>
         </div>
       {/if}
+      {#if proxyTabOpen}
+        <div class="saved-request-tab runner-tab" class:active={topView === 'proxy'} use:middleClick={closeProxyTab}>
+          <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={topView === 'proxy'} tabindex={topView === 'proxy' ? 0 : -1} onclick={openProxyTab}><span aria-hidden="true">⇄</span><span class="tab-title">Proxy</span></button>
+          <button class="tab-close" type="button" onclick={closeProxyTab} aria-label="Close Proxy tab"><AddCloseIcon /></button>
+        </div>
+      {/if}
       {#if loadTestTabTitle}
         <div class="saved-request-tab runner-tab loadtest-tab" class:active={topView === 'loadtest'} class:unsaved={Boolean(loadTestTabUnsaved)} use:middleClick={workspaceBlocked ? undefined : closeLoadTestTab}>
           <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={topView === 'loadtest'} tabindex={topView === 'loadtest' ? 0 : -1} onclick={openLoadTestTab}>
@@ -452,6 +464,9 @@
               <button class="menu-item" role="option" class:active={topView === 'git'} aria-selected={topView === 'git'} type="button" onclick={() => pickTab(openGitTab)}>
                 <span class="tab-overflow-name">Git</span>
               </button>
+            {/if}
+            {#if proxyTabOpen}
+              <button class="menu-item" role="option" aria-selected={topView === 'proxy'} type="button" onclick={() => pickTab(openProxyTab)}>Proxy</button>
             {/if}
             {#if mockTabOpen}
               <button class="menu-item" role="option" class:active={topView === 'mock'} aria-selected={topView === 'mock'} type="button" onclick={() => pickTab(openMockTab)}>

@@ -147,6 +147,8 @@ Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json
 **Cookies** — a per-workspace cookie jar with a per-domain editor, disableable per request.
 - **Cookie sync**: pair Kurlo with the in-repo browser extension (`apps/desktop/extension`, Chromium + Firefox) and the session you already have in the browser is the session Kurlo sends with. A loopback-only bridge that stays off until you turn it on, an approval you give in Kurlo by matching a six-digit code, and a per-domain allowlist enforced on both sides. Cookies travel one way: browser into Kurlo.
 
+**Capture proxy** — inspect HTTP and HTTPS traffic from a development service, save requests with their response examples, and export a session as HAR. [Capture guide](https://kurlo.dev/docs/guides/capture-proxy/)
+
 **Mock server** — serve a collection's saved examples over HTTP on a local port, so a client can be built against an endpoint that does not exist yet. Routing is by method and the example's path template (`/orders/:id`), a recorded query narrows which example answers, and a live log shows what the client asked for and which example replied. Loopback only; CORS preflight is answered for any origin.
 
 **Response viewer**
