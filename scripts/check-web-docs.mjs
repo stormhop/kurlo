@@ -3,6 +3,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, normalize, relative, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { DOCS_HOME, DOCS_SECTIONS, docsSectionPages, docsTopicPages } from '../apps/web/docs.sidebar.mjs';
+import { absolute } from '../apps/web/site.config.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = join(root, 'apps/web');
@@ -109,6 +111,136 @@ function checkBasePrefixedLinks() {
   }
 }
 
+function checkDocumentationNavigation(contentFiles) {
+  const base = (process.env.KURLO_SITE_BASE ?? '/').replace(/\/$/, '');
+  const sectionByPath = new Map();
+  const entriesBySection = new Map();
+  for (const section of DOCS_SECTIONS) {
+    const entries = [section.link, ...docsSectionPages(section).map(item => item.link)];
+    entriesBySection.set(section, entries.map(link => link.startsWith('/') ? `${base}${link}` : link));
+    for (const link of entries.filter(link => link.startsWith('/'))) {
+      if (sectionByPath.has(link)) fail(`Documentation page belongs to multiple sections: ${link}`);
+      sectionByPath.set(link, section);
+    }
+  }
+
+  const paths = contentFiles
+    .map(file => `/${relative(contentRoot, file).replaceAll('\\', '/').replace(/\.(mdx?|astro)$/i, '').replace(/\/index$/, '')}/`)
+    .filter(path => path.startsWith(DOCS_HOME));
+  const linkTargets = html => [...html.matchAll(/<a\s[^>]*href="([^"]+)"[^>]*>/g)].map(match => match[1]);
+  const containsSameLinks = (actual, expected) =>
+    actual.length === expected.length && expected.every(link => actual.includes(link));
+  const tabTargets = DOCS_SECTIONS.map(section => `${base}${section.link}`);
+
+  for (const path of new Set([...paths, ...sectionByPath.keys()])) {
+    const section = sectionByPath.get(path);
+    if (!section && path !== DOCS_HOME) fail(`Documentation page has no section: ${path}`);
+
+    const file = distCandidates(path).find(candidate => existsSync(candidate) && statSync(candidate).isFile());
+    if (!file) {
+      fail(`Documentation navigation points to a missing build output: ${path}`);
+      continue;
+    }
+    const html = read(file);
+    const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] ?? '';
+    const article = main.search(/<[^>]+\bclass="[^"]*\bsl-markdown-content\b/);
+    if (path === DOCS_HOME) {
+      if (html.includes('<docs-page-actions')) fail('The documentation homepage renders copy controls');
+    } else {
+      const actions = main.match(/<docs-page-actions\b[^>]*>([\s\S]*?)<\/docs-page-actions>/);
+      const pageActions = actions?.[1] ?? '';
+      const markdown = pageActions.match(/<template\b[^>]*>([\s\S]*?)<\/template>/)?.[1] ?? '';
+      if (!markdown.startsWith('# ') || !markdown.includes(`Source: ${absolute(path)}`)) {
+        fail(`Page actions are missing Markdown for ${path}`);
+      }
+      if ((pageActions.match(/<button\b[^>]*\bdata-copy-page\b/g)?.length ?? 0) !== 2 ||
+          !pageActions.includes('popovertarget="docs-page-actions"')) {
+        fail(`Page actions are missing copy controls for ${path}`);
+      }
+      if (!actions || actions.index >= article || html.indexOf('<docs-page-actions') < html.indexOf('<main')) {
+        fail(`Page actions must be in the article heading on ${path}`);
+      }
+      const actionLinks = [...pageActions.matchAll(/<a\b[^>]*href="([^"]+)"[^>]*>[\s\S]*?<\/a>/g)];
+      for (const chat of ['https://chatgpt.com/', 'https://claude.ai/new']) {
+        const link = actionLinks.find(([, href]) => href.startsWith(`${chat}?`));
+        const href = link?.[1];
+        if (!href || !new URL(href).searchParams.get('q')?.endsWith(absolute(path))) {
+          fail(`Page actions are missing the ${chat} link for ${path}`);
+        }
+        if (link && !/<svg\b[^>]*\bclass="[^"]*\bpage-action-brand\b/.test(link[0])) {
+          fail(`Page actions are missing the ${chat} logo for ${path}`);
+        }
+      }
+    }
+    const feedback = main.match(/<docs-page-feedback\b[^>]*>([\s\S]*?)<\/docs-page-feedback>/);
+    if (!feedback || feedback.index <= article || !feedback[0].includes(`data-path="${path}"`) ||
+        !feedback[1].includes('data-vote="yes"') || !feedback[1].includes('data-vote="no"') ||
+        (feedback[1].match(/<input\b[^>]*name="reason"/g)?.length ?? 0) !== 5) {
+      fail(`Page feedback is missing or incomplete on ${path}`);
+    }
+    const tabs = html.match(/<nav\b[^>]*aria-label="Documentation sections"[^>]*>([\s\S]*?)<\/nav>/)?.[1] ?? '';
+    if (!containsSameLinks(linkTargets(tabs), tabTargets)) fail(`Documentation section tabs are missing or incorrect on ${path}`);
+
+    const sidebar = html.match(/<sl-sidebar-pane\b[^>]*>([\s\S]*?)<\/sl-sidebar-pane>/)?.[1];
+    if (section) {
+      const expected = entriesBySection.get(section);
+      const articleLinks = linkTargets(sidebar ?? '').filter(link => expected.includes(link) || link.startsWith('/'));
+      if (!containsSameLinks(articleLinks, expected)) fail(`Documentation sidebar shows incorrect articles on ${path}`);
+
+      const headings = [...(sidebar ?? '').matchAll(/<h2\b[^>]*id="docs-sidebar-group-\d+"[^>]*>([^<]+)<\/h2>/g)]
+        .map(match => match[1].replaceAll('&amp;', '&'));
+      if (headings.join('\n') !== section.groups.map(group => group.label).join('\n')) {
+        fail(`Documentation sidebar is missing section headings on ${path}`);
+      }
+      const disclosures = (sidebar ?? '').match(/<summary\b/g)?.length ?? 0;
+      const guides = section.groups.flatMap(group => group.items).filter(item => docsTopicPages(item.link).length);
+      if (disclosures !== guides.length) fail(`Documentation sidebar should only expand guides on ${path}`);
+
+      const activeArticle = sidebar?.match(/<a\s[^>]*href="([^"]+)"[^>]*aria-current="page"/)?.[1];
+      if (activeArticle !== `${base}${path}`) fail(`Documentation sidebar highlights the wrong article on ${path}`);
+
+      const activeTab = tabs.match(/<a\s[^>]*href="([^"]+)"[^>]*aria-current="(?:true|page)"/)?.[1];
+      if (activeTab !== `${base}${section.link}`) fail(`Documentation section is highlighted incorrectly on ${path}`);
+
+      const neighboringPages = linkTargets([...html.matchAll(/<a\s[^>]*rel="(?:prev|next)"[^>]*>/g)].map(match => match[0]).join(''));
+      if (neighboringPages.some(link => !expected.includes(link))) fail(`Previous or next page crosses documentation sections on ${path}`);
+    } else if (path === DOCS_HOME) {
+      if (sidebar) fail('The documentation homepage renders an article sidebar');
+      if (/<div\b[^>]*class="pagination-links\b/.test(html)) fail('The documentation homepage renders an article footer');
+      for (const id of ['beyond-the-basics', 'reference', 'conventions', 'need-something-the-docs-dont-cover']) {
+        if (!html.includes(`id="${id}"`)) fail(`The documentation homepage is missing the existing #${id} anchor`);
+      }
+    }
+  }
+}
+
+function checkLegacyFragments() {
+  const base = (process.env.KURLO_SITE_BASE ?? '/').replace(/\/$/, '');
+  const legacy = JSON.parse(read(join(webRoot, 'docs.legacy-fragments.json')));
+  const cachedPages = new Map();
+  const page = path => {
+    if (!cachedPages.has(path)) {
+      const file = join(distRoot, path.slice(1), 'index.html');
+      cachedPages.set(path, existsSync(file) ? read(file) : '');
+    }
+    return cachedPages.get(path);
+  };
+  for (const [source, fragments] of Object.entries(legacy)) {
+    const anchors = new Map([...page(source).matchAll(/<span\s[^>]*id="([^"]+)"[^>]*data-destination="([^"]+)"/g)]
+      .map(match => [match[1], match[2]]));
+    for (const [id, destination] of Object.entries(fragments)) {
+      if (anchors.get(id) !== `${base}${destination}`) {
+        fail(`Missing documentation link for ${source}#${id}`);
+      }
+      const [targetPath, targetId] = destination.split('#');
+      const target = page(targetPath);
+      if (!target || targetId && !target.includes(`id="${targetId}"`)) {
+        fail(`Documentation link ${source}#${id} points to missing destination ${destination}`);
+      }
+    }
+  }
+}
+
 function checkPagefind() {
   const pagefindDir = join(distRoot, 'pagefind');
   if (!existsSync(pagefindDir)) {
@@ -128,7 +260,8 @@ function checkCodeBackedDocs() {
   const stripGo = read(join(root, 'apps/desktop/internal/api/file_workspace_store_strip.go'));
   const secretsGo = read(join(root, 'apps/desktop/internal/api/file_workspace_store.go'));
   const schema = read(join(root, 'schemas/kurlo-workspace-yaml-v1.schema.json'));
-  const yamlDoc = read(join(contentRoot, 'docs/reference/kurlo-yaml-format.md'));
+  const yaml = join(contentRoot, 'docs/reference/kurlo-yaml-format');
+  const yamlDoc = [read(join(yaml, 'request.md')), read(join(yaml, 'request-fields.md')), read(join(yaml, 'secrets.md'))].join('\n');
   const coverage = read(join(webRoot, 'DOCS_COVERAGE.md'));
 
   for (const field of ['oauth2GrantType', 'oauth2AuthURL', 'oauth2RefreshToken', 'oauth2TokenExpiry', 'oauth2UsePKCE']) {
@@ -166,7 +299,7 @@ function checkFrontDoorDocs() {
   const ui = read(join(root, 'apps/desktop/frontend/src/lib/stores/ui.ts'));
   const constants = read(join(root, 'apps/desktop/frontend/src/lib/constants.ts'));
   const codegenDoc = read(join(contentRoot, 'docs/guides/code-generation.md'));
-  const shortcutDoc = read(join(contentRoot, 'docs/reference/keyboard-shortcuts.md'));
+  const shortcutDoc = walk(join(contentRoot, 'docs/reference/keyboard-shortcuts'), path => path.endsWith('.md')).map(read).join('\n');
   const readme = read(join(root, 'README.md'));
 
   const languages = [...ui.matchAll(/^\s*'([a-z]+)',$/gm)].map(match => match[1]);
@@ -251,6 +384,8 @@ if (!existsSync(distRoot)) {
   checkMarkdownAssets(contentFiles);
   checkInternalLinks(contentFiles);
   checkBasePrefixedLinks();
+  checkDocumentationNavigation(contentFiles);
+  checkLegacyFragments();
   checkPagefind();
   checkCodeBackedDocs();
   checkFrontDoorDocs();

@@ -1,0 +1,9 @@
+---
+title: "Auto-updates"
+---
+
+Kurlo checks `latest.json` from `stormhop/kurlo` after launch. Open **Settings → About** to check and install by hand. **Settings → About → Install updates automatically** controls whether a discovered update installs in the background.
+
+Updates are verified against both the SHA-256 value and the minisign signature from the manifest before they install.
+
+An AppImage updates in place: Kurlo replaces the `.AppImage` file you started it from, so keep that file in a folder you can write to, such as `~/Applications`. AppImages from Kurlo 2.2.3 and earlier cannot install updates. Download 2.2.4 or later by hand once, and updates install from then on.

@@ -1,23 +1,68 @@
 ---
 import DocsHero from './DocsHero.astro';
+import DocsPageActions from './DocsPageActions.astro';
+import { Icon } from '@astrojs/starlight/components';
+import { DOCS_HOME, docsParentTopic, docsSectionForPath, isDocumentationPath } from '../../docs.sidebar.mjs';
 
 const route = Astro.locals.starlightRoute;
 const { title, description } = route.entry.data;
-const hub = route.id === 'docs';
+const path = `/${route.id}/`;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const section = docsSectionForPath(path);
+const hub = path === DOCS_HOME;
+const sectionHome = section?.link === path;
+const parent = docsParentTopic(path, section);
 ---
 
 {hub ? (
-  <DocsHero description={description} />
+  <DocsHero title={title} description={description} />
 ) : (
   <>
-    <h1 id="_top">{title}</h1>
+    {section && (
+      <nav class="docs-crumbs" aria-label="Breadcrumb">
+        <a href={`${base}${DOCS_HOME}`}>Docs</a>
+        <Icon name="right-caret" size="0.875rem" />
+        {sectionHome
+          ? <span aria-current="page">{section.label}</span>
+          : <a href={`${base}${section.link}`}>{section.label}</a>}
+        {parent && <>
+          <Icon name="right-caret" size="0.875rem" />
+          <a href={`${base}${parent.link}`}>{parent.label}</a>
+        </>}
+      </nav>
+    )}
+    <div class="docs-page-heading">
+      <h1 id="_top">{title}</h1>
+      {isDocumentationPath(path) && <DocsPageActions />}
+    </div>
     {description && <p class="kurlo-page-lead">{description}</p>}
   </>
 )}
 
 <style>
-  h1 {
+  .docs-crumbs {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.82rem;
+  }
+  .docs-crumbs a {
+    color: var(--sl-color-accent-high);
+    text-decoration: none;
+  }
+  .docs-crumbs a:hover {
+    text-decoration: underline;
+  }
+  .docs-page-heading {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.75rem;
     margin-top: 0.75rem;
+  }
+  h1 {
+    margin: 0;
     font-size: var(--sl-text-h1);
     line-height: 1.12;
     font-weight: 600;

@@ -1,0 +1,12 @@
+---
+title: Mock server
+description: Serve a collection's saved examples over HTTP on a local port, so a client can be built against an endpoint that does not exist yet.
+---
+
+import DocsTopicIndex from "../../../../components/DocsTopicIndex.astro";
+
+Kurlo can serve a collection's [saved examples](/docs/guides/examples/) as a real HTTP server on your own machine. A front end can then be written against an endpoint the backend has not shipped, and against the failure cases a staging environment will not produce on demand — a 500, an expired token, an empty list.
+
+It needs no account and no configuration. An example already records a status, headers, a body and the path that produced them, so it is already a route.
+
+<DocsTopicIndex />

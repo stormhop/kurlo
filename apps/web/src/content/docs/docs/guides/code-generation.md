@@ -1,9 +1,9 @@
 ---
-title: Code generation
-description: Copy the current HTTP or AI request as a runnable snippet in one of 14 targets.
+title: Code snippets
+description: Copy an HTTP, GraphQL or AI request as a runnable snippet in one of 14 targets.
 ---
 
-The **Code** side panel turns the currently-open request into a runnable snippet. Open it with the **Code snippet** (`</>`) button in the URL row, immediately before **Send**, or the right-sidebar shortcut from [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
+The **Code** side panel turns the currently-open request into a runnable snippet. Open it with the **Code snippet** (`</>`) button next to **Send**, or run **Show code snippet** from the [command palette](/docs/guides/workspaces/command-palette/).
 
 ![Code generation side panel](../../../../assets/screenshots/code-snippets.png)
 
@@ -31,7 +31,7 @@ Snippets are generated from the currently open HTTP, GraphQL or AI request:
 
 ## AI requests
 
-An [AI request](/docs/guides/request-types/#ai) becomes the HTTP call Kurlo makes for the first message: a `POST` to the full address shown under the base URL, such as `https://openrouter.ai/api/v1/chat/completions` or `https://api.anthropic.com/v1/messages`, with a JSON body that holds the model, the system prompt, the prompt and the settings you set (temperature, Top P, max tokens, streaming, and thinking for Anthropic). Anthropic snippets also carry the `anthropic-version` header. API keys follow the same rules as other requests: a secret `{{openaiApiKey}}` stays a placeholder.
+An [AI request](/docs/guides/request-types/ai/#ai) becomes the HTTP call Kurlo makes for the first message: a `POST` to the full address shown under the base URL, such as `https://openrouter.ai/api/v1/chat/completions` or `https://api.anthropic.com/v1/messages`, with a JSON body that holds the model, the system prompt, the prompt and the settings you set (temperature, Top P, max tokens, streaming, and thinking for Anthropic). Anthropic snippets also carry the `anthropic-version` header. API keys follow the same rules as other requests: a secret `{{openaiApiKey}}` stays a placeholder.
 
 Replies in the chat and MCP tools from the Tools tab are not part of the snippet: tools are listed from their servers when you send, and each step depends on the model's answer.
 

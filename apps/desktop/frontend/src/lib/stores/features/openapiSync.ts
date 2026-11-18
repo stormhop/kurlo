@@ -80,6 +80,7 @@ function plural(count: number, word: string) {
 }
 
 type OpenApiSyncHost = {
+  requestStorePersistEpoch: number;
   collections: Collection[];
   requests: SavedRequest[];
   workspaces: Workspace[];
@@ -395,17 +396,19 @@ export const openApiSyncFeature = {
   },
 
   async linkImportedOpenApiCollection(this: OpenApiSyncHost, collectionId: string, source: { url: string; skipTlsVerification?: boolean }, spec: unknown) {
+    const epoch = this.requestStorePersistEpoch;
     const { canonicalSpecText } = await import('../../openapiSync');
+    if (epoch !== this.requestStorePersistEpoch) return false;
     const saved = await this.saveOpenApiSource(collectionId, {
       source: source.url,
       intervalMinutes: 15,
       ...(source.skipTlsVerification ? { skipTlsVerification: true } : {}),
     });
-    if (!saved) return;
-    if (await this.storeOpenApiBase(collectionId, canonicalSpecText(spec))) {
-      writeLocal(collectionId, { lastCheckedAt: Date.now() });
-      this.setOpenApiStatus(collectionId, { state: 'in-sync', summary: 'In sync', pending: 0, checkedAt: Date.now() });
-    }
+    if (!saved || epoch !== this.requestStorePersistEpoch) return false;
+    if (!await this.storeOpenApiBase(collectionId, canonicalSpecText(spec)) || epoch !== this.requestStorePersistEpoch) return false;
+    writeLocal(collectionId, { lastCheckedAt: Date.now() });
+    this.setOpenApiStatus(collectionId, { state: 'in-sync', summary: 'In sync', pending: 0, checkedAt: Date.now() });
+    return true;
   },
 
   openApiSchedulerTick(this: OpenApiSyncHost) {

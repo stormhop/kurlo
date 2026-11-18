@@ -1,20 +1,28 @@
 ---
 import '@fontsource/anton';
+import { Icon } from '@astrojs/starlight/components';
 import Scene from './Scene.astro';
 
 interface Props {
+  title: string;
   description?: string;
 }
 
-const { description } = Astro.props;
+const { title, description } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <div class="kurlo-docs-hero not-content">
   <Scene variant="dusk" eager />
   <div class="kurlo-docs-hero-copy">
-    <p class="kurlo-docs-hero-label">Documentation</p>
-    <h1 id="_top">Learn Kurlo.</h1>
+    <h1 id="_top">{title}</h1>
     {description && <p class="kurlo-docs-hero-lead">{description}</p>}
+    <div class="kurlo-docs-hero-actions">
+      <a class="primary" href={`${base}/docs/getting-started/first-request/`}>
+        Send your first request <Icon name="right-arrow" size="1rem" />
+      </a>
+      <a href={`${base}/docs/getting-started/migrating/`}>Migrate to Kurlo</a>
+    </div>
   </div>
 </div>
 
@@ -25,9 +33,8 @@ const { description } = Astro.props;
     overflow: hidden;
     display: flex;
     align-items: flex-end;
-    min-height: clamp(15rem, 34vw, 21rem);
-    margin-top: 0.5rem;
-    border-radius: 16px;
+    min-height: 16.5rem;
+    border-radius: 18px;
     color: #f7f3ea;
   }
   .kurlo-docs-hero::after {
@@ -35,35 +42,74 @@ const { description } = Astro.props;
     position: absolute;
     inset: 0;
     z-index: -1;
-    background: linear-gradient(90deg, rgba(14, 12, 44, 0.55) 0%, rgba(14, 12, 44, 0.25) 45%, rgba(14, 12, 44, 0) 75%);
+    background: linear-gradient(90deg, rgba(15, 14, 53, 0.87), rgba(19, 16, 64, 0.57) 48%, rgba(21, 19, 66, 0.05) 85%);
   }
   .kurlo-docs-hero-copy {
-    padding: clamp(1.25rem, 4vw, 2.25rem);
-  }
-  .kurlo-docs-hero-label {
-    margin: 0 0 0.75rem;
-    font-family: var(--sl-font-mono);
-    font-size: 0.75rem;
-    letter-spacing: 0.09em;
-    text-transform: uppercase;
-    opacity: 0.85;
+    padding: clamp(1.25rem, 4vw, 2.75rem);
   }
   h1 {
     margin: 0;
     font-family: 'Anton', Impact, sans-serif;
     font-weight: 400;
-    font-size: clamp(3rem, 2rem + 4vw, 5rem);
-    line-height: 0.9;
+    font-size: clamp(2.4rem, 1.35rem + 3.2vw, 4.4rem);
+    line-height: 1;
     letter-spacing: 0.005em;
     text-transform: uppercase;
     color: #f7f3ea;
     text-shadow: 0 4px 30px rgba(20, 18, 60, 0.3);
   }
   .kurlo-docs-hero-lead {
-    max-width: 30rem;
-    margin: 0.9rem 0 0;
+    max-width: 32rem;
+    margin: 0.85rem 0 0;
     font-size: 1.0625rem;
     line-height: 1.5;
     text-shadow: 0 1px 2px rgba(16, 14, 50, 0.55), 0 2px 18px rgba(16, 14, 50, 0.5);
+  }
+  .kurlo-docs-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1.35rem;
+  }
+  .kurlo-docs-hero-actions a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid #ffffff66;
+    border-radius: 7px;
+    background: #15134073;
+    color: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .kurlo-docs-hero-actions a:hover {
+    border-color: #fff;
+  }
+  .kurlo-docs-hero-actions .primary {
+    background: #f2eeff;
+    color: #181531;
+  }
+  @media (max-width: 37rem) {
+    .kurlo-docs-hero {
+      min-height: 14rem;
+    }
+    .kurlo-docs-hero::after {
+      background: linear-gradient(0deg, #15133c 5%, #15133c55 100%);
+    }
+    h1 {
+      font-size: 2.2rem;
+    }
+    .kurlo-docs-hero-lead {
+      font-size: 0.95rem;
+    }
+    .kurlo-docs-hero-actions {
+      margin-top: 1rem;
+    }
+    .kurlo-docs-hero-actions a {
+      padding-inline: 0.65rem;
+      font-size: 0.8125rem;
+    }
   }
 </style>

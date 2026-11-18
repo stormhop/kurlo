@@ -52,7 +52,7 @@ const features = [
   {
     title: 'Talks to models, too.',
     text: 'An AI request sends a prompt to OpenAI, Anthropic, OpenRouter, Groq, Ollama or LM Studio and streams the answer with its tool calls and tokens. Test it like any response with pm.response.llm().',
-    link: 'docs/guides/request-types/#ai',
+    link: 'docs/guides/request-types/ai/#ai',
     plate: 'd',
     visual: 'ai',
   },
@@ -80,10 +80,10 @@ const features = [
 ];
 
 const also = [
-  { title: 'Postman moves in', text: 'Postman, Insomnia, Bruno, OpenAPI, HAR and cURL. pm.* tests keep running, nothing to rewrite.', link: 'docs/getting-started/migrating/' },
-  { title: 'Folders set the rules', text: 'Headers, auth, scripts and tests on a folder apply to every request inside it.', link: 'docs/guides/collection-defaults/#folder-defaults' },
-  { title: 'Finishes your URLs', text: 'Completes URLs from history and saved requests, and the next JSON key from your examples.', link: 'docs/guides/request-types/#suggestions-while-you-type' },
-  { title: 'Environments that inherit', text: 'Staging takes what it does not set from Base, and one table shows every variable in every environment.', link: 'docs/guides/environments/#inheriting-from-another-environment' },
+  { title: 'Postman moves in', text: 'Import Postman v2 JSON, v3 folders, Insomnia, Bruno, OpenAPI, HAR, or cURL. Common pm.* tests carry over.', link: 'docs/getting-started/migrating/' },
+  { title: 'Folders set the rules', text: 'Headers, auth, scripts and tests on a folder apply to every request inside it.', link: 'docs/guides/collection-defaults/folders/' },
+  { title: 'Finishes your URLs', text: 'Completes URLs from history and saved requests, and the next JSON key from your examples.', link: 'docs/guides/request-types/http/#suggestions-while-you-type' },
+  { title: 'Environments that inherit', text: 'Staging takes what it does not set from Base, and one table shows every variable in every environment.', link: 'docs/guides/environments/manage/#inheriting-from-another-environment' },
   { title: 'Auth, all of it', text: 'OAuth 2.0 with all four grants, PKCE and refresh, JWT Bearer, NTLM, AWS SigV4, Digest, API keys and client certificates.', link: 'docs/guides/authentication/' },
   { title: 'Your browser’s cookies', text: 'An extension for Chrome, Edge, Brave and Firefox sends the session you are already signed into.', link: 'docs/guides/cookies/' },
   { title: 'Remembers', text: 'Every send with its response, kept for 14 days and reopenable in the editor.', link: 'docs/guides/history/' },
@@ -118,7 +118,7 @@ const faq = [
   { q: 'Do I need an account?', a: 'No. There is no Kurlo server, so there is nothing to sign in to.' },
   { q: 'What does it collect?', a: 'Nothing. On launch it asks GitHub whether a newer release exists, with no usage data in the request. Everything else goes only where you send it.', link: 'privacy/' },
   { q: 'Does my agent see my tokens?', a: 'No. Secrets reach your API, but the agent sees [secret]. Environments you protect are off limits to it entirely.', link: 'docs/guides/mcp-server/' },
-  { q: 'Coming from Postman?', a: 'Export the collection as v2.1 and drop it on the sidebar. Your tests keep running as pm.*, so there’s nothing to rewrite.', link: 'docs/getting-started/migrating/' },
+  { q: 'Coming from Postman?', a: 'Drop a v2.1 JSON export or a v3 Native Git collection folder into Kurlo. Use v3 to bring native gRPC requests.', link: 'docs/getting-started/migrating/postman/' },
   { q: 'Why does macOS hesitate to open it?', a: 'It isn’t notarized yet. Allow it once in System Settings › Privacy & Security and it opens normally from then on.', link: 'docs/getting-started/installation/' },
 ];
 

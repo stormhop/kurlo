@@ -11,13 +11,24 @@ head:
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts
 attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
+
+### Fixed
+
+- **OpenAPI imports** stop if the intended workspace is no longer active when the spec arrives.
+- **OpenAPI and Postman imports** report save failures and let you retry saving imported requests.
+
 ## 3.1.4
 
 ### Added
 
 - **Postman v3 collections**: import the Git folder of `.request.yaml` files Postman v12 writes, or drop it into the
   window; collections, requests, auth, scripts, examples, environments and globals come across. See
-  [Import and export](/docs/guides/import-export/#postman-v3-folders).
+  [Import and export](/docs/guides/import-export/postman/#postman-v3-folders).
 - **Move requests between folders** by dragging them onto a folder or back onto the collection header. See
   [Workspaces](/docs/guides/workspaces/).
 - **PFX/P12 client certificates** for mTLS over HTTP and gRPC, with a password and certificate chain. See
@@ -47,16 +58,16 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 ### Added
 
 - **Client certificates for gRPC**: the gRPC **Settings** tab has **Client certificate (mTLS)**, like HTTP, used for the
-  call and for reflection whenever TLS is on. See [Request types](/docs/guides/request-types/#grpc).
+  call and for reflection whenever TLS is on. See [Request types](/docs/guides/request-types/grpc/).
 - **Script output you cannot miss**: a failing script puts a red banner above the response body and a count on the
   **Scripts** tab, the output stays visible under "Could not send request", `console.warn` / `console.error` are
   coloured, every `pm.sendRequest` call is logged, and long or dropped log lines are marked. See
-  [Logging](/docs/reference/scripting-api/#logging).
+  [Logging](/docs/reference/scripting-api/logging/#logging).
 - **`{{variables}}` in every auth field**: auth fields suggest variables after `{{` and flag undefined ones; a secret
-  field holding only `{{token}}` shows it as text. See [Authentication](/docs/guides/authentication/#bearer-token).
+  field holding only `{{token}}` shows it as text. See [Authentication](/docs/guides/authentication/bearer/).
 - **Preview tabs**: enable **Settings → General → Preview tabs** to reuse one temporary request tab while browsing.
   Double-clicking, editing or running the request keeps its tab open. Off by default; the preference and preview survive
-  a restart. See [App settings](/docs/guides/settings/#preview-tabs).
+  a restart. See [App settings](/docs/guides/settings/start-and-tabs/#preview-tabs).
 
 ### Changed
 
@@ -68,7 +79,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **`pm.sendRequest` works like Postman**: string headers, disabled headers, `urlencoded`, `formdata` and `graphql`
   bodies and `Content-Type` from the body are handled, so servers no longer answer 415, and the script timeout cancels a
-  running call. See [`pm.sendRequest`](/docs/reference/scripting-api/#pmsendrequest).
+  running call. See [`pm.sendRequest`](/docs/reference/scripting-api/send-request/).
 - **Scripts behave as written**: pre-request `pm.test` results show and count everywhere, GraphQL body updates, form
   edits and `pm.globals.unset` keep what they should, and secret values in test names are masked.
 - **gRPC requests inherit collection auth**: **Inherit auth** now uses the collection's or nearest folder's credentials
@@ -100,7 +111,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   import it, instead of the window showing the file's text.
 - **JetBrains HTTP Client scripts run**: the sandbox understands `client`, `request` and `response`, so scripts imported
   from `.http` files work as written.
-  See [JetBrains HTTP Client globals](/docs/reference/scripting-api/#jetbrains-http-client-globals).
+  See [JetBrains HTTP Client globals](/docs/reference/scripting-api/compatibility/#jetbrains-http-client-globals).
 
 ### Changed
 
@@ -159,32 +170,32 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   background, shows new, changed, conflicting and removed endpoints for review, and merges three ways so your edits,
   scripts and tests stay. See [OpenAPI sync](/docs/guides/openapi-sync/).
 - **`kurlo openapi check`**: flag spec drift in CI with exit code `1`, or ask an agent through the `check_openapi_sync`
-  MCP tool. See [Contract drift](/docs/guides/cli-runner/#contract-drift-with-kurlo-openapi-check).
+  MCP tool. See [Contract drift](/docs/guides/cli-runner/openapi/#contract-drift-with-kurlo-openapi-check).
 - **Request variables**: a **Vars** tab on every request with Pre Request variables that override the environment and
   Post Response variables taken from the response with expressions such as `res.body.token`. Imported from Bruno and
-  Insomnia folders. See [Request variables](/docs/guides/environments/#request-variables).
+  Insomnia folders. See [Request variables](/docs/guides/environments/request-variables/).
 - **JWT Bearer auth**: Kurlo signs a fresh JWT on every send from a secret or a private key, with claims, an optional
-  lifetime and a token preview. See [JWT Bearer](/docs/guides/authentication/#jwt-bearer).
+  lifetime and a token preview. See [JWT Bearer](/docs/guides/authentication/jwt/).
 - **Assertions**: check the status, time, size, a header or a JSON field of a response without code, in **Scripts →
   Assertions**. Results show with the tests and count in the runner, `kurlo run` and `kurlo mcp`.
-  See [Assertions](/docs/guides/scripting/#assertions).
+  See [Assertions](/docs/guides/scripting/assertions/).
 - **Undo deletes**: a deleted request, folder, collection or environment can be brought back with **Undo** or from *
   *Recently deleted** until you quit Kurlo.
-  See [Restoring deleted items](/docs/guides/workspaces/#restoring-deleted-items).
+  See [Restoring deleted items](/docs/guides/workspaces/starred/#restoring-deleted-items).
 - **Environment colors**: mark an environment red, amber, green, blue or gray, and the title bar switcher, environment
-  lists and pickers show it. See [Coloring an environment](/docs/guides/environments/#coloring-an-environment).
+  lists and pickers show it. See [Coloring an environment](/docs/guides/environments/secrets/#coloring-an-environment).
 - **Reorder requests by dragging** above or below another request in the same collection or folder.
-  See [Reordering requests](/docs/guides/workspaces/#reordering-requests).
+  See [Reordering requests](/docs/guides/workspaces/requests/#reordering-requests).
 - **Autosave delay**: choose how long Kurlo waits after an edit before saving.
-  See [Saving](/docs/guides/settings/#saving).
+  See [Saving](/docs/guides/settings/saving/).
 - **Skip TLS check on URL import** for specs served with a self-signed or internal certificate.
-  See [From a URL](/docs/guides/import-export/#from-a-url).
+  See [From a URL](/docs/guides/import-export/openapi/#from-a-url).
 - **Show in Finder / Explorer**: open the YAML file of a request or the folder of a collection from its menu.
-  See [The request ⋯ menu](/docs/guides/workspaces/#the-request--menu).
+  See [The request ⋯ menu](/docs/guides/workspaces/requests/#the-request--menu).
 - **Edit menu in text fields**: right-click a field or a code editor for Cut, Copy, Paste and Select all.
   See [Keyboard shortcuts](/docs/reference/keyboard-shortcuts/).
 - **Kurlo docs in search**: the search palette offers the documentation first, and with a query it searches the docs in
-  your browser. See [Command palette](/docs/guides/workspaces/#command-palette).
+  your browser. See [Command palette](/docs/guides/workspaces/command-palette/).
 
 ### Performance
 
@@ -202,21 +213,21 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 ### Changed
 
 - **Portable app for Windows**: the standalone `.exe` is now named `kurlo-<version>-windows-<arch>-portable.exe` and is
-  on the download page. See [Installation](/docs/getting-started/installation/#windows).
+  on the download page. See [Installation](/docs/getting-started/installation/windows/).
 - **OpenAPI servers import like Bruno**: requests use `{{baseUrl}}`; document servers become a collection variable, path
   and operation servers go into the request's **Vars** tab, and alternatives such as Sandbox are switched-off rows you
-  can tick instead. See [From OpenAPI / Swagger](/docs/guides/import-export/#from-openapi--swagger).
+  can tick instead. See [From OpenAPI / Swagger](/docs/guides/import-export/openapi/#from-openapi--swagger).
 - **Imported collections start collapsed**, and remember your later expand and collapse choices.
 - **New requests start as drafts with manual saving**: **Add request** opens a draft that already uses the collection's
   and folder's settings, and **Save** puts it there. Untouched drafts close without asking.
-  See [Creating a request](/docs/guides/workspaces/#creating-a-request).
+  See [Creating a request](/docs/guides/workspaces/requests/#creating-a-request).
 - **Starred requests are personal**: stars stay on your machine instead of in request files and Git, and the group
-  scrolls within ten rows. See [Starred (favourites)](/docs/guides/workspaces/#starred-favourites).
+  scrolls within ten rows. See [Starred (favourites)](/docs/guides/workspaces/starred/#starred-favourites).
 - **Search moved to the status bar**: open it from **Search** at the bottom right or with `Cmd/Ctrl K`.
-  See [Command palette](/docs/guides/workspaces/#command-palette).
+  See [Command palette](/docs/guides/workspaces/command-palette/).
 - **More room in the tab row**: close buttons appear on hover or keyboard focus without moving the tabs, and on Windows
   and Linux there is always a free spot to drag the window by.
-  See [Window title bar](/docs/guides/settings/#appearance).
+  See [Window title bar](/docs/guides/settings/appearance/).
 - **Code snippet is next to Send** in the URL row.
 - **Panels fold in and out**: the sidebar, Agent mode's **Chat details** and **Code snippet** open and close smoothly;
   reduced motion disables the animation.
@@ -231,7 +242,7 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 - **Imported requests that would not load**: a request whose description began with a line break, for example from an
   OpenAPI import, loads again after a restart.
 - **OpenAPI import reads generator-written YAML** from Jackson, springdoc and similar tools.
-  See [OpenAPI / Swagger](/docs/guides/import-export/#from-openapi--swagger).
+  See [OpenAPI / Swagger](/docs/guides/import-export/openapi/#from-openapi--swagger).
 - **No false unsaved dot** when opening a request with path variables.
 - **Send errors** such as a TLS certificate error show at once.
 - **Long URLs stay on one line**: the URL bar scrolls the text sideways instead of growing downwards.
@@ -246,11 +257,11 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 ### Added
 
 - **Filter JSON responses** with JSONPath or a jq-style path.
-  See [Filtering a JSON response](/docs/guides/response-viewer/#filtering-a-json-response).
+  See [Filtering a JSON response](/docs/guides/response-viewer/search-and-filter/#filtering-a-json-response).
 - **Saved WebSocket and Socket.IO messages**, kept with the request: up to 100 per request, with search.
-  See [Saved messages](/docs/guides/request-types/#saved-messages).
+  See [Saved messages](/docs/guides/request-types/websocket/#saved-messages).
 - **Import a .env file** into an environment.
-  See [Importing a .env file](/docs/guides/environments/#importing-a-env-file).
+  See [Importing a .env file](/docs/guides/environments/manage/#importing-a-env-file).
 - **Fable 5.2** in the Claude Code model menu. See [Agent](/docs/guides/agent/).
 - Ten new themes: GitHub Light, GitHub Dark Dimmed, JetBrains Light, JetBrains Dark, One Dark, Tokyo Night, Everforest,
   Flexoki Paper, High Contrast Light and High Contrast Dark.
@@ -265,7 +276,7 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 - **Supported macOS is now 15 Sequoia or later.** Kurlo still starts on macOS 12–14, but those versions are no longer
   tested. Windows and Linux are unchanged.
 - Environments open one at a time; the **Matrix** is one click away, lets you pick its columns and stays smooth with
-  hundreds of variables. See [Comparing environments](/docs/guides/environments/#comparing-environments).
+  hundreds of variables. See [Comparing environments](/docs/guides/environments/manage/#comparing-environments).
 - Cookies open as a sidebar section with a page per domain and Kurlo's own date and time picker for **Expires**.
 - Workspace **Notes** became a **README**, kept as `README.md` in the workspace folder.
 - Clearer workspace and collection overviews with rename in place and a **•••** menu.
@@ -278,7 +289,7 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 ### Fixed
 
 - **Manual save covers environments, global variables and the workspace README.**
-  See [Saving](/docs/guides/settings/#saving).
+  See [Saving](/docs/guides/settings/saving/).
 - **The Collection Runner no longer sends unchecked requests** when opened from the activity rail.
 - **Network errors mask environment secrets** before they reach history or script results.
 - In the **Matrix**, **×** no longer deletes a variable set in only one environment, and typing into a **Not set** cell
@@ -298,10 +309,10 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 
 - **Pinning environments.** The collection Overview shows only pinned environments and adds others from a search picker
   instead of a checkbox for every environment.
-  See [Pinning environments to a collection](/docs/guides/environments/#pinning-environments-to-a-collection).
+  See [Pinning environments to a collection](/docs/guides/environments/pin/#pinning-environments-to-a-collection).
 
 - **Environment switcher.** Scrolls with many environments and adds a search field above eight; environment dropdowns
-  get search too. See [Switching environments](/docs/guides/environments/#switching-environments).
+  get search too. See [Switching environments](/docs/guides/environments/manage/#switching-environments).
 - **Steady scrolling.** Dropdown lists and panels no longer bounce past their edges.
 
 ### Fixed
@@ -329,7 +340,7 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 - **Selecting a response.** Cmd/Ctrl+A in the response panel selects only the body, and a selection dragged from the
   body leaves warnings above it out.
 - **Creating environments through the agent.** Create many environments with their variables in one batch; `values` or
-  `variables` can be a list of rows or a `key: value` object. See [Batch edits](/docs/guides/mcp-server/#batch-edits).
+  `variables` can be a list of rows or a `key: value` object. See [Batch edits](/docs/guides/mcp-server/edit/#batch-edits).
 
 ## 3.0.1
 
@@ -337,7 +348,7 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 
 - **Environments pinned to a collection.** Pin a collection's environments so the switcher shows only them while you
   work in it, select its default environment when you open it, and go back to your previous environment when you leave
-  it. See [Pinning environments to a collection](/docs/guides/environments/#pinning-environments-to-a-collection).
+  it. See [Pinning environments to a collection](/docs/guides/environments/pin/#pinning-environments-to-a-collection).
 
 ## 3.0.0
 
@@ -348,34 +359,34 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
   branch and use your MCP servers, and keeps chats on this computer. See [Agent](/docs/guides/agent/).
 
 - **Kurlo tools in AI requests.** Give an AI request's model Kurlo's read and run tools for the workspace, and pick
-  which AI connection a **Kurlo connection** request uses. See [Kurlo tools](/docs/guides/request-types/#kurlo-tools).
+  which AI connection a **Kurlo connection** request uses. See [Kurlo tools](/docs/guides/request-types/ai/#kurlo-tools).
 
 - **Create PR from the Git screen.** Open a pull or merge request page for a pushed branch.
-  See [Daily Git flow](/docs/guides/git-workspaces/#daily-git-flow).
+  See [Daily Git flow](/docs/guides/git-workspaces/workflow/).
 
 - **AI connections.** Settings → AI connects OpenRouter by signing in, an Anthropic, OpenAI or compatible key, or a
   local Ollama or LM Studio model. Keys are encrypted and stay out of workspace files, and AI requests can use the
-  default connection. See [AI](/docs/guides/settings/#ai).
+  default connection. See [AI](/docs/guides/settings/ai/#ai).
 
 - **Environment inheritance.** An environment takes the variables it does not set from a parent environment; the matrix
   shows where each value comes from.
-  See [Inheriting from another environment](/docs/guides/environments/#inheriting-from-another-environment).
+  See [Inheriting from another environment](/docs/guides/environments/manage/#inheriting-from-another-environment).
 
 - **Folder defaults.** Folders set headers, auth, scripts and tests for the requests inside them, and Postman and Bruno
   folder auth and scripts import onto the folder.
-  See [Folder defaults](/docs/guides/collection-defaults/#folder-defaults).
+  See [Folder defaults](/docs/guides/collection-defaults/folders/).
 
 - **NTLM sign-in.** HTTP requests can use NTLMv2 auth. See [Authentication](/docs/guides/authentication/).
 
 - **Suggestions while you type.** The URL field completes URLs from history and saved requests, and finds a request by
   name; a JSON body offers the next key from the request's examples. `Tab` accepts.
-  See [Suggestions while you type](/docs/guides/request-types/#suggestions-while-you-type).
+  See [Suggestions while you type](/docs/guides/request-types/http/#suggestions-while-you-type).
 
 - **Rename environments from their names.** Edit the environment name directly in the editor, or double-click it in the
   sidebar. **Rename** focuses the name field; Enter or leaving the field saves, and Escape cancels.
 
 - **Zoom in Settings.** **Settings → Appearance** has a **Zoom** row with −, + and **Reset**.
-  See [Appearance](/docs/guides/settings/#appearance).
+  See [Appearance](/docs/guides/settings/appearance/).
 
 ### Changed
 
@@ -385,7 +396,7 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 
 - **Cookie jar redesign.** Domains on the left, cookies in a table with expiry and flags, and an editor with **Fields**
   and **Raw** modes. The **Sync** tab uses Settings-style cards.
-  See [Managing cookies](/docs/guides/cookies/#managing-cookies).
+  See [Managing cookies](/docs/guides/cookies/manage/#managing-cookies).
 
 - **Linux window without the system title bar.** Kurlo draws its own title bar on Linux, like on Windows, and drops the
   GTK menu bar. `Ctrl Q` quits and zoom is in **Settings → Appearance**.
@@ -393,16 +404,16 @@ Large workspaces, such as an OpenAPI import of 500 requests with 3,400 examples,
 ### Fixed
 
 - **No scroll bars on a short AI prompt.** The **Prompt** field of an AI request fits a short request panel and scrolls
-  only when its text does not fit. See [AI](/docs/guides/request-types/#ai).
+  only when its text does not fit. See [AI](/docs/guides/request-types/ai/#ai).
 
 - **A clear message when an AI request's saved key is missing.** Kurlo says the key from the Auth tab is not on this
-  computer instead of showing an internal reference. See [AI](/docs/guides/request-types/#ai).
+  computer instead of showing an internal reference. See [AI](/docs/guides/request-types/ai/#ai).
 
 - **Open Settings → AI goes to the connections and models.** The model box and the request bar of an AI request open
-  Settings → AI on **Kurlo agent**. See [AI](/docs/guides/request-types/#ai).
+  Settings → AI on **Kurlo agent**. See [AI](/docs/guides/request-types/ai/#ai).
 
 - **Close tab closes the Mock tab.** `Cmd+W` closes the Mock server tab like the other tabs.
-  See [Mock server](/docs/guides/mock-server/#starting-it).
+  See [Mock server](/docs/guides/mock-server/start/#starting-it).
 
 - **URL-encoded bodies keep the order of their fields.** Fields are sent in the order of the form instead of sorted by
   name.

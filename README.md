@@ -77,10 +77,10 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - Bulk edit for params, headers and form fields — switch the table to a `key: value` text area and back
 - Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved examples
 - GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
-- Postman, Insomnia, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and all-data backup import paths
+- Import Postman v2 JSON or v3 Native Git folders, Insomnia v4, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and all-data backups
 - OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the collection
 - OpenAPI sync — keep a collection linked to its spec URL or file, review new, changed and removed endpoints with a three-way merge that keeps your edits, with no monthly limit; `kurlo openapi check` flags drift in CI
-- Postman, OpenAPI, OpenCollection, and all-data backup export paths
+- Export Postman v2.1 JSON, Postman v3 folders with native gRPC, Insomnia v4, OpenAPI/Swagger, OpenCollection YAML, and all-data backups
 
 **Authentication**
 - Bearer Token
@@ -142,7 +142,7 @@ npx -y @kurlo/cli mcp install --env Staging
 
 Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json` instead, so the whole team gets the server by cloning. Manual setup, the tools and the flags are covered in the [MCP server guide](https://kurlo.dev/docs/guides/mcp-server/).
 
-**Response examples** — save any response as a named example on its request: the status, headers and body it came back with, alongside the request that produced it. Secrets are redacted on capture, a clean body is stored byte for byte, and examples ride along through Postman, OpenCollection, HAR and OpenAPI imports and exports. A response can be diffed against an example instead of against the previous send.
+**Response examples** — save any response as a named example on its request: the status, headers and body it came back with, alongside the request that produced it. Secrets are redacted on capture, a clean body is stored byte for byte, and examples are read from Postman, OpenCollection, HAR and OpenAPI and included in Postman v2.1 and OpenCollection exports. A response can be diffed against an example instead of against the previous send.
 
 **Cookies** — a per-workspace cookie jar with a per-domain editor, disableable per request.
 - **Cookie sync**: pair Kurlo with the in-repo browser extension (`apps/desktop/extension`, Chromium + Firefox) and the session you already have in the browser is the session Kurlo sends with. A loopback-only bridge that stays off until you turn it on, an approval you give in Kurlo by matching a six-digit code, and a per-domain allowlist enforced on both sides. Cookies travel one way: browser into Kurlo.

@@ -533,6 +533,7 @@ test('sends the client certificate with a gRPC call', async ({ page }) => {
 });
 
 test('persists a PFX container and passphrase for gRPC without a separate key', async ({ page }) => {
+  if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
   await installKurloBridge(page, '', 'browser/e2e', false, {
     collections: [{ id: 'pfx-api', workspaceId: 'workspace-e2e', name: 'PFX API' }],
     requests: [{ id: 'pfx-call', collectionId: 'pfx-api', name: 'PFX call', requestType: 'grpc', method: 'POST', url: 'grpcs://grpc.kurlo.test:443', grpcMethod: 'shop.Inventory/GetItem' }],
@@ -553,6 +554,7 @@ test('persists a PFX container and passphrase for gRPC without a separate key', 
   await expect(certSetting).toContainText('/certs/client.pfx');
   await expect(certSetting.getByPlaceholder('Leave blank if the key is unencrypted')).toHaveValue('{{pfxPassword}}');
   await certSetting.scrollIntoViewIfNeeded();
+  if (docsScreenshotDir) await certSetting.screenshot({ path: join(docsScreenshotDir, 'client-certificate-pfx.png'), animations: 'disabled' });
   await page.screenshot({ path: join(tmpdir(), 'kurlo-pfx-client-cert.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Invoke', exact: true }).click();
   await expect.poll(() => page.evaluate(() => {

@@ -1,0 +1,14 @@
+---
+title: MCP server (kurlo mcp)
+description: Let Claude, Codex, Cursor and other AI assistants run your saved Kurlo requests and keep your collections up to date through the Model Context Protocol.
+---
+
+import DocsTopicIndex from "../../../../components/DocsTopicIndex.astro";
+
+`kurlo mcp` serves a Kurlo workspace to AI assistants as a [Model Context Protocol](https://modelcontextprotocol.io) server. Once it is connected, an assistant can see your collections and environments, run a saved request and read the response, run a collection's tests, or send a one-off call that uses your environment's variables. It does this with the same engine as the app and [`kurlo run`](/docs/guides/cli-runner/).
+
+It can also write to the workspace: add and change saved requests with their tests, write tests from a response, save responses as examples and set environment variables. An agent that adds an endpoint to your service can add the request for it in the same commit, and Kurlo, if it is open, shows the change within a second.
+
+The assistant starts `kurlo mcp` itself and talks to it over stdin and stdout. The server comes from the [`@kurlo/cli`](https://www.npmjs.com/package/@kurlo/cli) npm package, which `npx` downloads on first use. You can [connect an assistant](/docs/guides/mcp-server/connect/) with or without the desktop app installed.
+
+<DocsTopicIndex />

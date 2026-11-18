@@ -1,81 +1,16 @@
 ---
-title: Documentation
-description: Everything you need to send, test, mock and ship API requests with Kurlo.
+title: Learn Kurlo
+description: Learn to send requests, manage collections, and automate API testing with Kurlo.
+tableOfContents: false
+lastUpdated: false
 ---
 
-New here? Install Kurlo and send your first request — about ten minutes end to end.
+import DocsDirectory from '../../../components/DocsDirectory.astro';
 
-<div class="kurlo-tiles">
-  <a class="kurlo-tile" href="/docs/getting-started/installation/">
-    <span class="kurlo-tile-title">Install Kurlo</span>
-    <span class="kurlo-tile-text">macOS, Windows and Linux builds, first-run notes and verifying the download.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/getting-started/first-request/">
-    <span class="kurlo-tile-title">Send your first request</span>
-    <span class="kurlo-tile-text">A request, a collection, an environment and a test, in five minutes.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/getting-started/migrating/">
-    <span class="kurlo-tile-title">Move from Postman or Insomnia</span>
-    <span class="kurlo-tile-text">Bring your collections, environments and pm.* scripts with you.</span>
-  </a>
-</div>
-
-## Beyond the basics
-
-<div class="kurlo-tiles">
-  <a class="kurlo-tile" href="/docs/guides/browser-security/">
-    <span class="kurlo-tile-title">Browser security emulation</span>
-    <span class="kurlo-tile-text">See the CORS, credentials and CSP failures your frontend will hit — before it does.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/guides/mock-server/">
-    <span class="kurlo-tile-title">Mock server</span>
-    <span class="kurlo-tile-text">Serve a collection's saved examples on localhost while the real endpoint is still being built.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/guides/cookies/">
-    <span class="kurlo-tile-title">Cookies from your browser</span>
-    <span class="kurlo-tile-text">Send with the session you already have in Chrome, Edge, Brave or Firefox.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/guides/git-workspaces/">
-    <span class="kurlo-tile-title">Git-backed workspaces</span>
-    <span class="kurlo-tile-text">Reviewable YAML in your repository, with secrets kept on your machine.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/guides/cli-runner/">
-    <span class="kurlo-tile-title">kurlo run in CI</span>
-    <span class="kurlo-tile-text">The same requests and test scripts from the terminal, with JUnit and JSON reports.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/guides/request-types/">
-    <span class="kurlo-tile-title">Every protocol</span>
-    <span class="kurlo-tile-text">HTTP, SSE, GraphQL, gRPC, WebSocket, Socket.IO and MCP in one client.</span>
-  </a>
-</div>
-
-## Reference
-
-<div class="kurlo-tiles">
-  <a class="kurlo-tile" href="/docs/reference/scripting-api/">
-    <span class="kurlo-tile-title">Scripting API</span>
-    <span class="kurlo-tile-text">The full pm.* surface for pre-request and test scripts.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/reference/kurlo-yaml-format/">
-    <span class="kurlo-tile-title">Kurlo YAML format</span>
-    <span class="kurlo-tile-text">The public contract for Git-backed workspace files.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/reference/keyboard-shortcuts/">
-    <span class="kurlo-tile-title">Keyboard shortcuts</span>
-    <span class="kurlo-tile-text">Every default binding, and how to rebind them.</span>
-  </a>
-  <a class="kurlo-tile" href="/docs/troubleshooting/">
-    <span class="kurlo-tile-title">Troubleshooting</span>
-    <span class="kurlo-tile-text">Gatekeeper, SmartScreen, proxies, corporate CAs and the other usual suspects.</span>
-  </a>
-</div>
+<DocsDirectory />
 
 ## Conventions
 
 - `Cmd/Ctrl` means Command on macOS and Ctrl on Windows and Linux.
 - Commands prefixed `$` run in your terminal. Commands without a prefix run inside Kurlo, usually from the command palette (`Cmd/Ctrl K`).
 - Screenshots use the light theme unless a guide says otherwise; the dark theme behaves identically.
-
-## Need something the docs don't cover?
-
-Open an issue or start a discussion on [GitHub](https://github.com/stormhop/kurlo/issues). Reports with steps to reproduce and the version from **Settings → About** get triaged fastest.

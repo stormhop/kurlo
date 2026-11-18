@@ -45,6 +45,37 @@ func (a *App) WriteCollectionTextFiles(root string, files []CollectionTextFile) 
 	return ""
 }
 
+func (a *App) WriteNewCollectionTextFiles(parent, name string, files []CollectionTextFile) string {
+	if err := writeNewCollectionTextFiles(parent, name, files); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+func writeNewCollectionTextFiles(parent, name string, files []CollectionTextFile) error {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, `/\:`) {
+		return fmt.Errorf("invalid collection export folder name")
+	}
+	parent, err := normalizeExistingDir(parent)
+	if err != nil {
+		return err
+	}
+	root := filepath.Join(parent, name)
+	if err := os.Mkdir(root, 0700); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return fmt.Errorf("a file or folder named %q already exists in the selected directory", name)
+		}
+		return err
+	}
+	if err := writeCollectionTextFilesForRoot(root, files); err != nil {
+		if cleanupErr := os.RemoveAll(root); cleanupErr != nil {
+			return errors.Join(err, cleanupErr)
+		}
+		return err
+	}
+	return nil
+}
+
 func readCollectionTextFilesForRoot(root string) ([]CollectionTextFile, error) {
 	info, err := os.Lstat(root)
 	if err != nil {

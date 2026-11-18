@@ -1,0 +1,266 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+import { SITE_URL } from '../../site.config.mjs';
+import ChatGPTLogo from '../assets/icons/chatgpt.svg';
+import ClaudeLogo from '../assets/icons/claude.svg';
+import { cleanBody } from '../lib/llms';
+
+const { entry } = Astro.locals.starlightRoute;
+const { title, description } = entry.data;
+const source = new URL(Astro.url.pathname, SITE_URL).href;
+const markdown = [`# ${title}`, `Source: ${source}`, description, cleanBody(entry.body ?? '')].filter(Boolean).join('\n\n');
+const prompt = new URLSearchParams({ q: `Use this Kurlo documentation page as context for my questions: ${source}` });
+const copyIcon = 'M8 8h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-9a2 2 0 0 1-2-2V8ZM15 4H5a1 1 0 0 0-1 1v10';
+const chats = [
+  { label: 'ChatGPT', logo: ChatGPTLogo, href: `https://chatgpt.com/?${prompt}` },
+  { label: 'Claude', logo: ClaudeLogo, href: `https://claude.ai/new?${prompt}` },
+] as const;
+---
+
+<docs-page-actions class="print:hidden" data-pagefind-ignore>
+  <template>{markdown}</template>
+  <button class="copy-page" type="button" data-copy-page>
+    <svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d={copyIcon} /></svg>
+    Copy page
+  </button>
+  <button class="page-actions-toggle" type="button" popovertarget="docs-page-actions" aria-label="Page actions">
+    <svg class="copy-icon page-actions-mobile-icon" viewBox="0 0 24 24" aria-hidden="true"><path d={copyIcon} /></svg>
+    <Icon name="down-caret" class="page-actions-caret" size="1rem" />
+  </button>
+  <div id="docs-page-actions" class="page-actions-panel" popover aria-label="Page actions" role="group">
+    <button class="page-action" type="button" data-copy-page>
+      <span class="page-action-icon"><svg class="copy-icon" viewBox="0 0 24 24" aria-hidden="true"><path d={copyIcon} /></svg></span>
+      <span><strong>Copy page</strong><small>Copy this page as Markdown</small></span>
+    </button>
+    {chats.map(({ label, href, logo: Logo }) => (
+      <a class="page-action" href={href} target="_blank" rel="noopener noreferrer">
+        <span class="page-action-icon"><Logo class="page-action-brand" aria-hidden="true" /></span>
+        <span>
+          <strong>Open in {label} <Icon name="external" size="0.9rem" /></strong>
+          <small>Ask questions about this page</small>
+        </span>
+      </a>
+    ))}
+  </div>
+  <output class="page-actions-status"></output>
+</docs-page-actions>
+
+<style>
+  docs-page-actions {
+    --docs-control-size: 2.25rem;
+    --docs-control-radius: 0.55rem;
+    --docs-hover: color-mix(in srgb, var(--sl-color-white) 6%, transparent);
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    height: var(--docs-control-size);
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--docs-control-radius);
+    background: var(--kurlo-surface);
+    color: var(--sl-color-white);
+    white-space: nowrap;
+  }
+  button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .copy-page,
+  .page-actions-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+  .copy-page {
+    padding-inline: 0.65rem;
+    border-start-start-radius: inherit;
+    border-end-start-radius: inherit;
+    font-size: 0.8125rem;
+    font-weight: 550;
+  }
+  .page-actions-toggle {
+    width: 1.875rem;
+    padding: 0;
+    border-inline-start: 1px solid var(--sl-color-hairline);
+    border-start-end-radius: inherit;
+    border-end-end-radius: inherit;
+  }
+  .copy-page:hover,
+  .page-actions-toggle:hover,
+  docs-page-actions:has(:popover-open) .page-actions-toggle,
+  .page-action:hover {
+    background: var(--docs-hover);
+  }
+  docs-page-actions:has(:popover-open) .page-actions-caret {
+    transform: rotate(180deg);
+  }
+  .copy-icon {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+  }
+  .page-actions-mobile-icon {
+    display: none;
+  }
+  .page-actions-panel,
+  .page-actions-status {
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    background: var(--sl-color-black);
+    color: var(--sl-color-white);
+    box-shadow: var(--sl-shadow-lg);
+  }
+  .page-actions-panel {
+    --page-actions-width: 17rem;
+    --page-actions-margin: 0.75rem;
+    position: fixed;
+    inset: var(--page-actions-top, 1rem) clamp(var(--page-actions-margin), var(--page-actions-right, 0rem), calc(100% - var(--page-actions-width) - var(--page-actions-margin))) auto auto;
+    width: min(var(--page-actions-width), calc(100% - 2 * var(--page-actions-margin)));
+    max-height: var(--page-actions-height, calc(100dvh - 2rem));
+    margin: 0;
+    padding: 0.3rem;
+    overflow: auto;
+    white-space: normal;
+  }
+  .page-actions-panel[data-above] {
+    transform: translateY(-100%);
+  }
+  .page-action {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    width: 100%;
+    padding: 0.55rem;
+    border-radius: 0.5rem;
+    color: inherit;
+    text-align: start;
+    text-decoration: none;
+  }
+  .page-action-icon {
+    display: grid;
+    flex: 0 0 2rem;
+    height: 2rem;
+    place-items: center;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.5rem;
+    color: var(--sl-color-gray-2);
+  }
+  .page-action-brand {
+    width: 1.125rem;
+    height: 1.125rem;
+    color: var(--sl-color-white);
+  }
+  .page-action strong {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+  .page-action small {
+    display: block;
+    color: var(--sl-color-gray-2);
+    font-size: 0.8125rem;
+  }
+  .page-actions-status {
+    position: absolute;
+    z-index: 1;
+    inset: calc(100% + 0.4rem) 0 auto auto;
+    padding: 0.4rem 0.65rem;
+    font-size: 0.8125rem;
+  }
+  .page-actions-status:empty {
+    clip-path: inset(50%);
+  }
+  @media (max-width: 50rem) {
+    .copy-page,
+    .page-actions-caret {
+      display: none;
+    }
+    .page-actions-mobile-icon {
+      display: block;
+    }
+    .page-actions-toggle {
+      width: calc(var(--docs-control-size) - 2px);
+      border: 0;
+      border-radius: inherit;
+    }
+  }
+</style>
+
+<script>
+  class DocsPageActions extends HTMLElement {
+    connectedCallback() {
+      const menu = this.querySelector<HTMLElement>('.page-actions-panel')!;
+      const template = this.querySelector<HTMLTemplateElement>('template')!;
+      const toggle = this.querySelector<HTMLButtonElement>('.page-actions-toggle')!;
+      const status = this.querySelector<HTMLOutputElement>('output')!;
+      let clearStatus: number;
+
+      const positionMenu = () => {
+        const { top, bottom, right } = this.getBoundingClientRect();
+        const margin = 12;
+        const gap = 6;
+        const below = document.documentElement.clientHeight - bottom - gap - margin;
+        const above = top - gap - margin;
+        const openAbove = below < menu.scrollHeight && above > below;
+        const height = Math.max(0, openAbove ? above : below);
+        menu.toggleAttribute('data-above', openAbove);
+        menu.style.setProperty('--page-actions-right', `${document.documentElement.clientWidth - right}px`);
+        menu.style.setProperty('--page-actions-height', `${height}px`);
+        menu.style.setProperty('--page-actions-top', `${openAbove ? top - gap : bottom + gap}px`);
+      };
+      const closeMenu = () => menu.hidePopover();
+      menu.addEventListener('beforetoggle', event => {
+        if (event.newState === 'open') positionMenu();
+      });
+      menu.addEventListener('toggle', () => {
+        if (menu.matches(':popover-open')) {
+          positionMenu();
+          window.addEventListener('resize', positionMenu);
+          window.addEventListener('scroll', closeMenu, { passive: true });
+        } else {
+          window.removeEventListener('resize', positionMenu);
+          window.removeEventListener('scroll', closeMenu);
+        }
+      });
+
+      this.addEventListener('click', async event => {
+        if (!(event.target instanceof Element)) return;
+        if (event.target.closest('a')) menu.hidePopover();
+        if (!event.target.closest('[data-copy-page]')) return;
+
+        if (menu.matches(':popover-open')) {
+          menu.hidePopover();
+          toggle.focus();
+        }
+
+        try {
+          const articleLinks = document.querySelectorAll<HTMLAnchorElement>('.docs-directory a, .docs-link-list a');
+          const links = Array.from(articleLinks, link => {
+            const label = (link.querySelector('strong') ?? link).textContent?.trim();
+            return `- [${label}](${link.href})`;
+          });
+          const markdown = template.content.textContent?.trim() ?? '';
+          const related = links.length ? `\n\n## Related pages\n\n${links.join('\n')}` : '';
+          await navigator.clipboard.writeText(`${markdown}${related}\n`);
+          status.value = 'Copied as Markdown';
+        } catch {
+          status.value = 'Could not copy page';
+        }
+
+        window.clearTimeout(clearStatus);
+        clearStatus = window.setTimeout(() => { status.value = ''; }, 2400);
+      });
+    }
+  }
+
+  customElements.define('docs-page-actions', DocsPageActions);
+</script>

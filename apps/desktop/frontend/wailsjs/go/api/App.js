@@ -842,6 +842,10 @@ export function WriteCollectionTextFiles(arg1, arg2) {
   return window['go']['api']['App']['WriteCollectionTextFiles'](arg1, arg2);
 }
 
+export function WriteNewCollectionTextFiles(arg1, arg2, arg3) {
+  return window['go']['api']['App']['WriteNewCollectionTextFiles'](arg1, arg2, arg3);
+}
+
 export function WriteOpenAPIBaseSpec(arg1, arg2) {
   return window['go']['api']['App']['WriteOpenAPIBaseSpec'](arg1, arg2);
 }

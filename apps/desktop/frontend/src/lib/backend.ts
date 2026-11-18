@@ -413,6 +413,10 @@ export async function writeCollectionTextFiles(root: string, files: CollectionTe
   return (await window.go?.api?.App?.WriteCollectionTextFiles?.(root, files)) ?? 'Wails bridge not available';
 }
 
+export async function writeNewCollectionTextFiles(parent: string, name: string, files: CollectionTextFile[]): Promise<string> {
+  return (await window.go?.api?.App?.WriteNewCollectionTextFiles?.(parent, name, files)) ?? 'Wails bridge not available';
+}
+
 export async function defaultWorkspaceLocation(): Promise<DefaultWorkspaceLocationResult> {
   return (await window.go?.api?.App?.DefaultWorkspaceLocation?.()) ?? { path: '', error: 'Wails bridge not available' };
 }

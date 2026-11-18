@@ -105,13 +105,12 @@ describe('openApiNameFromUrl', () => {
 
 function urlImportHost() {
   const host = {
-    collections: [{ id: 'existing' }] as Array<{ id: string }>,
+    activeWorkspaceId: 'workspace',
+    workspaces: [{ id: 'workspace' }],
+    requestStorePersistEpoch: 0,
     guardWorkspaceWritable: () => true,
-    importOpenApiPayload: vi.fn(async () => {
-      host.collections = [...host.collections, { id: 'imported' }];
-      return 1;
-    }),
-    linkImportedOpenApiCollection: vi.fn(async () => {}),
+    importOpenApiPayload: vi.fn(async () => ({ collectionId: 'imported', requestCount: 1 })),
+    linkImportedOpenApiCollection: vi.fn(async () => true),
   };
   return host;
 }
@@ -135,7 +134,7 @@ describe('importOpenApiFromUrl TLS verification', () => {
     expect(lastSentRequest().enableSSLVerification).toBe(false);
     expect(count).toBe(1);
     expect(host.importOpenApiPayload).toHaveBeenCalledOnce();
-    expect(host.importOpenApiPayload).toHaveBeenCalledWith(JSON.parse(minimalSpec), 'self-signed.example.test', 'https://self-signed.example.test/openapi.json');
+    expect(host.importOpenApiPayload).toHaveBeenCalledWith(JSON.parse(minimalSpec), 'self-signed.example.test', 'https://self-signed.example.test/openapi.json', { workspaceId: 'workspace', persistEpoch: 0 });
   });
 
   it('links the new collection to the URL when asked to keep it in sync', async () => {
@@ -167,6 +166,28 @@ describe('importOpenApiFromUrl TLS verification', () => {
   it('recognises certificate errors only', () => {
     expect(looksLikeTlsCertificateError('x509: certificate signed by unknown authority')).toBe(true);
     expect(looksLikeTlsCertificateError('dial tcp: connection refused')).toBe(false);
+  });
+});
+
+describe('OpenAPI import persistence', () => {
+  it('rejects a response from the previous storage even if the workspace ID matches', async () => {
+    const host = urlImportHost();
+    const response = Promise.withResolvers<Awaited<ReturnType<typeof sendHttpRequest>>>();
+    vi.mocked(sendHttpRequest).mockReturnValueOnce(response.promise);
+    const importing = importExportFeature.importOpenApiFromUrl.call(host as never, 'https://api.example.test/openapi.json', { keepInSync: true });
+    host.requestStorePersistEpoch += 1;
+    response.resolve({ statusCode: 200, body: minimalSpec } as never);
+    await expect(importing).rejects.toThrow('The workspace changed during import.');
+    expect(host.importOpenApiPayload).not.toHaveBeenCalled();
+    expect(host.linkImportedOpenApiCollection).not.toHaveBeenCalled();
+  });
+
+  it('reports failure when the collection saved but its OpenAPI sync setup did not', async () => {
+    const host = urlImportHost();
+    host.linkImportedOpenApiCollection.mockResolvedValueOnce(false);
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, body: minimalSpec } as never);
+    await expect(importExportFeature.importOpenApiFromUrl.call(host as never, 'https://api.example.test/openapi.json', { keepInSync: true }))
+      .rejects.toThrow('Kurlo could not save its OpenAPI sync settings or spec snapshot.');
   });
 });
 

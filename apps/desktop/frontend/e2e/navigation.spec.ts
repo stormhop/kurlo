@@ -144,7 +144,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(palette).toBeHidden();
   });
 
-  test('reveals tab close buttons on hover and keyboard focus without shifting tabs', async ({ page }, testInfo) => {
+  test('reveals tab close buttons on hover and keyboard focus without shifting tabs', async ({ page, browserName }, testInfo) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     const requests = ['List customer accounts and permissions', 'Create customer account'].map((name, index) => ({
       id: `tab-${index}`, collectionId: 'col-tabs', name, requestType: 'http', method: 'GET', url: 'https://api.example.test/accounts',
@@ -195,7 +195,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.getByRole('tab', { name: 'Overview', exact: true }).focus();
     await page.keyboard.press('ArrowRight');
     await expect(close).toHaveCSS('opacity', '1');
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
     await expect(close).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(tabs).toHaveCount(1);
@@ -216,7 +216,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(page.getByRole('tab', { name: /Create customer account/ })).toHaveCount(0);
   });
 
-  test('keeps unsaved tab indicators visible and supports closing without hover', async ({ page }, testInfo) => {
+  test('keeps unsaved tab indicators visible and supports closing without hover', async ({ page, browserName }, testInfo) => {
     const savedStore = {
       collections: [{ id: 'col-tabs', workspaceId: 'workspace-e2e', name: 'Accounts' }],
       requests: [{ id: 'saved-tab', collectionId: 'col-tabs', name: 'List accounts', requestType: 'http', method: 'GET', url: 'https://api.example.test/accounts' }],
@@ -248,7 +248,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.keyboard.press('End');
     await expect(close.locator('svg')).toHaveCSS('opacity', '1');
     expect(await close.evaluate(node => getComputedStyle(node, '::after').opacity)).toBe('0');
-    await page.keyboard.press('Tab');
+    await page.keyboard.press(browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
     await expect(close).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('dialog', { name: 'Save request' })).toHaveCount(0);

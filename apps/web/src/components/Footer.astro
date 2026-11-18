@@ -1,7 +1,11 @@
 ---
 import '@fontsource/anton';
 import Default from '@astrojs/starlight/components/Footer.astro';
+import { DOCS_HOME, isDocumentationPath } from '../../docs.sidebar.mjs';
+import DocsPageFeedback from './DocsPageFeedback.astro';
 
+const path = `/${Astro.locals.starlightRoute.id}/`;
+const docsHome = path === DOCS_HOME;
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 const columns = [
   { title: 'Kurlo', links: [['Home', base], ['Download', `${base}download/`], ['Agent mode', `${base}agent/`], ['MCP', `${base}mcp/`], ['Changelog', `${base}changelog/`], ['Privacy', `${base}privacy/`]] },
@@ -10,9 +14,10 @@ const columns = [
 ];
 ---
 
-<Default><slot /></Default>
+{isDocumentationPath(path) && <DocsPageFeedback path={path} />}
+{!docsHome && <Default><slot /></Default>}
 
-<div class="kurlo-site-footer not-content">
+<div class:list={['kurlo-site-footer', 'not-content', { 'docs-home-footer': docsHome }]}>
   <p class="kurlo-site-footer-line">The bird always comes back.</p>
   <div class="kurlo-site-footer-cols">
     {columns.map(column => (
@@ -36,6 +41,9 @@ const columns = [
     background: #07081a;
     color: #a9abc6;
     font-size: var(--sl-text-sm);
+  }
+  .kurlo-site-footer.docs-home-footer {
+    margin-top: 1.5rem;
   }
   .kurlo-site-footer-line {
     margin: 0;

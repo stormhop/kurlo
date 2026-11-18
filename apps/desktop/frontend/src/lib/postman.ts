@@ -652,7 +652,7 @@ function postmanGrantTypeFromKurlo(grant: OAuth2GrantType | undefined, pkce: boo
   }
 }
 
-function postmanAuthFromKurlo(auth: SavedRequest['auth'], includeSecrets = false) {
+export function postmanAuthFromKurlo(auth: SavedRequest['auth'], includeSecrets = false) {
   if (auth.type === 'bearer') return { type: 'bearer', bearer: [postmanAuthPair('token', auth.bearerToken, 'string', includeSecrets)] };
   if (auth.type === 'basic' || auth.type === 'digest') {
     return { type: auth.type, [auth.type]: [postmanAuthPair('username', auth.basicUser, 'string', includeSecrets), postmanAuthPair('password', auth.basicPass, 'string', includeSecrets)] };
@@ -715,7 +715,7 @@ function postmanAuthFromKurlo(auth: SavedRequest['auth'], includeSecrets = false
   return undefined;
 }
 
-function postmanBodyFromKurlo(req: SavedRequest, stripFn: (s: string, t: string) => string, includeSecrets = false) {
+export function postmanBodyFromKurlo(req: SavedRequest, stripFn: (s: string, t: string) => string, includeSecrets = false) {
   if (['json', 'text', 'xml', 'html'].includes(req.bodyType)) {
     const raw = stripFn(req.bodyContent, req.bodyType);
     if (req.bodyType === 'json') {
@@ -754,7 +754,7 @@ function postmanBodyFromKurlo(req: SavedRequest, stripFn: (s: string, t: string)
   return undefined;
 }
 
-function exportBodyLikeValue(source: string, bodyType: string, stripFn: (s: string, t: string) => string, includeSecrets = false) {
+export function exportBodyLikeValue(source: string, bodyType: string, stripFn: (s: string, t: string) => string, includeSecrets = false) {
   const stripped = stripFn(source, bodyType);
   if (includeSecrets) return stripped;
   if (bodyType === 'json') {
@@ -827,11 +827,19 @@ function postmanPreviewLanguage(mediaType: string): string {
   return 'text';
 }
 
+export function postmanRequestScriptSources(req: SavedRequest, includeSecrets: boolean) {
+  return {
+    before: joinScripts(requestVarsToPostmanScript(req.vars, includeSecrets), req.preRequestScript),
+    after: joinScripts(req.testScript, assertionsToPostmanScript(req.assertions)),
+  };
+}
+
 function postmanItemFromRequest(req: SavedRequest, stripFn: (s: string, t: string) => string, includeSecrets = false) {
   const auth = postmanAuthFromKurlo(req.auth, includeSecrets);
   const body = postmanBodyFromKurlo(req, stripFn, includeSecrets);
   const name = req.name || req.url;
-  const event = postmanEventsFromScripts(joinScripts(requestVarsToPostmanScript(req.vars, includeSecrets), req.preRequestScript), joinScripts(req.testScript, assertionsToPostmanScript(req.assertions)));
+  const scripts = postmanRequestScriptSources(req, includeSecrets);
+  const event = postmanEventsFromScripts(scripts.before, scripts.after);
   const response = postmanResponsesFromExamples(req, includeSecrets);
   return {
     name,

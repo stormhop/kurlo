@@ -1,0 +1,51 @@
+---
+import { getCollection } from 'astro:content';
+import { docsTopicPages } from '../../docs.sidebar.mjs';
+import legacyFragments from '../../docs.legacy-fragments.json';
+import DocsLinkList from './DocsLinkList.astro';
+
+const path = `/${Astro.locals.starlightRoute.id}/`;
+const pages = docsTopicPages(path);
+const fragmentsByPage = new Map<string, [string, string][]>();
+const redirects: Record<string, Record<string, string>> = legacyFragments;
+for (const [id, destination] of Object.entries(redirects[path] ?? {})) {
+  const page = destination.split('#', 1)[0];
+  const fragments = fragmentsByPage.get(page) ?? [];
+  fragments.push([id, destination]);
+  fragmentsByPage.set(page, fragments);
+}
+
+const entries = await getCollection('docs');
+const descriptions = new Map(entries.map(entry => [`/${entry.id}/`, entry.data.description]));
+---
+
+<div class="docs-topic-index not-content">
+  <DocsLinkList items={pages.map(page => ({
+    ...page,
+    description: descriptions.get(page.link),
+    fragments: fragmentsByPage.get(page.link),
+  }))} />
+</div>
+
+<script>
+  function followMovedHeading() {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+
+    let id: string;
+    try {
+      id = decodeURIComponent(hash);
+    } catch {
+      return;
+    }
+
+    const target = document.getElementById(id)?.dataset.destination;
+    if (!target) return;
+    const destination = new URL(target, window.location.origin);
+    destination.search = window.location.search;
+    window.location.replace(destination);
+  }
+
+  followMovedHeading();
+  window.addEventListener('hashchange', followMovedHeading);
+</script>

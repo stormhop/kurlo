@@ -7,7 +7,7 @@ import type { AuthState, AuthType, BodyType, CollectionDefaults, Environment, Fo
 import { asArray, asText, authStateHasData, emptyAuthState, inheritAuthState, isRecord, newEntityId, newRequestId, safeFileName } from './utils';
 import { filesystemNameFromName } from './normalizers';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
-import { parseYaml } from './yaml';
+import { parseYaml, yamlMap } from './yaml';
 import { pathParamsFromUrl } from './pathParams';
 
 export type CollectionTextFile = {
@@ -1160,50 +1160,6 @@ export function openCollectionBundleFromFiles(files: CollectionTextFile[], colle
   if (!requests.length && !folderPaths.length) throw new Error('No Bruno/OpenCollection requests found');
   const folderDefaults = folderDefaultsFromOpenCollection(sorted, folderNames);
   return { name, description, defaults, folderPaths, folderDefaults, requests, environments };
-}
-
-function yamlScalar(value: unknown, indent: number): string {
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  const text = asText(value);
-  if (text.includes('\n')) {
-    const pad = ' '.repeat(indent + 2);
-    return `|-\n${text.split('\n').map(line => `${pad}${line}`).join('\n')}`;
-  }
-  if (!text) return '""';
-  if (/^[A-Za-z_./$][A-Za-z0-9_./:@{}$ -]*$/.test(text) && !/^(true|false|null|~)$/i.test(text) && !/ $/.test(text) && !text.includes(': ')) return text;
-  return JSON.stringify(text);
-}
-
-function yamlValue(value: unknown, indent = 0): string {
-  const pad = ' '.repeat(indent);
-  if (Array.isArray(value)) {
-    if (!value.length) return '[]';
-    return value.map(item => {
-      if (isRecord(item)) {
-        const rendered = yamlMap(item, indent + 2);
-        return `${pad}- ${rendered.trimStart()}`;
-      }
-      return `${pad}- ${yamlScalar(item, indent)}`;
-    }).join('\n');
-  }
-  if (isRecord(value)) return `\n${yamlMap(value, indent + 2)}`;
-  return yamlScalar(value, indent);
-}
-
-function yamlMap(value: Record<string, unknown>, indent = 0): string {
-  const pad = ' '.repeat(indent);
-  const lines: string[] = [];
-  for (const [key, raw] of Object.entries(value)) {
-    if (raw === undefined || raw === null) continue;
-    if (Array.isArray(raw)) {
-      lines.push(raw.length ? `${pad}${key}:\n${yamlValue(raw, indent + 2)}` : `${pad}${key}: []`);
-    } else if (isRecord(raw)) {
-      lines.push(`${pad}${key}:\n${yamlMap(raw, indent + 2)}`);
-    } else {
-      lines.push(`${pad}${key}: ${yamlScalar(raw, indent)}`);
-    }
-  }
-  return `${lines.join('\n')}\n`;
 }
 
 function requestToOpenCollection(req: SavedRequest, seq: number, stripFn: (source: string, bodyType: string) => string, includeSecrets = false) {

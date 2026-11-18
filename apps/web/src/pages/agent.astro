@@ -73,9 +73,9 @@ const home = [
 const clients = ['Claude Code', 'Codex', 'Cursor', 'VS Code', 'Windsurf', 'Gemini CLI', 'Claude Desktop'];
 
 const faq = [
-  { q: 'Which agents work in Agent mode?', a: 'The Kurlo agent with any model you connect, and the Claude Code and Codex CLIs installed on this computer. All three share one chat list, and each chat keeps the agent it started with.', link: 'docs/guides/agent/#local-agents' },
+  { q: 'Which agents work in Agent mode?', a: 'The Kurlo agent with any model you connect, and the Claude Code and Codex CLIs installed on this computer. All three share one chat list, and each chat keeps the agent it started with.', link: 'docs/guides/agent/local-agents/' },
   { q: 'What does it cost?', a: 'Nothing from us. The Kurlo agent runs free on a local model or on your own key, and Claude Code and Codex use the plan you already pay for.' },
-  { q: 'Do I need Claude Code or Codex?', a: 'No. The Kurlo agent works with OpenRouter, an Anthropic, OpenAI or compatible key, or a local Ollama or LM Studio model.', link: 'docs/guides/settings/#ai' },
+  { q: 'Do I need Claude Code or Codex?', a: 'No. The Kurlo agent works with OpenRouter, an Anthropic, OpenAI or compatible key, or a local Ollama or LM Studio model.', link: 'docs/guides/settings/ai/#ai' },
   { q: 'Can it break my collection?', a: 'Not without your Apply. Every change is shown line by line first, nothing is written while the card waits, and the files are YAML in Git, so any change can be reverted.' },
   { q: 'Does the model see my tokens?', a: 'No. Secrets reach your API, but the model gets [secret], and protected environments are off limits to every agent.' },
   { q: 'How is this different from kurlo mcp?', a: 'Same tools, other side. Agent mode runs the agent inside Kurlo with approval cards. kurlo mcp hands the tools to the assistant in your terminal or editor, which can also read and fix your code.', link: 'mcp/' },
@@ -136,7 +136,7 @@ const ldJson = structuredData({
         </article>
       ))}
     </div>
-    <p class="k-fine"><a href={href('docs/guides/agent/#local-agents')}>How to connect each one</a></p>
+    <p class="k-fine"><a href={href('docs/guides/agent/local-agents/')}>How to connect each one</a></p>
   </section>
 
   <section class="k-wrap" id="ask" aria-labelledby="ask-title">

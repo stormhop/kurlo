@@ -1,9 +1,9 @@
 import { getCollection } from 'astro:content';
-import { DOCS_SIDEBAR } from '../../docs.sidebar.mjs';
+import { DOCS_HOME, DOCS_SECTIONS, docsSectionPages } from '../../docs.sidebar.mjs';
 import { SITE_NAME } from '../../site.constants.mjs';
 import { absolute } from '../../site.config.mjs';
 
-type SidebarItem = { label: string; link?: string; items?: SidebarItem[] };
+type SidebarItem = { label: string; link: string };
 
 export type LlmsPage = { group: string; label: string; url: string; description: string; body: string };
 
@@ -11,7 +11,7 @@ export const LLMS_SUMMARY =
   'Kurlo is a free, open-source (MIT) desktop API client for HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE and MCP. No account, no seats, no cloud, no telemetry: collections are plain YAML files on your disk, and Git is how a team shares them.';
 
 export const LLMS_DETAILS = [
-  'It runs Postman `pm.*` scripts as written, imports Postman, Insomnia, Bruno, OpenAPI and HAR, and has a local mock server, a collection runner, and browser CORS and CSP checks.',
+  'It supports common Postman `pm.*` APIs, imports Postman v2 JSON and v3 Native Git folders, and reads Insomnia v4, Bruno, OpenAPI and HAR. It also has a local mock server, a collection runner, and browser CORS and CSP checks.',
   'For AI agents, `kurlo mcp` is an MCP server that lists, runs and edits the saved requests of a workspace and reads what the user sent from the app. `npx -y @kurlo/cli mcp install` adds it to Claude Code, Cursor, Codex, VS Code and other clients. `kurlo run` runs collections in CI.',
 ];
 
@@ -40,7 +40,7 @@ function stripTags(line: string): string {
     .replace(/&(lt|gt|quot|#39|nbsp|amp);/g, entity => ENTITIES[entity]);
 }
 
-function cleanBody(body: string): string {
+export function cleanBody(body: string): string {
   let fenced = false;
   const lines: string[] = [];
   for (const line of body.split('\n')) {
@@ -70,7 +70,7 @@ export async function llmsPages(): Promise<LlmsPage[]> {
   const byLink = new Map(entries.map(entry => [pageLink(entry.id), entry]));
   const pages: LlmsPage[] = [];
   const add = (group: string, item: SidebarItem) => {
-    if (!item.link?.startsWith('/')) return;
+    if (!item.link.startsWith('/')) return;
     const entry = byLink.get(item.link);
     if (!entry) return;
     pages.push({
@@ -81,12 +81,9 @@ export async function llmsPages(): Promise<LlmsPage[]> {
       body: cleanBody(entry.body ?? ''),
     });
   };
-  for (const item of DOCS_SIDEBAR as SidebarItem[]) {
-    if (item.items) {
-      for (const child of item.items) add(item.label, child);
-    } else {
-      add('Docs', item);
-    }
+  add('Docs', { label: 'Overview', link: DOCS_HOME });
+  for (const section of DOCS_SECTIONS) {
+    for (const item of docsSectionPages(section)) add(section.label, item);
   }
   return pages;
 }

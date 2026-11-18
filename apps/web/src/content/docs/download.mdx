@@ -1,6 +1,8 @@
 ---
 title: Download Kurlo
-description: Free and open source for macOS, Windows and Linux. Signed updates install themselves.
+description: Download the latest Kurlo release for macOS, Windows, or Linux.
+tableOfContents: false
+lastUpdated: false
 head:
   - tag: title
     content: Download Kurlo for macOS, Windows and Linux
@@ -12,17 +14,14 @@ import DownloadPlatforms from '../../components/DownloadPlatforms.astro';
 
 ## Verify your download
 
-Every release publishes SHA-256 checksums in `SHA256SUMS.txt`. Auto-updates check both the checksum and the minisign signature embedded in `latest.json` before they install.
+Every release includes a `SHA256SUMS.txt` file. Use the command for your platform and compare the result with the checksum for the same filename.
 
-```sh
-shasum -a 256 kurlo-*.dmg
-# Compare against the value in SHA256SUMS.txt on the release page.
-```
+See [Verify downloads](/docs/getting-started/installation/verify/) for the commands and how Kurlo verifies signed auto-updates.
 
 ## Older releases
 
-Every published version stays on the releases page. If you need an older build, browse the [full release list](https://github.com/stormhop/kurlo/releases) and pick a tag.
+Find previous versions and their installers in the [GitHub release archive](https://github.com/stormhop/kurlo/releases).
 
 ## Build from source
 
-Kurlo is open source under the MIT license. Clone [stormhop/kurlo](https://github.com/stormhop/kurlo) and follow the [build instructions](https://github.com/stormhop/kurlo#building-from-source) — you need Go, Node.js and Wails v2.
+Kurlo is open source under the MIT license. Follow the [build instructions](https://github.com/stormhop/kurlo#building-from-source) to compile it with Go, Node.js, and Wails v2.

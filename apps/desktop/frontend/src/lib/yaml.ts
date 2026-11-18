@@ -1,3 +1,5 @@
+import { asText, isRecord } from './utils';
+
 type YamlLine = {
   indent: number;
   text: string;
@@ -432,4 +434,49 @@ export function parseYaml(source: string): unknown {
   } finally {
     anchors = new Map();
   }
+}
+
+function yamlScalar(value: unknown, indent: number, preserveMultiline: boolean): string {
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  const text = asText(value);
+  if (text.includes('\n')) {
+    const lines = text.split('\n');
+    if (preserveMultiline && (/^\s|\n$/.test(text) || lines.some(line => /\p{Cc}/u.test(line)))) return JSON.stringify(text);
+    const pad = ' '.repeat(indent + 2);
+    return `|-\n${lines.map(line => `${pad}${line}`).join('\n')}`;
+  }
+  if (!text) return '""';
+  if (/^[A-Za-z_./$][A-Za-z0-9_./:@{}$ -]*$/.test(text) && !/^(true|false|null|~)$/i.test(text) && !/ $/.test(text) && !text.includes(': ')) return text;
+  return JSON.stringify(text);
+}
+
+function yamlValue(value: unknown[], indent: number, preserveMultiline: boolean): string {
+  const pad = ' '.repeat(indent);
+  return value.map(item => {
+    if (isRecord(item)) {
+      const rendered = renderYamlMap(item, indent + 2, preserveMultiline);
+      return `${pad}- ${rendered.trimStart()}`;
+    }
+    return `${pad}- ${yamlScalar(item, indent, preserveMultiline)}`;
+  }).join('\n');
+}
+
+function renderYamlMap(value: Record<string, unknown>, indent: number, preserveMultiline: boolean): string {
+  const pad = ' '.repeat(indent);
+  const lines: string[] = [];
+  for (const [key, raw] of Object.entries(value)) {
+    if (raw === undefined || raw === null) continue;
+    if (Array.isArray(raw)) {
+      lines.push(raw.length ? `${pad}${key}:\n${yamlValue(raw, indent + 2, preserveMultiline)}` : `${pad}${key}: []`);
+    } else if (isRecord(raw)) {
+      lines.push(`${pad}${key}:\n${renderYamlMap(raw, indent + 2, preserveMultiline)}`);
+    } else {
+      lines.push(`${pad}${key}: ${yamlScalar(raw, indent, preserveMultiline)}`);
+    }
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+export function yamlMap(value: Record<string, unknown>, { preserveMultiline = false } = {}): string {
+  return renderYamlMap(value, 0, preserveMultiline);
 }

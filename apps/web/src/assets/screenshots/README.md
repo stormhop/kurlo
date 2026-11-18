@@ -59,6 +59,9 @@ Each guide page benefits from at least one screenshot. To take the doc site from
 | `scripting-pre-request.png`    | Scripting guide / Scripting API reference    | Pre-request script with `pm.request.headers.set(...)`        |
 | `scripting-tengo.png`          | Scripting guide / Scripting API reference    | Tengo pre-request script and reference snippets              |
 | `import-postman.png`           | Migration guide                              | Sidebar import dialog                                        |
+| `postman-export-formats.png`    | Postman import and export guide              | Collection export dialog with Postman v3 selected             |
+| `welcome.png`                  | First request guide                          | Welcome screen on a fresh profile                             |
+| `client-certificate-pfx.png`   | Client certificates guide                    | PFX file and passphrase variable in gRPC settings             |
 | `cookie-jar-populated.png`     | Cookies guide                                | Cookie jar with the domain list and a saved cookie           |
 | `cookie-jar-editor.png`        | Cookies guide                                | Cookie editor in Fields mode under the table                 |
 | `code-snippets.png`            | Code generation guide                        | Side panel with `curl` selected                              |

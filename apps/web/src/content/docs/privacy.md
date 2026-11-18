@@ -26,7 +26,7 @@ Inside that directory you may find:
 - `requests.json` — an AES-256-GCM encrypted JSON envelope containing local profile state, history, workspace cookies, Git-local secret values, and storage metadata.
 - `request-store.key` — a base64-encoded recovery copy of the encryption key, written with owner-only `0600` permissions.
 - `request-store.key.dpapi` — an additional Windows DPAPI-protected key copy.
-- `preferences.json` — the configured default workspace location, cookie sync settings, and [AI connections](/docs/guides/settings/#ai) with their keys encrypted by the request-store key. Other UI preferences are stored by the desktop WebView.
+- `preferences.json` — the configured default workspace location, cookie sync settings, and [AI connections](/docs/guides/settings/ai/#ai) with their keys encrypted by the request-store key. Other UI preferences are stored by the desktop WebView.
 - `agent-chats/` — [agent](/docs/guides/agent/) chats and copies of sent attachments, encrypted on disk. Kurlo keeps up to 200 unarchived chats across the local profile for up to 90 days of inactivity. Archived chats and their attachments are kept until you delete them. Markdown exports are unencrypted files saved at a location you choose.
 - `agent-activity/` — the encrypted log of tool calls made by the agent and by assistants connected through `kurlo mcp`, with the files they changed, kept for 30 days.
 - `workspaces/` — the default folder-backed YAML workspace location.
@@ -73,7 +73,7 @@ Four features bind a local listener. All four are loopback-only (`127.0.0.1`, an
 |----------|----------------|----------------|
 | OAuth 2.0 redirect | Only while an Authorization Code sign-in is in flight, on an ephemeral port | The single `/callback` that receives the authorization code, then closes |
 | OpenRouter sign-in | Only while *Connect OpenRouter* is waiting (at most five minutes), on an ephemeral port | The single `/callback` that receives OpenRouter's code, then closes |
-| [Cookie sync](/docs/guides/cookies/#sync-cookies-from-your-browser) bridge | While cookie sync is on (ports 3199-3203) | Pairing and the WebSocket a paired browser pushes cookies over. Extension origins only; a web page probing the port gets a `403` |
+| [Cookie sync](/docs/guides/cookies/sync/#sync-cookies-from-your-browser) bridge | While cookie sync is on (ports 3199-3203) | Pairing and the WebSocket a paired browser pushes cookies over. Extension origins only; a web page probing the port gets a `403` |
 | [Mock server](/docs/guides/mock-server/) | While you have it running, on the port you choose | The saved examples of the collection you pointed it at — status, headers and body as recorded. Any program on your machine that can reach the port can read them, so treat a mock made from real responses accordingly. In a browser, only a page served from this machine is answered; a site on another host gets a `403` |
 
 ## Scripting safety
@@ -101,6 +101,10 @@ Cookies are never transmitted anywhere except in the request to the domain that 
 - **Export** - *Settings -> General -> Data -> Export all data* writes workspace data, history, cookies, secrets, and selected preferences to a plaintext JSON file you choose. External Git repositories, the global proxy password, and some local UI preferences are not bundled. See [Backup & recovery](/docs/guides/backup-recovery/).
 - **Import** — replaces the current profile with a previous export. This is destructive; Kurlo shows a confirmation dialog before running.
 - **Delete** — quit Kurlo and remove the directory listed under [What Kurlo stores on your machine](#what-kurlo-stores-on-your-machine).
+
+## Documentation feedback
+
+When you rate a documentation page, kurlo.dev sends the page path, your vote, and any reason you select to its GoatCounter instance. The feedback form has no free-text field and sends no account details.
 
 ## Reporting a security issue
 

@@ -1,0 +1,28 @@
+---
+title: "Linux"
+description: "Install system dependencies and launch the AppImage."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+**Requirements:** x64 with Ubuntu 22.04 or later, Debian 12 or later, or Fedora 37 or later, plus GTK 3, WebKitGTK 4.1 and FUSE 2 from your distribution's package manager.
+
+<Steps>
+
+1. Install the libraries Kurlo draws its window with:
+
+   ```sh
+   sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libfuse2   # Ubuntu, Debian
+   sudo dnf install gtk3 webkit2gtk4.1 fuse-libs              # Fedora
+   ```
+
+2. Download `kurlo-<version>-linux-amd64.AppImage`.
+
+3. Make it executable and run it:
+
+   ```sh
+   chmod +x kurlo-*.AppImage
+   ./kurlo-*.AppImage
+   ```
+
+</Steps>

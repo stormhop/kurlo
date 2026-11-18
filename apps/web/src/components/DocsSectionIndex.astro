@@ -1,0 +1,41 @@
+---
+import { getCollection } from 'astro:content';
+import { docsSectionForPath, docsTopicPages } from '../../docs.sidebar.mjs';
+import DocsLinkList from './DocsLinkList.astro';
+
+const { id } = Astro.locals.starlightRoute;
+const section = docsSectionForPath(`/${id}/`);
+if (!section) throw new Error(`Missing documentation section for ${id}`);
+
+const entries = await getCollection('docs');
+const descriptions = new Map(entries.map(entry => [`/${entry.id}/`, entry.data.description]));
+---
+
+<div class="docs-section-index not-content">
+  {section.groups.map(group => (
+    <section>
+      <h2>{group.label}</h2>
+      <DocsLinkList items={group.items.map(item => ({
+        ...item,
+        description: descriptions.get(item.link),
+        articleCount: docsTopicPages(item.link).length,
+      }))} />
+    </section>
+  ))}
+</div>
+
+<style>
+  .docs-section-index {
+    display: grid;
+    gap: 1.75rem;
+  }
+  .docs-section-index h2 {
+    margin: 0 0 0.65rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+  .docs-section-index section + section {
+    padding-block-start: 1.25rem;
+    border-block-start: 1px solid var(--sl-color-hairline);
+  }
+</style>

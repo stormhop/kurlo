@@ -789,6 +789,7 @@ class AppVM {
   declare exportCollection: typeof importExportFeature.exportCollection;
   declare exportCollectionToOpenCollection: typeof importExportFeature.exportCollectionToOpenCollection;
   declare exportCollectionToPostman: typeof importExportFeature.exportCollectionToPostman;
+  declare exportCollectionToPostmanV3: typeof importExportFeature.exportCollectionToPostmanV3;
   declare exportCollectionToInsomnia: typeof importExportFeature.exportCollectionToInsomnia;
   declare exportCollectionToOpenApi: typeof importExportFeature.exportCollectionToOpenApi;
   declare chooseCollectionSecretExportMode: typeof importExportFeature.chooseCollectionSecretExportMode;

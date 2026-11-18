@@ -1,0 +1,97 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+
+interface Props {
+  items: {
+    label: string;
+    link: string;
+    description?: string;
+    articleCount?: number;
+    fragments?: [string, string][];
+  }[];
+}
+
+const { items } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<ul class="docs-link-list">
+  {items.map(item => {
+    const local = item.link.startsWith('/');
+    return (
+      <li>
+        {item.fragments?.map(([id, destination]) => (
+          <span id={id} class="moved-heading" data-destination={`${base}${destination}`}></span>
+        ))}
+        <a href={local ? `${base}${item.link}` : item.link}>
+          <span>
+            <strong>{item.label}</strong>
+            {item.description && <span>{item.description}</span>}
+            {item.articleCount ? <span class="docs-link-count">{item.articleCount} articles</span> : null}
+          </span>
+          <Icon name={local ? (item.articleCount ? 'right-caret' : 'right-arrow') : 'external'} size="1.15rem" />
+        </a>
+      </li>
+    );
+  })}
+</ul>
+
+<style>
+  .docs-link-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .docs-link-list > li {
+    position: relative;
+  }
+  :global(.not-content) .docs-link-list > li + li {
+    margin: 0;
+  }
+  .docs-link-list a {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 100%;
+    padding: 0.8rem 0.95rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 9px;
+    background: var(--kurlo-surface);
+    color: var(--sl-color-accent-high);
+    text-decoration: none;
+  }
+  .docs-link-list a:hover,
+  .docs-link-list li:has(> .moved-heading:target) > a {
+    border-color: var(--sl-color-accent);
+  }
+  .docs-link-list a > span {
+    display: grid;
+    gap: 0.2rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  .docs-link-list a strong {
+    color: var(--sl-color-white);
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .docs-link-count {
+    margin-block-start: 0.2rem;
+    color: var(--sl-color-accent-high);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .docs-link-list a :global(svg) {
+    flex-shrink: 0;
+    margin-top: 0.15rem;
+  }
+  .moved-heading {
+    position: absolute;
+    inset-block-start: 0;
+  }
+</style>

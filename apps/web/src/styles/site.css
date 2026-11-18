@@ -111,8 +111,7 @@ code {
 .k-tag,
 .k-counter,
 .k-req,
-.k-links a,
-.k-nav-cta {
+.k-links a {
   font-family: var(--mono);
   font-size: 0.75rem;
   font-weight: 500;
@@ -193,15 +192,6 @@ code {
   opacity: 1;
 }
 
-.k-nav-cta {
-  padding: 0.7rem 1rem;
-  border-radius: 6px;
-  background: var(--ink);
-  color: var(--paper);
-  text-decoration: none;
-  font-weight: 700;
-}
-
 .k-star {
   display: inline-flex;
   align-items: center;
@@ -246,9 +236,9 @@ code {
   margin-left: -0.75rem;
 }
 
-.k-nav:not(.k-nav-solid) .k-nav-cta {
-  background: var(--cream);
-  color: #15161c;
+.k-nav:not(.k-nav-solid) {
+  --download-background: var(--cream);
+  --download-color: #15161c;
 }
 
 .k-hero {

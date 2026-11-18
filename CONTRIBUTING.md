@@ -109,7 +109,7 @@ Two of these surprise people:
 - **Docs consistency.** `scripts/check-web-docs.mjs` cross-checks the YAML workspace
   reference in `apps/web` against the Go source and the JSON Schema. Adding a persisted
   auth field means updating `schemas/kurlo-workspace-yaml-v1.schema.json` and
-  `apps/web/src/content/docs/docs/reference/kurlo-yaml-format.md` too. It also checks the
+  `apps/web/src/content/docs/docs/reference/kurlo-yaml-format/request-fields.md` too. It also checks the
   documents that nothing else reads: a new `SHORTCUT_DEFINITIONS` entry has to appear in the
   keyboard-shortcuts reference, and a new snippet target in the code-generation guide.
 

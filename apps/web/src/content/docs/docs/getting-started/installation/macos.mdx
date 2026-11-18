@@ -1,0 +1,20 @@
+---
+title: "macOS"
+description: "Download the DMG and handle the first-launch prompt."
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+**Requirements:** macOS 15 Sequoia or later. Kurlo draws its window with the system WebKit and is tested on the version macOS 15 ships with; it may start on older macOS, but that is not tested. Apple Silicon and Intel are both supported.
+
+<Steps>
+
+1. Download `kurlo-<version>-darwin-universal.dmg`.
+
+2. Open the disk image and drag **Kurlo.app** to `/Applications`.
+
+3. Launch Kurlo from Spotlight or the Applications folder.
+
+</Steps>
+
+Current builds are not Apple-notarized, so macOS blocks the first launch. Click **Done**, then open *System Settings → Privacy & Security* and click **Open Anyway** next to Kurlo. Or run `xattr -dr com.apple.quarantine /Applications/Kurlo.app` once. See the [troubleshooting guide](/docs/troubleshooting/installation/#macos-kurlo-not-opened-or-apple-could-not-verify-kurlo).

@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
+import { DOCS_VIEWPORT, docsScreenshotDir } from './support/config';
+import { captureDocsScreenshot } from './support/screenshots';
 
 async function firstLaunch(page: Page) {
   await installKurloBridge(page, '', 'browser/e2e', false, null, { firstLaunch: true, preserveStorage: true });
@@ -47,8 +49,11 @@ test('welcome new request and example use real drafts without sending or duplica
 });
 
 test('welcome opens real import and agent settings, and canceled workspace selection keeps it visible', async ({ page }) => {
+  if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
   await firstLaunch(page);
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Welcome to Kurlo' })).toBeVisible();
+  await captureDocsScreenshot(page, 'welcome');
   await page.getByRole('button', { name: /Import a collection Postman/ }).click();
   const importer = page.getByRole('dialog', { name: 'Import collection' });
   await expect(importer).toBeVisible();

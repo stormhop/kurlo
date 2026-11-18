@@ -1,0 +1,12 @@
+---
+title: Scripting API
+description: Look up pm.* methods for variables, requests, assertions, logs, and calls from scripts.
+---
+
+import DocsTopicIndex from "../../../../components/DocsTopicIndex.astro";
+
+Scripts run in a sandboxed JavaScript VM by default. The legacy [Tengo](https://github.com/d5/tengo) engine shares the core `pm.*` methods for request mutation, response assertions, variables, environments, and logs. The [scripting guide](/docs/guides/scripting/) explains which features are specific to JavaScript.
+
+Module imports, process access, and filesystem access are disabled; `require` resolves only the [bundled stand-ins](/docs/reference/scripting-api/compatibility/#require). Network access is disabled too, unless a request opts into [`pm.sendRequest`](/docs/reference/scripting-api/send-request/). Execution is capped at 2 seconds by default — see [Script timeout](/docs/reference/scripting-api/send-request/#script-timeout).
+
+<DocsTopicIndex />

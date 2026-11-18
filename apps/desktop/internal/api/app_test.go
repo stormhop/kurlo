@@ -2485,7 +2485,7 @@ func TestRequestBodyBytesUsesGetBodyWithoutConsumingRequestBody(t *testing.T) {
 func TestKurloYAMLFormatPublicContractFiles(t *testing.T) {
 	repoRoot := filepath.Clean(filepath.Join("..", "..", "..", ".."))
 	schemaPath := filepath.Join(repoRoot, "schemas", "kurlo-workspace-yaml-v1.schema.json")
-	docPath := filepath.Join(repoRoot, "apps", "web", "src", "content", "docs", "docs", "reference", "kurlo-yaml-format.md")
+	docPath := filepath.Join(repoRoot, "apps", "web", "src", "content", "docs", "docs", "reference", "kurlo-yaml-format")
 
 	schemaBytes, err := os.ReadFile(schemaPath)
 	if err != nil {
@@ -2520,11 +2520,11 @@ func TestKurloYAMLFormatPublicContractFiles(t *testing.T) {
 		}
 	}
 
-	docBytes, err := os.ReadFile(docPath)
+	docBytes, err := os.ReadFile(docPath + ".mdx")
 	if err != nil {
 		t.Fatalf("read format docs: %v", err)
 	}
-	docText := string(docBytes)
+	docText := string(docBytes) + "\n" + readAllText(t, docPath)
 	for _, token := range []string{
 		workspaceStoreKind,
 		workspaceStoreFormat,

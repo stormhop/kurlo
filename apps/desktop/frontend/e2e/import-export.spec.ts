@@ -1,14 +1,123 @@
 import { chooseRequestSection, clickTabClose, collectionRow, folderRow } from './support/actions';
 
-import { installKurloBridge } from './support/bridge';
+import { installKurloBridge, type E2EWindow } from './support/bridge';
 
 import { captureDocsScreenshot } from './support/screenshots';
 
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import { tmpdir } from 'node:os';
 
 import { join } from 'node:path';
+
+test.describe('Import destination and save errors', () => {
+  const specUrl = 'https://spec.kurlo.test/catalogue.json';
+  const spec = {
+    openapi: '3.0.3',
+    info: { title: 'Catalogue import', version: '1' },
+    paths: { '/items': { get: { operationId: 'listItems' } } },
+  };
+
+  async function prepareImport(page: Page, source: string) {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Collections', exact: true }).click();
+    await page.getByLabel('Import collection').first().click();
+    const dialog = page.getByRole('dialog', { name: 'Import collection' });
+    await dialog.getByText(source, { exact: true }).click();
+    await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+    await expect(dialog).toBeHidden();
+  }
+
+  async function startOpenApiImport(page: Page) {
+    await prepareImport(page, 'OpenAPI / Swagger from URL');
+    const prompt = page.getByRole('dialog', { name: 'Import from URL' });
+    await prompt.getByRole('textbox').fill(specUrl);
+    await prompt.getByRole('button', { name: 'Import', exact: true }).click();
+    await page.waitForFunction(() => window.__kurloE2E.responseGate?.ready);
+  }
+
+  async function delaySpec(page: Page) {
+    await page.addInitScript(({ specUrl, spec }) => {
+      const app = (window as unknown as E2EWindow).go.api.App;
+      const send = app.SendRequest;
+      app.SendRequest = async (...args) => {
+        if (args[0].url !== specUrl) return send(...args);
+        await new Promise<void>(release => { window.__kurloE2E.responseGate = { ready: true, release }; });
+        return { statusCode: 200, status: '200 OK', body: JSON.stringify(spec) };
+      };
+    }, { specUrl, spec });
+  }
+
+  test('cancels a delayed OpenAPI import if another workspace is active', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeWorkspaceId: 'workspace-a',
+      workspaces: [{ id: 'workspace-a', name: 'Workspace A' }, { id: 'workspace-b', name: 'Workspace B' }],
+    });
+    await delaySpec(page);
+    await startOpenApiImport(page);
+    const switcher = page.getByRole('button', { name: 'Workspace switcher' });
+    await expect(switcher).toContainText('Workspace A');
+    await switcher.click();
+    await page.getByRole('button', { name: /^Workspace B / }).click();
+    await expect(switcher).toContainText('Workspace B');
+    await page.evaluate(() => window.__kurloE2E.responseGate!.release());
+    const error = page.getByRole('dialog', { name: 'Import from URL failed' });
+    await expect(error).toContainText('The workspace changed during import.');
+    await error.getByRole('button', { name: 'OK' }).click();
+    await expect(switcher).toContainText('Workspace B');
+    await expect(page.getByRole('button', { name: 'Catalogue import', exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => window.__kurloE2E.savedStores.flatMap(store => store.collections).filter(collection => collection.name === 'Catalogue import'))).toEqual([]);
+    await expect(page.getByText('Imported 1 request', { exact: true })).toHaveCount(0);
+  });
+
+  for (const source of ['OpenAPI', 'Postman']) {
+    test(`reports a save failure instead of success when importing ${source}`, async ({ page }) => {
+      await installKurloBridge(page);
+      await page.addInitScript(() => { window.__kurloE2E.failSaves = true; });
+      if (source === 'OpenAPI') {
+        await delaySpec(page);
+        await startOpenApiImport(page);
+        await page.evaluate(() => window.__kurloE2E.responseGate!.release());
+        const error = page.getByRole('dialog', { name: 'Import from URL failed' });
+        await expect(error).toContainText('Kurlo could not save the workspace.');
+        await error.getByRole('button', { name: 'OK' }).click();
+      } else {
+        await prepareImport(page, 'Postman collection');
+        await page.setInputFiles('input[type="file"]', {
+          name: 'catalogue.postman_collection.json',
+          mimeType: 'application/json',
+          buffer: Buffer.from(JSON.stringify({
+            info: { name: 'Catalogue import', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+            item: [{ name: 'listItems', request: { method: 'GET', url: 'https://api.kurlo.test/items' } }],
+          })),
+        });
+        await expect(page.getByText('Import failed: Kurlo could not save the workspace.', { exact: true })).toBeVisible();
+      }
+      await expect(page.getByText('Imported 1 request', { exact: true })).toHaveCount(0);
+      expect(await page.evaluate(() => window.__kurloE2E.store.collections.some(collection => collection.name === 'Catalogue import'))).toBe(false);
+      const save = page.getByRole('button', { name: 'Save', exact: true });
+      await expect(save).toBeEnabled();
+      await page.evaluate(() => { window.__kurloE2E.failSaves = false; });
+      await save.click();
+      await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections.filter(collection => collection.name === 'Catalogue import').length)).toBe(1);
+      await expect(page.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
+    });
+  }
+
+  test('reports when OpenAPI saves the collection but fails to save the sync snapshot', async ({ page }) => {
+    await installKurloBridge(page);
+    await delaySpec(page);
+    await page.addInitScript(() => {
+      (window as unknown as E2EWindow).go.api.App.WriteOpenAPIBaseSpec = async () => 'Disk full';
+    });
+    await startOpenApiImport(page);
+    await page.evaluate(() => window.__kurloE2E.responseGate!.release());
+    const error = page.getByRole('dialog', { name: 'Import from URL failed' });
+    await expect(error).toContainText('Kurlo could not save its OpenAPI sync settings or spec snapshot.');
+    await expect(page.getByText('Imported 1 request', { exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => window.__kurloE2E.store.collections.some(collection => collection.name === 'Catalogue import'))).toBe(true);
+  });
+});
 
 test.describe("Kurlo desktop browser E2E", () => {
   test('imports a Postman collection into the sidebar', async ({ page }) => {
@@ -175,6 +284,7 @@ for (const source of ['file', 'URL']) {
       });
     } else {
       const prompt = page.getByRole('dialog', { name: 'Import from URL' });
+      await prompt.getByRole('checkbox', { name: 'Keep in sync with this URL' }).uncheck();
       await prompt.getByRole('textbox').fill('https://spec.kurlo.test/openapi.json');
       await prompt.getByRole('button', { name: 'Import', exact: true }).click();
     }

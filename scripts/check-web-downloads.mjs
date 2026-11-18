@@ -7,6 +7,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = join(root, 'apps/web');
 const distRoot = join(webRoot, 'dist');
 const repo = 'https://github.com/stormhop/kurlo';
+const base = (process.env.KURLO_SITE_BASE ?? '/').replace(/\/$/, '');
 
 const receipts = readFileSync(join(webRoot, 'src/lib/receipts.ts'), 'utf8');
 const version = receipts.match(/name: 'Kurlo',\s*version: '([^']+)'/)?.[1];
@@ -56,6 +57,15 @@ function attributes(tag) {
   return Object.fromEntries([...tag.matchAll(/([\w-]+)(?:="([^"]*)")?/g)].map(match => [match[1], (match[2] ?? '').replaceAll('&amp;', '&')]));
 }
 
+for (const path of ['index.html', 'docs/index.html', 'download/index.html']) {
+  const html = page(path);
+  const header = html.match(/<header\b[^>]*>[\s\S]*?<\/header>/)?.[0] ?? '';
+  const links = [...header.matchAll(/<a\b[^>]*>/g)].map(match => attributes(match[0]));
+  if (!links.some(link => link.href === `${base}/download/` && link.class?.split(/\s+/).includes('download-link'))) {
+    errors.push(`${path}: the header is missing the shared Download button`);
+  }
+}
+
 for (const path of ['index.html', 'agent/index.html', 'mcp/index.html', 'pricing/index.html', 'vs/postman/index.html']) {
   const html = page(path);
   if (!html) continue;
@@ -75,13 +85,23 @@ for (const path of ['index.html', 'agent/index.html', 'mcp/index.html', 'pricing
 
 const download = page('download/index.html');
 if (download) {
+  if (!/class="kurlo-header-shell[^"]*"[^>]*\bdata-docs\b/.test(download) || /<html\b[^>]*\bdata-has-sidebar\b/.test(download)) {
+    errors.push('download/index.html: expected the documentation header without an article sidebar');
+  }
   const hrefs = new Set([...download.matchAll(/href="([^"]+)"/g)].map(match => match[1].replaceAll('&amp;', '&')));
   for (const file of allFiles) {
     if (!hrefs.has(file)) errors.push(`download/index.html: no direct link to ${file}`);
   }
-  const ctas = [...download.matchAll(/<a\b[^>]*\bdata-cta\b[^>]*>/g)].map(match => attributes(match[0]).href);
-  for (const expected of Object.values(primary)) {
-    if (!ctas.includes(expected)) errors.push(`download/index.html: no platform button for ${expected}`);
+  const ctas = [...download.matchAll(/<a\b[^>]*\bdata-cta\b[^>]*>/g)].map(match => attributes(match[0]));
+  for (const expected of [...Object.values(primary), url('-windows-arm64-installer.exe')]) {
+    if (!ctas.some(cta => cta.href === expected && cta.class?.split(/\s+/).includes('download-link'))) {
+      errors.push(`download/index.html: no shared platform button for ${expected}`);
+    }
+  }
+  for (const os of ['macos', 'windows', 'linux']) {
+    if (!hrefs.has(`${base}/docs/getting-started/installation/${os}/`)) {
+      errors.push(`download/index.html: no installation guide for ${os}`);
+    }
   }
 }
 

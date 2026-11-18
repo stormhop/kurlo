@@ -1,22 +1,30 @@
 ---
+import { Icon } from '@astrojs/starlight/components';
+import DownloadLink from './DownloadLink.astro';
 import { RELEASE_PAGE, RELEASE_VERSION, assetName, assetUrl, portableDownload, primaryDownloads } from '../lib/downloads';
 
-const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 interface PlatformFile {
   label: string;
   match: string;
-  arch?: 'x86' | 'arm';
-  primary?: boolean;
   name?: string;
   url?: string;
 }
 
+interface Build {
+  arch?: 'x64' | 'arm64';
+  primary: PlatformFile;
+  alternatives?: PlatformFile[];
+}
+
 interface Platform {
-  id: string;
+  id: 'mac' | 'windows' | 'linux';
   name: string;
+  icon: 'apple' | 'seti:windows' | 'linux';
   requirement: string;
-  files: PlatformFile[];
+  builds: Build[];
+  installation: string;
   note: string;
 }
 
@@ -24,261 +32,394 @@ const platforms: Platform[] = [
   {
     id: 'mac',
     name: 'macOS',
-    requirement: 'macOS 15 Sequoia or later · Apple Silicon and Intel',
-    files: [
-      { label: 'Universal disk image', match: '-darwin-universal.dmg', primary: true },
+    icon: 'apple',
+    requirement: 'macOS 15 Sequoia or later. Apple Silicon and Intel.',
+    builds: [
+      { primary: { label: 'Universal disk image', match: '-darwin-universal.dmg' } },
     ],
-    note: 'Not Apple-notarized yet: on first launch, allow it in System Settings → Privacy & Security → Open Anyway.',
+    installation: 'macos',
+    note: 'If macOS blocks the first launch, open System Settings → Privacy & Security and select Open Anyway.',
   },
   {
     id: 'windows',
     name: 'Windows',
-    requirement: 'Windows 10 1903+ or Windows 11 · x64 and Arm64',
-    files: [
-      { label: 'Installer', match: '-windows-amd64-installer.exe', arch: 'x86', primary: true },
-      { label: 'MSIX package', match: '-windows-amd64.msix', arch: 'x86' },
-      { label: 'Portable app', ...portableDownload('amd64'), arch: 'x86' },
-      { label: 'Installer', match: '-windows-arm64-installer.exe', arch: 'arm', primary: true },
-      { label: 'MSIX package', match: '-windows-arm64.msix', arch: 'arm' },
-      { label: 'Portable app', ...portableDownload('arm64'), arch: 'arm' },
+    icon: 'seti:windows',
+    requirement: 'Windows 10 (1903 or later) or Windows 11.',
+    builds: [
+      {
+        arch: 'x64',
+        primary: { label: 'Installer', match: '-windows-amd64-installer.exe' },
+        alternatives: [
+          { label: 'MSIX package', match: '-windows-amd64.msix' },
+          { label: 'Portable app', ...portableDownload('amd64') },
+        ],
+      },
+      {
+        arch: 'arm64',
+        primary: { label: 'Installer', match: '-windows-arm64-installer.exe' },
+        alternatives: [
+          { label: 'MSIX package', match: '-windows-arm64.msix' },
+          { label: 'Portable app', ...portableDownload('arm64') },
+        ],
+      },
     ],
-    note: 'The portable app runs without installing and updates itself. SmartScreen may warn: Kurlo is not Authenticode-signed yet.',
+    installation: 'windows',
+    note: 'SmartScreen may warn on first launch. The portable app runs without installation and updates itself.',
   },
   {
     id: 'linux',
     name: 'Linux',
-    requirement: 'Ubuntu 22.04+, Debian 12+ or Fedora 37+ · x64 · WebKitGTK 4.1',
-    files: [
-      { label: 'Portable AppImage', match: '-linux-amd64.AppImage', primary: true },
+    icon: 'linux',
+    requirement: 'Ubuntu 22.04+, Debian 12+, or Fedora 37+. x64 with WebKitGTK 4.1.',
+    builds: [
+      { primary: { label: 'Portable AppImage', match: '-linux-amd64.AppImage' } },
     ],
-    note: 'Install libwebkit2gtk-4.1-0 and libfuse2, make the file executable with chmod +x, then run it.',
+    installation: 'linux',
+    note: 'Install WebKitGTK 4.1 and FUSE 2, then make the AppImage executable before running it.',
   },
 ];
 
 const sizes = new Map(primaryDownloads.map(item => [item.suffix, item.size]));
-const fileLabel = (item: PlatformFile) => [item.name ?? assetName(item.match), sizes.get(item.match)].filter(Boolean).join(' · ');
-const primaryUrl = (platform: Platform) => assetUrl(platform.files.find(item => item.primary)?.match ?? platform.files[0].match);
+const fileSize = (item: PlatformFile) => sizes.get(item.match);
+const fileName = (item: PlatformFile) => item.name ?? assetName(item.match);
+const fileUrl = (item: PlatformFile) => item.url ?? assetUrl(item.match);
+const installation = `${base}/docs/getting-started/installation/`;
 ---
 
-<div class="kurlo-platforms not-content">
-  {platforms.map(platform => (
-    <section class="kurlo-platform" data-platform={platform.id} aria-labelledby={`platform-${platform.id}`}>
-      <header>
-        <h2 id={`platform-${platform.id}`}>{platform.name}</h2>
-        <span class="kurlo-platform-yours">Your system</span>
-      </header>
-      <p class="kurlo-platform-req">{platform.requirement}</p>
-      <ul>
-        {platform.files.map(item => (
-          <li data-arch={item.arch} hidden={item.arch === 'arm'}>
-            <a href={item.url ?? assetUrl(item.match)} data-asset={item.match} data-primary={item.primary ? '' : undefined}>
-              {item.label}
-            </a>
-            <code data-asset-name>{fileLabel(item)}</code>
-          </li>
-        ))}
-      </ul>
-      <p class="kurlo-platform-note">{platform.note}</p>
-      <a class="kurlo-platform-cta" href={primaryUrl(platform)} data-cta download>Download for {platform.name}</a>
-    </section>
-  ))}
-</div>
-<p class="kurlo-platforms-after not-content">
-  <span data-release-line>Kurlo {RELEASE_VERSION}. Every file is on the <a href={RELEASE_PAGE}>release page</a>.</span> First-run steps for each system are in <a href={`${base}docs/getting-started/installation/`}>Installation</a>.
-</p>
+<div class="kurlo-downloads not-content">
+  <div class="download-release">
+    <p>
+      <a class="download-release-version" href={RELEASE_PAGE} data-release-link>Kurlo v{RELEASE_VERSION}</a>
+      <span class="download-release-date" data-release-date hidden></span>
+    </p>
+    <a class="download-installation" href={installation}><Icon name="open-book" size="1rem" /> Installation guide</a>
+  </div>
 
-<script is:inline>
-  (() => {
-    const ua = navigator.userAgent || '';
-    const platform = (navigator.userAgentData && navigator.userAgentData.platform) || '';
-    const os = /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows'
-      : (/mac/i.test(platform) || /Macintosh/i.test(ua)) && !/iPhone|iPad/i.test(ua) ? 'mac'
-      : (/linux/i.test(platform) || /Linux|X11/i.test(ua)) && !/Android/i.test(ua) ? 'linux'
-      : '';
-    if (!os) return;
-    document.documentElement.dataset.kurloOs = os;
-    document.querySelector(`.kurlo-platform[data-platform="${os}"]`)?.classList.add('kurlo-platform-current');
-  })();
-</script>
+  <div class="kurlo-platforms">
+    {platforms.map(platform => (
+      <section class="kurlo-platform" data-platform={platform.id} aria-labelledby={`platform-${platform.id}`}>
+        <div class="platform-heading">
+          <span class="platform-icon"><Icon name={platform.icon} size="1.25rem" /></span>
+          <h2 id={`platform-${platform.id}`}>{platform.name}</h2>
+          <span class="platform-current" data-current-system hidden>Your system</span>
+        </div>
+        <p class="platform-requirement">{platform.requirement}</p>
+
+        {platform.builds.length > 1 && (
+          <div class="platform-architectures" role="group" aria-labelledby="windows-architecture-label">
+            <span id="windows-architecture-label">Architecture</span>
+            {platform.builds.map(build => (
+              <label>
+                <input type="radio" name="windows-architecture" value={build.arch} checked={build.arch === 'x64'} />
+                <span>{build.arch === 'arm64' ? 'Arm64' : build.arch}</span>
+              </label>
+            ))}
+          </div>
+        )}
+
+        {platform.builds.map(({ arch, primary, alternatives }) => (
+          <div class="platform-build" data-arch={arch}>
+            <DownloadLink class="platform-action" href={fileUrl(primary)} title={fileName(primary)} data-asset={primary.match} data-cta download>
+              Download for {platform.name}
+            </DownloadLink>
+            <p class="platform-format">
+              {primary.label}<span data-asset-size>{fileSize(primary) ? ` · ${fileSize(primary)}` : ''}</span>
+            </p>
+            {alternatives && (
+              <ul class="platform-alternatives" aria-label="Other formats">
+                {alternatives.map(file => (
+                  <li>
+                    <a href={fileUrl(file)} data-asset={file.match} title={fileName(file)}>
+                      {file.label}<Icon name="download" size="0.875rem" />
+                    </a>
+                    <span data-asset-size></span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+
+        <div class="platform-install">
+          <p>{platform.note}</p>
+          <a href={`${installation}${platform.installation}/`}>Installation steps <Icon name="right-arrow" size="0.875rem" /></a>
+        </div>
+      </section>
+    ))}
+  </div>
+</div>
 
 <script>
-  import { findAsset, formatSize, latestRelease, type Release } from '../scripts/latest-release';
+  import { findAsset, formatSize, latestRelease } from '../scripts/latest-release';
 
-  async function applyArchitecture() {
-    if (document.documentElement.dataset.kurloOs !== 'windows') return;
-    const uaData = (navigator as Navigator & {
-      userAgentData?: { getHighEntropyValues?: (hints: string[]) => Promise<{ architecture?: string }> };
-    }).userAgentData;
-    if (!uaData?.getHighEntropyValues) return;
-    try {
-      const values = await uaData.getHighEntropyValues(['architecture']);
-      if (values?.architecture !== 'arm') return;
-      for (const item of document.querySelectorAll<HTMLElement>('.kurlo-platform li[data-arch]')) {
-        item.hidden = item.dataset.arch !== 'arm';
-      }
-    } catch {}
+  const ua = navigator.userAgent;
+  const uaData = (navigator as Navigator & {
+    userAgentData?: {
+      platform?: string;
+      getHighEntropyValues?: (hints: string[]) => Promise<{ architecture?: string }>;
+    };
+  }).userAgentData;
+  const platform = uaData?.platform ?? '';
+  const os = /Win/i.test(platform) || /Windows/i.test(ua) ? 'windows'
+    : (/mac/i.test(platform) || /Macintosh/i.test(ua)) && !/iPhone|iPad/i.test(ua) ? 'mac'
+    : (/linux/i.test(platform) || /Linux|X11/i.test(ua)) && !/Android/i.test(ua) ? 'linux'
+    : '';
+  if (os) {
+    const card = document.querySelector(`.kurlo-platform[data-platform="${os}"]`);
+    const badge = card?.querySelector<HTMLElement>('[data-current-system]');
+    if (badge) badge.hidden = false;
   }
 
-  function syncCtas() {
-    for (const card of document.querySelectorAll('.kurlo-platform')) {
-      const primary = card.querySelector<HTMLAnchorElement>('li:not([hidden]) a[data-primary]');
-      const cta = card.querySelector<HTMLAnchorElement>('[data-cta]');
-      if (primary && cta) cta.href = primary.href;
-    }
+  const architecture = document.querySelector('.platform-architectures');
+  if (os === 'windows' && architecture && uaData?.getHighEntropyValues) {
+    let userSelected = false;
+    architecture.addEventListener('change', () => { userSelected = true; }, { once: true });
+    uaData.getHighEntropyValues(['architecture']).then(values => {
+      const arm = architecture.querySelector<HTMLInputElement>('input[value="arm64"]');
+      if (arm && !userSelected && values.architecture === 'arm') arm.checked = true;
+    }).catch(() => {});
   }
 
-  function render(release: Release) {
-    for (const link of document.querySelectorAll<HTMLAnchorElement>('[data-asset]')) {
+  const release = await latestRelease();
+  if (release) {
+    for (const link of document.querySelectorAll<HTMLAnchorElement>('.kurlo-platform [data-asset]')) {
       const asset = findAsset(release, link.dataset.asset ?? '');
       if (!asset) continue;
       link.href = asset.browser_download_url;
-      const name = link.parentElement?.querySelector('[data-asset-name]');
-      if (name) name.textContent = `${asset.name} · ${formatSize(asset.size)}`;
+      link.title = asset.name;
+      const size = formatSize(asset.size);
+      const sizeLabel = link.parentElement?.querySelector('[data-asset-size]');
+      if (sizeLabel && size) sizeLabel.textContent = link.hasAttribute('data-cta') ? ` · ${size}` : size;
     }
 
-    syncCtas();
-
-    const line = document.querySelector('[data-release-line]');
-    const releasePage = release.html_url || line?.querySelector('a')?.href;
-    if (line && releasePage && release.tag_name) {
-      const published = release.published_at
-        ? new Date(release.published_at).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' })
-        : '';
-      line.textContent = `Kurlo ${release.tag_name}${published ? `, released ${published}` : ''}. Every file is on the `;
-      const anchor = document.createElement('a');
-      anchor.href = releasePage;
-      anchor.textContent = 'release page';
-      line.append(anchor, '.');
+    const releaseLink = document.querySelector<HTMLAnchorElement>('[data-release-link]');
+    if (releaseLink && release.tag_name && release.html_url) {
+      releaseLink.href = release.html_url;
+      releaseLink.textContent = `Kurlo ${release.tag_name}`;
+      const date = document.querySelector<HTMLElement>('[data-release-date]');
+      if (date && release.published_at) {
+        date.textContent = new Date(release.published_at).toLocaleDateString('en', {
+          year: 'numeric', month: 'short', day: 'numeric',
+        });
+        date.hidden = false;
+      }
     }
   }
-
-  await applyArchitecture();
-  syncCtas();
-  const release = await latestRelease();
-  if (release) render(release);
 </script>
 
 <style>
+  :global(html:has(.kurlo-downloads)) {
+    --sl-content-width: 70rem;
+  }
+  :global(main:has(.kurlo-downloads) .content-panel + .content-panel) {
+    padding-top: 0;
+    border-top: 0;
+  }
+  .kurlo-downloads {
+    color: var(--sl-color-white);
+  }
+  .download-release,
+  .download-release p {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.75rem;
+    margin: 0;
+  }
+  .download-release {
+    justify-content: space-between;
+    padding-block: 0.7rem;
+    margin-block-end: 1.25rem;
+    border-block: 1px solid var(--sl-color-hairline);
+    font-size: 0.875rem;
+  }
+  .download-release-version {
+    font-weight: 650;
+    color: var(--sl-color-white);
+    text-decoration: none;
+  }
+  .download-release-date {
+    color: var(--sl-color-gray-3);
+  }
+  .download-installation,
+  .platform-install a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--sl-color-accent-high);
+    font-weight: 550;
+    text-decoration: none;
+  }
+  .download-release a:hover,
+  .platform-install a:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
   .kurlo-platforms {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-    gap: 0.75rem;
-    margin-top: 1.5rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
   }
   .kurlo-platform {
     display: flex;
     flex-direction: column;
-    gap: 0.85rem;
+    align-items: flex-start;
+    min-width: 0;
     padding: 1.25rem;
     border: 1px solid var(--sl-color-hairline);
-    border-radius: 14px;
-    background: var(--sl-color-black);
+    border-radius: 12px;
+    background: var(--kurlo-surface);
   }
-  .kurlo-platform header {
+  .kurlo-platform:has(.platform-current:not([hidden])) {
+    border-color: color-mix(in srgb, var(--sl-color-accent) 52%, var(--sl-color-hairline));
+  }
+  .platform-heading {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    width: 100%;
   }
-  .kurlo-platform h2 {
-    margin: 0;
-    font-size: 1.2rem;
-    font-weight: 600;
-    letter-spacing: -0.015em;
-    color: var(--sl-color-white);
-  }
-  .kurlo-platform-yours {
-    display: none;
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--sl-color-accent) 14%, transparent);
+  .platform-icon {
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 8px;
+    background: var(--sl-color-accent-low);
     color: var(--sl-color-accent-high);
-    font-size: 0.75rem;
+  }
+  .platform-heading h2 {
+    margin: 0;
+    font-size: 1.15rem;
     font-weight: 600;
   }
-  :global(:root[data-theme='light']) .kurlo-platform-yours {
-    color: var(--sl-color-accent);
+  .platform-current {
+    margin-inline-start: auto;
+    padding: 0.1rem 0.45rem;
+    border-radius: 5px;
+    color: var(--sl-color-accent-high);
+    background: var(--sl-color-accent-low);
+    font-size: 0.7rem;
+    font-weight: 600;
   }
-  .kurlo-platform-req,
-  .kurlo-platform-note {
-    margin: 0;
-    font-size: 0.875rem;
-    line-height: 1.55;
+  .platform-requirement {
+    margin: 0.65rem 0 1rem;
     color: var(--sl-color-gray-2);
+    font-size: 0.875rem;
+    line-height: 1.5;
   }
-  .kurlo-platform-note {
-    color: var(--sl-color-gray-3);
-  }
-  .kurlo-platform ul {
+  .platform-architectures {
     display: flex;
-    flex-direction: column;
-    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0 0 0.75rem;
+  }
+  .platform-architectures > span {
+    margin-inline-end: 0.25rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.78rem;
+  }
+  .platform-architectures label {
+    position: relative;
+    display: grid;
+    min-width: 3.25rem;
+    place-items: center;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 6px;
+    background: var(--sl-color-black);
+    font-size: 0.8rem;
+  }
+  .platform-architectures label:has(input:checked) {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+    font-weight: 600;
+  }
+  .platform-architectures label:has(input:focus-visible) {
+    outline: 2px solid var(--sl-color-accent);
+    outline-offset: 2px;
+  }
+  .platform-architectures input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     margin: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .platform-architectures label span {
+    padding: 0.2rem 0.55rem;
+  }
+  .platform-build {
+    width: 100%;
+  }
+  .platform-build[data-arch] {
+    display: none;
+  }
+  .kurlo-platform:has(input[value='x64']:checked) [data-arch='x64'],
+  .kurlo-platform:has(input[value='arm64']:checked) [data-arch='arm64'] {
+    display: block;
+  }
+  .platform-build :global(.platform-action) {
+    width: 100%;
+  }
+  .platform-format {
+    margin: 0.35rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+  .platform-alternatives {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.75rem), 1fr));
+    gap: 0.4rem;
     padding: 0;
+    margin: 0.85rem 0 0;
     list-style: none;
   }
-  .kurlo-platform li {
+  .platform-alternatives li {
     display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    font-size: 0.875rem;
-    color: var(--sl-color-white);
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0 0.4rem;
   }
-  .kurlo-platform li[hidden] {
-    display: none;
-  }
-  .kurlo-platform li a {
-    color: inherit;
-    text-decoration: none;
-  }
-  .kurlo-platform li a:hover {
-    text-decoration: underline;
-    text-underline-offset: 0.2em;
-  }
-  .kurlo-platform code {
-    font-family: var(--sl-font-mono);
-    font-size: 0.75rem;
-    color: var(--sl-color-gray-3);
-    overflow-wrap: anywhere;
-  }
-  .kurlo-platform-cta {
+  .platform-alternatives a {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    height: 2.5rem;
-    margin-top: auto;
-    border-radius: 10px;
-    border: 1px solid var(--sl-color-hairline);
-    background: var(--kurlo-surface);
-    color: var(--sl-color-white);
-    font-size: 0.9rem;
-    font-weight: 600;
+    gap: 0.4rem;
+    color: var(--sl-color-accent-high);
+    font-size: 0.84rem;
     text-decoration: none;
-    transition: border-color 0.15s ease, background 0.15s ease;
   }
-  .kurlo-platform-cta:hover {
-    border-color: color-mix(in srgb, var(--sl-color-accent) 50%, var(--sl-color-hairline));
-  }
-  .kurlo-platform-current {
-    border-color: color-mix(in srgb, var(--sl-color-accent) 55%, var(--sl-color-hairline));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-color-accent) 12%, transparent);
-  }
-  .kurlo-platform-current .kurlo-platform-yours {
-    display: inline-flex;
-  }
-  .kurlo-platform-current .kurlo-platform-cta {
-    background: var(--sl-color-accent);
-    border-color: var(--sl-color-accent);
-    color: #ffffff;
-  }
-  .kurlo-platforms-after {
-    margin-top: 1rem;
-    font-size: 0.9rem;
-    color: var(--sl-color-gray-3);
-  }
-  .kurlo-platforms-after a {
-    color: inherit;
+  .platform-alternatives a:hover {
     text-decoration: underline;
-    text-underline-offset: 0.2em;
+  }
+  .platform-alternatives span {
+    color: var(--sl-color-gray-3);
+    font-size: 0.8rem;
+  }
+  .platform-install {
+    width: 100%;
+    margin-block-start: auto;
+    padding-block-start: 1rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.83rem;
+    line-height: 1.5;
+  }
+  .platform-install p {
+    margin: 0 0 0.6rem;
+    padding-block-start: 0.85rem;
+    border-block-start: 1px solid var(--sl-color-hairline);
+  }
+  @media (max-width: 54rem) {
+    .kurlo-platforms {
+      grid-template-columns: 1fr;
+    }
+    .platform-build {
+      max-width: 22rem;
+    }
   }
 </style>

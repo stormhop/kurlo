@@ -1,0 +1,10 @@
+---
+title: "Verify the download"
+---
+
+SHA-256 checksums are published in `SHA256SUMS.txt`; auto-updates use the values embedded in `latest.json`. Verify before running:
+
+```sh
+shasum -a 256 kurlo-*.dmg
+# Compare against the value on the releases page.
+```

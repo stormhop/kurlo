@@ -1,6 +1,6 @@
 ---
 title: Your first request
-description: Send a request, save it to a collection, parameterize it with an environment.
+description: Send and save a request, set a base URL through an environment, and check the response with a test.
 ---
 
 This walkthrough takes about five minutes. By the end you'll have:
@@ -10,7 +10,9 @@ This walkthrough takes about five minutes. By the end you'll have:
 3. An environment with a base URL variable.
 4. A test script asserting the response.
 
-On a new profile, the **Welcome to Kurlo** screen offers **New request**, **Import a collection**, and **Open a workspace**. **Try an example** opens a `GET https://httpbin.org/get` draft; click **Send** when you're ready. You can skip the screen and reopen it later with `Cmd/Ctrl K` → **Welcome screen**.
+On a new profile, the **Welcome to Kurlo** screen offers **New request**, **Import a collection**, and **Open a workspace**. **Try an example** opens a `GET https://httpbin.org/get` draft. Click **Send** when you're ready. Choose **Skip for now** to dismiss the screen, or reopen it later with `Cmd/Ctrl K` → **Welcome screen**.
+
+![Welcome screen with options to create a request, import a collection, or open a workspace](../../../../assets/screenshots/welcome.png)
 
 ## 1. Create a workspace
 
@@ -48,18 +50,19 @@ It is the quickest way to paste a block of headers from somewhere else, or to ad
 
 ## 3. Save it to a collection
 
-- Click **Save** (or `Cmd/Ctrl S`).
-- Pick **+ New collection**, name it `Examples`, and save the request as `Get with query`.
+- In the Collections sidebar, click **New collection** (`+`) and name it `Examples`.
+- Return to the request tab and name the request `Get with query`.
+- Click **Save** (or press `Cmd/Ctrl S`). In **Save request**, open the collection list, select `Examples`, and click **Save**.
 
-The request now lives in the sidebar tree. Drag-and-drop reorders requests within their collection or folder.
+The request now lives in the sidebar tree. Drag it to reorder it or [move it to another folder in the same collection](/docs/guides/workspaces/requests/#reordering-requests).
 
 ## 4. Parameterize with an environment
 
 Hard-coded URLs don't survive across staging and prod. Replace the host with a variable:
 
-- Open **Environments** in the side panel, click **+** to create `Local`.
-- Add `baseUrl = https://httpbin.org`.
-- Activate `Local` from the environment switcher.
+- Open **Environments** in the activity rail and click **New environment** (`+`) to create `Local`.
+- Add `baseUrl = https://httpbin.org`. In manual-save mode, click **Save** in the environment editor.
+- Select `Local` from the environment switcher if it is not already active.
 - Edit the request URL to `{{baseUrl}}/get?lang=go&runtime=wails`.
 - Send again — same result, but now portable.
 

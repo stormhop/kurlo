@@ -403,7 +403,6 @@ test.describe('Text fields and workspace files', () => {
     await installKurloBridge(page, '', 'windows/e2e');
     await page.goto('/');
     const url = page.getByLabel('Request URL');
-    await url.fill('https://api.kurlo.test/orders');
     const menu = page.getByRole('menu', { name: 'Edit' });
 
     await url.click({ button: 'right' });
@@ -411,6 +410,12 @@ test.describe('Text fields and workspace files', () => {
     await expect(menu.getByRole('menuitem', { name: /Cut/ })).toBeDisabled();
     await expect(menu.getByRole('menuitem', { name: /Copy/ })).toBeDisabled();
     await expect(menu.getByRole('menuitem', { name: /Paste/ })).toContainText('Ctrl+V');
+    await expect(menu.getByRole('menuitem', { name: /Select all/ })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+
+    await url.fill('https://api.kurlo.test/orders');
+    await url.click({ button: 'right' });
     await menu.getByRole('menuitem', { name: /Select all/ }).click();
     await expect(menu).toBeHidden();
 

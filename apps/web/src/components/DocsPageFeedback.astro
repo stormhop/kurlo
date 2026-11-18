@@ -1,0 +1,206 @@
+---
+const { path } = Astro.props as { path: string };
+const reasons = [
+  ['getting-started', 'Help me get started faster'],
+  ['find-info', 'Make information easier to find'],
+  ['clarity', 'Explain the feature more clearly'],
+  ['outdated', 'Update this documentation'],
+  ['other', 'Something else'],
+];
+---
+
+<docs-page-feedback class="not-content print:hidden" data-path={path} data-pagefind-ignore>
+  <div class="feedback-vote" role="group" aria-labelledby="docs-feedback-question">
+    <span id="docs-feedback-question">Was this page helpful?</span>
+    <div class="feedback-vote-buttons">
+      {['Yes', 'No'].map(label => (
+        <button
+          type="button"
+          data-vote={label.toLowerCase()}
+          aria-expanded={label === 'No' ? 'false' : undefined}
+          aria-controls={label === 'No' ? 'docs-feedback-form' : undefined}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 10v11H3V10h4Zm0 1 4.4-8.2a2 2 0 0 1 2.9 2.1L13 9h5.8a2.1 2.1 0 0 1 2 2.5l-1.4 7.8a2 2 0 0 1-2 1.7H7"/>
+          </svg>
+          {label}
+        </button>
+      ))}
+    </div>
+  </div>
+  <form id="docs-feedback-form" hidden>
+    <fieldset>
+      <legend>What could we improve?</legend>
+      {reasons.map(([value, label]) => (
+        <label><input type="radio" name="reason" value={value} required /> {label}</label>
+      ))}
+      <div class="feedback-form-buttons">
+        <button type="button" data-cancel>Cancel</button>
+        <button type="submit" disabled>Submit feedback</button>
+      </div>
+    </fieldset>
+  </form>
+  <output></output>
+</docs-page-feedback>
+
+<style>
+  docs-page-feedback {
+    display: block;
+    margin-block-start: 2rem;
+    padding-block: 1.25rem;
+    border-block: 1px solid var(--sl-color-hairline);
+    color: var(--sl-color-gray-2);
+    font-size: 0.875rem;
+  }
+  .feedback-vote,
+  .feedback-vote-buttons,
+  .feedback-form-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .feedback-vote {
+    gap: 0.5rem 1rem;
+  }
+  .feedback-vote[hidden] {
+    display: none;
+  }
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 2.25rem;
+    padding-inline: 0.7rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.55rem;
+    background: var(--kurlo-surface);
+    color: var(--sl-color-white);
+    font: inherit;
+    cursor: pointer;
+  }
+  button:not(:disabled):hover {
+    border-color: var(--sl-color-accent);
+  }
+  [data-vote="no"] svg {
+    transform: rotate(180deg);
+  }
+  button[aria-expanded="true"] {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+  }
+  form {
+    margin-block-start: 1rem;
+    padding-block-start: 1rem;
+    border-block-start: 1px solid var(--sl-color-hairline);
+  }
+  fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  legend {
+    margin-block-end: 0.55rem;
+    padding: 0;
+    color: var(--sl-color-white);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  label {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    width: fit-content;
+    padding-block: 0.25rem;
+    cursor: pointer;
+  }
+  input {
+    flex-shrink: 0;
+    margin: 0;
+    accent-color: var(--sl-color-accent);
+  }
+  .feedback-form-buttons {
+    margin-block-start: 1rem;
+  }
+  button[type="submit"]:enabled {
+    border-color: var(--sl-color-accent);
+    background: var(--sl-color-accent);
+    color: #fff;
+  }
+  button:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  output {
+    display: block;
+  }
+  .feedback-vote:not([hidden]) ~ output:not(:empty) {
+    margin-block-start: 0.7rem;
+  }
+</style>
+
+<script>
+  class DocsPageFeedback extends HTMLElement {
+    connectedCallback() {
+      const vote = this.querySelector<HTMLElement>('.feedback-vote')!;
+      const yes = this.querySelector<HTMLButtonElement>('[data-vote="yes"]')!;
+      const no = this.querySelector<HTMLButtonElement>('[data-vote="no"]')!;
+      const form = this.querySelector<HTMLFormElement>('form')!;
+      const choices = form.querySelector<HTMLFieldSetElement>('fieldset')!;
+      const submit = form.querySelector<HTMLButtonElement>('[type="submit"]')!;
+      const status = this.querySelector<HTMLOutputElement>('output')!;
+
+      const closeForm = () => {
+        form.hidden = true;
+        form.reset();
+        submit.disabled = true;
+        no.setAttribute('aria-expanded', 'false');
+      };
+      const send = async (answer: string) => {
+        yes.disabled = no.disabled = choices.disabled = true;
+        status.value = 'Sending feedback…';
+        try {
+          const query = new URLSearchParams({ p: `docs-feedback${this.dataset.path}${answer}`, e: '1' });
+          const response = await fetch(`/analytics/count?${query}`, {
+            credentials: 'omit',
+            referrerPolicy: 'no-referrer',
+            cache: 'no-store',
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!response.ok || !response.headers.get('content-type')?.startsWith('image/gif')) throw new Error('Feedback request failed');
+          vote.hidden = true;
+          closeForm();
+          status.value = 'Thanks for your feedback.';
+        } catch {
+          yes.disabled = no.disabled = choices.disabled = false;
+          status.value = 'Could not send feedback. Please try again.';
+        }
+      };
+
+      yes.addEventListener('click', () => void send('yes'));
+      no.addEventListener('click', () => {
+        form.hidden = false;
+        status.value = '';
+        no.setAttribute('aria-expanded', 'true');
+        form.querySelector('input')?.focus();
+      });
+      form.querySelector('[data-cancel]')?.addEventListener('click', () => {
+        closeForm();
+        status.value = '';
+        no.focus();
+      });
+      form.addEventListener('change', () => {
+        submit.disabled = !form.querySelector(':checked');
+      });
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        const reason = new FormData(form).get('reason');
+        if (typeof reason === 'string') void send(`no-${reason}`);
+      });
+    }
+  }
+
+  customElements.define('docs-page-feedback', DocsPageFeedback);
+</script>

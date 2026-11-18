@@ -38,7 +38,7 @@ Provisioning, the nginx site, TLS issuance and rollback live in the private `sto
 
 ### Where the domain lives
 
-`site.config.mjs` holds `PRIMARY_DOMAIN` and everything derived from it — `astro.config.mjs`, the structured data and `src/pages/robots.txt.ts` all read from there, so moving the site is one line plus DNS.
+`site.config.mjs` holds `PRIMARY_DOMAIN` and everything derived from it — `site.astro.mjs`, the structured data and `src/pages/robots.txt.ts` all read from there, so moving the site is one line plus DNS.
 
 `KURLO_SITE_URL` and `KURLO_SITE_BASE` override it at build time for staging. Empty values count as unset, which matters because GitHub Actions passes an unconfigured repository variable through as an empty string.
 
@@ -53,7 +53,8 @@ Provisioning, the nginx site, TLS issuance and rollback live in the private `sto
 
 ```
 apps/web/
-├── astro.config.mjs          # Starlight config, sidebar, social links
+├── astro.config.mts          # Astro entry point
+├── site.astro.mjs            # Starlight config and navigation file watcher
 ├── src/
 │   ├── assets/               # in-repo images referenced from MDX
 │   ├── content.config.ts     # Starlight content collection loader
@@ -69,4 +70,6 @@ apps/web/
 
 ## Notes on the docs subtree
 
-Starlight is mounted at the site root — so all content lives under `src/content/docs/`. To give docs a `/docs/` URL prefix, the docs themselves live inside an extra `docs/` folder: `src/content/docs/docs/getting-started/installation.md` → `/docs/getting-started/installation/`. The splash landing and download page sit alongside as siblings (no `/docs/` prefix). The sidebar is curated explicitly in `astro.config.mjs`, so the docs subtree never bleeds into the landing.
+Starlight is mounted at the site root. Documentation lives under `src/content/docs/docs/`. For example, `getting-started/installation.mdx` serves `/docs/getting-started/installation/`, and `getting-started/installation/macos.mdx` serves the macOS article.
+
+`docs.sidebar.mjs` defines the areas and their groups. `docs.topics.mjs` lists the articles in each guide in sidebar order. When moving a published heading, update its entry in `docs.legacy-fragments.json` so old links lead to the new article.

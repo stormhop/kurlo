@@ -1,49 +1,110 @@
 ---
 import Search from '@astrojs/starlight/components/Search.astro';
 import ThemeSelect from '@astrojs/starlight/components/ThemeSelect.astro';
+import { Icon } from '@astrojs/starlight/components';
+import DownloadLink from './DownloadLink.astro';
+import { DOCS_HOME, DOCS_SECTIONS, docsSectionForPath } from '../../docs.sidebar.mjs';
+import { GITHUB_SOURCE } from '../../site.constants.mjs';
 import logo from '../assets/logo.png';
 
 const base = import.meta.env.BASE_URL.endsWith('/') ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
 const path = Astro.url.pathname.slice(base.length - 1);
+const section = docsSectionForPath(path);
+const isDownloadPage = path === '/download/';
+const useDocsHeader = path === DOCS_HOME || Boolean(section) || isDownloadPage;
+const changelog = { label: 'Changelog', href: `${base}changelog/`, active: path.startsWith('/changelog/') };
+const download = `${base}download/`;
 const links = [
-  { label: 'Docs', href: `${base}docs/`, active: path.startsWith('/docs/') },
-  { label: 'Agent mode', href: `${base}agent/`, active: false },
-  { label: 'MCP', href: `${base}mcp/`, active: false },
-  { label: 'Changelog', href: `${base}changelog/`, active: path.startsWith('/changelog/') },
-  { label: 'GitHub', href: 'https://github.com/stormhop/kurlo', active: false },
+  ...(useDocsHeader ? [] : [
+    { label: 'Docs', href: `${base}docs/`, active: false },
+    { label: 'Agent mode', href: `${base}agent/`, active: false },
+    { label: 'MCP', href: `${base}mcp/`, active: false },
+  ]),
+  changelog,
 ];
 ---
 
-<div class="kurlo-header">
-  <div class="kurlo-header-title">
-    <a class="kurlo-brand" href={base} aria-label="Kurlo home">
-      <img src={logo.src} alt="" width="30" height="30" />
-      <span>kurlo</span>
-    </a>
+<div class="kurlo-header-shell" data-docs={useDocsHeader ? '' : undefined}>
+  <div class="kurlo-header">
+    <div class="kurlo-header-title">
+      <a class="kurlo-brand" href={base} aria-label="Kurlo home">
+        <img src={logo.src} alt="" width="30" height="30" />
+        <span>kurlo</span>
+      </a>
+      {useDocsHeader && <a class="docs-home" href={`${base}docs/`} aria-current={path === DOCS_HOME ? 'page' : undefined}>Docs</a>}
+    </div>
+    <div class="kurlo-header-search print:hidden">
+      <Search />
+    </div>
+    <div class="kurlo-header-end sl-hidden md:sl-flex print:hidden">
+      <nav class="kurlo-header-nav" aria-label="Site">
+        {links.map(link => (
+          <a href={link.href} aria-current={link.active ? 'page' : undefined}>{link.label}</a>
+        ))}
+        <a href={GITHUB_SOURCE} aria-label="GitHub"><Icon name="github" size="1.125rem" /></a>
+      </nav>
+      <ThemeSelect />
+      <DownloadLink href={download} aria-current={isDownloadPage ? 'page' : undefined} />
+    </div>
+    {useDocsHeader && !Astro.locals.starlightRoute.hasSidebar && <div class="md:sl-hidden"><ThemeSelect /></div>}
   </div>
-  <div class="kurlo-header-search print:hidden">
-    <Search />
-  </div>
-  <div class="kurlo-header-end sl-hidden md:sl-flex print:hidden">
-    <nav class="kurlo-header-nav" aria-label="Site">
-      {links.map(link => (
-        <a href={link.href} aria-current={link.active ? 'page' : undefined}>{link.label}</a>
-      ))}
-    </nav>
-    <ThemeSelect />
-    <a class="kurlo-header-cta" href={`${base}download/`} aria-current={path.startsWith('/download/') ? 'page' : undefined}>Download</a>
-  </div>
+  {useDocsHeader && (
+    <div class="docs-sections print:hidden">
+      <button class="docs-sections-trigger" type="button" popovertarget="docs-section-picker" aria-label={section ? `${section.label}, browse sections` : undefined} hidden>
+        {section?.label ?? 'Browse sections'}
+        <Icon name="down-caret" size="1rem" class="docs-sections-caret" />
+      </button>
+      <div id="docs-section-picker" class="docs-section-picker">
+        <nav class="docs-section-links" aria-label="Documentation sections">
+          {DOCS_SECTIONS.map(item => (
+            <a href={`${base}${item.link.slice(1)}`} aria-current={path === item.link ? 'page' : section === item ? 'true' : undefined}>
+              {item.label}
+            </a>
+          ))}
+        </nav>
+        <nav class="docs-mobile-links" aria-label="Site">
+          <a href={changelog.href}>Changelog</a>
+          <a href={GITHUB_SOURCE}>GitHub</a>
+          <DownloadLink href={download} aria-current={isDownloadPage ? 'page' : undefined} />
+        </nav>
+      </div>
+    </div>
+  )}
 </div>
 
 <style>
+  :global(html:has(.kurlo-header-shell[data-docs])) {
+    --kurlo-header-row-height: 3.625rem;
+    --sl-nav-height: calc(var(--kurlo-header-row-height) + 2.625rem);
+  }
+  :global(header.header:has(.kurlo-header-shell[data-docs])) {
+    padding: 0;
+    background: color-mix(in srgb, var(--sl-color-black) 94%, transparent);
+  }
+  .kurlo-header-shell {
+    height: 100%;
+  }
+  .kurlo-header-shell[data-docs] {
+    --docs-control-size: 2.25rem;
+    --docs-control-radius: 0.55rem;
+    --docs-hover: color-mix(in srgb, var(--sl-color-white) 6%, transparent);
+  }
+  .kurlo-header-shell[data-docs] .kurlo-header {
+    height: var(--kurlo-header-row-height);
+    padding-inline: var(--sl-nav-pad-x);
+  }
   .kurlo-header {
     display: flex;
     align-items: center;
     gap: var(--sl-nav-gap);
     height: 100%;
+    max-width: 98rem;
+    margin-inline: auto;
   }
   .kurlo-header-title {
     display: flex;
+    align-items: center;
+    flex-shrink: 0;
     min-width: 0;
     overflow: clip;
     padding: 0.25rem;
@@ -62,6 +123,31 @@ const links = [
   .kurlo-brand img {
     border-radius: 8px;
   }
+  .kurlo-header-shell[data-docs] .kurlo-brand {
+    font-size: 1.2rem;
+  }
+  .docs-home {
+    display: grid;
+    min-height: 1.75rem;
+    place-items: center;
+    margin-inline-start: 0.65rem;
+    padding-inline: 0.55rem;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.45rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.8125rem;
+    font-weight: 550;
+    text-decoration: none;
+  }
+  .docs-home:hover {
+    background: var(--docs-hover);
+    color: var(--sl-color-white);
+  }
+  .docs-home[aria-current] {
+    background: var(--sl-color-accent-low);
+    border-color: transparent;
+    color: var(--sl-color-accent-high);
+  }
   .kurlo-header-search {
     display: flex;
     flex: 1 1 auto;
@@ -76,8 +162,7 @@ const links = [
     align-items: center;
     gap: 1.5rem;
   }
-  .kurlo-header-nav a,
-  .kurlo-header-cta {
+  .kurlo-header-nav a {
     font-family: var(--sl-font-mono);
     font-size: 0.75rem;
     font-weight: 500;
@@ -93,28 +178,221 @@ const links = [
   .kurlo-header-nav a[aria-current='page'] {
     color: var(--sl-color-white);
   }
-  .kurlo-header-cta {
-    padding: 0.7rem 1rem;
-    border-radius: 6px;
-    background: var(--sl-color-white);
-    color: var(--sl-color-black);
-    font-weight: 700;
-    transition: opacity 0.15s ease;
+  .kurlo-header-shell[data-docs] .kurlo-header-end,
+  .kurlo-header-shell[data-docs] .kurlo-header-nav {
+    gap: 0.4rem;
   }
-  .kurlo-header-cta:hover {
-    opacity: 0.88;
+  .kurlo-header-shell[data-docs] .kurlo-header-search {
+    justify-content: center;
+    min-width: 0;
+  }
+  .kurlo-header-shell[data-docs] .kurlo-header-search :global(button[data-open-modal]) {
+    max-width: 26rem;
+    height: var(--docs-control-size);
+    border-radius: var(--docs-control-radius);
+  }
+  .kurlo-header-shell[data-docs] .kurlo-header-nav a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--docs-control-size);
+    min-height: var(--docs-control-size);
+    padding: 0 0.65rem;
+    border-radius: var(--docs-control-radius);
+    font-family: var(--sl-font);
+    font-size: 0.8125rem;
+    font-weight: 550;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .kurlo-header-shell[data-docs] .kurlo-header-nav a:hover,
+  .kurlo-header-shell[data-docs] :global(starlight-theme-select label:hover) {
+    background: var(--docs-hover);
+  }
+  .kurlo-header-shell[data-docs] :global(starlight-theme-select label) {
+    width: 2.75rem;
+    height: var(--docs-control-size);
+    border-radius: var(--docs-control-radius);
+  }
+  .kurlo-header-shell[data-docs] :global(starlight-theme-select select) {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border-radius: inherit;
+    color: transparent;
+  }
+  .kurlo-header-shell[data-docs] :global(starlight-theme-select .label-icon) {
+    inset-inline-start: 0.5rem;
+    font-size: 1rem;
+  }
+  .kurlo-header-shell[data-docs] :global(starlight-theme-select .caret) {
+    inset-inline-end: 0.35rem;
+    font-size: 0.875rem;
+  }
+  .docs-sections {
+    display: flex;
+    align-items: center;
+    height: calc(var(--sl-nav-height) - var(--kurlo-header-row-height));
+    max-width: 98rem;
+    margin-inline: auto;
+    padding-inline: var(--sl-nav-pad-x);
+    border-block-start: 1px solid var(--sl-color-hairline);
+  }
+  .docs-section-picker:not([popover]) {
+    min-width: 0;
+  }
+  .docs-section-picker:not([popover]) .docs-section-links {
+    display: flex;
+    gap: clamp(0.125rem, 0.55vw, 0.5rem);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .docs-sections a:not(:global(.download-link)) {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    min-height: 1.875rem;
+    padding: 0 0.625rem;
+    border-radius: 0.45rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .docs-sections a:not(:global(.download-link)):hover {
+    background: var(--docs-hover);
+    color: var(--sl-color-white);
+  }
+  .docs-sections a:not(:global(.download-link))[aria-current] {
+    background: var(--sl-color-accent-low);
+    color: var(--sl-color-accent-high);
+    font-weight: 600;
+  }
+  .docs-sections a:not(:global(.download-link)):focus-visible {
+    outline-offset: -3px;
+  }
+  .docs-sections-trigger:not([hidden]) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-height: var(--docs-control-size);
+    padding-inline: 0.65rem;
+    border: 0;
+    border-radius: var(--docs-control-radius);
+    background: var(--kurlo-surface);
+    color: var(--sl-color-white);
+    font-size: 0.875rem;
+    font-weight: 550;
+    cursor: pointer;
+  }
+  .docs-sections:has(:popover-open) .docs-sections-caret {
+    transform: rotate(180deg);
+  }
+  .docs-mobile-links {
+    display: none;
+  }
+  .docs-section-picker[popover] {
+    position: fixed;
+    inset: calc(var(--sl-nav-height) + 0.35rem) var(--sl-nav-pad-x) auto;
+    width: auto;
+    max-height: calc(100dvh - var(--sl-nav-height) - 1rem);
+    margin: 0;
+    padding: 0.3rem;
+    overflow-y: auto;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: 0.75rem;
+    background: var(--sl-color-black);
+    box-shadow: var(--sl-shadow-lg);
+  }
+  .docs-section-picker[popover] a:not(:global(.download-link)) {
+    min-height: 2.5rem;
+    padding-inline: 0.75rem;
+  }
+  @media (max-width: 49.999rem) {
+    :global(html:has(.kurlo-header-shell[data-docs])) {
+      --kurlo-header-row-height: 3.5rem;
+      --sl-nav-height: calc(var(--kurlo-header-row-height) + 3rem);
+      --sl-menu-button-size: 2.5rem;
+    }
+    .kurlo-header-shell[data-docs] {
+      --docs-control-size: 2.5rem;
+    }
+    .kurlo-header-shell[data-docs] .kurlo-header {
+      gap: 0.5rem;
+    }
+    :global([data-has-sidebar]) .kurlo-header-shell[data-docs] .kurlo-header {
+      padding-inline-end: calc(var(--sl-nav-pad-x) + var(--sl-menu-button-size) + 0.5rem);
+    }
+    :global(html:has(.kurlo-header-shell[data-docs]) .sl-menu-button) {
+      top: calc((var(--kurlo-header-row-height) - var(--sl-menu-button-size)) / 2);
+      border: 1px solid var(--sl-color-hairline);
+      border-radius: 0.55rem;
+      background: var(--kurlo-surface);
+      color: var(--sl-color-white);
+      box-shadow: none;
+    }
+    :global(html:has(.kurlo-header-shell[data-docs]) .sl-menu-button:has(~ :popover-open)) {
+      background: var(--sl-color-accent-low);
+      color: var(--sl-color-accent-high);
+    }
+    .kurlo-header-search,
+    .kurlo-header-shell[data-docs] .kurlo-header-search {
+      justify-content: flex-end;
+    }
+    .kurlo-header-search :global([data-open-modal]) {
+      width: 2.25rem;
+      justify-content: center;
+      padding: 0;
+    }
+    .kurlo-header-shell[data-docs] .kurlo-header-search :global([data-open-modal]) {
+      width: var(--docs-control-size);
+    }
+    .docs-section-picker[popover] .docs-mobile-links {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-block-start: 0.3rem;
+      padding-block-start: 0.3rem;
+      border-block-start: 1px solid var(--sl-color-hairline);
+    }
   }
   @media (min-width: 50rem) {
-    .kurlo-header-title {
+    .kurlo-header-shell:not([data-docs]) .kurlo-header-title {
       min-width: calc(var(--sl-sidebar-width) - 2 * var(--sl-nav-pad-x));
     }
-    .kurlo-header-search {
+    .kurlo-header-shell:not([data-docs]) .kurlo-header-search {
       padding-inline-start: 0.5rem;
+    }
+  }
+  @media (min-width: 64rem) {
+    .kurlo-header-shell[data-docs] .kurlo-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) min(33vw, 26rem) minmax(0, 1fr);
+    }
+    .kurlo-header-shell[data-docs] .kurlo-header-end {
+      justify-self: end;
     }
   }
 </style>
 
 <script>
+  const picker = document.querySelector<HTMLElement>('#docs-section-picker');
+  const trigger = document.querySelector<HTMLButtonElement>('.docs-sections-trigger');
+  if (picker && trigger && 'popover' in picker) {
+    const desktop = matchMedia('(min-width: 50rem)');
+    const updatePicker = () => {
+      picker.popover = desktop.matches ? null : 'auto';
+      trigger.hidden = desktop.matches;
+    };
+    updatePicker();
+    desktop.addEventListener('change', updatePicker);
+  }
+
   const query = new URLSearchParams(window.location.search).get('q')?.trim();
   if (query) {
     const fill = () => {

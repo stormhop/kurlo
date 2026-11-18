@@ -1,0 +1,95 @@
+---
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+import MobileMenuFooter from '@astrojs/starlight/components/MobileMenuFooter.astro';
+import SidebarPersister from '@astrojs/starlight/components/SidebarPersister.astro';
+import SidebarRestorePoint from '@astrojs/starlight/components/SidebarRestorePoint.astro';
+import SidebarSublist from '@astrojs/starlight/components/SidebarSublist.astro';
+import { docsSectionForPath } from '../../docs.sidebar.mjs';
+
+const { id, sidebar } = Astro.locals.starlightRoute;
+const section = docsSectionForPath(`/${id}/`);
+---
+
+{section ? (
+  <>
+    <SidebarPersister>
+      <div class="docs-sidebar-tree">
+        <p class="docs-sidebar-title">{section.label}</p>
+        {sidebar.map((entry, index) => entry.type === 'group' ? (
+          <section class="docs-sidebar-group" aria-labelledby={`docs-sidebar-group-${index}`}>
+            <h2 id={`docs-sidebar-group-${index}`}>{entry.label}</h2>
+            <SidebarRestorePoint />
+            <SidebarSublist sublist={entry.entries} nested />
+          </section>
+        ) : (
+          <SidebarSublist sublist={[entry]} nested />
+        ))}
+      </div>
+    </SidebarPersister>
+    <div class="md:sl-hidden"><MobileMenuFooter /></div>
+  </>
+) : <Default />}
+
+<script>
+  const sidebar = document.getElementById('starlight__sidebar');
+  const current = sidebar?.querySelector('a[aria-current="page"]');
+  if (sidebar && current) {
+    for (let group = current.closest('details'); group; group = group.parentElement?.closest('details') ?? null) {
+      group.open = true;
+    }
+
+    const reveal = () => {
+      if (!sidebar.clientHeight) return;
+      const bounds = sidebar.getBoundingClientRect();
+      const item = current.getBoundingClientRect();
+      if (item.top < bounds.top) sidebar.scrollTop += item.top - bounds.top;
+      if (item.bottom > bounds.bottom) sidebar.scrollTop += item.bottom - bounds.bottom;
+    };
+
+    reveal();
+    sidebar.addEventListener('toggle', event => {
+      if (event.target === sidebar && sidebar.matches(':popover-open')) reveal();
+    });
+  }
+</script>
+
+<style>
+  .docs-sidebar-title {
+    margin: 0.1rem 0.6rem 0.55rem;
+    color: var(--sl-color-white);
+    font-size: 1rem;
+    font-weight: 650;
+  }
+  .docs-sidebar-group {
+    margin-block-start: 0.9rem;
+    padding-block-start: 0.75rem;
+    border-block-start: 1px solid var(--sl-color-hairline);
+  }
+  .docs-sidebar-group h2 {
+    margin: 0 0.6rem 0.4rem;
+    color: var(--sl-color-gray-2);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+  }
+  .docs-sidebar-tree :global(summary) {
+    padding: 0.38rem 0.6rem;
+    border-radius: 7px;
+  }
+  .docs-sidebar-tree :global(summary:hover),
+  .docs-sidebar-tree :global(details[open] > summary) {
+    background: var(--kurlo-surface);
+  }
+  .docs-sidebar-tree :global(details:has(a[aria-current='page']) > summary .large) {
+    color: var(--sl-color-accent-high);
+  }
+  .docs-sidebar-tree :global(details > ul) {
+    margin: 0.25rem 0 0.45rem 0.95rem;
+    padding-inline-start: 0.4rem;
+    border-inline-start: 1px solid var(--sl-color-hairline);
+  }
+  .docs-sidebar-tree :global(details:has(a[aria-current='page']) > ul) {
+    border-inline-start-color: var(--sl-color-accent);
+  }
+</style>

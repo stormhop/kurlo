@@ -1,0 +1,24 @@
+---
+title: Kurlo YAML format
+description: Public contract for Git-backed Kurlo workspaces.
+---
+
+import DocsTopicIndex from "../../../../components/DocsTopicIndex.astro";
+
+Kurlo stores Git-backed workspaces as plain YAML files. This format reference is intended for review tools, formatters, generators, and import/export integrations.
+
+Schema: `schemas/kurlo-workspace-yaml-v1.schema.json`
+
+## Contract
+
+| Field | Value |
+|-------|-------|
+| Storage kind | `workspace-yaml` |
+| Format | `kurlo.workspace.yaml.v1` |
+| File version | `1` |
+| Path layout | `yaml-filesystem-names.v1` |
+| Encoding | UTF-8 YAML |
+
+Kurlo preserves unknown fields inside workspace, collection, request, environment, auth, settings, and row objects when it can. Tools should do the same to stay forward-compatible.
+
+<DocsTopicIndex />

@@ -5,11 +5,22 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Postman v3 collection export.** Open a Kurlo collection as local files in Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available.
+
+### Fixed
+
+- **OpenAPI imports stay in the intended workspace.** Kurlo cancels a pending import if another workspace is active when the spec arrives.
+- **Import errors are visible.** OpenAPI and Postman imports report a save failure and keep imported requests available to save again.
+
 ## [3.1.4] - 2026-11-17
 
 ### Added
 
-- **Postman v3 collections.** Import the folder of `.request.yaml` files that Postman v12 keeps in Git: pick **Postman v3 collection folder**, or drop the folder or a single request file into the window. Collections, folder order, every request kind Kurlo runs, auth, bodies, scripts, settings, examples, environments and globals come across; requests Kurlo cannot run, such as MQTT or Kafka, are skipped and counted.
+- **Postman v3 collections.** Import a Native Git folder or a single `*.request.yaml` file. Kurlo reads HTTP, GraphQL, gRPC, WebSocket, Socket.IO, and MCP over HTTP, along with supported settings, examples, scripts, environments and globals. Unsupported requests are skipped and counted.
 - **Move requests between folders.** Drag a saved request onto a folder in its collection, including empty and nested folders, or onto the collection header to return it to the root.
 - **PFX/P12 client certificates.** Use PKCS#12 containers directly for mTLS, with a password and certificate chain, for HTTP and gRPC including reflection.
 - **Performance dock.** Open it from the gauge in the status bar or with Cmd/Ctrl Alt P to see CPU, memory, uptime and Kurlo's processes, with two-minute charts. Drag its top edge to resize it; sampling stops while it is closed.

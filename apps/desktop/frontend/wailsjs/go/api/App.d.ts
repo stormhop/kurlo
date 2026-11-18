@@ -423,6 +423,8 @@ export function WebSocketSend(arg1:string,arg2:model.WebSocketSendMessage):Promi
 
 export function WriteCollectionTextFiles(arg1:string,arg2:Array<api.CollectionTextFile>):Promise<string>;
 
+export function WriteNewCollectionTextFiles(arg1:string,arg2:string,arg3:Array<api.CollectionTextFile>):Promise<string>;
+
 export function WriteOpenAPIBaseSpec(arg1:string,arg2:string):Promise<string>;
 
 export function WriteWorkspaceYAMLFile(arg1:string,arg2:string):Promise<api.WorkspaceOpenResult>;

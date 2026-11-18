@@ -1,0 +1,40 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+type Props = HTMLAttributes<'a'>;
+const { class: className, ...attributes } = Astro.props;
+---
+
+<a class:list={['download-link', className]} {...attributes}><slot>Download</slot></a>
+
+<style>
+  .download-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.7rem 1rem;
+    border-radius: 6px;
+    background: var(--download-background, #15161c);
+    color: var(--download-color, #f1eee7);
+    font-family: 'Geist Mono Variable', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.55;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+  }
+  :global(:root[data-theme='dark']) .download-link {
+    background: var(--download-background, #eeece6);
+    color: var(--download-color, #0e0f15);
+  }
+  .download-link:hover {
+    opacity: 0.88;
+  }
+  .download-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
+</style>

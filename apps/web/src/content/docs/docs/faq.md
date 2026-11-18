@@ -1,6 +1,6 @@
 ---
 title: FAQ
-description: Common questions about Kurlo — data, auth, updates, troubleshooting.
+description: Find answers about data storage, backups, installation, auto-updates, and Postman compatibility.
 ---
 
 ## Is Kurlo free?
@@ -27,7 +27,7 @@ Folder/Git workspace YAML is intentionally readable so it can be reviewed and co
 
 ## How do I export and back up my data?
 
-Use **Settings -> General -> Advanced data -> Export all data** for a portable Kurlo backup. It includes profile data, history, cookies, and selected preferences; it is also a plaintext file that can contain secrets. Collection exports are for interoperability and do not include runtime history or cookies.
+Use **Settings → General → Data → Export all data** for a portable Kurlo backup. It includes profile data, history, cookies, and selected preferences. The plaintext file can contain secrets. Collection exports are for interoperability and do not include runtime history or cookies.
 
 For an exact disk-level backup, quit Kurlo and copy the data directory with both `requests.json` and its matching `request-store.key`. Back up external workspace repositories separately.
 
@@ -57,10 +57,6 @@ The NSIS installer is not currently Authenticode-signed, so SmartScreen may flag
 ## Postman compatibility — what doesn't carry over?
 
 See [Import & export](/docs/guides/import-export/). Short version: common `pm.*` scripts import into Kurlo's sandboxed script fields — including `pm.sendRequest`, `pm.collectionVariables`, and `CryptoJS` request signing. What still needs a rewrite: scripts that `require` a Node.js module or external package, anything using `async`/`await` or `setTimeout`, Visualizers, and cloud-only Postman features. Monitors have no direct equivalent — use the [CLI runner](/docs/guides/cli-runner/) on a schedule. Mock servers do have one, and it is local: Kurlo serves a collection's [saved examples](/docs/guides/examples/) over HTTP on your own machine. See [Mock server](/docs/guides/mock-server/).
-
-## Roadmap?
-
-There is no published roadmap document. What ships lands in the [changelog](/changelog/), and feature requests are tracked as [GitHub issues](https://github.com/stormhop/kurlo/issues) — open one if something you need is missing. Known gaps today: folder-level auth/headers/scripts (collections have them, folders do not), OAuth 1.0, NTLM and Hawk, MQTT, response visualizers (`pm.visualizer.set`), and `setTimeout`/`async` in the script sandbox.
 
 ## How do I report a bug?
 

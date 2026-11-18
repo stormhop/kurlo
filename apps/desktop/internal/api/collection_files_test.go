@@ -128,3 +128,30 @@ func TestEnsureWorkspaceGitignoreKeepsLFWhereItFoundLF(t *testing.T) {
 		t.Fatalf("an LF file must stay LF, got %q", content)
 	}
 }
+
+func TestWriteNewCollectionTextFilesKeepsExistingExportsAndRollsBackErrors(t *testing.T) {
+	parent := t.TempDir()
+	const requestPath = "postman/collections/api/check.request.yaml"
+	files := []CollectionTextFile{{Path: requestPath, Content: "$kind: grpc-request\n"}}
+	if err := writeNewCollectionTextFiles(parent, "api", files); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeNewCollectionTextFiles(parent, "api", []CollectionTextFile{{Path: requestPath, Content: "changed"}}); err == nil {
+		t.Fatal("expected existing export to be rejected")
+	}
+	if got := readFileString(t, filepath.Join(parent, "api", filepath.FromSlash(requestPath))); got != files[0].Content {
+		t.Fatalf("existing export changed: %q", got)
+	}
+	badFiles := append(files, CollectionTextFile{Path: "../outside.yaml", Content: "invalid"})
+	if err := writeNewCollectionTextFiles(parent, "incomplete", badFiles); err == nil {
+		t.Fatal("expected invalid request path to be rejected")
+	}
+	if _, err := os.Lstat(filepath.Join(parent, "incomplete")); !os.IsNotExist(err) {
+		t.Fatalf("incomplete folder remains: %v", err)
+	}
+	for _, name := range []string{"..", ".", "../outside", `other\folder`, "C:folder"} {
+		if err := writeNewCollectionTextFiles(parent, name, files); err == nil {
+			t.Fatalf("accepted unsafe export folder name %q", name)
+		}
+	}
+}
