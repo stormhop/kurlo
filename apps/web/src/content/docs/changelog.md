@@ -21,6 +21,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **OpenAPI imports** stop if the intended workspace is no longer active when the spec arrives.
 - **OpenAPI and Postman imports** report save failures and let you retry saving imported requests.
+- **Secret variables** keep their IDs when loading and autosaving a Git workspace.
 
 ## 3.1.4
 

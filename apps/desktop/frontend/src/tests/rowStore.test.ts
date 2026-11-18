@@ -65,3 +65,19 @@ describe('cloneRowsForStore', () => {
     expect(strip(restoreRows(cloneRowsForStore(source)))).toEqual(strip(source));
   });
 });
+
+describe('restoreRows', () => {
+  it('keeps the first stored secret ID and gives other rows distinct IDs', () => {
+    const blank = mkRow();
+    const secret = { ...blank, id: blank.id + 1, key: 'token', value: 'secret-ref', secret: true };
+    const restored = restoreRows([
+      { ...blank, key: 'host', value: 'local' },
+      secret,
+      { ...secret, key: 'secondToken' },
+    ]);
+
+    expect(cloneRowsForStore(restored)[1]).toMatchObject({ id: secret.id, key: secret.key, secret: true });
+    expect(new Set(restored.map(row => row.id)).size).toBe(restored.length);
+    expect(restored.map(row => row.id)).not.toContain(mkRow().id);
+  });
+});

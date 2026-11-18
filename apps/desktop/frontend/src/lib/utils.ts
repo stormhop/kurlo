@@ -1,5 +1,5 @@
 import type { KVRow, BodyType, AuthType, JwtAddTo, JwtAlgorithm, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
-import { JWT_ALGORITHMS, mkRow } from './constants';
+import { JWT_ALGORITHMS, mkRow, reserveRowIds } from './constants';
 import { clipboardSet } from './backend';
 
 export function clamp(value: number, min: number, max: number) {
@@ -102,19 +102,20 @@ export function cloneRowsForStore(rows: KVRow[]) {
 }
 
 export function restoreRows(rows: KVRow[] | undefined): KVRow[] {
-  const restored = sanitizeRows(rows)
-    .filter(rowHasContent)
-    .map(row => ({
-      ...mkRow(),
-      enabled: row.enabled ?? true,
-      key: row.key ?? '',
-      value: row.value ?? '',
-      description: row.description ?? '',
-      isFile: row.isFile ?? false,
-      fileName: row.fileName ?? '',
-      contentType: row.contentType ?? '',
-      secret: row.secret ?? false,
-    }));
+  const source = sanitizeRows(rows).filter(rowHasContent);
+  const secretIds = new Set(source.filter(row => row.secret && Number.isSafeInteger(row.id)).map(row => row.id));
+  reserveRowIds(secretIds);
+  const restored = source.map(row => ({
+    id: row.secret && secretIds.delete(row.id) ? row.id : mkRow().id,
+    enabled: row.enabled ?? true,
+    key: row.key ?? '',
+    value: row.value ?? '',
+    description: row.description ?? '',
+    isFile: row.isFile ?? false,
+    fileName: row.fileName ?? '',
+    contentType: row.contentType ?? '',
+    secret: row.secret ?? false,
+  }));
   return [...restored, mkRow()];
 }
 

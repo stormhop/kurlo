@@ -169,6 +169,15 @@ export const COLLECTION_AUTH_OPTIONS = AUTH_OPTIONS
   .map(option => option.value === 'oauth2' ? { ...option, label: 'OAuth 2.0 (client credentials)' } : option);
 
 let _rowCounter = 0;
+const reservedRowIds = new Set<number>();
+
+export function reserveRowIds(ids: ReadonlySet<number>) {
+  for (const id of ids) {
+    if (id >= _rowCounter) reservedRowIds.add(id);
+  }
+}
+
 export function mkRow(): KVRow {
+  while (reservedRowIds.delete(_rowCounter)) _rowCounter++;
   return { id: _rowCounter++, enabled: true, key: '', value: '', description: '', secret: false };
 }

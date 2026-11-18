@@ -15,6 +15,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 - **OpenAPI imports stay in the intended workspace.** Kurlo cancels a pending import if another workspace is active when the spec arrives.
 - **Import errors are visible.** OpenAPI and Postman imports report a save failure and keep imported requests available to save again.
+- **Secret variables keep their IDs after reloading.** Autosaving a freshly opened Git workspace no longer rewrites unchanged secret rows.
 
 ## [3.1.4] - 2026-11-17
 
