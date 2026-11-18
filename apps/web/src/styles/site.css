@@ -8,11 +8,11 @@
   --card: #fbf9f4;
   --ink: #15161c;
   --ink-2: #4a4b56;
-  --ink-3: #6d6e78;
+  --ink-3: #60616c;
   --line: rgba(21, 22, 28, 0.12);
   --accent: #4f5be8;
   --accent-text: #3f4bd6;
-  --ok: #17804b;
+  --ok: #146b40;
   --bad: #c2343f;
   --later: #9a5b06;
   --cream: #f7f3ea;
@@ -1751,7 +1751,7 @@ code {
   font-weight: 500;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #6f7190;
+  color: #8b8eaa;
 }
 
 .k-foot a {
@@ -1771,7 +1771,7 @@ code {
   padding-top: 1.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 0.8125rem;
-  color: #6f7190;
+  color: #8b8eaa;
 }
 
 .k-foot .k-foot-love {

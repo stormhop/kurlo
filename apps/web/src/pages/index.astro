@@ -32,6 +32,7 @@ const features = [
     title: 'Lives in your repo.',
     text: 'Every request is a YAML file next to your code. It gets reviewed in a pull request and merged with your branch, and secrets stay on your machine as placeholders.',
     link: 'docs/guides/git-workspaces/',
+    linkLabel: 'Git workspaces',
     plate: 'a',
     visual: 'yaml',
   },
@@ -39,6 +40,7 @@ const features = [
     title: 'Or hand it to your terminal.',
     text: 'Prefer to stay in Claude Code, Codex or Cursor? kurlo mcp gives them the same tools: run saved requests, write new ones with tests, read the response you just got. Tokens reach your API, never the model.',
     link: 'mcp/',
+    linkLabel: 'Set up Kurlo MCP',
     plate: 'b',
     visual: 'terminal',
   },
@@ -46,6 +48,7 @@ const features = [
     title: 'Find your API’s limits.',
     text: 'Turn saved requests into load tests powered by k6. Build a flow, ramp up virtual users or iterations per second, and set limits for response times and failures. Run locally, export a k6 script or use the CLI.',
     link: 'docs/guides/load-testing/',
+    linkLabel: 'Load testing guide',
     plate: 'c',
     visual: 'load',
   },
@@ -53,6 +56,7 @@ const features = [
     title: 'Talks to models, too.',
     text: 'An AI request sends a prompt to OpenAI, Anthropic, OpenRouter, Groq, Ollama or LM Studio and streams the answer with its tool calls and tokens. Test it like any response with pm.response.llm().',
     link: 'docs/guides/request-types/ai/#ai',
+    linkLabel: 'AI requests guide',
     plate: 'd',
     visual: 'ai',
   },
@@ -60,6 +64,7 @@ const features = [
     title: 'Mock it before it exists.',
     text: 'Serve a collection’s saved examples on localhost while the real endpoint is still being built. No account, no request quota.',
     link: 'docs/guides/mock-server/',
+    linkLabel: 'Mock server guide',
     plate: 'a',
     visual: 'mock',
   },
@@ -67,6 +72,7 @@ const features = [
     title: 'Same tests in CI.',
     text: 'kurlo run sends the same requests with the same scripts in your pipeline. A failing test fails the build.',
     link: 'docs/guides/cli-runner/',
+    linkLabel: 'CLI runner guide',
     plate: 'c',
     visual: 'ci',
   },
@@ -74,6 +80,7 @@ const features = [
     title: 'Speaks everything.',
     text: 'HTTP/1.1 and 2, GraphQL with a schema explorer, gRPC, WebSocket, Socket.IO, SSE, language models, and MCP servers you can call by hand.',
     link: 'docs/guides/request-types/',
+    linkLabel: 'Supported request types',
     plate: 'b',
     visual: 'protocols',
   },
@@ -225,7 +232,7 @@ const ldJson = structuredData({
         <div class="k-feature-copy">
           <p class="k-no"><span class="k-dot" aria-hidden="true"></span>No. {String(i + 1).padStart(2, '0')}</p>
           <h3>{feature.title}</h3>
-          <p><Rich text={feature.text} terms={terms} /> <a href={href(feature.link)}>More</a></p>
+          <p><Rich text={feature.text} terms={terms} /> <a href={href(feature.link)}>{feature.linkLabel}</a></p>
         </div>
         <div class={`k-plate k-plate-${feature.plate}`}>
           {feature.visual === 'yaml' && (
