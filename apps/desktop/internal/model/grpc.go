@@ -13,28 +13,26 @@ type GrpcRequest struct {
 	ProtoFilePath    string   `json:"protoFilePath"`
 	ProtoImportPaths []string `json:"protoImportPaths"`
 
-	UseTLS                   bool   `json:"useTls"`
-	EnableSSLVerification    bool   `json:"enableSSLVerification"`
-	ServerName               string `json:"serverName"`
-	ClientCertPath           string `json:"clientCertPath"`
-	ClientKeyPath            string `json:"clientKeyPath"`
-	ClientKeyPassword        string `json:"clientKeyPassword"`
-	IncludeDefaultValues     bool   `json:"includeDefaultValues"`
-	MaxResponseMessageSizeMb int    `json:"maxResponseMessageSizeMb"`
-	TimeoutMs                int    `json:"timeoutMs"`
-
-	PreRequestScript        string            `json:"preRequestScript"`
-	TestScript              string            `json:"testScript"`
-	ScriptEngine            string            `json:"scriptEngine"`
-	Name                    string            `json:"name"`
-	ScriptTimeoutMs         int               `json:"scriptTimeoutMs"`
-	AllowSendRequest        bool              `json:"allowSendRequest"`
-	SecretEnvironmentKeys   []string          `json:"secretEnvironmentKeys"`
-	SecretEnvironmentValues []string          `json:"secretEnvironmentValues"`
-	CollectionVariables     map[string]string `json:"collectionVariables"`
-	RequestVariables        map[string]string `json:"requestVariables,omitempty"`
-	ScriptEnvironment       map[string]string `json:"scriptEnvironment,omitempty"`
-	ScriptVariables         map[string]string `json:"scriptVariables,omitempty"`
+	UseTLS                   bool              `json:"useTls"`
+	EnableSSLVerification    bool              `json:"enableSSLVerification"`
+	ServerName               string            `json:"serverName"`
+	ClientCertPath           string            `json:"clientCertPath"`
+	ClientKeyPath            string            `json:"clientKeyPath"`
+	ClientKeyPassword        string            `json:"clientKeyPassword"`
+	IncludeDefaultValues     bool              `json:"includeDefaultValues"`
+	MaxResponseMessageSizeMb int               `json:"maxResponseMessageSizeMb"`
+	TimeoutMs                int               `json:"timeoutMs"`
+	PreRequestScript         string            `json:"preRequestScript"`
+	TestScript               string            `json:"testScript"`
+	Name                     string            `json:"name"`
+	ScriptTimeoutMs          int               `json:"scriptTimeoutMs"`
+	AllowSendRequest         bool              `json:"allowSendRequest"`
+	SecretEnvironmentKeys    []string          `json:"secretEnvironmentKeys"`
+	SecretEnvironmentValues  []string          `json:"secretEnvironmentValues"`
+	CollectionVariables      map[string]string `json:"collectionVariables"`
+	RequestVariables         map[string]string `json:"requestVariables,omitempty"`
+	ScriptEnvironment        map[string]string `json:"scriptEnvironment,omitempty"`
+	ScriptVariables          map[string]string `json:"scriptVariables,omitempty"`
 }
 
 type GrpcMessage struct {

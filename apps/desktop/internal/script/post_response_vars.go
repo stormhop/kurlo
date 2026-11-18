@@ -74,5 +74,5 @@ func RunPostResponseVars(rows []model.KeyValue, ctx *Context) model.ScriptResult
 	if count == 0 {
 		return model.ScriptResult{}
 	}
-	return run(string(EngineJS), postResponseVarsPrelude+src.String(), ctx, true)
+	return run(postResponseVarsPrelude+src.String(), ctx, true)
 }

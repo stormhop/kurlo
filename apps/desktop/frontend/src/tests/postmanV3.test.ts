@@ -283,16 +283,16 @@ describe('postmanV3FromFiles', () => {
       { key: 'apiToken', value: '', enabled: true, secret: true },
     ]);
     expect(bundle.defaults.auth).toMatchObject({ type: 'bearer', bearerToken: '{{apiToken}}' });
-    expect(bundle.defaults.preRequestScript).toBe("pm.variables.set('stamp', Date.now());");
-    expect(bundle.defaults.testScript).toContain('not 5xx');
-    expect(bundle.defaults.preRequestScript).not.toContain('grpc only');
+    expect(bundle.defaults.preRequestScriptJs).toBe("pm.variables.set('stamp', Date.now());");
+    expect(bundle.defaults.testScriptJs).toContain('not 5xx');
+    expect(bundle.defaults.preRequestScriptJs).not.toContain('grpc only');
   });
 
   it('maps folder auth and scripts', () => {
     const { bundle } = bundleOf(shop);
     const users = bundle.folderDefaults.find(folder => folder.path.join('/') === 'Users');
     expect(users?.auth).toMatchObject({ type: 'basic', basicUser: 'admin', basicPass: '{{adminPass}}' });
-    expect(users?.preRequestScript).toBe("console.log('users folder');");
+    expect(users?.preRequestScriptJs).toBe("console.log('users folder');");
   });
 
   it('reads headers, query and path variables in both list and map form', () => {
@@ -303,7 +303,7 @@ describe('postmanV3FromFiles', () => {
     expect(list.params.map(row => [row.key, row.value, row.enabled])).toEqual([['page', '1', true], ['limit', '10', true]]);
     expect(list.headers.map(row => [row.key, row.value, row.enabled])).toEqual([['Accept', 'application/json', true], ['X-Off', '1', false]]);
     expect(list.auth.type).toBe('none');
-    expect(list.testScript).toContain("pm.response.to.have.status(200)");
+    expect(list.testScriptJs).toContain("pm.response.to.have.status(200)");
 
     const create = byName(bundle.requests, 'Create user');
     expect(create.headers.map(row => [row.key, row.value])).toEqual([['Content-Type', 'application/json'], ['X-Count', '3']]);
@@ -316,8 +316,8 @@ describe('postmanV3FromFiles', () => {
   it('joins several scripts of the same phase in file order', () => {
     const { bundle } = bundleOf(shop);
     const create = byName(bundle.requests, 'Create user');
-    expect(create.preRequestScript).toBe("pm.variables.set('order', 'first');\n\nconst note = 'second';\npm.variables.set('order', note);");
-    expect(create.testScript).toContain('status(201)');
+    expect(create.preRequestScriptJs).toBe("pm.variables.set('order', 'first');\n\nconst note = 'second';\npm.variables.set('order', note);");
+    expect(create.testScriptJs).toContain('status(201)');
   });
 
   it('maps request settings to Kurlo settings', () => {
@@ -528,8 +528,8 @@ describe('postmanV3FromFiles protocols', () => {
     expect(viewer).toMatchObject({ requestType: 'graphql', method: 'POST', url: '{{baseUrl}}/graphql' });
     expect(JSON.parse(viewer.bodyContent)).toMatchObject({ query: 'query Viewer($id: ID!) { user(id: $id) { id } }', operationName: 'Viewer' });
     expect(viewer.headers.map(row => row.key)).toEqual(['X-Client']);
-    expect(viewer.preRequestScript).toBe("pm.variables.set('q', 1);");
-    expect(viewer.testScript).toContain('gql ok');
+    expect(viewer.preRequestScriptJs).toBe("pm.variables.set('q', 1);");
+    expect(viewer.testScriptJs).toContain('gql ok');
     expect(viewer.examples?.map(example => [example.name, example.response.statusCode, example.response.body])).toEqual([
       ['Found', 200, '{"data":{"user":{"id":"1"}}}'],
     ]);
@@ -543,7 +543,7 @@ describe('postmanV3FromFiles protocols', () => {
       url: 'grpc.example.com:443',
       grpcMethod: 'helloworld.Greeter/SayHello',
       bodyContent: '{"name":"Ada"}',
-      preRequestScript: "console.log('invoke');",
+      preRequestScriptJs: "console.log('invoke');",
     });
     expect(grpc.grpcMetadata?.map(row => [row.key, row.value, row.enabled])).toEqual([['x-tenant', 'acme', true], ['x-off', '1', false]]);
     expect(grpc.settings).toMatchObject({

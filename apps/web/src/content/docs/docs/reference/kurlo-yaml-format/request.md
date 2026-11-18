@@ -53,9 +53,7 @@ request:
   bodyFileName: ""
   formRows: []
   graphqlSchema: ""
-  preRequestScript: ""
   preRequestScriptJs: ""
-  testScript: ""
   testScriptJs: ""
   requestNotes: ""
   settings:

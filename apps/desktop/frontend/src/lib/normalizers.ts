@@ -74,7 +74,7 @@ const ENTITY_STRINGS = ['id', 'name', 'filesystemName', 'description', 'workspac
 const REQUEST_FIELDS: FieldTypes = {
     strings: [
         ...ENTITY_STRINGS, 'collectionId', 'collection', 'method', 'url', 'requestTab', 'requestType', 'bodyType', 'rawBodyType',
-        'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema', 'preRequestScript', 'testScript',
+        'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema',
         'preRequestScriptJs', 'testScriptJs', 'requestNotes', 'sioEventName', 'grpcMethod', 'grpcProtoFilePath',
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
         'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId', 'openapi',
@@ -287,8 +287,6 @@ export function normalizeSavedRequest(
         bodyFileName: input.bodyFileName || bodyDefaults.bodyFileName,
         formRows: cloneRowsForStore(input.formRows ?? bodyDefaults.formRows),
         graphqlSchema: input.graphqlSchema || '',
-        preRequestScript: input.preRequestScript || '',
-        testScript: input.testScript || '',
         preRequestScriptJs: input.preRequestScriptJs || '',
         testScriptJs: input.testScriptJs || '',
         requestNotes: input.requestNotes || '',

@@ -95,7 +95,7 @@ describe('assertions', () => {
       request: { method: 'GET', url: 'https://api.example.test/orders' },
       event: [{ listen: 'test', script: { exec: ['pm.test("own", () => pm.expect(1).to.eql(1))'] } }],
     }], 'collection-1', 'API', undefined);
-    req.testScript = 'pm.test("own", () => pm.expect(1).to.eql(1))';
+    req.testScriptJs = 'pm.test("own", () => pm.expect(1).to.eql(1))';
     req.assertions = [newAssertionRow({ target: 'status', operator: 'eq', value: '200' })];
 
     const exported = buildPostmanCollection('API', '', [req], s => s, true) as { item: Array<Record<string, unknown> & { event?: Array<{ script: { exec: string[] } }> }> };
@@ -105,6 +105,6 @@ describe('assertions', () => {
 
     const [again] = postmanRequestsFromItems(exported.item, 'collection-1', 'API', undefined);
     expect(again.assertions?.map(({ id, ...row }) => row)).toEqual([{ enabled: true, target: 'status', operator: 'eq', value: '200' }]);
-    expect(again.testScript).toBe('pm.test("own", () => pm.expect(1).to.eql(1))');
+    expect(again.testScriptJs).toBe('pm.test("own", () => pm.expect(1).to.eql(1))');
   });
 });

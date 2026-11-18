@@ -35,8 +35,8 @@ func TestFailedRequestStillCarriesHeadersArray(t *testing.T) {
 		{"unsupported scheme", model.HttpRequest{Method: "GET", URL: "ftp://example.test/x"}},
 		{"missing host", model.HttpRequest{Method: "GET", URL: "http:///x"}},
 		{"bad client certificate", model.HttpRequest{Method: "GET", URL: "https://example.test/x", ClientCertPath: "/nope/missing.pem"}},
-		{"pre-request script failure", model.HttpRequest{Method: "GET", URL: "https://example.test/x", ScriptEngine: "js", PreRequestScript: "throw new Error('boom')"}},
-		{"skipped by script", model.HttpRequest{Method: "GET", URL: "https://example.test/x", ScriptEngine: "js", PreRequestScript: "pm.execution.skipRequest()"}},
+		{"pre-request script failure", model.HttpRequest{Method: "GET", URL: "https://example.test/x", PreRequestScript: "throw new Error('boom')"}},
+		{"skipped by script", model.HttpRequest{Method: "GET", URL: "https://example.test/x", PreRequestScript: "pm.execution.skipRequest()"}},
 	}
 
 	for _, tc := range cases {

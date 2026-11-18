@@ -1025,10 +1025,10 @@ func (s *mcpServer) toolGetRequest(_ context.Context, arguments json.RawMessage)
 	if rows := mcpEnabledRows(req.FormRows, nil); len(rows) > 0 {
 		detail["form"] = rows
 	}
-	if script := cliPreScript(req); strings.TrimSpace(script) != "" {
+	if script := req.PreRequestScriptJs; strings.TrimSpace(script) != "" {
 		detail["preRequestScript"] = script
 	}
-	if script := cliTestScript(req); strings.TrimSpace(script) != "" {
+	if script := req.TestScriptJs; strings.TrimSpace(script) != "" {
 		detail["testScript"] = script
 	}
 	if len(req.Assertions) > 0 {

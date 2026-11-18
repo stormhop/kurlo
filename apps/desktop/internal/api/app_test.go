@@ -699,9 +699,9 @@ func TestJSEngineRunsPreRequestAndTestScripts(t *testing.T) {
 
 	app := NewApp()
 	resp := app.SendRequest(model.HttpRequest{
-		Method:       http.MethodGet,
-		URL:          server.URL,
-		ScriptEngine: "js",
+		Method: http.MethodGet,
+		URL:    server.URL,
+
 		PreRequestScript: `
 const token = "abc-" + (1 + 2);
 pm.request.headers.set("X-Token", token);
@@ -749,7 +749,7 @@ func TestPreRequestScriptErrorAbortsRequest(t *testing.T) {
 	resp := app.SendRequest(model.HttpRequest{
 		Method:                http.MethodGet,
 		URL:                   server.URL,
-		PreRequestScript:      "pm.environment.set(\"nonce\", \"123\")\n1 / 0",
+		PreRequestScript:      "pm.environment.set(\"nonce\", \"123\")\nthrow new Error(\"stop\")",
 		FollowRedirects:       true,
 		TimeoutMs:             5000,
 		HTTPVersion:           "auto",
@@ -2622,11 +2622,11 @@ func TestPreRequestScriptRewritesTheBodyThatIsSent(t *testing.T) {
 
 	app := NewApp()
 	resp := app.SendRequest(model.HttpRequest{
-		Method:       http.MethodPost,
-		URL:          server.URL,
-		BodyType:     "json",
-		Body:         `{"amount":10}`,
-		ScriptEngine: "js",
+		Method:   http.MethodPost,
+		URL:      server.URL,
+		BodyType: "json",
+		Body:     `{"amount":10}`,
+
 		PreRequestScript: `
 const payload = pm.request.body.json()
 payload.amount = payload.amount * 2
@@ -2664,10 +2664,10 @@ func TestPreRequestScriptCanAddABodyToARequestThatHadNone(t *testing.T) {
 
 	app := NewApp()
 	resp := app.SendRequest(model.HttpRequest{
-		Method:                 http.MethodPost,
-		URL:                    server.URL,
-		BodyType:               "none",
-		ScriptEngine:           "js",
+		Method:   http.MethodPost,
+		URL:      server.URL,
+		BodyType: "none",
+
 		PreRequestScript:       `pm.request.body.update({ generated: true })`,
 		FollowRedirects:        true,
 		TimeoutMs:              5000,
@@ -2704,11 +2704,11 @@ func TestScriptBodyWriteDoesNotOverrideAFileBody(t *testing.T) {
 
 	app := NewApp()
 	resp := app.SendRequest(model.HttpRequest{
-		Method:                 http.MethodPost,
-		URL:                    server.URL,
-		BodyType:               "binary",
-		BodyFilePath:           path,
-		ScriptEngine:           "js",
+		Method:       http.MethodPost,
+		URL:          server.URL,
+		BodyType:     "binary",
+		BodyFilePath: path,
+
 		PreRequestScript:       `pm.request.body.update("from-script")`,
 		FollowRedirects:        true,
 		TimeoutMs:              5000,
@@ -2738,11 +2738,11 @@ func TestScriptEditsUrlencodedBodyFields(t *testing.T) {
 
 	app := NewApp()
 	resp := app.SendRequest(model.HttpRequest{
-		Method:       http.MethodPost,
-		URL:          server.URL,
-		BodyType:     "urlencoded",
-		FormData:     []model.KeyValue{{Key: "grant_type", Value: "password", Enabled: true}},
-		ScriptEngine: "js",
+		Method:   http.MethodPost,
+		URL:      server.URL,
+		BodyType: "urlencoded",
+		FormData: []model.KeyValue{{Key: "grant_type", Value: "password", Enabled: true}},
+
 		PreRequestScript: `
 pm.request.body.urlencoded.upsert({ key: "grant_type", value: "client_credentials" })
 pm.request.body.urlencoded.add({ key: "scope", value: "read" })
@@ -2777,11 +2777,11 @@ func TestScriptRawWriteOnAFormBodyIsReportedNotDropped(t *testing.T) {
 
 	app := NewApp()
 	resp := app.SendRequest(model.HttpRequest{
-		Method:                 http.MethodPost,
-		URL:                    server.URL,
-		BodyType:               "urlencoded",
-		FormData:               []model.KeyValue{{Key: "a", Value: "1", Enabled: true}},
-		ScriptEngine:           "js",
+		Method:   http.MethodPost,
+		URL:      server.URL,
+		BodyType: "urlencoded",
+		FormData: []model.KeyValue{{Key: "a", Value: "1", Enabled: true}},
+
 		PreRequestScript:       `pm.request.body.raw = "b=2"`,
 		FollowRedirects:        true,
 		TimeoutMs:              5000,
@@ -2814,10 +2814,10 @@ func TestScriptBodyWriteRescuesABinaryRequestWithNoFile(t *testing.T) {
 
 	app := NewApp()
 	resp := app.SendRequest(model.HttpRequest{
-		Method:                 http.MethodPost,
-		URL:                    server.URL,
-		BodyType:               "binary",
-		ScriptEngine:           "js",
+		Method:   http.MethodPost,
+		URL:      server.URL,
+		BodyType: "binary",
+
 		PreRequestScript:       `pm.request.body.update("generated")`,
 		FollowRedirects:        true,
 		TimeoutMs:              5000,

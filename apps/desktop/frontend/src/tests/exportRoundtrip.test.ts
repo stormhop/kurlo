@@ -32,8 +32,8 @@ function richRequest(id: string, overrides: Partial<SavedRequest>): SavedRequest
     formRows: [],
     vars: [row('orderId', '{{prefix}}-1'), row('draft', 'yes', false)],
     postResponseVars: [row('orderToken', 'res.body.token'), row('skipped', 'res.status', false)],
-    preRequestScript: 'pm.variables.set("nonce", "1")',
-    testScript: 'pm.test("ok", () => pm.response.to.have.status(200))',
+    preRequestScriptJs: 'pm.variables.set("nonce", "1")',
+    testScriptJs: 'pm.test("ok", () => pm.response.to.have.status(200))',
     requestNotes: 'Creates an order.',
     settings: { ...DEFAULT_REQUEST_SETTINGS },
     ...overrides,
@@ -100,8 +100,8 @@ function essence(request: SavedRequest) {
     bodyType: request.bodyType,
     bodyContent: ['json', 'text', 'xml'].includes(request.bodyType) ? request.bodyContent : '',
     formRows: ['form', 'urlencoded'].includes(request.bodyType) ? rows(request.formRows) : [],
-    preRequestScript: request.preRequestScript,
-    testScript: request.testScript,
+    preRequestScriptJs: request.preRequestScriptJs,
+    testScriptJs: request.testScriptJs,
     requestNotes: request.requestNotes,
   };
 }

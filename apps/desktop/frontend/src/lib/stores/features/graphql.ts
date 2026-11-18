@@ -144,8 +144,6 @@ export const graphqlFeature = {
       body: '',
       bodyFilePath: '',
       formData: [],
-      preRequestScript: '',
-      testScript: '',
       followRedirects: effectiveSettings.followRedirects,
       timeoutMs: effectiveSettings.timeoutMs,
       httpVersion: effectiveSettings.httpVersion,
@@ -247,8 +245,6 @@ export const graphqlFeature = {
         variables: DEFAULT_GRAPHQL_VARIABLES,
         operationName: 'IntrospectionQuery',
       }),
-      preRequestScript: '',
-      testScript: '',
     };
     this.graphqlSchemaLoading = true;
     this.graphqlSchemaStatus = '';

@@ -542,7 +542,6 @@
       vm.loadStartupViewPreference();
       vm.loadRequestTabPreferences();
       vm.loadProxyConfig();
-      vm.loadScriptEngine();
       void vm.loadDefaultWorkspaceLocation();
       vm.initSSEListeners();
       vm.initAiListeners();
@@ -1030,7 +1029,6 @@
         saveState={vm.collectionSettingsSaveState}
         workspaceBlocked={vm.workspaceBlocked}
         variableSuggestions={vm.variableSuggestions}
-        scriptEngine={vm.scriptEngine}
         onSave={vm.saveCollectionSettings}
         onReset={vm.resetCollectionSettings}
         onCreateRequest={vm.createNewRequest}
@@ -1228,7 +1226,7 @@
           headerCount={vm.requestHeaderCount}
           bodyHasContent={vm.bodyHasContent()}
           bodyBadgeLabel={vm.bodyBadgeLabel()}
-          scriptLineCount={scriptLineCount(vm.preRequestScript) + scriptLineCount(vm.testScript)}
+          scriptLineCount={scriptLineCount(vm.preRequestScriptJs) + scriptLineCount(vm.testScriptJs)}
           assertionCount={vm.assertions.filter(row => row.target.trim()).length}
           listenEventCount={activeCount(vm.sioEvents)}
           metadataCount={activeCount(vm.grpcMetadata)}

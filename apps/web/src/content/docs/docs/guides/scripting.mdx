@@ -1,11 +1,11 @@
 ---
 title: Scripting
-description: Pre-request and test scripts in JavaScript or Tengo — inject headers, assert responses, set variables.
+description: Pre-request and test scripts in JavaScript — inject headers, assert responses, set variables.
 ---
 
 import DocsTopicIndex from "../../../../components/DocsTopicIndex.astro";
 
-Kurlo scripts run in a sandboxed JavaScript VM by default. Existing requests can still use the legacy [Tengo](https://github.com/d5/tengo) engine. Both engines share the core `pm.*` API — variables, environment, request mutation, response, tests, expectations and logs — and the 2-second cap (configurable per request). The JavaScript engine also adds collection variables, globals, iteration data, cookies, `pm.crypto` and `pm.sendRequest`.
+Kurlo runs scripts in a sandboxed JavaScript VM. Use the `pm.*` API to edit requests, access variables, inspect responses, run assertions, and log output. Each script has a two-second default timeout, configurable per request. The sandbox also provides iteration data, cookies, `pm.crypto` and `pm.sendRequest`.
 
 There are two script hooks per request:
 
@@ -15,7 +15,5 @@ There are two script hooks per request:
 Collection variables set or removed in a pre-request script are available to the test script of the same request.
 
 ![Pre-request JavaScript in the request Scripts tab](../../../../assets/screenshots/scripting-pre-request.png)
-
-![Legacy Tengo pre-request script in the request Scripts tab](../../../../assets/screenshots/scripting-tengo.png)
 
 <DocsTopicIndex />

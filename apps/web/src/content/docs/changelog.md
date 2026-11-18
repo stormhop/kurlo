@@ -146,7 +146,6 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   handlers no longer land in the body, and XML bodies starting with `<` are kept.
 - **Import dialog shows `.http` and `.rest` files on Linux**: import opens the system dialog filtered to the chosen
   format.
-- **Tengo script timeouts**: Tengo scripts respect the configured script timeout instead of always using two seconds.
 - **Compact release notes in About**: long update notes show about ten lines and a link to the full changelog on the
   website.
 - **Mock server with thousands of examples**: the route list reads only methods, paths and statuses and the server reads

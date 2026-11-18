@@ -206,9 +206,8 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(requests.find(entry => entry.name === 'List invoices')?.testScriptJs ?? '').toContain('pm.test');
   });
 
-  test('keeps Postman scripts as JavaScript when Tengo is the script engine', async ({ page }) => {
+  test('keeps imported Postman request and collection scripts', async ({ page }) => {
     await installKurloBridge(page);
-    await page.addInitScript(() => localStorage.setItem('kurlo.scriptEngine.v1', 'tengo'));
     await page.goto('/');
     await page.getByRole('button', { name: 'Collections' }).click();
     await page.getByLabel('Import collection').first().click();
@@ -217,7 +216,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await sourceDialog.getByRole('button', { name: 'Import', exact: true }).click();
     await expect(sourceDialog).toBeHidden();
     const collection = {
-      info: { name: 'Tengo user API', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
+      info: { name: 'Imported scripts API', schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json' },
       event: [{ listen: 'prerequest', script: { exec: ['pm.variables.set("trace", "1")'] } }],
       item: [{
         name: 'Ping',
@@ -226,22 +225,20 @@ test.describe("Kurlo desktop browser E2E", () => {
       }],
     };
     await page.setInputFiles('input[type="file"]', {
-      name: 'tengo.postman_collection.json',
+      name: 'scripts.postman_collection.json',
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify(collection)),
     });
-    await collectionRow(page, 'Tengo user API').getByLabel('Expand collection').click();
+    await collectionRow(page, 'Imported scripts API').getByLabel('Expand collection').click();
     await expect(page.getByRole('button', { name: 'GET Ping' })).toBeVisible();
     const store = await page.evaluate(() => window.__kurloE2E.store as {
-      collections: Array<{ name: string; defaults?: { preRequestScript?: string; preRequestScriptJs?: string } }>;
-      requests: Array<{ name: string; testScript?: string; testScriptJs?: string }>;
+      collections: Array<{ name: string; defaults?: { preRequestScriptJs?: string } }>;
+      requests: Array<{ name: string; testScriptJs?: string }>;
     });
     const ping = store.requests.find(entry => entry.name === 'Ping')!;
     expect(ping.testScriptJs).toContain('pm.test');
-    expect(ping.testScript ?? '').toBe('');
-    const defaults = store.collections.find(entry => entry.name === 'Tengo user API')?.defaults;
+    const defaults = store.collections.find(entry => entry.name === 'Imported scripts API')?.defaults;
     expect(defaults?.preRequestScriptJs ?? '').toContain('pm.variables.set');
-    expect(defaults?.preRequestScript ?? '').toBe('');
   });
 });
 

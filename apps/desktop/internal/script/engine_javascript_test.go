@@ -10,11 +10,11 @@ import (
 )
 
 func jsPre(src string, ctx *Context) model.ScriptResult {
-	return RunPreRequest(string(EngineJS), src, ctx)
+	return RunPreRequest(src, ctx)
 }
 
 func jsTests(src string, ctx *Context) model.ScriptResult {
-	return RunTests(string(EngineJS), src, ctx)
+	return RunTests(src, ctx)
 }
 
 func TestJSModernSyntaxAndVariables(t *testing.T) {

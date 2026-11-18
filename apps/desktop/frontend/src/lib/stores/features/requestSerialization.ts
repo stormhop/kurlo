@@ -24,7 +24,6 @@ import type {
   ProxyConfig,
   RequestType,
   SavedRequest,
-  ScriptEngine,
 } from '../../types/models';
 
 const RAW_BODY_TYPES = ['text', 'json', 'html', 'xml'] as const;
@@ -46,6 +45,10 @@ function oauth2RequestFields(auth: SavedRequest['auth'], resolve: (value: string
       oauth2ClientAuth: auth.oauth2ClientAuth ?? '',
     }),
   };
+}
+
+function scriptFieldsForSend(req: SavedRequest): Pick<HttpRequest, 'preRequestScript' | 'testScript'> {
+  return { preRequestScript: req.preRequestScriptJs ?? '', testScript: req.testScriptJs ?? '' };
 }
 
 function requestVariableFieldsForSend(req: SavedRequest, values: Record<string, string>, requestType: RequestType): Pick<HttpRequest, 'requestVariables' | 'postResponseVars'> {
@@ -99,7 +102,6 @@ type RequestSerializationHost = {
     requestId?: string,
     options?: RunnableHttpOptions,
   ) => HttpRequest;
-  scriptFieldsForSend: (req: SavedRequest) => { preRequestScript: string; testScript: string; scriptEngine: ScriptEngine };
   secretEnvironmentKeysForRequest: (req: Pick<SavedRequest, 'collectionId'>, secretKeys?: string[]) => string[];
   secretEnvironmentValuesForRequest: (req: Pick<SavedRequest, 'collectionId'>, secretValues?: string[]) => string[];
   requestsById: Map<string, SavedRequest>;
@@ -154,7 +156,7 @@ export const requestSerializationFeature = {
       try { body = this.graphQLBodyForSend(graphql); }
       catch { body = serializeGraphQLPayload(graphql); }
     }
-    return { ...emptyHttpRequest(), workspaceId: this.activeWorkspaceId, method: isGraphQL ? 'POST' : req.method, url: flat.url, params: flat.params.map(({ key, value, enabled }) => ({ key, value, enabled, isFile: false, fileName: '', contentType: '' })), pathParams: (req.pathParams ?? []).map(({ key, value, enabled }) => ({ key, value, enabled, isFile: false, fileName: '', contentType: '' })), headers: req.headers.map(({ key, value, enabled }) => ({ key, value, enabled, isFile: false, fileName: '', contentType: '' })), auth: { ...emptyAuthConfig(), type: req.auth.type, token: req.auth.type === 'oauth2' ? req.auth.oauth2Token : req.auth.bearerToken, username: req.auth.basicUser, password: req.auth.basicPass, keyName: req.auth.apiKeyName, keyValue: req.auth.apiKeyValue, keyIn: req.auth.apiKeyIn, oauth2GrantType: req.auth.oauth2GrantType ?? '', oauth2AuthURL: req.auth.oauth2AuthURL ?? '', oauth2TokenURL: req.auth.oauth2TokenURL, oauth2ClientID: req.auth.oauth2ClientID, oauth2Secret: req.auth.oauth2Secret, oauth2Scope: req.auth.oauth2Scope, oauth2UsePKCE: req.auth.oauth2UsePKCE ?? false, oauth2RefreshToken: req.auth.oauth2RefreshToken ?? '', awsAccessKey: req.auth.awsAccessKey, awsSecretKey: req.auth.awsSecretKey, awsSessionToken: req.auth.awsSessionToken ?? '', awsRegion: req.auth.awsRegion, awsService: req.auth.awsService }, bodyType: isGraphQL ? 'graphql' : req.bodyType, body, bodyFilePath: req.bodyFilePath, formData: req.formRows.map(({ key, value, enabled, isFile, fileName, contentType }) => ({ key, value, enabled, isFile: isFile ?? false, fileName: fileName ?? '', contentType: contentType ?? '' })), ...this.scriptFieldsForSend(req), name: req.name, scriptTimeoutMs: req.settings.scriptTimeoutMs, allowSendRequest: req.settings.allowSendRequest, followRedirects: req.settings.followRedirects, timeoutMs: req.settings.timeoutMs, httpVersion: req.settings.httpVersion, enableSSLVerification: req.settings.enableSSLVerification, followOriginalMethod: req.settings.followOriginalMethod, followAuthorizationHeader: req.settings.followAuthorizationHeader, removeRefererHeader: req.settings.removeRefererHeader, encodeUrlAutomatically: req.settings.encodeUrlAutomatically, disableCookieJar: req.settings.disableCookieJar, maxRedirects: req.settings.maxRedirects, ...this.resolveProxyFields(req.settings.proxyUrl ?? ''), clientCertPath: req.settings.clientCertPath ?? '', clientKeyPath: req.settings.clientKeyPath ?? '', clientKeyPassword: req.settings.clientKeyPassword ?? '', browserEmulation: req.settings.browserEmulation, browserOrigin: req.settings.browserOrigin, browserWithCredentials: req.settings.browserWithCredentials, browserEnforceCORS: req.settings.browserEnforceCORS, browserEnforceCSP: req.settings.browserEnforceCSP, browserCSP: req.settings.browserCSP, wsHandshakeTimeoutMs: req.settings.wsHandshakeTimeoutMs, wsReconnectAttempts: req.settings.wsReconnectAttempts, wsReconnectIntervalMs: req.settings.wsReconnectIntervalMs, wsMaxMessageSizeMb: req.settings.wsMaxMessageSizeMb, wsKeepAliveIntervalMs: req.settings.wsKeepAliveIntervalMs, sseDisableReconnect: req.settings.sseDisableReconnect, sseReconnectIntervalMs: req.settings.sseReconnectIntervalMs };
+    return { ...emptyHttpRequest(), workspaceId: this.activeWorkspaceId, method: isGraphQL ? 'POST' : req.method, url: flat.url, params: flat.params.map(({ key, value, enabled }) => ({ key, value, enabled, isFile: false, fileName: '', contentType: '' })), pathParams: (req.pathParams ?? []).map(({ key, value, enabled }) => ({ key, value, enabled, isFile: false, fileName: '', contentType: '' })), headers: req.headers.map(({ key, value, enabled }) => ({ key, value, enabled, isFile: false, fileName: '', contentType: '' })), auth: { ...emptyAuthConfig(), type: req.auth.type, token: req.auth.type === 'oauth2' ? req.auth.oauth2Token : req.auth.bearerToken, username: req.auth.basicUser, password: req.auth.basicPass, keyName: req.auth.apiKeyName, keyValue: req.auth.apiKeyValue, keyIn: req.auth.apiKeyIn, oauth2GrantType: req.auth.oauth2GrantType ?? '', oauth2AuthURL: req.auth.oauth2AuthURL ?? '', oauth2TokenURL: req.auth.oauth2TokenURL, oauth2ClientID: req.auth.oauth2ClientID, oauth2Secret: req.auth.oauth2Secret, oauth2Scope: req.auth.oauth2Scope, oauth2UsePKCE: req.auth.oauth2UsePKCE ?? false, oauth2RefreshToken: req.auth.oauth2RefreshToken ?? '', awsAccessKey: req.auth.awsAccessKey, awsSecretKey: req.auth.awsSecretKey, awsSessionToken: req.auth.awsSessionToken ?? '', awsRegion: req.auth.awsRegion, awsService: req.auth.awsService }, bodyType: isGraphQL ? 'graphql' : req.bodyType, body, bodyFilePath: req.bodyFilePath, formData: req.formRows.map(({ key, value, enabled, isFile, fileName, contentType }) => ({ key, value, enabled, isFile: isFile ?? false, fileName: fileName ?? '', contentType: contentType ?? '' })), ...scriptFieldsForSend(req), name: req.name, scriptTimeoutMs: req.settings.scriptTimeoutMs, allowSendRequest: req.settings.allowSendRequest, followRedirects: req.settings.followRedirects, timeoutMs: req.settings.timeoutMs, httpVersion: req.settings.httpVersion, enableSSLVerification: req.settings.enableSSLVerification, followOriginalMethod: req.settings.followOriginalMethod, followAuthorizationHeader: req.settings.followAuthorizationHeader, removeRefererHeader: req.settings.removeRefererHeader, encodeUrlAutomatically: req.settings.encodeUrlAutomatically, disableCookieJar: req.settings.disableCookieJar, maxRedirects: req.settings.maxRedirects, ...this.resolveProxyFields(req.settings.proxyUrl ?? ''), clientCertPath: req.settings.clientCertPath ?? '', clientKeyPath: req.settings.clientKeyPath ?? '', clientKeyPassword: req.settings.clientKeyPassword ?? '', browserEmulation: req.settings.browserEmulation, browserOrigin: req.settings.browserOrigin, browserWithCredentials: req.settings.browserWithCredentials, browserEnforceCORS: req.settings.browserEnforceCORS, browserEnforceCSP: req.settings.browserEnforceCSP, browserCSP: req.settings.browserCSP, wsHandshakeTimeoutMs: req.settings.wsHandshakeTimeoutMs, wsReconnectAttempts: req.settings.wsReconnectAttempts, wsReconnectIntervalMs: req.settings.wsReconnectIntervalMs, wsMaxMessageSizeMb: req.settings.wsMaxMessageSizeMb, wsKeepAliveIntervalMs: req.settings.wsKeepAliveIntervalMs, sseDisableReconnect: req.settings.sseDisableReconnect, sseReconnectIntervalMs: req.settings.sseReconnectIntervalMs };
   },
 
   savedRequestToRunnableHttpRequest(
@@ -225,7 +227,7 @@ export const requestSerializationFeature = {
       body: outBody,
       bodyFilePath: resolveValue(req.bodyFilePath),
       formData: resolveRows(req.formRows).filter(r => r.enabled && r.key).map(({ key, value, enabled, isFile, fileName, contentType }) => ({ key, value, enabled, isFile: isFile ?? false, fileName: fileName ?? '', contentType: contentType ?? '' })),
-      ...this.scriptFieldsForSend(req),
+      ...scriptFieldsForSend(req),
       ...(requestTypeSupportsAssertions(this.normalizeRequestTypeValue(req.requestType, req.url)) ? { assertions: assertionsForSend(req.assertions, resolveValue) } : {}),
       followRedirects: req.settings.followRedirects,
       timeoutMs: req.settings.timeoutMs,
@@ -412,7 +414,7 @@ export const requestSerializationFeature = {
       name: req.name,
       scriptTimeoutMs: req.settings.scriptTimeoutMs,
       allowSendRequest: req.settings.allowSendRequest,
-      ...this.scriptFieldsForSend(req),
+      ...scriptFieldsForSend(req),
       collectionVariables: collectionVariableValues(this.collectionForRequest(req)),
       scriptEnvironment,
       scriptVariables,

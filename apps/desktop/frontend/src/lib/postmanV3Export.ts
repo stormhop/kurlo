@@ -4,7 +4,6 @@ import { exportBodyLikeValue, postmanAuthFromKurlo, postmanBodyFromKurlo, postma
 import type { PostmanV3File } from './postmanV3';
 import { parseQuery, splitUrl } from './queryParams';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
-import { withActiveScripts } from './scriptEngine';
 import { safeExportRow, safeExportUrl, safeExportValue } from './secretExport';
 import type { AuthState, Collection, CollectionDefaults, FolderDefaults, KVRow, SavedRequest } from './types/models';
 import { yamlMap } from './yaml';
@@ -46,16 +45,15 @@ function scripts(beforeType: string, afterType: string, before: string, after: s
 }
 
 function definition(name: string, description: string, order: number | undefined, defaults: CollectionDefaults | FolderDefaults | undefined, includeSecrets: boolean) {
-  const active = defaults && withActiveScripts(defaults, 'js');
-  const hooks = active ? [
-    ...scripts('http:beforeRequest', 'http:afterResponse', active.preRequestScript, active.testScript),
-    ...scripts('graphql:beforeQuery', 'graphql:afterResponse', active.preRequestScript, active.testScript),
-    ...scripts('grpc:beforeInvoke', 'grpc:afterResponse', active.preRequestScript, active.testScript),
+  const hooks = defaults ? [
+    ...scripts('http:beforeRequest', 'http:afterResponse', defaults.preRequestScriptJs, defaults.testScriptJs),
+    ...scripts('graphql:beforeQuery', 'graphql:afterResponse', defaults.preRequestScriptJs, defaults.testScriptJs),
+    ...scripts('grpc:beforeInvoke', 'grpc:afterResponse', defaults.preRequestScriptJs, defaults.testScriptJs),
   ] : [];
   return {
     $kind: 'collection', name, description: description || undefined, order,
-    variables: active && 'variables' in active ? pairs(active.variables, includeSecrets) : undefined,
-    auth: active ? authConfig(active.auth, includeSecrets) : undefined,
+    variables: defaults && 'variables' in defaults ? pairs(defaults.variables, includeSecrets) : undefined,
+    auth: defaults ? authConfig(defaults.auth, includeSecrets) : undefined,
     scripts: hooks.length ? hooks : undefined,
   };
 }
@@ -105,8 +103,7 @@ function httpBody(request: SavedRequest, nodes: Nodes) {
   }
 }
 
-function requestDoc(raw: SavedRequest, order: number, nodes: Nodes) {
-  const req = withActiveScripts(raw, 'js');
+function requestDoc(req: SavedRequest, order: number, nodes: Nodes) {
   const { includeSecrets, collection } = nodes;
   const settings = mergeCollectionSettings(collection.defaults.settings, req.settings, req.settingsOverrides);
   const headers = pairs(mergeDefaultRows(inheritedHeaderRows(collection, req.folderPath), req.headers), includeSecrets);

@@ -2,38 +2,12 @@
 title: "Assertions"
 ---
 
-JavaScript:
-
 ```js
 pm.test("status is 200", () => pm.response.to.have.status(200))
 pm.test("has id", () => pm.expect(pm.response.json()).to.have.property("id"))
 ```
 
-Tengo:
-
-```js
-body := pm.response.json()
-pm.test("status is 200", pm.response.code == 200)
-pm.test("has id", pm.expect(body).has_key("id"))
-```
-
-**`pm.test(name, fnOrResult)`** — register a named assertion. JavaScript accepts a callback or boolean. Tengo accepts a boolean expression.
-
-**`pm.expect(value)`** — chainable assertion builder.
-
-| Chain | Description |
-|-------|-------------|
-| `.equal(v)` | Strict equality |
-| `.not_equal(v)` | Inverse of `equal` |
-| `.contains(s)` | Substring or array membership |
-| `.exists()` | Not null/undefined |
-| `.is_null()` | Strict null check |
-| `.greater_than(n)` | `value > n` |
-| `.less_than(n)` | `value < n` |
-| `.has_key(k)` | Map contains key |
-| `.type_of()` | Returns the type as a string (`"string"`, `"int"`, `"map"`, etc.) |
-
-JavaScript also supports Chai-style aliases for the common Postman patterns:
+**`pm.test(name, fnOrResult)`** registers a named assertion and accepts a callback or a boolean. **`pm.expect(value)`** builds a chainable Chai-style assertion.
 
 | Chain | Description |
 |-------|-------------|

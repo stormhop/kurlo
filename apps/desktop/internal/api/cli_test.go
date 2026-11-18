@@ -159,10 +159,9 @@ func TestResolveCLIValuesUnknownEnvironment(t *testing.T) {
 func TestBuildHTTPRequestResolvesVariablesAndScripts(t *testing.T) {
 	req := cliSavedRequest{
 		Name: "r", RequestType: "http", Method: "get",
-		URL:              "{{base}}/users/{{id}}",
-		TestScriptJs:     `pm.test("ok", () => true)`,
-		PreRequestScript: "legacy",
-		Settings:         cliSettings{TimeoutMs: intPointer(1000)},
+		URL:          "{{base}}/users/{{id}}",
+		TestScriptJs: `pm.test("ok", () => true)`,
+		Settings:     cliSettings{TimeoutMs: intPointer(1000)},
 	}
 	built := buildHTTPRequest(req, map[string]string{"base": "https://api.test", "id": "42"}, nil, 0)
 	if !built.ResolveTemplates || built.URL != "{{base}}/users/{{id}}" {
@@ -178,11 +177,28 @@ func TestBuildHTTPRequestResolvesVariablesAndScripts(t *testing.T) {
 	if built.Method != "GET" {
 		t.Fatalf("method = %q", built.Method)
 	}
-	if built.ScriptEngine != "js" || built.TestScript == "" {
-		t.Fatalf("expected JS engine with the JS test script, got engine=%q test=%q", built.ScriptEngine, built.TestScript)
+	if built.TestScript != req.TestScriptJs {
+		t.Fatalf("test script = %q, want %q", built.TestScript, req.TestScriptJs)
 	}
 	if built.PreRequestScript != "" {
-		t.Fatalf("expected the legacy pre-request script to be ignored, got %q", built.PreRequestScript)
+		t.Fatalf("expected no pre-request script, got %q", built.PreRequestScript)
+	}
+}
+
+func TestBuildHTTPRequestIgnoresRetiredScriptFields(t *testing.T) {
+	var req cliSavedRequest
+	err := json.Unmarshal([]byte(`{
+		"method": "GET",
+		"url": "https://api.test",
+		"preRequestScript": "throw new Error('old pre-request script')",
+		"testScript": "throw new Error('old test script')"
+	}`), &req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	built := buildHTTPRequest(req, nil, nil, 0)
+	if built.PreRequestScript != "" || built.TestScript != "" {
+		t.Fatalf("unexpected scripts: %q and %q", built.PreRequestScript, built.TestScript)
 	}
 }
 

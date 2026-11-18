@@ -38,7 +38,7 @@ import type {
   Method, BodyType, RawBodyType, HttpVersion, RequestTab, ScriptTab, ResponseTab, GrpcResponseTab,
   AuthType, OAuth2GrantType, OAuth2ClientAuth, SidebarView, ShortcutId, KVRow,
   Workspace, Collection, Environment,
-   RequestSettingsOverrides, ProxyConfig, SavedRequest, RequestHistoryEntry, RequestStore, ScriptEngine,
+   RequestSettingsOverrides, ProxyConfig, SavedRequest, RequestHistoryEntry, RequestStore,
   CollectionGroup, HistoryDayGroup,
   CollectionRunnerResult, RenderedSnippetLine, RequestType, SIOArg, SavedRealtimeMessage, GrpcResponse, GrpcServiceDefinition,
   RequestExample,
@@ -76,7 +76,6 @@ import { requestSerializationFeature } from './features/requestSerialization';
 import { requestStateFeature } from './features/requestState';
 import { realtimeFeature } from './features/realtime';
 import { responseFeature } from './features/response';
-import { scriptsFeature } from './features/scripts';
 import { snippetsFeature } from './features/snippets';
 import { sseFeature } from './features/sse';
 import { websocketFeature } from './features/websocket';
@@ -522,9 +521,6 @@ class AppVM {
   declare sendAiPrompt: typeof aiFeature.sendAiPrompt;
   declare initAiListeners: typeof aiFeature.initAiListeners;
 
-  declare activePreRequestScript: typeof scriptsFeature.activePreRequestScript;
-  declare activeTestScript: typeof scriptsFeature.activeTestScript;
-  declare scriptFieldsForSend: typeof scriptsFeature.scriptFieldsForSend;
 
   declare bodyLang: typeof requestBodyFeature.bodyLang;
   declare bodyMode: typeof requestBodyFeature.bodyMode;
@@ -920,8 +916,6 @@ class AppVM {
   declare resetZoom: typeof preferencesFeature.resetZoom;
   declare loadProxyConfig: typeof preferencesFeature.loadProxyConfig;
   declare setProxyConfig: typeof preferencesFeature.setProxyConfig;
-  declare loadScriptEngine: typeof preferencesFeature.loadScriptEngine;
-  declare setScriptEngine: typeof preferencesFeature.setScriptEngine;
 
   declare pruneHistory: typeof historyFeature.pruneHistory;
   declare buildHistoryGroups: typeof historyFeature.buildHistoryGroups;
@@ -1196,11 +1190,8 @@ class AppVM {
   rawTypeMenuOpen = $state(false);
   authMenuOpen = $state(false);
 
-  preRequestScript = $state('');
-  testScript = $state('');
   preRequestScriptJs = $state('');
   testScriptJs = $state('');
-  scriptEngine = $state<ScriptEngine>('js');
   requestNotes = $state('');
   requestExamples = $state<RequestExample[]>([]);
   requestExamplesSource: { view: RequestExample[]; source: RequestExample[] } | null = null;
@@ -2175,7 +2166,6 @@ applyFeatures(
   grpcFeature,
   mcpFeature,
   aiFeature,
-  scriptsFeature,
   examplesFeature,
   requestBodyFeature,
   requestCrudFeature,

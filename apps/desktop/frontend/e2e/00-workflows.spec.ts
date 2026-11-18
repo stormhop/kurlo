@@ -197,26 +197,6 @@ test.describe("Kurlo desktop browser E2E", () => {
     }
     if (docsScreenshotDir) {
       try {
-        await page.getByLabel('Settings', { exact: true }).click();
-        await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
-        await page.getByRole('radio', { name: 'Tengo', exact: true }).click();
-        await page.getByLabel('Close settings').click();
-        await chooseRequestSection(page, 'Scripts');
-        await page.locator('.script-section').getByRole('tab', { name: /^Pre-request/ }).click();
-        await fillCodeEditor(page, 'pre-request-script-editor', [
-          'pm.variables.set("requestId", "tengo-docs")',
-          'pm.log("Tengo pre-request ready")',
-        ].join('\n'));
-        await captureDocsScreenshot(page, 'scripting-tengo');
-        await page.getByLabel('Settings', { exact: true }).click();
-        await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
-        await page.getByRole('radio', { name: 'JavaScript', exact: true }).click();
-        await page.getByLabel('Close settings').click();
-        await page.locator('.script-section').getByRole('tab', { name: /^Tests/ }).click();
-      } catch (err) { console.log('docs screenshot scripting-tengo skipped:', err); }
-    }
-    if (docsScreenshotDir) {
-      try {
         await page.locator('.response-status-bar').screenshot({ path: join(docsScreenshotDir, 'status-bar.png'), animations: 'disabled' });
       } catch (err) { console.log('docs screenshot status-bar skipped:', err); }
       try {

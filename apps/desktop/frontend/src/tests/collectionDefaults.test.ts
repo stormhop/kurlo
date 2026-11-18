@@ -40,8 +40,6 @@ const baseRequest: SavedRequest = {
   bodyFileName: '',
   formRows: [],
   graphqlSchema: '',
-  preRequestScript: '',
-  testScript: '',
   requestNotes: '',
   settings: { ...DEFAULT_REQUEST_SETTINGS },
   sioEvents: [],
@@ -79,33 +77,17 @@ describe('collection defaults', () => {
   it('inherits auth, scripts and non-default transport settings', () => {
     const defaults = emptyCollectionDefaults();
     defaults.auth = { ...emptyAuthState(), type: 'bearer', bearerToken: '{{token}}' };
-    defaults.preRequestScript = 'pm.log("collection")';
-    defaults.testScript = 'pm.test("ok", true)';
+    defaults.preRequestScriptJs = 'pm.log("collection")';
+    defaults.testScriptJs = 'pm.test("ok", true)';
     defaults.settings = { ...DEFAULT_REQUEST_SETTINGS, timeoutMs: 12000, proxyUrl: 'http://localhost:8080' };
 
     const merged = applyCollectionDefaultsToRequest({ ...baseRequest, auth: inheritAuthState() }, collection(defaults));
 
     expect(merged.auth.type).toBe('bearer');
-    expect(merged.preRequestScript).toContain('collection');
-    expect(merged.testScript).toContain('ok');
+    expect(merged.preRequestScriptJs).toContain('collection');
+    expect(merged.testScriptJs).toContain('ok');
     expect(merged.settings.timeoutMs).toBe(12000);
     expect(merged.settings.proxyUrl).toBe('http://localhost:8080');
-  });
-
-  it('merges per-engine default scripts independently', () => {
-    const defaults = emptyCollectionDefaults();
-    defaults.preRequestScript = 'pm.log("tengo-default")';
-    defaults.preRequestScriptJs = 'console.log("js-default")';
-    defaults.testScriptJs = 'pm.test("js", () => {})';
-
-    const request = { ...baseRequest, preRequestScript: 'pm.log("tengo-req")', preRequestScriptJs: 'console.log("js-req")' };
-    const merged = applyCollectionDefaultsToRequest(request, collection(defaults));
-
-    expect(merged.preRequestScript).toContain('tengo-default');
-    expect(merged.preRequestScript).toContain('tengo-req');
-    expect(merged.preRequestScriptJs).toContain('js-default');
-    expect(merged.preRequestScriptJs).toContain('js-req');
-    expect(merged.testScriptJs).toContain('js');
   });
 
   it('treats a JS-only default script as collection content', () => {
@@ -179,12 +161,12 @@ describe('collection defaults', () => {
 
   it('runs request tests before collection tests like Bruno sandwich post flow', () => {
     const defaults = emptyCollectionDefaults();
-    defaults.testScript = 'pm.test("collection", true)';
-    const request = { ...baseRequest, testScript: 'pm.test("request", true)' };
+    defaults.testScriptJs = 'pm.test("collection", true)';
+    const request = { ...baseRequest, testScriptJs: 'pm.test("request", true)' };
 
     const merged = applyCollectionDefaultsToRequest(request, collection(defaults));
 
-    expect(merged.testScript).toBe('pm.test("request", true)\n\npm.test("collection", true)');
+    expect(merged.testScriptJs).toBe('pm.test("request", true)\n\npm.test("collection", true)');
   });
 
   it('resolves environment variables above collection values like Bruno', () => {
@@ -227,8 +209,8 @@ describe('collection settings round-trip into requests', () => {
       headers: [{ ...mkRow(), key: 'X-Env', value: 'prod', description: 'environment' }],
       variables: [{ ...mkRow(), key: 'apiKey', value: 'sk-live-123', secret: true }],
       auth: { ...emptyAuthState(), type: 'bearer', bearerToken: '{{apiKey}}' },
-      preRequestScript: 'pm.log("collection")',
-      testScript: 'pm.test("collection", true)',
+      preRequestScriptJs: 'pm.log("collection")',
+      testScriptJs: 'pm.test("collection", true)',
       settings: { ...DEFAULT_REQUEST_SETTINGS, timeoutMs: 9000 },
     });
     const col = collection(stored);
@@ -241,8 +223,8 @@ describe('collection settings round-trip into requests', () => {
     expect('secret' in (header ?? {})).toBe(false);
     expect(merged.auth.type).toBe('bearer');
     expect(merged.auth.bearerToken).toBe('{{apiKey}}');
-    expect(merged.preRequestScript).toContain('collection');
-    expect(merged.testScript).toContain('collection');
+    expect(merged.preRequestScriptJs).toContain('collection');
+    expect(merged.testScriptJs).toContain('collection');
     expect(merged.settings.timeoutMs).toBe(9000);
     expect(collectionSecretVariableKeys(col)).toEqual(['apiKey']);
     expect(collectionSecretVariableValues(col)).toEqual(['sk-live-123']);

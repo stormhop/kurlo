@@ -94,7 +94,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - Client certificates (mutual TLS), per request or inherited from a collection
 - Per-request and collection defaults with inheritance
 
-**Scripting** — pre-request and test scripts in sandboxed JavaScript, with legacy [Tengo](https://github.com/d5/tengo) support:
+**Scripting** — pre-request and test scripts in sandboxed JavaScript:
 ```js
 // pre-request: inject a header
 pm.request.headers.set("X-Client", "kurlo")
@@ -242,7 +242,7 @@ apps/desktop/internal/
   api/                      HTTP executor, auth, request store, state
   api/auth/                 Bearer, Basic, Digest, API Key, OAuth2, AWS SigV4
   model/                    Shared Go types (request, response, auth config)
-  script/                   JavaScript/Tengo scripting engines + pm.* API
+  script/                   JavaScript sandbox and pm.* API
 apps/desktop/frontend/src/
   App.svelte                Root shell and layout
   lib/stores/app.svelte.ts  Composed app view-model
@@ -260,7 +260,7 @@ perf/                       Generated performance fixtures (ignored by Git)
 
 ## Scripting API reference
 
-Scripts run in a sandboxed JavaScript environment by default, or in the legacy [Tengo](https://github.com/d5/tengo) engine for existing requests. Imports, filesystem, process, and network access are disabled. Execution timeout: 2 seconds by default, configurable per request up to 60.
+Scripts run in a sandboxed JavaScript environment with a two-second default timeout, configurable per request up to 60 seconds. The sandbox blocks module imports, filesystem access, processes, and direct network access. Requests can opt in to HTTP calls through `pm.sendRequest`.
 
 The full surface — every method, the variable-scope precedence rules, and the Chai-style assertion aliases — is in the [scripting API reference](https://kurlo.dev/docs/reference/scripting-api/). The short version:
 

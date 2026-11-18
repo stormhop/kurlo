@@ -34,7 +34,7 @@ func TestSendRequestUsesRequestVarsAndSetsPostResponseVars(t *testing.T) {
 		RequestVariables: map[string]string{"userId": "7", "tenant": "acme"},
 		PreRequestScript: `pm.environment.set("seenUser", pm.variables.get("userId")); pm.environment.set("tenant", "changed")`,
 		TestScript:       `pm.test("token visible", () => pm.expect(pm.variables.get("token")).to.eql("t-9"))`,
-		ScriptEngine:     "js",
+
 		PostResponseVars: []model.KeyValue{
 			{Key: "token", Value: "res.body.token", Enabled: true},
 			{Key: "userIdFromBody", Value: "res('user.id')", Enabled: true},

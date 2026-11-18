@@ -471,7 +471,7 @@ test('inherits collection auth in a gRPC request', async ({ page }) => {
   await installKurloBridge(page, '', 'browser/e2e', false, {
     collections: [{
       id: 'col-grpc-auth', workspaceId: 'workspace-e2e', name: 'gRPC API',
-      defaults: { headers: [], variables: [], auth: { type: 'bearer', bearerToken: 'collection-token' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', settings: {} },
+      defaults: { headers: [], variables: [], auth: { type: 'bearer', bearerToken: 'collection-token' }, preRequestScriptJs: '', testScriptJs: '', settings: {} },
     }],
     requests: [{
       id: 'grpc-auth', collectionId: 'col-grpc-auth', collection: 'gRPC API', name: 'Inventory', folderPath: [],

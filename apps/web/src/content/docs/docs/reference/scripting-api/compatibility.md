@@ -36,7 +36,7 @@ JavaScript scripts written for Postman's older API run unchanged:
 
 ## JetBrains HTTP Client globals
 
-Scripts imported from `.http` files, written for the JetBrains HTTP Client, run in the JavaScript engine as well:
+Scripts imported from `.http` files, written for the JetBrains HTTP Client, run in the JavaScript sandbox:
 
 | Name | Meaning |
 |------|---------|

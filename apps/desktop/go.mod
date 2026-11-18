@@ -9,7 +9,6 @@ require (
 	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/andybalholm/brotli v1.2.6
-	github.com/d5/tengo/v2 v2.17.0
 	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
 	github.com/fullstorydev/grpcurl v1.9.4
 	github.com/godbus/dbus/v5 v5.1.0

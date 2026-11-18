@@ -39,7 +39,7 @@ Use the **Postman collection** picker for exported Postman environments or globa
 
 ## Pre-request / test script compatibility
 
-Postman scripts are JavaScript with Postman's `pm.*` API. Kurlo supports sandboxed JavaScript for new imports and keeps legacy [Tengo](https://github.com/d5/tengo) script fields for older requests. The shared `pm.*` API mirrors the common Postman surface for headers, variables, environments, response JSON, tests, and logs.
+Postman scripts are JavaScript with Postman's `pm.*` API. Kurlo runs imported scripts in a JavaScript sandbox. Its `pm.*` API mirrors the common Postman surface for headers, variables, environments, response JSON, tests, and logs.
 
 Most simple Postman scripts import with minimal edits:
 

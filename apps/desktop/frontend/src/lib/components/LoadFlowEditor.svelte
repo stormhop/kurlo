@@ -140,7 +140,7 @@
 
   function hasScript(request: SavedRequest | undefined) {
     if (!request) return false;
-    return [request.preRequestScript, request.testScript, request.preRequestScriptJs, request.testScriptJs]
+    return [request.preRequestScriptJs, request.testScriptJs]
       .some(script => Boolean(script?.trim()));
   }
 

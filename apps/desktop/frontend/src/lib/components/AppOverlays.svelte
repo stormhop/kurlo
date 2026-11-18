@@ -146,8 +146,6 @@
       setPreviewTabs={vm.setPreviewTabs}
       startupView={vm.startupView}
       setStartupView={vm.setStartupView}
-      scriptEngine={vm.scriptEngine}
-      setScriptEngine={vm.setScriptEngine}
       shortcutGroups={vm.shortcutGroups}
       shortcutCombo={vm.shortcutCombo}
       startShortcutCapture={vm.startShortcutCapture}

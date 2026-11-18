@@ -34,8 +34,8 @@ type CollectionDefaultsInput = {
   headers?: KVRow[];
   variables?: KVRow[];
   auth?: AuthState;
-  preRequestScript?: string;
-  testScript?: string;
+  preRequestScriptJs?: string;
+  testScriptJs?: string;
   settings?: Partial<RequestSettings>;
 };
 
@@ -568,7 +568,7 @@ function scriptsFromOpenCollection(value: unknown) {
   const scripts = isRecord(value) ? asArray(value.scripts) as ScriptEntry[] : [];
   const before = scripts.filter(script => asText(script.type) === 'before-request').map(script => asText(script.code)).filter(Boolean);
   const after = scripts.filter(script => ['after-response', 'tests'].includes(asText(script.type))).map(script => asText(script.code)).filter(Boolean);
-  return { preRequestScript: before.join('\n\n'), testScript: after.join('\n\n') };
+  return { preRequestScriptJs: before.join('\n\n'), testScriptJs: after.join('\n\n') };
 }
 
 function collectionDefaultsInputHasSettings(input: CollectionDefaultsInput | undefined) {
@@ -580,8 +580,8 @@ function mergeCollectionDefaultsInput(base: CollectionDefaultsInput, next: Colle
     headers: next.headers?.length ? next.headers : base.headers,
     variables: next.variables?.length ? next.variables : base.variables,
     auth: next.auth && authStateHasData(next.auth, next.auth.type) ? next.auth : base.auth,
-    preRequestScript: next.preRequestScript || base.preRequestScript,
-    testScript: next.testScript || base.testScript,
+    preRequestScriptJs: next.preRequestScriptJs || base.preRequestScriptJs,
+    testScriptJs: next.testScriptJs || base.testScriptJs,
     settings: {
       ...(base.settings ?? {}),
       ...(collectionDefaultsInputHasSettings(next) ? next.settings : {}),
@@ -594,8 +594,8 @@ function normalizeCollectionDefaultsInput(input: CollectionDefaultsInput): Colle
     headers: input.headers ?? [],
     variables: input.variables ?? [],
     auth: input.auth ?? emptyAuthState(),
-    preRequestScript: input.preRequestScript ?? '',
-    testScript: input.testScript ?? '',
+    preRequestScriptJs: input.preRequestScriptJs ?? '',
+    testScriptJs: input.testScriptJs ?? '',
     settings: { ...DEFAULT_REQUEST_SETTINGS, ...(input.settings ?? {}) },
   });
 }
@@ -611,8 +611,8 @@ function collectionDefaultsFromOpenCollectionDocument(parsed: unknown): Collecti
       ? variableRowsFromOpenCollection(parsed.request.variables)
       : rowsFromOpenCollectionValue(parsed.variables ?? parsed.vars ?? parsed.values),
     ...(authStateHasData(auth, auth.type) ? { auth } : {}),
-    ...(scripts.preRequestScript ? { preRequestScript: scripts.preRequestScript } : {}),
-    ...(scripts.testScript ? { testScript: scripts.testScript } : {}),
+    ...(scripts.preRequestScriptJs ? { preRequestScriptJs: scripts.preRequestScriptJs } : {}),
+    ...(scripts.testScriptJs ? { testScriptJs: scripts.testScriptJs } : {}),
     settings: settingsPatchFromOpenCollection(parsed.settings),
   };
 }
@@ -664,8 +664,8 @@ function collectionDefaultsFromBruCollectionFile(file: CollectionTextFile | unde
     headers: rowsFromBruBlock(byName.get('headers')),
     variables,
     ...(authStateHasData(auth, auth.type) ? { auth } : {}),
-    preRequestScript: byName.get('script:pre-request') || '',
-    testScript: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
+    preRequestScriptJs: byName.get('script:pre-request') || '',
+    testScriptJs: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
     settings: settingsPatchFromBruBlock(byName.get('settings')),
   };
 }
@@ -682,8 +682,8 @@ function collectionDefaultsFromFiles(files: CollectionTextFile[]): CollectionDef
 function collectionDefaultsToOpenCollection(defaults: CollectionDefaults, includeSecrets = false): Record<string, unknown> {
   const normalized = normalizeCollectionDefaults(defaults);
   const runtimeScripts = [
-    normalized.preRequestScript ? { type: 'before-request', code: normalized.preRequestScript } : undefined,
-    normalized.testScript ? { type: 'tests', code: normalized.testScript } : undefined,
+    normalized.preRequestScriptJs ? { type: 'before-request', code: normalized.preRequestScriptJs } : undefined,
+    normalized.testScriptJs ? { type: 'tests', code: normalized.testScriptJs } : undefined,
   ].filter(Boolean);
   const settings = settingsToOpenCollection(safeExportSettings(normalized.settings, includeSecrets), true, true);
   return {
@@ -864,8 +864,8 @@ function folderDefaultsFromFolderFile(file: CollectionTextFile, folderPath: stri
       ...folder,
       headers: rowsFromBruBlock(byName.get('headers')),
       auth: authType === 'inherit' ? folder.auth : authType === 'none' ? emptyAuthState() : authFromBruBlocks(byName, authType),
-      preRequestScript: byName.get('script:pre-request') || '',
-      testScript: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
+      preRequestScriptJs: byName.get('script:pre-request') || '',
+      testScriptJs: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
     };
     return folderDefaultsHaveContent(next) ? next : null;
   }
@@ -878,8 +878,8 @@ function folderDefaultsFromFolderFile(file: CollectionTextFile, folderPath: stri
     ...folder,
     headers: rowsFromOpenCollectionValue(parsed.headers ?? http.headers),
     auth: authValue === undefined ? folder.auth : openCollectionAuth(authValue),
-    preRequestScript: scripts.preRequestScript,
-    testScript: scripts.testScript,
+    preRequestScriptJs: scripts.preRequestScriptJs,
+    testScriptJs: scripts.testScriptJs,
   };
   return folderDefaultsHaveContent(next) ? next : null;
 }
@@ -900,8 +900,8 @@ function folderDefaultsFromOpenCollection(files: CollectionTextFile[], folderNam
 function folderDefaultsToOpenCollection(folder: FolderDefaults | undefined, includeSecrets: boolean): Record<string, unknown> {
   if (!folder || !folderDefaultsHaveContent(folder)) return {};
   const runtimeScripts = [
-    folder.preRequestScript ? { type: 'before-request', code: folder.preRequestScript } : undefined,
-    folder.testScript ? { type: 'tests', code: folder.testScript } : undefined,
+    folder.preRequestScriptJs ? { type: 'before-request', code: folder.preRequestScriptJs } : undefined,
+    folder.testScriptJs ? { type: 'tests', code: folder.testScriptJs } : undefined,
   ].filter(Boolean);
   const headers = folder.headers.filter(row => row.key || row.value);
   return {
@@ -1058,8 +1058,8 @@ function requestFromBruFile(file: CollectionTextFile, collectionId: string, coll
       grpcProtoFileName: methodConfig.protoFileName || '',
       grpcProtoImportPaths: methodConfig.protoImportPaths ? methodConfig.protoImportPaths.split(',').map(path => path.trim()).filter(Boolean) : [],
     } : {}),
-    preRequestScript: byName.get('script:pre-request') || '',
-    testScript: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
+    preRequestScriptJs: byName.get('script:pre-request') || '',
+    testScriptJs: [byName.get('script:post-response'), byName.get('tests')].filter(Boolean).join('\n\n'),
     ...requestVarsFromBruBlocks(byName),
     requestNotes: byName.get('docs') || '',
     settings: { ...DEFAULT_REQUEST_SETTINGS, ...requestSettingsPatch },
@@ -1167,8 +1167,8 @@ function requestToOpenCollection(req: SavedRequest, seq: number, stripFn: (sourc
   const body = bodyToOpenCollection(req, stripFn, includeSecrets);
   const settings = settingsToOpenCollection(safeExportSettings(req.settings, includeSecrets), true, true, req.settingsOverrides);
   const runtimeScripts = [
-    req.preRequestScript ? { type: 'before-request', code: req.preRequestScript } : undefined,
-    req.testScript ? { type: 'tests', code: req.testScript } : undefined,
+    req.preRequestScriptJs ? { type: 'before-request', code: req.preRequestScriptJs } : undefined,
+    req.testScriptJs ? { type: 'tests', code: req.testScriptJs } : undefined,
   ].filter(Boolean);
   const requestType = req.requestType ?? (req.bodyType === 'graphql' ? 'graphql' : 'http');
   const runtimeVars = requestVarsToOpenCollection(req, includeSecrets);

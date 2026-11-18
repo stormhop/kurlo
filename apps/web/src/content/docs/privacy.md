@@ -78,11 +78,11 @@ Four features bind a local listener. All four are loopback-only (`127.0.0.1`, an
 
 ## Scripting safety
 
-Pre-request and test scripts run in a sandboxed JavaScript VM by default, with a legacy [Tengo](https://github.com/d5/tengo) engine for existing requests:
+Pre-request and test scripts run in a sandboxed JavaScript VM.
 
-- Imports, `require`, process access, filesystem access, and direct network sockets are disabled.
-- Execution is capped at **2 seconds** per script.
-- Scripts have access only to the explicit `pm.*` API (request/response/variables/environment/log). They cannot reach the file system, spawn processes, or open network sockets directly. Any HTTP call goes through the regular request engine.
+- The sandbox blocks module imports, processes, filesystem access, and direct network sockets. `require` resolves only [bundled libraries](/docs/reference/scripting-api/compatibility/#require).
+- The default limit is **2 seconds** per script. You can set a timeout of up to 60 seconds per request.
+- Scripts can make HTTP calls through [`pm.sendRequest`](/docs/reference/scripting-api/send-request/) when the request opts in. These calls use Kurlo's request engine.
 
 ## Cookies
 

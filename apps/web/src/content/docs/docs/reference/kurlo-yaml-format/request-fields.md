@@ -25,7 +25,6 @@ title: "Request fields"
 | `aiConnectionId` | With `aiProvider: kurlo`, the id of the AI connection from Settings → AI to use; omitted for the default connection. |
 | `bodyType` | `none`, `json`, `text`, `xml`, `html`, `form`, `urlencoded`, `binary`, or `graphql`. |
 | `rawBodyType` | `text`, `json`, `html`, or `xml`. |
-| `preRequestScript`, `testScript` | Legacy Tengo scripts. |
 | `preRequestScriptJs`, `testScriptJs` | JavaScript pre-request/test scripts. |
 | `assertions` | HTTP and GraphQL only. A list of [assertions](/docs/guides/scripting/assertions/), each with `enabled`, `target` (`status`, `responseTime`, `size`, `header.<Name>`, `body`, `body.<path>` or `$.<path>`), `operator` (`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `contains`, `notContains`, `matches`, `exists`, `notExists`, `type`, `length`) and `value`, a string. Rows without a target are dropped on save. |
 | `auth.type` | `inherit`, `none`, `bearer`, `basic`, `apikey`, `jwt`, `oauth1`, `oauth2`, `aws`, `digest`, or `ntlm`. NTLM uses `basicUser` and `basicPass`. |

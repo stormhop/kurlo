@@ -17,7 +17,7 @@ func jsCtx() *Context {
 
 func runPre(t *testing.T, ctx *Context, src string) model.ScriptResult {
 	t.Helper()
-	result := RunPreRequest("js", src, ctx)
+	result := RunPreRequest(src, ctx)
 	if result.Error != "" {
 		t.Fatalf("script error: %s", result.Error)
 	}
@@ -158,7 +158,7 @@ func TestJSInfoEventNameInTestScript(t *testing.T) {
 
 	ctx := jsCtx()
 	ctx.Response = &model.HttpResponse{StatusCode: 200, Body: "{}"}
-	result := RunTests("js", `pm.test("event", () => pm.expect(pm.info.eventName).to.equal("test"))`, ctx)
+	result := RunTests(`pm.test("event", () => pm.expect(pm.info.eventName).to.equal("test"))`, ctx)
 	if result.Error != "" {
 		t.Fatalf("script error: %s", result.Error)
 	}
@@ -208,7 +208,7 @@ func TestJSSkipRequestIgnoredInTestScript(t *testing.T) {
 
 	ctx := jsCtx()
 	ctx.Response = &model.HttpResponse{StatusCode: 200}
-	result := RunTests("js", `pm.execution.skipRequest()`, ctx)
+	result := RunTests(`pm.execution.skipRequest()`, ctx)
 	if result.SkippedRequest {
 		t.Error("skipRequest() in a test script should be ignored")
 	}
@@ -260,7 +260,7 @@ func TestJSCryptoUnknownAlgorithmThrows(t *testing.T) {
 	t.Parallel()
 
 	ctx := jsCtx()
-	result := RunPreRequest("js", `pm.crypto.hash("sha3", "x")`, ctx)
+	result := RunPreRequest(`pm.crypto.hash("sha3", "x")`, ctx)
 	if result.Error == "" {
 		t.Fatal("an unknown algorithm must fail loudly, not sign with an empty digest")
 	}
@@ -326,12 +326,12 @@ func TestJSTimeoutOverrideAllowsLongerScript(t *testing.T) {
 	`
 	short := jsCtx()
 	short.Timeout = 50 * time.Millisecond
-	if result := RunPreRequest("js", src, short); result.Error == "" {
+	if result := RunPreRequest(src, short); result.Error == "" {
 		t.Error("expected the script to hit the configured timeout")
 	}
 
 	ctx.Timeout = 5 * time.Second
-	if result := RunPreRequest("js", src, ctx); result.Error != "" {
+	if result := RunPreRequest(src, ctx); result.Error != "" {
 		t.Errorf("override should have allowed the script to finish, got %q", result.Error)
 	}
 	if ctx.Variables["done"] != "yes" {
@@ -360,7 +360,7 @@ func TestJSSendRequestDisabledByDefault(t *testing.T) {
 	t.Parallel()
 
 	ctx := jsCtx()
-	result := RunPreRequest("js", `pm.sendRequest("https://example.com")`, ctx)
+	result := RunPreRequest(`pm.sendRequest("https://example.com")`, ctx)
 	if result.Error == "" {
 		t.Fatal("pm.sendRequest must be unavailable unless it is explicitly enabled")
 	}
@@ -517,7 +517,7 @@ func TestJSSendRequestRequiresURL(t *testing.T) {
 
 	ctx := jsCtx()
 	ctx.Send = func(SendRequest) SendResponse { return SendResponse{StatusCode: 200} }
-	result := RunPreRequest("js", `pm.sendRequest({ method: "GET" })`, ctx)
+	result := RunPreRequest(`pm.sendRequest({ method: "GET" })`, ctx)
 	if result.Error == "" {
 		t.Fatal("expected an error when no url is given")
 	}
@@ -652,7 +652,7 @@ func TestJSSendRequestUnsupportedBodiesFail(t *testing.T) {
 	} {
 		ctx := jsCtx()
 		ctx.Send = func(SendRequest) SendResponse { return SendResponse{StatusCode: 200} }
-		result := RunPreRequest("js", `pm.sendRequest({ url: "https://example.com", method: "POST", body: `+body+` })`, ctx)
+		result := RunPreRequest(`pm.sendRequest({ url: "https://example.com", method: "POST", body: `+body+` })`, ctx)
 		if !strings.Contains(result.Error, "not supported") {
 			t.Errorf("body %s: error = %q", body, result.Error)
 		}

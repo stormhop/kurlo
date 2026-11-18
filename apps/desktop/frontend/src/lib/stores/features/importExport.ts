@@ -2,13 +2,12 @@ import type { CollectionTextFilesResult } from '../../wire';
 import { chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles, writeNewCollectionTextFiles } from '../../backend';
 import { detectImportSource, isBrunoFolder, isPostmanV3Document, isPostmanV3Folder, type ImportSource } from '../../importSource';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
-import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, ScriptEngine, Workspace } from '../../types/models';
+import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, Workspace } from '../../types/models';
 import { mergeGlobalRowsWithImportedRows } from './globals';
 import { mkRow } from '../../constants';
 import type { TopView } from '../ui';
 import { filesystemNameFromName, makeCollection, normalizeCollection, normalizeEnvironment, normalizeSavedRequest } from '../../normalizers';
 import { normalizeCollectionDefaults } from '../../collectionDefaults';
-import { routeImportedScripts, withActiveScripts } from '../../scriptEngine';
 import { downloadTextFile, safeFileName } from '../../utils';
 import { requestsHaveExportSecrets } from '../../secretExport';
 import { flattenedEnvironment } from '../../environmentInheritance';
@@ -104,7 +103,6 @@ type ImportExportHost = {
   openRequestIds: string[];
   requestHistory: RequestHistoryEntry[];
   topView: TopView;
-  scriptEngine: ScriptEngine;
   _postmanImportInput: HTMLInputElement | undefined;
   guardWorkspaceWritable: (action?: string) => boolean;
   closeFloatingMenus: () => void;
@@ -421,11 +419,11 @@ export const importExportFeature = {
       description: bundle.description,
       filesystemName: filesystemNameFromName(bundle.name, collectionId),
       folderPaths: bundle.folderPaths,
-      defaults: routeImportedScripts(normalizeCollectionDefaults(bundle.defaults)),
-      folderDefaults: (bundle.folderDefaults ?? []).map(folder => routeImportedScripts(folder)),
+      defaults: normalizeCollectionDefaults(bundle.defaults),
+      folderDefaults: bundle.folderDefaults,
     }, wsId);
     const importCollections = [...this.collections, importedCollection];
-    const importedReqs = bundle.requests.map(req => routeImportedScripts(normalizeSavedRequest({ ...req, collectionId: importedCollection.id, collection: importedCollection.name }, importCollections, wsId)));
+    const importedReqs = bundle.requests.map(req => normalizeSavedRequest({ ...req, collectionId: importedCollection.id, collection: importedCollection.name }, importCollections, wsId));
     const importedEnvs = (bundle.environments ?? []).map(env => normalizeEnvironment(env, wsId));
     collapseImportedCollection(this, importedCollection, importedReqs);
     const nextCols = [...this.collections, importedCollection];
@@ -463,7 +461,7 @@ export const importExportFeature = {
     }
     const importCollections = [...this.collections, collection];
     const importedReqs = builtRequests
-      .map(req => routeImportedScripts(normalizeSavedRequest(req, importCollections, wsId)));
+      .map(req => normalizeSavedRequest(req, importCollections, wsId));
     if (!importedReqs.length) throw new Error('No requests found in import file');
     collapseImportedCollection(this, collection, importedReqs);
     const nextCols = [...this.collections, collection]; const nextReqs = [...this.requests, ...importedReqs];
@@ -574,10 +572,8 @@ export const importExportFeature = {
     if (!parentDir) return;
     const targetRoot = `${parentDir.replace(/[\\/]$/, '')}/${safeFileName(folderName)}`;
     const envs = this.environments.filter(env => env.workspaceId === col.workspaceId);
-    const exportDefaults = withActiveScripts(col.defaults, 'js');
-    const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildOpenCollectionFiles } = await import('../../opencollection');
-    const files = buildOpenCollectionFiles(col.name, col.description ?? '', exportDefaults, exportReqs, envs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, folderPaths, (col.folderDefaults ?? []).map(folder => withActiveScripts(folder, 'js')));
+    const files = buildOpenCollectionFiles(col.name, col.description ?? '', col.defaults, reqs, envs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, folderPaths, col.folderDefaults ?? []);
     const error = await writeCollectionTextFiles(targetRoot, files);
     if (error) {
       this.collectionImportToast = 'OpenCollection export failed';
@@ -598,9 +594,8 @@ export const importExportFeature = {
     }
     const includeSecrets = await this.chooseCollectionSecretExportMode(reqs, 'Postman collection export');
     if (includeSecrets === null) return;
-    const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildPostmanCollection } = await import('../../postman');
-    const payload = buildPostmanCollection(col.name, col.description ?? '', exportReqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, withActiveScripts(col.defaults, 'js'), (col.folderDefaults ?? []).map(folder => withActiveScripts(folder, 'js')));
+    const payload = buildPostmanCollection(col.name, col.description ?? '', reqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, col.defaults, col.folderDefaults ?? []);
     this.closeFloatingMenus();
     const name = `${safeFileName(col.name)}.postman_collection.json`;
     const content = JSON.stringify(payload, null, 2);
@@ -666,9 +661,8 @@ export const importExportFeature = {
     }
     const includeSecrets = await this.chooseCollectionSecretExportMode(reqs, 'Insomnia export');
     if (includeSecrets === null) return;
-    const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildInsomniaExport } = await import('../../insomnia');
-    const payload = buildInsomniaExport(col.name, col.description ?? '', exportReqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets);
+    const payload = buildInsomniaExport(col.name, col.description ?? '', reqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets);
     this.closeFloatingMenus();
     const name = `${safeFileName(col.name)}.insomnia.json`;
     const content = JSON.stringify(payload, null, 2);

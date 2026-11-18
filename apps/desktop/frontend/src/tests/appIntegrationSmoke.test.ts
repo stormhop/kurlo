@@ -52,7 +52,7 @@ describe('full application e2e smoke', () => {
     app.bodyType = 'json';
     app.rawBodyType = 'json';
     app.bodyContent = '{"username":"ada","password":"raw-password"}';
-    app.activeTestScript = 'pm.test("status", () => pm.response.to.have.status(200));';
+    app.testScriptJs = 'pm.test("status", () => pm.response.to.have.status(200));';
     app.applyRequestSettings({ ...app.currentRequestSettings(), timeoutMs: 12000, followRedirects: false });
     app.markRequestSettingOverride('timeoutMs');
     app.markRequestSettingOverride('followRedirects');

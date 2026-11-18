@@ -81,20 +81,13 @@ describe('bulkTextToRows', () => {
 });
 
 describe('script snippets', () => {
-  it('offers JavaScript and Tengo variants for both script kinds', () => {
-    for (const engine of ['js', 'tengo'] as const) {
-      expect(preRequestSnippets(engine).length).toBeGreaterThan(0);
-      expect(testSnippets(engine).length).toBeGreaterThan(0);
-      for (const snippet of [...preRequestSnippets(engine), ...testSnippets(engine)]) {
-        expect(snippet.label.trim()).not.toBe('');
-        expect(snippet.code.trim()).not.toBe('');
-      }
-    }
-  });
-
-  it('keeps Tengo snippets free of JavaScript arrow functions', () => {
-    for (const snippet of [...preRequestSnippets('tengo'), ...testSnippets('tengo')]) {
-      expect(snippet.code).not.toContain('=>');
+  it('offers valid JavaScript examples for both script kinds', () => {
+    expect(preRequestSnippets.length).toBeGreaterThan(0);
+    expect(testSnippets.length).toBeGreaterThan(0);
+    for (const snippet of [...preRequestSnippets, ...testSnippets]) {
+      expect(snippet.label.trim()).not.toBe('');
+      expect(snippet.code.trim()).not.toBe('');
+      expect(() => new Function(snippet.code)).not.toThrow();
     }
   });
 

@@ -145,10 +145,10 @@ func TestSendRequestRunsAssertionsAfterTheTestScript(t *testing.T) {
 	defer server.Close()
 
 	resp := NewApp().SendRequest(model.HttpRequest{
-		Method:                  http.MethodPost,
-		URL:                     server.URL + "/orders",
-		TestScript:              `pm.test("script test", () => pm.expect(1).to.eql(1))`,
-		ScriptEngine:            "js",
+		Method:     http.MethodPost,
+		URL:        server.URL + "/orders",
+		TestScript: `pm.test("script test", () => pm.expect(1).to.eql(1))`,
+
 		Assertions:              []model.Assertion{{Enabled: true, Target: "status", Operator: "eq", Value: "201"}, {Enabled: true, Target: "body.token", Operator: "eq", Value: "tok-very-secret"}},
 		SecretEnvironmentValues: []string{"tok-very-secret"},
 		FollowRedirects:         true,

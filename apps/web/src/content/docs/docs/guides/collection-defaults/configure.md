@@ -10,11 +10,9 @@ title: "Configure collection defaults"
 | Headers | Header rows merged into child requests. |
 | Vars | Collection variables, including values marked secret. |
 | Auth | Default authentication scheme and credentials. See [Authentication](/docs/guides/authentication/) for supported schemes. |
-| Script | Collection pre-request script for the selected JavaScript or Tengo engine. |
-| Tests | Collection test script for the selected engine. |
+| Script | Collection JavaScript that runs before each request. |
+| Tests | Collection JavaScript that runs after each response. |
 | Proxy | Transport defaults such as HTTP version, TLS verification, client certificates, redirects, and proxy URL. |
-
-Use the app-wide script-engine setting to switch between the independently stored JavaScript and Tengo fields.
 
 ## Overview
 

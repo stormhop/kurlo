@@ -45,6 +45,7 @@ test('switches preview tabs in General and filters the setting through search', 
   await expect(requestTabs(page)).toHaveText(['One', 'Two']);
   await page.getByLabel('Settings', { exact: true }).click();
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+  await expect(settings.getByRole('radiogroup', { name: 'Script engine' })).toHaveCount(0);
   const toggle = settings.getByRole('checkbox', { name: 'Preview tabs', exact: true });
   await expect(toggle).not.toBeChecked();
   await toggle.locator('..').click();
@@ -237,12 +238,21 @@ test('script editors fill resized panels and scroll throughout the available are
 
 for (const [runtime, shortcut] of [['windows/e2e', 'Control+s'], ['darwin/e2e', 'Meta+s']]) {
   test(`saves scripts at the active request, collection and folder with ${shortcut}`, async ({ page }) => {
+    const oldScript = 'throw new Error("retired script field")';
+    const original = 'console.log("existing JavaScript")';
     await installKurloBridge(page, '', runtime, false, {
-      collections: [collection], activeId: 'one', openIds: ['one'],
-      requests: [{ ...requests[0], folderPath: ['Auth'] }],
+      collections: [{
+        ...collection,
+        defaults: { testScript: oldScript, testScriptJs: original },
+        folderDefaults: [{ path: ['Auth'], preRequestScript: oldScript, preRequestScriptJs: original }],
+      }],
+      activeId: 'one',
+      openIds: ['one'],
+      requests: [{ ...requests[0], folderPath: ['Auth'], preRequestScript: oldScript, preRequestScriptJs: original }],
     });
     await page.goto('/');
     await chooseRequestSection(page, 'Scripts');
+    await expect(page.getByTestId('pre-request-script-editor').locator('.cm-content')).toHaveText(original);
     const source = 'pm.variables.set("trace", "test")';
     await fillCodeEditor(page, 'pre-request-script-editor', source);
     await page.keyboard.press(shortcut);
@@ -251,8 +261,9 @@ for (const [runtime, shortcut] of [['windows/e2e', 'Control+s'], ['darwin/e2e', 
     const row = collectionRow(page, collection.name);
     await row.getByLabel('Collection menu').click();
     await row.locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
-    await page.getByRole('tab', { name: 'Tests', exact: true }).click();
+    await page.locator('.collection-tabs').getByRole('tab', { name: /^Tests/ }).click();
     const editor = page.locator('.collection-script-section .cm-content');
+    await expect(editor).toHaveText(original);
     await editor.fill(source);
     await editor.press(shortcut);
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections[0].defaults?.testScriptJs)).toBe(source);
@@ -260,9 +271,19 @@ for (const [runtime, shortcut] of [['windows/e2e', 'Control+s'], ['darwin/e2e', 
     const folder = folderRow(page, 'Auth');
     await folder.getByLabel('Folder menu').click();
     await folder.locator('.folder-menu').getByRole('button', { name: 'Settings' }).click();
-    await page.locator('.collection-tabs').getByRole('tab', { name: 'Script', exact: true }).click();
+    await page.locator('.collection-tabs').getByRole('tab', { name: /^Script/ }).click();
+    await expect(editor).toHaveText(original);
     await editor.fill(source);
     await editor.press(shortcut);
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections[0].folderDefaults?.[0].preRequestScriptJs)).toBe(source);
+    const saved = await page.evaluate(() => {
+      const { requests, collections } = window.__kurloE2E.store;
+      return [requests[0], collections[0].defaults, collections[0].folderDefaults?.[0]];
+    });
+    for (const item of saved) {
+      expect(item).not.toHaveProperty('preRequestScript');
+      expect(item).not.toHaveProperty('testScript');
+    }
+    await captureDocsScreenshot(page, 'folder-javascript-editor', page.locator('.collection-script-section'));
   });
 }

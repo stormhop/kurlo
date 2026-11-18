@@ -200,7 +200,6 @@ export const DOCS_TOPICS = {
   '/docs/guides/settings/': [
     ['saving', 'Saving'],
     ['start-and-tabs', 'Startup and tabs'],
-    ['script-engine', 'Script engine'],
     ['storage', 'Default location and data'],
     ['appearance', 'Appearance'],
     ['proxy', 'Proxy'],

@@ -84,7 +84,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 
 	var preResult model.ScriptResult
 	if req.PreRequestScript != "" {
-		preResult = script.RunPreRequest(req.ScriptEngine, req.PreRequestScript, ctx)
+		preResult = script.RunPreRequest(req.PreRequestScript, ctx)
 		preResult = redactRequestScriptResult(preResult, req.Auth, req.SecretEnvironmentValues)
 		scriptedURL := ctx.RequestURL
 		urlChanged := scriptedURL != "" && scriptedURL != req.URL
@@ -153,7 +153,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		populateScriptRequestContext(testCtx, req)
 		populateScriptCookies(testCtx, req, jars)
 		testCtx.Send = newScriptSender(requestCtx, req.AllowSendRequest, req)
-		resp.TestResult = script.RunTests(req.ScriptEngine, req.TestScript, testCtx)
+		resp.TestResult = script.RunTests(req.TestScript, testCtx)
 		resp.TestResult = redactRequestScriptResult(resp.TestResult, req.Auth, req.SecretEnvironmentValues)
 		envDelta.merge(testScope.commit(sm))
 	}

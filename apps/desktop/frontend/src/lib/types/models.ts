@@ -192,8 +192,6 @@ export type CollectionDefaults = {
   headers: KVRow[];
   variables: KVRow[];
   auth: AuthState;
-  preRequestScript: string;
-  testScript: string;
   preRequestScriptJs: string;
   testScriptJs: string;
   settings: RequestSettings;
@@ -203,8 +201,6 @@ export type FolderDefaults = {
   path: string[];
   headers: KVRow[];
   auth: AuthState;
-  preRequestScript: string;
-  testScript: string;
   preRequestScriptJs: string;
   testScriptJs: string;
 };
@@ -236,7 +232,6 @@ export type Environment = {
   parentId?: string;
   color?: EnvironmentColor;
 };
-export type ScriptEngine = 'js' | 'tengo';
 export type RequestSettings = {
   httpVersion: HttpVersion; enableSSLVerification: boolean; followRedirects: boolean;
   followOriginalMethod: boolean; followAuthorizationHeader: boolean; removeRefererHeader: boolean;
@@ -298,7 +293,7 @@ export type SavedRequest = {
   bodyType: BodyType; rawBodyType: RawBodyType; bodyContent: string;
   bodyFilePath: string; bodyFileName: string; formRows: KVRow[];
   graphqlSchema?: string;
-  preRequestScript: string; testScript: string; preRequestScriptJs?: string; testScriptJs?: string; requestNotes: string; settings: RequestSettings; settingsOverrides?: RequestSettingsOverrides;
+  preRequestScriptJs?: string; testScriptJs?: string; requestNotes: string; settings: RequestSettings; settingsOverrides?: RequestSettingsOverrides;
   sioEvents?: KVRow[];
   sioEventName?: string;
   sioArgs?: SIOArg[];

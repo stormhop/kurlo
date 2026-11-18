@@ -233,7 +233,7 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 
 	var preResult model.ScriptResult
 	if req.PreRequestScript != "" {
-		preResult = script.RunPreRequest(req.ScriptEngine, req.PreRequestScript, ctx)
+		preResult = script.RunPreRequest(req.PreRequestScript, ctx)
 		preResult = redactRequestScriptResult(preResult, req.Auth, req.SecretEnvironmentValues)
 		mergeScriptGrpcRequestContext(ctx, &req)
 		envDelta.merge(scope.commit(sm))
@@ -266,7 +266,7 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 		testCtx.IterationData, testCtx.Info.Iteration, testCtx.Info.IterationCount = iteration.data, iteration.index, iteration.count
 		testCtx.Send = newScriptSender(requestCtx, req.AllowSendRequest, model.HttpRequest{EnableSSLVerification: req.EnableSSLVerification})
 		testCtx.Response = grpcResponseAsHTTP(resp)
-		resp.TestResult = script.RunTests(req.ScriptEngine, req.TestScript, testCtx)
+		resp.TestResult = script.RunTests(req.TestScript, testCtx)
 		resp.TestResult = redactRequestScriptResult(resp.TestResult, req.Auth, req.SecretEnvironmentValues)
 		envDelta.merge(testScope.commit(sm))
 	}

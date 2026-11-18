@@ -229,9 +229,9 @@ export const collectionDefaultsFeature = {
       notes.push(`Auth: ${host.authLabel(auth.type)}${source.kind === 'folder' ? ` from folder ${source.folder.path.join(' / ')}` : ''}`);
     }
     const scriptSources = [defaults, ...folders];
-    const preRequestLines = scriptSources.reduce((total, source) => total + scriptLineCount(source.preRequestScript) + scriptLineCount(source.preRequestScriptJs), 0);
+    const preRequestLines = scriptSources.reduce((total, source) => total + scriptLineCount(source.preRequestScriptJs), 0);
     if (preRequestLines) notes.push(`Pre-request script: ${preRequestLines}L`);
-    const testLines = scriptSources.reduce((total, source) => total + scriptLineCount(source.testScript) + scriptLineCount(source.testScriptJs), 0);
+    const testLines = scriptSources.reduce((total, source) => total + scriptLineCount(source.testScriptJs), 0);
     if (testLines) notes.push(`Test script: ${testLines}L`);
     const settings = REQUEST_SETTING_KEYS
       .filter(key => host.collectionSettingIsInherited(key))

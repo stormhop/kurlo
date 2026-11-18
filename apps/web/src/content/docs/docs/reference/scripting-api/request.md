@@ -84,5 +84,3 @@ const fields = pm.request.body.urlencoded.toObject()   // { grant_type: "...", s
 | `.clear()` / `.toObject()` | Empty the body / read it as an object |
 
 A file field keeps its attachment when a script rewrites its value; `type: "file"` marks it in the list. `pm.request.body.update({ mode: "urlencoded", urlencoded: [...] })` replaces every field at once.
-
-In Tengo the same surface is `pm.request.body`, `pm.request.body_type` (Kurlo's own names, not Postman's), and `pm.request.set_body(value)`. Tengo has no form-field API.

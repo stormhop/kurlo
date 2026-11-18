@@ -244,8 +244,6 @@
           "items": { "$ref": "#/definitions/kvRow" }
         },
         "auth": { "$ref": "#/definitions/auth" },
-        "preRequestScript": { "type": "string" },
-        "testScript": { "type": "string" },
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },
         "settings": { "$ref": "#/definitions/requestSettings" }
@@ -302,8 +300,6 @@
           "items": { "$ref": "#/definitions/kvRow" }
         },
         "graphqlSchema": { "type": "string" },
-        "preRequestScript": { "type": "string" },
-        "testScript": { "type": "string" },
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },
         "requestNotes": { "type": "string" },

@@ -51,8 +51,6 @@ export function emptyCollectionDefaults(): CollectionDefaults {
     headers: [],
     variables: [],
     auth: emptyAuthState(),
-    preRequestScript: '',
-    testScript: '',
     preRequestScriptJs: '',
     testScriptJs: '',
     settings: { ...DEFAULT_REQUEST_SETTINGS },
@@ -65,8 +63,6 @@ export function normalizeCollectionDefaults(raw?: Partial<CollectionDefaults>): 
     headers: cloneRowsForStore(input.headers ?? []),
     variables: cloneRowsForStore(input.variables ?? []),
     auth: { ...emptyAuthState(), ...sanitizeLike(input.auth, emptyAuthState()) },
-    preRequestScript: input.preRequestScript ?? '',
-    testScript: input.testScript ?? '',
     preRequestScriptJs: input.preRequestScriptJs ?? '',
     testScriptJs: input.testScriptJs ?? '',
     settings: { ...DEFAULT_REQUEST_SETTINGS, ...sanitizeLike(input.settings, DEFAULT_REQUEST_SETTINGS) },
@@ -94,8 +90,6 @@ export function collectionDefaultsHaveContent(defaults: CollectionDefaults | und
     defaults.headers.some(rowHasContent)
     || defaults.variables.some(rowHasContent)
     || authStateHasData(defaults.auth, defaults.auth.type)
-    || defaults.preRequestScript.trim()
-    || defaults.testScript.trim()
     || defaults.preRequestScriptJs.trim()
     || defaults.testScriptJs.trim()
     || REQUEST_SETTING_KEYS.some(key => defaults.settings[key] !== DEFAULT_REQUEST_SETTINGS[key])
@@ -250,8 +244,6 @@ export function emptyFolderDefaults(path: string[], id = newEntityId('folder')):
     path: normalizeFolderPath(path),
     headers: [],
     auth: { ...emptyAuthState(), type: 'inherit' },
-    preRequestScript: '',
-    testScript: '',
     preRequestScriptJs: '',
     testScriptJs: '',
   };
@@ -268,8 +260,6 @@ export function folderDefaultsHaveContent(folder: FolderDefaults | undefined): b
   return Boolean(
     folder.headers.some(rowHasContent)
     || folder.auth.type !== 'inherit'
-    || folder.preRequestScript.trim()
-    || folder.testScript.trim()
     || folder.preRequestScriptJs.trim()
     || folder.testScriptJs.trim()
   );
@@ -286,8 +276,6 @@ export function normalizeFolderDefaults(raw: unknown): FolderDefaults | null {
     ...empty,
     headers: cloneRowsForStore(Array.isArray(input.headers) ? input.headers : []),
     auth: { ...auth, type: auth.type || 'inherit' },
-    preRequestScript: typeof input.preRequestScript === 'string' ? input.preRequestScript : '',
-    testScript: typeof input.testScript === 'string' ? input.testScript : '',
     preRequestScriptJs: typeof input.preRequestScriptJs === 'string' ? input.preRequestScriptJs : '',
     testScriptJs: typeof input.testScriptJs === 'string' ? input.testScriptJs : '',
   };
@@ -383,8 +371,6 @@ export function applyCollectionDefaultsToRequest(req: SavedRequest, collection: 
     ...req,
     headers: mergeDefaultRows(inheritedHeaderRows(collection, req.folderPath), req.headers),
     auth: mergeCollectionAuth(inheritedAuth(collection, req.folderPath) ?? defaults.auth, req.auth),
-    preRequestScript: joinScripts(defaults.preRequestScript, ...outerFirst.map(folder => folder.preRequestScript), req.preRequestScript),
-    testScript: joinScripts(req.testScript, ...innerFirst.map(folder => folder.testScript), defaults.testScript),
     preRequestScriptJs: joinScripts(defaults.preRequestScriptJs, ...outerFirst.map(folder => folder.preRequestScriptJs), req.preRequestScriptJs ?? ''),
     testScriptJs: joinScripts(req.testScriptJs ?? '', ...innerFirst.map(folder => folder.testScriptJs), defaults.testScriptJs),
     settings: mergeCollectionSettings(defaults.settings, req.settings, req.settingsOverrides),

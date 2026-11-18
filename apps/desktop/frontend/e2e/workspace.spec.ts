@@ -210,7 +210,6 @@ test.describe('Collection overview', () => {
           auth: { type: 'bearer', bearerToken: '{{token}}' },
           preRequestScriptJs: 'pm.environment.set("a", 1);\npm.environment.set("b", 2);',
           testScriptJs: '',
-          preRequestScript: '', testScript: '',
           settings: { proxyUrl: 'http://proxy.local:8080' },
         },
       }],
@@ -309,7 +308,7 @@ test.describe('Collection overview', () => {
         id: 'col-reset', workspaceId: 'workspace-e2e', name: 'Reset API',
         defaults: {
           headers: [], variables: [], auth: { type: 'none' },
-          preRequestScript: '', testScript: '', preRequestScriptJs: 'console.log("pre");', testScriptJs: 'console.log("test");',
+          preRequestScriptJs: 'console.log("pre");', testScriptJs: 'console.log("test");',
           settings: { timeoutMs: 9000 },
         },
       }],
@@ -346,7 +345,7 @@ test.describe('Collection overview', () => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       collections: [{
         id: 'col-autosave', workspaceId: 'workspace-e2e', name: 'Autosave API',
-        defaults: { headers: [{ id: 1, enabled: true, key: 'X-Saved', value: 'yes' }], variables: [], auth: { type: 'none' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '' },
+        defaults: { headers: [{ id: 1, enabled: true, key: 'X-Saved', value: 'yes' }], variables: [], auth: { type: 'none' }, preRequestScriptJs: '', testScriptJs: '' },
       }],
       requests: [{ id: 'req-autosave', collectionId: 'col-autosave', collection: 'Autosave API', name: 'Ping', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/ping', auth: { type: 'inherit' } }],
       activeId: 'req-autosave', openIds: ['req-autosave'],
@@ -370,8 +369,8 @@ test.describe('Collection overview', () => {
   test('autosaved collection settings save when opening another collection', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       collections: [
-        { id: 'col-switch-a', workspaceId: 'workspace-e2e', name: 'Switch A', defaults: { headers: [], variables: [], auth: { type: 'none' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '' } },
-        { id: 'col-switch-b', workspaceId: 'workspace-e2e', name: 'Switch B', defaults: { headers: [], variables: [], auth: { type: 'none' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '' } },
+        { id: 'col-switch-a', workspaceId: 'workspace-e2e', name: 'Switch A', defaults: { headers: [], variables: [], auth: { type: 'none' }, preRequestScriptJs: '', testScriptJs: '' } },
+        { id: 'col-switch-b', workspaceId: 'workspace-e2e', name: 'Switch B', defaults: { headers: [], variables: [], auth: { type: 'none' }, preRequestScriptJs: '', testScriptJs: '' } },
       ],
       requests: [
         { id: 'req-switch-a', collectionId: 'col-switch-a', collection: 'Switch A', name: 'A', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/a', auth: { type: 'inherit' } },

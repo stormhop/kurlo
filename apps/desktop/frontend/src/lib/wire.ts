@@ -232,7 +232,7 @@ export function emptyHttpRequest(): HttpRequest {
     requestId: '', workspaceId: '', method: '', url: '',
     params: [], pathParams: [], headers: [], auth: emptyAuthConfig(),
     bodyType: '', body: '', bodyFilePath: '', formData: [],
-    preRequestScript: '', testScript: '', scriptEngine: '',
+    preRequestScript: '', testScript: '',
     followRedirects: false, timeoutMs: 0, name: '',
     scriptTimeoutMs: 0, allowSendRequest: false,
     httpVersion: '', enableSSLVerification: false,

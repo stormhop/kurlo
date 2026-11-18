@@ -195,8 +195,6 @@ type cliSavedRequest struct {
 	BodyContent        string            `json:"bodyContent"`
 	BodyFilePath       string            `json:"bodyFilePath"`
 	FormRows           []cliKV           `json:"formRows"`
-	PreRequestScript   string            `json:"preRequestScript"`
-	TestScript         string            `json:"testScript"`
 	PreRequestScriptJs string            `json:"preRequestScriptJs"`
 	TestScriptJs       string            `json:"testScriptJs"`
 	Assertions         []model.Assertion `json:"assertions"`
@@ -209,8 +207,6 @@ type cliCollectionDefaults struct {
 	Variables          []cliKV     `json:"variables"`
 	Headers            []cliKV     `json:"headers"`
 	Auth               cliAuth     `json:"auth"`
-	PreRequestScript   string      `json:"preRequestScript"`
-	TestScript         string      `json:"testScript"`
 	PreRequestScriptJs string      `json:"preRequestScriptJs"`
 	TestScriptJs       string      `json:"testScriptJs"`
 	Settings           cliSettings `json:"settings"`
@@ -221,8 +217,6 @@ type cliFolderDefaults struct {
 	Path               []string `json:"path"`
 	Headers            []cliKV  `json:"headers"`
 	Auth               cliAuth  `json:"auth"`
-	PreRequestScript   string   `json:"preRequestScript"`
-	TestScript         string   `json:"testScript"`
 	PreRequestScriptJs string   `json:"preRequestScriptJs"`
 	TestScriptJs       string   `json:"testScriptJs"`
 }
@@ -426,10 +420,9 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		Body:                    body,
 		BodyFilePath:            req.BodyFilePath,
 		FormData:                formData,
-		PreRequestScript:        cliPreScript(req),
-		TestScript:              cliTestScript(req),
+		PreRequestScript:        req.PreRequestScriptJs,
+		TestScript:              req.TestScriptJs,
 		Assertions:              req.Assertions,
-		ScriptEngine:            cliScriptEngine(req),
 		FollowRedirects:         boolOr(req.Settings.FollowRedirects, true),
 		TimeoutMs:               timeoutMs,
 		HTTPVersion:             defaultString(req.Settings.HTTPVersion, "auto"),
@@ -455,30 +448,6 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		RequestVariables:        cliRequestVariablesForSend(req.Vars, values),
 		PostResponseVars:        cliPostResponseVars(req.PostResponseVars),
 	}
-}
-
-func cliScriptEngine(req cliSavedRequest) string {
-	if strings.TrimSpace(req.PreRequestScriptJs) != "" || strings.TrimSpace(req.TestScriptJs) != "" {
-		return "js"
-	}
-	if strings.TrimSpace(req.PreRequestScript) != "" || strings.TrimSpace(req.TestScript) != "" {
-		return "tengo"
-	}
-	return "js"
-}
-
-func cliPreScript(req cliSavedRequest) string {
-	if cliScriptEngine(req) == "js" {
-		return req.PreRequestScriptJs
-	}
-	return req.PreRequestScript
-}
-
-func cliTestScript(req cliSavedRequest) string {
-	if cliScriptEngine(req) == "js" {
-		return req.TestScriptJs
-	}
-	return req.TestScript
 }
 
 func defaultString(value, fallback string) string {

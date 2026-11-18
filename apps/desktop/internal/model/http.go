@@ -137,15 +137,13 @@ type HttpRequest struct {
 	PreRequestScript string      `json:"preRequestScript"`
 	TestScript       string      `json:"testScript"`
 	Assertions       []Assertion `json:"assertions,omitempty"`
-	ScriptEngine     string      `json:"scriptEngine"`
 	FollowRedirects  bool        `json:"followRedirects"`
 	TimeoutMs        int         `json:"timeoutMs"`
-
-	Name             string `json:"name"`
-	ScriptTimeoutMs  int    `json:"scriptTimeoutMs"`
-	AllowSendRequest bool   `json:"allowSendRequest"`
-	Iteration        int    `json:"iteration,omitempty"`
-	IterationCount   int    `json:"iterationCount,omitempty"`
+	Name             string      `json:"name"`
+	ScriptTimeoutMs  int         `json:"scriptTimeoutMs"`
+	AllowSendRequest bool        `json:"allowSendRequest"`
+	Iteration        int         `json:"iteration,omitempty"`
+	IterationCount   int         `json:"iterationCount,omitempty"`
 
 	HTTPVersion                  string            `json:"httpVersion"`
 	EnableSSLVerification        bool              `json:"enableSSLVerification"`

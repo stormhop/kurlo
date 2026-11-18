@@ -10,7 +10,7 @@
   import { collectionSettingsFingerprint, emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsFingerprint, folderDefaultsFor, inheritedAuthSource, normalizeCollectionDefaults } from '../collectionDefaults';
   import { activeCount, cloneRowsForStore, guardTrailing, jwtAlgorithmUsesSecret, removeRow, restoreRows, scriptLineCount } from '../utils';
   import { openFileDialog } from '../backend';
-  import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, JwtAlgorithm, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
+  import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, JwtAlgorithm, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings } from '../types/models';
   import { defaultPinnedEnvironmentId, normalizeCollectionEnvironmentPins } from '../collectionEnvironments';
   import { isVariableReferenceOnly, type VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
@@ -53,7 +53,6 @@
     saveState = 'idle',
     workspaceBlocked = false,
     variableSuggestions = [],
-    scriptEngine = 'js',
     onSave,
     onReset,
     onCreateRequest,
@@ -76,7 +75,6 @@
     saveState?: 'idle' | 'saving' | 'saved';
     workspaceBlocked?: boolean;
     variableSuggestions?: VariableSuggestion[];
-    scriptEngine?: ScriptEngine;
     onSave: (collectionId: string, patch: CollectionSettingsPatch) => boolean | void | Promise<boolean | void>;
     onReset: (collectionId: string) => boolean | Promise<boolean>;
     onCreateRequest: (collectionId: string) => void | Promise<void>;
@@ -128,8 +126,6 @@
   let headers = $state<KVRow[]>([]);
   let variables = $state<KVRow[]>([]);
   let auth = $state<AuthState>(emptyCollectionDefaults().auth);
-  let preRequestScript = $state('');
-  let testScript = $state('');
   let preRequestScriptJs = $state('');
   let testScriptJs = $state('');
   let settings = $state<RequestSettings>(emptyCollectionDefaults().settings);
@@ -143,9 +139,6 @@
     return { value: environment.id, label: environment.name, hint: `${count} ${count === 1 ? 'variable' : 'variables'}`, color: environmentColorVar(environment) };
   }));
 
-  const engineLabel = $derived(scriptEngine === 'js' ? 'JavaScript' : 'Tengo');
-  const activePre = $derived(scriptEngine === 'js' ? preRequestScriptJs : preRequestScript);
-  const activeTest = $derived(scriptEngine === 'js' ? testScriptJs : testScript);
   let authMenuOpen = $state(false);
   let savingInFlight = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -217,8 +210,6 @@
       headers = restoreRows(folder.headers);
       variables = [];
       auth = { ...folder.auth };
-      preRequestScript = folder.preRequestScript;
-      testScript = folder.testScript;
       preRequestScriptJs = folder.preRequestScriptJs;
       testScriptJs = folder.testScriptJs;
       return;
@@ -229,8 +220,6 @@
     headers = restoreRows(defaults.headers);
     variables = restoreRows(defaults.variables);
     auth = { ...defaults.auth };
-    preRequestScript = defaults.preRequestScript;
-    testScript = defaults.testScript;
     preRequestScriptJs = defaults.preRequestScriptJs;
     testScriptJs = defaults.testScriptJs;
     settings = { ...defaults.settings };
@@ -283,8 +272,6 @@
       headers: cloneRowsForStore(headers),
       variables: cloneRowsForStore(variables),
       auth,
-      preRequestScript,
-      testScript,
       preRequestScriptJs,
       testScriptJs,
       settings,
@@ -297,8 +284,6 @@
       path: [...folderPath],
       headers: cloneRowsForStore(headers),
       auth: { ...auth },
-      preRequestScript,
-      testScript,
       preRequestScriptJs,
       testScriptJs,
     };
@@ -487,8 +472,8 @@
   const defaultRows = $derived.by((): Array<{ tab: CollectionSettingsTab; label: string; value: string; set: boolean }> => {
     const headerCount = activeCount(headers);
     const variableCount = activeCount(variables);
-    const preLines = scriptLineCount(activePre);
-    const testLines = scriptLineCount(activeTest);
+    const preLines = scriptLineCount(preRequestScriptJs);
+    const testLines = scriptLineCount(testScriptJs);
     const authSet = auth.type !== 'none' && auth.type !== 'inherit';
     return [
       { tab: 'headers', label: 'Headers', value: headerCount ? plural(headerCount, 'header') : 'None', set: headerCount > 0 },
@@ -511,8 +496,6 @@
         folderId = empty.id;
         headers = restoreRows([]);
         auth = { ...empty.auth };
-        preRequestScript = '';
-        testScript = '';
         preRequestScriptJs = '';
         testScriptJs = '';
         loadedFingerprint = incomingFingerprint(collection);
@@ -525,8 +508,6 @@
       headers = restoreRows(defaults.headers);
       variables = restoreRows(defaults.variables);
       auth = { ...defaults.auth };
-      preRequestScript = '';
-      testScript = '';
       preRequestScriptJs = '';
       testScriptJs = '';
       settings = { ...defaults.settings };
@@ -622,8 +603,8 @@
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'vars'} aria-selected={collectionSettingsTab === 'vars'} tabindex={collectionSettingsTab === 'vars' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'vars')}>Vars{#if activeCount(variables) > 0}<span class="badge">{activeCount(variables)}</span>{/if}</button>
         {/if}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'auth'} aria-selected={collectionSettingsTab === 'auth'} tabindex={collectionSettingsTab === 'auth' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'auth')}>Auth{#if auth.type !== 'none' && auth.type !== 'inherit'}<span class="badge badge-on">On</span>{/if}</button>
-        <button class="tab" role="tab" class:active={collectionSettingsTab === 'script'} aria-selected={collectionSettingsTab === 'script'} tabindex={collectionSettingsTab === 'script' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'script')}>Script{#if scriptLineCount(activePre) > 0}<span class="badge badge-on">{scriptLineCount(activePre)} lines</span>{/if}</button>
-        <button class="tab" role="tab" class:active={collectionSettingsTab === 'tests'} aria-selected={collectionSettingsTab === 'tests'} tabindex={collectionSettingsTab === 'tests' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'tests')}>Tests{#if scriptLineCount(activeTest) > 0}<span class="badge badge-on">{scriptLineCount(activeTest)} lines</span>{/if}</button>
+        <button class="tab" role="tab" class:active={collectionSettingsTab === 'script'} aria-selected={collectionSettingsTab === 'script'} tabindex={collectionSettingsTab === 'script' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'script')}>Script{#if scriptLineCount(preRequestScriptJs) > 0}<span class="badge badge-on">{scriptLineCount(preRequestScriptJs)} lines</span>{/if}</button>
+        <button class="tab" role="tab" class:active={collectionSettingsTab === 'tests'} aria-selected={collectionSettingsTab === 'tests'} tabindex={collectionSettingsTab === 'tests' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'tests')}>Tests{#if scriptLineCount(testScriptJs) > 0}<span class="badge badge-on">{scriptLineCount(testScriptJs)} lines</span>{/if}</button>
         {#if !isFolder}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'proxy'} aria-selected={collectionSettingsTab === 'proxy'} tabindex={collectionSettingsTab === 'proxy' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'proxy')}>Proxy</button>
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'openapi'} aria-selected={collectionSettingsTab === 'openapi'} tabindex={collectionSettingsTab === 'openapi' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'openapi')}>OpenAPI{#if vm.openApiHasUpdates(collection.id)}<span class="badge badge-on">{vm.openApiStatus(collection.id).pending}</span>{:else if collection.openapi}<span class="badge">On</span>{/if}</button>
@@ -904,21 +885,13 @@
           </div>
         {:else if collectionSettingsTab === 'script'}
           <div class="script-section collection-script-section">
-            <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after the collection and parent folder scripts, before each request’s own pre-request script' : 'runs before each request\'s own pre-request script'}</span></div>
-            {#if scriptEngine === 'js'}
-              <CodeEditor bind:value={preRequestScriptJs} language="javascript" placeholder={'// Collection pre-request script (JavaScript) pm.variables.set("traceId", "kurlo-001")'} fillHeight />
-            {:else}
-              <CodeEditor bind:value={preRequestScript} language="javascript" placeholder={'// Collection pre-request script (Tengo) pm.variables.set("traceId", "kurlo-001")'} fillHeight />
-            {/if}
+            <div class="script-head"><span class="script-hint">JavaScript · {isFolder ? 'runs after the collection and parent folder scripts, before each request’s own pre-request script' : 'runs before each request\'s own pre-request script'}</span></div>
+            <CodeEditor bind:value={preRequestScriptJs} language="javascript" placeholder={'pm.variables.set("traceId", "kurlo-001")'} fillHeight />
           </div>
         {:else if collectionSettingsTab === 'tests'}
           <div class="script-section collection-script-section">
-            <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after each request’s own test script, before the parent folder and collection tests' : 'runs after each request\'s own test script, after the response arrives'}</span></div>
-            {#if scriptEngine === 'js'}
-              <CodeEditor bind:value={testScriptJs} language="javascript" placeholder={'// Collection test script (JavaScript) pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} fillHeight />
-            {:else}
-              <CodeEditor bind:value={testScript} language="javascript" placeholder={'// Collection test script (Tengo) pm.test("No server error", pm.response.code < 500)'} fillHeight />
-            {/if}
+            <div class="script-head"><span class="script-hint">JavaScript · {isFolder ? 'runs after each request’s own test script, before the parent folder and collection tests' : 'runs after each request\'s own test script, after the response arrives'}</span></div>
+            <CodeEditor bind:value={testScriptJs} language="javascript" placeholder={'pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} fillHeight />
           </div>
         {:else if collectionSettingsTab === 'openapi'}
           <OpenApiSyncPanel {collection} {workspaceBlocked} />

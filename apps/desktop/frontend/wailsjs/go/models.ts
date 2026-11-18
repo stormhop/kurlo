@@ -2642,7 +2642,6 @@ export namespace model {
 	    preRequestScript: string;
 	    testScript: string;
 	    assertions?: Assertion[];
-	    scriptEngine: string;
 	    followRedirects: boolean;
 	    timeoutMs: number;
 	    name: string;
@@ -2723,7 +2722,6 @@ export namespace model {
 	        this.preRequestScript = source["preRequestScript"];
 	        this.testScript = source["testScript"];
 	        this.assertions = this.convertValues(source["assertions"], Assertion);
-	        this.scriptEngine = source["scriptEngine"];
 	        this.followRedirects = source["followRedirects"];
 	        this.timeoutMs = source["timeoutMs"];
 	        this.name = source["name"];
@@ -3424,7 +3422,6 @@ export namespace model {
 	    timeoutMs: number;
 	    preRequestScript: string;
 	    testScript: string;
-	    scriptEngine: string;
 	    name: string;
 	    scriptTimeoutMs: number;
 	    allowSendRequest: boolean;
@@ -3461,7 +3458,6 @@ export namespace model {
 	        this.timeoutMs = source["timeoutMs"];
 	        this.preRequestScript = source["preRequestScript"];
 	        this.testScript = source["testScript"];
-	        this.scriptEngine = source["scriptEngine"];
 	        this.name = source["name"];
 	        this.scriptTimeoutMs = source["scriptTimeoutMs"];
 	        this.allowSendRequest = source["allowSendRequest"];
