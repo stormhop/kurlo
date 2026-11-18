@@ -1,0 +1,30 @@
+<g class="tail-back">
+  <path d="M547 413 Q530 435 493 455 Q472 470 466 496 L492 510 Q508 484 533 472 Q559 458 565 424Z" fill="#ba3946" stroke="#fff1da" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M475 481 l24 12" stroke="#f6b68f" stroke-width="7"/>
+</g>
+<g class="tail-front">
+  <path d="M549 405 C510 425 481 418 448 398 C408 373 380 373 340 388 L346 422 C384 408 404 415 435 434 C476 458 515 462 553 433Z" fill="#e95651" stroke="#fff1da" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M362 385 l7 30 M381 382 l7 30" fill="none" stroke="#ffc5a2" stroke-width="7"/>
+  <path d="M342 391 l-10 3 m12 9 -11 3 m13 8 -10 4" fill="none" stroke="#fff1da" stroke-width="6" stroke-linecap="round"/>
+</g>
+<path d="M544 387 Q554 380 564 391 C585 420 633 448 693 448 Q704 450 702 459 L694 482 Q691 490 678 488 C619 485 562 461 530 426 Q524 418 530 407Z" fill="#e95651" stroke="#fff1da" stroke-linejoin="round" stroke-width="8"/>
+<path d="M552 394 Q605 454 691 457" stroke="#ff9a80" fill="none" stroke-width="7" stroke-linecap="round"/>
+<path d="M532 402 Q544 393 554 407 L561 420 Q563 431 553 437 Q541 442 531 433 L524 419 Q521 410 532 402Z" fill="#d34849" stroke="#fff1da" stroke-width="6"/>
+
+<style>
+  @media (prefers-reduced-motion: no-preference) {
+    :global(.bird) .tail-front,
+    :global(.bird) .tail-back {
+      transform-origin: 547px 416px;
+      animation: flutter 2.5s ease-in-out infinite alternate;
+    }
+    :global(.bird) .tail-back {
+      animation-direction: alternate-reverse;
+      animation-delay: -.3s;
+    }
+  }
+  @keyframes flutter {
+    from { transform: rotate(-3deg); }
+    to { transform: rotate(6deg); }
+  }
+</style>

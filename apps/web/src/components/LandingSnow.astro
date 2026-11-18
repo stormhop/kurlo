@@ -1,0 +1,56 @@
+<div class="landing-snow" aria-hidden="true"></div>
+
+<style>
+  .landing-snow {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    mask-image: linear-gradient(100deg, #0001, #0004 36%, black 62%);
+  }
+
+  .landing-snow::before,
+  .landing-snow::after {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--fall)) -10px 0;
+    background-size: var(--tile-width) var(--fall);
+  }
+
+  .landing-snow::before {
+    --tile-width: 226px;
+    --fall: 151px;
+    background-image:
+      radial-gradient(circle at 11% 27%, #f3f6ffb5 .8px, transparent 1.4px),
+      radial-gradient(circle at 63% 15%, #f3f6ff80 .7px, transparent 1.2px),
+      radial-gradient(circle at 47% 59%, #f3f6ff8c 1px, transparent 1.7px),
+      radial-gradient(circle at 82% 72%, #f3f6ffb0 .7px, transparent 1.3px),
+      radial-gradient(circle at 26% 88%, #f3f6ff99 1px, transparent 1.8px),
+      radial-gradient(circle at 92% 38%, #f3f6ff99 .8px, transparent 1.4px);
+  }
+
+  .landing-snow::after {
+    --tile-width: 331px;
+    --fall: 203px;
+    background-image:
+      radial-gradient(circle at 24% 18%, #f7f8ffad 1px, transparent 2.6px),
+      radial-gradient(circle at 73% 49%, #f7f8ffb0 1.4px, transparent 3.4px),
+      radial-gradient(circle at 43% 86%, #f7f8ff80 1.2px, transparent 2.8px),
+      radial-gradient(circle at 97% 76%, #f7f8ff8c 1.1px, transparent 2.4px);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .landing-snow::before { animation: fall 12s linear infinite; }
+    .landing-snow::after { animation: fall 7s linear -3s infinite; }
+  }
+
+  @keyframes fall {
+    from { transform: translate3d(0, 0, 0); }
+    50% { transform: translate3d(9px, calc(var(--fall) / 2), 0); }
+    to { transform: translate3d(0, var(--fall), 0); }
+  }
+
+  @media print {
+    .landing-snow { display: none; }
+  }
+</style>

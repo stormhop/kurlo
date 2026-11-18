@@ -354,6 +354,18 @@ function expandShortcutRanges(text) {
   return expanded;
 }
 
+function checkWinterLandingPages() {
+  for (const [route, scarves] of [['/', 1], ['/mcp/', 1], ['/agent/', 2], ['/pricing/', 0], [DOCS_HOME, 0]]) {
+    const file = distCandidates(route).find(existsSync);
+    const html = file ? read(file) : '';
+    const layers = html.match(/<div class="landing-snow(?:\s|")/g) ?? [];
+    const birds = html.match(/<g class="tail-front(?:\s|")/g) ?? [];
+    if (!file || layers.length !== Number(scarves > 0) || birds.length !== scarves) {
+      fail(`Unexpected snow or scarf count on ${route}`);
+    }
+  }
+}
+
 function checkScreenshotInventory() {
   const expected = [
     'auth-oauth2-token-fetch.png',
@@ -394,6 +406,7 @@ if (!existsSync(distRoot)) {
   checkPagefind();
   checkCodeBackedDocs();
   checkFrontDoorDocs();
+  checkWinterLandingPages();
   checkScreenshotInventory();
 }
 

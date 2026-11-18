@@ -1,5 +1,7 @@
 ---
 import { getImage } from 'astro:assets';
+import BirdScarf from './BirdScarf.astro';
+import LandingSnow from './LandingSnow.astro';
 import dusk from '../assets/scenes/dusk.webp';
 import dawn from '../assets/scenes/dawn.webp';
 import night from '../assets/scenes/night.webp';
@@ -9,9 +11,10 @@ interface Props {
   variant: 'dusk' | 'dawn' | 'night';
   bird?: boolean;
   eager?: boolean;
+  winter?: boolean;
 }
 
-const { variant, bird = false, eager = bird } = Astro.props;
+const { variant, bird = false, eager = bird, winter = false } = Astro.props;
 const source = { dusk, dawn, night }[variant];
 const widths = [960, 1600, 2560];
 const images = await Promise.all(widths.map(width => getImage({ src: source, width, format: 'webp', quality: 84 })));
@@ -29,6 +32,7 @@ const id = `${variant}-bird`;
 
 <div class={`scene scene-${variant}`} aria-hidden="true">
   <img src={images[1].src} srcset={srcset} sizes="max(100vw, 160svh)" alt="" width="2560" height="1600" decoding="async" loading={eager ? 'eager' : 'lazy'} fetchpriority={eager ? 'high' : 'auto'} />
+  {winter && <LandingSnow />}
   <svg class="scene-overlay" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" data-scene>
     <defs>
       <g id={id}>
@@ -45,7 +49,10 @@ const id = `${variant}-bird`;
     {variant === 'night' && (
       <g transform={`translate(${perch.x.toFixed(1)} ${(perch.y - 0.15 * (735 - BIRD_CENTER.y)).toFixed(1)}) scale(0.15)`}>
         <use href={`#${id}`} />
-        <g transform={shift}><path d={BIRD_WING} fill={BIRD_LIGHT} /></g>
+        <g transform={shift}>
+          <path d={BIRD_WING} fill={BIRD_LIGHT} />
+          {winter && <BirdScarf />}
+        </g>
       </g>
     )}
 
@@ -61,7 +68,10 @@ const id = `${variant}-bird`;
                 </g>
               </g>
               <use href={`#${id}`} />
-              <g transform={shift}><path class="wing" d={BIRD_WING} fill={BIRD_LIGHT} /></g>
+              <g transform={shift}>
+                <path class="wing" d={BIRD_WING} fill={BIRD_LIGHT} />
+                {winter && <BirdScarf />}
+              </g>
             </g>
           </g>
         </g>
