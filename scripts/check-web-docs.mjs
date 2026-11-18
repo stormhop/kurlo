@@ -265,9 +265,14 @@ function checkCodeBackedDocs() {
   const stripGo = read(join(root, 'apps/desktop/internal/api/file_workspace_store_strip.go'));
   const secretsGo = read(join(root, 'apps/desktop/internal/api/file_workspace_store.go'));
   const schema = read(join(root, 'schemas/kurlo-workspace-yaml-v1.schema.json'));
+  const publishedSchema = join(distRoot, 'schemas/kurlo-workspace-yaml-v1.schema.json');
   const yaml = join(contentRoot, 'docs/reference/kurlo-yaml-format');
   const yamlDoc = [read(join(yaml, 'request.md')), read(join(yaml, 'request-fields.md')), read(join(yaml, 'secrets.md'))].join('\n');
   const coverage = read(join(webRoot, 'DOCS_COVERAGE.md'));
+
+  if (!existsSync(publishedSchema) || read(publishedSchema) !== schema) {
+    fail('The built workspace YAML schema differs from schemas/kurlo-workspace-yaml-v1.schema.json.');
+  }
 
   for (const field of ['oauth2GrantType', 'oauth2AuthURL', 'oauth2RefreshToken', 'oauth2TokenExpiry', 'oauth2UsePKCE']) {
     if (!stripGo.includes(`"${field}"`)) fail(`OAuth2 field ${field} is missing from authActiveFields`);

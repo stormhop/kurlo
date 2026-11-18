@@ -70,7 +70,7 @@ export const competitors: Competitor[] = [
         'Drop the files or folder into Kurlo, or use the import button next to +.',
         'Pick an environment and send a request you use often to check it.',
       ],
-      carries: 'Folders, requests, supported auth, environments, HTTP and GraphQL examples, and compatible scripts. Kurlo exports Postman collections as v2.1 JSON.',
+      carries: 'Folders, requests, supported auth, environments, HTTP and GraphQL examples, and compatible scripts. Kurlo exports Postman collections as v2.1 JSON or v3 YAML folders with native HTTP, GraphQL, and gRPC requests.',
       link: 'docs/getting-started/migrating/postman/',
     },
     sources: [{ label: 'Postman pricing', url: 'https://www.postman.com/pricing/' }],
