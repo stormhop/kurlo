@@ -28,7 +28,7 @@ For a login → orders flow:
 2. Add it as the first step, choose **Once per user**, and save `token` from JSON path `$.access_token`.
 3. Set the **List orders** request's bearer token to `{{token}}` and add it as the next step.
 
-Extracted variables take precedence over data-row variables, then the chosen environment and collection/global defaults. A value saved by a step becomes available to subsequent steps and later iterations of that VU.
+Variable lookup starts with extracted values, then checks the current data row, the request’s **Pre Request Vars**, the chosen environment, and collection/global defaults. If a row omits a field, the request can still use its default. A value saved by a step becomes available to subsequent steps and later iterations of that VU.
 
 ## Check responses
 

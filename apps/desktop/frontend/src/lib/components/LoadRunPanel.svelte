@@ -47,7 +47,7 @@
   let follow = $state(true);
   let logOpen = $state<boolean | null>(null);
 
-  const running = $derived(run.running && run.loadTestId === loadTest.id);
+  const running = $derived(run.running && !otherRunning && run.loadTestId === loadTest.id);
   const elapsed = $derived(run.progress.elapsedMs);
   const percent = $derived(run.plannedMs > 0 ? Math.min(100, Math.round(elapsed / run.plannedMs * 100)) : 0);
   const stage = $derived.by(() => {

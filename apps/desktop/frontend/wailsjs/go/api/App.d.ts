@@ -213,7 +213,7 @@ export function InstallBrowserExtension(arg1:string):Promise<api.BrowserExtensio
 
 export function K6Info(arg1:string):Promise<model.K6Info>;
 
-export function LastLoadRun(arg1:string):Promise<model.LoadRunResult>;
+export function LastLoadRun(arg1:string,arg2:string):Promise<model.LoadRunResult>;
 
 export function ListCookies(arg1:string):Promise<Array<model.Cookie>>;
 
@@ -229,7 +229,7 @@ export function LoadRunLog():Promise<Array<string>>;
 
 export function LoadRunStatus():Promise<model.LoadRunState>;
 
-export function LoadRunSummaryJSON(arg1:string):Promise<string>;
+export function LoadRunSummaryJSON(arg1:string,arg2:string):Promise<string>;
 
 export function LoadTestTargets(arg1:string):Promise<Array<string>>;
 
@@ -251,7 +251,7 @@ export function OpenDirectoryDialogWithDefault(arg1:string,arg2:string):Promise<
 
 export function OpenFileDialog(arg1:string):Promise<string>;
 
-export function OpenLoadRunReport(arg1:string):Promise<string>;
+export function OpenLoadRunReport(arg1:string,arg2:string):Promise<string>;
 
 export function OpenLogFolder():Promise<string>;
 

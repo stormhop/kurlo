@@ -1372,7 +1372,7 @@ class AppVM {
   declare createLoadTest: typeof loadTestFeature.createLoadTest;
   declare reportLoadTestEdits: typeof loadTestFeature.reportLoadTestEdits;
   declare confirmLeaveLoadTest: typeof loadTestFeature.confirmLeaveLoadTest;
-  loadTestEdits = $state<{ collectionId: string; test: LoadTest; dirty: boolean } | null>(null);
+  loadTestEdits = $state<{ collectionId: string; test: LoadTest; baseFingerprint?: string; dirty: boolean } | null>(null);
   loadTestDraft = $state<{ collectionId: string; test: LoadTest } | null>(null);
   declare createLoadTestFromRequest: typeof loadTestFeature.createLoadTestFromRequest;
   declare renameLoadTest: typeof loadTestFeature.renameLoadTest;
@@ -1399,7 +1399,7 @@ class AppVM {
 
   loadRun = $state<LoadRunState>(emptyLoadRunState());
   loadRunLogLines = $state<string[]>([]);
-  loadRunLogTestId = $state('');
+  loadRunLogKey = $state('');
   loadRunResults = $state<Record<string, LoadRunResult>>({});
   loadTestExportRequestId = $state('');
   declare runSavedLoadTest: typeof loadRunFeature.runSavedLoadTest;

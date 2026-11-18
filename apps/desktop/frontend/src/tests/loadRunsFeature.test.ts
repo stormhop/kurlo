@@ -15,6 +15,7 @@ const backend = vi.hoisted(() => ({
 
 vi.mock('../lib/backend', async (importOriginal) => ({ ...(await importOriginal<object>()), ...backend }));
 
+import { loadRunKey } from '../lib/loadTests';
 import { emptyLoadRunState } from '../lib/backend';
 import { isLoopbackHost, loadRunFeature } from '../lib/stores/features/loadRuns';
 import type { Collection, Environment } from '../lib/types/models';
@@ -28,13 +29,14 @@ function makeHost(environment?: Partial<Environment>, environments: Environment[
     ...loadRunFeature,
     environments,
     activeLoadTestId: 'lt-1',
+    activeLoadTestCollectionId: 'col',
     collections: [collection],
     k6Path: '',
     k6Info: null,
     k6MissingOpen: false,
     loadRun: emptyLoadRunState(),
     loadRunLogLines: ['old line'],
-    loadRunLogTestId: 'other',
+    loadRunLogKey: 'other',
     loadRunResults: {} as Record<string, LoadRunResult>,
     loadTestTab: 'flow' as 'flow' | 'load' | 'data' | 'results',
     guardWorkspaceWritable: () => true,
@@ -89,7 +91,7 @@ describe('running a load test', () => {
     expect(host.loadRun).toEqual(running);
     expect(host.loadTestTab).toBe('results');
     expect(host.loadRunLogLines).toEqual([]);
-    expect(host.loadRunLogTestId).toBe('lt-1');
+    expect(host.loadRunLogKey).toBe(loadRunKey('col', 'lt-1'));
   });
 
   it('opens the install dialog when k6 is missing', async () => {
@@ -159,19 +161,19 @@ describe('running a load test', () => {
 
 describe('load run results', () => {
   it('loads the last run once per test', async () => {
-    const result = { loadTestId: 'lt-1', status: 'passed' } as LoadRunResult;
+    const result = { collectionId: 'col', loadTestId: 'lt-1', status: 'passed' } as LoadRunResult;
     backend.lastLoadRun.mockResolvedValue(result);
     const host = makeHost();
-    await host.loadLastLoadRun('lt-1');
-    await host.loadLastLoadRun('lt-1');
-    expect(host.loadRunResults['lt-1']).toBe(result);
+    await host.loadLastLoadRun('col', 'lt-1');
+    await host.loadLastLoadRun('col', 'lt-1');
+    expect(host.loadRunResults[loadRunKey('col', 'lt-1')]).toBe(result);
     expect(backend.lastLoadRun).toHaveBeenCalledTimes(1);
   });
 
   it('saves the k6 summary to a file', async () => {
     backend.loadRunSummaryJSON.mockResolvedValue('{"metrics":{}}');
     const host = makeHost();
-    await host.saveLoadTestSummary('lt-1', 'smoke-summary.json');
+    await host.saveLoadTestSummary('col', 'lt-1', 'smoke-summary.json');
     expect(host.saveTextFile).toHaveBeenCalledWith('smoke-summary.json', '{"metrics":{}}');
   });
 
@@ -192,10 +194,10 @@ describe('load run results', () => {
     handlers['load:progress'](running);
     expect(host.loadRunLogLines).toEqual([]);
     handlers['load:log']('running (01.0s), 2/2 VUs, 8 complete and 0 interrupted iterations');
-    handlers['load:done']({ loadTestId: 'lt-1', status: 'failed' });
+    handlers['load:done']({ collectionId: 'col', loadTestId: 'lt-1', status: 'failed' });
     expect(host.loadRun.running).toBe(true);
     expect(host.loadRunLogLines).toHaveLength(1);
-    expect(host.loadRunResults['lt-1'].status).toBe('failed');
+    expect(host.loadRunResults[loadRunKey('col', 'lt-1')].status).toBe('failed');
   });
 });
 
@@ -219,7 +221,7 @@ describe('load log backpressure', () => {
       expect(lines).toHaveLength(500);
       expect(lines.at(-1)).toBe('Request Failed 59999');
       handlers['load:logs'](['last message', 'x'.repeat(20000)]);
-      handlers['load:done']({ loadTestId: 'lt-1', status: 'failed' });
+      handlers['load:done']({ collectionId: 'col', loadTestId: 'lt-1', status: 'failed' });
       expect(updates).toBe(2);
       expect(lines.at(-1)).toHaveLength(4096);
       expect(lines.at(-2)).toBe('last message');

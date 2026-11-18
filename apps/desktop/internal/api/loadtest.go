@@ -109,7 +109,22 @@ func loadTestRequest(saved cliSavedRequest, collection *cliCollection) loadtest.
 	if requestType == "http" && strings.EqualFold(built.Method, "SSE") {
 		requestType = "sse"
 	}
+	var redirects *int
+	if !built.FollowRedirects {
+		zero := 0
+		redirects = &zero
+	} else if built.MaxRedirects > 0 {
+		redirects = &built.MaxRedirects
+	}
+	var variables []loadtest.Variable
+	for _, row := range saved.Vars {
+		if name := strings.TrimSpace(row.Key); row.Enabled && name != "" {
+			variables = append(variables, loadtest.Variable{Name: name, Value: row.Value, Secret: row.Secret})
+		}
+	}
 	return loadtest.Request{
+		Redirects:  redirects,
+		Variables:  variables,
 		ID:         saved.ID,
 		Name:       name,
 		Type:       requestType,

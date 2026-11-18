@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"github.com/stormhop/kurlo/apps/desktop/internal/util"
 )
 
 func applyPathParams(rawURL string, rows []model.KeyValue) string {
@@ -28,7 +29,7 @@ func applyPathParams(rawURL string, rows []model.KeyValue) string {
 			continue
 		}
 		if value, found := values[name]; found {
-			segments[i] = escapePathParamValue(value)
+			segments[i] = util.EscapePathParamValue(value)
 			changed = true
 		}
 	}
@@ -61,35 +62,4 @@ func urlPathBounds(rawURL string) (int, int) {
 		return -1, -1
 	}
 	return from + slash, end
-}
-
-func escapePathParamValue(value string) string {
-	var out strings.Builder
-	for i := 0; i < len(value); i++ {
-		c := value[i]
-		if c == '%' && i+2 < len(value) && isHexDigit(value[i+1]) && isHexDigit(value[i+2]) {
-			out.WriteByte(c)
-			continue
-		}
-		if pathParamSafeByte(c) {
-			out.WriteByte(c)
-			continue
-		}
-		out.WriteByte('%')
-		out.WriteByte("0123456789ABCDEF"[c>>4])
-		out.WriteByte("0123456789ABCDEF"[c&15])
-	}
-	return out.String()
-}
-
-func pathParamSafeByte(c byte) bool {
-	switch {
-	case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-		return true
-	}
-	return strings.IndexByte("-._~!$&'()*+,;=:@{}", c) >= 0
-}
-
-func isHexDigit(c byte) bool {
-	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')
 }

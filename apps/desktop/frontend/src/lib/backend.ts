@@ -749,17 +749,17 @@ export async function loadRunLog(): Promise<string[]> {
   return (await window.go?.api?.App?.LoadRunLog?.()) ?? [];
 }
 
-export async function lastLoadRun(loadTestId: string): Promise<LoadRunResult | null> {
-  const result = await window.go?.api?.App?.LastLoadRun?.(loadTestId);
+export async function lastLoadRun(collectionId: string, loadTestId: string): Promise<LoadRunResult | null> {
+  const result = await window.go?.api?.App?.LastLoadRun?.(collectionId, loadTestId);
   return result?.loadTestId ? result : null;
 }
 
-export async function loadRunSummaryJSON(loadTestId: string): Promise<string> {
-  return (await window.go?.api?.App?.LoadRunSummaryJSON?.(loadTestId)) ?? '';
+export async function loadRunSummaryJSON(collectionId: string, loadTestId: string): Promise<string> {
+  return (await window.go?.api?.App?.LoadRunSummaryJSON?.(collectionId, loadTestId)) ?? '';
 }
 
-export async function openLoadRunReport(loadTestId: string): Promise<string> {
-  return (await window.go?.api?.App?.OpenLoadRunReport?.(loadTestId)) ?? 'Reports open only in the desktop app.';
+export async function openLoadRunReport(collectionId: string, loadTestId: string): Promise<string> {
+  return (await window.go?.api?.App?.OpenLoadRunReport?.(collectionId, loadTestId)) ?? 'Reports open only in the desktop app.';
 }
 
 export async function loadTestTargets(payload: string): Promise<string[]> {

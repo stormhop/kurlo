@@ -53,7 +53,7 @@ const DYNAMIC = {
   "$timestamp": () => String(Math.floor(Date.now() / 1000)),
 };
 
-const vu = {};
+const vu = Object.create(null);
 const done = {};
 let row = {};
 
@@ -63,9 +63,9 @@ function env(name, depth) {
 }
 
 function lookup(name, depth) {
-  if (name in vu) return vu[name] === undefined ? undefined : String(vu[name]);
-  if (name in row) return String(row[name]);
-  if (name in DYNAMIC) return DYNAMIC[name]();
+  if (vu[name] !== undefined) return String(vu[name]);
+  if (Object.prototype.hasOwnProperty.call(row, name)) return String(row[name]);
+  if (Object.prototype.hasOwnProperty.call(DYNAMIC, name)) return DYNAMIC[name]();
   return env(name, depth);
 }
 
@@ -77,10 +77,16 @@ function t(text, depth = 0) {
   });
 }
 
+function formBody(pairs) {
+  const encode = value => encodeURIComponent(value).replace(/%20/g, '+').replace(/[!'()*]/g, c => '%' + c.charCodeAt(0).toString(16).toUpperCase());
+  return pairs.map(([key, value]) => encode(key) + '=' + encode(value)).join('&');
+}
+
 function q(url, pairs) {
   const query = pairs.map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value)).join('&');
   if (!query) return url;
-  return url + (url.includes('?') ? '&' : '?') + query;
+  const [base, ...fragment] = url.split('#');
+  return base + (base.includes('?') ? '&' : '?') + query + (fragment.length ? '#' + fragment.join('#') : '');
 }
 
 function withUser(url, user, password) {
@@ -102,12 +108,12 @@ export function setup() {
 
 export default function (data) {
   group("sync", () => {
-    const res = http.request("POST", "https://partner.test/sync", { "since": t("{{$timestamp}}") }, { headers: { "Authorization": 'Bearer ' + data.tokens[0] }, tags: { step: "sync" } });
+    const res = http.request("POST", "https://partner.test/sync", formBody([["since", t("{{$timestamp}}")]]), { headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": 'Bearer ' + data.tokens[0] }, tags: { step: "sync" } });
     vu["trace"] = header(res, "X-Trace-Id");
     vu["cursor"] = ((typeof res.body === 'string' ? res.body : '').match(new RegExp("next=(\\w+)")) || [])[1];
   });
   group("sync_2", () => {
-    const res = http.request("POST", "https://partner.test/sync", { "since": t("{{$timestamp}}") }, { headers: { "Authorization": 'Bearer ' + data.tokens[0] }, tags: { step: "sync_2" } });
+    const res = http.request("POST", "https://partner.test/sync", formBody([["since", t("{{$timestamp}}")]]), { headers: { "Content-Type": "application/x-www-form-urlencoded", "Authorization": 'Bearer ' + data.tokens[0] }, tags: { step: "sync_2" } });
   });
   group("report", () => {
     const res = http.request("GET", "https://partner.test/report", null, { headers: { "Authorization": 'Basic ' + encoding.b64encode(t("ops:{{opsPassword}}")) }, tags: { step: "report" } });
@@ -122,6 +128,6 @@ export default function (data) {
     const res = http.request("GET", "https://s3.test/bucket", null, { tags: { step: "bucket" } });
   });
   group("upload", () => {
-    const res = http.request("POST", "https://partner.test/upload", { "title": "report" }, { tags: { step: "upload" } });
+    const res = http.request("POST", "https://partner.test/upload", formBody([["title", "report"]]), { headers: { "Content-Type": "application/x-www-form-urlencoded" }, tags: { step: "upload" } });
   });
 }

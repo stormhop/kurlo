@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { loadRunKey } from '../loadTests';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import KurloBird from './KurloBird.svelte';
   import { untrack } from 'svelte';
@@ -135,7 +136,7 @@
     renameEnvironment,
     environmentValueCount,
     openWorkspaceDiagnostic,
-    activeLoadTestId = '',
+    activeLoadTestKey = '',
     openLoadTestMenuId = '',
     createLoadTest,
     createLoadTestFromRequest,
@@ -144,7 +145,7 @@
     duplicateLoadTest,
     renameLoadTest,
     deleteLoadTest,
-    runningLoadTestId = '',
+    runningLoadTestKey = '',
     loadRunResults = {},
     runLoadTest = () => {},
     exportLoadTest = () => {},
@@ -223,7 +224,7 @@
     renameEnvironment: (environmentId: string, name: string) => void | Promise<void>;
     environmentValueCount: (environment: Environment) => number;
     openWorkspaceDiagnostic: (diagnostics: WorkspaceDiagnostic[]) => void;
-    activeLoadTestId?: string;
+    activeLoadTestKey?: string;
     openLoadTestMenuId?: string;
     createLoadTest: (collectionId: string, requestIds?: string[]) => void;
     createLoadTestFromRequest: (requestId: string) => void;
@@ -232,11 +233,11 @@
     duplicateLoadTest: (collectionId: string, loadTestId: string) => void;
     renameLoadTest: (collectionId: string, loadTestId: string, name?: string) => void | Promise<void>;
     deleteLoadTest: (collectionId: string, loadTestId: string) => void;
-    runningLoadTestId?: string;
+    runningLoadTestKey?: string;
     loadRunResults?: Record<string, LoadRunResult>;
     runLoadTest?: (collectionId: string, loadTestId: string) => void;
     exportLoadTest?: (collectionId: string, loadTestId: string) => void;
-    loadLoadTestResult?: (loadTestId: string) => void;
+    loadLoadTestResult?: (collectionId: string, loadTestId: string) => void;
     workspaceBlocked?: boolean;
     gone?: boolean;
   } = $props();
@@ -348,7 +349,7 @@
 
   $effect(() => {
     for (const row of visibleCollectionRows.rows) {
-      if (row.type === 'loadtest' && !loadRunResults[row.loadTest.id]) loadLoadTestResult(row.loadTest.id);
+      if (row.type === 'loadtest' && !loadRunResults[loadRunKey(row.collectionId, row.loadTest.id)]) loadLoadTestResult(row.collectionId, row.loadTest.id);
     }
   });
   let historyOverscan = $derived(virtualOverscan(historyViewportHeight, VIRTUAL_OVERSCAN * $uiScale));
@@ -519,7 +520,7 @@
         const collapsed = collapsedLoadTestGroups.has(group.collection.id) && !hasSearch;
         rows.push({ type: 'loadtest-group', key: `loadtest-group:${group.collection.id}`, height: FOLDER_ROW_HEIGHT, collectionId: group.collection.id, count: loadTests.length, collapsed, depth: COLLECTION_CHILD_DEPTH });
         if (!collapsed) {
-          for (const loadTest of loadTests) rows.push({ type: 'loadtest', key: `loadtest:${loadTest.id}`, height: LOADTEST_ROW_HEIGHT, collectionId: group.collection.id, loadTest, depth: COLLECTION_CHILD_DEPTH + 1 });
+          for (const loadTest of loadTests) rows.push({ type: 'loadtest', key: `loadtest:${loadRunKey(group.collection.id, loadTest.id)}`, height: LOADTEST_ROW_HEIGHT, collectionId: group.collection.id, loadTest, depth: COLLECTION_CHILD_DEPTH + 1 });
         }
       }
     }
@@ -1042,15 +1043,17 @@
               </div>
             </div>
           {:else if row.type === 'loadtest'}
+            {@const testKey = loadRunKey(row.collectionId, row.loadTest.id)}
+            {@const running = runningLoadTestKey === testKey}
             <div
               class="collection-request-wrap hover-managed"
               class:hovered={hoveredRowKey === row.key}
               data-sidebar-hover-key={row.key}
               class:in-folder={true}
-              class:active={row.loadTest.id === activeLoadTestId && topView === 'loadtest'}
+              class:active={testKey === activeLoadTestKey && topView === 'loadtest'}
               style={`--tree-depth: ${row.depth}`}
             >
-              {#if editingLoadTestId === row.loadTest.id}
+              {#if editingLoadTestId === row.loadTest.id && editingLoadTestCollectionId === row.collectionId}
                 <input class="field field-sm sidebar-request-title-input" maxlength={NAME_MAX_LENGTH} bind:this={editingLoadTestInput} bind:value={editingLoadTestName} aria-label="Load test name" spellcheck="false" onblur={commitLoadTestRename} onkeydown={(event) => {
                   if (event.key === 'Enter') { event.preventDefault(); void commitLoadTestRename(); }
                   else if (event.key === 'Escape') { event.preventDefault(); cancelLoadTestRename(); }
@@ -1064,30 +1067,30 @@
                 class="collection-request"
                 type="button"
                 onclick={() => openLoadTest(row.collectionId, row.loadTest.id)}
-                ondblclick={(event) => { if (!workspaceBlocked) startLoadTestRename(row.collectionId, row.loadTest, event); }}
-                oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleLoadTestMenu(row.loadTest.id, event); }}
+                ondblclick={(event) => { if (!workspaceBlocked && !running) startLoadTestRename(row.collectionId, row.loadTest, event); }}
+                oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleLoadTestMenu(testKey, event); }}
                 disabled={workspaceBlocked}
               >
                 <span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>
                 <span class="collection-title">{row.loadTest.name}</span>
-                {#if runningLoadTestId === row.loadTest.id}
+                {#if running}
                   <span class="sidebar-loadtest-status running"><span class="sr-only">running</span></span>
-                {:else if loadRunResults[row.loadTest.id]}
-                  {@const status = loadRunResults[row.loadTest.id].status}
+                {:else if loadRunResults[testKey]}
+                  {@const status = loadRunResults[testKey].status}
                   <span class="sidebar-loadtest-status {status}"><span class="sr-only">last run {LOAD_RUN_STATUS[status] ?? status}</span></span>
                 {/if}
               </button>
               {/if}
-              <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleLoadTestMenu(row.loadTest.id, event)} aria-label="Load test menu" disabled={workspaceBlocked}>•••</button>
-              {#if openLoadTestMenuId === row.loadTest.id}
+              <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleLoadTestMenu(testKey, event)} aria-label="Load test menu" disabled={workspaceBlocked}>•••</button>
+              {#if openLoadTestMenuId === testKey}
                 <div class="menu request-menu" use:floatingMenu>
-                  <button class="menu-item" type="button" onclick={() => runLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked || Boolean(runningLoadTestId)}><MenuIcon name="play" />Run with k6</button>
+                  <button class="menu-item" type="button" onclick={() => runLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked || Boolean(runningLoadTestKey)}><MenuIcon name="play" />Run with k6</button>
                   <button class="menu-item" type="button" onclick={() => exportLoadTest(row.collectionId, row.loadTest.id)}><MenuIcon name="export" />Export k6 script</button>
                   <div class="menu-separator" role="separator"></div>
-                  <button class="menu-item" type="button" onclick={() => renameLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
+                  <button class="menu-item" type="button" onclick={() => renameLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked || running}><MenuIcon name="rename" />Rename</button>
                   <button class="menu-item" type="button" onclick={() => duplicateLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="duplicate" />Duplicate</button>
                   <div class="menu-separator" role="separator"></div>
-                  <button class="menu-item danger" type="button" onclick={() => deleteLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked}><MenuIcon name="trash" />Delete</button>
+                  <button class="menu-item danger" type="button" onclick={() => deleteLoadTest(row.collectionId, row.loadTest.id)} disabled={workspaceBlocked || running}><MenuIcon name="trash" />Delete</button>
                 </div>
               {/if}
             </div>

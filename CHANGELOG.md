@@ -14,6 +14,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **k6 request handling.** Load tests now honor request variables and redirect settings, preserve encoded path segments, keep query parameters on URLs with fragments, and send repeated form fields.
+- **k6 data and validation.** Runs preserve large numeric IDs and variable defaults when a data row omits a field. Unreadable or invalid data, unsupported JSON paths, and incompatible extraction patterns produce errors before the run.
+- **Load test edits and results.** Switching tests flushes pending autosave edits. Edits made during a save survive, failed saves can be retried, and running tests lock their editor. Collections with matching test IDs keep separate results, summaries, and reports.
+
 - **Script saving.** In manual-save mode, Ctrl+S (Cmd+S on macOS) saves edits to the active collection or folder, including its scripts.
 - **HTTP body fonts.** Request and response bodies use the same monospace font and size.
 - **OpenAPI imports stay in the intended workspace.** Kurlo cancels a pending import if another workspace is active when the spec arrives.

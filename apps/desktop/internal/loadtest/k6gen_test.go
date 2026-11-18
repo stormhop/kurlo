@@ -264,7 +264,10 @@ func TestGenerateResolvesTemplatedObjectKeys(t *testing.T) {
 				}
 				values := params["headers"]
 				if kind == "form" {
-					values = body
+					if body != "X-Dynamic=resolved-value" {
+						t.Errorf("form body = %#v", body)
+					}
+					return
 				}
 				rows, ok := values.(map[string]any)
 				if !ok || rows["X-Dynamic"] != "resolved-value" {
@@ -371,7 +374,7 @@ func TestApplyPathParams(t *testing.T) {
 	}
 	params := []Pair{{Key: "id", Value: "{{orderId}}"}, {Key: "item", Value: "a/b"}}
 	for _, tc := range cases {
-		if got := applyPathParams(tc.url, params); got != tc.want {
+		if got := (Plan{}).RequestTarget(Request{URL: tc.url, PathParams: params}); got != tc.want {
 			t.Errorf("applyPathParams(%q) = %q, want %q", tc.url, got, tc.want)
 		}
 	}

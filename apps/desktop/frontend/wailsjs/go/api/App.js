@@ -422,8 +422,8 @@ export function K6Info(arg1) {
   return window['go']['api']['App']['K6Info'](arg1);
 }
 
-export function LastLoadRun(arg1) {
-  return window['go']['api']['App']['LastLoadRun'](arg1);
+export function LastLoadRun(arg1, arg2) {
+  return window['go']['api']['App']['LastLoadRun'](arg1, arg2);
 }
 
 export function ListCookies(arg1) {
@@ -454,8 +454,8 @@ export function LoadRunStatus() {
   return window['go']['api']['App']['LoadRunStatus']();
 }
 
-export function LoadRunSummaryJSON(arg1) {
-  return window['go']['api']['App']['LoadRunSummaryJSON'](arg1);
+export function LoadRunSummaryJSON(arg1, arg2) {
+  return window['go']['api']['App']['LoadRunSummaryJSON'](arg1, arg2);
 }
 
 export function LoadTestTargets(arg1) {
@@ -498,8 +498,8 @@ export function OpenFileDialog(arg1) {
   return window['go']['api']['App']['OpenFileDialog'](arg1);
 }
 
-export function OpenLoadRunReport(arg1) {
-  return window['go']['api']['App']['OpenLoadRunReport'](arg1);
+export function OpenLoadRunReport(arg1, arg2) {
+  return window['go']['api']['App']['OpenLoadRunReport'](arg1, arg2);
 }
 
 export function OpenLogFolder() {

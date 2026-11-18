@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { loadRunKey } from './lib/loadTests';
   import { kurloChangedFiles } from './lib/gitFiles';
   import { onMount, untrack } from 'svelte';
   import { getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
@@ -203,7 +204,7 @@
   const loadTestTab = $derived.by(() => {
     const active = vm.activeLoadTest();
     if (!active) return null;
-    const edits = vm.loadTestEdits?.test.id === active.loadTest.id ? vm.loadTestEdits : null;
+    const edits = vm.loadTestEdits?.collectionId === active.collection.id && vm.loadTestEdits.test.id === active.loadTest.id ? vm.loadTestEdits : null;
     const title = (edits?.test.name ?? active.loadTest.name).trim() || 'New load test';
     const unsaved = active.isDraft ? 'Unsaved draft' : edits?.dirty && !vm.autosave ? 'Unsaved changes' : '';
     return { title, unsaved };
@@ -740,7 +741,7 @@
     duplicateRequest={vm.duplicateRequest}
     copyRequestCurl={vm.copyRequestCurl}
     revealInFileManager={vm.revealInFileManager}
-    activeLoadTestId={vm.activeLoadTestId}
+    activeLoadTestKey={loadRunKey(vm.activeLoadTestCollectionId, vm.activeLoadTestId)}
     openLoadTestMenuId={vm.openLoadTestMenuId}
     createLoadTest={(collectionId: string, requestIds?: string[]) => void vm.createLoadTest(collectionId, requestIds)}
     createLoadTestFromRequest={(requestId: string) => void vm.createLoadTestFromRequest(requestId)}
@@ -749,11 +750,11 @@
     renameLoadTest={vm.renameLoadTest}
     duplicateLoadTest={(collectionId: string, loadTestId: string) => void vm.duplicateLoadTest(collectionId, loadTestId)}
     deleteLoadTest={(collectionId: string, loadTestId: string) => void vm.deleteLoadTest(collectionId, loadTestId)}
-    runningLoadTestId={vm.loadRun.running ? vm.loadRun.loadTestId : ''}
+    runningLoadTestKey={vm.loadRun.running ? loadRunKey(vm.loadRun.collectionId, vm.loadRun.loadTestId) : ''}
     loadRunResults={vm.loadRunResults}
     runLoadTest={(collectionId: string, loadTestId: string) => void vm.runSavedLoadTest(collectionId, loadTestId)}
     exportLoadTest={(collectionId: string, loadTestId: string) => void vm.exportSavedLoadTest(collectionId, loadTestId)}
-    loadLoadTestResult={(loadTestId: string) => void vm.loadLastLoadRun(loadTestId)}
+    loadLoadTestResult={(collectionId: string, loadTestId: string) => void vm.loadLastLoadRun(collectionId, loadTestId)}
     toggleRequestPinned={vm.toggleRequestPinned}
     deleteRequest={vm.deleteRequest}
     toggleFolderCollapsed={vm.toggleFolderCollapsed}
@@ -1090,21 +1091,21 @@
         onCopy={(text: string) => void clipboardSet(text)}
         run={vm.loadRun}
         logLines={vm.loadRunLogLines}
-        logTestId={vm.loadRunLogTestId}
-        result={active ? vm.loadRunResults[active.loadTest.id] ?? null : null}
+        logKey={vm.loadRunLogKey}
+        result={active ? vm.loadRunResults[loadRunKey(active.collection.id, active.loadTest.id)] ?? null : null}
         k6Info={vm.k6Info}
         bind:k6MissingOpen={vm.k6MissingOpen}
         onRun={(collectionId: string, draft: LoadTest) => void vm.runLoadTest(collectionId, draft)}
         onStop={() => void vm.stopLoadTest()}
-        onLoadResult={(loadTestId: string) => void vm.loadLastLoadRun(loadTestId)}
+        onLoadResult={(collectionId: string, loadTestId: string) => void vm.loadLastLoadRun(collectionId, loadTestId)}
         onOpenDashboard={(url: string) => openExternalURL(url)}
-        onOpenReport={(loadTestId: string) => void vm.openLoadTestReport(loadTestId)}
-        onSaveSummary={(loadTestId: string, fileName: string) => void vm.saveLoadTestSummary(loadTestId, fileName)}
+        onOpenReport={(collectionId: string, loadTestId: string) => void vm.openLoadTestReport(collectionId, loadTestId)}
+        onSaveSummary={(collectionId: string, loadTestId: string, fileName: string) => void vm.saveLoadTestSummary(collectionId, loadTestId, fileName)}
         onChooseK6={() => void vm.chooseK6Binary()}
         onCheckK6={() => void vm.checkK6().then(info => { if (info.found) vm.k6MissingOpen = false; })}
         onOpenK6Guide={() => openExternalURL('https://grafana.com/docs/k6/latest/set-up/install-k6/')}
-        pendingEdits={vm.loadTestEdits?.test ?? null}
-        onEdits={(collectionId: string, test: LoadTest, dirty: boolean) => vm.reportLoadTestEdits(collectionId, test, dirty)}
+        pendingEdits={vm.loadTestEdits?.collectionId === active?.collection.id ? vm.loadTestEdits?.test ?? null : null}
+        onEdits={(collectionId: string, test: LoadTest, dirty: boolean, baseFingerprint?: string) => vm.reportLoadTestEdits(collectionId, test, dirty, baseFingerprint)}
         exportRequestId={vm.loadTestExportRequestId}
         onExportRequestHandled={() => (vm.loadTestExportRequestId = '')}
       />

@@ -942,9 +942,9 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
       },
       LoadTestTargets: async () => ['shop.kurlo.test'],
       StartLoadRun: async (payload: string) => {
-        const parsed = JSON.parse(payload) as { loadTest: { id: string } };
+        const parsed = JSON.parse(payload) as { collection: { id: string }; loadTest: { id: string } };
         state.calls.push(`StartLoadRun:${parsed.loadTest.id}`);
-        return { running: true, stopping: false, loadTestId: parsed.loadTest.id, collectionId: '', startedAt: Date.now(), plannedMs: 60000, dashboardUrl: '', k6Version: 'v1.3.0', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } };
+        return { running: true, stopping: false, loadTestId: parsed.loadTest.id, collectionId: parsed.collection.id, startedAt: Date.now(), plannedMs: 60000, dashboardUrl: '', k6Version: 'v1.3.0', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } };
       },
       StopLoadRun: async () => {
         state.calls.push('StopLoadRun');
@@ -953,8 +953,8 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
       LoadRunStatus: async () => ({ running: false, stopping: false, loadTestId: '', collectionId: '', startedAt: 0, plannedMs: 0, dashboardUrl: '', k6Version: '', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } }),
       LoadRunLog: async () => [],
       LastLoadRun: async () => ({ loadTestId: '', thresholds: [], steps: [] }),
-      LoadRunSummaryJSON: async (loadTestId: string) => `{"metrics":{},"loadTestId":"${loadTestId}"}`,
-      OpenLoadRunReport: async (loadTestId: string) => {
+      LoadRunSummaryJSON: async (_collectionId: string, loadTestId: string) => `{"metrics":{},"loadTestId":"${loadTestId}"}`,
+      OpenLoadRunReport: async (_collectionId: string, loadTestId: string) => {
         state.calls.push(`OpenLoadRunReport:${loadTestId}`);
         return '';
       },
