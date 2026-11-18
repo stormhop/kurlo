@@ -22,6 +22,7 @@ The `⋯` button next to a collection reveals:
 - **Add request** / **Add folder** — quick creators that drop new items into this collection
 - **Settings** — opens the collection overview and its defaults. Click **Run** at the top of that page to open the [Collection Runner](/docs/guides/collection-runner/) for this collection.
 - **Rename** — opens the same inline editor as double-click.
+- **Build documentation** — choose which requests to include in an HTML reference. Kurlo opens the saved file in your browser. See [Build collection documentation](/docs/guides/cli-runner/docs/).
 - **Export…** — opens the format picker for [collection exports](/docs/guides/import-export/export/#export), including files and folders.
 - **Show in Finder** / **Show in Explorer** — shows the collection's folder in the workspace on disk, so you can see its YAML files or open them in another editor. On Linux it is **Show in file manager**.
 - **Delete collection** — asks for confirmation before removing the collection and its contents. You can restore it from **Recently deleted** until you quit Kurlo.

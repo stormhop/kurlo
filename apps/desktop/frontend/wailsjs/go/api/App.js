@@ -206,6 +206,10 @@ export function ExportAgentChat(arg1, arg2) {
   return window['go']['api']['App']['ExportAgentChat'](arg1, arg2);
 }
 
+export function ExportCollectionDocs(arg1) {
+  return window['go']['api']['App']['ExportCollectionDocs'](arg1);
+}
+
 export function ExportLoadTestK6(arg1, arg2) {
   return window['go']['api']['App']['ExportLoadTestK6'](arg1, arg2);
 }

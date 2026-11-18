@@ -164,6 +164,7 @@ export const DOCS_TOPICS = {
     ['options', 'Flags and exit codes'],
     ['ci', 'GitHub Actions'],
     ['load', 'Load tests with k6'],
+    ['docs', 'Build collection documentation'],
     ['openapi', 'Check OpenAPI drift'],
   ],
   '/docs/guides/load-testing/': [

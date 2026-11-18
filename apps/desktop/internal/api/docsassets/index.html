@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-{{scriptDigest}}'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <link rel="icon" href="{{icon}}">
+  <title>{{.Name}} · API reference</title>
+  <style>{{css}}</style>
+</head>
+<body>
+{{template "icons"}}
+<header class="topbar">
+  <a class="brand" href="#overview" aria-label="{{.Name}} overview"><img src="{{icon}}" width="28" height="28" alt=""><strong>{{.Name}}</strong></a>
+  <label class="search control">
+    <svg aria-hidden="true"><use href="#i-search"/></svg>
+    <input id="search" type="search" aria-label="Search the reference" placeholder="Search requests, folders, URLs…" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <kbd>/</kbd>
+  </label>
+  <div class="tools">
+    {{if .Variables}}<select class="control env-picker" id="var-environment" aria-label="Variable environment" hidden></select><button class="control vars-switch" id="var-toggle" role="switch" aria-checked="false" aria-label="Show variable values"><i aria-hidden="true"></i><span>Show vars</span></button>{{end}}
+    <button class="icon-button control" id="theme" aria-label="Switch to light theme"><svg aria-hidden="true"><use href="#i-sun"/></svg></button>
+    <button class="button control" id="print" aria-label="Print reference"><svg aria-hidden="true"><use href="#i-print"/></svg><span>Print reference</span></button>
+    <button class="icon-button mobile control" id="menu" aria-label="Browse contents" aria-expanded="false" aria-controls="sidebar"><svg aria-hidden="true"><use href="#i-menu"/></svg></button>
+  </div>
+</header>
+<div class="layout">
+  <aside id="sidebar"><nav aria-label="Collection contents">
+    <a class="navlink" href="#overview"><svg aria-hidden="true"><use href="#i-book"/></svg>Overview</a>
+    {{if .Variables}}<a class="navlink" href="#variables"><svg aria-hidden="true"><use href="#i-code"/></svg>Variables <small>{{len .Variables}}</small></a>{{end}}
+    {{if .Environments}}<a class="navlink" href="#environments"><svg aria-hidden="true"><use href="#i-globe"/></svg>Environments <small>{{len .Environments}}</small></a>{{end}}
+    {{if .Groups}}<div class="nav-title second">Requests</div>{{end}}
+    {{range .Navigation}}{{template "folder" .}}{{end}}
+  </nav></aside>
+  <main id="main">
+    <section id="overview" class="view">
+      <header class="collection-header">
+        <h1>{{.Name}}</h1>
+        <div class="stats" aria-label="Collection summary">
+          <a href="#request-directory"><b>{{.Count}}</b><span>{{if eq .Count 1}}Request{{else}}Requests{{end}}</span></a>
+          {{with .Folders}}<div><b>{{.}}</b><span>{{if eq . 1}}Folder{{else}}Folders{{end}}</span></div>{{end}}
+          {{with .Examples}}<div><b>{{.}}</b><span>{{if eq . 1}}Example{{else}}Examples{{end}}</span></div>{{end}}
+          {{with .Variables}}<a href="#variables"><b>{{len .}}</b><span>{{if eq (len .) 1}}Variable{{else}}Variables{{end}}</span></a>{{end}}
+          {{with .Environments}}<a href="#environments"><b>{{len .}}</b><span>{{if eq (len .) 1}}Environment{{else}}Environments{{end}}</span></a>{{end}}
+        </div>
+      </header>
+      {{with .Description}}<div class="prose intro">{{markdown "overview" . $.LinkBase}}</div>{{end}}
+      <h2 id="request-directory" data-section>Request directory</h2>
+      {{if not .Groups}}<div class="empty-state"><svg aria-hidden="true"><use href="#i-folder"/></svg><div><strong>No saved requests</strong><p>Save a request in this collection and rebuild the reference.</p></div></div>{{end}}
+      {{range .Groups}}<details class="directory" data-folder="{{.Name}}" {{if .Root}}data-root{{end}} open>
+        <summary><svg aria-hidden="true"><use href="#i-folder"/></svg><span>{{.Name}}</span><small>{{len .Endpoints}}</small></summary>
+        {{range .Endpoints}}<a href="#{{.ID}}" class="directory-row"{{if .AI}} data-address="{{.Message.Address}}"{{end}}><span class="verb" data-kind="{{.Message.Method}}">{{.Message.Method}}</span><span class="directory-name"><strong>{{.Name}}</strong></span><code>{{.Detail}}</code><svg aria-hidden="true"><use href="#i-arrow"/></svg></a>{{else}}<p class="empty">No requests directly in this folder</p>{{end}}
+      </details>{{end}}
+      {{if or .Auth .Defaults.Tables}}<h2>Collection configuration</h2>{{with .Auth}}<p>Authentication · <code>{{.}}</code></p>{{end}}{{template "details" .Defaults}}{{end}}
+    </section>
+    {{if .Variables}}<section id="variables" class="view">
+      {{template "back" .Name}}<h1>Variables</h1><p class="subtitle">Saved values by scope and the requests that use them.</p>
+      {{range $name, $variable := .Variables}}<section class="var-card" data-name="{{$name}}">
+        <h2 id="{{variableID $name}}"><svg aria-hidden="true"><use href="#i-code"/></svg><code>{{printf "{{%s}}" $name}}</code></h2>
+        {{if $variable.Definitions}}<dl class="var-definitions">
+          {{range $variable.Groups}}<div data-scope="{{.Scope}}" data-source="{{.Source}}" data-env="{{.EnvironmentID}}" data-disabled="{{.Disabled}}" data-masked="{{.Masked}}">
+            <dt><span>{{.Scope}}</span>{{if eq .Scope "Request"}}
+              {{if gt (len .Bindings) 1}}<details class="var-sources"><summary>{{len .Bindings}} definitions</summary>{{end}}
+              {{range .Bindings}}<a data-order="{{.Order}}" href="#{{.ID}}">{{.Name}}</a>{{end}}
+              {{if gt (len .Bindings) 1}}</details>{{end}}
+            {{else}}{{.Source}}{{range .Bindings}}<i hidden data-order="{{.Order}}"></i>{{end}}{{end}}</dt>
+            <dd>{{template "variable-value" .}}</dd></div>{{end}}
+        </dl>{{else}}<p class="var-missing">No saved definition in this export.</p>{{end}}
+        {{with $variable.Uses}}<details class="var-uses"><summary>Used in {{len .}} {{if eq (len .) 1}}request{{else}}requests{{end}}</summary>
+          {{range .}}<a class="variable-link" href="#{{.ID}}">{{.Name}} <span aria-hidden="true">↗</span></a>{{end}}</details>{{end}}
+      </section>{{end}}
+    </section>{{end}}
+    {{if .Environments}}<section id="environments" class="view">
+      {{template "back" .Name}}<h1>Environments</h1><p class="subtitle">Environments pinned to this collection.</p>
+      {{range .Environments}}<section class="var-card" data-env-id="{{.ID}}"><h2><svg aria-hidden="true"><use href="#i-globe"/></svg>{{.Name}}</h2>
+        {{with .Definitions}}<dl class="var-definitions">{{range .}}<div><dt><a href="#{{variableID .Name}}"><code>{{.Name}}</code></a></dt><dd>{{template "variable-value" .}}</dd></div>{{end}}</dl>{{else}}<p class="var-missing">No variables defined.</p>{{end}}
+      </section>{{end}}
+    </section>{{end}}
+    {{range .Groups}}{{$group := .}}{{range .Endpoints}}
+    {{$requestID := .ID}}<article id="{{.ID}}" class="view endpoint">
+      <header class="request-header">
+        <div class="crumb"><a href="#overview">{{$.Name}}</a>{{if not $group.Root}}<span>/</span>{{$group.Name}}{{end}}</div>
+        <div class="endpoint-head"><div>{{if or (ne .Kind "HTTP request") (not .Message.Address)}}<span class="request-kind">{{.Kind}}</span>{{end}}<h1>{{.Name}}</h1></div><button class="button control permalink"><svg aria-hidden="true"><use href="#i-link"/></svg>Copy link</button></div>
+        {{template "route" .Message}}
+      </header>
+      {{$hasDetails := or .Message.Body .Message.Tables}}
+      {{$hasConfig := and .AI (or .AI.Provider .AI.Model .AI.Settings)}}
+      {{$hasMain := or $hasDetails $hasConfig (and (not .AI) (not .Message.Address))}}
+      {{if or .Notes $hasDetails $hasConfig .AI .Curl .Examples}}<div class="section-links" role="navigation" aria-label="On this request">
+        {{if .Notes}}<a href="#section-{{$requestID}}-documentation">Documentation</a>{{end}}
+        {{if $hasConfig}}<a href="#section-{{$requestID}}-configuration">Configuration</a>{{end}}
+        {{if $hasDetails}}<a href="#section-{{$requestID}}-details">Request details</a>{{end}}
+        {{if .Curl}}<a href="#section-{{$requestID}}-curl">cURL</a>{{end}}
+        {{if .AI}}<a href="#section-{{$requestID}}-prompt">Prompt</a>{{end}}
+        {{if .Examples}}<a href="#section-{{$requestID}}-examples">Saved examples</a>{{end}}
+      </div>{{end}}
+      {{with .Notes}}<section class="description"><h2 data-section id="section-{{$requestID}}-documentation">Documentation</h2><div class="prose">{{markdown $requestID . $.LinkBase}}</div></section>{{end}}
+      {{if or $hasMain .AI .Curl}}<div class="reading-layout {{if and $hasMain (or .AI .Curl)}}with-panel{{end}}">
+        {{if $hasMain}}<div class="reading-main">
+          {{if $hasConfig}}{{with .AI}}<section><h2 data-section id="section-{{$requestID}}-configuration">Configuration</h2><dl class="properties">
+            {{with .Provider}}<div><dt>Provider</dt><dd>{{.}}</dd></div>{{end}}
+            {{with .Model}}<div><dt>Model</dt><dd><code>{{.}}</code></dd></div>{{end}}
+            {{range .Settings}}<div><dt>{{.Label}}</dt><dd>{{.Value}}</dd></div>{{end}}
+          </dl></section>{{end}}{{end}}
+          {{if $hasDetails}}<section><h2 data-section id="section-{{$requestID}}-details">Request details</h2>{{template "details" .Message}}</section>{{end}}
+          {{if and (not .AI) (not .Message.Address)}}<div class="empty-state"><svg aria-hidden="true"><use href="#i-link"/></svg><div><strong>Request address missing</strong><p>Set the address in Kurlo and rebuild to include it here.</p></div></div>{{end}}
+        </div>{{end}}
+        {{if or .AI .Curl}}<div class="reading-side">
+          {{with .Curl}}<section class="curl-panel">
+            <div class="snippet">
+              <div class="snippet-head"><h2 data-section id="section-{{$requestID}}-curl">cURL</h2><button class="button control copy" aria-label="Copy cURL"><svg aria-hidden="true"><use href="#i-copy"/></svg>Copy</button></div>
+              <pre data-literal><code>{{.}}</code></pre>
+            </div>
+          </section>{{end}}
+          {{with .AI}}<section class="companion prompt-panel"><header><svg aria-hidden="true"><use href="#i-spark"/></svg><h2 data-section id="section-{{$requestID}}-prompt">Prompt</h2></header>
+            {{if hasText .System}}<div class="prompt-section"><div class="prompt-label"><h3>System instructions</h3><button class="icon-button control copy" aria-label="Copy system instructions"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div><pre><code>{{.System}}</code></pre></div>{{end}}
+            {{if hasText .Prompt}}<div class="prompt-section"><div class="prompt-label"><h3>User message</h3><button class="icon-button control copy" aria-label="Copy user message"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div><pre><code>{{.Prompt}}</code></pre></div>{{else}}<div class="prompt-section empty-prompt"><strong>No user message saved</strong><p>Add a prompt in the AI request editor and rebuild.</p></div>{{end}}
+          </section>{{end}}
+        </div>{{end}}
+      </div>{{end}}
+      {{if .Examples}}<section class="saved-examples">
+        <h2 data-section id="section-{{$requestID}}-examples">Saved examples</h2>
+        <div class="example-list">
+          {{range $i, $ex := .Examples}}<details class="example" {{if eq $i 0}}open{{end}}>
+            <summary><strong>{{.Name}}</strong>{{with .Status}}<span class="status" data-status="{{.}}">{{.}}</span>{{end}}</summary>
+            {{with .Notes}}<div class="example-notes prose">{{markdown (printf "%s-example-%d" $requestID $i) . $.LinkBase}}</div>{{end}}
+            {{$request := .Request}}{{$response := .Response}}
+            {{$hasRequest := or $request.Address $request.Body $request.Tables}}
+            {{$hasResponse := or $response.Body $response.Tables $response.Media}}
+            {{if or $hasRequest $hasResponse}}<div class="example-pair {{if and $hasRequest $hasResponse}}paired{{end}}">
+              {{if $hasRequest}}<details class="snapshot" open>
+                <summary>Request snapshot</summary>
+                <div class="example-pane-body">{{template "route" $request}}{{template "details" $request}}</div>
+              </details>{{end}}
+              {{if $hasResponse}}<section class="example-response">
+                <h3>Response</h3>
+                <div class="example-pane-body">{{template "details" $response}}</div>
+              </section>{{end}}
+            </div>{{end}}
+          </details>{{end}}
+        </div>
+      </section>{{end}}
+      <footer class="turn-page">
+        {{with .Previous}}<a href="#{{.ID}}"><span>← Previous request</span><strong>{{.Name}}</strong></a>{{else}}<a href="#overview"><span>← Collection</span><strong>{{$.Name}}</strong></a>{{end}}
+        {{with .Next}}<a href="#{{.ID}}"><span>Next request →</span><strong>{{.Name}}</strong></a>{{end}}
+      </footer>
+    </article>{{end}}{{end}}
+    <section id="results" hidden>
+      <h1>Search results</h1>
+      <div class="results-bar"><p id="result-count" aria-live="polite"></p><select id="method-filter" class="picker" aria-label="Filter by method or protocol"><option value="">All methods</option></select></div>
+      <div id="matches"></div>
+    </section>
+  </main>
+</div>
+<div id="var-popover" role="dialog" aria-label="Variable details" hidden><header><strong></strong><span></span></header><div class="hint-values"></div><a class="hint-link">All definitions ↗</a></div>
+<div id="notice" role="status"></div>
+<script>{{script}}</script>
+</body>
+</html>
+
+{{define "variable-value"}}{{if .Masked}}<span class="var-state">Hidden value</span>{{else if eq .Value ""}}<span class="var-state">Empty string</span>{{else}}<code>{{.Value}}</code>{{end}}
+            {{if .Disabled}}<small>Disabled</small>{{end}}{{with .Description}}<p>{{.}}</p>{{end}}{{end}}
+
+{{define "folder"}}
+{{if not .Root}}<details class="folder" open>
+  <summary><svg aria-hidden="true"><use href="#i-folder"/></svg><span>{{.Label}}</span></summary>
+  <div class="folder-children">{{end}}
+  {{range .Endpoints}}<a class="entry" href="#{{.ID}}" aria-label="{{.Message.Method}} {{.Name}}"><span class="verb" data-kind="{{.Message.Method}}" aria-hidden="true">{{template "sidebar-method" .Message.Method}}</span><span class="entry-name">{{.Name}}</span></a>{{end}}
+  {{range .Children}}{{template "folder" .}}{{end}}
+{{if not .Root}}</div></details>{{end}}
+{{end}}
+
+{{define "sidebar-method"}}
+{{- if eq . "DELETE"}}DEL{{else if eq . "OPTIONS"}}OPT{{else if eq . "GraphQL"}}GQL{{else if eq . "Socket.IO"}}SIO{{else}}{{.}}{{end -}}
+{{end}}
+
+{{define "back"}}<div class="crumb"><a href="#overview">{{.}}</a><span>/</span> API reference</div>{{end}}
+
+{{define "route"}}
+{{if .Address}}<div class="route"><span class="verb" data-kind="{{.Method}}">{{.Method}}</span><code>{{.Address}}</code>
+  <button class="icon-button control copy" aria-label="Copy address"><svg aria-hidden="true"><use href="#i-copy"/></svg></button>
+</div>{{end}}
+{{end}}
+
+{{define "details"}}
+{{range .Tables}}{{$desc := .HasDescription}}<h4>{{.Title}}</h4>
+<div class="table-wrap"><table><thead><tr><th>Name</th><th>Value</th>{{if $desc}}<th>Description</th>{{end}}</tr></thead>
+<tbody>{{range .Rows}}<tr><td><code>{{.Key}}</code></td><td><code>{{.Value}}</code></td>{{if $desc}}<td>{{.Description}}</td>{{end}}</tr>{{end}}</tbody></table></div>
+{{end}}
+{{if .Body}}<div class="snippet"><div class="snippet-head"><span>{{if .Media}}{{.Media}}{{else}}Body{{end}}</span><button class="icon-button control copy" aria-label="Copy body"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div><pre><code>{{bodyHTML .Body}}</code></pre></div>
+{{else}}{{with .Media}}<span class="subtitle">{{.}}</span>{{end}}{{end}}
+{{end}}
+
+{{define "icons"}}<svg xmlns="http://www.w3.org/2000/svg" fill="none" aria-hidden="true" class="symbols"><defs>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 15a8.5 8.5 0 0 1-11-11 9 9 0 1 0 11 11Z"/></symbol>
+  <symbol id="i-print" viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H4V9h16v8h-3M7 14h10v7H7z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 6c-3-2-6-2-10-1v14c4-1 7-1 10 1 3-2 6-2 10-1V5c-4-1-7-1-10 1Zm0 0v14"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.3 6.7L21 12l-6.7 2.3L12 21l-2.3-6.7L3 12l6.7-2.3Z"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5m8-10 5 5-5 5m-3-14-2 18"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="m9 15 6-6m-6 4-2 2a3.5 3.5 0 1 0 5 5l3-3m0-6 2-2a3.5 3.5 0 1 0-5-5L9 7"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H4v13h4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+</defs></svg>{{end}}

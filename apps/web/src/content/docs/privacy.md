@@ -65,6 +65,8 @@ A few bounded categories of network calls happen on your behalf:
 
 Proxy settings can route these requests through your selected system or custom proxy. There is no separate telemetry channel or first-launch ping.
 
+[Collection documentation](/docs/guides/cli-runner/docs/) is generated locally as a standalone HTML file. It hides marked secrets, recognized credential values and values from protected environments. The file can still contain ordinary variable values, request bodies, prompts and saved responses. Review the HTML before sharing it.
+
 ## Ports Kurlo opens on your machine
 
 Four features bind a local listener. All four are loopback-only (`127.0.0.1`, and `::1` for the OpenRouter sign-in), so nothing on your network can reach them, and none of them is open unless you start it.

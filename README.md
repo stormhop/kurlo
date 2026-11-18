@@ -28,6 +28,7 @@ Ask in plain words and the agent runs your requests and collections, explains wh
 - **An agent that asks first.** The Kurlo agent, Claude Code or Codex works on your collections inside the app. It shows every change before it is written, can follow a plan you approve and work on its own Git branch, and keeps chats on your machine.
 - **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request as the API change.
 - **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
+- **Share an API reference.** Turn a collection into a searchable HTML file with saved requests and responses. Open it offline or publish it to a static host.
 - **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
 - **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.6 MB and the Linux one is 13.5 MB.
 
@@ -125,6 +126,7 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 - Folder defaults — headers, auth, scripts and tests on a folder apply to every request inside it
 - Drag-and-drop organisation
 - Request history — every send on its own page, request and stored response side by side, reopenable in the editor (14-day retention, 1000 entries)
+- [Static API documentation](https://kurlo.dev/docs/guides/cli-runner/docs/) — build a standalone HTML reference with `kurlo docs build` or **Build documentation** in the collection menu
 - Collection runner — sequential or parallel, data files, iterations, an HTML report, and the last run of every collection kept
 - [Load testing with k6](https://kurlo.dev/docs/guides/load-testing/) — collection flows with extraction and checks, virtual users or iteration rates, thresholds, CSV/JSON data, script export, local runs and last-run reports
 - Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets; branch, commit, pull, push and open a pull request from the app

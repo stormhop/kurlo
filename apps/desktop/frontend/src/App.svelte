@@ -13,6 +13,7 @@
   import { appLazyComponents as lazy } from './lib/stores/lazyComponents.svelte';
 
   import AppOverlays from './lib/components/AppOverlays.svelte';
+  import CollectionDocsModal from './lib/components/CollectionDocsModal.svelte';
   import AppToasts from './lib/components/AppToasts.svelte';
   import TextContextMenu from './lib/components/TextContextMenu.svelte';
   import { installFileDrop } from './lib/fileDrop';
@@ -64,6 +65,16 @@
       void vm.enterEnvironmentScope(target);
     });
   });
+
+  let docsTarget = $state<{ id: string; workspace: string; epoch: number } | null>(null);
+  const docsCollection = $derived(docsTarget && docsTarget.workspace === vm.activeWorkspaceId && docsTarget.epoch === vm.requestStorePersistEpoch
+    ? vm.collections.find(collection => collection.id === docsTarget?.id && collection.workspaceId === vm.activeWorkspaceId)
+    : undefined);
+
+  function openDocs(id: string) {
+    vm.closeFloatingMenus();
+    docsTarget = { id, workspace: vm.activeWorkspaceId, epoch: vm.requestStorePersistEpoch };
+  }
 
   const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
   const UPDATE_READY_KEY = 'kurlo:update-ready';
@@ -649,6 +660,16 @@
 {/if}
 
 <AppToasts />
+{#if docsCollection}
+  <CollectionDocsModal collection={docsCollection}
+    requests={vm.requests.filter(request => request.collectionId === docsCollection?.id && !request.isDraft)}
+    onClose={() => docsTarget = null}
+    onGenerate={(ids, linkBaseUrl) => {
+      const collection = docsCollection;
+      docsTarget = null;
+      if (collection) void vm.buildCollectionDocs(collection.id, ids, linkBaseUrl);
+    }} />
+{/if}
 
 <AppOverlays
   startupUpdateInfo={updateInfo}
@@ -728,6 +749,7 @@
     openOpenApiSettings={vm.openOpenApiSettings}
     openApiUpdates={(id: string) => vm.openApiHasUpdates(id) ? vm.openApiStatus(id).summary : ''}
     openFolderSettings={vm.openFolderSettings}
+    buildCollectionDocs={openDocs}
     exportCollection={vm.exportCollection}
     deleteCollection={vm.deleteCollection}
     moveCollection={vm.moveCollection}
@@ -1037,6 +1059,7 @@
         onSaveFolder={vm.saveFolderSettings}
         onResetFolder={vm.resetFolderSettings}
         onCreateRequestInFolder={vm.createRequestInFolder}
+        onBuildDocs={openDocs}
         onExport={vm.exportCollection}
         onDelete={vm.deleteCollection}
       />

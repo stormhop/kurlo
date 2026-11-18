@@ -15,6 +15,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Static collection documentation.** Use **Build documentation** in a collection menu or run `kurlo docs build` to create a self-contained HTML reference with searchable requests, saved examples, and variable previews. See [Build collection documentation](/docs/guides/cli-runner/docs/).
 - **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
 - **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
 

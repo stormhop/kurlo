@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Static collection documentation.** Build a self-contained HTML reference with `kurlo docs build`, or choose **Build documentation** from a collection menu to save an HTML file and open it in your browser. Choose all requests or narrow the selection by folder. Hover over a variable to inspect and copy its value for the current request, or turn on **Show vars** to read resolved addresses and bodies. Browse collapsible folders, filter search results by method or protocol, and jump directly to request details, saved examples or AI prompts. Copy a cURL template beside the request details, compare saved requests and responses in full-width examples, and set a documentation URL to resolve relative links. The reference follows the browser’s color scheme, works offline and supports printing.
 - **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
 - **Postman v3 collection export.** Open a Kurlo collection as local files in Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available.
 

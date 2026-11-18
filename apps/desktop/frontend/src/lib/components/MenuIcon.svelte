@@ -1,5 +1,5 @@
 <script lang="ts">
-  type MenuIconName = 'request' | 'folder' | 'settings' | 'rename' | 'export' | 'import' | 'trash' | 'duplicate' | 'star' | 'copy' | 'play' | 'open' | 'example' | 'collection' | 'collection-add' | 'lock' | 'replace' | 'load' | 'archive' | 'restore';
+  type MenuIconName = 'request' | 'folder' | 'settings' | 'rename' | 'docs' | 'export' | 'import' | 'trash' | 'duplicate' | 'star' | 'copy' | 'play' | 'open' | 'example' | 'collection' | 'collection-add' | 'lock' | 'replace' | 'load' | 'archive' | 'restore';
 
   let { name }: { name: MenuIconName } = $props();
 </script>
@@ -18,6 +18,8 @@
   {:else if name === 'archive' || name === 'restore'}
     <path d="M3.5 6v7h9V6M2.5 3h11v3h-11z"/>
     {#if name === 'archive'}<path d="M6.5 9h3"/>{:else}<path d="M8 11V7.5M6.5 9 8 7.5 9.5 9"/>{/if}
+  {:else if name === 'docs'}
+    <path d="M8 4c-1.6-1-3.5-1.3-6-1v9c2.5-.3 4.4 0 6 1 1.6-1 3.5-1.3 6-1V3c-2.5-.3-4.4 0-6 1Zm0 0v9"/>
   {:else if name === 'export'}
     <path d="M8 10V2.5M5.2 5.2L8 2.4l2.8 2.8"/><path d="M3 9.5V13h10V9.5"/>
   {:else if name === 'import'}

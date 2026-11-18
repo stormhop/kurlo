@@ -346,8 +346,14 @@
   max-width: max(100%, min(30rem, calc(100vw - 2rem)));
   overflow-y: auto;
 }
-.app-select-menu:has(> input[type='search']) {
+.app-select-menu:not(.app-select-menu-floating):has(> input[type='search']) {
   min-width: max(100%, 15rem);
+}
+.app-select-menu.app-select-menu-floating {
+  position: fixed;
+  min-width: 0;
+  max-width: 30rem;
+  max-height: 20rem;
 }
 .app-select-menu > input[type='search'] {
   position: sticky;

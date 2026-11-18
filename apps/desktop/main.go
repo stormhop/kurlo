@@ -41,6 +41,9 @@ func main() {
 	if len(os.Args) >= 2 && os.Args[1] == "load" {
 		os.Exit(api.RunLoadCLI(os.Args[2:], os.Stdout, os.Stderr))
 	}
+	if len(os.Args) >= 2 && os.Args[1] == "docs" {
+		os.Exit(api.RunDocsCLI(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) >= 2 && os.Args[1] == "openapi" {
 		os.Exit(api.RunOpenAPICLI(os.Args[2:], os.Stdout, os.Stderr))
 	}

@@ -782,6 +782,7 @@ class AppVM {
   declare importOpenApiFromUrl: typeof importExportFeature.importOpenApiFromUrl;
   declare openOpenApiUrlImport: typeof importExportFeature.openOpenApiUrlImport;
   declare importHttpFilePayload: typeof importExportFeature.importHttpFilePayload;
+  declare buildCollectionDocs: typeof importExportFeature.buildCollectionDocs;
   declare exportCollection: typeof importExportFeature.exportCollection;
   declare exportCollectionToOpenCollection: typeof importExportFeature.exportCollectionToOpenCollection;
   declare exportCollectionToPostman: typeof importExportFeature.exportCollectionToPostman;

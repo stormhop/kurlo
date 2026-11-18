@@ -8,14 +8,16 @@ import (
 )
 
 type cliKV struct {
-	Key      string `json:"key"`
-	Value    string `json:"value"`
-	Enabled  bool   `json:"enabled"`
-	IsFile   bool   `json:"isFile"`
-	FileName string `json:"fileName"`
-	Secret   bool   `json:"secret"`
+	Description string `json:"description,omitempty"`
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Enabled     bool   `json:"enabled"`
+	IsFile      bool   `json:"isFile"`
+	FileName    string `json:"fileName"`
+	Secret      bool   `json:"secret"`
 
 	ContentType string `json:"contentType"`
+	bareQuery   bool
 }
 
 type cliAuth struct {
@@ -131,7 +133,12 @@ type cliExampleResponse struct {
 
 type cliExample struct {
 	Snapshot struct {
-		Method string `json:"method"`
+		Method      string  `json:"method"`
+		URL         string  `json:"url,omitempty"`
+		Headers     []cliKV `json:"headers,omitempty"`
+		Params      []cliKV `json:"params,omitempty"`
+		BodyType    string  `json:"bodyType,omitempty"`
+		BodyContent string  `json:"bodyContent,omitempty"`
 	} `json:"snapshot"`
 	Match struct {
 		PathTemplate string            `json:"pathTemplate"`
@@ -180,6 +187,8 @@ type cliSavedRequest struct {
 	RequestType        string            `json:"requestType"`
 	CollectionID       string            `json:"collectionId"`
 	Collection         string            `json:"collection"`
+	NameAuto           bool              `json:"nameAuto,omitempty"`
+	RequestNotes       string            `json:"requestNotes,omitempty"`
 	FolderPath         []string          `json:"folderPath"`
 	Method             string            `json:"method"`
 	URL                string            `json:"url"`
@@ -222,6 +231,9 @@ type cliFolderDefaults struct {
 }
 
 type cliCollection struct {
+	FolderPaths    [][]string            `json:"folderPaths,omitempty"`
+	EnvironmentIDs []string              `json:"environmentIds,omitempty"`
+	Description    string                `json:"description,omitempty"`
 	FolderDefaults []cliFolderDefaults   `json:"folderDefaults"`
 	WorkspaceID    string                `json:"workspaceId"`
 	FilesystemName string                `json:"filesystemName"`

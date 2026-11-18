@@ -61,6 +61,7 @@
     onSaveFolder = () => false,
     onResetFolder = () => false,
     onCreateRequestInFolder = () => {},
+    onBuildDocs,
     onExport = () => {},
     onDelete = () => {},
   }: {
@@ -83,6 +84,7 @@
     onSaveFolder?: (collectionId: string, folder: FolderDefaults, baseFingerprint?: string) => boolean | Promise<boolean>;
     onResetFolder?: (collectionId: string, folderPath: string[]) => boolean | Promise<boolean>;
     onCreateRequestInFolder?: (collectionId: string, folderPath: string[]) => void | Promise<void>;
+    onBuildDocs: (collectionId: string) => void;
     onExport?: (collectionId: string) => void | Promise<void>;
     onDelete?: (collectionId: string) => void | Promise<void>;
   } = $props();
@@ -580,6 +582,7 @@
           {#if moreMenuOpen}
             <div class="menu request-menu env-more-menu" role="menu">
               {#if !isFolder}
+                <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => onBuildDocs(collection.id))}><MenuIcon name="docs" />Build documentation</button>
                 <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => onExport(collection.id))}><MenuIcon name="export" />Export…</button>
               {/if}
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(reset)}><MenuIcon name="restore" />Reset defaults</button>

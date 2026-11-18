@@ -251,7 +251,7 @@ test.describe('Collection overview', () => {
     await expect(head.getByRole('button', { name: 'Reset defaults' })).toHaveCount(0);
     await head.getByRole('button', { name: 'More collection actions' }).click();
     const menu = head.getByRole('menu');
-    await expect(menu.getByRole('menuitem')).toHaveText(['Export…', 'Reset defaults', 'Delete collection']);
+    await expect(menu.getByRole('menuitem')).toHaveText(['Build documentation', 'Export…', 'Reset defaults', 'Delete collection']);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
 

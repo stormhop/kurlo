@@ -18,8 +18,10 @@ require (
 	github.com/jhump/protoreflect v1.19.0
 	github.com/klauspost/compress v1.20.3
 	github.com/minio/selfupdate v0.6.0
+	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/wailsapp/wails/v2 v2.13.0
+	github.com/yuin/goldmark v1.7.17
 	golang.org/x/image v0.40.0
 	golang.org/x/net v0.61.0
 	golang.org/x/sys v0.49.0
@@ -52,7 +54,6 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/petermattis/goid v0.0.0-20260113132338-7c7de50cc741 // indirect
-	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

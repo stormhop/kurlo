@@ -1,5 +1,7 @@
 import type { CollectionTextFilesResult } from '../../wire';
-import { chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles, writeNewCollectionTextFiles } from '../../backend';
+import { environmentChain } from '../../environmentInheritance';
+import { requestExamplesPending } from '../../examples';
+import { exportCollectionDocs, chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles, writeNewCollectionTextFiles } from '../../backend';
 import { detectImportSource, isBrunoFolder, isPostmanV3Document, isPostmanV3Folder, type ImportSource } from '../../importSource';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
 import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, Workspace } from '../../types/models';
@@ -86,6 +88,10 @@ function fileSegmentForExport(name: string) {
 }
 
 type ImportExportHost = {
+  requestsForStore: (requests: SavedRequest[]) => SavedRequest[];
+  environmentsForStore: (environments: Environment[]) => Environment[];
+  globalsForStore: () => KVRow[];
+  ensureRequestExamples: (ids: string[]) => Promise<void>;
   ensureCollectionExamples: (collectionId: string) => Promise<void>;
   changeGlobalsEverywhere: (change: (rows: KVRow[]) => KVRow[]) => void;
   collectionImportSource: ImportSource;
@@ -537,6 +543,35 @@ export const importExportFeature = {
       { variables },
     );
     return requestCount;
+  },
+  async buildCollectionDocs(this: ImportExportHost, collectionId: string, ids?: string[], linkBaseUrl?: string) {
+    this.closeFloatingMenus();
+    const epoch = this.requestStorePersistEpoch;
+    const workspaceId = this.activeWorkspaceId;
+    try {
+      const selected = ids && new Set(ids);
+      if (ids) await this.ensureRequestExamples(ids);
+      else await this.ensureCollectionExamples(collectionId);
+      if (epoch !== this.requestStorePersistEpoch || workspaceId !== this.activeWorkspaceId) return;
+      const collection = this.collections.find(item => item.id === collectionId && item.workspaceId === workspaceId);
+      if (!collection) return;
+      const requests = this.requestsForStore(this.requests).filter(request => request.collectionId === collectionId && !request.isDraft && (!selected || selected.has(request.id)));
+      if (selected && (!selected.size || requests.length !== selected.size)) throw new Error('The selected requests changed. Open the export again.');
+      if (requests.some(requestExamplesPending)) throw new Error('Saved examples could not be loaded. Try building again.');
+      const workspaceEnvs = this.environmentsForStore(this.environments).filter(env => env.workspaceId === workspaceId);
+      const pins = collection.environmentIds ?? [];
+      const included = new Set(pins.flatMap(id => environmentChain(workspaceEnvs, id).map(env => env.id)));
+      const variables = (rows: KVRow[]) => rows.filter(row => row.key.trim()).map(({ key, value, description, enabled, secret }) => ({
+        key, value: secret ? '' : value, description, enabled, secret,
+      }));
+      const environments = workspaceEnvs.filter(env => !pins.length || included.has(env.id))
+        .map(({ id, name, workspaceId, parentId, protected: protectedEnv, values }) => ({
+          id, name, workspaceId, parentId, protected: protectedEnv, values: variables(values),
+        }));
+      await exportCollectionDocs(JSON.stringify({ collection: selected ? { ...collection, folderPaths: [] } : collection, requests, environments, globals: variables(this.globalsForStore()), linkBaseUrl }));
+    } catch (error) {
+      await this.openAlertDialog('Could not export collection documentation', String(error));
+    }
   },
   async exportCollection(this: ImportExportHost, collectionId: string) {
     this.closeFloatingMenus();

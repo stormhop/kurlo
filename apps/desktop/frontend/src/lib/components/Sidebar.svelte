@@ -90,6 +90,7 @@
     openFolderSettings = () => {},
     openOpenApiSettings,
     openApiUpdates = () => '',
+    buildCollectionDocs,
     exportCollection,
     deleteCollection,
     moveCollection,
@@ -178,6 +179,7 @@
     openFolderSettings?: (collectionId: string, folderPath: string[]) => void | Promise<void>;
     openOpenApiSettings: (collectionId: string) => void | Promise<void>;
     openApiUpdates?: (collectionId: string) => string;
+    buildCollectionDocs: (id: string) => void;
     exportCollection: (id: string) => void;
     deleteCollection: (id: string) => void;
     moveCollection: (sourceId: string, targetId: string, placement: DropPlacement) => void;
@@ -1021,6 +1023,7 @@
                     <button class="menu-item" type="button" onclick={() => renameCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="rename" />Rename</button>
                     <button class="menu-item" type="button" onclick={() => openFindReplace(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="replace" />Find and replace…</button>
                     <button class="menu-item" type="button" onclick={() => openOpenApiSettings(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="import" />OpenAPI sync…</button>
+                    <button class="menu-item" type="button" onclick={() => buildCollectionDocs(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="docs" />Build documentation</button>
                     <button class="menu-item" type="button" onclick={() => exportCollection(row.group.collection.id)} disabled={workspaceBlocked}><MenuIcon name="export" />Export…</button>
                     {#if revealInFileManager && fileManagerLabel()}<button class="menu-item" type="button" onclick={() => revealInFileManager('collection', row.group.collection.id)}><MenuIcon name="open" />{fileManagerLabel()}</button>{/if}
                     <div class="menu-separator" role="separator"></div>
