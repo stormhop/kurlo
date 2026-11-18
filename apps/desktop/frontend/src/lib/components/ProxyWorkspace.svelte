@@ -58,7 +58,7 @@
   ));
   const current = $derived(filtered.find(row => row.id === selected) ?? filtered[0]);
   const id = $derived(current?.id);
-  const httpIDs = $derived(filtered.filter(row => row.method !== 'CONNECT' && !(status.browser && row.inProgress)).map(row => row.id));
+  const httpIDs = $derived(filtered.filter(row => row.method !== 'CONNECT').map(row => row.id));
   function api() {
     const app = window.go?.api?.App;
     if (!app?.StartProxyCapture) throw new Error('Capture requires the Kurlo desktop app.');
@@ -89,9 +89,7 @@
   });
   $effect(() => {
     const entryID = id;
-    const responseStatus = current?.status;
-    void responseStatus;
-    const progress = current && (status.browser || current.stream || current.method === 'CONNECT') ? current.received + current.sent + Number(current.inProgress ?? false) : 0;
+    const progress = current?.stream || current?.method === 'CONNECT' ? current.received + current.sent + Number(current.inProgress ?? false) : 0;
     void progress;
     if (!entryID) { detail = null; return; }
     let valid = true;
@@ -103,7 +101,8 @@
     error = ''; busy = true;
     try { await work(); } catch (cause) { error = String(cause); } finally { busy = false; }
   }
-  const qrAddress = $derived(setup && status.running && !status.browser ? status.address : '');
+  const pacURL = $derived(`http://${(status.running && status.address) || (config.listenIP || '127.0.0.1') + ':' + config.port}/proxy.pac`);
+  const qrAddress = $derived(setup && status.running ? status.address : '');
   $effect(() => {
     if (!qrAddress) { qr = ''; return; }
     let valid = true;
@@ -127,16 +126,6 @@
     return action(async () => {
       if (status.running) await api().StopProxyCapture!();
       else { await api().StartProxyCapture!({ ...config, certificate: config.service ? config.certificate : '', key: config.service ? config.key : '' }); selected = 0; host = ''; setup = false; ruleID = 0; }
-      await refresh();
-    });
-  }
-  function recordBrowser() {
-    return action(async () => {
-      await api().StartBrowserCapture!();
-      selected = 0;
-      host = ''; filter = ''; method = ''; code = '';
-      setup = false;
-      ruleID = 0;
       await refresh();
     });
   }
@@ -217,11 +206,10 @@
 
 <section class="capture" aria-label="Capture proxy">
   <header class="capture-head">
-    <div class="mock-title"><span class="mock-glyph" aria-hidden="true">⇄</span><div><h2>Capture proxy</h2><p>{status.browser ? 'Browser tab' : status.address || (config.listenIP || '127.0.0.1') + ':' + config.port}</p></div></div>
+    <div class="mock-title"><span class="mock-glyph" aria-hidden="true">⇄</span><div><h2>Capture proxy</h2><p>{(status.running && status.address) || (config.listenIP || '127.0.0.1') + ':' + config.port}</p></div></div>
     <span class:live={status.running}>{status.running ? '● Recording' : 'Stopped'}</span>
-    {#if !status.running}<button class="btn btn-primary" disabled={busy || !loaded} onclick={recordBrowser}>Record browser</button>{/if}
-    <button class="btn btn-secondary" onclick={toggle} disabled={busy || !loaded}>{status.running ? 'Stop capture' : 'Start proxy'}</button>
-    <button class="btn btn-secondary" disabled={!loaded || (status.running && status.browser)} aria-expanded={setup} onclick={() => setup = !setup}>Setup</button>
+    <button class="btn" class:btn-secondary={status.running} class:btn-primary={!status.running} onclick={toggle} disabled={busy || !loaded}>{status.running ? 'Stop capture' : 'Record'}</button>
+    <button class="btn btn-secondary" disabled={!loaded} aria-expanded={setup} onclick={() => setup = !setup}>Setup</button>
   </header>
   {#if setup}
     <div class="setup">
@@ -236,7 +224,8 @@
       {/if}
       {#if document.documentElement.dataset.platform === 'darwin'}<label><input class="check" type="checkbox" bind:checked={config.identifyProcess} disabled={status.running}> Identify local processes</label>{/if}
       {#if qr}<img src={qr} width="88" height="88" alt="Proxy address QR code">{/if}
-      <span>Point your client at the proxy. PAC URL: <code>http://{status.address || (config.listenIP || '127.0.0.1') + ':' + config.port}/proxy.pac</code></span>
+      <span>Set this automatic proxy URL in your system or browser settings, then open the site in your usual browser.</span>
+      <code>{pacURL}</code><button class="btn btn-secondary" onclick={() => action(async () => { await clipboardCopy(pacURL); })}>Copy PAC URL</button>
       {#if status.rules}<button class="btn btn-secondary" onclick={() => action(async () => { await api().ClearProxyLocalResponses!(); await refresh(); })}>Clear local responses ({status.rules})</button>{/if}
     </div>
   {/if}
@@ -270,15 +259,15 @@
           <td><button class="btn-link path" aria-label={row.url || row.host} onclick={() => selected = row.id}>{row.path || row.host}</button></td>
           {#if layout === 'Timeline'}<td>{row.host}</td>{/if}<td>{row.method === 'CONNECT' && row.status === 200 ? 'Tunnel' : row.status}</td><td>{row.inProgress ? 'Open' : row.duration + ' ms'}</td>
         </tr>{/each}</tbody></table></div>
-      {:else}<div class="empty-state"><strong class="empty-state-title">{rows.length ? 'No matching traffic' : status.running ? 'Waiting for traffic' : 'Start a capture'}</strong><span class="empty-state-text">{rows.length ? 'Change the filters to see other entries.' : status.running && status.browser ? 'Open the site in the browser tab Kurlo launched.' : 'Record a browser tab, or start the proxy and point your client at the address above.'}</span></div>{/if}
+      {:else}<div class="empty-state"><strong class="empty-state-title">{rows.length ? 'No matching traffic' : status.running ? 'Waiting for traffic' : 'Start a capture'}</strong><span class="empty-state-text">{rows.length ? 'Change the filters to see other entries.' : status.running ? 'Open or reload a site in your configured browser.' : 'Connect your browser in Setup, then click Record.'}</span></div>{/if}
     </section>
     {#if detail && current && detail.entry.id === current.id}
       <article class="detail">
         <header><div><strong>{current.method} {current.path || current.host}</strong><small>{current.host} · {new Date(current.started).toLocaleTimeString('en-GB', { hour12: false })} · {current.duration} ms · {formatSize(current.received)}{current.process ? ' · ' + current.process : ''}{current.local ? ' · Local response' : ''}</small></div>
           {#if current.method !== 'CONNECT'}
-            <button class="btn btn-secondary" disabled={busy || (status.browser && current.inProgress) || detail.request.binary || (detail.request.truncated && !detail.request.archived)} onclick={openForReplay}>Open for replay</button>
-            <button class="btn btn-secondary" disabled={busy || (status.browser && current.inProgress) || detail.request.binary || detail.request.truncated} onclick={copyCurl}>Copy cURL</button>
-            {#if status.running && !status.browser}<button class="btn btn-secondary" disabled={busy} onclick={editRule}>Map local</button>{/if}<button class="btn btn-primary" disabled={busy || (status.browser && current.inProgress) || detail.request.binary || (detail.request.truncated && !detail.request.archived)} onclick={beginSave}>Save as request</button>{/if}
+            <button class="btn btn-secondary" disabled={busy || detail.request.binary || (detail.request.truncated && !detail.request.archived)} onclick={openForReplay}>Open for replay</button>
+            <button class="btn btn-secondary" disabled={busy || detail.request.binary || detail.request.truncated} onclick={copyCurl}>Copy cURL</button>
+            {#if status.running}<button class="btn btn-secondary" disabled={busy} onclick={editRule}>Map local</button>{/if}<button class="btn btn-primary" disabled={busy || detail.request.binary || (detail.request.truncated && !detail.request.archived)} onclick={beginSave}>Save as request</button>{/if}
         </header>
         {#if saveID && saveID === current.id}
           <form class="setup" onsubmit={e => { e.preventDefault(); void save([saveID]); }}>

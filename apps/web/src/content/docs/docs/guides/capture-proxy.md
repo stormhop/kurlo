@@ -3,19 +3,16 @@ title: Capture proxy
 description: Inspect traffic from a development client, save requests and examples, and export a session as HAR.
 ---
 
-## Record a website in the browser
+Open **Capture proxy** and click **Record**. Kurlo listens for connections at the address in the header. Open the site yourself in your usual browser.
 
-Open **Capture proxy** and click **Record browser**. Kurlo opens a visible Chromium tab using a separate profile. Type the site's normal HTTPS address into that tab and use the site. Select a GET or POST in Kurlo to see its status and response body. Requests from that tab to other API hosts also appear in the timeline.
+## Connect your browser
 
-![Browser capture showing an HTTPS GET, a POST and its JSON response](../../../../assets/screenshots/capture-browser.png)
+1. In **Setup**, click **Copy PAC URL**. The default is `http://127.0.0.1:9090/proxy.pac`. Keep the recorder running while applying this setting.
+2. Select automatic proxy configuration in your operating system's network settings and paste the URL. Browsers with their own proxy preferences can use the same automatic configuration URL. Keep the listening port consistent across sessions.
+3. Open or reload the site. HTTP requests appear with their responses. For HTTPS, **CONNECT** shows the destination and connection metadata. To see individual HTTPS requests and responses for a development service, configure its certificate and key as described below.
+4. Click **Stop capture** to stop listening and keep the recorded entries. The PAC file offers a direct connection if the proxy is unavailable. Browser retry and PAC caching behavior can affect how quickly routing changes.
 
-Kurlo locates an installed Chrome, Chromium, Edge or Brave browser. It remembers the capture browser's cookies and site settings in its own local profile between sessions. The site uses the browser's normal TLS verification. Recording begins before you navigate. **Stop capture** closes the capture window and keeps the entries available for inspection. Closing the recording tab also ends the session.
-
-Browser recording observes the designated tab. Other tabs, independent workers, streaming frames and browser-wide traffic are outside this view. Response bodies are available for completed requests when Chromium retains the content, up to 1 MiB per response. The inspector previews the first 16 KiB. Export HAR to read a larger archived body. Standard capture redaction and export controls apply.
-
-## Record a client using an HTTP proxy
-
-Open **Capture proxy** in the activity rail, then click **Start proxy**. Set your client's HTTP and HTTPS proxy to the address shown in Kurlo. The default is `127.0.0.1:9090`. To check the connection, send a request to a development HTTP endpoint from that client.
+For manual configuration, point both the HTTP and HTTPS proxy settings to the host and port shown in Kurlo. Disable a manual proxy when you stop Kurlo.
 
 ![Capture timeline with a selected order request and its JSON response](../../../../assets/screenshots/capture-proxy.png)
 

@@ -13,8 +13,6 @@ None of it has to be taken on trust: Kurlo is open source under the MIT license,
 
 ## What Kurlo stores on your machine
 
-Record browser opens a dedicated local Chromium profile in the Kurlo configuration directory (`capture-browser`). The browser can retain cookies, history and site data in that profile.
-
 Capture proxy keeps a bounded session in memory and writes larger bodies in plaintext to owner-only temporary files. Starting a new session or closing Kurlo normally removes these files. HAR exports and saved requests persist. Kurlo omits common credential headers and sensitive query keys from captures. Bodies, paths and custom fields can contain secrets. Review them before sharing. [Capture proxy](/docs/guides/capture-proxy/)
 
 

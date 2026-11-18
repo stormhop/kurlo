@@ -15,13 +15,13 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
-- **Record browser** opens a dedicated Chromium tab for inspecting HTTPS requests and responses. [Browser recording](/docs/guides/capture-proxy/#record-a-website-in-the-browser).
 - **Capture proxy** records development traffic, turns calls into requests and examples, and exports HAR from the desktop or CLI. See [Capture proxy](/docs/guides/capture-proxy/).
 
 - **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
 
 ### Fixed
 
+- **Record** starts the local proxy for browsers using the configured proxy address. [Connect your browser](/docs/guides/capture-proxy/#connect-your-browser).
 - **OpenAPI imports** stop if the intended workspace is no longer active when the spec arrives.
 - **OpenAPI and Postman imports** report save failures and let you retry saving imported requests.
 - **Secret variables** keep their IDs when loading and autosaving a Git workspace.

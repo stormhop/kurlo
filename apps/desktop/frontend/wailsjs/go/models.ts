@@ -5072,7 +5072,6 @@ export namespace proxycapture {
 	    }
 	}
 	export class Status {
-	    browser?: boolean;
 	    config: Config;
 	    rules: number;
 	    address: string;
@@ -5085,7 +5084,6 @@ export namespace proxycapture {
 
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.browser = source["browser"];
 	        this.config = this.convertValues(source["config"], Config);
 	        this.rules = source["rules"];
 	        this.address = source["address"];

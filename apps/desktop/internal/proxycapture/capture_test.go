@@ -117,7 +117,7 @@ func TestProxyBoundedPreviewPACAndLoop(t *testing.T) {
 		t.Fatal(x.Entry)
 	}
 	resp, err = http.Get("http://" + r.Status().Address + "/proxy.pac")
-	if text := responseText(t, resp, err); !strings.Contains(text, "PROXY "+r.Status().Address) {
+	if text := responseText(t, resp, err); !strings.Contains(text, "PROXY "+r.Status().Address+"; DIRECT") {
 		t.Fatal(text)
 	}
 	resp, err = client.Get("http://" + r.Status().Address + "/")

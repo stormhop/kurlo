@@ -34,7 +34,10 @@ test('capture, inspect a tunnel and save an HTTP request with its example', asyn
     });
   });
   await page.getByRole('button', { name: 'Capture proxy' }).click();
-  await page.getByRole('button', { name: 'Start proxy' }).click();
+  await page.getByRole('button', { name: 'Setup' }).click();
+  await expect(page.getByText('http://127.0.0.1:9090/proxy.pac', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
+  expect(page.context().pages()).toEqual([page]);
   await expect(page.getByText('"total": 42', { exact: false })).toBeVisible();
   await page.getByRole('button', { name: 'Structure', exact: true }).click();
   await page.getByRole('navigation', { name: 'Capture hosts' }).getByRole('button', { name: 'cdn.test:443' }).click();
@@ -57,42 +60,4 @@ test('capture, inspect a tunnel and save an HTTP request with its example', asyn
   expect(saved?.folderPath).toEqual(['Captured']);
   expect(saved?.url).toBe('http://shop.test/orders');
   expect(saved?.examples?.[0]?.response.body).toBe('{"total":42}');
-});
-
-test('Record browser displays individual HTTPS calls and keeps their responses after stop', async ({ page }) => {
-  await installKurloBridge(page);
-  await page.setViewportSize({width: 1440, height: 900});
-  await page.goto('/');
-  await page.evaluate(() => {
-    let running = false;
-    let browser = false;
-    const calls = [
-      {id: 1, method: 'GET', path: '/', status: 200},
-      {id: 2, method: 'POST', path: '/api/orders', status: 201}
-    ].map(call => ({...call, host: 'shop.test', url: 'https://shop.test' + call.path, started: '2026-11-18T10:32:00Z', duration: 18, sent: 0, received: 15}));
-    const config = {port: 0, include: '', service: '', certificate: '', key: '', listenIP: '', clientIP: '', identifyProcess: false};
-    const status = () => ({browser, running, count: browser ? calls.length : 0, config, rules: 0, address: ''});
-    Object.assign(window.go!.api!.App!, {
-      StartProxyCapture: async () => { throw new Error('Unexpected proxy start'); },
-      StartBrowserCapture: async () => { browser = true; running = true; return status(); },
-      StopProxyCapture: async () => { running = false; return status(); },
-      ProxyCaptureStatus: async () => status(),
-      ProxyCaptureEntries: async () => browser ? calls : [],
-      ProxyPausedResponses: async () => [],
-      ProxyCaptureEntry: async (id: number) => ({
-        entry: calls.find(call => call.id === id),
-        request: {headers: {}, body: id === 2 ? '{"order":17}' : '', truncated: false, binary: false},
-        response: {headers: {}, body: id === 2 ? '{"accepted":17}' : 'Storefront', truncated: false, binary: false}
-      })
-    });
-  });
-  await page.getByRole('button', {name:'Capture proxy'}).click();
-  await page.getByRole('button', {name:'Record browser'}).click();
-  await page.getByRole('button', {name:'https://shop.test/api/orders'}).click();
-  await expect(page.getByText('"accepted": 17', {exact:false})).toBeVisible();
-  await expect(page.getByRole('button', {name:'Map local'})).toHaveCount(0);
-  if (process.env.KURLO_BROWSER_CAPTURE_SCREENSHOT) await page.screenshot({path:process.env.KURLO_BROWSER_CAPTURE_SCREENSHOT});
-  await page.getByRole('button', {name:'Stop capture'}).click();
-  await expect(page.getByRole('button', {name:'Record browser'})).toBeEnabled();
-  await expect(page.getByText('"accepted": 17', {exact:false})).toBeVisible();
 });

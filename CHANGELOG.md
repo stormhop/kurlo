@@ -9,13 +9,13 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
-- **Record a browser tab.** Open a site at its normal HTTPS address in a dedicated Chromium window and inspect GET and POST requests and responses directly in Kurlo.
 - **Capture proxy.** Inspect HTTP traffic and a development HTTPS service, save an exchange as a request with its response example, and export a session as HAR. Includes a CLI recorder, local response rules and an optional HAR source for MCP.
 
 - **Postman v3 collection export.** Open a Kurlo collection as local files in Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available.
 
 ### Fixed
 
+- **Record in your usual browser.** Record starts the local capture proxy. Setup provides a copyable automatic proxy configuration URL with a direct fallback.
 - **OpenAPI imports stay in the intended workspace.** Kurlo cancels a pending import if another workspace is active when the spec arrives.
 - **Import errors are visible.** OpenAPI and Postman imports report a save failure and keep imported requests available to save again.
 - **Secret variables keep their IDs after reloading.** Autosaving a freshly opened Git workspace no longer rewrites unchanged secret rows.

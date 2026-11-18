@@ -794,10 +794,6 @@ export function SocketIOEmit(arg1, arg2) {
   return window['go']['api']['App']['SocketIOEmit'](arg1, arg2);
 }
 
-export function StartBrowserCapture() {
-  return window['go']['api']['App']['StartBrowserCapture']();
-}
-
 export function StartCodexLogin(arg1) {
   return window['go']['api']['App']['StartCodexLogin'](arg1);
 }

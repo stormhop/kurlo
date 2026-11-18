@@ -54,7 +54,6 @@ type Entry struct {
 }
 
 type Message struct {
-	decoded   bool
 	raw       []byte
 	file      string
 	Archived  bool                `json:"archived,omitempty"`
@@ -64,8 +63,6 @@ type Message struct {
 	Binary    bool                `json:"binary"`
 }
 
-func (m Message) IsDecoded() bool { return m.decoded }
-
 func (m Message) EncodedPreview() io.Reader {
 	if m.Binary {
 		return bytes.NewReader(m.raw)
@@ -74,16 +71,14 @@ func (m Message) EncodedPreview() io.Reader {
 }
 
 type Exchange struct {
-	httpVersion string
-	route       localRoute
-	Frames      []Frame `json:"frames,omitempty"`
-	Entry       Entry   `json:"entry"`
-	Request     Message `json:"request"`
-	Response    Message `json:"response"`
+	route    localRoute
+	Frames   []Frame `json:"frames,omitempty"`
+	Entry    Entry   `json:"entry"`
+	Request  Message `json:"request"`
+	Response Message `json:"response"`
 }
 
 type Status struct {
-	Browser bool   `json:"browser,omitempty"`
 	Config  Config `json:"config"`
 	Rules   int    `json:"rules"`
 	Address string `json:"address"`
@@ -92,8 +87,6 @@ type Status struct {
 }
 
 type Recorder struct {
-	launch  *browserLaunch
-	browser bool
 	files   *bodyFiles
 	config  Config
 	mu      sync.Mutex
@@ -106,7 +99,6 @@ type Recorder struct {
 }
 
 type session struct {
-	browserClose    func()
 	stopped         chan struct{}
 	files           *bodyFiles
 	pauses          map[int64]pauseSlot
@@ -132,8 +124,8 @@ type session struct {
 func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.run != nil || r.launch != nil {
-		return r.status(), errors.New("a capture is already starting or running")
+	if r.run != nil {
+		return r.status(), errors.New("capture proxy is already running")
 	}
 	if config.Port < 0 || config.Port > 65535 {
 		return r.status(), errors.New("invalid proxy port")
@@ -179,7 +171,6 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 
 func (r *Recorder) beginSession(s *session, config Config, address string) {
 	s.stopped = make(chan struct{})
-	r.browser = s.browserClose != nil
 	s.record = func(x Exchange) int64 {
 		r.mu.Lock()
 		if r.run != s {
@@ -228,12 +219,6 @@ func (r *Recorder) beginSession(s *session, config Config, address string) {
 func (r *Recorder) Stop() Status {
 	r.mu.Lock()
 	s := r.run
-	if launch := r.launch; s == nil && launch != nil {
-		launch.cancel()
-		r.mu.Unlock()
-		<-launch.done
-		return r.Status()
-	}
 	r.mu.Unlock()
 	if s != nil {
 		r.stopSession(s)
@@ -252,12 +237,8 @@ func (r *Recorder) stopSession(s *session) {
 	s.closing = true
 	s.mu.Unlock()
 	s.cancel()
-	if s.browserClose != nil {
-		s.browserClose()
-	} else {
-		s.server.Close()
-		s.transport.CloseIdleConnections()
-	}
+	s.server.Close()
+	s.transport.CloseIdleConnections()
 	s.wg.Wait()
 	r.mu.Lock()
 	if r.run == s {
@@ -288,7 +269,7 @@ func (r *Recorder) status() Status {
 		rules = len(r.run.rules)
 		r.run.mu.Unlock()
 	}
-	return Status{Browser: r.browser, Config: r.config, Rules: rules, Running: r.run != nil, Address: r.address, Count: r.count}
+	return Status{Config: r.config, Rules: rules, Running: r.run != nil, Address: r.address, Count: r.count}
 }
 func (r *Recorder) Status() Status { r.mu.Lock(); defer r.mu.Unlock(); return r.status() }
 func (r *Recorder) snapshotLocked() []*Exchange {
@@ -490,7 +471,7 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !r.URL.IsAbs() && r.Method != http.MethodConnect {
 		if r.Method == http.MethodGet && r.URL.Path == "/proxy.pac" && r.Host == s.addr.String() {
 			w.Header().Set("Content-Type", "application/x-ns-proxy-autoconfig")
-			fmt.Fprintf(w, "function FindProxyForURL(url, host) { return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' ? 'DIRECT' : 'PROXY %s'; }", s.addr)
+			fmt.Fprintf(w, "function FindProxyForURL(url, host) { return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' ? 'DIRECT' : 'PROXY %s; DIRECT'; }", s.addr)
 			return
 		}
 		http.Error(w, "Expected an explicit proxy request", 400)

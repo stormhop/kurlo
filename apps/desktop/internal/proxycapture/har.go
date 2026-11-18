@@ -104,11 +104,7 @@ func (r *Recorder) HARDecoded(ids []int64, decode func(http.Header, string, int)
 		if err != nil {
 			return "", err
 		}
-		proto := x.httpVersion
-		if proto == "" {
-			proto = "HTTP/1.1"
-		}
-		req := map[string]any{"method": e.Method, "url": e.URL, "httpVersion": proto, "headers": pairs(x.Request.Headers), "cookies": []any{}, "queryString": pairs(u.Query()), "headersSize": -1, "bodySize": e.Sent}
+		req := map[string]any{"method": e.Method, "url": e.URL, "httpVersion": "HTTP/1.1", "headers": pairs(x.Request.Headers), "cookies": []any{}, "queryString": pairs(u.Query()), "headersSize": -1, "bodySize": e.Sent}
 		reqBody, err := x.Request.archived()
 		if err != nil {
 			return "", err
@@ -122,7 +118,7 @@ func (r *Recorder) HARDecoded(ids []int64, decode func(http.Header, string, int)
 		}
 		binary := x.Response.Binary
 		size := e.Received
-		if !x.Response.decoded && decode != nil && remaining > 0 && (!x.Response.Truncated || x.Response.Archived) && http.Header(x.Response.Headers).Get("Content-Encoding") != "" {
+		if decode != nil && remaining > 0 && (!x.Response.Truncated || x.Response.Archived) && http.Header(x.Response.Headers).Get("Content-Encoding") != "" {
 			if decoded, ok := decode(x.Response.Headers, resBody, min(maxBodyFile, remaining)); ok {
 				resBody = decoded
 				size = int64(len(decoded))
@@ -135,7 +131,7 @@ func (r *Recorder) HARDecoded(ids []int64, decode func(http.Header, string, int)
 			content["encoding"] = "base64"
 			content["text"] = base64.StdEncoding.EncodeToString([]byte(resBody))
 		}
-		resp := map[string]any{"status": e.Status, "statusText": http.StatusText(e.Status), "httpVersion": proto, "headers": pairs(x.Response.Headers), "cookies": []any{}, "content": content, "redirectURL": http.Header(x.Response.Headers).Get("Location"), "headersSize": -1, "bodySize": e.Received}
+		resp := map[string]any{"status": e.Status, "statusText": http.StatusText(e.Status), "httpVersion": "HTTP/1.1", "headers": pairs(x.Response.Headers), "cookies": []any{}, "content": content, "redirectURL": http.Header(x.Response.Headers).Get("Location"), "headersSize": -1, "bodySize": e.Received}
 		entries = append(entries, map[string]any{"startedDateTime": e.Started, "time": e.Duration, "request": req, "response": resp, "cache": map[string]any{}, "timings": map[string]int64{"send": 0, "wait": e.Duration, "receive": 0}})
 	}
 	if len(selected) > 0 {

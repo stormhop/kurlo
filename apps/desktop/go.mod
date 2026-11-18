@@ -9,8 +9,6 @@ require (
 	github.com/Azure/go-ntlmssp v0.1.1
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/andybalholm/brotli v1.2.6
-	github.com/chromedp/cdproto v0.160.5
-	github.com/chromedp/chromedp v0.24.0
 	github.com/d5/tengo/v2 v2.17.0
 	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
 	github.com/fullstorydev/grpcurl v1.9.4
@@ -33,8 +31,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	software.sslmate.com/src/go-pkcs12 v0.7.4
 )
-
-require github.com/go-json-experiment/json v0.0.0-20260213210345-44df1a37e875 // indirect
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect

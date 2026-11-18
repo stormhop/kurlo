@@ -40,9 +40,6 @@ func (r *Recorder) SetLocalResponse(config LocalResponse) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	s := r.run
-	if s != nil && s.browserClose != nil {
-		return errors.New("local response rules require a proxy session")
-	}
 	if s == nil {
 		return errors.New("start a capture first")
 	}

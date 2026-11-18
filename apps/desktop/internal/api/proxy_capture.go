@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -26,21 +25,13 @@ func (a *App) StartProxyCapture(config proxycapture.Config) (proxycapture.Status
 	if config.Port < 1 {
 		return a.capture.Status(), errors.New("enter a port between 1 and 65535")
 	}
-	return a.capture.Start(config, a.captureNotify())
-}
-
-func (a *App) StartBrowserCapture() (proxycapture.Status, error) {
-	return a.capture.StartBrowser(filepath.Join(requestStoreDir(), "capture-browser"), a.captureNotify())
-}
-
-func (a *App) captureNotify() func() {
 	emit := func() {
 		if a.ctx != nil {
 			runtime.EventsEmit(a.ctx, "proxy:changed")
 		}
 	}
 	batch := newEventBatcher(256, 100*time.Millisecond, func(struct{}) { emit() }, func([]struct{}) { emit() })
-	return func() { batch.add(struct{}{}) }
+	return a.capture.Start(config, func() { batch.add(struct{}{}) })
 }
 
 func (a *App) StopProxyCapture() proxycapture.Status     { return a.capture.Stop() }
@@ -48,7 +39,7 @@ func (a *App) ProxyCaptureStatus() proxycapture.Status   { return a.capture.Stat
 func (a *App) ProxyCaptureEntries() []proxycapture.Entry { return a.capture.Entries() }
 func (a *App) ProxyCaptureEntry(id int64) (proxycapture.Exchange, error) {
 	x, err := a.capture.Get(id)
-	if err != nil || x.Response.IsDecoded() || http.Header(x.Response.Headers).Get("Content-Encoding") == "" {
+	if err != nil || http.Header(x.Response.Headers).Get("Content-Encoding") == "" {
 		return x, err
 	}
 	reader, closeReader := newDecodingReader(x.Response.EncodedPreview(), &http.Response{Header: x.Response.Headers})
@@ -81,7 +72,7 @@ func decodeCaptureBody(headers http.Header, raw string, limit int) (string, bool
 
 func (a *App) ProxyCaptureQR() (string, error) {
 	status := a.capture.Status()
-	if !status.Running || status.Browser {
+	if !status.Running {
 		return "", errors.New("start the proxy first")
 	}
 	image, err := qrcode.Encode("http://"+status.Address, qrcode.Medium, 160)
