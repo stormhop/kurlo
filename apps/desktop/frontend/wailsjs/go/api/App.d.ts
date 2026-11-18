@@ -400,6 +400,8 @@ export function SocketIODisconnect(arg1:string):Promise<void>;
 
 export function SocketIOEmit(arg1:string,arg2:model.SocketIOEmitMessage):Promise<model.SocketIOEmitResult>;
 
+export function StartBrowserCapture():Promise<proxycapture.Status>;
+
 export function StartCodexLogin(arg1:string):Promise<model.CodexStatus>;
 
 export function StartCookieSync(arg1:model.CookieSyncConfig,arg2:string):Promise<model.CookieSyncStatus>;

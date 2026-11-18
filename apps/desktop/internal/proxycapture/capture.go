@@ -54,6 +54,7 @@ type Entry struct {
 }
 
 type Message struct {
+	decoded   bool
 	raw       []byte
 	file      string
 	Archived  bool                `json:"archived,omitempty"`
@@ -63,6 +64,8 @@ type Message struct {
 	Binary    bool                `json:"binary"`
 }
 
+func (m Message) IsDecoded() bool { return m.decoded }
+
 func (m Message) EncodedPreview() io.Reader {
 	if m.Binary {
 		return bytes.NewReader(m.raw)
@@ -71,14 +74,16 @@ func (m Message) EncodedPreview() io.Reader {
 }
 
 type Exchange struct {
-	route    localRoute
-	Frames   []Frame `json:"frames,omitempty"`
-	Entry    Entry   `json:"entry"`
-	Request  Message `json:"request"`
-	Response Message `json:"response"`
+	httpVersion string
+	route       localRoute
+	Frames      []Frame `json:"frames,omitempty"`
+	Entry       Entry   `json:"entry"`
+	Request     Message `json:"request"`
+	Response    Message `json:"response"`
 }
 
 type Status struct {
+	Browser bool   `json:"browser,omitempty"`
 	Config  Config `json:"config"`
 	Rules   int    `json:"rules"`
 	Address string `json:"address"`
@@ -87,6 +92,8 @@ type Status struct {
 }
 
 type Recorder struct {
+	launch  *browserLaunch
+	browser bool
 	files   *bodyFiles
 	config  Config
 	mu      sync.Mutex
@@ -99,6 +106,8 @@ type Recorder struct {
 }
 
 type session struct {
+	browserClose    func()
+	stopped         chan struct{}
 	files           *bodyFiles
 	pauses          map[int64]pauseSlot
 	changed         func()
@@ -123,8 +132,8 @@ type session struct {
 func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.run != nil {
-		return r.status(), errors.New("capture proxy is already running")
+	if r.run != nil || r.launch != nil {
+		return r.status(), errors.New("a capture is already starting or running")
 	}
 	if config.Port < 0 || config.Port > 65535 {
 		return r.status(), errors.New("invalid proxy port")
@@ -161,6 +170,16 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 		req.Context().Value(traceKey{}).(*trace).failed = true
 		http.Error(w, "Upstream connection failed", http.StatusBadGateway)
 	}}
+	s.server = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 64 << 10, BaseContext: func(net.Listener) context.Context { return ctx }}
+	r.beginSession(s, config, ln.Addr().String())
+	activeAddresses.Store(r.address, s)
+	go s.server.Serve(ln)
+	return r.status(), nil
+}
+
+func (r *Recorder) beginSession(s *session, config Config, address string) {
+	s.stopped = make(chan struct{})
+	r.browser = s.browserClose != nil
 	s.record = func(x Exchange) int64 {
 		r.mu.Lock()
 		if r.run != s {
@@ -171,9 +190,12 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 			if x.Entry.ID > r.next-int64(r.count) && x.Entry.ID <= r.next {
 				idx := (r.cursor - 1 - int(r.next-x.Entry.ID) + capacity) % capacity
 				r.ring[idx] = &x
+			} else {
+				s.files.remove(x.Request.file)
+				s.files.remove(x.Response.file)
 			}
 			r.mu.Unlock()
-			notify()
+			s.changed()
 			return x.Entry.ID
 		}
 		r.next++
@@ -188,45 +210,63 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 			r.count++
 		}
 		r.mu.Unlock()
-		notify()
+		s.changed()
 		return x.Entry.ID
 	}
-	s.server = &http.Server{Handler: s, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 64 << 10, BaseContext: func(net.Listener) context.Context { return ctx }}
 	if r.files != nil {
 		r.files.close()
 	}
 	r.files = s.files
 	r.config = config
-	r.address = ln.Addr().String()
+	r.address = address
 	r.run = s
-	activeAddresses.Store(r.address, s)
 	r.ring = [capacity]*Exchange{}
 	r.count = 0
 	r.cursor = 0
-	go s.server.Serve(ln)
-	return r.status(), nil
 }
 
 func (r *Recorder) Stop() Status {
 	r.mu.Lock()
 	s := r.run
+	if launch := r.launch; s == nil && launch != nil {
+		launch.cancel()
+		r.mu.Unlock()
+		<-launch.done
+		return r.Status()
+	}
 	r.mu.Unlock()
 	if s != nil {
-		s.mu.Lock()
-		s.closing = true
-		s.mu.Unlock()
-		s.cancel()
-		s.server.Close()
-		s.transport.CloseIdleConnections()
-		s.wg.Wait()
-		r.mu.Lock()
-		if r.run == s {
-			activeAddresses.CompareAndDelete(r.address, s)
-			r.run = nil
-		}
-		r.mu.Unlock()
+		r.stopSession(s)
 	}
 	return r.Status()
+}
+
+func (r *Recorder) stopSession(s *session) {
+	s.mu.Lock()
+	if s.closing {
+		s.mu.Unlock()
+		<-s.stopped
+		return
+	}
+
+	s.closing = true
+	s.mu.Unlock()
+	s.cancel()
+	if s.browserClose != nil {
+		s.browserClose()
+	} else {
+		s.server.Close()
+		s.transport.CloseIdleConnections()
+	}
+	s.wg.Wait()
+	r.mu.Lock()
+	if r.run == s {
+		activeAddresses.CompareAndDelete(r.address, s)
+		r.run = nil
+	}
+	close(s.stopped)
+	r.mu.Unlock()
+	s.changed()
 }
 
 func (r *Recorder) Close() {
@@ -248,7 +288,7 @@ func (r *Recorder) status() Status {
 		rules = len(r.run.rules)
 		r.run.mu.Unlock()
 	}
-	return Status{Config: r.config, Rules: rules, Running: r.run != nil, Address: r.address, Count: r.count}
+	return Status{Browser: r.browser, Config: r.config, Rules: rules, Running: r.run != nil, Address: r.address, Count: r.count}
 }
 func (r *Recorder) Status() Status { r.mu.Lock(); defer r.mu.Unlock(); return r.status() }
 func (r *Recorder) snapshotLocked() []*Exchange {

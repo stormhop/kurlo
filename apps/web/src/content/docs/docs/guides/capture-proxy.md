@@ -3,7 +3,19 @@ title: Capture proxy
 description: Inspect traffic from a development client, save requests and examples, and export a session as HAR.
 ---
 
-Open **Capture proxy** in the activity rail, then click **Start capture**. Set your client's HTTP and HTTPS proxy to the address shown in Kurlo. The default is `127.0.0.1:9090`. To check the connection, send a request to a development HTTP endpoint from that client.
+## Record a website in the browser
+
+Open **Capture proxy** and click **Record browser**. Kurlo opens a visible Chromium tab using a separate profile. Type the site's normal HTTPS address into that tab and use the site. Select a GET or POST in Kurlo to see its status and response body. Requests from that tab to other API hosts also appear in the timeline.
+
+![Browser capture showing an HTTPS GET, a POST and its JSON response](../../../../assets/screenshots/capture-browser.png)
+
+Kurlo locates an installed Chrome, Chromium, Edge or Brave browser. It remembers the capture browser's cookies and site settings in its own local profile between sessions. The site uses the browser's normal TLS verification. Recording begins before you navigate. **Stop capture** closes the capture window and keeps the entries available for inspection. Closing the recording tab also ends the session.
+
+Browser recording observes the designated tab. Other tabs, independent workers, streaming frames and browser-wide traffic are outside this view. Response bodies are available for completed requests when Chromium retains the content, up to 1 MiB per response. The inspector previews the first 16 KiB. Export HAR to read a larger archived body. Standard capture redaction and export controls apply.
+
+## Record a client using an HTTP proxy
+
+Open **Capture proxy** in the activity rail, then click **Start proxy**. Set your client's HTTP and HTTPS proxy to the address shown in Kurlo. The default is `127.0.0.1:9090`. To check the connection, send a request to a development HTTP endpoint from that client.
 
 ![Capture timeline with a selected order request and its JSON response](../../../../assets/screenshots/capture-proxy.png)
 

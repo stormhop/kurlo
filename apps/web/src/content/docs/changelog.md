@@ -15,6 +15,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Record browser** opens a dedicated Chromium tab for inspecting HTTPS requests and responses. [Browser recording](/docs/guides/capture-proxy/#record-a-website-in-the-browser).
 - **Capture proxy** records development traffic, turns calls into requests and examples, and exports HAR from the desktop or CLI. See [Capture proxy](/docs/guides/capture-proxy/).
 
 - **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
