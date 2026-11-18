@@ -135,7 +135,7 @@
   margin: 0;
   background: var(--bg);
   font-family: var(--font-mono);
-  font-size: var(--text-label);
+  font-size: var(--text-code);
   line-height: var(--leading-relaxed);
   color: var(--text);
 }
@@ -323,6 +323,7 @@
 }
 
 .response-line-code {
+  font: inherit;
   display: block;
   min-width: 0;
   padding: 0 var(--space-4);

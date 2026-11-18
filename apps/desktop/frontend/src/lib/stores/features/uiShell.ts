@@ -88,6 +88,7 @@ type UiShellHost = {
   saveGlobals: () => Promise<boolean>;
   saveWorkspaceReadmes: () => Promise<boolean>;
   _sidebarSearchInput: HTMLInputElement | undefined;
+  _collectionWorkspaceRef: { save: () => Promise<void> } | undefined;
   _urlInputRef: HTMLInputElement | undefined;
   activeRequestId: string;
   appDialog: AppDialogState | null;
@@ -456,6 +457,7 @@ export const uiShellFeature = {
       if (this.topView === 'environment') await this.saveEnvironment();
       else if (this.topView === 'globals') await this.saveGlobals();
       else if (this.topView === 'overview') await this.saveWorkspaceReadmes();
+      else if (this.topView === 'collection') await this._collectionWorkspaceRef?.save();
       else if (this.activeRequestId) await this.saveActiveRequest();
       return;
     }

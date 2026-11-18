@@ -563,3 +563,31 @@ func TestSendRequestPostmanFormBodiesReachTheServer(t *testing.T) {
 		t.Errorf("sendRequest calls were not logged: %#v", resp.PreRequestResult.Logs)
 	}
 }
+
+func TestRequestAuthInPreRequestAndResponseScripts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer session-value" || r.Header.Get("X-Script-Auth") != "bearer" {
+			t.Error("request did not use the configured bearer auth and script header")
+		}
+	}))
+	defer server.Close()
+	req := model.HttpRequest{
+		Method: "GET", URL: server.URL, ScriptEngine: "js",
+		Auth:             model.AuthConfig{Type: "bearer", Token: "{{session}}", Password: "inactive"},
+		ResolveTemplates: true, TemplateValues: map[string]string{"session": "session-value"},
+		PreRequestScript: `const auth = pm.request.auth;
+			if (auth.parameters() !== auth.bearer) throw new Error("unexpected auth parameters");
+			pm.expect(auth.parameters().get("token")).to.eql("session-value");
+			pm.expect(auth.basic).to.eql(undefined);
+			pm.request.headers.set("X-Script-Auth", auth.type);
+			console.log(auth.bearer.get("token"));`,
+		TestScript: `pm.test("auth matches", () => pm.expect(pm.request.auth.bearer.toObject().token).to.eql("session-value"));`,
+	}
+	resp := sendRequest(t.Context(), req, state.New(), nil, nil)
+	if resp.Error != "" || resp.TestResult.Error != "" || len(resp.TestResult.Tests) != 1 || !resp.TestResult.Tests[0].Passed {
+		t.Fatalf("request failed: %#v", resp)
+	}
+	if len(resp.PreRequestResult.Logs) != 1 || !strings.Contains(resp.PreRequestResult.Logs[0], "[secret]") || strings.Contains(resp.PreRequestResult.Logs[0], "session-value") {
+		t.Fatal("expected the logged bearer token to be masked")
+	}
+}

@@ -350,8 +350,8 @@
     });
   }
 
-  async function save() {
-    if (!collection || savingInFlight) return;
+  export async function save() {
+    if (!collection || !draftDirty || workspaceBlocked || savingInFlight) return;
     pendingAutosave = null;
     if (autosaveTimer) {
       clearTimeout(autosaveTimer);

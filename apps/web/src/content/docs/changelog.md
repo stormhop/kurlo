@@ -15,10 +15,13 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
 - **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
 
 ### Fixed
 
+- **Script saving.** In manual-save mode, Ctrl+S (Cmd+S on macOS) saves edits to the active collection or folder, including its scripts.
+- **HTTP body fonts.** Request and response bodies use the same monospace font and size.
 - **OpenAPI imports** stop if the intended workspace is no longer active when the spec arrives.
 - **OpenAPI and Postman imports** report save failures and let you retry saving imported requests.
 - **Secret variables** keep their IDs when loading and autosaving a Git workspace.

@@ -9,10 +9,13 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
 - **Postman v3 collection export.** Open a Kurlo collection as local files in Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available.
 
 ### Fixed
 
+- **Script saving.** In manual-save mode, Ctrl+S (Cmd+S on macOS) saves edits to the active collection or folder, including its scripts.
+- **HTTP body fonts.** Request and response bodies use the same monospace font and size.
 - **OpenAPI imports stay in the intended workspace.** Kurlo cancels a pending import if another workspace is active when the spec arrives.
 - **Import errors are visible.** OpenAPI and Postman imports report a save failure and keep imported requests available to save again.
 - **Secret variables keep their IDs after reloading.** Autosaving a freshly opened Git workspace no longer rewrites unchanged secret rows.

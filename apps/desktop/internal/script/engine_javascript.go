@@ -279,6 +279,7 @@ func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool, deadline time
 
 		"reqGetUrl":    func() string { return ctx.RequestURL },
 		"reqSetUrl":    func(u string) { ctx.RequestURL = limitJSHostString(u) },
+		"reqGetAuth":   func() map[string]any { return scriptRequestAuth(ctx.RequestAuth) },
 		"reqGetMethod": func() string { return ctx.RequestMethod },
 
 		"schemaValidate": func(schemaJSON, dataJSON string) string {
@@ -793,6 +794,31 @@ var __kurloAPI = (function (host) {
   };
   Object.defineProperty(pm.request, 'url', { get: function () { return host.reqGetUrl(); }, configurable: true });
   Object.defineProperty(pm.request, 'method', { get: function () { return host.reqGetMethod(); }, configurable: true });
+
+  var requestAuth;
+  Object.defineProperty(pm.request, 'auth', { enumerable: true, get: function () {
+    if (requestAuth) return requestAuth;
+    var config = host.reqGetAuth(), values = Object.assign(Object.create(null), config.values);
+    function entry(key) {
+      if (!Object.prototype.hasOwnProperty.call(values, key)) return undefined;
+      return { key: key, value: values[key], type: typeof values[key] };
+    }
+    function all() { return Object.keys(values).sort().map(entry); }
+    var params = Object.freeze({
+      get: function (key) { return values[key]; },
+      has: function (key) { return Object.prototype.hasOwnProperty.call(values, key); },
+      one: entry,
+      all: all,
+      count: function () { return Object.keys(values).length; },
+      each: function (callback) { all().forEach(callback); },
+      toObject: function () { return Object.assign({}, values); },
+      toJSON: all
+    });
+    var auth = { type: config.type, parameters: function () { return params; } };
+    auth[config.type] = params;
+    requestAuth = Object.freeze(auth);
+    return requestAuth;
+  } });
 
   function formRows() {
     try { return JSON.parse(host.reqGetFormData()) || []; } catch (e) { return []; }

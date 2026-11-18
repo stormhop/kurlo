@@ -393,7 +393,7 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 
 	resolvedAuth := resolveAuthTemplates(httpReq.Auth, values)
 	base.secrets = append([]string(nil), httpReq.SecretEnvironmentValues...)
-	base.secrets = append(base.secrets, authCLISecrets(resolvedAuth)...)
+	base.secrets = append(base.secrets, requestAuthSecrets(resolvedAuth)...)
 	if err := tokens.resolveOAuth2Token(&resolvedAuth); err != nil {
 		base.Error = err.Error()
 		redactCLIResult(&base)
@@ -405,7 +405,7 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 		return base, model.HttpResponse{}
 	}
 	httpReq.Auth.Token = resolvedAuth.Token
-	authSecrets := authCLISecrets(resolvedAuth)
+	authSecrets := requestAuthSecrets(resolvedAuth)
 	base.secrets = append(base.secrets, authSecrets...)
 	httpReq.SecretEnvironmentValues = append(httpReq.SecretEnvironmentValues, authSecrets...)
 
@@ -446,17 +446,6 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 	}
 	redactCLIResult(&base)
 	return base, resp
-}
-
-func authCLISecrets(auth model.AuthConfig) []string {
-	return []string{
-		auth.Token, auth.Password, auth.KeyValue,
-		auth.OAuth2Secret, auth.OAuth2Password, auth.OAuth2RefreshToken,
-		auth.OAuth2AssertionPrivateKey, auth.OAuth1ConsumerSecret,
-		auth.OAuth1Token, auth.OAuth1TokenSecret, auth.OAuth1PrivateKey,
-		auth.AWSSecretKey, auth.AWSSessionToken,
-		auth.JWTSecret, auth.JWTPrivateKey,
-	}
 }
 
 func redactCLIResult(result *cliRunResult) {

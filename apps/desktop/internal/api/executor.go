@@ -85,7 +85,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 	var preResult model.ScriptResult
 	if req.PreRequestScript != "" {
 		preResult = script.RunPreRequest(req.ScriptEngine, req.PreRequestScript, ctx)
-		preResult = redactScriptResult(preResult, req.SecretEnvironmentValues)
+		preResult = redactRequestScriptResult(preResult, req.Auth, req.SecretEnvironmentValues)
 		scriptedURL := ctx.RequestURL
 		urlChanged := scriptedURL != "" && scriptedURL != req.URL
 		if template.ResolveTemplates && preResult.Error == "" {
@@ -101,7 +101,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 				}
 				resolved.SecretEnvironmentValues = append(resolved.SecretEnvironmentValues, revealedSecretValues(changed, template.SecretEnvironmentKeys, values)...)
 				req = resolved
-				preResult = redactScriptResult(preResult, req.SecretEnvironmentValues)
+				preResult = redactRequestScriptResult(preResult, req.Auth, req.SecretEnvironmentValues)
 			}
 		}
 		if urlChanged {
@@ -154,7 +154,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		populateScriptCookies(testCtx, req, jars)
 		testCtx.Send = newScriptSender(requestCtx, req.AllowSendRequest, req)
 		resp.TestResult = script.RunTests(req.ScriptEngine, req.TestScript, testCtx)
-		resp.TestResult = redactScriptResult(resp.TestResult, req.SecretEnvironmentValues)
+		resp.TestResult = redactRequestScriptResult(resp.TestResult, req.Auth, req.SecretEnvironmentValues)
 		envDelta.merge(testScope.commit(sm))
 	}
 	mergePostResponseVarsResult(&resp.TestResult, varsResult)
@@ -337,6 +337,21 @@ func (d environmentDelta) removedKeys() []string {
 	return keys
 }
 
+func requestAuthSecrets(auth model.AuthConfig) []string {
+	return []string{
+		auth.Token, auth.Password, auth.KeyValue,
+		auth.OAuth2Secret, auth.OAuth2Password, auth.OAuth2RefreshToken,
+		auth.OAuth2AssertionPrivateKey, auth.OAuth1ConsumerSecret,
+		auth.OAuth1Token, auth.OAuth1TokenSecret, auth.OAuth1PrivateKey,
+		auth.AWSSecretKey, auth.AWSSessionToken,
+		auth.JWTSecret, auth.JWTPrivateKey,
+	}
+}
+
+func redactRequestScriptResult(result model.ScriptResult, auth model.AuthConfig, secrets []string) model.ScriptResult {
+	return redactScriptResult(result, append(requestAuthSecrets(auth), secrets...))
+}
+
 func redactScriptResult(result model.ScriptResult, secrets []string) model.ScriptResult {
 	result.Error = redactSecrets(result.Error, secrets)
 	for i, log := range result.Logs {
@@ -380,6 +395,7 @@ func redactRequestError(text string, secrets []string) string {
 }
 
 func populateScriptRequestContext(ctx *script.Context, req model.HttpRequest) {
+	ctx.RequestAuth = req.Auth
 	ctx.RequestURL = req.URL
 	ctx.RequestMethod = req.Method
 	ctx.RequestBody = req.Body

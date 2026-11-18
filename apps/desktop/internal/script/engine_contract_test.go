@@ -156,3 +156,28 @@ pm.log("test", body["name"])
 		})
 	}
 }
+
+func TestJavaScriptRequestAuthParameters(t *testing.T) {
+	for _, tc := range []struct {
+		config model.AuthConfig
+		check  string
+	}{
+		{model.AuthConfig{}, `pm.expect(auth.type).to.eql("noauth"); pm.expect(params.count()).to.eql(0);`},
+		{model.AuthConfig{Type: "apikey", KeyName: "api_key", KeyIn: "query"}, `pm.expect(auth.apikey.one("key").value).to.eql("api_key"); pm.expect(params.get("in")).to.eql("query");`},
+		{model.AuthConfig{Type: "digest", Username: "alice"}, `pm.expect(auth.digest.get("username")).to.eql("alice");`},
+		{model.AuthConfig{Type: "ntlm", Username: "bob"}, `pm.expect(auth.ntlm.get("username")).to.eql("bob");`},
+		{model.AuthConfig{Type: "aws", AWSSessionToken: "temp"}, `pm.expect(auth.awsv4.get("sessionToken")).to.eql("temp");`},
+		{model.AuthConfig{Type: "oauth2", Token: "access", OAuth2GrantType: "authorization_code", OAuth2UsePKCE: true}, `pm.expect(params.get("grant_type")).to.eql("authorization_code_with_pkce"); pm.expect(auth.oauth2.get("accessToken")).to.eql("access");`},
+		{model.AuthConfig{Type: "oauth1", OAuth1IncludeBodyHash: true}, `pm.expect(auth.oauth1.get("includeBodyHash")).to.eql(true);`},
+		{model.AuthConfig{Type: "jwt", JWTAddTo: "query"}, `pm.expect(auth.jwt.get("addTokenTo")).to.eql("queryParam");`},
+	} {
+		t.Run(tc.config.Type, func(t *testing.T) {
+			ctx := NewContext(nil, nil)
+			ctx.RequestAuth = tc.config
+			source := `const auth = pm.request.auth, params = auth.parameters(); pm.expect(params.has("missing")).to.eql(false); pm.expect(params.get("missing")).to.eql(undefined);`
+			if result := RunPreRequest("js", source+tc.check, ctx); result.Error != "" {
+				t.Fatal(result.Error)
+			}
+		})
+	}
+}

@@ -29,6 +29,25 @@ import type {
 
 const RAW_BODY_TYPES = ['text', 'json', 'html', 'xml'] as const;
 
+function oauth2RequestFields(auth: SavedRequest['auth'], resolve: (value: string) => string) {
+  return {
+    oauth2GrantType: auth.oauth2GrantType ?? '',
+    oauth2AuthURL: resolve(auth.oauth2AuthURL ?? ''),
+    oauth2TokenURL: resolve(auth.oauth2TokenURL),
+    oauth2ClientID: resolve(auth.oauth2ClientID),
+    oauth2Secret: resolve(auth.oauth2Secret),
+    oauth2Scope: resolve(auth.oauth2Scope),
+    oauth2UsePKCE: auth.oauth2UsePKCE ?? false,
+    oauth2RefreshToken: resolve(auth.oauth2RefreshToken ?? ''),
+    ...(auth.type === 'oauth2' && {
+      oauth2Audience: resolve(auth.oauth2Audience ?? ''),
+      oauth2Username: resolve(auth.oauth2Username ?? ''),
+      oauth2Password: resolve(auth.oauth2Password ?? ''),
+      oauth2ClientAuth: auth.oauth2ClientAuth ?? '',
+    }),
+  };
+}
+
 function requestVariableFieldsForSend(req: SavedRequest, values: Record<string, string>, requestType: RequestType): Pick<HttpRequest, 'requestVariables' | 'postResponseVars'> {
   const requestVariables: Record<string, string> = {};
   for (const key of Object.keys(requestVariableValues(req.vars))) {
@@ -193,14 +212,7 @@ export const requestSerializationFeature = {
         keyName: resolveValue(req.auth.apiKeyName),
         keyValue: resolveValue(req.auth.apiKeyValue),
         keyIn: req.auth.apiKeyIn,
-        oauth2GrantType: req.auth.oauth2GrantType ?? '',
-        oauth2AuthURL: resolveValue(req.auth.oauth2AuthURL ?? ''),
-        oauth2TokenURL: resolveValue(req.auth.oauth2TokenURL),
-        oauth2ClientID: resolveValue(req.auth.oauth2ClientID),
-        oauth2Secret: resolveValue(req.auth.oauth2Secret),
-        oauth2Scope: resolveValue(req.auth.oauth2Scope),
-        oauth2UsePKCE: req.auth.oauth2UsePKCE ?? false,
-        oauth2RefreshToken: resolveValue(req.auth.oauth2RefreshToken ?? ''),
+        ...oauth2RequestFields(req.auth, resolveValue),
         awsAccessKey: resolveValue(req.auth.awsAccessKey),
         awsSecretKey: resolveValue(req.auth.awsSecretKey),
         awsSessionToken: resolveValue(req.auth.awsSessionToken ?? ''),
@@ -379,14 +391,7 @@ export const requestSerializationFeature = {
         keyName: this.resolveTemplate(auth.apiKeyName, envValues),
         keyValue: this.resolveTemplate(auth.apiKeyValue, envValues),
         keyIn: 'header',
-        oauth2GrantType: auth.oauth2GrantType ?? '',
-        oauth2AuthURL: this.resolveTemplate(auth.oauth2AuthURL ?? '', envValues),
-        oauth2TokenURL: this.resolveTemplate(auth.oauth2TokenURL, envValues),
-        oauth2ClientID: this.resolveTemplate(auth.oauth2ClientID, envValues),
-        oauth2Secret: this.resolveTemplate(auth.oauth2Secret, envValues),
-        oauth2Scope: this.resolveTemplate(auth.oauth2Scope, envValues),
-        oauth2UsePKCE: auth.oauth2UsePKCE ?? false,
-        oauth2RefreshToken: this.resolveTemplate(auth.oauth2RefreshToken ?? '', envValues),
+        ...oauth2RequestFields(auth, value => this.resolveTemplate(value, envValues)),
         awsAccessKey: '',
         awsSecretKey: '',
         awsRegion: '',

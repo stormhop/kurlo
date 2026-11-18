@@ -74,6 +74,7 @@ type Context struct {
 	IterationData       map[string]string
 
 	RequestURL     string
+	RequestAuth    model.AuthConfig
 	RequestMethod  string
 	RequestHeaders map[string]string
 	RequestParams  map[string]string

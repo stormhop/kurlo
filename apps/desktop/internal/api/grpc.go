@@ -234,7 +234,7 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 	var preResult model.ScriptResult
 	if req.PreRequestScript != "" {
 		preResult = script.RunPreRequest(req.ScriptEngine, req.PreRequestScript, ctx)
-		preResult = redactScriptResult(preResult, req.SecretEnvironmentValues)
+		preResult = redactRequestScriptResult(preResult, req.Auth, req.SecretEnvironmentValues)
 		mergeScriptGrpcRequestContext(ctx, &req)
 		envDelta.merge(scope.commit(sm))
 		if preResult.Error != "" {
@@ -267,7 +267,7 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 		testCtx.Send = newScriptSender(requestCtx, req.AllowSendRequest, model.HttpRequest{EnableSSLVerification: req.EnableSSLVerification})
 		testCtx.Response = grpcResponseAsHTTP(resp)
 		resp.TestResult = script.RunTests(req.ScriptEngine, req.TestScript, testCtx)
-		resp.TestResult = redactScriptResult(resp.TestResult, req.SecretEnvironmentValues)
+		resp.TestResult = redactRequestScriptResult(resp.TestResult, req.Auth, req.SecretEnvironmentValues)
 		envDelta.merge(testScope.commit(sm))
 	}
 
@@ -892,6 +892,7 @@ func grpcResponseBody(messages []model.GrpcMessage) string {
 }
 
 func populateScriptGrpcRequestContext(ctx *script.Context, req model.GrpcRequest) {
+	ctx.RequestAuth = req.Auth
 	ctx.RequestURL = req.Target
 	ctx.RequestMethod = normalizeGrpcMethodName(req.FullMethod)
 	ctx.Info = script.Info{RequestName: req.Name}

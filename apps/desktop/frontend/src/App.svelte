@@ -1017,6 +1017,7 @@
     {:else if vm.topView === 'collection'}
       {#if lazy.CollectionWorkspaceComponent}
       <lazy.CollectionWorkspaceComponent
+        bind:this={vm._collectionWorkspaceRef}
         collection={vm.activeCollectionSettings}
         environments={vm.activeWorkspaceEnvironments}
         requestCount={vm.activeCollectionSettings ? vm.collectionRequestCount(vm.activeCollectionSettings.id) : 0}

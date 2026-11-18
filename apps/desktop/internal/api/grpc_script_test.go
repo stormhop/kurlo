@@ -123,3 +123,20 @@ func TestAgentGrpcSkippedStreamReportsTheReason(t *testing.T) {
 		t.Fatalf("skipped stream close event: %#v", event)
 	}
 }
+
+func TestGrpcScriptsReadRequestAuth(t *testing.T) {
+	const check = `pm.expect(pm.request.auth.type).to.equal("basic");
+		pm.expect(pm.request.auth.basic.toObject()).to.eql({username: "reader", password: "test-password"});
+		console.log(pm.request.auth.basic.get("password"));`
+	resp := sendGrpcRequestWith(t.Context(), model.GrpcRequest{
+		ScriptEngine: "js", Auth: model.AuthConfig{Type: "basic", Username: "reader", Password: "test-password"},
+		PreRequestScript: check, TestScript: check,
+	}, state.New(), nil, func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse {
+		return model.GrpcResponse{GrpcCode: "OK"}
+	}, grpcRunIteration{})
+	for _, result := range []model.ScriptResult{resp.PreRequestResult, resp.TestResult} {
+		if result.Error != "" || len(result.Logs) != 1 || !strings.Contains(result.Logs[0], "[secret]") || strings.Contains(result.Logs[0], "test-password") {
+			t.Fatalf("unexpected auth script result: %#v", result)
+		}
+	}
+}

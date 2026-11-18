@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
-import { chooseRequestSection, fillCodeEditor } from './support/actions';
+import { chooseRequestSection, collectionRow, folderRow, fillCodeEditor } from './support/actions';
 import { captureDocsScreenshot } from './support/screenshots';
 import { DOCS_VIEWPORT, docsScreenshotDir } from './support/config';
 
@@ -234,3 +234,35 @@ test('script editors fill resized panels and scroll throughout the available are
     await expect.poll(fillsPanel).toBe(true);
   }
 });
+
+for (const [runtime, shortcut] of [['windows/e2e', 'Control+s'], ['darwin/e2e', 'Meta+s']]) {
+  test(`saves scripts at the active request, collection and folder with ${shortcut}`, async ({ page }) => {
+    await installKurloBridge(page, '', runtime, false, {
+      collections: [collection], activeId: 'one', openIds: ['one'],
+      requests: [{ ...requests[0], folderPath: ['Auth'] }],
+    });
+    await page.goto('/');
+    await chooseRequestSection(page, 'Scripts');
+    const source = 'pm.variables.set("trace", "test")';
+    await fillCodeEditor(page, 'pre-request-script-editor', source);
+    await page.keyboard.press(shortcut);
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests[0].preRequestScriptJs)).toBe(source);
+
+    const row = collectionRow(page, collection.name);
+    await row.getByLabel('Collection menu').click();
+    await row.locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('tab', { name: 'Tests', exact: true }).click();
+    const editor = page.locator('.collection-script-section .cm-content');
+    await editor.fill(source);
+    await editor.press(shortcut);
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections[0].defaults?.testScriptJs)).toBe(source);
+
+    const folder = folderRow(page, 'Auth');
+    await folder.getByLabel('Folder menu').click();
+    await folder.locator('.folder-menu').getByRole('button', { name: 'Settings' }).click();
+    await page.locator('.collection-tabs').getByRole('tab', { name: 'Script', exact: true }).click();
+    await editor.fill(source);
+    await editor.press(shortcut);
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections[0].folderDefaults?.[0].preRequestScriptJs)).toBe(source);
+  });
+}

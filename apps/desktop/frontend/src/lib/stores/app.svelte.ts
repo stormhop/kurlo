@@ -1591,6 +1591,7 @@ class AppVM {
 
   _postmanImportInput: HTMLInputElement | undefined = undefined;
   _sidebarSearchInput: HTMLInputElement | undefined = undefined;
+  _collectionWorkspaceRef: { save: () => Promise<void> } | undefined;
   _urlInputRef: HTMLInputElement | undefined = undefined;
 
   sidebarRequestMemo = new SidebarRequestMemo();

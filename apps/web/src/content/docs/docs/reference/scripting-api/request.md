@@ -6,6 +6,7 @@ title: "pm.request"
 |--------|-------------|
 | `pm.request.url` | Current request URL (string) |
 | `pm.request.method` | HTTP method |
+| `pm.request.auth` | Effective authentication details for JavaScript scripts |
 | `pm.request.headers.get(name)` | Get request header |
 | `pm.request.headers.set(name, value)` | Set / override header |
 | `pm.request.headers.unset(name)` | Remove header |
@@ -26,6 +27,20 @@ Header and parameter writes are an upsert, matching Postman: the first row with 
 | `pm.request.body.update(value)` | Replace the body; objects are stringified |
 | `pm.request.body.urlencoded` | Field list — only when the mode is `urlencoded` |
 | `pm.request.body.formdata` | Field list — only when the mode is `formdata` |
+
+## Reading request authentication
+
+JavaScript pre-request and test scripts can read the active authentication method for HTTP, GraphQL, and gRPC requests. This includes auth inherited from the collection or folder. Template values are resolved for the current request.
+
+```js
+const auth = pm.request.auth
+if (auth.type === "bearer") {
+  const token = auth.bearer.get("token")
+  pm.expect(token).to.be.a("string")
+}
+```
+
+`auth.parameters()` returns the active method's parameter list. For example, `auth.parameters().get("username")` reads a Basic username, and `auth.apikey.get("in")` reads an API key's location. Use `.has(key)` to check for a parameter and `.toObject()` to read the list as key-value pairs. With **No Auth**, `auth.type` is `"noauth"` and the list is empty. The auth object is read-only.
 
 ## Rewriting and signing the body
 

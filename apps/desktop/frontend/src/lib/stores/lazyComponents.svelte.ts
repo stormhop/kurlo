@@ -26,7 +26,7 @@ class AppLazyComponents {
   BodyTabComponent = $state<LazyComponent | null>(null);
   CodeSnippetPanelComponent = $state<LazyComponent | null>(null);
   CollectionRunnerWorkspaceComponent = $state<LazyComponent | null>(null);
-  CollectionWorkspaceComponent = $state<LazyComponent | null>(null);
+  CollectionWorkspaceComponent = $state<typeof import('../components/CollectionWorkspace.svelte').default | null>(null);
   CookieWorkspaceComponent = $state<LazyComponent | null>(null);
   DocsTabComponent = $state<LazyComponent | null>(null);
   EnvironmentWorkspaceComponent = $state<LazyComponent | null>(null);
@@ -83,7 +83,7 @@ class AppLazyComponents {
   }
 
   async loadCollectionWorkspace() {
-    if (!this.CollectionWorkspaceComponent) this.CollectionWorkspaceComponent = (await import('../components/CollectionWorkspace.svelte')).default as LazyComponent;
+    if (!this.CollectionWorkspaceComponent) this.CollectionWorkspaceComponent = (await import('../components/CollectionWorkspace.svelte')).default;
   }
 
   async loadCookieWorkspace() {

@@ -124,3 +124,23 @@ test('dims commented lines of a long body, including a block opened above the sc
   await expect(editor.locator('.cm-line', { hasText: '"key2999": 2999,' })).not.toHaveClass(/cm-kurlo-commented-line/);
   await expect(commented.filter({ hasText: 'first note' })).toHaveCount(0);
 });
+
+test('uses the same code font for the HTTP request and response bodies', async ({ page }, testInfo) => {
+  await installKurloBridge(page, '{"message":"Hello"}', 'windows/e2e', false, {
+    collections: [{ id: 'fonts', workspaceId: 'workspace-e2e', name: 'Fonts' }],
+    activeId: 'echo', openIds: ['echo'],
+    requests: [{ id: 'echo', name: 'Echo', collectionId: 'fonts', collection: 'Fonts', requestType: 'http', method: 'POST',
+      url: 'https://example.test/large-response', bodyType: 'json', bodyContent: '{"message":"Hello"}', auth: { type: 'none' } }],
+  });
+  await page.goto('/');
+  await chooseRequestSection(page, 'Body');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  const requestLine = page.getByTestId('request-body-editor').locator('.cm-line').first();
+  const responseLine = page.getByRole('textbox', { name: 'Response body', exact: true }).locator('.response-line-code').first();
+  await expect(responseLine).toBeVisible();
+  for (const property of ['font-family', 'font-size']) {
+    const expected = await requestLine.evaluate((node, prop) => getComputedStyle(node).getPropertyValue(prop), property);
+    await expect(responseLine).toHaveCSS(property, expected);
+  }
+  await page.screenshot({ path: join(tmpdir(), `kurlo-http-body-fonts-${testInfo.project.name}.png`), animations: 'disabled' });
+});
