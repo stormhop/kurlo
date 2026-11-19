@@ -30,7 +30,7 @@ Ask in plain words and the agent runs your requests and collections, explains wh
 - **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
 - **Share an API reference.** Turn a collection into a searchable HTML file with saved requests and responses. Open it offline or publish it to a static host.
 - **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
-- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.6 MB and the Linux one is 13.5 MB.
+- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.9 MB and the Linux one is 13.6 MB.
 
 | | Kurlo | Postman | Insomnia | Bruno |
 |---|---|---|---|---|
