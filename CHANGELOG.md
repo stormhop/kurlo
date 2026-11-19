@@ -9,27 +9,23 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
-- **GraphQL query builder.** Select nested fields from an introspected or imported schema, set arguments and bind typed variables alongside the query editor. The tree tracks repeated selections and supports keyboard resizing.
-- **Script editor autocomplete.** Explore the available `pm.*` methods with signatures and examples. Complete variable keys and saved request names in request, folder and collection scripts. The caret moves with the text when deleting characters.
-- **Static collection documentation.** Build a self-contained HTML reference with `kurlo docs build`, or choose **Build documentation** from a collection menu to save an HTML file and open it in your browser. Choose all requests or narrow the selection by folder. Hover over a variable to inspect and copy its value for the current request, or turn on **Show vars** to read resolved addresses and bodies. Browse collapsible folders, filter search results by method or protocol, and jump directly to request details, saved examples or AI prompts. Copy a cURL template beside the request details, choose a saved example to read its request and response together, and set a base URL when the selected documentation contains relative links. The reference follows the browser’s color scheme, works offline and supports printing.
-- **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
-- **Postman v3 collection export.** Open a Kurlo collection as local files in Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available.
+- **GraphQL query builder.** Select nested fields from an imported or introspected schema, set arguments and bind typed variables. The field tree stays in sync with the query editor.
+- **Script editor autocomplete.** Complete `pm.*` methods, variable keys and saved request names in request, folder and collection scripts. Method hints include signatures and examples.
+- **Static collection documentation.** Choose **Build documentation** from a collection menu or run `kurlo docs build` to export a searchable, offline HTML reference. Include all requests or selected folders, inspect variable values, copy cURL templates and browse saved request and response examples together.
+- **Request authentication in scripts.** Read the active auth type and parameters, including inherited auth, through `pm.request.auth` in pre-request and test scripts.
+- **Postman v3 collection export.** Export a collection as a YAML folder for Postman Desktop with native HTTP, GraphQL and gRPC requests. Postman v2.1 JSON export remains available.
 
 ### Fixed
 
-- **Request shortcuts.** Sending from a text or GraphQL editor preserves the document. Modal dialogs block the background send shortcut.
-- **Socket.IO messages.** The event name, acknowledgment and Send button stay together in narrow windows at larger UI scales.
-- **GraphQL schema.** Clearing a schema discards any pending introspection result.
-- On macOS, request buttons show the configured shortcut for sending, invoking, connecting or canceling. In WebSocket and Socket.IO message editors, the send shortcut connects first and sends messages once connected.
-- **k6 request handling.** Load tests now honor request variables and redirect settings, preserve encoded path segments, keep query parameters on URLs with fragments, and send repeated form fields.
-- **k6 data and validation.** Runs preserve large numeric IDs and variable defaults when a data row omits a field. Unreadable or invalid data, unsupported JSON paths, and incompatible extraction patterns produce errors before the run.
-- **Load test edits and results.** Switching tests flushes pending autosave edits. Edits made during a save survive, failed saves can be retried, and running tests lock their editor. Collections with matching test IDs keep separate results, summaries, and reports.
-
-- **Script saving.** In manual-save mode, Ctrl+S (Cmd+S on macOS) saves edits to the active collection or folder, including its scripts.
+- **Request shortcuts.** On macOS, request buttons show the configured shortcut for the current action. Sending from a text or GraphQL editor preserves its contents, and open dialogs block background sends. In WebSocket and Socket.IO message editors, the shortcut connects first and sends messages once connected.
+- **Socket.IO message controls.** The event name, acknowledgment and Send button stay together in narrow windows at larger UI scales.
+- **GraphQL schema refresh.** Clearing the schema while introspection is running prevents the old result from reappearing.
+- **k6 requests and data.** Load tests honor request variables and redirects, preserve encoded paths, query strings and repeated form fields, and keep large numeric IDs and variable defaults intact. Invalid data, JSON paths and extraction patterns surface before a run.
+- **Load test editing and results.** Pending edits survive a switch between tests and can be retried after a failed save. Running tests lock their editors, and tests in different collections keep their own results and reports.
+- **Manual script saves.** Ctrl+S (Cmd+S on macOS) saves the active folder or collection script.
 - **HTTP body fonts.** Request and response bodies use the same monospace font and size.
-- **OpenAPI imports stay in the intended workspace.** Kurlo cancels a pending import if another workspace is active when the spec arrives.
-- **Import errors are visible.** OpenAPI and Postman imports report a save failure and keep imported requests available to save again.
-- **Secret variables keep their IDs after reloading.** Autosaving a freshly opened Git workspace no longer rewrites unchanged secret rows.
+- **Import recovery.** OpenAPI imports stop if you switch workspaces before the spec arrives. OpenAPI and Postman imports report save failures and keep the imported requests available to save again.
+- **Git workspace secrets.** Opening and autosaving a workspace preserves the IDs of unchanged secret variables.
 
 ## [3.1.4] - 2026-11-17
 

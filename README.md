@@ -77,6 +77,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - cURL import — paste a curl command into the URL field, it parses automatically
 - Bulk edit for params, headers and form fields — switch the table to a `key: value` text area and back
 - Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved examples
+- Build GraphQL operations from a schema, select nested fields and bind typed variables in the query editor
 - GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
 - Import Postman v2 JSON or v3 Native Git folders, Insomnia v4, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and all-data backups
 - OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the collection
@@ -95,7 +96,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - Client certificates (mutual TLS), per request or inherited from a collection
 - Per-request and collection defaults with inheritance
 
-**Scripting** — pre-request and test scripts in sandboxed JavaScript:
+**Scripting** — write sandboxed JavaScript in requests, folders and collections. The editor completes `pm.*` methods, variable keys and saved request names, with signatures and examples.
 ```js
 // pre-request: inject a header
 pm.request.headers.set("X-Client", "kurlo")

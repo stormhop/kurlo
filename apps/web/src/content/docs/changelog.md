@@ -15,27 +15,19 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
-- **GraphQL query builder.** Select nested fields from an introspected or imported schema, set arguments and bind typed variables alongside the query editor. The tree tracks repeated selections and supports keyboard resizing.
-- **Script editor autocomplete.** Explore the available `pm.*` methods with signatures and examples. Complete variable keys and saved request names in request, folder and collection scripts. The caret moves with the text when deleting characters.
-- **Static collection documentation.** Use **Build documentation** in a collection menu or run `kurlo docs build` to create a self-contained HTML reference with searchable requests, paired request and response examples, and variable previews. Set a base URL when the selected notes contain relative links. See [Build collection documentation](/docs/guides/cli-runner/docs/).
-- **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
-- **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
+- **GraphQL query builder.** Choose fields, set arguments and edit typed variables alongside the query. [GraphQL guide](/docs/guides/request-types/graphql/).
+- **Script autocomplete.** Look up `pm.*` methods, variable keys and saved request names as you type. [Scripting guide](/docs/guides/scripting/).
+- **Offline collection documentation.** Export searchable HTML with variable previews, cURL templates and saved examples. [Build collection documentation](/docs/guides/cli-runner/docs/).
+- **Request auth in scripts.** Read the active or inherited auth settings with `pm.request.auth`.
+- **Postman v3 export.** Open exported HTTP, GraphQL and gRPC requests as local files in Postman Desktop. [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
 
 ### Fixed
 
-- **Request shortcuts.** Sending from a text or GraphQL editor preserves the document. Modal dialogs block the background send shortcut.
-- **Socket.IO messages.** The event name, acknowledgment and Send button stay together in narrow windows at larger UI scales.
-- **GraphQL schema.** Clearing a schema discards any pending introspection result.
-- On macOS, request buttons show the configured shortcut for sending, invoking, connecting or canceling. In WebSocket and Socket.IO message editors, the send shortcut connects first and sends messages once connected.
-- **k6 request handling.** Load tests now honor request variables and redirect settings, preserve encoded path segments, keep query parameters on URLs with fragments, and send repeated form fields.
-- **k6 data and validation.** Runs preserve large numeric IDs and variable defaults when a data row omits a field. Unreadable or invalid data, unsupported JSON paths, and incompatible extraction patterns produce errors before the run.
-- **Load test edits and results.** Switching tests flushes pending autosave edits. Edits made during a save survive, failed saves can be retried, and running tests lock their editor. Collections with matching test IDs keep separate results, summaries, and reports.
-
-- **Script saving.** In manual-save mode, Ctrl+S (Cmd+S on macOS) saves edits to the active collection or folder, including its scripts.
-- **HTTP body fonts.** Request and response bodies use the same monospace font and size.
-- **OpenAPI imports** stop if the intended workspace is no longer active when the spec arrives.
-- **OpenAPI and Postman imports** report save failures and let you retry saving imported requests.
-- **Secret variables** keep their IDs when loading and autosaving a Git workspace.
+- **Request editing.** Send shortcuts respect the focused editor and open dialogs. macOS buttons show the active shortcut. Socket.IO message controls fit at larger scales, and HTTP body fonts match across request and response.
+- **GraphQL introspection.** Clearing the schema during a refresh keeps it cleared.
+- **k6 load testing.** Runs preserve request settings, encoded URLs, repeated form fields and large IDs. Failed saves can be retried, and results stay with the correct collection.
+- **Script saving.** The save shortcut applies to the active folder or collection script.
+- **Imports and Git workspaces.** OpenAPI imports stop after a workspace switch. OpenAPI and Postman imports keep requests available after a failed save. Autosaving preserves secret variable IDs.
 
 ## 3.1.4
 
