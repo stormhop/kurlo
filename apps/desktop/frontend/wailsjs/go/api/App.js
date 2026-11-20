@@ -202,6 +202,10 @@ export function DiscoverLocalAiServers() {
   return window['go']['api']['App']['DiscoverLocalAiServers']();
 }
 
+export function DocsRelativeLinkScopes(arg1) {
+  return window['go']['api']['App']['DocsRelativeLinkScopes'](arg1);
+}
+
 export function ExportAgentChat(arg1, arg2) {
   return window['go']['api']['App']['ExportAgentChat'](arg1, arg2);
 }

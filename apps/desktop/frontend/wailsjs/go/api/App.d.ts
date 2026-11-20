@@ -103,6 +103,8 @@ export function DiagnosticsReport():Promise<string>;
 
 export function DiscoverLocalAiServers():Promise<model.AiLocalDiscovery>;
 
+export function DocsRelativeLinkScopes(arg1:Record<string, Array<string>>):Promise<Array<string>>;
+
 export function ExportAgentChat(arg1:string,arg2:string):Promise<string>;
 
 export function ExportCollectionDocs(arg1:string):Promise<void>;

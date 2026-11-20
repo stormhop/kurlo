@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -94,6 +95,18 @@ func TestDocsBuildFromYAML(t *testing.T) {
 	after, err := os.ReadFile(path)
 	if err != nil || !bytes.Contains(after, []byte("Private endpoint")) || bytes.Contains(after, []byte("Paid order")) {
 		t.Fatal("rebuild did not replace the site")
+	}
+}
+
+func TestDocsRelativeLinkScopes(t *testing.T) {
+	scopes := (&App{}).DocsRelativeLinkScopes(map[string][]string{
+		"":        {"[guide][manual]\n\n[manual]: ../guide"},
+		"request": {"[external](https://docs.test)", "[query](?page=2)"},
+		"other":   {"[anchor](#next) [host](//docs.test/guide) [mail](mailto:test@example.test)", "`[code](/guide)`", "![image](icon.png)", "[unused]: relative"},
+	})
+	sort.Strings(scopes)
+	if strings.Join(scopes, "|") != "|request" {
+		t.Fatal(scopes)
 	}
 }
 
@@ -304,6 +317,12 @@ func TestReferenceNavigationAndEnvironmentScope(t *testing.T) {
 	}
 	request.Examples[0].Snapshot.Method = "GET"
 	request.Examples[0].Snapshot.URL = "{{baseUrl}}/books?page=1"
+	missing := request.Examples[0]
+	missing.Name = "Missing book"
+	missing.Snapshot.URL = "{{baseUrl}}/books/404"
+	missing.Response = cliExampleResponse{StatusCode: 404, Body: "No matching book"}
+	missing.Notes = "## Missing scenario"
+	request.Examples = append(request.Examples, missing)
 	envs := []cliEnvironment{
 		{ID: "staging", WorkspaceID: "workspace", Name: "Staging", Values: []cliKV{{Key: "shard", Value: "west", Enabled: true}, {Key: "baseUrl", Value: "https://staging.example", Enabled: true}, {Key: "someKey", Value: "private-env-value", Enabled: true, Secret: true}}},
 		{ID: "other-workspace", WorkspaceID: "another", Name: "Private environment"},

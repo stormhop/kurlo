@@ -2,7 +2,7 @@
   import { loadRunKey } from './lib/loadTests';
   import { kurloChangedFiles } from './lib/gitFiles';
   import { onMount, untrack } from 'svelte';
-  import { getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
+  import { docsRelativeLinkScopes, getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
   import type { MockRequestLog, OAuth2DevicePrompt, UpdateInfo } from './lib/backend';
   import { hasReleaseNotes } from 'virtual:kurlo-changelog-meta';
   import { isReleaseVersion, latestReleaseNotes, normalizeVersion, releaseNotesFor, shouldShowWhatsNew, shouldSpotlightAgentMode, type ChangelogSection } from './lib/whatsNew';
@@ -66,14 +66,32 @@
     });
   });
 
-  let docsTarget = $state<{ id: string; workspace: string; epoch: number } | null>(null);
+  let docsTarget = $state.raw<{ id: string; workspace: string; epoch: number; linkScopes: string[] | null } | null>(null);
   const docsCollection = $derived(docsTarget && docsTarget.workspace === vm.activeWorkspaceId && docsTarget.epoch === vm.requestStorePersistEpoch
     ? vm.collections.find(collection => collection.id === docsTarget?.id && collection.workspaceId === vm.activeWorkspaceId)
     : undefined);
 
-  function openDocs(id: string) {
+  async function openDocs(id: string) {
     vm.closeFloatingMenus();
-    docsTarget = { id, workspace: vm.activeWorkspaceId, epoch: vm.requestStorePersistEpoch };
+    const target = { id, workspace: vm.activeWorkspaceId, epoch: vm.requestStorePersistEpoch, linkScopes: null };
+    docsTarget = target;
+    try {
+      await vm.ensureCollectionExamples(id);
+      if (docsTarget !== target || !docsCollection) return;
+      const requests = vm.requestsForStore(vm.requests).filter(request => request.collectionId === id && !request.isDraft);
+      const notes: Record<string, string[]> = Object.create(null);
+      for (const request of requests) {
+        const sources = [request.requestNotes, ...(request.examples ?? []).map(example => example.notes ?? '')].filter(Boolean);
+        if (sources.length) notes[request.id] = sources;
+      }
+      if (docsCollection.description) notes[''] = [docsCollection.description];
+      const linkScopes = Object.keys(notes).length ? await docsRelativeLinkScopes(notes) : [];
+      if (docsTarget === target) docsTarget = { ...target, linkScopes };
+    } catch (error) {
+      if (docsTarget !== target || !docsCollection) return;
+      docsTarget = null;
+      await vm.openAlertDialog('Could not prepare collection documentation', String(error));
+    }
   }
 
   const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
@@ -661,7 +679,7 @@
 
 <AppToasts />
 {#if docsCollection}
-  <CollectionDocsModal collection={docsCollection}
+  <CollectionDocsModal collection={docsCollection} linkScopes={docsTarget?.linkScopes ?? null}
     requests={vm.requests.filter(request => request.collectionId === docsCollection?.id && !request.isDraft)}
     onClose={() => docsTarget = null}
     onGenerate={(ids, linkBaseUrl) => {

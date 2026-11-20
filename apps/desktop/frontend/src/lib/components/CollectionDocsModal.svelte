@@ -7,9 +7,10 @@
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import Select from './Select.svelte';
 
-  let { collection, requests, onGenerate, onClose }: {
+  let { collection, requests, linkScopes, onGenerate, onClose }: {
     collection: Collection;
     requests: SavedRequest[];
+    linkScopes: string[] | null;
     onGenerate: (ids?: string[], linkBaseUrl?: string) => void;
     onClose: () => void;
   } = $props();
@@ -19,9 +20,10 @@
   let folder = $state('');
   let selected = $state<string[]>([]);
   let linkBaseUrl = $state('');
+  const showLinkBase = $derived(linkScopes?.some(id => !id || !selection || checked.has(id)) ?? false);
   const validLinkBase = $derived.by(() => {
     const value = linkBaseUrl.trim();
-    if (!value) return true;
+    if (!showLinkBase || !value) return true;
     if (!/^https?:\/\//i.test(value)) return false;
     try {
       const url = new URL(value);
@@ -122,17 +124,18 @@
           </div>
         </div>
       {/if}
-      <details class="link-settings">
-        <summary>Link settings</summary>
-        <label for="docs-link-base">Documentation URL</label>
-        <input id="docs-link-base" class="field" type="url" bind:value={linkBaseUrl} placeholder="https://docs.example.com" aria-describedby="docs-link-hint" aria-invalid={!validLinkBase} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
-        <small id="docs-link-hint">{validLinkBase ? 'Used to open relative links in documentation.' : 'Enter an HTTP or HTTPS URL without credentials.'}</small>
-      </details>
+      {#if showLinkBase}
+        <div class="link-base">
+          <label for="docs-link-base">Base URL for relative links</label>
+          <input id="docs-link-base" class="field" type="url" bind:value={linkBaseUrl} placeholder="https://docs.example.com" aria-describedby="docs-link-hint" aria-invalid={!validLinkBase} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          <small id="docs-link-hint">{validLinkBase ? 'Optional. Leave empty to keep links relative in the exported HTML.' : 'Enter an HTTP or HTTPS URL without credentials.'}</small>
+        </div>
+      {/if}
     </div>
     <div class="modal-foot">
       <span class="export-hint">Opens in your browser and works offline.</span>
       <button type="button" class="btn btn-ghost" onclick={onClose}>Cancel</button>
-      <button type="button" class="btn btn-primary" disabled={!validLinkBase || (selection && !selected.length)} onclick={() => onGenerate(selection ? selected : undefined, linkBaseUrl.trim() || undefined)}>Generate</button>
+      <button type="button" class="btn btn-primary" disabled={linkScopes === null || !validLinkBase || (selection && !selected.length)} onclick={() => onGenerate(selection ? selected : undefined, (showLinkBase && linkBaseUrl.trim()) || undefined)}>Generate</button>
     </div>
   </div>
 </div>
@@ -193,10 +196,9 @@
   .request-name { display: grid; gap: var(--space-0-5); overflow-wrap: anywhere; font-size: var(--text-label); }
   .request-name small { color: var(--text-2); font-size: var(--text-micro); }
   .choices .empty-state { margin: 0; padding: var(--space-4); }
-  .link-settings { color: var(--text-2); font-size: var(--text-label); }
-  .link-settings summary { cursor: pointer; }
-  .link-settings label, .link-settings small { display: block; margin-top: var(--space-2); }
-  .link-settings .field { width: 100%; margin-top: var(--space-1); }
+  .link-base { color: var(--text-2); font-size: var(--text-label); }
+  .link-base small { display: block; margin-top: var(--space-2); }
+  .link-base .field { width: 100%; margin-top: var(--space-1); }
   .modal-foot { flex-wrap: wrap; border-top: 1px solid var(--border-subtle); }
   .export-hint { margin-right: auto; }
 

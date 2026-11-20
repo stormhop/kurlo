@@ -31,6 +31,9 @@ import (
 //go:embed docsassets/kurlo.png
 var docsIcon []byte
 
+//go:embed docsassets/kurlo-mark.png
+var docsMark []byte
+
 //go:embed docsassets/index.html
 var collectionDocsSource string
 
@@ -47,6 +50,10 @@ var docsScript = docsVariableScript + "\n" + docsReaderScript
 
 var docsMarkdown = goldmark.New(goldmark.WithParserOptions(parser.WithAutoHeadingID()), goldmark.WithExtensions(extension.Table, extension.Strikethrough, extension.TaskList))
 
+func docsImageURL(data []byte) template.URL {
+	return template.URL("data:image/png;base64," + base64.StdEncoding.EncodeToString(data))
+}
+
 var collectionDocsTemplate = template.Must(template.New("docs").Funcs(template.FuncMap{
 	"css":    func() template.CSS { return template.CSS(docsCSS) },
 	"script": func() template.JS { return template.JS(docsScript) },
@@ -54,14 +61,46 @@ var collectionDocsTemplate = template.Must(template.New("docs").Funcs(template.F
 		digest := sha256.Sum256([]byte(strings.ReplaceAll(docsScript, "\r\n", "\n")))
 		return base64.StdEncoding.EncodeToString(digest[:])
 	},
-	"icon": func() template.URL {
-		return template.URL("data:image/png;base64," + base64.StdEncoding.EncodeToString(docsIcon))
-	},
+	"icon":       func() template.URL { return docsImageURL(docsIcon) },
+	"mark":       func() template.URL { return docsImageURL(docsMark) },
 	"variableID": func(name string) string { return "variable-" + base64.RawURLEncoding.EncodeToString([]byte(name)) },
 	"markdown":   renderDocsMarkdown,
 	"bodyHTML":   renderDocsBody,
 	"hasText":    func(s string) bool { return strings.TrimSpace(s) != "" },
 }).Parse(collectionDocsSource))
+
+func docsNeedsLinkBase(destination []byte) bool {
+	if len(destination) == 0 || destination[0] == '#' {
+		return false
+	}
+	target, err := url.Parse(string(destination))
+	return err == nil && !target.IsAbs() && target.Host == ""
+}
+
+func (a *App) DocsRelativeLinkScopes(notes map[string][]string) []string {
+	scopes := []string{}
+	for scope, sources := range notes {
+		for _, source := range sources {
+			if !strings.Contains(source, "[") {
+				continue
+			}
+			document := docsMarkdown.Parser().Parse(text.NewReader([]byte(source)))
+			found := false
+			ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+				if link, ok := node.(*ast.Link); entering && ok && docsNeedsLinkBase(link.Destination) {
+					found = true
+					return ast.WalkStop, nil
+				}
+				return ast.WalkContinue, nil
+			})
+			if found {
+				scopes = append(scopes, scope)
+				break
+			}
+		}
+	}
+	return scopes
+}
 
 func renderDocsMarkdown(scope, source string, base *url.URL) (template.HTML, error) {
 	data := []byte(source)
@@ -97,7 +136,7 @@ func renderDocsMarkdown(scope, source string, base *url.URL) (template.HTML, err
 			switch {
 			case target.Host != "":
 				target.Scheme = "https"
-			case base != nil:
+			case base != nil && docsNeedsLinkBase(link.Destination):
 				target = base.ResolveReference(target)
 			default:
 				continue
@@ -134,8 +173,8 @@ type docsMessage struct {
 }
 
 type docsExample struct {
-	Name, Notes, Status string
-	Request, Response   docsMessage
+	Name, Notes, Status, Curl string
+	Request, Response         docsMessage
 }
 
 type docsProperty struct {
@@ -185,7 +224,10 @@ type docsEndpoint struct {
 	Examples        []docsExample
 }
 
-func docsCurl(message docsMessage) string {
+func (message docsMessage) curl(bodyType string) string {
+	if bodyType == "form" || bodyType == "urlencoded" || bodyType == "binary" {
+		return ""
+	}
 	if message.Address == "" {
 		return ""
 	}
@@ -520,9 +562,7 @@ func collectionDocsEndpoint(req cliSavedRequest, credentials map[string]bool) do
 		ID:   "request-" + base64.RawURLEncoding.EncodeToString([]byte(req.ID)),
 		Name: name, Notes: req.RequestNotes, Message: message,
 	}
-	if req.BodyType != "form" && req.BodyType != "urlencoded" && req.BodyType != "binary" {
-		endpoint.Curl = docsCurl(message)
-	}
+	endpoint.Curl = message.curl(req.BodyType)
 	if method == "AI" {
 		endpoint.AI = aiReference(req)
 		if req.NameAuto || req.Name == "" {
@@ -543,9 +583,11 @@ func collectionDocsExample(example cliExample, credentials map[string]bool) docs
 	}
 	response := docsMessage{Body: docsBody(res.Body, credentials), Media: res.BodyMediaType}
 	response.addRows("Response headers", res.Headers)
+	request := docsRequest(snap.Method, snap.URL, nil, snap.Params, snap.Headers, snap.BodyType, snap.BodyContent, nil, credentials)
 	return docsExample{
+		Curl: request.curl(snap.BodyType),
 		Name: example.Name, Notes: example.Notes, Status: status, Response: response,
-		Request: docsRequest(snap.Method, snap.URL, nil, snap.Params, snap.Headers, snap.BodyType, snap.BodyContent, nil, credentials),
+		Request: request,
 	}
 }
 

@@ -11,10 +11,10 @@
 <body>
 {{template "icons"}}
 <header class="topbar">
-  <a class="brand" href="#overview" aria-label="{{.Name}} overview"><img src="{{icon}}" width="28" height="28" alt=""><strong>{{.Name}}</strong></a>
+  <a class="brand" href="#overview" aria-label="{{.Name}} overview"><img src="{{mark}}" width="28" height="28" alt=""><strong>Kurlo</strong><span class="brand-context">/ &nbsp; API reference</span></a>
   <label class="search control">
     <svg aria-hidden="true"><use href="#i-search"/></svg>
-    <input id="search" type="search" aria-label="Search the reference" placeholder="Search requests, folders, URLs…" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <input id="search" type="search" aria-label="Search the reference" placeholder="Find a request…" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
     <kbd>/</kbd>
   </label>
   <div class="tools">
@@ -26,6 +26,7 @@
 </header>
 <div class="layout">
   <aside id="sidebar"><nav aria-label="Collection contents">
+    <strong class="rail-name">{{.Name}}</strong>
     <a class="navlink" href="#overview"><svg aria-hidden="true"><use href="#i-book"/></svg>Overview</a>
     {{if .Variables}}<a class="navlink" href="#variables"><svg aria-hidden="true"><use href="#i-code"/></svg>Variables <small>{{len .Variables}}</small></a>{{end}}
     {{if .Environments}}<a class="navlink" href="#environments"><svg aria-hidden="true"><use href="#i-globe"/></svg>Environments <small>{{len .Environments}}</small></a>{{end}}
@@ -85,7 +86,7 @@
       </header>
       {{$hasDetails := or .Message.Body .Message.Tables}}
       {{$hasConfig := and .AI (or .AI.Provider .AI.Model .AI.Settings)}}
-      {{$hasMain := or $hasDetails $hasConfig (and (not .AI) (not .Message.Address))}}
+      {{$hasMain := or .Notes (and .Examples .Curl) $hasDetails $hasConfig (and (not .AI) (not .Message.Address))}}
       {{if or .Notes $hasDetails $hasConfig .AI .Curl .Examples}}<div class="section-links" role="navigation" aria-label="On this request">
         {{if .Notes}}<a href="#section-{{$requestID}}-documentation">Documentation</a>{{end}}
         {{if $hasConfig}}<a href="#section-{{$requestID}}-configuration">Configuration</a>{{end}}
@@ -94,9 +95,9 @@
         {{if .AI}}<a href="#section-{{$requestID}}-prompt">Prompt</a>{{end}}
         {{if .Examples}}<a href="#section-{{$requestID}}-examples">Saved examples</a>{{end}}
       </div>{{end}}
-      {{with .Notes}}<section class="description"><h2 data-section id="section-{{$requestID}}-documentation">Documentation</h2><div class="prose">{{markdown $requestID . $.LinkBase}}</div></section>{{end}}
-      {{if or $hasMain .AI .Curl}}<div class="reading-layout {{if and $hasMain (or .AI .Curl)}}with-panel{{end}}">
+      {{if or $hasMain .AI .Curl .Examples}}<div class="reading-layout {{if and $hasMain (or .AI .Curl .Examples)}}with-panel{{end}}">
         {{if $hasMain}}<div class="reading-main">
+          {{with .Notes}}<section class="description"><h2 data-section id="section-{{$requestID}}-documentation">Documentation</h2><div class="prose">{{markdown $requestID . $.LinkBase}}</div></section>{{end}}
           {{if $hasConfig}}{{with .AI}}<section><h2 data-section id="section-{{$requestID}}-configuration">Configuration</h2><dl class="properties">
             {{with .Provider}}<div><dt>Provider</dt><dd>{{.}}</dd></div>{{end}}
             {{with .Model}}<div><dt>Model</dt><dd><code>{{.}}</code></dd></div>{{end}}
@@ -104,42 +105,38 @@
           </dl></section>{{end}}{{end}}
           {{if $hasDetails}}<section><h2 data-section id="section-{{$requestID}}-details">Request details</h2>{{template "details" .Message}}</section>{{end}}
           {{if and (not .AI) (not .Message.Address)}}<div class="empty-state"><svg aria-hidden="true"><use href="#i-link"/></svg><div><strong>Request address missing</strong><p>Set the address in Kurlo and rebuild to include it here.</p></div></div>{{end}}
+          {{if and .Curl .Examples}}{{template "endpoint-curl" .}}{{end}}
         </div>{{end}}
-        {{if or .AI .Curl}}<div class="reading-side">
-          {{with .Curl}}<section class="curl-panel">
-            <div class="snippet">
-              <div class="snippet-head"><h2 data-section id="section-{{$requestID}}-curl">cURL</h2><button class="button control copy" aria-label="Copy cURL"><svg aria-hidden="true"><use href="#i-copy"/></svg>Copy</button></div>
-              <pre data-literal><code>{{.}}</code></pre>
-            </div>
-          </section>{{end}}
+        {{if or .AI .Curl .Examples}}<div class="reading-side">
+          {{if and .Curl (not .Examples)}}{{template "endpoint-curl" .}}{{end}}
           {{with .AI}}<section class="companion prompt-panel"><header><svg aria-hidden="true"><use href="#i-spark"/></svg><h2 data-section id="section-{{$requestID}}-prompt">Prompt</h2></header>
             {{if hasText .System}}<div class="prompt-section"><div class="prompt-label"><h3>System instructions</h3><button class="icon-button control copy" aria-label="Copy system instructions"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div><pre><code>{{.System}}</code></pre></div>{{end}}
             {{if hasText .Prompt}}<div class="prompt-section"><div class="prompt-label"><h3>User message</h3><button class="icon-button control copy" aria-label="Copy user message"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div><pre><code>{{.Prompt}}</code></pre></div>{{else}}<div class="prompt-section empty-prompt"><strong>No user message saved</strong><p>Add a prompt in the AI request editor and rebuild.</p></div>{{end}}
           </section>{{end}}
+          {{if .Examples}}<section class="saved-examples">
+            <header class="examples-head"><h2 data-section id="section-{{$requestID}}-examples">Saved examples</h2>
+              {{if gt (len .Examples) 1}}<select class="control picker example-picker" aria-label="Choose saved example">
+                {{range $i, $ex := .Examples}}<option value="{{$i}}">{{if .Name}}{{.Name}}{{else}}Unnamed example{{end}}{{with .Status}} · {{.}}{{end}}</option>{{end}}
+              </select>{{end}}
+            </header>
+            {{range $i, $ex := .Examples}}<section class="example" data-example="{{$i}}" {{if eq $i 0}}data-current{{end}}>
+              <h3 class="example-title">{{if .Name}}{{.Name}}{{else}}Unnamed example{{end}}</h3>
+              {{with .Notes}}<div class="example-notes prose">{{markdown (printf "%s-example-%d" $requestID $i) . $.LinkBase}}</div>{{end}}
+              {{with .Curl}}<div class="snippet"><div class="snippet-head"><strong>Request · cURL</strong><button class="icon-button control copy" aria-label="Copy example cURL"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div>
+                <pre data-literal><code>{{.}}</code></pre></div>{{end}}
+              {{if or .Request.Address .Request.Body .Request.Tables}}<details class="snapshot" {{if not .Curl}}open{{end}}>
+                <summary>Request snapshot</summary>
+                <div class="example-pane-body">{{template "route" .Request}}{{template "details" .Request}}</div>
+              </details>{{end}}
+              {{if or .Status .Response.Body .Response.Tables .Response.Media}}<section class="example-response">
+                <h3>Response{{with .Status}}<span class="status" data-status="{{.}}">{{.}}</span>{{end}}</h3>
+                {{with .Response}}{{template "body" .}}
+                {{if .Tables}}<details class="snapshot"><summary>Response headers</summary><div class="example-pane-body">{{template "tables" .}}</div></details>{{end}}{{end}}
+              </section>{{end}}
+            </section>{{end}}
+          </section>{{end}}
         </div>{{end}}
       </div>{{end}}
-      {{if .Examples}}<section class="saved-examples">
-        <h2 data-section id="section-{{$requestID}}-examples">Saved examples</h2>
-        <div class="example-list">
-          {{range $i, $ex := .Examples}}<details class="example" {{if eq $i 0}}open{{end}}>
-            <summary><strong>{{.Name}}</strong>{{with .Status}}<span class="status" data-status="{{.}}">{{.}}</span>{{end}}</summary>
-            {{with .Notes}}<div class="example-notes prose">{{markdown (printf "%s-example-%d" $requestID $i) . $.LinkBase}}</div>{{end}}
-            {{$request := .Request}}{{$response := .Response}}
-            {{$hasRequest := or $request.Address $request.Body $request.Tables}}
-            {{$hasResponse := or $response.Body $response.Tables $response.Media}}
-            {{if or $hasRequest $hasResponse}}<div class="example-pair {{if and $hasRequest $hasResponse}}paired{{end}}">
-              {{if $hasRequest}}<details class="snapshot" open>
-                <summary>Request snapshot</summary>
-                <div class="example-pane-body">{{template "route" $request}}{{template "details" $request}}</div>
-              </details>{{end}}
-              {{if $hasResponse}}<section class="example-response">
-                <h3>Response</h3>
-                <div class="example-pane-body">{{template "details" $response}}</div>
-              </section>{{end}}
-            </div>{{end}}
-          </details>{{end}}
-        </div>
-      </section>{{end}}
       <footer class="turn-page">
         {{with .Previous}}<a href="#{{.ID}}"><span>← Previous request</span><strong>{{.Name}}</strong></a>{{else}}<a href="#overview"><span>← Collection</span><strong>{{$.Name}}</strong></a>{{end}}
         {{with .Next}}<a href="#{{.ID}}"><span>Next request →</span><strong>{{.Name}}</strong></a>{{end}}
@@ -182,12 +179,21 @@
 </div>{{end}}
 {{end}}
 
-{{define "details"}}
+{{define "endpoint-curl"}}<section class="curl-panel"><div class="snippet">
+  <div class="snippet-head"><h2 data-section id="section-{{.ID}}-curl">cURL</h2><button class="button control copy" aria-label="Copy cURL"><svg aria-hidden="true"><use href="#i-copy"/></svg>Copy</button></div>
+  <pre data-literal><code>{{.Curl}}</code></pre>
+</div></section>{{end}}
+
+{{define "details"}}{{template "tables" .}}{{template "body" .}}{{end}}
+
+{{define "tables"}}
 {{range .Tables}}{{$desc := .HasDescription}}<h4>{{.Title}}</h4>
 <div class="table-wrap"><table><thead><tr><th>Name</th><th>Value</th>{{if $desc}}<th>Description</th>{{end}}</tr></thead>
 <tbody>{{range .Rows}}<tr><td><code>{{.Key}}</code></td><td><code>{{.Value}}</code></td>{{if $desc}}<td>{{.Description}}</td>{{end}}</tr>{{end}}</tbody></table></div>
 {{end}}
-{{if .Body}}<div class="snippet"><div class="snippet-head"><span>{{if .Media}}{{.Media}}{{else}}Body{{end}}</span><button class="icon-button control copy" aria-label="Copy body"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div><pre><code>{{bodyHTML .Body}}</code></pre></div>
+{{end}}
+
+{{define "body"}}{{if .Body}}<div class="snippet"><div class="snippet-head"><span>{{if .Media}}{{.Media}}{{else}}Body{{end}}</span><button class="icon-button control copy" aria-label="Copy body"><svg aria-hidden="true"><use href="#i-copy"/></svg></button></div><pre><code>{{bodyHTML .Body}}</code></pre></div>
 {{else}}{{with .Media}}<span class="subtitle">{{.}}</span>{{end}}{{end}}
 {{end}}
 

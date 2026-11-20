@@ -26,6 +26,29 @@
     document.querySelectorAll('details.folder, details.directory:not([data-root])').forEach(folder => { folder.open = false; });
   }
 
+  const desktop = matchMedia('(min-width: 761px)');
+  const searchBox = search.closest('label');
+  const positionSearch = () => {
+    if (desktop.matches) navigation.querySelector('.rail-name').after(searchBox);
+    else document.querySelector('.tools').before(searchBox);
+  };
+  positionSearch();
+  desktop.addEventListener('change', positionSearch);
+
+  function selectExample(section, index) {
+    for (const example of section.querySelectorAll('.example')) {
+      example.toggleAttribute('data-current', example.dataset.example === index);
+    }
+    const picker = section.querySelector('.example-picker');
+    if (picker) picker.value = index;
+  }
+
+  document.addEventListener('change', event => {
+    if (event.target.matches('.example-picker')) {
+      selectExample(event.target.closest('.saved-examples'), event.target.value);
+    }
+  });
+
   function revealCurrentLink() {
     const current = navigation.querySelector('[aria-current="page"]');
     if (!current || !navigation.clientHeight) return;
@@ -97,8 +120,9 @@
     const target = document.getElementById(location.hash.slice(1));
     const heading = target?.matches('[data-section], .prose :is(h1,h2,h3,h4,h5,h6), .var-card > h2') ? target : document.querySelector('main > .view:not([hidden]) h1');
     if (heading === target) {
-      const example = heading.closest('details');
-      if (example) example.open = true;
+      const example = heading.closest('.example');
+      if (example) selectExample(example.closest('.saved-examples'), example.dataset.example);
+      for (let detail = heading.closest('details'); detail; detail = detail.parentElement.closest('details')) detail.open = true;
       heading.scrollIntoView();
     }
     if (focusHeading) {
@@ -202,7 +226,7 @@
   let closedDetails;
   window.addEventListener('beforeprint', () => {
     if (closedDetails) return;
-    closedDetails = [...document.querySelectorAll('details:is(.directory, .example, .snapshot, .var-uses, .var-sources):not([open])')];
+    closedDetails = [...document.querySelectorAll('details:is(.directory, .snapshot, .var-uses, .var-sources):not([open])')];
     for (const detail of closedDetails) detail.open = true;
     variables.resetTokens();
   });

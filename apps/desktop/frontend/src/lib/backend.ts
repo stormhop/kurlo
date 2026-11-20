@@ -389,6 +389,12 @@ export type OpenApiSpecFile = { content: string; exists: boolean; path: string; 
 
 const NO_BRIDGE_SPEC: OpenApiSpecFile = { content: '', exists: false, path: '', error: 'OpenAPI sync is only available in the desktop app.' };
 
+export async function docsRelativeLinkScopes(notes: Record<string, string[]>): Promise<string[]> {
+  const app = window.go?.api?.App;
+  if (!app?.DocsRelativeLinkScopes) throw new Error('Building collection documentation requires the desktop app.');
+  return app.DocsRelativeLinkScopes(notes);
+}
+
 export async function exportCollectionDocs(payload: string): Promise<void> {
   const app = window.go?.api?.App;
   if (!app?.ExportCollectionDocs) throw new Error('Building collection documentation requires the desktop app.');

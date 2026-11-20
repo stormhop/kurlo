@@ -26,8 +26,9 @@ test('builds documentation from both collection menus and reports export errors'
   await page.addInitScript(() => {
     const app = (window as unknown as E2EWindow).go.api.App;
     app.LoadRequestExamples = async ids => Object.fromEntries(ids.map(id => [id, [{
-      id: 'found', name: 'Books found', response: { statusCode: 200, body: '["Atlas"]' },
+      id: 'found', name: 'Books found', notes: '[Guide](/guide/books)', response: { statusCode: 200, body: '["Atlas"]' },
     }]]));
+    app.DocsRelativeLinkScopes = async notes => Object.keys(notes).filter(id => notes[id].includes('[Guide](/guide/books)'));
     app.ExportCollectionDocs = async payload => {
       window.__kurloE2E.savedFiles.push({ name: 'docs', path: '', content: payload });
       if (window.__kurloE2E.savedFiles.length === 2) throw new Error('Browser unavailable');
@@ -43,6 +44,8 @@ test('builds documentation from both collection menus and reports export errors'
   await page.getByRole('button', { name: 'Build documentation' }).click();
   const dialog = page.getByRole('dialog', { name: 'Generate documentation' });
   await expect(dialog).toContainText('2 requests · 12 folders');
+  const documentationURL = dialog.getByLabel('Base URL for relative links');
+  await expect(documentationURL).toBeVisible();
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   expect(await page.evaluate(() => window.__kurloE2E.savedFiles.length)).toBe(0);
   await row.hover();
@@ -52,6 +55,7 @@ test('builds documentation from both collection menus and reports export errors'
   await page.keyboard.press('ArrowRight');
   await expect(dialog.getByRole('radio', { name: 'Select requests' })).toBeChecked();
   await expect(dialog.getByRole('button', { name: 'Generate', exact: true })).toBeDisabled();
+  await expect(documentationURL).toHaveCount(0);
   const folderPicker = dialog.getByRole('button', { name: /^Filter by folder/ });
   const folderList = dialog.getByRole('listbox', { name: 'Filter by folder' });
   const folderSearch = dialog.getByRole('searchbox', { name: 'Search Filter by folder' });
@@ -121,10 +125,18 @@ test('builds documentation from both collection menus and reports export errors'
   await expect(dialog).toContainText('1 of 2 selected');
   await dialog.getByRole('heading').click();
   await captureDocsScreenshot(page, 'collection-docs-generate', dialog);
-  await dialog.getByText('Link settings', { exact: true }).click();
-  const documentationURL = dialog.getByLabel('Documentation URL');
   await documentationURL.fill('/docs');
   await expect(dialog.getByRole('button', { name: 'Generate', exact: true })).toBeDisabled();
+  await dialog.getByRole('checkbox', { name: /List books/ }).uncheck();
+  await expect(documentationURL).toHaveCount(0);
+  await folderPicker.click();
+  await dialog.getByRole('option', { name: 'Admin' }).click();
+  await dialog.getByRole('checkbox', { name: /Archive user/ }).check();
+  await expect(dialog.getByRole('button', { name: 'Generate', exact: true })).toBeEnabled();
+  await dialog.getByRole('checkbox', { name: /Archive user/ }).uncheck();
+  await folderPicker.click();
+  await dialog.getByRole('option', { name: 'Catalog' }).click();
+  await dialog.getByRole('checkbox', { name: /List books/ }).check();
   await documentationURL.fill('https://docs.example.test');
   await dialog.getByRole('button', { name: 'Generate', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedFiles.length)).toBe(1);
