@@ -568,6 +568,7 @@ export const uiShellFeature = {
       return;
     }
     const shortcutId = this.shortcutForEvent(e);
+    if (shortcutId === 'send-request' && document.querySelector('[aria-modal="true"]')) return;
     if (shortcutId && this.topView === 'agent' && REQUEST_SCOPED_SHORTCUTS.has(shortcutId)) {
       if (e.key === 'Escape') this.closeFloatingMenus();
       return;

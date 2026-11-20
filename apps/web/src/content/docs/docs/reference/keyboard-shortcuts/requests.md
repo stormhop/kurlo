@@ -22,6 +22,10 @@ title: "Request editor shortcuts"
 | `Cmd/Ctrl 9` | Switch to the last tab, whichever number it is |
 | `Shift Cmd/Ctrl [` / `Shift Cmd/Ctrl ]` | Previous / next tab |
 
+`Cmd/Ctrl Enter` runs the open request. It sends HTTP, MCP and AI requests, runs a GraphQL query, invokes a gRPC method, and connects or disconnects an SSE stream.
+
+For WebSocket and Socket.IO, press the same shortcut to connect. Once connected, press it in the Message editor to send the current message or event. Focus the URL field and press it to disconnect. On macOS the active button shows your configured shortcut when the workspace is wide enough.
+
 `Escape` cancels only while the open request is running; otherwise it closes menus as before. Closing several tabs asks about unsaved changes and drafts one tab at a time, and stops if you cancel.
 
 The `Alt` shortcuts other than the tab ones leave text fields alone, so `AltGr` combinations still type characters such as `€` there.

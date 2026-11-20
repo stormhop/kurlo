@@ -2,6 +2,7 @@
   import BirdSpinner from './BirdSpinner.svelte';
   import { NAME_MAX_LENGTH } from '../constants';
   import { onMount } from 'svelte';
+  import RequestShortcutHint from './RequestShortcutHint.svelte';
   import SaveActions from './SaveActions.svelte';
   import VariableInput from './VariableInput.svelte';
   import { urlGhost, urlGhostCandidates } from '../ghostText';
@@ -21,8 +22,6 @@
     showSave = false,
     saveDirty = false,
     canRevert = false,
-    sendShortcut = '',
-    sendShortcutInline = false,
     onSave = () => {},
     onRevert = () => {},
     requestType,
@@ -60,8 +59,6 @@
     showSave?: boolean;
     saveDirty?: boolean;
     canRevert?: boolean;
-    sendShortcut?: string;
-    sendShortcutInline?: boolean;
     onSave?: () => void;
     onRevert?: () => void;
     requestType: RequestType;
@@ -104,21 +101,11 @@
   let isGRPC = $derived(requestType === 'grpc');
   let isAI = $derived(requestType === 'ai');
   const chosenAiConnection = $derived(vm.aiConnectionId ? aiConnectionsStore.list.find(connection => connection.id === vm.aiConnectionId) ?? null : null);
-  let sseConnected = $derived(sseStatus === 'connected');
-  let sseConnecting = $derived(sseStatus === 'connecting');
-  let showSSEControls = $derived(isSSE || sseConnected || sseConnecting);
-  let isWS = $derived(requestType === 'ws');
-  let wsConnected = $derived(wsStatus === 'connected');
-  let wsConnecting = $derived(wsStatus === 'connecting' || wsStatus === 'reconnecting');
-  let isSIO = $derived(requestType === 'socketio');
-  let sioConnected = $derived(sioStatus === 'connected');
-  let sioConnecting = $derived(sioStatus === 'connecting' || sioStatus === 'reconnecting');
-  let sendBusy = $derived(
-    loading
-    || (isSIO && (sioConnected || sioConnecting))
-    || (isWS && (wsConnected || wsConnecting))
-    || (sseConnected || sseConnecting),
-  );
+  const connectionStatus = $derived(requestType === 'ws' ? wsStatus : requestType === 'socketio' ? sioStatus : sseStatus);
+  const connecting = $derived(connectionStatus === 'connecting' || connectionStatus === 'reconnecting');
+  const connectionActive = $derived(connecting || connectionStatus === 'connected');
+  const showSSEControls = $derived(requestType === 'http' && (isSSE || connectionActive));
+  const sendBusy = $derived(loading || connectionActive);
 
   function sendFromUrl() {
     if (!sendBusy) onSend();
@@ -424,81 +411,36 @@
       </button>
     {/if}
 
-    {#if isGraphQL}
-      <button
-        class="btn-send btn-graphql-query"
-        class:btn-send-cancel={loading}
-        onclick={onSend}
-        type="button"
-      >
-        {#if loading}<BirdSpinner tone="current" />Cancel
-        {:else}
-          Query
-        {/if}
-      </button>
-    {:else if isGRPC}
-      <button
-        class="btn-send btn-graphql-query"
-        class:btn-send-cancel={loading}
-        onclick={onSend}
-        type="button"
-      >
-        {#if loading}<BirdSpinner tone="current" />Cancel
-        {:else}
-          Invoke
-        {/if}
-      </button>
-    {:else if isAI}
+    {#if isGraphQL || isGRPC || isAI}
       <button
         class="btn-send"
+        class:btn-graphql-query={isGraphQL || isGRPC}
         class:btn-send-cancel={loading}
         onclick={onSend}
         type="button"
       >
-        {#if loading}<BirdSpinner tone="current" />Stop
+        {#if loading}
+          <BirdSpinner tone="current" />{isAI ? 'Stop' : 'Cancel'}
         {:else}
-          Send{#if sendShortcut && sendShortcutInline}<kbd class="btn-send-kbd">{sendShortcut}</kbd>{/if}
+          {isGraphQL ? 'Query' : isGRPC ? 'Invoke' : 'Send'}
         {/if}
+        <RequestShortcutHint cancel={loading} />
       </button>
-    {:else if isSIO}
-      {#if sioConnected || sioConnecting}
-        <button class="btn-send btn-ws-disconnect" onclick={onSend} type="button">
-          {#if sioConnecting}
-            <BirdSpinner tone="current" />
-          {:else}
-            <span class="sse-dot-live"></span>
-            Disconnect
-          {/if}
-        </button>
-      {:else}
-        <button class="btn-send btn-ws-connect" onclick={onSend} type="button">Connect</button>
-      {/if}
-    {:else if isWS}
-      {#if wsConnected || wsConnecting}
-        <button class="btn-send btn-ws-disconnect" onclick={onSend} type="button">
-          {#if wsConnecting}
-            <BirdSpinner tone="current" />
-          {:else}
-            <span class="sse-dot-live"></span>
-            Disconnect
-          {/if}
-        </button>
-      {:else}
-        <button class="btn-send btn-ws-connect" onclick={onSend} type="button">Connect</button>
-      {/if}
-    {:else if showSSEControls}
-      {#if sseConnected || sseConnecting}
-        <button class="btn-send btn-sse-disconnect" onclick={onSend} type="button">
-          {#if sseConnecting}
-            <BirdSpinner tone="current" />
-          {:else}
-            <span class="sse-dot-live"></span>
-            Disconnect
-          {/if}
-        </button>
-      {:else}
-        <button class="btn-send btn-sse-connect" onclick={onSend} type="button">Connect</button>
-      {/if}
+    {:else if requestType === 'ws' || requestType === 'socketio' || showSSEControls}
+      <button
+        class="btn-send"
+        class:btn-sse-connect={showSSEControls && !connectionActive}
+        class:btn-sse-disconnect={showSSEControls && connectionActive}
+        class:btn-ws-connect={!showSSEControls && !connectionActive}
+        class:btn-ws-disconnect={!showSSEControls && connectionActive}
+        onclick={onSend}
+        type="button"
+      >
+        {#if connecting}<BirdSpinner tone="current" />
+        {:else if connectionActive}<span class="sse-dot-live"></span>{/if}
+        {connectionActive ? 'Disconnect' : 'Connect'}
+        <RequestShortcutHint />
+      </button>
     {:else}
       <div class="send-split" class:loading onfocusout={closeSendMenuOnFocusOut}>
         <button
@@ -509,8 +451,9 @@
         >
           {#if loading}<BirdSpinner tone="current" />Cancel
           {:else}
-            Send{#if sendShortcut && sendShortcutInline}<kbd class="btn-send-kbd">{sendShortcut}</kbd>{/if}
+            Send
           {/if}
+          <RequestShortcutHint cancel={loading} />
         </button>
         {#if !loading}
           <button

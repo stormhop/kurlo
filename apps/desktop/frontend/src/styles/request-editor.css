@@ -601,11 +601,15 @@
   padding: 0;
   border: none;
   background: none;
-  color: color-mix(in srgb, var(--on-accent) 70%, transparent);
+  color: color-mix(in srgb, currentColor 70%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-micro);
   font-weight: var(--weight-medium);
   line-height: 1rem;
+}
+.workspace:has(.connected-message-editor:focus-within) .btn-ws-disconnect .btn-send-kbd,
+.connected-message-editor:not(:focus-within) .ws-message-send .btn-send-kbd {
+  visibility: hidden;
 }
 @container workspace (max-width: 51.25rem) {
   .btn-send-kbd { display: none; }

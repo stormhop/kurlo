@@ -1,4 +1,4 @@
-import { chooseRequestType, collectionRow } from './support/actions';
+import { chooseRequestType, collectionRow, fillCodeEditor } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -107,6 +107,137 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.locator('body').click({ position: { x: 5, y: 5 } });
     await page.keyboard.press('Control+Shift+W');
     await expect(closeButtons).toHaveCount(0);
+  });
+
+  test('shows the send shortcut on GraphQL Query and runs it from the editor on macOS', async ({ page }) => {
+    await installKurloBridge(page, '', 'darwin/e2e');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'GraphQL Request');
+    await page.getByLabel('Request URL').fill('https://api.kurlo.test/graphql');
+    const query = page.getByRole('button', { name: 'Query', exact: true });
+    await expect(query.locator('kbd')).toHaveText('⌘↵');
+    await expect(query.locator('kbd')).toBeVisible();
+    await query.screenshot({ path: join(tmpdir(), 'kurlo-graphql-query-shortcut.png') });
+    await page.getByTestId('graphql-query-editor').locator('.cm-content').press('Meta+Enter');
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1)?.url)).toBe('https://api.kurlo.test/graphql');
+  });
+
+  for (const scenario of [
+    { type: 'http', action: 'Send', url: 'https://api.kurlo.test/slow?ms=4000', calls: 'sentRequests' },
+    { type: 'grpc', action: 'Invoke', url: 'grpc.kurlo.test:443', calls: 'sentGrpcRequests' },
+    { type: 'mcp', action: 'Send', url: 'https://mcp.kurlo.test/mcp', calls: 'sentMcpRequests' },
+    { type: 'ai', action: 'Send', url: 'https://ai.kurlo.test/v1/chat/completions', calls: 'sentAiRequests' },
+    { type: 'sse', action: 'Connect', url: 'https://api.kurlo.test/events', calls: 'sseConnects' },
+  ] as const) {
+    test(`shows and runs the primary shortcut for ${scenario.type} on macOS`, async ({ page }) => {
+      await installKurloBridge(page, '', 'darwin/e2e', false, {
+        activeId: 'shortcut', openIds: ['shortcut'],
+        requests: [{
+          id: 'shortcut', name: 'Shortcut test', collectionId: '', url: scenario.url,
+          requestType: scenario.type === 'sse' ? 'http' : scenario.type,
+          method: scenario.type === 'sse' ? 'SSE' : 'POST', requestTab: 'body',
+          grpcMethod: 'shop.Inventory/GetItem', bodyContent: '{}',
+          aiModel: 'test-model', aiPrompt: 'Hello', aiProvider: 'openai',
+        }],
+      });
+      await page.setViewportSize({ width: 1600, height: 900 });
+      await page.goto('/');
+      const primary = page.locator('.request-composer .btn-send');
+      await expect(primary).toHaveAccessibleName(scenario.action);
+      await expect(primary.locator('kbd')).toHaveText('⌘↵');
+      await expect(primary.locator('kbd')).toBeVisible();
+      if (scenario.type === 'grpc') {
+        await primary.screenshot({ path: join(tmpdir(), 'kurlo-grpc-invoke-shortcut.png') });
+        await page.getByTestId('grpc-message-editor').locator('.cm-content').press('Meta+Enter');
+      } else {
+        await primary.press('Meta+Enter');
+      }
+      if (scenario.type === 'http') {
+        await expect(primary).toHaveAccessibleName('Cancel');
+        await expect(primary.locator('kbd')).toHaveText('esc');
+        await page.keyboard.press('Escape');
+        await expect(primary).toHaveAccessibleName('Send');
+        await expect(page.getByText('Request canceled')).toBeVisible();
+      } else {
+        await expect.poll(() => page.evaluate(key => window.__kurloE2E[key].length, scenario.calls)).toBe(1);
+      }
+      if (scenario.type === 'sse') {
+        await expect(primary).toHaveAccessibleName('Disconnect');
+        await expect(primary.locator('kbd')).toBeVisible();
+        await primary.press('Meta+Enter');
+        await expect(primary).toHaveAccessibleName('Connect');
+      }
+    });
+  }
+
+  for (const socket of [
+    { type: 'WebSocket Request', editor: 'websocket-message-editor', url: 'wss://ws.kurlo.test/socket' },
+    { type: 'Socket.IO Request', editor: 'socketio-message-editor', url: 'https://io.kurlo.test' },
+  ]) {
+    test(`connects, sends and disconnects ${socket.type} by shortcut on macOS`, async ({ page }) => {
+      await installKurloBridge(page, '', 'darwin/e2e');
+      await page.setViewportSize({ width: 1600, height: 900 });
+      await page.goto('/');
+      await page.getByLabel('New unsaved request').click();
+      await chooseRequestType(page, socket.type);
+      const url = page.getByLabel('Request URL');
+      await url.fill(socket.url);
+      const connect = page.locator('.request-composer .btn-send');
+      const send = page.locator('.ws-message-send');
+      const isWebSocket = socket.type === 'WebSocket Request';
+      if (!isWebSocket) await page.getByPlaceholder('Event name').fill('greeting');
+      await fillCodeEditor(page, socket.editor, '"hello"');
+      await expect(connect).toHaveAccessibleName('Connect');
+      await expect(connect.locator('kbd')).toBeVisible();
+      await expect(send).toBeDisabled();
+      await page.keyboard.press('Meta+Enter');
+      await expect(connect).toHaveAccessibleName('Disconnect');
+      await expect(connect.locator('kbd')).toBeHidden();
+      await expect(send.locator('kbd')).toBeVisible();
+      await expect(send.locator('kbd')).toHaveText('⌘↵');
+      await page.keyboard.press('Meta+Enter');
+      if (isWebSocket) {
+        await expect.poll(() => page.evaluate(() => window.__kurloE2E.webSocketMessages.map(m => m.message.data))).toEqual(['"hello"']);
+        await send.screenshot({ path: join(tmpdir(), 'kurlo-websocket-send-shortcut.png') });
+      } else {
+        await expect.poll(() => page.evaluate(() => window.__kurloE2E.socketIOEmits.map(m => [m.message.eventName, m.message.args]))).toEqual([['greeting', ['"hello"']]]);
+      }
+      await url.focus();
+      await expect(connect.locator('kbd')).toBeVisible();
+      await expect(send.locator('kbd')).toBeHidden();
+      if (isWebSocket) await connect.screenshot({ path: join(tmpdir(), 'kurlo-websocket-disconnect-shortcut.png') });
+      await page.keyboard.press('Meta+Enter');
+      await expect(connect).toHaveAccessibleName('Connect');
+      await expect(send).toBeDisabled();
+    });
+  }
+
+  test('uses the rebound shortcut for both WebSocket actions', async ({ page }) => {
+    await installKurloBridge(page, '', 'darwin/e2e');
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await page.goto('/');
+    await page.getByLabel('New unsaved request').click();
+    await chooseRequestType(page, 'WebSocket Request');
+    await page.getByLabel('Request URL').fill('wss://ws.kurlo.test/socket');
+    await page.getByRole('button', { name: /^Settings/ }).click();
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await settings.getByRole('tab', { name: 'Shortcuts', exact: true }).click();
+    const row = settings.locator('.shortcut-row').filter({ has: page.getByText('Send request', { exact: true }) });
+    await row.locator('.shortcut-combo').click();
+    await page.keyboard.press('Meta+Shift+Enter');
+    const label = await row.locator('.keycaps').getAttribute('aria-label');
+    expect(label).toContain('⇧');
+    await page.keyboard.press('Escape');
+    const connect = page.locator('.request-composer .btn-send');
+    await expect(connect.locator('kbd')).toHaveText(label!);
+    await fillCodeEditor(page, 'websocket-message-editor', 'hello');
+    await page.keyboard.press('Meta+Shift+Enter');
+    await expect(connect).toHaveAccessibleName('Disconnect');
+    await expect(page.locator('.ws-message-send kbd')).toHaveText(label!);
+    await page.keyboard.press('Meta+Shift+Enter');
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.webSocketMessages.map(m => m.message.data))).toEqual(['hello']);
   });
 
   test('lays out the shortcut settings without sideways scrolling and with aligned keycaps', async ({ page }) => {

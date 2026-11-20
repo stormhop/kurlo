@@ -23,7 +23,10 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Fixed
 
+- **Request shortcuts.** Sending from a text or GraphQL editor preserves the document. Modal dialogs block the background send shortcut.
+- **Socket.IO messages.** The event name, acknowledgment and Send button stay together in narrow windows at larger UI scales.
 - **GraphQL schema.** Clearing a schema discards any pending introspection result.
+- On macOS, request buttons show the configured shortcut for sending, invoking, connecting or canceling. In WebSocket and Socket.IO message editors, the send shortcut connects first and sends messages once connected.
 - **k6 request handling.** Load tests now honor request variables and redirect settings, preserve encoded path segments, keep query parameters on URLs with fragments, and send repeated form fields.
 - **k6 data and validation.** Runs preserve large numeric IDs and variable defaults when a data row omits a field. Unreadable or invalid data, unsupported JSON paths, and incompatible extraction patterns produce errors before the run.
 - **Load test edits and results.** Switching tests flushes pending autosave edits. Edits made during a save survive, failed saves can be retried, and running tests lock their editor. Collections with matching test IDs keep separate results, summaries, and reports.

@@ -2,6 +2,7 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
+  import RequestShortcutHint from './RequestShortcutHint.svelte';
   import SavedMessagesMenu from './SavedMessagesMenu.svelte';
   import { bodyPlaceholder } from '../bodyTemplates';
   import { vm } from '../stores/app.svelte';
@@ -16,7 +17,8 @@
     if (vm.shortcutForEvent(event) === 'send-request') {
       event.preventDefault();
       event.stopPropagation();
-      void vm.socketIOEmitCurrentMessage();
+      if (vm.socketIOConnected) void vm.socketIOEmitCurrentMessage();
+      else void vm.runActiveRequest();
     }
   }
 
@@ -45,7 +47,7 @@
   });
 </script>
 
-<div class="sio-message-root" role="presentation" onkeydown={onKeydown}>
+<div class="sio-message-root" class:connected-message-editor={vm.socketIOConnected} role="presentation" onkeydowncapture={onKeydown}>
 
   <div class="sio-body">
 
@@ -159,28 +161,31 @@
           <SavedMessagesMenu connected={vm.socketIOConnected} />
 
 
-          <input
-            class="field field-sm sio-event-name-input"
-            type="text"
-            bind:value={vm.sioEventName}
-            placeholder='Event name'
-            spellcheck="false"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="none"
-          />
-          <label class="check-label sio-ack-label">
-            <input type="checkbox" bind:checked={vm.sioAck} class="check" />
-            Ack
-          </label>
-          <button
-            class="btn btn-primary btn-sm ws-message-send"
-            type="button"
-            disabled={!vm.socketIOConnected}
-            onclick={vm.socketIOEmitCurrentMessage}
-          >
-            Send
-          </button>
+          <div class="sio-event-controls">
+            <input
+              class="field field-sm sio-event-name-input"
+              type="text"
+              bind:value={vm.sioEventName}
+              placeholder='Event name'
+              spellcheck="false"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
+            />
+            <label class="check-label sio-ack-label">
+              <input type="checkbox" bind:checked={vm.sioAck} class="check" />
+              Ack
+            </label>
+            <button
+              class="btn btn-primary btn-sm ws-message-send"
+              type="button"
+              disabled={!vm.socketIOConnected}
+              onclick={vm.socketIOEmitCurrentMessage}
+            >
+              Send
+              {#if vm.socketIOConnected}<RequestShortcutHint />{/if}
+            </button>
+          </div>
         </div>
 
         {#if currentArgIdx >= 0}
@@ -270,6 +275,7 @@
 
   .sio-editor-toolbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--space-1-5);
     padding: var(--space-1) var(--space-2);
@@ -290,8 +296,18 @@
     min-width: 5.625rem;
   }
 
+  .sio-event-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1-5);
+    max-width: 100%;
+    min-width: 0;
+    margin-left: auto;
+  }
+
   .sio-event-name-input {
     width: 12.5rem;
+    min-width: 0;
   }
 
 </style>

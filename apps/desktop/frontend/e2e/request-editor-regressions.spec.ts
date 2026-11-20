@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import type { SavedRequest } from '../src/lib/types/models';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
 
@@ -17,6 +19,57 @@ async function openRequest(page: Page, fields: Partial<SavedRequest> = {}) {
   });
   await page.goto('/');
   await expect(page.locator('.request-composer')).toBeVisible();
+}
+
+test('blocks the send shortcut while Settings is open and restores it on close', async ({ page }) => {
+  await openRequest(page);
+  await page.getByRole('button', { name: /^Settings/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await dialog.getByRole('tab', { name: 'General', exact: true }).press('Meta+Enter');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.getByLabel('Request URL').press('Meta+Enter');
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(1);
+  await expect(page.locator('.response-area')).toContainText('200');
+  expect(await page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(1);
+});
+
+for (const protocol of ['HTTP', 'GraphQL']) {
+  test(`sends twice from the ${protocol} editor without modifying the document`, async ({ page }) => {
+    const isGraphQL = protocol === 'GraphQL';
+    const text = isGraphQL ? query : 'first\nsecond';
+    await openRequest(page, isGraphQL ? graphql : { requestTab: 'body', bodyType: 'text', bodyContent: text });
+    const lines = page.getByTestId(isGraphQL ? 'graphql-query-editor' : 'request-body-editor').locator('.cm-line');
+    await lines.first().click();
+    for (const count of [1, 2]) {
+      await page.keyboard.press('Meta+Enter');
+      await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(count);
+      await expect(page.locator('.request-composer .btn-send')).toHaveAccessibleName(isGraphQL ? 'Query' : 'Send');
+    }
+    expect(await lines.allTextContents()).toEqual(text.split('\n'));
+    const sent = await page.evaluate(() => window.__kurloE2E.sentRequests.map(call => call.body));
+    expect(sent.map(body => isGraphQL ? JSON.parse(body).query : body)).toEqual([text, text]);
+  });
+}
+
+for (const scale of [1.25, 1.5]) {
+  test(`keeps the Socket.IO Send button clickable at ${scale * 100}%`, async ({ page }) => {
+    await page.setViewportSize({ width: 1120, height: 680 });
+    await openRequest(page, { requestType: 'socketio', requestTab: 'body', sioEventName: 'greet' });
+    await page.getByRole('button', { name: 'Connect', exact: true }).click();
+    for (let step = 0; step < (scale === 1.25 ? 2 : 3); step++) await page.keyboard.press('Meta+=');
+    await expect(page.locator('html')).toHaveCSS('font-size', 16 * scale + 'px');
+    await page.screenshot({ path: join(tmpdir(), `kurlo-socketio-send-${scale}.png`), animations: 'disabled' });
+    const send = page.locator('.ws-message-send');
+    await expect.poll(() => send.evaluate(button => {
+      const rect = button.getBoundingClientRect();
+      const y = rect.top + rect.height / 2;
+      return [rect.left + 2, rect.right - 2].every(x => button.contains(document.elementFromPoint(x, y)));
+    })).toBe(true);
+    await send.click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.socketIOEmits.map(call => call.message.eventName))).toEqual(['greet']);
+  });
 }
 
 test('removes all occurrences of an unchecked GraphQL field from the outgoing query', async ({ page }) => {

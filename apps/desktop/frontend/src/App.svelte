@@ -22,7 +22,6 @@
   import RequestBar from './lib/components/RequestBar.svelte';
   import RequestEditorTabs from './lib/components/RequestEditorTabs.svelte';
   import ActivityRail from './lib/components/ActivityRail.svelte';
-  import { shortcutComboLabel, usesMacShortcutGlyphs } from './lib/stores/features/preferences';
   import { agentSidebarMaxWidth, responseRightMinWidth } from './lib/stores/features/uiShell';
   import { rem, toLogicalPx, uiScale } from './lib/uiScale';
   import Sidebar from './lib/components/Sidebar.svelte';
@@ -70,6 +69,12 @@
   const docsCollection = $derived(docsTarget && docsTarget.workspace === vm.activeWorkspaceId && docsTarget.epoch === vm.requestStorePersistEpoch
     ? vm.collections.find(collection => collection.id === docsTarget?.id && collection.workspaceId === vm.activeWorkspaceId)
     : undefined);
+
+  function reserveEditorSendShortcut(event: KeyboardEvent) {
+    if (event.target instanceof Element && event.target.closest('.cm-content') && vm.shortcutForEvent(event) === 'send-request') {
+      event.preventDefault();
+    }
+  }
 
   async function openDocs(id: string) {
     vm.closeFloatingMenus();
@@ -1223,8 +1228,6 @@
         showSave={!vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
         saveDirty={!vm.workspaceBlocked && vm.activeRequestIsDirty}
         canRevert={!vm.workspaceBlocked && vm.activeRequestCanRevert}
-        sendShortcut={shortcutComboLabel(vm.shortcutCombo('send-request'), vm.appRuntime)}
-        sendShortcutInline={usesMacShortcutGlyphs(vm.appRuntime)}
         onSave={vm.saveActiveRequest}
         onRevert={vm.revertActiveRequestChanges}
         requestType={vm.requestType}
@@ -1257,7 +1260,7 @@
       />
 
       <div class="request-split" class:split-right={responseOnRight} bind:clientWidth={requestSplitWidth} style="--request-split: {vm.requestSplitRatio}">
-      <div class="request-editor" style={responseOnRight ? '' : `height: ${rem(vm.requestPanelHeight)}; --request-panel-h: ${rem(vm.requestPanelHeight)}`}>
+      <div class="request-editor" role="presentation" onkeydowncapture={reserveEditorSendShortcut} style={responseOnRight ? '' : `height: ${rem(vm.requestPanelHeight)}; --request-panel-h: ${rem(vm.requestPanelHeight)}`}>
         <RequestEditorTabs
           bind:requestTab={vm.requestTab}
           requestType={vm.requestType}
