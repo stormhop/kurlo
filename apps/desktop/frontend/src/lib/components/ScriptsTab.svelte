@@ -3,7 +3,7 @@
   import { vm } from '../stores/app.svelte';
   import { scriptLineCount } from '../utils';
   import { appendSnippet, preRequestSnippets, testSnippets } from '../scriptSnippets';
-  import CodeEditor from '../CodeEditor.svelte';
+  import ScriptEditor from './ScriptEditor.svelte';
   import AssertionsEditor from './AssertionsEditor.svelte';
   import { assertionsForStore, requestTypeSupportsAssertions } from '../assertions';
 
@@ -46,11 +46,11 @@
         </button>
       {/each}
     </div>
-    <CodeEditor
+    <ScriptEditor
       bind:value={vm.preRequestScriptJs}
-      language="javascript"
+      collection={vm.activeRequestCollection()}
+      requestVariables={vm.requestVars}
       placeholder={'pm.environment.set("baseUrl", "https://api.example.com")'}
-      fillHeight
       testId="pre-request-script-editor"
       ariaLabel="Pre-request script editor"
     />
@@ -71,11 +71,12 @@
         </button>
       {/each}
     </div>
-    <CodeEditor
+    <ScriptEditor
       bind:value={vm.testScriptJs}
-      language="javascript"
+      tests
+      collection={vm.activeRequestCollection()}
+      requestVariables={vm.requestVars}
       placeholder={'pm.test("Status is 200", () => pm.expect(pm.response.code).to.eql(200))'}
-      fillHeight
       testId="test-script-editor"
       ariaLabel="Test script editor"
     />

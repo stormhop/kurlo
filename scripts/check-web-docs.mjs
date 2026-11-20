@@ -390,7 +390,7 @@ function checkScreenshotInventory() {
     'request-websocket.png',
     'response-viewer-search.png',
     'response-viewer-large-body.png',
-    'scripting-pre-request.png',
+    'scripting-pre-request.png', 'script-completion-api.png', 'script-completion-environment.png', 'script-completion-requests.png',
   ];
   for (const name of expected) {
     const path = join(screenshotsRoot, name);

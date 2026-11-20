@@ -1240,6 +1240,68 @@
   font-style: normal;
 }
 
+.cm-tooltip.script-completions,
+.cm-tooltip.script-completions .cm-completionInfo {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--text-code);
+}
+
+.cm-tooltip.cm-tooltip-autocomplete.script-completions > ul {
+  min-width: 11rem;
+  max-height: 14rem;
+  padding: var(--space-1);
+  font-family: var(--font-mono);
+}
+
+.cm-tooltip.cm-tooltip-autocomplete.script-completions > ul > li {
+  padding: var(--space-1) var(--space-2);
+  line-height: var(--leading-normal);
+  border-radius: var(--radius-sm);
+}
+
+.cm-tooltip.cm-tooltip-autocomplete.script-completions > ul > li[aria-selected] {
+  color: var(--text);
+  background: var(--accent-dim);
+}
+
+.script-completions .cm-completionDetail {
+  margin-left: var(--space-3);
+  font: var(--text-caption) var(--font-ui);
+  color: var(--text-2);
+}
+
+.cm-tooltip.script-completions .cm-tooltip.cm-completionInfo {
+  max-width: min(24rem, 80vw);
+  padding: var(--space-3);
+}
+
+.script-completion-hint {
+  display: grid;
+  gap: var(--space-1);
+  line-height: var(--leading-normal);
+}
+
+.script-completion-hint code {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.script-completion-hint code:first-child {
+  font-weight: var(--weight-semibold);
+}
+
+.script-completion-hint span {
+  margin-top: var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-caption);
+  color: var(--text-2);
+}
+
 .script-section {
   display: flex;
   flex-direction: column;

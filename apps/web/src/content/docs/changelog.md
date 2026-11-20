@@ -15,6 +15,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Script editor autocomplete.** Explore the available `pm.*` methods with signatures and examples. Complete variable keys and saved request names in request, folder and collection scripts. The caret moves with the text when deleting characters.
 - **Static collection documentation.** Use **Build documentation** in a collection menu or run `kurlo docs build` to create a self-contained HTML reference with searchable requests, paired request and response examples, and variable previews. Set a base URL when the selected notes contain relative links. See [Build collection documentation](/docs/guides/cli-runner/docs/).
 - **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
 - **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).

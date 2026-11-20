@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from 'svelte';
-  import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { Decoration, EditorView, ViewPlugin, WidgetType, drawSelection, tooltips, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { EditorState, Compartment, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
   import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
   import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
-  import { autocompletion, completionKeymap, completionStatus, closeBrackets, closeBracketsKeymap, type CompletionContext } from '@codemirror/autocomplete';
+  import { autocompletion, completionKeymap, completionStatus, closeBrackets, closeBracketsKeymap, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
   import { forEachDiagnostic, linter, type Diagnostic } from '@codemirror/lint';
   import { tags } from '@lezer/highlight';
   import { selectedLineNumbersForComment } from './editorSelection';
@@ -33,6 +33,7 @@
     testId = '',
     ariaLabel = '',
     variableSuggestions = [],
+    completionSource,
     maxLength = 0,
     onformat,
     validate,
@@ -50,6 +51,7 @@
     testId?: string;
     ariaLabel?: string;
     variableSuggestions?: VariableSuggestion[];
+    completionSource?: CompletionSource;
     maxLength?: number;
     onformat?: () => void;
     validate?: (text: string) => Promise<{ line: number; message: string } | null>;
@@ -80,6 +82,10 @@
       padding: compact ? 'var(--space-2) 0 var(--space-2) var(--space-3)' : 'var(--space-2-5) 0 var(--space-2-5) var(--space-3)',
       caretColor: 'var(--accent)',
       minHeight: fillHeight ? '100%' : minHeight,
+    },
+    '.cm-cursor': { borderLeftColor: 'var(--accent)' },
+    '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
+      backgroundColor: 'color-mix(in srgb, var(--accent) 30%, transparent)',
     },
     '.cm-line': {
       padding: '0 var(--space-3) 0 0',
@@ -278,7 +284,10 @@
         extension = (await import('@codemirror/lang-json')).json();
         break;
       case 'javascript':
-        extension = (await import('@codemirror/lang-javascript')).javascript({ jsx: false, typescript: false });
+        extension = [
+          (await import('@codemirror/lang-javascript')).javascript({ jsx: false, typescript: false }),
+          readonly ? [] : drawSelection(),
+        ];
         break;
       case 'html':
         extension = (await import('@codemirror/lang-html')).html();
@@ -679,7 +688,11 @@
         : [lineNumbers(), foldGutter({ markerDOM: foldMarker }), highlightActiveLineGutter(), highlightActiveLine(), bracketMatching(), closeBrackets()]),
       history(),
       indentOnInput(),
-      autocompletion({ override: [variableCompletionSource] }),
+      ...(completionSource ? [tooltips({ parent: document.body })] : []),
+      autocompletion({
+        override: [context => completionSource ? completionSource(context) : variableCompletionSource(context)],
+        tooltipClass: () => completionSource ? 'script-completions' : '',
+      }),
       commentDecorationPlugin,
       ghostExtension,
       kurloLinter,
@@ -824,6 +837,10 @@
     height: 100%;
     overscroll-behavior: none;
     scrollbar-gutter: stable both-edges;
+  }
+
+  :global(.cm-wrap .cm-scroller:has(> .cm-cursorLayer)) {
+    scrollbar-gutter: stable;
   }
 
   @supports (hanging-punctuation: first) {

@@ -16,4 +16,12 @@ Collection variables set or removed in a pre-request script are available to the
 
 ![Pre-request JavaScript in the request Scripts tab](../../../../assets/screenshots/scripting-pre-request.png)
 
+## Autocomplete
+
+In a request, folder or collection script, type `pm.` to see the available members. Choose one with the arrow keys to see its signature and an example. Press **Enter** to insert it, **Escape** to close the list, or **Ctrl+Space** to reopen it at the cursor. In **Tests**, `pm.response.` also offers response properties and assertions.
+
+![Script completion menu showing an environment method, its signature and an example](../../../../assets/screenshots/script-completion-api.png)
+
+Type the opening quote in `pm.environment.get("` to choose an enabled key from the active environment or its parents. The list shows names only. The other variable scopes offer their own keys. In a shared script, type `pm.info.requestName === "` to choose a saved request from the current collection.
+
 <DocsTopicIndex />

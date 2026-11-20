@@ -14,6 +14,7 @@
   import { defaultPinnedEnvironmentId, normalizeCollectionEnvironmentPins } from '../collectionEnvironments';
   import { isVariableReferenceOnly, type VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
+  import ScriptEditor from './ScriptEditor.svelte';
   import Select from './Select.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import SearchPicker from './SearchPicker.svelte';
@@ -889,12 +890,12 @@
         {:else if collectionSettingsTab === 'script'}
           <div class="script-section collection-script-section">
             <div class="script-head"><span class="script-hint">JavaScript · {isFolder ? 'runs after the collection and parent folder scripts, before each request’s own pre-request script' : 'runs before each request\'s own pre-request script'}</span></div>
-            <CodeEditor bind:value={preRequestScriptJs} language="javascript" placeholder={'pm.variables.set("traceId", "kurlo-001")'} fillHeight />
+            <ScriptEditor bind:value={preRequestScriptJs} {collection} ariaLabel="Pre-request script editor" placeholder={'pm.variables.set("traceId", "kurlo-001")'} />
           </div>
         {:else if collectionSettingsTab === 'tests'}
           <div class="script-section collection-script-section">
             <div class="script-head"><span class="script-hint">JavaScript · {isFolder ? 'runs after each request’s own test script, before the parent folder and collection tests' : 'runs after each request\'s own test script, after the response arrives'}</span></div>
-            <CodeEditor bind:value={testScriptJs} language="javascript" placeholder={'pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} fillHeight />
+            <ScriptEditor bind:value={testScriptJs} {collection} tests ariaLabel="Test script editor" placeholder={'pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} />
           </div>
         {:else if collectionSettingsTab === 'openapi'}
           <OpenApiSyncPanel {collection} {workspaceBlocked} />

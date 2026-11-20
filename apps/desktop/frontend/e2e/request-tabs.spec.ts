@@ -287,3 +287,138 @@ for (const [runtime, shortcut] of [['windows/e2e', 'Control+s'], ['darwin/e2e', 
     await captureDocsScreenshot(page, 'folder-javascript-editor', page.locator('.collection-script-section'));
   });
 }
+
+test('moves the script caret with the deleted character', async ({ page }) => {
+  await start(page);
+  await chooseRequestSection(page, 'Scripts');
+  const editor = page.getByTestId('pre-request-script-editor');
+  const content = editor.locator('.cm-content');
+  await content.click();
+  await page.keyboard.type('pm');
+  await expect(page.getByRole('option', { name: 'pm', exact: true })).toBeVisible();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Backspace');
+  await expect(content).toHaveText('pm');
+  const measurement = await editor.evaluateHandle(root => {
+    const frame = new Promise(resolve => {
+      root.addEventListener('keyup', () => requestAnimationFrame(() => {
+        const line = root.querySelector('.cm-line')!;
+        const text = document.createRange();
+        text.selectNodeContents(line);
+        const caret = root.querySelector('.cm-cursor-primary')?.getBoundingClientRect();
+        resolve({
+          text: line.textContent,
+          aligned: !!caret && Math.abs(caret.left - text.getBoundingClientRect().right) <= 1,
+          nativeCaret: getComputedStyle(line).caretColor,
+        });
+      }), { once: true });
+    });
+    return { frame };
+  });
+  await page.keyboard.press('Backspace');
+  expect(await measurement.evaluate(result => result.frame)).toEqual({
+    text: 'p', aligned: true, nativeCaret: 'rgba(0, 0, 0, 0)',
+  });
+  await measurement.dispose();
+});
+
+test('completes script API members, inherited environment keys and collection request names', async ({ page }) => {
+  const users = { ...collection, name: 'Accounts API' };
+  const saved = (name: string, path: string) => ({
+    ...requests[0], id: path, name, collection: users.name, url: `https://api.example.test/${path}`,
+  });
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [users], activeId: 'users', openIds: ['users'], activeEnvironmentId: 'staging',
+    requests: [saved('List users', 'users'), saved('Get profile', 'profile'), saved('Login', 'login')],
+    environments: [
+      { id: 'base', name: 'Base', workspaceId: collection.workspaceId, values: [
+        { id: 1, enabled: true, key: 'baseUrl', value: 'https://api.example.test' },
+      ] },
+      { id: 'staging', name: 'Staging', workspaceId: collection.workspaceId, parentId: 'base', values: [
+        { id: 2, enabled: true, key: 'apiToken', value: 'private-fixture-value', secret: true },
+        { id: 3, enabled: false, key: 'disabledKey', value: 'unused' },
+      ] },
+    ],
+  });
+  await page.setViewportSize({ width: 1440, height: 850 });
+  await page.goto('/');
+  await chooseRequestSection(page, 'Scripts');
+  const pre = page.getByTestId('pre-request-script-editor').locator('.cm-content');
+  const options = page.getByRole('listbox');
+  const panel = page.locator('.script-completion-hint');
+  await pre.click();
+  await page.keyboard.type('const baseUrl = pm.environment.');
+  await expect(options.getByRole('option')).toHaveCount(4);
+  await pre.press('ArrowDown');
+  await expect(panel).toContainText('pm.environment.get(key): string');
+  await captureDocsScreenshot(page, 'script-completion-api');
+  await pre.press('Enter');
+  await expect(pre).toHaveText('const baseUrl = pm.environment.get');
+  await page.keyboard.type('("');
+  await expect(options.getByRole('option')).toHaveCount(2);
+  await expect(options).toContainText('apiToken');
+  await expect(options).not.toContainText('private-fixture-value');
+  await pre.press('ArrowDown');
+  await expect(panel).toContainText('pm.environment.get("baseUrl")');
+  await captureDocsScreenshot(page, 'script-completion-environment');
+  await pre.press('Enter');
+  await expect(pre).toHaveText('const baseUrl = pm.environment.get("baseUrl")');
+
+  await page.locator('.script-section').getByRole('tab', { name: /^Tests/ }).click();
+  const tests = page.getByTestId('test-script-editor').locator('.cm-content');
+  await tests.click();
+  await page.keyboard.type('if (pm.info.requestName === "');
+  await expect(options.getByRole('option')).toHaveCount(3);
+  await tests.press('ArrowDown');
+  await tests.press('ArrowDown');
+  await expect(panel).toContainText('pm.info.requestName === "Login"');
+  await captureDocsScreenshot(page, 'script-completion-requests');
+  await page.keyboard.type('Lo');
+  await expect(options.getByRole('option')).toHaveCount(1);
+  await tests.press('Enter');
+  await expect(tests).toHaveText('if (pm.info.requestName === "Login")');
+  await tests.fill('pm.response.to.have.st');
+  await tests.press('Control+Space');
+  await expect(options).toContainText('status');
+  await tests.press('Escape');
+  await expect(options).toHaveCount(0);
+});
+
+test('scopes script completion to the open collection and folder and saves the selected member', async ({ page }) => {
+  const other = { ...collection, id: 'other', name: 'Other collection' };
+  await installKurloBridge(page, '', 'windows/e2e', false, {
+    activeId: 'one', openIds: ['one'], collections: [collection, other],
+    requests: [{ ...requests[0], folderPath: ['Auth'] }, { ...requests[1], collectionId: other.id, collection: other.name }],
+  });
+  await page.goto('/');
+  const row = collectionRow(page, collection.name);
+  await row.getByLabel('Collection menu').click();
+  await row.locator('.collection-menu').getByRole('button', { name: 'Settings' }).click();
+  const tabs = page.locator('.collection-tabs');
+  await tabs.getByRole('tab', { name: /^Tests/ }).click();
+  const editor = page.locator('.collection-script-section .cm-content');
+  await editor.click();
+  await page.keyboard.type('pm.info.requestName === "');
+  const options = page.getByRole('listbox').getByRole('option');
+  await expect(options).toHaveCount(1);
+  await expect(options).toContainText('One');
+  await editor.press('Enter');
+  await editor.press('Control+s');
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections[0].defaults?.testScriptJs)).toBe('pm.info.requestName === "One"');
+
+  const folder = folderRow(page, 'Auth');
+  await folder.getByLabel('Folder menu').click();
+  await folder.locator('.folder-menu').getByRole('button', { name: 'Settings' }).click();
+  await tabs.getByRole('tab', { name: /^Script/ }).click();
+  await editor.click();
+  await page.keyboard.type('pm.');
+  await expect(options.filter({ hasText: /^request$/ })).toBeVisible();
+  await expect(options.filter({ hasText: /^response$/ })).toHaveCount(0);
+  await page.keyboard.type('request.auth.parameters().cou');
+  await expect(options).toHaveCount(1);
+  await expect(options).toContainText('count');
+  await editor.press('Enter');
+  await page.keyboard.type('()');
+  await editor.press('Control+s');
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections[0].folderDefaults?.[0].preRequestScriptJs)).toBe('pm.request.auth.parameters().count()');
+});

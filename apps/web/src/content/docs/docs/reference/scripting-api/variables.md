@@ -11,6 +11,10 @@ title: "Variable scopes"
 | `.unset(key)` | Delete a variable |
 | `.clear()` | Clear all variables |
 
+When editing a script, type the opening quote in a variable lookup to browse keys for that scope. Environment suggestions include enabled keys inherited from parent environments.
+
+![Environment key suggestions in a script](../../../../../assets/screenshots/script-completion-environment.png)
+
 They differ in which scope they touch:
 
 | Scope | Reads | Writes |
