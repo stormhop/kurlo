@@ -1,13 +1,24 @@
+import { editBuilder } from '../lib/graphqlBuilder';
 import { once } from 'node:events';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { describe, expect, it } from 'vitest';
 import {
-  buildGraphQLExplorerOperation,
+  graphQLBuilderSchema,
+  DEFAULT_GRAPHQL_QUERY,
   buildGraphQLRequestBody,
   formatGraphQLQuery,
   graphQLSchemaValidationError,
-  graphQLExplorerFields,
 } from '../lib/graphql';
+
+function rootFields(source: string) {
+  const schema = graphQLBuilderSchema(source)!;
+  return schema.types.get(schema.roots.query!)!.fields;
+}
+
+function selectRoot(source: string, name: string) {
+  const field = rootFields(source).find(f => f.name === name)!;
+  return editBuilder({ query: DEFAULT_GRAPHQL_QUERY, variables: '{}', operationName: '' }, graphQLBuilderSchema(source)!, [field]);
+}
 
 async function readBody(req: IncomingMessage) {
   const chunks: Buffer[] = [];
@@ -28,12 +39,12 @@ type Character {
   episode: String
 }`;
 
-    expect(graphQLExplorerFields(schema).map(field => field.name)).toEqual(['hero']);
-    const operation = buildGraphQLExplorerOperation(schema, 'hero');
+    expect(rootFields(schema).map(field => field.name)).toEqual(['hero']);
+    const operation = selectRoot(schema, 'hero');
 
-    expect(operation?.query).toContain('query Hero($episode: String!)');
+    expect(operation?.query).toContain('query Example($episode: String!)');
     expect(operation?.query).toContain('hero(episode: $episode)');
-    expect(operation?.query).toContain('name');
+    expect(operation.query).toContain('__typename');
     expect(JSON.parse(operation?.variables ?? '{}')).toEqual({ episode: '' });
   });
 
@@ -55,13 +66,13 @@ type Character {
   name: String!
 }`;
 
-    const fields = graphQLExplorerFields(schema);
+    const fields = rootFields(schema);
     expect(fields.find(field => field.name === 'hero')?.args).toEqual([
       { name: 'episode', type: 'Episode!', required: true },
       { name: 'at', type: 'DateTime', required: false },
     ]);
-    expect(buildGraphQLExplorerOperation(schema, 'hero')?.query).toContain('query Hero($episode: Episode!)');
-    expect(buildGraphQLExplorerOperation(schema, 'now')?.query).toBe('query Now {\n  now\n}');
+    expect(selectRoot(schema, 'hero')?.query).toContain('query Example($episode: Episode!)');
+    expect(selectRoot(schema, 'now')?.query).toBe('query Example {\n  now\n}');
   });
 
   it('preserves deeply nested introspection type refs', () => {
@@ -114,8 +125,8 @@ type Character {
       },
     });
 
-    expect(graphQLExplorerFields(schema)[0]).toMatchObject({ name: 'users', type: '[User!]!' });
-    expect(buildGraphQLExplorerOperation(schema, 'users')?.query).toContain('query Users($ids: [ID!]!)');
+    expect(rootFields(schema)[0]).toMatchObject({ name: 'users', type: '[User!]!' });
+    expect(selectRoot(schema, 'users')?.query).toContain('query Example($ids: [ID!]!)');
   });
 
   it('reports GraphQL schema response errors instead of treating them as schemas', () => {

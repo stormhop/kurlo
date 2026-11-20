@@ -15,6 +15,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **GraphQL query builder.** Select nested fields from an introspected or imported schema, set arguments and bind typed variables alongside the query editor. The tree tracks repeated selections and supports keyboard resizing.
 - **Script editor autocomplete.** Explore the available `pm.*` methods with signatures and examples. Complete variable keys and saved request names in request, folder and collection scripts. The caret moves with the text when deleting characters.
 - **Static collection documentation.** Use **Build documentation** in a collection menu or run `kurlo docs build` to create a self-contained HTML reference with searchable requests, paired request and response examples, and variable previews. Set a base URL when the selected notes contain relative links. See [Build collection documentation](/docs/guides/cli-runner/docs/).
 - **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
@@ -22,6 +23,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Fixed
 
+- **GraphQL schema.** Clearing a schema discards any pending introspection result.
 - **k6 request handling.** Load tests now honor request variables and redirect settings, preserve encoded path segments, keep query parameters on URLs with fragments, and send repeated form fields.
 - **k6 data and validation.** Runs preserve large numeric IDs and variable defaults when a data row omits a field. Unreadable or invalid data, unsupported JSON paths, and incompatible extraction patterns produce errors before the run.
 - **Load test edits and results.** Switching tests flushes pending autosave edits. Edits made during a save survive, failed saves can be retried, and running tests lock their editor. Collections with matching test IDs keep separate results, summaries, and reports.

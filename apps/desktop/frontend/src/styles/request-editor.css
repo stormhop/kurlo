@@ -1515,6 +1515,93 @@
   margin-left: auto;
 }
 
+.builder-operation,
+.builder-arg,
+.builder-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.builder-operation {
+  padding: var(--space-2) var(--space-3);
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.builder-operation > span,
+.builder-arg small {
+  color: var(--text-3);
+  font: var(--text-caption) var(--font-mono);
+}
+
+.graphql-explorer-list .graphql-explorer-field {
+  min-height: 1.875rem;
+  padding: var(--space-1) var(--space-1-5);
+}
+
+.builder-selected .graphql-field-name {
+  color: var(--text);
+}
+
+.builder-expand,
+.builder-spacer {
+  width: 1rem;
+  flex: none;
+}
+
+.builder-expand svg.open {
+  transform: rotate(90deg);
+}
+
+.builder-label {
+  cursor: pointer;
+}
+
+.builder-label .check {
+  flex: none;
+}
+
+.graphql-field-args {
+  margin-left: calc(var(--space-10) + var(--space-1));
+}
+
+.builder-children {
+  margin-left: var(--space-3);
+  border-left: 1px solid var(--border);
+  padding-left: var(--space-1-5);
+  flex: none;
+}
+
+.builder-args {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  margin: var(--space-1) 0;
+  border-radius: var(--radius-md);
+  background: var(--elevated);
+}
+
+.builder-arg {
+  align-items: flex-end;
+}
+.builder-arg label {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  font: var(--text-label) var(--font-mono);
+}
+.builder-arg .btn {
+  flex: none;
+}
+.builder-message {
+  margin: var(--space-2) var(--space-3);
+  color: var(--text-2);
+  font-size: var(--text-label);
+}
+
 .graphql-column-resizer {
   width: 0.375rem;
   min-width: 0.375rem;

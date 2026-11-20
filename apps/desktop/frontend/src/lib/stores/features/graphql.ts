@@ -6,16 +6,13 @@ import {
   DEFAULT_GRAPHQL_QUERY,
   DEFAULT_GRAPHQL_VARIABLES,
   GRAPHQL_INTROSPECTION_QUERY,
-  buildGraphQLExplorerOperation,
   buildGraphQLRequestBody,
   formatGraphQLQuery,
-  graphQLExplorerFields,
   graphQLSchemaValidationError,
   normalizeGraphQLSchemaText,
   parseGraphQLPayload,
   parseGraphQLVariables,
   serializeGraphQLPayload,
-  type GraphQLExplorerField,
   type GraphQLPayload,
 } from '../../graphql';
 import type { ResolvedProxy } from '../../proxy';
@@ -80,23 +77,6 @@ export const graphqlFeature = {
     } catch (error) {
       return error instanceof Error ? error.message : String(error);
     }
-  },
-
-  get graphQLExplorerFields(): GraphQLExplorerField[] {
-    return graphQLExplorerFields((this as unknown as GraphQLHost).graphqlSchema);
-  },
-
-  applyGraphQLExplorerField(this: GraphQLHost, field: GraphQLExplorerField) {
-    const payload = buildGraphQLExplorerOperation(this.graphqlSchema, field.name);
-    if (!payload) {
-      this.graphqlSchemaStatus = 'Schema does not expose this query field';
-      return;
-    }
-    this.graphqlQuery = payload.query;
-    this.graphqlVariables = payload.variables;
-    this.graphqlOperationName = '';
-    this.requestTab = 'query';
-    this.scheduleActiveRequestPersist();
   },
 
   beautifyGraphQLQuery(this: GraphQLHost) {
@@ -279,6 +259,8 @@ export const graphqlFeature = {
   },
 
   clearGraphQLSchema(this: GraphQLHost) {
+    this.graphqlSchemaOperationToken++;
+    this.graphqlSchemaLoading = false;
     this.graphqlSchema = '';
     this.graphqlSchemaStatus = '';
     this.graphqlSchemaError = '';

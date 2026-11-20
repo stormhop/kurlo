@@ -462,8 +462,6 @@ class AppVM {
   declare graphQLBodyForSend: typeof graphqlFeature.graphQLBodyForSend;
   declare graphQLPayloadFromRequest: typeof graphqlFeature.graphQLPayloadFromRequest;
   declare graphQLPayloadError: typeof graphqlFeature.graphQLPayloadError;
-  declare graphQLExplorerFields: typeof graphqlFeature.graphQLExplorerFields;
-  declare applyGraphQLExplorerField: typeof graphqlFeature.applyGraphQLExplorerField;
   declare beautifyGraphQLQuery: typeof graphqlFeature.beautifyGraphQLQuery;
   declare graphQLPayloadHasContent: typeof graphqlFeature.graphQLPayloadHasContent;
   declare fetchGraphQLSchemaUrl: typeof graphqlFeature.fetchGraphQLSchemaUrl;

@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **GraphQL query builder.** Select nested fields from an introspected or imported schema, set arguments and bind typed variables alongside the query editor. The tree tracks repeated selections and supports keyboard resizing.
 - **Script editor autocomplete.** Explore the available `pm.*` methods with signatures and examples. Complete variable keys and saved request names in request, folder and collection scripts. The caret moves with the text when deleting characters.
 - **Static collection documentation.** Build a self-contained HTML reference with `kurlo docs build`, or choose **Build documentation** from a collection menu to save an HTML file and open it in your browser. Choose all requests or narrow the selection by folder. Hover over a variable to inspect and copy its value for the current request, or turn on **Show vars** to read resolved addresses and bodies. Browse collapsible folders, filter search results by method or protocol, and jump directly to request details, saved examples or AI prompts. Copy a cURL template beside the request details, choose a saved example to read its request and response together, and set a base URL when the selected documentation contains relative links. The reference follows the browser’s color scheme, works offline and supports printing.
 - **Request authentication in JavaScript.** Pre-request and test scripts can read the active auth type and parameters through `pm.request.auth`, including inherited auth.
@@ -16,6 +17,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **GraphQL schema.** Clearing a schema discards any pending introspection result.
 - **k6 request handling.** Load tests now honor request variables and redirect settings, preserve encoded path segments, keep query parameters on URLs with fragments, and send repeated form fields.
 - **k6 data and validation.** Runs preserve large numeric IDs and variable defaults when a data row omits a field. Unreadable or invalid data, unsupported JSON paths, and incompatible extraction patterns produce errors before the run.
 - **Load test edits and results.** Switching tests flushes pending autosave edits. Edits made during a save survive, failed saves can be retried, and running tests lock their editor. Collections with matching test IDs keep separate results, summaries, and reports.
