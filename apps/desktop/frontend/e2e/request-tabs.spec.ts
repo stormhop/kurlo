@@ -322,6 +322,12 @@ test('moves the script caret with the deleted character', async ({ page }) => {
   await measurement.dispose();
 });
 
+async function expectCompletionOptions(page: Page, count: number) {
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveCount(count);
+  const codeMirrorInteractionDelayMs = 75;
+  await page.clock.fastForward(codeMirrorInteractionDelayMs + 1);
+}
+
 test('completes script API members, inherited environment keys and collection request names', async ({ page }) => {
   const users = { ...collection, name: 'Accounts API' };
   const saved = (name: string, path: string) => ({
@@ -341,6 +347,7 @@ test('completes script API members, inherited environment keys and collection re
     ],
   });
   await page.setViewportSize({ width: 1440, height: 850 });
+  await page.clock.install();
   await page.goto('/');
   await chooseRequestSection(page, 'Scripts');
   const pre = page.getByTestId('pre-request-script-editor').locator('.cm-content');
@@ -348,14 +355,14 @@ test('completes script API members, inherited environment keys and collection re
   const panel = page.locator('.script-completion-hint');
   await pre.click();
   await page.keyboard.type('const baseUrl = pm.environment.');
-  await expect(options.getByRole('option')).toHaveCount(4);
+  await expectCompletionOptions(page, 4);
   await pre.press('ArrowDown');
   await expect(panel).toContainText('pm.environment.get(key): string');
   await captureDocsScreenshot(page, 'script-completion-api');
   await pre.press('Enter');
   await expect(pre).toHaveText('const baseUrl = pm.environment.get');
   await page.keyboard.type('("');
-  await expect(options.getByRole('option')).toHaveCount(2);
+  await expectCompletionOptions(page, 2);
   await expect(options).toContainText('apiToken');
   await expect(options).not.toContainText('private-fixture-value');
   await pre.press('ArrowDown');
@@ -368,13 +375,13 @@ test('completes script API members, inherited environment keys and collection re
   const tests = page.getByTestId('test-script-editor').locator('.cm-content');
   await tests.click();
   await page.keyboard.type('if (pm.info.requestName === "');
-  await expect(options.getByRole('option')).toHaveCount(3);
+  await expectCompletionOptions(page, 3);
   await tests.press('ArrowDown');
   await tests.press('ArrowDown');
   await expect(panel).toContainText('pm.info.requestName === "Login"');
   await captureDocsScreenshot(page, 'script-completion-requests');
   await page.keyboard.type('Lo');
-  await expect(options.getByRole('option')).toHaveCount(1);
+  await expectCompletionOptions(page, 1);
   await tests.press('Enter');
   await expect(tests).toHaveText('if (pm.info.requestName === "Login")');
   await tests.fill('pm.response.to.have.st');
@@ -390,6 +397,7 @@ test('scopes script completion to the open collection and folder and saves the s
     activeId: 'one', openIds: ['one'], collections: [collection, other],
     requests: [{ ...requests[0], folderPath: ['Auth'] }, { ...requests[1], collectionId: other.id, collection: other.name }],
   });
+  await page.clock.install();
   await page.goto('/');
   const row = collectionRow(page, collection.name);
   await row.getByLabel('Collection menu').click();
@@ -400,7 +408,7 @@ test('scopes script completion to the open collection and folder and saves the s
   await editor.click();
   await page.keyboard.type('pm.info.requestName === "');
   const options = page.getByRole('listbox').getByRole('option');
-  await expect(options).toHaveCount(1);
+  await expectCompletionOptions(page, 1);
   await expect(options).toContainText('One');
   await editor.press('Enter');
   await editor.press('Control+s');
@@ -415,7 +423,7 @@ test('scopes script completion to the open collection and folder and saves the s
   await expect(options.filter({ hasText: /^request$/ })).toBeVisible();
   await expect(options.filter({ hasText: /^response$/ })).toHaveCount(0);
   await page.keyboard.type('request.auth.parameters().cou');
-  await expect(options).toHaveCount(1);
+  await expectCompletionOptions(page, 1);
   await expect(options).toContainText('count');
   await editor.press('Enter');
   await page.keyboard.type('()');
