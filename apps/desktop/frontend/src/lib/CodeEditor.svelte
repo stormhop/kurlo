@@ -340,7 +340,7 @@
       .map(variable => ({
         label: variable.key,
         type: 'variable',
-        detail: variable.secret ? 'secret' : variableDisplayValue(variable),
+        detail: variable.linked ? variableDisplayValue(variable) : variable.secret ? 'secret' : variableDisplayValue(variable),
         apply: `${variable.key}}}`,
       }));
     const dynamicOptions = DYNAMIC_VARIABLES

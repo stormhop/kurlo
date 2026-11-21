@@ -380,6 +380,7 @@ export const requestSerializationFeature = {
     const auth = req.auth;
     return {
       requestId,
+      workspaceId: this.activeWorkspaceId,
       target: this.resolveTemplate(req.url.trim(), envValues),
       fullMethod: this.resolveTemplate(req.grpcMethod ?? '', envValues),
       message: this.resolveTemplate(req.bodyContent || DEFAULT_GRPC_MESSAGE, envValues),

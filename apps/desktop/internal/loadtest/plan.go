@@ -45,6 +45,7 @@ type Variable struct {
 	Name   string
 	Value  string
 	Secret bool
+	Linked bool
 }
 
 type Plan struct {

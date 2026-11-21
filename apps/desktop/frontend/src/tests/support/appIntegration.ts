@@ -97,6 +97,7 @@ const backend = vi.hoisted(() => {
       }
       return response(404, { error: `Unhandled ${req.method} ${req.url}` }, [{ name: 'handled', passed: false, error: 'No mock route' }]);
     }),
+    preflightCollectionRunner: vi.fn(async (_workspaceId: string, requests: Array<{ requestId: string }>) => requests.map(request => ({ requestId: request.requestId, failures: [] }))),
     sendHttpRequestToFile: vi.fn(async (req: HttpRequest) => ({ response: await backend.sendHttpRequest(req), savedPath: '/tmp/kurlo-response.json' })),
     sendGrpcRequest: vi.fn(async (): Promise<GrpcResponse> => ({
       status: 'OK',

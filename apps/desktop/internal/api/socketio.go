@@ -19,7 +19,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -312,34 +311,34 @@ func (m *socketIOManager) runtimeCallbacks(appCtx context.Context, sessionID str
 
 	batch := newEventBatcher[model.SocketIOMessage](maxBatchSize, batchWindow,
 		func(ev model.SocketIOMessage) {
-			runtime.EventsEmit(appCtx, "sio:event", model.SocketIOPayload{SessionID: sessionID, Event: ev})
+			emitRealtime(appCtx, sessionID, "sio:event", model.SocketIOPayload{SessionID: sessionID, Event: ev})
 		},
 		func(events []model.SocketIOMessage) {
-			runtime.EventsEmit(appCtx, "sio:events", model.SocketIOBatchPayload{SessionID: sessionID, Events: events})
+			emitRealtime(appCtx, sessionID, "sio:events", model.SocketIOBatchPayload{SessionID: sessionID, Events: events})
 		},
 	)
 
 	return socketIOCallbacks{
 		onOpen: func(ev model.SocketIOOpenEvent) {
-			runtime.EventsEmit(appCtx, "sio:open", ev)
+			emitRealtime(appCtx, sessionID, "sio:open", ev)
 		},
 		onEvent: func(ev model.SocketIOMessage) {
 			batch.add(ev)
 		},
 		onClose: func(ev model.SocketIOCloseEvent) {
 			batch.flush()
-			runtime.EventsEmit(appCtx, "sio:close", ev)
+			emitRealtime(appCtx, sessionID, "sio:close", ev)
 		},
 		onError: func(ev model.SocketIOErrorEvent) {
 			batch.flush()
-			runtime.EventsEmit(appCtx, "sio:error", ev)
+			emitRealtime(appCtx, sessionID, "sio:error", ev)
 		},
 		onReconnect: func(ev model.SocketIOReconnectEvent) {
 			batch.flush()
-			runtime.EventsEmit(appCtx, "sio:reconnecting", ev)
+			emitRealtime(appCtx, sessionID, "sio:reconnecting", ev)
 		},
 		onAck: func(ev model.SocketIOAckEvent) {
-			runtime.EventsEmit(appCtx, "sio:ack", ev)
+			emitRealtime(appCtx, sessionID, "sio:ack", ev)
 		},
 	}
 }

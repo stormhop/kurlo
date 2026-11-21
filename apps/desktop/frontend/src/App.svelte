@@ -1095,6 +1095,11 @@
         <lazy.CookieWorkspaceComponent />
       {/if}
 
+    {:else if vm.topView === 'secrets'}
+      {#if lazy.SecretProvidersWorkspaceComponent}
+        <lazy.SecretProvidersWorkspaceComponent />
+      {/if}
+
     {:else if vm.topView === 'environment'}
       {#if lazy.EnvironmentWorkspaceComponent}
       <lazy.EnvironmentWorkspaceComponent
@@ -1106,6 +1111,7 @@
         renameEnvironment={vm.renameEnvironment}
         setEnvironmentProtected={vm.setEnvironmentProtected}
         setEnvironmentSandbox={vm.setEnvironmentSandbox}
+        setEnvironmentSecretSources={vm.setEnvironmentSecretSources}
         setEnvironmentColor={vm.setEnvironmentColor}
         setEnvironmentParent={vm.setEnvironmentParent}
         deleteEnvironment={vm.deleteEnvironment}
@@ -1261,6 +1267,9 @@
         parallel={vm.collectionRunnerParallel}
         concurrency={vm.collectionRunnerConcurrency}
         running={vm.collectionRunnerRunning}
+        preflighting={vm.collectionRunnerPreflighting}
+        preflightFailures={vm.collectionRunnerPreflightFailures}
+        onDismissPreflightFailures={() => (vm.collectionRunnerPreflightFailures = [])}
         results={vm.collectionRunnerResults}
         summary={vm.collectionRunnerSummary}
         lastRunAt={vm.collectionRunnerShowingLastRun ? vm.collectionRunnerFinishedAt : 0}

@@ -363,7 +363,7 @@ export const importExportFeature = {
     if (!this.guardWorkspaceWritable('Importing')) return 0;
     const wsId = this.activeWorkspaceId || this.workspaces[0]?.id; if (!wsId) throw new Error('No workspace available');
     const { postmanV3FromFiles } = await import('../../postmanV3');
-    const { postmanCollectionBundle } = await import('../../postman');
+    const { postmanCollectionBundle, postmanVaultReferences, postmanVaultNotice } = await import('../../postman');
     const imported = postmanV3FromFiles(files, fallbackName);
     if (!imported.collections.length && !imported.variableSets.length) {
       const reason = imported.skipped[0] ? `${imported.skipped[0].path}: ${imported.skipped[0].reason}` : 'no Postman v3 collection found';
@@ -384,6 +384,8 @@ export const importExportFeature = {
     if (environments.length) parts.push(`and ${environments.length} environment${environments.length === 1 ? '' : 's'}`);
     const skipped = imported.skipped.length ? ` · skipped ${imported.skipped.length} unsupported item${imported.skipped.length === 1 ? '' : 's'}` : '';
     this.collectionImportSummary = `${parts.join(' ')}${skipped}`;
+    const vault = postmanVaultReferences([imported.collections.map(collection => collection.payload), imported.variableSets]);
+    if (vault.length) void this.openAlertDialog('Link Postman Vault references to a secret provider', postmanVaultNotice(vault));
     return requestCount;
   },
   async importBrunoOpenCollectionFolder(this: ImportExportHost) {
@@ -479,13 +481,21 @@ export const importExportFeature = {
   },
   async importPostmanPayload(this: ImportExportHost, payload: unknown, fileName: string) {
     const fallbackName = fileName.replace(/\.postman_(collection|environment|globals)$/i, '').replace(/\.json$/i, '');
-    const { postmanCollectionBundle, postmanVariableBundle } = await import('../../postman');
+    const { postmanCollectionBundle, postmanVariableBundle, postmanVaultReferences, postmanVaultNotice } = await import('../../postman');
+    const vault = postmanVaultReferences(payload);
+    const notifyVault = () => { if (vault.length) void this.openAlertDialog('Link Postman Vault references to a secret provider', postmanVaultNotice(vault)); };
     const variables = postmanVariableBundle(payload, fallbackName || 'Postman Environment');
-    if (variables) return this.importPostmanVariableBundle(variables);
+    if (variables) {
+      const count = await this.importPostmanVariableBundle(variables);
+      notifyVault();
+      return count;
+    }
     const wsId = this.activeWorkspaceId || this.workspaces[0]?.id; if (!wsId) throw new Error('No workspace available');
     const collectionId = makeCollection(wsId, fallbackName || 'Postman Collection').id;
     const bundle = postmanCollectionBundle(payload, collectionId, fallbackName || 'Postman Collection');
-    return this.importCollectionBundle({ ...bundle, id: collectionId });
+    const count = await this.importCollectionBundle({ ...bundle, id: collectionId });
+    notifyVault();
+    return count;
   },
   async importPostmanVariableBundle(this: ImportExportHost, bundle: { scope: 'environment' | 'globals'; name: string; values: KVRow[] }) {
     const destination = importDestination(this);

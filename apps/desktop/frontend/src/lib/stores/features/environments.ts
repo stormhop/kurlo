@@ -1,12 +1,13 @@
 import { chooseEnvFileToImport, getEnvironment, setEnvironment } from '../../backend';
 import { makeEnvironment } from '../../normalizers';
 import { mkRow, clampName } from '../../constants';
-import type { Collection, Environment, EnvironmentColor, KVRow, SidebarView, Workspace } from '../../types/models';
+import type { Collection, Environment, EnvironmentColor, KVRow, SecretSource, SidebarView, Workspace } from '../../types/models';
 import { normalizeEnvironmentColor } from '../../environmentColors';
 import { environmentForCollectionEntry, pinnedEnvironments, withoutPinnedEnvironment } from '../../collectionEnvironments';
 import type { VariableSuggestion } from '../../variables';
 import { variableTemplate } from '../../variables';
 import { resolveDynamicVariable } from '../../dynamicVariables';
+import { environmentRowValue, linkedSecretRef, normalizeSecretSources } from '../../linkedSecrets';
 import { changedValues, enabledValues, environmentsForStore, mapEnvironmentBaselines, trackEnvironmentEdit } from '../../manualWorkspaceEdits';
 import {
   addMatrixKey,
@@ -118,7 +119,9 @@ export function mergeEnvironmentRowsWithValues(rows: KVRow[], values: Record<str
     remaining.delete(key);
   }
   for (const [key, value] of remaining) {
-    const source = inherited.get(key)?.row;
+    const inheritedRow = inherited.get(key);
+    if (inheritedRow?.imported) continue;
+    const source = inheritedRow?.row;
     if (source && source.value === value) continue;
     const row = mkRow();
     next.push({ ...row, ...source, id: row.id, key, value, enabled: true });
@@ -134,7 +137,7 @@ export const environmentFeature = {
     const values: Record<string, string> = {};
     const environment = this.environments.find(candidate => candidate.id === environmentId && candidate.workspaceId === this.activeWorkspaceId);
     if (!environment) return values;
-    for (const [key, { row }] of effectiveEnvironmentRows(this.environments, environment.id)) values[key] = row.value;
+    for (const [key, { row }] of effectiveEnvironmentRows(this.environments, environment.id)) values[key] = environmentRowValue(row);
     return values;
   },
   activeEnvironmentValues(this: EnvironmentHost) {
@@ -144,7 +147,7 @@ export const environmentFeature = {
     const environment = this.environments.find(candidate => candidate.id === environmentId && candidate.workspaceId === this.activeWorkspaceId);
     if (!environment) return [];
     return [...effectiveEnvironmentRows(this.environments, environment.id)].map(([key, { row }]) => (
-      { key, value: row.value, description: row.description, secret: row.secret ?? false }
+      { key, value: row.value, description: row.description, secret: (row.secret ?? false) || Boolean(linkedSecretRef(row)), ...(linkedSecretRef(row) ? { linked: linkedSecretRef(row) } : {}) }
     ));
   },
   activeSecretEnvironmentKeys(this: EnvironmentHost) {
@@ -282,6 +285,16 @@ export const environmentFeature = {
       return sandbox ? { ...rest, sandbox: true } : rest;
     });
     await this.persistRequestStore();
+  },
+  async setEnvironmentSecretSources(this: EnvironmentHost, environmentId: string, sources: SecretSource[]) {
+    if (!this.guardWorkspaceWritable('Environment changes')) return false;
+    const next = normalizeSecretSources(sources);
+    this.changeEnvironmentsEverywhere(candidate => {
+      if (candidate.id !== environmentId) return candidate;
+      const { secretSources: _previous, ...rest } = candidate;
+      return next.length ? { ...rest, secretSources: next } : rest;
+    });
+    return this.persistRequestStore();
   },
   async setEnvironmentColor(this: EnvironmentHost, environmentId: string, color: EnvironmentColor | '') {
     if (!this.guardWorkspaceWritable('Environment changes')) return;

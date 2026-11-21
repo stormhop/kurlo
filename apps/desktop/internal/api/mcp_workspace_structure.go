@@ -197,7 +197,7 @@ func mcpUpdateEnvironment(st *mcpStore, environment, patch map[string]any) error
 	}
 	if _, editsValues := patch["values"]; editsValues {
 		for _, row := range mapSlice(environment["values"]) {
-			if boolValue(row["secret"]) {
+			if boolValue(row["secret"]) || row["secretRef"] != nil {
 				return fmt.Errorf("this environment contains secret rows; use set_variable for individual non-secret values")
 			}
 		}
@@ -295,6 +295,9 @@ func mcpEnvironmentValueRows(raw any) ([]any, error) {
 			return nil, fmt.Errorf("environment variable %s is listed twice", key)
 		}
 		seen[key] = true
+		if item["secretRef"] != nil {
+			return nil, fmt.Errorf("%s links to a secret manager; link secrets in Kurlo", key)
+		}
 		if boolValue(item["secret"]) {
 			return nil, fmt.Errorf("%s is a secret; add secret values in Kurlo", key)
 		}

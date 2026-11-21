@@ -26,30 +26,31 @@ var appVersion = "dev"
 const maxTextFileReadSize = 100 * 1024 * 1024
 
 type App struct {
-	performance       performanceMonitor
-	historyStore      *historyResponseStore
-	credentialStore   *gitCredentialStore
-	ctx               context.Context
-	workspacePrefetch workspacePrefetchSlot
-	quit              *quitGate
-	requestMu         sync.Mutex
-	requestSeq        uint64
-	requestCancels    map[string]requestCancel
-	state             *state.Manager
-	cookieJars        *cookieJarRegistry
-	preflightCache    *preflightCache
-	sse               *sseManager
-	ws                *websocketManager
-	sio               *socketIOManager
-	mock              *mockServer
-	cookieSync        *cookieSyncServer
-	binaryBodies      *binaryResponseCache
-	mcpSessions       *mcpSessionRegistry
-	loadRuns          loadRunManager
-	agentOnce         sync.Once
-	agent             *agentRuntime
-	agentEmit         aiEmitter
-	globalsRevision   atomic.Pointer[string]
+	performance        performanceMonitor
+	historyStore       *historyResponseStore
+	credentialStore    *gitCredentialStore
+	ctx                context.Context
+	workspacePrefetch  workspacePrefetchSlot
+	quit               *quitGate
+	requestMu          sync.Mutex
+	requestSeq         uint64
+	requestCancels     map[string]requestCancel
+	state              *state.Manager
+	cookieJars         *cookieJarRegistry
+	preflightCache     *preflightCache
+	sse                *sseManager
+	ws                 *websocketManager
+	sio                *socketIOManager
+	mock               *mockServer
+	cookieSync         *cookieSyncServer
+	binaryBodies       *binaryResponseCache
+	mcpSessions        *mcpSessionRegistry
+	loadRuns           loadRunManager
+	agentOnce          sync.Once
+	agent              *agentRuntime
+	agentEmit          aiEmitter
+	globalsRevision    atomic.Pointer[string]
+	realtimeWorkspaces sync.Map
 }
 
 type SaveRequestStoreResult struct {
@@ -86,6 +87,7 @@ func NewApp() *App {
 
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	linkedSecrets.manager.SetBrowser(a.openAuthorizeURL)
 	a.prefetchWorkspace()
 	go a.watchWorkspaceDisk(ctx)
 	repairStaleBundleInBackground(ctx)
@@ -657,7 +659,13 @@ func (a *App) SendRequest(req model.HttpRequest) model.HttpResponse {
 		cancel()
 		a.unregisterRequestCancel(req.RequestID, seq)
 	}()
-	return a.keepBinaryBodyOutOfTheWindow(req.RequestID, sendRequest(ctx, req, a.state, a.cookieJars, a.preflightCache))
+	linked, failed := a.linkSecretsIntoHTTP(ctx, &req)
+	if failed != nil {
+		return *failed
+	}
+	resp := a.keepBinaryBodyOutOfTheWindow(req.RequestID, sendRequest(ctx, req, a.state, a.cookieJars, a.preflightCache))
+	linked.finish(&resp)
+	return resp
 }
 
 type DownloadResult struct {
@@ -719,6 +727,10 @@ func (a *App) SendRequestToFile(req model.HttpRequest, defaultName string) Downl
 		cancel()
 		a.unregisterRequestCancel(req.RequestID, seq)
 	}()
+	linked, failed := a.linkSecretsIntoHTTP(ctx, &req)
+	if failed != nil {
+		return DownloadResult{Response: *failed}
+	}
 	stagedPath := ""
 	stagedReady := false
 	var stageErr error
@@ -762,6 +774,7 @@ func (a *App) SendRequestToFile(req model.HttpRequest, defaultName string) Downl
 	if stagedPath != "" {
 		defer os.Remove(stagedPath)
 	}
+	linked.finish(&resp)
 	if stageErr != nil {
 		resp.Error = "failed to stage response body: " + stageErr.Error()
 		return DownloadResult{Response: resp}
@@ -882,7 +895,13 @@ func (a *App) SendGrpcRequest(req model.GrpcRequest) model.GrpcResponse {
 		cancel()
 		a.unregisterRequestCancel(req.RequestID, seq)
 	}()
-	return sendGrpcRequest(ctx, req, a.state, a.grpcEventEmitter())
+	linked, err := resolveLinkedSecretsIn(ctx, linkedSecrets, req.WorkspaceID, &req)
+	if err != nil {
+		return model.GrpcResponse{Error: linkedSecretErrorMessage(err)}
+	}
+	resp := sendGrpcRequest(ctx, req, a.state, a.grpcEventEmitter())
+	redactLinkedSecretValues(&resp, linked)
+	return resp
 }
 
 func (a *App) grpcEventEmitter() grpcEventEmitter {
@@ -905,7 +924,13 @@ func (a *App) GrpcDiscover(req model.GrpcRequest) model.GrpcServiceDefinition {
 		ctx, cancel = context.WithTimeout(baseCtx, time.Duration(req.TimeoutMs)*time.Millisecond)
 		defer cancel()
 	}
-	return discoverGrpcServices(ctx, req)
+	linked, err := resolveLinkedSecretsIn(ctx, linkedSecrets, req.WorkspaceID, &req)
+	if err != nil {
+		return model.GrpcServiceDefinition{Error: linkedSecretErrorMessage(err)}
+	}
+	definition := discoverGrpcServices(ctx, req)
+	redactLinkedSecretValues(&definition, linked)
+	return definition
 }
 
 func (a *App) registerRequestCancel(requestID string, cancel context.CancelFunc) uint64 {
@@ -953,10 +978,17 @@ func (a *App) SSEConnect(sessionID string, req model.HttpRequest) {
 	if a.ctx == nil {
 		return
 	}
+	linked, failed := a.linkSecretsIntoHTTP(a.ctx, &req)
+	if failed != nil {
+		runtime.EventsEmit(a.ctx, "sse:error", model.SSEErrorEvent{SessionID: sessionID, Message: failed.Error, Timestamp: time.Now().UnixMilli()})
+		return
+	}
+	rememberRealtimeSecrets(sessionID, linked.values)
 	a.sse.connect(a.ctx, sessionID, req)
 }
 
 func (a *App) SSEDisconnect(sessionID string) {
+	linkedRealtimeValues.Delete(sessionID)
 	a.sse.disconnect(sessionID)
 }
 
@@ -964,14 +996,25 @@ func (a *App) WebSocketConnect(sessionID string, req model.HttpRequest) {
 	if a.ctx == nil {
 		return
 	}
+	linked, failed := a.linkSecretsIntoHTTP(a.ctx, &req)
+	if failed != nil {
+		runtime.EventsEmit(a.ctx, "ws:error", model.WebSocketErrorEvent{SessionID: sessionID, Message: failed.Error, Timestamp: time.Now().UnixMilli()})
+		return
+	}
+	a.realtimeWorkspaces.Store(sessionID, req.WorkspaceID)
+	rememberRealtimeSecrets(sessionID, linked.values)
 	a.ws.connect(a.ctx, sessionID, req)
 }
 
 func (a *App) WebSocketDisconnect(sessionID string) {
+	linkedRealtimeValues.Delete(sessionID)
 	a.ws.disconnect(sessionID)
 }
 
 func (a *App) WebSocketSend(sessionID string, msg model.WebSocketSendMessage) model.WebSocketSendResult {
+	if err := a.linkSecretsIntoRealtime(sessionID, &msg); err != nil {
+		return model.WebSocketSendResult{Error: linkedSecretErrorMessage(err)}
+	}
 	return a.ws.send(sessionID, msg)
 }
 
@@ -979,14 +1022,25 @@ func (a *App) SocketIOConnect(sessionID string, req model.HttpRequest) {
 	if a.ctx == nil {
 		return
 	}
+	linked, failed := a.linkSecretsIntoHTTP(a.ctx, &req)
+	if failed != nil {
+		runtime.EventsEmit(a.ctx, "sio:error", model.SocketIOErrorEvent{SessionID: sessionID, Message: failed.Error, Timestamp: time.Now().UnixMilli()})
+		return
+	}
+	a.realtimeWorkspaces.Store(sessionID, req.WorkspaceID)
+	rememberRealtimeSecrets(sessionID, linked.values)
 	a.sio.connect(a.ctx, sessionID, req)
 }
 
 func (a *App) SocketIODisconnect(sessionID string) {
+	linkedRealtimeValues.Delete(sessionID)
 	a.sio.disconnect(sessionID)
 }
 
 func (a *App) SocketIOEmit(sessionID string, msg model.SocketIOEmitMessage) model.SocketIOEmitResult {
+	if err := a.linkSecretsIntoRealtime(sessionID, &msg); err != nil {
+		return model.SocketIOEmitResult{Error: linkedSecretErrorMessage(err)}
+	}
 	return a.sio.emit(sessionID, msg)
 }
 

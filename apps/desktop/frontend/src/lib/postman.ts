@@ -922,13 +922,42 @@ export function buildPostmanCollection(
   };
 }
 
+const postmanVaultPattern = /\{\{\s*vault:([^{}]+?)\s*\}\}/g;
+
+export function postmanVaultReferences(payload: unknown): string[] {
+  const names = new Set<string>();
+  const visit = (value: unknown, depth: number) => {
+    if (depth > 64) return;
+    if (typeof value === 'string') {
+      if (!value.includes('vault:')) return;
+      for (const match of value.matchAll(postmanVaultPattern)) names.add(match[1].trim());
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, depth + 1);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      for (const item of Object.values(value)) visit(item, depth + 1);
+    }
+  };
+  visit(payload, 0);
+  return [...names].filter(Boolean).sort();
+}
+
+export function postmanVaultNotice(names: string[]) {
+  const shown = names.slice(0, 8).map(name => `{{vault:${name}}}`).join(', ');
+  const more = names.length > 8 ? ` and ${names.length - 8} more` : '';
+  return `This import uses Postman Vault: ${shown}${more}. Kurlo keeps these references as written. To send them, add a variable with the same name to an environment, link it to a secret provider, and change {{vault:name}} to {{name}}.`;
+}
+
 export function buildPostmanEnvironment(env: Environment, includeSecrets = false) {
   return {
     id: env.id,
     name: env.name,
     values: env.values
       .filter(v => v.key)
-      .map(v => ({ key: v.key, value: v.secret && !includeSecrets ? '' : v.value, enabled: v.enabled, type: v.secret ? 'secret' : 'default' })),
+      .map(v => ({ key: v.key, value: v.secretRef || (v.secret && !includeSecrets) ? '' : v.value, enabled: v.enabled, type: v.secret || v.secretRef ? 'secret' : 'default' })),
     _postman_variable_scope: 'environment',
     _postman_exported_at: new Date().toISOString(),
     _postman_exported_using: 'Kurlo',

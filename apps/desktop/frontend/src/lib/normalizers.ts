@@ -26,6 +26,7 @@ import { normalizeCollectionFolderPaths } from './collections';
 import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
 import { normalizeEnvironmentColor } from './environmentColors';
 import { normalizeOpenApiSource } from './openapiSource';
+import { normalizeSecretSources } from './linkedSecrets';
 import { defaultSocketIOArgs, requestBodyDefaultsFor } from './requestBodyDefaults';
 import {
     asText,
@@ -204,7 +205,8 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
 }
 
 export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: string): Environment {
-    const input = sanitizeFields(raw, { strings: [...ENTITY_STRINGS, 'parentId'], booleans: ['protected', 'sandbox'], arrays: ['values'] });
+    const input = sanitizeFields(raw, { strings: [...ENTITY_STRINGS, 'parentId'], booleans: ['protected', 'sandbox'], arrays: ['values', 'secretSources'] });
+    const secretSources = normalizeSecretSources(input.secretSources);
     const id = input.id || newEntityId('environment');
     const parentId = input.parentId?.trim() ?? '';
     const color = normalizeEnvironmentColor(input.color);
@@ -219,6 +221,7 @@ export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: str
         ...(input.sandbox ? { sandbox: true } : {}),
         ...(parentId && parentId !== id ? { parentId } : {}),
         ...(color ? { color } : {}),
+        ...(secretSources.length ? { secretSources } : {}),
     };
 }
 

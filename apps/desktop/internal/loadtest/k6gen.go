@@ -215,7 +215,7 @@ func (g *generator) scan(step int, value string, depth int) {
 			continue
 		}
 		g.seen[name] = true
-		if variable.Secret && !g.options.InlineSecrets {
+		if variable.Secret && (!g.options.InlineSecrets || variable.Linked) {
 			g.secrets = append(g.secrets, name)
 			continue
 		}
@@ -842,6 +842,10 @@ func (g *generator) writeScript(body string) {
 
 	sort.Strings(g.secrets)
 	for _, name := range g.secrets {
+		if g.variables[name].Linked {
+			g.info("%s comes from a secret manager and is not written into the script. Pass it when running: k6 run -e %s=…", name, name)
+			continue
+		}
 		g.info("%s is secret and is not written into the script. Pass it when running: k6 run -e %s=…", name, name)
 	}
 }

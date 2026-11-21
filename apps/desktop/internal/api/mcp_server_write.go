@@ -1098,6 +1098,9 @@ func (s *mcpServer) editSetVariable(st *mcpStore, arguments json.RawMessage) (fu
 	if _, own := rawEnvironmentRow(environment, key); !own {
 		for _, ancestor := range ancestors {
 			if row, ok := rawEnvironmentRow(ancestor, key); ok {
+				if row["secretRef"] != nil {
+					return nil, fmt.Errorf("%s in %s comes from %s and is linked to a secret manager; change it in Kurlo", key, stringValue(environment, "name"), stringValue(ancestor, "name"))
+				}
 				if boolValue(row["secret"]) {
 					return nil, fmt.Errorf("%s in %s comes from %s and is a secret; change it in Kurlo", key, stringValue(environment, "name"), stringValue(ancestor, "name"))
 				}
@@ -1122,6 +1125,9 @@ func (s *mcpServer) editSetVariable(st *mcpStore, arguments json.RawMessage) (fu
 	}
 	previous := ""
 	if target != nil {
+		if target["secretRef"] != nil {
+			return nil, fmt.Errorf("%s in %s is linked to a secret manager; change the link in Kurlo", key, stringValue(environment, "name"))
+		}
 		if boolValue(target["secret"]) {
 			return nil, fmt.Errorf("%s in %s is a secret; change it in Kurlo", key, stringValue(environment, "name"))
 		}

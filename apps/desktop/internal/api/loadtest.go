@@ -7,6 +7,7 @@ import (
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/loadtest"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	secretmgr "github.com/stormhop/kurlo/apps/desktop/internal/secrets"
 )
 
 type loadTestPayload struct {
@@ -71,6 +72,10 @@ func loadTestVariables(payload loadTestPayload) []loadtest.Variable {
 			}
 			if _, exists := byName[name]; !exists {
 				order = append(order, name)
+			}
+			if cliRowLinked(row) {
+				byName[name] = loadtest.Variable{Name: name, Secret: true, Linked: true}
+				continue
 			}
 			byName[name] = loadtest.Variable{Name: name, Value: row.Value, Secret: row.Secret}
 		}
@@ -156,4 +161,47 @@ func loadTestData(workspaceRoot, path string) ([]map[string]string, string) {
 		return nil, err.Error()
 	}
 	return rows, ""
+}
+
+func resolveLoadTestLinkedSecrets(plan *loadtest.Plan, decoded loadTestPayload) error {
+	if decoded.Environment == nil {
+		return nil
+	}
+	rows := map[string]secretmgr.Ref{}
+	for _, row := range decoded.Environment.Values {
+		if ref, ok := secretmgr.RefFromMap(row.SecretRef); ok && row.Enabled && strings.TrimSpace(row.Key) != "" {
+			rows[strings.TrimSpace(row.Key)] = ref
+		}
+	}
+	for _, variable := range plan.Variables {
+		if !variable.Linked {
+			delete(rows, variable.Name)
+		}
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	linked := newAppLinkedSecrets(decoded.Collection.WorkspaceID)
+	for _, request := range decoded.Requests {
+		merged := applyCollectionDefaults(request, &decoded.Collection)
+		linked.onlyFor(&merged)
+	}
+	linked.filtered = true
+	linked.hint = "app"
+	known := map[string]string{}
+	for _, variable := range plan.Variables {
+		if !variable.Linked {
+			known[variable.Name] = variable.Value
+		}
+	}
+	values, err := linked.fetch(decoded.Collection.WorkspaceID, rows, known)
+	if err != nil {
+		return err
+	}
+	for i := range plan.Variables {
+		if value, ok := values[plan.Variables[i].Name]; ok && plan.Variables[i].Linked {
+			plan.Variables[i].Value = value
+		}
+	}
+	return nil
 }

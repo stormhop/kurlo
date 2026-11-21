@@ -15,6 +15,8 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Secret managers.** Link environment variables to Vault, 1Password, AWS Secrets Manager or Parameter Store, Google Secret Manager, Azure Key Vault, Bitwarden, Doppler, Infisical or a command such as `pass`, and browse a provider to pick a secret. Only the reference goes into Git; values are fetched on send and stay in memory. An environment can import every key of a secret as variables. `kurlo run`, load tests and AI agents use linked values too, masked in reports and results. The Collection Runner checks the selected requests before sending any of them and stops on missing or empty secrets. [Secret managers guide](/docs/guides/environments/secret-managers/).
+
 - **File tab.** Edit a request’s YAML with wrapped lines, collapsible sections and protected metadata. Change the name, URL, method or protocol from the address bar and see it update in the YAML. Changing the URL back restores its original YAML. Choose suggested fields and values as you type, preview the save format with Beautify, hover over underlined fields to read validation errors, and review changes made on disk. Editor sections are remembered locally. Generated YAML keeps disabled rows and omits default row fields. [Request file guide](/docs/reference/kurlo-yaml-format/request/).
 
 ### Changed

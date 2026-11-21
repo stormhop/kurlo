@@ -18,6 +18,8 @@ import (
 	"unicode/utf8"
 
 	"gopkg.in/yaml.v3"
+
+	secretmgr "github.com/stormhop/kurlo/apps/desktop/internal/secrets"
 )
 
 const (
@@ -103,6 +105,7 @@ type filesystemWorkspaceFile struct {
 	Workspace       any              `json:"workspace" yaml:"workspace"`
 	CollectionOrder []string         `json:"collectionOrder,omitempty" yaml:"collectionOrder,omitempty"`
 	Cookies         []map[string]any `json:"cookies,omitempty" yaml:"cookies,omitempty"`
+	SecretProviders []map[string]any `json:"secretProviders,omitempty" yaml:"secretProviders,omitempty"`
 }
 
 type filesystemStoreRootFile struct {
@@ -154,6 +157,7 @@ type workspaceFileEntry struct {
 	workspace       map[string]any
 	collectionOrder []string
 	cookies         []map[string]any
+	secretProviders []map[string]any
 }
 
 type invalidWorkspaceFolder struct {
@@ -598,6 +602,7 @@ func writeYAMLWorkspaceStoreContents(root string, workspaces, collections, reque
 			Workspace:       workspace,
 			CollectionOrder: idsFor(collectionsByWorkspace[workspaceID]),
 			Cookies:         workspaceCookies[workspaceID],
+			SecretProviders: readWorkspaceSecretProviders(previousWorkspaceDirs[workspaceID]),
 		}, journal); err != nil {
 			return err
 		}
@@ -1119,6 +1124,7 @@ func loadYAMLWorkspaceStoreWithFixes(root string, secrets map[string]string, def
 		requests = append(requests, childRequests...)
 		environments = append(environments, childEnvironments...)
 		diagnostics = append(diagnostics, childDiagnostics...)
+		diagnostics = append(diagnostics, secretProviderDiagnostics(root, workspaceEntry.path, workspaceID, workspaceEntry.secretProviders, childEnvironments)...)
 	}
 
 	for _, folder := range invalidWorkspaceFolders {
@@ -1346,7 +1352,7 @@ func readYAMLWorkspaceEntriesWithDiagnostics(root string, secrets map[string]str
 		if !ok {
 			sortOrder = len(orderIndex) + index
 		}
-		workspaces = append(workspaces, workspaceFileEntry{order: sortOrder, path: path, workspace: workspace, collectionOrder: doc.CollectionOrder, cookies: doc.Cookies})
+		workspaces = append(workspaces, workspaceFileEntry{order: sortOrder, path: path, workspace: workspace, collectionOrder: doc.CollectionOrder, cookies: doc.Cookies, secretProviders: doc.SecretProviders})
 	}
 	sort.SliceStable(workspaces, func(i, j int) bool {
 		if workspaces[i].order == workspaces[j].order {
@@ -1890,6 +1896,10 @@ func sanitizeEnvironmentsForFilesystem(environments []map[string]any, existingSe
 			for index, rawRow := range rows {
 				row, ok := rawRow.(map[string]any)
 				if !ok || !boolValue(row["secret"]) {
+					continue
+				}
+				if _, linked := secretmgr.RefFromMap(row["secretRef"]); linked {
+					row["value"] = ""
 					continue
 				}
 				rowID := secretRowID(row, index)

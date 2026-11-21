@@ -1,7 +1,8 @@
 package model
 
 type GrpcRequest struct {
-	RequestID string `json:"requestId"`
+	RequestID   string `json:"requestId"`
+	WorkspaceID string `json:"workspaceId,omitempty"`
 
 	Target     string     `json:"target"`
 	FullMethod string     `json:"fullMethod"`

@@ -39,6 +39,8 @@ export function AuthorizeOAuth2Device(arg1:model.AuthConfig):Promise<model.OAuth
 
 export function BranchAgentChat(arg1:string,arg2:string,arg3:number):Promise<model.AgentChat>;
 
+export function BrowseSecretProvider(arg1:string,arg2:string,arg3:string):Promise<api.SecretBrowseResult>;
+
 export function CancelAgentMcpSignIn(arg1:string):Promise<void>;
 
 export function CancelCodexLogin():Promise<void>;
@@ -64,6 +66,8 @@ export function ClearAgentActivity():Promise<model.AgentResult>;
 export function ClearCookies(arg1:string):Promise<Array<model.Cookie>>;
 
 export function ClearHistoryResponses():Promise<string>;
+
+export function ClearSecretCache():Promise<number>;
 
 export function ClearVariables():Promise<void>;
 
@@ -95,6 +99,8 @@ export function DeleteCookie(arg1:string,arg2:model.Cookie):Promise<model.Cookie
 
 export function DeleteOpenAPIBaseSpec(arg1:string):Promise<string>;
 
+export function DeleteSecretProvider(arg1:string,arg2:string):Promise<api.SecretActionResult>;
+
 export function DeleteVariable(arg1:string):Promise<void>;
 
 export function DenyCookieSyncPairing(arg1:string):Promise<model.CookieSyncStatus>;
@@ -114,6 +120,8 @@ export function ExportLoadTestK6(arg1:string,arg2:boolean):Promise<model.K6Expor
 export function ExportLoadTestK6Files(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
 
 export function FetchOAuth2Token(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
+
+export function ForgetSecretProviderCredentials(arg1:string,arg2:string):Promise<api.SecretActionResult>;
 
 export function FormatRequestFileYAML(arg1:string):Promise<api.RequestFileYAMLResult>;
 
@@ -225,6 +233,10 @@ export function LastLoadRun(arg1:string,arg2:string):Promise<model.LoadRunResult
 
 export function ListCookies(arg1:string):Promise<Array<model.Cookie>>;
 
+export function ListSecretImportKeys(arg1:string):Promise<Array<api.SecretImportKeys>>;
+
+export function ListSecretProviders(arg1:string):Promise<api.SecretProvidersResult>;
+
 export function LoadHistoryResponse(arg1:string):Promise<api.HistoryResponseResult>;
 
 export function LoadMockRoutes(arg1:Array<model.MockRequestRef>):Promise<Array<model.MockRoute>>;
@@ -238,6 +250,8 @@ export function LoadRunLog():Promise<Array<string>>;
 export function LoadRunStatus():Promise<model.LoadRunState>;
 
 export function LoadRunSummaryJSON(arg1:string,arg2:string):Promise<string>;
+
+export function LoadSecretImportKeys(arg1:string,arg2:api.SecretImportInput):Promise<api.SecretImportKeysResult>;
 
 export function LoadTestTargets(arg1:string):Promise<Array<string>>;
 
@@ -268,6 +282,8 @@ export function OpenRouterConnectStatus():Promise<model.OpenRouterConnectState>;
 export function OpenWorkspaceRoot(arg1:string):Promise<api.WorkspaceOpenResult>;
 
 export function PerformanceStatus():Promise<model.PerformanceSample>;
+
+export function PreflightCollectionRunner(arg1:string,arg2:Array<api.RunnerSecretCheck>):Promise<Array<api.RunnerSecretCheckResult>>;
 
 export function PreviewJWTBearer(arg1:model.AuthConfig):Promise<model.JWTBearerPreview>;
 
@@ -305,11 +321,15 @@ export function ReplaceRequestStoreWithError(arg1:string):Promise<api.SaveReques
 
 export function RestartApp():Promise<void>;
 
+export function RevealSecretRef(arg1:string,arg2:api.SecretRefInput):Promise<api.SecretRevealResult>;
+
 export function RevealWorkspaceItem(arg1:string,arg2:string):Promise<string>;
 
 export function RevertAgentActivity(arg1:string,arg2:string):Promise<model.AgentActivityEntry>;
 
 export function RevokeCookieSyncPairing():Promise<model.CookieSyncStatus>;
+
+export function RevokeSecretProviderTrust(arg1:string,arg2:string):Promise<api.SecretActionResult>;
 
 export function SSEConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
 
@@ -338,6 +358,8 @@ export function SaveRequestStoreView(arg1:string):Promise<api.SaveRequestStoreRe
 export function SaveRequestStoreWithError(arg1:string):Promise<api.SaveRequestStoreResult>;
 
 export function SaveResponseBody(arg1:string,arg2:string):Promise<api.SaveResponseBodyResult>;
+
+export function SaveSecretProvider(arg1:string,arg2:Record<string, any>):Promise<api.SecretActionResult>;
 
 export function SaveWorkspaceSecrets(arg1:Record<string, string>):Promise<api.WorkspaceOpenResult>;
 
@@ -370,6 +392,8 @@ export function SetDefaultWorkspaceLocation(arg1:string):Promise<api.DefaultWork
 export function SetEnvironment(arg1:Record<string, string>):Promise<void>;
 
 export function SetEnvironmentVar(arg1:string,arg2:string):Promise<void>;
+
+export function SetSecretProviderCredential(arg1:string,arg2:string,arg3:string,arg4:string):Promise<api.SecretActionResult>;
 
 export function SetVariable(arg1:string,arg2:string):Promise<void>;
 
@@ -418,6 +442,12 @@ export function StoredHistoryResponseIDs():Promise<Array<string>>;
 export function TestAgentMcpServer(arg1:model.AgentMcpServer):Promise<model.AgentMcpTestResult>;
 
 export function TestAiConnection(arg1:model.AiConnectionInput):Promise<model.AiConnectionTestResult>;
+
+export function TestSecretProvider(arg1:string,arg2:string):Promise<api.SecretProviderStatus>;
+
+export function TestSecretRef(arg1:string,arg2:api.SecretRefInput):Promise<api.SecretRefTestResult>;
+
+export function TrustSecretProvider(arg1:string,arg2:string):Promise<api.SecretActionResult>;
 
 export function UpsertCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 

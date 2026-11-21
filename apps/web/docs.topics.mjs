@@ -102,6 +102,7 @@ export const DOCS_TOPICS = {
     ['pin', 'Pin an environment to a collection'],
     ['scripts', 'Variables from scripts'],
     ['secrets', 'Secret variables and environment safety'],
+    ['secret-managers', 'Secret managers'],
     ['global', 'Global variables and saving'],
   ],
   '/docs/guides/git-workspaces/': [

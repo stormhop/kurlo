@@ -7,7 +7,7 @@ import type {
   JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   RequestFileYAMLResult, WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
-  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState, RunnerSecretCheck, RunnerSecretCheckResult,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -73,6 +73,12 @@ export async function sendGrpcRequest(req: GrpcRequest): Promise<GrpcResponse> {
     throw new Error('Wails bridge not available');
   }
   return app.SendGrpcRequest(req);
+}
+
+export async function preflightCollectionRunner(workspaceId: string, requests: RunnerSecretCheck[]): Promise<RunnerSecretCheckResult[]> {
+  const app = window.go?.api?.App;
+  if (!app?.PreflightCollectionRunner) throw new Error('Wails bridge not available');
+  return app.PreflightCollectionRunner(workspaceId, requests);
 }
 
 export async function sendAiRequest(req: AiRequest): Promise<AiResponse> {

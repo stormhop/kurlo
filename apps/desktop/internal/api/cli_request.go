@@ -16,7 +16,8 @@ type cliKV struct {
 	FileName    string `json:"fileName"`
 	Secret      bool   `json:"secret"`
 
-	ContentType string `json:"contentType"`
+	ContentType string         `json:"contentType"`
+	SecretRef   map[string]any `json:"secretRef,omitempty"`
 	bareQuery   bool
 }
 
@@ -254,6 +255,7 @@ type cliEnvironment struct {
 	ParentID    string  `json:"parentId"`
 	Parent      string  `json:"-"`
 	Values      []cliKV `json:"values"`
+	Sources     []any   `json:"secretSources,omitempty"`
 }
 
 func decodeMaps[T any](maps []map[string]any) ([]T, error) {

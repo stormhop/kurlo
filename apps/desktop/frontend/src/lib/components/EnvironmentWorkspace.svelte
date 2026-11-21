@@ -9,6 +9,13 @@
   import { rowHasContent } from '../utils';
   import type { Environment, EnvironmentColor, KVRow } from '../types/models';
   import { ENVIRONMENT_COLORS, environmentColorVar } from '../environmentColors';
+  import SecretRefChip from './SecretRefChip.svelte';
+  import SecretLinkPopover from './SecretLinkPopover.svelte';
+  import { linkedSecretRef } from '../linkedSecrets';
+  import { ensureSecretProvidersChecked, loadSecretProviders, secretProviders } from '../stores/secretProviders.svelte';
+  import { secretProviderState } from '../secretProviderTypes';
+  import type { SecretRef, SecretSource } from '../types/models';
+  import SecretSourcesSection from './SecretSourcesSection.svelte';
 
   let {
     activeEnvironment,
@@ -19,6 +26,7 @@
     renameEnvironment,
     setEnvironmentProtected = () => {},
     setEnvironmentSandbox = () => {},
+    setEnvironmentSecretSources = () => {},
     setEnvironmentColor = () => {},
     setEnvironmentParent = () => {},
     deleteEnvironment,
@@ -47,6 +55,7 @@
     renameEnvironment: (environmentId: string, name: string) => void | Promise<void>;
     setEnvironmentProtected?: (environmentId: string, isProtected: boolean) => void;
     setEnvironmentSandbox?: (environmentId: string, sandbox: boolean) => void;
+    setEnvironmentSecretSources?: (environmentId: string, sources: SecretSource[]) => void | Promise<unknown>;
     setEnvironmentColor?: (environmentId: string, color: EnvironmentColor | '') => void;
     setEnvironmentParent?: (environmentId: string, parentId: string) => void;
     deleteEnvironment: (environmentId: string) => void;
@@ -221,6 +230,46 @@
     return `${start}-${end} of ${total}`;
   }
 
+  let linkTarget = $state<{ rowId: number; index: number; anchor: DOMRect } | null>(null);
+  const linkRow = $derived(linkTarget && activeEnvironment ? activeEnvironment.values[linkTarget.index] : undefined);
+
+  $effect(() => {
+    const workspaceId = activeEnvironment?.workspaceId ?? '';
+    const linked = (activeEnvironment?.values ?? []).some(row => linkedSecretRef(row));
+    if (workspaceId && linked) void ensureSecretProvidersChecked(workspaceId);
+  });
+
+  function openLink(event: MouseEvent, index: number, rowId: number) {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) return;
+    if (activeEnvironment) void loadSecretProviders(activeEnvironment.workspaceId);
+    linkTarget = { rowId, index, anchor: target.getBoundingClientRect() };
+  }
+
+  function linkVariable(ref: SecretRef) {
+    if (!activeEnvironment || !linkTarget) return;
+    updateEnvironmentRow(activeEnvironment.id, linkTarget.index, { secretRef: ref, secret: true, value: '' });
+    linkTarget = null;
+    void Promise.resolve(saveEnvironment()).then(() => loadSecretProviders(activeEnvironment?.workspaceId ?? ''));
+  }
+
+  function unlinkVariable() {
+    if (!activeEnvironment || !linkTarget) return;
+    updateEnvironmentRow(activeEnvironment.id, linkTarget.index, { secretRef: undefined, value: '' });
+    linkTarget = null;
+    void Promise.resolve(saveEnvironment()).then(() => loadSecretProviders(activeEnvironment?.workspaceId ?? ''));
+  }
+
+  function chipTone(ref: SecretRef): 'ok' | 'error' | 'untrusted' | 'loading' {
+    const provider = secretProviders.providers.find(item => item.id === ref.provider);
+    if (!provider) return secretProviders.loaded ? 'error' : 'loading';
+    const state = secretProviderState(provider, secretProviders.statuses[provider.id]);
+    if (state === 'untrusted') return 'untrusted';
+    if (state === 'checking') return 'loading';
+    if (state === 'signin' || state === 'nocli' || state === 'error' || state === 'invalid') return 'error';
+    return 'ok';
+  }
+
   function inputValue(event: Event): string {
     const target = event.currentTarget;
     return target instanceof HTMLInputElement ? target.value : '';
@@ -344,19 +393,32 @@
       {#each visibleEnvironmentRows as item (item.row.id)}
         {@const row = item.row}
         {@const i = item.index}
+        {@const linkedRef = linkedSecretRef(row)}
         <div class="kv-row env-kv-row" data-testid="environment-variable-row" class:inactive-row={!row.enabled && (row.key || row.value || row.description)}>
           <input type="checkbox" class="check" checked={row.enabled} onchange={(event) => updateEnvironmentRow(activeEnvironment.id, i, { enabled: inputChecked(event) })} aria-label="Enable variable" disabled={!row.key && !row.value} />
           <input class="field field-bare kv-input" value={row.key} placeholder="Add variable" aria-label="Environment variable key" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { key: inputValue(event) })} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
-          <button
-            class="env-type-toggle"
-            class:secret={row.secret}
-            type="button"
-            onclick={() => updateEnvironmentRow(activeEnvironment.id, i, { secret: !row.secret })}
-            disabled={!row.key && !row.value}
-          >
-            {row.secret ? 'Secret' : 'Default'}
-          </button>
-          <input class="field field-bare kv-input" type={row.secret ? 'password' : 'text'} value={row.value} placeholder="Value" aria-label="Environment variable value" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { value: inputValue(event) })} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+          {#if linkedRef}
+            <span class="env-type-linked"><MenuIcon name="key" />Linked</span>
+            <span class="secret-link-cell">
+              <SecretRefChip secretRef={linkedRef} tone={chipTone(linkedRef)} onclick={(event) => openLink(event, i, row.id)} />
+            </span>
+          {:else}
+            <button
+              class="env-type-toggle"
+              class:secret={row.secret}
+              type="button"
+              onclick={() => updateEnvironmentRow(activeEnvironment.id, i, { secret: !row.secret })}
+              disabled={!row.key && !row.value}
+            >
+              {row.secret ? 'Secret' : 'Default'}
+            </button>
+            <span class="secret-link-cell">
+              <input class="field field-bare kv-input" type={row.secret ? 'password' : 'text'} value={row.value} placeholder="Value" aria-label="Environment variable value" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { value: inputValue(event) })} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
+              {#if row.key.trim()}
+                <button class="btn btn-ghost btn-icon btn-sm secret-link-button" type="button" aria-label={`Link ${row.key} to a secret manager`} title="Link to secret manager" aria-haspopup="dialog" aria-expanded={linkTarget?.rowId === row.id} onclick={(event) => openLink(event, i, row.id)}><MenuIcon name="link" /></button>
+              {/if}
+            </span>
+          {/if}
           <input class="field field-bare kv-input kv-desc" value={row.description} placeholder="Description" aria-label="Environment variable description" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { description: inputValue(event) })} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
           <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeEnvironmentRow(activeEnvironment.id, i)} aria-label="Remove variable">✕</button>
         </div>
@@ -370,6 +432,17 @@
             <button class="btn btn-secondary btn-sm" type="button" onclick={() => (valuePage = Math.min(valuePageCount - 1, valuePage + 1))} disabled={valuePage + 1 >= valuePageCount}>Next</button>
           </div>
         </div>
+      {/if}
+      {#if linkTarget && linkRow}
+        <SecretLinkPopover
+          variableKey={linkRow.key}
+          current={linkedSecretRef(linkRow)}
+          workspaceId={activeEnvironment.workspaceId}
+          anchor={linkTarget.anchor}
+          onLink={linkVariable}
+          onUnlink={unlinkVariable}
+          onClose={() => (linkTarget = null)}
+        />
       {/if}
       {#if inheritedRows.length}
         <div class="env-inherited-head">Inherited</div>
@@ -392,6 +465,7 @@
         {/each}
       {/if}
     </div>
+    <SecretSourcesSection environment={activeEnvironment} {environments} onChange={sources => setEnvironmentSecretSources(activeEnvironment.id, sources)} />
   {:else}
     <div class="empty-state environment-empty-main">
       <span class="empty-state-title">No environment selected</span>

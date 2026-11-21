@@ -117,6 +117,9 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	}
 	var decoded loadTestPayload
 	_ = json.Unmarshal([]byte(payload), &decoded)
+	if err := resolveLoadTestLinkedSecrets(&plan, decoded); err != nil {
+		return model.LoadRunState{Error: err.Error()}
+	}
 	return a.startLoadPlan(plan, decoded, k6Path)
 }
 

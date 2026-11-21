@@ -475,6 +475,7 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         if (lifetime > 0) claims = { iat: now, exp: now + lifetime, ...claims };
         return { token: `${encode({ alg: cfg.jwtAlgorithm || 'HS256', typ: 'JWT' })}.${encode(claims)}.c2lnbmF0dXJl` };
       },
+      PreflightCollectionRunner: async (_workspaceId, requests) => requests.map(request => ({ requestId: request.requestId, failures: [] })),
       SendRequest: async (sent) => {
         const req = materializeTemplates(sent);
         state.sentRequests.push(clone(req));

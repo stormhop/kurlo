@@ -29,6 +29,7 @@
   import { environmentColorVar } from '../environmentColors';
   import { fileManagerLabel } from '../utils';
   import RecentlyDeleted from './RecentlyDeleted.svelte';
+  import SecretProvidersSidebar from './SecretProvidersSidebar.svelte';
   import type { LoadRunResult, LoadTest } from '../wire';
 
   import { canReorderRequests, type DropPlacement } from '../collections';
@@ -1315,6 +1316,7 @@
           <button class="btn btn-secondary" type="button" onclick={createEnvironment} disabled={workspaceBlocked}>Create environment</button>
         </div>
       {/if}
+      <SecretProvidersSidebar {workspaceBlocked} active={topView === 'secrets'} />
     </div>
   {/if}
 </aside>

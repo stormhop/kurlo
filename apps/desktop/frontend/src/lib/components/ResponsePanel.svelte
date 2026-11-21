@@ -1,5 +1,6 @@
 <script lang="ts">
   import ScriptResults from './ScriptResults.svelte';
+  import LinkedSecretFailurePanel from './LinkedSecretFailurePanel.svelte';
   import { scriptProblemCount } from '../scriptLogs';
   import { untrack } from 'svelte';
   import { vm } from '../stores/app.svelte';
@@ -204,6 +205,10 @@
       {#if waitingSeconds >= 1}<span class="response-placeholder-hint response-waiting-time">{waitingSeconds.toFixed(1)} s</span>{/if}
     </div>
 
+  {:else if response?.linkedSecretFailures?.length}
+    <div class="secret-failure-host">
+      <LinkedSecretFailurePanel failures={response.linkedSecretFailures} onRetry={() => vm.runActiveRequest()} />
+    </div>
   {:else if requestError}
     <div class="response-placeholder error" class:has-script-output={hasScriptOutput} role="textbox" aria-readonly="true" tabindex="0">
       <div class="request-error-shell">

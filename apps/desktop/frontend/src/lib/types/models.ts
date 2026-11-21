@@ -149,7 +149,8 @@ export type ShortcutId =
   | 'new-collection' | 'import-collection' | 'collection-runner' | 'toggle-response-layout' | 'toggle-performance-dock';
 
 export type ShortcutDefinition = { id: ShortcutId; group: string; label: string; defaultCombo: string };
-export type KVRow = { id: number; enabled: boolean; key: string; value: string; description: string; isFile?: boolean; fileName?: string; contentType?: string; secret?: boolean };
+export type SecretRef = { provider: string; path: string; field?: string; version?: string };
+export type KVRow = { id: number; enabled: boolean; key: string; value: string; description: string; isFile?: boolean; fileName?: string; contentType?: string; secret?: boolean; secretRef?: SecretRef };
 export type PreviewHeader = { key: string; value: string; note: string; overridden?: boolean };
 export type ResponseLine = { number: number; html: string; hasCurrentMatch?: boolean };
 export type WorkspaceDiagnostic = import('../backend').WorkspaceDiagnostic;
@@ -225,8 +226,10 @@ export type OpenApiSource = {
   ignored?: string[];
 };
 export type EnvironmentColor = 'red' | 'amber' | 'green' | 'blue' | 'gray';
+export type SecretSource = { provider: string; path: string; version?: string; prefix?: string; keys?: string[] };
 export type Environment = {
   id: string; workspaceId: string; name: string; filesystemName: string; values: KVRow[];
+  secretSources?: SecretSource[];
   protected?: boolean;
   sandbox?: boolean;
   parentId?: string;

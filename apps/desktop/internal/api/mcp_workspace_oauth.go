@@ -33,7 +33,7 @@ func (s *mcpServer) toolAuthorizeOAuth2(ctx context.Context, arguments json.RawM
 			break
 		}
 	}
-	run, err := s.prepareRun(ws.forRequest(req), args.Environment, nil)
+	run, err := s.prepareRun(ws.forRequest(req), args.Environment, nil, req)
 	if err != nil {
 		return nil, err
 	}

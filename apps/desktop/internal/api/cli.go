@@ -16,6 +16,8 @@ import (
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+
+	secretmgr "github.com/stormhop/kurlo/apps/desktop/internal/secrets"
 )
 
 type cliOptions struct {
@@ -42,6 +44,10 @@ type cliOptions struct {
 	failFast            bool
 	insecure            bool
 	verbose             bool
+	linked              *cliLinkedSecrets
+	secretProviders     string
+	secretTimeout       time.Duration
+	allowSecretCommands bool
 	stdout              io.Writer
 	stderr              io.Writer
 }
@@ -115,6 +121,9 @@ func parseCLIArgs(args []string, stdout, stderr io.Writer) (cliOptions, error) {
 	fs.BoolVar(&opts.insecure, "insecure", false, "disable TLS certificate verification for every request")
 	fs.BoolVar(&opts.insecure, "k", false, "alias for --insecure")
 	fs.BoolVar(&opts.verbose, "verbose", false, "print request and response detail for each request")
+	fs.StringVar(&opts.secretProviders, "secret-providers", "on", "on: get linked variables from the secret providers in workspace.yml; off: require --var or --env-file for them")
+	fs.DurationVar(&opts.secretTimeout, "secret-timeout", 0, "time limit for each secret provider call, like 10s (default: the provider's timeout setting)")
+	fs.BoolVar(&opts.allowSecretCommands, "allow-secret-commands", false, "let secret providers of type command run their command")
 	var varFlags, globalVarFlags multiFlag
 	fs.Var(&varFlags, "var", "override a variable as KEY=VALUE (repeatable)")
 	fs.Var(&globalVarFlags, "global-var", "set a global variable as KEY=VALUE (repeatable)")
@@ -196,7 +205,25 @@ func parseCLIArgs(args []string, stdout, stderr io.Writer) (cliOptions, error) {
 		}
 	}
 	opts.reporters = names
+	switch strings.ToLower(strings.TrimSpace(opts.secretProviders)) {
+	case "", "on", "true":
+		opts.secretProviders = "on"
+	case "off", "false":
+		opts.secretProviders = "off"
+	default:
+		return opts, fmt.Errorf("--secret-providers must be on or off, got %q", opts.secretProviders)
+	}
+	if opts.secretTimeout < 0 {
+		return opts, fmt.Errorf("--secret-timeout must be positive")
+	}
 	return opts, nil
+}
+
+func cliLinkedSecretsFor(opts cliOptions) *cliLinkedSecrets {
+	if opts.secretProviders == "off" {
+		return disabledLinkedSecrets("--secret-providers=off is set", "--var")
+	}
+	return newCLILinkedSecrets(opts.workspace, opts.secretTimeout, opts.allowSecretCommands)
 }
 
 func collectKeyValues(pairs []string, into map[string]string, flagName string) error {
@@ -277,11 +304,21 @@ func runCLI(opts cliOptions) int {
 		selected[i] = applyCollectionDefaults(selected[i], collectionsByID[selected[i].CollectionID])
 	}
 
+	byWorkspace := map[string][]cliSavedRequest{}
+	for _, req := range selected {
+		byWorkspace[req.WorkspaceID] = append(byWorkspace[req.WorkspaceID], req)
+	}
 	envValues := make(map[string]map[string]string)
 	envSecrets := make(map[string][]string)
 	for _, req := range selected {
 		if _, ok := envValues[req.WorkspaceID]; ok {
 			continue
+		}
+		opts.linked = cliLinkedSecretsFor(opts)
+		opts.linked.globals = globals
+		opts.linked.dataRows = dataRows
+		for _, target := range byWorkspace[req.WorkspaceID] {
+			opts.linked.onlyFor(&target)
 		}
 		values, secretValues, err := resolveCLIValuesForWorkspace(opts, environments, req.WorkspaceID)
 		if err != nil {
@@ -532,13 +569,26 @@ func resolveCLIValues(opts cliOptions, collections []cliCollection, environments
 func resolveCLIValuesForWorkspace(opts cliOptions, environments []cliEnvironment, workspaceID string) (map[string]string, []string, error) {
 	values := map[string]string{}
 	var secretValues []string
+	linked := map[string]secretmgr.Ref{}
+	linkedWorkspace := workspaceID
+	var imports []secretmgr.Import
 	if opts.env != "" {
 		env, err := findEnvironmentForWorkspace(environments, opts.env, workspaceID)
 		if err != nil {
 			return nil, nil, err
 		}
+		if env.WorkspaceID != "" {
+			linkedWorkspace = env.WorkspaceID
+		}
+		imports, _ = secretmgr.ImportsFromAny(env.Sources)
 		for _, row := range env.Values {
 			if row.Enabled && strings.TrimSpace(row.Key) != "" {
+				if ref, ok := secretmgr.RefFromMap(row.SecretRef); ok {
+					linked[strings.TrimSpace(row.Key)] = ref
+					delete(values, strings.TrimSpace(row.Key))
+					continue
+				}
+				delete(linked, strings.TrimSpace(row.Key))
 				values[strings.TrimSpace(row.Key)] = row.Value
 				if row.Secret && row.Value != "" {
 					secretValues = append(secretValues, row.Value)
@@ -565,7 +615,44 @@ func resolveCLIValuesForWorkspace(opts cliOptions, environments []cliEnvironment
 			secretValues = append(secretValues, value)
 		}
 	}
+	imported, err := opts.linked.expandImports(linkedWorkspace, imports, values, linked)
+	if err != nil {
+		return nil, nil, err
+	}
+	for key, ref := range imported {
+		linked[key] = ref
+	}
+	missing := map[string]secretmgr.Ref{}
+	for key, ref := range linked {
+		if _, overridden := values[key]; !overridden {
+			missing[key] = ref
+		}
+	}
+	if len(missing) > 0 {
+		fetched, err := opts.linked.fetch(linkedWorkspace, missing, values)
+		if err != nil {
+			return nil, nil, err
+		}
+		for key, value := range fetched {
+			values[key] = value
+			if value != "" {
+				secretValues = append(secretValues, value)
+			}
+		}
+	}
 	return values, secretValues, nil
+}
+
+func cliRowLinked(row cliKV) bool {
+	_, linked := secretmgr.RefFromMap(row.SecretRef)
+	return linked
+}
+
+func linkedVerb(count int) string {
+	if count == 1 {
+		return "is"
+	}
+	return "are"
 }
 
 var cliSecretNameParts = []string{"token", "secret", "password", "passwd", "apikey", "privatekey", "credential", "sessionid", "cookie", "authorization", "bearer", "jwt"}
@@ -750,7 +837,7 @@ func loadCLIWorkspaceWithSecrets(root string, secrets map[string]string) ([]map[
 
 func exportScopes(opts cliOptions, sm *state.Manager) error {
 	if opts.exportEnvironment != "" {
-		if err := writeVariableExport(opts.exportEnvironment, opts.env, sm.GetEnvironment()); err != nil {
+		if err := writeVariableExport(opts.exportEnvironment, opts.env, opts.linked.withoutFetched(sm.GetEnvironment())); err != nil {
 			return fmt.Errorf("export environment: %w", err)
 		}
 	}

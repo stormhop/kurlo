@@ -20,6 +20,7 @@ import (
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	secretmgr "github.com/stormhop/kurlo/apps/desktop/internal/secrets"
 )
 
 const mcpServerLatestHandshakeVersion = "2025-11-25"
@@ -1116,6 +1117,7 @@ func (s *mcpServer) toolListEnvironments(_ context.Context, _ json.RawMessage) (
 		Color            string     `json:"color,omitempty"`
 		Inherits         string     `json:"inherits,omitempty"`
 		Variables        []variable `json:"variables"`
+		ImportedFrom     []string   `json:"importedFrom,omitempty"`
 		SessionVariables []string   `json:"sessionVariables,omitempty"`
 	}
 	environments := make([]environment, 0, len(ws.environments))
@@ -1125,11 +1127,19 @@ func (s *mcpServer) toolListEnvironments(_ context.Context, _ json.RawMessage) (
 			if !row.Enabled || strings.TrimSpace(row.Key) == "" {
 				continue
 			}
+			if ref, linked := secretmgr.RefFromMap(row.SecretRef); linked {
+				entry.Variables = append(entry.Variables, variable{Key: row.Key, Value: "[secret from " + ref.Provider + "]", Secret: true})
+				continue
+			}
 			if row.Secret {
 				entry.Variables = append(entry.Variables, variable{Key: row.Key, Secret: true})
 				continue
 			}
 			entry.Variables = append(entry.Variables, variable{Key: row.Key, Value: row.Value})
+		}
+		imports, _ := secretmgr.ImportsFromAny(env.Sources)
+		for _, item := range imports {
+			entry.ImportedFrom = append(entry.ImportedFrom, mcpImportDescription(item))
 		}
 		if scope := s.session[strings.ToLower(strings.TrimSpace(env.Name))]; scope != nil {
 			entry.SessionVariables = sortedKeys(scope.set)
@@ -1164,7 +1174,7 @@ func mcpWorkspaceID(ws mcpWorkspace) string {
 	return id
 }
 
-func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[string]any) (*mcpRunContext, error) {
+func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[string]any, targets ...cliSavedRequest) (*mcpRunContext, error) {
 	envName = strings.TrimSpace(envName)
 	if envName == "" {
 		envName = s.opts.env
@@ -1187,7 +1197,24 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 		}
 	}
 	globals, globalSecrets := mcpGlobalValues(s.opts.workspace, s.opts.loadAppSecrets)
-	values, secrets, err := resolveCLIValuesForWorkspace(cliOptions{env: envName}, ws.environments, workspaceID)
+	linked := s.linkedSecrets(workspaceID)
+	linked.globals = globals
+	for _, target := range targets {
+		linked.onlyFor(&target)
+	}
+	linked.filtered = true
+	envOverrides := map[string]string{}
+	for key, value := range overrides {
+		if key = strings.TrimSpace(key); key != "" {
+			envOverrides[key] = jsonCellToString(value)
+		}
+	}
+	if scope := s.session[strings.ToLower(envName)]; scope != nil {
+		for key, value := range scope.set {
+			envOverrides[key] = value
+		}
+	}
+	values, secrets, err := resolveCLIValuesForWorkspace(cliOptions{env: envName, vars: envOverrides, linked: linked}, ws.environments, workspaceID)
 	if err != nil {
 		return nil, err
 	}
@@ -1229,6 +1256,13 @@ func (s *mcpServer) prepareRun(ws mcpWorkspace, envName string, overrides map[st
 		sm.SetCollectionVariables(collection.ID, rows)
 	}
 	return &mcpRunContext{envName: envName, values: values, secrets: append(secrets, globalSecrets...), sm: sm, collections: collections}, nil
+}
+
+func (s *mcpServer) linkedSecrets(workspaceID string) *cliLinkedSecrets {
+	if s.opts.loadAppSecrets {
+		return newAppLinkedSecrets(workspaceID)
+	}
+	return disabledLinkedSecrets("kurlo mcp reads secret managers only for the workspace open in the Kurlo app, where you trust each provider", "variables")
 }
 
 func (s *mcpServer) runOptions() cliOptions {
@@ -1445,7 +1479,7 @@ func (s *mcpServer) toolRunRequest(ctx context.Context, arguments json.RawMessag
 	}
 	req = ws.withDefaults(req)
 	req = args.apply(req)
-	run, err := s.prepareRun(ws.forRequest(req), args.Environment, args.Variables)
+	run, err := s.prepareRun(ws.forRequest(req), args.Environment, args.Variables, req)
 	if err != nil {
 		return nil, err
 	}
@@ -1504,7 +1538,7 @@ func (s *mcpServer) toolSendRequest(ctx context.Context, arguments json.RawMessa
 		}
 	}
 	req = args.apply(req)
-	run, err := s.prepareRun(ws, args.Environment, args.Variables)
+	run, err := s.prepareRun(ws, args.Environment, args.Variables, req)
 	if err != nil {
 		return nil, err
 	}
@@ -1565,7 +1599,7 @@ func (s *mcpServer) toolRunCollection(ctx context.Context, arguments json.RawMes
 	if len(workspaceIDs) == 1 {
 		runWorkspace = ws.forRequest(selected[0])
 	}
-	run, err := s.prepareRun(runWorkspace, args.Environment, args.Variables)
+	run, err := s.prepareRun(runWorkspace, args.Environment, args.Variables, selected...)
 	if err != nil {
 		return nil, err
 	}
@@ -1688,4 +1722,15 @@ func sortedKeys(values map[string]string) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func mcpImportDescription(item secretmgr.Import) string {
+	out := "every key of " + item.String() + " as a secret variable"
+	if item.Filtered() {
+		out = "keys " + strings.Join(item.Keys, ", ") + " of " + item.String() + " as secret variables"
+	}
+	if item.Prefix != "" {
+		out += " named " + item.Prefix + "<key>"
+	}
+	return out
 }

@@ -877,10 +877,19 @@ func (a *App) SendMcpRequest(req model.HttpRequest) model.McpResponse {
 		a.unregisterRequestCancel(req.RequestID, seq)
 	}()
 
+	linked, failed := a.linkSecretsIntoHTTP(ctx, &req)
+	if failed != nil {
+		return model.NormalizeMcpResponse(model.McpResponse{HTTP: *failed, Error: failed.Error})
+	}
 	transport := func(prepared model.HttpRequest) model.HttpResponse {
 		return sendRequest(ctx, prepared, a.state, a.cookieJars, a.preflightCache)
 	}
-	return model.NormalizeMcpResponse(a.mcpSessions.send(req, transport))
+	resp := model.NormalizeMcpResponse(a.mcpSessions.send(req, transport))
+	redactLinkedSecretValues(&resp, linked.values)
+	if len(linked.values) > 0 {
+		resp.HTTP.Timings.Secrets = linked.duration
+	}
+	return resp
 }
 
 func mcpSendStateless(req model.HttpRequest, transport mcpTransport) model.McpResponse {

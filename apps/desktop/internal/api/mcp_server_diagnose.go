@@ -128,7 +128,7 @@ func (s *mcpServer) toolDiagnoseLastFailure(_ context.Context, arguments json.Ra
 		envName = s.opts.env
 	}
 	diagnosis.Environment = envName
-	if values, _, err := resolveCLIValues(cliOptions{env: envName}, ws.collections, ws.environments, nil); err == nil {
+	if values, _, err := resolveCLIValues(cliOptions{env: envName, linked: skippedLinkedSecrets()}, ws.collections, ws.environments, nil); err == nil {
 		if scope := s.session[strings.ToLower(envName)]; scope != nil {
 			for key, value := range scope.set {
 				values[key] = value

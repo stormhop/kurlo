@@ -15,13 +15,14 @@ import (
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/loadtest"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	secretmgr "github.com/stormhop/kurlo/apps/desktop/internal/secrets"
 )
 
 const loadCLIUsage = `Usage:
   kurlo load list [--workspace .] [--collection NAME]
   kurlo load export <test> [--workspace .] [--collection NAME] [-o file.k6.js | --dir out/] [--inline-secrets]
   kurlo load run <test> [--workspace .] [--collection NAME] [--env NAME] [--env-file FILE] [--k6 PATH]
-                       [--json summary.json] [--report report.html]
+                       [--json summary.json] [--report report.html] [--allow-secret-commands]
 
 <test> is a load-test name, ID or YAML path inside the workspace.
 Export writes the script to stdout unless -o or --dir is supplied.
@@ -33,6 +34,7 @@ type loadCLIOptions struct {
 	environment, envFile, globalsFile    string
 	output, dir, k6, summary, report     string
 	inlineSecrets                        bool
+	allowSecretCommands                  bool
 	vars, globalVars                     map[string]string
 }
 
@@ -85,6 +87,7 @@ func parseLoadCLIArgs(args []string, stderr io.Writer) (loadCLIOptions, error) {
 		fs.StringVar(&opts.k6, "k6", "", "path to k6 (defaults to PATH)")
 		fs.StringVar(&opts.summary, "json", "", "save the raw k6 summary JSON")
 		fs.StringVar(&opts.report, "report", "", "save the k6 web dashboard HTML report")
+		fs.BoolVar(&opts.allowSecretCommands, "allow-secret-commands", false, "let secret providers of type command run their command")
 	}
 	fs.Usage = func() {
 		fmt.Fprint(stderr, loadCLIUsage, "\nFlags for ", opts.command, ":\n")
@@ -311,9 +314,11 @@ func buildCLILoadPlan(root string, opts loadCLIOptions, entry cliLoadTest, reque
 		plan.Requests[request.ID] = loadTestRequest(request, &entry.collection)
 	}
 	variables := map[string]loadtest.Variable{}
+	overridden := map[string]bool{}
 	for _, variable := range plan.Variables {
 		if value, ok := os.LookupEnv(variable.Name); ok {
 			variable.Value, variable.Secret = value, true
+			overridden[variable.Name] = true
 		}
 		variables[variable.Name] = variable
 	}
@@ -323,13 +328,64 @@ func buildCLILoadPlan(root string, opts loadCLIOptions, entry cliLoadTest, reque
 			return plan, err
 		}
 		for name, value := range values {
-			variables[name] = loadtest.Variable{Name: name, Value: value, Secret: true}
+			variables[name] = loadtest.Variable{Name: name, Value: value, Secret: true, Linked: variables[name].Linked}
+			overridden[name] = true
 		}
 	}
 	for name, value := range opts.vars {
 		variable := variables[name]
 		variable.Name, variable.Value = name, value
 		variables[name] = variable
+		overridden[name] = true
+	}
+	if opts.command == "run" && payload.Environment != nil {
+		rows := map[string]secretmgr.Ref{}
+		known := map[string]string{}
+		for _, row := range payload.Environment.Values {
+			name := strings.TrimSpace(row.Key)
+			if ref, ok := secretmgr.RefFromMap(row.SecretRef); ok && row.Enabled && variables[name].Linked && !overridden[name] {
+				rows[name] = ref
+			}
+		}
+		for name, variable := range variables {
+			if !variable.Linked {
+				known[name] = variable.Value
+			}
+		}
+		linked := newCLILinkedSecrets(root, 0, opts.allowSecretCommands)
+		for _, request := range payload.Requests {
+			merged := applyCollectionDefaults(request, &entry.collection)
+			linked.onlyFor(&merged)
+		}
+		linked.filtered = true
+		imports, _ := secretmgr.ImportsFromAny(payload.Environment.Sources)
+		defined := map[string]string{}
+		for name, variable := range variables {
+			if !variable.Linked || overridden[name] {
+				defined[name] = variable.Value
+			}
+		}
+		imported, err := linked.expandImports(entry.collection.WorkspaceID, imports, defined, rows)
+		if err != nil {
+			return plan, err
+		}
+		for name, ref := range imported {
+			rows[name] = ref
+			if _, ok := variables[name]; !ok {
+				variables[name] = loadtest.Variable{Name: name, Secret: true, Linked: true}
+			}
+		}
+		if len(rows) > 0 {
+			fetched, err := linked.fetch(entry.collection.WorkspaceID, rows, known)
+			if err != nil {
+				return plan, err
+			}
+			for name, value := range fetched {
+				variable := variables[name]
+				variable.Value = value
+				variables[name] = variable
+			}
+		}
 	}
 	plan.Variables = nil
 	names := make([]string, 0, len(variables))

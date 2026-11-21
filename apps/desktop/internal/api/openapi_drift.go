@@ -400,7 +400,7 @@ func (s *mcpServer) toolCheckOpenAPISync(ctx context.Context, arguments json.Raw
 				return nil, fmt.Errorf("environment %q is protected; ask the user to check the spec in Kurlo", envName)
 			}
 		}
-		resolved, _, err := resolveCLIValues(cliOptions{env: envName, vars: map[string]string{}}, nil, ws.environments, nil)
+		resolved, _, err := resolveCLIValues(cliOptions{env: envName, vars: map[string]string{}, linked: skippedLinkedSecrets()}, nil, ws.environments, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -463,6 +463,14 @@ func RunOpenAPICLI(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	values := map[string]string{}
+	for _, item := range varFlags {
+		key, value, ok := strings.Cut(item, "=")
+		if !ok || strings.TrimSpace(key) == "" {
+			fmt.Fprintf(stderr, "kurlo openapi check: --var expects KEY=VALUE, got %q\n", item)
+			return 2
+		}
+		values[strings.TrimSpace(key)] = value
+	}
 	if *envName != "" || *envFile != "" {
 		_, collections, _, environments, err := loadCLIWorkspace(root)
 		if err != nil {
@@ -474,20 +482,16 @@ func RunOpenAPICLI(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stderr, "kurlo openapi check:", err)
 			return 2
 		}
-		resolved, _, err := resolveCLIValuesForWorkspace(cliOptions{env: *envName, envFile: *envFile, vars: map[string]string{}}, environments, selected.WorkspaceID)
+		target := cliSavedRequest{CollectionVariables: enabledRowValues(selected.Defaults.Variables)}
+		if *specPath == "" && selected.OpenAPI != nil {
+			target.URL, target.Headers = selected.OpenAPI.Source, selected.OpenAPI.Headers
+		}
+		resolved, _, err := resolveCLIValuesForWorkspace(cliOptions{env: *envName, envFile: *envFile, vars: values, linked: newCLILinkedSecrets(root, 0, false).onlyFor(&target)}, environments, selected.WorkspaceID)
 		if err != nil {
 			fmt.Fprintln(stderr, "kurlo openapi check:", err)
 			return 2
 		}
 		values = resolved
-	}
-	for _, item := range varFlags {
-		key, value, ok := strings.Cut(item, "=")
-		if !ok || strings.TrimSpace(key) == "" {
-			fmt.Fprintf(stderr, "kurlo openapi check: --var expects KEY=VALUE, got %q\n", item)
-			return 2
-		}
-		values[strings.TrimSpace(key)] = value
 	}
 	report, err := checkOpenAPIDrift(context.Background(), openAPICheckOptions{
 		workspace: root, collection: *collection, specPath: *specPath, values: values, insecure: *insecure,

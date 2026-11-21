@@ -1,6 +1,7 @@
-import type { KVRow, BodyType, AuthType, JwtAddTo, JwtAlgorithm, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
+import type { KVRow, SecretRef, BodyType, AuthType, JwtAddTo, JwtAlgorithm, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
 import { JWT_ALGORITHMS, mkRow, reserveRowIds } from './constants';
 import { clipboardSet } from './backend';
+import { normalizeSecretRef } from './linkedSecrets';
 
 export function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
@@ -97,8 +98,14 @@ export function cloneRowsForStore(rows: KVRow[]) {
       ...(row.isFile ? { isFile: true } : {}),
       ...(row.isFile && row.fileName ? { fileName: row.fileName } : {}),
       ...(row.contentType ? { contentType: row.contentType } : {}),
-      ...(row.secret ? { secret: true } : {}),
+      ...(row.secret || normalizeSecretRef(row.secretRef) ? { secret: true } : {}),
+      ...withSecretRef(row),
     }));
+}
+
+function withSecretRef(row: KVRow): { secretRef?: SecretRef } {
+  const secretRef = normalizeSecretRef(row.secretRef);
+  return secretRef ? { secretRef } : {};
 }
 
 export function restoreRows(rows: KVRow[] | undefined): KVRow[] {
@@ -114,7 +121,8 @@ export function restoreRows(rows: KVRow[] | undefined): KVRow[] {
     isFile: row.isFile ?? false,
     fileName: row.fileName ?? '',
     contentType: row.contentType ?? '',
-    secret: row.secret ?? false,
+    secret: (row.secret ?? false) || Boolean(normalizeSecretRef(row.secretRef)),
+    ...withSecretRef(row),
   }));
   return [...restored, mkRow()];
 }

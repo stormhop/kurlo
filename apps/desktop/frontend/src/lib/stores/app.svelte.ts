@@ -960,6 +960,7 @@ class AppVM {
   declare renameEnvironment: typeof environmentFeature.renameEnvironment;
   declare setEnvironmentProtected: typeof environmentFeature.setEnvironmentProtected;
   declare setEnvironmentSandbox: typeof environmentFeature.setEnvironmentSandbox;
+  declare setEnvironmentSecretSources: typeof environmentFeature.setEnvironmentSecretSources;
   declare setEnvironmentColor: typeof environmentFeature.setEnvironmentColor;
   declare setEnvironmentParent: typeof environmentFeature.setEnvironmentParent;
   declare deleteEnvironment: typeof environmentFeature.deleteEnvironment;
@@ -1449,6 +1450,8 @@ class AppVM {
   collectionRunnerConcurrency = $state(DEFAULT_RUNNER_CONCURRENCY);
   collectionRunnerTitle = $state('');
   collectionRunnerRunning = $state(false);
+  collectionRunnerPreflighting = $state(false);
+  collectionRunnerPreflightFailures = $state<{ requestId: string; name: string; failures: import('../backend').LinkedSecretFailure[] }[]>([]);
   collectionRunnerResults = $state<CollectionRunnerResult[]>([]);
   collectionLastRuns = $state<Record<string, CollectionRunRecord>>({});
   collectionRunnerShowingLastRun = $state(false);

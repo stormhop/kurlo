@@ -1,4 +1,4 @@
-import type { api, model } from '../../wailsjs/go/models';
+import type { api, model, secrets } from '../../wailsjs/go/models';
 
 type Wire<T> = T extends (infer U)[]
   ? Wire<U>[]
@@ -136,6 +136,22 @@ export type SaveRequestStoreResult = Wire<api.SaveRequestStoreResult>;
 export type WorkspaceDiagnostic = Wire<api.WorkspaceDiagnostic>;
 export type WorkspaceOpenResult = Wire<api.WorkspaceOpenResult>;
 export type WorkspaceSecretRef = Wire<api.WorkspaceSecretRef>;
+export type SecretProviderView = Wire<api.SecretProviderView>;
+export type SecretProviderUsage = Wire<api.SecretProviderUsage>;
+export type SecretProvidersResult = Wire<api.SecretProvidersResult>;
+export type SecretProviderStatus = Wire<api.SecretProviderStatus>;
+export type SecretRefInput = Wire<api.SecretRefInput>;
+export type SecretImportInput = Wire<api.SecretImportInput>;
+export type SecretImportKeys = Wire<api.SecretImportKeys>;
+export type SecretImportKeysResult = Wire<api.SecretImportKeysResult>;
+export type SecretRefTestResult = Wire<api.SecretRefTestResult>;
+export type SecretRevealResult = Wire<api.SecretRevealResult>;
+export type SecretActionResult = Wire<api.SecretActionResult>;
+export type SecretBrowseResult = Wire<api.SecretBrowseResult>;
+export type SecretBrowseEntry = Wire<secrets.Entry>;
+export type LinkedSecretFailure = Wire<model.LinkedSecretFailure>;
+export type RunnerSecretCheck = { requestId: string; http?: HttpRequest; grpc?: GrpcRequest };
+export type RunnerSecretCheckResult = { requestId: string; failures: LinkedSecretFailure[] };
 export type RequestFileYAMLResult = Wire<api.RequestFileYAMLResult>;
 export type WorkspaceYAMLFileResult = Wire<api.WorkspaceYAMLFileResult>;
 export type HistoryResponseResult = Wire<api.HistoryResponseResult>;

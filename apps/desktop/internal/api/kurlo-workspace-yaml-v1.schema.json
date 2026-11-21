@@ -53,7 +53,33 @@
         "isFile": { "type": "boolean" },
         "fileName": { "type": "string" },
         "contentType": { "type": "string" },
-        "secret": { "type": "boolean" }
+        "secret": { "type": "boolean" },
+        "secretRef": { "$ref": "#/definitions/secretRef" }
+      }
+    },
+    "secretRef": {
+      "type": "object",
+      "description": "Links an environment variable to a secret provider. The value is fetched when a request is sent and is never written to YAML.",
+      "additionalProperties": false,
+      "required": ["provider", "path"],
+      "properties": {
+        "provider": { "type": "string", "description": "The id of an entry in secretProviders of workspace.yml." },
+        "path": { "type": "string", "description": "Where the secret lives: secret/data/app for Vault, op://Vault/Item for 1Password, a secret name or ARN for AWS, a variable name for env." },
+        "field": { "type": "string", "description": "A key inside the secret. Leave it out when the secret holds one value." },
+        "version": { "type": "string", "description": "A secret version. Leave it out for the latest one." }
+      }
+    },
+    "secretSource": {
+      "type": "object",
+      "description": "Imports every key of one secret as an environment variable. Values are fetched when a request is sent and are never written to YAML.",
+      "additionalProperties": false,
+      "required": ["provider", "path"],
+      "properties": {
+        "provider": { "type": "string", "description": "The id of an entry in secretProviders of workspace.yml." },
+        "path": { "type": "string", "description": "A secret with several keys: a Vault KV secret, a 1Password item, or a JSON secret in AWS." },
+        "version": { "type": "string", "description": "A secret version. Leave it out for the latest one." },
+        "prefix": { "type": "string", "description": "Text added before each key to form the variable name." },
+        "keys": { "type": "array", "items": { "type": "string" }, "description": "Only these keys become variables. Leave it out to import every key." }
       }
     },
     "auth": {
@@ -201,6 +227,46 @@
         "name": { "type": "string" },
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "description": { "type": "string" }
+      }
+    },
+    "secretProvider": {
+      "type": "object",
+      "description": "A connection to a secret store. It holds no credentials: tokens come from the environment or are saved on each device.",
+      "additionalProperties": true,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+        "type": { "type": "string", "enum": ["vault", "1password", "aws-secrets-manager", "aws-ssm", "gcp-secret-manager", "azure-key-vault", "bitwarden", "doppler", "infisical", "command", "env"] },
+        "name": { "type": "string" },
+        "address": { "type": "string", "description": "Vault server URL, Azure Key Vault URL, or a self-hosted Bitwarden, Doppler or Infisical server." },
+        "namespace": { "type": "string", "description": "Vault Enterprise or HCP namespace." },
+        "caCert": { "type": "string", "description": "Path to a PEM file with a private certificate authority." },
+        "skipTlsVerify": { "type": "boolean" },
+        "account": { "type": "string", "description": "1Password account to use when several are signed in, for example my.1password.com." },
+        "region": { "type": "string", "description": "AWS region, for example eu-central-1." },
+        "profile": { "type": "string", "description": "AWS profile from ~/.aws/config. SSO profiles need the AWS CLI." },
+        "endpoint": { "type": "string", "description": "Custom AWS or Google Cloud endpoint, for example a VPC endpoint or LocalStack." },
+        "project": { "type": "string", "description": "Google Cloud project id, or Infisical project id." },
+        "command": {
+          "oneOf": [{ "type": "array", "items": { "type": "string" }, "minItems": 1 }, { "type": "string" }],
+          "description": "For type command: the program and its arguments. {path} and {version} are replaced; without {path} the path is added as the last argument. Runs without a shell."
+        },
+        "cacheTtl": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "How long fetched values stay in memory: 30s, 5m, 0 or session. Defaults to 5m." },
+        "timeout": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "Timeout of one call to the provider. Defaults to 10s." },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "method": { "type": "string", "enum": ["token", "approle", "kubernetes", "oidc", "cli", "client-secret", "universal"] },
+            "roleId": { "type": "string", "description": "Vault AppRole role ID." },
+            "role": { "type": "string", "description": "Vault role for kubernetes or oidc auth." },
+            "mount": { "type": "string", "description": "Vault auth mount. Defaults to approle, kubernetes or oidc." },
+            "tokenPath": { "type": "string", "description": "Service account token file for Vault kubernetes auth." },
+            "redirectUri": { "type": "string", "description": "Loopback redirect for Vault OIDC. Defaults to http://localhost:8250/oidc/callback." },
+            "tenantId": { "type": "string", "description": "Azure tenant id." },
+            "clientId": { "type": "string", "description": "Azure application (client) id, or Infisical machine identity client id." }
+          }
+        }
       }
     },
     "collection": {
@@ -402,6 +468,11 @@
         "values": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "secretSources": {
+          "type": "array",
+          "description": "Secrets whose keys all become variables of this environment. A variable row with the same name wins.",
+          "items": { "$ref": "#/definitions/secretSource" }
         }
       }
     },
@@ -443,6 +514,11 @@
               "path": { "type": "string" }
             }
           }
+        },
+        "secretProviders": {
+          "type": "array",
+          "description": "Secret providers that environment variables can link to with secretRef.",
+          "items": { "$ref": "#/definitions/secretProvider" }
         }
       }
     },

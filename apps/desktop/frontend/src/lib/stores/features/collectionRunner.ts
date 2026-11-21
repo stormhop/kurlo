@@ -1,9 +1,9 @@
-import { cancelHttpRequest, openFileDialog, readTextFile, sendGrpcRequest, sendHttpRequest } from '../../backend';
+import { cancelHttpRequest, openFileDialog, preflightCollectionRunner, readTextFile, sendGrpcRequest, sendHttpRequest } from '../../backend';
 import { environmentValuesAfterChanges, type EnvironmentChanges } from './environments';
 import { globalValuesAfterChanges, type GlobalVariableChanges } from './globals';
 import type { RunnableHttpOptions } from './requestSerialization';
 import { clampConcurrency, DEFAULT_RUNNER_CONCURRENCY, forEachWithConcurrency } from '../../concurrency';
-import type { GrpcRequest, HttpRequest, HttpResponse } from '../../backend';
+import type { GrpcRequest, HttpRequest, HttpResponse, LinkedSecretFailure, RunnerSecretCheck } from '../../backend';
 import type { Collection, CollectionRunnerResult, GrpcResponse, RequestType, SavedRequest } from '../../types/models';
 import type { RunnerDataRow } from '../../runnerData';
 import { downloadTextFile, requestTabLabel, requestTransportLabel } from '../../utils';
@@ -34,6 +34,8 @@ type CollectionRunnerHost = {
   collectionRunnerConcurrency: number;
   collectionRunnerTitle: string;
   collectionRunnerRunning: boolean;
+  collectionRunnerPreflighting: boolean;
+  collectionRunnerPreflightFailures: { requestId: string; name: string; failures: LinkedSecretFailure[] }[];
   collectionRunnerResults: CollectionRunnerResult[];
   collectionLastRuns: Record<string, CollectionRunRecord>;
   collectionRunnerShowingLastRun: boolean;
@@ -465,7 +467,7 @@ export const collectionRunnerFeature = {
     }
   },
   async startCollectionRunner(this: CollectionRunnerHost, title: string, requests: SavedRequest[], options: { delayMs?: number; iterations?: number; parallel?: boolean; concurrency?: number; dataRows?: RunnerDataRow[]; collectionId?: string } = {}) {
-    if (this.collectionRunnerRunning) return;
+    if (this.collectionRunnerRunning || this.collectionRunnerPreflighting) return;
     if (!requests.length) {
       this.collectionImportToast = 'No requests to run';
       setTimeout(() => (this.collectionImportToast = ''), 2200);
@@ -486,6 +488,62 @@ export const collectionRunnerFeature = {
       iteration: iterationIndex + 1,
       runId: `${request.id}:${iterationIndex + 1}:${requestIndex}`,
     }))).flat();
+    const workspaceId = this.activeWorkspaceId;
+    const environmentId = this.activeEnvironmentId;
+    const collectionId = this.collectionRunnerCollectionId;
+    const topView = this.topView;
+    const initialEnvValues = this.activeEnvironmentValues();
+    const initialGlobals = this.globalVariableValues();
+    const secretValues = this.activeSecretEnvironmentValues();
+    const secretKeys = this.activeSecretEnvironmentKeys();
+    const preflightRunById = new Map<string, (typeof runs)[number]>();
+    const preflightByKey = new Map<string, RunnerSecretCheck>();
+    runs.forEach(run => {
+      const dataRow = dataRows[run.iteration - 1] ?? {};
+      const key = `${run.request.id}:${dataRows.length ? JSON.stringify(dataRow) : 'default'}`;
+      if (preflightByKey.has(key)) return;
+      const requestId = `preflight-${preflightByKey.size}`;
+      preflightRunById.set(requestId, run);
+      const request = { ...run.request, auth: this.requestForEditing(run.request.id)?.auth ?? run.request.auth };
+      if (this.normalizeRequestTypeValue(request.requestType, request.url) === 'grpc') {
+        preflightByKey.set(key, { requestId, grpc: this.savedRequestToRunnableGrpcRequest(request, initialEnvValues, secretValues, secretKeys, requestId, initialGlobals, dataRow) });
+        return;
+      }
+      preflightByKey.set(key, { requestId, http: this.savedRequestToRunnableHttpRequest(request, initialEnvValues, secretValues, secretKeys, requestId, {
+        deferTemplates: true,
+        globals: initialGlobals,
+        workspaceId,
+        iterationData: Object.keys(dataRow).length ? { ...dataRow } : undefined,
+        iteration: run.iteration,
+        iterationCount: iterations,
+      }) });
+    });
+    const preflightRequests = [...preflightByKey.values()];
+    this.collectionRunnerCancelRequested = false;
+    this.collectionRunnerPreflightFailures = [];
+    this.collectionRunnerPreflighting = true;
+    try {
+      const preflightResults = await preflightCollectionRunner(workspaceId, preflightRequests);
+      if (this.collectionRunnerCancelRequested || this.activeWorkspaceId !== workspaceId || this.activeEnvironmentId !== environmentId || this.collectionRunnerCollectionId !== collectionId || this.topView !== topView) return;
+      const failures = preflightResults
+        .filter(result => result.failures.length)
+        .map(result => {
+          const run = preflightRunById.get(result.requestId);
+          return { requestId: run?.request.id ?? result.requestId, name: run ? requestTabLabel(run.request) : result.requestId, failures: result.failures };
+        });
+      if (failures.length) {
+        this.collectionRunnerPreflightFailures = failures;
+        return;
+      }
+    } catch (error) {
+      if (this.collectionRunnerCancelRequested) return;
+      if (this.activeWorkspaceId !== workspaceId || this.activeEnvironmentId !== environmentId || this.collectionRunnerCollectionId !== collectionId || this.topView !== topView) return;
+      this.collectionRunnerPreflightFailures = [{ requestId: '', name: 'Preflight', failures: [{ provider: '', path: '', kind: 'preflight-error', message: error instanceof Error ? error.message : String(error) }] }];
+      return;
+    } finally {
+      this.collectionRunnerPreflighting = false;
+    }
+    if (this.collectionRunnerCancelRequested) return;
     this.collectionRunnerOpen = true;
     this.topView = 'runner';
     this.collectionRunnerTitle = title;
@@ -497,12 +555,8 @@ export const collectionRunnerFeature = {
     this.collectionRunnerCancelRequested = false;
     this.collectionRunnerActiveRequestId = '';
     this.collectionRunnerActiveRequestIds = new Set();
-    let envValues = this.activeEnvironmentValues();
-    const environmentId = this.activeEnvironmentId;
-    const workspaceId = this.activeWorkspaceId;
-    let globals = this.globalVariableValues();
-    const secretValues = this.activeSecretEnvironmentValues();
-    const secretKeys = this.activeSecretEnvironmentKeys();
+    let envValues = initialEnvValues;
+    let globals = initialGlobals;
     const executeRun = async (run: (typeof runs)[number]) => {
       const changes = await this.executeCollectionRunnerRequest(run.request, run.runId, run.iteration, envValues, secretValues, secretKeys, dataRows[run.iteration - 1] ?? {}, { globals, iterationCount: iterations, workspaceId });
       if (changes) {
@@ -559,6 +613,7 @@ export const collectionRunnerFeature = {
   },
   stopCollectionRunner(this: CollectionRunnerHost) {
     this.collectionRunnerCancelRequested = true;
+    if (this.collectionRunnerPreflighting) return;
     for (const requestId of this.collectionRunnerActiveRequestIds) void cancelHttpRequest(requestId);
     if (this.collectionRunnerActiveRequestId) void cancelHttpRequest(this.collectionRunnerActiveRequestId);
   },

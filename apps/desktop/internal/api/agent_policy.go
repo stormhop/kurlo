@@ -196,7 +196,7 @@ func agentWorkspaceUsesHost(s *mcpServer, env, host string) bool {
 	}
 	for _, req := range ws.requests {
 		scoped := ws.forRequest(req)
-		values, _, err := resolveCLIValues(cliOptions{env: env}, scoped.collections, scoped.environments, globals)
+		values, _, err := resolveCLIValues(cliOptions{env: env, linked: skippedLinkedSecrets()}, scoped.collections, scoped.environments, globals)
 		if err != nil {
 			continue
 		}
