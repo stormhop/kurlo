@@ -240,3 +240,63 @@ func TestUnknownBodyTypeKeepsTheBodyOnLoad(t *testing.T) {
 		t.Errorf("unknown body type without content changed to %q", got)
 	}
 }
+
+func TestWorkspaceRowsRoundTripWithCompactDefaults(t *testing.T) {
+	root := t.TempDir()
+	workspaces := []map[string]any{{"id": "w1", "name": "WS"}}
+	collections := []map[string]any{{
+		"id": "c1", "workspaceId": "w1", "name": "Col",
+		"defaults": map[string]any{"headers": []any{
+			map[string]any{"key": "X-Default", "value": "yes", "enabled": true, "description": ""},
+			map[string]any{"key": "X-Off", "value": "no", "enabled": false, "description": ""},
+		}},
+	}}
+	requests := []map[string]any{{
+		"id": "r1", "workspaceId": "w1", "collectionId": "c1", "name": "Req",
+		"method": "GET", "url": "https://example.com",
+		"headers": []any{
+			map[string]any{"id": "row-1", "key": "X-On", "value": "yes", "enabled": true, "description": ""},
+			map[string]any{"id": "row-2", "key": "X-Off", "value": "no", "enabled": false, "description": ""},
+		},
+	}}
+	envs := []map[string]any{{"id": "e1", "workspaceId": "w1", "name": "Env", "values": []any{
+		map[string]any{"key": "base", "value": "https://example.com", "enabled": true, "description": ""},
+		map[string]any{"key": "off", "value": "x", "enabled": false, "description": ""},
+	}}}
+	requests = sanitizeRequestsForFilesystem(requests, map[string]string{}, map[string]string{})
+	collections = sanitizeCollectionsForFilesystem(collections, map[string]string{}, map[string]string{})
+	envs = sanitizeEnvironmentsForFilesystem(envs, map[string]string{}, map[string]string{})
+	if err := writeYAMLWorkspaceStore(root, workspaces, collections, requests, envs, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join(root, "workspaces", "WS", "collections", "Col", "requests", "Req.yml")
+	data, err := os.ReadFile(requestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "enabled: true") || strings.Contains(string(data), "description:") {
+		t.Fatalf("default row fields were serialized: %s", data)
+	}
+	if !strings.Contains(string(data), "enabled: false") {
+		t.Fatalf("explicit false was omitted: %s", data)
+	}
+	_, loadedCollections, loadedRequests, loadedEnvs, _, diagnostics, err := loadYAMLWorkspaceStoreWithDiagnostics(root, nil)
+	if err != nil || len(diagnostics) != 0 {
+		t.Fatalf("load: %v diagnostics=%v", err, diagnostics)
+	}
+	rows := loadedRequests[0]["headers"].([]any)
+	if rows[0].(map[string]any)["enabled"] != true || rows[0].(map[string]any)["description"] != "" {
+		t.Fatal("request defaults were not restored")
+	}
+	if rows[1].(map[string]any)["enabled"] != false {
+		t.Fatal("request false was lost")
+	}
+	defaults := mapSlice(nestedMap(loadedCollections[0], "defaults")["headers"])
+	if len(defaults) != 2 || defaults[0]["enabled"] != true || defaults[1]["enabled"] != false {
+		t.Fatalf("collection header defaults changed: %#v", defaults)
+	}
+	values := loadedEnvs[0]["values"].([]any)
+	if values[0].(map[string]any)["enabled"] != true || values[1].(map[string]any)["enabled"] != false {
+		t.Fatal("environment row state changed")
+	}
+}

@@ -4,20 +4,19 @@ import "testing"
 
 func TestStripRequestForFilesystemPrunesTypeSpecificFields(t *testing.T) {
 	tests := []struct {
-		name                  string
-		request               map[string]any
-		wantSettings          []string
-		absentSettings        []string
-		wantOverrides         []string
-		absentOverrides       []string
-		wantFields            []string
-		absentFields          []string
-		wantMissingMethod     bool
-		wantMissingRequestTab bool
+		name              string
+		request           map[string]any
+		wantSettings      []string
+		absentSettings    []string
+		wantOverrides     []string
+		absentOverrides   []string
+		wantFields        []string
+		absentFields      []string
+		wantMissingMethod bool
 	}{
 		{
 			name:            "sse keeps http settings and drops realtime and grpc state",
-			request:         stripTestRequest("http", "SSE", "params", "none"),
+			request:         stripTestRequest("http", "SSE", "settings", "none"),
 			wantSettings:    []string{"timeoutMs"},
 			absentSettings:  []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
 			wantOverrides:   []string{"timeoutMs"},
@@ -26,75 +25,69 @@ func TestStripRequestForFilesystemPrunesTypeSpecificFields(t *testing.T) {
 			absentFields:    []string{"sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiPrompt", "aiToolRequestIds"},
 		},
 		{
-			name:                  "graphql keeps schema and drops realtime and grpc state",
-			request:               stripTestRequest("graphql", "POST", "query", "graphql"),
-			wantSettings:          []string{"timeoutMs"},
-			absentSettings:        []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantOverrides:         []string{"timeoutMs"},
-			absentOverrides:       []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantFields:            []string{"graphqlSchema"},
-			absentFields:          []string{"sioEvents", "sioArgs", "grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiPrompt", "aiToolRequestIds"},
-			wantMissingMethod:     true,
-			wantMissingRequestTab: true,
+			name:              "graphql keeps schema and drops realtime and grpc state",
+			request:           stripTestRequest("graphql", "POST", "query", "graphql"),
+			wantSettings:      []string{"timeoutMs"},
+			absentSettings:    []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
+			wantOverrides:     []string{"timeoutMs"},
+			absentOverrides:   []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
+			wantFields:        []string{"graphqlSchema"},
+			absentFields:      []string{"sioEvents", "sioArgs", "grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiPrompt", "aiToolRequestIds"},
+			wantMissingMethod: true,
 		},
 		{
-			name:                  "websocket keeps websocket settings only",
-			request:               stripTestRequest("ws", "GET", "body", "text"),
-			wantSettings:          []string{"wsReconnectAttempts", "wsMaxMessageSizeMb"},
-			absentSettings:        []string{"followRedirects", "timeoutMs", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantOverrides:         []string{"wsReconnectAttempts"},
-			absentOverrides:       []string{"timeoutMs", "sioPath", "grpcUseTls", "grpcServerName"},
-			absentFields:          []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiPrompt", "aiToolRequestIds"},
-			wantMissingMethod:     true,
-			wantMissingRequestTab: true,
+			name:              "websocket keeps websocket settings only",
+			request:           stripTestRequest("ws", "GET", "body", "text"),
+			wantSettings:      []string{"wsReconnectAttempts", "wsMaxMessageSizeMb"},
+			absentSettings:    []string{"followRedirects", "timeoutMs", "sioPath", "grpcUseTls", "grpcServerName"},
+			wantOverrides:     []string{"wsReconnectAttempts"},
+			absentOverrides:   []string{"timeoutMs", "sioPath", "grpcUseTls", "grpcServerName"},
+			absentFields:      []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiPrompt", "aiToolRequestIds"},
+			wantMissingMethod: true,
 		},
 		{
-			name:                  "socketio keeps socketio and websocket settings",
-			request:               stripTestRequest("socketio", "GET", "body", "none"),
-			wantSettings:          []string{"wsReconnectAttempts", "wsMaxMessageSizeMb", "sioPath"},
-			absentSettings:        []string{"followRedirects", "timeoutMs", "grpcUseTls", "grpcServerName"},
-			wantOverrides:         []string{"wsReconnectAttempts", "sioPath"},
-			absentOverrides:       []string{"timeoutMs", "grpcUseTls", "grpcServerName"},
-			wantFields:            []string{"sioEvents", "sioEventName", "sioArgs", "sioAck"},
-			absentFields:          []string{"method", "graphqlSchema", "grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiPrompt", "aiToolRequestIds"},
-			wantMissingMethod:     true,
-			wantMissingRequestTab: true,
+			name:              "socketio keeps socketio and websocket settings",
+			request:           stripTestRequest("socketio", "GET", "body", "none"),
+			wantSettings:      []string{"wsReconnectAttempts", "wsMaxMessageSizeMb", "sioPath"},
+			absentSettings:    []string{"followRedirects", "timeoutMs", "grpcUseTls", "grpcServerName"},
+			wantOverrides:     []string{"wsReconnectAttempts", "sioPath"},
+			absentOverrides:   []string{"timeoutMs", "grpcUseTls", "grpcServerName"},
+			wantFields:        []string{"sioEvents", "sioEventName", "sioArgs", "sioAck"},
+			absentFields:      []string{"method", "graphqlSchema", "grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiPrompt", "aiToolRequestIds"},
+			wantMissingMethod: true,
 		},
 		{
-			name:                  "grpc keeps grpc state and drops http websocket and socketio settings",
-			request:               stripTestRequest("grpc", "POST", "body", "json"),
-			wantSettings:          []string{"timeoutMs", "grpcUseTls", "grpcServerName", "grpcIncludeDefaultValues"},
-			absentSettings:        []string{"followRedirects", "wsReconnectAttempts", "sioPath", "grpcUseReflection"},
-			wantOverrides:         []string{"timeoutMs", "grpcUseTls", "grpcServerName"},
-			absentOverrides:       []string{"followRedirects", "wsReconnectAttempts", "sioPath", "grpcUseReflection"},
-			wantFields:            []string{"grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath"},
-			absentFields:          []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "mcpMethod", "mcpName", "mcpArguments"},
-			wantMissingMethod:     true,
-			wantMissingRequestTab: true,
+			name:              "grpc keeps grpc state and drops http websocket and socketio settings",
+			request:           stripTestRequest("grpc", "POST", "body", "json"),
+			wantSettings:      []string{"timeoutMs", "grpcUseTls", "grpcServerName", "grpcIncludeDefaultValues"},
+			absentSettings:    []string{"followRedirects", "wsReconnectAttempts", "sioPath", "grpcUseReflection"},
+			wantOverrides:     []string{"timeoutMs", "grpcUseTls", "grpcServerName"},
+			absentOverrides:   []string{"followRedirects", "wsReconnectAttempts", "sioPath", "grpcUseReflection"},
+			wantFields:        []string{"grpcMethod", "grpcMetadata", "grpcUseReflection", "grpcProtoFilePath"},
+			absentFields:      []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "mcpMethod", "mcpName", "mcpArguments"},
+			wantMissingMethod: true,
 		},
 		{
-			name:                  "mcp keeps the call and drops every other transport's state",
-			request:               stripTestRequest("mcp", "POST", "body", "none"),
-			wantSettings:          []string{"timeoutMs"},
-			absentSettings:        []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantOverrides:         []string{"timeoutMs"},
-			absentOverrides:       []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantFields:            []string{"mcpMethod", "mcpName", "mcpArguments", "mcpProtocolVersion"},
-			absentFields:          []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds", "aiKurloTools", "aiConnectionId"},
-			wantMissingMethod:     true,
-			wantMissingRequestTab: true,
+			name:              "mcp keeps the call and drops every other transport's state",
+			request:           stripTestRequest("mcp", "POST", "body", "none"),
+			wantSettings:      []string{"timeoutMs"},
+			absentSettings:    []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
+			wantOverrides:     []string{"timeoutMs"},
+			absentOverrides:   []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
+			wantFields:        []string{"mcpMethod", "mcpName", "mcpArguments", "mcpProtocolVersion"},
+			absentFields:      []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds", "aiKurloTools", "aiConnectionId"},
+			wantMissingMethod: true,
 		},
 		{
-			name:                  "ai keeps the prompt and model and drops every other transport's state",
-			request:               stripTestRequest("ai", "POST", "body", "none"),
-			wantSettings:          []string{"timeoutMs"},
-			absentSettings:        []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantOverrides:         []string{"timeoutMs"},
-			absentOverrides:       []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
-			wantFields:            []string{"aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds", "aiKurloTools", "aiConnectionId"},
-			absentFields:          []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "mcpMethod", "mcpName", "mcpArguments"},
-			wantMissingMethod:     true,
-			wantMissingRequestTab: true,
+			name:              "ai keeps the prompt and model and drops every other transport's state",
+			request:           stripTestRequest("ai", "POST", "body", "none"),
+			wantSettings:      []string{"timeoutMs"},
+			absentSettings:    []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
+			wantOverrides:     []string{"timeoutMs"},
+			absentOverrides:   []string{"wsReconnectAttempts", "sioPath", "grpcUseTls", "grpcServerName"},
+			wantFields:        []string{"aiProvider", "aiModel", "aiPrompt", "aiStream", "aiToolRequestIds", "aiKurloTools", "aiConnectionId"},
+			absentFields:      []string{"method", "sioEvents", "sioArgs", "graphqlSchema", "grpcMethod", "grpcMetadata", "mcpMethod", "mcpName", "mcpArguments"},
+			wantMissingMethod: true,
 		},
 	}
 
@@ -115,9 +108,7 @@ func TestStripRequestForFilesystemPrunesTypeSpecificFields(t *testing.T) {
 			if tt.wantMissingMethod {
 				assertMapMissingKeys(t, tt.request, []string{"method"})
 			}
-			if tt.wantMissingRequestTab {
-				assertMapMissingKeys(t, tt.request, []string{"requestTab"})
-			}
+			assertMapMissingKeys(t, tt.request, []string{"requestTab"})
 		})
 	}
 }
@@ -416,5 +407,68 @@ func TestStripRequestForFilesystemDropsPersonalStar(t *testing.T) {
 		if _, ok := request["isPinned"]; ok {
 			t.Fatalf("isPinned=%v was written to the request file", pinned)
 		}
+	}
+}
+
+func TestStripAndLoadWorkspaceRowsKeepsFalseAndExpandsLegacyDefaults(t *testing.T) {
+	request := map[string]any{
+		"params": []any{
+			map[string]any{"id": "one", "key": "enabled", "value": "true", "enabled": true, "description": ""},
+			map[string]any{"id": "two", "key": "disabled", "value": "false", "enabled": false, "description": ""},
+			map[string]any{"id": "three", "key": "legacy", "value": "old"},
+		},
+	}
+	stripRequestForFilesystem(request)
+	rows := request["params"].([]any)
+	first, second, third := rows[0].(map[string]any), rows[1].(map[string]any), rows[2].(map[string]any)
+	if _, exists := first["enabled"]; exists {
+		t.Fatal("default enabled flag was written")
+	}
+	if _, exists := first["description"]; exists {
+		t.Fatal("empty description was written")
+	}
+	if second["enabled"] != false {
+		t.Fatal("explicit disabled flag was lost")
+	}
+	if _, exists := second["description"]; exists {
+		t.Fatal("empty description was written")
+	}
+	if _, exists := third["enabled"]; exists || third["description"] != nil {
+		t.Fatal("legacy defaults leaked into serialized rows")
+	}
+	normalizeWorkspaceRows(request, "params")
+	first = rows[0].(map[string]any)
+	second = rows[1].(map[string]any)
+	third = rows[2].(map[string]any)
+	if first["enabled"] != true || first["description"] != "" {
+		t.Fatal("compact default changed on load")
+	}
+	if second["enabled"] != false {
+		t.Fatal("explicit false changed on load")
+	}
+	if third["enabled"] != true || third["description"] != "" {
+		t.Fatal("legacy row defaults were not restored")
+	}
+}
+
+func TestStripCollectionOpenAPIHeadersCompactsDefaultsAndKeepsIDs(t *testing.T) {
+	collection := map[string]any{"openapi": map[string]any{"headers": []any{
+		map[string]any{"id": "saved-secret-id", "key": "Authorization", "value": "{{token}}", "enabled": true, "description": ""},
+		map[string]any{"id": "row-off", "key": "X-Off", "value": "no", "enabled": false, "description": ""},
+	}}}
+	stripCollectionForFilesystem(collection)
+	rows := nestedMap(collection, "openapi")["headers"].([]any)
+	first, second := rows[0].(map[string]any), rows[1].(map[string]any)
+	if _, ok := first["enabled"]; ok {
+		t.Fatal("true default was written")
+	}
+	if _, ok := first["description"]; ok {
+		t.Fatal("empty description was written")
+	}
+	if first["id"] != "saved-secret-id" {
+		t.Fatal("OpenAPI row ID policy changed")
+	}
+	if second["enabled"] != false || second["id"] != "row-off" {
+		t.Fatal("explicit false or row ID was lost")
 	}
 }

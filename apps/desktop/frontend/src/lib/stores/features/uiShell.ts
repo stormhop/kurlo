@@ -85,6 +85,8 @@ export function codePanelMaxWidth(viewportWidth: number, sidebarWidth: number): 
 type ColumnResizeTarget = 'key' | 'val' | 'type' | 'desc';
 
 type UiShellHost = {
+  draftRequestIds: Set<string>;
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   saveGlobals: () => Promise<boolean>;
   saveWorkspaceReadmes: () => Promise<boolean>;
   _sidebarSearchInput: HTMLInputElement | undefined;
@@ -453,6 +455,11 @@ export const uiShellFeature = {
       return;
     }
     if (id === 'save-request') {
+      if (this.topView === 'request' && this.requestFiles?.active) {
+        if (this.draftRequestIds.has(this.activeRequestId)) await this.saveActiveRequest();
+        else await this.requestFiles.active.save();
+        return;
+      }
       if (this.autosave) return;
       if (this.topView === 'environment') await this.saveEnvironment();
       else if (this.topView === 'globals') await this.saveGlobals();

@@ -35,6 +35,7 @@
   import AgentWorkspace from './lib/components/AgentWorkspace.svelte';
   import { METHODS, REQUEST_TYPES, DEFAULT_WORKSPACE, RAW_BODY_TYPES } from './lib/constants';
   import { installQuitShortcut, installTitlebarDoubleClickHandler } from './lib/windowControls';
+  import { requestSectionPreference, saveRequestSectionPreference } from './lib/requestTabPreferences';
   import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
   import { requestTypeSupportsAssertions } from './lib/assertions';
   import type { SnippetLanguage } from './lib/stores/ui';
@@ -450,7 +451,7 @@
 
   $effect(() => {
     lazy.preloadForAppShell({
-      requestTab: vm.requestTab,
+      requestTab: requestSection,
       requestType: vm.requestType,
       method: vm.method,
       topView: vm.topView,
@@ -476,6 +477,74 @@
     vm.gitWorkspaceOpen;
     vm.sidebarView;
     untrack(() => vm.saveTopViewState());
+  });
+
+  const requestSection = $derived(vm.requestFiles.active ? 'file' : vm.requestTab);
+  const fileDraft = $derived(vm.activeRequest?.isDraft ? undefined : vm.requestFiles.active);
+  const barType = $derived(fileDraft?.barType ?? vm.requestType);
+  const barMethod = $derived(fileDraft?.barValue('method', vm.method,
+    ['ai', 'grpc', 'graphql', 'mcp'].includes(barType) ? 'POST' : 'GET') ?? vm.method);
+  const barUrl = $derived(fileDraft?.barValue('url', vm.url) ?? vm.url);
+
+  function setBarUrl(value: string) {
+    if (fileDraft) fileDraft.editBar({ url: value });
+    else vm.url = value;
+  }
+
+  function setBarMethod(value: string) {
+    if (fileDraft) fileDraft.editBar({ method: value });
+    else vm.method = value as typeof vm.method;
+  }
+
+  function changeBarProtocol(type: typeof vm.requestType, method?: string) {
+    if (fileDraft) fileDraft.changeProtocol(type, method);
+    else {
+      vm.selectRequestType(type);
+      if (method) setBarMethod(method);
+    }
+  }
+
+  function setBarName(value: string) {
+    if (fileDraft) fileDraft.editBar(fileDraft.currentBarValues()?.nameAuto === 'true' ? { name: value, nameAuto: false } : { name: value });
+    else vm.setRequestHeaderName(value);
+  }
+
+  let previousRequestSectionKey = '';
+  let previousFormRequestTab: typeof vm.requestTab | undefined;
+  $effect(() => {
+    const id = vm.activeRequestId;
+    const root = vm.requestFiles.root;
+    const section = vm.requestTab;
+    const request = vm.requestsById.get(id);
+    const workspaceId = vm.collections.find(collection => collection.id === request?.collectionId)?.workspaceId ?? vm.activeWorkspaceId;
+    const key = id && root ? JSON.stringify([root, workspaceId, id]) : '';
+    if (!vm.requestStoreLoaded || !key) {
+      previousRequestSectionKey = '';
+      previousFormRequestTab = undefined;
+      return;
+    }
+    if (key !== previousRequestSectionKey) {
+      previousRequestSectionKey = key;
+      previousFormRequestTab = section;
+      if (requestSectionPreference(root, workspaceId, id) === 'file' && !vm.requestFiles.active) {
+        untrack(() => void vm.requestFiles.select('file'));
+      }
+      return;
+    }
+    if (!vm.requestFiles.active && previousFormRequestTab !== undefined && previousFormRequestTab !== section) {
+      saveRequestSectionPreference(root, workspaceId, id, section);
+    }
+    previousFormRequestTab = section;
+  });
+
+  function selectRequestSection(section: import('./lib/stores/requestFiles.svelte').RequestSection) {
+    void vm.requestFiles.select(section);
+  }
+
+  $effect(() => {
+    if (vm.externalWorkspaceChangePending && !vm.requestFiles.dirtyIds.length) {
+      untrack(() => void vm.refreshPendingExternalWorkspaceChangeIfClean());
+    }
   });
 
   function hideBootScreen() {
@@ -865,7 +934,7 @@
       environmentMenu={vm.environmentMenu}
       environmentScopeName={vm.environmentScopeCollection?.name ?? ''}
       activeEnvironmentId={vm.activeEnvironmentId}
-      dirtyRequestIds={vm.dirtyRequestIdList}
+      dirtyRequestIds={[...(vm.autosave ? [] : vm.dirtyRequestIdList), ...vm.requestFiles.dirtyIds]}
       collectionRunnerOpen={vm.collectionRunnerOpen}
       collectionRunnerRunning={vm.collectionRunnerRunning}
       activeCollectionSettings={vm.activeCollectionSettings}
@@ -882,7 +951,6 @@
       closeLoadTestTab={() => void vm.closeLoadTestTab()}
       mockRunning={vm.mockServer.running}
       gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
-      autosave={vm.autosave}
       workspaceBlocked={vm.workspaceBlocked}
       toggleWorkspaceMenu={vm.toggleWorkspaceMenu}
       createWorkspace={vm.createWorkspace}
@@ -1223,16 +1291,17 @@
       <RequestBar
         bind:codePanelOpen={vm.codePanelOpen}
         {codePanelAvailable}
-        requestName={vm.requestHeaderName()}
+        requestName={fileDraft?.barValue('name', vm.requestHeaderName()) ?? vm.requestHeaderName()}
         requestLocation={activeRequestLocation}
-        showSave={!vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
+        {fileDraft}
+        showSave={!vm.requestFiles.active && !vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
         saveDirty={!vm.workspaceBlocked && vm.activeRequestIsDirty}
         canRevert={!vm.workspaceBlocked && vm.activeRequestCanRevert}
         onSave={vm.saveActiveRequest}
         onRevert={vm.revertActiveRequestChanges}
-        requestType={vm.requestType}
-        bind:method={vm.method}
-        bind:url={vm.url}
+        requestType={barType}
+        bind:method={() => barMethod, setBarMethod}
+        bind:url={() => barUrl, setBarUrl}
         bind:urlInputRef={vm._urlInputRef}
         requestTypes={REQUEST_TYPES}
         methods={METHODS}
@@ -1241,11 +1310,11 @@
         requestTypeLabel={vm.requestTypeLabel}
         requestTypeEditable={vm.requestTypeEditable}
         variableSuggestions={vm.variableSuggestions}
-        onRequestNameInput={vm.setRequestHeaderName}
-        onRequestNameCommit={vm.commitRequestHeaderName}
-        onRequestTypeChange={vm.selectRequestType}
+        onRequestNameInput={setBarName}
+        onRequestNameCommit={() => { if (!fileDraft) vm.commitRequestHeaderName(); }}
+        onRequestTypeChange={changeBarProtocol}
         onUrlPaste={vm.onUrlPaste}
-        onUrlInput={() => vm.syncParamsFromUrl()}
+        onUrlInput={() => { if (!fileDraft) vm.syncParamsFromUrl(); }}
         onSend={vm.runActiveRequest}
         onSendAndDownload={() => vm.runActiveRequestAndDownload()}
         sseStatus={vm.requestType === 'http' && (vm.method === 'SSE' || sseSessionVisible) ? (vm.currentSSESession?.status ?? 'idle') : undefined}
@@ -1262,9 +1331,10 @@
       <div class="request-split" class:split-right={responseOnRight} bind:clientWidth={requestSplitWidth} style="--request-split: {vm.requestSplitRatio}">
       <div class="request-editor" role="presentation" onkeydowncapture={reserveEditorSendShortcut} style={responseOnRight ? '' : `height: ${rem(vm.requestPanelHeight)}; --request-panel-h: ${rem(vm.requestPanelHeight)}`}>
         <RequestEditorTabs
-          bind:requestTab={vm.requestTab}
-          requestType={vm.requestType}
-          method={vm.method}
+          requestTab={requestSection}
+          onselect={selectRequestSection}
+          requestType={barType}
+          method={barMethod}
           paramsCount={activeCount(vm.params) + vm.pathParams.filter(r => r.value).length}
           authConfigured={vm.authHasConfig()}
           headerCount={vm.requestHeaderCount}
@@ -1282,7 +1352,7 @@
           exampleCount={vm.requestExamplesLoaded ? vm.requestExamples.length : (vm.requestsById.get(vm.activeRequestId)?.exampleCount ?? 0)}
         />
 
-        {#if vm.requestTab === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
+        {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
           <BodyModeSelector
             bind:rawTypeMenuOpen={vm.rawTypeMenuOpen}
             rawBodyType={vm.rawBodyType}
@@ -1298,8 +1368,17 @@
           />
         {/if}
 
-        <div class="tab-content" class:script-editor-mode={vm.requestTab === 'scripts' && (vm.scriptTab !== 'assertions' || !requestTypeSupportsAssertions(vm.requestType))} class:body-editor-mode={(vm.requestTab === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || vm.requestType === 'ai' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (vm.requestTab === 'query' || vm.requestTab === 'schema'))}>
-          {#if vm.requestTab === 'docs'}
+        <div class="tab-content" class:file-editor-mode={requestSection === 'file'} class:script-editor-mode={requestSection === 'scripts' && (vm.scriptTab !== 'assertions' || !requestTypeSupportsAssertions(vm.requestType))} class:body-editor-mode={(requestSection === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || vm.requestType === 'ai' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (requestSection === 'query' || requestSection === 'schema'))}>
+          {#if vm.requestFiles.active}
+            {#if vm.activeRequest?.isDraft}
+              <div class="file-tab-empty">
+                <p>Save this request to a collection to edit its YAML file.</p>
+                <button type="button" class="btn btn-secondary btn-sm" onclick={vm.saveActiveRequest}>Save request</button>
+              </div>
+            {:else if lazy.FileTabComponent}
+              <lazy.FileTabComponent draft={vm.requestFiles.active} />
+            {/if}
+          {:else if vm.requestTab === 'docs'}
             {#if lazy.DocsTabComponent}<lazy.DocsTabComponent />{/if}
           {:else if vm.requestTab === 'query'}
             {#if lazy.GraphQLQueryTabComponent}<lazy.GraphQLQueryTabComponent />{/if}
@@ -1399,7 +1478,7 @@
           listenEventCount={vm.sioEvents.filter(r => r.enabled && r.key.trim()).length}
           onClear={vm.socketIOClearMessages}
           onRestore={vm.socketIORestoreMessages}
-          onGoToEvents={() => vm.requestTab = 'events'}
+          onGoToEvents={() => void vm.requestFiles.select('events')}
         />
         {/if}
       {:else if vm.requestType === 'http' && (vm.method === 'SSE' || sseSessionVisible)}

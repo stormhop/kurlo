@@ -1,4 +1,5 @@
 import type { CookieJarEntry } from './backend';
+import { isWorkspaceSecretReference } from './variables';
 
 type DomainGroup = { domain: string; cookies: CookieJarEntry[] };
 
@@ -147,9 +148,7 @@ function cookieMatchesUrl(cookie: CookieJarEntry, requestUrl: string, now = Date
   return requestPath === cookiePath || requestPath.startsWith(cookiePath.endsWith('/') ? cookiePath : `${cookiePath}/`);
 }
 
-export function cookieValueIsMissingSecret(value: string): boolean {
-  return /^\{\{kurloSecret:[^{}]+\}\}$/.test(value);
-}
+export const cookieValueIsMissingSecret = isWorkspaceSecretReference;
 
 export function cookieForEditing(cookie: CookieJarEntry): CookieJarEntry {
   return cookieValueIsMissingSecret(cookie.value) ? { ...cookie, value: '' } : cookie;

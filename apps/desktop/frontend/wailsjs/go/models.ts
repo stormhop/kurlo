@@ -683,6 +683,34 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class RequestFileYAMLResult {
+	    ok: boolean;
+	    id: string;
+	    path: string;
+	    content: string;
+	    revision: string;
+	    requestJson?: string;
+	    error?: string;
+	    line?: number;
+	    conflict?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequestFileYAMLResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.id = source["id"];
+	        this.path = source["path"];
+	        this.content = source["content"];
+	        this.revision = source["revision"];
+	        this.requestJson = source["requestJson"];
+	        this.error = source["error"];
+	        this.line = source["line"];
+	        this.conflict = source["conflict"];
+	    }
+	}
 	export class SaveRequestStoreResult {
 	    ok: boolean;
 	    error?: string;
@@ -750,6 +778,7 @@ export namespace api {
 	    }
 	}
 	export class WorkspaceLoadResult {
+	    root: string;
 	    payload: string;
 	    diagnostics: WorkspaceDiagnostic[];
 	    revision?: number;
@@ -760,6 +789,7 @@ export namespace api {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.root = source["root"];
 	        this.payload = source["payload"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], WorkspaceDiagnostic);
 	        this.revision = source["revision"];

@@ -49,7 +49,6 @@
     closeLoadTestTab = () => {},
     mockRunning = false,
     gitChangeCount = 0,
-    autosave,
     workspaceBlocked = false,
     toggleWorkspaceMenu,
     createWorkspace,
@@ -110,7 +109,6 @@
     closeLoadTestTab?: () => void;
     mockRunning?: boolean;
     gitChangeCount?: number;
-    autosave: boolean;
     workspaceBlocked?: boolean;
     toggleWorkspaceMenu: (event: MouseEvent) => void;
     createWorkspace: () => void;
@@ -418,8 +416,8 @@
         </div>
       {/if}
       {#each openRequests as req, eachIndex (eachIndex)}
-        {@const unsaved = req.isDraft ? 'Unsaved draft' : !autosave && dirtyRequestIdSet.has(req.id) ? 'Unsaved changes' : ''}
-        <div class="saved-request-tab" class:active={req.id === activeRequestId && topView === 'request'} class:preview={req.id === previewRequestId} class:draft={req.isDraft} class:dirty={!autosave && !req.isDraft && dirtyRequestIdSet.has(req.id)} class:unsaved={Boolean(unsaved)} use:middleClick={workspaceBlocked ? undefined : () => closeRequestTab(req.id)}>
+        {@const unsaved = req.isDraft ? 'Unsaved draft' : dirtyRequestIdSet.has(req.id) ? 'Unsaved changes' : ''}
+        <div class="saved-request-tab" class:active={req.id === activeRequestId && topView === 'request'} class:preview={req.id === previewRequestId} class:draft={req.isDraft} class:dirty={!req.isDraft && dirtyRequestIdSet.has(req.id)} class:unsaved={Boolean(unsaved)} use:middleClick={workspaceBlocked ? undefined : () => closeRequestTab(req.id)}>
           <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={req.id === activeRequestId && topView === 'request'} tabindex={req.id === activeRequestId && topView === 'request' ? 0 : -1} onclick={() => switchRequest(req.id)} ondblclick={() => keepRequestTab(req.id)} disabled={workspaceBlocked}>
             <RequestTypeBadge request={req} variant="tab" />
             <span class="tab-title">{requestTabLabel(req)}</span>

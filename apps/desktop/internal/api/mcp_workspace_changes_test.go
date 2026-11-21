@@ -27,14 +27,14 @@ func TestMCPWorkspaceRequestDocumentsAndPatch(t *testing.T) {
 			}
 			h.tool("patch_request", map[string]any{"request": saved.ID, "patch": map[string]any{"requestNotes": "Changed", "auth": map[string]any{"oauth2Scope": "read"}}}, nil)
 			content := readWorkspaceFile(t, root, saved.File)
-			for _, value := range []string{"requestNotes: Changed", "oauth2Scope: read", "oauth2Secret: '{{clientSecret}}'"} {
+			for _, value := range []string{"requestNotes: Changed", "oauth2Scope: read", `oauth2Secret: "{{clientSecret}}"`} {
 				if !strings.Contains(content, value) {
 					t.Fatalf("patch did not preserve or add %q:\n%s", value, content)
 				}
 			}
 			var read struct{ YAML string }
 			h.tool("get_request", map[string]any{"request": saved.ID, "format": "yaml"}, &read)
-			if !strings.Contains(read.YAML, "requestType: "+protocol) || !strings.Contains(read.YAML, "oauth2Secret: '{{clientSecret}}'") {
+			if !strings.Contains(read.YAML, "requestType: "+protocol) || !strings.Contains(read.YAML, `oauth2Secret: "{{clientSecret}}"`) {
 				t.Fatalf("YAML read did not return the request fields: %s", read.YAML)
 			}
 			if protocol == "http" {
@@ -42,7 +42,7 @@ func TestMCPWorkspaceRequestDocumentsAndPatch(t *testing.T) {
 					"type": "ntlm", "basicUser": "DOMAIN\\user", "basicPass": "{{ntlmPassword}}",
 				}}}, nil)
 				content = readWorkspaceFile(t, root, saved.File)
-				if !strings.Contains(content, "type: ntlm") || !strings.Contains(content, "basicPass: '{{ntlmPassword}}'") {
+				if !strings.Contains(content, "type: ntlm") || !strings.Contains(content, `basicPass: "{{ntlmPassword}}"`) {
 					t.Fatalf("NTLM config was lost: %s", content)
 				}
 			}
@@ -375,5 +375,33 @@ func TestMCPRunReportsEachScriptLogOnce(t *testing.T) {
 	h.tool("run_request", map[string]any{"request": "Smoke/Logged"}, &run)
 	if !reflect.DeepEqual(run.Logs, []string{"before", "after"}) {
 		t.Fatalf("logs = %q", run.Logs)
+	}
+}
+
+func TestMCPRequestRowsRoundTripCompactDefaults(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	root := writeYAMLWorkspace(t, "https://example.test")
+	h := startMCPHarness(t, mcpServerOptions{workspace: root})
+	var saved struct{ ID, File string }
+	h.tool("save_request", map[string]any{"collection": "Smoke", "yaml": "version: 1\nrequest:\n  name: Compact rows\n  requestType: http\n  method: GET\n  url: https://example.test\n  headers:\n    - key: X-On\n      value: yes\n    - key: X-Off\n      value: no\n      enabled: false\n      description: \"\"\n  params:\n    - key: page\n      value: \"1\"\n      description: \"\"\n"}, &saved)
+	content := readWorkspaceFile(t, root, saved.File)
+	if strings.Contains(content, "enabled: true") || strings.Contains(content, "description: \"\"") {
+		t.Fatalf("MCP wrote redundant row defaults:\n%s", content)
+	}
+	if !strings.Contains(content, "enabled: false") {
+		t.Fatalf("MCP dropped explicit false:\n%s", content)
+	}
+	var read struct{ YAML string }
+	h.tool("get_request", map[string]any{"request": saved.ID, "format": "yaml"}, &read)
+	if !strings.Contains(read.YAML, "enabled: true") || !strings.Contains(read.YAML, "description: \"\"") || !strings.Contains(read.YAML, "enabled: false") {
+		t.Fatalf("MCP read did not hydrate defaults and explicit false:\n%s", read.YAML)
+	}
+	h.tool("patch_request", map[string]any{"request": saved.ID, "patch": map[string]any{"headers": []any{
+		map[string]any{"key": "X-On", "value": "yes", "enabled": true, "description": ""},
+		map[string]any{"key": "X-Off", "value": "no", "enabled": false, "description": ""},
+	}}}, nil)
+	content = readWorkspaceFile(t, root, saved.File)
+	if strings.Contains(content, "enabled: true") || strings.Contains(content, "description: \"\"") || !strings.Contains(content, "enabled: false") {
+		t.Fatalf("MCP patch did not compact the mixed rows:\n%s", content)
 	}
 }

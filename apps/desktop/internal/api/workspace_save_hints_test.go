@@ -175,3 +175,55 @@ func TestAFileChangedOutsideKurloIsReadBeforeTheNextSave(t *testing.T) {
 		t.Fatal("a workspace with a broken file should not be saved from remembered state")
 	}
 }
+
+func TestLegacyWorkspaceRowsKeepCommentedFilesByteForByte(t *testing.T) {
+	const legacyRows = `[{key: X-On, value: on, enabled: true, description: ""}, {key: X-Off, value: off, enabled: false}]`
+	rows := []any{
+		map[string]any{"key": "X-On", "value": "on"},
+		map[string]any{"key": "X-Off", "value": "off", "enabled": false},
+	}
+	for _, tc := range []struct {
+		name   string
+		source string
+		value  any
+	}{
+		{
+			name:   "environment",
+			source: "version: 1\nenvironment:\n  id: env\n  values: " + legacyRows + " # keep\n",
+			value:  filesystemEnvironmentFile{Version: fileStoreVersion, Environment: map[string]any{"id": "env", "values": rows}},
+		},
+		{
+			name:   "collection",
+			source: "version: 1\ncollection:\n  id: col\n  defaults:\n    headers: " + legacyRows + " # keep\n",
+			value: filesystemCollectionFile{Version: fileStoreVersion, Collection: map[string]any{
+				"id": "col", "defaults": map[string]any{"headers": rows},
+			}},
+		},
+		{
+			name:   "example",
+			source: "version: 1\nexample:\n  id: saved\n  response:\n    headers: " + legacyRows + " # keep\n",
+			value: filesystemExampleFile{Version: fileStoreVersion, Example: map[string]any{
+				"id": "saved", "response": map[string]any{"headers": rows},
+			}},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), tc.name+".yml")
+			if err := os.WriteFile(path, []byte(tc.source), 0644); err != nil {
+				t.Fatal(err)
+			}
+			journal := &saveJournal{root: filepath.Dir(path)}
+			if err := writeCanonicalYAMLFile(path, tc.value, journal, nil); err != nil {
+				t.Fatal(err)
+			}
+			got, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tc.source {
+				t.Fatalf("unchanged legacy file was rewritten:\n%s", got)
+			}
+			journal.close()
+		})
+	}
+}

@@ -3,11 +3,13 @@
     onbeautify,
     beautified = false,
     disabled = false,
+    busy,
     title = 'Beautify',
   }: {
     onbeautify: () => void | boolean | Promise<unknown>;
     beautified?: boolean;
     disabled?: boolean;
+    busy?: boolean;
     title?: string;
   } = $props();
 </script>
@@ -18,6 +20,7 @@
   type="button"
   {title}
   {disabled}
+  aria-busy={busy}
   onclick={() => onbeautify()}
 >
   {#if beautified}

@@ -6,7 +6,7 @@ import type {
   GitWorkspaceStatus, GrpcRequest, GrpcResponse, GrpcServiceDefinition, HttpRequest, HttpResponse,
   JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
-  WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
+  RequestFileYAMLResult, WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
   McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
 } from './wire';
 import {
@@ -214,12 +214,12 @@ export async function loadRequestStore(): Promise<string> {
   return app.LoadRequestStore();
 }
 
-export async function loadWorkspace(): Promise<{ payload: string; diagnostics: WorkspaceDiagnostic[]; revision?: number }> {
+export async function loadWorkspace(): Promise<{ root?: string; payload: string; diagnostics: WorkspaceDiagnostic[]; revision?: number }> {
   const app = window.go?.api?.App;
   if (app?.LoadWorkspace) {
     const result = await app.LoadWorkspace();
     const revision = typeof result?.revision === 'number' && result.revision > 0 ? result.revision : undefined;
-    return { payload: result?.payload ?? '', diagnostics: Array.isArray(result?.diagnostics) ? result.diagnostics : [], revision };
+    return { root: result?.root, payload: result?.payload ?? '', diagnostics: Array.isArray(result?.diagnostics) ? result.diagnostics : [], revision };
   }
   const diagnostics = await loadWorkspaceDiagnostics();
   return { payload: await loadRequestStore(), diagnostics };
@@ -237,6 +237,18 @@ export async function loadWorkspaceDiagnostics(): Promise<WorkspaceDiagnostic[]>
   if (!app?.LoadWorkspaceDiagnostics) return [];
   const diagnostics = await app.LoadWorkspaceDiagnostics();
   return Array.isArray(diagnostics) ? diagnostics : [];
+}
+
+export async function getRequestFileYAML(root: string, id: string, pathHint: string): Promise<RequestFileYAMLResult> {
+  return await window.go?.api?.App?.GetRequestFileYAML?.(root, id, pathHint) ?? { ok: false, id, path: '', content: '', revision: '', error: 'Open this request in the desktop app to edit its YAML.' };
+}
+
+export async function formatRequestFileYAML(content: string): Promise<RequestFileYAMLResult> {
+  return await window.go?.api?.App?.FormatRequestFileYAML?.(content) ?? { ok: false, id: '', path: '', content: '', revision: '', error: 'The desktop app is unavailable.' };
+}
+
+export async function saveRequestFileYAML(root: string, id: string, content: string, revision: string, pathHint: string): Promise<RequestFileYAMLResult> {
+  return await window.go?.api?.App?.SaveRequestFileYAML?.(root, id, content, revision, pathHint) ?? { ok: false, id, path: '', content: '', revision: '', error: 'The desktop app is unavailable.' };
 }
 
 export async function readWorkspaceYAMLFile(path: string): Promise<WorkspaceYAMLFileResult> {

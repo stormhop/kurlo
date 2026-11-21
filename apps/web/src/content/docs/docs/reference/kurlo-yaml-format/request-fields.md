@@ -7,7 +7,7 @@ title: "Request fields"
 | `requestType` | `http`, `graphql`, `ws`, `socketio`, `grpc`, `mcp`, or `ai` |
 | `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, or `SSE` |
 | `folderPath` | Display names only. Request files are stored flat; `folderPath` is the UI source of truth. |
-| `params`, `pathParams`, `vars`, `postResponseVars`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. A row with `secret: true` keeps its value in the encrypted local store, with a `{{kurloSecret:...}}` placeholder in the file. |
+| `params`, `pathParams`, `vars`, `postResponseVars`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. An omitted `enabled` means true. Disabled rows keep `enabled: false`. An omitted `description` means an empty string. A row with `secret: true` keeps its value in the encrypted local store, with a `{{kurloSecret:...}}` placeholder in the file. |
 | `vars` | [Request variables](/docs/guides/environments/request-variables/) set before the send, as rows. They win over environment, collection and global values. Omitted when empty. |
 | `postResponseVars` | Post-response variables, as rows whose `value` is a JavaScript expression over `res`, such as `res.body.token`. HTTP and GraphQL only. Omitted when empty. |
 | `pathParams` | Values of the `:name` path variables in `url`. The names come from the URL; a row whose name the URL no longer has is dropped. |

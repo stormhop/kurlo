@@ -4,6 +4,7 @@
   import { onMount } from 'svelte';
   import RequestShortcutHint from './RequestShortcutHint.svelte';
   import SaveActions from './SaveActions.svelte';
+  import type { RequestFileDraft } from '../requestFileDraft.svelte';
   import VariableInput from './VariableInput.svelte';
   import { urlGhost, urlGhostCandidates } from '../ghostText';
   import AiModelPicker from './AiModelPicker.svelte';
@@ -19,6 +20,7 @@
     codePanelAvailable = false,
     requestName,
     requestLocation = '',
+    fileDraft,
     showSave = false,
     saveDirty = false,
     canRevert = false,
@@ -56,6 +58,7 @@
     codePanelAvailable?: boolean;
     requestName: string;
     requestLocation?: string;
+    fileDraft?: RequestFileDraft;
     showSave?: boolean;
     saveDirty?: boolean;
     canRevert?: boolean;
@@ -74,7 +77,7 @@
     variableSuggestions?: VariableSuggestion[];
     onRequestNameInput: (value: string) => void;
     onRequestNameCommit: () => void;
-    onRequestTypeChange: (type: RequestType) => void;
+    onRequestTypeChange: (type: RequestType, method?: string) => void;
     onUrlPaste: (event: ClipboardEvent) => void;
     onUrlInput?: (event: Event) => void;
     onSend: () => void;
@@ -96,15 +99,17 @@
     excludeRequestId: vm.activeRequestId,
   }));
   const urlGhostFor = (typed: string) => urlGhost(typed, urlCandidates);
-  let isSSE = $derived(method === 'SSE');
-  let isGraphQL = $derived(requestType === 'graphql');
   let isGRPC = $derived(requestType === 'grpc');
   let isAI = $derived(requestType === 'ai');
-  const chosenAiConnection = $derived(vm.aiConnectionId ? aiConnectionsStore.list.find(connection => connection.id === vm.aiConnectionId) ?? null : null);
-  const connectionStatus = $derived(requestType === 'ws' ? wsStatus : requestType === 'socketio' ? sioStatus : sseStatus);
+  const aiProvider = $derived(fileDraft?.barValue('aiProvider', vm.aiProvider, 'openai') ?? vm.aiProvider);
+  const connectionId = $derived(fileDraft?.barValue('aiConnectionId', vm.aiConnectionId) ?? vm.aiConnectionId);
+  const chosenAiConnection = $derived(aiConnectionsStore.list.find(connection => connection.id === connectionId));
+  const running = $derived(vm.requestIsRunning(vm.activeRequestId));
+  const sendType = $derived(running ? vm.requestType : requestType);
+  const connectionStatus = $derived(sendType === 'ws' ? wsStatus : sendType === 'socketio' ? sioStatus : sseStatus);
   const connecting = $derived(connectionStatus === 'connecting' || connectionStatus === 'reconnecting');
   const connectionActive = $derived(connecting || connectionStatus === 'connected');
-  const showSSEControls = $derived(requestType === 'http' && (isSSE || connectionActive));
+  const showSSEControls = $derived(sendType === 'http' && ((running ? vm.method : method) === 'SSE' || connectionActive));
   const sendBusy = $derived(loading || connectionActive);
 
   function sendFromUrl() {
@@ -175,8 +180,7 @@
   };
   let protocolTypes = $derived(requestTypes.filter(type => type !== 'http'));
   let isHTTP = $derived(requestType === 'http');
-  let aiEndpoint = $derived(aiEndpointParts(url, vm.aiProvider));
-  let pickerInteractive = $derived(isHTTP || requestTypeEditable);
+  let aiEndpoint = $derived(aiEndpointParts(url, aiProvider));
   let pickerLabel = $derived(isHTTP ? method : requestTypeLabel(requestType));
 
   function selectRequestType(type: RequestType) {
@@ -188,9 +192,8 @@
   function selectMethod(nextMethod: string) {
     if (!isHTTP) {
       if (!requestTypeEditable) return;
-      onRequestTypeChange('http');
-    }
-    method = nextMethod;
+      onRequestTypeChange('http', nextMethod);
+    } else method = nextMethod;
     methodMenuOpen = false;
   }
 
@@ -222,11 +225,6 @@
       if (event.currentTarget instanceof HTMLInputElement) event.currentTarget.blur();
     }
   }
-
-  function inputValue(event: Event): string {
-    const target = event.currentTarget;
-    return target instanceof HTMLInputElement ? target.value : '';
-  }
 </script>
 
 <div class="request-composer" bind:this={requestComposerRef}>
@@ -238,11 +236,11 @@
     <input
       class="request-title-input"
       maxlength={NAME_MAX_LENGTH}
-      value={requestName}
+      disabled={!!fileDraft && !fileDraft.ready}
+      bind:value={() => requestName, onRequestNameInput}
       placeholder="New Request"
       spellcheck="false"
       aria-label="Request name"
-      oninput={(event) => onRequestNameInput(inputValue(event))}
       onblur={onRequestNameCommit}
       onkeydown={onNameKeydown}
       autocomplete="off"
@@ -255,27 +253,23 @@
   </div>
 
   <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-code={codePanelAvailable} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
-    <div class="url-field">
+    <div class="url-field" inert={!!fileDraft && !fileDraft.ready}>
       <div class="method-wrap" onfocusout={closeMethodMenuOnFocusOut}>
         <button
           class="method-trigger {isHTTP ? methodColor(method) : 'method-trigger--protocol'}"
           class:open={methodMenuOpen}
-          class:locked={!pickerInteractive}
           type="button"
           aria-label="Method and protocol"
-          aria-haspopup={pickerInteractive ? 'listbox' : undefined}
-          aria-expanded={pickerInteractive ? methodMenuOpen : undefined}
-          aria-disabled={!pickerInteractive}
-          onclick={() => { if (pickerInteractive) methodMenuOpen = !methodMenuOpen; }}
+          aria-haspopup="listbox"
+          aria-expanded={methodMenuOpen}
+          onclick={() => { methodMenuOpen = !methodMenuOpen; }}
         >
           <span>{pickerLabel}</span>
-          {#if pickerInteractive}
-            <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-              <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          {/if}
+          <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
+            <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
         </button>
-        {#if methodMenuOpen && pickerInteractive}
+        {#if methodMenuOpen}
           <div class="menu method-menu" role="listbox" aria-label="Method and protocol">
             <div class="method-menu-group" role="group" aria-label="HTTP">
               <span class="method-menu-label" aria-hidden="true">HTTP</span>
@@ -284,6 +278,7 @@
                   class={`menu-item ${methodColor(option)}`}
                   class:active={isHTTP && method === option}
                   role="option"
+                  disabled={!isHTTP && !requestTypeEditable}
                   aria-selected={isHTTP && method === option}
                   type="button"
                   onclick={() => selectMethod(option)}
@@ -310,16 +305,16 @@
                   </button>
                 {/each}
               {:else}
-                <p class="method-menu-note">The protocol is fixed once a saved request has a URL. Create a new request to use GraphQL, WebSocket, Socket.IO, gRPC, MCP or AI.</p>
+                <p class="method-menu-note">Stop the running request to change its protocol.</p>
               {/if}
             </div>
           </div>
         {/if}
       </div>
 
-      {#if isAI && vm.aiProvider === 'kurlo'}
-      <button class="field url-input ai-connection-url" type="button" aria-label={vm.aiConnectionId ? 'AI connection' : 'Default AI connection'} onclick={() => { aiConnectionsStore.reveal = 'models'; vm.openSettings('ai'); }}>
-        <span class="ai-connection-url-label" class:missing={vm.aiConnectionId && !chosenAiConnection}>{vm.aiConnectionId ? chosenAiConnection?.label ?? 'Removed connection' : aiConnectionsStore.defaultConnection?.label ?? 'No AI connection yet'}</span>
+      {#if isAI && aiProvider === 'kurlo'}
+      <button class="field url-input ai-connection-url" type="button" aria-label={connectionId ? 'AI connection' : 'Default AI connection'} onclick={() => { aiConnectionsStore.reveal = 'models'; vm.openSettings('ai'); }}>
+        <span class="ai-connection-url-label" class:missing={connectionId && !chosenAiConnection}>{connectionId ? chosenAiConnection?.label ?? 'Removed connection' : aiConnectionsStore.defaultConnection?.label ?? 'No AI connection yet'}</span>
         <span class="ai-connection-url-hint">Settings → AI</span>
       </button>
       {:else}
@@ -340,10 +335,19 @@
     </div>
 
     {#if isAI}
-      <AiModelPicker />
+      <AiModelPicker {fileDraft} />
     {/if}
 
-    {#if isGRPC}
+    {#if isGRPC && fileDraft}
+      <VariableInput
+        className="field field-xl"
+        ariaLabel="gRPC method"
+        disabled={!fileDraft.ready}
+        placeholder="/package.Service/Method"
+        bind:value={() => fileDraft?.barValue('grpcMethod', grpcMethod) ?? grpcMethod, value => fileDraft?.editBar({ grpcMethod: value })}
+        pickerOptions={url === vm.url ? grpcMethods.map(option => option.fullName) : []}
+      />
+    {:else if isGRPC}
       <div class="grpc-method-wrap" onfocusout={closeGrpcMethodMenuOnFocusOut}>
         <button
           class="field field-xl select-trigger grpc-method-trigger"
@@ -411,22 +415,22 @@
       </button>
     {/if}
 
-    {#if isGraphQL || isGRPC || isAI}
+    {#if sendType === 'graphql' || sendType === 'grpc' || sendType === 'ai'}
       <button
         class="btn-send"
-        class:btn-graphql-query={isGraphQL || isGRPC}
+        class:btn-graphql-query={sendType === 'graphql' || sendType === 'grpc'}
         class:btn-send-cancel={loading}
         onclick={onSend}
         type="button"
       >
         {#if loading}
-          <BirdSpinner tone="current" />{isAI ? 'Stop' : 'Cancel'}
+          <BirdSpinner tone="current" />{sendType === 'ai' ? 'Stop' : 'Cancel'}
         {:else}
-          {isGraphQL ? 'Query' : isGRPC ? 'Invoke' : 'Send'}
+          {sendType === 'graphql' ? 'Query' : sendType === 'grpc' ? 'Invoke' : 'Send'}
         {/if}
         <RequestShortcutHint cancel={loading} />
       </button>
-    {:else if requestType === 'ws' || requestType === 'socketio' || showSSEControls}
+    {:else if sendType === 'ws' || sendType === 'socketio' || showSSEControls}
       <button
         class="btn-send"
         class:btn-sse-connect={showSSEControls && !connectionActive}

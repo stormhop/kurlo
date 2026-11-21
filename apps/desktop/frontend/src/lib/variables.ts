@@ -18,3 +18,7 @@ export function variableTemplate(key: string) {
 export function isVariableReferenceOnly(value: string | undefined) {
   return !!value && /^(\s*\{\{[^{}]+}})+\s*$/.test(value);
 }
+
+export function isWorkspaceSecretReference(value: string | undefined): boolean {
+  return !!value && /^\{\{kurloSecret:[^{}]+\}\}$/.test(value);
+}

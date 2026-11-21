@@ -136,6 +136,7 @@ export type SaveRequestStoreResult = Wire<api.SaveRequestStoreResult>;
 export type WorkspaceDiagnostic = Wire<api.WorkspaceDiagnostic>;
 export type WorkspaceOpenResult = Wire<api.WorkspaceOpenResult>;
 export type WorkspaceSecretRef = Wire<api.WorkspaceSecretRef>;
+export type RequestFileYAMLResult = Wire<api.RequestFileYAMLResult>;
 export type WorkspaceYAMLFileResult = Wire<api.WorkspaceYAMLFileResult>;
 export type HistoryResponseResult = Wire<api.HistoryResponseResult>;
 

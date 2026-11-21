@@ -24,7 +24,7 @@ var compiledWorkspaceFileContract = sync.OnceValues(func() (map[string]*jsonsche
 		return nil, err
 	}
 	schemas := make(map[string]*jsonschema.Schema)
-	for _, section := range []string{"request", "collection", "environment", "example"} {
+	for _, section := range []string{"workspace", "request", "collection", "environment", "example"} {
 		schema, err := compiler.Compile(location + "#/definitions/" + section + "File")
 		if err != nil {
 			return nil, err
@@ -35,11 +35,15 @@ var compiledWorkspaceFileContract = sync.OnceValues(func() (map[string]*jsonsche
 })
 
 func validateWorkspaceFileContract(section string, fields map[string]any) error {
+	return validateWorkspaceDocument(section, map[string]any{"version": fileStoreVersion, section: fields})
+}
+
+func validateWorkspaceDocument(section string, value any) error {
 	schemas, err := compiledWorkspaceFileContract()
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(map[string]any{"version": fileStoreVersion, section: fields})
+	data, err := json.Marshal(value)
 	if err != nil {
 		return err
 	}

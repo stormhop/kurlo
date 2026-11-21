@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyCollectionDefaults } from '../lib/collectionDefaults';
 import { parseGraphQLPayload } from '../lib/graphql';
-import { filesystemNameFromName, normalizeCollection, normalizeEnvironment, normalizeHistoryEntry, normalizeSavedRequest, normalizeSioArgs, normalizeWorkspace, withStoredHistoryResponses } from '../lib/normalizers';
+import { filesystemNameFromName, normalizeCollection, normalizeEnvironment, normalizeHistoryEntry, normalizeRequestType, normalizeSavedRequest, normalizeSioArgs, normalizeWorkspace, withStoredHistoryResponses } from '../lib/normalizers';
 import { REQUEST_BODY_DEFAULTS } from '../lib/requestBodyDefaults';
 import type { Collection } from '../lib/types/models';
 
@@ -14,6 +14,20 @@ const collection: Collection = {
   collapsed: false,
   defaults: emptyCollectionDefaults(),
 };
+
+describe('normalizeRequestType', () => {
+  it('keeps an explicitly selected HTTP protocol when the URL uses ws', () => {
+    expect(normalizeRequestType({ requestType: 'http', url: 'wss://example.test/socket' })).toBe('http');
+  });
+
+  it('infers WebSocket from a sparse request URL', () => {
+    expect(normalizeRequestType({ url: 'wss://example.test/socket' })).toBe('ws');
+  });
+
+  it('preserves the legacy GraphQL body migration', () => {
+    expect(normalizeRequestType({ requestType: 'http', bodyType: 'graphql', url: 'https://example.test/graphql' })).toBe('graphql');
+  });
+});
 
 describe('normalizeSavedRequest', () => {
   it('keeps drafts out of collections when restored from storage', () => {

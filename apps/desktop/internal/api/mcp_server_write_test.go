@@ -55,7 +55,7 @@ func TestMCPServerBuildsACollectionAnAgentCanRun(t *testing.T) {
 		t.Fatalf("save_request = %+v", saved)
 	}
 	file := readWorkspaceFile(t, root, saved.File)
-	for _, want := range []string{"method: POST", "url: '{{baseUrl}}/orders'", "bodyType: json", "X-Trace", "testScriptJs:"} {
+	for _, want := range []string{"method: POST", `url: "{{baseUrl}}/orders"`, "bodyType: json", "X-Trace", "testScriptJs:"} {
 		if !strings.Contains(file, want) {
 			t.Errorf("request file is missing %q:\n%s", want, file)
 		}
@@ -101,7 +101,7 @@ func TestMCPServerBuildsACollectionAnAgentCanRun(t *testing.T) {
 		t.Fatal("passing request should change it, not create one")
 	}
 	file = readWorkspaceFile(t, root, saved.File)
-	if !strings.Contains(file, "/v2/orders") || !strings.Contains(file, "'{{apiToken}}'") || !strings.Contains(file, "X-Trace") || strings.Contains(file, "kurloSecret") {
+	if !strings.Contains(file, "/v2/orders") || !strings.Contains(file, `"{{apiToken}}"`) || !strings.Contains(file, "X-Trace") || strings.Contains(file, "kurloSecret") {
 		t.Fatalf("an update should change only what it names:\n%s", file)
 	}
 

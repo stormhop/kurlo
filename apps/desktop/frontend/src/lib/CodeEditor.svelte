@@ -2,11 +2,12 @@
   import { onMount, onDestroy, untrack } from 'svelte';
   import { Decoration, EditorView, ViewPlugin, WidgetType, drawSelection, tooltips, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { EditorState, Compartment, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
-  import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+  import { defaultKeymap, history, isolateHistory, historyKeymap, indentWithTab } from '@codemirror/commands';
   import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
   import { autocompletion, completionKeymap, completionStatus, closeBrackets, closeBracketsKeymap, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
   import { forEachDiagnostic, linter, type Diagnostic } from '@codemirror/lint';
   import { tags } from '@lezer/highlight';
+  import { textChange } from './textChange';
   import { selectedLineNumbersForComment } from './editorSelection';
   import { formatJsonDocument, validateJsonDocument } from './jsonEditing';
   import { formatGraphQLQuery } from './graphql';
@@ -33,7 +34,9 @@
     testId = '',
     ariaLabel = '',
     variableSuggestions = [],
+    editorExtensions = [],
     completionSource,
+    includeVariableCompletions = false,
     maxLength = 0,
     onformat,
     validate,
@@ -51,7 +54,9 @@
     testId?: string;
     ariaLabel?: string;
     variableSuggestions?: VariableSuggestion[];
+    editorExtensions?: Extension;
     completionSource?: CompletionSource;
+    includeVariableCompletions?: boolean;
     maxLength?: number;
     onformat?: () => void;
     validate?: (text: string) => Promise<{ line: number; message: string } | null>;
@@ -682,15 +687,19 @@
   }
 
   function buildExtensions(lang: Lang) {
+    const sources: CompletionSource[] = [];
+    if (completionSource) sources.push(context => completionSource?.(context) ?? null);
+    if (!completionSource || includeVariableCompletions) sources.push(variableCompletionSource);
     return [
       ...(prose
         ? [EditorView.lineWrapping]
         : [lineNumbers(), foldGutter({ markerDOM: foldMarker }), highlightActiveLineGutter(), highlightActiveLine(), bracketMatching(), closeBrackets()]),
+      editorExtensions,
       history(),
       indentOnInput(),
       ...(completionSource ? [tooltips({ parent: document.body })] : []),
       autocompletion({
-        override: [context => completionSource ? completionSource(context) : variableCompletionSource(context)],
+        override: sources,
         tooltipClass: () => completionSource ? 'script-completions' : '',
       }),
       commentDecorationPlugin,
@@ -746,7 +755,11 @@
       if (current === next) return;
       internalChange = true;
       try {
-        view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: next } });
+        if (language === 'yaml') {
+          view!.dispatch({ changes: textChange(current, next), annotations: isolateHistory.of('full') });
+        } else {
+          view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: next } });
+        }
       } finally {
         internalChange = false;
       }
@@ -790,15 +803,17 @@
     if (language === 'graphql' && current.trim()) {
       formatted = formatGraphQLQuery(current);
     }
-    if (formatted !== null && formatted !== current) {
-      internalChange = true;
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: formatted } });
-      internalChange = false;
-      value = formatted;
-      onformat?.();
-      return true;
-    }
-    return false;
+    return formatted !== null && applyFormattedText(formatted);
+  }
+
+  export function applyFormattedText(formatted: string) {
+    if (!view || view.state.doc.toString() === formatted) return false;
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: formatted },
+      annotations: isolateHistory.of('full'),
+    });
+    onformat?.();
+    return true;
   }
 
 </script>

@@ -1,3 +1,4 @@
+import { requestSectionPreference, resolveFormRequestTab } from '../../requestTabPreferences';
 import { sseDisconnect, socketIODisconnect, webSocketDisconnect } from '../../backend';
 import type { HttpResponse, McpResponse } from '../../backend';
 import { mcpFailureMessage } from './mcp';
@@ -8,7 +9,7 @@ import {
 } from '../../graphql';
 import { cloneRequestExample, requestExamplesPending } from '../../examples';
 import { AI_DEFAULT_PRESET, aiDefaultAuthFor } from './ai';
-import { filesystemNameFromName, normalizeSavedRequest, normalizeSioArgs } from '../../normalizers';
+import { extraRequestFileFields, filesystemNameFromName, normalizeSavedRequest, normalizeSioArgs } from '../../normalizers';
 import { pathParamsFromUrl } from '../../pathParams';
 import { cloneSavedMessages, normalizeSavedMessages, requestTypeSupportsSavedMessages } from '../../savedMessages';
 import { assertionsForStore, normalizeAssertions, requestTypeSupportsAssertions, type AssertionRow } from '../../assertions';
@@ -69,6 +70,7 @@ type RequestStateHost = {
   activeRequestCollectionId: (forPersistence?: boolean) => string;
   activeRequestId: string;
   activeWorkspaceId: string;
+  requestFiles?: import('../requestFiles.svelte').RequestFiles;
   apiKeyIn: 'header' | 'query';
   apiKeyName: string;
   apiKeyValue: string;
@@ -298,6 +300,7 @@ export const requestStateFeature = {
     const auth = this.currentAuthState();
     const id = this.activeRequestId || newRequestId();
     return {
+      ...extraRequestFileFields(existing),
       id,
       name: this.snapshotRequestName(),
       filesystemName: existing?.filesystemName || filesystemNameFromName(this.snapshotRequestName(), id),
@@ -426,12 +429,11 @@ export const requestStateFeature = {
     this.requestType = this.normalizeRequestTypeValue(req.requestType, req.url);
     this.requestNameAuto = req.nameAuto ?? (!req.name || req.name === 'New Request');
     this.requestName = this.requestNameAuto ? '' : req.name;
-    this.method = this.requestType === 'graphql' || this.requestType === 'grpc' ? 'POST' : req.method; this.url = req.url; this.requestTab = req.requestTab ?? (this.requestType === 'graphql' ? 'query' : this.requestType === 'grpc' ? 'body' : 'params');
-    if (this.requestType === 'graphql' && !['docs', 'query', 'auth', 'headers', 'vars', 'schema', 'scripts'].includes(this.requestTab)) this.requestTab = 'query';
-    if (this.requestType === 'ws' && !['docs', 'body', 'params', 'headers', 'vars', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'socketio' && !['docs', 'body', 'events', 'params', 'headers', 'vars', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'grpc' && !['docs', 'body', 'auth', 'metadata', 'vars', 'service', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'ai' && !['docs', 'body', 'auth', 'headers', 'vars', 'tools', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
+    this.method = this.requestType === 'graphql' || this.requestType === 'grpc' ? 'POST' : req.method;
+    this.url = req.url;
+    const workspaceId = this.collections.find(collection => collection.id === req.collectionId)?.workspaceId ?? this.activeWorkspaceId;
+    const section = requestSectionPreference(this.requestFiles?.root ?? '', workspaceId, req.id);
+    this.requestTab = resolveFormRequestTab(this.requestType, this.method, section, req.requestTab);
     this.sioEvents = this.restoreSioEventRows(req.sioEvents ?? []);
     this.sioEventName = req.sioEventName ?? '';
     this.sioArgs = normalizeSioArgs(req.sioArgs);

@@ -87,7 +87,7 @@ func writeDriftWorkspace(t *testing.T, source string, base map[string]any) strin
 	collections := []map[string]any{{
 		"id": "c1", "workspaceId": "w1", "name": "Pets",
 		"defaults": map[string]any{"variables": []any{map[string]any{"key": "region", "value": "eu", "enabled": true}}},
-		"openapi":  map[string]any{"source": source, "intervalMinutes": 15, "headers": []any{map[string]any{"key": "Authorization", "value": "Bearer {{specToken}}", "enabled": true}}},
+		"openapi":  map[string]any{"source": source, "intervalMinutes": 15, "headers": []any{map[string]any{"key": "Authorization", "value": "Bearer {{specToken}}"}}},
 	}}
 	requests := []map[string]any{
 		{"id": "r1", "collectionId": "c1", "name": "Get pet", "method": "GET", "url": "{{baseUrl}}/pets/:id", "openapi": "GET /pets/{id}"},

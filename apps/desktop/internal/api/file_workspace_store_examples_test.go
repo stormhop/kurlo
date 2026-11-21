@@ -39,13 +39,13 @@ const createdExample = `[
     "filesystemName": "created",
     "source": "captured",
     "createdAt": 1787000000000,
-    "snapshot": {"method": "POST", "url": "https://api.example.test/orders", "bodyType": "json", "bodyContent": "{\"amount\":500}"},
+    "snapshot": {"method": "POST", "url": "https://api.example.test/orders", "headers": [{"key":"X-On","value":"yes","enabled":true,"description":""},{"key":"X-Off","value":"no","enabled":false,"description":""}], "params": [{"key":"page","value":"1","enabled":true,"description":""}], "bodyType": "json", "bodyContent": "{\"amount\":500}"},
     "response": {
       "statusCode": 201,
       "status": "201 Created",
       "bodyMediaType": "application/json",
       "body": "{\n  \"id\": \"ord_1\"\n}",
-      "headers": []
+      "headers": [{"key":"X-Response","value":"ok","enabled":true,"description":""},{"key":"X-Disabled","value":"off","enabled":false,"description":""}]
     },
     "match": {"pathTemplate": "/orders"}
   }
@@ -104,6 +104,12 @@ func TestExamplesRoundTripThroughWorkspace(t *testing.T) {
 	if !strings.Contains(string(rawYAML), "body: |-\n            {\n              \"id\": \"ord_1\"") {
 		t.Errorf("the body must be a readable block inside the YAML:\n%s", rawYAML)
 	}
+	if strings.Contains(string(rawYAML), "enabled: true") || strings.Contains(string(rawYAML), "description:") {
+		t.Errorf("default example row fields must be omitted:\n%s", rawYAML)
+	}
+	if !strings.Contains(string(rawYAML), "enabled: false") {
+		t.Errorf("explicit false must remain in the example YAML:\n%s", rawYAML)
+	}
 	if strings.Contains(string(rawYAML), "bodyFile") {
 		t.Errorf("no body file pointer expected:\n%s", rawYAML)
 	}
@@ -124,13 +130,23 @@ func TestExamplesRoundTripThroughWorkspace(t *testing.T) {
 	if len(examples) != 1 {
 		t.Fatalf("expected one example after load, got %d", len(examples))
 	}
+	snapshot := nestedMap(examples[0], "snapshot")
+	response := nestedMap(examples[0], "response")
+	for _, rows := range [][]any{snapshot["headers"].([]any), snapshot["params"].([]any), response["headers"].([]any)} {
+		if rows[0].(map[string]any)["enabled"] != true || rows[0].(map[string]any)["description"] != "" {
+			t.Fatal("example default row fields were not restored")
+		}
+		if len(rows) > 1 && rows[1].(map[string]any)["enabled"] != false {
+			t.Fatal("example explicit false was lost")
+		}
+	}
 	if got := examples[0]["name"]; got != "Created" {
 		t.Errorf("name = %v, want Created", got)
 	}
 	if got := examples[0]["filesystemName"]; got != "created" {
 		t.Errorf("filesystemName = %v, want created", got)
 	}
-	response, _ := examples[0]["response"].(map[string]any)
+	response = examples[0]["response"].(map[string]any)
 	if response == nil {
 		t.Fatal("example came back with no response")
 	}

@@ -115,7 +115,7 @@ func TestCLIRequestVarsOverrideEnvironmentAndFeedLaterRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"vars:", "key: region", "value: '{{region}}-eu'", "postResponseVars:", "value: res.body.token"} {
+	for _, want := range []string{"vars:", "key: region", `value: "{{region}}-eu"`, "postResponseVars:", "value: res.body.token"} {
 		if !strings.Contains(string(raw), want) {
 			t.Fatalf("request YAML is missing %q:\n%s", want, raw)
 		}

@@ -11,6 +11,20 @@ head:
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts
 attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Added
+
+- **File tab.** Edit a request’s YAML with wrapped lines, collapsible sections and protected metadata. Change the name, URL, method or protocol from the address bar and see it update in the YAML. Changing the URL back restores its original YAML. Choose suggested fields and values as you type, preview the save format with Beautify, hover over underlined fields to read validation errors, and review changes made on disk. Editor sections are remembered locally. Generated YAML keeps disabled rows and omits default row fields. [Request file guide](/docs/reference/kurlo-yaml-format/request/).
+
+### Changed
+
+- **Request protocol.** Saved requests with a URL can switch protocol from the address bar.
+
+### Fixed
+
+- **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+
 ## 3.1.5
 
 ### Added

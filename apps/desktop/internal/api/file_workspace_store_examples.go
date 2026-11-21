@@ -76,6 +76,7 @@ func writeRequestExamples(collectionDir, requestSegment string, examples []map[s
 			continue
 		}
 
+		updateExampleRows(example, omitWorkspaceRowDefaults)
 		if response := exampleResponseMap(example); response != nil {
 			delete(response, "bodyFile")
 		}
@@ -268,6 +269,7 @@ func readRequestExamples(collectionDir, requestSegment, workspaceRoot, workspace
 			}.toDiagnostic())
 			continue
 		}
+		updateExampleRows(doc.Example, restoreWorkspaceRowDefaults)
 		validator.item("example", path, doc.Example)
 		if _, exists := doc.Example["requestId"]; exists {
 			validator.reference(path, "example", doc.Example, "requestId", requestID)
@@ -355,4 +357,9 @@ func legacyExampleBodyPaths(root string) (map[string]struct{}, error) {
 		}
 	}
 	return paths, nil
+}
+
+func updateExampleRows(example map[string]any, update func(map[string]any)) {
+	updateWorkspaceRows(nestedMap(example, "snapshot"), update, "params", "headers")
+	updateWorkspaceRows(nestedMap(example, "response"), update, "headers")
 }

@@ -43,15 +43,16 @@
             { "type": "string" }
           ]
         },
-        "enabled": { "type": "boolean" },
+        "enabled": { "type": "boolean", "default": true },
         "key": { "type": "string" },
         "value": {
           "type": "string",
           "description": "May be a kurlo secret placeholder such as {{kurloSecret:request:req-main:auth:bearerToken}}."
         },
-        "description": { "type": "string" },
+        "description": { "type": "string", "default": "" },
         "isFile": { "type": "boolean" },
         "fileName": { "type": "string" },
+        "contentType": { "type": "string" },
         "secret": { "type": "boolean" }
       }
     },
@@ -73,6 +74,15 @@
         "oauth2AuthURL": { "type": "string" },
         "oauth2TokenURL": { "type": "string" },
         "oauth2ClientID": { "type": "string" },
+        "oauth2DeviceAuthURL": { "type": "string" },
+        "oauth2Audience": { "type": "string" },
+        "oauth2Username": { "type": "string" },
+        "oauth2Password": { "type": "string" },
+        "oauth2ClientAuth": { "type": "string", "enum": ["body", "basic", "client_secret_jwt", "private_key_jwt"] },
+        "oauth2AssertionAlgorithm": { "type": "string" },
+        "oauth2AssertionPrivateKey": { "type": "string" },
+        "oauth2AssertionKeyID": { "type": "string" },
+        "oauth2AssertionAudience": { "type": "string" },
         "oauth2Secret": { "type": "string" },
         "oauth2Scope": { "type": "string" },
         "oauth2Token": { "type": "string" },
@@ -80,6 +90,7 @@
         "oauth2TokenExpiry": { "type": "number", "minimum": 0 },
         "oauth2UsePKCE": { "type": "boolean" },
         "awsAccessKey": { "type": "string" },
+        "awsSessionToken": { "type": "string" },
         "awsSecretKey": { "type": "string" },
         "awsRegion": { "type": "string" },
         "awsService": { "type": "string" },
@@ -124,6 +135,11 @@
         "disableCookieJar": { "type": "boolean" },
         "maxRedirects": { "type": "integer", "minimum": 0 },
         "timeoutMs": { "type": "integer", "minimum": 0 },
+        "scriptTimeoutMs": { "type": "integer", "minimum": 0 },
+        "allowSendRequest": { "type": "boolean" },
+        "wsKeepAliveIntervalMs": { "type": "integer", "minimum": 0 },
+        "sseDisableReconnect": { "type": "boolean" },
+        "sseReconnectIntervalMs": { "type": "integer", "minimum": 0 },
         "proxyUrl": { "type": "string" },
         "clientCertPath": { "type": "string" },
         "clientKeyPath": { "type": "string" },
@@ -268,7 +284,7 @@
         },
         "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "SSE"] },
         "url": { "type": "string" },
-        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "vars", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
+        "requestTab": { "type": "string", "description": "Legacy editor section. Kurlo remembers the selection locally for each request.", "enum": ["docs", "params", "query", "auth", "headers", "vars", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
         "params": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
@@ -305,6 +321,18 @@
         "requestNotes": { "type": "string" },
         "openapi": { "type": "string", "description": "OpenAPI operation this request is linked to, as METHOD /path/{template}." },
         "settings": { "$ref": "#/definitions/requestSettings" },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "target": { "type": "string" },
+              "operator": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        },
         "settingsOverrides": {
           "type": "object",
           "additionalProperties": { "type": "boolean" }

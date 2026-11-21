@@ -270,6 +270,7 @@ func (a *App) SaveFileDialog(defaultName string, content string) string {
 }
 
 type WorkspaceLoadResult struct {
+	Root        string                `json:"root"`
 	Payload     string                `json:"payload"`
 	Diagnostics []WorkspaceDiagnostic `json:"diagnostics"`
 	Revision    int64                 `json:"revision,omitempty"`
@@ -300,11 +301,11 @@ func (a *App) loadWorkspaceLocked(root string) WorkspaceLoadResult {
 		failedStoreLoads.note(root, err)
 	}
 	if err != nil {
-		return WorkspaceLoadResult{Diagnostics: diagnostics}
+		return WorkspaceLoadResult{Root: root, Diagnostics: diagnostics}
 	}
 	globals := profileGlobalsRevision(payload)
 	a.globalsRevision.Store(&globals)
-	return WorkspaceLoadResult{Payload: payload, Diagnostics: diagnostics, Revision: revision}
+	return WorkspaceLoadResult{Root: root, Payload: payload, Diagnostics: diagnostics, Revision: revision}
 }
 
 func (a *App) LoadWorkspaceDiagnostics() []WorkspaceDiagnostic {

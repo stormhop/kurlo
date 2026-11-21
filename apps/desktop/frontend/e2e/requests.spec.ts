@@ -612,6 +612,25 @@ test.describe('Starred requests', () => {
   });
 });
 
+test('replaces an unavailable JWT private key in its multiline field', async ({ page }) => {
+  await installKurloBridge(page, '', 'darwin/e2e', false, {
+    activeId: 'signing', openIds: ['signing'],
+    collections: [{ id: 'api', workspaceId: 'workspace-e2e', name: 'API' }],
+    requests: [{
+      id: 'signing', name: 'Signed request', collectionId: 'api', requestTab: 'auth', method: 'GET',
+      auth: { type: 'jwt', jwtAlgorithm: 'RS256', jwtPrivateKey: '{{kurloSecret:request.signing.auth.jwtPrivateKey}}' },
+    }],
+  });
+  await page.goto('/');
+  const key = page.getByLabel('Private key (PEM)', { exact: false });
+  await expect(key).toHaveAttribute('placeholder', 'Secret unavailable on this device');
+  await expect(key).toHaveValue('');
+  const replacement = 'first line\nsecond line';
+  await key.fill(replacement);
+  await page.keyboard.press('Meta+s');
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests[0].auth.jwtPrivateKey)).toBe(replacement);
+});
+
 test('signs a request with JWT Bearer auth and previews the token', async ({ page }, testInfo) => {
   if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
   await installKurloBridge(page);

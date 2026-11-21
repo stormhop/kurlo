@@ -12,15 +12,11 @@ environment:
   name: Local
   values:
     - id: 1
-      enabled: true
       key: baseUrl
       value: https://api.example.test
-      description: ""
     - id: 2
-      enabled: true
       key: token
       value: "{{kurloSecret:environment:environment-local:row:2}}"
-      description: ""
       secret: true
 ```
 

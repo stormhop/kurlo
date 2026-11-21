@@ -8,29 +8,37 @@
   import BirdSpinner from './BirdSpinner.svelte';
   import { tick } from 'svelte';
   import { vm } from '../stores/app.svelte';
-  import { AI_PRESETS, type AiPresetId } from '../stores/features/ai';
+  import type { RequestFileDraft } from '../requestFileDraft.svelte';
+  import { aiPresetFor, AI_PRESETS, type AiPresetId } from '../stores/features/ai';
   import { aiConnectionsStore } from '../stores/aiConnections.svelte';
 
+  let { fileDraft }: { fileDraft?: RequestFileDraft } = $props();
   let open = $state(false);
   let modelInput = $state<HTMLInputElement>();
   let triggerEl = $state<HTMLButtonElement>();
   let wrapEl = $state<HTMLDivElement>();
 
-  const preset = $derived(vm.aiCurrentPreset());
+  const url = $derived(fileDraft?.barValue('url', vm.url) ?? vm.url);
+  const provider = $derived(fileDraft?.barValue('aiProvider', vm.aiProvider, 'openai') ?? vm.aiProvider);
+  const modelName = $derived(fileDraft?.barValue('aiModel', vm.aiModel) ?? vm.aiModel);
+  const connectionId = $derived(fileDraft?.barValue('aiConnectionId', vm.aiConnectionId) ?? vm.aiConnectionId);
+  const preset = $derived(fileDraft ? aiPresetFor(url, provider) : vm.aiCurrentPreset());
+  const canLoadModels = $derived(!fileDraft || (fileDraft.ready && !fileDraft.dirty && vm.requestType === 'ai'));
   const usesConnection = $derived(preset.id === 'kurlo');
-  const connection = $derived((vm.aiConnectionId ? aiConnectionsStore.list.find(item => item.id === vm.aiConnectionId) : null) ?? aiConnectionsStore.defaultConnection);
-  const shownModel = $derived(usesConnection ? (connection?.model ?? '') : vm.aiModel.trim());
+  const connection = $derived((connectionId ? aiConnectionsStore.list.find(item => item.id === connectionId) : null) ?? aiConnectionsStore.defaultConnection);
+  const shownModel = $derived(usesConnection ? (connection?.model ?? '') : modelName.trim());
 
   $effect(() => {
     if (usesConnection) void aiConnectionsStore.refresh();
   });
-  const models = $derived(vm.aiModelOptions());
-  const filter = $derived(vm.aiModel.trim().toLowerCase());
+  const models = $derived(url === vm.url && provider === vm.aiProvider ? vm.aiModelOptions() : []);
+  const filter = $derived(modelName.trim().toLowerCase());
   const visibleModels = $derived(
-    filter && !models.includes(vm.aiModel.trim()) ? models.filter(model => model.toLowerCase().includes(filter)) : models,
+    filter && !models.includes(modelName.trim()) ? models.filter(model => model.toLowerCase().includes(filter)) : models,
   );
 
   function autoLoadModels() {
+    if (!canLoadModels) return;
     const key = `${vm.aiProvider}|${vm.url.trim()}`;
     if (vm.aiProvider === 'kurlo' || !vm.url.trim() || vm.aiModelOptions().length || vm.aiModelsLoading || autoLoaded.has(key)) return;
     autoLoaded.add(key);
@@ -62,15 +70,25 @@
   }
 
   async function choosePreset(id: AiPresetId) {
-    vm.selectAiPreset(id);
+    if (fileDraft) {
+      const next = AI_PRESETS.find(entry => entry.id === id);
+      if (!next) return;
+      fileDraft.currentBarValues();
+      fileDraft.editBar({ aiProvider: next.provider, url: next.url, ...(preset.id !== id && modelName ? { aiModel: '' } : {}) });
+    } else vm.selectAiPreset(id);
     vm.aiModelsError = null;
     autoLoadModels();
     await tick();
     modelInput?.focus();
   }
 
+  function setModel(model: string) {
+    if (fileDraft) fileDraft.editBar({ aiModel: model });
+    else vm.aiModel = model;
+  }
+
   function choose(model: string) {
-    vm.aiModel = model;
+    setModel(model);
     open = false;
     triggerEl?.focus();
   }
@@ -86,7 +104,7 @@
 
 <svelte:document onpointerdowncapture={closeOnOutsidePointerDown} />
 
-<div class="grpc-method-wrap ai-model-wrap" bind:this={wrapEl} onfocusout={closeOnFocusOut}>
+<div inert={!!fileDraft && !fileDraft.ready} class="grpc-method-wrap ai-model-wrap" bind:this={wrapEl} onfocusout={closeOnFocusOut}>
   <button
     class="field field-xl select-trigger grpc-method-trigger"
     class:open
@@ -137,7 +155,7 @@
         id="ai-model-input"
         class="field field-mono"
         bind:this={modelInput}
-        bind:value={vm.aiModel}
+        bind:value={() => modelName, setModel}
         placeholder={`e.g. ${preset.modelExample}`}
         autocomplete="off"
         spellcheck="false"
@@ -146,9 +164,9 @@
       />
       <p class="ai-model-hint">The model's name at {preset.id === 'custom' ? 'your server' : preset.label}. Pick one from the list or type it.</p>
 
-      {#if vm.aiModelsLoading}
+      {#if canLoadModels && vm.aiModelsLoading}
         <div class="grpc-method-empty"><BirdSpinner size="1.5rem" label="Loading the provider's models" /></div>
-      {:else if vm.aiModelsError}
+      {:else if canLoadModels && vm.aiModelsError}
         <div class="ai-model-problem" role="alert">
           <svg class="ai-model-problem-icon" width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <path d="M8 1.75l6.5 11.5h-13L8 1.75z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
@@ -168,19 +186,21 @@
           {#each visibleModels as model (model)}
             <button
               class="grpc-method-option"
-              class:active={vm.aiModel === model}
+              class:active={modelName === model}
               role="option"
-              aria-selected={vm.aiModel === model}
+              aria-selected={modelName === model}
               type="button"
               onclick={() => choose(model)}
             >
-              <span class="method-check">{vm.aiModel === model ? '✓' : ''}</span>
+              <span class="method-check">{modelName === model ? '✓' : ''}</span>
               <span class="grpc-option-main"><strong>{model}</strong></span>
             </button>
           {/each}
         </div>
       {:else if models.length}
         <div class="grpc-method-empty">No model in the list matches. The name you typed is sent as is.</div>
+      {:else if !canLoadModels}
+        <p class="ai-model-hint">Save your YAML edits to load models from this provider.</p>
       {:else}
         <button class="btn btn-ghost btn-sm ai-model-retry" type="button" onclick={() => vm.loadAiModels()}>Load the provider's models</button>
       {/if}

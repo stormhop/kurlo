@@ -1414,6 +1414,7 @@ func readYAMLCollectionEntriesWithDiagnostics(root string, order []string, works
 			invalidFolders = append(invalidFolders, invalidCollectionFolder{path: path, workspaceID: workspaceID, collectionID: collectionID})
 			continue
 		}
+		updateCollectionRows(collection, restoreWorkspaceRowDefaults)
 		mergeCollectionSecrets(collection, secrets)
 		sortOrder, ok := orderIndex[collectionID]
 		if !ok {
@@ -1470,6 +1471,7 @@ func readYAMLRequestEntriesWithDiagnostics(root string, order []string, secrets 
 			diagnostics = append(diagnostics, workspaceDiagnostic{scope: "request", path: path, root: workspaceRoot, err: err, workspaceID: workspaceID, collectionID: collectionID, requestID: requestID}.toDiagnostic())
 			return nil
 		}
+		normalizeWorkspaceRows(request, requestRowFieldsForStrip...)
 		normalizeLoadedBodyType(request)
 		id, validID := request["id"].(string)
 		if doc.Version == fileStoreVersion && validID && strings.TrimSpace(id) != "" {
@@ -1501,6 +1503,19 @@ func readYAMLRequestEntriesWithDiagnostics(root string, order []string, secrets 
 		return requests[i].order < requests[j].order
 	})
 	return requests, diagnostics
+}
+
+func normalizeWorkspaceRows(owner map[string]any, fields ...string) {
+	updateWorkspaceRows(owner, restoreWorkspaceRowDefaults, fields...)
+}
+
+func restoreWorkspaceRowDefaults(row map[string]any) {
+	if _, exists := row["enabled"]; !exists {
+		row["enabled"] = true
+	}
+	if _, exists := row["description"]; !exists {
+		row["description"] = ""
+	}
 }
 
 var loadedBodyTypes = map[string]bool{"none": true, "json": true, "text": true, "xml": true, "html": true, "form": true, "urlencoded": true, "binary": true, "graphql": true}
@@ -1553,6 +1568,7 @@ func readYAMLEnvironmentEntriesWithDiagnostics(root string, secrets map[string]s
 			diagnostics = append(diagnostics, workspaceDiagnostic{scope: "environment", path: path, root: workspaceRoot, message: "environment file does not contain an environment object", workspaceID: workspaceID}.toDiagnostic())
 			continue
 		}
+		normalizeWorkspaceRows(environment, "values")
 		if err := requireItemFilesystemName(environment, path); err != nil {
 			diagnostics = append(diagnostics, workspaceDiagnostic{scope: "environment", path: path, root: workspaceRoot, err: err, workspaceID: workspaceID}.toDiagnostic())
 			continue
@@ -2083,6 +2099,12 @@ func writeCanonicalYAMLFile(path string, value any, journal *saveJournal, canoni
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
+	if canonical == nil {
+		switch value.(type) {
+		case filesystemEnvironmentFile, filesystemCollectionFile, filesystemExampleFile:
+			canonical = canonicalWorkspaceRowDefaults
+		}
+	}
 	if existing, err := os.ReadFile(path); err == nil && (string(existing) == string(data) || yamlSameIgnoringTimestamps(existing, data, canonical)) {
 		return nil
 	}
@@ -2167,6 +2189,31 @@ func yamlSameIgnoringTimestamps(existing, next []byte, canonical func(any) any) 
 	return reflect.DeepEqual(withoutTimestamps(left), withoutTimestamps(right))
 }
 
+func updateCollectionRows(collection map[string]any, update func(map[string]any)) {
+	updateWorkspaceRows(nestedMap(collection, "defaults"), update, "headers", "variables")
+	for _, folder := range mapSlice(collection["folderDefaults"]) {
+		updateWorkspaceRows(folder, update, "headers")
+	}
+	updateWorkspaceRows(nestedMap(collection, "openapi"), update, "headers")
+}
+
+func canonicalWorkspaceRowDefaults(doc any) any {
+	file, ok := doc.(map[string]any)
+	if !ok {
+		return doc
+	}
+	if environment := nestedMap(file, "environment"); environment != nil {
+		updateWorkspaceRows(environment, omitWorkspaceRowDefaults, "values")
+	}
+	if collection := nestedMap(file, "collection"); collection != nil {
+		updateCollectionRows(collection, omitWorkspaceRowDefaults)
+	}
+	if example := nestedMap(file, "example"); example != nil {
+		updateExampleRows(example, omitWorkspaceRowDefaults)
+	}
+	return file
+}
+
 func canonicalRequestFile(collection map[string]any) func(any) any {
 	return func(doc any) any {
 		file, ok := doc.(map[string]any)
@@ -2174,6 +2221,8 @@ func canonicalRequestFile(collection map[string]any) func(any) any {
 			return doc
 		}
 		if request, ok := file["request"].(map[string]any); ok {
+			omitRequestEditorDefaults(request)
+			stripNestedDefaults(request, "settings", savedRequestSettingDefaults)
 			dropInferableSettingsOverrides(request, collection)
 		}
 		return file

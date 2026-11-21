@@ -5,7 +5,7 @@ import type { TopView } from './ui';
 export type LazyComponent = Component<Record<string, unknown>>;
 
 export type AppLazyComponentState = {
-  requestTab: RequestTab;
+  requestTab: RequestTab | 'file';
   requestType: RequestType;
   method: Method;
   topView: TopView;
@@ -28,6 +28,7 @@ class AppLazyComponents {
   CollectionRunnerWorkspaceComponent = $state<LazyComponent | null>(null);
   CollectionWorkspaceComponent = $state<typeof import('../components/CollectionWorkspace.svelte').default | null>(null);
   CookieWorkspaceComponent = $state<LazyComponent | null>(null);
+  FileTabComponent = $state<typeof import('../components/FileTab.svelte').default | null>(null);
   DocsTabComponent = $state<LazyComponent | null>(null);
   EnvironmentWorkspaceComponent = $state<LazyComponent | null>(null);
   ExamplesTabComponent = $state<LazyComponent | null>(null);
@@ -245,6 +246,7 @@ class AppLazyComponents {
   preloadForAppShell(state: AppLazyComponentState) {
     if (state.requestTab === 'auth') void this.loadAuthTab();
     if (state.requestTab === 'body') void this.loadBodyTab();
+    if (state.requestTab === 'file' && !this.FileTabComponent) void import('../components/FileTab.svelte').then(module => this.FileTabComponent = module.default);
     if (state.requestTab === 'docs') void this.loadDocsTab();
     if (state.requestTab === 'headers') void this.loadHeadersTab();
     if (state.requestTab === 'vars') void this.loadVarsTab();

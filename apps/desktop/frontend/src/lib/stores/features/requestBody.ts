@@ -22,6 +22,8 @@ import {
 const RAW_BODY_TYPES: RawBodyType[] = ['text', 'json', 'html', 'xml'];
 
 type RequestBodyHost = {
+  activeRequestId: string;
+  requestFiles?: import('../requestFiles.svelte').RequestFiles;
   apiKeyValue: string;
   authType: SavedRequest['auth']['type'];
   awsAccessKey: string;
@@ -370,11 +372,17 @@ export const requestBodyFeature = {
     const text = e.clipboardData?.getData('text') ?? '';
     if (/^curl(?:\.exe)?(?:\s|$)/i.test(text.trimStart())) {
       e.preventDefault();
+      const id = this.activeRequestId;
       const { parseCurl } = await import('../../curl');
       const parsed = parseCurl(text);
       if (parsed.error) {
         this.showCurlPasteToast(`Couldn't import cURL: ${parsed.error}`);
       } else if (parsed.url) {
+        if (this.activeRequestId !== id) return;
+        if (this.requestFiles?.active) {
+          await this.requestFiles.select('params');
+          if (this.requestFiles.active || this.activeRequestId !== id) return;
+        }
         this.applyParsedCurl(parsed);
         const cookieHeader = parsed.headers
           ?.filter(header => header.key.trim().toLowerCase() === 'cookie' && header.value.trim())

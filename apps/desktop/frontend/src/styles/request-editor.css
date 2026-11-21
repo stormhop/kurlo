@@ -196,6 +196,9 @@
   transition: background var(--dur-fast);
 }
 .method-trigger--protocol {
+  min-width: 0;
+  padding-inline: var(--space-2);
+  gap: var(--space-1-5);
   color: var(--accent-text);
   font-family: var(--font-ui);
 }
@@ -206,15 +209,6 @@
 .method-trigger:focus-visible {
   outline: none;
   background: var(--hover);
-}
-.method-trigger.locked {
-  min-width: 0;
-  padding: 0 var(--space-3);
-  cursor: default;
-  justify-content: center;
-}
-.method-trigger.locked:hover {
-  background: transparent;
 }
 .method-trigger svg {
   flex: 0 0 auto;
@@ -1105,6 +1099,9 @@
 }
 
 .body-section { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.file-tab-empty { margin: auto; padding: var(--space-4); text-align: center; color: var(--text-2); }
+.file-tab-empty p { margin: 0 0 var(--space-3); }
+.tab-content.file-editor-mode,
 .tab-content.body-editor-mode { overflow: hidden; padding: 0; display: flex; flex-direction: column; }
 
 .body-types,

@@ -93,9 +93,21 @@ function storeDeltaPayload(confirmed: ConfirmedStore, payload: RequestStore, sav
   return JSON.stringify({ base: confirmed.revision, store, requestIds: requests.map(req => req.id), requests: withoutExamplesOnDisk(changed) });
 }
 
+export function rememberSavedRequestFile(host: object, request: SavedRequest) {
+  const previous = queuedStorePayloads.get(host);
+  if (previous) {
+    queuedStorePayloads.set(host, {
+      ...previous,
+      requests: previous.requests.map(saved => saved.id === request.id ? request : saved),
+    });
+  }
+  confirmedStores.delete(host);
+}
+
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 type RequestPersistenceHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   starredRequestIds: Set<string>;
   activeEnvironmentId: string;
   activeRequestId: string;
@@ -272,6 +284,11 @@ export const requestPersistenceFeature = {
     nextEnvironments = this.environments,
     nextActiveEnvId = this.activeEnvironmentId,
   ) {
+    if (this.requestFiles?.pendingWrite) {
+      const epoch = this.requestStorePersistEpoch;
+      nextRequests = await this.requestFiles.afterWrites(nextRequests);
+      if (epoch !== this.requestStorePersistEpoch) return false;
+    }
     if (!this.requestStoreLoaded) return false;
     if (this.externalWorkspaceChangePending) {
       if (await this.refreshPendingExternalWorkspaceChangeIfClean()) return true;

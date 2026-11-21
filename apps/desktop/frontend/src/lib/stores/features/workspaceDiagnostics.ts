@@ -7,6 +7,7 @@ import type { TopView } from '../ui';
 import { listenRuntime } from '../../runtimeEvents';
 
 type WorkspaceDiagnosticsHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   activeRequestId: string;
   activeWorkspaceId: string;
   collectionImportToast: string;
@@ -384,6 +385,7 @@ export const workspaceDiagnosticsFeature = {
       return;
     }
     if (this.hasUnsavedDrafts() || this.hasUnsavedRequestChanges() || this.hasUnsavedWorkspaceEdits()) {
+      if (this.requestFiles?.active?.ready) void this.requestFiles.active.open();
       this.markExternalWorkspaceChangePending(reason);
       return;
     }

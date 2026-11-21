@@ -226,8 +226,16 @@ export function FetchOAuth2Token(arg1) {
   return window['go']['api']['App']['FetchOAuth2Token'](arg1);
 }
 
+export function FormatRequestFileYAML(arg1) {
+  return window['go']['api']['App']['FormatRequestFileYAML'](arg1);
+}
+
 export function GetEnvironment() {
   return window['go']['api']['App']['GetEnvironment']();
+}
+
+export function GetRequestFileYAML(arg1, arg2, arg3) {
+  return window['go']['api']['App']['GetRequestFileYAML'](arg1, arg2, arg3);
 }
 
 export function GetVariables() {
@@ -640,6 +648,10 @@ export function SaveHistoryResponse(arg1, arg2) {
 
 export function SaveLoadTestK6Folder(arg1, arg2, arg3) {
   return window['go']['api']['App']['SaveLoadTestK6Folder'](arg1, arg2, arg3);
+}
+
+export function SaveRequestFileYAML(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['api']['App']['SaveRequestFileYAML'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SaveRequestStore(arg1) {

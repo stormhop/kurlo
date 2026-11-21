@@ -5,6 +5,8 @@ import {
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
   emptyLoadRunState, revealWorkspaceItem,
 } from '../backend';
+import { RequestFiles } from './requestFiles.svelte';
+import { migrateRequestSectionPreferences } from '../requestTabPreferences';
 import { DEFAULT_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
 import { agentStore, codexAgentStore, claudeAgentStore } from './agent.svelte';
 import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../backend';
@@ -596,6 +598,7 @@ class AppVM {
   declare setPreviewTabs: typeof requestTabsFeature.setPreviewTabs;
   declare setPreviewRequestId: typeof requestTabsFeature.setPreviewRequestId;
   declare keepRequestTab: typeof requestTabsFeature.keepRequestTab;
+  declare requestIsRunning: typeof requestTabsFeature.requestIsRunning;
   declare requestTabNeedsKeeping: typeof requestTabsFeature.requestTabNeedsKeeping;
   declare openRequestTab: typeof requestTabsFeature.openRequestTab;
   declare closeRequestTab: typeof requestCrudFeature.closeRequestTab;
@@ -1562,6 +1565,7 @@ class AppVM {
   persistTimer: ReturnType<typeof setTimeout> | null = null;
   requestStorePersistQueue: Promise<unknown> = Promise.resolve();
   requestStorePersistEpoch = 0;
+  requestFiles: RequestFiles = new RequestFiles(this);
   requestStorePersistTimer: ReturnType<typeof setTimeout> | null = null;
   environmentPersistTimer: ReturnType<typeof setTimeout> | null = null;
   environmentSavedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1718,6 +1722,7 @@ class AppVM {
     let requestStoreReadFailed = false;
     const savedTopViewState = this.loadTopViewState();
     const loaded = rawOverride === undefined && diagnosticsOverride === undefined ? await loadWorkspace().catch(() => null) : null;
+    this.requestFiles.setRoot(loaded?.root);
     this.workspaceDiagnostics = normalizeWorkspaceDiagnostics(diagnosticsOverride ?? loaded?.diagnostics ?? await loadWorkspaceDiagnostics());
     try {
       const raw = rawOverride ?? loaded?.payload ?? await loadRequestStore();
@@ -1728,6 +1733,7 @@ class AppVM {
         lWs = (parsed.workspaces ?? []).map(normalizeWorkspace);
         lWsId = parsed.activeWorkspaceId ?? '';
         lCols = (parsed.collections ?? []).map(c => normalizeCollection(c, lWsId));
+        migrateRequestSectionPreferences(this.requestFiles.root, lWsId, lCols, parsed.requests ?? []);
         lEnvs = (parsed.environments ?? []).map(e => normalizeEnvironment(e, lWsId));
         lEnvId = parsed.activeEnvironmentId ?? '';
         lActiveId = parsed.activeId ?? ''; lOpenIds = parsed.openIds ?? []; lFolderCollapsed = parsed.folderCollapsed ?? {};
@@ -1802,6 +1808,7 @@ class AppVM {
       this.requestStoreLoaded = true;
     }
     if (!requestStoreReadFailed) this.rememberLoadedRequestStore(loaded?.revision);
+    if (this.requestFiles.active?.ready) void this.requestFiles.active.open();
     if (this.previewRequestId && !this.openRequestIds.includes(this.previewRequestId)) this.setPreviewRequestId('');
     const launchTopView = launching ? startupTopView(this.startupView, { workspaceBlocked: this.workspaceBlocked, hasActiveRequest: Boolean(this.activeRequestId) }) : null;
     if (launchTopView) {
@@ -1840,6 +1847,7 @@ class AppVM {
     const wasInGitView = this.topView === 'git';
     this.cancelPersistTimersOnly();
     this.requestStoreLoaded = false;
+    this.requestFiles.setRoot(result.root);
     await this.loadRequestWorkspace(result.payload, result.diagnostics ?? []);
     if (wasInGitView) this.openGitTab(false);
     this.gitStatus = normalizeGitStatus(result.git ?? await gitStatus());
@@ -1947,6 +1955,7 @@ class AppVM {
       'Close'
     );
     if (!confirmed) return;
+    if (!await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'close-repo';
     this.gitError = '';
@@ -1961,6 +1970,7 @@ class AppVM {
 
   async useAppStorage() {
     this.closeFloatingMenus();
+    if (!await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'use-app-storage';
     this.gitError = '';
@@ -1986,6 +1996,7 @@ class AppVM {
     if (!initMode) return;
     const parentDir = await openDirectoryDialog(`Choose parent folder for ${directoryName}`, await this.defaultWorkspaceParentForDialogs());
     if (!parentDir) return;
+    if (!await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'local-create';
     this.gitError = '';

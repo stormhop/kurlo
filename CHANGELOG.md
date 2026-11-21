@@ -5,6 +5,20 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Request file editor.** Open **File** to edit and save a request’s workspace YAML. Edit the name, URL, method or protocol from the address bar or directly in the same YAML draft. Complete YAML keys and values for the current section and authentication type, hover over underlined fields to read validation errors, and preview the save format with Beautify. Long lines wrap, sections fold, and Kurlo marks and protects the fields that identify the request. Typing and then removing a character in the URL leaves the saved YAML intact. Drafts stay with their request, and you can review external changes before saving. Kurlo remembers each request’s editor section locally and omits enabled flags on active key-value rows and empty row descriptions from generated YAML.
+
+### Changed
+
+- **Request protocol.** You can change the protocol of a saved request that already has a URL. Kurlo keeps the request’s name, URL and identity. Stop an active request or disconnect its session first.
+
+### Fixed
+
+- **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+
 ## [3.1.5] - 2026-11-20
 
 ### Added

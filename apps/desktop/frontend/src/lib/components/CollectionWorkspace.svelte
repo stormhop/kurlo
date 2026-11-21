@@ -12,13 +12,14 @@
   import { openFileDialog } from '../backend';
   import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, JwtAlgorithm, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings } from '../types/models';
   import { defaultPinnedEnvironmentId, normalizeCollectionEnvironmentPins } from '../collectionEnvironments';
-  import { isVariableReferenceOnly, type VariableSuggestion } from '../variables';
+  import type { VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
   import ScriptEditor from './ScriptEditor.svelte';
   import Select from './Select.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import SearchPicker from './SearchPicker.svelte';
   import VariableInput from './VariableInput.svelte';
+  import SecretInput from './SecretInput.svelte';
   import CollapsibleMarkdown from './CollapsibleMarkdown.svelte';
   import OpenApiSyncPanel from './OpenApiSyncPanel.svelte';
   import { vm } from '../stores/app.svelte';
@@ -782,17 +783,17 @@
             <div class="auth-fields">
               {#if auth.type === 'bearer'}
                 <label class="field-label" for="collection-bearer-token">Token</label>
-                <VariableInput id="collection-bearer-token" className="field field-input field-mono" bind:value={auth.bearerToken} suggestions={variableSuggestions} placeholder="Bearer token" type={isVariableReferenceOnly(auth.bearerToken) ? 'text' : 'password'} />
+                <SecretInput id="collection-bearer-token" className="field field-input field-mono" bind:value={auth.bearerToken} suggestions={variableSuggestions} placeholder="Bearer token" />
               {:else if auth.type === 'basic' || auth.type === 'digest' || auth.type === 'ntlm'}
                 <label class="field-label" for="collection-auth-user">Username</label>
                 <VariableInput id="collection-auth-user" className="field field-input" bind:value={auth.basicUser} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-auth-pass">Password</label>
-                <VariableInput id="collection-auth-pass" className="field field-input" bind:value={auth.basicPass} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.basicPass) ? 'text' : 'password'} />
+                <SecretInput id="collection-auth-pass" className="field field-input" bind:value={auth.basicPass} suggestions={variableSuggestions} />
               {:else if auth.type === 'apikey'}
                 <label class="field-label" for="collection-apikey-name">Key name</label>
                 <VariableInput id="collection-apikey-name" className="field field-input" bind:value={auth.apiKeyName} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-apikey-value">Key value</label>
-                <VariableInput id="collection-apikey-value" className="field field-input field-mono" bind:value={auth.apiKeyValue} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.apiKeyValue) ? 'text' : 'password'} />
+                <SecretInput id="collection-apikey-value" className="field field-input field-mono" bind:value={auth.apiKeyValue} suggestions={variableSuggestions} />
                 <span class="field-label">Add to</span>
                 <div class="segmented radio-group" role="radiogroup">
                   <label class="segmented-item radio-label"><input type="radio" bind:group={auth.apiKeyIn} value="header" /> Header</label>
@@ -804,7 +805,7 @@
                 <label class="field-label" for="collection-oauth-id">Client ID</label>
                 <VariableInput id="collection-oauth-id" className="field field-input" bind:value={auth.oauth2ClientID} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-oauth-secret">Client secret</label>
-                <VariableInput id="collection-oauth-secret" className="field field-input" bind:value={auth.oauth2Secret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth2Secret) ? 'text' : 'password'} />
+                <SecretInput id="collection-oauth-secret" className="field field-input" bind:value={auth.oauth2Secret} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-oauth-scope">Scope</label>
                 <VariableInput id="collection-oauth-scope" className="field field-input" bind:value={auth.oauth2Scope} suggestions={variableSuggestions} />
               {:else if auth.type === 'oauth1'}
@@ -823,13 +824,13 @@
                   </div>
                   <div><label class="field-label" for="collection-oauth1-key">Consumer key</label><VariableInput id="collection-oauth1-key" className="field field-input field-mono" bind:value={auth.oauth1ConsumerKey} suggestions={variableSuggestions} /></div>
                   {#if (auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
-                    <div class="auth-grid-span"><label class="field-label" for="collection-oauth1-private-key">Private key (PEM)</label><textarea id="collection-oauth1-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.oauth1PrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
+                    <div class="auth-grid-span"><label class="field-label" for="collection-oauth1-private-key">Private key (PEM)</label><SecretInput id="collection-oauth1-private-key" className="field field-input field-mono oauth2-key-input" bind:value={auth.oauth1PrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" multiline /></div>
                   {:else}
-                    <div><label class="field-label" for="collection-oauth1-secret">Consumer secret</label><VariableInput id="collection-oauth1-secret" className="field field-input field-mono" bind:value={auth.oauth1ConsumerSecret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth1ConsumerSecret) ? 'text' : 'password'} /></div>
+                    <div><label class="field-label" for="collection-oauth1-secret">Consumer secret</label><SecretInput id="collection-oauth1-secret" className="field field-input field-mono" bind:value={auth.oauth1ConsumerSecret} suggestions={variableSuggestions} /></div>
                   {/if}
-                  <div><label class="field-label" for="collection-oauth1-token">Access token</label><VariableInput id="collection-oauth1-token" className="field field-input field-mono" bind:value={auth.oauth1Token} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth1Token) ? 'text' : 'password'} /></div>
+                  <div><label class="field-label" for="collection-oauth1-token">Access token</label><SecretInput id="collection-oauth1-token" className="field field-input field-mono" bind:value={auth.oauth1Token} suggestions={variableSuggestions} /></div>
                   {#if !(auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
-                    <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><VariableInput id="collection-oauth1-token-secret" className="field field-input field-mono" bind:value={auth.oauth1TokenSecret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth1TokenSecret) ? 'text' : 'password'} /></div>
+                    <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><SecretInput id="collection-oauth1-token-secret" className="field field-input field-mono" bind:value={auth.oauth1TokenSecret} suggestions={variableSuggestions} /></div>
                   {/if}
                   <div><label class="field-label" for="collection-oauth1-realm">Realm</label><VariableInput id="collection-oauth1-realm" className="field field-input" bind:value={auth.oauth1Realm} suggestions={variableSuggestions} /></div>
                 </div>
@@ -850,11 +851,11 @@
                   {#if jwtAlgorithmUsesSecret(auth.jwtAlgorithm)}
                     <div class="auth-grid-span">
                       <label class="field-label" for="collection-jwt-secret">Secret</label>
-                      <VariableInput id="collection-jwt-secret" className="field field-input field-mono" bind:value={auth.jwtSecret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.jwtSecret) ? 'text' : 'password'} />
+                      <SecretInput id="collection-jwt-secret" className="field field-input field-mono" bind:value={auth.jwtSecret} suggestions={variableSuggestions} />
                       <label class="check-label jwt-secret-base64"><input class="check" type="checkbox" bind:checked={auth.jwtSecretBase64} /> Secret is base64-encoded</label>
                     </div>
                   {:else}
-                    <div class="auth-grid-span"><label class="field-label" for="collection-jwt-private-key">Private key (PEM)</label><textarea id="collection-jwt-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.jwtPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
+                    <div class="auth-grid-span"><label class="field-label" for="collection-jwt-private-key">Private key (PEM)</label><SecretInput id="collection-jwt-private-key" className="field field-input field-mono oauth2-key-input" bind:value={auth.jwtPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" multiline /></div>
                   {/if}
                   {#if auth.jwtAddTo === 'query'}
                     <div><label class="field-label" for="collection-jwt-query-param">Query parameter</label><VariableInput id="collection-jwt-query-param" className="field field-input field-mono" bind:value={auth.jwtQueryParam} suggestions={variableSuggestions} placeholder="token" /></div>
@@ -873,8 +874,8 @@
                 </div>
               {:else if auth.type === 'aws'}
                 <div class="auth-grid-2">
-                  <div><label class="field-label" for="collection-aws-key">Access key ID</label><VariableInput id="collection-aws-key" className="field field-input field-mono" bind:value={auth.awsAccessKey} suggestions={variableSuggestions} /></div>
-                  <div><label class="field-label" for="collection-aws-secret">Secret access key</label><VariableInput id="collection-aws-secret" className="field field-input field-mono" bind:value={auth.awsSecretKey} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.awsSecretKey) ? 'text' : 'password'} /></div>
+                  <div><label class="field-label" for="collection-aws-key">Access key ID</label><SecretInput id="collection-aws-key" className="field field-input field-mono" bind:value={auth.awsAccessKey} suggestions={variableSuggestions} visible /></div>
+                  <div><label class="field-label" for="collection-aws-secret">Secret access key</label><SecretInput id="collection-aws-secret" className="field field-input field-mono" bind:value={auth.awsSecretKey} suggestions={variableSuggestions} /></div>
                   <div><label class="field-label" for="collection-aws-region">Region</label><VariableInput id="collection-aws-region" className="field field-input" bind:value={auth.awsRegion} suggestions={variableSuggestions} /></div>
                   <div><label class="field-label" for="collection-aws-service">Service</label><VariableInput id="collection-aws-service" className="field field-input" bind:value={auth.awsService} suggestions={variableSuggestions} /></div>
                 </div>
@@ -960,16 +961,11 @@
                   </div>
                   <div class="client-cert-row">
                     <span class="client-cert-label">Key passphrase</span>
-                    <input
-                      class="field field-input client-cert-pass"
-                      type="password"
+                    <SecretInput
+                      className="field field-input client-cert-pass"
                       placeholder="Leave blank if the key is unencrypted"
-                      autocomplete="off"
-                      spellcheck="false"
                       bind:value={settings.clientKeyPassword}
                       disabled={!settings.clientCertPath}
-                      autocorrect="off"
-                      autocapitalize="none"
                     />
                   </div>
                   <p class="client-cert-hint">The key file defaults to the certificate file when left blank (combined PEM). Use <code>&#123;&#123;variable&#125;&#125;</code> in the passphrase to keep it in workspace secrets.</p>

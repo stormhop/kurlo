@@ -22,6 +22,7 @@ export type KurloBackupPayload = {
 };
 
 type DataBackupHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   ensureAllRequestExamples: () => Promise<void>;
   dataTransferStatus: string;
   dataTransferStatusTimer: ReturnType<typeof setTimeout> | null;
@@ -148,10 +149,12 @@ export const dataBackupFeature = {
   async exportAllData(this: DataBackupHost) {
     this.closeFloatingMenus();
 
-    const unsavedCount = this.hasUnsavedRequestChanges() ? this.dirtyRequestIds.size : 0;
+    const unsavedCount = this.hasUnsavedRequestChanges()
+      ? new Set([...this.dirtyRequestIds, ...(this.requestFiles?.dirtyIds ?? [])]).size
+      : 0;
     const warning = 'The backup file contains secrets — auth tokens, OAuth credentials, AWS keys, and any environment values marked as secret. Treat it like a password file: keep it private and do not commit it to a public repo.';
     const manualNote = unsavedCount > 0
-      ? ` You have ${unsavedCount} unsaved change${unsavedCount === 1 ? '' : 's'} in manual-save mode; only the last saved version of each request will be included.`
+      ? ` You have ${unsavedCount} unsaved change${unsavedCount === 1 ? '' : 's'}. The backup includes the last saved version of each request.`
       : '';
     const confirmed = await this.openConfirmDialog('Export all data', warning + manualNote, 'Export');
     if (!confirmed) return;
@@ -175,6 +178,7 @@ export const dataBackupFeature = {
   async importAllDataPayload(this: DataBackupHost, text: string) {
     const parsed = this.parseAllDataBackup(text);
     const store = { ...parsed.store, version: Number(parsed.store.version) || 2 };
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     const saved = await replaceRequestStore(JSON.stringify(store, null, 2));
     if (!saved.ok) throw new Error(saved.error || 'Could not write imported data');
     this.syncDirtyRequestIds(new Set());

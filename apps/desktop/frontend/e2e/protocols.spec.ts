@@ -367,7 +367,7 @@ test.describe('Protocol badge', () => {
       widths[`${type} with url`] = Math.round((await trigger.boundingBox())!.width);
     }
     for (const [label, width] of Object.entries(widths)) expect(width, label).toBeLessThanOrEqual(widths.http + 24);
-    expect(widths.ws, 'a locked WS badge hugs its label').toBeLessThanOrEqual(56);
+    expect(widths.ws, 'the WS picker leaves room for the URL').toBeLessThanOrEqual(56);
   });
 });
 

@@ -28,7 +28,6 @@ collection:
       headers:
         - key: X-Admin
           value: "1"
-          enabled: true
       auth:
         type: bearer
         bearerToken: '{{kurloSecret:collection.collection-core.folder.folder-admin.auth.bearerToken}}'
@@ -51,7 +50,6 @@ collection:
     headers:
       - key: Authorization
         value: Bearer {{specToken}}
-        enabled: true
     intervalMinutes: 15
     skipTlsVerification: false
     ignored:

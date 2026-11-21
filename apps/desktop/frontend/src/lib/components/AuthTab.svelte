@@ -5,13 +5,14 @@
   import Select from './Select.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import VariableInput from './VariableInput.svelte';
-  import { isVariableReferenceOnly } from '../variables';
+  import SecretInput from './SecretInput.svelte';
+  import { isWorkspaceSecretReference } from '../variables';
   import { decodeJwt, formatJwtClaimValue, formatJwtNumericDate, jwtClaimRows, jwtHeaderRows, jwtTokenState, type JwtDecodeResult } from '../jwt';
   import { clipboardCopy, jwtAlgorithmUsesSecret } from '../utils';
 
   let jwtInspectorOpen = $state(false);
   let bearerTokenVisible = $state(false);
-  const secretInputType = (value: string) => (isVariableReferenceOnly(value) ? 'text' : 'password');
+  let bearerMissing = $derived(isWorkspaceSecretReference(vm.bearerToken));
   let bearerTokenForJwt = $derived(vm.resolveTemplate(vm.bearerToken, vm.activeEnvironmentValues()));
   let jwtDecoded = $derived(decodeJwt(bearerTokenForJwt));
   let jwtState = $derived(jwtDecoded.ok ? jwtTokenState(jwtDecoded.payload) : null);
@@ -179,33 +180,35 @@
       <label class="field-label" for="bearer-token">Token</label>
       <div class="bearer-token-row">
         <div class="bearer-token-input-wrap">
-          <VariableInput id="bearer-token" className="field field-input field-mono" bind:value={vm.bearerToken} suggestions={vm.variableSuggestions} placeholder="Enter bearer token" type={bearerTokenVisible || isVariableReferenceOnly(vm.bearerToken) ? 'text' : 'password'} />
-          <button
-            class="btn btn-ghost btn-icon btn-xs token-visibility-btn"
-            type="button"
-            aria-label={bearerTokenVisible ? 'Hide token' : 'Show token'}
-            aria-pressed={bearerTokenVisible}
-            onclick={() => (bearerTokenVisible = !bearerTokenVisible)}
-          >
-            {#if bearerTokenVisible}
-              <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M2 2l12 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <path d="M6.2 6.4a2.1 2.1 0 002.9 2.9M9.4 5.1A2.1 2.1 0 0111 7.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-                <path d="M6.9 3.4A7.5 7.5 0 018 3.3c3.4 0 5.7 2.5 6.5 3.7a1.2 1.2 0 010 1.3 10.6 10.6 0 01-1.6 1.8M4.6 4.3A10.8 10.8 0 001.5 7a1.2 1.2 0 000 1.3c.8 1.2 3.1 3.7 6.5 3.7a7.4 7.4 0 003-.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            {:else}
-              <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M1.5 7.2C2.3 6 4.6 3.5 8 3.5s5.7 2.5 6.5 3.7a1.2 1.2 0 010 1.3c-.8 1.2-3.1 3.7-6.5 3.7S2.3 9.7 1.5 8.5a1.2 1.2 0 010-1.3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
-                <path d="M8 9.8a2.1 2.1 0 100-4.2 2.1 2.1 0 000 4.2z" stroke="currentColor" stroke-width="1.4"/>
-              </svg>
-            {/if}
-          </button>
+          <SecretInput id="bearer-token" className="field field-input field-mono" bind:value={vm.bearerToken} suggestions={vm.variableSuggestions} placeholder="Enter bearer token" visible={bearerTokenVisible} />
+          {#if !bearerMissing}
+            <button
+              class="btn btn-ghost btn-icon btn-xs token-visibility-btn"
+              type="button"
+              aria-label={bearerTokenVisible ? 'Hide token' : 'Show token'}
+              aria-pressed={bearerTokenVisible}
+              onclick={() => (bearerTokenVisible = !bearerTokenVisible)}
+            >
+              {#if bearerTokenVisible}
+                <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M2 2l12 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <path d="M6.2 6.4a2.1 2.1 0 002.9 2.9M9.4 5.1A2.1 2.1 0 0111 7.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                  <path d="M6.9 3.4A7.5 7.5 0 018 3.3c3.4 0 5.7 2.5 6.5 3.7a1.2 1.2 0 010 1.3 10.6 10.6 0 01-1.6 1.8M4.6 4.3A10.8 10.8 0 001.5 7a1.2 1.2 0 000 1.3c.8 1.2 3.1 3.7 6.5 3.7a7.4 7.4 0 003-.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              {:else}
+                <svg width="0.9375rem" height="0.9375rem" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M1.5 7.2C2.3 6 4.6 3.5 8 3.5s5.7 2.5 6.5 3.7a1.2 1.2 0 010 1.3c-.8 1.2-3.1 3.7-6.5 3.7S2.3 9.7 1.5 8.5a1.2 1.2 0 010-1.3z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                  <path d="M8 9.8a2.1 2.1 0 100-4.2 2.1 2.1 0 000 4.2z" stroke="currentColor" stroke-width="1.4"/>
+                </svg>
+              {/if}
+            </button>
+          {/if}
         </div>
-        <button class="btn btn-secondary" type="button" onclick={() => (jwtInspectorOpen = !jwtInspectorOpen)}>
+        <button class="btn btn-secondary" type="button" disabled={bearerMissing} onclick={() => (jwtInspectorOpen = !jwtInspectorOpen)}>
           {jwtInspectorOpen ? 'Hide' : 'Decode'}
         </button>
       </div>
-      {#if jwtInspectorOpen}
+      {#if jwtInspectorOpen && !bearerMissing}
         {@render jwtInspector(jwtDecoded, jwtState, 'Signature not verified')}
       {/if}
 
@@ -213,13 +216,13 @@
       <label class="field-label" for="auth-user">Username</label>
       <VariableInput id="auth-user" className="field field-input" bind:value={vm.basicUser} suggestions={vm.variableSuggestions} placeholder="Enter username" />
       <label class="field-label" for="auth-pass">Password</label>
-      <VariableInput id="auth-pass" className="field field-input" bind:value={vm.basicPass} suggestions={vm.variableSuggestions} placeholder="Enter password" type={secretInputType(vm.basicPass)} />
+      <SecretInput id="auth-pass" className="field field-input" bind:value={vm.basicPass} suggestions={vm.variableSuggestions} placeholder="Enter password" />
 
     {:else if vm.authType === 'apikey'}
       <label class="field-label" for="apikey-name">Key name</label>
       <VariableInput id="apikey-name" className="field field-input" bind:value={vm.apiKeyName} suggestions={vm.variableSuggestions} placeholder="e.g. X-API-Key" />
       <label class="field-label" for="apikey-val">Key value</label>
-      <VariableInput id="apikey-val" className="field field-input field-mono" bind:value={vm.apiKeyValue} suggestions={vm.variableSuggestions} placeholder="Enter value" type={secretInputType(vm.apiKeyValue)} />
+      <SecretInput id="apikey-val" className="field field-input field-mono" bind:value={vm.apiKeyValue} suggestions={vm.variableSuggestions} placeholder="Enter value" />
       <span class="field-label">Add to</span>
       <div class="segmented radio-group" role="radiogroup">
         {#if vm.requestType === 'grpc'}
@@ -251,7 +254,7 @@
           </div>
           <div>
             <label class="field-label" for="oauth2-password">Password</label>
-            <VariableInput id="oauth2-password" className="field field-input" bind:value={vm.oauth2Password} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth2Password)} />
+            <SecretInput id="oauth2-password" className="field field-input" bind:value={vm.oauth2Password} suggestions={vm.variableSuggestions} />
           </div>
         </div>
       {/if}
@@ -261,11 +264,11 @@
       <Select bind:value={vm.oauth2ClientAuth} options={OAUTH2_CLIENT_AUTH_OPTIONS} className="auth-field-select" ariaLabel="Client authentication method" />
       {#if vm.oauth2ClientAuth !== 'private_key_jwt'}
         <label class="field-label" for="oauth2-secret">Client secret{#if vm.oauth2GrantType === 'authorization_code'} <span class="field-label-hint">(optional with PKCE)</span>{/if}</label>
-        <VariableInput id="oauth2-secret" className="field field-input" bind:value={vm.oauth2Secret} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth2Secret)} />
+        <SecretInput id="oauth2-secret" className="field field-input" bind:value={vm.oauth2Secret} suggestions={vm.variableSuggestions} />
       {/if}
       {#if vm.oauth2ClientAuth === 'private_key_jwt'}
         <label class="field-label" for="oauth2-private-key">Private key (PEM) <span class="field-label-hint">— accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
-        <textarea id="oauth2-private-key" class="field field-input field-mono oauth2-key-input" bind:value={vm.oauth2AssertionPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea>
+        <SecretInput id="oauth2-private-key" className="field field-input field-mono oauth2-key-input" bind:value={vm.oauth2AssertionPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" multiline />
         <div class="auth-grid-2">
           <div>
             <label class="field-label" for="oauth2-kid">Key ID <span class="field-label-hint">(optional)</span></label>
@@ -300,12 +303,14 @@
           {#if vm.oauth2Loading}<BirdSpinner />{/if}
           {oauth2ActionLabel}
         </button>
-        {#if vm.oauth2RefreshToken}
+        {#if vm.oauth2RefreshToken && !isWorkspaceSecretReference(vm.oauth2RefreshToken)}
           <button class="btn btn-secondary" type="button" disabled={vm.oauth2Loading} onclick={vm.refreshOAuth2Token}>Refresh token</button>
         {/if}
-        {#if vm.oauth2Token}<span class="oauth2-token-badge">Token acquired ✓</span>{/if}
+        {#if vm.oauth2Token && !isWorkspaceSecretReference(vm.oauth2Token)}<span class="oauth2-token-badge">Token acquired ✓</span>{/if}
       </div>
-      {#if vm.oauth2Token}
+      {#if isWorkspaceSecretReference(vm.oauth2Token)}
+        <span class="field-label-hint">The access token is unavailable on this device.</span>
+      {:else if vm.oauth2Token}
         <span class="field-label">Current token</span>
         <input class="field field-input field-mono" type="password" readonly value={vm.oauth2Token} onclick={selectInputText} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
         {#if oauth2ExpiryLabel}<span class="oauth2-expiry-hint">{oauth2ExpiryLabel}</span>{/if}
@@ -331,13 +336,13 @@
         {#if jwtUsesSecret}
           <div class="auth-grid-span">
             <label class="field-label" for="jwt-secret">Secret</label>
-            <VariableInput id="jwt-secret" className="field field-input field-mono" bind:value={vm.jwt.secret} suggestions={vm.variableSuggestions} placeholder={'Shared secret or {{variable}}'} type={secretInputType(vm.jwt.secret)} />
+            <SecretInput id="jwt-secret" className="field field-input field-mono" bind:value={vm.jwt.secret} suggestions={vm.variableSuggestions} placeholder={'Shared secret or {{variable}}'} />
             <label class="check-label jwt-secret-base64"><input class="check" type="checkbox" bind:checked={vm.jwt.secretBase64} /> Secret is base64-encoded</label>
           </div>
         {:else}
           <div class="auth-grid-span">
             <label class="field-label" for="jwt-private-key">Private key (PEM) <span class="field-label-hint">— accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
-            <textarea id="jwt-private-key" class="field field-input field-mono oauth2-key-input" bind:value={vm.jwt.privateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea>
+            <SecretInput id="jwt-private-key" className="field field-input field-mono oauth2-key-input" bind:value={vm.jwt.privateKey} placeholder="-----BEGIN PRIVATE KEY-----" multiline />
           </div>
         {/if}
         {#if vm.jwt.addTo === 'query' && vm.requestType !== 'grpc'}
@@ -417,23 +422,23 @@
         {#if !oauth1UsesRsa}
           <div>
             <label class="field-label" for="oauth1-consumer-secret">Consumer secret</label>
-            <VariableInput id="oauth1-consumer-secret" className="field field-input field-mono" bind:value={vm.oauth1.consumerSecret} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth1.consumerSecret)} />
+            <SecretInput id="oauth1-consumer-secret" className="field field-input field-mono" bind:value={vm.oauth1.consumerSecret} suggestions={vm.variableSuggestions} />
           </div>
         {/if}
         {#if oauth1UsesRsa}
           <div class="auth-grid-span">
             <label class="field-label" for="oauth1-private-key">Private key (PEM) <span class="field-label-hint">— accepts a {'{{variable}}'} so it can live in workspace secrets</span></label>
-            <textarea id="oauth1-private-key" class="field field-input field-mono oauth2-key-input" bind:value={vm.oauth1.privateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea>
+            <SecretInput id="oauth1-private-key" className="field field-input field-mono oauth2-key-input" bind:value={vm.oauth1.privateKey} placeholder="-----BEGIN PRIVATE KEY-----" multiline />
           </div>
         {/if}
         <div>
           <label class="field-label" for="oauth1-token">Access token <span class="field-label-hint">(optional)</span></label>
-          <VariableInput id="oauth1-token" className="field field-input field-mono" bind:value={vm.oauth1.token} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth1.token)} />
+          <SecretInput id="oauth1-token" className="field field-input field-mono" bind:value={vm.oauth1.token} suggestions={vm.variableSuggestions} />
         </div>
         {#if !oauth1UsesRsa}
           <div>
             <label class="field-label" for="oauth1-token-secret">Token secret <span class="field-label-hint">(optional)</span></label>
-            <VariableInput id="oauth1-token-secret" className="field field-input field-mono" bind:value={vm.oauth1.tokenSecret} suggestions={vm.variableSuggestions} type={secretInputType(vm.oauth1.tokenSecret)} />
+            <SecretInput id="oauth1-token-secret" className="field field-input field-mono" bind:value={vm.oauth1.tokenSecret} suggestions={vm.variableSuggestions} />
           </div>
         {/if}
       </div>
@@ -475,15 +480,15 @@
       <div class="auth-grid-2">
         <div>
           <label class="field-label" for="aws-key">Access key ID</label>
-          <VariableInput id="aws-key" className="field field-input field-mono" bind:value={vm.awsAccessKey} suggestions={vm.variableSuggestions} />
+          <SecretInput id="aws-key" className="field field-input field-mono" bind:value={vm.awsAccessKey} suggestions={vm.variableSuggestions} visible />
         </div>
         <div>
           <label class="field-label" for="aws-secret">Secret access key</label>
-          <VariableInput id="aws-secret" className="field field-input field-mono" bind:value={vm.awsSecretKey} suggestions={vm.variableSuggestions} type={secretInputType(vm.awsSecretKey)} />
+          <SecretInput id="aws-secret" className="field field-input field-mono" bind:value={vm.awsSecretKey} suggestions={vm.variableSuggestions} />
         </div>
         <div class="auth-grid-span">
           <label class="field-label" for="aws-session-token">Session token <span class="field-label-hint">(temporary credentials from STS / SSO)</span></label>
-          <VariableInput id="aws-session-token" className="field field-input field-mono" bind:value={vm.awsSessionToken} suggestions={vm.variableSuggestions} type={secretInputType(vm.awsSessionToken)} />
+          <SecretInput id="aws-session-token" className="field field-input field-mono" bind:value={vm.awsSessionToken} suggestions={vm.variableSuggestions} />
         </div>
         <div>
           <label class="field-label" for="aws-region">Region</label>

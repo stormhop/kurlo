@@ -1,7 +1,6 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
-  import VariableInput from './VariableInput.svelte';
-  import { isVariableReferenceOnly } from '../variables';
+  import SecretInput from './SecretInput.svelte';
 
   let { description = 'Present a certificate for servers that require mutual TLS. Set it on a collection to reuse it across requests.' }: { description?: string } = $props();
 </script>
@@ -33,9 +32,8 @@
     </div>
     <div class="client-cert-row">
       <span class="client-cert-label">Passphrase</span>
-      <VariableInput
+      <SecretInput
         className="field field-input client-cert-pass"
-        type={isVariableReferenceOnly(vm.clientKeyPassword) ? 'text' : 'password'}
         placeholder="Leave blank if the key is unencrypted"
         bind:value={vm.clientKeyPassword}
         suggestions={vm.variableSuggestions}

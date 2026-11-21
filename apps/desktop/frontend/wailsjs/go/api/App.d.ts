@@ -115,7 +115,11 @@ export function ExportLoadTestK6Files(arg1:string,arg2:boolean):Promise<model.K6
 
 export function FetchOAuth2Token(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
+export function FormatRequestFileYAML(arg1:string):Promise<api.RequestFileYAMLResult>;
+
 export function GetEnvironment():Promise<Record<string, string>>;
+
+export function GetRequestFileYAML(arg1:string,arg2:string,arg3:string):Promise<api.RequestFileYAMLResult>;
 
 export function GetVariables():Promise<Record<string, string>>;
 
@@ -322,6 +326,8 @@ export function SaveFileDialog(arg1:string,arg2:string):Promise<string>;
 export function SaveHistoryResponse(arg1:string,arg2:string):Promise<api.HistoryResponseResult>;
 
 export function SaveLoadTestK6Folder(arg1:string,arg2:boolean,arg3:string):Promise<string>;
+
+export function SaveRequestFileYAML(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<api.RequestFileYAMLResult>;
 
 export function SaveRequestStore(arg1:string):Promise<boolean>;
 
