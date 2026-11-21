@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -58,7 +59,7 @@ func TestRequestFileYAMLRoundTripSurvivesFullStoreSave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fileInfo.Mode().Perm() != 0600 {
+	if runtime.GOOS != "windows" && fileInfo.Mode().Perm() != 0600 {
 		t.Fatalf("request file permissions changed: %o", fileInfo.Mode().Perm())
 	}
 	var request map[string]any
