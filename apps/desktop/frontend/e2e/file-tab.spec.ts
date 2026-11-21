@@ -313,7 +313,7 @@ test('saves a newly created request file from the File tab and updates the reque
 test('saves the file with Cmd+S and synchronizes its request fields', async ({ page }) => {
   await openSeededFileTab(page);
   await fillCodeEditor(page, 'request-file-editor', 'version: 1\nrequest:\n  id: file-one\n  name: "One"\n  method: GET\n  url: https://edited.kurlo.test\n');
-  await page.keyboard.press('ControlOrMeta+S');
+  await page.keyboard.press('Meta+S');
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.find(request => request.id === 'file-one')?.url)).toBe('https://edited.kurlo.test');
 });
 
