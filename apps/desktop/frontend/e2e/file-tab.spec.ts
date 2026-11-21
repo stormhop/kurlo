@@ -297,7 +297,7 @@ test('saves a newly created request file from the File tab and updates the reque
   await expect(editor).toContainText('https://created.kurlo.test');
   const yaml = await editor.innerText();
   await fillCodeEditor(page, 'request-file-editor', yaml.replace('https://created.kurlo.test', 'https://updated.kurlo.test'));
-  await page.keyboard.press('Meta+f');
+  await page.keyboard.press('ControlOrMeta+f');
   const searchInput = page.getByRole('textbox', { name: 'Find', exact: true });
   await expect(searchInput).toBeFocused();
   await searchInput.fill('https://updated');
@@ -313,7 +313,7 @@ test('saves a newly created request file from the File tab and updates the reque
 test('saves the file with Cmd+S and synchronizes its request fields', async ({ page }) => {
   await openSeededFileTab(page);
   await fillCodeEditor(page, 'request-file-editor', 'version: 1\nrequest:\n  id: file-one\n  name: "One"\n  method: GET\n  url: https://edited.kurlo.test\n');
-  await page.keyboard.press('Meta+S');
+  await page.keyboard.press('ControlOrMeta+S');
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.find(request => request.id === 'file-one')?.url)).toBe('https://edited.kurlo.test');
 });
 
@@ -368,7 +368,7 @@ test('keeps the request bar and YAML in sync while editing URL, method, protocol
   await expect(target).toHaveValue('localhost:50051');
   await expect(grpcMethod).toHaveValue('/inventory.v1.Inventory/GetItem');
   await target.fill('localhost:50053');
-  await page.keyboard.press('Meta+z');
+  await page.keyboard.press('ControlOrMeta+z');
   await expect(target).toHaveValue('localhost:50051');
   await expect(urlLine()).toContainText('url: "localhost:50051" # keep URL note');
 });
@@ -554,7 +554,7 @@ test('checks edited fields before Save and formats the draft as one undoable edi
   await file.getByRole('button', { name: 'Beautify', exact: true }).click();
   await expect.poll(() => editor.innerText()).toContain('\n    isPinned: false');
   await editor.focus();
-  await page.keyboard.press('Meta+z');
+  await page.keyboard.press('ControlOrMeta+z');
   await expect.poll(() => editor.innerText()).toContain('\n  isPinned: false');
   await page.keyboard.press('Alt+Shift+f');
   await expect.poll(() => editor.innerText()).toContain('\n    isPinned: false');
