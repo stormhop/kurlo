@@ -3,7 +3,6 @@
   import { trapFocus } from '../a11y';
   import type { Collection, SavedRequest } from '../types/models';
   import AddCloseIcon from './AddCloseIcon.svelte';
-  import MenuIcon from './MenuIcon.svelte';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
   import Select from './Select.svelte';
 
@@ -76,18 +75,13 @@
   <div class="modal docs-modal" role="dialog" aria-modal="true" aria-labelledby="docs-dialog-title" tabindex="-1" use:trapFocus
     onkeydown={(event) => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
     <div class="modal-head">
-      <h2 class="modal-title" id="docs-dialog-title">Generate documentation</h2>
+      <div class="docs-title">
+        <h2 class="modal-title" id="docs-dialog-title">Generate documentation</h2>
+        <span class="stats"><span class="collection-name">{collection.name}</span> · {requests.length} {requests.length === 1 ? 'request' : 'requests'} · {folders.length} {folders.length === 1 ? 'folder' : 'folders'}{#if collection.environmentIds?.length}{' · '}{collection.environmentIds.length} pinned {collection.environmentIds.length === 1 ? 'environment' : 'environments'}{/if}</span>
+      </div>
       <button class="btn btn-ghost btn-icon" aria-label="Close dialog" onclick={onClose}><AddCloseIcon /></button>
     </div>
     <div class="docs-body">
-      <div class="collection-summary">
-        <div class="collection-icon"><MenuIcon name="docs" /></div>
-        <div>
-          <div class="collection-title">{collection.name}</div>
-          <div class="stats">{requests.length} {requests.length === 1 ? 'request' : 'requests'} · {folders.length} {folders.length === 1 ? 'folder' : 'folders'}{#if collection.environmentIds?.length}{' · '}{collection.environmentIds.length} pinned {collection.environmentIds.length === 1 ? 'environment' : 'environments'}{/if}</div>
-        </div>
-        <span class="tag format">HTML</span>
-      </div>
       <fieldset class="scope">
         <legend>Requests to include</legend>
         <div class="segmented segmented-md">
@@ -96,31 +90,31 @@
         </div>
       </fieldset>
       {#if selection}
-        <div class="filters">
-          <div class="field field-wrap">
-            <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4" /><path d="m10 10 3 3" /></svg>
-            <input type="search" aria-label="Filter requests" placeholder="Search requests…" bind:value={query} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
+        <div class="selection">
+          <div class="filters">
+            <div class="field field-wrap">
+              <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4" /><path d="m10 10 3 3" /></svg>
+              <input type="search" aria-label="Filter requests" placeholder="Search requests…" bind:value={query} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" />
+            </div>
+            <Select className="setting-select" bind:value={folder} options={folderOptions} ariaLabel="Filter by folder" searchable={folderOptions.length > 8} searchPlaceholder="Search folders…" floating />
           </div>
-          <Select className="setting-select" bind:value={folder} options={folderOptions} ariaLabel="Filter by folder" searchable={folderOptions.length > 8} searchPlaceholder="Search folders…" floating />
-        </div>
-        <div class="request-picker">
-          <div class="list-tools">
-            <span aria-live="polite">{selected.length} of {requests.length} selected</span>
-            <button type="button" class="btn btn-ghost btn-sm" disabled={!visible.length} onclick={toggleVisible}>{allVisible ? 'Clear visible' : 'Select visible'}</button>
-          </div>
-          <div class="choices">
-            {#each visible as req (req.id)}
-              <label class="choice">
-                <input class="check" type="checkbox" checked={checked.has(req.id)} onchange={(event) => selected = event.currentTarget.checked ? [...selected, req.id] : selected.filter(id => id !== req.id)} />
-                <RequestTypeBadge request={req} variant="search" />
-                <span class="request-name">
-                  <span>{req.name}</span>
-                  {#if req.folderPath?.length}<small>{req.folderPath.join(' / ')}</small>{/if}
-                </span>
-              </label>
-            {:else}
-              <p class="empty-state">No matching requests</p>
-            {/each}
+          <div class="request-picker">
+            <div class="list-tools">
+              <span aria-live="polite">{selected.length} of {requests.length} selected</span>
+              <button type="button" class="btn-link" disabled={!visible.length} onclick={toggleVisible}>{allVisible ? 'Clear visible' : 'Select visible'}</button>
+            </div>
+            <div class="choices">
+              {#each visible as req (req.id)}
+                <label class="choice">
+                  <input class="check" type="checkbox" checked={checked.has(req.id)} onchange={(event) => selected = event.currentTarget.checked ? [...selected, req.id] : selected.filter(id => id !== req.id)} />
+                  <RequestTypeBadge request={req} variant="search" />
+                  <span class="request-name">{req.name}</span>
+                  {#if req.folderPath?.length}<span class="request-folder">{req.folderPath.join(' / ')}</span>{/if}
+                </label>
+              {:else}
+                <p class="empty-state">No matching requests</p>
+              {/each}
+            </div>
           </div>
         </div>
       {/if}
@@ -134,7 +128,7 @@
     </div>
     <div class="modal-foot">
       <span class="export-hint">Opens in your browser and works offline.</span>
-      <button type="button" class="btn btn-ghost" onclick={onClose}>Cancel</button>
+      <button type="button" class="btn btn-secondary" onclick={onClose}>Cancel</button>
       <button type="button" class="btn btn-primary" disabled={linkScopes === null || !validLinkBase || (selection && !selected.length)} onclick={() => onGenerate(selection ? selected : undefined, (showLinkBase && linkBaseUrl.trim()) || undefined)}>Generate</button>
     </div>
   </div>
@@ -142,65 +136,47 @@
 
 <style>
   .docs-modal { width: min(34rem, 94vw); max-height: 90vh; }
-  .modal-head .btn { margin-left: auto; }
-  .docs-body { display: grid; gap: var(--space-3); padding: var(--space-4); overflow: auto; }
-  .collection-summary {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--space-3);
-    align-items: center;
-    padding: var(--space-3);
-    background: var(--surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-  }
-  .collection-icon {
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: var(--radius-md);
-    color: var(--accent-text);
-    background: var(--accent-dim);
-  }
-  .collection-icon :global(svg) { width: 1.125rem; height: 1.125rem; }
-  .collection-title { font-weight: var(--weight-semibold); overflow-wrap: anywhere; }
-  .stats, .list-tools, .export-hint { color: var(--text-2); font-size: var(--text-label); }
-  .stats { margin-top: var(--space-0-5); }
-  .format { font-family: var(--font-mono); }
+  .docs-title { display: grid; gap: var(--space-0-5); flex: 1 1 auto; min-width: 0; }
+  .stats { overflow: hidden; color: var(--text-3); font-size: var(--text-label); text-overflow: ellipsis; white-space: nowrap; }
+  .collection-name { color: var(--text-2); font-weight: var(--weight-medium); }
+  .docs-body { display: grid; gap: var(--space-4); padding: var(--space-4); overflow: auto; }
   .scope { min-width: 0; border: 0; padding: 0; margin: 0; }
-  .scope legend { padding: 0; margin-bottom: var(--space-2); color: var(--text-2); font-size: var(--text-label); }
+  .scope legend { padding: 0; margin-bottom: var(--space-2); color: var(--text-2); font-size: var(--text-label); font-weight: var(--weight-medium); }
   .filters { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-2); }
-  .request-picker { overflow: hidden; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+  .selection { display: grid; gap: var(--space-2); min-width: 0; }
+  .request-picker { overflow: hidden; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
   .list-tools {
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: var(--space-2);
-    padding: var(--space-1) var(--space-2-5);
-    border-bottom: 1px solid var(--border);
-    background: var(--elevated);
+    min-height: var(--control-md);
+    padding: 0 var(--space-3);
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-3);
+    font-size: var(--text-label);
   }
-  .choices { max-height: min(15rem, 34vh); overflow: auto; }
+  .choices { max-height: min(17rem, 38vh); overflow: auto; overscroll-behavior: none; }
   .choice {
     display: flex;
     align-items: center;
-    gap: var(--space-2);
+    gap: var(--space-2-5);
     min-height: var(--control-lg);
-    padding: var(--space-1-5) var(--space-3);
+    padding: var(--space-1) var(--space-3);
     cursor: pointer;
   }
   .choice + .choice { border-top: 1px solid var(--border-subtle); }
-  .choice:hover { background: color-mix(in srgb, var(--hover) 30%, var(--surface)); }
-  .choice:has(.check:checked) { background: color-mix(in srgb, var(--accent-dim) 35%, transparent); }
-  .request-name { display: grid; gap: var(--space-0-5); overflow-wrap: anywhere; font-size: var(--text-label); }
-  .request-name small { color: var(--text-2); font-size: var(--text-micro); }
+  .choice:hover { background: color-mix(in srgb, var(--hover) 50%, transparent); }
+  .choice:has(.check:checked) { background: color-mix(in srgb, var(--accent-dim) 45%, transparent); }
+  .request-name { flex: 0 1 auto; min-width: 0; overflow: hidden; color: var(--text); text-overflow: ellipsis; white-space: nowrap; }
+  .request-folder { flex: 1 1 0; min-width: 4rem; overflow: hidden; color: var(--text-3); font-size: var(--text-label); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
   .choices .empty-state { margin: 0; padding: var(--space-4); }
   .link-base { color: var(--text-2); font-size: var(--text-label); }
-  .link-base small { display: block; margin-top: var(--space-2); }
-  .link-base .field { width: 100%; margin-top: var(--space-1); }
-  .modal-foot { flex-wrap: wrap; border-top: 1px solid var(--border-subtle); }
-  .export-hint { margin-right: auto; }
+  .link-base label { font-weight: var(--weight-medium); }
+  .link-base small { display: block; margin-top: var(--space-1-5); color: var(--text-3); }
+  .link-base .field { width: 100%; margin-top: var(--space-2); }
+  .modal-foot { flex-wrap: wrap; }
+  .export-hint { margin-right: auto; color: var(--text-3); font-size: var(--text-label); }
 
   @media (max-width: 440px) {
     .filters { grid-template-columns: minmax(0, 1fr); }

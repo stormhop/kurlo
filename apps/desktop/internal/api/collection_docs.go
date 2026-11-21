@@ -216,34 +216,69 @@ func aiReference(req cliSavedRequest) *docsAI {
 }
 
 type docsEndpoint struct {
-	AI              *docsAI
-	Previous, Next  *docsLink
-	ID, Name, Notes string
-	Curl            string
-	Message         docsMessage
-	Examples        []docsExample
+	AI                    *docsAI
+	Previous, Next        *docsLink
+	ID, Name, Notes, Auth string
+	Curl                  string
+	Snippets              []docsSnippet
+	Message               docsMessage
+	Examples              []docsExample
 }
 
-func (message docsMessage) curl(bodyType string) string {
-	if bodyType == "form" || bodyType == "urlencoded" || bodyType == "binary" {
-		return ""
+func docsAuth(auth cliAuth) (string, [][2]string) {
+	switch auth.Type {
+	case "bearer":
+		return "Bearer token", [][2]string{{"Authorization", "Bearer " + docsMaskedValue(auth.BearerToken)}}
+	case "oauth2":
+		return "OAuth 2.0", [][2]string{{"Authorization", "Bearer " + docsMaskedValue(auth.OAuth2Token)}}
+	case "apikey":
+		name := strings.TrimSpace(auth.APIKeyName)
+		if name == "" {
+			return "API key", nil
+		}
+		if auth.APIKeyIn == "query" {
+			return "API key in query · " + name, [][2]string{{"", docsQueryEscape(name) + "=" + docsMaskedValue(auth.APIKeyValue)}}
+		}
+		return "API key in header · " + name, [][2]string{{name, docsMaskedValue(auth.APIKeyValue)}}
+	case "basic":
+		return "Basic auth", nil
+	case "digest":
+		return "Digest auth", nil
+	case "ntlm":
+		return "NTLM", nil
+	case "jwt":
+		return "JWT bearer", nil
+	case "oauth1":
+		return "OAuth 1.0", nil
+	case "aws", "awsv4":
+		return "AWS Signature v4", nil
+	case "", "none", "inherit":
+		return "", nil
+	default:
+		return auth.Type, nil
 	}
-	if message.Address == "" {
-		return ""
+}
+
+type docsCall struct {
+	Method, Address, Body, ContentType string
+	Head                               bool
+	Headers                            [][2]string
+}
+
+func (message docsMessage) call(bodyType string, auth [][2]string) (docsCall, bool) {
+	if bodyType == "form" || bodyType == "urlencoded" || bodyType == "binary" || message.Address == "" {
+		return docsCall{}, false
 	}
-	method := "--request " + message.Method
+	call := docsCall{Method: message.Method, Body: message.Body}
 	switch message.Method {
 	case "GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "TRACE":
 	case "HEAD":
-		if message.Body == "" {
-			method = "--head"
-		}
+		call.Head = message.Body == ""
 	default:
-		return ""
+		return docsCall{}, false
 	}
 	address := message.Address
 	var query []string
-	var headers []string
 	hasContentType := false
 	for _, table := range message.Tables {
 		switch table.Title {
@@ -269,24 +304,161 @@ func (message docsMessage) curl(bodyType string) string {
 		case "Headers":
 			for _, row := range table.Rows {
 				if !isReservedFramingHeader(row.Key) && httpguts.ValidHeaderFieldName(row.Key) && httpguts.ValidHeaderFieldValue(row.Value) {
-					headers = append(headers, "--header "+shellQuote(row.Key+": "+row.Value))
+					call.Headers = append(call.Headers, [2]string{row.Key, row.Value})
 					hasContentType = hasContentType || strings.EqualFold(row.Key, "Content-Type")
 				}
 			}
 		}
 	}
+	for _, header := range auth {
+		if header[0] == "" {
+			query = append(query, header[1])
+			continue
+		}
+		duplicate := false
+		for _, existing := range call.Headers {
+			duplicate = duplicate || strings.EqualFold(existing[0], header[0])
+		}
+		if !duplicate && httpguts.ValidHeaderFieldName(header[0]) && httpguts.ValidHeaderFieldValue(header[1]) {
+			call.Headers = append(call.Headers, header)
+		}
+	}
 	if len(query) != 0 {
 		address += "?" + strings.Join(query, "&")
 	}
-	args := []string{method, "--url " + shellQuote(address)}
-	args = append(args, headers...)
+	call.Address = address
 	if message.Body != "" {
 		if media := rawBodyContentTypes[message.Media]; media != "" && !hasContentType {
-			args = append(args, "--header "+shellQuote("Content-Type: "+media))
+			call.ContentType = media
+			call.Headers = append(call.Headers, [2]string{"Content-Type", media})
 		}
-		args = append(args, "--data-raw "+shellQuote(message.Body))
+	}
+	return call, true
+}
+
+func (message docsMessage) curl(bodyType string) string {
+	call, ok := message.call(bodyType, nil)
+	if !ok {
+		return ""
+	}
+	return call.curl()
+}
+
+func (call docsCall) curl() string {
+	method := "--request " + call.Method
+	if call.Head {
+		method = "--head"
+	}
+	args := []string{method, "--url " + shellQuote(call.Address)}
+	for _, header := range call.Headers {
+		args = append(args, "--header "+shellQuote(header[0]+": "+header[1]))
+	}
+	if call.Body != "" {
+		args = append(args, "--data-raw "+shellQuote(call.Body))
 	}
 	return "curl --globoff --proto '=http,https' \\\n  " + strings.Join(args, " \\\n  ")
+}
+
+func docsLiteral(value string) string {
+	var out bytes.Buffer
+	encoder := json.NewEncoder(&out)
+	encoder.SetEscapeHTML(false)
+	_ = encoder.Encode(value)
+	return strings.TrimSuffix(out.String(), "\n")
+}
+
+func docsIndent(text, prefix string) string {
+	return strings.ReplaceAll(text, "\n", "\n"+prefix)
+}
+
+func (call docsCall) fetch() string {
+	var out strings.Builder
+	options := []string{"method: " + docsLiteral(call.Method)}
+	if len(call.Headers) != 0 {
+		var headers []string
+		for _, header := range call.Headers {
+			headers = append(headers, "    "+docsLiteral(header[0])+": "+docsLiteral(header[1]))
+		}
+		options = append(options, "headers: {\n"+strings.Join(headers, ",\n")+"\n  }")
+	}
+	if call.Body != "" {
+		if docsStructured(call.Body) {
+			options = append(options, "body: JSON.stringify("+docsIndent(strings.TrimSpace(call.Body), "  ")+")")
+		} else {
+			options = append(options, "body: "+docsLiteral(call.Body))
+		}
+	}
+	fmt.Fprintf(&out, "const response = await fetch(%s, {\n  %s\n});\n\n", docsLiteral(call.Address), strings.Join(options, ",\n  "))
+	if call.Head {
+		out.WriteString("console.log(response.status, Object.fromEntries(response.headers));")
+	} else {
+		out.WriteString("console.log(response.status, await response.text());")
+	}
+	return out.String()
+}
+
+var docsPythonTokens = regexp.MustCompile(`"(?:\\.|[^"\\])*"|\btrue\b|\bfalse\b|\bnull\b`)
+
+func docsStructured(body string) bool {
+	trimmed := strings.TrimSpace(body)
+	return (strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[")) && json.Valid([]byte(trimmed))
+}
+
+func docsPythonValue(body string) string {
+	return docsPythonTokens.ReplaceAllStringFunc(strings.TrimSpace(body), func(token string) string {
+		switch token {
+		case "true":
+			return "True"
+		case "false":
+			return "False"
+		case "null":
+			return "None"
+		}
+		return token
+	})
+}
+
+func (call docsCall) python() string {
+	var out strings.Builder
+	out.WriteString("import requests\n\n")
+	args := []string{docsLiteral(call.Method), "url"}
+	fmt.Fprintf(&out, "url = %s\n", docsLiteral(call.Address))
+	structured := call.Body != "" && docsStructured(call.Body)
+	var headers []string
+	for _, header := range call.Headers {
+		if structured && call.ContentType == "application/json" && header == [2]string{"Content-Type", call.ContentType} {
+			continue
+		}
+		headers = append(headers, "    "+docsLiteral(header[0])+": "+docsLiteral(header[1])+",")
+	}
+	if len(headers) != 0 {
+		fmt.Fprintf(&out, "headers = {\n%s\n}\n", strings.Join(headers, "\n"))
+		args = append(args, "headers=headers")
+	}
+	if call.Body != "" {
+		if structured {
+			fmt.Fprintf(&out, "payload = %s\n", docsPythonValue(call.Body))
+			args = append(args, "json=payload")
+		} else {
+			fmt.Fprintf(&out, "payload = %s\n", docsLiteral(call.Body))
+			args = append(args, "data=payload.encode()")
+		}
+	}
+	fmt.Fprintf(&out, "\nresponse = requests.request(%s)\n", strings.Join(args, ", "))
+	if call.Head {
+		out.WriteString("print(response.status_code, response.headers)")
+	} else {
+		out.WriteString("print(response.status_code, response.text)")
+	}
+	return out.String()
+}
+
+type docsSnippet struct {
+	Label, Code string
+}
+
+func (call docsCall) snippets() []docsSnippet {
+	return []docsSnippet{{"cURL", call.curl()}, {"JavaScript", call.fetch()}, {"Python", call.python()}}
 }
 
 func docsQueryEscape(value string) string {
@@ -330,9 +502,18 @@ func (ep docsEndpoint) Kind() string {
 type docsGroup struct {
 	Root      bool
 	Label     string
+	Path      []string
 	Children  []*docsGroup
 	Name      string
 	Endpoints []docsEndpoint
+}
+
+func (group *docsGroup) Total() int {
+	total := len(group.Endpoints)
+	for _, child := range group.Children {
+		total += child.Total()
+	}
+	return total
 }
 
 type docsPage struct {
@@ -562,7 +743,12 @@ func collectionDocsEndpoint(req cliSavedRequest, credentials map[string]bool) do
 		ID:   "request-" + base64.RawURLEncoding.EncodeToString([]byte(req.ID)),
 		Name: name, Notes: req.RequestNotes, Message: message,
 	}
-	endpoint.Curl = message.curl(req.BodyType)
+	label, authHeaders := docsAuth(req.Auth)
+	endpoint.Auth = label
+	if call, ok := message.call(req.BodyType, authHeaders); ok {
+		endpoint.Snippets = call.snippets()
+		endpoint.Curl = endpoint.Snippets[0].Code
+	}
 	if method == "AI" {
 		endpoint.AI = aiReference(req)
 		if req.NameAuto || req.Name == "" {
@@ -620,9 +806,7 @@ func collectionDocsPage(collection cliCollection, requests []cliSavedRequest, en
 	credentialNames := map[string]bool{}
 	page.Variables.addDefinitions(collection.Defaults.Variables, docsVariableDefinition{Scope: "Collection", Source: collection.Name}, credentialNames)
 	page.Defaults.addRows("Shared headers", collection.Defaults.Headers)
-	if auth := collection.Defaults.Auth.Type; auth != "none" && auth != "inherit" {
-		page.Auth = auth
-	}
+	page.Auth, _ = docsAuth(collection.Defaults.Auth)
 	credentialVariableNames(credentialNames, collection.Defaults.Headers, nil)
 	collectDocsVariables(credentialNames, docsAuthCredentials(collection.Defaults.Auth)...)
 	pinned := map[string]bool{}
@@ -641,7 +825,7 @@ func collectionDocsPage(collection cliCollection, requests []cliSavedRequest, en
 			}
 			group := byPath[key]
 			if group == nil {
-				group = &docsGroup{Name: name, Label: label, Root: len(path) == 0}
+				group = &docsGroup{Name: name, Label: label, Root: len(path) == 0, Path: path[:min(depth, len(path))]}
 				byPath[key] = group
 				groups = append(groups, group)
 				if parent == nil {

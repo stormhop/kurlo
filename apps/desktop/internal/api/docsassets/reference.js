@@ -26,28 +26,42 @@
     document.querySelectorAll('details.folder, details.directory:not([data-root])').forEach(folder => { folder.open = false; });
   }
 
-  const desktop = matchMedia('(min-width: 761px)');
-  const searchBox = search.closest('label');
-  const positionSearch = () => {
-    if (desktop.matches) navigation.querySelector('.rail-name').after(searchBox);
-    else document.querySelector('.tools').before(searchBox);
-  };
-  positionSearch();
-  desktop.addEventListener('change', positionSearch);
+  let snippetLanguage;
+  try { snippetLanguage = localStorage.getItem('kurlo-docs-snippet'); } catch {}
 
-  function selectExample(section, index) {
-    for (const example of section.querySelectorAll('.example')) {
-      example.toggleAttribute('data-current', example.dataset.example === index);
-    }
-    const picker = section.querySelector('.example-picker');
-    if (picker) picker.value = index;
+  function selectLanguage(panel, language) {
+    const tabs = [...panel.querySelectorAll('[role="tab"]')];
+    const tab = tabs.find(item => item.dataset.lang === language) || tabs[0];
+    if (!tab) return;
+    for (const item of tabs) item.setAttribute('aria-selected', String(item === tab));
+    for (const pre of panel.querySelectorAll('pre[data-lang]')) pre.hidden = pre.dataset.lang !== tab.dataset.lang;
+    panel.querySelector('.code-head .copy').setAttribute('aria-label', 'Copy ' + tab.dataset.lang);
   }
 
-  document.addEventListener('change', event => {
-    if (event.target.matches('.example-picker')) {
-      selectExample(event.target.closest('.saved-examples'), event.target.value);
+  function clampDescriptions(view) {
+    for (const description of view.querySelectorAll('.description:not(.clamp-box)')) {
+      const prose = description.querySelector('.prose');
+      description.classList.add('clamp-box');
+      if (prose.scrollHeight <= 340) continue;
+      description.classList.add('clamped');
+      const more = document.createElement('button');
+      more.className = 'more';
+      more.type = 'button';
+      more.textContent = 'Show more';
+      more.setAttribute('aria-expanded', 'false');
+      more.addEventListener('click', () => {
+        const open = description.classList.toggle('clamped');
+        more.textContent = open ? 'Show more' : 'Show less';
+        more.setAttribute('aria-expanded', String(!open));
+      });
+      description.append(more);
     }
-  });
+  }
+
+  function unclamp(node) {
+    const box = node.closest('.clamp-box.clamped');
+    if (box) box.querySelector('.more').click();
+  }
 
   function revealCurrentLink() {
     const current = navigation.querySelector('[aria-current="page"]');
@@ -79,6 +93,8 @@
       }
     }
     variables.show(active);
+    for (const panel of active.querySelectorAll('.code-panel')) selectLanguage(panel, snippetLanguage);
+    clampDescriptions(active);
     results.hidden = true;
     search.value = '';
     methodFilter.value = '';
@@ -120,8 +136,7 @@
     const target = document.getElementById(location.hash.slice(1));
     const heading = target?.matches('[data-section], .prose :is(h1,h2,h3,h4,h5,h6), .var-card > h2') ? target : document.querySelector('main > .view:not([hidden]) h1');
     if (heading === target) {
-      const example = heading.closest('.example');
-      if (example) selectExample(example.closest('.saved-examples'), example.dataset.example);
+      unclamp(heading);
       for (let detail = heading.closest('details'); detail; detail = detail.parentElement.closest('details')) detail.open = true;
       heading.scrollIntoView();
     }
@@ -164,14 +179,28 @@
   }
 
   document.addEventListener('click', async event => {
+    const tab = event.target.closest('.code-tabs [role="tab"]');
+    if (tab) {
+      snippetLanguage = tab.dataset.lang;
+      try { localStorage.setItem('kurlo-docs-snippet', snippetLanguage); } catch {}
+      for (const panel of document.querySelectorAll('.code-panel')) selectLanguage(panel, snippetLanguage);
+      return;
+    }
     const button = event.target.closest('button.copy, button.permalink');
     if (button) {
       const value = button.classList.contains('permalink')
         ? new URL('#' + button.closest('article').id, location.href).href
-        : button.closest('.snippet, .route, .prompt-section').querySelector('code').textContent;
+        : (scope => (scope.querySelector('pre:not([hidden]) code') || scope.querySelector('code')).textContent)(button.closest('.code-panel, .snippet, .route, .prompt-section'));
       try {
         await copy(value);
         notify('Copied to clipboard');
+        const icon = button.querySelector('use');
+        if (icon && !button.classList.contains('copied')) {
+          const original = icon.getAttribute('href');
+          icon.setAttribute('href', '#i-check');
+          button.classList.add('copied');
+          setTimeout(() => { icon.setAttribute('href', original); button.classList.remove('copied'); }, 1400);
+        }
       } catch {
         notify('Clipboard unavailable');
       }
@@ -226,7 +255,7 @@
   let closedDetails;
   window.addEventListener('beforeprint', () => {
     if (closedDetails) return;
-    closedDetails = [...document.querySelectorAll('details:is(.directory, .snapshot, .var-uses, .var-sources):not([open])')];
+    closedDetails = [...document.querySelectorAll('details:is(.directory, .snapshot, .example, .var-uses, .var-sources):not([open])')];
     for (const detail of closedDetails) detail.open = true;
     variables.resetTokens();
   });

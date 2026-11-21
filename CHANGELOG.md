@@ -13,6 +13,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
+- **Collection documentation.** The exported HTML reference has a cleaner layout. The request address stays pinned while you scroll, and a **Code** panel beside the request details shows cURL, JavaScript (`fetch`) and Python (`requests`) snippets. Snippets include bearer token, OAuth 2.0 and API key authorization as variable placeholders. Requests list their authorization type and show parameter descriptions under each name. Saved examples open as a list with colored status codes, and each shows its request and response side by side. Long request documentation collapses behind **Show more**. The **Generate documentation** dialog now matches other Kurlo dialogs: the collection name and counts sit under the title, and each request shows its folder on the same line.
 - **Request protocol.** You can change the protocol of a saved request that already has a URL. Kurlo keeps the request’s name, URL and identity. Stop an active request or disconnect its session first.
 
 ### Fixed

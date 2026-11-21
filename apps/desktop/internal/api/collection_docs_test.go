@@ -430,3 +430,69 @@ func TestDocsVariablesAcrossScopes(t *testing.T) {
 		}
 	}
 }
+
+func TestDocsSnippetsIncludeAuthInEveryLanguage(t *testing.T) {
+	req := cliSavedRequest{
+		ID: "create", Name: "Create order", Method: "POST", URL: "https://api.example.test/orders?limit=10",
+		Headers:  []cliKV{{Key: "X-Title", Value: "O'Connor \"quoted\"", Enabled: true}},
+		BodyType: "json", BodyContent: `{"paid":true,"note":null,"label":"true"}`,
+		Auth: cliAuth{Type: "bearer", BearerToken: "{{token}}"},
+	}
+	endpoint := collectionDocsEndpoint(req, nil)
+	if endpoint.Auth != "Bearer token" || len(endpoint.Snippets) != 3 || endpoint.Curl != endpoint.Snippets[0].Code {
+		t.Fatal(endpoint.Auth, endpoint.Snippets)
+	}
+	languages := map[string]string{}
+	for _, snippet := range endpoint.Snippets {
+		languages[snippet.Label] = snippet.Code
+	}
+	checks := map[string][]string{
+		"cURL":       {"--header 'Authorization: Bearer {{token}}'", "--url 'https://api.example.test/orders?limit=10'", "Content-Type: application/json"},
+		"JavaScript": {`await fetch("https://api.example.test/orders?limit=10"`, `method: "POST"`, `"Authorization": "Bearer {{token}}"`, `"X-Title": "O'Connor \"quoted\""`, "body: JSON.stringify({\"paid\":true"},
+		"Python":     {`url = "https://api.example.test/orders?limit=10"`, `"Authorization": "Bearer {{token}}",`, `payload = {"paid":True,"note":None,"label":"true"}`, `requests.request("POST", url, headers=headers, json=payload)`},
+	}
+	for language, wants := range checks {
+		for _, want := range wants {
+			if !strings.Contains(languages[language], want) {
+				t.Errorf("%s snippet missing %q:\n%s", language, want, languages[language])
+			}
+		}
+	}
+	if strings.Contains(languages["Python"], "Content-Type") {
+		t.Error("Python snippet should let requests set the JSON content type")
+	}
+
+	req.Auth = cliAuth{Type: "bearer", BearerToken: "literal-bearer"}
+	req.Headers = append(req.Headers, cliKV{Key: "authorization", Value: "{{custom}}", Enabled: true})
+	req.BodyType, req.BodyContent = "text", "plain \"body\""
+	endpoint = collectionDocsEndpoint(req, nil)
+	for _, snippet := range endpoint.Snippets {
+		if strings.Contains(snippet.Code, "literal-bearer") || strings.Count(strings.ToLower(snippet.Code), "authorization") != 1 {
+			t.Errorf("%s snippet leaked or duplicated authorization:\n%s", snippet.Label, snippet.Code)
+		}
+	}
+	if python := endpoint.Snippets[2].Code; !strings.Contains(python, `payload = "plain \"body\""`) || !strings.Contains(python, "data=payload.encode()") {
+		t.Error(python)
+	}
+
+	req.Headers = nil
+	req.Auth = cliAuth{Type: "apikey", APIKeyName: "api key", APIKeyIn: "query", APIKeyValue: "literal-key"}
+	endpoint = collectionDocsEndpoint(req, nil)
+	if endpoint.Auth != "API key in query · api key" || !strings.Contains(endpoint.Curl, "orders?limit=10&api+key=••••") || strings.Contains(endpoint.Curl, "literal-key") {
+		t.Fatal(endpoint.Auth, endpoint.Curl)
+	}
+	req.Auth = cliAuth{Type: "apikey", APIKeyName: "X-Key", APIKeyIn: "header", APIKeyValue: "{{apiKey}}"}
+	if curl := collectionDocsEndpoint(req, nil).Curl; !strings.Contains(curl, "'X-Key: {{apiKey}}'") {
+		t.Fatal(curl)
+	}
+
+	req.Method, req.BodyType, req.BodyContent, req.Auth = "HEAD", "none", "", cliAuth{Type: "basic", BasicUser: "u", BasicPass: "p"}
+	endpoint = collectionDocsEndpoint(req, nil)
+	if endpoint.Auth != "Basic auth" || !strings.Contains(endpoint.Snippets[1].Code, "response.headers") || strings.Contains(endpoint.Snippets[2].Code, "payload") {
+		t.Fatal(endpoint.Auth, endpoint.Snippets)
+	}
+	req.BodyType = "form"
+	if endpoint = collectionDocsEndpoint(req, nil); endpoint.Snippets != nil || endpoint.Curl != "" {
+		t.Fatal("form requests have no snippets", endpoint.Snippets)
+	}
+}

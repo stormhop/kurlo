@@ -11,13 +11,21 @@ In the sidebar, open the collection’s **⋯** menu and choose **Build document
 
 If the collection description, selected request notes, or their saved example notes contain relative links such as `/guide/auth`, the dialog shows **Base URL for relative links**. Enter the address of the site hosting those pages. The export uses it to turn relative links into full URLs. You can also put full URLs directly in your notes. If you publish the export with the linked pages on the same site, you can keep the links relative by leaving **Base URL for relative links** empty.
 
-The contents follow your collection’s folders. HTTP requests show the saved address, enabled parameters and headers, and body. Under **Saved examples**, choose a scenario to see its saved request and response together. Supported HTTP snapshots include a copyable cURL command. Expand **Request snapshot** or **Response headers** for more detail. On smaller screens the examples follow the request details. Collection descriptions, request documentation, and example notes render as Markdown. Expand a folder to browse its requests, or press `/` to search by name, folder, method or URL. Use **All methods** to filter the results by method or protocol. Use the arrow keys and Enter to open a result.
+The contents follow your collection’s folders. HTTP requests show the saved address, authorization type, enabled parameters and headers with their descriptions, and body. Collection descriptions, request documentation, and example notes render as Markdown. Long request documentation is collapsed; choose **Show more** to read all of it. Expand a folder in the sidebar to browse its requests, or press `/` to search by name, folder, method or URL. Use **All methods** to filter the results by method or protocol. Use the arrow keys and Enter to open a result.
 
 ![Atlas Library API overview with folder navigation and a searchable endpoint directory](../../../../../assets/screenshots/collection-docs-site.png)
 
-On an endpoint page, use the links under the request address to jump to documentation, request details or saved examples. Use **Copy link** to link directly to the endpoint. For supported HTTP requests, **Copy cURL** copies the saved template with variable placeholders. Fill in those placeholders before running the command. The copy buttons beside addresses and other code blocks copy what is displayed. The reference follows your browser’s color scheme on first open. Change it in the toolbar, or choose **Print reference** to print the whole collection with its examples. Printed requests show the original variable placeholders.
+On an endpoint page, the request address stays at the top while you scroll. Use the links under it to jump to documentation, request details, code or examples. Use **Copy link** to link directly to the endpoint.
 
-![Endpoint page with query parameters, a cURL template, and a saved request and response pair](../../../../../assets/screenshots/collection-docs-endpoint.png)
+For supported HTTP requests, **Code** shows the request as cURL, JavaScript (`fetch`) and Python (`requests`). Choose a tab and use the copy button beside it. The reference remembers your choice for every request. Snippets keep variable placeholders. Bearer token, OAuth 2.0 and API key authorization appear as a header or query parameter with the variable that holds the credential, or with `••••` when the value is not a variable. Fill in the placeholders before running the code. The copy buttons beside addresses and other code blocks copy what is displayed.
+
+![Endpoint page with authorization, query parameters and a cURL, JavaScript and Python code panel](../../../../../assets/screenshots/collection-docs-endpoint.png)
+
+**Examples** lists the request’s saved examples with their status codes. The first one is open. Expand any example to see its notes, the saved request as cURL and the response body side by side. Expand **Request snapshot** or **Response headers** for more detail. On smaller screens the request and response are stacked.
+
+![Saved examples with colored status codes, one expanded to show its request and response side by side](../../../../../assets/screenshots/collection-docs-examples.png)
+
+The reference follows your browser’s color scheme on first open. Change it in the toolbar, or use the printer button to print the whole collection with its examples. Printed requests show the original variable placeholders.
 
 AI requests show their saved provider, model and generation settings. Use the copy buttons in **Prompt** to copy the system instructions or user message, including line breaks and variable references.
 

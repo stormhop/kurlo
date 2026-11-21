@@ -19,6 +19,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Changed
 
+- **Collection documentation.** The HTML reference keeps the request address pinned, shows cURL, JavaScript and Python snippets with authorization placeholders, and lists saved examples with colored status codes and side-by-side responses. The **Generate documentation** dialog is more compact. [Collection documentation guide](/docs/guides/cli-runner/docs/).
 - **Request protocol.** Saved requests with a URL can switch protocol from the address bar.
 
 ### Fixed
