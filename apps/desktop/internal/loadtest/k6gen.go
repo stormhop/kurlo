@@ -191,7 +191,7 @@ func (g *generator) scan(step int, value string, depth int) {
 		return
 	}
 	for _, match := range templateName.FindAllStringSubmatch(value, -1) {
-		name := strings.TrimSpace(match[1])
+		name := model.TemplateVariableKey(match[1])
 		if name == "" {
 			continue
 		}
@@ -911,7 +911,7 @@ func (g *generator) writeHelpers() {
 	g.line("function t(text, depth = 0) {")
 	g.line("  if (depth > 10) return text;")
 	g.line("  return text.replace(/\\{\\{([^{}]*)\\}\\}/g, (match, key) => {")
-	g.line("    const value = lookup(key.trim(), depth);")
+	g.line("    const value = lookup(key.trim().replace(/^vault:\\s*/, ''), depth);")
 	g.line("    return value === undefined ? match : value;")
 	g.line("  });")
 	g.line("}")

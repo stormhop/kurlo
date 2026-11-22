@@ -264,7 +264,8 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         let current = String(value ?? '');
         for (let depth = 0; depth < 20 && current.includes('{{'); depth += 1) {
           const next = current.replace(/\{\{([^{}]*)\}\}/g, (match, raw) => {
-            const key = raw.trim();
+            const exact = raw.trim();
+            const key = Object.prototype.hasOwnProperty.call(values, exact) ? exact : exact.replace(/^vault:\s*/, '');
             return key && Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
           });
           if (next === current) break;

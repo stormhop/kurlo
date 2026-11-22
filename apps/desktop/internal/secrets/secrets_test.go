@@ -360,7 +360,7 @@ func TestVaultErrorsAreTyped(t *testing.T) {
 		t.Errorf("a token saved on the device must win over VAULT_TOKEN: %q, %v", value, err)
 	}
 
-	unreachable := mustProvider(t, map[string]any{"id": "down", "type": "vault", "address": "http://127.0.0.1:1", "timeout": "200ms"})
+	unreachable := mustProvider(t, map[string]any{"id": "down", "type": "vault", "address": "http://127.0.0.1:1", "timeout": "1s"})
 	down := NewManager(&fakeSource{configs: []ProviderConfig{unreachable}}, testEnv(map[string]string{"VAULT_TOKEN": "x"}, c))
 	if _, err := down.Value(ctx, "ws", Ref{Provider: "down", Path: "a"}); err == nil || KindOf(err) == KindNotFound {
 		t.Errorf("unreachable vault: %v", err)

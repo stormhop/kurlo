@@ -793,7 +793,7 @@ func (m docsMessage) collectVariables(names map[string]bool) {
 func collectDocsVariables(names map[string]bool, values ...string) {
 	for _, text := range values {
 		for _, match := range templatePattern.FindAllStringSubmatch(text, -1) {
-			name := strings.TrimSpace(match[1])
+			name := model.TemplateVariableKey(match[1])
 			if name != "" && !strings.HasPrefix(name, "kurloSecret:") {
 				names[name] = true
 			}

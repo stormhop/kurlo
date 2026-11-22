@@ -13,7 +13,7 @@
   import { formatGraphQLQuery } from './graphql';
   import { prettyMarkup } from './utils';
   import type { VariableSuggestion } from './variables';
-  import { variableDisplayValue } from './variables';
+  import { VAULT_TEMPLATE_PREFIX, matchVariableSuggestions, variableDisplayValue } from './variables';
   import { DYNAMIC_VARIABLES } from './dynamicVariables';
   import { maxLength as maxLengthFilter } from './editorLimit';
   import { registerEditorView, unregisterEditorView } from './editorViews';
@@ -329,21 +329,16 @@
     const prefix = match[1] ?? '';
     const start = context.pos - prefix.length;
     const needle = prefix.toLowerCase();
-    const environmentOptions = variableSuggestions
-      .filter(variable => variable.key.toLowerCase().includes(needle))
-      .sort((a, b) => {
-        const ap = a.key.toLowerCase().startsWith(needle) ? 0 : 1;
-        const bp = b.key.toLowerCase().startsWith(needle) ? 0 : 1;
-        return ap - bp || a.key.localeCompare(b.key);
-      })
-      .slice(0, 30)
-      .map(variable => ({
-        label: variable.key,
+    const matched = matchVariableSuggestions(variableSuggestions, prefix, 30);
+    const environmentOptions = matched.items.map(variable => variable.key === VAULT_TEMPLATE_PREFIX
+      ? { label: VAULT_TEMPLATE_PREFIX, type: 'namespace', detail: variable.description, apply: VAULT_TEMPLATE_PREFIX, boost: -1 }
+      : {
+        label: matched.vault ? `${VAULT_TEMPLATE_PREFIX}${variable.key}` : variable.key,
         type: 'variable',
         detail: variable.linked ? variableDisplayValue(variable) : variable.secret ? 'secret' : variableDisplayValue(variable),
-        apply: `${variable.key}}}`,
-      }));
-    const dynamicOptions = DYNAMIC_VARIABLES
+        apply: `${matched.vault ? VAULT_TEMPLATE_PREFIX : ''}${variable.key}}}`,
+      });
+    const dynamicOptions = matched.vault ? [] : DYNAMIC_VARIABLES
       .filter(variable => variable.name.toLowerCase().includes(needle))
       .slice(0, 30)
       .map(variable => ({

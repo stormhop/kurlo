@@ -150,6 +150,7 @@ export type SecretRevealResult = Wire<api.SecretRevealResult>;
 export type SecretActionResult = Wire<api.SecretActionResult>;
 export type SecretBrowseResult = Wire<api.SecretBrowseResult>;
 export type SecretBrowseEntry = Wire<secrets.Entry>;
+export type SecretEnvExportResult = Wire<api.SecretEnvExportResult>;
 export type LinkedSecretFailure = Wire<model.LinkedSecretFailure>;
 export type RunnerSecretCheck = { requestId: string; http?: HttpRequest; grpc?: GrpcRequest };
 export type RunnerSecretCheckResult = { requestId: string; failures: LinkedSecretFailure[] };

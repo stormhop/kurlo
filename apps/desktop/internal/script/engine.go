@@ -184,7 +184,7 @@ var replaceInPattern = regexp.MustCompile(`\{\{([^{}]*)\}\}`)
 func (c *Context) ReplaceIn(value string) string {
 	substitute := func(input string) string {
 		return replaceInPattern.ReplaceAllStringFunc(input, func(match string) string {
-			key := strings.TrimSpace(match[2 : len(match)-2])
+			key := model.TemplateVariableKey(match[2 : len(match)-2])
 			if key == "" {
 				return match
 			}

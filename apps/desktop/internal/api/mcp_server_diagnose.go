@@ -424,7 +424,7 @@ func mcpTemplateNames(text string, keep map[string]bool) []string {
 	seen := map[string]bool{}
 	var names []string
 	for _, match := range mcpVariableRe.FindAllStringSubmatch(text, -1) {
-		name := strings.TrimSpace(match[1])
+		name := model.TemplateVariableKey(match[1])
 		if keep[name] && !seen[name] {
 			seen[name] = true
 			names = append(names, name)

@@ -1,6 +1,6 @@
 import type {
   SecretImportInput, SecretImportKeys, SecretImportKeysResult,
-  SecretActionResult, SecretBrowseResult, SecretProviderStatus, SecretProvidersResult, SecretRefInput, SecretRefTestResult, SecretRevealResult,
+  SecretActionResult, SecretBrowseResult, SecretEnvExportResult, SecretProviderStatus, SecretProvidersResult, SecretRefInput, SecretRefTestResult, SecretRevealResult,
 } from './wire';
 
 const unavailable = 'Secret providers are available in the desktop app.';
@@ -91,4 +91,16 @@ export async function browseSecretProvider(workspaceId: string, providerId: stri
   const bridge = app();
   if (!bridge?.BrowseSecretProvider) return { ok: false, kind: 'unavailable', message: unavailable, prefix, entries: [], durationMs: 0 };
   return bridge.BrowseSecretProvider(workspaceId, providerId, prefix);
+}
+
+export async function previewSecretProviderEnv(workspaceId: string, providerId: string): Promise<SecretEnvExportResult> {
+  const bridge = app();
+  if (!bridge?.PreviewSecretProviderEnv) return { ok: false, error: unavailable, variables: [] };
+  return bridge.PreviewSecretProviderEnv(workspaceId, providerId);
+}
+
+export async function exportSecretProviderEnv(workspaceId: string, providerId: string): Promise<SecretEnvExportResult> {
+  const bridge = app();
+  if (!bridge?.ExportSecretProviderEnv) return { ok: false, error: unavailable, variables: [] };
+  return bridge.ExportSecretProviderEnv(workspaceId, providerId);
 }

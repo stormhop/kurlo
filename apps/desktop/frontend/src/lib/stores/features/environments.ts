@@ -5,7 +5,7 @@ import type { Collection, Environment, EnvironmentColor, KVRow, SecretSource, Si
 import { normalizeEnvironmentColor } from '../../environmentColors';
 import { environmentForCollectionEntry, pinnedEnvironments, withoutPinnedEnvironment } from '../../collectionEnvironments';
 import type { VariableSuggestion } from '../../variables';
-import { variableTemplate } from '../../variables';
+import { templateVariableKey, variableTemplate } from '../../variables';
 import { resolveDynamicVariable } from '../../dynamicVariables';
 import { environmentRowValue, linkedSecretRef, normalizeSecretSources } from '../../linkedSecrets';
 import { changedValues, enabledValues, environmentsForStore, mapEnvironmentBaselines, trackEnvironmentEdit } from '../../manualWorkspaceEdits';
@@ -171,7 +171,8 @@ export const environmentFeature = {
   resolveTemplate(this: EnvironmentHost, value: string, values = this.activeEnvironmentValues()) {
     if (!value || !value.includes('{{')) return value;
     const substitute = (input: string) => input.replace(/\{\{([^{}]*)\}\}/g, (match, raw: string) => {
-      const key = raw.trim();
+      if (Object.prototype.hasOwnProperty.call(values, raw.trim())) return values[raw.trim()];
+      const key = templateVariableKey(raw);
       if (!key) return match;
       if (Object.prototype.hasOwnProperty.call(values, key)) return values[key];
       return resolveDynamicVariable(key) ?? match;

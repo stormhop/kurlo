@@ -153,7 +153,7 @@ func decodeWorkspaceImport(content, format, name string, sourceURL ...string) (w
 	case "postman":
 		bundle, err := importPostman(doc, defaultString(name, "Postman import"))
 		if names := postmanVaultReferences(content); err == nil && len(names) > 0 {
-			bundle.warnings = append(bundle.warnings, "The import uses Postman Vault references ("+strings.Join(names, ", ")+"). They are kept as written; ask the user to add these variables to an environment and link them to a secret provider in Kurlo.")
+			bundle.warnings = append(bundle.warnings, "The import uses Postman Vault references ("+strings.Join(names, ", ")+"). They work as written: {{vault:name}} reads the variable name. Ask the user to add these variables to an environment and link them to a secret provider in Kurlo.")
 		}
 		return bundle, err
 	case "insomnia":

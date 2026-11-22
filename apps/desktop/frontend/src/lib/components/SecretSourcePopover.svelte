@@ -6,6 +6,7 @@
   import SecretBrowser from './SecretBrowser.svelte';
   import { trapFocus } from '../a11y';
   import { secretProviderTypeInfo } from '../secretProviderTypes';
+  import { matchReferenceProvider, parseSecretReference } from '../secretReferenceParse';
   import { secretProviders } from '../stores/secretProviders.svelte';
   import { loadKeysForSource } from '../stores/secretImports.svelte';
   import { openAddSecretProvider, openSecretProviders } from '../secretProvidersNav';
@@ -49,6 +50,26 @@
     providerId;
     browsing = false;
   });
+
+  let recognized = $state('');
+
+  function onPathPaste(event: ClipboardEvent) {
+    const text = event.clipboardData?.getData('text/plain') ?? '';
+    const parsed = parseSecretReference(text);
+    if (!parsed) return;
+    event.preventDefault();
+    const match = matchReferenceProvider(parsed, validProviders, providerId);
+    if (!match) {
+      path = text.trim();
+      recognized = `This is a ${parsed.label}. Add a ${secretProviderTypeInfo(parsed.type)?.name ?? parsed.type} provider${parsed.host ? ` for ${parsed.host}` : parsed.region ? ` in ${parsed.region}` : ''} to use it.`;
+      return;
+    }
+    providerId = match.id;
+    path = parsed.path;
+    
+    version = parsed.version ?? '';
+    recognized = `${parsed.label} · ${match.id}`;
+  }
 
   function pick(entry: SecretBrowseEntry) {
     path = entry.path ?? path;
@@ -140,7 +161,7 @@
       <div class="secret-popover-field">
         <label for="secret-source-path">Secret</label>
         <div class="secret-path-row">
-          <input id="secret-source-path" class="field field-mono" value={path} placeholder={info?.sourcePlaceholder ?? info?.pathPlaceholder ?? ''} oninput={(event) => (path = inputValue(event))} autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" data-autofocus="" />
+          <input id="secret-source-path" class="field field-mono" value={path} placeholder={info?.sourcePlaceholder ?? info?.pathPlaceholder ?? ''} oninput={(event) => { path = inputValue(event); recognized = ''; }} onpaste={onPathPaste} autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" data-autofocus="" />
           {#if info?.browse}
             <button class="btn btn-secondary btn-sm" type="button" onclick={() => (browsing = !browsing)} disabled={!canBrowse} aria-expanded={browsing} aria-label="Browse the secrets of this provider"><MenuIcon name="folder" />Browse</button>
           {/if}
@@ -148,7 +169,7 @@
         {#if browsing && provider}
           <SecretBrowser {workspaceId} providerId={provider.id} providerName={provider.name || provider.id} onPick={pick} />
         {/if}
-        <small>{info?.sourceHint ?? 'A secret with several keys.'}</small>
+        {#if recognized}<small class="secret-recognized" role="status">{recognized}</small>{:else}<small>{info?.sourceHint ?? 'A secret with several keys.'}</small>{/if}
       </div>
       <div class="secret-popover-pair">
         <label class="secret-popover-field">

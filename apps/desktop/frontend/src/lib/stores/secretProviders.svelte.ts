@@ -154,7 +154,7 @@ export async function revokeProviderTrust(providerId: string) {
 }
 
 export async function saveProviderCredential(providerId: string, name: string, value: string) {
-  const error = await afterAction(await setSecretProviderCredential(secretProviders.workspaceId, providerId, name, value), value ? 'Saved on this device' : 'Removed from this device');
+  const error = await afterAction(await setSecretProviderCredential(secretProviders.workspaceId, providerId, name, value), name === 'mfaCode' ? 'MFA code sent · used once for a one-hour session' : value ? 'Saved on this device' : 'Removed from this device');
   if (!error) await checkSecretProvider(providerId);
   return error;
 }

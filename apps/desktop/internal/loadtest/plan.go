@@ -96,7 +96,7 @@ func (p Plan) RequestTarget(r Request) string {
 	resolve := func(text string) string {
 		for range 10 {
 			next := templateName.ReplaceAllStringFunc(text, func(token string) string {
-				if v, ok := values[strings.TrimSpace(token[2:len(token)-2])]; ok {
+				if v, ok := values[model.TemplateVariableKey(token[2:len(token)-2])]; ok {
 					return v
 				}
 				return token

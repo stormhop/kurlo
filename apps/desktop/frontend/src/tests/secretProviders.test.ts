@@ -132,6 +132,7 @@ describe('palette', () => {
     const withSecrets = buildPaletteCommands({ ...base, ...fns, openSecretProviders: vi.fn(), addSecretProvider: vi.fn(), refreshSecrets: refresh, clearSecretCache: vi.fn() } as PaletteContext);
     const found = filterPaletteCommands(withSecrets, 'vault');
     expect(found.map(command => command.id)).toEqual(expect.arrayContaining(['go-secret-providers', 'secrets-refresh', 'secrets-clear-cache', 'create-secret-provider']));
+    expect(withSecrets.filter(command => command.id.startsWith('secrets-')).map(command => command.group)).toEqual(['Secrets', 'Secrets']);
     withSecrets.find(command => command.id === 'secrets-refresh')?.run();
     expect(refresh).toHaveBeenCalled();
   });

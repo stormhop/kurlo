@@ -36,7 +36,7 @@ var requestVariableReference = regexp.MustCompile(`\{\{([^{}]*)\}\}`)
 func substituteKnownVariables(value string, values map[string]string) string {
 	for depth := 0; depth < 20 && strings.Contains(value, "{{"); depth++ {
 		next := requestVariableReference.ReplaceAllStringFunc(value, func(match string) string {
-			key := strings.TrimSpace(match[2 : len(match)-2])
+			key := model.TemplateVariableKey(match[2 : len(match)-2])
 			if resolved, ok := values[key]; ok && key != "" {
 				return resolved
 			}

@@ -234,6 +234,10 @@ export function ExportLoadTestK6Files(arg1, arg2) {
   return window['go']['api']['App']['ExportLoadTestK6Files'](arg1, arg2);
 }
 
+export function ExportSecretProviderEnv(arg1, arg2) {
+  return window['go']['api']['App']['ExportSecretProviderEnv'](arg1, arg2);
+}
+
 export function FetchOAuth2Token(arg1) {
   return window['go']['api']['App']['FetchOAuth2Token'](arg1);
 }
@@ -576,6 +580,10 @@ export function PreviewJWTBearer(arg1) {
 
 export function PreviewLoadTestData(arg1) {
   return window['go']['api']['App']['PreviewLoadTestData'](arg1);
+}
+
+export function PreviewSecretProviderEnv(arg1, arg2) {
+  return window['go']['api']['App']['PreviewSecretProviderEnv'](arg1, arg2);
 }
 
 export function PruneHistoryResponses(arg1) {

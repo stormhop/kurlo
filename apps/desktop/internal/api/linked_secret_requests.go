@@ -92,7 +92,7 @@ func variableMentioned(texts []string, key string) bool {
 	if key == "" {
 		return false
 	}
-	pattern := regexp.MustCompile(`\{\{\s*` + regexp.QuoteMeta(key) + `\s*\}\}|["'` + "`" + `]` + regexp.QuoteMeta(key) + `["'` + "`" + `]`)
+	pattern := regexp.MustCompile(`\{\{\s*(?:vault:\s*)?` + regexp.QuoteMeta(key) + `\s*\}\}|["'` + "`" + `]` + regexp.QuoteMeta(key) + `["'` + "`" + `]`)
 	for _, text := range texts {
 		if strings.Contains(text, key) && pattern.MatchString(text) {
 			return true

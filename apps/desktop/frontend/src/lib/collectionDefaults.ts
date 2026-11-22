@@ -3,6 +3,7 @@ import type { AuthState, Collection, CollectionDefaults, FolderDefaults, KVRow, 
 import { authStateHasData, cloneRowsForStore, emptyAuthState, newEntityId, rowHasContent, sanitizeLike } from './utils';
 import { folderPathKey, folderPathStartsWith, normalizeFolderPath } from './collections';
 import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
+import { templateVariableKey } from './variables';
 
 type RequestSettingKey = keyof RequestSettings;
 
@@ -110,7 +111,7 @@ function substituteKnownVariables(value: string, values: Record<string, string>)
   let resolved = value;
   for (let depth = 0; depth < 20 && resolved.includes('{{'); depth += 1) {
     const next = resolved.replace(REQUEST_VARIABLE_PATTERN, (match, raw: string) => {
-      const key = raw.trim();
+      const key = templateVariableKey(raw);
       return key && Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
     });
     if (next === resolved) break;

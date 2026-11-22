@@ -87,6 +87,9 @@ func (p *gcpProvider) lookupToken(ctx context.Context) (string, string, int64, e
 	if key, ok := p.credentials("serviceAccountKey"); ok && strings.TrimSpace(key) != "" {
 		return p.tokenFromFile(ctx, []byte(key), "service account key saved on this device")
 	}
+	if key, ok := p.env.Getenv(GCPServiceAccountKeyEnv); ok && strings.TrimSpace(key) != "" {
+		return p.tokenFromFile(ctx, []byte(strings.TrimSpace(key)), GCPServiceAccountKeyEnv)
+	}
 	if path, ok := p.env.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); ok && strings.TrimSpace(path) != "" {
 		data, err := p.env.ReadFile(strings.TrimSpace(path))
 		if err != nil {

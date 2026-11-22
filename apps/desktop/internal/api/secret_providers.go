@@ -19,7 +19,7 @@ const secretProviderStateFile = "secret-providers.json"
 
 var secretProviderCredentialNames = map[string]bool{
 	"token": true, "secretId": true, "accessKeyId": true, "secretAccessKey": true, "sessionToken": true,
-	"clientSecret": true, "serviceAccountKey": true,
+	"clientSecret": true, "serviceAccountKey": true, "username": true, "password": true, "mfaCode": true,
 }
 
 type secretProviderDeviceState struct {
@@ -58,6 +58,7 @@ type linkedSecretService struct {
 	files     map[string]*workspaceSecretFiles
 	state     *secretProviderDeviceState
 	stateLoad error
+	mfaCodes  map[string]string
 }
 
 var linkedSecrets = newLinkedSecretService(fileWorkspaceStorePath, func() string {
@@ -300,6 +301,11 @@ func (s *linkedSecretService) Credentials(workspaceID, providerID string) secret
 	return func(name string) (string, bool) {
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		if name == "mfaCode" {
+			code, ok := s.mfaCodes[key]
+			delete(s.mfaCodes, key)
+			return code, ok && code != ""
+		}
 		value, ok := s.loadStateLocked().Credentials[key][name]
 		return value, ok && value != ""
 	}
@@ -329,6 +335,19 @@ func (s *linkedSecretService) setCredential(workspaceID, providerID, name, value
 	if !secretProviderCredentialNames[name] {
 		return fmt.Errorf("unknown credential %q", name)
 	}
+	if problem := secretmgr.CredentialProblem(name, value); problem != "" {
+		return fmt.Errorf("%s %s", credentialLabel(name), problem)
+	}
+	if name == "mfaCode" {
+		s.mu.Lock()
+		if s.mfaCodes == nil {
+			s.mfaCodes = map[string]string{}
+		}
+		s.mfaCodes[providerStateKey(workspaceID, providerID)] = strings.TrimSpace(value)
+		s.mu.Unlock()
+		s.manager.ForgetProvider(workspaceID, providerID)
+		return nil
+	}
 	s.mu.Lock()
 	state := s.loadStateLocked()
 	key := providerStateKey(workspaceID, providerID)
@@ -338,7 +357,11 @@ func (s *linkedSecretService) setCredential(workspaceID, providerID, name, value
 		if state.Credentials[key] == nil {
 			state.Credentials[key] = map[string]string{}
 		}
-		state.Credentials[key][name] = strings.TrimSpace(value)
+		if name == "password" {
+			state.Credentials[key][name] = value
+		} else {
+			state.Credentials[key][name] = strings.TrimSpace(value)
+		}
 	}
 	err := s.saveStateLocked()
 	s.mu.Unlock()
@@ -477,4 +500,29 @@ func (s *linkedSecretService) resetForTests() {
 	s.state = nil
 	s.mu.Unlock()
 	s.manager.ClearCache()
+}
+
+func credentialLabel(name string) string {
+	switch name {
+	case "serviceAccountKey":
+		return "The service account key"
+	case "accessKeyId":
+		return "The access key ID"
+	case "secretAccessKey":
+		return "The secret access key"
+	case "sessionToken":
+		return "The session token"
+	case "secretId":
+		return "The secret_id"
+	case "clientSecret":
+		return "The client secret"
+	case "username":
+		return "The user name"
+	case "password":
+		return "The password"
+	case "mfaCode":
+		return "The MFA code"
+	default:
+		return "The token"
+	}
 }

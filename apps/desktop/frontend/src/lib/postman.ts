@@ -948,7 +948,7 @@ export function postmanVaultReferences(payload: unknown): string[] {
 export function postmanVaultNotice(names: string[]) {
   const shown = names.slice(0, 8).map(name => `{{vault:${name}}}`).join(', ');
   const more = names.length > 8 ? ` and ${names.length - 8} more` : '';
-  return `This import uses Postman Vault: ${shown}${more}. Kurlo keeps these references as written. To send them, add a variable with the same name to an environment, link it to a secret provider, and change {{vault:name}} to {{name}}.`;
+  return `This import uses Postman Vault: ${shown}${more}. They work as written: {{vault:name}} takes the value of the variable name. Add these variables to an environment and link each one to a secret provider.`;
 }
 
 export function buildPostmanEnvironment(env: Environment, includeSecrets = false) {

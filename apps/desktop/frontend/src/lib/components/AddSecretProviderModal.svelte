@@ -2,10 +2,29 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import ProviderLogo from './ProviderLogo.svelte';
   import { trapFocus } from '../a11y';
+  import { portal } from '../portal';
   import { SECRET_PROVIDER_TYPES, type SecretProviderType } from '../secretProviderTypes';
 
   let { onChoose, onDismiss }: { onChoose: (type: SecretProviderType) => void; onDismiss: () => void } = $props();
   let selected = $state<SecretProviderType>('vault');
+  let grid = $state<HTMLDivElement>();
+  let moreAbove = $state(false);
+  let moreBelow = $state(false);
+
+  function updateScrollHints() {
+    if (!grid) return;
+    moreAbove = grid.scrollTop > 1;
+    moreBelow = grid.scrollTop + grid.clientHeight < grid.scrollHeight - 1;
+  }
+
+  $effect(() => {
+    const element = grid;
+    if (!element) return;
+    updateScrollHints();
+    const observer = new ResizeObserver(updateScrollHints);
+    observer.observe(element);
+    return () => observer.disconnect();
+  });
 
   function onKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
@@ -15,7 +34,7 @@
   }
 </script>
 
-<div class="dialog-backdrop" role="presentation" onmousedown={(event) => event.target === event.currentTarget && onDismiss()} onkeydown={onKeydown}>
+<div class="dialog-backdrop" role="presentation" use:portal onmousedown={(event) => event.target === event.currentTarget && onDismiss()} onkeydown={onKeydown}>
   <div class="modal secret-add-modal" role="dialog" aria-modal="true" aria-labelledby="secret-add-title" tabindex="-1" use:trapFocus>
     <div class="modal-head dialog-head">
       <div>
@@ -24,7 +43,7 @@
       </div>
       <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog"><AddCloseIcon /></button>
     </div>
-    <div class="secret-type-grid" role="radiogroup" aria-label="Provider type">
+    <div class="secret-type-grid" class:more-above={moreAbove} class:more-below={moreBelow} role="radiogroup" aria-label="Provider type" bind:this={grid} onscroll={updateScrollHints}>
       {#each SECRET_PROVIDER_TYPES as item (item.type)}
         <button class="secret-type-tile" class:active={selected === item.type} type="button" role="radio" aria-checked={selected === item.type} onclick={() => (selected = item.type)} ondblclick={() => onChoose(item.type)} data-autofocus={item.type === 'vault' ? '' : undefined}>
           <ProviderLogo type={item.type} size="lg" />

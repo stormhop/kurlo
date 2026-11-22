@@ -72,7 +72,7 @@ function lookup(name, depth) {
 function t(text, depth = 0) {
   if (depth > 10) return text;
   return text.replace(/\{\{([^{}]*)\}\}/g, (match, key) => {
-    const value = lookup(key.trim(), depth);
+    const value = lookup(key.trim().replace(/^vault:\s*/, ''), depth);
     return value === undefined ? match : value;
   });
 }

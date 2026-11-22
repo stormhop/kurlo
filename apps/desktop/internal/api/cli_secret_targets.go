@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 	secretmgr "github.com/stormhop/kurlo/apps/desktop/internal/secrets"
 )
 
@@ -19,7 +20,7 @@ func templateNames(text string) []string {
 	var names []string
 	if strings.Contains(text, "{{") {
 		for _, match := range templatePattern.FindAllStringSubmatch(text, -1) {
-			if name := strings.TrimSpace(match[1]); name != "" {
+			if name := model.TemplateVariableKey(match[1]); name != "" {
 				names = append(names, name)
 			}
 		}
@@ -86,7 +87,7 @@ func (l *cliLinkedSecrets) onlyFor(req *cliSavedRequest) *cliLinkedSecrets {
 	return l
 }
 
-var scriptSecretRead = regexp.MustCompile(`\b(pm\.(?:environment|variables)|request\.environment|insomnia\.environment)\s*\.\s*(?:get|has)\s*\(\s*["'` + "`" + `]([^"'` + "`" + `\r\n]+)["'` + "`" + `]\s*\)`)
+var scriptSecretRead = regexp.MustCompile(`\b(pm\.(?:environment|variables|vault)|request\.environment|insomnia\.environment)\s*\.\s*(?:get|has)\s*\(\s*["'` + "`" + `]([^"'` + "`" + `\r\n]+)["'` + "`" + `]\s*\)`)
 
 func (l *cliLinkedSecrets) needed(defined map[string]string, linked map[string]secretmgr.Ref) map[string]bool {
 	needed := map[string]bool{}
@@ -113,7 +114,7 @@ func (target cliSecretTarget) collect(needed map[string]bool, defined map[string
 	}
 	if strings.TrimSpace(target.scripts) != "" {
 		for _, match := range scriptSecretRead.FindAllStringSubmatch(target.scripts, -1) {
-			pending = append(pending, lookup{name: match[2], envOnly: match[1] != "pm.variables"})
+			pending = append(pending, lookup{name: match[2], envOnly: match[1] != "pm.variables" && match[1] != "pm.vault"})
 		}
 		for name := range linked {
 			if _, local := target.variables[name]; !local && strings.Contains(target.scripts, name) && variableMentioned([]string{target.scripts}, name) {

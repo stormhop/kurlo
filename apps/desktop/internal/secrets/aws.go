@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -86,6 +87,75 @@ func (p *awsProvider) forgetCredentials() {
 }
 
 func (p *awsProvider) lookupCredentials(ctx context.Context) (awsCredentials, error) {
+	base, err := p.baseCredentials(ctx)
+	if err != nil || p.config.RoleARN == "" {
+		return base, err
+	}
+	return p.assumeRole(ctx, base)
+}
+
+func (p *awsProvider) mfaCode() string {
+	if code, ok := p.credentials("mfaCode"); ok && strings.TrimSpace(code) != "" {
+		return strings.TrimSpace(code)
+	}
+	if code, ok := p.env.Getenv("AWS_MFA_CODE"); ok {
+		return strings.TrimSpace(code)
+	}
+	return ""
+}
+
+func (p *awsProvider) assumeRole(ctx context.Context, base awsCredentials) (awsCredentials, error) {
+	form := url.Values{}
+	form.Set("Action", "AssumeRole")
+	form.Set("Version", "2011-06-15")
+	form.Set("RoleArn", p.config.RoleARN)
+	form.Set("RoleSessionName", "kurlo")
+	form.Set("DurationSeconds", "3600")
+	if p.config.ExternalID != "" {
+		form.Set("ExternalId", p.config.ExternalID)
+	}
+	if p.config.MFASerial != "" {
+		code := p.mfaCode()
+		if code == "" {
+			return awsCredentials{}, newError(KindNotAuthenticated, p.config.ID, "enter the MFA code for %s under On this device, or set AWS_MFA_CODE", p.config.MFASerial)
+		}
+		form.Set("SerialNumber", p.config.MFASerial)
+		form.Set("TokenCode", code)
+	}
+	data, err := p.signedCall(ctx, base, "sts", "application/x-www-form-urlencoded; charset=utf-8", "", []byte(form.Encode()), "sts")
+	if err != nil {
+		var typed *Error
+		if errors.As(err, &typed) && (typed.Kind == KindForbidden || typed.Kind == KindNotAuthenticated) {
+			return awsCredentials{}, newError(KindNotAuthenticated, p.config.ID, "cannot assume %s: %s", p.config.RoleARN, typed.Message)
+		}
+		return awsCredentials{}, err
+	}
+	var decoded struct {
+		Response struct {
+			Result struct {
+				Credentials struct {
+					AccessKeyID     string  `json:"AccessKeyId"`
+					SecretAccessKey string  `json:"SecretAccessKey"`
+					SessionToken    string  `json:"SessionToken"`
+					Expiration      float64 `json:"Expiration"`
+				} `json:"Credentials"`
+			} `json:"AssumeRoleResult"`
+		} `json:"AssumeRoleResponse"`
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil || decoded.Response.Result.Credentials.AccessKeyID == "" {
+		return awsCredentials{}, newError(KindUnavailable, p.config.ID, "AssumeRole returned no credentials")
+	}
+	creds := decoded.Response.Result.Credentials
+	out := awsCredentials{AccessKeyID: creds.AccessKeyID, SecretAccessKey: creds.SecretAccessKey, SessionToken: creds.SessionToken, Source: "role " + p.config.RoleARN + " via " + base.Source}
+	if creds.Expiration > 0 {
+		out.Expires = time.Unix(int64(creds.Expiration), 0)
+	} else {
+		out.Expires = p.env.Now().Add(time.Hour)
+	}
+	return out, nil
+}
+
+func (p *awsProvider) baseCredentials(ctx context.Context) (awsCredentials, error) {
 	key, keyOK := p.credentials("accessKeyId")
 	secret, secretOK := p.credentials("secretAccessKey")
 	if keyOK && secretOK && key != "" && secret != "" {
@@ -203,6 +273,10 @@ func (p *awsProvider) call(ctx context.Context, service, contentType, target str
 	if err != nil {
 		return nil, err
 	}
+	return p.signedCall(ctx, creds, service, contentType, target, body, path)
+}
+
+func (p *awsProvider) signedCall(ctx context.Context, creds awsCredentials, service, contentType, target string, body []byte, path string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.endpoint(service), bytes.NewReader(body))
 	if err != nil {
 		return nil, newError(KindInvalidRef, p.config.ID, "invalid endpoint")

@@ -61,19 +61,23 @@ secretProviders:
 |---|---|
 | `id` | Lowercase letters, digits, `-` and `_`. Environment files refer to the provider by it. |
 | `type` | `vault`, `1password`, `aws-secrets-manager`, `aws-ssm`, `gcp-secret-manager`, `azure-key-vault`, `bitwarden`, `doppler`, `infisical`, `command` or `env`. |
-| `name` | Name shown in Kurlo. |
+| `name` | Name shown in Kurlo, up to 80 characters. |
 | `address` | Vault server or Azure Key Vault URL; for Bitwarden, Doppler and Infisical, a self-hosted or regional server. |
 | `namespace`, `caCert`, `skipTlsVerify` | Vault Enterprise namespace, PEM file of a private CA, and whether to skip TLS checks. |
-| `auth.method` | Vault: `token` (default), `approle`, `kubernetes` or `oidc`. Azure: `cli` (default) or `client-secret`. Infisical: `token` (default) or `universal`. |
+| `auth.method` | Vault: `token` (default), `approle`, `kubernetes`, `oidc`, `ldap` or `userpass`. Azure: `cli` (default) or `client-secret`. Infisical: `token` (default) or `universal`. |
 | `auth.roleId`, `auth.role`, `auth.mount` | Vault AppRole role ID; role for `kubernetes` and `oidc`; auth mount, which defaults to the method name. |
 | `auth.tokenPath`, `auth.redirectUri` | Service account token file for Vault `kubernetes`, and the loopback redirect for Vault `oidc` (`http://localhost:8250/oidc/callback` by default). |
+| `auth.username` | Vault `ldap` or `userpass` user name. Usually left out, so each person saves their own on the device or sets `VAULT_USERNAME`. |
 | `auth.tenantId`, `auth.clientId` | Azure tenant and app registration; Infisical machine identity client ID. |
 | `account` | 1Password account, when `op` is signed in to several. |
 | `region`, `profile`, `endpoint` | AWS region, profile from `~/.aws/config`, and a custom endpoint such as a VPC endpoint or LocalStack. `endpoint` also sets a Google Cloud endpoint. |
+| `roleArn`, `externalId`, `mfaSerial` | AWS role to assume, its external ID, and the MFA device whose code Kurlo asks for. |
 | `project` | Google Cloud project, or Infisical project ID. |
 | `command` | For `command`: the program and its arguments, as a list or one string split on spaces. `{path}` and `{version}` are replaced. |
-| `cacheTtl` | How long fetched values stay in memory: `30s`, `5m`, `0` or `session`. Defaults to `5m`. |
-| `timeout` | Timeout of one call to the provider. Defaults to `10s`. |
+| `cacheTtl` | How long fetched values stay in memory: `30s`, `5m`, `0` or `session`, up to `24h`. Defaults to `5m`. |
+| `timeout` | Timeout of one call to the provider, from `1s` to `10m`. Defaults to `10s`. |
 
 Only Kurlo writes this list. A save from the app keeps it as it is on disk.
+
+URLs must start with `https://` or `http://`, have a host, and contain no user name, password, `?` or `#`. Azure `auth.clientId` is a GUID and `auth.tenantId` is a GUID or a domain. A provider that breaks these rules is shown with the problem and is not used.
 

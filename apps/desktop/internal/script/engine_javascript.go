@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -45,7 +46,12 @@ func runJS(src string, ctx *Context, hasResponse bool) string {
 	})
 	defer timer.Stop()
 
-	_, runErr := vm.RunString(src)
+	_, runErr := vm.RunString(wrapTopLevelAwait(src))
+	if runErr == nil {
+		if failure := vm.Get("__kurloAsyncError"); failure != nil && !goja.IsUndefined(failure) && !goja.IsNull(failure) {
+			runErr = asyncScriptError(vm, failure)
+		}
+	}
 	if ctx.droppedLogs > 0 {
 		ctx.Logs = append(ctx.Logs, fmt.Sprintf("[warn] %d more log %s not shown: a script keeps its first %d log lines", ctx.droppedLogs, pluralLines(ctx.droppedLogs), jsMaxLogEntries))
 		ctx.droppedLogs = 0
@@ -61,6 +67,35 @@ func runJS(src string, ctx *Context, hasResponse bool) string {
 		return jsErrorMessage(runErr)
 	}
 	return ""
+}
+
+var topLevelAwait = regexp.MustCompile(`\bawait\b`)
+
+func wrapTopLevelAwait(src string) string {
+	if !topLevelAwait.MatchString(src) {
+		return src
+	}
+	if _, err := goja.Compile("script", src, false); err == nil {
+		return src
+	}
+	wrapped := "(async function () {\n" + src + "\n})().catch(function (e) { __kurloAsyncError = e === undefined || e === null ? new Error(String(e)) : e; });"
+	if _, err := goja.Compile("script", wrapped, false); err != nil {
+		return src
+	}
+	return wrapped
+}
+
+func asyncScriptError(vm *goja.Runtime, failure goja.Value) error {
+	if object, ok := failure.(*goja.Object); ok {
+		if message := object.Get("message"); message != nil && !goja.IsUndefined(message) {
+			name := "Error"
+			if value := object.Get("name"); value != nil && !goja.IsUndefined(value) {
+				name = value.String()
+			}
+			return errors.New(name + ": " + message.String())
+		}
+	}
+	return errors.New(failure.String())
 }
 
 func pluralLines(n int) string {
@@ -748,6 +783,14 @@ var __kurloAPI = (function (host) {
       clear: function () { host.varClear(); }
     },
     collectionVariables: kv('collGet', 'collSet', 'collUnset', 'collClear'),
+    vault: {
+      get: function (k) {
+        try { var v = host.varGet(String(k)); return Promise.resolve(v === undefined ? undefined : v); }
+        catch (e) { return Promise.reject(e); }
+      },
+      set: function (k) { return Promise.reject(new Error('pm.vault.set is not available in Kurlo: link the variable ' + String(k) + ' to a secret manager in the environment instead')); },
+      unset: function (k) { return Promise.reject(new Error('pm.vault.unset is not available in Kurlo: unlink the variable ' + String(k) + ' in the environment instead')); }
+    },
     crypto: crypto,
     cookies: {
       get: function (k) { return host.cookieGet(String(k)); },

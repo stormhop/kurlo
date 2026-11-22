@@ -2,6 +2,7 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import { trapFocus } from '../a11y';
+  import { portal } from '../portal';
   import { commandList, joinCommand, secretProviderTypeInfo } from '../secretProviderTypes';
   import type { SecretProviderView } from '../wire';
 
@@ -27,10 +28,10 @@
       else if (typeof value === 'boolean' && value) out.push({ key, value: 'true' });
     };
     add('type', provider.type);
-    for (const key of ['address', 'namespace', 'caCert', 'skipTlsVerify', 'account', 'region', 'profile', 'endpoint', 'project']) add(key, config[key]);
+    for (const key of ['address', 'namespace', 'caCert', 'skipTlsVerify', 'account', 'region', 'profile', 'endpoint', 'roleArn', 'externalId', 'mfaSerial', 'project']) add(key, config[key]);
     if (config.command !== undefined) add('command', joinCommand(commandList(config.command)));
     const auth = config.auth as Record<string, unknown> | undefined;
-    if (auth) for (const key of ['method', 'roleId', 'role', 'mount', 'tokenPath', 'redirectUri', 'tenantId', 'clientId']) add(`auth.${key}`, auth[key]);
+    if (auth) for (const key of ['method', 'roleId', 'role', 'mount', 'tokenPath', 'redirectUri', 'tenantId', 'clientId', 'username']) add(`auth.${key}`, auth[key]);
     return out;
   });
   const destination = $derived.by(() => {
@@ -58,7 +59,7 @@
   }
 </script>
 
-<div class="dialog-backdrop" role="presentation" onmousedown={(event) => event.target === event.currentTarget && onDismiss()} onkeydown={onKeydown}>
+<div class="dialog-backdrop" role="presentation" use:portal onmousedown={(event) => event.target === event.currentTarget && onDismiss()} onkeydown={onKeydown}>
   <div class="modal secret-trust-modal" role="dialog" aria-modal="true" aria-labelledby="secret-trust-title" aria-describedby="secret-trust-intro" tabindex="-1" use:trapFocus>
     <div class="modal-head dialog-head">
       <h2 class="modal-title" id="secret-trust-title">Trust “{provider.name || provider.id}” on this device?</h2>

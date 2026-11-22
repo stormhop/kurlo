@@ -8,10 +8,10 @@ Supported providers:
 
 | Provider | How Kurlo reads it | Where credentials come from |
 |---|---|---|
-| HashiCorp Vault and OpenBao | HTTP API: KV v1 and v2, dynamic secrets | A token saved on this device, `VAULT_TOKEN` or `~/.vault-token`; AppRole with a `secret_id` saved on this device or in `VAULT_SECRET_ID`; Kubernetes auth with the pod's service account; or OIDC sign-in in the browser |
+| HashiCorp Vault and OpenBao | HTTP API: KV v1 and v2, dynamic secrets | A token saved on this device, `VAULT_TOKEN` or `~/.vault-token`; AppRole with a `secret_id` saved on this device or in `VAULT_SECRET_ID`; LDAP or userpass with a password saved on this device or in `VAULT_PASSWORD`; Kubernetes auth with the pod's service account; or OIDC sign-in in the browser |
 | 1Password | The `op` CLI | The 1Password app on this computer, or a service account token saved on this device |
-| AWS Secrets Manager and Parameter Store | AWS API | Keys saved on this device, `AWS_ACCESS_KEY_ID`, the profile in `~/.aws/credentials`, or `aws configure export-credentials` for SSO profiles |
-| Google Secret Manager | Google Cloud API | A service account key saved on this device, `GOOGLE_APPLICATION_CREDENTIALS`, application default credentials, or `gcloud auth print-access-token` |
+| AWS Secrets Manager and Parameter Store | AWS API | Keys saved on this device, `AWS_ACCESS_KEY_ID`, the profile in `~/.aws/credentials`, or `aws configure export-credentials` for SSO profiles; optionally an assumed role with MFA |
+| Google Secret Manager | Google Cloud API | A service account key saved on this device or in `KURLO_GCP_SERVICE_ACCOUNT_KEY`, `GOOGLE_APPLICATION_CREDENTIALS`, application default credentials, or `gcloud auth print-access-token` |
 | Azure Key Vault | Azure API | The Azure CLI (`az login`), or an app registration with a client secret saved on this device or in `AZURE_CLIENT_SECRET` |
 | Bitwarden Secrets Manager | The `bws` CLI | A machine account access token saved on this device or in `BWS_ACCESS_TOKEN` |
 | Doppler | Doppler API | A token saved on this device, `DOPPLER_TOKEN`, or the signed-in `doppler` CLI |
@@ -26,6 +26,8 @@ Kurlo calls the services over their HTTP APIs or their official CLIs. It finds t
 1. Open **Environments** in the sidebar and click **+** next to **Secret providers**.
 2. Choose the provider type and fill in its address, account, region or project.
 3. Click **Save**, then **Test connection**.
+
+The form checks each field before saving and shows what to fix under it: a missing address or region, a URL without `https://` or with a user name and password in it, an AWS region or Google Cloud project in the wrong form, an Azure client ID that is not a GUID, an ID another provider already uses, or a timeout outside 1 second to 10 minutes. Credentials are checked too: tokens cannot contain spaces, and a Google Cloud key must be the whole JSON key file.
 
 Provider settings are saved in `workspace.yml`, so a Git workspace shares them with your team. Tokens and keys you enter under **On this device** are stored only on this computer, encrypted like other local secrets. Each person signs in on their own device.
 
@@ -45,6 +47,19 @@ Hover a variable row in an environment and click the link icon next to its value
 - Environment variables: the variable name.
 
 For a JSON value, put the key in **Field** with any provider.
+
+You can also paste a reference copied from the provider into **Path**. Kurlo recognizes it, picks the matching provider and fills in the path, field and version:
+
+| Paste | Becomes |
+|---|---|
+| `op://Payments/Stripe/credential` | 1Password reference |
+| `arn:aws:secretsmanager:eu-central-1:123456789012:secret:prod/db-AbCdEf` | AWS Secrets Manager secret, on the provider in that region |
+| `arn:aws:ssm:eu-central-1:123456789012:parameter/prod/api-key` | Parameter `/prod/api-key` |
+| `projects/my-project/secrets/db/versions/3` | Google secret `projects/my-project/secrets/db`, version `3` |
+| `https://team.vault.azure.net/secrets/db-password/0b1c…` | Azure secret `db-password` and its version, on the provider for that vault |
+| `https://vault.example.com/v1/secret/data/app` or a Vault UI link | Vault path `secret/data/app`, on the provider with that address |
+
+Add `#key` to the end of any of them to fill **Field**. If no provider matches, Kurlo says which one to add.
 
 **Browse** lists what the provider can show you: Vault mounts, folders and secrets, 1Password vaults, items and fields, AWS secrets and parameters, Google and Azure secrets, Bitwarden projects and secrets, Doppler projects, configs and secret names, and Infisical environments, folders and secret names. Click an entry to use it, or **Open** to go inside. Browsing shows names only, and needs the provider to be trusted. Vault lists the paths its policy permits. Google Cloud and Azure check the permission to list secrets when you click **Test connection**. If listing is forbidden, enter a known path and click **Test** on the link to check read access.
 
@@ -77,7 +92,40 @@ Open the provider and click **Review and trust**, or **Revoke trust** to stop us
 - **Token** reads a token saved on this device, then `VAULT_TOKEN`, then `~/.vault-token`.
 - **AppRole** logs in with the role ID from `workspace.yml` and a `secret_id` from this device or `VAULT_SECRET_ID`.
 - **Kubernetes** logs in with the service account token of the pod Kurlo runs in, by default `/var/run/secrets/kubernetes.io/serviceaccount/token`. Use it for `kurlo run` inside a cluster.
+- **LDAP** and **Userpass** log in with a user name and password. Leave **User name** empty in the form so each person saves their own under **On this device**; the CLI reads `VAULT_USERNAME` and `VAULT_PASSWORD`.
 - **OIDC** opens your browser to sign in with your identity provider. Add the redirect URI, `http://localhost:8250/oidc/callback` by default, to `allowed_redirect_uris` of the Vault role. The token stays in memory until Kurlo quits or you clear the secret cache. The CLI cannot sign in this way.
+
+## AWS roles and MFA
+
+To read secrets as another role, enter its **Role ARN**. Kurlo signs in with your usual AWS credentials, calls `AssumeRole` and uses the role for one hour. Add an **External ID** if the role's trust policy asks for one.
+
+If the role requires MFA, enter your **MFA device** ARN. Kurlo then shows an **MFA code** field under **On this device**: type the six digits and click **Save**. The code is used once to start the session and is never stored. When the hour ends, or after **Refresh secrets**, Kurlo asks for a new code. In the CLI, set `AWS_MFA_CODE`.
+
+```yaml
+secretProviders:
+  - id: payments
+    type: aws-secrets-manager
+    region: eu-central-1
+    roleArn: arn:aws:iam::123456789012:role/payments-read
+    mfaSerial: arn:aws:iam::123456789012:mfa/ada
+```
+
+## Permissions each provider needs
+
+Give Kurlo read access only. **Test connection** and **Browse** need the listing rights; reading linked values needs only the read rights.
+
+| Provider | Read a value | Browse |
+|---|---|---|
+| Vault | `read` on the secret path, for KV v2 `<mount>/data/<path>` | `list` on `<mount>/metadata/*`, `read` on `sys/internal/ui/mounts` |
+| 1Password | Read access to the vault, for a service account | The same |
+| AWS Secrets Manager | `secretsmanager:GetSecretValue`, and `kms:Decrypt` for a customer-managed key | `secretsmanager:ListSecrets` |
+| AWS Parameter Store | `ssm:GetParameter`, and `kms:Decrypt` for `SecureString` | `ssm:DescribeParameters` |
+| AWS role | `sts:AssumeRole` on the role for your base credentials | — |
+| Google Secret Manager | `roles/secretmanager.secretAccessor` | `roles/secretmanager.viewer` |
+| Azure Key Vault | `Key Vault Secrets User` role, or a `get` secret access policy | `list` secret access policy |
+| Bitwarden | Read access to the project for the machine account | The same |
+| Doppler | A read-only service token for the config, or a personal token | A personal or workplace token |
+| Infisical | Viewer role on the project for the machine identity | The same |
 
 ## Command provider
 
@@ -100,11 +148,13 @@ The **Response time** breakdown shows how long Kurlo spent fetching linked secre
 
 ## Cache
 
-Fetched values stay in memory for five minutes by default. Change it per provider under **Cache**: 1 minute, 5 minutes, 15 minutes or the whole session. Vault dynamic secrets expire earlier when their lease ends. **Refresh secrets** on the providers page or in the command palette clears the cache.
+Fetched values stay in memory for five minutes by default. Change it per provider under **Cache**: 1 minute, 5 minutes, 15 minutes, the whole session, or **Custom** with any duration up to 24 hours, such as `2h`. A longer time means fewer calls to the provider; it does not use more memory, because Kurlo keeps one copy of each value either way. Vault dynamic secrets expire earlier when their lease ends. **Refresh secrets** on the providers page or in the command palette clears the cache.
 
 ## Scripts
 
 Scripts read a linked value with `pm.environment.get("name")`. Kurlo fetches it only when the name appears in the script as a string. A linked value a script copies into another variable is stored as `[secret]`.
+
+Scripts written for Postman Vault work too: `await pm.vault.get("name")` returns the value of the variable `name`, linked or not, and `await` can be used at the top level of a script. `pm.vault.set` and `pm.vault.unset` fail with a message, because Kurlo changes secrets only in the secret manager.
 
 ## In the Collection Runner
 
@@ -114,7 +164,9 @@ The Runner checks linked secrets for the selected requests before sending the fi
 
 `kurlo run` fetches the linked variables that the selected requests use before it sends the first request. Values are masked as `[secret]` in the terminal output and in JSON and JUnit reports, and `--export-environment` leaves them out.
 
-The CLI uses the credentials of the machine it runs on: `VAULT_TOKEN` or `~/.vault-token`, `VAULT_SECRET_ID` for AppRole, the pod's service account for Vault Kubernetes auth, `OP_SERVICE_ACCOUNT_TOKEN` or the signed-in `op` CLI, the standard AWS variables, profiles and SSO, `GOOGLE_APPLICATION_CREDENTIALS` or `gcloud`, `az login` or `AZURE_CLIENT_SECRET`, `BWS_ACCESS_TOKEN`, `DOPPLER_TOKEN`, and `INFISICAL_TOKEN` or `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`. Tokens saved in the app are not read. The CLI does not ask you to trust providers: running it is the decision. The one exception is a `command` provider, which runs only with `--allow-secret-commands`.
+The CLI uses the credentials of the machine it runs on: `VAULT_TOKEN` or `~/.vault-token`, `VAULT_SECRET_ID` for AppRole, `VAULT_USERNAME` and `VAULT_PASSWORD` for LDAP and userpass, the pod's service account for Vault Kubernetes auth, `OP_SERVICE_ACCOUNT_TOKEN` or the signed-in `op` CLI, the standard AWS variables, profiles and SSO, with `AWS_MFA_CODE` for a role that needs MFA, `KURLO_GCP_SERVICE_ACCOUNT_KEY` with the key file contents, `GOOGLE_APPLICATION_CREDENTIALS` or `gcloud`, `az login` or `AZURE_CLIENT_SECRET`, `BWS_ACCESS_TOKEN`, `DOPPLER_TOKEN`, and `INFISICAL_TOKEN` or `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`. Tokens saved in the app are not read. The CLI does not ask you to trust providers: running it is the decision. The one exception is a `command` provider, which runs only with `--allow-secret-commands`.
+
+To move credentials you already saved in the app to CI, open the provider, click **•••** and choose **Export for CI…**. Kurlo lists the variables the CLI reads for this provider and saves them to a `.env` file that only you can read. Credentials you did not save in the app are left empty for you to fill in. The file holds secrets in plain text: add each line as a CI secret, or load the file in the job with `set -a; . ./vault.ci.env; set +a`, and delete it afterwards. Keep it out of Git.
 
 If a value cannot be fetched, the run stops with exit code `2` and lists each variable, its reference and the reason. Nothing is sent.
 
@@ -153,6 +205,8 @@ Requests that AI agents send through Kurlo use linked values and get `[secret]` 
 
 ## Postman Vault
 
-Postman collections and environments can refer to Postman Vault as `{{vault:name}}`. Kurlo imports these references unchanged and lists them after the import. To use them, add a variable with the same name to an environment, link it to a provider, and replace `{{vault:name}}` with `{{name}}`.
+Postman collections and environments can refer to Postman Vault as `{{vault:name}}`. Kurlo reads `{{vault:name}}` as the variable `name`, with any provider, everywhere a `{{variable}}` works: URL, params, headers, body, auth, scripts' `pm.variables.replaceIn`, the Collection Runner, `kurlo run`, load tests and AI agents. An imported collection keeps these references and lists them after the import: add a variable with each name to an environment and link it to a provider. Scripts that call `pm.vault.get("name")` keep working without changes.
+
+Type `{{` and Kurlo offers `vault:` when the environment has secret variables. After `{{vault:`, the list shows only linked and secret variables, linked ones first, with the provider they come from. A `{{vault:name}}` that no variable matches is underlined like any undefined variable. If a variable is itself named `vault:name`, it wins.
 
 Exported environments contain linked variables as secrets with empty values.

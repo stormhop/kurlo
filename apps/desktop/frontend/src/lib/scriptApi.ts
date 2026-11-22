@@ -27,7 +27,7 @@ const pm = group('pm');
 for (const [name, example] of Object.entries({
   variables: 'pm.variables.replaceIn("{{baseUrl}}/users")', environment: 'pm.environment.get("baseUrl")',
   globals: 'pm.globals.get("runId")', collectionVariables: 'pm.collectionVariables.get("version")',
-  iterationData: 'pm.iterationData.get("userId")', cookies: 'pm.cookies.names()', crypto: 'pm.crypto.uuid()',
+  iterationData: 'pm.iterationData.get("userId")', vault: 'const token = await pm.vault.get("apiToken")', cookies: 'pm.cookies.names()', crypto: 'pm.crypto.uuid()',
   request: 'pm.log(pm.request.url)', response: 'pm.log(pm.response.code)', info: 'pm.log(pm.info.requestName)',
   execution: 'if (!pm.environment.get("baseUrl")) pm.execution.skipRequest()',
 })) pm.property(name, 'object', example, `pm.${name}`);
@@ -45,6 +45,8 @@ for (const scope of ['variables', 'environment', 'globals', 'collectionVariables
   if (scope === 'variables') vars.method('replaceIn', 'text', 'string', '"{{baseUrl}}/users"');
 }
 group('pm.iterationData').method('get', 'key', 'string | undefined', '"userId"');
+const vault = group('pm.vault', 'await pm.vault');
+vault.method('get', 'key', 'Promise<string | undefined>', '"apiToken"');
 const cookies = group('pm.cookies');
 cookies.method('get', 'name', 'string | undefined', '"session"');
 cookies.method('has', 'name', 'boolean', '"session"');

@@ -376,7 +376,7 @@ func TestSecretProviderBindings(t *testing.T) {
 	if names := f.app.ListSecretProviders(f.workspace).Providers[0].SavedCredentials; len(names) != 1 || names[0] != "token" {
 		t.Fatalf("saved credentials = %v", names)
 	}
-	if result := f.app.SetSecretProviderCredential(f.workspace, "vault-prod", "password", "x"); result.Ok {
+	if result := f.app.SetSecretProviderCredential(f.workspace, "vault-prod", "apiKey", "x"); result.Ok {
 		t.Fatal("an unknown credential name was accepted")
 	}
 	if result := f.app.SaveSecretProvider(f.workspace, map[string]any{"id": "Bad ID", "type": "vault"}); result.Ok {
@@ -405,14 +405,20 @@ func TestBrowseAndNewProviderBindings(t *testing.T) {
 	if result := f.app.SaveSecretProvider(f.workspace, map[string]any{"id": "pass", "type": "command", "command": []any{"pass", "show", "{path}"}}); !result.Ok {
 		t.Fatal(result.Error)
 	}
-	if result := f.app.SaveSecretProvider(f.workspace, map[string]any{"id": "az", "type": "azure-key-vault", "address": "https://team.vault.azure.net", "auth": map[string]any{"method": "client-secret", "tenantId": "t", "clientId": "c"}}); !result.Ok {
+	if result := f.app.SaveSecretProvider(f.workspace, map[string]any{"id": "az", "type": "azure-key-vault", "address": "https://team.vault.azure.net", "auth": map[string]any{"method": "client-secret", "tenantId": "11111111-1111-1111-1111-111111111111", "clientId": "22222222-2222-2222-2222-222222222222"}}); !result.Ok {
 		t.Fatal(result.Error)
 	}
 	if browse := f.app.BrowseSecretProvider(f.workspace, "pass", ""); browse.Ok || browse.Kind != "invalid_ref" {
 		t.Fatalf("browse on a command provider = %+v", browse)
 	}
-	for _, name := range []string{"clientSecret", "serviceAccountKey"} {
-		if result := f.app.SetSecretProviderCredential(f.workspace, "az", name, "value"); !result.Ok {
+	if result := f.app.SetSecretProviderCredential(f.workspace, "az", "serviceAccountKey", "value"); result.Ok || !strings.Contains(result.Error, "JSON key file") {
+		t.Fatalf("a non-JSON service account key was saved: %+v", result)
+	}
+	if result := f.app.SetSecretProviderCredential(f.workspace, "az", "clientSecret", "two words"); result.Ok || !strings.Contains(result.Error, "spaces") {
+		t.Fatalf("a client secret with a space was saved: %+v", result)
+	}
+	for name, value := range map[string]string{"clientSecret": "value", "serviceAccountKey": `{"type":"authorized_user","refresh_token":"r"}`} {
+		if result := f.app.SetSecretProviderCredential(f.workspace, "az", name, value); !result.Ok {
 			t.Fatalf("%s: %s", name, result.Error)
 		}
 	}

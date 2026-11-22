@@ -30,7 +30,7 @@ func TestParseNewProviderTypes(t *testing.T) {
 	valid := []map[string]any{
 		{"id": "gcp", "type": "gcp-secret-manager", "project": "my-project-1"},
 		{"id": "az", "type": "azure-key-vault", "address": "https://team.vault.azure.net"},
-		{"id": "az-sp", "type": "azure-key-vault", "address": "https://team.vault.azure.net", "auth": map[string]any{"method": "client-secret", "tenantId": "t", "clientId": "c"}},
+		{"id": "az-sp", "type": "azure-key-vault", "address": "https://team.vault.azure.net", "auth": map[string]any{"method": "client-secret", "tenantId": "11111111-1111-1111-1111-111111111111", "clientId": "22222222-2222-2222-2222-222222222222"}},
 		{"id": "bw", "type": "bitwarden"},
 		{"id": "dp", "type": "doppler"},
 		{"id": "inf", "type": "infisical", "project": "6512aa", "auth": map[string]any{"method": "universal", "clientId": "c"}},
@@ -219,9 +219,9 @@ func TestGCPFallsBackToGcloud(t *testing.T) {
 func TestAzureKeyVaultClientSecretAndCLI(t *testing.T) {
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/tenant-1/oauth2/v2.0/token" {
+		if r.URL.Path == "/contoso.onmicrosoft.com/oauth2/v2.0/token" {
 			_ = r.ParseForm()
-			if r.Form.Get("client_secret") != "sp-secret" || r.Form.Get("scope") != "https://vault.azure.net/.default" || r.Form.Get("client_id") != "app-1" {
+			if r.Form.Get("client_secret") != "sp-secret" || r.Form.Get("scope") != "https://vault.azure.net/.default" || r.Form.Get("client_id") != "0b8e2f7a-0c5d-4b8e-9a3f-1f2e3d4c5b6a" {
 				w.WriteHeader(401)
 				_, _ = w.Write([]byte(`{"error":"invalid_client","error_description":"AADSTS7000215: Invalid client secret provided."}`))
 				return
@@ -262,7 +262,7 @@ func TestAzureKeyVaultClientSecretAndCLI(t *testing.T) {
 
 	c := &clock{now: time.Unix(1_800_000_000, 0)}
 	ctx := context.Background()
-	sp := mustProvider(t, map[string]any{"id": "az", "type": "azure-key-vault", "address": server.URL, "auth": map[string]any{"method": "client-secret", "tenantId": "tenant-1", "clientId": "app-1"}})
+	sp := mustProvider(t, map[string]any{"id": "az", "type": "azure-key-vault", "address": server.URL, "auth": map[string]any{"method": "client-secret", "tenantId": "contoso.onmicrosoft.com", "clientId": "0b8e2f7a-0c5d-4b8e-9a3f-1f2e3d4c5b6a"}})
 	manager := NewManager(&fakeSource{configs: []ProviderConfig{sp}, credentials: map[string]string{"az.clientSecret": "sp-secret"}}, (&fakeTool{}).env(nil, nil, c))
 	if value, err := manager.Value(ctx, "ws", Ref{Provider: "az", Path: "db-password"}); err != nil || value != "az-pw" {
 		t.Fatalf("value = %q, %v", value, err)
@@ -281,9 +281,9 @@ func TestAzureKeyVaultClientSecretAndCLI(t *testing.T) {
 		t.Fatalf("bad secret = %v", err)
 	}
 
-	cliConfig := mustProvider(t, map[string]any{"id": "az", "type": "azure-key-vault", "address": server.URL, "auth": map[string]any{"tenantId": "tenant-1"}})
+	cliConfig := mustProvider(t, map[string]any{"id": "az", "type": "azure-key-vault", "address": server.URL, "auth": map[string]any{"tenantId": "contoso.onmicrosoft.com"}})
 	tool := &fakeTool{reply: func(args []string) ([]byte, []byte, error) {
-		if strings.Join(args, " ") != "account get-access-token --resource https://vault.azure.net --output json --tenant tenant-1" {
+		if strings.Join(args, " ") != "account get-access-token --resource https://vault.azure.net --output json --tenant contoso.onmicrosoft.com" {
 			return nil, []byte("ERROR: Please run 'az login' to setup account."), errors.New("exit 1")
 		}
 		return []byte(`{"accessToken":"az-cli","expires_on":1800003600}`), nil, nil

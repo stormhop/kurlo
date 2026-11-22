@@ -119,6 +119,8 @@ export function ExportLoadTestK6(arg1:string,arg2:boolean):Promise<model.K6Expor
 
 export function ExportLoadTestK6Files(arg1:string,arg2:boolean):Promise<model.K6ExportResult>;
 
+export function ExportSecretProviderEnv(arg1:string,arg2:string):Promise<api.SecretEnvExportResult>;
+
 export function FetchOAuth2Token(arg1:model.AuthConfig):Promise<model.OAuth2TokenResponse>;
 
 export function ForgetSecretProviderCredentials(arg1:string,arg2:string):Promise<api.SecretActionResult>;
@@ -290,6 +292,8 @@ export function PreflightCollectionRunner(arg1:string,arg2:Array<api.RunnerSecre
 export function PreviewJWTBearer(arg1:model.AuthConfig):Promise<model.JWTBearerPreview>;
 
 export function PreviewLoadTestData(arg1:string):Promise<model.LoadDataPreview>;
+
+export function PreviewSecretProviderEnv(arg1:string,arg2:string):Promise<api.SecretEnvExportResult>;
 
 export function PruneHistoryResponses(arg1:Array<string>):Promise<string>;
 

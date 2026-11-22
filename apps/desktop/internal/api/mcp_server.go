@@ -1385,7 +1385,7 @@ func mcpUnresolvedVariables(req cliSavedRequest, run *mcpRunContext) []string {
 	var missing []string
 	for _, text := range texts {
 		for _, match := range mcpVariableRe.FindAllStringSubmatch(text, -1) {
-			name := strings.TrimSpace(match[1])
+			name := model.TemplateVariableKey(match[1])
 			if strings.HasPrefix(name, "kurloSecret:") || known[name] || seen[name] {
 				continue
 			}

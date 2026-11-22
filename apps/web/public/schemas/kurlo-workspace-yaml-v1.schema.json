@@ -247,20 +247,24 @@
         "profile": { "type": "string", "description": "AWS profile from ~/.aws/config. SSO profiles need the AWS CLI." },
         "endpoint": { "type": "string", "description": "Custom AWS or Google Cloud endpoint, for example a VPC endpoint or LocalStack." },
         "project": { "type": "string", "description": "Google Cloud project id, or Infisical project id." },
+        "roleArn": { "type": "string", "pattern": "^arn:aws[a-z-]*:iam::[0-9]{12}:role/.+$", "description": "AWS role that Kurlo assumes with the base credentials." },
+        "externalId": { "type": "string", "minLength": 2, "maxLength": 1224, "description": "External ID for the AWS role, if its trust policy asks for one." },
+        "mfaSerial": { "type": "string", "description": "AWS MFA device ARN or serial. Kurlo asks for a code, or reads AWS_MFA_CODE in the CLI." },
         "command": {
           "oneOf": [{ "type": "array", "items": { "type": "string" }, "minItems": 1 }, { "type": "string" }],
           "description": "For type command: the program and its arguments. {path} and {version} are replaced; without {path} the path is added as the last argument. Runs without a shell."
         },
-        "cacheTtl": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "How long fetched values stay in memory: 30s, 5m, 0 or session. Defaults to 5m." },
-        "timeout": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "Timeout of one call to the provider. Defaults to 10s." },
+        "cacheTtl": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "How long fetched values stay in memory: 30s, 5m, 0 or session, up to 24h. Defaults to 5m." },
+        "timeout": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "Timeout of one call to the provider, from 1s to 10m. Defaults to 10s." },
         "auth": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "method": { "type": "string", "enum": ["token", "approle", "kubernetes", "oidc", "cli", "client-secret", "universal"] },
+            "method": { "type": "string", "enum": ["token", "approle", "kubernetes", "oidc", "ldap", "userpass", "cli", "client-secret", "universal"] },
             "roleId": { "type": "string", "description": "Vault AppRole role ID." },
             "role": { "type": "string", "description": "Vault role for kubernetes or oidc auth." },
-            "mount": { "type": "string", "description": "Vault auth mount. Defaults to approle, kubernetes or oidc." },
+            "mount": { "type": "string", "description": "Vault auth mount. Defaults to the method name." },
+            "username": { "type": "string", "description": "Vault ldap or userpass user name. Leave it out so each person saves their own on the device or sets VAULT_USERNAME." },
             "tokenPath": { "type": "string", "description": "Service account token file for Vault kubernetes auth." },
             "redirectUri": { "type": "string", "description": "Loopback redirect for Vault OIDC. Defaults to http://localhost:8250/oidc/callback." },
             "tenantId": { "type": "string", "description": "Azure tenant id." },

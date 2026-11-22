@@ -67,6 +67,7 @@ function keyScope(state: EditorState, literal: SyntaxNode): ScriptScope | undefi
   const path = expressionPath(state, callee);
   const match = /^pm\.(variables|environment|globals|collectionVariables)\.(get|set|unset)$/.exec(path);
   if (match) return match[1] as ScriptScope;
+  if (path === 'pm.vault.get') return 'variables';
   if (/^pm\.expect\(\)(?:\.[\w$]+)*\.(equal|equals|eq|eql|eqls)$/.test(path)) {
     let caller = callee;
     while (caller?.name === 'MemberExpression') caller = caller.firstChild;

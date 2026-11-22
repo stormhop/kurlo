@@ -74,10 +74,12 @@
         <h1>Secret providers</h1>
         <p>Variables can take their values from Vault, 1Password and cloud secret stores. Provider settings live in <code>workspace.yml</code> and are shared through Git. Credentials and trust stay on this device.</p>
       </div>
-      <div class="overview-actions">
-        <button class="btn btn-secondary" type="button" onclick={refreshSecrets} disabled={!secretProviders.providers.length}><MenuIcon name="refresh" />Refresh secrets</button>
-        <button class="btn btn-primary" type="button" onclick={() => (secretProviders.addOpen = true)}><AddCloseIcon add /> Add provider</button>
-      </div>
+      {#if secretProviders.providers.length}
+        <div class="overview-actions">
+          <button class="btn btn-secondary" type="button" onclick={refreshSecrets}><MenuIcon name="refresh" />Refresh secrets</button>
+          <button class="btn btn-primary" type="button" onclick={() => (secretProviders.addOpen = true)}><AddCloseIcon add /> Add provider</button>
+        </div>
+      {/if}
     </div>
     {#if secretProviders.error}
       <div class="secret-banner secret-banner-error" role="alert"><MenuIcon name="warning" /><span>{secretProviders.error}</span></div>
@@ -131,9 +133,6 @@
         <button class="btn btn-primary" type="button" onclick={() => (secretProviders.addOpen = true)}><AddCloseIcon add /> Add provider</button>
       </div>
     {/if}
-  {/if}
-  {#if secretProviders.notice}
-    <div class="secret-toast" role="status">{secretProviders.notice}</div>
   {/if}
 </section>
 

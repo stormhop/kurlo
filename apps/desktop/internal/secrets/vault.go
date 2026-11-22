@@ -189,7 +189,7 @@ func (p *vaultProvider) Check(ctx context.Context) (Status, error) {
 
 func (p *vaultProvider) token(ctx context.Context) (string, error) {
 	switch p.config.Auth.Method {
-	case "approle", "kubernetes", "oidc":
+	case "approle", "kubernetes", "oidc", "ldap", "userpass":
 		return p.login(ctx)
 	}
 	if token, ok := p.credentials("token"); ok && strings.TrimSpace(token) != "" {
@@ -233,6 +233,8 @@ func (p *vaultProvider) login(ctx context.Context) (string, error) {
 		body, err = p.kubernetesLogin(ctx)
 	case "oidc":
 		body, err = p.oidcLogin(ctx)
+	case "ldap", "userpass":
+		body, err = p.passwordLogin(ctx)
 	}
 	if err != nil {
 		return "", err
@@ -263,6 +265,10 @@ func (p *vaultProvider) loginName() string {
 		return "Kubernetes"
 	case "oidc":
 		return "OIDC"
+	case "ldap":
+		return "LDAP"
+	case "userpass":
+		return "Userpass"
 	}
 	return "Vault"
 }
@@ -291,6 +297,31 @@ func (p *vaultProvider) appRoleLogin(ctx context.Context) ([]byte, error) {
 		return nil, newError(KindNotAuthenticated, p.config.ID, "no AppRole secret_id: set VAULT_SECRET_ID or save it for this provider")
 	}
 	return p.postLogin(ctx, "auth/"+p.config.Auth.Mount+"/login", map[string]string{"role_id": p.config.Auth.RoleID, "secret_id": strings.TrimSpace(secretID)})
+}
+
+func (p *vaultProvider) passwordLogin(ctx context.Context) ([]byte, error) {
+	username := p.config.Auth.Username
+	if username == "" {
+		if saved, ok := p.credentials("username"); ok {
+			username = strings.TrimSpace(saved)
+		}
+	}
+	if username == "" {
+		if value, ok := p.env.Getenv("VAULT_USERNAME"); ok {
+			username = strings.TrimSpace(value)
+		}
+	}
+	if username == "" {
+		return nil, newError(KindNotAuthenticated, p.config.ID, "no %s user name: save it for this provider or set VAULT_USERNAME", p.loginName())
+	}
+	password, ok := p.credentials("password")
+	if !ok || password == "" {
+		password, ok = p.env.Getenv("VAULT_PASSWORD")
+	}
+	if !ok || password == "" {
+		return nil, newError(KindNotAuthenticated, p.config.ID, "no %s password: save it for this provider or set VAULT_PASSWORD", p.loginName())
+	}
+	return p.postLogin(ctx, "auth/"+p.config.Auth.Mount+"/login/"+url.PathEscape(username), map[string]string{"password": password})
 }
 
 func (p *vaultProvider) kubernetesLogin(ctx context.Context) ([]byte, error) {
