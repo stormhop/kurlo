@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -319,7 +320,7 @@ func TestAWSCredentialChain(t *testing.T) {
 	ref := Ref{Provider: "aws", Path: "prod/db", Field: "password"}
 
 	profile := mustProvider(t, map[string]any{"id": "aws", "type": "aws-secrets-manager", "region": "eu-central-1", "endpoint": server.URL, "profile": "dev"})
-	files := map[string]string{"/home/test/.aws/credentials": "[default]\naws_access_key_id = WRONG\naws_secret_access_key = x\n\n[dev]\naws_access_key_id = AKIDEXAMPLE\naws_secret_access_key = secret\n"}
+	files := map[string]string{filepath.Join("/home/test", ".aws", "credentials"): "[default]\naws_access_key_id = WRONG\naws_secret_access_key = x\n\n[dev]\naws_access_key_id = AKIDEXAMPLE\naws_secret_access_key = secret\n"}
 	fromFile := NewManager(&fakeSource{configs: []ProviderConfig{profile}}, (&fakeTool{}).env(map[string]string{"AWS_ACCESS_KEY_ID": "WRONG", "AWS_SECRET_ACCESS_KEY": "x"}, files, c))
 	if value, err := fromFile.Value(ctx, "ws", ref); err != nil || value != "s3cr3t" {
 		t.Fatalf("a configured profile must win over AWS_ACCESS_KEY_ID: %q, %v", value, err)
