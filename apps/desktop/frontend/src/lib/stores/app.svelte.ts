@@ -554,7 +554,9 @@ class AppVM {
   declare bodyContentType: typeof requestBodyFeature.bodyContentType;
   declare bodyLengthLabel: typeof requestBodyFeature.bodyLengthLabel;
   declare pickFileForRow: typeof requestBodyFeature.pickFileForRow;
-  declare pickBinaryFile: typeof requestBodyFeature.pickBinaryFile;
+  declare setBinaryFilePath: typeof requestBodyFeature.setBinaryFilePath;
+  declare binaryContentTypeHeader: typeof requestBodyFeature.binaryContentTypeHeader;
+  declare useBinaryContentType: typeof requestBodyFeature.useBinaryContentType;
   declare applyParsedCurl: typeof requestBodyFeature.applyParsedCurl;
   declare showCurlPasteToast: typeof requestBodyFeature.showCurlPasteToast;
   declare onUrlPaste: typeof requestBodyFeature.onUrlPaste;
@@ -887,6 +889,7 @@ class AppVM {
   declare toggleSSLVerification: typeof preferencesFeature.toggleSSLVerification;
   declare pickClientCertFile: typeof preferencesFeature.pickClientCertFile;
   declare clearClientCertField: typeof preferencesFeature.clearClientCertField;
+  declare setClientCertField: typeof preferencesFeature.setClientCertField;
   declare loadShortcutSettings: typeof preferencesFeature.loadShortcutSettings;
   declare saveShortcutSettings: typeof preferencesFeature.saveShortcutSettings;
   declare shortcutCombo: typeof preferencesFeature.shortcutCombo;

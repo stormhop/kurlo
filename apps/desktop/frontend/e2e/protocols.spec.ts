@@ -518,10 +518,11 @@ test('sends the client certificate with a gRPC call', async ({ page }) => {
   await page.getByRole('tab', { name: /^Settings/ }).click();
   const certSetting = page.locator('.client-cert-setting');
   await expect(certSetting).toContainText('Client certificate (mTLS)');
+  await expect(certSetting.getByRole('button', { name: 'Choose file…' }).nth(1)).toBeDisabled();
   await certSetting.getByRole('button', { name: 'Choose file…' }).first().click();
-  await expect(certSetting).toContainText('/certs/client.crt');
-  await certSetting.getByRole('button', { name: 'Choose file…' }).click();
-  await expect(certSetting).toContainText('/certs/client.key');
+  await expect(certSetting.getByRole('textbox', { name: 'Client certificate path' })).toHaveValue('/certs/client.crt');
+  await certSetting.getByRole('button', { name: 'Choose file…' }).nth(1).click();
+  await expect(certSetting.getByRole('textbox', { name: 'Private key path' })).toHaveValue('/certs/client.key');
   await certSetting.getByPlaceholder('Leave blank if the key is unencrypted').fill('{{keyPassword}}');
   await page.screenshot({ path: join(tmpdir(), 'kurlo-grpc-client-cert.png'), animations: 'disabled' });
 
@@ -551,7 +552,7 @@ test('persists a PFX container and passphrase for gRPC without a separate key', 
   await page.addInitScript(store => { window.__kurloE2E.store = store; }, saved);
   await page.reload();
   await page.getByRole('tab', { name: /^Settings/ }).click();
-  await expect(certSetting).toContainText('/certs/client.pfx');
+  await expect(certSetting.getByRole('textbox', { name: 'Client certificate path' })).toHaveValue('/certs/client.pfx');
   await expect(certSetting.getByPlaceholder('Leave blank if the key is unencrypted')).toHaveValue('{{pfxPassword}}');
   await certSetting.scrollIntoViewIfNeeded();
   if (docsScreenshotDir) await certSetting.screenshot({ path: join(docsScreenshotDir, 'client-certificate-pfx.png'), animations: 'disabled' });

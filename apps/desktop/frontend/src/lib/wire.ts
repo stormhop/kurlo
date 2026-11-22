@@ -117,6 +117,7 @@ export type CollectionTextFile = Wire<api.CollectionTextFile>;
 export type CollectionTextFilesResult = Wire<api.CollectionTextFilesResult>;
 export type DefaultWorkspaceLocationResult = Wire<api.DefaultWorkspaceLocationResult>;
 export type DownloadResult = Wire<api.DownloadResult>;
+export type RequestFileInfo = Wire<api.RequestFileInfo>;
 export type GitAuthConfigResult = Wire<api.GitAuthConfigResult>;
 export type GitBranchEntry = Wire<api.GitBranchEntry>;
 export type GitBranchListResult = Wire<api.GitBranchListResult>;

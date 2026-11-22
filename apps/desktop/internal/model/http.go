@@ -133,6 +133,7 @@ type HttpRequest struct {
 	BodyType         string      `json:"bodyType"`
 	Body             string      `json:"body"`
 	BodyFilePath     string      `json:"bodyFilePath"`
+	FileRoot         string      `json:"-"`
 	FormData         []KeyValue  `json:"formData"`
 	PreRequestScript string      `json:"preRequestScript"`
 	TestScript       string      `json:"testScript"`

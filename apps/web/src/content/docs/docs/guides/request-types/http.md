@@ -17,6 +17,18 @@ The method menu lists the HTTP methods on the left and the other protocols on th
 
 To copy the request as cURL or client code, open [Code snippets](/docs/guides/code-generation/).
 
+## Send a file as the body
+
+Choose **Body → Binary** to send a file byte for byte. Drop a file onto the panel, or choose **Choose file…**.
+
+![The Binary body with a chosen image, its size and type, and the path relative to the workspace](../../../../../assets/screenshots/request-binary-body.png)
+
+- **Relative paths.** A file inside the workspace folder (the folder with `kurlo.yml`) is saved as a path relative to that folder, such as `fixtures/avatar.png`. Anyone who opens the workspace from Git sends the same file, and so do `kurlo run` and `kurlo mcp`. A file outside the folder keeps its absolute path and only works on your computer; Kurlo says so under the path. Files you attach in **Form data** are saved the same way.
+- **Edit the path.** The path field accepts `{{variables}}`. Kurlo checks the file when it can resolve every variable, otherwise when you send.
+- **File details.** The panel shows the file's size and type. **File not found** means nothing is at the path on this computer; choose **Replace…** or fix the path. **Show in Finder** (or Explorer, or your file manager) opens the file's folder.
+- **Content type.** Kurlo sends `application/octet-stream` unless the request has a `Content-Type` header. When the file has a known type, **Use image/png** (or the type Kurlo detected) adds that header for you.
+- **Size limit.** A file body can be up to 256 MB.
+
 ## Suggestions while you type
 
 Kurlo finishes what you are typing in faded text. Press `Tab` to accept it, or `Escape` to hide it.

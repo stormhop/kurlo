@@ -1267,6 +1267,7 @@ func (s *mcpServer) linkedSecrets(workspaceID string) *cliLinkedSecrets {
 
 func (s *mcpServer) runOptions() cliOptions {
 	return cliOptions{
+		workspace:        s.opts.workspace,
 		timeoutMs:        s.opts.timeoutMs,
 		insecure:         s.opts.insecure,
 		allowSendRequest: s.opts.allowSendRequest,

@@ -819,6 +819,7 @@ func rawRequestBody(reader io.Reader, contentType string) preparedBody {
 }
 
 func buildRequestBody(req model.HttpRequest) (preparedBody, error) {
+	req = resolveRequestFilePaths(req)
 	if contentType, ok := rawBodyContentTypes[req.BodyType]; ok {
 		if req.Body == "" {
 			if methodConventionallyHasNoBody(req.Method) {

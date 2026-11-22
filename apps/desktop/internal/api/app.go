@@ -649,6 +649,7 @@ func (a *App) RestartApp() {
 }
 
 func (a *App) SendRequest(req model.HttpRequest) model.HttpResponse {
+	req = withRequestFileRoot(req, fileWorkspaceStorePath())
 	baseCtx := context.Background()
 	if a.ctx != nil {
 		baseCtx = a.ctx
@@ -717,6 +718,7 @@ func newResponseDownloadSink(path string, onCommit func()) (*responseBodySink, e
 }
 
 func (a *App) SendRequestToFile(req model.HttpRequest, defaultName string) DownloadResult {
+	req = withRequestFileRoot(req, fileWorkspaceStorePath())
 	baseCtx := context.Background()
 	if a.ctx != nil {
 		baseCtx = a.ctx

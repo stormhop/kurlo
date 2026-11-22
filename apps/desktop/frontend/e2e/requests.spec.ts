@@ -69,6 +69,56 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect((await bar.boundingBox())!.height).toBe(before!.height);
   });
 
+  test('sends a dropped or chosen file as the body with a workspace-relative path', async ({ page }) => {
+    await installKurloBridge(page, '', 'darwin/e2e');
+    await page.addInitScript(() => {
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      window.runtime!.OnFileDrop = (callback) => { e2e.dropFiles = callback; };
+    });
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Files API');
+    await collectionRow(page, 'Files API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Files API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.example.test/avatar');
+    await chooseRequestSection(page, 'Body');
+    await page.locator('.body-mode-label:has(input[value="binary"])').click();
+
+    const panel = page.getByTestId('binary-body');
+    await expect(panel.getByText('Drop a file here')).toBeVisible();
+    await panel.getByRole('button', { name: 'Choose file…' }).click();
+    await expect(panel.getByLabel('Body file path')).toHaveValue('fixtures/avatar.png');
+    await expect(panel).toContainText('avatar.png');
+    await expect(panel).toContainText('24.0 KB · image/png');
+    await expect(panel).toContainText('Sent as application/octet-stream');
+    await captureDocsScreenshot(page, 'request-binary-body');
+
+    await panel.getByRole('button', { name: 'Use image/png' }).click();
+    await expect(panel).toContainText('Sent as image/png from the Content-Type header');
+    await panel.getByRole('button', { name: 'Show in Finder' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.includes('RevealRequestFile:fixtures/avatar.png'))).toBe(true);
+
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => {
+      const sent = window.__kurloE2E.sentRequests.at(-1) as { bodyType?: string; bodyFilePath?: string; headers?: Array<{ key: string; value: string; enabled: boolean }> } | undefined;
+      return sent && { bodyType: sent.bodyType, path: sent.bodyFilePath, type: sent.headers?.find(row => row.enabled && row.key === 'Content-Type')?.value };
+    })).toEqual({ bodyType: 'binary', path: 'fixtures/avatar.png', type: 'image/png' });
+
+    await panel.getByLabel('Body file path').fill('fixtures/missing.png');
+    await expect(panel.getByRole('alert')).toHaveText('File not found.');
+
+    await panel.getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(panel.getByText('Drop a file here')).toBeVisible();
+    const box = await panel.boundingBox();
+    expect(box).not.toBeNull();
+    await page.evaluate(({ x, y }) => {
+      const drop = (window.__kurloE2E as unknown as { dropFiles: (x: number, y: number, paths: string[]) => void }).dropFiles;
+      drop(x, y, ['/workspace/fixtures/report.pdf']);
+    }, { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 });
+    await expect(panel.getByLabel('Body file path')).toHaveValue('fixtures/report.pdf');
+  });
+
   test('sends request vars from the Vars tab and saves them', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');

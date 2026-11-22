@@ -7,7 +7,7 @@ import type {
   JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   RequestFileYAMLResult, WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
-  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState, RunnerSecretCheck, RunnerSecretCheckResult,
+  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, RequestFileInfo, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState, RunnerSecretCheck, RunnerSecretCheckResult,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -348,6 +348,18 @@ export async function revealWorkspaceItem(kind: 'request' | 'collection', id: st
 
 export async function openFileDialog(title: string): Promise<string> {
   return (await window.go?.api?.App?.OpenFileDialog?.(title)) ?? '';
+}
+
+export async function inspectRequestFile(path: string): Promise<RequestFileInfo | null> {
+  const app = window.go?.api?.App;
+  if (!app?.InspectRequestFile) return null;
+  return app.InspectRequestFile(path);
+}
+
+export async function revealRequestFile(path: string): Promise<string> {
+  const app = window.go?.api?.App;
+  if (!app?.RevealRequestFile) return 'Files can be shown from the desktop app.';
+  return app.RevealRequestFile(path);
 }
 
 export async function openDirectoryDialog(title: string, defaultDirectory = ''): Promise<string> {

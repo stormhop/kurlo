@@ -225,6 +225,8 @@ export function GitTokenInfo(arg1:string):Promise<api.GitTokenInfoResult>;
 
 export function GrpcDiscover(arg1:model.GrpcRequest):Promise<model.GrpcServiceDefinition>;
 
+export function InspectRequestFile(arg1:string):Promise<api.RequestFileInfo>;
+
 export function InstallBrowserExtension(arg1:string):Promise<api.BrowserExtensionResult>;
 
 export function K6Info(arg1:string):Promise<model.K6Info>;
@@ -320,6 +322,8 @@ export function ReopenOpenRouterConnect():Promise<model.OpenRouterConnectState>;
 export function ReplaceRequestStoreWithError(arg1:string):Promise<api.SaveRequestStoreResult>;
 
 export function RestartApp():Promise<void>;
+
+export function RevealRequestFile(arg1:string):Promise<string>;
 
 export function RevealSecretRef(arg1:string,arg2:api.SecretRefInput):Promise<api.SecretRevealResult>;
 

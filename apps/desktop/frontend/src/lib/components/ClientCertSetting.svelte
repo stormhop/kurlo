@@ -1,6 +1,7 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
   import SecretInput from './SecretInput.svelte';
+  import FilePathField from './FilePathField.svelte';
 
   let { description = 'Present a certificate for servers that require mutual TLS. Set it on a collection to reuse it across requests.' }: { description?: string } = $props();
 </script>
@@ -14,21 +15,28 @@
   <div class="client-cert-fields">
     <div class="client-cert-row">
       <span class="client-cert-label">Certificate (PEM/PFX/P12)</span>
-      {#if vm.clientCertPath}
-        <span class="client-cert-path">{vm.clientCertPath}</span>
-        <button class="btn btn-secondary" type="button" onclick={() => vm.clearClientCertField('clientCertPath')}>Clear</button>
-      {:else}
-        <button class="btn btn-secondary" type="button" onclick={() => vm.pickClientCertFile('clientCertPath')}>Choose file…</button>
-      {/if}
+      <FilePathField
+        value={vm.clientCertPath}
+        keepAbsolute
+        ariaLabel="Client certificate path"
+        placeholder="/path/to/client.pem"
+        dialogTitle="Select client certificate"
+        suggestions={vm.variableSuggestions}
+        onchange={(path) => vm.setClientCertField('clientCertPath', path)}
+      />
     </div>
     <div class="client-cert-row">
       <span class="client-cert-label">Private key (optional)</span>
-      {#if vm.clientKeyPath}
-        <span class="client-cert-path">{vm.clientKeyPath}</span>
-        <button class="btn btn-secondary" type="button" onclick={() => vm.clearClientCertField('clientKeyPath')}>Clear</button>
-      {:else}
-        <button class="btn btn-secondary" type="button" onclick={() => vm.pickClientCertFile('clientKeyPath')} disabled={!vm.clientCertPath}>Choose file…</button>
-      {/if}
+      <FilePathField
+        value={vm.clientKeyPath}
+        keepAbsolute
+        disabled={!vm.clientCertPath}
+        ariaLabel="Private key path"
+        placeholder="/path/to/client.key"
+        dialogTitle="Select client key"
+        suggestions={vm.variableSuggestions}
+        onchange={(path) => vm.setClientCertField('clientKeyPath', path)}
+      />
     </div>
     <div class="client-cert-row">
       <span class="client-cert-label">Passphrase</span>

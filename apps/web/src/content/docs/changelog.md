@@ -19,6 +19,8 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **File tab.** Edit a request’s YAML with wrapped lines, collapsible sections and protected metadata. Change the name, URL, method or protocol from the address bar and see it update in the YAML. Changing the URL back restores its original YAML. Choose suggested fields and values as you type, preview the save format with Beautify, hover over underlined fields to read validation errors, and review changes made on disk. Editor sections are remembered locally. Generated YAML keeps disabled rows and omits default row fields. [Request file guide](/docs/reference/kurlo-yaml-format/request/).
 
+- **File bodies.** Drop a file onto **Body → Binary** or choose one, and see its size and type, a **File not found** warning and a one-click `Content-Type` header. Files inside the workspace folder are saved with relative paths, so binary and form-data requests work after a Git clone and in `kurlo run`. [HTTP guide](/docs/guides/request-types/http/#send-a-file-as-the-body).
+
 ### Changed
 
 - **Collection documentation.** The HTML reference keeps the request address pinned, shows cURL, JavaScript and Python snippets with authorization placeholders, and lists saved examples with colored status codes and side-by-side responses. The **Generate documentation** dialog is more compact. [Collection documentation guide](/docs/guides/cli-runner/docs/).

@@ -683,6 +683,32 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class RequestFileInfo {
+	    path: string;
+	    absolutePath: string;
+	    name: string;
+	    size: number;
+	    contentType: string;
+	    exists: boolean;
+	    insideWorkspace: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequestFileInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.absolutePath = source["absolutePath"];
+	        this.name = source["name"];
+	        this.size = source["size"];
+	        this.contentType = source["contentType"];
+	        this.exists = source["exists"];
+	        this.insideWorkspace = source["insideWorkspace"];
+	        this.error = source["error"];
+	    }
+	}
 	export class RequestFileYAMLResult {
 	    ok: boolean;
 	    id: string;

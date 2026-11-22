@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -413,6 +414,9 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 	}
 
 	httpReq := buildHTTPRequest(req, values, secretValues, opts.timeoutMs)
+	if root, err := filepath.Abs(opts.workspace); err == nil && opts.workspace != "" {
+		httpReq.FileRoot = root
+	}
 	httpReq.IterationData = dataRow
 	httpReq.Name = req.Name
 	httpReq.Iteration = iteration

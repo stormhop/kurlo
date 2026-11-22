@@ -9,7 +9,6 @@
   import { HEADER_PICKER_NAMES, getHeaderValues } from '../headers';
   import { collectionSettingsFingerprint, emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsFingerprint, folderDefaultsFor, inheritedAuthSource, normalizeCollectionDefaults } from '../collectionDefaults';
   import { activeCount, cloneRowsForStore, guardTrailing, jwtAlgorithmUsesSecret, removeRow, restoreRows, scriptLineCount } from '../utils';
-  import { openFileDialog } from '../backend';
   import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, JwtAlgorithm, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings } from '../types/models';
   import { defaultPinnedEnvironmentId, normalizeCollectionEnvironmentPins } from '../collectionEnvironments';
   import type { VariableSuggestion } from '../variables';
@@ -19,6 +18,7 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import SearchPicker from './SearchPicker.svelte';
   import VariableInput from './VariableInput.svelte';
+  import FilePathField from './FilePathField.svelte';
   import SecretInput from './SecretInput.svelte';
   import CollapsibleMarkdown from './CollapsibleMarkdown.svelte';
   import OpenApiSyncPanel from './OpenApiSyncPanel.svelte';
@@ -258,14 +258,9 @@
     return target instanceof HTMLInputElement ? Number(target.value) : 0;
   }
 
-  async function pickCollectionCertFile(field: 'clientCertPath' | 'clientKeyPath') {
-    const path = await openFileDialog(field === 'clientCertPath' ? 'Select client certificate' : 'Select client key');
-    if (path) settings[field] = path;
-  }
-
-  function clearCollectionCertField(field: 'clientCertPath' | 'clientKeyPath') {
-    settings[field] = '';
-    if (field === 'clientCertPath') {
+  function setCollectionCertField(field: 'clientCertPath' | 'clientKeyPath', value: string) {
+    settings[field] = value;
+    if (field === 'clientCertPath' && !value) {
       settings.clientKeyPath = '';
       settings.clientKeyPassword = '';
     }
@@ -943,21 +938,28 @@
                 <div class="client-cert-fields">
                   <div class="client-cert-row">
                     <span class="client-cert-label">Certificate (CRT/PEM)</span>
-                    {#if settings.clientCertPath}
-                      <span class="client-cert-path">{settings.clientCertPath}</span>
-                      <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientCertPath')}>Clear</button>
-                    {:else}
-                      <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientCertPath')}>Choose file…</button>
-                    {/if}
+                    <FilePathField
+                      value={settings.clientCertPath}
+                      keepAbsolute
+                      ariaLabel="Client certificate path"
+                      placeholder="/path/to/client.pem"
+                      dialogTitle="Select client certificate"
+                      suggestions={variableSuggestions}
+                      onchange={(path) => setCollectionCertField('clientCertPath', path)}
+                    />
                   </div>
                   <div class="client-cert-row">
                     <span class="client-cert-label">Private key (optional)</span>
-                    {#if settings.clientKeyPath}
-                      <span class="client-cert-path">{settings.clientKeyPath}</span>
-                      <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientKeyPath')}>Clear</button>
-                    {:else}
-                      <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientKeyPath')} disabled={!settings.clientCertPath}>Choose file…</button>
-                    {/if}
+                    <FilePathField
+                      value={settings.clientKeyPath}
+                      keepAbsolute
+                      disabled={!settings.clientCertPath}
+                      ariaLabel="Private key path"
+                      placeholder="/path/to/client.key"
+                      dialogTitle="Select client key"
+                      suggestions={variableSuggestions}
+                      onchange={(path) => setCollectionCertField('clientKeyPath', path)}
+                    />
                   </div>
                   <div class="client-cert-row">
                     <span class="client-cert-label">Key passphrase</span>

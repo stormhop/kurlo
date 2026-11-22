@@ -446,6 +446,10 @@ export function GrpcDiscover(arg1) {
   return window['go']['api']['App']['GrpcDiscover'](arg1);
 }
 
+export function InspectRequestFile(arg1) {
+  return window['go']['api']['App']['InspectRequestFile'](arg1);
+}
+
 export function InstallBrowserExtension(arg1) {
   return window['go']['api']['App']['InstallBrowserExtension'](arg1);
 }
@@ -636,6 +640,10 @@ export function ReplaceRequestStoreWithError(arg1) {
 
 export function RestartApp() {
   return window['go']['api']['App']['RestartApp']();
+}
+
+export function RevealRequestFile(arg1) {
+  return window['go']['api']['App']['RevealRequestFile'](arg1);
 }
 
 export function RevealSecretRef(arg1, arg2) {

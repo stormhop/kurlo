@@ -773,7 +773,18 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         state.savedFiles.push({ name, content, path });
         return path;
       },
-      OpenFileDialog: async (title: string) => title.includes('CSV or JSON') ? '/workspace/data/users.csv' : '',
+      OpenFileDialog: async (title: string) => title.includes('CSV or JSON') ? '/workspace/data/users.csv' : title === 'Select file to send' ? '/workspace/fixtures/avatar.png' : '',
+      InspectRequestFile: async (path: string) => {
+        const relative = path.replace(/^\/workspace\//, '');
+        const name = relative.split('/').pop() ?? relative;
+        if (relative.includes('missing')) return { path: relative, absolutePath: `/workspace/${relative}`, name, size: 0, contentType: name.endsWith('.png') ? 'image/png' : '', exists: false, insideWorkspace: true, error: 'File not found.' };
+        if (relative.startsWith('/')) return { path: relative, absolutePath: relative, name, size: 1024, contentType: '', exists: true, insideWorkspace: false };
+        return { path: relative, absolutePath: `/workspace/${relative}`, name, size: 24576, contentType: name.endsWith('.png') ? 'image/png' : '', exists: true, insideWorkspace: true };
+      },
+      RevealRequestFile: async (path: string) => {
+        state.calls.push(`RevealRequestFile:${path}`);
+        return '';
+      },
       OpenDirectoryDialog: async () => '/exports',
       PreviewLoadTestData: async (path: string) => path.includes('missing')
         ? { path, columns: [], rows: [], total: 0, error: 'data file: no such file' }

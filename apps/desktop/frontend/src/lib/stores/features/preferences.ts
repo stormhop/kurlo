@@ -331,6 +331,10 @@ export const preferencesFeature = {
       this.markRequestSettingOverride?.(field);
     }
   },
+  setClientCertField(this: PreferencesHost, field: 'clientCertPath' | 'clientKeyPath', value: string) {
+    this[field] = value;
+    this.markRequestSettingOverride?.(field);
+  },
   clearClientCertField(this: PreferencesHost, field: 'clientCertPath' | 'clientKeyPath' | 'clientKeyPassword') {
     this[field] = '';
     this.markRequestSettingOverride?.(field);

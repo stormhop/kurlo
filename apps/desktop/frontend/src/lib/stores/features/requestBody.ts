@@ -1,4 +1,5 @@
-import { openFileDialog } from '../../backend';
+import { inspectRequestFile, openFileDialog } from '../../backend';
+import { fileBaseName } from '../../filePathField';
 import { bodyPlaceholder, type BodyEditorLang } from '../../bodyTemplates';
 import { mkRow } from '../../constants';
 import type { ParsedCurl } from '../../curl';
@@ -268,21 +269,37 @@ export const requestBodyFeature = {
   },
 
   async pickFileForRow(this: RequestBodyHost, row: KVRow, idx?: number) {
-    const path = await openFileDialog('Select file');
-    if (path) {
+    const picked = await openFileDialog('Select file');
+    if (picked) {
+      const path = (await inspectRequestFile(picked))?.path || picked;
       row.isFile = true;
       row.value = path;
-      row.fileName = path.split('/').pop() ?? path;
+      row.fileName = fileBaseName(path);
       if (idx !== undefined) guardTrailing(this.formRows, idx);
     }
   },
 
-  async pickBinaryFile(this: RequestBodyHost) {
-    const path = await openFileDialog('Select file');
-    if (path) {
-      this.bodyFilePath = path;
-      this.bodyFileName = path.split('/').pop() ?? path;
+  setBinaryFilePath(this: RequestBodyHost, path: string) {
+    this.bodyFilePath = path;
+    this.bodyFileName = path ? fileBaseName(path) : '';
+  },
+
+  binaryContentTypeHeader(this: RequestBodyHost): string {
+    const row = this.reqHeaders.find(header => header.enabled && header.key.trim().toLowerCase() === 'content-type');
+    return row?.value ?? '';
+  },
+
+  useBinaryContentType(this: RequestBodyHost, contentType: string) {
+    const existing = this.reqHeaders.find(header => header.key.trim().toLowerCase() === 'content-type');
+    if (existing) {
+      existing.enabled = true;
+      existing.value = contentType;
+      return;
     }
+    const row = { ...mkRow(), enabled: true, key: 'Content-Type', value: contentType };
+    const last = this.reqHeaders[this.reqHeaders.length - 1];
+    if (last && !last.key && !last.value) this.reqHeaders.splice(this.reqHeaders.length - 1, 0, row);
+    else this.reqHeaders.push(row, mkRow());
   },
 
   applyParsedCurl(this: RequestBodyHost, parsed: ParsedCurl) {
