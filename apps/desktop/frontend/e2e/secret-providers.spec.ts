@@ -321,8 +321,7 @@ test.describe('secret providers', () => {
     await shot(page, 'secret-provider-aws-role');
   });
 
-  test('fills a link from a pasted provider reference', async ({ page, context }) => {
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  test('fills a link from a pasted provider reference', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       environments: [{ id: 'env-prod', workspaceId: 'workspace-e2e', name: 'Prod', values: [{ id: 1, key: 'dbPassword', value: '', enabled: true }] }],
       activeEnvironmentId: 'env-prod',
