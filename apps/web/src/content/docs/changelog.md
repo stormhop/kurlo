@@ -30,6 +30,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Fixed
 
+- **Request tabs** no longer flash a close button after a draft is saved or closed.
 - **Record** starts the local proxy for browsers using the configured proxy address. [Connect your browser](/docs/guides/capture-proxy/#connect-your-browser).
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
 - **Undefined variables** are underlined in red even before any environment exists.

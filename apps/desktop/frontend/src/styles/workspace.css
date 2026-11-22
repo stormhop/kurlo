@@ -280,13 +280,14 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-50%);
-  transition: opacity var(--dur-fast), background var(--dur-fast), color var(--dur-fast);
+  transition: background var(--dur-fast), color var(--dur-fast);
 }
 
 .saved-request-tab:hover .tab-close,
 .saved-request-tab:has(:focus-visible) .tab-close {
   opacity: 1;
   pointer-events: auto;
+  transition: opacity var(--dur-fast), background var(--dur-fast), color var(--dur-fast);
 }
 
 .saved-request-tab:has(> .tab-close) > button:first-child {

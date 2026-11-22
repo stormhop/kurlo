@@ -24,6 +24,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Request tabs.** The close button no longer flashes on a tab for a moment after a draft is saved or closed.
 - **Record in your usual browser.** Record starts the local capture proxy. Setup provides a copyable automatic proxy configuration URL with a direct fallback.
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
 - **Undefined variables.** A `{{variable}}` that nothing defines is underlined in red even when the workspace has no environment, collection or global variables yet.

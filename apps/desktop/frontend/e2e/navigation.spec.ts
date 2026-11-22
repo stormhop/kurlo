@@ -610,3 +610,28 @@ test('slides the sidebar without restyling the rest of the window', async ({ pag
   expect(await inherited()).toEqual(before);
   await expect.poll(rendered).toBeGreaterThanOrEqual(grown);
 });
+
+test('hides the close button at once when a tab stops being unsaved', async ({ page }) => {
+  const requests = ['Create customer account', 'List accounts'].map((name, index) => ({
+    id: `tab-${index}`, collectionId: 'col-tabs', name, requestType: 'http', method: 'GET', url: 'https://api.example.test/accounts',
+  }));
+  await installKurloBridge(page, '', 'darwin/e2e', false, {
+    collections: [{ id: 'col-tabs', workspaceId: 'workspace-e2e', name: 'Accounts' }],
+    requests, openIds: requests.map(request => request.id), activeId: 'tab-0',
+  });
+  await page.goto('/');
+  await page.mouse.move(0, 100);
+  const tab = page.locator('.saved-request-tab:not(.overview-request-tab)').nth(1);
+  const close = tab.locator('.tab-close');
+  await expect(close).toHaveCSS('opacity', '0');
+  await tab.evaluate(node => node.classList.add('unsaved', 'draft'));
+  await expect(close).toHaveCSS('opacity', '1');
+  const after = await tab.evaluate(node => {
+    node.classList.remove('unsaved', 'draft');
+    const button = node.querySelector('.tab-close') as HTMLElement;
+    return [getComputedStyle(button).opacity, getComputedStyle(button.querySelector('svg')!).opacity];
+  });
+  expect(after[0]).toBe('0');
+  await tab.hover();
+  await expect(close).toHaveCSS('opacity', '1');
+});
