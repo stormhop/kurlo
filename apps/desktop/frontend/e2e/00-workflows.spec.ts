@@ -227,6 +227,12 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(page.locator('.history-entry').first()).toContainText('POST');
     await expect(page.locator('.history-entry').first()).toContainText('/login?scope=smoke');
     await expect(page.locator('.history-entry').first()).toContainText('200');
+    const historyRow = page.locator('.request-history-entry').first();
+    await expect(historyRow.locator('.history-time')).toBeVisible();
+    expect(await historyRow.locator('.history-url').evaluate(element => element.clientWidth)).toBeGreaterThan(95);
+    await historyRow.hover();
+    await expect(historyRow.getByRole('button', { name: 'History request menu' })).toBeVisible();
+    await expect(historyRow.locator('.history-time')).toBeHidden();
     await tourPause(page, 'HTTP response saved and history checked');
     await captureDocsScreenshot(page, 'history');
 
@@ -426,6 +432,7 @@ test.describe("Kurlo desktop browser E2E", () => {
           ].join('\n'),
         );
         await finishReadme();
+        await expect(readmeRegion.locator('.overview-readme-body br')).toHaveCount(2);
         await page.locator('.workspace-overview').evaluate((overview) => { overview.scrollTop = 0; });
         await captureDocsScreenshot(page, 'workspace-overview');
         await readmeRegion.getByRole('button', { name: 'Edit', exact: true }).click();

@@ -322,6 +322,31 @@ export function requestTabLabel(req: { name: string; method: string; url: string
   return req.name || requestTitleFrom(requestTransportLabel(req), req.url);
 }
 
+export function numberDuplicateTabLabels(previous: ReadonlyMap<string, number>, tabs: ReadonlyArray<{ id: string; label: string }>, label = 'New Request') {
+  const ids = tabs.filter(tab => tab.label === label).map(tab => tab.id);
+  const next = new Map<string, number>();
+  const taken = new Set<number>();
+  for (const id of ids) {
+    const kept = previous.get(id);
+    if (kept && !taken.has(kept)) {
+      next.set(id, kept);
+      taken.add(kept);
+    }
+  }
+  let candidate = 1;
+  for (const id of ids) {
+    if (next.has(id)) continue;
+    while (taken.has(candidate)) candidate += 1;
+    next.set(id, candidate);
+    taken.add(candidate);
+  }
+  return next;
+}
+
+export function numberedTabLabel(label: string, number: number | undefined) {
+  return number && number > 1 ? `${label} ${number}` : label;
+}
+
 export function emptyAuthState() {
   return {
     type: 'none' as AuthType,

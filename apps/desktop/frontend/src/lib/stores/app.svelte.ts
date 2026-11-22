@@ -1624,6 +1624,7 @@ class AppVM {
     return environmentMenuGroups(this.environmentScopeCollection, this.activeWorkspaceEnvironments);
   }
   get variableSuggestions(): VariableSuggestion[] { return this.requestVariableSuggestions(); }
+  get editedDraftIds(): string[] { return this.openRequestsForTabs.filter(req => req.isDraft && this.draftWasEdited(req)).map(req => req.id); }
   get cookieJarDefaultDomain() { return this.activeRequestCookieDomain(); }
   get loading(): boolean { return Boolean(this.activeRequestId && this.inFlightRequestIds.has(this.activeRequestId)); }
 

@@ -452,6 +452,19 @@
   min-height: 11.25rem;
 }
 
+.response-empty-state.response-idle {
+  min-height: 0;
+  overflow-y: auto;
+  justify-content: safe center;
+  padding-block: var(--space-3);
+}
+
+@media (max-height: 43.75rem) {
+  .response-idle > .kurlo-bird {
+    display: none;
+  }
+}
+
 .response-loading-state {
   padding-top: var(--space-0-5);
 }

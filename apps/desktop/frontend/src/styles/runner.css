@@ -210,12 +210,14 @@
 
 @container workspace (max-width: 61.25rem) {
   .runner-results-panel .runner-results-summary {
-    grid-template-columns: repeat(2, max-content);
-    row-gap: var(--space-3);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3) var(--space-6);
   }
 
   .runner-progress-wrap {
-    grid-column: 1 / -1;
+    flex: 1 0 100%;
   }
 }
 

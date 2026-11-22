@@ -4,7 +4,7 @@ title: "Default location and data"
 
 ## Default location
 
-Under **Files**, type a path or click **Browse**; Kurlo saves it when you leave the field, press `Enter` or click **Save**. The default location is the starting directory for:
+Under **Files**, type a path or click **Browse**; Kurlo saves it when you leave the field, press `Enter` or pick a folder with **Browse**. The default location is the starting directory for:
 
 - New folder-backed workspaces.
 - Collection exports that ask for a destination folder.

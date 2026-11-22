@@ -430,3 +430,24 @@ test('scopes script completion to the open collection and folder and saves the s
   await editor.press('Control+s');
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections[0].folderDefaults?.[0].preRequestScriptJs)).toBe('pm.request.auth.parameters().count()');
 });
+
+test('numbers untitled drafts and marks only edited ones as unsaved', async ({ page }) => {
+  await start(page);
+  const newDraft = page.getByRole('button', { name: 'New unsaved request' });
+  await newDraft.click();
+  await newDraft.click();
+  const drafts = page.locator('.saved-request-tab.draft');
+  await expect(drafts.locator('.tab-title')).toHaveText(['New Request', 'New Request 2']);
+  await expect(page.getByRole('textbox', { name: 'Request name' })).toHaveValue('New Request 2');
+  await expect(page.locator('.saved-request-tab.draft.unsaved')).toHaveCount(0);
+  await page.getByLabel('Request URL').fill('https://example.test/orders');
+  await expect(page.locator('.saved-request-tab.draft.unsaved')).toHaveCount(1);
+  await expect(drafts.nth(1)).toHaveClass(/unsaved/);
+  await drafts.nth(0).locator('.tab-close').click({ force: true });
+  await expect(drafts.locator('.tab-title')).toHaveText(['New Request 2']);
+  await newDraft.click();
+  await expect(drafts.locator('.tab-title')).toHaveText(['New Request 2', 'New Request']);
+  for (const title of await page.locator('.saved-request-tab:not(.overview-request-tab) .tab-title').all()) {
+    expect(await title.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  }
+});

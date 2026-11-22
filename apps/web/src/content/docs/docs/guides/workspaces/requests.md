@@ -10,9 +10,9 @@ A request is the leaf of the tree. Each request has its own URL, method, headers
 
 - Collection or folder `⋯` menu → **Add request**
 - Workspace overview → *Start* → **New request**
-- Drafts: **+** after the open tabs opens an unsaved HTTP request. Use the method and protocol picker at the start of the URL bar to switch request types before saving.
+- Drafts: **+** after the open tabs opens an unsaved HTTP request. Untitled drafts are numbered, such as **New Request 2**, and a draft gets a dot on its tab once you change it; an untouched draft closes without asking. Use the method and protocol picker at the start of the URL bar to switch request types before saving.
 
-With manual saving, a request added from a collection or folder starts as a draft too, marked with a dot on its tab. It already uses the headers, auth, scripts and variables of that collection and folder, and **Save** puts it there without asking where. With autosave on, it is saved straight away.
+With manual saving, a request added from a collection or folder starts as a draft too. It already uses the headers, auth, scripts and variables of that collection and folder, and **Save** puts it there without asking where. With autosave on, it is saved straight away.
 
 Closing a draft asks whether to save it only when you have changed it since it opened. An untouched draft, like an empty tab from **+**, closes without asking.
 

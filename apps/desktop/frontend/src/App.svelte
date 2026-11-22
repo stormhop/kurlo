@@ -36,10 +36,10 @@
   import { METHODS, REQUEST_TYPES, DEFAULT_WORKSPACE, RAW_BODY_TYPES } from './lib/constants';
   import { installQuitShortcut, installTitlebarDoubleClickHandler } from './lib/windowControls';
   import { requestSectionPreference, saveRequestSectionPreference } from './lib/requestTabPreferences';
-  import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
+  import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl, numberDuplicateTabLabels, numberedTabLabel } from './lib/utils';
   import { requestTypeSupportsAssertions } from './lib/assertions';
   import type { SnippetLanguage } from './lib/stores/ui';
-  import type { ResponseTab } from './lib/types/models';
+  import type { ResponseTab, SavedRequest } from './lib/types/models';
   import type { LoadTest } from './lib/wire';
   import { KURLO_DOCS_URL, openExternalURL } from './lib/externalLinks';
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from './lib/response-render';
@@ -257,6 +257,13 @@
   $effect(() => {
     if (!vm.codePanelOpen || !codePanelAvailable) vm.snippetMenuOpen = false;
   });
+  let untitledTabNumbers = new Map<string, number>();
+  let requestTabNumbers = $derived.by(() => {
+    untitledTabNumbers = numberDuplicateTabLabels(untitledTabNumbers, vm.openRequestsForTabs.map(req => ({ id: req.id, label: requestTabLabel(req) })));
+    return untitledTabNumbers;
+  });
+  const numberedRequestTabLabel = (req: SavedRequest) => numberedTabLabel(requestTabLabel(req), requestTabNumbers.get(req.id));
+  let requestBarName = $derived(vm.requestNameAuto ? numberedTabLabel(vm.requestHeaderName(), requestTabNumbers.get(vm.activeRequestId)) : vm.requestHeaderName());
   let windowWidth = $state(window.innerWidth);
   let runtimePlatform = $state(document.documentElement.dataset.platform ?? 'browser');
   let agentDetailsDocked = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity && !vm.sidebarHidden);
@@ -582,7 +589,10 @@
       void lazy.loadSettingsModal();
       void lazy.loadGlobalSearchModal();
     }, LAZY_WARM_DELAY_MS);
-    const warmEditor = () => void lazy.warmEditor();
+    const warmEditor = () => {
+      void lazy.warmEditor();
+      void lazy.warmRequestTabs();
+    };
     const warmEditorIdle = typeof window.requestIdleCallback === 'function'
       ? window.requestIdleCallback(warmEditor, { timeout: 1500 })
       : undefined;
@@ -935,6 +945,7 @@
       environmentScopeName={vm.environmentScopeCollection?.name ?? ''}
       activeEnvironmentId={vm.activeEnvironmentId}
       dirtyRequestIds={[...(vm.autosave ? [] : vm.dirtyRequestIdList), ...vm.requestFiles.dirtyIds]}
+      editedDraftIds={vm.editedDraftIds}
       collectionRunnerOpen={vm.collectionRunnerOpen}
       collectionRunnerRunning={vm.collectionRunnerRunning}
       activeCollectionSettings={vm.activeCollectionSettings}
@@ -965,7 +976,7 @@
       closeGitTab={vm.closeGitTab}
       openMockTab={vm.openMockServerTab}
       closeMockTab={vm.closeMockServerTab}
-      {requestTabLabel}
+      requestTabLabel={numberedRequestTabLabel}
       switchRequest={vm.switchRequest}
       closeRequestTab={vm.closeRequestTab}
       createDraftRequest={vm.createDraftRequest}
@@ -1300,7 +1311,7 @@
       <RequestBar
         bind:codePanelOpen={vm.codePanelOpen}
         {codePanelAvailable}
-        requestName={fileDraft?.barValue('name', vm.requestHeaderName()) ?? vm.requestHeaderName()}
+        requestName={fileDraft?.barValue('name', vm.requestHeaderName()) ?? requestBarName}
         requestLocation={activeRequestLocation}
         {fileDraft}
         showSave={!vm.requestFiles.active && !vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}

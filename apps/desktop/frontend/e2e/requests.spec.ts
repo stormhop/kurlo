@@ -845,6 +845,16 @@ test('takes a {{variable}} in the bearer token and shows it instead of dots', as
   await expect(page.locator('.auth-fields .var-token-err')).toHaveText('{{missing}}');
 });
 
+test('marks unknown variables when no environment or collection defines any', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New unsaved request' }).click();
+  await page.getByLabel('Request URL').fill('{{host}}/users/{{$randomUUID}}');
+  await expect(page.locator('.url-field .var-token-err')).toHaveText('{{host}}');
+  await page.getByLabel('Request URL').fill('https://api.kurlo.test/users');
+  await expect(page.locator('.url-field .var-token-err')).toHaveCount(0);
+});
+
 test('checks a header name built from collection and request variables', async ({ page }) => {
   await installKurloBridge(page, '', 'browser/e2e', false, {
     collections: [{ id: 'vars-col', workspaceId: 'workspace-e2e', name: 'Vars', defaults: { variables: [{ key: 'collectionHeader', value: 'Bad Name', enabled: true }] } }],
@@ -887,4 +897,15 @@ test.describe('Pasting cURL', () => {
     await expect(page.locator('.curl-toast')).toContainText("Couldn't import cURL: headers read from a file");
     await expect(page.getByLabel('Request URL')).toHaveValue('https://api.example.test/me');
   });
+});
+
+test('keeps the empty response actions reachable in a short window', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 600 });
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New unsaved request' }).click();
+  const load = page.getByRole('button', { name: 'Load response from file' });
+  await expect(load).toBeVisible();
+  const [box, panel] = await Promise.all([load.boundingBox(), page.locator('.response-idle').boundingBox()]);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(panel!.y + panel!.height + 1);
 });

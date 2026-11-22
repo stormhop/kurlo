@@ -29,6 +29,16 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 ### Fixed
 
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+- **Undefined variables** are underlined in red even before any environment exists.
+- **Request tabs** keep titles readable, number untitled drafts and mark a draft as unsaved only after you change it.
+- **Collection Runner** and **History** layouts fit narrower windows and show more of each request path.
+- **Workspace README** keeps your line breaks in the overview.
+- **Command palette** lists secret commands under **Secrets**.
+- **Activity bar** highlights one button at a time.
+- **Small windows** keep the empty response actions reachable and show when the provider list scrolls.
+- **Request tabs** no longer flash empty the first time you open them.
+- **Environments**, **Mock server** and **Settings** have clearer unsaved, empty and default-location states.
+- **Sidebar** shows the arrow pointer over collection names instead of a text cursor.
 
 ## 3.1.5
 

@@ -23,6 +23,19 @@ All notable changes to Kurlo are documented here. This project follows
 ### Fixed
 
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+- **Undefined variables.** A `{{variable}}` that nothing defines is underlined in red even when the workspace has no environment, collection or global variables yet.
+- **Request tabs.** Tab titles stay readable when many tabs are open, untitled drafts are numbered (**New Request 2**), and a draft shows the unsaved dot only after you change it.
+- **Collection Runner.** The data file button fits its column, the result tiles stay on one line with the progress bar below them in narrower windows, and **Reset settings** looks like a button.
+- **History.** Rows give the request path more room; the **•••** menu appears in place of the time on hover.
+- **Workspace README.** Lines you type on separate lines stay on separate lines in the overview.
+- **Command palette.** **Refresh secrets** and **Clear secret cache** are listed under **Secrets** instead of **Request**.
+- **Environments.** **Unsaved changes** next to an environment name is shown in amber instead of link blue.
+- **Activity bar.** Only one button is highlighted: when the Runner or Mock server is open, the button of the sidebar panel stays bright without the highlight.
+- **Mock server.** The empty state no longer repeats "Nothing to serve yet".
+- **Small windows.** The empty response area scrolls instead of cutting off **Load response from file**, and the provider list in **Add a secret provider** fades at the edge where more types are hidden.
+- **Request tabs.** Params, Auth, Headers, Body, Vars, Scripts, Docs, Examples and Settings load in the background after startup, so the first switch to a tab no longer shows an empty panel.
+- **Settings.** **Default location** saves when you leave the field, press `Enter` or pick a folder, without a separate **Save** button.
+- **Sidebar.** Hovering a collection name shows the normal arrow pointer instead of a text cursor.
 
 ## [3.1.5] - 2026-11-20
 

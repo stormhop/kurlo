@@ -528,3 +528,23 @@ test('warms the settings and search dialogs after startup so the first open does
   await page.getByLabel('Settings', { exact: true }).click();
   await expect(page.locator('.settings-nav-list')).toBeVisible();
 });
+
+test('warms the request editor tabs after startup so switching tabs never shows an empty panel', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await expect(page.locator('.collection-list')).toBeVisible();
+  const loaded = () => page.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name).filter(name => /\/(AuthTab|ScriptsTab|VarsTab|RequestSettingsTab)-[^/]*\.js$/.test(name)).length);
+  await expect.poll(loaded, { timeout: 6000 }).toBe(4);
+  await page.getByRole('tab', { name: 'Authorization' }).click();
+  await expect(page.getByRole('button', { name: 'Auth type' })).toBeVisible({ timeout: 200 });
+});
+
+test('saves the default location from the field without a separate Save button', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByLabel('Settings', { exact: true }).click();
+  const field = page.locator('#settings-default-location');
+  await expect(field).toHaveAttribute('placeholder', 'Choose a folder');
+  await expect(field.locator('xpath=..').getByRole('button', { name: 'Save' })).toHaveCount(0);
+  await expect(field.locator('xpath=..').getByRole('button', { name: 'Browse' })).toBeVisible();
+});

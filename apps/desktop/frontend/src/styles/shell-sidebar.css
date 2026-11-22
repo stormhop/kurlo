@@ -476,7 +476,7 @@
   border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
-  cursor: text;
+  cursor: default;
   font: inherit;
   text-align: left;
   text-overflow: ellipsis;
@@ -1461,15 +1461,51 @@
 }
 
 .history-entry-main {
-  grid-template-columns: 3rem minmax(0, 1fr) 1.375rem 2.125rem 0.5rem;
-  gap: var(--space-2);
+  grid-template-columns: 3rem minmax(0, 1fr) 1.375rem 2.125rem;
+  gap: var(--space-1-5);
   height: 1.875rem;
   padding: 0 var(--space-1-5) 0 var(--space-2-5);
 }
 
+.request-history-entry .history-entry-main {
+  position: relative;
+  padding-right: var(--space-3);
+}
+
+.request-history-entry {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.request-history-entry .history-entry-menu-btn {
+  position: absolute;
+  top: 50%;
+  right: var(--space-0-5);
+  transform: translateY(-50%);
+}
+
+.request-history-entry:hover .history-entry-menu-btn,
+.request-history-entry:focus-within .history-entry-menu-btn,
+.request-history-entry.menu-open .history-entry-menu-btn {
+  opacity: 1;
+}
+
+.request-history-entry:hover .history-time,
+.request-history-entry:hover .history-stored,
+.request-history-entry:focus-within .history-time,
+.request-history-entry:focus-within .history-stored,
+.request-history-entry.menu-open .history-time,
+.request-history-entry.menu-open .history-stored {
+  visibility: hidden;
+}
+
 .history-entry-main .history-meta { grid-column: 3; }
 .history-entry-main .history-time { grid-column: 4; text-align: right; }
-.history-entry-main .history-stored { grid-column: 5; }
+.history-entry-main .history-stored {
+  position: absolute;
+  top: 50%;
+  right: var(--space-0-5);
+  transform: translateY(-50%);
+}
 
 .history-url {
   font-family: var(--font-mono);

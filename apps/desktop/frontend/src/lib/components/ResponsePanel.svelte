@@ -472,7 +472,7 @@
     {/if}
 
   {:else}
-    <div class="response-placeholder response-empty-state" role="status">
+    <div class="response-placeholder response-empty-state response-idle" role="status">
       <KurloBird size="3rem" />
       <span class="response-placeholder-text">Send a request to see the response</span>
       {#if vm.shortcutCombo('send-request')}<span class="response-placeholder-hint"><Keycaps combo={vm.shortcutCombo('send-request')} runtime={appRuntime} /> to send</span>{/if}

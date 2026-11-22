@@ -1204,7 +1204,7 @@
                 <span>{row.group.label}</span>
               </button>
             {:else if row.type === 'entry'}
-              <div class="history-entry" class:active={row.entry.id === activeHistoryId}>
+              <div class="history-entry request-history-entry" class:active={row.entry.id === activeHistoryId} class:menu-open={openHistoryMenuId === row.entry.id}>
                 <button class="history-entry-main" type="button" onclick={() => openHistoryDetail(row.entry.id)} aria-current={row.entry.id === activeHistoryId ? 'page' : undefined} disabled={workspaceBlocked}>
                   <RequestTypeBadge request={row.entry.request} />
                   <span class="history-url">{historyPath(row.entry)}</span>

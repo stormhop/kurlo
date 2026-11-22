@@ -33,6 +33,7 @@
     environmentScopeName = '',
     activeEnvironmentId,
     dirtyRequestIds,
+    editedDraftIds = [],
     collectionRunnerOpen = false,
     collectionRunnerRunning = false,
     activeCollectionSettings,
@@ -93,6 +94,7 @@
     environmentScopeName?: string;
     activeEnvironmentId: string;
     dirtyRequestIds: string[];
+    editedDraftIds?: string[];
     collectionRunnerOpen?: boolean;
     collectionRunnerRunning?: boolean;
     activeCollectionSettings?: Collection;
@@ -135,6 +137,8 @@
   } = $props();
 
   let dirtyRequestIdSet = $derived(new Set(dirtyRequestIds));
+  let editedDraftIdSet = $derived(new Set(editedDraftIds));
+
   let workspaceLimitReached = $derived(workspaces.length >= MAX_WORKSPACES);
   let filteredWorkspaces = $derived(workspaces.filter(workspace => !workspaceSearch.trim() || workspace.name.toLowerCase().includes(workspaceSearch.trim().toLowerCase())));
 
@@ -381,7 +385,7 @@
         </div>
       {/if}
       {#if activeCollectionSettings}
-        <div class="saved-request-tab runner-tab" class:active={topView === 'collection'} use:middleClick={workspaceBlocked ? undefined : closeCollectionSettings}>
+        <div class="saved-request-tab runner-tab collection-settings-tab" class:active={topView === 'collection'} use:middleClick={workspaceBlocked ? undefined : closeCollectionSettings}>
           <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={topView === 'collection'} tabindex={topView === 'collection' ? 0 : -1} onclick={() => (topView = 'collection')} disabled={workspaceBlocked}>
             <svg width="0.875rem" height="0.875rem" viewBox="0 0 15 15" fill="none" aria-hidden="true">
               <path d="M2.2 4h3.3l1.2 1.2h6.1v6.1a1.2 1.2 0 01-1.2 1.2H3.4a1.2 1.2 0 01-1.2-1.2V4z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
@@ -416,7 +420,7 @@
         </div>
       {/if}
       {#each openRequests as req, eachIndex (eachIndex)}
-        {@const unsaved = req.isDraft ? 'Unsaved draft' : dirtyRequestIdSet.has(req.id) ? 'Unsaved changes' : ''}
+        {@const unsaved = req.isDraft ? (editedDraftIdSet.has(req.id) ? 'Unsaved draft' : '') : dirtyRequestIdSet.has(req.id) ? 'Unsaved changes' : ''}
         <div class="saved-request-tab" class:active={req.id === activeRequestId && topView === 'request'} class:preview={req.id === previewRequestId} class:draft={req.isDraft} class:dirty={!req.isDraft && dirtyRequestIdSet.has(req.id)} class:unsaved={Boolean(unsaved)} use:middleClick={workspaceBlocked ? undefined : () => closeRequestTab(req.id)}>
           <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={req.id === activeRequestId && topView === 'request'} tabindex={req.id === activeRequestId && topView === 'request' ? 0 : -1} onclick={() => switchRequest(req.id)} ondblclick={() => keepRequestTab(req.id)} disabled={workspaceBlocked}>
             <RequestTypeBadge request={req} variant="tab" />

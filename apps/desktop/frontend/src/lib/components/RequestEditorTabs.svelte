@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { tabListKeyboard } from '../a11y';
+  import { appLazyComponents } from '../stores/lazyComponents.svelte';
   import type { RequestSection as RequestTab } from '../stores/requestFiles.svelte';
   import type { RequestType } from '../types/models';
 
@@ -247,6 +248,8 @@
         aria-selected={requestTab === item.id}
         tabindex={requestTab === item.id ? 0 : -1}
         onclick={() => selectTab(item.id)}
+        onpointerenter={() => void appLazyComponents.warmRequestTabs()}
+        onfocus={() => void appLazyComponents.warmRequestTabs()}
         type="button"
         aria-label={item.short ? `${item.label}${item.badge ? ` ${item.badge}` : ''}` : undefined}
       >

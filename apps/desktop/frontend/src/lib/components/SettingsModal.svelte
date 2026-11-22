@@ -848,6 +848,7 @@
                     <input class="field field-md"
                       id="settings-default-location"
                       value={defaultWorkspaceLocationDraft}
+                      placeholder="Choose a folder"
                       spellcheck="false"
                       oninput={(event) => setDefaultWorkspaceLocationDraft(inputValue(event))}
                       onblur={() => saveDefaultWorkspaceLocation()}
@@ -858,7 +859,6 @@
                       autocapitalize="none"
                     />
                     <button class="btn btn-secondary" type="button" onclick={browseDefaultWorkspaceLocation}>Browse</button>
-                    <button class="btn btn-secondary" type="button" onclick={() => saveDefaultWorkspaceLocation()}>Save</button>
                   </div>
                 </div>
               </div>

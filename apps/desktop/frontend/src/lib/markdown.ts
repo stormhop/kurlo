@@ -52,8 +52,15 @@ export function markdownSizeLabel(source: string): string {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
 }
 
-export function parseMarkdown(source: string): MdBlock[] {
-  return parseBlocks(String(source ?? '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n'));
+let softBreaksAsLines = false;
+
+export function parseMarkdown(source: string, options: { breaks?: boolean } = {}): MdBlock[] {
+  softBreaksAsLines = Boolean(options.breaks);
+  try {
+    return parseBlocks(String(source ?? '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n'));
+  } finally {
+    softBreaksAsLines = false;
+  }
 }
 
 function isBlank(line: string) {
@@ -251,7 +258,7 @@ function parseInlineContent(text: string, depth: number): MdInline[] {
     }
 
     if (char === '\n') {
-      const hard = / {2,}$/.test(buffer) || buffer.endsWith('\\');
+      const hard = softBreaksAsLines || / {2,}$/.test(buffer) || buffer.endsWith('\\');
       buffer = buffer.replace(/ +$/, '').replace(/\\$/, '');
       if (hard) {
         flush();

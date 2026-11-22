@@ -396,7 +396,7 @@
             <p class="overview-readme-hint">Markdown. Saved as README.md in the workspace folder{storedInGit ? ', so your Git host shows it too' : ''}.</p>
           {/if}
         {:else if readme.trim()}
-          <CollapsibleMarkdown source={readme} resetKey={readmeWorkspaceId} />
+          <CollapsibleMarkdown source={readme} resetKey={readmeWorkspaceId} breaks />
         {:else}
           <div class="overview-readme-empty">
             <p>Conventions, auth hints, links — anything the next person opening this workspace should know.</p>

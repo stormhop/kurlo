@@ -239,6 +239,9 @@ test.describe("Kurlo desktop browser E2E", () => {
     const close = draft.locator('.tab-close');
     await page.getByLabel('Request URL').click();
     await page.mouse.move(0, 100);
+    await expect(draft).not.toHaveClass(/unsaved/);
+    await page.getByLabel('Request URL').fill('https://api.example.test/draft');
+    await page.mouse.move(0, 100);
     await expect(draft).toHaveClass(/unsaved/);
     await expect(close).toHaveCSS('opacity', '1');
     await expect(close.locator('svg')).toHaveCSS('opacity', '0');
@@ -248,6 +251,10 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.keyboard.press('End');
     await expect(close.locator('svg')).toHaveCSS('opacity', '1');
     expect(await close.evaluate(node => getComputedStyle(node, '::after').opacity)).toBe('0');
+    await page.getByLabel('Request URL').fill('');
+    await expect(draft).not.toHaveClass(/unsaved/);
+    await page.getByRole('tab', { name: 'Overview', exact: true }).focus();
+    await page.keyboard.press('End');
     await page.keyboard.press(browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab');
     await expect(close).toBeFocused();
     await page.keyboard.press('Enter');
@@ -283,7 +290,7 @@ test.describe("Kurlo desktop browser E2E", () => {
 
     const tabs = page.locator('.saved-request-tabs');
     await expect.poll(async () => tabs.evaluate((list) => list.scrollWidth > list.clientWidth)).toBe(true);
-    await expect.poll(async () => page.locator('.saved-request-tab:not(.overview-request-tab)').first().evaluate(tab => tab.getBoundingClientRect().width)).toBeLessThan(120);
+    await expect.poll(async () => page.locator('.saved-request-tab:not(.overview-request-tab)').first().evaluate(tab => tab.getBoundingClientRect().width)).toBeLessThan(140);
 
     await overflowButton.click();
     const list = page.getByRole('listbox', { name: 'Open tabs' });

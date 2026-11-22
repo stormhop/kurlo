@@ -244,6 +244,20 @@ class AppLazyComponents {
     if (!this.AgentNotesEditorComponent) this.AgentNotesEditorComponent = (await import('../components/AgentNotesEditor.svelte')).default as LazyComponent;
   }
 
+  async warmRequestTabs() {
+    await Promise.all([
+      this.loadParamsTab(),
+      this.loadAuthTab(),
+      this.loadHeadersTab(),
+      this.loadBodyTab(),
+      this.loadVarsTab(),
+      this.loadScriptsTab(),
+      this.loadDocsTab(),
+      this.loadExamplesTab(),
+      this.loadRequestSettingsTab(),
+    ]);
+  }
+
   async warmEditor() {
     await import('../CodeEditor.svelte');
   }

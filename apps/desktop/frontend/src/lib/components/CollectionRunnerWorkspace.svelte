@@ -180,7 +180,7 @@
             <path d="M8 1.7V4.5h2.8" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
           </svg>
           <span class="runner-file-copy">
-            <span>{dataFileName || 'Run with a CSV or JSON file'}</span>
+            <span>{dataFileName || 'Use a CSV or JSON file'}</span>
             {#if dataFileName}<small>{dataRowCount} row{dataRowCount === 1 ? '' : 's'} loaded</small>{/if}
           </span>
         </button>
@@ -229,7 +229,7 @@
       </label>
     </div>
     <div class="runner-actions">
-      <button class="btn btn-ghost" type="button" onclick={onReset} disabled={running}>Reset settings</button>
+      <button class="btn btn-secondary" type="button" onclick={onReset} disabled={running}>Reset settings</button>
     </div>
   </aside>
   <section class="collection-runner-main">

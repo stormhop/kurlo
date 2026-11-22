@@ -3,7 +3,7 @@
 
   const COLLAPSED_PX = 384;
 
-  let { source, resetKey = '' }: { source: string; resetKey?: string } = $props();
+  let { source, resetKey = '', breaks = false }: { source: string; resetKey?: string; breaks?: boolean } = $props();
 
   let body = $state<HTMLDivElement>();
   let expanded = $state(false);
@@ -31,7 +31,7 @@
   });
 </script>
 
-<div class="overview-readme-body" class:collapsed={overflows && !expanded} bind:this={body}><Markdown {source} /></div>
+<div class="overview-readme-body" class:collapsed={overflows && !expanded} bind:this={body}><Markdown {source} {breaks} /></div>
 {#if overflows}
   <button class="btn btn-ghost btn-sm overview-readme-more" type="button" onclick={() => (expanded = !expanded)} aria-expanded={expanded}>{expanded ? 'Show less' : 'Show all'}</button>
 {/if}
