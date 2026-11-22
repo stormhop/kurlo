@@ -12,6 +12,7 @@ var savedRequestFieldDefaults = map[string]any{
 }
 
 var savedRequestSettingDefaults = map[string]any{
+	"allowSendRequest":             false,
 	"httpVersion":                  "auto",
 	"enableSSLVerification":        true,
 	"followRedirects":              true,
@@ -36,6 +37,7 @@ var savedRequestSettingDefaults = map[string]any{
 	"wsKeepAliveIntervalMs":        float64(0),
 	"sseDisableReconnect":          false,
 	"sseReconnectIntervalMs":       float64(0),
+	"scriptTimeoutMs":              float64(0),
 	"sioClientVersion":             "v3",
 	"sioPath":                      "/socket.io",
 	"sioNamespace":                 "/",
@@ -186,6 +188,11 @@ var webSocketRequestSettingFieldSet = stringSet(webSocketRequestSettingFields)
 var socketIORequestSettingFieldSet = stringSet(socketIORequestSettingFields)
 var grpcRequestSettingFieldSet = stringSet(grpcRequestSettingFields)
 
+func omitRequestEditorDefaults(request map[string]any) {
+	delete(request, "requestTab")
+	updateWorkspaceRows(request, omitWorkspaceRowDefaults, requestRowFieldsForStrip...)
+}
+
 func stripRequestForFilesystem(request map[string]any) {
 	stripTimestamps(request)
 	delete(request, "isPinned")
@@ -193,11 +200,11 @@ func stripRequestForFilesystem(request map[string]any) {
 	stripBodyFieldsForType(request, requestType)
 	stripRealtimeFieldsForType(request, requestType)
 	stripMethodForType(request, requestType)
-	stripRequestTabForType(request, requestType)
+	delete(request, "requestTab")
 	stripRequestSettingsForType(request, requestType)
 
 	for _, field := range requestRowFieldsForStrip {
-		stripNonSecretRowIDs(request[field])
+		stripAndCompactKVRows(request[field])
 	}
 	stripSioArgRowIDs(request["sioArgs"])
 	stripEmptySioArgs(request)
@@ -315,20 +322,6 @@ func stripMethodForType(request map[string]any, requestType string) {
 		if method == "GET" {
 			delete(request, "method")
 		}
-	}
-}
-
-func stripRequestTabForType(request map[string]any, requestType string) {
-	tab := stringValue(request, "requestTab")
-	defaultTab := "params"
-	switch requestType {
-	case "ws", "socketio", "grpc", "mcp", "ai":
-		defaultTab = "body"
-	case "graphql":
-		defaultTab = "query"
-	}
-	if tab == defaultTab {
-		delete(request, "requestTab")
 	}
 }
 
@@ -463,6 +456,7 @@ func stripCollectionForFilesystem(collection map[string]any) {
 	stripTimestamps(collection)
 	stripCollectionDefaultsForFilesystem(collection)
 	stripFolderDefaultsForFilesystem(collection)
+	updateWorkspaceRows(nestedMap(collection, "openapi"), omitWorkspaceRowDefaults, "headers")
 	stripEmptyAndDefaults(collection, collectionFieldDefaults)
 }
 
@@ -477,7 +471,7 @@ func stripFolderDefaultsForFilesystem(collection map[string]any) {
 		if !ok {
 			continue
 		}
-		stripNonSecretRowIDs(folder["headers"])
+		stripAndCompactKVRows(folder["headers"])
 		if auth, ok := folder["auth"].(map[string]any); ok {
 			switch stringValue(auth, "type") {
 			case "", "inherit":
@@ -505,8 +499,8 @@ func stripCollectionDefaultsForFilesystem(collection map[string]any) {
 	if !ok {
 		return
 	}
-	stripNonSecretRowIDs(defaults["headers"])
-	stripNonSecretRowIDs(defaults["variables"])
+	stripAndCompactKVRows(defaults["headers"])
+	stripAndCompactKVRows(defaults["variables"])
 	stripAuthForFilesystem(defaults)
 	stripNestedDefaults(defaults, "settings", savedRequestSettingDefaults)
 	stripEmptyAndDefaults(defaults, nil)
@@ -517,7 +511,7 @@ func stripCollectionDefaultsForFilesystem(collection map[string]any) {
 
 func stripEnvironmentForFilesystem(environment map[string]any) {
 	stripTimestamps(environment)
-	stripNonSecretRowIDs(environment["values"])
+	stripAndCompactKVRows(environment["values"])
 	stripEmptyAndDefaults(environment, nil)
 }
 
@@ -608,20 +602,29 @@ func stripEmptyAndDefaults(item map[string]any, defaults map[string]any) {
 	}
 }
 
-func stripNonSecretRowIDs(value any) {
-	rows, ok := value.([]any)
-	if !ok {
-		return
+func updateWorkspaceRows(owner map[string]any, update func(map[string]any), fields ...string) {
+	for _, field := range fields {
+		for _, row := range mapSlice(owner[field]) {
+			update(row)
+		}
 	}
-	for _, raw := range rows {
-		row, ok := raw.(map[string]any)
-		if !ok {
-			continue
+}
+
+func omitWorkspaceRowDefaults(row map[string]any) {
+	if row["enabled"] == true {
+		delete(row, "enabled")
+	}
+	if description, ok := row["description"].(string); ok && description == "" {
+		delete(row, "description")
+	}
+}
+
+func stripAndCompactKVRows(value any) {
+	for _, row := range mapSlice(value) {
+		if !boolValue(row["secret"]) {
+			delete(row, "id")
 		}
-		if boolValue(row["secret"]) {
-			continue
-		}
-		delete(row, "id")
+		omitWorkspaceRowDefaults(row)
 	}
 }
 

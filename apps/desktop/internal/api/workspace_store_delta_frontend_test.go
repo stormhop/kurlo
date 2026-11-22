@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -20,18 +18,7 @@ func roundTripThroughAppStore(t *testing.T, frontend, payload string) map[string
 	cmd := exec.Command("npx", "playwright", "test", "e2e/workspace.spec.ts", "-g", "real workspace round trip", "--project=chromium", "--workers=1")
 	cmd.Dir = frontend
 	cmd.Env = append(os.Environ(), "HOME="+t.TempDir(), "KURLO_ROUNDTRIP_IN="+in, "KURLO_ROUNDTRIP_OUT="+out)
-	if os.Getenv("PLAYWRIGHT_BROWSERS_PATH") == "" {
-		if account, err := user.Current(); err == nil {
-			cache := filepath.Join(account.HomeDir, ".cache")
-			switch runtime.GOOS {
-			case "darwin":
-				cache = filepath.Join(account.HomeDir, "Library", "Caches")
-			case "windows":
-				cache = filepath.Join(account.HomeDir, "AppData", "Local")
-			}
-			cmd.Env = append(cmd.Env, "PLAYWRIGHT_BROWSERS_PATH="+filepath.Join(cache, "ms-playwright"))
-		}
-	}
+	cmd.Env = playwrightTestEnv(cmd.Env)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("round trip: %v\n%s", err, output)
 	}

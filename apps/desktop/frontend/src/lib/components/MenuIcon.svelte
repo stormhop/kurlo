@@ -1,5 +1,5 @@
 <script lang="ts">
-  type MenuIconName = 'request' | 'folder' | 'settings' | 'rename' | 'export' | 'import' | 'trash' | 'duplicate' | 'star' | 'copy' | 'play' | 'open' | 'example' | 'collection' | 'collection-add' | 'lock' | 'replace' | 'load' | 'archive' | 'restore';
+  type MenuIconName = 'request' | 'folder' | 'settings' | 'rename' | 'docs' | 'export' | 'import' | 'trash' | 'duplicate' | 'star' | 'copy' | 'play' | 'open' | 'example' | 'collection' | 'collection-add' | 'lock' | 'replace' | 'load' | 'archive' | 'restore' | 'key' | 'warning' | 'link' | 'unlink' | 'eye' | 'refresh' | 'shield';
 
   let { name }: { name: MenuIconName } = $props();
 </script>
@@ -18,6 +18,8 @@
   {:else if name === 'archive' || name === 'restore'}
     <path d="M3.5 6v7h9V6M2.5 3h11v3h-11z"/>
     {#if name === 'archive'}<path d="M6.5 9h3"/>{:else}<path d="M8 11V7.5M6.5 9 8 7.5 9.5 9"/>{/if}
+  {:else if name === 'docs'}
+    <path d="M8 4c-1.6-1-3.5-1.3-6-1v9c2.5-.3 4.4 0 6 1 1.6-1 3.5-1.3 6-1V3c-2.5-.3-4.4 0-6 1Zm0 0v9"/>
   {:else if name === 'export'}
     <path d="M8 10V2.5M5.2 5.2L8 2.4l2.8 2.8"/><path d="M3 9.5V13h10V9.5"/>
   {:else if name === 'import'}
@@ -44,5 +46,19 @@
     <path d="M2.5 13.5h11"/><path d="M3.5 11l3-3.5 2.5 2 3.5-5"/><path d="M10.5 4.5h2v2"/>
   {:else if name === 'lock'}
     <rect x="3.5" y="7" width="9" height="6.5" rx="1.2"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2"/>
+  {:else if name === 'key'}
+    <circle cx="5.5" cy="10.5" r="3"/><path d="m7.6 8.4 6-6M11.5 4.5l1.8 1.8M10 6l1.5 1.5"/>
+  {:else if name === 'warning'}
+    <path d="M7.1 2.6 1.7 12a1 1 0 0 0 .9 1.5h10.8a1 1 0 0 0 .9-1.5L8.9 2.6a1 1 0 0 0-1.8 0Z"/><path d="M8 6.2v3M8 11.4h.01"/>
+  {:else if name === 'link'}
+    <path d="M6.7 9.3a3 3 0 0 0 4.4.3l2-2a3 3 0 0 0-4.3-4.3l-1 1"/><path d="M9.3 6.7a3 3 0 0 0-4.4-.3l-2 2a3 3 0 0 0 4.3 4.3l1-1"/>
+  {:else if name === 'unlink'}
+    <path d="m11.9 8.9 1.2-1.2a3 3 0 0 0-4.3-4.3L7.6 4.6M4.1 7.1 2.9 8.3a3 3 0 0 0 4.3 4.3l1.2-1.2M5 1.5v2M1.5 5h2M11 14.5v-2M14.5 11h-2"/>
+  {:else if name === 'eye'}
+    <path d="M1.5 8S3.8 3.5 8 3.5 14.5 8 14.5 8 12.2 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2"/>
+  {:else if name === 'refresh'}
+    <path d="M13.5 8a5.5 5.5 0 0 1-9.6 3.7L2.5 10.3M2.5 13.5v-3.2h3.2M2.5 8a5.5 5.5 0 0 1 9.6-3.7l1.4 1.4M13.5 2.5v3.2h-3.2"/>
+  {:else if name === 'shield'}
+    <path d="M8 14.5s5-2.4 5-6.3V3.6L8 1.5 3 3.6v4.6c0 3.9 5 6.3 5 6.3Z"/>
   {/if}
 </svg>

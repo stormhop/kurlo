@@ -158,7 +158,7 @@
           <span class="mock-status-meta">{status.routeCount} example{status.routeCount === 1 ? '' : 's'} from <strong>{status.collectionName || 'this collection'}</strong>{#if simulateLatency} · recorded latency{/if}</span>
         {:else}
           <span class="mock-status-state">Stopped</span>
-          <span class="mock-status-meta">{canStart || loadingRoutes ? `Start it to serve these examples on port ${port || 3100}.` : 'Nothing to serve yet.'}</span>
+          <span class="mock-status-meta">{canStart || loadingRoutes ? `Start it to serve these examples on port ${port || 3100}.` : 'Needs at least one example.'}</span>
         {/if}
       </div>
       <div class="mock-actions">
@@ -212,7 +212,7 @@
     {/if}
     {#if !canStart && !status.running && !loadingRoutes}
       <p class="mock-hint">
-        Nothing to serve yet. Send a request, then use <strong>Save as example</strong> in the response panel — the mock replays what you captured.
+        Send a request, then use <strong>Save as example</strong> in the response panel — the mock replays what you captured.
       </p>
     {/if}
   </header>

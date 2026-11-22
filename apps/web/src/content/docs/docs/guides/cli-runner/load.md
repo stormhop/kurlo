@@ -33,7 +33,7 @@ The environment saved in the load test is the default. `--env NAME` overrides it
 3. Process environment values for declared variables.
 4. `--env-file FILE`, then repeated `--var KEY=VALUE` overrides.
 
-`--env-file` accepts a KEY=VALUE file or JSON, like `kurlo run`. Its values and process overrides stay external in exports, as do saved variables marked secret. k6 reads them from `__ENV`. `run` passes the selected values through the process environment, never through command-line arguments. The machine-local encrypted secret store is not read by the CLI; provide CI secrets through environment variables or an env file. Test-data paths are relative to the workspace root.
+`--env-file` accepts a KEY=VALUE file or JSON, like `kurlo run`. Its values and process overrides stay external in exports, as do saved variables marked secret. k6 reads them from `__ENV`. `run` passes the selected values through the process environment, never through command-line arguments. The machine-local encrypted secret store is not read by the CLI; provide CI secrets through environment variables or an env file. `run` fetches variables [linked to a secret manager](/docs/guides/environments/secret-managers/#load-tests) unless an override sets them, and runs `command` providers only with `--allow-secret-commands`; `export` leaves them to `__ENV`. Test-data paths are relative to the workspace root.
 
 Use `--inline-secrets` with `export` only when you want secret values written into the exported script. Do not commit or share that file. `run` never writes secret variables into its temporary script, and masks their values in the k6 log.
 

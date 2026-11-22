@@ -269,8 +269,8 @@ describe('postmanRequestsFromItems', () => {
       },
     ], 'collection-1', 'Postman API', undefined);
 
-    expect(requests[0].preRequestScript).toBe('pm.variables.set("nonce", "1")');
-    expect(requests[0].testScript).toBe('pm.test("ok", () => {\n  pm.response.to.have.status(200)\n})');
+    expect(requests[0].preRequestScriptJs).toBe('pm.variables.set("nonce", "1")');
+    expect(requests[0].testScriptJs).toBe('pm.test("ok", () => {\n  pm.response.to.have.status(200)\n})');
     expect(requests[0].requestNotes).toBe('Exchanges credentials for a token.');
   });
 
@@ -286,8 +286,8 @@ describe('postmanRequestsFromItems', () => {
       },
     ], 'collection-1', 'Postman API', undefined);
 
-    expect(requests[0].preRequestScript).toBe('pm.variables.set("a", "1")');
-    expect(requests[0].testScript).toBe('');
+    expect(requests[0].preRequestScriptJs).toBe('pm.variables.set("a", "1")');
+    expect(requests[0].testScriptJs).toBe('');
   });
 
   it('keeps folder scripts on the folder instead of copying them into requests', () => {
@@ -305,7 +305,7 @@ describe('postmanRequestsFromItems', () => {
       },
     ], 'collection-1', 'Postman API', undefined);
 
-    expect(requests[0].preRequestScript).toBe('pm.variables.set("page", "1")');
+    expect(requests[0].preRequestScriptJs).toBe('pm.variables.set("page", "1")');
     expect(requests[0].folderPath).toEqual(['Billing']);
   });
 
@@ -385,8 +385,8 @@ describe('postmanCollectionBundle', () => {
     expect(bundle.name).toBe('Billing API');
     expect(bundle.description).toBe('Everything about invoices.');
     expect(bundle.defaults.auth).toMatchObject({ type: 'bearer', bearerToken: '{{collectionToken}}' });
-    expect(bundle.defaults.preRequestScript).toBe('pm.variables.set("collection", "yes")');
-    expect(bundle.defaults.testScript).toBe('pm.test("json", () => pm.response.json())');
+    expect(bundle.defaults.preRequestScriptJs).toBe('pm.variables.set("collection", "yes")');
+    expect(bundle.defaults.testScriptJs).toBe('pm.test("json", () => pm.response.json())');
     expect(bundle.defaults.variables).toMatchObject([
       { key: 'baseUrl', value: 'https://api.example.test', enabled: true },
       { key: 'apiKey', value: 'k-1', secret: true },
@@ -633,16 +633,16 @@ describe('buildPostmanCollection', () => {
     const request = testRequest({
       id: 'req-scripts',
       name: 'Login',
-      preRequestScript: 'pm.variables.set("nonce", "1")',
-      testScript: 'pm.test("ok", () => pm.response.to.have.status(200))',
+      preRequestScriptJs: 'pm.variables.set("nonce", "1")',
+      testScriptJs: 'pm.test("ok", () => pm.response.to.have.status(200))',
       requestNotes: 'Exchanges credentials for a token.',
     });
     const defaults = {
       ...emptyCollectionDefaults(),
       variables: [testRow('baseUrl', 'https://api.example.test')],
       auth: { ...emptyAuthState(), type: 'bearer' as const, bearerToken: '{{collectionToken}}' },
-      preRequestScript: 'pm.variables.set("collection", "yes")',
-      testScript: 'pm.test("json", () => pm.response.json())',
+      preRequestScriptJs: 'pm.variables.set("collection", "yes")',
+      testScriptJs: 'pm.test("json", () => pm.response.json())',
     };
 
     const exported = buildPostmanCollection('API', 'Docs.', [request], strip, true, defaults);
@@ -651,13 +651,13 @@ describe('buildPostmanCollection', () => {
 
     const bundle = postmanCollectionBundle(exported, 'collection-2', 'API');
     expect(bundle.requests[0]).toMatchObject({
-      preRequestScript: 'pm.variables.set("nonce", "1")',
-      testScript: 'pm.test("ok", () => pm.response.to.have.status(200))',
+      preRequestScriptJs: 'pm.variables.set("nonce", "1")',
+      testScriptJs: 'pm.test("ok", () => pm.response.to.have.status(200))',
       requestNotes: 'Exchanges credentials for a token.',
     });
     expect(bundle.defaults).toMatchObject({
-      preRequestScript: 'pm.variables.set("collection", "yes")',
-      testScript: 'pm.test("json", () => pm.response.json())',
+      preRequestScriptJs: 'pm.variables.set("collection", "yes")',
+      testScriptJs: 'pm.test("json", () => pm.response.json())',
       auth: expect.objectContaining({ type: 'bearer', bearerToken: '{{collectionToken}}' }),
     });
     expect(bundle.defaults.variables).toMatchObject([{ key: 'baseUrl', value: 'https://api.example.test' }]);

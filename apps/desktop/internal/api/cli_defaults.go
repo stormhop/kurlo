@@ -23,29 +23,24 @@ func applyCollectionDefaults(req cliSavedRequest, collection *cliCollection) cli
 
 	auth := defaults.Auth
 	headers := defaults.Headers
-	pre := []string{defaults.PreRequestScript}
-	preJs := []string{defaults.PreRequestScriptJs}
+	pre := []string{defaults.PreRequestScriptJs}
 	for _, folder := range folders {
 		if folder.Auth.Type != "" && !strings.EqualFold(folder.Auth.Type, "inherit") {
 			auth = folder.Auth
 		}
 		headers = mergeDefaultRows(headers, folder.Headers)
-		pre = append(pre, folder.PreRequestScript)
-		preJs = append(preJs, folder.PreRequestScriptJs)
+		pre = append(pre, folder.PreRequestScriptJs)
 	}
-	tests := []string{req.TestScript}
-	testsJs := []string{req.TestScriptJs}
+
+	tests := []string{req.TestScriptJs}
 	for i := len(folders) - 1; i >= 0; i-- {
-		tests = append(tests, folders[i].TestScript)
-		testsJs = append(testsJs, folders[i].TestScriptJs)
+		tests = append(tests, folders[i].TestScriptJs)
 	}
 
 	req.Auth = mergeCollectionAuth(auth, req.Auth)
 	req.Headers = mergeDefaultRows(headers, req.Headers)
-	req.PreRequestScript = joinScripts(append(pre, req.PreRequestScript)...)
-	req.TestScript = joinScripts(append(tests, defaults.TestScript)...)
-	req.PreRequestScriptJs = joinScripts(append(preJs, req.PreRequestScriptJs)...)
-	req.TestScriptJs = joinScripts(append(testsJs, defaults.TestScriptJs)...)
+	req.PreRequestScriptJs = joinScripts(append(pre, req.PreRequestScriptJs)...)
+	req.TestScriptJs = joinScripts(append(tests, defaults.TestScriptJs)...)
 	req.Settings = mergeCollectionSettings(defaults.Settings, req.Settings)
 	req.Settings = mergeBrowserSettings(defaults.Settings, req.Settings, req.SettingsOverrides)
 	return req

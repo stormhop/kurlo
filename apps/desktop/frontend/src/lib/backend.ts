@@ -6,8 +6,8 @@ import type {
   GitWorkspaceStatus, GrpcRequest, GrpcResponse, GrpcServiceDefinition, HttpRequest, HttpResponse,
   JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
-  WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
-  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState,
+  RequestFileYAMLResult, WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
+  McpResponse, AiRequest, AiResponse, AgentMcpServer, AgentMcpServersState, AgentMcpTestResult, AgentWorkspaceNotes, AgentNotesSaveResult, AgentActivityEntry, AgentActivityFilter, AgentActivityList, GitPullRequestResult, AgentApproval, AgentChat, AgentChatSummary, AgentResult, AgentSendInput, AgentTurnResult, AiConnectionsState, AiConnectionInput, AiConnectionTestResult, AiLocalDiscovery, OpenRouterConnectState, LoadDataPreview, RequestFileInfo, LoadTest, LoadTestRequest, K6ExportResult, K6Info, LoadRunResult, LoadRunState, RunnerSecretCheck, RunnerSecretCheckResult,
 } from './wire';
 import {
   EMPTY_GIT_BRANCH_LIST, EMPTY_GIT_CONFLICT_FILE, EMPTY_GIT_LOG,
@@ -73,6 +73,12 @@ export async function sendGrpcRequest(req: GrpcRequest): Promise<GrpcResponse> {
     throw new Error('Wails bridge not available');
   }
   return app.SendGrpcRequest(req);
+}
+
+export async function preflightCollectionRunner(workspaceId: string, requests: RunnerSecretCheck[]): Promise<RunnerSecretCheckResult[]> {
+  const app = window.go?.api?.App;
+  if (!app?.PreflightCollectionRunner) throw new Error('Wails bridge not available');
+  return app.PreflightCollectionRunner(workspaceId, requests);
 }
 
 export async function sendAiRequest(req: AiRequest): Promise<AiResponse> {
@@ -214,12 +220,12 @@ export async function loadRequestStore(): Promise<string> {
   return app.LoadRequestStore();
 }
 
-export async function loadWorkspace(): Promise<{ payload: string; diagnostics: WorkspaceDiagnostic[]; revision?: number }> {
+export async function loadWorkspace(): Promise<{ root?: string; payload: string; diagnostics: WorkspaceDiagnostic[]; revision?: number }> {
   const app = window.go?.api?.App;
   if (app?.LoadWorkspace) {
     const result = await app.LoadWorkspace();
     const revision = typeof result?.revision === 'number' && result.revision > 0 ? result.revision : undefined;
-    return { payload: result?.payload ?? '', diagnostics: Array.isArray(result?.diagnostics) ? result.diagnostics : [], revision };
+    return { root: result?.root, payload: result?.payload ?? '', diagnostics: Array.isArray(result?.diagnostics) ? result.diagnostics : [], revision };
   }
   const diagnostics = await loadWorkspaceDiagnostics();
   return { payload: await loadRequestStore(), diagnostics };
@@ -237,6 +243,18 @@ export async function loadWorkspaceDiagnostics(): Promise<WorkspaceDiagnostic[]>
   if (!app?.LoadWorkspaceDiagnostics) return [];
   const diagnostics = await app.LoadWorkspaceDiagnostics();
   return Array.isArray(diagnostics) ? diagnostics : [];
+}
+
+export async function getRequestFileYAML(root: string, id: string, pathHint: string): Promise<RequestFileYAMLResult> {
+  return await window.go?.api?.App?.GetRequestFileYAML?.(root, id, pathHint) ?? { ok: false, id, path: '', content: '', revision: '', error: 'Open this request in the desktop app to edit its YAML.' };
+}
+
+export async function formatRequestFileYAML(content: string): Promise<RequestFileYAMLResult> {
+  return await window.go?.api?.App?.FormatRequestFileYAML?.(content) ?? { ok: false, id: '', path: '', content: '', revision: '', error: 'The desktop app is unavailable.' };
+}
+
+export async function saveRequestFileYAML(root: string, id: string, content: string, revision: string, pathHint: string): Promise<RequestFileYAMLResult> {
+  return await window.go?.api?.App?.SaveRequestFileYAML?.(root, id, content, revision, pathHint) ?? { ok: false, id, path: '', content: '', revision: '', error: 'The desktop app is unavailable.' };
 }
 
 export async function readWorkspaceYAMLFile(path: string): Promise<WorkspaceYAMLFileResult> {
@@ -332,6 +350,18 @@ export async function openFileDialog(title: string): Promise<string> {
   return (await window.go?.api?.App?.OpenFileDialog?.(title)) ?? '';
 }
 
+export async function inspectRequestFile(path: string): Promise<RequestFileInfo | null> {
+  const app = window.go?.api?.App;
+  if (!app?.InspectRequestFile) return null;
+  return app.InspectRequestFile(path);
+}
+
+export async function revealRequestFile(path: string): Promise<string> {
+  const app = window.go?.api?.App;
+  if (!app?.RevealRequestFile) return 'Files can be shown from the desktop app.';
+  return app.RevealRequestFile(path);
+}
+
 export async function openDirectoryDialog(title: string, defaultDirectory = ''): Promise<string> {
   const app = window.go?.api?.App;
   if (defaultDirectory && app?.OpenDirectoryDialogWithDefault) {
@@ -388,6 +418,18 @@ export async function saveFileDialog(name: string, content: string): Promise<str
 export type OpenApiSpecFile = { content: string; exists: boolean; path: string; error?: string };
 
 const NO_BRIDGE_SPEC: OpenApiSpecFile = { content: '', exists: false, path: '', error: 'OpenAPI sync is only available in the desktop app.' };
+
+export async function docsRelativeLinkScopes(notes: Record<string, string[]>): Promise<string[]> {
+  const app = window.go?.api?.App;
+  if (!app?.DocsRelativeLinkScopes) throw new Error('Building collection documentation requires the desktop app.');
+  return app.DocsRelativeLinkScopes(notes);
+}
+
+export async function exportCollectionDocs(payload: string): Promise<void> {
+  const app = window.go?.api?.App;
+  if (!app?.ExportCollectionDocs) throw new Error('Building collection documentation requires the desktop app.');
+  await app.ExportCollectionDocs(payload);
+}
 
 export async function readOpenApiBaseSpec(collectionId: string): Promise<OpenApiSpecFile> {
   return (await window.go?.api?.App?.ReadOpenAPIBaseSpec?.(collectionId)) ?? NO_BRIDGE_SPEC;
@@ -749,17 +791,17 @@ export async function loadRunLog(): Promise<string[]> {
   return (await window.go?.api?.App?.LoadRunLog?.()) ?? [];
 }
 
-export async function lastLoadRun(loadTestId: string): Promise<LoadRunResult | null> {
-  const result = await window.go?.api?.App?.LastLoadRun?.(loadTestId);
+export async function lastLoadRun(collectionId: string, loadTestId: string): Promise<LoadRunResult | null> {
+  const result = await window.go?.api?.App?.LastLoadRun?.(collectionId, loadTestId);
   return result?.loadTestId ? result : null;
 }
 
-export async function loadRunSummaryJSON(loadTestId: string): Promise<string> {
-  return (await window.go?.api?.App?.LoadRunSummaryJSON?.(loadTestId)) ?? '';
+export async function loadRunSummaryJSON(collectionId: string, loadTestId: string): Promise<string> {
+  return (await window.go?.api?.App?.LoadRunSummaryJSON?.(collectionId, loadTestId)) ?? '';
 }
 
-export async function openLoadRunReport(loadTestId: string): Promise<string> {
-  return (await window.go?.api?.App?.OpenLoadRunReport?.(loadTestId)) ?? 'Reports open only in the desktop app.';
+export async function openLoadRunReport(collectionId: string, loadTestId: string): Promise<string> {
+  return (await window.go?.api?.App?.OpenLoadRunReport?.(collectionId, loadTestId)) ?? 'Reports open only in the desktop app.';
 }
 
 export async function loadTestTargets(payload: string): Promise<string[]> {

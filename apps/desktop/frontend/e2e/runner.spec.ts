@@ -10,6 +10,39 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 test.describe("Kurlo desktop browser E2E", () => {
+  test('preflights all selected requests and stops before sending when one linked secret is unavailable', async ({ page }) => {
+    await page.setViewportSize({ width: 1120, height: 680 });
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-secret-preflight', workspaceId: 'workspace-e2e', name: 'Secret preflight' }],
+      requests: [
+        { id: 'preflight-plain', collectionId: 'col-secret-preflight', name: 'No linked secret', method: 'GET', url: 'https://api.kurlo.test/plain' },
+        { id: 'preflight-valid', collectionId: 'col-secret-preflight', name: 'Working linked secret', method: 'GET', url: 'https://api.kurlo.test/valid', headers: [{ key: 'Authorization', value: '{{secret:vault:app#token}}', enabled: true }] },
+        { id: 'preflight-broken', collectionId: 'col-secret-preflight', name: 'Broken linked secret', method: 'GET', url: 'https://api.kurlo.test/broken', headers: [{ key: 'Authorization', value: '{{secret:vault:missing#token}}', enabled: true }] },
+      ],
+    });
+    await page.goto('/');
+    await page.evaluate(() => {
+      window.go!.api!.App!.PreflightCollectionRunner = async (_workspaceId, requests) => requests.map((request, index) => ({
+        requestId: request.requestId,
+        failures: index === 2 ? [{ provider: 'vault', path: 'missing', field: 'token', kind: 'not-found', message: 'Secret not found' }] : [],
+      }));
+      document.documentElement.style.zoom = '1.25';
+    });
+    await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+    const runner = page.getByRole('region', { name: 'Collection runner' });
+    await runner.locator('.runner-select .app-select-trigger').click();
+    await runner.getByRole('option', { name: 'Secret preflight' }).click();
+    await runner.getByRole('button', { name: 'Run 3 requests' }).click();
+    await expect(runner.getByRole('alert', { name: 'Linked secret preflight errors' })).toContainText('Run stopped before sending requests');
+    await expect(runner.getByRole('alert', { name: 'Linked secret preflight errors' })).toContainText('vault:missing#token');
+    expect(await page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(0);
+    const alertBox = await runner.getByRole('alert', { name: 'Linked secret preflight errors' }).boundingBox();
+    expect(alertBox).not.toBeNull();
+    expect(alertBox!.y).toBeGreaterThanOrEqual(0);
+    expect(alertBox!.y + alertBox!.height).toBeLessThanOrEqual(680);
+    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'runner-linked-secret-preflight.png'), fullPage: false, animations: 'disabled' });
+  });
+
   test('scrolls a runner with hundreds of requests and results without pages', async ({ page }) => {
     const requests = Array.from({ length: 1000 }, (_, index) => ({
       id: `big-${index}`, collectionId: 'col-big', name: `Request ${index}`, method: 'GET', url: `https://api.kurlo.test/slow?ms=1&n=${index}`, folderPath: [`Group ${Math.floor(index / 50)}`],
@@ -125,6 +158,38 @@ test.describe("Kurlo desktop browser E2E", () => {
       return environments.find(environment => environment.id === 'prod')?.values;
     });
     expect(production).not.toEqual(expect.arrayContaining([expect.objectContaining({ key: 'token' })]));
+  });
+
+  test('fits the data file button and lines up the result tiles in a compact window', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 780 });
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-compact', workspaceId: 'workspace-e2e', name: 'Compact run' }],
+      requests: [
+        { id: 'compact-one', collectionId: 'col-compact', name: 'First', method: 'GET', url: 'https://api.kurlo.test/one' },
+        { id: 'compact-two', collectionId: 'col-compact', name: 'Second', method: 'GET', url: 'https://api.kurlo.test/two' },
+      ],
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+    const runner = page.getByRole('region', { name: 'Collection runner' });
+    await runner.locator('.runner-select .app-select-trigger').click();
+    await runner.getByRole('option', { name: 'Compact run' }).click();
+    const fileLabel = runner.locator('.runner-file-copy span');
+    await expect(fileLabel).toHaveText('Use a CSV or JSON file');
+    expect(await fileLabel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await expect(runner.getByRole('button', { name: 'Reset settings' })).toHaveClass(/btn-secondary/);
+    const rail = page.getByRole('navigation', { name: 'Kurlo' });
+    await expect(rail.locator('.activity-rail-btn.active')).toHaveCount(1);
+    await expect(rail.getByRole('button', { name: 'Collection runner' })).toHaveClass(/active/);
+    await expect(rail.getByRole('button', { name: 'Collections' })).toHaveClass(/panel-open/);
+    await runner.getByRole('button', { name: 'Run 2 requests' }).click();
+    const summary = runner.locator('.runner-results-summary');
+    await expect(summary).toContainText('Requests 2/2');
+    const tops = await summary.locator('.runner-stat').evaluateAll(stats => stats.map(stat => Math.round(stat.getBoundingClientRect().bottom)));
+    expect(new Set(tops).size).toBe(1);
+    const [summaryBox, progressBox] = await Promise.all([summary.boundingBox(), summary.locator('.runner-progress-wrap').boundingBox()]);
+    expect(progressBox!.width).toBeGreaterThan(summaryBox!.width * 0.8);
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-runner-compact.png'), animations: 'disabled' });
   });
 
   test('keeps the full saved runner verdict when result details are limited', async ({ page, browserName }) => {

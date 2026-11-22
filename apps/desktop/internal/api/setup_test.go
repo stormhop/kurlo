@@ -2,7 +2,9 @@ package api
 
 import (
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -73,4 +75,20 @@ func useTempHomeDir(t *testing.T, dir string) {
 
 func normalizeNewlines(value string) string {
 	return strings.ReplaceAll(value, "\r\n", "\n")
+}
+
+func playwrightTestEnv(env []string) []string {
+	if os.Getenv("PLAYWRIGHT_BROWSERS_PATH") == "" {
+		if account, err := user.Current(); err == nil {
+			cache := filepath.Join(account.HomeDir, ".cache")
+			switch runtime.GOOS {
+			case "darwin":
+				cache = filepath.Join(account.HomeDir, "Library", "Caches")
+			case "windows":
+				cache = filepath.Join(account.HomeDir, "AppData", "Local")
+			}
+			return append(env, "PLAYWRIGHT_BROWSERS_PATH="+filepath.Join(cache, "ms-playwright"))
+		}
+	}
+	return env
 }

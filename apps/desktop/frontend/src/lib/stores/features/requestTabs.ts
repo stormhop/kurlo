@@ -18,6 +18,7 @@ type RequestTabsHost = {
   disposeRealtimeSession: (id: string) => void;
   setPreviewRequestId: (id: string) => void;
   requestTabNeedsKeeping: (id: string) => boolean;
+  requestIsRunning: (id: string) => boolean;
 };
 
 export const requestTabsFeature = {
@@ -53,9 +54,16 @@ export const requestTabsFeature = {
     return Boolean(request?.isDraft)
       || this.dirtyRequestIds.has(id)
       || Boolean(request && this.requestDiffersFromStored(request))
-      || this.inFlightRequestIds.has(id)
+      || this.requestIsRunning(id);
+  },
+
+  requestIsRunning(this: RequestTabsHost, id: string) {
+    return this.inFlightRequestIds.has(id)
       || [this.webSocketSessions, this.socketIOSessions, this.sseSessions]
-        .some(sessions => this.realtimeStatusIsActive(sessions.get(id)?.status ?? ''));
+        .some(sessions => {
+          const session = sessions.get(id);
+          return session && this.realtimeStatusIsActive(session.status);
+        });
   },
 
   openRequestTab(this: RequestTabsHost, id: string) {

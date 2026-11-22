@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -34,8 +35,13 @@ func parseCLIData(data, path string) ([]map[string]string, error) {
 
 func parseJSONDataRows(text string) ([]map[string]string, error) {
 	var payload any
-	if err := json.Unmarshal([]byte(text), &payload); err != nil {
+	decoder := json.NewDecoder(strings.NewReader(text))
+	decoder.UseNumber()
+	if err := decoder.Decode(&payload); err != nil {
 		return nil, fmt.Errorf("data file is not valid JSON: %w", err)
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return nil, fmt.Errorf("data file has trailing content after its JSON value")
 	}
 	var rawRows []any
 	switch value := payload.(type) {
@@ -82,11 +88,8 @@ func jsonCellToString(cell any) string {
 		return value
 	case bool:
 		return strconv.FormatBool(value)
-	case float64:
-		if value == float64(int64(value)) {
-			return strconv.FormatInt(int64(value), 10)
-		}
-		return strconv.FormatFloat(value, 'f', -1, 64)
+	case json.Number:
+		return value.String()
 	default:
 		encoded, err := json.Marshal(value)
 		if err != nil {

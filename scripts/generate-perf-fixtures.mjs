@@ -221,8 +221,6 @@ function makeRequest(index, collection) {
     bodyFileName: '',
     formRows: [],
     graphqlSchema: isGraphQL ? 'type Query { node(id: ID!): Node }\ntype Node { id: ID! }' : '',
-    preRequestScript: '',
-    testScript: '',
     preRequestScriptJs: 'pm.variables.set("fixtureRequestId", pm.request.url)',
     testScriptJs: 'pm.test("status under 500", () => pm.expect(pm.response.code).to.be.below(500))',
     requestNotes: `Generated performance fixture request ${index}.`,
@@ -291,8 +289,6 @@ const collections = Array.from({ length: options.collections }, (_, index) => ({
     headers: [row(1, 'X-Collection', `perf-${index + 1}`)],
     variables: [row(2, 'baseUrl', 'https://api.example.test'), row(3, 'token', `perf-token-${index + 1}`, { secret: true })],
     auth: defaultAuth(),
-    preRequestScript: '',
-    testScript: '',
     preRequestScriptJs: '',
     testScriptJs: '',
     settings: index === 0

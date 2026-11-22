@@ -59,7 +59,7 @@ func runCLILoadTest(ctx context.Context, opts loadCLIOptions, plan loadtest.Plan
 		}
 	}
 	var secrets []string
-	for _, variable := range plan.Variables {
+	for _, variable := range plan.RuntimeVariables() {
 		if variable.Secret && variable.Value == "" {
 			continue
 		}

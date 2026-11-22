@@ -3,11 +3,13 @@
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { useClock } from '../clock.svelte';
   const now = useClock();
+  import type { LinkedSecretFailure } from '../backend';
   import type { Collection, CollectionRunnerResult, SavedRequest } from '../types/models';
   import { MAX_RUNNER_CONCURRENCY, MIN_RUNNER_CONCURRENCY } from '../concurrency';
   import Select from './Select.svelte';
   import { requestKindShortLabel } from '../utils';
   import { relativeTime } from '../collectionRuns';
+  import BirdSpinner from './BirdSpinner.svelte';
 
   let {
     collections,
@@ -25,6 +27,8 @@
     parallel,
     concurrency,
     running,
+    preflighting = false,
+    preflightFailures = [],
     title,
     results,
     summary,
@@ -50,6 +54,7 @@
     onDownloadReport,
     onRun,
     onStop,
+    onDismissPreflightFailures,
   }: {
     collections: Collection[];
     selectedCollectionId: string;
@@ -66,6 +71,8 @@
     parallel: boolean;
     concurrency: number;
     running: boolean;
+    preflighting?: boolean;
+    preflightFailures?: { requestId: string; name: string; failures: LinkedSecretFailure[] }[];
     title: string;
     results: CollectionRunnerResult[];
     summary: { total: number; completed: number; passed: number; failed: number; skipped: number; testsPassed: number; testsTotal: number; duration: number; allPassed: boolean };
@@ -91,6 +98,7 @@
     onDownloadReport: () => void | Promise<void>;
     onRun: () => void | Promise<void>;
     onStop: () => void;
+    onDismissPreflightFailures?: () => void;
   } = $props();
 
   let selectedSet = $derived(selectedRequestIds);
@@ -172,7 +180,7 @@
             <path d="M8 1.7V4.5h2.8" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>
           </svg>
           <span class="runner-file-copy">
-            <span>{dataFileName || 'Run with a CSV or JSON file'}</span>
+            <span>{dataFileName || 'Use a CSV or JSON file'}</span>
             {#if dataFileName}<small>{dataRowCount} row{dataRowCount === 1 ? '' : 's'} loaded</small>{/if}
           </span>
         </button>
@@ -221,7 +229,7 @@
       </label>
     </div>
     <div class="runner-actions">
-      <button class="btn btn-ghost" type="button" onclick={onReset} disabled={running}>Reset settings</button>
+      <button class="btn btn-secondary" type="button" onclick={onReset} disabled={running}>Reset settings</button>
     </div>
   </aside>
   <section class="collection-runner-main">
@@ -242,6 +250,8 @@
         {/if}
         {#if running}
           <button class="btn btn-secondary btn-danger" type="button" onclick={onStop}>Stop</button>
+        {:else if preflighting}
+          <button class="btn btn-secondary" type="button" onclick={onStop}><BirdSpinner size="1rem" label="Checking linked secrets" /> Cancel check</button>
         {:else}
           <button class="btn btn-primary runner-run-btn" type="button" onclick={onRun} disabled={!selectedCount || !collections.length}>
             <svg width="0.75rem" height="0.75rem" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l11-7z"/></svg>
@@ -250,6 +260,27 @@
         {/if}
       </div>
     </header>
+    {#if preflightFailures.length}
+      <section class="runner-preflight-alert" role="alert" aria-label="Linked secret preflight errors">
+        <div class="runner-preflight-heading">
+          <strong>Run stopped before sending requests</strong>
+          <button class="btn btn-ghost btn-icon" type="button" aria-label="Dismiss linked secret errors" onclick={onDismissPreflightFailures}>×</button>
+        </div>
+        <p>Resolve the linked secrets below, then run the collection again.</p>
+        <ul>
+          {#each preflightFailures as item (item.requestId + item.name)}
+            <li>
+              <strong>{item.name}</strong>
+              <ul>
+                {#each item.failures as failure (failure.provider + failure.path + failure.field + failure.kind)}
+                  <li>{failure.provider ? `${failure.provider}:${failure.path}${failure.field ? `#${failure.field}` : ''}` : 'Preflight'} — {failure.message}</li>
+                {/each}
+              </ul>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
     <div class="runner-page-body" bind:this={pageBody}>
     {#if hasResults}
       {@const verdict = running ? 'running' : summary.allPassed ? 'pass' : summary.failed > 0 ? 'fail' : 'stopped'}

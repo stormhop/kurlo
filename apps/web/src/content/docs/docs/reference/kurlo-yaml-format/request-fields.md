@@ -7,7 +7,7 @@ title: "Request fields"
 | `requestType` | `http`, `graphql`, `ws`, `socketio`, `grpc`, `mcp`, or `ai` |
 | `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, or `SSE` |
 | `folderPath` | Display names only. Request files are stored flat; `folderPath` is the UI source of truth. |
-| `params`, `pathParams`, `vars`, `postResponseVars`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. A row with `secret: true` keeps its value in the encrypted local store, with a `{{kurloSecret:...}}` placeholder in the file. |
+| `params`, `pathParams`, `vars`, `postResponseVars`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. An omitted `enabled` means true. Disabled rows keep `enabled: false`. An omitted `description` means an empty string. A row with `secret: true` keeps its value in the encrypted local store, with a `{{kurloSecret:...}}` placeholder in the file. |
 | `vars` | [Request variables](/docs/guides/environments/request-variables/) set before the send, as rows. They win over environment, collection and global values. Omitted when empty. |
 | `postResponseVars` | Post-response variables, as rows whose `value` is a JavaScript expression over `res`, such as `res.body.token`. HTTP and GraphQL only. Omitted when empty. |
 | `pathParams` | Values of the `:name` path variables in `url`. The names come from the URL; a row whose name the URL no longer has is dropped. |
@@ -25,7 +25,6 @@ title: "Request fields"
 | `aiConnectionId` | With `aiProvider: kurlo`, the id of the AI connection from Settings → AI to use; omitted for the default connection. |
 | `bodyType` | `none`, `json`, `text`, `xml`, `html`, `form`, `urlencoded`, `binary`, or `graphql`. |
 | `rawBodyType` | `text`, `json`, `html`, or `xml`. |
-| `preRequestScript`, `testScript` | Legacy Tengo scripts. |
 | `preRequestScriptJs`, `testScriptJs` | JavaScript pre-request/test scripts. |
 | `assertions` | HTTP and GraphQL only. A list of [assertions](/docs/guides/scripting/assertions/), each with `enabled`, `target` (`status`, `responseTime`, `size`, `header.<Name>`, `body`, `body.<path>` or `$.<path>`), `operator` (`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `contains`, `notContains`, `matches`, `exists`, `notExists`, `type`, `length`) and `value`, a string. Rows without a target are dropped on save. |
 | `auth.type` | `inherit`, `none`, `bearer`, `basic`, `apikey`, `jwt`, `oauth1`, `oauth2`, `aws`, `digest`, or `ntlm`. NTLM uses `basicUser` and `basicPass`. |

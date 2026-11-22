@@ -43,16 +43,43 @@
             { "type": "string" }
           ]
         },
-        "enabled": { "type": "boolean" },
+        "enabled": { "type": "boolean", "default": true },
         "key": { "type": "string" },
         "value": {
           "type": "string",
           "description": "May be a kurlo secret placeholder such as {{kurloSecret:request:req-main:auth:bearerToken}}."
         },
-        "description": { "type": "string" },
+        "description": { "type": "string", "default": "" },
         "isFile": { "type": "boolean" },
         "fileName": { "type": "string" },
-        "secret": { "type": "boolean" }
+        "contentType": { "type": "string" },
+        "secret": { "type": "boolean" },
+        "secretRef": { "$ref": "#/definitions/secretRef" }
+      }
+    },
+    "secretRef": {
+      "type": "object",
+      "description": "Links an environment variable to a secret provider. The value is fetched when a request is sent and is never written to YAML.",
+      "additionalProperties": false,
+      "required": ["provider", "path"],
+      "properties": {
+        "provider": { "type": "string", "description": "The id of an entry in secretProviders of workspace.yml." },
+        "path": { "type": "string", "description": "Where the secret lives: secret/data/app for Vault, op://Vault/Item for 1Password, a secret name or ARN for AWS, a variable name for env." },
+        "field": { "type": "string", "description": "A key inside the secret. Leave it out when the secret holds one value." },
+        "version": { "type": "string", "description": "A secret version. Leave it out for the latest one." }
+      }
+    },
+    "secretSource": {
+      "type": "object",
+      "description": "Imports every key of one secret as an environment variable. Values are fetched when a request is sent and are never written to YAML.",
+      "additionalProperties": false,
+      "required": ["provider", "path"],
+      "properties": {
+        "provider": { "type": "string", "description": "The id of an entry in secretProviders of workspace.yml." },
+        "path": { "type": "string", "description": "A secret with several keys: a Vault KV secret, a 1Password item, or a JSON secret in AWS." },
+        "version": { "type": "string", "description": "A secret version. Leave it out for the latest one." },
+        "prefix": { "type": "string", "description": "Text added before each key to form the variable name." },
+        "keys": { "type": "array", "items": { "type": "string" }, "description": "Only these keys become variables. Leave it out to import every key." }
       }
     },
     "auth": {
@@ -73,6 +100,15 @@
         "oauth2AuthURL": { "type": "string" },
         "oauth2TokenURL": { "type": "string" },
         "oauth2ClientID": { "type": "string" },
+        "oauth2DeviceAuthURL": { "type": "string" },
+        "oauth2Audience": { "type": "string" },
+        "oauth2Username": { "type": "string" },
+        "oauth2Password": { "type": "string" },
+        "oauth2ClientAuth": { "type": "string", "enum": ["body", "basic", "client_secret_jwt", "private_key_jwt"] },
+        "oauth2AssertionAlgorithm": { "type": "string" },
+        "oauth2AssertionPrivateKey": { "type": "string" },
+        "oauth2AssertionKeyID": { "type": "string" },
+        "oauth2AssertionAudience": { "type": "string" },
         "oauth2Secret": { "type": "string" },
         "oauth2Scope": { "type": "string" },
         "oauth2Token": { "type": "string" },
@@ -80,6 +116,7 @@
         "oauth2TokenExpiry": { "type": "number", "minimum": 0 },
         "oauth2UsePKCE": { "type": "boolean" },
         "awsAccessKey": { "type": "string" },
+        "awsSessionToken": { "type": "string" },
         "awsSecretKey": { "type": "string" },
         "awsRegion": { "type": "string" },
         "awsService": { "type": "string" },
@@ -124,6 +161,11 @@
         "disableCookieJar": { "type": "boolean" },
         "maxRedirects": { "type": "integer", "minimum": 0 },
         "timeoutMs": { "type": "integer", "minimum": 0 },
+        "scriptTimeoutMs": { "type": "integer", "minimum": 0 },
+        "allowSendRequest": { "type": "boolean" },
+        "wsKeepAliveIntervalMs": { "type": "integer", "minimum": 0 },
+        "sseDisableReconnect": { "type": "boolean" },
+        "sseReconnectIntervalMs": { "type": "integer", "minimum": 0 },
         "proxyUrl": { "type": "string" },
         "clientCertPath": { "type": "string" },
         "clientKeyPath": { "type": "string" },
@@ -187,6 +229,50 @@
         "description": { "type": "string" }
       }
     },
+    "secretProvider": {
+      "type": "object",
+      "description": "A connection to a secret store. It holds no credentials: tokens come from the environment or are saved on each device.",
+      "additionalProperties": true,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+        "type": { "type": "string", "enum": ["vault", "1password", "aws-secrets-manager", "aws-ssm", "gcp-secret-manager", "azure-key-vault", "bitwarden", "doppler", "infisical", "command", "env"] },
+        "name": { "type": "string" },
+        "address": { "type": "string", "description": "Vault server URL, Azure Key Vault URL, or a self-hosted Bitwarden, Doppler or Infisical server." },
+        "namespace": { "type": "string", "description": "Vault Enterprise or HCP namespace." },
+        "caCert": { "type": "string", "description": "Path to a PEM file with a private certificate authority." },
+        "skipTlsVerify": { "type": "boolean" },
+        "account": { "type": "string", "description": "1Password account to use when several are signed in, for example my.1password.com." },
+        "region": { "type": "string", "description": "AWS region, for example eu-central-1." },
+        "profile": { "type": "string", "description": "AWS profile from ~/.aws/config. SSO profiles need the AWS CLI." },
+        "endpoint": { "type": "string", "description": "Custom AWS or Google Cloud endpoint, for example a VPC endpoint or LocalStack." },
+        "project": { "type": "string", "description": "Google Cloud project id, or Infisical project id." },
+        "roleArn": { "type": "string", "pattern": "^arn:aws[a-z-]*:iam::[0-9]{12}:role/.+$", "description": "AWS role that Kurlo assumes with the base credentials." },
+        "externalId": { "type": "string", "minLength": 2, "maxLength": 1224, "description": "External ID for the AWS role, if its trust policy asks for one." },
+        "mfaSerial": { "type": "string", "description": "AWS MFA device ARN or serial. Kurlo asks for a code, or reads AWS_MFA_CODE in the CLI." },
+        "command": {
+          "oneOf": [{ "type": "array", "items": { "type": "string" }, "minItems": 1 }, { "type": "string" }],
+          "description": "For type command: the program and its arguments. {path} and {version} are replaced; without {path} the path is added as the last argument. Runs without a shell."
+        },
+        "cacheTtl": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "How long fetched values stay in memory: 30s, 5m, 0 or session, up to 24h. Defaults to 5m." },
+        "timeout": { "oneOf": [{ "type": "string" }, { "type": "integer" }], "description": "Timeout of one call to the provider, from 1s to 10m. Defaults to 10s." },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "method": { "type": "string", "enum": ["token", "approle", "kubernetes", "oidc", "ldap", "userpass", "cli", "client-secret", "universal"] },
+            "roleId": { "type": "string", "description": "Vault AppRole role ID." },
+            "role": { "type": "string", "description": "Vault role for kubernetes or oidc auth." },
+            "mount": { "type": "string", "description": "Vault auth mount. Defaults to the method name." },
+            "username": { "type": "string", "description": "Vault ldap or userpass user name. Leave it out so each person saves their own on the device or sets VAULT_USERNAME." },
+            "tokenPath": { "type": "string", "description": "Service account token file for Vault kubernetes auth." },
+            "redirectUri": { "type": "string", "description": "Loopback redirect for Vault OIDC. Defaults to http://localhost:8250/oidc/callback." },
+            "tenantId": { "type": "string", "description": "Azure tenant id." },
+            "clientId": { "type": "string", "description": "Azure application (client) id, or Infisical machine identity client id." }
+          }
+        }
+      }
+    },
     "collection": {
       "type": "object",
       "additionalProperties": true,
@@ -244,8 +330,6 @@
           "items": { "$ref": "#/definitions/kvRow" }
         },
         "auth": { "$ref": "#/definitions/auth" },
-        "preRequestScript": { "type": "string" },
-        "testScript": { "type": "string" },
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },
         "settings": { "$ref": "#/definitions/requestSettings" }
@@ -270,7 +354,7 @@
         },
         "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "SSE"] },
         "url": { "type": "string" },
-        "requestTab": { "type": "string", "enum": ["docs", "params", "query", "auth", "headers", "vars", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
+        "requestTab": { "type": "string", "description": "Legacy editor section. Kurlo remembers the selection locally for each request.", "enum": ["docs", "params", "query", "auth", "headers", "vars", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
         "params": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
@@ -302,13 +386,23 @@
           "items": { "$ref": "#/definitions/kvRow" }
         },
         "graphqlSchema": { "type": "string" },
-        "preRequestScript": { "type": "string" },
-        "testScript": { "type": "string" },
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },
         "requestNotes": { "type": "string" },
         "openapi": { "type": "string", "description": "OpenAPI operation this request is linked to, as METHOD /path/{template}." },
         "settings": { "$ref": "#/definitions/requestSettings" },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "enabled": { "type": "boolean" },
+              "target": { "type": "string" },
+              "operator": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        },
         "settingsOverrides": {
           "type": "object",
           "additionalProperties": { "type": "boolean" }
@@ -378,6 +472,11 @@
         "values": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
+        },
+        "secretSources": {
+          "type": "array",
+          "description": "Secrets whose keys all become variables of this environment. A variable row with the same name wins.",
+          "items": { "$ref": "#/definitions/secretSource" }
         }
       }
     },
@@ -419,6 +518,11 @@
               "path": { "type": "string" }
             }
           }
+        },
+        "secretProviders": {
+          "type": "array",
+          "description": "Secret providers that environment variables can link to with secretRef.",
+          "items": { "$ref": "#/definitions/secretProvider" }
         }
       }
     },

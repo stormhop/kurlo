@@ -239,6 +239,10 @@
   justify-self: start;
 }
 
+.client-cert-row > .file-field {
+  grid-column: 2 / 4;
+}
+
 .client-cert-label {
   color: var(--text-2);
   font-size: var(--text-label);
@@ -346,8 +350,14 @@
   max-width: max(100%, min(30rem, calc(100vw - 2rem)));
   overflow-y: auto;
 }
-.app-select-menu:has(> input[type='search']) {
+.app-select-menu:not(.app-select-menu-floating):has(> input[type='search']) {
   min-width: max(100%, 15rem);
+}
+.app-select-menu.app-select-menu-floating {
+  position: fixed;
+  min-width: 0;
+  max-width: 30rem;
+  max-height: 20rem;
 }
 .app-select-menu > input[type='search'] {
   position: sticky;
@@ -458,23 +468,189 @@
 }
 
 .binary-body {
-  padding: var(--space-5) var(--space-4);
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--space-4);
 }
 
-.binary-file-info {
-  display: inline-flex;
+.file-panel {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-panel:not(.file-panel-empty) {
+  align-items: flex-start;
+}
+
+.file-drop {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-2-5);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--elevated);
-  font-size: var(--text-label);
-  color: var(--text);
+  justify-content: center;
+  gap: var(--space-1-5);
+  padding: var(--space-4) var(--space-6);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-xl);
+  color: var(--text-3);
+  text-align: center;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
 }
 
-.btn-file-pick {
-  display: inline-flex;
+.file-drop.wails-drop-target-active,
+.file-card.wails-drop-target-active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.file-drop-icon {
+  color: var(--text-3);
+}
+
+.file-drop strong {
+  color: var(--text);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+}
+
+.file-drop p {
+  margin: 0;
+  max-width: 32.5rem;
+  font-size: var(--text-label);
+  line-height: var(--leading-normal);
+}
+
+.file-drop .btn {
+  margin-top: var(--space-1);
+}
+
+.file-drop .file-drop-hint {
+  margin-top: var(--space-1);
+  font-size: var(--text-caption);
+}
+
+.file-card {
+  display: grid;
+  gap: var(--space-2-5);
+  width: 100%;
+  max-width: 45rem;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--elevated);
+}
+
+.file-card-missing {
+  border-color: var(--danger-border);
+}
+
+.file-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.file-card-icon {
+  flex: none;
+  color: var(--text-3);
+}
+
+.file-card-missing .file-card-icon {
+  color: var(--danger);
+}
+
+.file-card-copy {
+  display: grid;
+  flex: 1;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.file-card-name {
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-card-meta,
+.file-field-meta {
+  color: var(--text-3);
+  font-size: var(--text-caption);
+}
+
+.file-card-error {
+  color: var(--danger);
+}
+
+.file-card-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.file-card-note {
+  margin: 0;
+  color: var(--text-3);
+  font-size: var(--text-caption);
+  line-height: var(--leading-normal);
+}
+
+.file-card-type {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: var(--text-caption);
+}
+
+.file-card-type code {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}
+
+.file-field {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.file-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.file-field-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-field-row > .btn {
+  flex: none;
+}
+
+.file-card .variable-input-wrap,
+.file-field .variable-input-wrap {
+  min-width: 0;
+}
+
+.file-field-clear-slot {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.file-path-input {
+  width: 100%;
+  font-size: var(--text-code);
 }
 
 .kv-file-cell {

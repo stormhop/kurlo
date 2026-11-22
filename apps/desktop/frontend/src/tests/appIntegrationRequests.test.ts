@@ -98,7 +98,7 @@ describe('creating a request', () => {
     expect(selectDialog).not.toHaveBeenCalled();
   });
 
-  it('lets a saved request change protocol until it has a URL', async () => {
+  it('changes the protocol of a saved request with a URL and preserves its identity', async () => {
     backend.state.savedStores = [];
     const app = new TestApp() as TestApp & Record<string, any>;
 
@@ -119,11 +119,17 @@ describe('creating a request', () => {
     expect(app.requestTab).toBe('query');
 
     app.url = 'https://api.example.test/graphql';
-    expect(app.requestTypeEditable).toBe(false);
     await app.saveActiveRequest();
+    const id = app.activeRequestId;
+    app.inFlightRequestIds.add(id);
+    expect(app.requestTypeEditable).toBe(false);
     app.selectRequestType('http');
     expect(app.requestType).toBe('graphql');
-    expect(app.requests.find(req => req.id === app.activeRequestId)?.requestType).toBe('graphql');
+    app.inFlightRequestIds.delete(id);
+    expect(app.requestTypeEditable).toBe(true);
+    app.selectRequestType('http');
+    await app.saveActiveRequest();
+    expect(app.requestsById.get(id)).toMatchObject({ requestType: 'http', url: 'https://api.example.test/graphql', name: 'Schema' });
   });
 });
 

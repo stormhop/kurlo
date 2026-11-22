@@ -7,7 +7,7 @@ A new request always starts as HTTP — the `+` in the tab bar, `Cmd/Ctrl N`, an
 
 ![Method and protocol picker in the address bar](../../../../../assets/screenshots/request-protocol-picker.png)
 
-The picker holds both decisions: the HTTP methods on the left, the other protocols on the right. A draft can switch protocol at any time — pick `POST` on a GraphQL draft and it becomes an HTTP request. A saved request can switch until it has a URL; after that its protocol is fixed, the picker still changes an HTTP request's method, and a request of any other type shows its protocol without a menu.
+The address bar lists HTTP methods on the left and other protocols on the right. You can change a draft or a saved request, including one with a URL. For example, choosing `POST` on a GraphQL request switches it to HTTP. Stop an active request or disconnect its session before changing protocols. In **File**, the picker updates the open YAML draft.
 
 ## At a glance
 

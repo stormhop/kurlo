@@ -10,6 +10,8 @@
   import GitAuthModal from './GitAuthModal.svelte';
   import FindReplaceModal from './FindReplaceModal.svelte';
   import MissingSecretsModal from './MissingSecretsModal.svelte';
+  import { openAddSecretProvider, openSecretProviders } from '../secretProvidersNav';
+  import { checkAllSecretProviders, clearSecretValues } from '../stores/secretProviders.svelte';
   import OpenApiReviewModal from './OpenApiReviewModal.svelte';
 
   $effect(() => {
@@ -74,6 +76,10 @@
     openMockServer: () => vm.openMockServerTab(),
     openGit: () => vm.openGitTab(),
     openCookies: () => vm.openCookieJar(),
+    openSecretProviders: () => openSecretProviders(),
+    addSecretProvider: () => openAddSecretProvider(),
+    refreshSecrets: async () => { await clearSecretValues(); await checkAllSecretProviders(); },
+    clearSecretCache: () => clearSecretValues(),
     openSettings: (tab) => vm.openSettings(tab),
     runShortcut: (id) => vm.runShortcut(id),
     createRequest: (type) => vm.createNewRequest(undefined, type),
@@ -146,8 +152,6 @@
       setPreviewTabs={vm.setPreviewTabs}
       startupView={vm.startupView}
       setStartupView={vm.setStartupView}
-      scriptEngine={vm.scriptEngine}
-      setScriptEngine={vm.setScriptEngine}
       shortcutGroups={vm.shortcutGroups}
       shortcutCombo={vm.shortcutCombo}
       startShortcutCapture={vm.startShortcutCapture}

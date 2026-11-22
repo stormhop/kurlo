@@ -1,3 +1,4 @@
+import { loadRunKey } from '../../loadTests';
 import {
   k6Info,
   lastLoadRun,
@@ -27,6 +28,7 @@ export function isLoopbackHost(host: string): boolean {
 
 type LoadRunHost = {
   activeLoadTestId: string;
+  activeLoadTestCollectionId: string;
   collections: Collection[];
   environments: Environment[];
   k6Path: string;
@@ -34,7 +36,7 @@ type LoadRunHost = {
   k6MissingOpen: boolean;
   loadRun: LoadRunState;
   loadRunLogLines: string[];
-  loadRunLogTestId: string;
+  loadRunLogKey: string;
   loadRunResults: Record<string, LoadRunResult>;
   loadTestTab: LoadTestTab;
   loadTestExportRequestId: string;
@@ -48,7 +50,7 @@ type LoadRunHost = {
   loadTestEnvironment: (collection: Collection, test: LoadTest) => Environment | undefined;
   loadTestPayload: (collectionId: string, test: LoadTest) => string | null;
   checkK6: () => Promise<K6Info>;
-  loadLastLoadRun: (loadTestId: string) => Promise<void>;
+  loadLastLoadRun: (collectionId: string, loadTestId: string) => Promise<void>;
   confirmLoadTargets: (collection: Collection, test: LoadTest, payload: string) => Promise<boolean>;
 };
 
@@ -61,7 +63,7 @@ export const loadRunFeature = {
     }
     void loadRunStatus().then(state => {
       this.loadRun = state;
-      if (state.running) this.loadRunLogTestId = state.loadTestId;
+      if (state.running) this.loadRunLogKey = loadRunKey(state.collectionId, state.loadTestId);
     });
     let receivedLogs = false;
     let pending: string[] = [];
@@ -83,13 +85,13 @@ export const loadRunFeature = {
     });
     if (!window.runtime?.EventsOn) return;
     listenRuntime<LoadRunState>('load:progress', state => {
-      if (state.running && state.loadTestId !== this.loadRunLogTestId) {
+      if (state.running && loadRunKey(state.collectionId, state.loadTestId) !== this.loadRunLogKey) {
         if (timer !== undefined) clearTimeout(timer);
         timer = undefined;
         pending = [];
         receivedLogs = true;
         this.loadRunLogLines = [];
-        this.loadRunLogTestId = state.loadTestId;
+        this.loadRunLogKey = loadRunKey(state.collectionId, state.loadTestId);
       }
       this.loadRun = state;
     });
@@ -97,7 +99,7 @@ export const loadRunFeature = {
     listenRuntime<string[]>('load:logs', lines => enqueue(lines));
     listenRuntime<LoadRunResult>('load:done', result => {
       flush();
-      this.loadRunResults = { ...this.loadRunResults, [result.loadTestId]: result };
+      this.loadRunResults = { ...this.loadRunResults, [loadRunKey(result.collectionId, result.loadTestId)]: result };
     });
   },
 
@@ -119,11 +121,12 @@ export const loadRunFeature = {
     await this.checkK6();
   },
 
-  async loadLastLoadRun(this: LoadRunHost, loadTestId: string) {
-    if (!loadTestId || this.loadRunResults[loadTestId] || requestedLastRuns.has(loadTestId)) return;
-    requestedLastRuns.add(loadTestId);
-    const result = await lastLoadRun(loadTestId);
-    if (result) this.loadRunResults = { ...this.loadRunResults, [loadTestId]: result };
+  async loadLastLoadRun(this: LoadRunHost, collectionId: string, loadTestId: string) {
+    const key = loadRunKey(collectionId, loadTestId);
+    if (!loadTestId || this.loadRunResults[key] || requestedLastRuns.has(key)) return;
+    requestedLastRuns.add(key);
+    const result = await lastLoadRun(collectionId, loadTestId);
+    if (result && !this.loadRunResults[key]) this.loadRunResults = { ...this.loadRunResults, [key]: result };
   },
 
   async confirmLoadTargets(this: LoadRunHost, collection: Collection, test: LoadTest, payload: string): Promise<boolean> {
@@ -165,7 +168,7 @@ export const loadRunFeature = {
     this.k6MissingOpen = false;
     if (!await this.confirmLoadTargets(collection, test, payload)) return;
     this.loadRunLogLines = [];
-    this.loadRunLogTestId = test.id;
+    this.loadRunLogKey = loadRunKey(collectionId, test.id);
     this.loadTestTab = 'results';
     const state = await startLoadRun(payload, this.k6Path);
     if (state.error) {
@@ -179,13 +182,13 @@ export const loadRunFeature = {
     const test = this.collections.find(candidate => candidate.id === collectionId)?.loadTests?.find(candidate => candidate.id === loadTestId);
     if (!test) return;
     await this.openLoadTest(collectionId, loadTestId);
-    if (this.activeLoadTestId !== loadTestId) return;
+    if (this.activeLoadTestId !== loadTestId || this.activeLoadTestCollectionId !== collectionId) return;
     await this.runLoadTest(collectionId, test);
   },
 
   async exportSavedLoadTest(this: LoadRunHost, collectionId: string, loadTestId: string) {
     await this.openLoadTest(collectionId, loadTestId);
-    if (this.activeLoadTestId !== loadTestId) return;
+    if (this.activeLoadTestId !== loadTestId || this.activeLoadTestCollectionId !== collectionId) return;
     this.loadTestExportRequestId = loadTestId;
   },
 
@@ -194,13 +197,13 @@ export const loadRunFeature = {
     this.loadRun = { ...(await stopLoadRun()), stopping: true };
   },
 
-  async openLoadTestReport(this: LoadRunHost, loadTestId: string) {
-    const message = await openLoadRunReport(loadTestId);
+  async openLoadTestReport(this: LoadRunHost, collectionId: string, loadTestId: string) {
+    const message = await openLoadRunReport(collectionId, loadTestId);
     if (message) await this.openAlertDialog('HTML report', message);
   },
 
-  async saveLoadTestSummary(this: LoadRunHost, loadTestId: string, fileName: string) {
-    const summary = await loadRunSummaryJSON(loadTestId);
+  async saveLoadTestSummary(this: LoadRunHost, collectionId: string, loadTestId: string, fileName: string) {
+    const summary = await loadRunSummaryJSON(collectionId, loadTestId);
     if (!summary) {
       await this.openAlertDialog('k6 summary', 'This run has no k6 summary.');
       return;

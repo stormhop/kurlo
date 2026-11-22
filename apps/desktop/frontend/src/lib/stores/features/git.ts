@@ -170,6 +170,7 @@ export type GitAuthChoice =
 export type GitAuthRequest = { host: string; scheme: string; tokenRejected: boolean; defaultUsername: string };
 
 type GitHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   gitWorkspaceOpen: boolean;
   gitStatus: GitWorkspaceStatus;
   gitDiff: GitDiffResult;
@@ -206,7 +207,7 @@ type GitHost = {
   cancelPendingPersistTimers: () => void;
   guardGitWorkspaceMutable: (action?: string) => boolean;
   collectionImportToast: string;
-  beginGitMutation: (action: string, options?: { guard?: boolean; refreshStatus?: boolean }) => Promise<boolean>;
+  beginGitMutation: (action: string, options?: { guard?: boolean; refreshStatus?: boolean; reviewFiles?: boolean }) => Promise<boolean>;
   refreshGitStatus: () => Promise<void>;
   refreshGitStatusAfterPersist: () => Promise<void>;
   selectGitFile: (path: string) => Promise<void>;
@@ -431,9 +432,10 @@ export const gitFeature = {
       if (this.gitAction === 'branches') this.gitAction = '';
     }
   },
-  async beginGitMutation(this: GitHost, action: string, options: { guard?: boolean; refreshStatus?: boolean } = {}) {
+  async beginGitMutation(this: GitHost, action: string, options: { guard?: boolean; refreshStatus?: boolean; reviewFiles?: boolean } = {}) {
     const { guard = true, refreshStatus = false } = options;
     if (guard && !this.guardGitWorkspaceMutable(action)) return false;
+    if (options.reviewFiles && this.requestFiles && !await this.requestFiles.review()) return false;
     await this.persistActiveRequestNow(true);
     if (refreshStatus) await this.refreshGitStatus();
     return true;
@@ -443,6 +445,7 @@ export const gitFeature = {
     await this.persistActiveRequestNow(true);
     const path = await openDirectoryDialog('Open Kurlo workspace repository');
     if (!path) return;
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'open';
     this.gitError = '';
@@ -481,6 +484,7 @@ export const gitFeature = {
     if (!initMode) return;
     const parentDir = await openDirectoryDialog(`Choose parent folder for ${directoryName}`, await this.defaultWorkspaceParentForDialogs());
     if (!parentDir) return;
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'clone';
     this.gitError = '';
@@ -615,7 +619,7 @@ export const gitFeature = {
     }
   },
   async pullGitWorkspace(this: GitHost, strategy = 'ff') {
-    await this.beginGitMutation('Pull', { guard: false });
+    if (!await this.beginGitMutation('Pull', { guard: false, reviewFiles: true })) return;
     let normalizedStrategy = normalizeGitPullStrategy(strategy);
     if (shouldPromptForDivergedPull(normalizedStrategy, this.gitStatus)) {
       const selected = await this.openSelectDialog(
@@ -681,7 +685,7 @@ export const gitFeature = {
       await this.pullGitWorkspace('ff');
       return;
     }
-    if (!await this.beginGitMutation('Branch pull')) return;
+    if (!await this.beginGitMutation('Branch pull', { reviewFiles: true })) return;
     this.gitLoading = true;
     this.gitAction = 'branch-pull';
     this.gitError = '';
@@ -700,6 +704,7 @@ export const gitFeature = {
   async resolveGitConflict(this: GitHost, resolution: string, path = this.gitSelectedPath, content = this.gitConflictContent) {
     path = path.trim();
     if (!path) return false;
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.cancelPendingPersistTimers();
     this.gitLoading = true;
     this.gitAction = `resolve-${resolution}`;
@@ -730,6 +735,7 @@ export const gitFeature = {
       if (!mergeMessage) return;
       message = mergeMessage;
     }
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.cancelPendingPersistTimers();
     this.gitLoading = true;
     this.gitAction = 'operation-continue';
@@ -760,6 +766,7 @@ export const gitFeature = {
       `Abort the current Git ${operation} and reload the workspace from the previous state?`
     );
     if (!confirmed) return;
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.cancelPendingPersistTimers();
     this.gitLoading = true;
     this.gitAction = 'operation-abort';
@@ -783,7 +790,7 @@ export const gitFeature = {
   },
   async stashGitWorkspace(this: GitHost) {
     if (!this.gitStatus.isRepo || this.gitStatus.operation) return;
-    if (!await this.beginGitMutation('Stash')) return;
+    if (!await this.beginGitMutation('Stash', { reviewFiles: true })) return;
     const message = await this.openPromptDialog('Stash Kurlo changes', 'Kurlo workspace changes', 'Only Kurlo-managed YAML files are stashed.');
     if (!message) return;
     this.gitLoading = true;
@@ -808,7 +815,7 @@ export const gitFeature = {
   },
   async popGitStash(this: GitHost, ref = this.gitStatus.stashes?.[0]?.ref ?? '') {
     if (!this.gitStatus.isRepo || this.gitStatus.operation) return;
-    if (!await this.beginGitMutation('Applying stash')) return;
+    if (!await this.beginGitMutation('Applying stash', { reviewFiles: true })) return;
     if (!ref) {
       this.gitError = 'No Git stashes to apply.';
       return;
@@ -904,7 +911,7 @@ export const gitFeature = {
   },
   async checkoutGitBranch(this: GitHost, branchName = '') {
     this.closeFloatingMenus();
-    if (!await this.beginGitMutation('Branch checkout', { refreshStatus: true })) return;
+    if (!await this.beginGitMutation('Branch checkout', { refreshStatus: true, reviewFiles: true })) return;
     if (!this.gitStatus.isRepo) {
       this.gitError = 'Open a Git repository first.';
       return;
@@ -953,7 +960,7 @@ export const gitFeature = {
   },
   async createGitBranch(this: GitHost, startPoint = '') {
     this.closeFloatingMenus();
-    if (!await this.beginGitMutation('Branch creation', { refreshStatus: true })) return;
+    if (!await this.beginGitMutation('Branch creation', { refreshStatus: true, reviewFiles: true })) return;
     if (!this.gitStatus.isRepo) {
       this.gitError = 'Open a Git repository first.';
       return;
@@ -986,7 +993,7 @@ export const gitFeature = {
   },
   async createGitBranchFromRemote(this: GitHost, startPoint = '') {
     this.closeFloatingMenus();
-    if (!await this.beginGitMutation('Branch tracking', { refreshStatus: true })) return;
+    if (!await this.beginGitMutation('Branch tracking', { refreshStatus: true, reviewFiles: true })) return;
     if (!this.gitStatus.isRepo) {
       this.gitError = 'Open a Git repository first.';
       return;
@@ -1166,6 +1173,7 @@ export const gitFeature = {
       `Discard local changes in "${path}" and reload the workspace? This cannot be undone.`
     );
     if (!confirmed) return;
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.cancelPendingPersistTimers();
     this.gitLoading = true;
     this.gitAction = 'discard-file';
@@ -1191,6 +1199,7 @@ export const gitFeature = {
       `Discard local changes in ${count} selected Kurlo file${count === 1 ? '' : 's'} and reload the workspace? This cannot be undone.`
     );
     if (!confirmed) return;
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.cancelPendingPersistTimers();
     this.gitLoading = true;
     this.gitAction = 'discard-selected';
@@ -1216,6 +1225,7 @@ export const gitFeature = {
       `Discard local Kurlo workspace changes and reload from the current commit? This affects Kurlo-managed files only and cannot be undone.`
     );
     if (!confirmed) return;
+    if (this.requestFiles && !await this.requestFiles.review()) return;
     this.cancelPendingPersistTimers();
     this.gitLoading = true;
     this.gitAction = 'discard-all';
@@ -1322,6 +1332,8 @@ export const gitFeature = {
           this.gitError = result.error || 'Push failed';
           return;
         }
+        this.gitAction = '';
+        if (this.requestFiles && !await this.requestFiles.review()) return;
         await this.pullThenPushGitWorkspace(strategy, remoteName);
         return;
       }

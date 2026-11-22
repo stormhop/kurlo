@@ -23,9 +23,53 @@ func marshalWorkspaceYAML(value any) ([]byte, error) {
 		return nil, err
 	}
 	if !bytes.ContainsRune(data, '\t') && !yamlBlockIndentIndicator.Match(data) {
+		if isRequestYAMLDocument(value) {
+			return canonicalizeRequestYAMLQuotes(data)
+		}
 		return data, nil
 	}
-	return yaml.Marshal(quoteUnsafeYAMLStrings(value))
+	data, err = yaml.Marshal(quoteUnsafeYAMLStrings(value))
+	if err != nil {
+		return nil, err
+	}
+	if isRequestYAMLDocument(value) {
+		return canonicalizeRequestYAMLQuotes(data)
+	}
+	return data, nil
+}
+
+func isRequestYAMLDocument(value any) bool {
+	switch value.(type) {
+	case filesystemRequestFile, *filesystemRequestFile:
+		return true
+	}
+	return false
+}
+
+func canonicalizeRequestYAMLQuotes(data []byte) ([]byte, error) {
+	if !bytes.ContainsRune(data, '\'') {
+		return data, nil
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	if !doubleQuoteSingleQuotedStrings(&doc) {
+		return data, nil
+	}
+	return yaml.Marshal(&doc)
+}
+
+func doubleQuoteSingleQuotedStrings(node *yaml.Node) bool {
+	changed := false
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!str" && node.Style&yaml.SingleQuotedStyle != 0 {
+		node.Style = yaml.DoubleQuotedStyle | node.Style&yaml.TaggedStyle
+		changed = true
+	}
+	for _, child := range node.Content {
+		changed = doubleQuoteSingleQuotedStrings(child) || changed
+	}
+	return changed
 }
 
 func blockScalarUnsafe(value string) bool {

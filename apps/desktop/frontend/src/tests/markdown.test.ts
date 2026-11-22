@@ -10,6 +10,16 @@ describe('markdown', () => {
     ]);
   });
 
+  it('keeps typed line breaks when asked, without touching code blocks', () => {
+    expect(parseMarkdown('First line\nsecond line\n\n```\na\nb\n```', { breaks: true })).toEqual([
+      { type: 'paragraph', children: [{ type: 'text', text: 'First line' }, { type: 'break' }, { type: 'text', text: 'second line' }] },
+      { type: 'code', lang: '', text: 'a\nb' },
+    ]);
+    expect(parseMarkdown('First line\nsecond line')).toEqual([
+      { type: 'paragraph', children: [{ type: 'text', text: 'First line second line' }] },
+    ]);
+  });
+
   it('keeps fenced code verbatim, with its language', () => {
     expect(parseMarkdown('```json\n{"a": **1**}\n  <b>\n```')).toEqual([{ type: 'code', lang: 'json', text: '{"a": **1**}\n  <b>' }]);
     expect(parseMarkdown('```\nunclosed')).toEqual([{ type: 'code', lang: '', text: 'unclosed' }]);

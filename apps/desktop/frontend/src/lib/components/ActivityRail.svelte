@@ -37,6 +37,7 @@
     sidebarHidden = false;
   }
 
+  let railViewOpen = $derived(topView === 'runner' || topView === 'mock');
   let sidebarActive = (view: SidebarView) => !sidebarHidden && sidebarView === view;
 </script>
 
@@ -44,22 +45,22 @@
   <div class="activity-rail-titlebar titlebar-drag-region"></div>
 
   <div class="activity-rail-group">
-    <button class="activity-rail-btn" class:active={sidebarActive('collections')} type="button" aria-label="Collections" aria-pressed={sidebarActive('collections')} onclick={() => showSidebarView('collections')} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('collections') && !railViewOpen} class:panel-open={sidebarActive('collections') && railViewOpen} type="button" aria-label="Collections" aria-pressed={sidebarActive('collections')} onclick={() => showSidebarView('collections')} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="m3 13 9 5 9-5"/>
       </svg>
     </button>
-    <button class="activity-rail-btn" class:active={sidebarActive('environments')} type="button" aria-label="Environments" aria-pressed={sidebarActive('environments')} onclick={() => showSidebarView('environments')} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('environments') && !railViewOpen} class:panel-open={sidebarActive('environments') && railViewOpen} type="button" aria-label="Environments" aria-pressed={sidebarActive('environments')} onclick={() => showSidebarView('environments')} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>
       </svg>
     </button>
-    <button class="activity-rail-btn" class:active={sidebarActive('history')} type="button" aria-label="History" aria-pressed={sidebarActive('history')} onclick={() => showSidebarView('history')} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('history') && !railViewOpen} class:panel-open={sidebarActive('history') && railViewOpen} type="button" aria-label="History" aria-pressed={sidebarActive('history')} onclick={() => showSidebarView('history')} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
       </svg>
     </button>
-    <button class="activity-rail-btn" class:active={sidebarActive('agent')} type="button" aria-label="Agent" aria-pressed={sidebarActive('agent')} onclick={() => { showSidebarView('agent'); openAgent(); }} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('agent') && !railViewOpen} class:panel-open={sidebarActive('agent') && railViewOpen} type="button" aria-label="Agent" aria-pressed={sidebarActive('agent')} onclick={() => { showSidebarView('agent'); openAgent(); }} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M12 3.5 13.6 8a2 2 0 0 0 1.4 1.4l4.5 1.6-4.5 1.6a2 2 0 0 0-1.4 1.4L12 18.5 10.4 14A2 2 0 0 0 9 12.6L4.5 11 9 9.4A2 2 0 0 0 10.4 8z"/><path d="M18.5 3v3M17 4.5h3"/>
       </svg>
@@ -89,7 +90,7 @@
   <div class="activity-rail-spacer"></div>
 
   <div class="activity-rail-group">
-    <button class="activity-rail-btn" class:active={sidebarActive('cookies')} type="button" aria-label="Cookies" aria-pressed={sidebarActive('cookies')} onclick={() => openCookieJar()} disabled={workspaceBlocked}>
+    <button class="activity-rail-btn" class:active={sidebarActive('cookies') && !railViewOpen} class:panel-open={sidebarActive('cookies') && railViewOpen} type="button" aria-label="Cookies" aria-pressed={sidebarActive('cookies')} onclick={() => openCookieJar()} disabled={workspaceBlocked}>
       <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M20.6 13.1A8.5 8.5 0 1 1 10.9 3.4a3 3 0 0 0 3.9 3.9 3 3 0 0 0 3.9 3.9 3 3 0 0 0 1.9 1.9z"/><path d="M8.2 9h.01M11.5 14.2h.01M7.4 16.2h.01M14.8 11.7h.01" stroke-width="2.6"/>
       </svg>
@@ -194,6 +195,9 @@
   .activity-rail-btn.active {
     background: var(--elevated);
     color: var(--text);
+  }
+  .activity-rail-btn.panel-open {
+    color: var(--text-2);
   }
   .activity-rail-btn.active::before {
     content: '';

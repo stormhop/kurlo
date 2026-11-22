@@ -31,6 +31,8 @@ function downloadFilenameFromUrl(url: string): string {
 }
 
 type RequestExecutionHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
+  collectionImportToast: string;
   activeRequestId: string;
   switchRequest: (id: string) => Promise<void>;
   topView: string;
@@ -125,6 +127,10 @@ export const requestExecutionFeature = {
 
   async runActiveRequest(this: RequestExecutionHost) {
     if (!this.guardWorkspaceWritable('Sending requests')) return;
+    if (this.requestFiles?.active?.dirty && !this.loading && !this.sseSessionIsActive() && !this.webSocketConnected && !this.webSocketConnecting && !this.socketIOConnected && !this.socketIOConnecting) {
+      this.collectionImportToast = 'Save or revert your YAML edits before running this request.';
+      return;
+    }
     if (this.requestType === 'ws') {
       if (this.webSocketConnected || this.webSocketConnecting) await this.webSocketDisconnect();
       else await this.webSocketConnect();
@@ -163,6 +169,10 @@ export const requestExecutionFeature = {
 
   async runActiveRequestAndDownload(this: RequestExecutionHost) {
     if (this.requestType !== 'http' || this.method === 'SSE' || this.sseSessionIsActive()) return;
+    if (this.requestFiles?.active?.dirty) {
+      this.collectionImportToast = 'Save or revert your YAML edits before running this request.';
+      return;
+    }
     await this.send({ downloadName: downloadFilenameFromUrl(this.url) });
   },
 

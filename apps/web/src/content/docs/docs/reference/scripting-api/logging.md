@@ -16,16 +16,4 @@ Each script keeps its first 200 log lines; when it prints more, the last line sa
 
 ## Engine notes
 
-- JavaScript is the default engine for new requests and Postman-style scripts.
-- Tengo is kept for older requests and teams that already wrote Tengo snippets.
-- Both engines use the same variable/environment mutation contract.
-- Both engines block module imports and host APIs; only the [bundled `require` stand-ins](/docs/reference/scripting-api/compatibility/#require) resolve. Use `pm.sendRequest`, Kurlo requests, and the Collection Runner for chained HTTP calls.
-
-```js
-// blocked in JavaScript
-require("fs")
-import("node:fs")
-
-// blocked in Tengo
-json := import("json")
-```
+The JavaScript sandbox blocks module imports and host APIs. It supports [bundled `require` stand-ins](/docs/reference/scripting-api/compatibility/#require) and routes HTTP calls through [`pm.sendRequest`](/docs/reference/scripting-api/send-request/) when enabled for the request.

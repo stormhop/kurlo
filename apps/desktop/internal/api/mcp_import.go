@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -149,7 +151,11 @@ func decodeWorkspaceImport(content, format, name string, sourceURL ...string) (w
 	case "openapi", "swagger":
 		return importOpenAPI(doc, defaultString(name, "OpenAPI import"), sourceURL...)
 	case "postman":
-		return importPostman(doc, defaultString(name, "Postman import"))
+		bundle, err := importPostman(doc, defaultString(name, "Postman import"))
+		if names := postmanVaultReferences(content); err == nil && len(names) > 0 {
+			bundle.warnings = append(bundle.warnings, "The import uses Postman Vault references ("+strings.Join(names, ", ")+"). They work as written: {{vault:name}} reads the variable name. Ask the user to add these variables to an environment and link them to a secret provider in Kurlo.")
+		}
+		return bundle, err
 	case "insomnia":
 		return importInsomnia(doc, defaultString(name, "Insomnia import"))
 	case "har":
@@ -667,4 +673,23 @@ func scrubImportURL(raw string) string {
 	}
 	parsed.RawQuery = strings.ReplaceAll(strings.ReplaceAll(values.Encode(), "%7B", "{"), "%7D", "}")
 	return parsed.String()
+}
+
+var postmanVaultReference = regexp.MustCompile(`\{\{\s*vault:([^{}]+?)\s*\}\}`)
+
+func postmanVaultReferences(content string) []string {
+	if !strings.Contains(content, "vault:") {
+		return nil
+	}
+	seen := map[string]bool{}
+	var names []string
+	for _, match := range postmanVaultReference.FindAllStringSubmatch(content, -1) {
+		name := strings.TrimSpace(match[1])
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
 }

@@ -4,6 +4,7 @@ import type { Collection, Environment, PersistRequestStore, RequestHistoryEntry,
 import type { CookieJarEntry } from '../../backend';
 
 type WorkspaceHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   draftTargets?: Map<string, { collectionId: string; folderPath: string[] }>;
   activeRequestId: string;
   activeWorkspaceId: string;
@@ -211,6 +212,7 @@ export const workspaceFeature = {
     const nextCollections = this.collections.filter(collection => collection.workspaceId !== workspaceId);
     const nextEnvironments = this.environments.filter(environment => environment.workspaceId !== workspaceId);
     const removedIds = new Set(this.requests.filter(request => collectionIds.includes(request.collectionId)).map(request => request.id));
+    if (this.requestFiles && !await this.requestFiles.review([...removedIds])) return;
     const nextRequests = this.requests.filter(request => !removedIds.has(request.id));
     const nextOpenIds = this.openRequestIds.filter(id => !removedIds.has(id));
     const nextHistory = this.requestHistory.filter(entry => !collectionIds.includes(entry.request.collectionId));

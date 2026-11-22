@@ -110,8 +110,8 @@ describe('folder defaults in Postman', () => {
         ],
       }],
     }, 'col', 'Shop');
-    expect(bundle.requests.map(req => [req.name, req.auth.type, req.preRequestScript])).toEqual([['List', 'inherit', ''], ['Ping', 'inherit', '']]);
-    expect(bundle.folderDefaults.map(item => [item.path.join('/'), item.auth.type, item.auth.bearerToken, item.preRequestScript])).toEqual([
+    expect(bundle.requests.map(req => [req.name, req.auth.type, req.preRequestScriptJs])).toEqual([['List', 'inherit', ''], ['Ping', 'inherit', '']]);
+    expect(bundle.folderDefaults.map(item => [item.path.join('/'), item.auth.type, item.auth.bearerToken, item.preRequestScriptJs])).toEqual([
       ['Orders', 'bearer', 'orders-token', 'pm.variables.set("scope", "orders")'],
       ['Orders/Open', 'none', '', ''],
     ]);
@@ -127,12 +127,12 @@ describe('folder defaults in Postman', () => {
 describe('folder defaults in Bruno / OpenCollection', () => {
   it('survive an export and import round trip', () => {
     const folders = [
-      folder(['Orders'], { headers: [header('Accept', 'application/json')], auth: bearer('orders-token'), preRequestScript: 'orders-pre', testScript: 'orders-test' }),
+      folder(['Orders'], { headers: [header('Accept', 'application/json')], auth: bearer('orders-token'), preRequestScriptJs: 'orders-pre', testScriptJs: 'orders-test' }),
       folder(['Public'], { auth: emptyAuthState() }),
     ];
     const files = buildOpenCollectionFiles('Shop', '', emptyCollectionDefaults(), [request(['Orders'])], [], source => source, true, [], folders);
     const bundle = openCollectionBundleFromFiles(files, 'col', 'Shop', 'ws');
-    expect(bundle.folderDefaults.map(item => [item.path.join('/'), item.auth.type, item.auth.bearerToken, item.headers.map(row => row.key), item.preRequestScript, item.testScript])).toEqual([
+    expect(bundle.folderDefaults.map(item => [item.path.join('/'), item.auth.type, item.auth.bearerToken, item.headers.map(row => row.key), item.preRequestScriptJs, item.testScriptJs])).toEqual([
       ['Orders', 'bearer', 'orders-token', ['Accept'], 'orders-pre', 'orders-test'],
       ['Public', 'none', '', [], '', ''],
     ]);
@@ -146,7 +146,7 @@ describe('folder defaults in Bruno / OpenCollection', () => {
       { path: 'misc/folder.bru', content: 'meta {\n  name: Misc\n}\n' },
     ], 'col', 'Legacy', 'ws');
     expect(bundle.folderDefaults).toHaveLength(1);
-    expect(bundle.folderDefaults[0]).toMatchObject({ path: ['Orders'], auth: { type: 'bearer', bearerToken: 'folder-token' }, preRequestScript: 'bru.setVar("a", 1)' });
+    expect(bundle.folderDefaults[0]).toMatchObject({ path: ['Orders'], auth: { type: 'bearer', bearerToken: 'folder-token' }, preRequestScriptJs: 'bru.setVar("a", 1)' });
     expect(bundle.folderDefaults[0].headers.map(row => [row.key, row.value])).toEqual([['X-Scope', 'orders']]);
   });
 });

@@ -85,9 +85,12 @@ export function codePanelMaxWidth(viewportWidth: number, sidebarWidth: number): 
 type ColumnResizeTarget = 'key' | 'val' | 'type' | 'desc';
 
 type UiShellHost = {
+  draftRequestIds: Set<string>;
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   saveGlobals: () => Promise<boolean>;
   saveWorkspaceReadmes: () => Promise<boolean>;
   _sidebarSearchInput: HTMLInputElement | undefined;
+  _collectionWorkspaceRef: { save: () => Promise<void> } | undefined;
   _urlInputRef: HTMLInputElement | undefined;
   activeRequestId: string;
   appDialog: AppDialogState | null;
@@ -452,10 +455,16 @@ export const uiShellFeature = {
       return;
     }
     if (id === 'save-request') {
+      if (this.topView === 'request' && this.requestFiles?.active) {
+        if (this.draftRequestIds.has(this.activeRequestId)) await this.saveActiveRequest();
+        else await this.requestFiles.active.save();
+        return;
+      }
       if (this.autosave) return;
       if (this.topView === 'environment') await this.saveEnvironment();
       else if (this.topView === 'globals') await this.saveGlobals();
       else if (this.topView === 'overview') await this.saveWorkspaceReadmes();
+      else if (this.topView === 'collection') await this._collectionWorkspaceRef?.save();
       else if (this.activeRequestId) await this.saveActiveRequest();
       return;
     }
@@ -566,6 +575,7 @@ export const uiShellFeature = {
       return;
     }
     const shortcutId = this.shortcutForEvent(e);
+    if (shortcutId === 'send-request' && document.querySelector('[aria-modal="true"]')) return;
     if (shortcutId && this.topView === 'agent' && REQUEST_SCOPED_SHORTCUTS.has(shortcutId)) {
       if (e.key === 'Escape') this.closeFloatingMenus();
       return;

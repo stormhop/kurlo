@@ -133,19 +133,18 @@ type HttpRequest struct {
 	BodyType         string      `json:"bodyType"`
 	Body             string      `json:"body"`
 	BodyFilePath     string      `json:"bodyFilePath"`
+	FileRoot         string      `json:"-"`
 	FormData         []KeyValue  `json:"formData"`
 	PreRequestScript string      `json:"preRequestScript"`
 	TestScript       string      `json:"testScript"`
 	Assertions       []Assertion `json:"assertions,omitempty"`
-	ScriptEngine     string      `json:"scriptEngine"`
 	FollowRedirects  bool        `json:"followRedirects"`
 	TimeoutMs        int         `json:"timeoutMs"`
-
-	Name             string `json:"name"`
-	ScriptTimeoutMs  int    `json:"scriptTimeoutMs"`
-	AllowSendRequest bool   `json:"allowSendRequest"`
-	Iteration        int    `json:"iteration,omitempty"`
-	IterationCount   int    `json:"iterationCount,omitempty"`
+	Name             string      `json:"name"`
+	ScriptTimeoutMs  int         `json:"scriptTimeoutMs"`
+	AllowSendRequest bool        `json:"allowSendRequest"`
+	Iteration        int         `json:"iteration,omitempty"`
+	IterationCount   int         `json:"iterationCount,omitempty"`
 
 	HTTPVersion                  string            `json:"httpVersion"`
 	EnableSSLVerification        bool              `json:"enableSSLVerification"`
@@ -207,6 +206,15 @@ type GraphQLPayload struct {
 	OperationName string `json:"operationName"`
 }
 
+type LinkedSecretFailure struct {
+	Provider string `json:"provider"`
+	Path     string `json:"path"`
+	Field    string `json:"field,omitempty"`
+	Version  string `json:"version,omitempty"`
+	Kind     string `json:"kind"`
+	Message  string `json:"message"`
+}
+
 type HttpResponse struct {
 	StatusCode       int             `json:"statusCode"`
 	Status           string          `json:"status"`
@@ -226,6 +234,8 @@ type HttpResponse struct {
 	SkipReason string `json:"skipReason,omitempty"`
 
 	Warnings []string `json:"warnings,omitempty"`
+
+	LinkedSecretFailures []LinkedSecretFailure `json:"linkedSecretFailures,omitempty"`
 
 	BrowserHiddenHeaders []string `json:"browserHiddenHeaders,omitempty"`
 
@@ -282,4 +292,5 @@ type ResponseTime struct {
 	WaitingTTFB          float64 `json:"waitingTTFB"`
 	Download             float64 `json:"download"`
 	Process              float64 `json:"process"`
+	Secrets              float64 `json:"secrets,omitempty"`
 }

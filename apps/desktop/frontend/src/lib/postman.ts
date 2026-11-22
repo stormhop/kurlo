@@ -39,9 +39,9 @@ function postmanKvRows(list: unknown): KVRow[] {
     .filter((row): row is KVRow => Boolean(row));
 }
 
-export type PostmanScripts = { preRequestScript: string; testScript: string };
+export type PostmanScripts = { preRequestScriptJs: string; testScriptJs: string };
 
-const NO_SCRIPTS: PostmanScripts = { preRequestScript: '', testScript: '' };
+const NO_SCRIPTS: PostmanScripts = { preRequestScriptJs: '', testScriptJs: '' };
 
 function postmanScriptSource(event: Record<string, unknown>): string {
   const script = isRecord(event.script) ? event.script : {};
@@ -59,9 +59,9 @@ function joinScripts(first: string, second: string): string {
 function withoutGeneratedAssertions(scripts: PostmanScripts, assertions: AssertionRow[]): PostmanScripts {
   const generated = assertionsToPostmanScript(assertions);
   if (!generated) return scripts;
-  const test = scripts.testScript.replace(/\s+$/, '');
+  const test = scripts.testScriptJs.replace(/\s+$/, '');
   if (!test.endsWith(generated)) return scripts;
-  return { ...scripts, testScript: test.slice(0, test.length - generated.length).replace(/\s+$/, '') };
+  return { ...scripts, testScriptJs: test.slice(0, test.length - generated.length).replace(/\s+$/, '') };
 }
 
 function requestVarsToPostmanScript(rows: KVRow[] | undefined, includeSecrets = false): string {
@@ -74,28 +74,28 @@ function requestVarsToPostmanScript(rows: KVRow[] | undefined, includeSecrets = 
 function withoutGeneratedRequestVars(scripts: PostmanScripts, vars: KVRow[]): PostmanScripts {
   const generated = requestVarsToPostmanScript(vars, true);
   if (!generated) return scripts;
-  const pre = scripts.preRequestScript.replace(/^\s+/, '');
+  const pre = scripts.preRequestScriptJs.replace(/^\s+/, '');
   if (!pre.startsWith(generated)) return scripts;
-  return { ...scripts, preRequestScript: pre.slice(generated.length).replace(/^\s+/, '') };
+  return { ...scripts, preRequestScriptJs: pre.slice(generated.length).replace(/^\s+/, '') };
 }
 
 function mergeScripts(outer: PostmanScripts, inner: PostmanScripts): PostmanScripts {
   return {
-    preRequestScript: joinScripts(outer.preRequestScript, inner.preRequestScript),
-    testScript: joinScripts(outer.testScript, inner.testScript),
+    preRequestScriptJs: joinScripts(outer.preRequestScriptJs, inner.preRequestScriptJs),
+    testScriptJs: joinScripts(outer.testScriptJs, inner.testScriptJs),
   };
 }
 
 export function postmanScriptsFromEvents(...sources: unknown[]): PostmanScripts {
-  const result = { preRequestScript: '', testScript: '' };
+  const result = { preRequestScriptJs: '', testScriptJs: '' };
   for (const source of sources) {
     for (const event of asArray(source)) {
       if (!isRecord(event) || event.disabled === true) continue;
       const code = postmanScriptSource(event);
       if (!code.trim()) continue;
       const listen = asText(event.listen).toLowerCase();
-      if (listen === 'prerequest') result.preRequestScript = joinScripts(result.preRequestScript, code);
-      else if (listen === 'test') result.testScript = joinScripts(result.testScript, code);
+      if (listen === 'prerequest') result.preRequestScriptJs = joinScripts(result.preRequestScriptJs, code);
+      else if (listen === 'test') result.testScriptJs = joinScripts(result.testScriptJs, code);
     }
   }
   return result;
@@ -497,8 +497,8 @@ export function postmanRequestsFromItems(
         grpcProtoFileName: asText(kurlo.grpcProtoFileName),
         grpcProtoImportPaths: asArray(kurlo.grpcProtoImportPaths).map(asText).filter(Boolean),
       } : {}),
-      preRequestScript: scripts.preRequestScript,
-      testScript: scripts.testScript,
+      preRequestScriptJs: scripts.preRequestScriptJs,
+      testScriptJs: scripts.testScriptJs,
       ...(assertions.length ? { assertions } : {}),
       requestNotes: postmanDescription(req.description) || postmanDescription(item.description),
       settings: {
@@ -534,8 +534,8 @@ function postmanFolderDefaults(items: unknown, path: string[] = []): FolderDefau
     const folder = {
       ...emptyFolderDefaults(next),
       ...(item.auth !== undefined ? { auth: postmanAuthConfig(item.auth) } : {}),
-      preRequestScript: scripts.preRequestScript,
-      testScript: scripts.testScript,
+      preRequestScriptJs: scripts.preRequestScriptJs,
+      testScriptJs: scripts.testScriptJs,
     };
     if (folderDefaultsHaveContent(folder)) folders.push(folder);
     folders.push(...postmanFolderDefaults(item.item, next));
@@ -575,8 +575,8 @@ export function postmanCollectionBundle(payload: unknown, collectionId: string, 
       ...emptyCollectionDefaults(),
       variables: postmanVariableRows(payload.variable),
       auth: postmanAuthConfig(payload.auth),
-      preRequestScript: scripts.preRequestScript,
-      testScript: scripts.testScript,
+      preRequestScriptJs: scripts.preRequestScriptJs,
+      testScriptJs: scripts.testScriptJs,
     },
     folderPaths: postmanFolderPaths(payload.item),
     folderDefaults: postmanFolderDefaults(payload.item),
@@ -829,8 +829,8 @@ function postmanPreviewLanguage(mediaType: string): string {
 
 export function postmanRequestScriptSources(req: SavedRequest, includeSecrets: boolean) {
   return {
-    before: joinScripts(requestVarsToPostmanScript(req.vars, includeSecrets), req.preRequestScript),
-    after: joinScripts(req.testScript, assertionsToPostmanScript(req.assertions)),
+    before: joinScripts(requestVarsToPostmanScript(req.vars, includeSecrets), req.preRequestScriptJs ?? ''),
+    after: joinScripts(req.testScriptJs ?? '', assertionsToPostmanScript(req.assertions)),
   };
 }
 
@@ -896,12 +896,12 @@ export function buildPostmanCollection(
   for (const folderDefault of folderDefaults) {
     const folder = postmanFolderNode(items, folderDefault.path);
     if (!folder) continue;
-    const folderEvent = postmanEventsFromScripts(folderDefault.preRequestScript, folderDefault.testScript);
+    const folderEvent = postmanEventsFromScripts(folderDefault.preRequestScriptJs, folderDefault.testScriptJs);
     if (folderEvent) folder.event = folderEvent;
     if (folderDefault.auth.type === 'none') folder.auth = { type: 'noauth' };
     else if (folderDefault.auth.type !== 'inherit') folder.auth = postmanAuthFromKurlo(folderDefault.auth, includeSecrets);
   }
-  const event = postmanEventsFromScripts(defaults?.preRequestScript ?? '', defaults?.testScript ?? '');
+  const event = postmanEventsFromScripts(defaults?.preRequestScriptJs ?? '', defaults?.testScriptJs ?? '');
   const auth = defaults && defaults.auth.type !== 'none' && defaults.auth.type !== 'inherit'
     ? postmanAuthFromKurlo(defaults.auth, includeSecrets)
     : undefined;
@@ -922,13 +922,42 @@ export function buildPostmanCollection(
   };
 }
 
+const postmanVaultPattern = /\{\{\s*vault:([^{}]+?)\s*\}\}/g;
+
+export function postmanVaultReferences(payload: unknown): string[] {
+  const names = new Set<string>();
+  const visit = (value: unknown, depth: number) => {
+    if (depth > 64) return;
+    if (typeof value === 'string') {
+      if (!value.includes('vault:')) return;
+      for (const match of value.matchAll(postmanVaultPattern)) names.add(match[1].trim());
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, depth + 1);
+      return;
+    }
+    if (value && typeof value === 'object') {
+      for (const item of Object.values(value)) visit(item, depth + 1);
+    }
+  };
+  visit(payload, 0);
+  return [...names].filter(Boolean).sort();
+}
+
+export function postmanVaultNotice(names: string[]) {
+  const shown = names.slice(0, 8).map(name => `{{vault:${name}}}`).join(', ');
+  const more = names.length > 8 ? ` and ${names.length - 8} more` : '';
+  return `This import uses Postman Vault: ${shown}${more}. They work as written: {{vault:name}} takes the value of the variable name. Add these variables to an environment and link each one to a secret provider.`;
+}
+
 export function buildPostmanEnvironment(env: Environment, includeSecrets = false) {
   return {
     id: env.id,
     name: env.name,
     values: env.values
       .filter(v => v.key)
-      .map(v => ({ key: v.key, value: v.secret && !includeSecrets ? '' : v.value, enabled: v.enabled, type: v.secret ? 'secret' : 'default' })),
+      .map(v => ({ key: v.key, value: v.secretRef || (v.secret && !includeSecrets) ? '' : v.value, enabled: v.enabled, type: v.secret || v.secretRef ? 'secret' : 'default' })),
     _postman_variable_scope: 'environment',
     _postman_exported_at: new Date().toISOString(),
     _postman_exported_using: 'Kurlo',

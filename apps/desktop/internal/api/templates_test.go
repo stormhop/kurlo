@@ -78,7 +78,7 @@ func templatedRequest(values map[string]string) model.HttpRequest {
 	req := traceTestRequest("{{base}}/items")
 	req.ResolveTemplates = true
 	req.TemplateValues = values
-	req.ScriptEngine = "js"
+
 	return req
 }
 

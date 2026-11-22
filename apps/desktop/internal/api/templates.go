@@ -33,7 +33,11 @@ func resolveTemplateValue(value string, values map[string]string) string {
 
 func substituteTemplates(value string, values map[string]string) string {
 	return templatePattern.ReplaceAllStringFunc(value, func(match string) string {
-		key := strings.TrimSpace(match[2 : len(match)-2])
+		raw := strings.TrimSpace(match[2 : len(match)-2])
+		if replacement, ok := values[raw]; ok && raw != "" {
+			return replacement
+		}
+		key := model.TemplateVariableKey(raw)
 		if key == "" {
 			return match
 		}

@@ -294,8 +294,8 @@ export function parseHttpFile(text: string, collectionId: string, collectionName
       bodyFilePath: '',
       bodyFileName: '',
       formRows: [],
-      preRequestScript: parsed.preRequestScripts.join('\n\n'),
-      testScript: parsed.responseScripts.join('\n\n'),
+      preRequestScriptJs: parsed.preRequestScripts.join('\n\n'),
+      testScriptJs: parsed.responseScripts.join('\n\n'),
       requestNotes: parsed.notes.join('\n'),
       settings: { ...DEFAULT_REQUEST_SETTINGS, ...(socketIO?.settings ?? {}) },
     });

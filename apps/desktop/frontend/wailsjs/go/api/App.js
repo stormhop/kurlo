@@ -74,6 +74,10 @@ export function BranchAgentChat(arg1, arg2, arg3) {
   return window['go']['api']['App']['BranchAgentChat'](arg1, arg2, arg3);
 }
 
+export function BrowseSecretProvider(arg1, arg2, arg3) {
+  return window['go']['api']['App']['BrowseSecretProvider'](arg1, arg2, arg3);
+}
+
 export function CancelAgentMcpSignIn(arg1) {
   return window['go']['api']['App']['CancelAgentMcpSignIn'](arg1);
 }
@@ -128,6 +132,10 @@ export function ClearHistoryResponses() {
 
 export function ClearProxyLocalResponses() {
   return window['go']['api']['App']['ClearProxyLocalResponses']();
+}
+
+export function ClearSecretCache() {
+  return window['go']['api']['App']['ClearSecretCache']();
 }
 
 export function ClearVariables() {
@@ -190,6 +198,10 @@ export function DeleteOpenAPIBaseSpec(arg1) {
   return window['go']['api']['App']['DeleteOpenAPIBaseSpec'](arg1);
 }
 
+export function DeleteSecretProvider(arg1, arg2) {
+  return window['go']['api']['App']['DeleteSecretProvider'](arg1, arg2);
+}
+
 export function DeleteVariable(arg1) {
   return window['go']['api']['App']['DeleteVariable'](arg1);
 }
@@ -206,8 +218,16 @@ export function DiscoverLocalAiServers() {
   return window['go']['api']['App']['DiscoverLocalAiServers']();
 }
 
+export function DocsRelativeLinkScopes(arg1) {
+  return window['go']['api']['App']['DocsRelativeLinkScopes'](arg1);
+}
+
 export function ExportAgentChat(arg1, arg2) {
   return window['go']['api']['App']['ExportAgentChat'](arg1, arg2);
+}
+
+export function ExportCollectionDocs(arg1) {
+  return window['go']['api']['App']['ExportCollectionDocs'](arg1);
 }
 
 export function ExportLoadTestK6(arg1, arg2) {
@@ -218,12 +238,28 @@ export function ExportLoadTestK6Files(arg1, arg2) {
   return window['go']['api']['App']['ExportLoadTestK6Files'](arg1, arg2);
 }
 
+export function ExportSecretProviderEnv(arg1, arg2) {
+  return window['go']['api']['App']['ExportSecretProviderEnv'](arg1, arg2);
+}
+
 export function FetchOAuth2Token(arg1) {
   return window['go']['api']['App']['FetchOAuth2Token'](arg1);
 }
 
+export function ForgetSecretProviderCredentials(arg1, arg2) {
+  return window['go']['api']['App']['ForgetSecretProviderCredentials'](arg1, arg2);
+}
+
+export function FormatRequestFileYAML(arg1) {
+  return window['go']['api']['App']['FormatRequestFileYAML'](arg1);
+}
+
 export function GetEnvironment() {
   return window['go']['api']['App']['GetEnvironment']();
+}
+
+export function GetRequestFileYAML(arg1, arg2, arg3) {
+  return window['go']['api']['App']['GetRequestFileYAML'](arg1, arg2, arg3);
 }
 
 export function GetVariables() {
@@ -418,6 +454,10 @@ export function GrpcDiscover(arg1) {
   return window['go']['api']['App']['GrpcDiscover'](arg1);
 }
 
+export function InspectRequestFile(arg1) {
+  return window['go']['api']['App']['InspectRequestFile'](arg1);
+}
+
 export function InstallBrowserExtension(arg1) {
   return window['go']['api']['App']['InstallBrowserExtension'](arg1);
 }
@@ -426,12 +466,20 @@ export function K6Info(arg1) {
   return window['go']['api']['App']['K6Info'](arg1);
 }
 
-export function LastLoadRun(arg1) {
-  return window['go']['api']['App']['LastLoadRun'](arg1);
+export function LastLoadRun(arg1, arg2) {
+  return window['go']['api']['App']['LastLoadRun'](arg1, arg2);
 }
 
 export function ListCookies(arg1) {
   return window['go']['api']['App']['ListCookies'](arg1);
+}
+
+export function ListSecretImportKeys(arg1) {
+  return window['go']['api']['App']['ListSecretImportKeys'](arg1);
+}
+
+export function ListSecretProviders(arg1) {
+  return window['go']['api']['App']['ListSecretProviders'](arg1);
 }
 
 export function LoadHistoryResponse(arg1) {
@@ -458,8 +506,12 @@ export function LoadRunStatus() {
   return window['go']['api']['App']['LoadRunStatus']();
 }
 
-export function LoadRunSummaryJSON(arg1) {
-  return window['go']['api']['App']['LoadRunSummaryJSON'](arg1);
+export function LoadRunSummaryJSON(arg1, arg2) {
+  return window['go']['api']['App']['LoadRunSummaryJSON'](arg1, arg2);
+}
+
+export function LoadSecretImportKeys(arg1, arg2) {
+  return window['go']['api']['App']['LoadSecretImportKeys'](arg1, arg2);
 }
 
 export function LoadTestTargets(arg1) {
@@ -502,8 +554,8 @@ export function OpenFileDialog(arg1) {
   return window['go']['api']['App']['OpenFileDialog'](arg1);
 }
 
-export function OpenLoadRunReport(arg1) {
-  return window['go']['api']['App']['OpenLoadRunReport'](arg1);
+export function OpenLoadRunReport(arg1, arg2) {
+  return window['go']['api']['App']['OpenLoadRunReport'](arg1, arg2);
 }
 
 export function OpenLogFolder() {
@@ -522,12 +574,20 @@ export function PerformanceStatus() {
   return window['go']['api']['App']['PerformanceStatus']();
 }
 
+export function PreflightCollectionRunner(arg1, arg2) {
+  return window['go']['api']['App']['PreflightCollectionRunner'](arg1, arg2);
+}
+
 export function PreviewJWTBearer(arg1) {
   return window['go']['api']['App']['PreviewJWTBearer'](arg1);
 }
 
 export function PreviewLoadTestData(arg1) {
   return window['go']['api']['App']['PreviewLoadTestData'](arg1);
+}
+
+export function PreviewSecretProviderEnv(arg1, arg2) {
+  return window['go']['api']['App']['PreviewSecretProviderEnv'](arg1, arg2);
 }
 
 export function ProxyCaptureEntries() {
@@ -626,6 +686,14 @@ export function ResumeProxyResponse(arg1, arg2, arg3) {
   return window['go']['api']['App']['ResumeProxyResponse'](arg1, arg2, arg3);
 }
 
+export function RevealRequestFile(arg1) {
+  return window['go']['api']['App']['RevealRequestFile'](arg1);
+}
+
+export function RevealSecretRef(arg1, arg2) {
+  return window['go']['api']['App']['RevealSecretRef'](arg1, arg2);
+}
+
 export function RevealWorkspaceItem(arg1, arg2) {
   return window['go']['api']['App']['RevealWorkspaceItem'](arg1, arg2);
 }
@@ -636,6 +704,10 @@ export function RevertAgentActivity(arg1, arg2) {
 
 export function RevokeCookieSyncPairing() {
   return window['go']['api']['App']['RevokeCookieSyncPairing']();
+}
+
+export function RevokeSecretProviderTrust(arg1, arg2) {
+  return window['go']['api']['App']['RevokeSecretProviderTrust'](arg1, arg2);
 }
 
 export function SSEConnect(arg1, arg2) {
@@ -670,6 +742,10 @@ export function SaveLoadTestK6Folder(arg1, arg2, arg3) {
   return window['go']['api']['App']['SaveLoadTestK6Folder'](arg1, arg2, arg3);
 }
 
+export function SaveRequestFileYAML(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['api']['App']['SaveRequestFileYAML'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function SaveRequestStore(arg1) {
   return window['go']['api']['App']['SaveRequestStore'](arg1);
 }
@@ -688,6 +764,10 @@ export function SaveRequestStoreWithError(arg1) {
 
 export function SaveResponseBody(arg1, arg2) {
   return window['go']['api']['App']['SaveResponseBody'](arg1, arg2);
+}
+
+export function SaveSecretProvider(arg1, arg2) {
+  return window['go']['api']['App']['SaveSecretProvider'](arg1, arg2);
 }
 
 export function SaveWorkspaceSecrets(arg1) {
@@ -756,6 +836,10 @@ export function SetEnvironmentVar(arg1, arg2) {
 
 export function SetProxyLocalResponse(arg1) {
   return window['go']['api']['App']['SetProxyLocalResponse'](arg1);
+}
+
+export function SetSecretProviderCredential(arg1, arg2, arg3, arg4) {
+  return window['go']['api']['App']['SetSecretProviderCredential'](arg1, arg2, arg3, arg4);
 }
 
 export function SetVariable(arg1, arg2) {
@@ -860,6 +944,18 @@ export function TestAgentMcpServer(arg1) {
 
 export function TestAiConnection(arg1) {
   return window['go']['api']['App']['TestAiConnection'](arg1);
+}
+
+export function TestSecretProvider(arg1, arg2) {
+  return window['go']['api']['App']['TestSecretProvider'](arg1, arg2);
+}
+
+export function TestSecretRef(arg1, arg2) {
+  return window['go']['api']['App']['TestSecretRef'](arg1, arg2);
+}
+
+export function TrustSecretProvider(arg1, arg2) {
+  return window['go']['api']['App']['TrustSecretProvider'](arg1, arg2);
 }
 
 export function UpsertCookie(arg1, arg2) {

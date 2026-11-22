@@ -12,6 +12,47 @@ import { type HttpResponse, type HttpRequest } from '../lib/backend';
 import { requestExecutionFeature } from '../lib/stores/features/requestExecution';
 
 describe('full application e2e smoke', () => {
+  it('preflights every runner request before sending any request when a linked secret is broken', async () => {
+    backend.state.sentHttpRequests = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.collections = [{ id: 'preflight-collection', name: 'Preflight', folderPaths: [], defaults: emptyCollectionDefaults() }];
+    app.activeWorkspaceId = 'workspace-test';
+    const requests = ['No linked secret', 'Working linked secret', 'Broken linked secret'].map((name, index) => ({
+      id: `preflight-${index}`,
+      name,
+      collectionId: 'preflight-collection',
+      folderPath: [],
+      requestType: 'http',
+      method: 'GET',
+      url: 'https://example.test',
+      auth: { type: 'none', bearerToken: '', basicUser: '', basicPass: '', apiKeyName: '', apiKeyValue: '' },
+      headers: index ? [row('Authorization', index === 1 ? '{{secret:env:path#field}}' : '{{secret:env:missing#field}}')] : [],
+      params: [],
+      pathParams: [],
+      formRows: [],
+      settings: { timeoutMs: 1000, scriptTimeoutMs: 1000, followRedirects: true },
+      vars: [],
+      preRequestScriptJs: '',
+      testScriptJs: '',
+      bodyContent: '',
+      bodyType: 'none',
+    })) as any[];
+    app.requests = requests;
+    backend.preflightCollectionRunner.mockResolvedValueOnce([
+      { requestId: 'preflight-0', failures: [] },
+      { requestId: 'preflight-1', failures: [] },
+      { requestId: 'preflight-2', failures: [{ provider: 'env', path: 'missing', field: 'field', kind: 'not-found', message: 'Secret not found' }] },
+    ]);
+
+    await app.startCollectionRunner('Preflight', requests);
+
+    expect(backend.preflightCollectionRunner).toHaveBeenCalledOnce();
+    expect(backend.preflightCollectionRunner.mock.calls[0][1]).toHaveLength(3);
+    expect(backend.state.sentHttpRequests).toHaveLength(0);
+    expect(app.collectionRunnerRunning).toBe(false);
+    expect(app.collectionRunnerPreflightFailures).toMatchObject([{ name: 'Broken linked secret', failures: [{ path: 'missing' }] }]);
+  });
+
   it('creates collections, folders, environments, sends requests, records history, runs runner, and round-trips exports', async () => {
     backend.state.savedStores = [];
     backend.state.sentHttpRequests = [];
@@ -52,7 +93,7 @@ describe('full application e2e smoke', () => {
     app.bodyType = 'json';
     app.rawBodyType = 'json';
     app.bodyContent = '{"username":"ada","password":"raw-password"}';
-    app.activeTestScript = 'pm.test("status", () => pm.response.to.have.status(200));';
+    app.testScriptJs = 'pm.test("status", () => pm.response.to.have.status(200));';
     app.applyRequestSettings({ ...app.currentRequestSettings(), timeoutMs: 12000, followRedirects: false });
     app.markRequestSettingOverride('timeoutMs');
     app.markRequestSettingOverride('followRedirects');

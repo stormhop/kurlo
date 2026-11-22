@@ -144,6 +144,11 @@ function checkDocumentationNavigation(contentFiles) {
     const html = read(file);
     const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] ?? '';
     const article = main.search(/<[^>]+\bclass="[^"]*\bsl-markdown-content\b/);
+    const winterScenes = [...html.matchAll(/data-docs-winter="(hero|article)"/g)].map(match => match[1]);
+    const lights = /<svg\b[^>]*class="[^"]*\bwinter-lights\b/.test(html);
+    if (winterScenes.length !== 1 || winterScenes[0] !== (path === DOCS_HOME ? 'hero' : 'article') || lights !== (path === DOCS_HOME)) {
+      fail(`Unexpected winter decoration on ${path}`);
+    }
     if (path === DOCS_HOME) {
       if (html.includes('<docs-page-actions')) fail('The documentation homepage renders copy controls');
     } else {
@@ -260,9 +265,14 @@ function checkCodeBackedDocs() {
   const stripGo = read(join(root, 'apps/desktop/internal/api/file_workspace_store_strip.go'));
   const secretsGo = read(join(root, 'apps/desktop/internal/api/file_workspace_store.go'));
   const schema = read(join(root, 'schemas/kurlo-workspace-yaml-v1.schema.json'));
+  const publishedSchema = join(distRoot, 'schemas/kurlo-workspace-yaml-v1.schema.json');
   const yaml = join(contentRoot, 'docs/reference/kurlo-yaml-format');
   const yamlDoc = [read(join(yaml, 'request.md')), read(join(yaml, 'request-fields.md')), read(join(yaml, 'secrets.md'))].join('\n');
   const coverage = read(join(webRoot, 'DOCS_COVERAGE.md'));
+
+  if (!existsSync(publishedSchema) || read(publishedSchema) !== schema) {
+    fail('The built workspace YAML schema differs from schemas/kurlo-workspace-yaml-v1.schema.json.');
+  }
 
   for (const field of ['oauth2GrantType', 'oauth2AuthURL', 'oauth2RefreshToken', 'oauth2TokenExpiry', 'oauth2UsePKCE']) {
     if (!stripGo.includes(`"${field}"`)) fail(`OAuth2 field ${field} is missing from authActiveFields`);
@@ -349,6 +359,18 @@ function expandShortcutRanges(text) {
   return expanded;
 }
 
+function checkWinterLandingPages() {
+  for (const [route, scarves] of [['/', 1], ['/mcp/', 1], ['/agent/', 2], ['/pricing/', 0], [DOCS_HOME, 0]]) {
+    const file = distCandidates(route).find(existsSync);
+    const html = file ? read(file) : '';
+    const layers = html.match(/<div class="landing-snow(?:\s|")/g) ?? [];
+    const birds = html.match(/<g class="tail-front(?:\s|")/g) ?? [];
+    if (!file || layers.length !== Number(scarves > 0) || birds.length !== scarves) {
+      fail(`Unexpected snow or scarf count on ${route}`);
+    }
+  }
+}
+
 function checkScreenshotInventory() {
   const expected = [
     'auth-oauth2-token-fetch.png',
@@ -368,7 +390,8 @@ function checkScreenshotInventory() {
     'request-websocket.png',
     'response-viewer-search.png',
     'response-viewer-large-body.png',
-    'scripting-tengo.png',
+    'graphql-query-builder.png', 'graphql-builder-variables.png',
+    'scripting-pre-request.png', 'script-completion-api.png', 'script-completion-environment.png', 'script-completion-requests.png',
   ];
   for (const name of expected) {
     const path = join(screenshotsRoot, name);
@@ -389,6 +412,7 @@ if (!existsSync(distRoot)) {
   checkPagefind();
   checkCodeBackedDocs();
   checkFrontDoorDocs();
+  checkWinterLandingPages();
   checkScreenshotInventory();
 }
 

@@ -2,7 +2,7 @@
   import { DEFAULT_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
   import { NAME_MAX_LENGTH } from '../constants';
   import { tabListKeyboard } from '../a11y';
-  import { loadTestFingerprint, normalizeLoadTest } from '../loadTests';
+  import { loadRunKey, loadTestFingerprint, normalizeLoadTest } from '../loadTests';
   import { executorDurationMs, executorModel, executorPeak, formatDuration } from '../loadPresets';
   import type { LoadTestTab } from '../stores/features/loadTests';
   import type { Collection, Environment, SavedRequest } from '../types/models';
@@ -43,7 +43,7 @@
     onCopy,
     run,
     logLines,
-    logTestId,
+    logKey,
     result,
     k6Info,
     k6MissingOpen = $bindable(false),
@@ -83,23 +83,23 @@
     onCopy: (text: string) => void;
     run: LoadRunState;
     logLines: string[];
-    logTestId: string;
+    logKey: string;
     result: LoadRunResult | null;
     k6Info: K6Info | null;
     k6MissingOpen: boolean;
     onRun: (collectionId: string, draft: LoadTest) => void;
     onStop: () => void;
-    onLoadResult: (loadTestId: string) => void;
+    onLoadResult: (collectionId: string, loadTestId: string) => void;
     onOpenDashboard: (url: string) => void;
-    onOpenReport: (loadTestId: string) => void;
-    onSaveSummary: (loadTestId: string, fileName: string) => void;
+    onOpenReport: (collectionId: string, loadTestId: string) => void;
+    onSaveSummary: (collectionId: string, loadTestId: string, fileName: string) => void;
     onChooseK6: () => void;
     onCheckK6: () => void;
     onOpenK6Guide: () => void;
     exportRequestId?: string;
     onExportRequestHandled?: () => void;
     pendingEdits?: LoadTest | null;
-    onEdits?: (collectionId: string, test: LoadTest, dirty: boolean) => void;
+    onEdits?: (collectionId: string, test: LoadTest, dirty: boolean, baseFingerprint?: string) => void;
   } = $props();
 
   const DATA_MODES: Record<string, string> = {
@@ -111,6 +111,8 @@
 
   let draft = $state<LoadTest>({ id: '', name: '', scenarios: [], settings: {} });
   let loadedId = $state('');
+  let loadedCollectionId = $state('');
+  let failedSaveFingerprint = $state('');
   let loadedFingerprint = $state('');
   let externalUpdate = $state(false);
   let savingInFlight = $state(false);
@@ -118,8 +120,9 @@
   let exportOpen = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const runningHere = $derived(run.running && run.loadTestId === loadTest?.id);
-  const runningElsewhere = $derived(run.running && run.loadTestId !== loadTest?.id);
+  const runningHere = $derived(run.running && run.collectionId === collection?.id && run.loadTestId === loadTest?.id);
+  const runningElsewhere = $derived(run.running && !runningHere);
+  const editingLocked = $derived(workspaceBlocked || runningHere);
   const ready = $derived(Boolean(loadedId) && draft.id === loadedId);
   const draftFingerprint = $derived(ready ? loadTestFingerprint(draft) : '');
   const dirty = $derived(ready && draftFingerprint !== loadedFingerprint);
@@ -145,7 +148,7 @@
   $effect(() => {
     if (!loadTest) return;
     const incoming = loadTestFingerprint(loadTest);
-    if (loadTest.id !== loadedId) {
+    if (loadTest.id !== loadedId || collection?.id !== loadedCollectionId) {
       load(loadTest, true);
       return;
     }
@@ -155,7 +158,7 @@
   });
 
   $effect(() => {
-    if (isDraft || !autosave || !ready || !collection || workspaceBlocked || externalUpdate || savingInFlight || !dirty) return;
+    if (isDraft || !autosave || !ready || !collection || editingLocked || externalUpdate || savingInFlight || failedSaveFingerprint === draftFingerprint || !dirty) return;
     if (autosaveTimer) clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(() => {
       autosaveTimer = null;
@@ -182,13 +185,13 @@
   });
 
   $effect(() => {
-    if (loadTest?.id) onLoadResult(loadTest.id);
+    if (collection && loadTest?.id) onLoadResult(collection.id, loadTest.id);
   });
 
   $effect(() => {
     if (!ready || !collection) return;
     void draftFingerprint;
-    onEdits(collection.id, $state.snapshot(draft) as LoadTest, dirty);
+    onEdits(collection.id, $state.snapshot(draft) as LoadTest, dirty, loadedFingerprint);
   });
 
   $effect(() => {
@@ -210,19 +213,27 @@
     const source = restore && pendingEdits?.id === next.id ? pendingEdits : next;
     draft = normalizeLoadTest(JSON.parse(JSON.stringify(source)));
     loadedId = next.id;
+    loadedCollectionId = collection?.id ?? '';
+    failedSaveFingerprint = '';
     loadedFingerprint = loadTestFingerprint(next);
     externalUpdate = false;
     problems = [];
   }
 
   async function save() {
-    if (!ready || !collection || savingInFlight) return;
+    if (!ready || !collection || editingLocked || savingInFlight) return;
+    const snapshot = $state.snapshot(draft) as LoadTest;
+    const submitted = loadTestFingerprint(snapshot);
+    const owner = collection.id;
     savingInFlight = true;
     try {
-      const ok = await onSave(collection.id, $state.snapshot(draft) as LoadTest, loadedFingerprint);
-      if (ok && loadTest) {
+      const ok = await onSave(owner, snapshot, loadedFingerprint);
+      if (collection?.id !== owner || loadTest?.id !== snapshot.id) return;
+      if (!ok) failedSaveFingerprint = submitted;
+      if (ok) {
         loadedFingerprint = loadTestFingerprint(loadTest);
-        draft = normalizeLoadTest(JSON.parse(JSON.stringify(loadTest)));
+        if (loadTestFingerprint(draft) === submitted) draft = normalizeLoadTest(JSON.parse(JSON.stringify(loadTest)));
+        failedSaveFingerprint = '';
         externalUpdate = false;
       }
     } finally {
@@ -259,7 +270,7 @@
               aria-label="Load test name"
               aria-invalid={nameProblems.length > 0}
               spellcheck="false"
-              disabled={workspaceBlocked}
+              disabled={editingLocked}
               oninput={(event) => (draft.name = inputValue(event))}
               onkeydown={(event) => {
                 if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
@@ -270,11 +281,11 @@
             />
             {#if isDraft}
               <span class="loadtest-draft-note">Unsaved draft</span>
-              <SaveActions saveDirty={true} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
+              <SaveActions saveDirty={true} canRevert={dirty} disabled={editingLocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
             {:else if !autosave}
-              <SaveActions saveDirty={dirty} canRevert={dirty} disabled={workspaceBlocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
+              <SaveActions saveDirty={dirty} canRevert={dirty} disabled={editingLocked || savingInFlight} onSave={save} onRevert={() => load(loadTest)} />
             {:else}
-              <span class="loadtest-save-status">{saveState === 'saving' ? 'Saving changes…' : 'Saved'}</span>
+              <span class="loadtest-save-status">{saveState === 'saving' ? 'Saving changes…' : dirty ? 'Unsaved changes' : 'Saved'}</span>
             {/if}
           </div>
           <LoadValidationMessages problems={nameProblems} />
@@ -288,7 +299,7 @@
             options={environmentOptions}
             searchable={environmentOptions.length > 8}
             searchPlaceholder="Search environments"
-            disabled={workspaceBlocked}
+            disabled={editingLocked}
             onChange={setEnvironment}
           />
           <button class="btn btn-secondary" type="button" onclick={() => (exportOpen = true)}>Export k6 script</button>
@@ -305,7 +316,7 @@
       {#if externalUpdate}
         <div class="loadtest-row">
           <span class="loadtest-hint">Updated elsewhere</span>
-          <button class="btn btn-secondary btn-sm" type="button" onclick={() => load(loadTest)} disabled={workspaceBlocked}>Reload</button>
+          <button class="btn btn-secondary btn-sm" type="button" onclick={() => load(loadTest)} disabled={editingLocked}>Reload</button>
         </div>
       {/if}
       <div class="loadtest-plan" role="group" aria-label="Test plan">
@@ -333,24 +344,24 @@
     </div>
     <div class="loadtest-content" role="tabpanel">
       {#if loadTestTab === 'flow'}
-        <LoadFlowEditor bind:draft {requests} problems={flowProblems} disabled={workspaceBlocked} {onOpenRequest} />
+        <LoadFlowEditor bind:draft {requests} problems={flowProblems} disabled={editingLocked} {onOpenRequest} />
       {:else if loadTestTab === 'load'}
-        <LoadProfileEditor bind:draft problems={profileProblems} disabled={workspaceBlocked} {requests} />
+        <LoadProfileEditor bind:draft problems={profileProblems} disabled={editingLocked} {requests} />
       {:else if loadTestTab === 'data'}
-        <LoadDataTab bind:draft problems={dataProblems} disabled={workspaceBlocked} onChoose={onChooseData} onPreview={onPreviewData} />
+        <LoadDataTab bind:draft problems={dataProblems} disabled={editingLocked} onChoose={onChooseData} onPreview={onPreviewData} />
       {:else}
         <LoadRunPanel
           loadTest={draft}
           {requests}
           {run}
-          logLines={logTestId === loadTest.id ? logLines : []}
+          logLines={logKey === loadRunKey(collection.id, loadTest.id) ? logLines : []}
           {result}
           otherRunning={runningElsewhere}
-          disabled={workspaceBlocked}
+          disabled={editingLocked}
           onRun={runDraft}
           {onOpenDashboard}
-          onOpenReport={() => onOpenReport(loadTest.id)}
-          onSaveSummary={() => onSaveSummary(loadTest.id, summaryName())}
+          onOpenReport={() => onOpenReport(collection.id, loadTest.id)}
+          onSaveSummary={() => onSaveSummary(collection.id, loadTest.id, summaryName())}
         />
       {/if}
     </div>

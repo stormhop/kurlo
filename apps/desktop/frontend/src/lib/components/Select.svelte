@@ -6,6 +6,7 @@
     className = '',
     disabled = false,
     searchable = false,
+    floating = false,
     searchPlaceholder = 'Search models',
     ariaLabel = undefined,
     onChange = () => {},
@@ -15,6 +16,7 @@
     className?: string;
     disabled?: boolean;
     searchable?: boolean;
+    floating?: boolean;
     searchPlaceholder?: string;
     ariaLabel?: string;
     onChange?: (value: string) => void;
@@ -32,9 +34,14 @@
   const filteredOptions = $derived(options.filter(option => option.label.toLowerCase().includes(search.trim().toLowerCase())));
 
   async function toggle() {
-    open = !open;
+    if (open) {
+      open = false;
+      triggerButton?.focus({ preventScroll: true });
+      return;
+    }
     search = '';
-    if (open && searchable) {
+    open = true;
+    if (searchable) {
       await tick();
       searchInput?.focus({ preventScroll: true });
     }
@@ -78,6 +85,29 @@
     if (!wrap || !menu) return;
     const trigger = wrap.getBoundingClientRect();
     const bounds = clipBounds(wrap);
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const cap = MENU_MAX_REM * rem;
+    if (floating) {
+      if (trigger.bottom <= bounds.top || trigger.top >= bounds.bottom) {
+        open = false;
+        return;
+      }
+      const gap = rem / 4;
+      const dialog = wrap.closest('[role="dialog"]')?.getBoundingClientRect();
+      const topEdge = Math.max(dialog?.top ?? 0, 0) + MENU_MARGIN;
+      const bottomEdge = Math.min(dialog?.bottom ?? window.innerHeight, window.innerHeight) - MENU_MARGIN;
+      const leftEdge = Math.max(bounds.left, 0) + MENU_MARGIN;
+      const rightEdge = Math.min(bounds.right, window.innerWidth) - MENU_MARGIN;
+      const above = trigger.top - gap - topEdge;
+      const below = bottomEdge - trigger.bottom - gap;
+      const width = Math.min(Math.max(trigger.width, searchable ? 15 * rem : 0, menu.getBoundingClientRect().width), rightEdge - leftEdge);
+      const left = Math.max(leftEdge, trigger.left + width <= rightEdge ? trigger.left : trigger.right - width);
+      const downward = Math.min(menu.scrollHeight, cap) <= below || below >= above;
+      const edges = downward ? `top:${trigger.bottom + gap}px;bottom:auto` : `top:auto;bottom:${window.innerHeight - trigger.top + gap}px`;
+      const height = Math.max(0, Math.floor(Math.min(downward ? below : above, cap)));
+      menuStyle = `left:${left}px;width:${width}px;max-height:${height}px;${edges}`;
+      return;
+    }
     const below = bounds.bottom - trigger.bottom - MENU_MARGIN;
     const above = trigger.top - bounds.top - MENU_MARGIN;
     const natural = menu.scrollHeight;
@@ -89,13 +119,17 @@
       const room = trigger.right - viewportLeft;
       horizontal = `left:auto;right:0;max-width:${Math.max(trigger.width, Math.floor(room))}px;`;
     }
-    const cap = MENU_MAX_REM * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16);
     const wanted = Math.min(natural, cap);
     if (wanted <= below || below >= above) {
       menuStyle = `${horizontal}max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(Math.min(below, cap)))}px`;
       return;
     }
     menuStyle = `${horizontal}top:auto;bottom:calc(100% + 4px);max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(Math.min(above, cap)))}px`;
+  }
+
+  function followMenu(event: Event) {
+    if (event.target instanceof Node && menu?.contains(event.target)) return;
+    fitMenu();
   }
 
   function onPointerDownOutside(event: PointerEvent) {
@@ -109,7 +143,7 @@
     event.preventDefault();
     event.stopPropagation();
     open = false;
-    triggerButton?.focus();
+    triggerButton?.focus({ preventScroll: true });
   }
 
   $effect(() => {
@@ -120,9 +154,15 @@
     if (menu) fitMenu();
     document.addEventListener('pointerdown', onPointerDownOutside, true);
     document.addEventListener('keydown', onKeydown, true);
+    if (floating) {
+      window.addEventListener('scroll', followMenu, true);
+      window.addEventListener('resize', followMenu);
+    }
     return () => {
       document.removeEventListener('pointerdown', onPointerDownOutside, true);
       document.removeEventListener('keydown', onKeydown, true);
+      window.removeEventListener('scroll', followMenu, true);
+      window.removeEventListener('resize', followMenu);
     };
   });
 
@@ -130,7 +170,7 @@
     value = v;
     open = false;
     onChange(v);
-    triggerButton?.focus();
+    triggerButton?.focus({ preventScroll: true });
   }
 
   function onFocusOut(event: FocusEvent) {
@@ -142,6 +182,7 @@
 <div class="app-select {className}" class:open bind:this={wrap} onfocusout={onFocusOut}>
   <button
     class="field select-trigger app-select-trigger"
+    class:open
     class:env-colored={Boolean(selected?.color)}
     style:--env-color={selected?.color}
     type="button"
@@ -150,6 +191,7 @@
     aria-haspopup="listbox"
     aria-expanded={open}
     aria-label={ariaLabel ? `${ariaLabel}: ${selected?.label ?? value}` : undefined}
+    onmousedown={(event) => { if (open && event.button === 0) event.preventDefault(); }}
     onclick={() => void toggle()}
     onkeydown={navigate}
   >
@@ -160,7 +202,7 @@
     </svg>
   </button>
   {#if open}
-    <div class="menu app-select-menu" role="listbox" tabindex="-1" bind:this={menu} style={menuStyle} onkeydown={navigate} aria-label={ariaLabel}>
+    <div class="menu app-select-menu" class:app-select-menu-floating={floating} role="listbox" tabindex="-1" bind:this={menu} style={floating && !menuStyle ? 'visibility:hidden' : menuStyle} onkeydown={navigate} aria-label={ariaLabel}>
       {#if searchable}
         <input class="field field-sm" type="search" bind:value={search} bind:this={searchInput} aria-label={`Search ${ariaLabel || 'options'}`} placeholder={searchPlaceholder} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
       {/if}

@@ -128,7 +128,7 @@ func (s *mcpServer) toolDiagnoseLastFailure(_ context.Context, arguments json.Ra
 		envName = s.opts.env
 	}
 	diagnosis.Environment = envName
-	if values, _, err := resolveCLIValues(cliOptions{env: envName}, ws.collections, ws.environments, nil); err == nil {
+	if values, _, err := resolveCLIValues(cliOptions{env: envName, linked: skippedLinkedSecrets()}, ws.collections, ws.environments, nil); err == nil {
 		if scope := s.session[strings.ToLower(envName)]; scope != nil {
 			for key, value := range scope.set {
 				values[key] = value
@@ -424,7 +424,7 @@ func mcpTemplateNames(text string, keep map[string]bool) []string {
 	seen := map[string]bool{}
 	var names []string
 	for _, match := range mcpVariableRe.FindAllStringSubmatch(text, -1) {
-		name := strings.TrimSpace(match[1])
+		name := model.TemplateVariableKey(match[1])
 		if keep[name] && !seen[name] {
 			seen[name] = true
 			names = append(names, name)

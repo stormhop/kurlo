@@ -23,7 +23,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type sseSession struct {
@@ -106,7 +105,7 @@ func (m *sseManager) runStream(sseCtx, appCtx context.Context, sessionID string,
 		if m.replaced(sessionID, seq) {
 			return
 		}
-		runtime.EventsEmit(appCtx, name, payload)
+		emitRealtime(appCtx, sessionID, name, payload)
 	}
 
 	batch := newEventBatcher[model.SSEEvent](maxBatchSize, batchWindow,

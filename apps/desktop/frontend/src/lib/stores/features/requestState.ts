@@ -1,3 +1,4 @@
+import { requestSectionPreference, resolveFormRequestTab } from '../../requestTabPreferences';
 import { sseDisconnect, socketIODisconnect, webSocketDisconnect } from '../../backend';
 import type { HttpResponse, McpResponse } from '../../backend';
 import { mcpFailureMessage } from './mcp';
@@ -8,7 +9,7 @@ import {
 } from '../../graphql';
 import { cloneRequestExample, requestExamplesPending } from '../../examples';
 import { AI_DEFAULT_PRESET, aiDefaultAuthFor } from './ai';
-import { filesystemNameFromName, normalizeSavedRequest, normalizeSioArgs } from '../../normalizers';
+import { extraRequestFileFields, filesystemNameFromName, normalizeSavedRequest, normalizeSioArgs } from '../../normalizers';
 import { pathParamsFromUrl } from '../../pathParams';
 import { cloneSavedMessages, normalizeSavedMessages, requestTypeSupportsSavedMessages } from '../../savedMessages';
 import { assertionsForStore, normalizeAssertions, requestTypeSupportsAssertions, type AssertionRow } from '../../assertions';
@@ -69,6 +70,7 @@ type RequestStateHost = {
   activeRequestCollectionId: (forPersistence?: boolean) => string;
   activeRequestId: string;
   activeWorkspaceId: string;
+  requestFiles?: import('../requestFiles.svelte').RequestFiles;
   apiKeyIn: 'header' | 'query';
   apiKeyName: string;
   apiKeyValue: string;
@@ -153,7 +155,6 @@ type RequestStateHost = {
   pathParams: KVRow[];
   requestVars: KVRow[];
   postResponseVars: KVRow[];
-  preRequestScript: string;
   preRequestScriptJs: string;
   rawBodyType: RawBodyType;
   reqHeaders: KVRow[];
@@ -188,7 +189,6 @@ type RequestStateHost = {
   sioSelectedArgId: string;
   socketIOSessions: Map<string, SocketIOSession>;
   sseSessions: Map<string, SSESession>;
-  testScript: string;
   testScriptJs: string;
   topView: string;
   url: string;
@@ -219,7 +219,7 @@ function rowsIfAny<K extends 'vars' | 'postResponseVars'>(key: K, rows: KVRow[])
 export const requestStateFeature = {
   requestEditSignal(this: RequestStateHost): string {
     void this.bodyContent; void this.graphqlSchema; void this.graphqlQuery;
-    void this.graphqlVariables; void this.preRequestScript; void this.testScript; void this.preRequestScriptJs; void this.testScriptJs;
+    void this.graphqlVariables; void this.preRequestScriptJs; void this.testScriptJs;
     void this.requestNotes; void this.url; void this.requestName;
     return JSON.stringify({
       id: this.activeRequestId, requestType: this.requestType,
@@ -275,7 +275,7 @@ export const requestStateFeature = {
     const settings = this.currentRequestSettings();
     const id = newRequestId();
     const aiAuth = aiDefaultAuthFor();
-    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, savedMessages: [], grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], aiKurloTools: false, aiConnectionId: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
+    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, savedMessages: [], grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], aiKurloTools: false, aiConnectionId: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
   },
 
   activeRequestDraftTarget(this: RequestStateHost, forPersistence = false) {
@@ -300,6 +300,7 @@ export const requestStateFeature = {
     const auth = this.currentAuthState();
     const id = this.activeRequestId || newRequestId();
     return {
+      ...extraRequestFileFields(existing),
       id,
       name: this.snapshotRequestName(),
       filesystemName: existing?.filesystemName || filesystemNameFromName(this.snapshotRequestName(), id),
@@ -316,7 +317,6 @@ export const requestStateFeature = {
       bodyType: isGraphQL ? 'graphql' : this.bodyType, rawBodyType: isGraphQL ? 'json' : this.rawBodyType, bodyContent: isGraphQL ? this.graphQLBodyContentForStore() : this.bodyContent,
       bodyFilePath: this.bodyFilePath, bodyFileName: this.bodyFileName,
       formRows: cloneRowsForStore(this.formRows), graphqlSchema: isGraphQL ? this.graphqlSchema : '',
-      preRequestScript: this.preRequestScript, testScript: this.testScript,
       preRequestScriptJs: this.preRequestScriptJs, testScriptJs: this.testScriptJs,
       requestNotes: this.requestNotes,
       ...(this.requestExamplesLoaded
@@ -375,7 +375,7 @@ export const requestStateFeature = {
     const hasSharedContent =
       req.params.some(rowHasContent) || (req.pathParams ?? []).some(r => r.value.trim()) || req.headers.some(rowHasContent) ||
       (req.vars ?? []).some(rowHasContent) || (req.postResponseVars ?? []).some(rowHasContent) ||
-      this.authStateHasData(req.auth, req.auth.type) || req.preRequestScript.trim() || req.testScript.trim() ||
+      this.authStateHasData(req.auth, req.auth.type) || req.preRequestScriptJs?.trim() || req.testScriptJs?.trim() ||
       req.requestNotes.trim() || Boolean(req.assertions?.some(row => row.target.trim()));
     const hasSavedMessages = Boolean(req.savedMessages?.length);
     if (requestType === 'ws') {
@@ -429,12 +429,11 @@ export const requestStateFeature = {
     this.requestType = this.normalizeRequestTypeValue(req.requestType, req.url);
     this.requestNameAuto = req.nameAuto ?? (!req.name || req.name === 'New Request');
     this.requestName = this.requestNameAuto ? '' : req.name;
-    this.method = this.requestType === 'graphql' || this.requestType === 'grpc' ? 'POST' : req.method; this.url = req.url; this.requestTab = req.requestTab ?? (this.requestType === 'graphql' ? 'query' : this.requestType === 'grpc' ? 'body' : 'params');
-    if (this.requestType === 'graphql' && !['docs', 'query', 'auth', 'headers', 'vars', 'schema', 'scripts'].includes(this.requestTab)) this.requestTab = 'query';
-    if (this.requestType === 'ws' && !['docs', 'body', 'params', 'headers', 'vars', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'socketio' && !['docs', 'body', 'events', 'params', 'headers', 'vars', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'grpc' && !['docs', 'body', 'auth', 'metadata', 'vars', 'service', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
-    if (this.requestType === 'ai' && !['docs', 'body', 'auth', 'headers', 'vars', 'tools', 'scripts', 'settings'].includes(this.requestTab)) this.requestTab = 'body';
+    this.method = this.requestType === 'graphql' || this.requestType === 'grpc' ? 'POST' : req.method;
+    this.url = req.url;
+    const workspaceId = this.collections.find(collection => collection.id === req.collectionId)?.workspaceId ?? this.activeWorkspaceId;
+    const section = requestSectionPreference(this.requestFiles?.root ?? '', workspaceId, req.id);
+    this.requestTab = resolveFormRequestTab(this.requestType, this.method, section, req.requestTab);
     this.sioEvents = this.restoreSioEventRows(req.sioEvents ?? []);
     this.sioEventName = req.sioEventName ?? '';
     this.sioArgs = normalizeSioArgs(req.sioArgs);
@@ -502,7 +501,6 @@ export const requestStateFeature = {
       this.graphqlSchemaStatus = ''; this.graphqlSchemaError = '';
     }
     this.bodyFilePath = req.bodyFilePath; this.bodyFileName = req.bodyFileName;
-    this.preRequestScript = req.preRequestScript; this.testScript = req.testScript;
     this.preRequestScriptJs = req.preRequestScriptJs ?? ''; this.testScriptJs = req.testScriptJs ?? '';
     this.requestNotes = req.requestNotes ?? '';
     const examplesPending = requestExamplesPending(req);

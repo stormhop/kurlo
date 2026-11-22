@@ -17,14 +17,49 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **Capture proxy** records development traffic, turns calls into requests and examples, and exports HAR from the desktop or CLI. See [Capture proxy](/docs/guides/capture-proxy/).
 
-- **Postman v3 collection export** writes a YAML folder for Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available. See [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
+- **Secret managers.** Link environment variables to Vault, 1Password, AWS Secrets Manager or Parameter Store, Google Secret Manager, Azure Key Vault, Bitwarden, Doppler, Infisical or a command such as `pass`, and browse a provider to pick a secret. Only the reference goes into Git; values are fetched on send and stay in memory. An environment can import every key of a secret as variables. `kurlo run`, load tests and AI agents use linked values too, masked in reports and results. The Collection Runner checks the selected requests before sending any of them and stops on missing or empty secrets. The provider form checks each field and credential before saving. Vault signs in with LDAP or userpass too, AWS providers can assume a role with MFA, and pasting an ARN, `op://` URI, Azure or Vault URL fills in the link. **Export for CI…** saves the provider's credentials as a `.env` file for `kurlo run`. Cache time can be any duration up to 24 hours, and scripts can use `await pm.vault.get()`. Postman-style `{{vault:name}}` works in every field, with suggestions after `{{vault:`. [Secret managers guide](/docs/guides/environments/secret-managers/).
+
+- **File tab.** Edit a request’s YAML with wrapped lines, collapsible sections and protected metadata. Change the name, URL, method or protocol from the address bar and see it update in the YAML. Changing the URL back restores its original YAML. Choose suggested fields and values as you type, preview the save format with Beautify, hover over underlined fields to read validation errors, and review changes made on disk. Editor sections are remembered locally. Generated YAML keeps disabled rows and omits default row fields. [Request file guide](/docs/reference/kurlo-yaml-format/request/).
+
+- **File bodies.** Drop a file onto **Body → Binary** or choose one, and see its size and type, a **File not found** warning and a one-click `Content-Type` header. Files inside the workspace folder are saved with relative paths, so binary and form-data requests work after a Git clone and in `kurlo run`. [HTTP guide](/docs/guides/request-types/http/#send-a-file-as-the-body).
+
+### Changed
+
+- **Collection documentation.** The HTML reference keeps the request address pinned, shows cURL, JavaScript and Python snippets with authorization placeholders, and lists saved examples with colored status codes and side-by-side responses. The **Generate documentation** dialog is more compact. [Collection documentation guide](/docs/guides/cli-runner/docs/).
+- **Request protocol.** Saved requests with a URL can switch protocol from the address bar.
 
 ### Fixed
 
 - **Record** starts the local proxy for browsers using the configured proxy address. [Connect your browser](/docs/guides/capture-proxy/#connect-your-browser).
-- **OpenAPI imports** stop if the intended workspace is no longer active when the spec arrives.
-- **OpenAPI and Postman imports** report save failures and let you retry saving imported requests.
-- **Secret variables** keep their IDs when loading and autosaving a Git workspace.
+- **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+- **Undefined variables** are underlined in red even before any environment exists.
+- **Request tabs** keep titles readable, number untitled drafts and mark a draft as unsaved only after you change it.
+- **Collection Runner** and **History** layouts fit narrower windows and show more of each request path.
+- **Workspace README** keeps your line breaks in the overview.
+- **Command palette** lists secret commands under **Secrets**.
+- **Activity bar** highlights one button at a time.
+- **Small windows** keep the empty response actions reachable and show when the provider list scrolls.
+- **Request tabs** no longer flash empty the first time you open them.
+- **Environments**, **Mock server** and **Settings** have clearer unsaved, empty and default-location states.
+- **Sidebar** shows the arrow pointer over collection names instead of a text cursor.
+
+## 3.1.5
+
+### Added
+
+- **GraphQL query builder.** Choose fields, set arguments and edit typed variables alongside the query. [GraphQL guide](/docs/guides/request-types/graphql/).
+- **Script autocomplete.** Look up `pm.*` methods, variable keys and saved request names as you type. [Scripting guide](/docs/guides/scripting/).
+- **Offline collection documentation.** Export searchable HTML with variable previews, cURL templates and saved examples. [Build collection documentation](/docs/guides/cli-runner/docs/).
+- **Request auth in scripts.** Read the active or inherited auth settings with `pm.request.auth`.
+- **Postman v3 export.** Open exported HTTP, GraphQL and gRPC requests as local files in Postman Desktop. [Export to Postman v3](/docs/guides/import-export/postman/#export-to-postman-v3).
+
+### Fixed
+
+- **Request editing.** Send shortcuts respect the focused editor and open dialogs. macOS buttons show the active shortcut. Socket.IO message controls fit at larger scales, and HTTP body fonts match across request and response.
+- **GraphQL introspection.** Clearing the schema during a refresh keeps it cleared.
+- **k6 load testing.** Runs preserve request settings, encoded URLs, repeated form fields and large IDs. Failed saves can be retried, and results stay with the correct collection.
+- **Script saving.** The save shortcut applies to the active folder or collection script.
+- **Imports and Git workspaces.** OpenAPI imports stop after a workspace switch. OpenAPI and Postman imports keep requests available after a failed save. Autosaving preserves secret variable IDs.
 
 ## 3.1.4
 
@@ -142,7 +177,6 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
   handlers no longer land in the body, and XML bodies starting with `<` are kept.
 - **Import dialog shows `.http` and `.rest` files on Linux**: import opens the system dialog filtered to the chosen
   format.
-- **Tengo script timeouts**: Tengo scripts respect the configured script timeout instead of always using two seconds.
 - **Compact release notes in About**: long update notes show about ten lines and a link to the full changelog on the
   website.
 - **Mock server with thousands of examples**: the route list reads only methods, paths and statuses and the server reads

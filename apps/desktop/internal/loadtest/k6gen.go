@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,24 +39,25 @@ var dynamicHelpers = map[string]string{
 var summaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)", "p(99)"}
 
 type generator struct {
-	plan      Plan
-	options   Options
-	out       bytes.Buffer
-	indent    int
-	warnings  []model.K6ExportWarning
-	warned    map[string]bool
-	variables map[string]Variable
-	columns   map[string]bool
-	extracted map[string]bool
-	defaults  map[string]string
-	seen      map[string]bool
-	dynamics  map[string]bool
-	secrets   []string
-	needs     map[string]bool
-	tokens    []model.AuthConfig
-	stepTags  map[string]string
-	stepOrder []model.K6ExportStep
-	insecure  bool
+	plan       Plan
+	options    Options
+	out        bytes.Buffer
+	indent     int
+	warnings   []model.K6ExportWarning
+	warned     map[string]bool
+	variables  map[string]Variable
+	columns    map[string]bool
+	extracted  map[string]bool
+	defaults   map[string]string
+	seen       map[string]bool
+	dynamics   map[string]bool
+	secrets    []string
+	needs      map[string]bool
+	tokens     []Request
+	localNames map[string]bool
+	stepTags   map[string]string
+	stepOrder  []model.K6ExportStep
+	insecure   bool
 }
 
 func GenerateK6(plan Plan, options Options) model.K6ExportResult {
@@ -83,12 +84,16 @@ func GenerateK6(plan Plan, options Options) model.K6ExportResult {
 	}
 	steps := g.steps()
 	for _, step := range steps {
+		if len(plan.Requests[step.RequestID].Variables) > 0 {
+			g.needs["locals"] = true
+		}
 		for _, extract := range step.Extract {
 			if extract.Var != "" {
 				g.extracted[extract.Var] = true
 			}
 		}
 	}
+
 	g.insecure = plan.Test.Settings.Insecure
 	body := g.defaultFunction(steps)
 	g.writeScript(body)
@@ -186,11 +191,11 @@ func (g *generator) scan(step int, value string, depth int) {
 		return
 	}
 	for _, match := range templateName.FindAllStringSubmatch(value, -1) {
-		name := strings.TrimSpace(match[1])
+		name := model.TemplateVariableKey(match[1])
 		if name == "" {
 			continue
 		}
-		if g.extracted[name] || g.columns[name] {
+		if _, hasDefault := g.variables[name]; !hasDefault && (g.extracted[name] || g.columns[name] || g.localNames[name]) {
 			continue
 		}
 		if strings.HasPrefix(name, "$") {
@@ -210,7 +215,7 @@ func (g *generator) scan(step int, value string, depth int) {
 			continue
 		}
 		g.seen[name] = true
-		if variable.Secret && !g.options.InlineSecrets {
+		if variable.Secret && (!g.options.InlineSecrets || variable.Linked) {
 			g.secrets = append(g.secrets, name)
 			continue
 		}
@@ -331,6 +336,7 @@ func (g *generator) writeStep(number int, step model.LoadStep, request Request, 
 	}
 	g.line("group(%s, () => {", jsString(tag))
 	g.indent++
+	g.writeRequestScope(number, request)
 	g.line("const res = http.request(%s, %s, %s, %s);", jsString(request.Method), g.urlExpr(number, request), g.bodyExpr(number, request), g.paramsExpr(number, request, tag))
 	g.writeChecks(number, step, tag)
 	g.writeExtracts(number, step)
@@ -351,13 +357,39 @@ func (g *generator) writeStep(number int, step model.LoadStep, request Request, 
 	}
 }
 
+func (g *generator) writeRequestScope(step int, request Request) {
+	if !g.needs["locals"] {
+		return
+	}
+	g.localNames = map[string]bool{}
+	g.line("local = Object.create(null);")
+	for i, variable := range request.Variables {
+		var expr string
+		if variable.Secret && !g.options.InlineSecrets {
+			key := request.secretKey(i)
+			g.info("Pass the secret request variable %s for %s as %s when running k6.", variable.Name, request.Name, key)
+			g.scan(step, variable.Value, 0)
+			expr = "t(__ENV[" + jsString(key) + "] ?? '')"
+		} else {
+			expr = g.text(step, variable.Value)
+		}
+		g.line("local[%s] = %s;", jsString(variable.Name), expr)
+		g.localNames[variable.Name] = true
+	}
+}
+
 func seconds(ms int) string {
 	return strconv.FormatFloat(float64(ms)/1000, 'f', -1, 64)
 }
 
 func (g *generator) urlExpr(number int, request Request) string {
-	raw := applyPathParams(request.URL, request.PathParams)
-	expr := g.text(number, raw)
+	expr := strings.Join(pathParts(request.URL, request.PathParams, func(s string) string { return g.text(number, s) }, func(s string) string {
+		g.needs["pathSegment"] = true
+		return "pathSegment(" + g.text(number, s) + ")"
+	}), " + ")
+	if len(request.PathParams) > 0 {
+		expr = "(" + expr + ")"
+	}
 	query := make([]string, 0, len(request.Query)+1)
 	for _, pair := range request.Query {
 		query = append(query, "["+g.text(number, pair.Key)+", "+g.text(number, pair.Value)+"]")
@@ -377,42 +409,39 @@ func (g *generator) urlExpr(number int, request Request) string {
 	return expr
 }
 
-func applyPathParams(rawURL string, params []Pair) string {
+func pathParts(rawURL string, params []Pair, literal, parameter func(string) string) []string {
+	pathEnd := len(rawURL)
+	if cut := strings.IndexAny(rawURL, "?#"); cut >= 0 {
+		pathEnd = cut
+	}
+	pathStart := 0
+	if schema := strings.Index(rawURL[:pathEnd], "://"); schema >= 0 {
+		pathStart = schema + 3
+	}
+	firstSlash := strings.IndexByte(rawURL[pathStart:pathEnd], '/')
+	if firstSlash < 0 || len(params) == 0 {
+		return []string{literal(rawURL)}
+	}
+	offset := pathStart + firstSlash + 1
+	last := 0
+	var parts []string
 	values := map[string]string{}
 	for _, param := range params {
 		if param.Key != "" && param.Value != "" {
 			values[param.Key] = param.Value
 		}
 	}
-	if len(values) == 0 {
-		return rawURL
-	}
-	start := 0
-	if scheme := strings.Index(rawURL, "://"); scheme >= 0 {
-		slash := strings.IndexByte(rawURL[scheme+3:], '/')
-		if slash < 0 {
-			return rawURL
+	for _, segment := range strings.Split(rawURL[offset:pathEnd], "/") {
+		if name, ok := strings.CutPrefix(segment, ":"); ok && values[name] != "" {
+			parts = append(parts, literal(rawURL[last:offset]), parameter(values[name]))
+			last = offset + len(segment)
 		}
-		start = scheme + 3 + slash
+		offset += len(segment) + 1
 	}
-	end := len(rawURL)
-	if cut := strings.IndexAny(rawURL[start:], "?#"); cut >= 0 {
-		end = start + cut
+	if last < len(rawURL) || len(parts) == 0 {
+		parts = append(parts, literal(rawURL[last:]))
 	}
-	segments := strings.Split(rawURL[start:end], "/")
-	for i, segment := range segments {
-		if !strings.HasPrefix(segment, ":") {
-			continue
-		}
-		if value, ok := values[segment[1:]]; ok {
-			if strings.Contains(value, "{{") {
-				segments[i] = value
-			} else {
-				segments[i] = url.PathEscape(value)
-			}
-		}
-	}
-	return rawURL[:start] + strings.Join(segments, "/") + rawURL[end:]
+	return parts
 }
 
 func (g *generator) bodyExpr(number int, request Request) string {
@@ -431,7 +460,7 @@ func (g *generator) bodyExpr(number int, request Request) string {
 				skipped = true
 				continue
 			}
-			fields = append(fields, g.objectKey(number, field.Key)+": "+g.text(number, field.Value))
+			fields = append(fields, "["+g.text(number, field.Key)+", "+g.text(number, field.Value)+"]")
 		}
 		if request.BodyType == "form" {
 			g.warn(number, "The multipart form of %s is sent URL-encoded.", request.Name)
@@ -442,7 +471,8 @@ func (g *generator) bodyExpr(number int, request Request) string {
 		if len(fields) == 0 {
 			return "null"
 		}
-		return "{ " + strings.Join(fields, ", ") + " }"
+		g.needs["form"] = true
+		return "formBody([" + strings.Join(fields, ", ") + "])"
 	case "binary":
 		g.warn(number, "The file body of %s is not exported.", request.Name)
 	}
@@ -459,6 +489,9 @@ func (g *generator) paramsExpr(number int, request Request, tag string) string {
 	if contentType, ok := rawContentTypes[request.BodyType]; ok && request.Body != "" && !has["content-type"] {
 		headers = append(headers, jsString("Content-Type")+": "+jsString(contentType))
 	}
+	if (request.BodyType == "urlencoded" || request.BodyType == "form") && !has["content-type"] && slices.ContainsFunc(request.Form, func(f FormField) bool { return !f.IsFile }) {
+		headers = append(headers, jsString("Content-Type")+": "+jsString("application/x-www-form-urlencoded"))
+	}
 	if auth := g.authHeader(number, request); auth != "" && !has["authorization"] {
 		headers = append(headers, jsString("Authorization")+": "+auth)
 	}
@@ -467,6 +500,9 @@ func (g *generator) paramsExpr(number int, request Request, tag string) string {
 		headers = append(headers, g.objectKey(number, request.Auth.KeyName)+": "+g.text(number, request.Auth.KeyValue))
 	}
 	parts := []string{}
+	if request.Redirects != nil {
+		parts = append(parts, "redirects: "+strconv.Itoa(*request.Redirects))
+	}
 	if len(headers) > 0 {
 		parts = append(parts, "headers: { "+strings.Join(headers, ", ")+" }")
 	}
@@ -500,7 +536,7 @@ func (g *generator) authHeader(number int, request Request) string {
 	case "oauth2":
 		grant := strings.ToLower(strings.TrimSpace(cfg.OAuth2GrantType))
 		if (grant == "client_credentials" || grant == "password") && strings.TrimSpace(cfg.OAuth2TokenURL) != "" {
-			index := g.tokenIndex(number, cfg)
+			index := g.tokenIndex(number, request)
 			return "'Bearer ' + data.tokens[" + strconv.Itoa(index) + "]"
 		}
 		if cfg.Token != "" {
@@ -518,13 +554,14 @@ func (g *generator) authHeader(number int, request Request) string {
 	}
 }
 
-func (g *generator) tokenIndex(number int, cfg model.AuthConfig) int {
+func (g *generator) tokenIndex(number int, request Request) int {
+	cfg := request.Auth
 	for index, existing := range g.tokens {
-		if sameTokenSource(existing, cfg) {
+		if sameTokenSource(existing.Auth, cfg) && (len(existing.Variables) == 0 && len(request.Variables) == 0 || existing.ID == request.ID) {
 			return index
 		}
 	}
-	g.tokens = append(g.tokens, cfg)
+	g.tokens = append(g.tokens, request)
 	for _, value := range []string{cfg.OAuth2TokenURL, cfg.OAuth2ClientID, cfg.OAuth2Secret, cfg.OAuth2Scope, cfg.OAuth2Audience, cfg.OAuth2Username, cfg.OAuth2Password} {
 		g.scan(number, value, 0)
 	}
@@ -595,7 +632,7 @@ func (g *generator) writeExtracts(number int, step model.LoadStep) {
 			g.needs["header"] = true
 			g.line("%s = header(res, %s);", target, jsString(extract.Path))
 		case "regex":
-			if _, err := regexp.Compile(extract.Path); err != nil {
+			if _, err := extractionPattern(extract.Path); err != nil {
 				g.warn(number, "The pattern for %s is not valid; it is not saved.", extract.Var)
 				continue
 			}
@@ -783,9 +820,12 @@ func (g *generator) writeScript(body string) {
 	g.indent--
 	g.line("};")
 	g.line("")
-	g.line("const vu = {};")
+	g.line("const vu = Object.create(null);")
 	g.line("const done = {};")
 	g.line("let row = {};")
+	if g.needs["locals"] {
+		g.line("let local;")
+	}
 	g.line("")
 	g.writeHelpers()
 	if setupBody != "" {
@@ -802,6 +842,10 @@ func (g *generator) writeScript(body string) {
 
 	sort.Strings(g.secrets)
 	for _, name := range g.secrets {
+		if g.variables[name].Linked {
+			g.info("%s comes from a secret manager and is not written into the script. Pass it when running: k6 run -e %s=…", name, name)
+			continue
+		}
 		g.info("%s is secret and is not written into the script. Pass it when running: k6 run -e %s=…", name, name)
 	}
 }
@@ -815,7 +859,9 @@ func (g *generator) setup() string {
 	g.line("export function setup() {")
 	g.indent++
 	g.line("const tokens = [];")
-	for index, cfg := range g.tokens {
+	for index, request := range g.tokens {
+		g.writeRequestScope(0, request)
+		cfg := request.Auth
 		grant := strings.ToLower(strings.TrimSpace(cfg.OAuth2GrantType))
 		fields := []string{"grant_type: " + jsString(grant)}
 		if grant == "password" {
@@ -853,16 +899,19 @@ func (g *generator) writeHelpers() {
 	g.line("}")
 	g.line("")
 	g.line("function lookup(name, depth) {")
-	g.line("  if (name in vu) return vu[name] === undefined ? undefined : String(vu[name]);")
-	g.line("  if (name in row) return String(row[name]);")
-	g.line("  if (name in DYNAMIC) return DYNAMIC[name]();")
+	g.line("  if (vu[name] !== undefined) return String(vu[name]);")
+	g.line("  if (Object.prototype.hasOwnProperty.call(row, name)) return String(row[name]);")
+	if g.needs["locals"] {
+		g.line("  if (local && local[name] !== undefined) return local[name];")
+	}
+	g.line("  if (Object.prototype.hasOwnProperty.call(DYNAMIC, name)) return DYNAMIC[name]();")
 	g.line("  return env(name, depth);")
 	g.line("}")
 	g.line("")
 	g.line("function t(text, depth = 0) {")
 	g.line("  if (depth > 10) return text;")
 	g.line("  return text.replace(/\\{\\{([^{}]*)\\}\\}/g, (match, key) => {")
-	g.line("    const value = lookup(key.trim(), depth);")
+	g.line("    const value = lookup(key.trim().replace(/^vault:\\s*/, ''), depth);")
 	g.line("    return value === undefined ? match : value;")
 	g.line("  });")
 	g.line("}")
@@ -876,11 +925,25 @@ func (g *generator) writeHelpers() {
 		g.line("}")
 		g.line("")
 	}
+	if g.needs["pathSegment"] {
+		g.line("function pathSegment(value) {")
+		g.line("  return value.replace(/%%[0-9a-fA-F]{2}|[^a-zA-Z0-9._~!$&'()*+,;=:@{}-]/gu, c => c.length === 3 && c[0] === '%%' ? c : encodeURIComponent(c));")
+		g.line("}")
+		g.line("")
+	}
+	if g.needs["form"] {
+		g.line("function formBody(pairs) {")
+		g.line("  const encode = value => encodeURIComponent(value).replace(/%%20/g, '+').replace(/[!'()*]/g, c => '%%' + c.charCodeAt(0).toString(16).toUpperCase());")
+		g.line("  return pairs.map(([key, value]) => encode(key) + '=' + encode(value)).join('&');")
+		g.line("}")
+		g.line("")
+	}
 	if g.needs["q"] {
 		g.line("function q(url, pairs) {")
 		g.line("  const query = pairs.map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value)).join('&');")
 		g.line("  if (!query) return url;")
-		g.line("  return url + (url.includes('?') ? '&' : '?') + query;")
+		g.line("  const [base, ...fragment] = url.split('#');")
+		g.line("  return base + (base.includes('?') ? '&' : '?') + query + (fragment.length ? '#' + fragment.join('#') : '');")
 		g.line("}")
 		g.line("")
 	}

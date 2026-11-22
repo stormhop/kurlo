@@ -1,18 +1,19 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from 'svelte';
-  import { Decoration, EditorView, ViewPlugin, WidgetType, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { Decoration, EditorView, ViewPlugin, WidgetType, drawSelection, tooltips, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { EditorState, Compartment, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
-  import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
+  import { defaultKeymap, history, isolateHistory, historyKeymap, indentWithTab } from '@codemirror/commands';
   import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
-  import { autocompletion, completionKeymap, completionStatus, closeBrackets, closeBracketsKeymap, type CompletionContext } from '@codemirror/autocomplete';
+  import { autocompletion, completionKeymap, completionStatus, closeBrackets, closeBracketsKeymap, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
   import { forEachDiagnostic, linter, type Diagnostic } from '@codemirror/lint';
   import { tags } from '@lezer/highlight';
+  import { textChange } from './textChange';
   import { selectedLineNumbersForComment } from './editorSelection';
   import { formatJsonDocument, validateJsonDocument } from './jsonEditing';
   import { formatGraphQLQuery } from './graphql';
   import { prettyMarkup } from './utils';
   import type { VariableSuggestion } from './variables';
-  import { variableDisplayValue } from './variables';
+  import { VAULT_TEMPLATE_PREFIX, matchVariableSuggestions, variableDisplayValue } from './variables';
   import { DYNAMIC_VARIABLES } from './dynamicVariables';
   import { maxLength as maxLengthFilter } from './editorLimit';
   import { registerEditorView, unregisterEditorView } from './editorViews';
@@ -33,6 +34,9 @@
     testId = '',
     ariaLabel = '',
     variableSuggestions = [],
+    editorExtensions = [],
+    completionSource,
+    includeVariableCompletions = false,
     maxLength = 0,
     onformat,
     validate,
@@ -50,6 +54,9 @@
     testId?: string;
     ariaLabel?: string;
     variableSuggestions?: VariableSuggestion[];
+    editorExtensions?: Extension;
+    completionSource?: CompletionSource;
+    includeVariableCompletions?: boolean;
     maxLength?: number;
     onformat?: () => void;
     validate?: (text: string) => Promise<{ line: number; message: string } | null>;
@@ -80,6 +87,10 @@
       padding: compact ? 'var(--space-2) 0 var(--space-2) var(--space-3)' : 'var(--space-2-5) 0 var(--space-2-5) var(--space-3)',
       caretColor: 'var(--accent)',
       minHeight: fillHeight ? '100%' : minHeight,
+    },
+    '.cm-cursor': { borderLeftColor: 'var(--accent)' },
+    '.cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': {
+      backgroundColor: 'color-mix(in srgb, var(--accent) 30%, transparent)',
     },
     '.cm-line': {
       padding: '0 var(--space-3) 0 0',
@@ -278,7 +289,10 @@
         extension = (await import('@codemirror/lang-json')).json();
         break;
       case 'javascript':
-        extension = (await import('@codemirror/lang-javascript')).javascript({ jsx: false, typescript: false });
+        extension = [
+          (await import('@codemirror/lang-javascript')).javascript({ jsx: false, typescript: false }),
+          readonly ? [] : drawSelection(),
+        ];
         break;
       case 'html':
         extension = (await import('@codemirror/lang-html')).html();
@@ -315,21 +329,16 @@
     const prefix = match[1] ?? '';
     const start = context.pos - prefix.length;
     const needle = prefix.toLowerCase();
-    const environmentOptions = variableSuggestions
-      .filter(variable => variable.key.toLowerCase().includes(needle))
-      .sort((a, b) => {
-        const ap = a.key.toLowerCase().startsWith(needle) ? 0 : 1;
-        const bp = b.key.toLowerCase().startsWith(needle) ? 0 : 1;
-        return ap - bp || a.key.localeCompare(b.key);
-      })
-      .slice(0, 30)
-      .map(variable => ({
-        label: variable.key,
+    const matched = matchVariableSuggestions(variableSuggestions, prefix, 30);
+    const environmentOptions = matched.items.map(variable => variable.key === VAULT_TEMPLATE_PREFIX
+      ? { label: VAULT_TEMPLATE_PREFIX, type: 'namespace', detail: variable.description, apply: VAULT_TEMPLATE_PREFIX, boost: -1 }
+      : {
+        label: matched.vault ? `${VAULT_TEMPLATE_PREFIX}${variable.key}` : variable.key,
         type: 'variable',
-        detail: variable.secret ? 'secret' : variableDisplayValue(variable),
-        apply: `${variable.key}}}`,
-      }));
-    const dynamicOptions = DYNAMIC_VARIABLES
+        detail: variable.linked ? variableDisplayValue(variable) : variable.secret ? 'secret' : variableDisplayValue(variable),
+        apply: `${matched.vault ? VAULT_TEMPLATE_PREFIX : ''}${variable.key}}}`,
+      });
+    const dynamicOptions = matched.vault ? [] : DYNAMIC_VARIABLES
       .filter(variable => variable.name.toLowerCase().includes(needle))
       .slice(0, 30)
       .map(variable => ({
@@ -673,13 +682,21 @@
   }
 
   function buildExtensions(lang: Lang) {
+    const sources: CompletionSource[] = [];
+    if (completionSource) sources.push(context => completionSource?.(context) ?? null);
+    if (!completionSource || includeVariableCompletions) sources.push(variableCompletionSource);
     return [
       ...(prose
         ? [EditorView.lineWrapping]
         : [lineNumbers(), foldGutter({ markerDOM: foldMarker }), highlightActiveLineGutter(), highlightActiveLine(), bracketMatching(), closeBrackets()]),
+      editorExtensions,
       history(),
       indentOnInput(),
-      autocompletion({ override: [variableCompletionSource] }),
+      ...(completionSource ? [tooltips({ parent: document.body })] : []),
+      autocompletion({
+        override: sources,
+        tooltipClass: () => completionSource ? 'script-completions' : '',
+      }),
       commentDecorationPlugin,
       ghostExtension,
       kurloLinter,
@@ -733,7 +750,11 @@
       if (current === next) return;
       internalChange = true;
       try {
-        view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: next } });
+        if (language === 'yaml') {
+          view!.dispatch({ changes: textChange(current, next), annotations: isolateHistory.of('full') });
+        } else {
+          view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: next } });
+        }
       } finally {
         internalChange = false;
       }
@@ -777,15 +798,17 @@
     if (language === 'graphql' && current.trim()) {
       formatted = formatGraphQLQuery(current);
     }
-    if (formatted !== null && formatted !== current) {
-      internalChange = true;
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: formatted } });
-      internalChange = false;
-      value = formatted;
-      onformat?.();
-      return true;
-    }
-    return false;
+    return formatted !== null && applyFormattedText(formatted);
+  }
+
+  export function applyFormattedText(formatted: string) {
+    if (!view || view.state.doc.toString() === formatted) return false;
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: formatted },
+      annotations: isolateHistory.of('full'),
+    });
+    onformat?.();
+    return true;
   }
 
 </script>
@@ -824,6 +847,10 @@
     height: 100%;
     overscroll-behavior: none;
     scrollbar-gutter: stable both-edges;
+  }
+
+  :global(.cm-wrap .cm-scroller:has(> .cm-cursorLayer)) {
+    scrollbar-gutter: stable;
   }
 
   @supports (hanging-punctuation: first) {

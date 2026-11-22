@@ -308,6 +308,7 @@ func (a *App) saveRequestStoreDelta(payload string) (int64, []string, error) {
 			Workspace:       workspace,
 			CollectionOrder: idsFor(collectionsByWorkspace[id]),
 			Cookies:         sanitizedCookies[id],
+			SecretProviders: readWorkspaceSecretProviders(dir),
 		}, nil); err != nil {
 			return 0, nil, err
 		}

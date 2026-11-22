@@ -1,6 +1,7 @@
 <script lang="ts">
   import { vm } from '../stores/app.svelte';
   import { trashEntryLabel } from '../stores/features/trash';
+  import { secretProviders } from '../stores/secretProviders.svelte';
 
   const undoEntry = $derived(vm.undoEntryId ? vm.trash.find(entry => entry.id === vm.undoEntryId) : undefined);
 </script>
@@ -29,5 +30,6 @@
 {/if}
 {#if vm.curlPasteToast}<div class="curl-toast" role="status" aria-live="polite">{vm.curlPasteToast}</div>{/if}
 {#if vm.collectionImportToast}<div class="curl-toast">{vm.collectionImportToast}</div>{/if}
+{#if secretProviders.notice}<div class="curl-toast" role="status" aria-live="polite">{secretProviders.notice}</div>{/if}
 {#if vm.environmentToast}<div class="curl-toast">{vm.environmentToast}</div>{/if}
 {#if vm.gitToast}<div class="git-toast" role="status" aria-live="polite"><span class="git-toast-dot"></span><span>{vm.gitToast}</span></div>{/if}

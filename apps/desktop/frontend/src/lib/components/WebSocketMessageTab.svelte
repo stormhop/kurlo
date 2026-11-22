@@ -1,6 +1,7 @@
 <script lang="ts">
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
+  import RequestShortcutHint from './RequestShortcutHint.svelte';
   import SavedMessagesMenu from './SavedMessagesMenu.svelte';
   import { RAW_BODY_TYPES } from '../constants';
   import { vm } from '../stores/app.svelte';
@@ -16,13 +17,14 @@
     if (vm.shortcutForEvent(event) === 'send-request') {
       event.preventDefault();
       event.stopPropagation();
-      void vm.webSocketSendCurrentMessage();
+      if (vm.webSocketConnected) void vm.webSocketSendCurrentMessage();
+      else void vm.runActiveRequest();
     }
   }
 </script>
 
 <div class="body-section">
-  <div class="body-editor-wrap ws-body-editor-wrap" role="presentation" onkeydown={onKeydown}>
+  <div class="body-editor-wrap ws-body-editor-wrap" class:connected-message-editor={vm.webSocketConnected} role="presentation" onkeydowncapture={onKeydown}>
     <div class="body-editor-toolbar ws-message-toolbar">
       <div class="raw-type-menu ws-type-menu">
         <button
@@ -63,6 +65,7 @@
         </button>
         <button class="btn btn-primary btn-sm ws-message-send" type="button" disabled={!vm.webSocketConnected} onclick={vm.webSocketSendCurrentMessage}>
           Send
+          {#if vm.webSocketConnected}<RequestShortcutHint />{/if}
         </button>
       </div>
     </div>

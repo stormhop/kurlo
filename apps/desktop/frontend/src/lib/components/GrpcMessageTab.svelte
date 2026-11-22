@@ -17,7 +17,7 @@
 </script>
 
 <div class="body-section">
-  <div class="body-editor-wrap grpc-message-editor-wrap" role="presentation" onkeydown={onKeydown}>
+  <div class="body-editor-wrap grpc-message-editor-wrap" role="presentation" onkeydowncapture={onKeydown}>
     <div class="body-editor-toolbar grpc-message-toolbar">
       <div class="grpc-method-summary">
         {#if selectedMethod}

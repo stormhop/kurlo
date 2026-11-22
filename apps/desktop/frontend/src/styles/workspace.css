@@ -216,7 +216,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  min-width: 6rem;
+  min-width: 8.5rem;
   max-width: 12.5rem;
   height: 2rem;
   border: 1px solid transparent;
@@ -377,6 +377,11 @@
 
 .runner-tab > button:first-child svg {
   flex: 0 0 auto;
+}
+
+.collection-settings-tab {
+  min-width: 8.5rem;
+  max-width: 12.5rem;
 }
 
 .git-workspace-tab {
@@ -3794,8 +3799,8 @@
 }
 
 .env-save-indicator.dirty {
-  color: var(--put);
-  border-color: color-mix(in srgb, var(--put) 36%, var(--border));
+  color: var(--warning);
+  border-color: var(--warning-border);
 }
 
 .environment-editor-card {
@@ -4855,10 +4860,6 @@
     border-right: none;
     border-bottom: 1px solid var(--border-subtle);
   }
-}
-
-.runner-actions .btn-ghost {
-  margin-left: calc(var(--space-3) * -1);
 }
 
 .runner-result-row .runner-request-main span {

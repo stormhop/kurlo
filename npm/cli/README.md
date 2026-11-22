@@ -19,6 +19,14 @@ npm install -g @kurlo/cli
 
 Node installed with Homebrew, Volta or nvm keeps global packages in your home folder already. Avoid `sudo npm install -g`: it works, but leaves root-owned files that break later installs.
 
+## Build collection documentation
+
+```bash
+kurlo docs build "Orders API" --workspace ./api --out ./public/reference
+```
+
+Open `public/reference/index.html` locally or publish it to a static host. Use `--open` for a browser preview and `--docs-base-url https://docs.example.com` to resolve relative links in notes. The collection selector accepts a name or ID and is optional in a workspace with one collection. Use `--out ./docs/orders.html` for a named file. The default output is `./kurlo-docs/index.html`.
+
 ## Connect an AI agent
 
 Add Kurlo to every AI client on your machine (Claude Code, Claude Desktop, Codex, Cursor, VS Code, Windsurf, Gemini CLI):
@@ -99,6 +107,7 @@ Exit codes: `0` passed, `99` thresholds failed, `1` workspace, export or runtime
 
 - [MCP server](https://kurlo.dev/docs/guides/mcp-server/)
 - [CLI runner](https://kurlo.dev/docs/guides/cli-runner/)
+- [Build collection documentation](https://kurlo.dev/docs/guides/cli-runner/docs/)
 - [Load testing with k6](https://kurlo.dev/docs/guides/load-testing/)
 - [Git-backed workspaces](https://kurlo.dev/docs/guides/git-workspaces/)
 

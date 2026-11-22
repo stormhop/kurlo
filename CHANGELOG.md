@@ -11,14 +11,56 @@ All notable changes to Kurlo are documented here. This project follows
 
 - **Capture proxy.** Inspect HTTP traffic and a development HTTPS service, save an exchange as a request with its response example, and export a session as HAR. Includes a CLI recorder, local response rules and an optional HAR source for MCP.
 
-- **Postman v3 collection export.** Open a Kurlo collection as local files in Postman Desktop with native gRPC, GraphQL, and HTTP requests. Postman v2.1 JSON remains available.
+- **Secret managers.** Link environment variables to HashiCorp Vault or OpenBao, 1Password, AWS Secrets Manager, AWS Parameter Store, Google Secret Manager, Azure Key Vault, Bitwarden Secrets Manager, Doppler, Infisical, a command you choose (such as `pass`) or environment variables of the Kurlo process. Vault can sign in with a token, AppRole, Kubernetes auth or OIDC in the browser. **Browse** in the link and import dialogs lists the provider's mounts, vaults, projects, folders and secret names, so you can pick a path instead of typing it. Add providers under **Secret providers** in the Environments sidebar, then link a variable from its row. The environment file keeps only the reference; Kurlo fetches the value when a request is sent, keeps it in memory for the provider's cache time and shows it as `[secret]` in responses, history, script logs and streamed messages. Provider settings are shared through `workspace.yml`; tokens and keys stay on each device, encrypted. A provider from a cloned or pulled workspace is used only after you trust it on this device, and Kurlo asks again when its address, account, region, profile, project, command or sign-in method changes. A command provider never runs before you trust it, and the CLI runs it only with `--allow-secret-commands`. When a value cannot be fetched, the request is not sent and the response area lists each variable with the fix. The response time breakdown shows how long fetching took. `kurlo run` fetches the linked variables the selected requests use with the machine's own credentials before the first request, masks them in JSON and JUnit reports, leaves them out of `--export-environment`, and stops with exit code 2 naming each variable it could not fetch; `--var` and `--env-file` still win, `--secret-providers=off` turns fetching off and `--secret-timeout` limits each call. Load tests fetch linked values before starting k6, while exported k6 scripts read them from `__ENV`. AI agents and `kurlo mcp` use linked values for the workspace open in the app and see `[secret]` and `[secret from <provider>]`; they cannot add or change providers or links. Importing Postman `{{vault:…}}` references lists them so you can link them. An environment can also import every key of one secret as variables with **Add source** (`secretSources`), with an optional prefix and a choice of keys; a variable row with the same name wins, and key names are kept on the device so suggestions work before the first request. The Collection Runner checks the links used by the selected requests before it sends anything. Missing and empty secrets stop the run. The provider form checks every field as you type and before saving, and malformed credentials such as a token with spaces or a Google Cloud key that is not JSON are not saved. Vault can also sign in with LDAP or userpass, and AWS providers can assume a role, with an external ID and MFA. Pasting a provider's own reference, such as an AWS ARN, `op://` URI, Azure secret identifier, Google secret name or Vault URL, into **Path** picks the provider and fills in the path, field and version. **Export for CI…** in the provider menu saves the credentials saved in the app as a `.env` file with the variables `kurlo run` reads. The cache time can be any duration up to 24 hours. Scripts can call `await pm.vault.get("name")` as in Postman, and `{{vault:name}}` reads the variable `name` everywhere a `{{variable}}` works, in the app, the Runner, `kurlo run`, load tests and MCP; typing `{{vault:` suggests linked and secret variables. The guide lists the permissions each provider needs. Deleting a provider now starts from the **•••** menu at the top and asks for confirmation, and provider notices appear at the bottom of the window like other notices.
+
+- **Request file editor.** Open **File** to edit and save a request’s workspace YAML. Edit the name, URL, method or protocol from the address bar or directly in the same YAML draft. Complete YAML keys and values for the current section and authentication type, hover over underlined fields to read validation errors, and preview the save format with Beautify. Long lines wrap, sections fold, and Kurlo marks and protects the fields that identify the request. Typing and then removing a character in the URL leaves the saved YAML intact. Drafts stay with their request, and you can review external changes before saving. Kurlo remembers each request’s editor section locally and omits enabled flags on active key-value rows and empty row descriptions from generated YAML.
+
+- **File bodies.** **Body → Binary** is now a drop zone: drop a file onto it or choose one. The chosen file shows its name, size and type, and the path stays editable and accepts `{{variables}}`. **Show in Finder** opens the file's folder, a missing file is marked **File not found** before you send, and **Use image/png** (or the detected type) adds a matching `Content-Type` header; without one Kurlo still sends `application/octet-stream`. A file inside the workspace folder is saved with a path relative to that folder, for **Binary** bodies and files in **Form data**, so the request works after a Git clone and in `kurlo run` and `kurlo mcp`. Files outside the workspace keep their absolute path, and Kurlo notes that the path only works on this computer. Client certificate and key fields in request and collection settings use the same path field, with **Choose file…** and a clear button.
+
+### Changed
+
+- **Collection documentation.** The exported HTML reference has a cleaner layout. The request address stays pinned while you scroll, and a **Code** panel beside the request details shows cURL, JavaScript (`fetch`) and Python (`requests`) snippets. Snippets include bearer token, OAuth 2.0 and API key authorization as variable placeholders. Requests list their authorization type and show parameter descriptions under each name. Saved examples open as a list with colored status codes, and each shows its request and response side by side. Long request documentation collapses behind **Show more**. The **Generate documentation** dialog now matches other Kurlo dialogs: the collection name and counts sit under the title, and each request shows its folder on the same line.
+- **Request protocol.** You can change the protocol of a saved request that already has a URL. Kurlo keeps the request’s name, URL and identity. Stop an active request or disconnect its session first.
 
 ### Fixed
 
 - **Record in your usual browser.** Record starts the local capture proxy. Setup provides a copyable automatic proxy configuration URL with a direct fallback.
-- **OpenAPI imports stay in the intended workspace.** Kurlo cancels a pending import if another workspace is active when the spec arrives.
-- **Import errors are visible.** OpenAPI and Postman imports report a save failure and keep imported requests available to save again.
-- **Secret variables keep their IDs after reloading.** Autosaving a freshly opened Git workspace no longer rewrites unchanged secret rows.
+- **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+- **Undefined variables.** A `{{variable}}` that nothing defines is underlined in red even when the workspace has no environment, collection or global variables yet.
+- **Request tabs.** Tab titles stay readable when many tabs are open, untitled drafts are numbered (**New Request 2**), and a draft shows the unsaved dot only after you change it.
+- **Collection Runner.** The data file button fits its column, the result tiles stay on one line with the progress bar below them in narrower windows, and **Reset settings** looks like a button.
+- **History.** Rows give the request path more room; the **•••** menu appears in place of the time on hover.
+- **Workspace README.** Lines you type on separate lines stay on separate lines in the overview.
+- **Command palette.** **Refresh secrets** and **Clear secret cache** are listed under **Secrets** instead of **Request**.
+- **Environments.** **Unsaved changes** next to an environment name is shown in amber instead of link blue.
+- **Activity bar.** Only one button is highlighted: when the Runner or Mock server is open, the button of the sidebar panel stays bright without the highlight.
+- **Mock server.** The empty state no longer repeats "Nothing to serve yet".
+- **Small windows.** The empty response area scrolls instead of cutting off **Load response from file**, and the provider list in **Add a secret provider** fades at the edge where more types are hidden.
+- **Request tabs.** Params, Auth, Headers, Body, Vars, Scripts, Docs, Examples and Settings load in the background after startup, so the first switch to a tab no longer shows an empty panel.
+- **Settings.** **Default location** saves when you leave the field, press `Enter` or pick a folder, without a separate **Save** button.
+- **Sidebar.** Hovering a collection name shows the normal arrow pointer instead of a text cursor.
+
+## [3.1.5] - 2026-11-20
+
+### Added
+
+- **GraphQL query builder.** Select nested fields from an imported or introspected schema, set arguments and bind typed variables. The field tree stays in sync with the query editor.
+- **Script editor autocomplete.** Complete `pm.*` methods, variable keys and saved request names in request, folder and collection scripts. Method hints include signatures and examples.
+- **Static collection documentation.** Choose **Build documentation** from a collection menu or run `kurlo docs build` to export a searchable, offline HTML reference. Include all requests or selected folders, inspect variable values, copy cURL templates and browse saved request and response examples together.
+- **Request authentication in scripts.** Read the active auth type and parameters, including inherited auth, through `pm.request.auth` in pre-request and test scripts.
+- **Postman v3 collection export.** Export a collection as a YAML folder for Postman Desktop with native HTTP, GraphQL and gRPC requests. Postman v2.1 JSON export remains available.
+
+### Fixed
+
+- **Request shortcuts.** On macOS, request buttons show the configured shortcut for the current action. Sending from a text or GraphQL editor preserves its contents, and open dialogs block background sends. In WebSocket and Socket.IO message editors, the shortcut connects first and sends messages once connected.
+- **Socket.IO message controls.** The event name, acknowledgment and Send button stay together in narrow windows at larger UI scales.
+- **GraphQL schema refresh.** Clearing the schema while introspection is running prevents the old result from reappearing.
+- **k6 requests and data.** Load tests honor request variables and redirects, preserve encoded paths, query strings and repeated form fields, and keep large numeric IDs and variable defaults intact. Invalid data, JSON paths and extraction patterns surface before a run.
+- **Load test editing and results.** Pending edits survive a switch between tests and can be retried after a failed save. Running tests lock their editors, and tests in different collections keep their own results and reports.
+- **Manual script saves.** Ctrl+S (Cmd+S on macOS) saves the active folder or collection script.
+- **HTTP body fonts.** Request and response bodies use the same monospace font and size.
+- **Import recovery.** OpenAPI imports stop if you switch workspaces before the spec arrives. OpenAPI and Postman imports report save failures and keep the imported requests available to save again.
+- **Git workspace secrets.** Opening and autosaving a workspace preserves the IDs of unchanged secret variables.
 
 ## [3.1.4] - 2026-11-17
 
@@ -97,7 +139,6 @@ All notable changes to Kurlo are documented here. This project follows
 - **Edits save on the first launch.** On a new installation Kurlo treated the not-yet-created workspace folder as a workspace it had failed to read, so it refused every save and showed *changes could not be saved*. Nothing reached the disk and the work was lost on restart. An empty profile now counts as a fresh start; a workspace that exists but cannot be read is still protected from being overwritten.
 - **`.http` import keeps scripts out of requests.** A pre-request script (`< {% … %}`) above the request line no longer makes the importer skip that request, and response handlers (`> {% … %}`) no longer end up in the body. Both are imported as the request's scripts. XML bodies that start with `<` are no longer mistaken for file references.
 - **Import dialog shows `.http` and `.rest` files on Linux.** Import now opens the system file dialog filtered to the chosen format, so the GTK dialog lists `.http`, `.rest` and `.har` files instead of hiding them.
-- **Tengo script timeouts.** Tengo scripts now respect the configured script timeout instead of always stopping after two seconds.
 - **Compact release notes in About.** Long update notes show a preview of about ten lines with a link to the full website changelog, keeping Settings easy to scroll.
 - **Mock server with thousands of examples.** The mock server no longer pulls every saved response into the editor: the route list reads only methods, paths and statuses, and the server reads the responses from disk when it starts. The list draws only the rows on screen, so it opens quickly, scrolls without blank gaps and the sidebar slides smoothly beside it. Hiding or showing the sidebar keeps the route at the top of the list in place even when long warnings rewrap to the new width.
 - **The sidebar hides and shows at once.** Toggling the sidebar no longer restyles the whole window: in workspaces with hundreds of requests the slide starts without a pause, and the hidden sidebar keeps only the rows on screen until it comes back.
@@ -280,7 +321,7 @@ Large workspaces — such as an OpenAPI import of 500 requests with 3,400 exampl
 
 ### Changed
 
-- **Settings, one layout for every page.** The Settings window is wider, and each page has a title and a line on what it covers, with settings grouped in boxes: name and description on the left, the control on the right. General shows every setting at once instead of folded cards (Saving and Script engine are switches, On launch is a list), Proxy shows the server and sign-in fields only when the proxy is **On**, Shortcuts, Support and About use the same rows, and the AI page puts **Your agents** first: the Codex row shows its state, account, model (saved as soon as you pick it) and plan limits as bars, with the executable path folded below.
+- **Settings, one layout for every page.** The Settings window is wider, and each page has a title and a line on what it covers, with settings grouped in boxes: name and description on the left, the control on the right. General shows every setting at once instead of folded cards (Saving is a switch and On launch is a list), Proxy shows the server and sign-in fields only when the proxy is **On**, Shortcuts, Support and About use the same rows, and the AI page puts **Your agents** first: the Codex row shows its state, account, model (saved as soon as you pick it) and plan limits as bars, with the executable path folded below.
 
 - **Cookie jar redesign.** The Cookies window now matches Settings: domains in a filterable list on the left, the selected domain's cookies in a table with value, path, expiry and flags, and expired cookies struck through. Clicking a row opens an editor below the table with **Fields** (name, value, path, expires, SameSite, HttpOnly, Secure, include subdomains) and **Raw** for pasting a `Set-Cookie` string; `Cmd/Ctrl Enter` saves. Domains holding a cookie without a value are marked. Opening the window no longer adds the open request's domain as an empty entry; an empty jar offers to add a cookie for it instead. The **Sync** tab is laid out as Settings cards with a switch to turn sync on, and the manual pairing code stays hidden until **Show code**.
 
@@ -412,7 +453,7 @@ Large workspaces — such as an OpenAPI import of 500 requests with 3,400 exampl
 - An API key in a header such as `x-auth-token` or `anthropic-api-key` was not recognized, and Kurlo warned that the key was missing.
 - Long AI answers no longer parse their Markdown again on every streamed chunk.
 - The response layout button in the status bar did nothing when the editor was too narrow for the side-by-side layout; it is now disabled and says why.
-- With Tengo as the script engine, a Postman, Insomnia or Bruno import put the collection's JavaScript into the Tengo fields, so every imported script failed on the first send. Imported scripts now always go to the JavaScript fields, and exports to those formats take the JavaScript scripts instead of the active engine's.
+- Postman, Insomnia and Bruno imports and exports preserve JavaScript scripts.
 - The shortcut list in Settings could be scrolled sideways, which cut off the start of every name, and the keys of different shortcuts did not line up. The list no longer scrolls sideways, and single-character keys share one width, so the keys form columns.
 - A merge conflict written in the diff3 style, with a `|||||||` base section, was shown with the base text inside **Ours**, and the file was not recognized as still holding conflict markers. The base section is now kept apart, and reading or changing the remote URL waits for a running Git operation.
 - Git status and diffs could fail for a moment while a commit, pull, merge or rebase was running. A saved Git token that cannot be read is now reported as such instead of ending in a plain 401.
@@ -1042,7 +1083,7 @@ Kurlo 2.0 is a new look — the Graphite design, from the window chrome to every
 ## [1.3.0] - 2026-08-01
 
 ### Added
-- **`pm.request.body` — scripts can read and rewrite the body that is sent.** The pre-request sandbox had no access to the body at all, so the single most common reason to write a pre-request script — generating a payload, or signing one with HMAC — was impossible. `pm.request.body.raw` is readable and writable, `.json()` parses it, `.update(value)` replaces it (objects are stringified), and `.mode` reports the body type. Tengo gets the same surface as `pm.request.body` / `pm.request.set_body()`. A body written onto a request that had none is still sent — Kurlo picks `json` or `text` from the content — while a binary file body is left alone, since the script never saw those bytes. Test scripts see the body that actually went out.
+- **`pm.request.body` — scripts can read and rewrite the body that is sent.** The pre-request sandbox had no access to the body at all, so the single most common reason to write a pre-request script — generating a payload, or signing one with HMAC — was impossible. `pm.request.body.raw` is readable and writable, `.json()` parses it, `.update(value)` replaces it (objects are stringified), and `.mode` reports the body type. A body written onto a request that had none is still sent — Kurlo picks `json` or `text` from the content — while a binary file body is left alone, since the script never saw those bytes. Test scripts see the body that actually went out.
 - **JSON Schema assertions.** `pm.response.to.have.jsonSchema(schema)` validates the response against a draft-07 subset, and reports each failure with its path (`/items/1: missing required property "sku"`). `pm.response.to.have.jsonBody(path, value)` checks a single dotted path. The validator is shared with the `tv4` global and `require("ajv")`, so collections written against either report the same failures.
 - **`require()` for the libraries imported Postman scripts expect.** `lodash` (also as the `_` global), `ajv`, `tv4`, `uuid`, `crypto-js`, and `chai` resolve to Kurlo implementations covering the calls that appear in test scripts; `atob`/`btoa` are globals now too. Anything else — including an unsupported lodash member — fails with a message naming what was asked for, instead of a downstream `undefined is not a function`. The sandbox globals are no longer `var`-declared, so a script can open with `const _ = require("lodash")` or `const expect = require("chai").expect` without a parse error.
 - **Bulk edit for key/value tables.** Params, headers, and both form body types switch between the table and a `key:value` text form, `//` disabling a line — Postman's format, so a block of headers pastes straight across. Descriptions, secret flags, and attached files stay with their key across a round trip.
@@ -1141,7 +1182,7 @@ this repository.
 - Auth defaults inherited from collection and folder level.
 
 ### Scripting
-- Sandboxed JavaScript pre-request and test scripts with a `pm.*` API, plus the legacy Tengo engine for existing requests. Imports, filesystem, process, and network access are disabled; execution is capped at 2 seconds.
+- Sandboxed JavaScript pre-request and test scripts with a `pm.*` API. Imports, filesystem, process, and network access are disabled; execution is capped at 2 seconds.
 
 ### Workspaces
 - Multiple workspaces, nested collections, drag-and-drop organization, and 14-day request history.
@@ -1161,7 +1202,8 @@ this repository.
 - Configurable keyboard shortcuts throughout, global search (`⌘K`), quick send (`⌘Enter`), and tab switching (`⌘1`–`⌘9`).
 - Settings search and full keyboard navigation, theme previews, and onboarding empty states.
 
-[Unreleased]: https://github.com/stormhop/kurlo/compare/v3.1.4...HEAD
+[Unreleased]: https://github.com/stormhop/kurlo/compare/v3.1.5...HEAD
+[3.1.5]: https://github.com/stormhop/kurlo/compare/v3.1.4...v3.1.5
 [3.1.4]: https://github.com/stormhop/kurlo/compare/v3.1.3...v3.1.4
 [3.1.3]: https://github.com/stormhop/kurlo/compare/v3.1.2...v3.1.3
 [3.1.2]: https://github.com/stormhop/kurlo/compare/v3.1.1...v3.1.2

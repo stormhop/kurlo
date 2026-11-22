@@ -93,7 +93,7 @@ func (s *mcpServer) protocolGRPC(run *mcpRunContext, req cliSavedRequest, values
 		ClientCertPath: httpReq.ClientCertPath, ClientKeyPath: httpReq.ClientKeyPath, ClientKeyPassword: httpReq.ClientKeyPassword,
 		IncludeDefaultValues:     boolOr(settings.GrpcIncludeDefaultValues, true),
 		MaxResponseMessageSizeMb: settings.GrpcMaxResponseMessageSizeMb, TimeoutMs: httpReq.TimeoutMs, Name: req.Name,
-		PreRequestScript: httpReq.PreRequestScript, TestScript: httpReq.TestScript, ScriptEngine: httpReq.ScriptEngine,
+		PreRequestScript: httpReq.PreRequestScript, TestScript: httpReq.TestScript,
 		ScriptTimeoutMs: httpReq.ScriptTimeoutMs, AllowSendRequest: httpReq.AllowSendRequest, SecretEnvironmentValues: run.secrets,
 		CollectionVariables: httpReq.CollectionVariables,
 	}, nil

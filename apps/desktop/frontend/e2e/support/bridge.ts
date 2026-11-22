@@ -264,7 +264,8 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         let current = String(value ?? '');
         for (let depth = 0; depth < 20 && current.includes('{{'); depth += 1) {
           const next = current.replace(/\{\{([^{}]*)\}\}/g, (match, raw) => {
-            const key = raw.trim();
+            const exact = raw.trim();
+            const key = Object.prototype.hasOwnProperty.call(values, exact) ? exact : exact.replace(/^vault:\s*/, '');
             return key && Object.prototype.hasOwnProperty.call(values, key) ? values[key] : match;
           });
           if (next === current) break;
@@ -475,6 +476,7 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         if (lifetime > 0) claims = { iat: now, exp: now + lifetime, ...claims };
         return { token: `${encode({ alg: cfg.jwtAlgorithm || 'HS256', typ: 'JWT' })}.${encode(claims)}.c2lnbmF0dXJl` };
       },
+      PreflightCollectionRunner: async (_workspaceId, requests) => requests.map(request => ({ requestId: request.requestId, failures: [] })),
       SendRequest: async (sent) => {
         const req = materializeTemplates(sent);
         state.sentRequests.push(clone(req));
@@ -772,7 +774,18 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         state.savedFiles.push({ name, content, path });
         return path;
       },
-      OpenFileDialog: async (title: string) => title.includes('CSV or JSON') ? '/workspace/data/users.csv' : '',
+      OpenFileDialog: async (title: string) => title.includes('CSV or JSON') ? '/workspace/data/users.csv' : title === 'Select file to send' ? '/workspace/fixtures/avatar.png' : '',
+      InspectRequestFile: async (path: string) => {
+        const relative = path.replace(/^\/workspace\//, '');
+        const name = relative.split('/').pop() ?? relative;
+        if (relative.includes('missing')) return { path: relative, absolutePath: `/workspace/${relative}`, name, size: 0, contentType: name.endsWith('.png') ? 'image/png' : '', exists: false, insideWorkspace: true, error: 'File not found.' };
+        if (relative.startsWith('/')) return { path: relative, absolutePath: relative, name, size: 1024, contentType: '', exists: true, insideWorkspace: false };
+        return { path: relative, absolutePath: `/workspace/${relative}`, name, size: 24576, contentType: name.endsWith('.png') ? 'image/png' : '', exists: true, insideWorkspace: true };
+      },
+      RevealRequestFile: async (path: string) => {
+        state.calls.push(`RevealRequestFile:${path}`);
+        return '';
+      },
       OpenDirectoryDialog: async () => '/exports',
       PreviewLoadTestData: async (path: string) => path.includes('missing')
         ? { path, columns: [], rows: [], total: 0, error: 'data file: no such file' }
@@ -942,9 +955,9 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
       },
       LoadTestTargets: async () => ['shop.kurlo.test'],
       StartLoadRun: async (payload: string) => {
-        const parsed = JSON.parse(payload) as { loadTest: { id: string } };
+        const parsed = JSON.parse(payload) as { collection: { id: string }; loadTest: { id: string } };
         state.calls.push(`StartLoadRun:${parsed.loadTest.id}`);
-        return { running: true, stopping: false, loadTestId: parsed.loadTest.id, collectionId: '', startedAt: Date.now(), plannedMs: 60000, dashboardUrl: '', k6Version: 'v1.3.0', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } };
+        return { running: true, stopping: false, loadTestId: parsed.loadTest.id, collectionId: parsed.collection.id, startedAt: Date.now(), plannedMs: 60000, dashboardUrl: '', k6Version: 'v1.3.0', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } };
       },
       StopLoadRun: async () => {
         state.calls.push('StopLoadRun');
@@ -953,8 +966,8 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
       LoadRunStatus: async () => ({ running: false, stopping: false, loadTestId: '', collectionId: '', startedAt: 0, plannedMs: 0, dashboardUrl: '', k6Version: '', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } }),
       LoadRunLog: async () => [],
       LastLoadRun: async () => ({ loadTestId: '', thresholds: [], steps: [] }),
-      LoadRunSummaryJSON: async (loadTestId: string) => `{"metrics":{},"loadTestId":"${loadTestId}"}`,
-      OpenLoadRunReport: async (loadTestId: string) => {
+      LoadRunSummaryJSON: async (_collectionId: string, loadTestId: string) => `{"metrics":{},"loadTestId":"${loadTestId}"}`,
+      OpenLoadRunReport: async (_collectionId: string, loadTestId: string) => {
         state.calls.push(`OpenLoadRunReport:${loadTestId}`);
         return '';
       },

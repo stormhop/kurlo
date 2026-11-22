@@ -4,6 +4,7 @@
   import { guardTrailing, removeRow } from '../utils';
   import CodeEditor from '../CodeEditor.svelte';
   import VariableInput from './VariableInput.svelte';
+  import FilePathField from './FilePathField.svelte';
   import BulkEditPanel from './BulkEditPanel.svelte';
   import { jsonKeyGhost, jsonKeySchema } from '../ghostText';
 
@@ -179,18 +180,17 @@
 
   {:else if vm.bodyType === 'binary'}
     <div class="binary-body">
-      {#if vm.bodyFilePath}
-        <div class="binary-file-info">
-          <svg width="1rem" height="1rem" viewBox="0 0 16 16" fill="none"><rect x="2" y="1" width="10" height="13" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5 5h5M5 8h5M5 11h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          <span>{vm.bodyFileName}</span>
-          <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => { vm.bodyFilePath = ''; vm.bodyFileName = ''; }}>✕</button>
-        </div>
-      {:else}
-        <button class="btn btn-dashed btn-lg btn-file-pick" type="button" onclick={vm.pickBinaryFile}>
-          <svg width="1rem" height="1rem" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 5l3-3 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-          Choose file…
-        </button>
-      {/if}
+      <FilePathField
+        variant="panel"
+        value={vm.bodyFilePath}
+        ariaLabel="Body file path"
+        dialogTitle="Select file to send"
+        suggestions={vm.variableSuggestions}
+        contentTypeHeader={vm.binaryContentTypeHeader()}
+        onUseContentType={(type) => vm.useBinaryContentType(type)}
+        onchange={(path) => vm.setBinaryFilePath(path)}
+        testId="binary-body"
+      />
     </div>
 
   {:else}

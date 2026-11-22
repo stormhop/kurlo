@@ -59,7 +59,6 @@ func TestSendRequestFillsPathVariables(t *testing.T) {
 		ResolveTemplates: true,
 		TemplateValues:   map[string]string{"base": srv.URL, "user": "u-7"},
 		PreRequestScript: `pm.request.pathVariables.set("userId", pm.request.pathVariables.get("userId") + "x")`,
-		ScriptEngine:     "js",
 	}
 	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
 	if resp.Error != "" {
@@ -78,37 +77,29 @@ func TestScriptReadsPathVariables(t *testing.T) {
 		URL:        "https://api.test/users/:id",
 		PathParams: []model.KeyValue{pathRow("id", "42", true), pathRow("off", "x", false)},
 	}
-	for _, engine := range []string{"js", "tengo"} {
-		ctx := script.NewContext(nil, nil)
-		populateScriptRequestContext(ctx, req)
-		src := `pm.test("reads", function () {
+	ctx := script.NewContext(nil, nil)
+	populateScriptRequestContext(ctx, req)
+	src := `pm.test("reads", function () {
   pm.expect(pm.request.pathVariables.get("id")).to.equal("42");
   pm.expect(pm.request.pathVariables.has("off")).to.equal(false);
   pm.expect(pm.request.pathVariables.toObject()).to.eql({ id: "42" });
   pm.expect(pm.request.url).to.equal("https://api.test/users/:id");
-});`
-		if engine == "tengo" {
-			src = `pm.request.pathVariables.set("id", pm.request.pathVariables.get("id") + "0")`
+});
+pm.request.pathVariables.set("id", pm.request.pathVariables.get("id") + "0");`
+	result := script.RunPreRequest(src, ctx)
+	if result.Error != "" {
+		t.Fatalf("script error: %s", result.Error)
+	}
+	for _, test := range result.Tests {
+		if !test.Passed {
+			t.Fatalf("test %q failed: %s", test.Name, test.Error)
 		}
-		result := script.RunPreRequest(engine, src, ctx)
-		if result.Error != "" {
-			t.Fatalf("%s script error: %s", engine, result.Error)
-		}
-		for _, test := range result.Tests {
-			if !test.Passed {
-				t.Fatalf("%s test %q failed: %s", engine, test.Name, test.Error)
-			}
-		}
-		next := req
-		next.PathParams = append([]model.KeyValue(nil), req.PathParams...)
-		mergeScriptPathParams(ctx, &next)
-		want := "42"
-		if engine == "tengo" {
-			want = "420"
-		}
-		if next.PathParams[0].Value != want {
-			t.Fatalf("%s: id = %q, want %q", engine, next.PathParams[0].Value, want)
-		}
+	}
+	next := req
+	next.PathParams = append([]model.KeyValue(nil), req.PathParams...)
+	mergeScriptPathParams(ctx, &next)
+	if next.PathParams[0].Value != "420" {
+		t.Fatalf("id = %q, want 420", next.PathParams[0].Value)
 	}
 }
 

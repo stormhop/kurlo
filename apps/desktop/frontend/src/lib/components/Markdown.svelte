@@ -6,7 +6,7 @@
 
   const LIVE_PARSE_MS = 120;
 
-  let { source, remoteImages = false, compact = false, live = false }: { source: string; remoteImages?: boolean; compact?: boolean; live?: boolean } = $props();
+  let { source, remoteImages = false, compact = false, live = false, breaks = false }: { source: string; remoteImages?: boolean; compact?: boolean; live?: boolean; breaks?: boolean } = $props();
 
   let liveSource = $state(untrack(() => source));
   let lastParse = 0;
@@ -30,7 +30,7 @@
   });
   const shown = $derived(live ? liveSource : source);
   const tooLong = $derived(markdownTooLongToPreview(shown));
-  const blocks = $derived(tooLong ? [] : parseMarkdown(shown));
+  const blocks = $derived(tooLong ? [] : parseMarkdown(shown, { breaks }));
   let copiedIndex = $state('');
 
   function openLink(event: MouseEvent, href: string) {

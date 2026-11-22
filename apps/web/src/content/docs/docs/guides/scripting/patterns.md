@@ -18,7 +18,6 @@ title: "Script patterns and limits"
 - A single regular-expression match stops after 2 seconds. A pattern with lookahead or a backreference that backtracks without end, such as `/^(a+)+(?=b)/` on a long string, no longer hangs the app or a CI run. Under the default 2-second script limit the script then fails with a time-out.
 - No module imports, process access, filesystem access, or direct network sockets. `require` resolves only [Kurlo's bundled stand-ins](/docs/reference/scripting-api/compatibility/#require) — `lodash`, `ajv`, `tv4`, `uuid`, `crypto-js`, `chai`.
 - Scripts make HTTP calls only through `pm.sendRequest`, and only when the request opts in.
-- Tengo uses expression-style assertions: `pm.test("status", pm.response.code == 200)`.
 - JavaScript supports Postman-style callbacks: `pm.test("status", () => pm.response.to.have.status(200))`.
 
 See the full method reference in [Scripting API](/docs/reference/scripting-api/).

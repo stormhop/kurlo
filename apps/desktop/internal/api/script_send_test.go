@@ -133,7 +133,7 @@ func TestSendRequestPreScriptFetchesToken(t *testing.T) {
 		URL:                   apiServer.URL + "/data",
 		EnableSSLVerification: true,
 		AllowSendRequest:      true,
-		ScriptEngine:          "js",
+
 		PreRequestScript: fmt.Sprintf(`
 			const res = pm.sendRequest({ method: "POST", url: %q, body: "grant_type=client_credentials" })
 			pm.request.headers.set("Authorization", "Bearer " + res.json().access_token)
@@ -159,8 +159,8 @@ func TestSendRequestPmSendRequestBlockedWithoutOptIn(t *testing.T) {
 		Method:                "GET",
 		URL:                   server.URL,
 		EnableSSLVerification: true,
-		ScriptEngine:          "js",
-		PreRequestScript:      `pm.sendRequest("` + server.URL + `/other")`,
+
+		PreRequestScript: `pm.sendRequest("` + server.URL + `/other")`,
 	}
 	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
 	if resp.Error == "" {
@@ -182,8 +182,8 @@ func TestSendRequestSkipRequest(t *testing.T) {
 		Method:                "GET",
 		URL:                   server.URL,
 		EnableSSLVerification: true,
-		ScriptEngine:          "js",
-		PreRequestScript:      `pm.execution.skipRequest()`,
+
+		PreRequestScript: `pm.execution.skipRequest()`,
 	}
 	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
 	if hits != 0 {
@@ -212,9 +212,9 @@ func TestSendRequestCollectionVariablesRoundTrip(t *testing.T) {
 		Method:                "GET",
 		URL:                   server.URL + "/things",
 		EnableSSLVerification: true,
-		ScriptEngine:          "js",
-		CollectionVariables:   map[string]string{"apiVersion": "v2", "stale": "remove-me"},
-		PreRequestScript:      `pm.request.set_url(pm.request.url + "?v=" + pm.collectionVariables.get("apiVersion"))`,
+
+		CollectionVariables: map[string]string{"apiVersion": "v2", "stale": "remove-me"},
+		PreRequestScript:    `pm.request.set_url(pm.request.url + "?v=" + pm.collectionVariables.get("apiVersion"))`,
 		TestScript: `
 			pm.collectionVariables.set("lastId", pm.response.json().id)
 			pm.collectionVariables.unset("stale")
@@ -257,9 +257,9 @@ func TestSendRequestScriptTimeoutOverride(t *testing.T) {
 		Method:                "GET",
 		URL:                   server.URL,
 		EnableSSLVerification: true,
-		ScriptEngine:          "js",
-		PreRequestScript:      src,
-		ScriptTimeoutMs:       20,
+
+		PreRequestScript: src,
+		ScriptTimeoutMs:  20,
 	}
 
 	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
@@ -274,27 +274,6 @@ func TestSendRequestScriptTimeoutOverride(t *testing.T) {
 	}
 }
 
-func TestSendRequestTengoScriptTimeout(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Error("a timed out pre-request script must not send the request")
-	}))
-	defer server.Close()
-
-	resp := NewApp().SendRequest(model.HttpRequest{
-		Method:                http.MethodGet,
-		URL:                   server.URL,
-		EnableSSLVerification: true,
-		ScriptEngine:          "tengo",
-		PreRequestScript:      "for true {}",
-		ScriptTimeoutMs:       20,
-	})
-	if !strings.Contains(resp.Error, "script timed out after 20ms") {
-		t.Fatalf("configured Tengo timeout did not reach the script engine: %q", resp.Error)
-	}
-}
-
 func TestSendRequestPmInfoRequestName(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "{}")
@@ -305,10 +284,10 @@ func TestSendRequestPmInfoRequestName(t *testing.T) {
 		Method:                "GET",
 		URL:                   server.URL,
 		EnableSSLVerification: true,
-		ScriptEngine:          "js",
-		Name:                  "Fetch widgets",
-		Iteration:             3,
-		IterationCount:        10,
+
+		Name:           "Fetch widgets",
+		Iteration:      3,
+		IterationCount: 10,
 		TestScript: `
 			pm.test("name", () => pm.expect(pm.info.requestName).to.equal("Fetch widgets"))
 			pm.test("iteration", () => pm.expect(pm.info.iteration).to.equal(3))
@@ -338,8 +317,8 @@ func TestSendRequestPmCookies(t *testing.T) {
 		Method:                "GET",
 		URL:                   server.URL,
 		EnableSSLVerification: true,
-		ScriptEngine:          "js",
-		WorkspaceID:           "ws-1",
+
+		WorkspaceID: "ws-1",
 	}
 	if resp := sendRequest(context.Background(), req, state.New(), jars, nil); resp.Error != "" {
 		t.Fatalf("first send failed: %s", resp.Error)
@@ -370,8 +349,8 @@ func TestTestScriptSeesCollectionVariablesThePreRequestScriptSet(t *testing.T) {
 		Method:                "GET",
 		URL:                   server.URL,
 		EnableSSLVerification: true,
-		ScriptEngine:          "js",
-		CollectionVariables:   map[string]string{"token": "old", "stale": "x"},
+
+		CollectionVariables: map[string]string{"token": "old", "stale": "x"},
 		PreRequestScript: `
 			pm.collectionVariables.set("token", "fresh")
 			pm.collectionVariables.unset("stale")
@@ -460,9 +439,9 @@ func TestSendRequestScriptTimeoutBoundsPmSendRequest(t *testing.T) {
 		URL:                   apiSrv.URL,
 		EnableSSLVerification: true,
 		AllowSendRequest:      true,
-		ScriptEngine:          "js",
-		ScriptTimeoutMs:       100,
-		PreRequestScript:      fmt.Sprintf(`const r = pm.sendRequest(%q)`, slow.URL),
+
+		ScriptTimeoutMs:  100,
+		PreRequestScript: fmt.Sprintf(`const r = pm.sendRequest(%q)`, slow.URL),
 	}
 	start := time.Now()
 	resp := sendRequest(context.Background(), req, state.New(), newCookieJarRegistry(), nil)
@@ -538,7 +517,7 @@ func TestSendRequestPostmanFormBodiesReachTheServer(t *testing.T) {
 		URL:                   apiServer.URL,
 		EnableSSLVerification: true,
 		AllowSendRequest:      true,
-		ScriptEngine:          "js",
+
 		PreRequestScript: fmt.Sprintf(`
 			const base = %q
 			pm.sendRequest({ url: base + "/form", method: "POST", header: "Accept: application/json",
@@ -561,5 +540,33 @@ func TestSendRequestPostmanFormBodiesReachTheServer(t *testing.T) {
 	}
 	if len(resp.PreRequestResult.Logs) != 3 || !strings.HasPrefix(resp.PreRequestResult.Logs[0], "[request] pm.sendRequest POST ") {
 		t.Errorf("sendRequest calls were not logged: %#v", resp.PreRequestResult.Logs)
+	}
+}
+
+func TestRequestAuthInPreRequestAndResponseScripts(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer session-value" || r.Header.Get("X-Script-Auth") != "bearer" {
+			t.Error("request did not use the configured bearer auth and script header")
+		}
+	}))
+	defer server.Close()
+	req := model.HttpRequest{
+		Method: "GET", URL: server.URL,
+		Auth:             model.AuthConfig{Type: "bearer", Token: "{{session}}", Password: "inactive"},
+		ResolveTemplates: true, TemplateValues: map[string]string{"session": "session-value"},
+		PreRequestScript: `const auth = pm.request.auth;
+			if (auth.parameters() !== auth.bearer) throw new Error("unexpected auth parameters");
+			pm.expect(auth.parameters().get("token")).to.eql("session-value");
+			pm.expect(auth.basic).to.eql(undefined);
+			pm.request.headers.set("X-Script-Auth", auth.type);
+			console.log(auth.bearer.get("token"));`,
+		TestScript: `pm.test("auth matches", () => pm.expect(pm.request.auth.bearer.toObject().token).to.eql("session-value"));`,
+	}
+	resp := sendRequest(t.Context(), req, state.New(), nil, nil)
+	if resp.Error != "" || resp.TestResult.Error != "" || len(resp.TestResult.Tests) != 1 || !resp.TestResult.Tests[0].Passed {
+		t.Fatalf("request failed: %#v", resp)
+	}
+	if len(resp.PreRequestResult.Logs) != 1 || !strings.Contains(resp.PreRequestResult.Logs[0], "[secret]") || strings.Contains(resp.PreRequestResult.Logs[0], "session-value") {
+		t.Fatal("expected the logged bearer token to be masked")
 	}
 }

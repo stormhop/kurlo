@@ -1,6 +1,7 @@
-import type { KVRow, BodyType, AuthType, JwtAddTo, JwtAlgorithm, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
+import type { KVRow, SecretRef, BodyType, AuthType, JwtAddTo, JwtAlgorithm, OAuth1AddTo, OAuth1SignatureMethod, RawBodyType, RequestType, SavedRequest } from './types/models';
 import { JWT_ALGORITHMS, mkRow, reserveRowIds } from './constants';
 import { clipboardSet } from './backend';
+import { normalizeSecretRef } from './linkedSecrets';
 
 export function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
@@ -97,8 +98,14 @@ export function cloneRowsForStore(rows: KVRow[]) {
       ...(row.isFile ? { isFile: true } : {}),
       ...(row.isFile && row.fileName ? { fileName: row.fileName } : {}),
       ...(row.contentType ? { contentType: row.contentType } : {}),
-      ...(row.secret ? { secret: true } : {}),
+      ...(row.secret || normalizeSecretRef(row.secretRef) ? { secret: true } : {}),
+      ...withSecretRef(row),
     }));
+}
+
+function withSecretRef(row: KVRow): { secretRef?: SecretRef } {
+  const secretRef = normalizeSecretRef(row.secretRef);
+  return secretRef ? { secretRef } : {};
 }
 
 export function restoreRows(rows: KVRow[] | undefined): KVRow[] {
@@ -114,7 +121,8 @@ export function restoreRows(rows: KVRow[] | undefined): KVRow[] {
     isFile: row.isFile ?? false,
     fileName: row.fileName ?? '',
     contentType: row.contentType ?? '',
-    secret: row.secret ?? false,
+    secret: (row.secret ?? false) || Boolean(normalizeSecretRef(row.secretRef)),
+    ...withSecretRef(row),
   }));
   return [...restored, mkRow()];
 }
@@ -312,6 +320,31 @@ export function requestKindShortLabel(label: string) {
 
 export function requestTabLabel(req: { name: string; method: string; url: string; requestType?: string }) {
   return req.name || requestTitleFrom(requestTransportLabel(req), req.url);
+}
+
+export function numberDuplicateTabLabels(previous: ReadonlyMap<string, number>, tabs: ReadonlyArray<{ id: string; label: string }>, label = 'New Request') {
+  const ids = tabs.filter(tab => tab.label === label).map(tab => tab.id);
+  const next = new Map<string, number>();
+  const taken = new Set<number>();
+  for (const id of ids) {
+    const kept = previous.get(id);
+    if (kept && !taken.has(kept)) {
+      next.set(id, kept);
+      taken.add(kept);
+    }
+  }
+  let candidate = 1;
+  for (const id of ids) {
+    if (next.has(id)) continue;
+    while (taken.has(candidate)) candidate += 1;
+    next.set(id, candidate);
+    taken.add(candidate);
+  }
+  return next;
+}
+
+export function numberedTabLabel(label: string, number: number | undefined) {
+  return number && number > 1 ? `${label} ${number}` : label;
 }
 
 export function emptyAuthState() {

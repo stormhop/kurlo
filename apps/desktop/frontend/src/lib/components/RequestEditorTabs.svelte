@@ -1,9 +1,10 @@
 <script lang="ts">
   import { tick } from 'svelte';
   import { tabListKeyboard } from '../a11y';
+  import { appLazyComponents } from '../stores/lazyComponents.svelte';
+  import type { RequestSection as RequestTab } from '../stores/requestFiles.svelte';
   import type { RequestType } from '../types/models';
 
-  type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'vars' | 'metadata' | 'body' | 'schema' | 'service' | 'scripts' | 'settings' | 'events' | 'examples' | 'tools';
   type BadgeKind = 'default' | 'on';
   type TabItem = {
     id: RequestTab;
@@ -14,7 +15,8 @@
   };
 
   let {
-    requestTab = $bindable<RequestTab>('params'),
+    requestTab,
+    onselect,
     requestType = 'http',
     method = 'GET',
     paramsCount,
@@ -34,6 +36,7 @@
     varCount = 0,
   }: {
     requestTab: RequestTab;
+    onselect: (tab: RequestTab) => void;
     requestType?: RequestType;
     method?: string;
     paramsCount: number;
@@ -174,7 +177,15 @@
     ];
   }
 
-  let tabItems = $derived(buildTabItems());
+  function addFileTabBeforeSettings(items: TabItem[]): TabItem[] {
+    const fileTab: TabItem = { id: 'file', label: 'File' };
+    const settingsIndex = items.findIndex(item => item.id === 'settings');
+    return settingsIndex < 0
+      ? [...items, fileTab]
+      : [...items.slice(0, settingsIndex), fileTab, ...items.slice(settingsIndex)];
+  }
+
+  let tabItems: TabItem[] = $derived(addFileTabBeforeSettings(buildTabItems()));
   let activeTabItem = $derived(tabItems.find((item) => item.id === requestTab) ?? tabItems[0]);
 
   function updateCompactMode() {
@@ -210,7 +221,7 @@
   });
 
   function selectTab(tab: RequestTab) {
-    requestTab = tab;
+    onselect(tab);
     compactMenuOpen = false;
   }
 
@@ -237,6 +248,8 @@
         aria-selected={requestTab === item.id}
         tabindex={requestTab === item.id ? 0 : -1}
         onclick={() => selectTab(item.id)}
+        onpointerenter={() => void appLazyComponents.warmRequestTabs()}
+        onfocus={() => void appLazyComponents.warmRequestTabs()}
         type="button"
         aria-label={item.short ? `${item.label}${item.badge ? ` ${item.badge}` : ''}` : undefined}
       >

@@ -367,7 +367,7 @@ test.describe('Protocol badge', () => {
       widths[`${type} with url`] = Math.round((await trigger.boundingBox())!.width);
     }
     for (const [label, width] of Object.entries(widths)) expect(width, label).toBeLessThanOrEqual(widths.http + 24);
-    expect(widths.ws, 'a locked WS badge hugs its label').toBeLessThanOrEqual(56);
+    expect(widths.ws, 'the WS picker leaves room for the URL').toBeLessThanOrEqual(56);
   });
 });
 
@@ -471,7 +471,7 @@ test('inherits collection auth in a gRPC request', async ({ page }) => {
   await installKurloBridge(page, '', 'browser/e2e', false, {
     collections: [{
       id: 'col-grpc-auth', workspaceId: 'workspace-e2e', name: 'gRPC API',
-      defaults: { headers: [], variables: [], auth: { type: 'bearer', bearerToken: 'collection-token' }, preRequestScript: '', testScript: '', preRequestScriptJs: '', testScriptJs: '', settings: {} },
+      defaults: { headers: [], variables: [], auth: { type: 'bearer', bearerToken: 'collection-token' }, preRequestScriptJs: '', testScriptJs: '', settings: {} },
     }],
     requests: [{
       id: 'grpc-auth', collectionId: 'col-grpc-auth', collection: 'gRPC API', name: 'Inventory', folderPath: [],
@@ -518,10 +518,11 @@ test('sends the client certificate with a gRPC call', async ({ page }) => {
   await page.getByRole('tab', { name: /^Settings/ }).click();
   const certSetting = page.locator('.client-cert-setting');
   await expect(certSetting).toContainText('Client certificate (mTLS)');
+  await expect(certSetting.getByRole('button', { name: 'Choose file…' }).nth(1)).toBeDisabled();
   await certSetting.getByRole('button', { name: 'Choose file…' }).first().click();
-  await expect(certSetting).toContainText('/certs/client.crt');
-  await certSetting.getByRole('button', { name: 'Choose file…' }).click();
-  await expect(certSetting).toContainText('/certs/client.key');
+  await expect(certSetting.getByRole('textbox', { name: 'Client certificate path' })).toHaveValue('/certs/client.crt');
+  await certSetting.getByRole('button', { name: 'Choose file…' }).nth(1).click();
+  await expect(certSetting.getByRole('textbox', { name: 'Private key path' })).toHaveValue('/certs/client.key');
   await certSetting.getByPlaceholder('Leave blank if the key is unencrypted').fill('{{keyPassword}}');
   await page.screenshot({ path: join(tmpdir(), 'kurlo-grpc-client-cert.png'), animations: 'disabled' });
 
@@ -551,7 +552,7 @@ test('persists a PFX container and passphrase for gRPC without a separate key', 
   await page.addInitScript(store => { window.__kurloE2E.store = store; }, saved);
   await page.reload();
   await page.getByRole('tab', { name: /^Settings/ }).click();
-  await expect(certSetting).toContainText('/certs/client.pfx');
+  await expect(certSetting.getByRole('textbox', { name: 'Client certificate path' })).toHaveValue('/certs/client.pfx');
   await expect(certSetting.getByPlaceholder('Leave blank if the key is unencrypted')).toHaveValue('{{pfxPassword}}');
   await certSetting.scrollIntoViewIfNeeded();
   if (docsScreenshotDir) await certSetting.screenshot({ path: join(docsScreenshotDir, 'client-certificate-pfx.png'), animations: 'disabled' });
@@ -561,4 +562,85 @@ test('persists a PFX container and passphrase for gRPC without a separate key', 
     const sent = window.__kurloE2E.sentGrpcRequests.at(-1) as { clientCertPath?: string; clientKeyPath?: string; clientKeyPassword?: string } | undefined;
     return sent && { cert: sent.clientCertPath, key: sent.clientKeyPath || '', password: sent.clientKeyPassword };
   })).toEqual({ cert: '/certs/client.pfx', key: '', password: '{{pfxPassword}}' });
+});
+
+test('builds and sends a nested GraphQL operation from live introspection', async ({ page }) => {
+  const { startCatalogServer } = await import('./support/graphqlCatalog');
+  const { server, url } = await startCatalogServer();
+  try {
+    await installKurloBridge(page, '', 'windows/e2e', false, {
+      collections: [{ id: 'books', name: 'Library', workspaceId: 'workspace-e2e' }],
+      requests: [{ id: 'catalog', name: 'Book catalog', collectionId: 'books', collection: 'Library',
+        requestType: 'graphql', method: 'POST', url, requestTab: 'query', bodyType: 'graphql',
+        bodyContent: JSON.stringify({ query: 'query BookDetails {\n  __typename\n}', variables: {} }) }],
+      activeId: 'catalog', openIds: ['catalog'],
+    });
+    await page.setViewportSize({ width: 1440, height: 1020 });
+    await page.goto('/');
+    await page.exposeFunction('executeCatalogPayload', async (body: string) => {
+      const result = await fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/json' } });
+      return result.text();
+    });
+    await page.evaluate(() => {
+      const app = (window as unknown as E2EWindow).go.api.App;
+      const send = app.SendRequest;
+      const transport = window as unknown as { executeCatalogPayload: (body: string) => Promise<string> };
+      app.SendRequest = async request => {
+        const result = await send(request);
+        const body = await transport.executeCatalogPayload(window.__kurloE2E.sentRequests.at(-1)!.body);
+        return { ...result, body, size: body.length, preRequestResult: { logs: [], tests: [] }, testResult: { logs: [], tests: [] } };
+      };
+    });
+    await page.getByRole('button', { name: 'Show the response below the request' }).click();
+    await page.getByRole('button', { name: 'Use GraphQL introspection' }).click();
+    const check = (name: string) => page.getByRole('checkbox', { name, exact: true });
+    await check('book').check();
+    await expect(page.getByLabel('Argument id')).toHaveValue('$id');
+    await check('title').check();
+    await check('year').check();
+    await check('author').check();
+    await check('name').check();
+    await page.getByLabel('Edit variable $id').click();
+    await fillCodeEditor(page, 'graphql-variables-editor', '{\n  "id": "1"\n}');
+    await page.getByRole('button', { name: 'Query', exact: true }).click();
+    await expect(page.locator('.response-body-viewer')).toContainText('A Wizard of Earthsea');
+    await expect(page.locator('.response-body-viewer')).toContainText('Ursula K. Le Guin');
+    const divider = await page.getByRole('button', { name: 'Resize panels' }).boundingBox();
+    if (!divider) throw Error('Missing response divider');
+    await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(divider.x + divider.width / 2, 686, { steps: 8 });
+    await page.mouse.up();
+    await captureDocsScreenshot(page, 'graphql-builder-variables');
+    await page.getByRole('button', { name: 'Query editor', exact: true }).click();
+    await expect(page.getByTestId('graphql-query-editor')).toContainText('book(id: $id)');
+    if (docsScreenshotDir) {
+      await page.locator('.graphql-query-grid').screenshot({ path: join(docsScreenshotDir, 'graphql-query-builder.png'), animations: 'disabled' });
+    }
+
+    const input = page.getByLabel('Argument id', { exact: true });
+    await input.fill('"3"');
+    await input.press('Enter');
+    await expect(page.getByTestId('graphql-query-editor')).toContainText('book(id: "3")');
+    await page.getByRole('button', { name: 'Query', exact: true }).click();
+    await expect(page.locator('.response-body-viewer')).toContainText('Kindred');
+    await input.press('Control+s');
+    await expect.poll(() => page.evaluate(() => JSON.parse(window.__kurloE2E.store.requests[0].bodyContent))).toMatchObject({ variables: {}, query: expect.stringContaining('book(id: "3")') });
+    await fillCodeEditor(page, 'graphql-query-editor', 'query Catalog { books { title } }');
+    await expect(check('book')).not.toBeChecked();
+    await page.getByRole('button', { name: 'Collapse book', exact: true }).click();
+    await expect(check('books')).toBeChecked();
+    await page.getByRole('button', { name: 'Expand books', exact: true }).click();
+    await page.getByLabel('Use variable for limit').click();
+    await expect(page.getByLabel('Argument limit')).toHaveValue('$limit');
+    await expect(page.getByTestId('graphql-query-editor')).toContainText('$limit: Int');
+    await page.getByLabel('Edit variable $limit').click();
+    await fillCodeEditor(page, 'graphql-variables-editor', '{"limit": 2}');
+    await page.getByRole('button', { name: 'Query', exact: true }).click();
+    await expect(page.locator('.response-body-viewer')).toContainText('The Tombs of Atuan');
+    await expect(page.locator('.response-body-viewer')).not.toContainText('Kindred');
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
 });

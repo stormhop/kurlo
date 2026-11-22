@@ -1,4 +1,4 @@
-import type { api, model, proxycapture } from '../../wailsjs/go/models';
+import type { api, model, proxycapture, secrets } from '../../wailsjs/go/models';
 
 type Wire<T> = T extends (infer U)[]
   ? Wire<U>[]
@@ -122,6 +122,7 @@ export type CollectionTextFile = Wire<api.CollectionTextFile>;
 export type CollectionTextFilesResult = Wire<api.CollectionTextFilesResult>;
 export type DefaultWorkspaceLocationResult = Wire<api.DefaultWorkspaceLocationResult>;
 export type DownloadResult = Wire<api.DownloadResult>;
+export type RequestFileInfo = Wire<api.RequestFileInfo>;
 export type GitAuthConfigResult = Wire<api.GitAuthConfigResult>;
 export type GitBranchEntry = Wire<api.GitBranchEntry>;
 export type GitBranchListResult = Wire<api.GitBranchListResult>;
@@ -141,6 +142,24 @@ export type SaveRequestStoreResult = Wire<api.SaveRequestStoreResult>;
 export type WorkspaceDiagnostic = Wire<api.WorkspaceDiagnostic>;
 export type WorkspaceOpenResult = Wire<api.WorkspaceOpenResult>;
 export type WorkspaceSecretRef = Wire<api.WorkspaceSecretRef>;
+export type SecretProviderView = Wire<api.SecretProviderView>;
+export type SecretProviderUsage = Wire<api.SecretProviderUsage>;
+export type SecretProvidersResult = Wire<api.SecretProvidersResult>;
+export type SecretProviderStatus = Wire<api.SecretProviderStatus>;
+export type SecretRefInput = Wire<api.SecretRefInput>;
+export type SecretImportInput = Wire<api.SecretImportInput>;
+export type SecretImportKeys = Wire<api.SecretImportKeys>;
+export type SecretImportKeysResult = Wire<api.SecretImportKeysResult>;
+export type SecretRefTestResult = Wire<api.SecretRefTestResult>;
+export type SecretRevealResult = Wire<api.SecretRevealResult>;
+export type SecretActionResult = Wire<api.SecretActionResult>;
+export type SecretBrowseResult = Wire<api.SecretBrowseResult>;
+export type SecretBrowseEntry = Wire<secrets.Entry>;
+export type SecretEnvExportResult = Wire<api.SecretEnvExportResult>;
+export type LinkedSecretFailure = Wire<model.LinkedSecretFailure>;
+export type RunnerSecretCheck = { requestId: string; http?: HttpRequest; grpc?: GrpcRequest };
+export type RunnerSecretCheckResult = { requestId: string; failures: LinkedSecretFailure[] };
+export type RequestFileYAMLResult = Wire<api.RequestFileYAMLResult>;
 export type WorkspaceYAMLFileResult = Wire<api.WorkspaceYAMLFileResult>;
 export type HistoryResponseResult = Wire<api.HistoryResponseResult>;
 
@@ -237,7 +256,7 @@ export function emptyHttpRequest(): HttpRequest {
     requestId: '', workspaceId: '', method: '', url: '',
     params: [], pathParams: [], headers: [], auth: emptyAuthConfig(),
     bodyType: '', body: '', bodyFilePath: '', formData: [],
-    preRequestScript: '', testScript: '', scriptEngine: '',
+    preRequestScript: '', testScript: '',
     followRedirects: false, timeoutMs: 0, name: '',
     scriptTimeoutMs: 0, allowSendRequest: false,
     httpVersion: '', enableSSLVerification: false,

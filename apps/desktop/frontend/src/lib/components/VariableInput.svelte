@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { VariableSuggestion } from '../variables';
-  import { variableDisplayValue } from '../variables';
+  import { VAULT_TEMPLATE_PREFIX, matchVariableSuggestions, templateVariableKey, variableDisplayValue } from '../variables';
   import { isDynamicVariableName } from '../dynamicVariables';
   import { escapeHtml } from '../utils';
   import type { InputGhost } from '../ghostText';
@@ -76,14 +76,14 @@
   });
 
   const highlightHtml = $derived.by(() => {
-    if (!suggestions.length || !value) return '';
+    if (!value || !value.includes('{{')) return '';
     const VAR_RE = /\{\{([^{}]*)}}/g;
     let result = '';
     let last = 0;
     let m: RegExpExecArray | null;
     while ((m = VAR_RE.exec(value)) !== null) {
       result += escapeHtml(value.slice(last, m.index));
-      const key = m[1].trim();
+      const key = templateVariableKey(m[1]);
       if (knownKeySet.has(key) || isDynamicVariableName(key)) {
         result += escapeHtml(m[0]);
       } else {
@@ -101,9 +101,7 @@
     return `${highlightHtml || escapeHtml(value)}<span class="ghost-text" data-testid="ghost-text">${escapeHtml(activeGhost.text)}</span>`;
   });
 
-  const hasUnresolved = $derived(
-    suggestions.length > 0 && /\{\{/.test(value) && highlightHtml.includes('var-token-err')
-  );
+  const hasUnresolved = $derived(highlightHtml.includes('var-token-err'));
 
   function updateCaret() {
     if (!inputRef) return;
@@ -192,13 +190,7 @@
   function filteredSuggestions() {
     const range = triggerRange();
     if (!range) return [];
-    const needle = range.prefix.toLowerCase();
-    const rows = suggestions.filter(item => item.key.toLowerCase().includes(needle));
-    return rows.sort((a, b) => {
-      const ap = a.key.toLowerCase().startsWith(needle) ? 0 : 1;
-      const bp = b.key.toLowerCase().startsWith(needle) ? 0 : 1;
-      return ap - bp || a.key.localeCompare(b.key);
-    }).slice(0, 12);
+    return matchVariableSuggestions(suggestions, range.prefix).items;
   }
 
   function refreshMenu() {
@@ -233,8 +225,10 @@
   function choose(variable: VariableSuggestion) {
     const range = triggerRange();
     if (!range) return;
-    const insert = `${variable.key}}}`;
-    value = `${value.slice(0, range.from)}${insert}${value.slice(range.to)}`;
+    const prefixOnly = variable.key === VAULT_TEMPLATE_PREFIX;
+    const vault = !prefixOnly && range.prefix.startsWith(VAULT_TEMPLATE_PREFIX);
+    const insert = prefixOnly ? VAULT_TEMPLATE_PREFIX : `${vault ? VAULT_TEMPLATE_PREFIX : ''}${variable.key}}}`;
+    value = `${value.slice(0, range.from)}${insert}${value.slice(prefixOnly ? range.from + range.prefix.length : range.to)}`;
     open = false;
     suppressRefresh = true;
     setTimeout(() => {
@@ -247,6 +241,7 @@
       inputRef.setSelectionRange(pos, pos);
       inputRef.dispatchEvent(new Event('input', { bubbles: true }));
       suppressRefresh = false;
+      if (prefixOnly) refreshMenu();
     }, 0);
   }
 
@@ -434,7 +429,7 @@
           onclick={() => choose(variable)}
         >
           <span class="variable-menu-key">{variable.key}</span>
-          <span class="variable-menu-value">{variableDisplayValue(variable)}</span>
+          <span class="variable-menu-value">{variable.key === VAULT_TEMPLATE_PREFIX ? variable.description : variableDisplayValue(variable)}</span>
         </button>
       {/each}
     </div>

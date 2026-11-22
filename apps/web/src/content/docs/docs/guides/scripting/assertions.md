@@ -25,4 +25,4 @@ Assertions are saved in the request file as `assertions`. A Postman export turns
 
 ## Snippets
 
-The **Snippets** row above the editor inserts working code at the end of the current script — setting a variable, adding a header, editing or signing the body, asserting a status, checking a JSON schema. The list follows the active engine, so Tengo requests get Tengo snippets. Hovering a snippet shows the code it will insert.
+The **Snippets** row above the editor inserts working code at the end of the current script — setting a variable, adding a header, editing or signing the body, asserting a status, checking a JSON schema. Hovering a snippet shows the code it will insert.

@@ -42,8 +42,6 @@ const TEXT_FIELDS = [
   ['aiPrompt', 'Prompt'],
   ['preRequestScriptJs', 'Pre-request script'],
   ['testScriptJs', 'Test script'],
-  ['preRequestScript', 'Pre-request script (Tengo)'],
-  ['testScript', 'Test script (Tengo)'],
   ['requestNotes', 'Docs'],
 ] as const;
 

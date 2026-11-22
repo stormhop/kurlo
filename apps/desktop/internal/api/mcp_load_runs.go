@@ -260,14 +260,14 @@ func (s *mcpServer) loadTestResult(ws mcpWorkspace, ref mcpLoadRunRef) (model.Lo
 	}
 	result := model.LoadRunResult{}
 	if ref.StartedAt == 0 {
-		result = s.executionApp.LastLoadRun(entry.test.ID)
+		result = s.executionApp.LastLoadRun(entry.collection.ID, entry.test.ID)
 	} else {
 		data, err := os.ReadFile(loadRunSnapshotPath(entry.collection.ID, entry.test.ID, ref.StartedAt))
 		if err == nil {
 			err = json.Unmarshal(data, &result)
 		}
 		if os.IsNotExist(err) {
-			latest := s.executionApp.LastLoadRun(entry.test.ID)
+			latest := s.executionApp.LastLoadRun(entry.collection.ID, entry.test.ID)
 			if latest.StartedAt == ref.StartedAt {
 				result = latest
 			}
@@ -358,7 +358,7 @@ func (s *mcpServer) toolListLoadRuns(_ context.Context, arguments json.RawMessag
 			}
 		}
 	}
-	if latest := s.executionApp.LastLoadRun(entry.test.ID); latest.CollectionID == entry.collection.ID && latest.FinishedAt > 0 && !slices.Contains(timestamps, latest.StartedAt) {
+	if latest := s.executionApp.LastLoadRun(entry.collection.ID, entry.test.ID); latest.CollectionID == entry.collection.ID && latest.FinishedAt > 0 && !slices.Contains(timestamps, latest.StartedAt) {
 		timestamps = append(timestamps, latest.StartedAt)
 	}
 	slices.Sort(timestamps)

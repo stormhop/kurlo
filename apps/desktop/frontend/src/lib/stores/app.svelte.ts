@@ -5,6 +5,8 @@ import {
   useLocalWorkspaceStore, createLocalWorkspaceRoot, saveWorkspaceSecrets,
   emptyLoadRunState, revealWorkspaceItem,
 } from '../backend';
+import { RequestFiles } from './requestFiles.svelte';
+import { migrateRequestSectionPreferences } from '../requestTabPreferences';
 import { DEFAULT_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
 import { agentStore, codexAgentStore, claudeAgentStore } from './agent.svelte';
 import type { CookieJarEntry, CookieSyncStatus, GitBranchListResult, GitConflictFileResult, GitDiffResult, GitLogResult, GitWorkspaceStatus, HttpResponse, McpResponse, MockRequestLog, MockServerStatus, OAuth2DevicePrompt, WorkspaceDiagnostic, WorkspaceOpenResult, WorkspaceSecretRef, K6Info, LoadRunResult, LoadRunState, LoadTest } from '../backend';
@@ -38,7 +40,7 @@ import type {
   Method, BodyType, RawBodyType, HttpVersion, RequestTab, ScriptTab, ResponseTab, GrpcResponseTab,
   AuthType, OAuth2GrantType, OAuth2ClientAuth, SidebarView, ShortcutId, KVRow,
   Workspace, Collection, Environment,
-   RequestSettingsOverrides, ProxyConfig, SavedRequest, RequestHistoryEntry, RequestStore, ScriptEngine,
+   RequestSettingsOverrides, ProxyConfig, SavedRequest, RequestHistoryEntry, RequestStore,
   CollectionGroup, HistoryDayGroup,
   CollectionRunnerResult, RenderedSnippetLine, RequestType, SIOArg, SavedRealtimeMessage, GrpcResponse, GrpcServiceDefinition,
   RequestExample,
@@ -76,7 +78,6 @@ import { requestSerializationFeature } from './features/requestSerialization';
 import { requestStateFeature } from './features/requestState';
 import { realtimeFeature } from './features/realtime';
 import { responseFeature } from './features/response';
-import { scriptsFeature } from './features/scripts';
 import { snippetsFeature } from './features/snippets';
 import { sseFeature } from './features/sse';
 import { websocketFeature } from './features/websocket';
@@ -474,8 +475,6 @@ class AppVM {
   declare graphQLBodyForSend: typeof graphqlFeature.graphQLBodyForSend;
   declare graphQLPayloadFromRequest: typeof graphqlFeature.graphQLPayloadFromRequest;
   declare graphQLPayloadError: typeof graphqlFeature.graphQLPayloadError;
-  declare graphQLExplorerFields: typeof graphqlFeature.graphQLExplorerFields;
-  declare applyGraphQLExplorerField: typeof graphqlFeature.applyGraphQLExplorerField;
   declare beautifyGraphQLQuery: typeof graphqlFeature.beautifyGraphQLQuery;
   declare graphQLPayloadHasContent: typeof graphqlFeature.graphQLPayloadHasContent;
   declare fetchGraphQLSchemaUrl: typeof graphqlFeature.fetchGraphQLSchemaUrl;
@@ -533,9 +532,6 @@ class AppVM {
   declare sendAiPrompt: typeof aiFeature.sendAiPrompt;
   declare initAiListeners: typeof aiFeature.initAiListeners;
 
-  declare activePreRequestScript: typeof scriptsFeature.activePreRequestScript;
-  declare activeTestScript: typeof scriptsFeature.activeTestScript;
-  declare scriptFieldsForSend: typeof scriptsFeature.scriptFieldsForSend;
 
   declare bodyLang: typeof requestBodyFeature.bodyLang;
   declare bodyMode: typeof requestBodyFeature.bodyMode;
@@ -569,7 +565,9 @@ class AppVM {
   declare bodyContentType: typeof requestBodyFeature.bodyContentType;
   declare bodyLengthLabel: typeof requestBodyFeature.bodyLengthLabel;
   declare pickFileForRow: typeof requestBodyFeature.pickFileForRow;
-  declare pickBinaryFile: typeof requestBodyFeature.pickBinaryFile;
+  declare setBinaryFilePath: typeof requestBodyFeature.setBinaryFilePath;
+  declare binaryContentTypeHeader: typeof requestBodyFeature.binaryContentTypeHeader;
+  declare useBinaryContentType: typeof requestBodyFeature.useBinaryContentType;
   declare applyParsedCurl: typeof requestBodyFeature.applyParsedCurl;
   declare showCurlPasteToast: typeof requestBodyFeature.showCurlPasteToast;
   declare onUrlPaste: typeof requestBodyFeature.onUrlPaste;
@@ -613,6 +611,7 @@ class AppVM {
   declare setPreviewTabs: typeof requestTabsFeature.setPreviewTabs;
   declare setPreviewRequestId: typeof requestTabsFeature.setPreviewRequestId;
   declare keepRequestTab: typeof requestTabsFeature.keepRequestTab;
+  declare requestIsRunning: typeof requestTabsFeature.requestIsRunning;
   declare requestTabNeedsKeeping: typeof requestTabsFeature.requestTabNeedsKeeping;
   declare openRequestTab: typeof requestTabsFeature.openRequestTab;
   declare closeRequestTab: typeof requestCrudFeature.closeRequestTab;
@@ -797,6 +796,7 @@ class AppVM {
   declare importOpenApiFromUrl: typeof importExportFeature.importOpenApiFromUrl;
   declare openOpenApiUrlImport: typeof importExportFeature.openOpenApiUrlImport;
   declare importHttpFilePayload: typeof importExportFeature.importHttpFilePayload;
+  declare buildCollectionDocs: typeof importExportFeature.buildCollectionDocs;
   declare exportCollection: typeof importExportFeature.exportCollection;
   declare exportCollectionToOpenCollection: typeof importExportFeature.exportCollectionToOpenCollection;
   declare exportCollectionToPostman: typeof importExportFeature.exportCollectionToPostman;
@@ -900,6 +900,7 @@ class AppVM {
   declare toggleSSLVerification: typeof preferencesFeature.toggleSSLVerification;
   declare pickClientCertFile: typeof preferencesFeature.pickClientCertFile;
   declare clearClientCertField: typeof preferencesFeature.clearClientCertField;
+  declare setClientCertField: typeof preferencesFeature.setClientCertField;
   declare loadShortcutSettings: typeof preferencesFeature.loadShortcutSettings;
   declare saveShortcutSettings: typeof preferencesFeature.saveShortcutSettings;
   declare shortcutCombo: typeof preferencesFeature.shortcutCombo;
@@ -931,8 +932,6 @@ class AppVM {
   declare resetZoom: typeof preferencesFeature.resetZoom;
   declare loadProxyConfig: typeof preferencesFeature.loadProxyConfig;
   declare setProxyConfig: typeof preferencesFeature.setProxyConfig;
-  declare loadScriptEngine: typeof preferencesFeature.loadScriptEngine;
-  declare setScriptEngine: typeof preferencesFeature.setScriptEngine;
 
   declare pruneHistory: typeof historyFeature.pruneHistory;
   declare buildHistoryGroups: typeof historyFeature.buildHistoryGroups;
@@ -975,6 +974,7 @@ class AppVM {
   declare renameEnvironment: typeof environmentFeature.renameEnvironment;
   declare setEnvironmentProtected: typeof environmentFeature.setEnvironmentProtected;
   declare setEnvironmentSandbox: typeof environmentFeature.setEnvironmentSandbox;
+  declare setEnvironmentSecretSources: typeof environmentFeature.setEnvironmentSecretSources;
   declare setEnvironmentColor: typeof environmentFeature.setEnvironmentColor;
   declare setEnvironmentParent: typeof environmentFeature.setEnvironmentParent;
   declare deleteEnvironment: typeof environmentFeature.deleteEnvironment;
@@ -1207,11 +1207,8 @@ class AppVM {
   rawTypeMenuOpen = $state(false);
   authMenuOpen = $state(false);
 
-  preRequestScript = $state('');
-  testScript = $state('');
   preRequestScriptJs = $state('');
   testScriptJs = $state('');
-  scriptEngine = $state<ScriptEngine>('js');
   requestNotes = $state('');
   requestExamples = $state<RequestExample[]>([]);
   requestExamplesSource: { view: RequestExample[]; source: RequestExample[] } | null = null;
@@ -1383,7 +1380,7 @@ class AppVM {
   declare createLoadTest: typeof loadTestFeature.createLoadTest;
   declare reportLoadTestEdits: typeof loadTestFeature.reportLoadTestEdits;
   declare confirmLeaveLoadTest: typeof loadTestFeature.confirmLeaveLoadTest;
-  loadTestEdits = $state<{ collectionId: string; test: LoadTest; dirty: boolean } | null>(null);
+  loadTestEdits = $state<{ collectionId: string; test: LoadTest; baseFingerprint?: string; dirty: boolean } | null>(null);
   loadTestDraft = $state<{ collectionId: string; test: LoadTest } | null>(null);
   declare createLoadTestFromRequest: typeof loadTestFeature.createLoadTestFromRequest;
   declare renameLoadTest: typeof loadTestFeature.renameLoadTest;
@@ -1410,7 +1407,7 @@ class AppVM {
 
   loadRun = $state<LoadRunState>(emptyLoadRunState());
   loadRunLogLines = $state<string[]>([]);
-  loadRunLogTestId = $state('');
+  loadRunLogKey = $state('');
   loadRunResults = $state<Record<string, LoadRunResult>>({});
   loadTestExportRequestId = $state('');
   declare runSavedLoadTest: typeof loadRunFeature.runSavedLoadTest;
@@ -1467,6 +1464,8 @@ class AppVM {
   collectionRunnerConcurrency = $state(DEFAULT_RUNNER_CONCURRENCY);
   collectionRunnerTitle = $state('');
   collectionRunnerRunning = $state(false);
+  collectionRunnerPreflighting = $state(false);
+  collectionRunnerPreflightFailures = $state<{ requestId: string; name: string; failures: import('../backend').LinkedSecretFailure[] }[]>([]);
   collectionRunnerResults = $state<CollectionRunnerResult[]>([]);
   collectionLastRuns = $state<Record<string, CollectionRunRecord>>({});
   collectionRunnerShowingLastRun = $state(false);
@@ -1583,6 +1582,7 @@ class AppVM {
   persistTimer: ReturnType<typeof setTimeout> | null = null;
   requestStorePersistQueue: Promise<unknown> = Promise.resolve();
   requestStorePersistEpoch = 0;
+  requestFiles: RequestFiles = new RequestFiles(this);
   requestStorePersistTimer: ReturnType<typeof setTimeout> | null = null;
   environmentPersistTimer: ReturnType<typeof setTimeout> | null = null;
   environmentSavedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1602,6 +1602,7 @@ class AppVM {
 
   _postmanImportInput: HTMLInputElement | undefined = undefined;
   _sidebarSearchInput: HTMLInputElement | undefined = undefined;
+  _collectionWorkspaceRef: { save: () => Promise<void> } | undefined;
   _urlInputRef: HTMLInputElement | undefined = undefined;
 
   sidebarRequestMemo = new SidebarRequestMemo();
@@ -1634,6 +1635,7 @@ class AppVM {
     return environmentMenuGroups(this.environmentScopeCollection, this.activeWorkspaceEnvironments);
   }
   get variableSuggestions(): VariableSuggestion[] { return this.requestVariableSuggestions(); }
+  get editedDraftIds(): string[] { return this.openRequestsForTabs.filter(req => req.isDraft && this.draftWasEdited(req)).map(req => req.id); }
   get cookieJarDefaultDomain() { return this.activeRequestCookieDomain(); }
   get loading(): boolean { return Boolean(this.activeRequestId && this.inFlightRequestIds.has(this.activeRequestId)); }
 
@@ -1738,6 +1740,7 @@ class AppVM {
     let requestStoreReadFailed = false;
     const savedTopViewState = this.loadTopViewState();
     const loaded = rawOverride === undefined && diagnosticsOverride === undefined ? await loadWorkspace().catch(() => null) : null;
+    this.requestFiles.setRoot(loaded?.root);
     this.workspaceDiagnostics = normalizeWorkspaceDiagnostics(diagnosticsOverride ?? loaded?.diagnostics ?? await loadWorkspaceDiagnostics());
     try {
       const raw = rawOverride ?? loaded?.payload ?? await loadRequestStore();
@@ -1748,6 +1751,7 @@ class AppVM {
         lWs = (parsed.workspaces ?? []).map(normalizeWorkspace);
         lWsId = parsed.activeWorkspaceId ?? '';
         lCols = (parsed.collections ?? []).map(c => normalizeCollection(c, lWsId));
+        migrateRequestSectionPreferences(this.requestFiles.root, lWsId, lCols, parsed.requests ?? []);
         lEnvs = (parsed.environments ?? []).map(e => normalizeEnvironment(e, lWsId));
         lEnvId = parsed.activeEnvironmentId ?? '';
         lActiveId = parsed.activeId ?? ''; lOpenIds = parsed.openIds ?? []; lFolderCollapsed = parsed.folderCollapsed ?? {};
@@ -1822,6 +1826,7 @@ class AppVM {
       this.requestStoreLoaded = true;
     }
     if (!requestStoreReadFailed) this.rememberLoadedRequestStore(loaded?.revision);
+    if (this.requestFiles.active?.ready) void this.requestFiles.active.open();
     if (this.previewRequestId && !this.openRequestIds.includes(this.previewRequestId)) this.setPreviewRequestId('');
     const launchTopView = launching ? startupTopView(this.startupView, { workspaceBlocked: this.workspaceBlocked, hasActiveRequest: Boolean(this.activeRequestId) }) : null;
     if (launchTopView) {
@@ -1860,6 +1865,7 @@ class AppVM {
     const wasInGitView = this.topView === 'git';
     this.cancelPersistTimersOnly();
     this.requestStoreLoaded = false;
+    this.requestFiles.setRoot(result.root);
     await this.loadRequestWorkspace(result.payload, result.diagnostics ?? []);
     if (wasInGitView) this.openGitTab(false);
     this.gitStatus = normalizeGitStatus(result.git ?? await gitStatus());
@@ -1967,6 +1973,7 @@ class AppVM {
       'Close'
     );
     if (!confirmed) return;
+    if (!await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'close-repo';
     this.gitError = '';
@@ -1981,6 +1988,7 @@ class AppVM {
 
   async useAppStorage() {
     this.closeFloatingMenus();
+    if (!await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'use-app-storage';
     this.gitError = '';
@@ -2006,6 +2014,7 @@ class AppVM {
     if (!initMode) return;
     const parentDir = await openDirectoryDialog(`Choose parent folder for ${directoryName}`, await this.defaultWorkspaceParentForDialogs());
     if (!parentDir) return;
+    if (!await this.requestFiles.review()) return;
     this.gitLoading = true;
     this.gitAction = 'local-create';
     this.gitError = '';
@@ -2185,7 +2194,6 @@ applyFeatures(
   grpcFeature,
   mcpFeature,
   aiFeature,
-  scriptsFeature,
   examplesFeature,
   requestBodyFeature,
   requestCrudFeature,

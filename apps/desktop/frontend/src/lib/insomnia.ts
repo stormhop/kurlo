@@ -316,8 +316,8 @@ export function insomniaRequestsFromResources(payload: unknown, collectionId: st
         grpcProtoFileName: asText(kurlo.grpcProtoFileName),
         grpcProtoImportPaths: asArray(kurlo.grpcProtoImportPaths).map(asText).filter(Boolean),
       } : {}),
-      preRequestScript: asText(resource.preRequestScript),
-      testScript: asText(resource.afterResponseScript),
+      preRequestScriptJs: asText(resource.preRequestScript),
+      testScriptJs: asText(resource.afterResponseScript),
       requestNotes: asText(resource.description),
       settings: { ...DEFAULT_REQUEST_SETTINGS, ...(socketIO?.settings ?? {}), ...kurloSettings(kurlo.settings) },
     };
@@ -496,8 +496,8 @@ function requestResource(req: SavedRequest, parentId: string, stripFn: (source: 
     authentication: insomniaAuth(req.auth, includeSecrets),
     body: insomniaBody(req, stripFn, includeSecrets),
     description: req.requestNotes,
-    ...(req.preRequestScript ? { preRequestScript: req.preRequestScript } : {}),
-    ...(req.testScript ? { afterResponseScript: req.testScript } : {}),
+    ...(req.preRequestScriptJs ? { preRequestScript: req.preRequestScriptJs } : {}),
+    ...(req.testScriptJs ? { afterResponseScript: req.testScriptJs } : {}),
     ...(req.requestType === 'grpc' ? {
       protoMethodName: req.grpcMethod ?? '',
       metadata: (req.grpcMetadata ?? []).filter(row => row.key || row.value).map(row => insomniaRow(row, includeSecrets)),

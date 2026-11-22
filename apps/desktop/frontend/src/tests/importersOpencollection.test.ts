@@ -32,7 +32,7 @@ describe('openCollectionBundleFromFiles', () => {
     expect(bundle.defaults.variables[0]).toMatchObject({ key: 'workspace', value: 'core' });
     expect(bundle.defaults.headers[0]).toMatchObject({ key: 'X-Collection', value: 'kurlo' });
     expect(bundle.defaults.auth).toMatchObject({ type: 'bearer', bearerToken: '{{collectionToken}}' });
-    expect(bundle.defaults.preRequestScript).toContain('collection');
+    expect(bundle.defaults.preRequestScriptJs).toContain('collection');
     expect(bundle.defaults.settings.timeoutMs).toBe(9000);
     expect(bundle.defaults.settings.enableSSLVerification).toBe(false);
     expect(bundle.defaults.settings.proxyUrl).toBe('http://localhost:8080');
@@ -47,8 +47,8 @@ describe('openCollectionBundleFromFiles', () => {
       url: '{{baseUrl}}/users',
       bodyType: 'json',
       bodyContent: '{"name":"Ada"}',
-      preRequestScript: 'bru.setVar("stamp", Date.now());',
-      testScript: 'test("created", () => expect(res.status).to.equal(201));',
+      preRequestScriptJs: 'bru.setVar("stamp", Date.now());',
+      testScriptJs: 'test("created", () => expect(res.status).to.equal(201));',
       requestNotes: 'Creates a user.',
     });
     expect(bundle.requests[0].params[0]).toMatchObject({ key: 'dryRun', value: 'true' });
@@ -85,7 +85,7 @@ describe('openCollectionBundleFromFiles', () => {
       expect.objectContaining({ key: 'collectionSecret', secret: true }),
     ]));
     expect(bundle.defaults.auth).toMatchObject({ type: 'apikey', apiKeyName: 'X-Collection-Key', apiKeyValue: '{{collectionKey}}' });
-    expect(bundle.defaults.preRequestScript).toContain('legacy');
+    expect(bundle.defaults.preRequestScriptJs).toContain('legacy');
     expect(bundle.defaults.settings.timeoutMs).toBe(7000);
     expect(bundle.defaults.settings.followRedirects).toBe(false);
     expect(bundle.requests).toHaveLength(1);
@@ -98,7 +98,7 @@ describe('openCollectionBundleFromFiles', () => {
       auth: expect.objectContaining({ type: 'basic', basicUser: 'admin', basicPass: '{{password}}' }),
     });
     expect(bundle.requests[0].headers[0]).toMatchObject({ key: 'Content-Type', value: 'application/json' });
-    expect(bundle.requests[0].testScript).toContain('expect(res.status)');
+    expect(bundle.requests[0].testScriptJs).toContain('expect(res.status)');
   });
 
   it('imports non-HTTP legacy Bruno .bru request files when type metadata is present', () => {
@@ -209,8 +209,8 @@ describe('buildOpenCollectionFiles', () => {
       auth: { ...emptyAuthState(), type: 'bearer', bearerToken: 'raw-token' },
       bodyType: 'json',
       bodyContent: '{"name":"Ada"}',
-      preRequestScript: 'bru.setVar("stamp", Date.now());',
-      testScript: 'test("created", () => expect(res.status).to.equal(201));',
+      preRequestScriptJs: 'bru.setVar("stamp", Date.now());',
+      testScriptJs: 'test("created", () => expect(res.status).to.equal(201));',
       requestNotes: 'Creates a user.',
       settings: { ...DEFAULT_REQUEST_SETTINGS, timeoutMs: 12000, followRedirects: true },
       settingsOverrides: { timeoutMs: true, followRedirects: true },
@@ -226,7 +226,7 @@ describe('buildOpenCollectionFiles', () => {
     defaults.headers = [testRow('X-Collection', 'collection-secret')];
     defaults.variables = [{ ...testRow('tenant', 'acme'), secret: true }];
     defaults.auth = { ...emptyAuthState(), type: 'apikey', apiKeyName: 'X-Collection-Key', apiKeyValue: 'collection-secret', apiKeyIn: 'header' };
-    defaults.preRequestScript = 'bru.setVar("collection", "yes");';
+    defaults.preRequestScriptJs = 'bru.setVar("collection", "yes");';
     defaults.settings = { ...DEFAULT_REQUEST_SETTINGS, timeoutMs: 9000, followRedirects: false, proxyUrl: 'http://localhost:8080' };
 
     const files = buildOpenCollectionFiles('Bruno API', 'Docs', defaults, [request], [env], strip);

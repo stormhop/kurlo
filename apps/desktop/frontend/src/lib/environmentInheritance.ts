@@ -1,6 +1,7 @@
-import type { Environment, KVRow } from './types/models';
+import type { Environment, KVRow, SecretSource } from './types/models';
+import { importedEnvironmentRows } from './stores/secretImports.svelte';
 
-export type InheritedRow = { row: KVRow; sourceId: string; sourceName: string };
+export type InheritedRow = { row: KVRow; sourceId: string; sourceName: string; imported?: SecretSource };
 
 export function environmentChain(environments: Environment[], environmentId: string): Environment[] {
   const chain: Environment[] = [];
@@ -20,9 +21,19 @@ export function parentEnvironment(environments: Environment[], environment: Envi
   return environmentChain(environments, environment.id)[1];
 }
 
+function addImportedRows(target: Map<string, InheritedRow>, environment: Environment) {
+  for (const [key, row, source] of importedEnvironmentRows(environment)) {
+    const existing = target.get(key);
+    if (existing && !existing.imported) continue;
+    target.set(key, { row, sourceId: environment.id, sourceName: environment.name, imported: source });
+  }
+}
+
 export function effectiveEnvironmentRows(environments: Environment[], environmentId: string): Map<string, InheritedRow> {
   const effective = new Map<string, InheritedRow>();
-  for (const environment of environmentChain(environments, environmentId).reverse()) {
+  const chain = environmentChain(environments, environmentId).reverse();
+  for (const environment of chain) addImportedRows(effective, environment);
+  for (const environment of chain) {
     for (const row of environment.values) {
       const key = row.key.trim();
       if (!row.enabled || !key) continue;
@@ -33,8 +44,10 @@ export function effectiveEnvironmentRows(environments: Environment[], environmen
 }
 
 export function inheritedEnvironmentRows(environments: Environment[], environmentId: string): Map<string, InheritedRow> {
-  const parent = environmentChain(environments, environmentId)[1];
-  return parent ? effectiveEnvironmentRows(environments, parent.id) : new Map();
+  const [own, parent] = environmentChain(environments, environmentId);
+  const inherited = parent ? effectiveEnvironmentRows(environments, parent.id) : new Map<string, InheritedRow>();
+  if (own) addImportedRows(inherited, own);
+  return inherited;
 }
 
 export function inheritedEnvironmentValues(environments: Environment[], environmentId: string): Record<string, string> {
@@ -44,7 +57,7 @@ export function inheritedEnvironmentValues(environments: Environment[], environm
 }
 
 export function flattenedEnvironment(environments: Environment[], environment: Environment): Environment {
-  if (!environment.parentId) return environment;
+  if (!environment.parentId && !environment.secretSources?.length) return environment;
   const ownKeys = new Set(environment.values.filter(row => row.enabled && row.key.trim()).map(row => row.key.trim()));
   const inherited = [...inheritedEnvironmentRows(environments, environment.id).entries()]
     .filter(([key]) => !ownKeys.has(key))

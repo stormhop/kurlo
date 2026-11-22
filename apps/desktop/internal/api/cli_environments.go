@@ -36,6 +36,11 @@ func flattenCLIEnvironments(environments []cliEnvironment) []cliEnvironment {
 		env := environments[i]
 		if len(chain) > 1 {
 			env.Values = flattenedCLIEnvironmentRows(chain)
+			var sources []any
+			for index := len(chain) - 1; index >= 0; index-- {
+				sources = append(sources, chain[index].Sources...)
+			}
+			env.Sources = sources
 			if parent := chain[1]; parent.Name != "" {
 				env.Parent = parent.Name
 			}

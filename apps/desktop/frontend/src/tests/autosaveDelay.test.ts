@@ -35,6 +35,21 @@ afterEach(() => {
 });
 
 describe('autosave delay setting', () => {
+  it('keeps manual save as the default when no autosave preference has been stored', () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    const host = { autosave: false };
+    preferencesFeature.loadAutosaveSettings.call(host as never);
+    expect(host.autosave).toBe(false);
+  });
+
+  it('loads an explicit autosave preference', () => {
+    vi.stubGlobal('localStorage', memoryStorage());
+    localStorage.setItem('kurlo.autosave.v1', 'true');
+    const host = { autosave: false };
+    preferencesFeature.loadAutosaveSettings.call(host as never);
+    expect(host.autosave).toBe(true);
+  });
+
   it('clamps and rounds what the user types', () => {
     expect(normalizeAutosaveDelay(undefined)).toBe(DEFAULT_AUTOSAVE_DELAY_MS);
     expect(normalizeAutosaveDelay('abc')).toBe(DEFAULT_AUTOSAVE_DELAY_MS);

@@ -17,7 +17,7 @@ type LoadTestHost = {
   activeLoadTestId: string;
   activeLoadTestCollectionId: string;
   loadTestDraft: { collectionId: string; test: LoadTest } | null;
-  loadTestEdits: { collectionId: string; test: LoadTest; dirty: boolean } | null;
+  loadTestEdits: { collectionId: string; test: LoadTest; baseFingerprint?: string; dirty: boolean } | null;
   autosave: boolean;
   openSaveChangesDialog: (name: string) => Promise<'save' | 'discard' | 'cancel'>;
   activeEnvironmentId: string;
@@ -149,23 +149,25 @@ export const loadTestFeature = {
     return !error;
   },
 
-  reportLoadTestEdits(this: LoadTestHost, collectionId: string, test: LoadTest, dirty: boolean) {
-    if (test.id !== this.activeLoadTestId) return;
-    this.loadTestEdits = { collectionId, test, dirty };
+  reportLoadTestEdits(this: LoadTestHost, collectionId: string, test: LoadTest, dirty: boolean, baseFingerprint?: string) {
+    if (test.id !== this.activeLoadTestId || collectionId !== this.activeLoadTestCollectionId) return;
+    this.loadTestEdits = { collectionId, test, dirty, baseFingerprint };
   },
 
-  async confirmLeaveLoadTest(this: LoadTestHost & { saveLoadTest: (collectionId: string, draft: LoadTest) => Promise<boolean> }): Promise<boolean> {
+  async confirmLeaveLoadTest(this: LoadTestHost & { saveLoadTest: (collectionId: string, draft: LoadTest, baseFingerprint?: string) => Promise<boolean> }): Promise<boolean> {
     const id = this.activeLoadTestId;
     if (!id) return true;
     const draft = this.loadTestDraft?.test.id === id ? this.loadTestDraft : null;
     const edits = this.loadTestEdits?.test.id === id ? this.loadTestEdits : null;
-    const unsaved = draft ? Boolean(edits?.dirty) : Boolean(edits?.dirty && !this.autosave);
-    if (unsaved) {
-      const test = edits?.test ?? draft!.test;
-      const collectionId = edits?.collectionId ?? draft!.collectionId;
-      const choice = await this.openSaveChangesDialog(test.name.trim() || 'New load test');
+    if (edits?.dirty) {
+      const test = edits.test;
+      const collectionId = edits.collectionId;
+      const choice = !draft && this.autosave ? 'save' : await this.openSaveChangesDialog(test.name.trim() || 'New load test');
       if (choice === 'cancel') return false;
-      if (choice === 'save' && !await this.saveLoadTest(collectionId, test)) return false;
+      if (choice === 'save') {
+        if (!await this.saveLoadTest(collectionId, test, edits.baseFingerprint)) return false;
+        if (this.loadTestEdits?.dirty && loadTestFingerprint(this.loadTestEdits.test) !== loadTestFingerprint(test)) return false;
+      }
     }
     this.loadTestDraft = null;
     this.loadTestEdits = null;
@@ -175,10 +177,10 @@ export const loadTestFeature = {
   async openLoadTest(this: LoadTestHost & { confirmLeaveLoadTest: () => Promise<boolean> }, collectionId: string, loadTestId: string) {
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection?.loadTests?.some(test => test.id === loadTestId)) return;
-    if (this.activeLoadTestId && this.activeLoadTestId !== loadTestId && !await this.confirmLeaveLoadTest()) return;
+    if (this.activeLoadTestId && (this.activeLoadTestId !== loadTestId || this.activeLoadTestCollectionId !== collectionId) && !await this.confirmLeaveLoadTest()) return;
     this.closeFloatingMenus();
     await this.persistActiveRequestNow();
-    if (this.activeLoadTestId !== loadTestId) this.loadTestTab = 'flow';
+    if (this.activeLoadTestId !== loadTestId || this.activeLoadTestCollectionId !== collectionId) this.loadTestTab = 'flow';
     this.activeWorkspaceId = collection.workspaceId;
     this.activeLoadTestCollectionId = collectionId;
     this.activeLoadTestId = loadTestId;
@@ -203,7 +205,17 @@ export const loadTestFeature = {
       if (!loadTests.length) delete next.loadTests;
       return next;
     });
-    return this.persistRequestStore();
+    const pending = this.collections.find(candidate => candidate.id === collectionId)?.loadTests;
+    const ok = await this.persistRequestStore();
+    if (!ok) {
+      this.collections = this.collections.map(candidate => {
+        if (candidate.id !== collectionId || candidate.loadTests !== pending) return candidate;
+        const restored = { ...candidate, loadTests: collection.loadTests };
+        if (!restored.loadTests) delete restored.loadTests;
+        return restored;
+      });
+    }
+    return ok;
   },
 
   async createLoadTest(this: LoadTestHost & { loadTestRequestOptions: (collectionId: string) => SavedRequest[]; confirmLeaveLoadTest: () => Promise<boolean> }, collectionId: string, requestIds: string[] = []) {
@@ -275,7 +287,7 @@ export const loadTestFeature = {
     if (!test) return;
     if (!await this.openConfirmDialog('Delete load test', `Delete "${test.name}"? Its file is removed from the workspace.`, 'Delete')) return;
     if (!await this.updateCollectionLoadTests(collectionId, tests => tests.filter(candidate => candidate.id !== loadTestId))) return;
-    if (this.activeLoadTestId === loadTestId) {
+    if (this.activeLoadTestId === loadTestId && this.activeLoadTestCollectionId === collectionId) {
       this.loadTestEdits = null;
       this.activeLoadTestId = '';
       this.activeLoadTestCollectionId = '';
@@ -304,8 +316,8 @@ export const loadTestFeature = {
       this.loadTestSavedTimer = null;
     }
     const ok = await this.updateCollectionLoadTests(collectionId, tests => isNew ? [...tests, next] : tests.map(test => test.id === draft.id ? next : test));
-    if (ok && isNew) this.loadTestDraft = null;
-    if (ok && this.loadTestEdits?.test.id === draft.id) this.loadTestEdits = { ...this.loadTestEdits, test: next, dirty: false };
+    if (ok && isNew && this.loadTestDraft?.collectionId === collectionId && this.loadTestDraft.test.id === draft.id) this.loadTestDraft = null;
+    if (ok && this.loadTestEdits?.collectionId === collectionId && this.loadTestEdits.test.id === draft.id && loadTestFingerprint(this.loadTestEdits.test) === loadTestFingerprint(draft)) this.loadTestEdits = { ...this.loadTestEdits, test: next, dirty: false };
     this.loadTestSaveState = ok ? 'saved' : 'idle';
     if (ok) {
       this.loadTestSavedTimer = setTimeout(() => {

@@ -26,6 +26,8 @@ Choose [Postman collection v3 (YAML folder)](/docs/guides/import-export/postman/
 
 Secrets marked as **secret** are stripped, redacted, or kept as Kurlo secret placeholders depending on the target format. Git/YAML workspaces keep the real values in Kurlo's encrypted local profile, outside shared files.
 
+To share a readable reference, choose [Build documentation](/docs/guides/cli-runner/docs/) in the collection menu. This creates a standalone HTML file with saved requests and examples.
+
 ## Sharing within a team
 
 For day-to-day collaboration:

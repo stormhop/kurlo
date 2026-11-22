@@ -14,6 +14,7 @@ Usage:
   kurlo run [workspace] [flags]   Run a workspace's requests and test scripts
   kurlo load list|export|run     Manage and run collection load tests with k6
   kurlo proxy [flags]             Capture HTTP traffic and HTTPS tunnel metadata
+  kurlo docs build [collection]   Build a static documentation site from a collection
   kurlo openapi check [collection] Check a synced collection's OpenAPI spec for drift
   kurlo mcp [workspace] [flags]   Serve a workspace to AI agents over MCP
   kurlo mcp install [client...]   Add Kurlo to Claude Code, Cursor, Codex and other AI clients
@@ -39,6 +40,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return api.RunLoadCLI(args[1:], stdout, stderr)
 	case "proxy":
 		return api.RunProxyCLI(args[1:], stdout, stderr)
+	case "docs":
+		return api.RunDocsCLI(args[1:], stdout, stderr)
 	case "openapi":
 		return api.RunOpenAPICLI(args[1:], stdout, stderr)
 	case "mcp":

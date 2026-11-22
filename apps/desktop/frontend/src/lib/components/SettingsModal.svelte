@@ -12,7 +12,7 @@
   import { tabListKeyboard, trapFocus } from '../a11y';
   import type { SettingsTab } from '../stores/ui';
   import type { UpdateInfo } from '../backend';
-  import type { ProxyConfig, ProxyMode, ProxyProtocol, ScriptEngine, ShortcutId } from '../types/models';
+  import type { ProxyConfig, ProxyMode, ProxyProtocol, ShortcutId } from '../types/models';
   import type { StartupView } from '../startupView';
   import {
     DARK_THEME_VARIANTS,
@@ -91,7 +91,7 @@
   }
 
   const NAV_ITEMS: SettingsNavItem[] = [
-    { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave delay interval manual save preview tabs temporary reuse double click keep default location workspace collection folder data export import backup script engine javascript tengo' },
+    { id: 'general', label: 'General', keywords: 'general on launch startup start screen open request overview restore saving autosave delay interval manual save preview tabs temporary reuse double click keep default location workspace collection folder data export import backup' },
     { id: 'theme', label: 'Appearance', keywords: 'appearance theme dark light system color scheme zoom scale size interface text font bigger smaller' },
     { id: 'proxy', label: 'Proxy', keywords: 'proxy http https socks5 system bypass network hostname port credentials' },
     { id: 'ai', label: 'AI', keywords: 'ai agent model llm openrouter anthropic claude openai gpt key api byok ollama lm studio local connection' },
@@ -112,8 +112,6 @@
     setPreviewTabs,
     startupView,
     setStartupView,
-    scriptEngine,
-    setScriptEngine,
     shortcutGroups,
     shortcutCombo,
     startShortcutCapture,
@@ -154,8 +152,6 @@
     setPreviewTabs: (value: boolean) => void;
     startupView: StartupView;
     setStartupView: (value: StartupView) => void;
-    scriptEngine: ScriptEngine;
-    setScriptEngine: (value: ScriptEngine) => void;
     shortcutGroups: () => ShortcutGroup[];
     shortcutCombo: (id: ShortcutId) => string;
     startShortcutCapture: (id: ShortcutId) => void;
@@ -764,7 +760,7 @@
 
       {#if settingsTab === 'general'}
         <div class="settings-body general-tab" id="settings-panel-general" role="tabpanel">
-          {@render pageHead('General', 'How Kurlo saves your work, what it opens first and how scripts run.')}
+          {@render pageHead('General', 'Choose how Kurlo saves your work, what it opens first, and where it stores new files.')}
 
           {#if matchesQuery('Saving', 'autosave', 'manual save', 'Autosave delay', 'interval', 'Preview tabs', 'temporary reuse double click keep', 'On launch', 'startup start screen open request overview restore')}
             <section class="settings-block">
@@ -839,27 +835,6 @@
             </section>
           {/if}
 
-          {#if matchesQuery('Scripts', 'script engine javascript tengo pre-request tests')}
-            <section class="settings-block">
-              <h4 class="settings-group-label">Scripts</h4>
-              <div class="settings-group">
-                <div class="settings-row">
-                  <div class="settings-row-text">
-                    <span class="settings-row-title" id="settings-engine-title">Script engine</span>
-                    <span class="settings-row-desc">{scriptEngine === 'js' ? 'Postman-style JavaScript: pm.test(), pm.expect().to.eql().' : 'Tengo: lightweight sandboxed scripting with pm.test(name, cond).'}</span>
-                  </div>
-                  <div class="settings-row-control">
-                    <div class="segmented" role="radiogroup" aria-labelledby="settings-engine-title">
-                      <button class="segmented-item" type="button" role="radio" aria-checked={scriptEngine === 'js'} onclick={() => setScriptEngine('js')}>JavaScript</button>
-                      <button class="segmented-item" type="button" role="radio" aria-checked={scriptEngine === 'tengo'} onclick={() => setScriptEngine('tengo')}>Tengo</button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p class="settings-group-note">Applies to all pre-request and test scripts. Each request keeps a script per engine, so switching never loses work.</p>
-            </section>
-          {/if}
-
           {#if matchesQuery('Default Location', 'workspace collection folder path documents kurlo')}
             <section class="settings-block">
               <h4 class="settings-group-label">Files</h4>
@@ -873,6 +848,7 @@
                     <input class="field field-md"
                       id="settings-default-location"
                       value={defaultWorkspaceLocationDraft}
+                      placeholder="Choose a folder"
                       spellcheck="false"
                       oninput={(event) => setDefaultWorkspaceLocationDraft(inputValue(event))}
                       onblur={() => saveDefaultWorkspaceLocation()}
@@ -883,7 +859,6 @@
                       autocapitalize="none"
                     />
                     <button class="btn btn-secondary" type="button" onclick={browseDefaultWorkspaceLocation}>Browse</button>
-                    <button class="btn btn-secondary" type="button" onclick={() => saveDefaultWorkspaceLocation()}>Save</button>
                   </div>
                 </div>
               </div>

@@ -102,6 +102,7 @@ export const DOCS_TOPICS = {
     ['pin', 'Pin an environment to a collection'],
     ['scripts', 'Variables from scripts'],
     ['secrets', 'Secret variables and environment safety'],
+    ['secret-managers', 'Secret managers'],
     ['global', 'Global variables and saving'],
   ],
   '/docs/guides/git-workspaces/': [
@@ -164,6 +165,7 @@ export const DOCS_TOPICS = {
     ['options', 'Flags and exit codes'],
     ['ci', 'GitHub Actions'],
     ['load', 'Load tests with k6'],
+    ['docs', 'Build collection documentation'],
     ['openapi', 'Check OpenAPI drift'],
   ],
   '/docs/guides/load-testing/': [
@@ -200,7 +202,6 @@ export const DOCS_TOPICS = {
   '/docs/guides/settings/': [
     ['saving', 'Saving'],
     ['start-and-tabs', 'Startup and tabs'],
-    ['script-engine', 'Script engine'],
     ['storage', 'Default location and data'],
     ['appearance', 'Appearance'],
     ['proxy', 'Proxy'],

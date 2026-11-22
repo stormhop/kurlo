@@ -69,6 +69,56 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect((await bar.boundingBox())!.height).toBe(before!.height);
   });
 
+  test('sends a dropped or chosen file as the body with a workspace-relative path', async ({ page }) => {
+    await installKurloBridge(page, '', 'darwin/e2e');
+    await page.addInitScript(() => {
+      const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
+      window.runtime!.OnFileDrop = (callback) => { e2e.dropFiles = callback; };
+    });
+    await page.goto('/');
+    await page.getByLabel('New collection').click();
+    await fillPrompt(page, 'New collection', 'Files API');
+    await collectionRow(page, 'Files API').getByLabel('Collection menu').click();
+    await collectionRow(page, 'Files API').locator('.collection-menu').getByRole('button', { name: 'Add request' }).click();
+    await chooseRequestType(page, 'HTTP Request');
+    await page.getByLabel('Request URL').fill('https://api.example.test/avatar');
+    await chooseRequestSection(page, 'Body');
+    await page.locator('.body-mode-label:has(input[value="binary"])').click();
+
+    const panel = page.getByTestId('binary-body');
+    await expect(panel.getByText('Drop a file here')).toBeVisible();
+    await panel.getByRole('button', { name: 'Choose file…' }).click();
+    await expect(panel.getByLabel('Body file path')).toHaveValue('fixtures/avatar.png');
+    await expect(panel).toContainText('avatar.png');
+    await expect(panel).toContainText('24.0 KB · image/png');
+    await expect(panel).toContainText('Sent as application/octet-stream');
+    await captureDocsScreenshot(page, 'request-binary-body');
+
+    await panel.getByRole('button', { name: 'Use image/png' }).click();
+    await expect(panel).toContainText('Sent as image/png from the Content-Type header');
+    await panel.getByRole('button', { name: 'Show in Finder' }).click();
+    await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.includes('RevealRequestFile:fixtures/avatar.png'))).toBe(true);
+
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => {
+      const sent = window.__kurloE2E.sentRequests.at(-1) as { bodyType?: string; bodyFilePath?: string; headers?: Array<{ key: string; value: string; enabled: boolean }> } | undefined;
+      return sent && { bodyType: sent.bodyType, path: sent.bodyFilePath, type: sent.headers?.find(row => row.enabled && row.key === 'Content-Type')?.value };
+    })).toEqual({ bodyType: 'binary', path: 'fixtures/avatar.png', type: 'image/png' });
+
+    await panel.getByLabel('Body file path').fill('fixtures/missing.png');
+    await expect(panel.getByRole('alert')).toHaveText('File not found.');
+
+    await panel.getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(panel.getByText('Drop a file here')).toBeVisible();
+    const box = await panel.boundingBox();
+    expect(box).not.toBeNull();
+    await page.evaluate(({ x, y }) => {
+      const drop = (window.__kurloE2E as unknown as { dropFiles: (x: number, y: number, paths: string[]) => void }).dropFiles;
+      drop(x, y, ['/workspace/fixtures/report.pdf']);
+    }, { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 });
+    await expect(panel.getByLabel('Body file path')).toHaveValue('fixtures/report.pdf');
+  });
+
   test('sends request vars from the Vars tab and saves them', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');
@@ -612,6 +662,25 @@ test.describe('Starred requests', () => {
   });
 });
 
+test('replaces an unavailable JWT private key in its multiline field', async ({ page }) => {
+  await installKurloBridge(page, '', 'darwin/e2e', false, {
+    activeId: 'signing', openIds: ['signing'],
+    collections: [{ id: 'api', workspaceId: 'workspace-e2e', name: 'API' }],
+    requests: [{
+      id: 'signing', name: 'Signed request', collectionId: 'api', requestTab: 'auth', method: 'GET',
+      auth: { type: 'jwt', jwtAlgorithm: 'RS256', jwtPrivateKey: '{{kurloSecret:request.signing.auth.jwtPrivateKey}}' },
+    }],
+  });
+  await page.goto('/');
+  const key = page.getByLabel('Private key (PEM)', { exact: false });
+  await expect(key).toHaveAttribute('placeholder', 'Secret unavailable on this device');
+  await expect(key).toHaveValue('');
+  const replacement = 'first line\nsecond line';
+  await key.fill(replacement);
+  await page.keyboard.press('Meta+s');
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests[0].auth.jwtPrivateKey)).toBe(replacement);
+});
+
 test('signs a request with JWT Bearer auth and previews the token', async ({ page }, testInfo) => {
   if (docsScreenshotDir) await page.setViewportSize(DOCS_VIEWPORT);
   await installKurloBridge(page);
@@ -776,6 +845,16 @@ test('takes a {{variable}} in the bearer token and shows it instead of dots', as
   await expect(page.locator('.auth-fields .var-token-err')).toHaveText('{{missing}}');
 });
 
+test('marks unknown variables when no environment or collection defines any', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New unsaved request' }).click();
+  await page.getByLabel('Request URL').fill('{{host}}/users/{{$randomUUID}}');
+  await expect(page.locator('.url-field .var-token-err')).toHaveText('{{host}}');
+  await page.getByLabel('Request URL').fill('https://api.kurlo.test/users');
+  await expect(page.locator('.url-field .var-token-err')).toHaveCount(0);
+});
+
 test('checks a header name built from collection and request variables', async ({ page }) => {
   await installKurloBridge(page, '', 'browser/e2e', false, {
     collections: [{ id: 'vars-col', workspaceId: 'workspace-e2e', name: 'Vars', defaults: { variables: [{ key: 'collectionHeader', value: 'Bad Name', enabled: true }] } }],
@@ -818,4 +897,15 @@ test.describe('Pasting cURL', () => {
     await expect(page.locator('.curl-toast')).toContainText("Couldn't import cURL: headers read from a file");
     await expect(page.getByLabel('Request URL')).toHaveValue('https://api.example.test/me');
   });
+});
+
+test('keeps the empty response actions reachable in a short window', async ({ page }) => {
+  await page.setViewportSize({ width: 960, height: 600 });
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'New unsaved request' }).click();
+  const load = page.getByRole('button', { name: 'Load response from file' });
+  await expect(load).toBeVisible();
+  const [box, panel] = await Promise.all([load.boundingBox(), page.locator('.response-idle').boundingBox()]);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(panel!.y + panel!.height + 1);
 });

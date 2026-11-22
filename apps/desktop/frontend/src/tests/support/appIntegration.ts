@@ -1,5 +1,5 @@
 import { vi, expect } from 'vitest';
-import { type RequestStore, type GrpcResponse, type KVRow, type Workspace, type Collection, type Environment, type SavedRequest, type RequestHistoryEntry, type ResponseTab, type GrpcResponseTab, type SidebarView, type RequestSettings, type RequestSettingsOverrides, type RequestType, type Method, type RequestTab, type OAuth2GrantType, type BodyType, type RawBodyType, type ScriptEngine, type RequestExample, type SIOArg, type CollectionRunnerResult } from '../../lib/types/models';
+import { type RequestStore, type GrpcResponse, type KVRow, type Workspace, type Collection, type Environment, type SavedRequest, type RequestHistoryEntry, type ResponseTab, type GrpcResponseTab, type SidebarView, type RequestSettings, type RequestSettingsOverrides, type RequestType, type Method, type RequestTab, type OAuth2GrantType, type BodyType, type RawBodyType, type RequestExample, type SIOArg, type CollectionRunnerResult } from '../../lib/types/models';
 import { type HttpRequest, type HttpResponse, type SaveRequestStoreResult, type OAuth2TokenResponse, type CookieJarEntry } from '../../lib/backend';
 import { mkRow, DEFAULT_REQUEST_SETTINGS } from '../../lib/constants';
 import { type TrashEntry, trashFeature } from '../../lib/stores/features/trash';
@@ -32,7 +32,6 @@ import { historyFeature } from '../../lib/stores/features/history';
 import { collectionRunnerDerivedFeature } from '../../lib/stores/features/collectionRunnerDerived';
 import { collectionRunnerFeature } from '../../lib/stores/features/collectionRunner';
 import { authFeature } from '../../lib/stores/features/auth';
-import { scriptsFeature } from '../../lib/stores/features/scripts';
 import { socketioFormFeature } from '../../lib/stores/features/socketioForm';
 import { importExportFeature } from '../../lib/stores/features/importExport';
 import { openApiSyncFeature } from '../../lib/stores/features/openapiSync';
@@ -98,6 +97,7 @@ const backend = vi.hoisted(() => {
       }
       return response(404, { error: `Unhandled ${req.method} ${req.url}` }, [{ name: 'handled', passed: false, error: 'No mock route' }]);
     }),
+    preflightCollectionRunner: vi.fn(async (_workspaceId: string, requests: Array<{ requestId: string }>) => requests.map(request => ({ requestId: request.requestId, failures: [] }))),
     sendHttpRequestToFile: vi.fn(async (req: HttpRequest) => ({ response: await backend.sendHttpRequest(req), savedPath: '/tmp/kurlo-response.json' })),
     sendGrpcRequest: vi.fn(async (): Promise<GrpcResponse> => ({
       status: 'OK',
@@ -306,11 +306,8 @@ class TestApp {
   grpcProtoFilePath = '';
   grpcProtoFileName = '';
   grpcProtoImportPaths: string[] = [];
-  preRequestScript = '';
-  testScript = '';
   preRequestScriptJs = '';
   testScriptJs = '';
-  scriptEngine: ScriptEngine = 'js';
   requestNotes = '';
   requestExamples: RequestExample[] = [];
   requestExamplesLoaded = true;
@@ -511,7 +508,6 @@ applyFeatures(
   collectionRunnerDerivedFeature,
   collectionRunnerFeature,
   authFeature,
-  scriptsFeature,
   socketioFormFeature,
   importExportFeature,
   trashFeature,

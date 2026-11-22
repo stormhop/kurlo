@@ -1,0 +1,13 @@
+---
+import Columns from '@astrojs/starlight/components/TwoColumnContent.astro';
+import DocsWinter from './DocsWinter.astro';
+import { DOCS_HOME, isDocumentationPath } from '../../docs.sidebar.mjs';
+
+const path = `/${Astro.locals.starlightRoute.id}/`;
+---
+
+{path !== DOCS_HOME && isDocumentationPath(path) && <DocsWinter />}
+<Columns>
+  <slot name="right-sidebar" slot="right-sidebar" />
+  <slot />
+</Columns>

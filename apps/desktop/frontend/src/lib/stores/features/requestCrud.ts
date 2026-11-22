@@ -8,6 +8,7 @@ import {
   DEFAULT_GRAPHQL_VARIABLES,
   parseGraphQLPayload,
 } from '../../graphql';
+import { resolveFormRequestTab } from '../../requestTabPreferences';
 import { makeCollection } from '../../normalizers';
 import { requestMatchesSidebarQuery } from './collections';
 import { AI_DEFAULT_PRESET, aiDefaultAuthFor, type AiTurn } from './ai';
@@ -27,6 +28,7 @@ import type {
   ResponseTab,
   RequestType,
   SavedRequest,
+  Workspace,
 } from '../../types/models';
 import { newRequestId, requestTabLabel } from '../../utils';
 import { requestDiffersFromSavedSnapshot } from '../../manualSave';
@@ -35,6 +37,7 @@ import type { TopView } from '../ui';
 export type DraftTarget = { collectionId: string; folderPath: string[] };
 
 type RequestCrudHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   ensureRequestExamples: (ids: string[]) => Promise<void>;
   draftTargets: Map<string, DraftTarget>;
   draftBaselines: Map<string, SavedRequest>;
@@ -90,7 +93,7 @@ type RequestCrudHost = {
   topView: TopView;
   quitReviewInProgress: boolean;
   url: string;
-  workspaces: Array<{ id: string }>;
+  workspaces: Workspace[];
   activeCollectionId: () => string;
   applySavedRequest: (request: SavedRequest) => void;
   blankSavedRequest: (collectionId?: string, requestType?: RequestType) => SavedRequest;
@@ -132,12 +135,13 @@ type RequestCrudHost = {
   openSelectDialog: (title: string, message: string, options: DialogOption[], confirmLabel?: string, cancelLabel?: string) => Promise<string | false | null>;
   openWorkspaceDiagnostic: (diagnostics?: SavedRequest['workspaceDiagnostics']) => void;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
-  persistRequestStore: (requests?: SavedRequest[], activeId?: string, openIds?: string[]) => Promise<boolean>;
+  persistRequestStore: (requests?: SavedRequest[], activeId?: string, openIds?: string[], workspaces?: Workspace[], collections?: Collection[]) => Promise<boolean>;
   persistRequestStoreView: (activeId?: string, openIds?: string[], workspaceId?: string) => Promise<boolean>;
   removeDirtyRequest: (id: string) => void;
   requestForEditing: (id: string) => SavedRequest | undefined;
   requestHasContent: (req: SavedRequest) => boolean;
   requestTypeEditable: boolean;
+  requestIsRunning: (id: string) => boolean;
   mcpMethod: string;
   aiProvider: string;
   bearerToken: string;
@@ -193,9 +197,7 @@ export const requestCrudFeature = {
 
   get requestTypeEditable(): boolean {
     const host = this as unknown as RequestCrudHost;
-    const active = host.activeRequest;
-    if (!active) return false;
-    return Boolean(active.isDraft) || !host.url.trim();
+    return !!host.activeRequest && !host.requestIsRunning(host.activeRequestId);
   },
 
   get pinnedRequests(): SavedRequest[] {
@@ -393,7 +395,7 @@ export const requestCrudFeature = {
       this.graphqlSchemaStatus = '';
       this.graphqlSchemaError = '';
     }
-    if (blank) this.requestTab = this.blankSavedRequest('', this.requestType).requestTab;
+    this.requestTab = resolveFormRequestTab(this.requestType, this.method, blank ? undefined : this.requestTab);
   },
 
   async createNewRequest(this: RequestCrudHost, collectionId?: string, requestType?: RequestType) {
@@ -475,34 +477,45 @@ export const requestCrudFeature = {
   },
 
   async saveDraftToCollection(this: RequestCrudHost, draftId: string, cancelLabel = 'Discard') {
-    if (!this.guardWorkspaceWritable('Saving drafts')) return false;
+    if (!this.guardWorkspaceWritable('Saving drafts')) return null;
     const draft = this.requestsById.get(draftId);
     const target = this.draftTarget(draftId);
-    if (target) {
-      this.requests = this.requests.map(r => r.id === draftId ? { ...r, isDraft: false, collectionId: target.collectionId, collection: this.collectionNameById(target.collectionId), folderPath: target.folderPath } : r);
-      this.draftRequestIds = new Set([...this.draftRequestIds].filter(id => id !== draftId));
-      this.forgetDraft(draftId);
-      const saved = this.requestsById.get(draftId);
-      if (saved) this.savedRequestSnapshots.set(draftId, this.savedRequestSnapshot(saved));
-      await this.persistRequestStore();
-      return true;
-    }
+    if (!draft) return false;
+    let collectionId = target?.collectionId;
+    let folderPath = target?.folderPath;
+    let createdCollection: Collection | undefined;
     const wsCols = this.collections.filter(c => c.workspaceId === (this.activeWorkspaceId || this.workspaces[0]?.id));
-    if (!wsCols.length) {
+    if (!target && !wsCols.length) {
       const wsId = this.activeWorkspaceId || this.workspaces[0]?.id;
       if (!wsId) return false;
-      const col = makeCollection(wsId, DEFAULT_COLLECTION);
-      this.collections = [...this.collections, col];
-      wsCols.push(col);
+      createdCollection = makeCollection(wsId, DEFAULT_COLLECTION);
+      wsCols.push(createdCollection);
     }
-    const selectedId = await this.openSelectDialog('Save request', `Choose a collection to save "${draft ? requestTabLabel(draft) : 'this draft'}" into:`, wsCols.map(c => ({ value: c.id, label: c.name })), 'Save', cancelLabel);
-    if (!selectedId) return selectedId;
-    this.requests = this.requests.map(r => r.id === draftId ? { ...r, isDraft: false, collectionId: selectedId, collection: this.collectionNameById(selectedId) } : r);
+    if (!collectionId) {
+      const selectedId = await this.openSelectDialog('Save request', `Choose a collection to save "${requestTabLabel(draft)}" into:`, wsCols.map(c => ({ value: c.id, label: c.name })), 'Save', cancelLabel);
+      if (!selectedId) return selectedId;
+      collectionId = selectedId;
+      folderPath = undefined;
+    }
+    const collection = this.collections.find(candidate => candidate.id === collectionId) ?? createdCollection;
+    const current = this.requestsById.get(draftId);
+    if (!collection || !current) return null;
+    const destination = { isDraft: false, collectionId, collection: collection.name, ...(folderPath ? { folderPath } : {}) };
+    const saved = { ...current, ...destination };
+    const nextCollections = createdCollection ? [...this.collections, createdCollection] : this.collections;
+    const nextRequests = this.requests.map(request => request.id === draftId ? saved : request);
+    const written = await this.persistRequestStore(nextRequests, this.activeRequestId, this.openRequestIds, this.workspaces, nextCollections);
+    if (createdCollection && !this.collections.some(candidate => candidate.id === createdCollection.id)) {
+      this.collections = [...this.collections, createdCollection];
+    }
+    if (!written) {
+      this.draftTargets.set(draftId, { collectionId, folderPath: folderPath ?? [] });
+      return null;
+    }
+    this.requests = this.requests.map(request => request.id === draftId ? { ...request, ...destination } : request);
     this.draftRequestIds = new Set([...this.draftRequestIds].filter(id => id !== draftId));
     this.forgetDraft(draftId);
-    const saved = this.requestsById.get(draftId);
-    if (saved) this.savedRequestSnapshots.set(draftId, this.savedRequestSnapshot(saved));
-    await this.persistRequestStore();
+    this.savedRequestSnapshots.set(draftId, this.savedRequestSnapshot(saved));
     return true;
   },
 
@@ -538,13 +551,17 @@ export const requestCrudFeature = {
     if (!this.autosave && this.activeRequestId && !this.applyingSavedRequest) {
       this.updateRequestDirtyState(this.activeRequestId, this.snapshotActiveRequest({ forPersistence: true }));
     }
-    return !this.autosave && this.dirtyRequestIds.size > 0;
+    return Boolean(this.requestFiles?.dirtyIds.length) || (!this.autosave && this.dirtyRequestIds.size > 0);
   },
 
   async reviewDraftsBeforeQuit(this: RequestCrudHost) {
     if (this.quitReviewInProgress) return;
     this.quitReviewInProgress = true;
     try {
+      if (this.requestFiles && !await this.requestFiles.review()) {
+        await cancelQuit();
+        return;
+      }
       await this.persistActiveRequestNow();
       if (!this.autosave) {
         for (const dirtyId of [...this.dirtyRequestIds]) {
@@ -619,6 +636,12 @@ export const requestCrudFeature = {
   },
 
   async closeRequestTab(this: RequestCrudHost, id: string, force = false) {
+    const file = this.requestFiles?.entries.get(id);
+    if (file) {
+      if (file.saving) await file.save();
+      if (!force && !await this.requestFiles.review([id])) return;
+      this.requestFiles.entries.delete(id);
+    }
     const closeTarget = this.requestForEditing(id);
     const isDraft = closeTarget?.isDraft || this.draftRequestIds.has(id);
     if (!isDraft && !force && !this.autosave && id === this.activeRequestId) {
@@ -847,6 +870,7 @@ export const requestCrudFeature = {
   },
 
   forgetRequestResponses(this: RequestCrudHost, ids: string[]) {
+    for (const id of ids) this.requestFiles?.entries.delete(id);
     const gone = new Set(ids);
     if (!gone.size) return;
     const keep = <V>(map: Map<string, V>) => [...map.keys()].some(id => gone.has(id)) ? new Map([...map].filter(([id]) => !gone.has(id))) : map;
@@ -866,7 +890,8 @@ export const requestCrudFeature = {
     this.openRequestMenuId = '';
     const confirmed = await this.openConfirmDialog('Delete request', `Delete "${requestTabLabel(req)}"? You can restore it from Recently deleted until you quit Kurlo.`);
     if (!confirmed) return;
-    this.trashRequest(req, this.workspaceIdForCollection(req.collectionId));
+    if (this.requestFiles && !await this.requestFiles.review([id])) return;
+    this.trashRequest(this.requestsById.get(id) ?? req, this.workspaceIdForCollection(req.collectionId));
     this.removeDirtyRequest(id);
     if ((req.folderPath ?? []).length) {
       this.collections = this.collections.map(collection =>

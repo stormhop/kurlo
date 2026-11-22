@@ -107,16 +107,16 @@ describe('planOpenApiSync field merge', () => {
     const { collection, requests } = importCollection(baseSpec);
     const edited = edit(requests, 'GET /pets/{id}', request => ({
       ...request,
-      testScript: 'pm.test("ok", () => {})',
-      preRequestScript: 'pm.variables.set("a", 1)',
+      testScriptJs: 'pm.test("ok", () => {})',
+      preRequestScriptJs: 'pm.variables.set("a", 1)',
       settings: { ...request.settings, timeoutMs: 1234 },
     }));
     const next = spec({ ...baseSpec.paths as Spec, '/pets/{id}': { get: getPet({ description: 'New docs' }) } });
     const plan = planOpenApiSync({ collection, requests: edited, baseSpec, nextSpec: next });
     const result = applyOpenApiPlan(plan, acceptAllOpenApiSelection(plan), edited, collection);
     const request = byKey(result.requests, 'GET /pets/{id}');
-    expect(request.testScript).toBe('pm.test("ok", () => {})');
-    expect(request.preRequestScript).toBe('pm.variables.set("a", 1)');
+    expect(request.testScriptJs).toBe('pm.test("ok", () => {})');
+    expect(request.preRequestScriptJs).toBe('pm.variables.set("a", 1)');
     expect(request.settings.timeoutMs).toBe(1234);
     expect(request.requestNotes).toBe('New docs');
   });
@@ -201,7 +201,7 @@ describe('planOpenApiSync endpoints', () => {
 
   it('treats a moved path with the same operationId as a URL change', () => {
     const { collection, requests } = importCollection(baseSpec);
-    const edited = edit(requests, 'GET /pets/{id}', request => ({ ...request, testScript: 'keep me' }));
+    const edited = edit(requests, 'GET /pets/{id}', request => ({ ...request, testScriptJs: 'keep me' }));
     const next = spec({ '/animals/{id}': { get: getPet() }, '/pets': (baseSpec.paths as Spec)['/pets'] });
     const plan = planOpenApiSync({ collection, requests: edited, baseSpec, nextSpec: next });
     expect(plan.endpoints).toHaveLength(1);
@@ -210,7 +210,7 @@ describe('planOpenApiSync endpoints', () => {
     const result = applyOpenApiPlan(plan, defaultOpenApiSelection(plan), edited, collection);
     const moved = byKey(result.requests, 'GET /animals/{id}');
     expect(moved.url).toBe('{{baseUrl}}/animals/:id');
-    expect(moved.testScript).toBe('keep me');
+    expect(moved.testScriptJs).toBe('keep me');
     expect(result.requests).toHaveLength(2);
   });
 });

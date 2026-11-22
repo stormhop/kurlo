@@ -15,7 +15,7 @@ func TestGrpcPreRequestCanSkipTheSend(t *testing.T) {
 	invoked := false
 	var done model.GrpcDoneEvent
 	resp := sendGrpcRequestWith(t.Context(), model.GrpcRequest{
-		RequestID: "skip", ScriptEngine: "js",
+		RequestID:        "skip",
 		PreRequestScript: `pm.environment.set("token", "pre"); pm.collectionVariables.set("token", "collection"); pm.execution.skipRequest();`,
 		TestScript:       `throw new Error("post-request must not execute");`,
 	}, state.New(), func(name string, payload any) {
@@ -39,9 +39,9 @@ func TestGrpcPreRequestCanSkipTheSend(t *testing.T) {
 
 func TestGrpcPreRequestCollectionChangesReachPostRequest(t *testing.T) {
 	resp := sendGrpcRequestWith(t.Context(), model.GrpcRequest{
-		ScriptEngine: "js", CollectionVariables: map[string]string{"token": "old", "remove": "old"},
-		PreRequestScript: `pm.collectionVariables.set("token", "new"); pm.collectionVariables.unset("remove");`,
-		TestScript:       `pm.test("pre-request changes are visible", function () { pm.expect(pm.collectionVariables.get("token")).to.equal("new"); pm.expect(pm.collectionVariables.get("remove")).to.equal(undefined); }); pm.collectionVariables.set("token", "post");`,
+		CollectionVariables: map[string]string{"token": "old", "remove": "old"},
+		PreRequestScript:    `pm.collectionVariables.set("token", "new"); pm.collectionVariables.unset("remove");`,
+		TestScript:          `pm.test("pre-request changes are visible", function () { pm.expect(pm.collectionVariables.get("token")).to.equal("new"); pm.expect(pm.collectionVariables.get("remove")).to.equal(undefined); }); pm.collectionVariables.set("token", "post");`,
 	}, state.New(), nil, func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse {
 		return model.GrpcResponse{GrpcCode: "OK"}
 	}, grpcRunIteration{})
@@ -58,7 +58,7 @@ func TestGrpcScriptSnapshotsStayIsolatedFromActiveEnvironment(t *testing.T) {
 	sm.SetEnvironment(map[string]string{"mode": "production", "untouched": "yes"})
 	sm.SetVariables(map[string]string{"source": "other", "unchanged": "live", "remove": "old"})
 	resp := sendGrpcRequestWith(t.Context(), model.GrpcRequest{
-		ScriptEngine:      "js",
+
 		ScriptEnvironment: map[string]string{"mode": "test", "remove": "old"},
 		ScriptVariables:   map[string]string{"source": "captured", "unchanged": "captured", "remove": "old"},
 		PreRequestScript:  `pm.test("captured state", function () { pm.expect(pm.environment.get("mode")).to.equal("test"); pm.expect(pm.globals.get("source")).to.equal("captured"); }); pm.environment.set("token", "pre"); pm.environment.unset("remove"); pm.globals.set("changed", "new"); pm.globals.unset("remove");`,
@@ -88,8 +88,8 @@ func TestGrpcScriptSnapshotsStayIsolatedFromActiveEnvironment(t *testing.T) {
 
 func TestGrpcPreRequestFailureReturnsEnvironmentDelta(t *testing.T) {
 	resp := sendGrpcRequestWith(t.Context(), model.GrpcRequest{
-		ScriptEngine: "js", ScriptEnvironment: map[string]string{"remove": "old"},
-		PreRequestScript: `pm.environment.set("token", "pre"); pm.environment.unset("remove"); throw new Error("stop");`,
+		ScriptEnvironment: map[string]string{"remove": "old"},
+		PreRequestScript:  `pm.environment.set("token", "pre"); pm.environment.unset("remove"); throw new Error("stop");`,
 	}, state.New(), nil, func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse {
 		t.Fatal("failed pre-request script must not send")
 		return model.GrpcResponse{}
@@ -104,7 +104,7 @@ func TestAgentGrpcSkippedStreamReportsTheReason(t *testing.T) {
 	session := &agentLiveSession{
 		ctx: ctx, cancel: cancel, ready: make(chan error, 1), done: make(chan struct{}), messages: make(chan agentSessionEvent, 1),
 	}
-	go session.runGRPC(model.GrpcRequest{ScriptEngine: "js", PreRequestScript: `pm.execution.skipRequest();`}, state.New())
+	go session.runGRPC(model.GrpcRequest{PreRequestScript: `pm.execution.skipRequest();`}, state.New())
 	select {
 	case err := <-session.ready:
 		if err == nil || !strings.Contains(err.Error(), "skipRequest") {
@@ -121,5 +121,22 @@ func TestAgentGrpcSkippedStreamReportsTheReason(t *testing.T) {
 	event := <-session.messages
 	if event.Type != "close" || event.Data.(map[string]any)["skipped"] != true {
 		t.Fatalf("skipped stream close event: %#v", event)
+	}
+}
+
+func TestGrpcScriptsReadRequestAuth(t *testing.T) {
+	const check = `pm.expect(pm.request.auth.type).to.equal("basic");
+		pm.expect(pm.request.auth.basic.toObject()).to.eql({username: "reader", password: "test-password"});
+		console.log(pm.request.auth.basic.get("password"));`
+	resp := sendGrpcRequestWith(t.Context(), model.GrpcRequest{
+		Auth:             model.AuthConfig{Type: "basic", Username: "reader", Password: "test-password"},
+		PreRequestScript: check, TestScript: check,
+	}, state.New(), nil, func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse {
+		return model.GrpcResponse{GrpcCode: "OK"}
+	}, grpcRunIteration{})
+	for _, result := range []model.ScriptResult{resp.PreRequestResult, resp.TestResult} {
+		if result.Error != "" || len(result.Logs) != 1 || !strings.Contains(result.Logs[0], "[secret]") || strings.Contains(result.Logs[0], "test-password") {
+			t.Fatalf("unexpected auth script result: %#v", result)
+		}
 	}
 }

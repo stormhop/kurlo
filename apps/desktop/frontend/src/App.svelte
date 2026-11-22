@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { loadRunKey } from './lib/loadTests';
   import { kurloChangedFiles } from './lib/gitFiles';
   import { onMount, untrack } from 'svelte';
-  import { getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
+  import { docsRelativeLinkScopes, getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
   import type { MockRequestLog, OAuth2DevicePrompt, UpdateInfo } from './lib/backend';
   import { hasReleaseNotes } from 'virtual:kurlo-changelog-meta';
   import { isReleaseVersion, latestReleaseNotes, normalizeVersion, releaseNotesFor, shouldShowWhatsNew, shouldSpotlightAgentMode, type ChangelogSection } from './lib/whatsNew';
@@ -12,6 +13,7 @@
   import { appLazyComponents as lazy } from './lib/stores/lazyComponents.svelte';
 
   import AppOverlays from './lib/components/AppOverlays.svelte';
+  import CollectionDocsModal from './lib/components/CollectionDocsModal.svelte';
   import AppToasts from './lib/components/AppToasts.svelte';
   import TextContextMenu from './lib/components/TextContextMenu.svelte';
   import { installFileDrop } from './lib/fileDrop';
@@ -21,7 +23,6 @@
   import RequestEditorTabs from './lib/components/RequestEditorTabs.svelte';
   import ProxyWorkspace from './lib/components/ProxyWorkspace.svelte';
   import ActivityRail from './lib/components/ActivityRail.svelte';
-  import { shortcutComboLabel, usesMacShortcutGlyphs } from './lib/stores/features/preferences';
   import { agentSidebarMaxWidth, responseRightMinWidth } from './lib/stores/features/uiShell';
   import { rem, toLogicalPx, uiScale } from './lib/uiScale';
   import Sidebar from './lib/components/Sidebar.svelte';
@@ -35,10 +36,11 @@
   import AgentWorkspace from './lib/components/AgentWorkspace.svelte';
   import { METHODS, REQUEST_TYPES, DEFAULT_WORKSPACE, RAW_BODY_TYPES } from './lib/constants';
   import { installQuitShortcut, installTitlebarDoubleClickHandler } from './lib/windowControls';
-  import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl } from './lib/utils';
+  import { requestSectionPreference, saveRequestSectionPreference } from './lib/requestTabPreferences';
+  import { methodColor, requestTabLabel, requestTransportLabel, activeCount, statusClass, formatSize, scriptLineCount, requestSupportsCurl, numberDuplicateTabLabels, numberedTabLabel } from './lib/utils';
   import { requestTypeSupportsAssertions } from './lib/assertions';
   import type { SnippetLanguage } from './lib/stores/ui';
-  import type { ResponseTab } from './lib/types/models';
+  import type { ResponseTab, SavedRequest } from './lib/types/models';
   import type { LoadTest } from './lib/wire';
   import { KURLO_DOCS_URL, openExternalURL } from './lib/externalLinks';
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from './lib/response-render';
@@ -64,6 +66,40 @@
       void vm.enterEnvironmentScope(target);
     });
   });
+
+  let docsTarget = $state.raw<{ id: string; workspace: string; epoch: number; linkScopes: string[] | null } | null>(null);
+  const docsCollection = $derived(docsTarget && docsTarget.workspace === vm.activeWorkspaceId && docsTarget.epoch === vm.requestStorePersistEpoch
+    ? vm.collections.find(collection => collection.id === docsTarget?.id && collection.workspaceId === vm.activeWorkspaceId)
+    : undefined);
+
+  function reserveEditorSendShortcut(event: KeyboardEvent) {
+    if (event.target instanceof Element && event.target.closest('.cm-content') && vm.shortcutForEvent(event) === 'send-request') {
+      event.preventDefault();
+    }
+  }
+
+  async function openDocs(id: string) {
+    vm.closeFloatingMenus();
+    const target = { id, workspace: vm.activeWorkspaceId, epoch: vm.requestStorePersistEpoch, linkScopes: null };
+    docsTarget = target;
+    try {
+      await vm.ensureCollectionExamples(id);
+      if (docsTarget !== target || !docsCollection) return;
+      const requests = vm.requestsForStore(vm.requests).filter(request => request.collectionId === id && !request.isDraft);
+      const notes: Record<string, string[]> = Object.create(null);
+      for (const request of requests) {
+        const sources = [request.requestNotes, ...(request.examples ?? []).map(example => example.notes ?? '')].filter(Boolean);
+        if (sources.length) notes[request.id] = sources;
+      }
+      if (docsCollection.description) notes[''] = [docsCollection.description];
+      const linkScopes = Object.keys(notes).length ? await docsRelativeLinkScopes(notes) : [];
+      if (docsTarget === target) docsTarget = { ...target, linkScopes };
+    } catch (error) {
+      if (docsTarget !== target || !docsCollection) return;
+      docsTarget = null;
+      await vm.openAlertDialog('Could not prepare collection documentation', String(error));
+    }
+  }
 
   const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
   const UPDATE_READY_KEY = 'kurlo:update-ready';
@@ -204,7 +240,7 @@
   const loadTestTab = $derived.by(() => {
     const active = vm.activeLoadTest();
     if (!active) return null;
-    const edits = vm.loadTestEdits?.test.id === active.loadTest.id ? vm.loadTestEdits : null;
+    const edits = vm.loadTestEdits?.collectionId === active.collection.id && vm.loadTestEdits.test.id === active.loadTest.id ? vm.loadTestEdits : null;
     const title = (edits?.test.name ?? active.loadTest.name).trim() || 'New load test';
     const unsaved = active.isDraft ? 'Unsaved draft' : edits?.dirty && !vm.autosave ? 'Unsaved changes' : '';
     return { title, unsaved };
@@ -222,6 +258,13 @@
   $effect(() => {
     if (!vm.codePanelOpen || !codePanelAvailable) vm.snippetMenuOpen = false;
   });
+  let untitledTabNumbers = new Map<string, number>();
+  let requestTabNumbers = $derived.by(() => {
+    untitledTabNumbers = numberDuplicateTabLabels(untitledTabNumbers, vm.openRequestsForTabs.map(req => ({ id: req.id, label: requestTabLabel(req) })));
+    return untitledTabNumbers;
+  });
+  const numberedRequestTabLabel = (req: SavedRequest) => numberedTabLabel(requestTabLabel(req), requestTabNumbers.get(req.id));
+  let requestBarName = $derived(vm.requestNameAuto ? numberedTabLabel(vm.requestHeaderName(), requestTabNumbers.get(vm.activeRequestId)) : vm.requestHeaderName());
   let windowWidth = $state(window.innerWidth);
   let runtimePlatform = $state(document.documentElement.dataset.platform ?? 'browser');
   let agentDetailsDocked = $derived(vm.topView === 'agent' && agentNavigation.detailsOpen && !agentNavigation.activity && !vm.sidebarHidden);
@@ -416,7 +459,7 @@
 
   $effect(() => {
     lazy.preloadForAppShell({
-      requestTab: vm.requestTab,
+      requestTab: requestSection,
       requestType: vm.requestType,
       method: vm.method,
       topView: vm.topView,
@@ -442,6 +485,74 @@
     vm.gitWorkspaceOpen;
     vm.sidebarView;
     untrack(() => vm.saveTopViewState());
+  });
+
+  const requestSection = $derived(vm.requestFiles.active ? 'file' : vm.requestTab);
+  const fileDraft = $derived(vm.activeRequest?.isDraft ? undefined : vm.requestFiles.active);
+  const barType = $derived(fileDraft?.barType ?? vm.requestType);
+  const barMethod = $derived(fileDraft?.barValue('method', vm.method,
+    ['ai', 'grpc', 'graphql', 'mcp'].includes(barType) ? 'POST' : 'GET') ?? vm.method);
+  const barUrl = $derived(fileDraft?.barValue('url', vm.url) ?? vm.url);
+
+  function setBarUrl(value: string) {
+    if (fileDraft) fileDraft.editBar({ url: value });
+    else vm.url = value;
+  }
+
+  function setBarMethod(value: string) {
+    if (fileDraft) fileDraft.editBar({ method: value });
+    else vm.method = value as typeof vm.method;
+  }
+
+  function changeBarProtocol(type: typeof vm.requestType, method?: string) {
+    if (fileDraft) fileDraft.changeProtocol(type, method);
+    else {
+      vm.selectRequestType(type);
+      if (method) setBarMethod(method);
+    }
+  }
+
+  function setBarName(value: string) {
+    if (fileDraft) fileDraft.editBar(fileDraft.currentBarValues()?.nameAuto === 'true' ? { name: value, nameAuto: false } : { name: value });
+    else vm.setRequestHeaderName(value);
+  }
+
+  let previousRequestSectionKey = '';
+  let previousFormRequestTab: typeof vm.requestTab | undefined;
+  $effect(() => {
+    const id = vm.activeRequestId;
+    const root = vm.requestFiles.root;
+    const section = vm.requestTab;
+    const request = vm.requestsById.get(id);
+    const workspaceId = vm.collections.find(collection => collection.id === request?.collectionId)?.workspaceId ?? vm.activeWorkspaceId;
+    const key = id && root ? JSON.stringify([root, workspaceId, id]) : '';
+    if (!vm.requestStoreLoaded || !key) {
+      previousRequestSectionKey = '';
+      previousFormRequestTab = undefined;
+      return;
+    }
+    if (key !== previousRequestSectionKey) {
+      previousRequestSectionKey = key;
+      previousFormRequestTab = section;
+      if (requestSectionPreference(root, workspaceId, id) === 'file' && !vm.requestFiles.active) {
+        untrack(() => void vm.requestFiles.select('file'));
+      }
+      return;
+    }
+    if (!vm.requestFiles.active && previousFormRequestTab !== undefined && previousFormRequestTab !== section) {
+      saveRequestSectionPreference(root, workspaceId, id, section);
+    }
+    previousFormRequestTab = section;
+  });
+
+  function selectRequestSection(section: import('./lib/stores/requestFiles.svelte').RequestSection) {
+    void vm.requestFiles.select(section);
+  }
+
+  $effect(() => {
+    if (vm.externalWorkspaceChangePending && !vm.requestFiles.dirtyIds.length) {
+      untrack(() => void vm.refreshPendingExternalWorkspaceChangeIfClean());
+    }
   });
 
   function hideBootScreen() {
@@ -479,7 +590,10 @@
       void lazy.loadSettingsModal();
       void lazy.loadGlobalSearchModal();
     }, LAZY_WARM_DELAY_MS);
-    const warmEditor = () => void lazy.warmEditor();
+    const warmEditor = () => {
+      void lazy.warmEditor();
+      void lazy.warmRequestTabs();
+    };
     const warmEditorIdle = typeof window.requestIdleCallback === 'function'
       ? window.requestIdleCallback(warmEditor, { timeout: 1500 })
       : undefined;
@@ -542,7 +656,6 @@
       vm.loadStartupViewPreference();
       vm.loadRequestTabPreferences();
       vm.loadProxyConfig();
-      vm.loadScriptEngine();
       void vm.loadDefaultWorkspaceLocation();
       vm.initSSEListeners();
       vm.initAiListeners();
@@ -650,6 +763,16 @@
 {/if}
 
 <AppToasts />
+{#if docsCollection}
+  <CollectionDocsModal collection={docsCollection} linkScopes={docsTarget?.linkScopes ?? null}
+    requests={vm.requests.filter(request => request.collectionId === docsCollection?.id && !request.isDraft)}
+    onClose={() => docsTarget = null}
+    onGenerate={(ids, linkBaseUrl) => {
+      const collection = docsCollection;
+      docsTarget = null;
+      if (collection) void vm.buildCollectionDocs(collection.id, ids, linkBaseUrl);
+    }} />
+{/if}
 
 <AppOverlays
   startupUpdateInfo={updateInfo}
@@ -730,6 +853,7 @@
     openOpenApiSettings={vm.openOpenApiSettings}
     openApiUpdates={(id: string) => vm.openApiHasUpdates(id) ? vm.openApiStatus(id).summary : ''}
     openFolderSettings={vm.openFolderSettings}
+    buildCollectionDocs={openDocs}
     exportCollection={vm.exportCollection}
     deleteCollection={vm.deleteCollection}
     moveCollection={vm.moveCollection}
@@ -742,7 +866,7 @@
     duplicateRequest={vm.duplicateRequest}
     copyRequestCurl={vm.copyRequestCurl}
     revealInFileManager={vm.revealInFileManager}
-    activeLoadTestId={vm.activeLoadTestId}
+    activeLoadTestKey={loadRunKey(vm.activeLoadTestCollectionId, vm.activeLoadTestId)}
     openLoadTestMenuId={vm.openLoadTestMenuId}
     createLoadTest={(collectionId: string, requestIds?: string[]) => void vm.createLoadTest(collectionId, requestIds)}
     createLoadTestFromRequest={(requestId: string) => void vm.createLoadTestFromRequest(requestId)}
@@ -751,11 +875,11 @@
     renameLoadTest={vm.renameLoadTest}
     duplicateLoadTest={(collectionId: string, loadTestId: string) => void vm.duplicateLoadTest(collectionId, loadTestId)}
     deleteLoadTest={(collectionId: string, loadTestId: string) => void vm.deleteLoadTest(collectionId, loadTestId)}
-    runningLoadTestId={vm.loadRun.running ? vm.loadRun.loadTestId : ''}
+    runningLoadTestKey={vm.loadRun.running ? loadRunKey(vm.loadRun.collectionId, vm.loadRun.loadTestId) : ''}
     loadRunResults={vm.loadRunResults}
     runLoadTest={(collectionId: string, loadTestId: string) => void vm.runSavedLoadTest(collectionId, loadTestId)}
     exportLoadTest={(collectionId: string, loadTestId: string) => void vm.exportSavedLoadTest(collectionId, loadTestId)}
-    loadLoadTestResult={(loadTestId: string) => void vm.loadLastLoadRun(loadTestId)}
+    loadLoadTestResult={(collectionId: string, loadTestId: string) => void vm.loadLastLoadRun(collectionId, loadTestId)}
     toggleRequestPinned={vm.toggleRequestPinned}
     deleteRequest={vm.deleteRequest}
     toggleFolderCollapsed={vm.toggleFolderCollapsed}
@@ -822,7 +946,8 @@
       environmentMenu={vm.environmentMenu}
       environmentScopeName={vm.environmentScopeCollection?.name ?? ''}
       activeEnvironmentId={vm.activeEnvironmentId}
-      dirtyRequestIds={vm.dirtyRequestIdList}
+      dirtyRequestIds={[...(vm.autosave ? [] : vm.dirtyRequestIdList), ...vm.requestFiles.dirtyIds]}
+      editedDraftIds={vm.editedDraftIds}
       collectionRunnerOpen={vm.collectionRunnerOpen}
       collectionRunnerRunning={vm.collectionRunnerRunning}
       activeCollectionSettings={vm.activeCollectionSettings}
@@ -842,7 +967,6 @@
       closeLoadTestTab={() => void vm.closeLoadTestTab()}
       mockRunning={vm.mockServer.running}
       gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
-      autosave={vm.autosave}
       workspaceBlocked={vm.workspaceBlocked}
       toggleWorkspaceMenu={vm.toggleWorkspaceMenu}
       createWorkspace={vm.createWorkspace}
@@ -857,7 +981,7 @@
       closeGitTab={vm.closeGitTab}
       openMockTab={vm.openMockServerTab}
       closeMockTab={vm.closeMockServerTab}
-      {requestTabLabel}
+      requestTabLabel={numberedRequestTabLabel}
       switchRequest={vm.switchRequest}
       closeRequestTab={vm.closeRequestTab}
       createDraftRequest={vm.createDraftRequest}
@@ -987,6 +1111,11 @@
         <lazy.CookieWorkspaceComponent />
       {/if}
 
+    {:else if vm.topView === 'secrets'}
+      {#if lazy.SecretProvidersWorkspaceComponent}
+        <lazy.SecretProvidersWorkspaceComponent />
+      {/if}
+
     {:else if vm.topView === 'environment'}
       {#if lazy.EnvironmentWorkspaceComponent}
       <lazy.EnvironmentWorkspaceComponent
@@ -998,6 +1127,7 @@
         renameEnvironment={vm.renameEnvironment}
         setEnvironmentProtected={vm.setEnvironmentProtected}
         setEnvironmentSandbox={vm.setEnvironmentSandbox}
+        setEnvironmentSecretSources={vm.setEnvironmentSecretSources}
         setEnvironmentColor={vm.setEnvironmentColor}
         setEnvironmentParent={vm.setEnvironmentParent}
         deleteEnvironment={vm.deleteEnvironment}
@@ -1022,6 +1152,7 @@
     {:else if vm.topView === 'collection'}
       {#if lazy.CollectionWorkspaceComponent}
       <lazy.CollectionWorkspaceComponent
+        bind:this={vm._collectionWorkspaceRef}
         collection={vm.activeCollectionSettings}
         environments={vm.activeWorkspaceEnvironments}
         requestCount={vm.activeCollectionSettings ? vm.collectionRequestCount(vm.activeCollectionSettings.id) : 0}
@@ -1033,7 +1164,6 @@
         saveState={vm.collectionSettingsSaveState}
         workspaceBlocked={vm.workspaceBlocked}
         variableSuggestions={vm.variableSuggestions}
-        scriptEngine={vm.scriptEngine}
         onSave={vm.saveCollectionSettings}
         onReset={vm.resetCollectionSettings}
         onCreateRequest={vm.createNewRequest}
@@ -1042,6 +1172,7 @@
         onSaveFolder={vm.saveFolderSettings}
         onResetFolder={vm.resetFolderSettings}
         onCreateRequestInFolder={vm.createRequestInFolder}
+        onBuildDocs={openDocs}
         onExport={vm.exportCollection}
         onDelete={vm.deleteCollection}
       />
@@ -1096,21 +1227,21 @@
         onCopy={(text: string) => void clipboardSet(text)}
         run={vm.loadRun}
         logLines={vm.loadRunLogLines}
-        logTestId={vm.loadRunLogTestId}
-        result={active ? vm.loadRunResults[active.loadTest.id] ?? null : null}
+        logKey={vm.loadRunLogKey}
+        result={active ? vm.loadRunResults[loadRunKey(active.collection.id, active.loadTest.id)] ?? null : null}
         k6Info={vm.k6Info}
         bind:k6MissingOpen={vm.k6MissingOpen}
         onRun={(collectionId: string, draft: LoadTest) => void vm.runLoadTest(collectionId, draft)}
         onStop={() => void vm.stopLoadTest()}
-        onLoadResult={(loadTestId: string) => void vm.loadLastLoadRun(loadTestId)}
+        onLoadResult={(collectionId: string, loadTestId: string) => void vm.loadLastLoadRun(collectionId, loadTestId)}
         onOpenDashboard={(url: string) => openExternalURL(url)}
-        onOpenReport={(loadTestId: string) => void vm.openLoadTestReport(loadTestId)}
-        onSaveSummary={(loadTestId: string, fileName: string) => void vm.saveLoadTestSummary(loadTestId, fileName)}
+        onOpenReport={(collectionId: string, loadTestId: string) => void vm.openLoadTestReport(collectionId, loadTestId)}
+        onSaveSummary={(collectionId: string, loadTestId: string, fileName: string) => void vm.saveLoadTestSummary(collectionId, loadTestId, fileName)}
         onChooseK6={() => void vm.chooseK6Binary()}
         onCheckK6={() => void vm.checkK6().then(info => { if (info.found) vm.k6MissingOpen = false; })}
         onOpenK6Guide={() => openExternalURL('https://grafana.com/docs/k6/latest/set-up/install-k6/')}
-        pendingEdits={vm.loadTestEdits?.test ?? null}
-        onEdits={(collectionId: string, test: LoadTest, dirty: boolean) => vm.reportLoadTestEdits(collectionId, test, dirty)}
+        pendingEdits={vm.loadTestEdits?.collectionId === active?.collection.id ? vm.loadTestEdits?.test ?? null : null}
+        onEdits={(collectionId: string, test: LoadTest, dirty: boolean, baseFingerprint?: string) => vm.reportLoadTestEdits(collectionId, test, dirty, baseFingerprint)}
         exportRequestId={vm.loadTestExportRequestId}
         onExportRequestHandled={() => (vm.loadTestExportRequestId = '')}
       />
@@ -1154,6 +1285,9 @@
         parallel={vm.collectionRunnerParallel}
         concurrency={vm.collectionRunnerConcurrency}
         running={vm.collectionRunnerRunning}
+        preflighting={vm.collectionRunnerPreflighting}
+        preflightFailures={vm.collectionRunnerPreflightFailures}
+        onDismissPreflightFailures={() => (vm.collectionRunnerPreflightFailures = [])}
         results={vm.collectionRunnerResults}
         summary={vm.collectionRunnerSummary}
         lastRunAt={vm.collectionRunnerShowingLastRun ? vm.collectionRunnerFinishedAt : 0}
@@ -1184,18 +1318,17 @@
       <RequestBar
         bind:codePanelOpen={vm.codePanelOpen}
         {codePanelAvailable}
-        requestName={vm.requestHeaderName()}
+        requestName={fileDraft?.barValue('name', vm.requestHeaderName()) ?? requestBarName}
         requestLocation={activeRequestLocation}
-        showSave={!vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
+        {fileDraft}
+        showSave={!vm.requestFiles.active && !vm.workspaceBlocked && !vm.autosave && vm.activeRequestId !== ''}
         saveDirty={!vm.workspaceBlocked && vm.activeRequestIsDirty}
         canRevert={!vm.workspaceBlocked && vm.activeRequestCanRevert}
-        sendShortcut={shortcutComboLabel(vm.shortcutCombo('send-request'), vm.appRuntime)}
-        sendShortcutInline={usesMacShortcutGlyphs(vm.appRuntime)}
         onSave={vm.saveActiveRequest}
         onRevert={vm.revertActiveRequestChanges}
-        requestType={vm.requestType}
-        bind:method={vm.method}
-        bind:url={vm.url}
+        requestType={barType}
+        bind:method={() => barMethod, setBarMethod}
+        bind:url={() => barUrl, setBarUrl}
         bind:urlInputRef={vm._urlInputRef}
         requestTypes={REQUEST_TYPES}
         methods={METHODS}
@@ -1204,11 +1337,11 @@
         requestTypeLabel={vm.requestTypeLabel}
         requestTypeEditable={vm.requestTypeEditable}
         variableSuggestions={vm.variableSuggestions}
-        onRequestNameInput={vm.setRequestHeaderName}
-        onRequestNameCommit={vm.commitRequestHeaderName}
-        onRequestTypeChange={vm.selectRequestType}
+        onRequestNameInput={setBarName}
+        onRequestNameCommit={() => { if (!fileDraft) vm.commitRequestHeaderName(); }}
+        onRequestTypeChange={changeBarProtocol}
         onUrlPaste={vm.onUrlPaste}
-        onUrlInput={() => vm.syncParamsFromUrl()}
+        onUrlInput={() => { if (!fileDraft) vm.syncParamsFromUrl(); }}
         onSend={vm.runActiveRequest}
         onSendAndDownload={() => vm.runActiveRequestAndDownload()}
         sseStatus={vm.requestType === 'http' && (vm.method === 'SSE' || sseSessionVisible) ? (vm.currentSSESession?.status ?? 'idle') : undefined}
@@ -1223,17 +1356,18 @@
       />
 
       <div class="request-split" class:split-right={responseOnRight} bind:clientWidth={requestSplitWidth} style="--request-split: {vm.requestSplitRatio}">
-      <div class="request-editor" style={responseOnRight ? '' : `height: ${rem(vm.requestPanelHeight)}; --request-panel-h: ${rem(vm.requestPanelHeight)}`}>
+      <div class="request-editor" role="presentation" onkeydowncapture={reserveEditorSendShortcut} style={responseOnRight ? '' : `height: ${rem(vm.requestPanelHeight)}; --request-panel-h: ${rem(vm.requestPanelHeight)}`}>
         <RequestEditorTabs
-          bind:requestTab={vm.requestTab}
-          requestType={vm.requestType}
-          method={vm.method}
+          requestTab={requestSection}
+          onselect={selectRequestSection}
+          requestType={barType}
+          method={barMethod}
           paramsCount={activeCount(vm.params) + vm.pathParams.filter(r => r.value).length}
           authConfigured={vm.authHasConfig()}
           headerCount={vm.requestHeaderCount}
           bodyHasContent={vm.bodyHasContent()}
           bodyBadgeLabel={vm.bodyBadgeLabel()}
-          scriptLineCount={scriptLineCount(vm.preRequestScript) + scriptLineCount(vm.testScript)}
+          scriptLineCount={scriptLineCount(vm.preRequestScriptJs) + scriptLineCount(vm.testScriptJs)}
           assertionCount={vm.assertions.filter(row => row.target.trim()).length}
           listenEventCount={activeCount(vm.sioEvents)}
           metadataCount={activeCount(vm.grpcMetadata)}
@@ -1245,7 +1379,7 @@
           exampleCount={vm.requestExamplesLoaded ? vm.requestExamples.length : (vm.requestsById.get(vm.activeRequestId)?.exampleCount ?? 0)}
         />
 
-        {#if vm.requestTab === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
+        {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
           <BodyModeSelector
             bind:rawTypeMenuOpen={vm.rawTypeMenuOpen}
             rawBodyType={vm.rawBodyType}
@@ -1261,8 +1395,17 @@
           />
         {/if}
 
-        <div class="tab-content" class:script-editor-mode={vm.requestTab === 'scripts' && (vm.scriptTab !== 'assertions' || !requestTypeSupportsAssertions(vm.requestType))} class:body-editor-mode={(vm.requestTab === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || vm.requestType === 'ai' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (vm.requestTab === 'query' || vm.requestTab === 'schema'))}>
-          {#if vm.requestTab === 'docs'}
+        <div class="tab-content" class:file-editor-mode={requestSection === 'file'} class:script-editor-mode={requestSection === 'scripts' && (vm.scriptTab !== 'assertions' || !requestTypeSupportsAssertions(vm.requestType))} class:body-editor-mode={(requestSection === 'body' && (vm.requestType === 'ws' || vm.requestType === 'socketio' || vm.requestType === 'grpc' || vm.requestType === 'mcp' || vm.requestType === 'ai' || !['none', 'form', 'urlencoded', 'binary'].includes(vm.bodyType))) || (vm.requestType === 'graphql' && (requestSection === 'query' || requestSection === 'schema'))}>
+          {#if vm.requestFiles.active}
+            {#if vm.activeRequest?.isDraft}
+              <div class="file-tab-empty">
+                <p>Save this request to a collection to edit its YAML file.</p>
+                <button type="button" class="btn btn-secondary btn-sm" onclick={vm.saveActiveRequest}>Save request</button>
+              </div>
+            {:else if lazy.FileTabComponent}
+              <lazy.FileTabComponent draft={vm.requestFiles.active} />
+            {/if}
+          {:else if vm.requestTab === 'docs'}
             {#if lazy.DocsTabComponent}<lazy.DocsTabComponent />{/if}
           {:else if vm.requestTab === 'query'}
             {#if lazy.GraphQLQueryTabComponent}<lazy.GraphQLQueryTabComponent />{/if}
@@ -1362,7 +1505,7 @@
           listenEventCount={vm.sioEvents.filter(r => r.enabled && r.key.trim()).length}
           onClear={vm.socketIOClearMessages}
           onRestore={vm.socketIORestoreMessages}
-          onGoToEvents={() => vm.requestTab = 'events'}
+          onGoToEvents={() => void vm.requestFiles.select('events')}
         />
         {/if}
       {:else if vm.requestType === 'http' && (vm.method === 'SSE' || sseSessionVisible)}

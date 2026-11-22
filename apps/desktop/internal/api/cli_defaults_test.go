@@ -143,7 +143,6 @@ func TestRunCLIAppliesCollectionScriptSettings(t *testing.T) {
 		"    type: none",
 		"  bodyType: none",
 		"  bodyContent: \"\"",
-		"  scriptEngine: js",
 		"  preRequestScriptJs: |",
 		"    const start = Date.now()",
 		"    while (Date.now() - start < 2400) { }",
@@ -181,6 +180,8 @@ func TestRunCLIAppliesCollectionHeadersAndScripts(t *testing.T) {
 		"        enabled: true",
 		"        key: X-Client",
 		"        value: kurlo",
+		"    preRequestScript: |",
+		`      throw new Error("old collection script");`,
 		"    preRequestScriptJs: |",
 		"      pm.request.headers.set(\"X-From-Script\", \"collection\")",
 		"    testScriptJs: |",
@@ -194,6 +195,8 @@ func TestRunCLIAppliesCollectionHeadersAndScripts(t *testing.T) {
 		"      enabled: true",
 		"      key: X-Own",
 		"      value: mine",
+		"  testScript: |",
+		`    throw new Error("old request script");`,
 		"  bodyType: none",
 		"  bodyContent: \"\"",
 		"  settings: {}",
@@ -336,6 +339,34 @@ func TestCLIRequestTimeoutFromSavedFiles(t *testing.T) {
 			built := buildHTTPRequest(applyCollectionDefaults(requests[0], &collections[0]), nil, nil, 0)
 			if built.TimeoutMs != tc.want {
 				t.Fatalf("timeoutMs = %d, want %d", built.TimeoutMs, tc.want)
+			}
+		})
+	}
+}
+
+func TestRunCLICompactAndLegacyRows(t *testing.T) {
+	for _, tc := range []struct{ name, active string }{{"compact", ""}, {"legacy", ", enabled: true, description: ''"}} {
+		t.Run(tc.name, func(t *testing.T) {
+			observed := make(chan *http.Request, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				observed <- r
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+			root := writeDefaultsWorkspace(t, server.URL,
+				"    headers:\n      - {key: X-Inherited, value: shared"+tc.active+"}\n      - {key: X-Inherited-Off, value: ignored, enabled: false}",
+				"  headers:\n    - {key: X-Own, value: own"+tc.active+"}\n    - {key: X-Off, value: ignored, enabled: false}\n  params:\n    - {key: on, value: active"+tc.active+"}\n    - {key: off, value: ignored, enabled: false}")
+			var out bytes.Buffer
+			if code := runCLI(cliOptions{workspace: root, reporters: []string{"json"}, iterations: 1, stdout: &out, stderr: &out}); code != 0 {
+				t.Fatalf("CLI exited %d: %s", code, out.String())
+			}
+			select {
+			case r := <-observed:
+				if r.Header.Get("X-Inherited") != "shared" || r.Header.Get("X-Own") != "own" || r.Header.Get("X-Off") != "" || r.Header.Get("X-Inherited-Off") != "" || r.URL.Query().Get("on") != "active" || r.URL.Query().Has("off") {
+					t.Fatalf("unexpected request: %s %#v", r.URL, r.Header)
+				}
+			default:
+				t.Fatal("request did not reach the server")
 			}
 		})
 	}

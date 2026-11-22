@@ -29,8 +29,6 @@ function request(overrides: Partial<SavedRequest> = {}): SavedRequest {
     bodyFilePath: '',
     bodyFileName: '',
     formRows: [],
-    preRequestScript: '',
-    testScript: '',
     requestNotes: '',
     settings: { ...DEFAULT_REQUEST_SETTINGS },
     ...overrides,

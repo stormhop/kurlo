@@ -70,6 +70,12 @@ in `importers*.test.ts`; application integration tests use `appIntegration*.test
 Their shared fixtures live in `src/tests/support` and remain isolated per test file.
 Large JSON tests call the response renderer used by the application.
 
+The request File tab is covered at three levels. `e2e/file-tab.spec.ts` drives the
+editor against a mocked bridge and captures `request-file-tab` in screenshot mode.
+The `requestFile*`, `requestYaml*` and `requestTabPreferences` unit tests cover the
+draft, the address-bar sync and completion. The real read, save, conflict and
+format paths run in Go: `make test GO_TEST_FLAGS="-run 'TestRequestFileYAML|TestFormatRequestFileYAML|TestRequestDraftSchema'"`.
+
 `npm run frontend:check` checks both the application and Playwright TypeScript.
 Use `npm run test:e2e:check` to check only the browser tests and their configuration.
 The test bridge uses generated Wails argument types and permits partial mock

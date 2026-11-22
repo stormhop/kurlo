@@ -1,0 +1,93 @@
+---
+interface Props {
+  hero?: boolean;
+}
+
+const { hero = false } = Astro.props;
+const spans = [
+  { start: -8, end: 344, height: 28, count: 15 },
+  { start: 344, end: 598, height: 20, count: 11 },
+];
+---
+
+<div class="docs-winter" data-docs-winter={hero ? 'hero' : 'article'} aria-hidden="true">
+  {hero && (
+    <svg class="winter-lights" viewBox="0 0 590 48" focusable="false">
+      {spans.map(({ start, end, height, count }) => (
+        <g>
+          <path d={`M${start} -4 Q${(start + end) / 2} ${height * 2 - 4} ${end} -4`} fill="none" stroke="#544956" stroke-width="1.25" />
+          {Array.from({ length: count - 1 }, (_, index) => {
+            const t = (index + 1) / count;
+            const x = start + (end - start) * t;
+            const y = 4 * height * t * (1 - t) - 4;
+            return <g transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`} fill={index % 4 === 0 ? '#ffc4a9' : '#ffe2a4'}>
+              <path d="M0 0v4" stroke="#63565d" stroke-width="1.5" />
+              <ellipse cy="6" rx="3.8" ry="5" opacity=".16" />
+              <ellipse cy="6" rx="1.9" ry="3.1" />
+            </g>;
+          })}
+        </g>
+      ))}
+    </svg>
+  )}
+</div>
+
+<style>
+  .docs-winter {
+    pointer-events: none;
+    overflow: hidden;
+    color: #abc4d9;
+    --snow-width: 346px;
+    --snow-height: 212px;
+    --snow-speed: 15s;
+  }
+  .docs-winter[data-docs-winter='article'] {
+    position: fixed;
+    inset: var(--sl-nav-height) 0 0;
+    z-index: -1;
+  }
+  :global([data-theme='light']) .docs-winter[data-docs-winter='article'] {
+    color: #6487a3;
+  }
+  .docs-winter[data-docs-winter='hero'] {
+    position: absolute;
+    inset: 0 0 0 32%;
+    color: #f3f8ff;
+    --snow-width: 168px;
+    --snow-height: 128px;
+    --snow-speed: 7s;
+    mask-image: linear-gradient(to right, transparent, black 25%);
+  }
+  .docs-winter::before {
+    content: '';
+    position: absolute;
+    inset: calc(-1 * var(--snow-height)) -8px 0;
+    background-image:
+      radial-gradient(circle at 12% 28%, currentColor 1px, transparent 1.8px),
+      radial-gradient(circle at 41% 7%, currentColor .6px, transparent 1.3px),
+      radial-gradient(circle at 76% 54%, currentColor 1.6px, transparent 2.2px),
+      radial-gradient(circle at 31% 81%, currentColor .8px, transparent 1.5px),
+      radial-gradient(circle at 91% 17%, currentColor .6px, transparent 1.3px),
+      radial-gradient(circle at 56% 65%, currentColor 1px, transparent 1.8px);
+    background-size: var(--snow-width) var(--snow-height);
+    opacity: .52;
+    animation: snowfall var(--snow-speed) linear infinite;
+  }
+  .winter-lights {
+    position: absolute;
+    inset: 0 0 auto auto;
+    width: 81%;
+    height: auto;
+  }
+  @keyframes snowfall {
+    from { transform: translate3d(0, 0, 0); }
+    50% { transform: translate3d(7px, calc(var(--snow-height) / 2), 0); }
+    to { transform: translate3d(0, var(--snow-height), 0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .docs-winter::before { animation: none; }
+  }
+  @media print {
+    .docs-winter { display: none; }
+  }
+</style>

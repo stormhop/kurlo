@@ -444,7 +444,6 @@ test.describe('Startup screen', () => {
     const onLaunch = panel.getByRole('button', { name: /^On launch:/ });
     await expect(onLaunch).toContainText('Request editor');
     await expect(panel.getByText('Saving', { exact: true })).toBeVisible();
-    await expect(panel.getByRole('radio', { name: 'JavaScript', exact: true })).toBeVisible();
     await expect(panel.getByRole('button', { name: 'Export all data', exact: true })).toBeVisible();
     await onLaunch.click();
     await page.getByRole('option', { name: 'Where you left off' }).click();

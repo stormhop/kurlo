@@ -7,6 +7,7 @@
   import { KURLO_REPO_URL } from '../starPrompt';
   import type { GitWorkspaceStatus } from '../backend';
   import type { TopView } from '../stores/ui';
+  import SecretAttention from './SecretAttention.svelte';
   import {
     DARK_THEME_VARIANTS,
     LIGHT_THEME_VARIANTS,
@@ -133,6 +134,7 @@
       {/if}
       </span>
     </button>
+    <SecretAttention />
   </div>
   <div class="status-bar-right">
     <button

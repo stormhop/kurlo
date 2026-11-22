@@ -8,14 +8,17 @@ import (
 )
 
 type cliKV struct {
-	Key      string `json:"key"`
-	Value    string `json:"value"`
-	Enabled  bool   `json:"enabled"`
-	IsFile   bool   `json:"isFile"`
-	FileName string `json:"fileName"`
-	Secret   bool   `json:"secret"`
+	Description string `json:"description,omitempty"`
+	Key         string `json:"key"`
+	Value       string `json:"value"`
+	Enabled     bool   `json:"enabled"`
+	IsFile      bool   `json:"isFile"`
+	FileName    string `json:"fileName"`
+	Secret      bool   `json:"secret"`
 
-	ContentType string `json:"contentType"`
+	ContentType string         `json:"contentType"`
+	SecretRef   map[string]any `json:"secretRef,omitempty"`
+	bareQuery   bool
 }
 
 type cliAuth struct {
@@ -131,7 +134,12 @@ type cliExampleResponse struct {
 
 type cliExample struct {
 	Snapshot struct {
-		Method string `json:"method"`
+		Method      string  `json:"method"`
+		URL         string  `json:"url,omitempty"`
+		Headers     []cliKV `json:"headers,omitempty"`
+		Params      []cliKV `json:"params,omitempty"`
+		BodyType    string  `json:"bodyType,omitempty"`
+		BodyContent string  `json:"bodyContent,omitempty"`
 	} `json:"snapshot"`
 	Match struct {
 		PathTemplate string            `json:"pathTemplate"`
@@ -180,6 +188,8 @@ type cliSavedRequest struct {
 	RequestType        string            `json:"requestType"`
 	CollectionID       string            `json:"collectionId"`
 	Collection         string            `json:"collection"`
+	NameAuto           bool              `json:"nameAuto,omitempty"`
+	RequestNotes       string            `json:"requestNotes,omitempty"`
 	FolderPath         []string          `json:"folderPath"`
 	Method             string            `json:"method"`
 	URL                string            `json:"url"`
@@ -195,8 +205,6 @@ type cliSavedRequest struct {
 	BodyContent        string            `json:"bodyContent"`
 	BodyFilePath       string            `json:"bodyFilePath"`
 	FormRows           []cliKV           `json:"formRows"`
-	PreRequestScript   string            `json:"preRequestScript"`
-	TestScript         string            `json:"testScript"`
 	PreRequestScriptJs string            `json:"preRequestScriptJs"`
 	TestScriptJs       string            `json:"testScriptJs"`
 	Assertions         []model.Assertion `json:"assertions"`
@@ -209,8 +217,6 @@ type cliCollectionDefaults struct {
 	Variables          []cliKV     `json:"variables"`
 	Headers            []cliKV     `json:"headers"`
 	Auth               cliAuth     `json:"auth"`
-	PreRequestScript   string      `json:"preRequestScript"`
-	TestScript         string      `json:"testScript"`
 	PreRequestScriptJs string      `json:"preRequestScriptJs"`
 	TestScriptJs       string      `json:"testScriptJs"`
 	Settings           cliSettings `json:"settings"`
@@ -221,13 +227,14 @@ type cliFolderDefaults struct {
 	Path               []string `json:"path"`
 	Headers            []cliKV  `json:"headers"`
 	Auth               cliAuth  `json:"auth"`
-	PreRequestScript   string   `json:"preRequestScript"`
-	TestScript         string   `json:"testScript"`
 	PreRequestScriptJs string   `json:"preRequestScriptJs"`
 	TestScriptJs       string   `json:"testScriptJs"`
 }
 
 type cliCollection struct {
+	FolderPaths    [][]string            `json:"folderPaths,omitempty"`
+	EnvironmentIDs []string              `json:"environmentIds,omitempty"`
+	Description    string                `json:"description,omitempty"`
 	FolderDefaults []cliFolderDefaults   `json:"folderDefaults"`
 	WorkspaceID    string                `json:"workspaceId"`
 	FilesystemName string                `json:"filesystemName"`
@@ -248,6 +255,7 @@ type cliEnvironment struct {
 	ParentID    string  `json:"parentId"`
 	Parent      string  `json:"-"`
 	Values      []cliKV `json:"values"`
+	Sources     []any   `json:"secretSources,omitempty"`
 }
 
 func decodeMaps[T any](maps []map[string]any) ([]T, error) {
@@ -426,10 +434,9 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		Body:                    body,
 		BodyFilePath:            req.BodyFilePath,
 		FormData:                formData,
-		PreRequestScript:        cliPreScript(req),
-		TestScript:              cliTestScript(req),
+		PreRequestScript:        req.PreRequestScriptJs,
+		TestScript:              req.TestScriptJs,
 		Assertions:              req.Assertions,
-		ScriptEngine:            cliScriptEngine(req),
 		FollowRedirects:         boolOr(req.Settings.FollowRedirects, true),
 		TimeoutMs:               timeoutMs,
 		HTTPVersion:             defaultString(req.Settings.HTTPVersion, "auto"),
@@ -455,30 +462,6 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		RequestVariables:        cliRequestVariablesForSend(req.Vars, values),
 		PostResponseVars:        cliPostResponseVars(req.PostResponseVars),
 	}
-}
-
-func cliScriptEngine(req cliSavedRequest) string {
-	if strings.TrimSpace(req.PreRequestScriptJs) != "" || strings.TrimSpace(req.TestScriptJs) != "" {
-		return "js"
-	}
-	if strings.TrimSpace(req.PreRequestScript) != "" || strings.TrimSpace(req.TestScript) != "" {
-		return "tengo"
-	}
-	return "js"
-}
-
-func cliPreScript(req cliSavedRequest) string {
-	if cliScriptEngine(req) == "js" {
-		return req.PreRequestScriptJs
-	}
-	return req.PreRequestScript
-}
-
-func cliTestScript(req cliSavedRequest) string {
-	if cliScriptEngine(req) == "js" {
-		return req.TestScriptJs
-	}
-	return req.TestScript
 }
 
 func defaultString(value, fallback string) string {

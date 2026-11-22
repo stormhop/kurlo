@@ -804,7 +804,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(editor.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
 
     await page.evaluate((id) => {
-      const base = { running: true, stopping: false, loadTestId: id, collectionId: '', startedAt: Date.now(), plannedMs: 60000, dashboardUrl: 'http://127.0.0.1:5665', k6Version: 'v1.3.0' };
+      const base = { running: true, stopping: false, loadTestId: id, collectionId: window.__kurloE2E.store.collections.find(c => c.loadTests?.some(t => t.id === id))!.id, startedAt: Date.now(), plannedMs: 60000, dashboardUrl: 'http://127.0.0.1:5665', k6Version: 'v1.3.0' };
       window.__kurloE2E.emit('load:progress', { ...base, progress: { elapsedMs: 15000, vus: 2, maxVUs: 2, iterations: 42, interrupted: 0 } });
       window.__kurloE2E.emit('load:log', 'running (15.0s), 2/2 VUs, 42 complete and 0 interrupted iterations');
     }, loadTestId);
@@ -820,7 +820,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.evaluate((id) => {
       window.__kurloE2E.emit('load:progress', { running: false, stopping: false, loadTestId: '', collectionId: '', startedAt: 0, plannedMs: 0, dashboardUrl: '', k6Version: '', progress: { elapsedMs: 0, vus: 0, maxVUs: 0, iterations: 0, interrupted: 0 } });
       window.__kurloE2E.emit('load:done', {
-        loadTestId: id, collectionId: '', loadTestName: 'Login load test', environment: '', k6Version: 'v1.3.0', status: 'failed', exitCode: 99,
+        loadTestId: id, collectionId: window.__kurloE2E.store.collections.find(c => c.loadTests?.some(t => t.id === id))!.id, loadTestName: 'Login load test', environment: '', k6Version: 'v1.3.0', status: 'failed', exitCode: 99,
         startedAt: Date.now() - 60000, finishedAt: Date.now(), hasReport: true, hasSummary: true,
         thresholds: [
           { metric: 'http_req_duration', expression: 'p(95)<500', ok: true, actual: 212.4, hasActual: true },
@@ -852,7 +852,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedFiles.map(file => file.name))).toEqual(['login-load-test-summary.json']);
     await page.evaluate((id) => {
       window.__kurloE2E.emit('load:done', {
-        loadTestId: id, collectionId: '', loadTestName: 'Login load test', environment: 'Dev', k6Version: 'v1.4.2', status: 'stopped', exitCode: 105,
+        loadTestId: id, collectionId: window.__kurloE2E.store.collections.find(c => c.loadTests?.some(t => t.id === id))!.id, loadTestName: 'Login load test', environment: 'Dev', k6Version: 'v1.4.2', status: 'stopped', exitCode: 105,
         startedAt: Date.now() - 3278, finishedAt: Date.now(), hasReport: false, hasSummary: false, thresholds: [], steps: [],
       });
     }, loadTestId);

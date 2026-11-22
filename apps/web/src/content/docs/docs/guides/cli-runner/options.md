@@ -36,6 +36,9 @@ kurlo run . --env CI --folder "Billing/Refunds"      # a folder subtree
 | `--fail-fast`, `--bail` | Stop at the first failing request. |
 | `--insecure`, `-k` | Disable TLS certificate verification for every request. |
 | `--verbose` | Print request/response detail and script output for each request. |
+| `--secret-providers on\|off` | Fetch [linked variables](/docs/guides/environments/secret-managers/#in-the-cli-and-ci) from secret managers (default `on`). With `off`, pass them with `--var` or `--env-file`. |
+| `--secret-timeout <duration>` | Time limit for each secret manager call, such as `30s`. Defaults to the provider's setting. |
+| `--allow-secret-commands` | Let secret providers of type `command` run their program. Without it, a variable linked to one stops the run with exit code `2`. |
 
 ## Exit codes
 
@@ -43,4 +46,4 @@ kurlo run . --env CI --folder "Billing/Refunds"      # a folder subtree
 |------|---------|
 | `0` | Every request succeeded and every assertion passed. |
 | `1` | At least one request errored or one assertion failed. |
-| `2` | Setup problem — workspace not found, unknown environment, or no requests matched. |
+| `2` | Setup problem — workspace not found, unknown environment, no requests matched, or a linked secret could not be fetched. |

@@ -96,8 +96,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Login user' })).toHaveCount(1);
     await page.getByLabel('Method and protocol').click();
-    await expect(page.getByText('The protocol is fixed once a saved request has a URL.', { exact: false })).toBeVisible();
-    await expect(page.getByRole('option', { name: 'GraphQL' })).toHaveCount(0);
+    await expect(page.getByRole('option', { name: 'GraphQL' })).toBeVisible();
     await page.getByRole('option', { name: 'POST' }).click();
 
     await chooseRequestSection(page, 'Params');
@@ -197,26 +196,6 @@ test.describe("Kurlo desktop browser E2E", () => {
     }
     if (docsScreenshotDir) {
       try {
-        await page.getByLabel('Settings', { exact: true }).click();
-        await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
-        await page.getByRole('radio', { name: 'Tengo', exact: true }).click();
-        await page.getByLabel('Close settings').click();
-        await chooseRequestSection(page, 'Scripts');
-        await page.locator('.script-section').getByRole('tab', { name: /^Pre-request/ }).click();
-        await fillCodeEditor(page, 'pre-request-script-editor', [
-          'pm.variables.set("requestId", "tengo-docs")',
-          'pm.log("Tengo pre-request ready")',
-        ].join('\n'));
-        await captureDocsScreenshot(page, 'scripting-tengo');
-        await page.getByLabel('Settings', { exact: true }).click();
-        await page.getByRole('tab', { name: 'General', exact: true }).click({ timeout: 4000 });
-        await page.getByRole('radio', { name: 'JavaScript', exact: true }).click();
-        await page.getByLabel('Close settings').click();
-        await page.locator('.script-section').getByRole('tab', { name: /^Tests/ }).click();
-      } catch (err) { console.log('docs screenshot scripting-tengo skipped:', err); }
-    }
-    if (docsScreenshotDir) {
-      try {
         await page.locator('.response-status-bar').screenshot({ path: join(docsScreenshotDir, 'status-bar.png'), animations: 'disabled' });
       } catch (err) { console.log('docs screenshot status-bar skipped:', err); }
       try {
@@ -248,6 +227,12 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(page.locator('.history-entry').first()).toContainText('POST');
     await expect(page.locator('.history-entry').first()).toContainText('/login?scope=smoke');
     await expect(page.locator('.history-entry').first()).toContainText('200');
+    const historyRow = page.locator('.request-history-entry').first();
+    await expect(historyRow.locator('.history-time')).toBeVisible();
+    expect(await historyRow.locator('.history-url').evaluate(element => element.clientWidth)).toBeGreaterThan(95);
+    await historyRow.hover();
+    await expect(historyRow.getByRole('button', { name: 'History request menu' })).toBeVisible();
+    await expect(historyRow.locator('.history-time')).toBeHidden();
     await tourPause(page, 'HTTP response saved and history checked');
     await captureDocsScreenshot(page, 'history');
 
@@ -447,6 +432,7 @@ test.describe("Kurlo desktop browser E2E", () => {
           ].join('\n'),
         );
         await finishReadme();
+        await expect(readmeRegion.locator('.overview-readme-body br')).toHaveCount(2);
         await page.locator('.workspace-overview').evaluate((overview) => { overview.scrollTop = 0; });
         await captureDocsScreenshot(page, 'workspace-overview');
         await readmeRegion.getByRole('button', { name: 'Edit', exact: true }).click();

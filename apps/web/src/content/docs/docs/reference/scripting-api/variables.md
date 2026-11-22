@@ -11,6 +11,10 @@ title: "Variable scopes"
 | `.unset(key)` | Delete a variable |
 | `.clear()` | Clear all variables |
 
+When editing a script, type the opening quote in a variable lookup to browse keys for that scope. Environment suggestions include enabled keys inherited from parent environments.
+
+![Environment key suggestions in a script](../../../../../assets/screenshots/script-completion-environment.png)
+
 They differ in which scope they touch:
 
 | Scope | Reads | Writes |
@@ -32,3 +36,14 @@ Globals persist. They are saved with your data, survive a restart, and are share
 // Cache a value for every later request in the collection.
 pm.collectionVariables.set("lastOrderId", pm.response.json().id)
 ```
+
+## pm.vault
+
+Scripts written for Postman Vault run unchanged. `pm.vault.get(key)` returns a promise with the value of the variable `key` from the scopes above, so link that variable to a [secret manager](/docs/guides/environments/secret-managers/) to read the secret. `await` works at the top level of a script.
+
+```js
+const apiKey = await pm.vault.get("postman-api-key");
+pm.request.headers.upsert({ key: "X-API-Key", value: apiKey });
+```
+
+`pm.vault.set` and `pm.vault.unset` reject with an error: change linked secrets in the secret manager itself. In templates, `{{vault:name}}` reads the same variable, including in `pm.variables.replaceIn`.

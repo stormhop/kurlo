@@ -132,7 +132,7 @@ func (s *mcpServer) toolOpenSession(ctx context.Context, arguments json.RawMessa
 		return nil, fmt.Errorf("%s is a %s request; use run_request", mcpRequestPath(req), kind)
 	}
 	req = ws.withDefaults(req)
-	run, err := s.prepareRun(ws.forRequest(req), args.Environment, args.Variables)
+	run, err := s.prepareRun(ws.forRequest(req), args.Environment, args.Variables, req)
 	if err != nil {
 		return nil, err
 	}

@@ -27,6 +27,7 @@ Workspace state, requests, environments, request history, cookies, secrets, and 
 Inside that directory you may find:
 
 - `requests.json` — an AES-256-GCM encrypted JSON envelope containing local profile state, history, workspace cookies, Git-local secret values, and storage metadata.
+- `secret-providers.json` — which [secret providers](/docs/guides/environments/secret-managers/) you trust on this device and the tokens or keys you saved for them, encrypted with the same key as `requests.json`. Values fetched from providers are never written to disk.
 - `request-store.key` — a base64-encoded recovery copy of the encryption key, written with owner-only `0600` permissions.
 - `request-store.key.dpapi` — an additional Windows DPAPI-protected key copy.
 - `preferences.json` — the configured default workspace location, cookie sync settings, and [AI connections](/docs/guides/settings/ai/#ai) with their keys encrypted by the request-store key. Other UI preferences are stored by the desktop WebView.
@@ -66,7 +67,11 @@ A few bounded categories of network calls happen on your behalf:
 
 7. **AI connections.** When you test an AI connection or load its models, Kurlo calls that provider's model list (and, for OpenRouter, its key check) with your key. Connecting OpenRouter opens openrouter.ai in your browser; after you approve, OpenRouter sends the browser to `kurlo.dev/connect/openrouter/`, a static page that forwards it to Kurlo on `127.0.0.1`, and Kurlo exchanges the code for a key at `openrouter.ai/api/v1/auth/keys`. The code passes through that page's URL but cannot be exchanged without a secret that never leaves Kurlo, and it expires after ten minutes. If kurlo.dev cannot be reached, OpenRouter returns to `localhost` directly. *Find local models* only contacts `127.0.0.1` ports 11434 and 1234. These calls follow the system proxy environment variables, not the proxy configured in Kurlo.
 
+8. **Secret managers.** When a request uses a [linked variable](/docs/guides/environments/secret-managers/), or you test or browse a provider, Kurlo calls the address in the provider settings: Vault, AWS, Google Cloud (and Google's token endpoint), Azure Key Vault (and Microsoft's sign-in endpoint), Doppler or Infisical. It runs the `op`, `aws`, `gcloud`, `az`, `bws` or `doppler` CLI, or the program of a `command` provider, on your computer. Vault OIDC sign-in opens your browser and listens on the redirect address on `localhost`. All of this happens only for providers you trust on this device. These calls follow the system proxy environment variables, not the proxy configured in Kurlo.
+
 Proxy settings can route these requests through your selected system or custom proxy. There is no separate telemetry channel or first-launch ping.
+
+[Collection documentation](/docs/guides/cli-runner/docs/) is generated locally as a standalone HTML file. It hides marked secrets, recognized credential values and values from protected environments. The file can still contain ordinary variable values, request bodies, prompts and saved responses. Review the HTML before sharing it.
 
 ## Ports Kurlo opens on your machine
 
@@ -81,11 +86,11 @@ Four features bind a local listener. All four are loopback-only (`127.0.0.1`, an
 
 ## Scripting safety
 
-Pre-request and test scripts run in a sandboxed JavaScript VM by default, with a legacy [Tengo](https://github.com/d5/tengo) engine for existing requests:
+Pre-request and test scripts run in a sandboxed JavaScript VM.
 
-- Imports, `require`, process access, filesystem access, and direct network sockets are disabled.
-- Execution is capped at **2 seconds** per script.
-- Scripts have access only to the explicit `pm.*` API (request/response/variables/environment/log). They cannot reach the file system, spawn processes, or open network sockets directly. Any HTTP call goes through the regular request engine.
+- The sandbox blocks module imports, processes, filesystem access, and direct network sockets. `require` resolves only [bundled libraries](/docs/reference/scripting-api/compatibility/#require).
+- The default limit is **2 seconds** per script. You can set a timeout of up to 60 seconds per request.
+- Scripts can make HTTP calls through [`pm.sendRequest`](/docs/reference/scripting-api/send-request/) when the request opts in. These calls use Kurlo's request engine.
 
 ## Cookies
 

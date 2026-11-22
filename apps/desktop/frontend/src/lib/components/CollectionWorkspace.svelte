@@ -9,15 +9,17 @@
   import { HEADER_PICKER_NAMES, getHeaderValues } from '../headers';
   import { collectionSettingsFingerprint, emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsFingerprint, folderDefaultsFor, inheritedAuthSource, normalizeCollectionDefaults } from '../collectionDefaults';
   import { activeCount, cloneRowsForStore, guardTrailing, jwtAlgorithmUsesSecret, removeRow, restoreRows, scriptLineCount } from '../utils';
-  import { openFileDialog } from '../backend';
-  import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, JwtAlgorithm, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings, ScriptEngine } from '../types/models';
+  import type { AuthState, Collection, CollectionDefaults, Environment, FolderDefaults, JwtAlgorithm, KVRow, OAuth1AddTo, OAuth1SignatureMethod, RequestSettings } from '../types/models';
   import { defaultPinnedEnvironmentId, normalizeCollectionEnvironmentPins } from '../collectionEnvironments';
-  import { isVariableReferenceOnly, type VariableSuggestion } from '../variables';
+  import type { VariableSuggestion } from '../variables';
   import CodeEditor from '../CodeEditor.svelte';
+  import ScriptEditor from './ScriptEditor.svelte';
   import Select from './Select.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import SearchPicker from './SearchPicker.svelte';
   import VariableInput from './VariableInput.svelte';
+  import FilePathField from './FilePathField.svelte';
+  import SecretInput from './SecretInput.svelte';
   import CollapsibleMarkdown from './CollapsibleMarkdown.svelte';
   import OpenApiSyncPanel from './OpenApiSyncPanel.svelte';
   import { vm } from '../stores/app.svelte';
@@ -53,7 +55,6 @@
     saveState = 'idle',
     workspaceBlocked = false,
     variableSuggestions = [],
-    scriptEngine = 'js',
     onSave,
     onReset,
     onCreateRequest,
@@ -62,6 +63,7 @@
     onSaveFolder = () => false,
     onResetFolder = () => false,
     onCreateRequestInFolder = () => {},
+    onBuildDocs,
     onExport = () => {},
     onDelete = () => {},
   }: {
@@ -76,7 +78,6 @@
     saveState?: 'idle' | 'saving' | 'saved';
     workspaceBlocked?: boolean;
     variableSuggestions?: VariableSuggestion[];
-    scriptEngine?: ScriptEngine;
     onSave: (collectionId: string, patch: CollectionSettingsPatch) => boolean | void | Promise<boolean | void>;
     onReset: (collectionId: string) => boolean | Promise<boolean>;
     onCreateRequest: (collectionId: string) => void | Promise<void>;
@@ -85,6 +86,7 @@
     onSaveFolder?: (collectionId: string, folder: FolderDefaults, baseFingerprint?: string) => boolean | Promise<boolean>;
     onResetFolder?: (collectionId: string, folderPath: string[]) => boolean | Promise<boolean>;
     onCreateRequestInFolder?: (collectionId: string, folderPath: string[]) => void | Promise<void>;
+    onBuildDocs: (collectionId: string) => void;
     onExport?: (collectionId: string) => void | Promise<void>;
     onDelete?: (collectionId: string) => void | Promise<void>;
   } = $props();
@@ -128,8 +130,6 @@
   let headers = $state<KVRow[]>([]);
   let variables = $state<KVRow[]>([]);
   let auth = $state<AuthState>(emptyCollectionDefaults().auth);
-  let preRequestScript = $state('');
-  let testScript = $state('');
   let preRequestScriptJs = $state('');
   let testScriptJs = $state('');
   let settings = $state<RequestSettings>(emptyCollectionDefaults().settings);
@@ -143,9 +143,6 @@
     return { value: environment.id, label: environment.name, hint: `${count} ${count === 1 ? 'variable' : 'variables'}`, color: environmentColorVar(environment) };
   }));
 
-  const engineLabel = $derived(scriptEngine === 'js' ? 'JavaScript' : 'Tengo');
-  const activePre = $derived(scriptEngine === 'js' ? preRequestScriptJs : preRequestScript);
-  const activeTest = $derived(scriptEngine === 'js' ? testScriptJs : testScript);
   let authMenuOpen = $state(false);
   let savingInFlight = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -217,8 +214,6 @@
       headers = restoreRows(folder.headers);
       variables = [];
       auth = { ...folder.auth };
-      preRequestScript = folder.preRequestScript;
-      testScript = folder.testScript;
       preRequestScriptJs = folder.preRequestScriptJs;
       testScriptJs = folder.testScriptJs;
       return;
@@ -229,8 +224,6 @@
     headers = restoreRows(defaults.headers);
     variables = restoreRows(defaults.variables);
     auth = { ...defaults.auth };
-    preRequestScript = defaults.preRequestScript;
-    testScript = defaults.testScript;
     preRequestScriptJs = defaults.preRequestScriptJs;
     testScriptJs = defaults.testScriptJs;
     settings = { ...defaults.settings };
@@ -265,14 +258,9 @@
     return target instanceof HTMLInputElement ? Number(target.value) : 0;
   }
 
-  async function pickCollectionCertFile(field: 'clientCertPath' | 'clientKeyPath') {
-    const path = await openFileDialog(field === 'clientCertPath' ? 'Select client certificate' : 'Select client key');
-    if (path) settings[field] = path;
-  }
-
-  function clearCollectionCertField(field: 'clientCertPath' | 'clientKeyPath') {
-    settings[field] = '';
-    if (field === 'clientCertPath') {
+  function setCollectionCertField(field: 'clientCertPath' | 'clientKeyPath', value: string) {
+    settings[field] = value;
+    if (field === 'clientCertPath' && !value) {
       settings.clientKeyPath = '';
       settings.clientKeyPassword = '';
     }
@@ -283,8 +271,6 @@
       headers: cloneRowsForStore(headers),
       variables: cloneRowsForStore(variables),
       auth,
-      preRequestScript,
-      testScript,
       preRequestScriptJs,
       testScriptJs,
       settings,
@@ -297,8 +283,6 @@
       path: [...folderPath],
       headers: cloneRowsForStore(headers),
       auth: { ...auth },
-      preRequestScript,
-      testScript,
       preRequestScriptJs,
       testScriptJs,
     };
@@ -350,8 +334,8 @@
     });
   }
 
-  async function save() {
-    if (!collection || savingInFlight) return;
+  export async function save() {
+    if (!collection || !draftDirty || workspaceBlocked || savingInFlight) return;
     pendingAutosave = null;
     if (autosaveTimer) {
       clearTimeout(autosaveTimer);
@@ -487,8 +471,8 @@
   const defaultRows = $derived.by((): Array<{ tab: CollectionSettingsTab; label: string; value: string; set: boolean }> => {
     const headerCount = activeCount(headers);
     const variableCount = activeCount(variables);
-    const preLines = scriptLineCount(activePre);
-    const testLines = scriptLineCount(activeTest);
+    const preLines = scriptLineCount(preRequestScriptJs);
+    const testLines = scriptLineCount(testScriptJs);
     const authSet = auth.type !== 'none' && auth.type !== 'inherit';
     return [
       { tab: 'headers', label: 'Headers', value: headerCount ? plural(headerCount, 'header') : 'None', set: headerCount > 0 },
@@ -511,8 +495,6 @@
         folderId = empty.id;
         headers = restoreRows([]);
         auth = { ...empty.auth };
-        preRequestScript = '';
-        testScript = '';
         preRequestScriptJs = '';
         testScriptJs = '';
         loadedFingerprint = incomingFingerprint(collection);
@@ -525,8 +507,6 @@
       headers = restoreRows(defaults.headers);
       variables = restoreRows(defaults.variables);
       auth = { ...defaults.auth };
-      preRequestScript = '';
-      testScript = '';
       preRequestScriptJs = '';
       testScriptJs = '';
       settings = { ...defaults.settings };
@@ -599,6 +579,7 @@
           {#if moreMenuOpen}
             <div class="menu request-menu env-more-menu" role="menu">
               {#if !isFolder}
+                <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => onBuildDocs(collection.id))}><MenuIcon name="docs" />Build documentation</button>
                 <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(() => onExport(collection.id))}><MenuIcon name="export" />Export…</button>
               {/if}
               <button class="menu-item" type="button" role="menuitem" onclick={() => runMenuAction(reset)}><MenuIcon name="restore" />Reset defaults</button>
@@ -622,8 +603,8 @@
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'vars'} aria-selected={collectionSettingsTab === 'vars'} tabindex={collectionSettingsTab === 'vars' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'vars')}>Vars{#if activeCount(variables) > 0}<span class="badge">{activeCount(variables)}</span>{/if}</button>
         {/if}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'auth'} aria-selected={collectionSettingsTab === 'auth'} tabindex={collectionSettingsTab === 'auth' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'auth')}>Auth{#if auth.type !== 'none' && auth.type !== 'inherit'}<span class="badge badge-on">On</span>{/if}</button>
-        <button class="tab" role="tab" class:active={collectionSettingsTab === 'script'} aria-selected={collectionSettingsTab === 'script'} tabindex={collectionSettingsTab === 'script' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'script')}>Script{#if scriptLineCount(activePre) > 0}<span class="badge badge-on">{scriptLineCount(activePre)} lines</span>{/if}</button>
-        <button class="tab" role="tab" class:active={collectionSettingsTab === 'tests'} aria-selected={collectionSettingsTab === 'tests'} tabindex={collectionSettingsTab === 'tests' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'tests')}>Tests{#if scriptLineCount(activeTest) > 0}<span class="badge badge-on">{scriptLineCount(activeTest)} lines</span>{/if}</button>
+        <button class="tab" role="tab" class:active={collectionSettingsTab === 'script'} aria-selected={collectionSettingsTab === 'script'} tabindex={collectionSettingsTab === 'script' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'script')}>Script{#if scriptLineCount(preRequestScriptJs) > 0}<span class="badge badge-on">{scriptLineCount(preRequestScriptJs)} lines</span>{/if}</button>
+        <button class="tab" role="tab" class:active={collectionSettingsTab === 'tests'} aria-selected={collectionSettingsTab === 'tests'} tabindex={collectionSettingsTab === 'tests' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'tests')}>Tests{#if scriptLineCount(testScriptJs) > 0}<span class="badge badge-on">{scriptLineCount(testScriptJs)} lines</span>{/if}</button>
         {#if !isFolder}
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'proxy'} aria-selected={collectionSettingsTab === 'proxy'} tabindex={collectionSettingsTab === 'proxy' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'proxy')}>Proxy</button>
         <button class="tab" role="tab" class:active={collectionSettingsTab === 'openapi'} aria-selected={collectionSettingsTab === 'openapi'} tabindex={collectionSettingsTab === 'openapi' ? 0 : -1} type="button" onclick={() => (collectionSettingsTab = 'openapi')}>OpenAPI{#if vm.openApiHasUpdates(collection.id)}<span class="badge badge-on">{vm.openApiStatus(collection.id).pending}</span>{:else if collection.openapi}<span class="badge">On</span>{/if}</button>
@@ -797,17 +778,17 @@
             <div class="auth-fields">
               {#if auth.type === 'bearer'}
                 <label class="field-label" for="collection-bearer-token">Token</label>
-                <VariableInput id="collection-bearer-token" className="field field-input field-mono" bind:value={auth.bearerToken} suggestions={variableSuggestions} placeholder="Bearer token" type={isVariableReferenceOnly(auth.bearerToken) ? 'text' : 'password'} />
+                <SecretInput id="collection-bearer-token" className="field field-input field-mono" bind:value={auth.bearerToken} suggestions={variableSuggestions} placeholder="Bearer token" />
               {:else if auth.type === 'basic' || auth.type === 'digest' || auth.type === 'ntlm'}
                 <label class="field-label" for="collection-auth-user">Username</label>
                 <VariableInput id="collection-auth-user" className="field field-input" bind:value={auth.basicUser} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-auth-pass">Password</label>
-                <VariableInput id="collection-auth-pass" className="field field-input" bind:value={auth.basicPass} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.basicPass) ? 'text' : 'password'} />
+                <SecretInput id="collection-auth-pass" className="field field-input" bind:value={auth.basicPass} suggestions={variableSuggestions} />
               {:else if auth.type === 'apikey'}
                 <label class="field-label" for="collection-apikey-name">Key name</label>
                 <VariableInput id="collection-apikey-name" className="field field-input" bind:value={auth.apiKeyName} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-apikey-value">Key value</label>
-                <VariableInput id="collection-apikey-value" className="field field-input field-mono" bind:value={auth.apiKeyValue} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.apiKeyValue) ? 'text' : 'password'} />
+                <SecretInput id="collection-apikey-value" className="field field-input field-mono" bind:value={auth.apiKeyValue} suggestions={variableSuggestions} />
                 <span class="field-label">Add to</span>
                 <div class="segmented radio-group" role="radiogroup">
                   <label class="segmented-item radio-label"><input type="radio" bind:group={auth.apiKeyIn} value="header" /> Header</label>
@@ -819,7 +800,7 @@
                 <label class="field-label" for="collection-oauth-id">Client ID</label>
                 <VariableInput id="collection-oauth-id" className="field field-input" bind:value={auth.oauth2ClientID} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-oauth-secret">Client secret</label>
-                <VariableInput id="collection-oauth-secret" className="field field-input" bind:value={auth.oauth2Secret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth2Secret) ? 'text' : 'password'} />
+                <SecretInput id="collection-oauth-secret" className="field field-input" bind:value={auth.oauth2Secret} suggestions={variableSuggestions} />
                 <label class="field-label" for="collection-oauth-scope">Scope</label>
                 <VariableInput id="collection-oauth-scope" className="field field-input" bind:value={auth.oauth2Scope} suggestions={variableSuggestions} />
               {:else if auth.type === 'oauth1'}
@@ -838,13 +819,13 @@
                   </div>
                   <div><label class="field-label" for="collection-oauth1-key">Consumer key</label><VariableInput id="collection-oauth1-key" className="field field-input field-mono" bind:value={auth.oauth1ConsumerKey} suggestions={variableSuggestions} /></div>
                   {#if (auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
-                    <div class="auth-grid-span"><label class="field-label" for="collection-oauth1-private-key">Private key (PEM)</label><textarea id="collection-oauth1-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.oauth1PrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
+                    <div class="auth-grid-span"><label class="field-label" for="collection-oauth1-private-key">Private key (PEM)</label><SecretInput id="collection-oauth1-private-key" className="field field-input field-mono oauth2-key-input" bind:value={auth.oauth1PrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" multiline /></div>
                   {:else}
-                    <div><label class="field-label" for="collection-oauth1-secret">Consumer secret</label><VariableInput id="collection-oauth1-secret" className="field field-input field-mono" bind:value={auth.oauth1ConsumerSecret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth1ConsumerSecret) ? 'text' : 'password'} /></div>
+                    <div><label class="field-label" for="collection-oauth1-secret">Consumer secret</label><SecretInput id="collection-oauth1-secret" className="field field-input field-mono" bind:value={auth.oauth1ConsumerSecret} suggestions={variableSuggestions} /></div>
                   {/if}
-                  <div><label class="field-label" for="collection-oauth1-token">Access token</label><VariableInput id="collection-oauth1-token" className="field field-input field-mono" bind:value={auth.oauth1Token} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth1Token) ? 'text' : 'password'} /></div>
+                  <div><label class="field-label" for="collection-oauth1-token">Access token</label><SecretInput id="collection-oauth1-token" className="field field-input field-mono" bind:value={auth.oauth1Token} suggestions={variableSuggestions} /></div>
                   {#if !(auth.oauth1SignatureMethod ?? '').startsWith('RSA-')}
-                    <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><VariableInput id="collection-oauth1-token-secret" className="field field-input field-mono" bind:value={auth.oauth1TokenSecret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.oauth1TokenSecret) ? 'text' : 'password'} /></div>
+                    <div><label class="field-label" for="collection-oauth1-token-secret">Token secret</label><SecretInput id="collection-oauth1-token-secret" className="field field-input field-mono" bind:value={auth.oauth1TokenSecret} suggestions={variableSuggestions} /></div>
                   {/if}
                   <div><label class="field-label" for="collection-oauth1-realm">Realm</label><VariableInput id="collection-oauth1-realm" className="field field-input" bind:value={auth.oauth1Realm} suggestions={variableSuggestions} /></div>
                 </div>
@@ -865,11 +846,11 @@
                   {#if jwtAlgorithmUsesSecret(auth.jwtAlgorithm)}
                     <div class="auth-grid-span">
                       <label class="field-label" for="collection-jwt-secret">Secret</label>
-                      <VariableInput id="collection-jwt-secret" className="field field-input field-mono" bind:value={auth.jwtSecret} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.jwtSecret) ? 'text' : 'password'} />
+                      <SecretInput id="collection-jwt-secret" className="field field-input field-mono" bind:value={auth.jwtSecret} suggestions={variableSuggestions} />
                       <label class="check-label jwt-secret-base64"><input class="check" type="checkbox" bind:checked={auth.jwtSecretBase64} /> Secret is base64-encoded</label>
                     </div>
                   {:else}
-                    <div class="auth-grid-span"><label class="field-label" for="collection-jwt-private-key">Private key (PEM)</label><textarea id="collection-jwt-private-key" class="field field-input field-mono oauth2-key-input" bind:value={auth.jwtPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" spellcheck="false"></textarea></div>
+                    <div class="auth-grid-span"><label class="field-label" for="collection-jwt-private-key">Private key (PEM)</label><SecretInput id="collection-jwt-private-key" className="field field-input field-mono oauth2-key-input" bind:value={auth.jwtPrivateKey} placeholder="-----BEGIN PRIVATE KEY-----" multiline /></div>
                   {/if}
                   {#if auth.jwtAddTo === 'query'}
                     <div><label class="field-label" for="collection-jwt-query-param">Query parameter</label><VariableInput id="collection-jwt-query-param" className="field field-input field-mono" bind:value={auth.jwtQueryParam} suggestions={variableSuggestions} placeholder="token" /></div>
@@ -888,8 +869,8 @@
                 </div>
               {:else if auth.type === 'aws'}
                 <div class="auth-grid-2">
-                  <div><label class="field-label" for="collection-aws-key">Access key ID</label><VariableInput id="collection-aws-key" className="field field-input field-mono" bind:value={auth.awsAccessKey} suggestions={variableSuggestions} /></div>
-                  <div><label class="field-label" for="collection-aws-secret">Secret access key</label><VariableInput id="collection-aws-secret" className="field field-input field-mono" bind:value={auth.awsSecretKey} suggestions={variableSuggestions} type={isVariableReferenceOnly(auth.awsSecretKey) ? 'text' : 'password'} /></div>
+                  <div><label class="field-label" for="collection-aws-key">Access key ID</label><SecretInput id="collection-aws-key" className="field field-input field-mono" bind:value={auth.awsAccessKey} suggestions={variableSuggestions} visible /></div>
+                  <div><label class="field-label" for="collection-aws-secret">Secret access key</label><SecretInput id="collection-aws-secret" className="field field-input field-mono" bind:value={auth.awsSecretKey} suggestions={variableSuggestions} /></div>
                   <div><label class="field-label" for="collection-aws-region">Region</label><VariableInput id="collection-aws-region" className="field field-input" bind:value={auth.awsRegion} suggestions={variableSuggestions} /></div>
                   <div><label class="field-label" for="collection-aws-service">Service</label><VariableInput id="collection-aws-service" className="field field-input" bind:value={auth.awsService} suggestions={variableSuggestions} /></div>
                 </div>
@@ -904,21 +885,13 @@
           </div>
         {:else if collectionSettingsTab === 'script'}
           <div class="script-section collection-script-section">
-            <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after the collection and parent folder scripts, before each request’s own pre-request script' : 'runs before each request\'s own pre-request script'}</span></div>
-            {#if scriptEngine === 'js'}
-              <CodeEditor bind:value={preRequestScriptJs} language="javascript" placeholder={'// Collection pre-request script (JavaScript) pm.variables.set("traceId", "kurlo-001")'} fillHeight />
-            {:else}
-              <CodeEditor bind:value={preRequestScript} language="javascript" placeholder={'// Collection pre-request script (Tengo) pm.variables.set("traceId", "kurlo-001")'} fillHeight />
-            {/if}
+            <div class="script-head"><span class="script-hint">JavaScript · {isFolder ? 'runs after the collection and parent folder scripts, before each request’s own pre-request script' : 'runs before each request\'s own pre-request script'}</span></div>
+            <ScriptEditor bind:value={preRequestScriptJs} {collection} ariaLabel="Pre-request script editor" placeholder={'pm.variables.set("traceId", "kurlo-001")'} />
           </div>
         {:else if collectionSettingsTab === 'tests'}
           <div class="script-section collection-script-section">
-            <div class="script-head"><span class="script-hint">{engineLabel} · {isFolder ? 'runs after each request’s own test script, before the parent folder and collection tests' : 'runs after each request\'s own test script, after the response arrives'}</span></div>
-            {#if scriptEngine === 'js'}
-              <CodeEditor bind:value={testScriptJs} language="javascript" placeholder={'// Collection test script (JavaScript) pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} fillHeight />
-            {:else}
-              <CodeEditor bind:value={testScript} language="javascript" placeholder={'// Collection test script (Tengo) pm.test("No server error", pm.response.code < 500)'} fillHeight />
-            {/if}
+            <div class="script-head"><span class="script-hint">JavaScript · {isFolder ? 'runs after each request’s own test script, before the parent folder and collection tests' : 'runs after each request\'s own test script, after the response arrives'}</span></div>
+            <ScriptEditor bind:value={testScriptJs} {collection} tests ariaLabel="Test script editor" placeholder={'pm.test("No server error", () => pm.expect(pm.response.code).to.be.below(500))'} />
           </div>
         {:else if collectionSettingsTab === 'openapi'}
           <OpenApiSyncPanel {collection} {workspaceBlocked} />
@@ -965,34 +938,36 @@
                 <div class="client-cert-fields">
                   <div class="client-cert-row">
                     <span class="client-cert-label">Certificate (CRT/PEM)</span>
-                    {#if settings.clientCertPath}
-                      <span class="client-cert-path">{settings.clientCertPath}</span>
-                      <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientCertPath')}>Clear</button>
-                    {:else}
-                      <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientCertPath')}>Choose file…</button>
-                    {/if}
+                    <FilePathField
+                      value={settings.clientCertPath}
+                      keepAbsolute
+                      ariaLabel="Client certificate path"
+                      placeholder="/path/to/client.pem"
+                      dialogTitle="Select client certificate"
+                      suggestions={variableSuggestions}
+                      onchange={(path) => setCollectionCertField('clientCertPath', path)}
+                    />
                   </div>
                   <div class="client-cert-row">
                     <span class="client-cert-label">Private key (optional)</span>
-                    {#if settings.clientKeyPath}
-                      <span class="client-cert-path">{settings.clientKeyPath}</span>
-                      <button class="btn btn-secondary" type="button" onclick={() => clearCollectionCertField('clientKeyPath')}>Clear</button>
-                    {:else}
-                      <button class="btn btn-secondary" type="button" onclick={() => pickCollectionCertFile('clientKeyPath')} disabled={!settings.clientCertPath}>Choose file…</button>
-                    {/if}
+                    <FilePathField
+                      value={settings.clientKeyPath}
+                      keepAbsolute
+                      disabled={!settings.clientCertPath}
+                      ariaLabel="Private key path"
+                      placeholder="/path/to/client.key"
+                      dialogTitle="Select client key"
+                      suggestions={variableSuggestions}
+                      onchange={(path) => setCollectionCertField('clientKeyPath', path)}
+                    />
                   </div>
                   <div class="client-cert-row">
                     <span class="client-cert-label">Key passphrase</span>
-                    <input
-                      class="field field-input client-cert-pass"
-                      type="password"
+                    <SecretInput
+                      className="field field-input client-cert-pass"
                       placeholder="Leave blank if the key is unencrypted"
-                      autocomplete="off"
-                      spellcheck="false"
                       bind:value={settings.clientKeyPassword}
                       disabled={!settings.clientCertPath}
-                      autocorrect="off"
-                      autocapitalize="none"
                     />
                   </div>
                   <p class="client-cert-hint">The key file defaults to the certificate file when left blank (combined PEM). Use <code>&#123;&#123;variable&#125;&#125;</code> in the passphrase to keep it in workspace secrets.</p>

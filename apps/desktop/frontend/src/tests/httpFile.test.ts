@@ -138,13 +138,13 @@ GET {{host}}/items
       ['Me', 'GET', '{{host}}/me'],
       ['Items', 'GET', '{{host}}/items'],
     ]);
-    expect(requests[0].preRequestScript).toBe('request.variables.set("ts", Date.now());');
+    expect(requests[0].preRequestScriptJs).toBe('request.variables.set("ts", Date.now());');
     expect(requests[0].bodyContent).toBe('{"user": "a"}');
-    expect(requests[0].testScript).toBe('client.global.set("token", response.body.token);\nclient.test("ok", () => client.assert(response.status === 200));');
-    expect(requests[1].preRequestScript).toBe('request.variables.set("x", "1")');
+    expect(requests[0].testScriptJs).toBe('client.global.set("token", response.body.token);\nclient.test("ok", () => client.assert(response.status === 200));');
+    expect(requests[1].preRequestScriptJs).toBe('request.variables.set("x", "1")');
     expect(requests[1].headers.map(header => header.key)).toEqual(['Authorization']);
     expect(requests[1].bodyType).toBe('none');
-    expect(requests[2].testScript).toBe('client.log(response.status)');
+    expect(requests[2].testScriptJs).toBe('client.log(response.status)');
     expect(requests[2].bodyType).toBe('none');
     expect(requests.map(request => request.requestNotes)).toEqual(['', '', '']);
   });
@@ -166,7 +166,7 @@ Content-Type: application/json
 <> ./order.previous.json
 `);
     expect(requests[0].bodyContent).toBe('{\n  "id": 1\n}');
-    expect(requests[0].testScript).toBe('client.test("created", function () {\n    client.assert(response.status === 201, "expected 201");\n});');
+    expect(requests[0].testScriptJs).toBe('client.test("created", function () {\n    client.assert(response.status === 201, "expected 201");\n});');
     expect(requests[0].requestNotes).toContain('./order.json');
   });
 

@@ -42,7 +42,7 @@ const DYNAMIC = {
   "$guid": uuid,
 };
 
-const vu = {};
+const vu = Object.create(null);
 const done = {};
 let row = {};
 
@@ -52,16 +52,16 @@ function env(name, depth) {
 }
 
 function lookup(name, depth) {
-  if (name in vu) return vu[name] === undefined ? undefined : String(vu[name]);
-  if (name in row) return String(row[name]);
-  if (name in DYNAMIC) return DYNAMIC[name]();
+  if (vu[name] !== undefined) return String(vu[name]);
+  if (Object.prototype.hasOwnProperty.call(row, name)) return String(row[name]);
+  if (Object.prototype.hasOwnProperty.call(DYNAMIC, name)) return DYNAMIC[name]();
   return env(name, depth);
 }
 
 function t(text, depth = 0) {
   if (depth > 10) return text;
   return text.replace(/\{\{([^{}]*)\}\}/g, (match, key) => {
-    const value = lookup(key.trim(), depth);
+    const value = lookup(key.trim().replace(/^vault:\s*/, ''), depth);
     return value === undefined ? match : value;
   });
 }
@@ -73,10 +73,15 @@ function uuid() {
   });
 }
 
+function pathSegment(value) {
+  return value.replace(/%[0-9a-fA-F]{2}|[^a-zA-Z0-9._~!$&'()*+,;=:@{}-]/gu, c => c.length === 3 && c[0] === '%' ? c : encodeURIComponent(c));
+}
+
 function q(url, pairs) {
   const query = pairs.map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value)).join('&');
   if (!query) return url;
-  return url + (url.includes('?') ? '&' : '?') + query;
+  const [base, ...fragment] = url.split('#');
+  return base + (base.includes('?') ? '&' : '?') + query + (fragment.length ? '#' + fragment.join('#') : '');
 }
 
 function jsonAt(res, path) {
@@ -108,7 +113,7 @@ export default function () {
   });
   sleep(0.5 + Math.random() * 1);
   group("order_details", () => {
-    const res = http.request("GET", t("{{baseUrl}}/orders/{{orderId}}"), null, { headers: { "Authorization": t("Bearer {{token}}") }, tags: { step: "order_details" }, timeout: "10s" });
+    const res = http.request("GET", (t("{{baseUrl}}/orders/") + pathSegment(t("{{orderId}}"))), null, { headers: { "Authorization": t("Bearer {{token}}") }, tags: { step: "order_details" }, timeout: "10s" });
   });
   group("create_order", () => {
     const res = http.request("POST", t("{{baseUrl}}/graphql"), "{\"query\":\"mutation { createOrder { id } }\"}", { headers: { "Content-Type": "application/json", "Authorization": t("Bearer {{token}}") }, tags: { step: "create_order" }, timeout: "10s" });

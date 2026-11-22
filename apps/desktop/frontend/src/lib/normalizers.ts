@@ -1,10 +1,10 @@
+import { resolveFormRequestTab } from './requestTabPreferences';
 import type {
     Collection,
     Environment,
     KVRow,
     Method,
     RequestHistoryEntry,
-    RequestTab,
     RequestType,
     SavedRequest,
     SIOArg,
@@ -26,6 +26,7 @@ import { normalizeCollectionFolderPaths } from './collections';
 import { normalizeCollectionEnvironmentPins } from './collectionEnvironments';
 import { normalizeEnvironmentColor } from './environmentColors';
 import { normalizeOpenApiSource } from './openapiSource';
+import { normalizeSecretSources } from './linkedSecrets';
 import { defaultSocketIOArgs, requestBodyDefaultsFor } from './requestBodyDefaults';
 import {
     asText,
@@ -74,7 +75,7 @@ const ENTITY_STRINGS = ['id', 'name', 'filesystemName', 'description', 'workspac
 const REQUEST_FIELDS: FieldTypes = {
     strings: [
         ...ENTITY_STRINGS, 'collectionId', 'collection', 'method', 'url', 'requestTab', 'requestType', 'bodyType', 'rawBodyType',
-        'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema', 'preRequestScript', 'testScript',
+        'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema',
         'preRequestScriptJs', 'testScriptJs', 'requestNotes', 'sioEventName', 'grpcMethod', 'grpcProtoFilePath',
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
         'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId', 'openapi',
@@ -84,13 +85,25 @@ const REQUEST_FIELDS: FieldTypes = {
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
 
-function normalizeRequestType(input: Partial<SavedRequest>): RequestType {
+const managedRequestFields = new Set([
+    ...Object.values(REQUEST_FIELDS).flat(),
+    'preRequestScript', 'testScript',
+    'exampleCount', 'workspaceDiagnostics', 'isInvalid', 'isPinned', '__proto__', 'prototype', 'constructor',
+]);
+
+export function extraRequestFileFields(request?: Partial<SavedRequest>): Record<string, unknown> {
+    if (!request) return {};
+    return Object.fromEntries(Object.entries(request).filter(([key]) => !managedRequestFields.has(key)));
+}
+
+export function normalizeRequestType(input: { requestType?: string; bodyType?: string; url?: string }): RequestType {
     if (input.requestType === 'mcp') return 'mcp';
     if (input.requestType === 'ai') return 'ai';
     if (input.requestType === 'grpc') return 'grpc';
     if (input.requestType === 'socketio') return 'socketio';
     if (input.requestType === 'ws') return 'ws';
     if (input.requestType === 'graphql' || input.bodyType === 'graphql') return 'graphql';
+    if (input.requestType === 'http') return 'http';
     return /^wss?:\/\//i.test(input.url || '') ? 'ws' : 'http';
 }
 
@@ -192,7 +205,8 @@ export function normalizeCollection(raw: Partial<Collection>, workspaceId: strin
 }
 
 export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: string): Environment {
-    const input = sanitizeFields(raw, { strings: [...ENTITY_STRINGS, 'parentId'], booleans: ['protected', 'sandbox'], arrays: ['values'] });
+    const input = sanitizeFields(raw, { strings: [...ENTITY_STRINGS, 'parentId'], booleans: ['protected', 'sandbox'], arrays: ['values', 'secretSources'] });
+    const secretSources = normalizeSecretSources(input.secretSources);
     const id = input.id || newEntityId('environment');
     const parentId = input.parentId?.trim() ?? '';
     const color = normalizeEnvironmentColor(input.color);
@@ -207,6 +221,7 @@ export function normalizeEnvironment(raw: Partial<Environment>, workspaceId: str
         ...(input.sandbox ? { sandbox: true } : {}),
         ...(parentId && parentId !== id ? { parentId } : {}),
         ...(color ? { color } : {}),
+        ...(secretSources.length ? { secretSources } : {}),
     };
 }
 
@@ -224,28 +239,11 @@ export function normalizeSavedRequest(
         || '';
     const collectionName = collections.find(c => c.id === collectionId)?.name || DEFAULT_COLLECTION;
     const normalizedRequestType = normalizeRequestType(input);
-    const isRealtime = normalizedRequestType === 'ws' || normalizedRequestType === 'socketio';
     const isGraphQL = normalizedRequestType === 'graphql';
     const isGrpc = normalizedRequestType === 'grpc';
     const isMcp = normalizedRequestType === 'mcp';
     const isAi = normalizedRequestType === 'ai';
     const bodyDefaults = requestBodyDefaultsFor(normalizedRequestType);
-    const rawRequestTab = input.requestTab || (isMcp || isAi ? 'body' : isGrpc ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params');
-    const requestTab = isGraphQL && !['docs', 'query', 'auth', 'headers', 'vars', 'schema', 'scripts'].includes(rawRequestTab)
-        ? 'query'
-        : isMcp && !['docs', 'body', 'auth', 'headers', 'vars', 'scripts', 'settings', 'examples'].includes(rawRequestTab)
-        ? 'body'
-        : isAi && !['docs', 'body', 'auth', 'headers', 'vars', 'tools', 'scripts', 'settings'].includes(rawRequestTab)
-        ? 'body'
-        : !isAi && rawRequestTab === 'tools'
-        ? 'params'
-        : isGrpc && !['docs', 'body', 'auth', 'metadata', 'vars', 'service', 'scripts', 'settings'].includes(rawRequestTab)
-        ? 'body'
-        : isRealtime && ['scripts', 'query', 'schema'].includes(rawRequestTab)
-        ? 'body'
-        : (input.method ?? '').toUpperCase() === 'SSE' && ['scripts', 'query', 'schema'].includes(rawRequestTab)
-        ? 'params'
-        : rawRequestTab;
     const realtimeLabel = normalizedRequestType === 'ai' ? 'AI' : normalizedRequestType === 'mcp' ? 'MCP' : normalizedRequestType === 'grpc' ? 'gRPC' : normalizedRequestType === 'socketio' ? 'Socket.IO' : normalizedRequestType === 'ws' ? 'WS' : normalizedRequestType === 'graphql' ? 'GraphQL' : '';
     const normalizedName = input.name || requestTitleFrom(realtimeLabel || (input.method || 'GET'), input.url || '');
     const folderPath = Array.isArray(input.folderPath) ? input.folderPath.map(asText).filter(Boolean) : [];
@@ -261,6 +259,7 @@ export function normalizeSavedRequest(
     const settingsOverrides = normalizeRequestSettingsOverrides(input.settingsOverrides as RequestSettingsOverrides | undefined, settings, inheritedSettings);
     const normalizedExamples = normalizeRequestExamples(input.examples, id);
     return {
+        ...extraRequestFileFields(input),
         id,
         name: normalizedName,
         filesystemName: filesystemNameFromName(input.filesystemName || normalizedName, id),
@@ -273,7 +272,7 @@ export function normalizeSavedRequest(
         folderPath,
         method: (isGraphQL || isGrpc || isAi ? 'POST' : input.method || 'GET') as Method,
         url: input.url || '',
-        requestTab: requestTab as RequestTab,
+        requestTab: resolveFormRequestTab(normalizedRequestType, input.method, input.requestTab),
         params: cloneRowsForStore(input.params ?? []),
         pathParams: cloneRowsForStore(input.pathParams ?? []),
         headers: cloneRowsForStore(input.headers ?? []),
@@ -287,8 +286,6 @@ export function normalizeSavedRequest(
         bodyFileName: input.bodyFileName || bodyDefaults.bodyFileName,
         formRows: cloneRowsForStore(input.formRows ?? bodyDefaults.formRows),
         graphqlSchema: input.graphqlSchema || '',
-        preRequestScript: input.preRequestScript || '',
-        testScript: input.testScript || '',
         preRequestScriptJs: input.preRequestScriptJs || '',
         testScriptJs: input.testScriptJs || '',
         requestNotes: input.requestNotes || '',

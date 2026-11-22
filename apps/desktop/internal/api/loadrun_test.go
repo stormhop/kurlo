@@ -109,7 +109,7 @@ func TestLoadRunWithRealK6(t *testing.T) {
 	}
 	waitForLoadRun(t, app, 60*time.Second)
 
-	result := app.LastLoadRun("lt-run")
+	result := app.LastLoadRun("col", "lt-run")
 	if result.Status != "passed" || result.ExitCode != 0 {
 		t.Fatalf("the run should pass: %+v\n%s", result, strings.Join(app.LoadRunLog(), "\n"))
 	}
@@ -122,7 +122,7 @@ func TestLoadRunWithRealK6(t *testing.T) {
 	if len(result.Thresholds) != 2 || !result.Thresholds[0].Ok || !result.Thresholds[1].Ok || result.Thresholds[1].StepID != "st-orders" {
 		t.Errorf("thresholds = %+v", result.Thresholds)
 	}
-	if !result.HasSummary || app.LoadRunSummaryJSON("lt-run") == "" {
+	if !result.HasSummary || app.LoadRunSummaryJSON("col", "lt-run") == "" {
 		t.Error("the k6 summary should be kept with the result")
 	}
 	mu.Lock()
@@ -161,7 +161,7 @@ func TestStopLoadRunWithRealK6(t *testing.T) {
 		t.Errorf("stop should be acknowledged: %+v", stopping)
 	}
 	waitForLoadRun(t, app, 30*time.Second)
-	result := app.LastLoadRun("lt-run")
+	result := app.LastLoadRun("col", "lt-run")
 	if result.Status != "stopped" || !result.HasSummary {
 		t.Fatalf("a stopped run keeps its summary: %+v", result)
 	}
@@ -178,10 +178,10 @@ func TestStartLoadRunRefusesBrokenTestsAndMissingK6(t *testing.T) {
 	if state := app.StartLoadRun(valid, "/no/k6"); state.Running || state.Error == "" {
 		t.Errorf("a missing k6 must be reported: %+v", state)
 	}
-	if result := app.LastLoadRun("never-ran"); result.LoadTestID != "" || result.Steps == nil {
+	if result := app.LastLoadRun("col", "never-ran"); result.LoadTestID != "" || result.Steps == nil {
 		t.Errorf("no result yet: %+v", result)
 	}
-	if message := app.OpenLoadRunReport("never-ran"); message == "" {
+	if message := app.OpenLoadRunReport("col", "never-ran"); message == "" {
 		t.Error("a missing report should be explained")
 	}
 	if loadRunDir("../escape") == loadRunDir("..") || strings.Contains(loadRunDir("../escape"), "..") {

@@ -25,7 +25,7 @@ The first argument is the workspace directory (the folder that contains `kurlo.y
 - **Variable chaining**: a value a test writes with `pm.environment.set(...)` is visible to later requests in the same run, so a login step can hand a token to the requests after it.
 - **Browser checks**: a request with [browser emulation](/docs/guides/browser-security/) turned on, by itself or through its collection, is sent the way the browser would send it, and a CORS or CSP refusal fails the run. Keep it on for the requests your frontend makes, and CI catches a CORS change before the frontend ships.
 
-A request can keep both JavaScript and Tengo scripts. `kurlo run` runs the JavaScript fields when either is present; the app runs the engine selected in **Settings → General → Script engine**, because the workspace file does not record that choice.
+`kurlo run` runs the JavaScript pre-request and test scripts saved on the request and inherited from its folder and collection.
 
 `kurlo run` skips SSE, WebSocket, Socket.IO, gRPC, MCP, and AI requests. Use the [desktop Collection Runner](/docs/guides/collection-runner/) for gRPC. A request whose pre-request script calls `pm.execution.skipRequest()` is reported as skipped and does not fail the run.
 

@@ -86,10 +86,6 @@ func (a *App) LoadTestTargets(payload string) []string {
 }
 
 func loadTestHosts(plan loadtest.Plan) []string {
-	values := map[string]string{}
-	for _, variable := range plan.Variables {
-		values[variable.Name] = variable.Value
-	}
 	seen := map[string]bool{}
 	hosts := []string{}
 	if len(plan.Test.Scenarios) == 0 {
@@ -100,7 +96,7 @@ func loadTestHosts(plan loadtest.Plan) []string {
 		if !ok {
 			continue
 		}
-		target := resolveTemplateValue(request.URL, values)
+		target := plan.RequestTarget(request)
 		host := target
 		if parsed, err := url.Parse(target); err == nil && parsed.Hostname() != "" {
 			host = parsed.Hostname()
@@ -121,6 +117,9 @@ func (a *App) StartLoadRun(payload, k6Path string) model.LoadRunState {
 	}
 	var decoded loadTestPayload
 	_ = json.Unmarshal([]byte(payload), &decoded)
+	if err := resolveLoadTestLinkedSecrets(&plan, decoded); err != nil {
+		return model.LoadRunState{Error: err.Error()}
+	}
 	return a.startLoadPlan(plan, decoded, k6Path)
 }
 
@@ -147,10 +146,14 @@ func (a *App) startLoadPlan(plan loadtest.Plan, decoded loadTestPayload, k6Path 
 	if err := loadtest.ValidateRunTargets(plan); err != nil {
 		return failed(err.Error())
 	}
-	for _, variable := range plan.Variables {
+	runtimeVariables := plan.RuntimeVariables()
+	for _, variable := range runtimeVariables {
 		if variable.Secret && strings.ContainsRune(variable.Value, '\x00') {
 			return failed(fmt.Sprintf("Secret variable %q contains a NUL byte. Remove it before running with k6.", variable.Name))
 		}
+	}
+	if plan.DataError != "" {
+		return failed("Cannot read test data: " + plan.DataError)
 	}
 	k6 := loadtest.FindK6(k6Path, hideCmdWindow)
 	if !k6.Found {
@@ -170,7 +173,7 @@ func (a *App) startLoadPlan(plan loadtest.Plan, decoded loadTestPayload, k6Path 
 		env = append(env, fmt.Sprintf("K6_WEB_DASHBOARD_PORT=%d", port))
 	}
 	var secrets []string
-	for _, variable := range plan.Variables {
+	for _, variable := range runtimeVariables {
 		if variable.Secret && variable.Value != "" && !strings.ContainsAny(variable.Name, "=\x00") {
 			env = append(env, variable.Name+"="+variable.Value)
 			secrets = append(secrets, variable.Value)
@@ -373,9 +376,31 @@ func lastErrorLine(lines []string, exitCode int) string {
 	return fmt.Sprintf("k6 ended with exit code %d.", exitCode)
 }
 
-func loadRunSnapshotPath(collectionID, testID string, startedAt int64) string {
+func loadRunStorageKey(collectionID, testID string) string {
 	key := sha256.Sum256([]byte(collectionID + "\x00" + testID))
-	return filepath.Join(requestStoreDir(), "loadrun-history", hex.EncodeToString(key[:]), fmt.Sprintf("%d.json", startedAt))
+	return hex.EncodeToString(key[:])
+}
+
+func scopedLoadRunDir(collectionID, testID string) string {
+	return filepath.Join(requestStoreDir(), "loadruns-by-collection", loadRunStorageKey(collectionID, testID))
+}
+
+func readableLoadRunDir(collectionID, testID string) string {
+	dir := scopedLoadRunDir(collectionID, testID)
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		return dir
+	}
+	legacy := loadRunDir(testID)
+	data, err := os.ReadFile(filepath.Join(legacy, loadRunResultFile))
+	var result model.LoadRunResult
+	if err == nil && json.Unmarshal(data, &result) == nil && result.CollectionID == collectionID && result.LoadTestID == testID {
+		return legacy
+	}
+	return dir
+}
+
+func loadRunSnapshotPath(collectionID, testID string, startedAt int64) string {
+	return filepath.Join(requestStoreDir(), "loadrun-history", loadRunStorageKey(collectionID, testID), fmt.Sprintf("%d.json", startedAt))
 }
 
 func saveLoadRun(result model.LoadRunResult, summary, report []byte) error {
@@ -390,7 +415,7 @@ func saveLoadRun(result model.LoadRunResult, summary, report []byte) error {
 	if err := writeFileAtomic(snapshot, data); err != nil {
 		return err
 	}
-	dir := loadRunDir(result.LoadTestID)
+	dir := scopedLoadRunDir(result.CollectionID, result.LoadTestID)
 	unlock, err := lockWorkspaceWrites(dir)
 	if err != nil {
 		return err
@@ -426,28 +451,28 @@ func (a *App) StopLoadRun() model.LoadRunState {
 	return a.loadRuns.state
 }
 
-func (a *App) LastLoadRun(loadTestID string) model.LoadRunResult {
-	data, err := os.ReadFile(filepath.Join(loadRunDir(loadTestID), loadRunResultFile))
+func (a *App) LastLoadRun(collectionID, loadTestID string) model.LoadRunResult {
+	data, err := os.ReadFile(filepath.Join(readableLoadRunDir(collectionID, loadTestID), loadRunResultFile))
 	if err != nil {
 		return model.LoadRunResult{Thresholds: []model.LoadRunThreshold{}, Steps: []model.LoadRunStep{}}
 	}
 	var result model.LoadRunResult
-	if err := json.Unmarshal(data, &result); err != nil || result.LoadTestID != loadTestID {
+	if err := json.Unmarshal(data, &result); err != nil || result.CollectionID != collectionID || result.LoadTestID != loadTestID {
 		return model.LoadRunResult{Thresholds: []model.LoadRunThreshold{}, Steps: []model.LoadRunStep{}}
 	}
 	return result
 }
 
-func (a *App) LoadRunSummaryJSON(loadTestID string) string {
-	data, err := os.ReadFile(filepath.Join(loadRunDir(loadTestID), loadRunSummary))
+func (a *App) LoadRunSummaryJSON(collectionID, loadTestID string) string {
+	data, err := os.ReadFile(filepath.Join(readableLoadRunDir(collectionID, loadTestID), loadRunSummary))
 	if err != nil {
 		return ""
 	}
 	return string(data)
 }
 
-func (a *App) OpenLoadRunReport(loadTestID string) string {
-	path := filepath.Join(loadRunDir(loadTestID), loadRunReportFile)
+func (a *App) OpenLoadRunReport(collectionID, loadTestID string) string {
+	path := filepath.Join(readableLoadRunDir(collectionID, loadTestID), loadRunReportFile)
 	if _, err := os.Stat(path); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "This run has no HTML report. k6 writes one only for runs long enough to chart."

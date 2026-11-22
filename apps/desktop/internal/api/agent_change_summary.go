@@ -25,8 +25,8 @@ var agentChangeHiddenFields = map[string]bool{
 var agentChangeLabels = map[string]string{
 	"name": "Name", "method": "Method", "url": "URL", "params": "Query params", "pathParams": "Path params",
 	"headers": "Headers", "auth": "Auth", "bodyType": "Body type", "rawBodyType": "Body format", "bodyContent": "Body",
-	"formRows": "Form fields", "bodyFilePath": "Body file", "testScriptJs": "Tests", "testScript": "Tests",
-	"preRequestScriptJs": "Pre-request script", "preRequestScript": "Pre-request script", "requestNotes": "Docs",
+	"formRows": "Form fields", "bodyFilePath": "Body file", "testScriptJs": "Tests",
+	"preRequestScriptJs": "Pre-request script", "requestNotes": "Docs",
 	"docs": "Docs", "description": "Description", "settings": "Settings", "settingsOverrides": "Settings",
 	"examples": "Examples", "values": "Variables", "protected": "Protected", "sandbox": "Sandbox for the agent", "color": "Color",
 	"parentId": "Parent environment", "savedMessages": "Saved messages", "assertions": "Assertions", "defaults": "Defaults", "folders": "Folders", "variables": "Variables",

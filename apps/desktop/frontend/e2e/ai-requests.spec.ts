@@ -265,6 +265,74 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(JSON.stringify(sent[0].http)).not.toContain('missingSecretKey');
   });
 
+  test('keeps a missing Kurlo vault reference out of the AI auth field', async ({ page }, testInfo) => {
+    const secretReference = '{{kurloSecret:request.ai-missing-secret.auth.bearerToken}}';
+    await installKurloBridge(page, '', 'darwin/e2e', false, {
+      activeId: 'ai-missing-secret',
+      openIds: ['ai-missing-secret'],
+      collections: [{ id: 'collection-e2e', workspaceId: 'workspace-e2e', name: 'Core API' }],
+      requests: [{
+        id: 'ai-missing-secret', name: 'AI request', collectionId: 'collection-e2e',
+        requestType: 'ai', requestTab: 'auth', method: 'POST', aiProvider: 'kurlo',
+        auth: { type: 'bearer', bearerToken: secretReference },
+      }],
+    });
+    await page.goto('/');
+
+    const token = page.locator('#bearer-token');
+    await expect(token).toHaveAttribute('placeholder', 'Secret unavailable on this device');
+    await expect(token).toHaveValue('');
+    await expect(page.getByRole('button', { name: 'Clear missing secret reference' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Decode', exact: true })).toBeDisabled();
+    await expect(page.locator('body')).not.toContainText(secretReference);
+    await expect.poll(() => page.evaluate(() =>
+      window.__kurloE2E.store.requests.find(request => request.id === 'ai-missing-secret')?.auth.bearerToken,
+    )).toBe(secretReference);
+    await page.screenshot({
+      path: join(tmpdir(), `kurlo-ai-missing-secret-${testInfo.project.name}.png`),
+      animations: 'disabled',
+    });
+
+    await token.click();
+    await expect(token).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(token).not.toBeFocused();
+    await expect(page.locator('body')).not.toContainText(secretReference);
+    await page.getByRole('tab', { name: /^Prompt/ }).click();
+    await fillCodeEditor(page, 'ai-prompt-editor', 'Keep the unavailable reference while editing another field');
+    await page.keyboard.press('Meta+s');
+    await expect.poll(() => page.evaluate(() =>
+      window.__kurloE2E.store.requests.find(request => request.id === 'ai-missing-secret')?.aiPrompt,
+    )).toBe('Keep the unavailable reference while editing another field');
+    await expect.poll(() => page.evaluate(() =>
+      window.__kurloE2E.store.requests.find(request => request.id === 'ai-missing-secret')?.auth.bearerToken,
+    )).toBe(secretReference);
+
+    await page.getByRole('tab', { name: /^Auth/ }).click();
+    await page.getByRole('button', { name: 'Clear missing secret reference' }).click();
+    await expect(token).toBeFocused();
+    await expect(token).toHaveValue('');
+    await expect(token).toHaveAttribute('placeholder', 'Enter bearer token');
+    await expect(page.getByRole('button', { name: 'Clear missing secret reference' })).toHaveCount(0);
+    await page.keyboard.press('Meta+s');
+    await expect.poll(() => page.evaluate(() =>
+      window.__kurloE2E.store.requests.find(request => request.id === 'ai-missing-secret')?.auth.bearerToken,
+    )).toBe('');
+
+    await page.reload();
+    await expect(token).toHaveAttribute('placeholder', 'Secret unavailable on this device');
+    await token.click();
+    await page.keyboard.type('{');
+    await expect(token).toBeFocused();
+    await page.keyboard.type('{userToken}}');
+    await expect(token).toHaveValue('{{userToken}}');
+    await page.keyboard.press('Meta+s');
+    await expect.poll(() => page.evaluate(() =>
+      window.__kurloE2E.store.requests.find(request => request.id === 'ai-missing-secret')?.auth.bearerToken,
+    )).toBe('{{userToken}}');
+    await expect(page.locator('body')).not.toContainText('ai-missing-secret');
+  });
+
   test('keeps the AI prompt and settings inside a narrow request panel', async ({ page }) => {
     await page.setViewportSize({ width: 1180, height: 470 });
     await installKurloBridge(page);

@@ -683,6 +683,126 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class RequestFileInfo {
+	    path: string;
+	    absolutePath: string;
+	    name: string;
+	    size: number;
+	    contentType: string;
+	    exists: boolean;
+	    insideWorkspace: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequestFileInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.absolutePath = source["absolutePath"];
+	        this.name = source["name"];
+	        this.size = source["size"];
+	        this.contentType = source["contentType"];
+	        this.exists = source["exists"];
+	        this.insideWorkspace = source["insideWorkspace"];
+	        this.error = source["error"];
+	    }
+	}
+	export class RequestFileYAMLResult {
+	    ok: boolean;
+	    id: string;
+	    path: string;
+	    content: string;
+	    revision: string;
+	    requestJson?: string;
+	    error?: string;
+	    line?: number;
+	    conflict?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new RequestFileYAMLResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.id = source["id"];
+	        this.path = source["path"];
+	        this.content = source["content"];
+	        this.revision = source["revision"];
+	        this.requestJson = source["requestJson"];
+	        this.error = source["error"];
+	        this.line = source["line"];
+	        this.conflict = source["conflict"];
+	    }
+	}
+	export class RunnerSecretCheck {
+	    requestId: string;
+	    http?: model.HttpRequest;
+	    grpc?: model.GrpcRequest;
+	
+	    static createFrom(source: any = {}) {
+	        return new RunnerSecretCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requestId = source["requestId"];
+	        this.http = this.convertValues(source["http"], model.HttpRequest);
+	        this.grpc = this.convertValues(source["grpc"], model.GrpcRequest);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class RunnerSecretCheckResult {
+	    requestId: string;
+	    failures: model.LinkedSecretFailure[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RunnerSecretCheckResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requestId = source["requestId"];
+	        this.failures = this.convertValues(source["failures"], model.LinkedSecretFailure);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SaveRequestStoreResult {
 	    ok: boolean;
 	    error?: string;
@@ -719,6 +839,357 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class SecretActionResult {
+	    ok: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretActionResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.error = source["error"];
+	    }
+	}
+	export class SecretBrowseResult {
+	    ok: boolean;
+	    kind?: string;
+	    message?: string;
+	    prefix: string;
+	    entries: secrets.Entry[];
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretBrowseResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.kind = source["kind"];
+	        this.message = source["message"];
+	        this.prefix = source["prefix"];
+	        this.entries = this.convertValues(source["entries"], secrets.Entry);
+	        this.durationMs = source["durationMs"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SecretEnvVariable {
+	    name: string;
+	    credential: string;
+	    saved: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretEnvVariable(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.credential = source["credential"];
+	        this.saved = source["saved"];
+	    }
+	}
+	export class SecretEnvExportResult {
+	    ok: boolean;
+	    error?: string;
+	    path?: string;
+	    variables: SecretEnvVariable[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretEnvExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.error = source["error"];
+	        this.path = source["path"];
+	        this.variables = this.convertValues(source["variables"], SecretEnvVariable);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class SecretImportInput {
+	    provider: string;
+	    path: string;
+	    version?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretImportInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.path = source["path"];
+	        this.version = source["version"];
+	    }
+	}
+	export class SecretImportKeys {
+	    provider: string;
+	    path: string;
+	    version?: string;
+	    keys: string[];
+	    loadedAt: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretImportKeys(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.path = source["path"];
+	        this.version = source["version"];
+	        this.keys = source["keys"];
+	        this.loadedAt = source["loadedAt"];
+	    }
+	}
+	export class SecretImportKeysResult {
+	    ok: boolean;
+	    kind?: string;
+	    message?: string;
+	    keys: string[];
+	    loadedAt: number;
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretImportKeysResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.kind = source["kind"];
+	        this.message = source["message"];
+	        this.keys = source["keys"];
+	        this.loadedAt = source["loadedAt"];
+	        this.durationMs = source["durationMs"];
+	    }
+	}
+	export class SecretProviderStatus {
+	    providerId: string;
+	    ok: boolean;
+	    kind?: string;
+	    message?: string;
+	    detail?: string;
+	    expiresInSeconds?: number;
+	    policies?: string[];
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretProviderStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.providerId = source["providerId"];
+	        this.ok = source["ok"];
+	        this.kind = source["kind"];
+	        this.message = source["message"];
+	        this.detail = source["detail"];
+	        this.expiresInSeconds = source["expiresInSeconds"];
+	        this.policies = source["policies"];
+	        this.durationMs = source["durationMs"];
+	    }
+	}
+	export class SecretProviderUsage {
+	    environmentId: string;
+	    environmentName: string;
+	    key: string;
+	    path: string;
+	    field?: string;
+	    import?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretProviderUsage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.environmentId = source["environmentId"];
+	        this.environmentName = source["environmentName"];
+	        this.key = source["key"];
+	        this.path = source["path"];
+	        this.field = source["field"];
+	        this.import = source["import"];
+	    }
+	}
+	export class SecretProviderView {
+	    id: string;
+	    type: string;
+	    name: string;
+	    config: Record<string, any>;
+	    valid: boolean;
+	    problem?: string;
+	    trusted: boolean;
+	    trustChanged: boolean;
+	    savedCredentials: string[];
+	    usedBy: SecretProviderUsage[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretProviderView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.config = source["config"];
+	        this.valid = source["valid"];
+	        this.problem = source["problem"];
+	        this.trusted = source["trusted"];
+	        this.trustChanged = source["trustChanged"];
+	        this.savedCredentials = source["savedCredentials"];
+	        this.usedBy = this.convertValues(source["usedBy"], SecretProviderUsage);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SecretProvidersResult {
+	    providers: SecretProviderView[];
+	    cachedValues: number;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretProvidersResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.providers = this.convertValues(source["providers"], SecretProviderView);
+	        this.cachedValues = source["cachedValues"];
+	        this.error = source["error"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SecretRefInput {
+	    provider: string;
+	    path: string;
+	    field?: string;
+	    version?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretRefInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.path = source["path"];
+	        this.field = source["field"];
+	        this.version = source["version"];
+	    }
+	}
+	export class SecretRefTestResult {
+	    ok: boolean;
+	    kind?: string;
+	    message?: string;
+	    length: number;
+	    fields: string[];
+	    durationMs: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretRefTestResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.kind = source["kind"];
+	        this.message = source["message"];
+	        this.length = source["length"];
+	        this.fields = source["fields"];
+	        this.durationMs = source["durationMs"];
+	    }
+	}
+	export class SecretRevealResult {
+	    value: string;
+	    kind?: string;
+	    message?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SecretRevealResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.value = source["value"];
+	        this.kind = source["kind"];
+	        this.message = source["message"];
+	    }
+	}
 	export class WorkspaceDiagnostic {
 	    scope: string;
 	    severity: string;
@@ -750,6 +1221,7 @@ export namespace api {
 	    }
 	}
 	export class WorkspaceLoadResult {
+	    root: string;
 	    payload: string;
 	    diagnostics: WorkspaceDiagnostic[];
 	    revision?: number;
@@ -760,6 +1232,7 @@ export namespace api {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.root = source["root"];
 	        this.payload = source["payload"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], WorkspaceDiagnostic);
 	        this.revision = source["revision"];
@@ -1830,6 +2303,28 @@ export namespace model {
 	    }
 	}
 	
+	export class LinkedSecretFailure {
+	    provider: string;
+	    path: string;
+	    field?: string;
+	    version?: string;
+	    kind: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LinkedSecretFailure(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.path = source["path"];
+	        this.field = source["field"];
+	        this.version = source["version"];
+	        this.kind = source["kind"];
+	        this.message = source["message"];
+	    }
+	}
 	export class TimelineEvent {
 	    label: string;
 	    atMs: number;
@@ -1978,6 +2473,7 @@ export namespace model {
 	    waitingTTFB: number;
 	    download: number;
 	    process: number;
+	    secrets?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new ResponseTime(source);
@@ -1994,6 +2490,7 @@ export namespace model {
 	        this.waitingTTFB = source["waitingTTFB"];
 	        this.download = source["download"];
 	        this.process = source["process"];
+	        this.secrets = source["secrets"];
 	    }
 	}
 	export class KeyValue {
@@ -2035,6 +2532,7 @@ export namespace model {
 	    skipped?: boolean;
 	    skipReason?: string;
 	    warnings?: string[];
+	    linkedSecretFailures?: LinkedSecretFailure[];
 	    browserHiddenHeaders?: string[];
 	    previewImageBase64?: string;
 	    previewMediaType?: string;
@@ -2071,6 +2569,7 @@ export namespace model {
 	        this.skipped = source["skipped"];
 	        this.skipReason = source["skipReason"];
 	        this.warnings = source["warnings"];
+	        this.linkedSecretFailures = this.convertValues(source["linkedSecretFailures"], LinkedSecretFailure);
 	        this.browserHiddenHeaders = source["browserHiddenHeaders"];
 	        this.previewImageBase64 = source["previewImageBase64"];
 	        this.previewMediaType = source["previewMediaType"];
@@ -2642,7 +3141,6 @@ export namespace model {
 	    preRequestScript: string;
 	    testScript: string;
 	    assertions?: Assertion[];
-	    scriptEngine: string;
 	    followRedirects: boolean;
 	    timeoutMs: number;
 	    name: string;
@@ -2723,7 +3221,6 @@ export namespace model {
 	        this.preRequestScript = source["preRequestScript"];
 	        this.testScript = source["testScript"];
 	        this.assertions = this.convertValues(source["assertions"], Assertion);
-	        this.scriptEngine = source["scriptEngine"];
 	        this.followRedirects = source["followRedirects"];
 	        this.timeoutMs = source["timeoutMs"];
 	        this.name = source["name"];
@@ -3405,6 +3902,7 @@ export namespace model {
 	}
 	export class GrpcRequest {
 	    requestId: string;
+	    workspaceId?: string;
 	    target: string;
 	    fullMethod: string;
 	    message: string;
@@ -3424,7 +3922,6 @@ export namespace model {
 	    timeoutMs: number;
 	    preRequestScript: string;
 	    testScript: string;
-	    scriptEngine: string;
 	    name: string;
 	    scriptTimeoutMs: number;
 	    allowSendRequest: boolean;
@@ -3442,6 +3939,7 @@ export namespace model {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.requestId = source["requestId"];
+	        this.workspaceId = source["workspaceId"];
 	        this.target = source["target"];
 	        this.fullMethod = source["fullMethod"];
 	        this.message = source["message"];
@@ -3461,7 +3959,6 @@ export namespace model {
 	        this.timeoutMs = source["timeoutMs"];
 	        this.preRequestScript = source["preRequestScript"];
 	        this.testScript = source["testScript"];
-	        this.scriptEngine = source["scriptEngine"];
 	        this.name = source["name"];
 	        this.scriptTimeoutMs = source["scriptTimeoutMs"];
 	        this.allowSendRequest = source["allowSendRequest"];
@@ -3719,6 +4216,7 @@ export namespace model {
 	        this.error = source["error"];
 	    }
 	}
+	
 	
 	export class LoadCheck {
 	    type: string;
@@ -4880,7 +5378,7 @@ export namespace model {
 }
 
 export namespace proxycapture {
-
+	
 	export class Config {
 	    port: number;
 	    include: string;
@@ -4890,11 +5388,11 @@ export namespace proxycapture {
 	    listenIP: string;
 	    clientIP: string;
 	    identifyProcess: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.port = source["port"];
@@ -4923,11 +5421,11 @@ export namespace proxycapture {
 	    received: number;
 	    sent: number;
 	    error?: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Entry(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.stream = source["stream"];
@@ -4953,11 +5451,11 @@ export namespace proxycapture {
 	    body: string;
 	    truncated: boolean;
 	    binary: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Message(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.archived = source["archived"];
@@ -4972,11 +5470,11 @@ export namespace proxycapture {
 	    kind: string;
 	    text: string;
 	    size: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Frame(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.direction = source["direction"];
@@ -4990,11 +5488,11 @@ export namespace proxycapture {
 	    entry: Entry;
 	    request: Message;
 	    response: Message;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Exchange(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.frames = this.convertValues(source["frames"], Frame);
@@ -5002,7 +5500,7 @@ export namespace proxycapture {
 	        this.request = this.convertValues(source["request"], Message);
 	        this.response = this.convertValues(source["response"], Message);
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5021,7 +5519,7 @@ export namespace proxycapture {
 		    return a;
 		}
 	}
-
+	
 	export class LocalResponse {
 	    pause: boolean;
 	    script: string;
@@ -5032,11 +5530,11 @@ export namespace proxycapture {
 	    rateKiB: number;
 	    delayMs: number;
 	    errorPercent: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new LocalResponse(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.pause = source["pause"];
@@ -5050,18 +5548,18 @@ export namespace proxycapture {
 	        this.errorPercent = source["errorPercent"];
 	    }
 	}
-
+	
 	export class Paused {
 	    id: number;
 	    method: string;
 	    url: string;
 	    status: number;
 	    body: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Paused(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
@@ -5077,11 +5575,11 @@ export namespace proxycapture {
 	    address: string;
 	    running: boolean;
 	    count: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Status(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.config = this.convertValues(source["config"], Config);
@@ -5090,7 +5588,7 @@ export namespace proxycapture {
 	        this.running = source["running"];
 	        this.count = source["count"];
 	    }
-
+	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
 		    if (!a) {
 		        return a;
@@ -5108,6 +5606,31 @@ export namespace proxycapture {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace secrets {
+	
+	export class Entry {
+	    name: string;
+	    path?: string;
+	    field?: string;
+	    browse?: string;
+	    detail?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.path = source["path"];
+	        this.field = source["field"];
+	        this.browse = source["browse"];
+	        this.detail = source["detail"];
+	    }
 	}
 
 }

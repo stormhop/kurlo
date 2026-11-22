@@ -10,6 +10,7 @@ import type { Collection, PersistRequestStore, RequestType, SavedRequest } from 
 import type { TopView } from '../ui';
 
 type FolderHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   autosave: boolean;
   openNewDraft: (request: import('../../types/models').SavedRequest, target?: { collectionId: string; folderPath: string[] }) => Promise<void>;
   trashFolder: (collection: import('../../types/models').Collection, folderPath: string[], requestIds: string[]) => void;
@@ -160,6 +161,7 @@ export const folderFeature = {
       .filter(request => request.collectionId === collectionId && this.folderPathMatches(request.folderPath ?? [], folderPath))
       .map(request => request.id);
     const owner = this.collections.find(collection => collection.id === collectionId);
+    if (this.requestFiles && !await this.requestFiles.review(removed)) return;
     if (owner) this.trashFolder(owner, folderPath, removed);
     this.collections = this.collections.map(collection =>
       collection.id === collectionId ? removeFolderDefaultsTree(removeCollectionFolderPathTree(collection, folderPath), folderPath) : collection

@@ -534,7 +534,7 @@ func TestAiTestScriptsReadTheNormalizedAnswer(t *testing.T) {
 		openAIChunkEvent(`{"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":4}}`),
 	}})
 	req := aiTestRequest(model.AiProviderOpenAI, server.URL)
-	req.HTTP.ScriptEngine = "js"
+
 	req.HTTP.TestScript = `
 const llm = pm.response.llm();
 pm.test("tool", () => pm.expect(llm.toolCalls[0].name).to.equal("lookup"));
@@ -562,7 +562,7 @@ func TestAiTestScriptsRunOnceAfterAllSteps(t *testing.T) {
 		openAIChunkEvent(`{"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}`),
 	}})
 	req := aiTestRequest(model.AiProviderOpenAI, server.URL)
-	req.HTTP.ScriptEngine = "js"
+
 	req.HTTP.TestScript = `pm.test("once", () => {});`
 	runner, _ := newTestAiRunner(req, nil)
 	out := runner.run()

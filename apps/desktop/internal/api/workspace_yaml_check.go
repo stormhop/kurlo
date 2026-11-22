@@ -93,6 +93,11 @@ func yamlErrorFailure(err error) WorkspaceYAMLCheckResult {
 }
 
 func checkWorkspaceYAML(path, content string) WorkspaceYAMLCheckResult {
+	section := workspaceYAMLSection(path)
+	if section == "request" {
+		_, check := checkedRequestDocument(content)
+		return check
+	}
 	var document yaml.Node
 	if err := yaml.Unmarshal([]byte(content), &document); err != nil {
 		return yamlErrorFailure(err)
@@ -101,7 +106,6 @@ func checkWorkspaceYAML(path, content string) WorkspaceYAMLCheckResult {
 		return yamlCheckFailure(1, "The file must be a YAML mapping that starts with version: 1")
 	}
 	top := document.Content[0]
-	section := workspaceYAMLSection(path)
 	var target any
 	switch section {
 	case "":
@@ -110,8 +114,6 @@ func checkWorkspaceYAML(path, content string) WorkspaceYAMLCheckResult {
 		target = &filesystemWorkspaceFile{}
 	case "collection":
 		target = &filesystemCollectionFile{}
-	case "request":
-		target = &filesystemRequestFile{}
 	case "environment":
 		target = &filesystemEnvironmentFile{}
 	case "example":

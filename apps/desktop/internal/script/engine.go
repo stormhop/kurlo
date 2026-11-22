@@ -9,13 +9,6 @@ import (
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
 
-type Engine string
-
-const (
-	EngineTengo Engine = "tengo"
-	EngineJS    Engine = "js"
-)
-
 const scriptExecutionTimeout = 2 * time.Second
 
 const maxScriptExecutionTimeout = 60 * time.Second
@@ -30,15 +23,6 @@ func resolveTimeout(override time.Duration) time.Duration {
 		return maxScriptExecutionTimeout
 	}
 	return override
-}
-
-func resolveEngine(name string) Engine {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "js", "javascript", "node":
-		return EngineJS
-	default:
-		return EngineTengo
-	}
 }
 
 type Info struct {
@@ -74,6 +58,7 @@ type Context struct {
 	IterationData       map[string]string
 
 	RequestURL     string
+	RequestAuth    model.AuthConfig
 	RequestMethod  string
 	RequestHeaders map[string]string
 	RequestParams  map[string]string
@@ -199,7 +184,7 @@ var replaceInPattern = regexp.MustCompile(`\{\{([^{}]*)\}\}`)
 func (c *Context) ReplaceIn(value string) string {
 	substitute := func(input string) string {
 		return replaceInPattern.ReplaceAllStringFunc(input, func(match string) string {
-			key := strings.TrimSpace(match[2 : len(match)-2])
+			key := model.TemplateVariableKey(match[2 : len(match)-2])
 			if key == "" {
 				return match
 			}
@@ -225,15 +210,15 @@ func (c *Context) ReplaceIn(value string) string {
 	return resolved
 }
 
-func RunPreRequest(engine, src string, ctx *Context) model.ScriptResult {
-	return run(engine, src, ctx, false)
+func RunPreRequest(src string, ctx *Context) model.ScriptResult {
+	return run(src, ctx, false)
 }
 
-func RunTests(engine, src string, ctx *Context) model.ScriptResult {
-	return run(engine, src, ctx, true)
+func RunTests(src string, ctx *Context) model.ScriptResult {
+	return run(src, ctx, true)
 }
 
-func run(engine, src string, ctx *Context, hasResponse bool) (result model.ScriptResult) {
+func run(src string, ctx *Context, hasResponse bool) (result model.ScriptResult) {
 	if strings.TrimSpace(src) == "" {
 		return
 	}
@@ -247,12 +232,7 @@ func run(engine, src string, ctx *Context, hasResponse bool) (result model.Scrip
 		before[k] = v
 	}
 
-	switch resolveEngine(engine) {
-	case EngineJS:
-		result.Error = runJS(src, ctx, hasResponse)
-	default:
-		result.Error = runTengo(src, ctx, hasResponse)
-	}
+	result.Error = runJS(src, ctx, hasResponse)
 
 	result.Tests = ctx.Tests
 	result.Logs = ctx.Logs

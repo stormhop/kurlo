@@ -112,6 +112,7 @@ const parts = [
   { part: 'Load tests', details: 'k6 under the hood: run locally, export a script or use the CLI.', status: 'Yes', tone: 'yes' },
   { part: 'Mock server', details: 'Saved examples served on localhost, with a request log.', status: 'Yes', tone: 'yes' },
   { part: 'CI', details: 'kurlo run with JUnit and JSON reports, from npm as @kurlo/cli.', status: 'Yes', tone: 'yes' },
+  { part: 'Collection documentation', details: 'A searchable HTML reference with saved examples, generated from the collection menu or CLI.', status: 'Yes', tone: 'yes' },
   { part: 'Postman scripts', details: 'pm.*, pm.sendRequest, chai and CryptoJS.', status: 'Yes', tone: 'yes' },
   { part: 'Git', details: 'Clone, branch, commit, pull, push and open a pull request without leaving the app.', status: 'Yes', tone: 'yes' },
   { part: 'Account', details: 'There is no Kurlo server to have one on.', status: 'None', tone: 'yes' },
@@ -142,7 +143,7 @@ const ldJson = structuredData({
 
 <SiteLayout title={title} description={description} canonical={site} ldJson={ldJson} links={[{ label: 'Agent mode', href: href('agent/') }, { label: 'Features', href: '#features' }, { label: 'MCP', href: href('mcp/') }, { label: 'Receipts', href: '#receipts' }, { label: 'Compare', href: '#compare' }]}>
   <section class="k-hero" data-hero aria-labelledby="hero-title">
-    <Scene variant="dusk" bird />
+    <Scene variant="dusk" bird winter />
     <p class="k-hint" data-hint aria-hidden="true">Click the sky <svg width="38" height="22" viewBox="0 0 38 22" fill="none"><path d="M2 4c10 0 22 2 32 14m0 0-1-8m1 8-8-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></p>
     <div class="k-hero-copy">
       <a class="k-pill" href="#agent"><b>New</b><span>Kurlo 3.0: Agent mode, with Claude Code and Codex</span><i aria-hidden="true">→</i></a>

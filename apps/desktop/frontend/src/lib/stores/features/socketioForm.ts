@@ -25,7 +25,7 @@ export const socketioFormFeature = {
       .filter(rowHasContent)
       .map(row => ({
         ...this.mkSioEventRow(),
-        enabled: row.enabled ?? false,
+        enabled: row.enabled ?? true,
         key: row.key ?? '',
         value: row.value ?? '',
         description: row.description ?? '',

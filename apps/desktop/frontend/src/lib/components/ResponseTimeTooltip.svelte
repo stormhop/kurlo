@@ -36,7 +36,9 @@
   }
 
   function rowsFor(source: ResponseTimings | null | undefined): TimingRow[] {
+    const secrets = numeric(source?.secrets);
     return [
+      ...(secrets > 0 ? [{ label: 'Linked secrets', value: secrets, color: 'var(--accent)' }] : []),
       { label: 'Prepare', value: numeric(source?.prepare), color: 'var(--text-3)' },
       { label: 'Socket Initialization', value: numeric(source?.socketInitialization), color: 'var(--s4xx)' },
       { label: 'DNS Lookup', value: numeric(source?.dnsLookup), color: 'var(--s4xx)' },

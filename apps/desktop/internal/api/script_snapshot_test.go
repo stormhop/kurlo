@@ -20,7 +20,7 @@ func TestHTTPScriptSnapshotsPreserveTheOriginatingEnvironment(t *testing.T) {
 	}))
 	defer server.Close()
 	resp := sendRequest(t.Context(), model.HttpRequest{
-		URL: server.URL, Method: http.MethodGet, ScriptEngine: "js",
+		URL: server.URL, Method: http.MethodGet,
 		ScriptEnvironment: map[string]string{"mode": "test", "remove": "old"},
 		ScriptVariables:   map[string]string{"source": "captured", "remove": "old"},
 		PreRequestScript:  `pm.test("captured state", function () { pm.expect(pm.environment.get("mode")).to.equal("test"); pm.expect(pm.globals.get("source")).to.equal("captured"); }); pm.environment.set("token", "pre"); pm.environment.unset("remove"); pm.globals.set("changed", "new"); pm.globals.unset("remove");`,
@@ -47,7 +47,7 @@ func TestEmptyScriptSnapshotDoesNotReadActiveEnvironment(t *testing.T) {
 	sm.SetEnvironment(map[string]string{"mode": "production"})
 	sm.SetVariables(map[string]string{"token": "production"})
 	resp := sendRequest(t.Context(), model.HttpRequest{
-		ScriptEngine: "js", ScriptEnvironment: map[string]string{}, ScriptVariables: map[string]string{},
+		ScriptEnvironment: map[string]string{}, ScriptVariables: map[string]string{},
 		PreRequestScript: `pm.test("empty captured state", function () { pm.expect(pm.environment.get("mode")).to.equal(undefined); pm.expect(pm.globals.get("token")).to.equal(undefined); }); pm.execution.skipRequest();`,
 	}, sm, nil, nil)
 	if !resp.Skipped || len(resp.PreRequestResult.Tests) != 1 || !resp.PreRequestResult.Tests[0].Passed {

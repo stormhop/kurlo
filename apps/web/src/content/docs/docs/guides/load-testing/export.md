@@ -15,6 +15,8 @@ Click **Export k6 script** to inspect the generated JavaScript and see what carr
 password='your-test-password' k6 run checkout-flow.k6.js
 ```
 
+For a secret defined in a request’s **Pre Request Vars**, use the environment variable name shown for that request in the export dialog. This lets two requests use different secrets with the same variable name.
+
 For a folder export, run `k6 run script.k6.js` from that folder. When Kurlo starts k6 itself, it supplies the selected secret variable values through the child process's environment.
 
 **Write into the script** includes secret values in the exported file. Do not commit or share that file. Data files are also included in exports, so use test data you intend to share.

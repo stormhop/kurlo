@@ -196,6 +196,9 @@
   transition: background var(--dur-fast);
 }
 .method-trigger--protocol {
+  min-width: 0;
+  padding-inline: var(--space-2);
+  gap: var(--space-1-5);
   color: var(--accent-text);
   font-family: var(--font-ui);
 }
@@ -206,15 +209,6 @@
 .method-trigger:focus-visible {
   outline: none;
   background: var(--hover);
-}
-.method-trigger.locked {
-  min-width: 0;
-  padding: 0 var(--space-3);
-  cursor: default;
-  justify-content: center;
-}
-.method-trigger.locked:hover {
-  background: transparent;
 }
 .method-trigger svg {
   flex: 0 0 auto;
@@ -601,11 +595,15 @@
   padding: 0;
   border: none;
   background: none;
-  color: color-mix(in srgb, var(--on-accent) 70%, transparent);
+  color: color-mix(in srgb, currentColor 70%, transparent);
   font-family: var(--font-mono);
   font-size: var(--text-micro);
   font-weight: var(--weight-medium);
   line-height: 1rem;
+}
+.workspace:has(.connected-message-editor:focus-within) .btn-ws-disconnect .btn-send-kbd,
+.connected-message-editor:not(:focus-within) .ws-message-send .btn-send-kbd {
+  visibility: hidden;
 }
 @container workspace (max-width: 51.25rem) {
   .btn-send-kbd { display: none; }
@@ -1101,6 +1099,9 @@
 }
 
 .body-section { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.file-tab-empty { margin: auto; padding: var(--space-4); text-align: center; color: var(--text-2); }
+.file-tab-empty p { margin: 0 0 var(--space-3); }
+.tab-content.file-editor-mode,
 .tab-content.body-editor-mode { overflow: hidden; padding: 0; display: flex; flex-direction: column; }
 
 .body-types,
@@ -1238,6 +1239,68 @@
 
 .tab-script {
   font-style: normal;
+}
+
+.cm-tooltip.script-completions,
+.cm-tooltip.script-completions .cm-completionInfo {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--text-code);
+}
+
+.cm-tooltip.cm-tooltip-autocomplete.script-completions > ul {
+  min-width: 11rem;
+  max-height: 14rem;
+  padding: var(--space-1);
+  font-family: var(--font-mono);
+}
+
+.cm-tooltip.cm-tooltip-autocomplete.script-completions > ul > li {
+  padding: var(--space-1) var(--space-2);
+  line-height: var(--leading-normal);
+  border-radius: var(--radius-sm);
+}
+
+.cm-tooltip.cm-tooltip-autocomplete.script-completions > ul > li[aria-selected] {
+  color: var(--text);
+  background: var(--accent-dim);
+}
+
+.script-completions .cm-completionDetail {
+  margin-left: var(--space-3);
+  font: var(--text-caption) var(--font-ui);
+  color: var(--text-2);
+}
+
+.cm-tooltip.script-completions .cm-tooltip.cm-completionInfo {
+  max-width: min(24rem, 80vw);
+  padding: var(--space-3);
+}
+
+.script-completion-hint {
+  display: grid;
+  gap: var(--space-1);
+  line-height: var(--leading-normal);
+}
+
+.script-completion-hint code {
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.script-completion-hint code:first-child {
+  font-weight: var(--weight-semibold);
+}
+
+.script-completion-hint span {
+  margin-top: var(--space-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-caption);
+  color: var(--text-2);
 }
 
 .script-section {
@@ -1451,6 +1514,93 @@
 
 .graphql-field-type {
   margin-left: auto;
+}
+
+.builder-operation,
+.builder-arg,
+.builder-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.builder-operation {
+  padding: var(--space-2) var(--space-3);
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.builder-operation > span,
+.builder-arg small {
+  color: var(--text-3);
+  font: var(--text-caption) var(--font-mono);
+}
+
+.graphql-explorer-list .graphql-explorer-field {
+  min-height: 1.875rem;
+  padding: var(--space-1) var(--space-1-5);
+}
+
+.builder-selected .graphql-field-name {
+  color: var(--text);
+}
+
+.builder-expand,
+.builder-spacer {
+  width: 1rem;
+  flex: none;
+}
+
+.builder-expand svg.open {
+  transform: rotate(90deg);
+}
+
+.builder-label {
+  cursor: pointer;
+}
+
+.builder-label .check {
+  flex: none;
+}
+
+.graphql-field-args {
+  margin-left: calc(var(--space-10) + var(--space-1));
+}
+
+.builder-children {
+  margin-left: var(--space-3);
+  border-left: 1px solid var(--border);
+  padding-left: var(--space-1-5);
+  flex: none;
+}
+
+.builder-args {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  margin: var(--space-1) 0;
+  border-radius: var(--radius-md);
+  background: var(--elevated);
+}
+
+.builder-arg {
+  align-items: flex-end;
+}
+.builder-arg label {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  font: var(--text-label) var(--font-mono);
+}
+.builder-arg .btn {
+  flex: none;
+}
+.builder-message {
+  margin: var(--space-2) var(--space-3);
+  color: var(--text-2);
+  font-size: var(--text-label);
 }
 
 .graphql-column-resizer {

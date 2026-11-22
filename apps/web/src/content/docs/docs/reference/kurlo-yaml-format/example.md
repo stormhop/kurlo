@@ -32,7 +32,6 @@ example:
       }
     headers:
       - id: 1
-        enabled: true
         key: Content-Type
         value: application/json
   match:

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import GraphQLBuilder from './GraphQLBuilder.svelte';
+  import { graphQLBuilderSchema } from '../graphql';
   import BirdSpinner from './BirdSpinner.svelte';
   import { onMount } from 'svelte';
   import { vm } from '../stores/app.svelte';
@@ -11,7 +13,7 @@
   let queryEditor: { format: () => boolean } | undefined = undefined;
   let fileInput = $state<HTMLInputElement | undefined>(undefined);
   let explorerWidth = $state(420);
-  let fields = $derived(vm.graphQLExplorerFields);
+  const schema = $derived(graphQLBuilderSchema(vm.graphqlSchema));
 
 
   type ActivePanel = 'query' | 'variables';
@@ -34,14 +36,28 @@
     explorerWidth = Math.round(Math.min(Math.max(width * 0.38, MIN_EXPLORER_WIDTH), MAX_EXPLORER_WIDTH));
   });
 
+  function resizeExplorer(width: number) {
+    if (!queryGridRef) return;
+    const available = toLogicalPx(queryGridRef.getBoundingClientRect().width);
+    const max = Math.min(MAX_EXPLORER_WIDTH, available - MIN_EDITOR_WIDTH, available * 0.45);
+    explorerWidth = Math.min(Math.max(width, MIN_EXPLORER_WIDTH), max);
+  }
+
+  function onExplorerKeydown(event: KeyboardEvent) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const divider = event.currentTarget as HTMLButtonElement;
+    if (!queryGridRef) return;
+    const width = toLogicalPx(divider.getBoundingClientRect().left - queryGridRef.getBoundingClientRect().left);
+    resizeExplorer(width + (event.key === 'ArrowRight' ? 16 : -16));
+  }
+
   function startExplorerResize(event: PointerEvent) {
     if (!queryGridRef) return;
     event.preventDefault();
-    const rect = queryGridRef.getBoundingClientRect();
-    const max = Math.max(MIN_EXPLORER_WIDTH, Math.min(MAX_EXPLORER_WIDTH, toLogicalPx(rect.width) - MIN_EDITOR_WIDTH));
-    const move = (next: PointerEvent) => {
-      explorerWidth = Math.round(Math.min(Math.max(toLogicalPx(next.clientX - rect.left), MIN_EXPLORER_WIDTH), max));
-    };
+    const left = queryGridRef.getBoundingClientRect().left;
+    const move = (next: PointerEvent) => resizeExplorer(toLogicalPx(next.clientX - left));
     const up = () => {
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
@@ -84,33 +100,10 @@
   style={`--graphql-explorer-width: ${rem(explorerWidth)};`}
 >
   <aside class="graphql-explorer-panel">
-    {#if fields.length}
-      <div class="graphql-explorer-toolbar">
-        <span>Explore</span>
-        <button class="btn btn-secondary" type="button" onclick={() => vm.fetchGraphQLSchema()} disabled={vm.graphqlSchemaLoading || !vm.url.trim()}>
-          {#if vm.graphqlSchemaLoading}<BirdSpinner />{/if}
-          Refresh
-        </button>
-      </div>
-      <div class="graphql-explorer-list">
-        {#each fields as field (field.name)}
-          <button
-            class="graphql-explorer-field"
-            type="button"
-            onclick={() => vm.applyGraphQLExplorerField(field)}
-          >
-            <span class="graphql-field-main">
-              <span class="graphql-field-name">{field.name}</span>
-              <span class="graphql-field-type">{field.type}</span>
-            </span>
-            {#if field.args.length}
-              <span class="graphql-field-args">
-                {field.args.map(arg => `${arg.name}: ${arg.type}`).join(', ')}
-              </span>
-            {/if}
-          </button>
-        {/each}
-      </div>
+    {#if schema && schema.types.get(schema.roots.query ?? '')?.fields.length}
+      {#key vm.activeRequestId}
+        <GraphQLBuilder {schema} showVariables={() => { activePanel = 'variables'; }} />
+      {/key}
     {:else}
       <div class="graphql-explorer-empty">
         {#if vm.graphqlSchemaError}
@@ -189,6 +182,7 @@
     type="button"
     aria-label="Resize GraphQL explorer"
     onpointerdown={startExplorerResize}
+    onkeydown={onExplorerKeydown}
   ></button>
 
   <section class="graphql-editor-stack" style={editorStackStyle}>

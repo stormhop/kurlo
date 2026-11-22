@@ -28,8 +28,9 @@ Ask in plain words and the agent runs your requests and collections, explains wh
 - **An agent that asks first.** The Kurlo agent, Claude Code or Codex works on your collections inside the app. It shows every change before it is written, can follow a plan you approve and work on its own Git branch, and keeps chats on your machine.
 - **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request as the API change.
 - **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
+- **Share an API reference.** Turn a collection into a searchable HTML file with saved requests and responses. Open it offline or publish it to a static host.
 - **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
-- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.6 MB and the Linux one is 13.5 MB.
+- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.9 MB and the Linux one is 13.6 MB.
 
 | | Kurlo | Postman | Insomnia | Bruno |
 |---|---|---|---|---|
@@ -76,6 +77,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - cURL import — paste a curl command into the URL field, it parses automatically
 - Bulk edit for params, headers and form fields — switch the table to a `key: value` text area and back
 - Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved examples
+- Build GraphQL operations from a schema, select nested fields and bind typed variables in the query editor
 - GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
 - Import Postman v2 JSON or v3 Native Git folders, Insomnia v4, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and all-data backups
 - OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the collection
@@ -94,7 +96,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - Client certificates (mutual TLS), per request or inherited from a collection
 - Per-request and collection defaults with inheritance
 
-**Scripting** — pre-request and test scripts in sandboxed JavaScript, with legacy [Tengo](https://github.com/d5/tengo) support:
+**Scripting** — write sandboxed JavaScript in requests, folders and collections. The editor completes `pm.*` methods, variable keys and saved request names, with signatures and examples.
 ```js
 // pre-request: inject a header
 pm.request.headers.set("X-Client", "kurlo")
@@ -125,9 +127,11 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 - Folder defaults — headers, auth, scripts and tests on a folder apply to every request inside it
 - Drag-and-drop organisation
 - Request history — every send on its own page, request and stored response side by side, reopenable in the editor (14-day retention, 1000 entries)
+- [Static API documentation](https://kurlo.dev/docs/guides/cli-runner/docs/) — build a standalone HTML reference with `kurlo docs build` or **Build documentation** in the collection menu
 - Collection runner — sequential or parallel, data files, iterations, an HTML report, and the last run of every collection kept
 - [Load testing with k6](https://kurlo.dev/docs/guides/load-testing/) — collection flows with extraction and checks, virtual users or iteration rates, thresholds, CSV/JSON data, script export, local runs and last-run reports
 - Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets; branch, commit, pull, push and open a pull request from the app
+- Edit a request's YAML file in the File tab with completion, schema checks, Beautify and protected identity fields; the address bar edits the same draft
 - **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure. `kurlo load list|export|run` lists collection load tests, exports k6 scripts or runs local k6 with threshold results and reports
 
 **Agent mode** — new in 3.0. Pick the Kurlo agent on your own model (OpenRouter, an API key, or Ollama and LM Studio), or connect the Claude Code and Codex CLIs you already use with their own accounts, and ask in plain words. The agent runs requests and collections, explains failures, writes requests and tests, imports OpenAPI, Postman and HAR files, and reads a connected project folder. It asks before every change and every call other than `GET`, `HEAD` or `OPTIONS`, can follow a plan you approve, work on its own Git branch and call your own MCP servers. Trusted hosts and sandbox environments run without asking, protected environments are off limits, and secrets reach the API while the model sees `[secret]`. Chats stay encrypted on your machine, and **Activity** lists every tool call with the files it changed and a way to restore them. See the [agent guide](https://kurlo.dev/docs/guides/agent/).
@@ -244,7 +248,7 @@ apps/desktop/internal/
   api/                      HTTP executor, auth, request store, state
   api/auth/                 Bearer, Basic, Digest, API Key, OAuth2, AWS SigV4
   model/                    Shared Go types (request, response, auth config)
-  script/                   JavaScript/Tengo scripting engines + pm.* API
+  script/                   JavaScript sandbox and pm.* API
 apps/desktop/frontend/src/
   App.svelte                Root shell and layout
   lib/stores/app.svelte.ts  Composed app view-model
@@ -262,7 +266,7 @@ perf/                       Generated performance fixtures (ignored by Git)
 
 ## Scripting API reference
 
-Scripts run in a sandboxed JavaScript environment by default, or in the legacy [Tengo](https://github.com/d5/tengo) engine for existing requests. Imports, filesystem, process, and network access are disabled. Execution timeout: 2 seconds by default, configurable per request up to 60.
+Scripts run in a sandboxed JavaScript environment with a two-second default timeout, configurable per request up to 60 seconds. The sandbox blocks module imports, filesystem access, processes, and direct network access. Requests can opt in to HTTP calls through `pm.sendRequest`.
 
 The full surface — every method, the variable-scope precedence rules, and the Chai-style assertion aliases — is in the [scripting API reference](https://kurlo.dev/docs/reference/scripting-api/). The short version:
 

@@ -1,14 +1,15 @@
 import type { CollectionTextFilesResult } from '../../wire';
-import { chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles, writeNewCollectionTextFiles } from '../../backend';
+import { environmentChain } from '../../environmentInheritance';
+import { requestExamplesPending } from '../../examples';
+import { exportCollectionDocs, chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles, writeNewCollectionTextFiles } from '../../backend';
 import { detectImportSource, isBrunoFolder, isPostmanV3Document, isPostmanV3Folder, type ImportSource } from '../../importSource';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
-import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, ScriptEngine, Workspace } from '../../types/models';
+import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, Workspace } from '../../types/models';
 import { mergeGlobalRowsWithImportedRows } from './globals';
 import { mkRow } from '../../constants';
 import type { TopView } from '../ui';
 import { filesystemNameFromName, makeCollection, normalizeCollection, normalizeEnvironment, normalizeSavedRequest } from '../../normalizers';
 import { normalizeCollectionDefaults } from '../../collectionDefaults';
-import { routeImportedScripts, withActiveScripts } from '../../scriptEngine';
 import { downloadTextFile, safeFileName } from '../../utils';
 import { requestsHaveExportSecrets } from '../../secretExport';
 import { flattenedEnvironment } from '../../environmentInheritance';
@@ -87,6 +88,10 @@ function fileSegmentForExport(name: string) {
 }
 
 type ImportExportHost = {
+  requestsForStore: (requests: SavedRequest[]) => SavedRequest[];
+  environmentsForStore: (environments: Environment[]) => Environment[];
+  globalsForStore: () => KVRow[];
+  ensureRequestExamples: (ids: string[]) => Promise<void>;
   ensureCollectionExamples: (collectionId: string) => Promise<void>;
   changeGlobalsEverywhere: (change: (rows: KVRow[]) => KVRow[]) => void;
   collectionImportSource: ImportSource;
@@ -104,7 +109,6 @@ type ImportExportHost = {
   openRequestIds: string[];
   requestHistory: RequestHistoryEntry[];
   topView: TopView;
-  scriptEngine: ScriptEngine;
   _postmanImportInput: HTMLInputElement | undefined;
   guardWorkspaceWritable: (action?: string) => boolean;
   closeFloatingMenus: () => void;
@@ -359,7 +363,7 @@ export const importExportFeature = {
     if (!this.guardWorkspaceWritable('Importing')) return 0;
     const wsId = this.activeWorkspaceId || this.workspaces[0]?.id; if (!wsId) throw new Error('No workspace available');
     const { postmanV3FromFiles } = await import('../../postmanV3');
-    const { postmanCollectionBundle } = await import('../../postman');
+    const { postmanCollectionBundle, postmanVaultReferences, postmanVaultNotice } = await import('../../postman');
     const imported = postmanV3FromFiles(files, fallbackName);
     if (!imported.collections.length && !imported.variableSets.length) {
       const reason = imported.skipped[0] ? `${imported.skipped[0].path}: ${imported.skipped[0].reason}` : 'no Postman v3 collection found';
@@ -380,6 +384,8 @@ export const importExportFeature = {
     if (environments.length) parts.push(`and ${environments.length} environment${environments.length === 1 ? '' : 's'}`);
     const skipped = imported.skipped.length ? ` · skipped ${imported.skipped.length} unsupported item${imported.skipped.length === 1 ? '' : 's'}` : '';
     this.collectionImportSummary = `${parts.join(' ')}${skipped}`;
+    const vault = postmanVaultReferences([imported.collections.map(collection => collection.payload), imported.variableSets]);
+    if (vault.length) void this.openAlertDialog('Link Postman Vault references to a secret provider', postmanVaultNotice(vault));
     return requestCount;
   },
   async importBrunoOpenCollectionFolder(this: ImportExportHost) {
@@ -421,11 +427,11 @@ export const importExportFeature = {
       description: bundle.description,
       filesystemName: filesystemNameFromName(bundle.name, collectionId),
       folderPaths: bundle.folderPaths,
-      defaults: routeImportedScripts(normalizeCollectionDefaults(bundle.defaults)),
-      folderDefaults: (bundle.folderDefaults ?? []).map(folder => routeImportedScripts(folder)),
+      defaults: normalizeCollectionDefaults(bundle.defaults),
+      folderDefaults: bundle.folderDefaults,
     }, wsId);
     const importCollections = [...this.collections, importedCollection];
-    const importedReqs = bundle.requests.map(req => routeImportedScripts(normalizeSavedRequest({ ...req, collectionId: importedCollection.id, collection: importedCollection.name }, importCollections, wsId)));
+    const importedReqs = bundle.requests.map(req => normalizeSavedRequest({ ...req, collectionId: importedCollection.id, collection: importedCollection.name }, importCollections, wsId));
     const importedEnvs = (bundle.environments ?? []).map(env => normalizeEnvironment(env, wsId));
     collapseImportedCollection(this, importedCollection, importedReqs);
     const nextCols = [...this.collections, importedCollection];
@@ -465,7 +471,7 @@ export const importExportFeature = {
     }
     const importCollections = existing ? this.collections : [...this.collections, collection];
     const importedReqs = builtRequests
-      .map(req => routeImportedScripts(normalizeSavedRequest(req, importCollections, wsId)));
+      .map(req => normalizeSavedRequest(req, importCollections, wsId));
     if (!importedReqs.length) throw new Error('No requests found in import file');
     if (!existing) collapseImportedCollection(this, collection, importedReqs);
     const nextCols = importCollections; const nextReqs = [...this.requests, ...importedReqs];
@@ -477,13 +483,21 @@ export const importExportFeature = {
   },
   async importPostmanPayload(this: ImportExportHost, payload: unknown, fileName: string) {
     const fallbackName = fileName.replace(/\.postman_(collection|environment|globals)$/i, '').replace(/\.json$/i, '');
-    const { postmanCollectionBundle, postmanVariableBundle } = await import('../../postman');
+    const { postmanCollectionBundle, postmanVariableBundle, postmanVaultReferences, postmanVaultNotice } = await import('../../postman');
+    const vault = postmanVaultReferences(payload);
+    const notifyVault = () => { if (vault.length) void this.openAlertDialog('Link Postman Vault references to a secret provider', postmanVaultNotice(vault)); };
     const variables = postmanVariableBundle(payload, fallbackName || 'Postman Environment');
-    if (variables) return this.importPostmanVariableBundle(variables);
+    if (variables) {
+      const count = await this.importPostmanVariableBundle(variables);
+      notifyVault();
+      return count;
+    }
     const wsId = this.activeWorkspaceId || this.workspaces[0]?.id; if (!wsId) throw new Error('No workspace available');
     const collectionId = makeCollection(wsId, fallbackName || 'Postman Collection').id;
     const bundle = postmanCollectionBundle(payload, collectionId, fallbackName || 'Postman Collection');
-    return this.importCollectionBundle({ ...bundle, id: collectionId });
+    const count = await this.importCollectionBundle({ ...bundle, id: collectionId });
+    notifyVault();
+    return count;
   },
   async importPostmanVariableBundle(this: ImportExportHost, bundle: { scope: 'environment' | 'globals'; name: string; values: KVRow[] }) {
     const destination = importDestination(this);
@@ -542,6 +556,35 @@ export const importExportFeature = {
     );
     return requestCount;
   },
+  async buildCollectionDocs(this: ImportExportHost, collectionId: string, ids?: string[], linkBaseUrl?: string) {
+    this.closeFloatingMenus();
+    const epoch = this.requestStorePersistEpoch;
+    const workspaceId = this.activeWorkspaceId;
+    try {
+      const selected = ids && new Set(ids);
+      if (ids) await this.ensureRequestExamples(ids);
+      else await this.ensureCollectionExamples(collectionId);
+      if (epoch !== this.requestStorePersistEpoch || workspaceId !== this.activeWorkspaceId) return;
+      const collection = this.collections.find(item => item.id === collectionId && item.workspaceId === workspaceId);
+      if (!collection) return;
+      const requests = this.requestsForStore(this.requests).filter(request => request.collectionId === collectionId && !request.isDraft && (!selected || selected.has(request.id)));
+      if (selected && (!selected.size || requests.length !== selected.size)) throw new Error('The selected requests changed. Open the export again.');
+      if (requests.some(requestExamplesPending)) throw new Error('Saved examples could not be loaded. Try building again.');
+      const workspaceEnvs = this.environmentsForStore(this.environments).filter(env => env.workspaceId === workspaceId);
+      const pins = collection.environmentIds ?? [];
+      const included = new Set(pins.flatMap(id => environmentChain(workspaceEnvs, id).map(env => env.id)));
+      const variables = (rows: KVRow[]) => rows.filter(row => row.key.trim()).map(({ key, value, description, enabled, secret }) => ({
+        key, value: secret ? '' : value, description, enabled, secret,
+      }));
+      const environments = workspaceEnvs.filter(env => !pins.length || included.has(env.id))
+        .map(({ id, name, workspaceId, parentId, protected: protectedEnv, values }) => ({
+          id, name, workspaceId, parentId, protected: protectedEnv, values: variables(values),
+        }));
+      await exportCollectionDocs(JSON.stringify({ collection: selected ? { ...collection, folderPaths: [] } : collection, requests, environments, globals: variables(this.globalsForStore()), linkBaseUrl }));
+    } catch (error) {
+      await this.openAlertDialog('Could not export collection documentation', String(error));
+    }
+  },
   async exportCollection(this: ImportExportHost, collectionId: string) {
     this.closeFloatingMenus();
     const format = await this.openSelectDialog('Export collection', 'Choose the export format:', [
@@ -576,10 +619,8 @@ export const importExportFeature = {
     if (!parentDir) return;
     const targetRoot = `${parentDir.replace(/[\\/]$/, '')}/${safeFileName(folderName)}`;
     const envs = this.environments.filter(env => env.workspaceId === col.workspaceId);
-    const exportDefaults = withActiveScripts(col.defaults, 'js');
-    const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildOpenCollectionFiles } = await import('../../opencollection');
-    const files = buildOpenCollectionFiles(col.name, col.description ?? '', exportDefaults, exportReqs, envs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, folderPaths, (col.folderDefaults ?? []).map(folder => withActiveScripts(folder, 'js')));
+    const files = buildOpenCollectionFiles(col.name, col.description ?? '', col.defaults, reqs, envs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, folderPaths, col.folderDefaults ?? []);
     const error = await writeCollectionTextFiles(targetRoot, files);
     if (error) {
       this.collectionImportToast = 'OpenCollection export failed';
@@ -600,9 +641,8 @@ export const importExportFeature = {
     }
     const includeSecrets = await this.chooseCollectionSecretExportMode(reqs, 'Postman collection export');
     if (includeSecrets === null) return;
-    const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildPostmanCollection } = await import('../../postman');
-    const payload = buildPostmanCollection(col.name, col.description ?? '', exportReqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, withActiveScripts(col.defaults, 'js'), (col.folderDefaults ?? []).map(folder => withActiveScripts(folder, 'js')));
+    const payload = buildPostmanCollection(col.name, col.description ?? '', reqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets, col.defaults, col.folderDefaults ?? []);
     this.closeFloatingMenus();
     const name = `${safeFileName(col.name)}.postman_collection.json`;
     const content = JSON.stringify(payload, null, 2);
@@ -668,9 +708,8 @@ export const importExportFeature = {
     }
     const includeSecrets = await this.chooseCollectionSecretExportMode(reqs, 'Insomnia export');
     if (includeSecrets === null) return;
-    const exportReqs = reqs.map(r => withActiveScripts(r, 'js'));
     const { buildInsomniaExport } = await import('../../insomnia');
-    const payload = buildInsomniaExport(col.name, col.description ?? '', exportReqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets);
+    const payload = buildInsomniaExport(col.name, col.description ?? '', reqs, (s, t) => this.stripBodyComments(s, t as BodyType), includeSecrets);
     this.closeFloatingMenus();
     const name = `${safeFileName(col.name)}.insomnia.json`;
     const content = JSON.stringify(payload, null, 2);

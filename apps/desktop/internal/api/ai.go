@@ -702,7 +702,7 @@ func finishAiTests(ctx context.Context, req model.AiRequest, out model.AiRespons
 	populateScriptRequestContext(testCtx, testReq)
 	populateScriptCookies(testCtx, testReq, jars)
 	testCtx.Send = newScriptSender(ctx, testReq.AllowSendRequest, testReq)
-	result := script.RunTests(testReq.ScriptEngine, testReq.TestScript, testCtx)
+	result := script.RunTests(testReq.TestScript, testCtx)
 	result = redactScriptResult(result, testReq.SecretEnvironmentValues)
 	var delta environmentDelta
 	delta.add(map[string]string{}, out.HTTP.EnvironmentUpdates)

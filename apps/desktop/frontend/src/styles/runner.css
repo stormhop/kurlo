@@ -66,6 +66,34 @@
   font-weight: var(--weight-medium);
 }
 
+.runner-preflight-alert {
+  margin: var(--space-3) var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-lg);
+  background: var(--danger-bg);
+  color: var(--text);
+}
+
+.runner-preflight-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.runner-preflight-alert p {
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--text-2);
+}
+
+.runner-preflight-alert ul {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
 .runner-results-panel {
   overflow: hidden;
   border: 1px solid var(--border-subtle);
@@ -182,12 +210,14 @@
 
 @container workspace (max-width: 61.25rem) {
   .runner-results-panel .runner-results-summary {
-    grid-template-columns: repeat(2, max-content);
-    row-gap: var(--space-3);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3) var(--space-6);
   }
 
   .runner-progress-wrap {
-    grid-column: 1 / -1;
+    flex: 1 0 100%;
   }
 }
 

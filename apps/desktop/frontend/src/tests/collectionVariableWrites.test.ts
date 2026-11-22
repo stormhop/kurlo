@@ -21,8 +21,6 @@ function makeCollection(variables: KVRow[]): Collection {
       headers: [],
       variables,
       auth: emptyAuthState(),
-      preRequestScript: '',
-      testScript: '',
       preRequestScriptJs: '',
       testScriptJs: '',
       settings: { ...DEFAULT_REQUEST_SETTINGS },

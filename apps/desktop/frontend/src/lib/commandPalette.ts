@@ -3,7 +3,7 @@ import type { RequestType, ShortcutId, SidebarView } from './types/models';
 import type { ResponseLayout } from './stores/features/uiShell';
 import type { SettingsTab } from './stores/ui';
 
-export type PaletteGroup = 'Go to' | 'Create' | 'Request' | 'View' | 'Help';
+export type PaletteGroup = 'Go to' | 'Create' | 'Request' | 'View' | 'Secrets' | 'Help';
 
 export type PaletteCommand = {
   id: string;
@@ -30,6 +30,10 @@ export type PaletteContext = {
   openMockServer: () => unknown;
   openGit: () => unknown;
   openCookies: () => unknown;
+  openSecretProviders?: () => unknown;
+  addSecretProvider?: () => unknown;
+  refreshSecrets?: () => unknown;
+  clearSecretCache?: () => unknown;
   openSettings: (tab: SettingsTab) => unknown;
   runShortcut: (id: ShortcutId) => unknown;
   createRequest: (type: RequestType) => unknown;
@@ -44,7 +48,7 @@ export type PaletteContext = {
   showWelcome?: () => unknown;
 };
 
-const GROUP_ORDER: PaletteGroup[] = ['Request', 'Create', 'Go to', 'View', 'Help'];
+const GROUP_ORDER: PaletteGroup[] = ['Request', 'Create', 'Go to', 'View', 'Secrets', 'Help'];
 
 export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
   const commands: PaletteCommand[] = [
@@ -57,6 +61,9 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     { id: 'go-mock', group: 'Go to', label: 'Mock server', keywords: 'examples serve', run: ctx.openMockServer },
     { id: 'go-git', group: 'Go to', label: 'Git', keywords: 'commit branch pull push changes', run: ctx.openGit },
     { id: 'go-cookies', group: 'Go to', label: 'Cookies', keywords: 'cookie jar sync', run: ctx.openCookies },
+    ...(ctx.openSecretProviders ? [{ id: 'go-secret-providers', group: 'Go to' as const, label: 'Secret providers', keywords: 'vault 1password aws secrets manager ssm linked secret', run: ctx.openSecretProviders }] : []),
+    ...(ctx.refreshSecrets ? [{ id: 'secrets-refresh', group: 'Secrets' as const, label: 'Refresh secrets', keywords: 'vault 1password aws linked secret cache fetch again', run: ctx.refreshSecrets }] : []),
+    ...(ctx.clearSecretCache ? [{ id: 'secrets-clear-cache', group: 'Secrets' as const, label: 'Clear secret cache', keywords: 'vault 1password aws linked secret memory forget', run: ctx.clearSecretCache }] : []),
     { id: 'go-settings', group: 'Go to', label: 'Settings', keywords: 'preferences options', shortcut: 'settings', run: () => ctx.runShortcut('settings') },
     { id: 'go-shortcuts', group: 'Go to', label: 'Keyboard shortcuts', keywords: 'keys bindings hotkeys', shortcut: 'shortcut-help', run: () => ctx.runShortcut('shortcut-help') },
     { id: 'go-proxy', group: 'Go to', label: 'Proxy settings', keywords: 'network http socks', run: () => ctx.openSettings('proxy') },
@@ -69,6 +76,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     { id: 'create-request-ai', group: 'Create', label: 'New AI request', keywords: 'llm openai anthropic claude gpt chat model prompt', run: () => ctx.createRequest('ai') },
     { id: 'create-collection', group: 'Create', label: 'New collection', shortcut: 'new-collection', run: ctx.createCollection },
     { id: 'create-environment', group: 'Create', label: 'New environment', keywords: 'variables', run: ctx.createEnvironment },
+    ...(ctx.addSecretProvider ? [{ id: 'create-secret-provider', group: 'Create' as const, label: 'Add secret provider…', keywords: 'vault 1password aws secrets manager ssm', run: ctx.addSecretProvider }] : []),
     { id: 'import-collection', group: 'Create', label: 'Import collection…', keywords: 'postman insomnia bruno openapi har curl opencollection', shortcut: 'import-collection', run: ctx.importCollection },
   ];
 

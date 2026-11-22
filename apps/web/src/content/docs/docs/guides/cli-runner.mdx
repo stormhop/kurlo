@@ -1,10 +1,12 @@
 ---
 title: CLI runner (kurlo run and kurlo load)
-description: Run requests, test scripts and k6 load tests from a Kurlo YAML workspace in the terminal or CI.
+description: Run requests and load tests, or build collection documentation from a Kurlo YAML workspace in the terminal or CI.
 ---
 
 import DocsTopicIndex from "../../../../components/DocsTopicIndex.astro";
 
 `kurlo run` executes a [Git-backed YAML workspace](/docs/guides/git-workspaces/) from the command line — the same requests and JavaScript test scripts you run in the app, without the window. It's built for CI: a non-zero exit code fails the build when a request errors or an assertion fails.
+
+Use `kurlo docs build` to generate a self-contained HTML reference from a collection.
 
 <DocsTopicIndex />

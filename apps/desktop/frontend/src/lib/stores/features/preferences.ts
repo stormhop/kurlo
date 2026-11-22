@@ -15,7 +15,7 @@ import {
   type ThemeVariantId,
 } from '../../theme';
 import { applyUiScale, currentUiScale, saveUiScale, stepUiScale } from '../../uiScale';
-import type { HttpVersion, ProxyConfig, RequestSettings, ScriptEngine, ShortcutId, Workspace } from '../../types/models';
+import type { HttpVersion, ProxyConfig, RequestSettings, ShortcutId, Workspace } from '../../types/models';
 
 type PreferencesHost = {
   hasUnsavedEnvironmentChanges: () => boolean;
@@ -26,7 +26,6 @@ type PreferencesHost = {
   autosave: boolean;
   autosaveDelayMs: number;
   startupView: StartupView;
-  scriptEngine: ScriptEngine;
   dirtyRequestIds: Set<string>;
   httpVersion: HttpVersion;
   enableSSLVerification: boolean;
@@ -108,7 +107,6 @@ export function storableRequestSettings<T extends Partial<RequestSettings>>(sett
 const SHORTCUT_STORAGE_KEY = 'kurlo.shortcuts.v1';
 const AUTOSAVE_STORAGE_KEY = 'kurlo.autosave.v1';
 const PROXY_STORAGE_KEY = 'kurlo.proxy.v1';
-const SCRIPT_ENGINE_STORAGE_KEY = 'kurlo.scriptEngine.v1';
 
 export function shortcutPlatform(runtime = ''): string {
   const fromRuntime = runtime.split('/')[0];
@@ -333,6 +331,10 @@ export const preferencesFeature = {
       this.markRequestSettingOverride?.(field);
     }
   },
+  setClientCertField(this: PreferencesHost, field: 'clientCertPath' | 'clientKeyPath', value: string) {
+    this[field] = value;
+    this.markRequestSettingOverride?.(field);
+  },
   clearClientCertField(this: PreferencesHost, field: 'clientCertPath' | 'clientKeyPath' | 'clientKeyPassword') {
     this[field] = '';
     this.markRequestSettingOverride?.(field);
@@ -497,18 +499,6 @@ export const preferencesFeature = {
   setStartupView(this: PreferencesHost, view: StartupView) {
     this.startupView = view;
     saveStartupView(view);
-  },
-  loadScriptEngine(this: PreferencesHost) {
-    try {
-      const raw = localStorage.getItem(SCRIPT_ENGINE_STORAGE_KEY);
-      if (raw === 'js' || raw === 'tengo') this.scriptEngine = raw;
-    } catch {}
-  },
-  setScriptEngine(this: PreferencesHost, value: ScriptEngine) {
-    this.scriptEngine = value;
-    try {
-      localStorage.setItem(SCRIPT_ENGINE_STORAGE_KEY, value);
-    } catch {}
   },
   loadProxyConfig(this: PreferencesHost) {
     try {

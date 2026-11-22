@@ -736,3 +736,31 @@ test('shows one hundred variables with the add row and no empty page', async ({ 
     return store.environments.find(environment => environment.id === 'env-hundred')!.values.some(row => row.key === 'v101');
   })).toBe(true);
 });
+
+test('keeps the secret provider picker within the minimum window at 125% scale', async ({ page }) => {
+  await page.setViewportSize({ width: 1120, height: 680 });
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.keyboard.press('Control+=');
+  await page.keyboard.press('Control+=');
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).fontSize)).toBe('20px');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  await page.getByRole('button', { name: 'Add secret provider' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add a secret provider' });
+  await expect(dialog).toBeVisible();
+  const bounds = await dialog.boundingBox();
+  expect(bounds!.y).toBeGreaterThanOrEqual(0);
+  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(680);
+  const choices = dialog.getByRole('radiogroup');
+  await expect(choices.getByRole('radio')).toHaveCount(11);
+  await choices.hover();
+  await page.mouse.wheel(0, 600);
+  await expect.poll(() => choices.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
+  await choices.getByRole('radio', { name: /Environment variables/ }).click();
+  await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeInViewport({ ratio: 1 });
+  const next = dialog.getByRole('button', { name: 'Continue' });
+  await expect(next).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'add-provider-125.png'), animations: 'disabled' });
+  await next.click();
+  await expect(page.getByRole('heading', { name: 'New Environment variables' })).toBeVisible();
+});

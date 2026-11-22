@@ -21,6 +21,7 @@ const FOLDER_MAP_SEPARATOR = '\u001f';
 type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy' | 'openapi';
 
 type CollectionHost = {
+  requestFiles: import('../requestFiles.svelte').RequestFiles;
   trashCollection: (collection: import('../../types/models').Collection, requestIds: string[]) => void;
   activeCollectionSettingsId: string;
   activeRequestId: string;
@@ -300,6 +301,7 @@ export const collectionFeature = {
     const confirmed = await this.openConfirmDialog('Delete collection', `Delete "${collection.name}" and all requests inside it? You can restore it from Recently deleted until you quit Kurlo.`);
     if (!confirmed) return;
     const requestIds = this.requests.filter(request => request.collectionId === collectionId).map(request => request.id);
+    if (this.requestFiles && !await this.requestFiles.review(requestIds)) return;
     this.trashCollection(collection, requestIds);
     this.collections = this.collections.filter(candidate => candidate.id !== collectionId);
     this.requests = this.requests.filter(request => request.collectionId !== collectionId);

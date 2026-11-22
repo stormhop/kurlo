@@ -26,7 +26,7 @@ func TestEmptyScriptLeavesTheRequestUntouched(t *testing.T) {
 
 	ctx := script.NewContext(nil, nil)
 	populateScriptRequestContext(ctx, req)
-	if err := script.RunPreRequest("js", `console.log("noop")`, ctx).Error; err != "" {
+	if err := script.RunPreRequest(`console.log("noop")`, ctx).Error; err != "" {
 		t.Fatalf("script error: %s", err)
 	}
 	mergeScriptHeaders(ctx, &req)
@@ -53,7 +53,7 @@ func TestScriptWriteUpsertsOnlyTheKeyItNamed(t *testing.T) {
 	ctx := script.NewContext(nil, nil)
 	populateScriptRequestContext(ctx, req)
 	src := `pm.request.headers.set("x-multi", "written"); pm.request.params.set("tag", "written")`
-	if err := script.RunPreRequest("js", src, ctx).Error; err != "" {
+	if err := script.RunPreRequest(src, ctx).Error; err != "" {
 		t.Fatalf("script error: %s", err)
 	}
 	mergeScriptHeaders(ctx, &req)
@@ -76,7 +76,7 @@ func TestScriptWriteRevivesADisabledRowAndAppendsNewOnes(t *testing.T) {
 	ctx := script.NewContext(nil, nil)
 	populateScriptRequestContext(ctx, req)
 	src := `pm.request.headers.set("X-Trace", "new"); pm.request.headers.set("X-Fresh", "1")`
-	if err := script.RunPreRequest("js", src, ctx).Error; err != "" {
+	if err := script.RunPreRequest(src, ctx).Error; err != "" {
 		t.Fatalf("script error: %s", err)
 	}
 	mergeScriptHeaders(ctx, &req)
@@ -96,7 +96,7 @@ func TestScriptRemovalDoesNotOverwriteTheCallersRows(t *testing.T) {
 
 	ctx := script.NewContext(nil, nil)
 	populateScriptRequestContext(ctx, req)
-	if err := script.RunPreRequest("js", `pm.request.headers.unset("X-Drop")`, ctx).Error; err != "" {
+	if err := script.RunPreRequest(`pm.request.headers.unset("X-Drop")`, ctx).Error; err != "" {
 		t.Fatalf("script error: %s", err)
 	}
 	mergeScriptHeaders(ctx, &req)

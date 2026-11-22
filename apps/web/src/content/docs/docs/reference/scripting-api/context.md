@@ -13,6 +13,10 @@ Read-only facts about the current run.
 | `pm.info.iteration` | Current iteration (1-based) |
 | `pm.info.iterationCount` | Total iterations in this run |
 
+In a collection or folder script, type `pm.info.requestName === "` to pick a saved request from the current collection.
+
+![Request name suggestions in a test script](../../../../../assets/screenshots/script-completion-requests.png)
+
 ## `pm.cookies`
 
 Read-only access to the cookies the request's jar would send for this URL. Domain, path, and `Secure` matching is already applied.

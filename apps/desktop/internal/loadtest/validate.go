@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dop251/goja/parser"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
 
@@ -166,6 +167,13 @@ func (v *validator) arrivalPool(executor model.LoadExecutor) {
 	}
 }
 
+func extractionPattern(pattern string) (*regexp.Regexp, error) {
+	if _, err := parser.TransformRegExp(pattern, false, false); err != nil {
+		return nil, err
+	}
+	return regexp.Compile(pattern)
+}
+
 func (v *validator) extract(number int, extract model.LoadExtract) {
 	if !variableName.MatchString(extract.Var) {
 		v.add("Step %d: %q is not a valid variable name. Use letters, digits and _, not starting with a digit.", number, extract.Var)
@@ -174,13 +182,15 @@ func (v *validator) extract(number int, extract model.LoadExtract) {
 	case "json":
 		if !strings.HasPrefix(strings.TrimSpace(extract.Path), "$") {
 			v.add("Step %d: the JSON path for %s must start with $.", number, extract.Var)
+		} else if _, err := jsonPathToGJSON(extract.Path); err != nil {
+			v.add("Step %d: the JSON path for %s is invalid: %s.", number, extract.Var, err)
 		}
 	case "header":
 		if strings.TrimSpace(extract.Path) == "" {
 			v.add("Step %d: name the header to save as %s.", number, extract.Var)
 		}
 	case "regex":
-		pattern, err := regexp.Compile(extract.Path)
+		pattern, err := extractionPattern(extract.Path)
 		if err != nil {
 			v.add("Step %d: the pattern for %s is not a valid regular expression.", number, extract.Var)
 		} else if pattern.NumSubexp() != 1 {
@@ -201,6 +211,8 @@ func (v *validator) check(number int, check model.LoadCheck) {
 	case "jsonExists":
 		if !strings.HasPrefix(strings.TrimSpace(check.Path), "$") {
 			v.add("Step %d: the JSON path to check must start with $.", number)
+		} else if _, err := jsonPathToGJSON(check.Path); err != nil {
+			v.add("Step %d: the JSON path to check %q is invalid: %s.", number, check.Path, err)
 		}
 	case "bodyContains":
 		if check.Value == "" {

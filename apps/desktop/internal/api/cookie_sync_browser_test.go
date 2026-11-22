@@ -82,7 +82,7 @@ func TestCookieSyncWithARealBrowserExtension(t *testing.T) {
 
 	cmd := exec.CommandContext(ctx, "node", "e2e/cookie-sync-extension.mjs")
 	cmd.Dir = filepath.Join(root, "apps", "desktop", "frontend")
-	cmd.Env = append(os.Environ(),
+	cmd.Env = append(playwrightTestEnv(os.Environ()),
 		"KURLO_BRIDGE_PORT="+strconv.Itoa(harness.port),
 		"KURLO_EXTENSION_DIR="+filepath.Join(root, "apps", "desktop", "extension"),
 		"KURLO_COOKIE_DOMAIN=kurlo.test",

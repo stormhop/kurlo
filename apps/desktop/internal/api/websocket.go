@@ -17,7 +17,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/auth"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const websocketWriteTimeout = 10 * time.Second
@@ -152,31 +151,31 @@ func (m *websocketManager) runtimeCallbacks(appCtx context.Context, sessionID st
 
 	batch := newEventBatcher[model.WebSocketMessage](maxBatchSize, batchWindow,
 		func(ev model.WebSocketMessage) {
-			runtime.EventsEmit(appCtx, "ws:event", model.WebSocketPayload{SessionID: sessionID, Event: ev})
+			emitRealtime(appCtx, sessionID, "ws:event", model.WebSocketPayload{SessionID: sessionID, Event: ev})
 		},
 		func(events []model.WebSocketMessage) {
-			runtime.EventsEmit(appCtx, "ws:events", model.WebSocketBatchPayload{SessionID: sessionID, Events: events})
+			emitRealtime(appCtx, sessionID, "ws:events", model.WebSocketBatchPayload{SessionID: sessionID, Events: events})
 		},
 	)
 
 	return websocketCallbacks{
 		onOpen: func(ev model.WebSocketOpenEvent) {
-			runtime.EventsEmit(appCtx, "ws:open", ev)
+			emitRealtime(appCtx, sessionID, "ws:open", ev)
 		},
 		onEvent: func(ev model.WebSocketMessage) {
 			batch.add(ev)
 		},
 		onClose: func(ev model.WebSocketCloseEvent) {
 			batch.flush()
-			runtime.EventsEmit(appCtx, "ws:close", ev)
+			emitRealtime(appCtx, sessionID, "ws:close", ev)
 		},
 		onError: func(ev model.WebSocketErrorEvent) {
 			batch.flush()
-			runtime.EventsEmit(appCtx, "ws:error", ev)
+			emitRealtime(appCtx, sessionID, "ws:error", ev)
 		},
 		onReconnect: func(ev model.WebSocketReconnectEvent) {
 			batch.flush()
-			runtime.EventsEmit(appCtx, "ws:reconnecting", ev)
+			emitRealtime(appCtx, sessionID, "ws:reconnecting", ev)
 		},
 	}
 }

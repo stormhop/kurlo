@@ -38,8 +38,6 @@ function request(overrides: Partial<SavedRequest>): SavedRequest {
     bodyFilePath: '',
     bodyFileName: '',
     formRows: [],
-    preRequestScript: '',
-    testScript: '',
     preRequestScriptJs: '',
     testScriptJs: '',
     requestNotes: '',
