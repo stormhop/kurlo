@@ -33,6 +33,32 @@ func (r *Recorder) Clear() Status {
 	return status
 }
 
+func (r *Recorder) Delete(ids []int64) Status {
+	selected := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		selected[id] = true
+	}
+	r.mu.Lock()
+	removed := false
+	for i, x := range r.ring {
+		if x != nil && selected[x.Entry.ID] {
+			if r.files != nil {
+				r.files.remove(x.Request.file)
+				r.files.remove(x.Response.file)
+			}
+			r.ring[i] = nil
+			removed = true
+		}
+	}
+	s := r.run
+	status := r.status()
+	r.mu.Unlock()
+	if removed && s != nil {
+		s.changed()
+	}
+	return status
+}
+
 func (r *Recorder) Search(query string, decode func(http.Header, string, int) (string, bool)) []SearchHit {
 	needle := strings.ToLower(strings.TrimSpace(query))
 	if needle == "" {

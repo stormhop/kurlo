@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { installKurloBridge } from './support/bridge';
-import type { ProxyConfig, ProxyEntry } from '../src/lib/wire';
+import type { ProxyConfig, ProxyEntry, ProxyRule } from '../src/lib/wire';
 
 test('capture, inspect a tunnel and save an HTTP request with its example', async ({ page }) => {
   await installKurloBridge(page);
@@ -268,4 +268,129 @@ test('search captured bodies and clear the list while recording', async ({ page 
   await expect(page.locator('.capture-row')).toHaveCount(0);
   await expect(page.locator('.capture .empty-state')).toContainText('Waiting for traffic');
   await expect(page.getByRole('button', { name: 'Clear', exact: true })).toBeDisabled();
+});
+
+async function installRulesCapture(page: import('@playwright/test').Page) {
+  await page.evaluate(() => {
+    document.documentElement.dataset.platform = 'darwin';
+    let rows: ProxyEntry[] = ['/orders/1', '/orders/2', '/cart', '/profile'].map((path, index) => ({ id: index + 1, started: '2026-11-18T14:32:00Z', duration: 10, sent: 0, received: 20, host: 'shop.test', url: 'https://shop.test' + path + (index === 0 ? '?expand=items' : ''), method: index === 2 ? 'POST' : 'GET', path, status: 200 }));
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    let rules: ProxyRule[] = [];
+    const calls: { rules: ProxyRule[][]; deleted: number[][]; har: number[][] } = { rules: [], deleted: [], har: [] };
+    (window as unknown as { captureCalls: typeof calls }).captureCalls = calls;
+    const status = () => ({ running: true, address: '127.0.0.1:9090', count: rows.length, config, rules: rules.filter(rule => rule.enabled).length, systemProxy: false });
+    const msg = { headers: { 'Content-Type': ['application/json'] }, body: '{"id":1}', binary: false, truncated: false };
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [...rows],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async (id: number) => ({ entry: rows.find(row => row.id === id), request: { ...msg, body: '' }, response: msg }),
+      ProxyCaptureHAR: async (ids: number[]) => { calls.har.push(ids); return JSON.stringify({ log: { entries: [] } }); },
+      ProxyRules: async () => rules.map(rule => ({ ...rule })),
+      SetProxyRules: async (next: ProxyRule[]) => {
+        if (next.some(rule => rule.url.includes('reject'))) throw new Error('Orders: start the URL pattern with http://, https:// or *://');
+        calls.rules.push(JSON.parse(JSON.stringify(next)));
+        rules = next.map(rule => ({ ...rule, hits: rule.id === next[0]?.id ? 3 : 0 }));
+        return rules;
+      },
+      DeleteProxyEntries: async (ids: number[]) => { calls.deleted.push(ids); rows = rows.filter(row => !ids.includes(row.id)); return status(); },
+    });
+  });
+}
+
+test('create, edit, order and remove capture rules', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await installRulesCapture(page);
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await page.getByRole('button', { name: 'https://shop.test/orders/1?expand=items', exact: true }).click();
+  await page.getByRole('button', { name: 'Map local', exact: true }).click();
+  const editor = page.getByRole('dialog', { name: 'New Map local rule' });
+  const pattern = editor.getByPlaceholder('https://api.example.com/orders/*');
+  await expect(pattern).toHaveValue('https://shop.test/orders/1');
+  await expect(editor.getByText('Matches 1 recorded request')).toBeVisible();
+  await expect(editor.getByLabel('Local response body')).toHaveValue('{\n  "id": 1\n}');
+  await pattern.fill('https://shop.test/orders/*');
+  await expect(editor.getByText('Matches 2 recorded requests')).toBeVisible();
+  await pattern.fill('shop.test/orders');
+  await expect(editor.getByText('Start with http://, https:// or *:// and include a host.')).toBeVisible();
+  await pattern.fill('https://shop.test/orders/*');
+  await editor.getByLabel('Name').fill('reject me');
+  await editor.getByLabel('Name').fill('Orders');
+  await editor.getByRole('button', { name: 'Add rule' }).click();
+  await expect(editor).toHaveCount(0);
+  const drawer = page.getByRole('complementary', { name: 'Capture rules' });
+  await expect(drawer.getByRole('listitem').filter({ hasText: 'Orders' })).toContainText('Responds 200 · used 3 times');
+  await expect(page.locator('.capture .mock-head').getByText('1 rule on')).toBeVisible();
+
+  await drawer.getByRole('button', { name: 'Add Rewrite' }).click();
+  const rewrite = page.getByRole('dialog', { name: 'New Rewrite rule' });
+  await rewrite.getByPlaceholder('https://api.example.com/orders/*').fill('https://shop.test/reject/*');
+  await rewrite.getByPlaceholder('Keep the original server, or http://localhost:3000').fill('http://localhost:3000');
+  await rewrite.getByRole('button', { name: 'Add header' }).first().click();
+  await rewrite.getByLabel('Request header name 1').fill('X-Env');
+  await rewrite.getByLabel('Request header value 1').fill('dev');
+  await rewrite.getByRole('button', { name: 'Add rule' }).click();
+  await expect(rewrite.getByRole('alert')).toContainText('start the URL pattern');
+  await rewrite.getByPlaceholder('https://api.example.com/orders/*').fill('https://shop.test/api/*');
+  await rewrite.getByRole('button', { name: 'Add rule' }).click();
+  await expect(rewrite).toHaveCount(0);
+  await expect(drawer.getByRole('listitem')).toHaveCount(2);
+  await expect(drawer.getByRole('listitem').nth(1)).toContainText('to http://localhost:3000 · 1 request header change');
+
+  const shot = process.env.KURLO_PROXY_RULES_SCREENSHOT;
+  if (shot) await page.screenshot({ path: shot, animations: 'disabled' });
+
+  await drawer.getByRole('button', { name: 'Move https://shop.test/api/* up' }).click();
+  await expect(drawer.getByRole('listitem').first()).toContainText('Rewrite');
+  await drawer.locator('.capture-rule').filter({ hasText: 'Orders' }).locator('.switch-track').click();
+  await expect(drawer.getByLabel('Turn on Orders')).toBeVisible();
+  await drawer.getByRole('button', { name: 'Delete https://shop.test/api/*' }).click();
+  await drawer.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(drawer.getByRole('listitem')).toHaveCount(1);
+  const saved = await page.evaluate(() => (window as unknown as { captureCalls: { rules: ProxyRule[][] } }).captureCalls.rules);
+  expect(saved.map(list => list.map(rule => `${rule.kind}:${rule.enabled}`))).toEqual([
+    ['local:true'], ['local:true', 'rewrite:true'], ['rewrite:true', 'local:true'], ['rewrite:true', 'local:false'], ['local:false'],
+  ]);
+  expect(saved[1][1].rewrite.setRequestHeaders).toEqual([{ name: 'X-Env', value: 'dev' }]);
+  await drawer.getByRole('button', { name: 'Close rules' }).click();
+  await expect(drawer).toHaveCount(0);
+});
+
+test('select several captured rows and act on them', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await installRulesCapture(page);
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const row = (path: string) => page.locator('.capture-row').filter({ hasText: path });
+  await row('/orders/1').click();
+  await row('/cart').click({ modifiers: ['Shift'] });
+  await expect(page.getByText('3 selected')).toBeVisible();
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await row('/orders/2').click({ modifiers: [modifier] });
+  await expect(page.getByText('2 selected')).toBeVisible();
+  await expect(row('/orders/2')).not.toHaveClass(/selected/);
+  await page.getByRole('button', { name: 'Export HAR' }).click();
+  await page.getByRole('button', { name: 'Save as requests…' }).click();
+  await expect(page.getByRole('dialog', { name: 'Save 2 requests' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Save 2 requests' }).getByLabel('Request name')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await row('/cart').focus();
+  await page.keyboard.press(`${modifier}+a`);
+  await expect(page.getByText('4 selected')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.capture-selection')).toHaveCount(0);
+  await row('/orders/2').click();
+  await row('/profile').click({ modifiers: ['Shift'] });
+  const shot = process.env.KURLO_PROXY_SELECT_SCREENSHOT;
+  if (shot) await page.screenshot({ path: shot, animations: 'disabled' });
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await expect(page.locator('.capture-row')).toHaveCount(1);
+  await expect(row('/orders/1')).toHaveClass(/active/);
+  const calls = await page.evaluate(() => (window as unknown as { captureCalls: { deleted: number[][]; har: number[][] } }).captureCalls);
+  expect(calls.har[0]).toEqual([1, 3]);
+  expect(calls.deleted).toEqual([[2, 3, 4]]);
 });

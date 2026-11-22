@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,6 +35,7 @@ func (a *App) StartProxyCapture(config proxycapture.Config) (proxycapture.Status
 		}
 	}
 	config.AuthorityDir = captureAuthorityDir()
+	a.loadCaptureRules()
 	batch := newEventBatcher(256, 100*time.Millisecond, func(struct{}) { emit() }, func([]struct{}) { emit() })
 	status, err := a.capture.Start(config, func() { batch.add(struct{}{}) })
 	if err != nil || !config.SystemProxy {
@@ -50,7 +53,10 @@ func (a *App) StopProxyCapture() (proxycapture.Status, error) {
 	return a.withSystemProxy(status), err
 }
 
-func (a *App) ProxyCaptureStatus() proxycapture.Status { return a.withSystemProxy(a.capture.Status()) }
+func (a *App) ProxyCaptureStatus() proxycapture.Status {
+	a.loadCaptureRules()
+	return a.withSystemProxy(a.capture.Status())
+}
 
 func (a *App) withSystemProxy(status proxycapture.Status) proxycapture.Status {
 	status.SystemProxy = status.Running && newSystemProxy().Active()
@@ -138,6 +144,7 @@ func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) i
 		return nil
 	})
 	systemProxy := fs.Bool("system-proxy", false, "set this proxy as the system automatic proxy while recording")
+	rulesFile := fs.String("rules", "", "apply Map local and Rewrite rules from a JSON file")
 	processes := fs.Bool("process", false, "identify local macOS client processes when available")
 	out := fs.String("out", "", "write the HTTP session as HAR on exit")
 	if err := fs.Parse(args); err != nil {
@@ -152,6 +159,16 @@ func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) i
 	}
 	var recorder proxycapture.Recorder
 	defer recorder.Close()
+	if *rulesFile != "" {
+		rules, err := readCaptureRules(*rulesFile)
+		if err == nil {
+			err = recorder.SetRules(rules)
+		}
+		if err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+	}
 	status, err := recorder.Start(proxycapture.Config{Port: *port, Include: *include, Service: *service, Certificate: *cert, Key: *key, ListenIP: *listen, ClientIP: *peer, IdentifyProcess: *processes, SSLHosts: sslHosts, AuthorityDir: captureAuthorityDir()}, nil)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -185,11 +202,6 @@ func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) i
 	fmt.Fprintf(stdout, "Captured %d entries\n", recorder.Status().Count)
 	return 0
 }
-
-func (a *App) SetProxyLocalResponse(rule proxycapture.LocalResponse) error {
-	return a.capture.SetLocalResponse(rule)
-}
-func (a *App) ClearProxyLocalResponses() { a.capture.ClearLocalResponses() }
 
 func (a *App) ProxyPausedResponses() []proxycapture.Paused { return a.capture.Paused() }
 func (a *App) ResumeProxyResponse(id int64, status int, body string) error {
@@ -266,4 +278,64 @@ func decodeCapturePreview(headers http.Header, raw string, limit int) (string, b
 		return "", false
 	}
 	return strings.ToValidUTF8(string(body), ""), true
+}
+
+var captureRulesPath = func() string { return filepath.Join(requestStoreDir(), "capture-rules.json") }
+
+func readCaptureRules(path string) ([]proxycapture.Rule, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var rules []proxycapture.Rule
+	if err := json.Unmarshal(data, &rules); err != nil {
+		return nil, fmt.Errorf("read capture rules: %w", err)
+	}
+	return rules, nil
+}
+
+func (a *App) loadCaptureRules() {
+	a.captureRulesOnce.Do(func() {
+		rules, err := readCaptureRules(captureRulesPath())
+		if err == nil {
+			err = a.capture.SetRules(rules)
+		}
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Printf("kurlo: capture rules: %v", err)
+		}
+	})
+}
+
+func (a *App) ProxyRules() []proxycapture.Rule {
+	a.loadCaptureRules()
+	return a.capture.Rules()
+}
+
+func (a *App) SetProxyRules(rules []proxycapture.Rule) ([]proxycapture.Rule, error) {
+	a.loadCaptureRules()
+	if rules == nil {
+		rules = []proxycapture.Rule{}
+	}
+	if err := a.capture.SetRules(rules); err != nil {
+		return a.capture.Rules(), err
+	}
+	saved := a.capture.Rules()
+	for i := range saved {
+		saved[i].Hits = 0
+	}
+	data, err := json.MarshalIndent(saved, "", "  ")
+	if err == nil {
+		err = os.MkdirAll(filepath.Dir(captureRulesPath()), 0o700)
+	}
+	if err == nil {
+		err = replaceFileAtomicMode(captureRulesPath(), append(data, '\n'), 0o600)
+	}
+	if err != nil {
+		return a.capture.Rules(), fmt.Errorf("could not save capture rules: %w", err)
+	}
+	return a.capture.Rules(), nil
+}
+
+func (a *App) DeleteProxyEntries(ids []int64) proxycapture.Status {
+	return a.withSystemProxy(a.capture.Delete(ids))
 }

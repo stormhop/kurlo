@@ -5452,6 +5452,8 @@ export namespace proxycapture {
 	    inProgress?: boolean;
 	    process?: string;
 	    local?: boolean;
+	    rule?: string;
+	    rewritten?: string;
 	    id: number;
 	    started: string;
 	    method: string;
@@ -5474,6 +5476,8 @@ export namespace proxycapture {
 	        this.inProgress = source["inProgress"];
 	        this.process = source["process"];
 	        this.local = source["local"];
+	        this.rule = source["rule"];
+	        this.rewritten = source["rewritten"];
 	        this.id = source["id"];
 	        this.started = source["started"];
 	        this.method = source["method"];
@@ -5562,32 +5566,44 @@ export namespace proxycapture {
 		}
 	}
 	
-	export class LocalResponse {
-	    pause: boolean;
-	    script: string;
-	    entryId: number;
-	    status: number;
-	    contentType: string;
-	    body: string;
-	    rateKiB: number;
-	    delayMs: number;
-	    errorPercent: number;
+	export class HeaderValue {
+	    name: string;
+	    value: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new LocalResponse(source);
+	        return new HeaderValue(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.pause = source["pause"];
-	        this.script = source["script"];
-	        this.entryId = source["entryId"];
+	        this.name = source["name"];
+	        this.value = source["value"];
+	    }
+	}
+	export class LocalAnswer {
+	    status: number;
+	    contentType: string;
+	    body: string;
+	    delayMs: number;
+	    rateKiB: number;
+	    errorPercent: number;
+	    pause: boolean;
+	    script: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LocalAnswer(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.status = source["status"];
 	        this.contentType = source["contentType"];
 	        this.body = source["body"];
-	        this.rateKiB = source["rateKiB"];
 	        this.delayMs = source["delayMs"];
+	        this.rateKiB = source["rateKiB"];
 	        this.errorPercent = source["errorPercent"];
+	        this.pause = source["pause"];
+	        this.script = source["script"];
 	    }
 	}
 	
@@ -5610,6 +5626,94 @@ export namespace proxycapture {
 	        this.status = source["status"];
 	        this.body = source["body"];
 	    }
+	}
+	export class RewriteAction {
+	    target: string;
+	    pathFrom: string;
+	    pathTo: string;
+	    setRequestHeaders: HeaderValue[];
+	    removeRequestHeaders: string[];
+	    setResponseHeaders: HeaderValue[];
+	    removeResponseHeaders: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new RewriteAction(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.target = source["target"];
+	        this.pathFrom = source["pathFrom"];
+	        this.pathTo = source["pathTo"];
+	        this.setRequestHeaders = this.convertValues(source["setRequestHeaders"], HeaderValue);
+	        this.removeRequestHeaders = source["removeRequestHeaders"];
+	        this.setResponseHeaders = this.convertValues(source["setResponseHeaders"], HeaderValue);
+	        this.removeResponseHeaders = source["removeResponseHeaders"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Rule {
+	    id: string;
+	    name: string;
+	    enabled: boolean;
+	    kind: string;
+	    method: string;
+	    url: string;
+	    local: LocalAnswer;
+	    rewrite: RewriteAction;
+	    hits: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Rule(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.enabled = source["enabled"];
+	        this.kind = source["kind"];
+	        this.method = source["method"];
+	        this.url = source["url"];
+	        this.local = this.convertValues(source["local"], LocalAnswer);
+	        this.rewrite = this.convertValues(source["rewrite"], RewriteAction);
+	        this.hits = source["hits"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class SearchHit {
 	    id: number;

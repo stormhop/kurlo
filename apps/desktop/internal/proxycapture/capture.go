@@ -40,6 +40,8 @@ type Entry struct {
 	InProgress bool   `json:"inProgress,omitempty"`
 	Process    string `json:"process,omitempty"`
 	Local      bool   `json:"local,omitempty"`
+	Rule       string `json:"rule,omitempty"`
+	Rewritten  string `json:"rewritten,omitempty"`
 	ID         int64  `json:"id"`
 	Started    string `json:"started"`
 	Method     string `json:"method"`
@@ -71,7 +73,6 @@ func (m Message) EncodedPreview() io.Reader {
 }
 
 type Exchange struct {
-	route    localRoute
 	Frames   []Frame `json:"frames,omitempty"`
 	Entry    Entry   `json:"entry"`
 	Request  Message `json:"request"`
@@ -89,6 +90,7 @@ type Status struct {
 
 type Recorder struct {
 	files   *bodyFiles
+	rules   ruleSet
 	config  Config
 	mu      sync.Mutex
 	run     *session
@@ -108,7 +110,7 @@ type session struct {
 	service         *serviceTLS
 	clientIP        net.IP
 	identifyProcess bool
-	rules           map[localRoute]LocalResponse
+	rules           *ruleSet
 	server          *http.Server
 	transport       *http.Transport
 	serviceHTTP     *http.Transport
@@ -166,7 +168,7 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 	if notify == nil {
 		notify = func() {}
 	}
-	s := &session{files: &bodyFiles{}, changed: notify, pauses: make(map[int64]pauseSlot), service: service, clientIP: peer, identifyProcess: config.IdentifyProcess, rules: make(map[localRoute]LocalResponse), authority: authority, authorityDir: config.AuthorityDir, sslHosts: sslHosts, addr: ln.Addr().(*net.TCPAddr), ctx: ctx, cancel: cancel, include: strings.ToLower(strings.TrimSpace(config.Include))}
+	s := &session{files: &bodyFiles{}, changed: notify, pauses: make(map[int64]pauseSlot), service: service, clientIP: peer, identifyProcess: config.IdentifyProcess, rules: &r.rules, authority: authority, authorityDir: config.AuthorityDir, sslHosts: sslHosts, addr: ln.Addr().(*net.TCPAddr), ctx: ctx, cancel: cancel, include: strings.ToLower(strings.TrimSpace(config.Include))}
 	s.transport = s.newTransport(nil)
 	if service != nil {
 		s.serviceHTTP = s.newTransport(service.upstream)
@@ -196,7 +198,12 @@ func (r *Recorder) beginSession(s *session, config Config, address string) {
 		if x.Entry.ID != 0 {
 			if x.Entry.ID > r.next-int64(r.count) && x.Entry.ID <= r.next {
 				idx := (r.cursor - 1 - int(r.next-x.Entry.ID) + capacity) % capacity
-				r.ring[idx] = &x
+				if r.ring[idx] != nil {
+					r.ring[idx] = &x
+				} else {
+					s.files.remove(x.Request.file)
+					s.files.remove(x.Response.file)
+				}
 			} else {
 				s.files.remove(x.Request.file)
 				s.files.remove(x.Response.file)
@@ -282,19 +289,24 @@ func (r *Recorder) Close() {
 	}
 }
 func (r *Recorder) status() Status {
-	rules := 0
-	if r.run != nil {
-		r.run.mu.Lock()
-		rules = len(r.run.rules)
-		r.run.mu.Unlock()
+	return Status{Config: r.config, Rules: r.rules.enabled(), Running: r.run != nil, Address: r.address, Count: r.liveCount()}
+}
+func (r *Recorder) liveCount() int {
+	count := 0
+	for _, x := range r.ring {
+		if x != nil {
+			count++
+		}
 	}
-	return Status{Config: r.config, Rules: rules, Running: r.run != nil, Address: r.address, Count: r.count}
+	return count
 }
 func (r *Recorder) Status() Status { r.mu.Lock(); defer r.mu.Unlock(); return r.status() }
 func (r *Recorder) snapshotLocked() []*Exchange {
 	items := make([]*Exchange, 0, r.count)
 	for i := 0; i < r.count; i++ {
-		items = append(items, r.ring[(r.cursor-r.count+i+capacity)%capacity])
+		if x := r.ring[(r.cursor-r.count+i+capacity)%capacity]; x != nil {
+			items = append(items, x)
+		}
 	}
 	return items
 }
@@ -315,6 +327,9 @@ func (r *Recorder) Get(id int64) (Exchange, error) {
 		return Exchange{}, errors.New("capture entry is no longer available")
 	}
 	idx := (r.cursor - 1 - int(r.next-id) + capacity) % capacity
+	if r.ring[idx] == nil {
+		return Exchange{}, errors.New("capture entry is no longer available")
+	}
 	return *r.ring[idx], nil
 }
 
@@ -404,6 +419,7 @@ type trace struct {
 	newStream      func(string, int, http.Header) *streamTap
 	sent, received preview
 	response       http.Header
+	rewrites       []*compiledRule
 	failed         bool
 }
 
@@ -519,7 +535,6 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		x.route = routeFor(r)
 		x.Entry.URL = displayURL(r.URL)
 		x.Entry.Path = r.URL.EscapedPath()
 		if x.Entry.Path == "" {
@@ -538,6 +553,8 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				live.Entry.Status = code
 				live.Entry.InProgress = true
 				live.Request.Headers = copyHeaders(r.Header)
+				live.Entry.Rule = x.Entry.Rule
+				live.Entry.Rewritten = x.Entry.Rewritten
 				live.Response.Headers = headers
 				live.Entry.ID = s.record(live)
 				return &streamTap{base: live, start: start, publish: s.record}
@@ -547,6 +564,12 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		defer tr.discardUnfinished()
 		req := r.WithContext(context.WithValue(r.Context(), traceKey{}, tr))
+		if rewrites := s.rules.matching(RuleRewrite, r); len(rewrites) > 0 {
+			applyRequestRewrites(req, rewrites)
+			tr.rewrites = rewrites
+			x.Entry.Rule = ruleNames(rewrites)
+			x.Entry.Rewritten = displayURL(req.URL)
+		}
 		if r.Body != nil {
 			req.Body = readerWithClose{Reader: io.TeeReader(r.Body, &tr.sent), Closer: r.Body}
 		}

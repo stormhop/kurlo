@@ -89,11 +89,37 @@ For a second device, choose your computer's private LAN interface address in **S
 
 Kurlo retains the latest 1,000 entries. Stopping preserves the session for inspection. Starting another session clears it. Body previews show up to 16 KiB. Larger HTTP bodies can be exported in full up to 8 MiB per body and 64 MiB of temporary file storage per session. When a limit is reached, the HAR marks the preview incomplete. Check bodies and paths before sharing a HAR. They can contain application data.
 
-## Try a local response
+## Change traffic with rules
 
-While recording, select an HTTP exchange and click **Map local**. Enter a status, content type and body, load a text file, or choose a saved response example. The next request with the same method and full URL receives this local response. Under **Network conditions**, a rule can add a delay, limit the speed in KiB/s, return HTTP 503 at a chosen rate, or pause before sending. Paused responses appear above the traffic list. Open one, edit it, and click **Release response** within 60 seconds.
+Click **Rules** in the header to open the rule list. Rules are saved on this computer and apply whenever Kurlo records. Turn a rule off with its switch to keep it for later.
 
-Optional JavaScript functions `onRequest(request, response)` and `onResponse(request, response)` run in order for that local rule. Read `request.method` and `request.path`, and set `response.status` or `response.body`. Use **Settings → Connection → Clear local responses** to remove all rules for the session.
+- **Map local** answers matching requests with your own status, content type and body. Nothing is sent to the server. Load the body from a text file or a saved response example. Under **Network conditions**, add a delay, limit the speed in KiB/s, return HTTP 503 at a chosen rate, or pause before sending. Paused responses appear above the traffic list. Open one, edit it, and click **Release response** within 60 seconds. Optional JavaScript functions `onRequest(request, response)` and `onResponse(request, response)` can read `request.method` and `request.path` and set `response.status` or `response.body`.
+- **Rewrite** changes matching requests before Kurlo sends them. **Send to** moves them to another server, such as `http://localhost:3000`. **Replace in path** swaps the first occurrence of a path part, such as `/v1/` for `/v2/`. Add, replace or remove request headers and response headers.
+
+To start from a recorded request, select it and click **Map local** or **Rewrite**. The rule takes its method and URL, and Map local also takes its status and body.
+
+![Rules panel with a Map local rule and a Rewrite rule](../../../../assets/screenshots/capture-proxy-rules.png)
+
+**URL patterns** use `*` for any characters. They match the scheme, host, port and path. Host names ignore letter case, paths do not.
+
+| Pattern | Matches |
+|---|---|
+| `https://api.example.com/orders/*` | Every path under `/orders/` on that host, with any query |
+| `https://api.example.com` | Every path on that host |
+| `*://api.example.com/*` | HTTP and HTTPS |
+| `https://*.example.com/*` | Every subdomain of `example.com` |
+| `http://localhost:*/api/*` | Any local port |
+| `https://api.example.com/search?q=*` | Only requests with that query |
+
+While you type a pattern, the editor shows how many recorded requests it matches. Leave **Method** at **Any method** to match every method.
+
+Kurlo checks rules from top to bottom. The first matching Map local rule answers the request, and then no Rewrite rule applies. Otherwise every matching Rewrite rule applies in order. Use the arrows to change the order. Rows show **Map local** or **Rewrite** when a rule changed them, and the details name the rule and the new address. Each rule counts how often it was used since Kurlo started.
+
+HTTPS requests need [decryption](#decrypt-https-for-selected-hosts) for rules to see them.
+
+## Work with several requests
+
+Shift-click to select a range of rows, and Cmd-click on macOS or Ctrl-click to add or remove one row. Cmd+A or Ctrl+A selects every row that matches the filters, and Escape returns to one row. With several rows selected, save them as requests in one collection and folder, export them as HAR, send them to the agent, or delete them. Delete or Backspace removes the selected rows from the list.
 
 ## Record from a terminal
 
@@ -101,7 +127,7 @@ Optional JavaScript functions `onRequest(request, response)` and `onResponse(req
 kurlo proxy --port 9090 --include api.dev.test --out session.har
 ```
 
-Point the client at the proxy while the command runs, or add `--system-proxy` to set Kurlo as the system proxy until the command exits. Press Ctrl+C to stop and write the HAR. Add `--ssl-host api.dev.test` to decrypt HTTPS for a host with the Kurlo certificate. Repeat the flag or separate hosts with commas. `kurlo proxy ca` shows the certificate path, fingerprint and whether this system trusts it, and `kurlo proxy ca --pem` prints the certificate. Use `--service api.dev.test:443 --cert service.pem --key service-key.pem` to inspect a service with its own certificate instead. Run `kurlo proxy --help` for LAN and process options.
+Point the client at the proxy while the command runs, or add `--system-proxy` to set Kurlo as the system proxy until the command exits. Press Ctrl+C to stop and write the HAR. Add `--rules rules.json` to apply rules from a file with the same format Kurlo saves in its configuration folder as `capture-rules.json`. Add `--ssl-host api.dev.test` to decrypt HTTPS for a host with the Kurlo certificate. Repeat the flag or separate hosts with commas. `kurlo proxy ca` shows the certificate path, fingerprint and whether this system trusts it, and `kurlo proxy ca --pem` prints the certificate. Use `--service api.dev.test:443 --cert service.pem --key service-key.pem` to inspect a service with its own certificate instead. Run `kurlo proxy --help` for LAN and process options.
 
 To share endpoint metadata with an MCP client, start `kurlo mcp /path/to/workspace --capture-har /path/to/session.har`. The capture tools expose method, host, path, status and duration. Use `check_captured_openapi` with a synced collection and host to compare observed methods and paths with its saved specification.
 

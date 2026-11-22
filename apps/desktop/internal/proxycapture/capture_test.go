@@ -39,6 +39,9 @@ func startRecorder(t *testing.T, c Config) (*Recorder, *http.Client) {
 	t.Cleanup(func() { transport.CloseIdleConnections(); r.Close() })
 	return r, &http.Client{Transport: transport, Timeout: 3 * time.Second}
 }
+func localRule(id, method, pattern string, answer LocalAnswer) Rule {
+	return Rule{ID: id, Name: id, Enabled: true, Kind: RuleLocal, Method: method, URL: pattern, Local: answer}
+}
 func responseText(t *testing.T, resp *http.Response, err error) string {
 	t.Helper()
 	if err != nil {
@@ -83,7 +86,7 @@ func TestCaptureHTTPMappingAndHAR(t *testing.T) {
 	if err != nil || !json.Valid([]byte(har)) || strings.Contains(har, "sensitive") || strings.Contains(har, "never-save") || strings.Contains(har, "Bearer private") {
 		t.Fatal(har, err)
 	}
-	if err := r.SetLocalResponse(LocalResponse{EntryID: x.Entry.ID, Status: 202, Body: "fixture", ContentType: "text/plain"}); err != nil {
+	if err := r.SetRules([]Rule{localRule("fixture", "POST", target.URL+"/echo?token=sensitive&sort=id", LocalAnswer{Status: 202, Body: "fixture", ContentType: "text/plain"})}); err != nil {
 		t.Fatal(err)
 	}
 	resp, err = client.Post(target.URL+"/echo?token=sensitive&sort=id", "text/plain", strings.NewReader(payload))
@@ -95,7 +98,9 @@ func TestCaptureHTTPMappingAndHAR(t *testing.T) {
 	if resp.StatusCode == 202 {
 		t.Fatal("rule matched a different URL")
 	}
-	r.ClearLocalResponses()
+	if err := r.SetRules(nil); err != nil {
+		t.Fatal(err)
+	}
 	resp, err = client.Post(target.URL+"/echo?sort=id", "text/plain", nil)
 	responseText(t, resp, err)
 	if resp.StatusCode != 400 || upstreamCalls.Load() != 3 {
@@ -246,8 +251,8 @@ func TestLocalBreakpointHooksAndResume(t *testing.T) {
 	r, client := startRecorder(t, Config{})
 	resp, err := client.Get(target.URL)
 	responseText(t, resp, err)
-	config := LocalResponse{EntryID: r.Entries()[0].ID, Status: 200, Body: "test", Pause: true, Script: "function onResponse(req, res) { res.status = 203; res.body += ' edited'; }"}
-	if err = r.SetLocalResponse(config); err != nil {
+	config := localRule("pause", "GET", target.URL+"/", LocalAnswer{Status: 200, Body: "test", Pause: true, Script: "function onResponse(req, res) { res.status = 203; res.body += ' edited'; }"})
+	if err = r.SetRules([]Rule{config}); err != nil {
 		t.Fatal(err)
 	}
 	type result struct {
@@ -281,10 +286,10 @@ func TestLocalBreakpointHooksAndResume(t *testing.T) {
 	if got.err != nil || got.status != 202 || got.body != "released" {
 		t.Fatal(got)
 	}
-	config.Pause = false
-	config.Script = ""
-	config.ErrorPercent = 100
-	if err = r.SetLocalResponse(config); err != nil {
+	config.Local.Pause = false
+	config.Local.Script = ""
+	config.Local.ErrorPercent = 100
+	if err = r.SetRules([]Rule{config}); err != nil {
 		t.Fatal(err)
 	}
 	resp, err = client.Get(target.URL)
@@ -428,7 +433,7 @@ func TestMappedPostBodyAndRateLimit(t *testing.T) {
 	resp, err := client.Post(target.URL, "text/plain", strings.NewReader("sample"))
 	responseText(t, resp, err)
 	content := strings.Repeat("k", 2048)
-	if err := rec.SetLocalResponse(LocalResponse{EntryID: rec.Entries()[0].ID, Status: 200, Body: content, RateKiB: 16}); err != nil {
+	if err := rec.SetRules([]Rule{localRule("rate", "POST", target.URL, LocalAnswer{Status: 200, Body: content, RateKiB: 16})}); err != nil {
 		t.Fatal(err)
 	}
 	start := time.Now()

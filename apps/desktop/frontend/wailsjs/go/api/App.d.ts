@@ -70,8 +70,6 @@ export function ClearHistoryResponses():Promise<string>;
 
 export function ClearProxyCapture():Promise<proxycapture.Status>;
 
-export function ClearProxyLocalResponses():Promise<void>;
-
 export function ClearSecretCache():Promise<number>;
 
 export function ClearVariables():Promise<void>;
@@ -103,6 +101,8 @@ export function DeleteAgentMcpServer(arg1:string):Promise<model.AgentMcpServersS
 export function DeleteCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 
 export function DeleteOpenAPIBaseSpec(arg1:string):Promise<string>;
+
+export function DeleteProxyEntries(arg1:Array<number>):Promise<proxycapture.Status>;
 
 export function DeleteSecretProvider(arg1:string,arg2:string):Promise<api.SecretActionResult>;
 
@@ -318,6 +318,8 @@ export function ProxyPausedResponses():Promise<Array<proxycapture.Paused>>;
 
 export function ProxyPlatformSupport():Promise<api.ProxyPlatformSupport>;
 
+export function ProxyRules():Promise<Array<proxycapture.Rule>>;
+
 export function PruneHistoryResponses(arg1:Array<string>):Promise<string>;
 
 export function Quit():Promise<void>;
@@ -430,7 +432,7 @@ export function SetEnvironment(arg1:Record<string, string>):Promise<void>;
 
 export function SetEnvironmentVar(arg1:string,arg2:string):Promise<void>;
 
-export function SetProxyLocalResponse(arg1:proxycapture.LocalResponse):Promise<void>;
+export function SetProxyRules(arg1:Array<proxycapture.Rule>):Promise<Array<proxycapture.Rule>>;
 
 export function SetProxySSLHosts(arg1:Array<string>):Promise<proxycapture.Status>;
 

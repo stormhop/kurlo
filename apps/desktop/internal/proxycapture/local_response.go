@@ -2,80 +2,22 @@ package proxycapture
 
 import (
 	"context"
-	"crypto/sha256"
-	"errors"
-
 	"io"
 	"math/rand/v2"
 	"net/http"
-	"strings"
 	"time"
 )
 
-type LocalResponse struct {
-	Pause        bool   `json:"pause"`
-	Script       string `json:"script"`
-	EntryID      int64  `json:"entryId"`
-	Status       int    `json:"status"`
-	ContentType  string `json:"contentType"`
-	Body         string `json:"body"`
-	RateKiB      int    `json:"rateKiB"`
-	DelayMs      int    `json:"delayMs"`
-	ErrorPercent int    `json:"errorPercent"`
-}
-
-type localRoute [32]byte
-
-func routeFor(r *http.Request) localRoute {
-	return sha256.Sum256([]byte(r.Method + " " + r.URL.String()))
-}
-
-func (r *Recorder) SetLocalResponse(config LocalResponse) error {
-	if config.RateKiB < 0 || config.RateKiB > 16384 || config.Status < 200 || config.Status > 599 || config.DelayMs < 0 || config.DelayMs > 30000 || config.ErrorPercent < 0 || config.ErrorPercent > 100 {
-		return errors.New("invalid local response status, delay or error rate")
-	}
-	if len(config.Script) > 16<<10 || len(config.Body) > 1<<20 || len(config.ContentType) > 256 || strings.ContainsAny(config.ContentType, "\r\n") {
-		return errors.New("invalid local response content")
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	s := r.run
-	if s == nil {
-		return errors.New("start a capture first")
-	}
-	for _, x := range r.ring {
-		if x != nil && x.Entry.ID == config.EntryID && x.Entry.Method != "CONNECT" {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			key := x.route
-			if _, ok := s.rules[key]; !ok && len(s.rules) >= 32 {
-				return errors.New("the session already has 32 local responses")
-			}
-			s.rules[key] = config
-			return nil
-		}
-	}
-	return errors.New("select an available HTTP entry")
-}
-
-func (r *Recorder) ClearLocalResponses() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if s := r.run; s != nil {
-		s.mu.Lock()
-		clear(s.rules)
-		s.mu.Unlock()
-	}
-}
-
 func (s *session) serveLocal(w http.ResponseWriter, r *http.Request, x *Exchange) bool {
-	s.mu.Lock()
-	rule, ok := s.rules[routeFor(r)]
-	s.mu.Unlock()
-	if !ok {
+	matches := s.rules.matching(RuleLocal, r)
+	if len(matches) == 0 {
 		return false
 	}
+	match := matches[0]
+	match.hits.Add(1)
+	rule := match.Local
 	x.Entry.Local = true
+	x.Entry.Rule = ruleNames(matches[:1])
 	var request preview
 	request.files = s.files
 	if r.Body != nil {

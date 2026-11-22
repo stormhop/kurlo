@@ -8,22 +8,22 @@
     entry,
     exchange,
     busy,
-    recording,
     decrypted,
     onReplay,
     onCopyCurl,
     onMapLocal,
+    onRewrite,
     onSave,
     onDecrypt,
   }: {
     entry: ProxyEntry;
     exchange: ProxyExchange | null;
     busy: boolean;
-    recording: boolean;
     decrypted: boolean;
     onReplay: () => void;
     onCopyCurl: () => void;
     onMapLocal: () => void;
+    onRewrite: () => void;
     onSave: () => void;
     onDecrypt: (host: string) => void;
   } = $props();
@@ -72,19 +72,21 @@
       <p>
         {entry.host} · {started} · {entry.inProgress ? 'open' : entry.duration + ' ms'} · {formatSize(entry.received)}
         {#if entry.process} · {entry.process}{/if}
-        {#if entry.local} · <span class="capture-local">Local response</span>{/if}
+        {#if entry.local} · <span class="capture-local">Answered by {entry.rule || 'a Map local rule'}</span>{/if}
       </p>
     </div>
     {#if !tunnel}
       <div class="capture-detail-actions">
         <button class="btn btn-ghost btn-sm" type="button" disabled={busy || !exchange || exchange.request.binary || exchange.request.truncated} onclick={onCopyCurl}>Copy cURL</button>
-        {#if recording}<button class="btn btn-ghost btn-sm" type="button" disabled={busy || !exchange} onclick={onMapLocal}>Map local</button>{/if}
+        <button class="btn btn-ghost btn-sm" type="button" disabled={busy || !exchange} onclick={onMapLocal}>Map local</button>
+        <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={onRewrite}>Rewrite</button>
         <button class="btn btn-secondary btn-sm" type="button" disabled={busy || blocked} onclick={onReplay}>Open in editor</button>
         <button class="btn btn-primary btn-sm" type="button" disabled={busy || blocked} onclick={onSave}>Save as request</button>
       </div>
     {/if}
   </header>
 
+  {#if entry.rewritten}<p class="mock-hint capture-detail-error">Sent to <code>{entry.rewritten}</code> by {entry.rule}.</p>{/if}
   {#if entry.error}<p class="mock-error capture-detail-error" role="alert">{entry.error}</p>{/if}
 
   {#if tunnel}

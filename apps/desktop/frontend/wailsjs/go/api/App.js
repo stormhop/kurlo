@@ -134,10 +134,6 @@ export function ClearProxyCapture() {
   return window['go']['api']['App']['ClearProxyCapture']();
 }
 
-export function ClearProxyLocalResponses() {
-  return window['go']['api']['App']['ClearProxyLocalResponses']();
-}
-
 export function ClearSecretCache() {
   return window['go']['api']['App']['ClearSecretCache']();
 }
@@ -200,6 +196,10 @@ export function DeleteCookie(arg1, arg2) {
 
 export function DeleteOpenAPIBaseSpec(arg1) {
   return window['go']['api']['App']['DeleteOpenAPIBaseSpec'](arg1);
+}
+
+export function DeleteProxyEntries(arg1) {
+  return window['go']['api']['App']['DeleteProxyEntries'](arg1);
 }
 
 export function DeleteSecretProvider(arg1, arg2) {
@@ -630,6 +630,10 @@ export function ProxyPlatformSupport() {
   return window['go']['api']['App']['ProxyPlatformSupport']();
 }
 
+export function ProxyRules() {
+  return window['go']['api']['App']['ProxyRules']();
+}
+
 export function PruneHistoryResponses(arg1) {
   return window['go']['api']['App']['PruneHistoryResponses'](arg1);
 }
@@ -854,8 +858,8 @@ export function SetEnvironmentVar(arg1, arg2) {
   return window['go']['api']['App']['SetEnvironmentVar'](arg1, arg2);
 }
 
-export function SetProxyLocalResponse(arg1) {
-  return window['go']['api']['App']['SetProxyLocalResponse'](arg1);
+export function SetProxyRules(arg1) {
+  return window['go']['api']['App']['SetProxyRules'](arg1);
 }
 
 export function SetProxySSLHosts(arg1) {

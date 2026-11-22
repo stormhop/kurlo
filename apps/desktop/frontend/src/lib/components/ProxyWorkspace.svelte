@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { ProxyCertificateInfo as CertificateInfo, ProxyEntry as Entry, ProxyExchange as Exchange, ProxyPaused as Paused, ProxyPlatformSupport as PlatformSupport, ProxyStatus as Status } from '../wire';
+  import type { ProxyCertificateInfo as CertificateInfo, ProxyEntry as Entry, ProxyExchange as Exchange, ProxyPaused as Paused, ProxyPlatformSupport as PlatformSupport, ProxyRule as Rule, ProxyStatus as Status } from '../wire';
 
   const snapshot = {
     loaded: false,
@@ -8,6 +8,7 @@
     paused: [] as Paused[],
     support: null as PlatformSupport | null,
     certificate: null as CertificateInfo | null,
+    rules: [] as Rule[],
     selected: 0,
     layout: 'timeline' as 'timeline' | 'structure',
     host: '',
@@ -29,7 +30,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { vm } from '../stores/app.svelte';
-  import type { ProxyCertificateInfo, ProxyPaused, ProxyConfig, ProxyEntry, ProxyExchange, ProxyPlatformSupport, ProxyStatus } from '../wire';
+  import type { ProxyCertificateInfo, ProxyPaused, ProxyConfig, ProxyEntry, ProxyExchange, ProxyPlatformSupport, ProxyRule, ProxyStatus } from '../wire';
   import { openFileDialog } from '../backend';
   import { clipboardCopy, formatSize, methodColor, statusClass } from '../utils';
   import { filesystemNameFromName } from '../normalizers';
@@ -40,7 +41,9 @@
   import ProxySettings from './ProxySettings.svelte';
   import ProxyExchangeDetail from './ProxyExchangeDetail.svelte';
   import ProxyDialog from './ProxyDialog.svelte';
-  import Disclosure from './Disclosure.svelte';
+  import ProxyRules from './ProxyRules.svelte';
+  import ProxyRuleEditor from './ProxyRuleEditor.svelte';
+  import { blankRule, patternForURL, type RuleKind } from '../captureRules';
 
   const SSL_HOSTS_KEY = 'kurlo.proxy.sslHosts';
   const SYSTEM_PROXY_KEY = 'kurlo.proxy.systemProxy';
@@ -73,8 +76,13 @@
   let copied = $state(false);
   let split = $state(storedSplit());
   let body = $state<HTMLElement>();
-  let saving = $state<{ id: number; name: string; collection: string; folder: string } | null>(null);
-  let rule = $state<{ id: number; url: string; status: number; contentType: string; body: string; delay: number; rateKiB: number; fault: number; pause: boolean; script: string; exampleRequest: string } | null>(null);
+  let saving = $state<{ ids: number[]; name: string; collection: string; folder: string } | null>(null);
+  let rules = $state.raw<ProxyRule[]>(snapshot.rules);
+  let rulesOpen = $state(false);
+  let editing = $state<{ rule: ProxyRule; isNew: boolean } | null>(null);
+  let ruleError = $state('');
+  let selection = $state.raw<Set<number>>(new Set());
+  let anchor = $state(0);
   let release = $state<{ id: number; label: string; status: number; body: string } | null>(null);
   let active = true;
   let synced = false;
@@ -105,8 +113,9 @@
   const pacURL = $derived(`http://${address}/proxy.pac`);
   const sslHosts = $derived(config.sslHosts ?? []);
   const systemProxyOn = $derived(support.systemProxy && Boolean(config.systemProxy));
-  const exampleRequests = $derived(rule ? vm.requests.filter(request => collections.some(collection => collection.id === request.collectionId) && (request.examples?.length || request.exampleCount)) : []);
-  const ruleExamples = $derived(exampleRequests.find(request => request.id === rule?.exampleRequest)?.examples ?? []);
+  const selectedRows = $derived(filtered.filter(row => selection.has(row.id)));
+  const multi = $derived(selectedRows.length > 1);
+  const actionIDs = $derived(multi ? selectedRows.filter(row => row.method !== 'CONNECT').map(row => row.id) : httpIDs);
   const failedCount = $derived(rows.filter(row => row.error).length);
 
   function matchesText(row: ProxyEntry) {
@@ -158,6 +167,7 @@
       rows = entries ?? [];
       paused = waiting ?? [];
       Object.assign(snapshot, { loaded: true, status: next, rows, paused });
+      if (rulesOpen) void loadRules();
     } catch (cause) { if (active) error = String(cause); } finally {
       reading = false;
       if (active && refreshAgain) { refreshAgain = false; void refresh(); }
@@ -184,6 +194,7 @@
     void refresh();
     if (!snapshot.support) void loadSupport();
     void loadCertificate();
+    void loadRules();
     return () => { active = false; off?.(); };
   });
 
@@ -226,6 +237,7 @@
       await api().ClearProxyCapture!();
       exchanges.clear();
       selected = 0;
+      selection = new Set();
       detail = null;
       await refresh();
     });
@@ -256,7 +268,7 @@
       try {
         if (status.running) await api().StopProxyCapture!();
         else {
-          selected = 0; host = ''; rule = null; exchanges.clear();
+          selected = 0; host = ''; selection = new Set(); exchanges.clear();
           await api().StartProxyCapture!({ ...config, systemProxy: systemProxyOn, identifyProcess: support.identifyProcess && config.identifyProcess, sslHosts, certificate: config.service ? config.certificate : '', key: config.service ? config.key : '' });
           settingsOpen = false;
         }
@@ -311,12 +323,34 @@
   }
 
   function onListKeydown(event: KeyboardEvent) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      selection = new Set(filtered.map(row => row.id));
+      return;
+    }
+    if (event.key === 'Escape' && multi) {
+      event.preventDefault();
+      selection = current ? new Set([current.id]) : new Set();
+      return;
+    }
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      void deleteSelected();
+      return;
+    }
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
     event.preventDefault();
     const index = filtered.findIndex(row => row.id === current?.id);
     const next = filtered[Math.min(filtered.length - 1, Math.max(0, index + (event.key === 'ArrowDown' ? 1 : -1)))];
     if (next) {
-      selected = next.id;
+      if (event.shiftKey) {
+        if (!anchor) anchor = current?.id ?? next.id;
+        selectRow(next, event);
+      } else {
+        selection = new Set([next.id]);
+        anchor = next.id;
+        selected = next.id;
+      }
       document.querySelector<HTMLElement>(`[data-capture-row="${next.id}"]`)?.focus();
     }
   }
@@ -342,9 +376,10 @@
     if (event.key === 'ArrowDown') { event.preventDefault(); setSplit(split - 0.05); }
   }
 
-  function beginSave() {
-    if (!current) return;
-    saving = { id: current.id, name: `${current.method} ${current.path}`, collection: collections[0]?.id || '', folder: 'Captured' };
+  function beginSave(ids = current ? [current.id] : []) {
+    if (!ids.length) return;
+    const first = rows.find(row => row.id === ids[0]);
+    saving = { ids, name: first ? `${first.method} ${first.path}` : '', collection: collections[0]?.id || '', folder: 'Captured' };
   }
 
   function save(ids: number[], asCollection = false) {
@@ -356,11 +391,14 @@
       await vm.importRequestsPayload('Captured', (collectionId, name) => {
         const requests = harRequestsFromLog(har, collectionId, name);
         if (target) {
-          const requestName = target.name.trim();
-          if (!requestName) throw new Error('Enter a request name.');
-          requests[0].name = requestName;
-          requests[0].filesystemName = filesystemNameFromName(requestName, requests[0].id);
-          requests[0].folderPath = target.folder.split('/').map(part => part.trim()).filter(Boolean);
+          const folderPath = target.folder.split('/').map(part => part.trim()).filter(Boolean);
+          if (target.ids.length === 1) {
+            const requestName = target.name.trim();
+            if (!requestName) throw new Error('Enter a request name.');
+            requests[0].name = requestName;
+            requests[0].filesystemName = filesystemNameFromName(requestName, requests[0].id);
+          }
+          for (const request of requests) request.folderPath = folderPath;
           return requests;
         }
         const seen = new Set<string>();
@@ -402,7 +440,7 @@
   function askAgent() {
     return action(async () => {
       const workspace = vm.activeWorkspaceId;
-      const endpoints = Array.from(new Set(filtered.filter(row => row.method !== 'CONNECT').map(row => JSON.stringify([row.method, row.host, row.path, row.status])))).slice(0, 100);
+      const endpoints = Array.from(new Set(filtered.filter(row => row.method !== 'CONNECT' && actionIDs.includes(row.id)).map(row => JSON.stringify([row.method, row.host, row.path, row.status])))).slice(0, 100);
       const { agentNavigation, agentStoreFor } = await import('../stores/agent.svelte');
       if (vm.activeWorkspaceId !== workspace) return;
       const agent = agentStoreFor(agentNavigation.mode);
@@ -414,40 +452,101 @@
   }
 
   function exportHAR() {
-    return action(async () => { await vm.saveTextFile('capture.har', await api().ProxyCaptureHAR!(httpIDs)); });
-  }
-
-  function beginRule() {
-    if (!shown || !current) return;
-    rule = { id: current.id, url: `${current.method} ${current.url}`, status: current.status || 200, contentType: shown.response.headers?.['Content-Type']?.[0] || 'text/plain', body: prettyJSON(shown.response.body), delay: 0, rateKiB: 0, fault: 0, pause: false, script: '', exampleRequest: '' };
+    return action(async () => { await vm.saveTextFile('capture.har', await api().ProxyCaptureHAR!(actionIDs)); });
   }
 
   function prettyJSON(value: string) {
     try { return JSON.stringify(JSON.parse(value), null, 2); } catch { return value; }
   }
 
-  function applyRule() {
-    const draft = rule;
-    if (!draft) return;
-    return action(async () => {
-      await api().SetProxyLocalResponse!({ entryId: draft.id, status: draft.status, contentType: draft.contentType, body: draft.body, delayMs: draft.delay, rateKiB: draft.rateKiB, errorPercent: draft.fault, pause: draft.pause, script: draft.script });
-      rule = null;
+  async function loadRules() {
+    try {
+      const app = api();
+      if (app.ProxyRules) rules = snapshot.rules = (await app.ProxyRules()) ?? [];
+    } catch (cause) { if (active) error = String(cause); }
+  }
+
+  async function saveRules(next: ProxyRule[]) {
+    if (busy) return false;
+    busy = true; ruleError = '';
+    try {
+      rules = snapshot.rules = (await api().SetProxyRules!(next)) ?? [];
       await refresh();
-    });
+      return true;
+    } catch (cause) {
+      ruleError = String(cause).replace(/^Error: /, '');
+      if (!editing) error = ruleError;
+      return false;
+    } finally { busy = false; }
   }
 
-  function chooseExample(id: string) {
-    const response = ruleExamples.find(item => item.id === id)?.response;
-    if (!response || !rule) return;
-    rule.body = response.body;
-    rule.status = response.statusCode;
-    rule.contentType = response.headers.find(row => row.key.toLowerCase() === 'content-type')?.value || 'text/plain';
+  function startRule(kind: RuleKind, from?: ProxyEntry) {
+    const rule = blankRule(kind, from?.method ?? '', from ? patternForURL(from.url) : '');
+    if (from && kind === 'local' && shown?.entry.id === from.id) {
+      rule.local.status = from.status || 200;
+      rule.local.contentType = shown.response.headers?.['Content-Type']?.[0] || 'text/plain';
+      rule.local.body = prettyJSON(shown.response.body);
+    }
+    ruleError = '';
+    editing = { rule, isNew: true };
   }
 
-  function loadRuleFile() {
+  async function commitRule(rule: ProxyRule) {
+    const exists = rules.some(item => item.id === rule.id);
+    if (await saveRules(exists ? rules.map(item => (item.id === rule.id ? rule : item)) : [...rules, rule])) {
+      editing = null;
+      rulesOpen = true;
+    }
+  }
+
+  function moveRule(rule: ProxyRule, offset: number) {
+    const index = rules.findIndex(item => item.id === rule.id);
+    const next = [...rules];
+    const [item] = next.splice(index, 1);
+    next.splice(Math.max(0, Math.min(next.length, index + offset)), 0, item);
+    void saveRules(next);
+  }
+
+  async function loadRuleFile() {
+    const file = await openFileDialog('Choose a local response text file');
+    return file ? api().ReadProxyResponseFile!(file) : '';
+  }
+
+  function selectRow(entry: ProxyEntry, event: MouseEvent | KeyboardEvent) {
+    if (event.shiftKey && anchor) {
+      const from = filtered.findIndex(row => row.id === anchor);
+      const to = filtered.findIndex(row => row.id === entry.id);
+      if (from >= 0 && to >= 0) {
+        const [start, end] = from < to ? [from, to] : [to, from];
+        selection = new Set(filtered.slice(start, end + 1).map(row => row.id));
+        selected = entry.id;
+        return;
+      }
+    }
+    if (event.metaKey || event.ctrlKey) {
+      const next = new Set(selection.size ? selection : current ? [current.id] : []);
+      if (next.has(entry.id) && next.size > 1) next.delete(entry.id);
+      else next.add(entry.id);
+      selection = next;
+    } else {
+      selection = new Set([entry.id]);
+    }
+    anchor = entry.id;
+    selected = entry.id;
+  }
+
+  function deleteSelected() {
+    const ids = multi ? selectedRows.map(row => row.id) : current ? [current.id] : [];
+    if (!ids.length) return;
+    const index = filtered.findIndex(row => row.id === ids[ids.length - 1]);
+    const next = filtered.slice(index + 1).find(row => !ids.includes(row.id)) ?? filtered.slice(0, index).reverse().find(row => !ids.includes(row.id));
     return action(async () => {
-      const file = await openFileDialog('Choose a local response text file');
-      if (file && rule) rule.body = await api().ReadProxyResponseFile!(file);
+      await api().DeleteProxyEntries!(ids);
+      for (const id of ids) exchanges.delete(id);
+      selection = next ? new Set([next.id]) : new Set();
+      selected = next?.id ?? 0;
+      anchor = selected;
+      await refresh();
     });
   }
 
@@ -485,7 +584,7 @@
           <span class="mock-status-meta capture-status-meta">
             {#if status.systemProxy}<span class="capture-pill">System proxy</span>{/if}
             {#if sslHosts.length}<span class="capture-pill">{sslHosts.length} decrypted {sslHosts.length === 1 ? 'host' : 'hosts'}</span>{/if}
-            {#if status.rules}<span class="capture-pill">{status.rules} local {status.rules === 1 ? 'response' : 'responses'}</span>{/if}
+            {#if status.rules}<button class="capture-pill capture-pill-button" type="button" onclick={() => (rulesOpen = true)}>{status.rules} {status.rules === 1 ? 'rule' : 'rules'} on</button>{/if}
           </span>
         {:else}
           <span class="mock-status-state">Stopped</span>
@@ -497,6 +596,10 @@
           <svg width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
           Settings
         </button>
+        <button class="btn btn-secondary capture-settings-toggle" type="button" aria-label="Capture rules" aria-expanded={rulesOpen} disabled={!loaded} onclick={() => { rulesOpen = !rulesOpen; if (rulesOpen) void loadRules(); }}>
+          <svg width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h11"/><path d="m12 4 3 3-3 3"/><path d="M20 17H9"/><path d="m12 14-3 3 3 3"/></svg>
+          Rules{#if rules.length}<span class="capture-count-badge">{rules.length}</span>{/if}
+        </button>
         {#if status.running}
           <button class="btn btn-secondary" type="button" onclick={toggle} disabled={busy || !loaded}>Stop capture</button>
         {:else}
@@ -505,7 +608,7 @@
       </div>
     </div>
     {#if settingsOpen}
-      <ProxySettings bind:config recording={status.running} rules={status.rules} {support} {certificate} {busy} {pacURL} {qr}
+      <ProxySettings bind:config recording={status.running} {support} {certificate} {busy} {pacURL} {qr}
         onSystemProxy={setSystemProxy}
         onAddHosts={added => setSSLHosts([...new Set([...sslHosts, ...added])])}
         onRemoveHost={item => setSSLHosts(sslHosts.filter(value => value !== item))}
@@ -513,8 +616,7 @@
         onUntrust={() => certificateAction(() => api().UntrustProxyCertificate!())}
         onExport={exportCertificate}
         onChooseFile={chooseFile}
-        onCopyPAC={copyPAC}
-        onClearRules={() => action(async () => { await api().ClearProxyLocalResponses!(); await refresh(); })} />
+        onCopyPAC={copyPAC} />
     {/if}
     {#if error}<p class="mock-error" role="alert">{error}</p>{/if}
     {#if paused.length}
@@ -537,7 +639,20 @@
     <Select bind:value={method} options={methodOptions} ariaLabel="Method filter" className="capture-select" />
     <Select bind:value={code} options={statusOptions} ariaLabel="Status filter" className="capture-select" />
     <span class="capture-toolbar-spacer"></span>
-    <div class="capture-actions" role="group" aria-label="Captured traffic actions">
+    {#if multi}
+      <div class="capture-actions capture-selection" role="group" aria-label="Selected entries">
+        <span class="capture-selection-count">{selectedRows.length} selected</span>
+        <button class="btn btn-secondary btn-sm" type="button" disabled={!actionIDs.length || busy} onclick={() => beginSave(actionIDs)}>Save as requests…</button>
+        <button class="btn btn-secondary btn-sm" type="button" disabled={!actionIDs.length || busy} onclick={exportHAR}>Export HAR</button>
+        <button class="btn btn-secondary btn-sm capture-action-ai capture-action" type="button" disabled={!actionIDs.length || busy} onclick={askAgent}>
+          <svg width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 13.6 8a2 2 0 0 0 1.4 1.4l4.5 1.6-4.5 1.6a2 2 0 0 0-1.4 1.4L12 18.5 10.4 14A2 2 0 0 0 9 12.6L4.5 11 9 9.4A2 2 0 0 0 10.4 8z"/><path d="M18.5 3v3M17 4.5h3"/></svg>
+          Ask agent
+        </button>
+        <button class="btn btn-secondary btn-sm" type="button" disabled={busy} onclick={deleteSelected}>Delete</button>
+        <button class="btn btn-ghost btn-sm" type="button" onclick={() => (selection = current ? new Set([current.id]) : new Set())}>Deselect</button>
+      </div>
+    {:else}
+      <div class="capture-actions" role="group" aria-label="Captured traffic actions">
       <button class="btn btn-secondary btn-sm capture-action" type="button" disabled={!rows.length || busy} onclick={clearTraffic}>
         <svg width="0.875rem" height="0.875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="m6 18 12-12"/></svg>
         Clear
@@ -555,6 +670,7 @@
         Ask agent
       </button>
     </div>
+    {/if}
   </div>
 
   <div class="capture-body" bind:this={body}>
@@ -573,7 +689,7 @@
           <VirtualList rows={listRows} rowHeight={ROW_HEIGHT} className="mock-pane capture-pane" ariaLabel="Captured traffic">
             {#snippet row(item)}
               {@const entry = item.entry}
-              <button class="mock-row capture-row" class:active={current?.id === entry.id} class:failed={Boolean(entry.error)} type="button" data-capture-row={entry.id} aria-current={current?.id === entry.id ? 'true' : undefined} aria-label={entry.url || entry.host} onpointerenter={() => prefetch(entry)} onclick={() => (selected = entry.id)}>
+              <button class="mock-row capture-row" class:active={current?.id === entry.id} class:selected={multi && selection.has(entry.id)} class:failed={Boolean(entry.error)} type="button" data-capture-row={entry.id} aria-current={current?.id === entry.id ? 'true' : undefined} aria-pressed={multi ? selection.has(entry.id) : undefined} aria-label={entry.url || entry.host} onpointerenter={() => prefetch(entry)} onclick={event => selectRow(entry, event)}>
                 <span class="mock-time">{new Date(entry.started).toLocaleTimeString('en-GB', { hour12: false })}</span>
                 {#if entry.method === 'CONNECT'}
                   <span class="collection-method capture-tunnel-method"><svg width="0.6875rem" height="0.6875rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>TLS</span>
@@ -584,7 +700,7 @@
                   <code class="mock-path">{entry.method === 'CONNECT' ? entry.host : entry.path || '/'}</code>
                   {#if layout === 'timeline' && entry.method !== 'CONNECT'}<span class="capture-row-host">{entry.host}</span>{/if}
                   {#if entry.process}<span class="mock-chip">{entry.process}</span>{/if}
-                  {#if entry.local}<span class="mock-chip">Local</span>{/if}
+                  {#if entry.local}<span class="mock-chip capture-rule-chip">Map local</span>{:else if entry.rewritten}<span class="mock-chip capture-rule-chip">Rewrite</span>{/if}
                   {#if query && !matchesText(entry) && contentHits.has(entry.id)}<span class="mock-chip capture-match">in {contentHits.get(entry.id)?.[0]}</span>{/if}
                 </span>
                 {#if entry.error}
@@ -613,17 +729,26 @@
       <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
       <div class="capture-split" role="separator" aria-orientation="horizontal" aria-label="Resize details" aria-valuemin={20} aria-valuemax={80} aria-valuenow={Math.round(split * 100)} tabindex="0" onpointerdown={startResize} onkeydown={onSplitKeydown}></div>
       <div class="capture-detail-wrap" style:flex-basis={`${split * 100}%`}>
-        <ProxyExchangeDetail entry={current} exchange={shown} {busy} recording={status.running} decrypted={sslHosts.includes(current.host.toLowerCase().replace(/:443$/, ''))}
-          onReplay={openForReplay} onCopyCurl={copyCurl} onMapLocal={beginRule} onSave={beginSave} onDecrypt={item => setSSLHosts([...sslHosts, item])} />
+        <ProxyExchangeDetail entry={current} exchange={shown} {busy} decrypted={sslHosts.includes(current.host.toLowerCase().replace(/:443$/, ''))}
+          onReplay={openForReplay} onCopyCurl={copyCurl} onMapLocal={() => startRule('local', current)} onRewrite={() => startRule('rewrite', current)} onSave={() => beginSave()} onDecrypt={item => setSSLHosts([...sslHosts, item])} />
       </div>
+    {/if}
+    {#if rulesOpen}
+      <ProxyRules {rules} {busy}
+        onAdd={kind => startRule(kind)}
+        onEdit={rule => { ruleError = ''; editing = { rule, isNew: false }; }}
+        onToggle={(rule, enabled) => saveRules(rules.map(item => (item.id === rule.id ? { ...item, enabled } : item)))}
+        onMove={moveRule}
+        onDelete={rule => saveRules(rules.filter(item => item.id !== rule.id))}
+        onClose={() => (rulesOpen = false)} />
     {/if}
   </div>
 </section>
 </div>
 
 {#if saving}
-  <ProxyDialog title="Save as request" subtitle="Kurlo saves the request and its response as an example." submitLabel="Save request" {busy} onSubmit={() => saving && save([saving.id])} onDismiss={() => (saving = null)}>
-    <label class="capture-dialog-field"><span>Request name</span><input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} class="field field-md" required bind:value={saving.name} data-autofocus></label>
+  <ProxyDialog title={saving.ids.length === 1 ? 'Save as request' : `Save ${saving.ids.length} requests`} subtitle={saving.ids.length === 1 ? 'Kurlo saves the request and its response as an example.' : 'Kurlo saves each request with its response as an example.'} submitLabel={saving.ids.length === 1 ? 'Save request' : 'Save requests'} {busy} onSubmit={() => saving && save(saving.ids)} onDismiss={() => (saving = null)}>
+    {#if saving.ids.length === 1}<label class="capture-dialog-field"><span>Request name</span><input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} class="field field-md" required bind:value={saving.name} data-autofocus></label>{/if}
     <div class="capture-dialog-field"><span>Collection</span>
       <Select bind:value={saving.collection} options={[...collections.map(item => ({ value: item.id, label: item.name })), { value: '', label: 'New Captured collection' }]} ariaLabel="Collection" className="capture-dialog-select" />
     </div>
@@ -631,40 +756,8 @@
   </ProxyDialog>
 {/if}
 
-{#if rule}
-  <ProxyDialog title="Local response" subtitle={`Kurlo answers ${rule.url} itself while recording.`} submitLabel="Apply local response" {busy} wide onSubmit={applyRule} onDismiss={() => (rule = null)}>
-    <div class="capture-dialog-grid">
-      <label class="capture-dialog-field"><span>Status</span><input type="number" class="field field-mono field-md" min="200" max="599" required bind:value={rule.status}></label>
-      <label class="capture-dialog-field capture-dialog-span"><span>Content-Type</span><input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} class="field field-mono field-md" required bind:value={rule.contentType}></label>
-    </div>
-    {#if exampleRequests.length}
-      <div class="capture-dialog-grid">
-        <div class="capture-dialog-field capture-dialog-span"><span>Use a saved example</span>
-          <Select bind:value={rule.exampleRequest} options={[{ value: '', label: 'Choose a request…' }, ...exampleRequests.map(request => ({ value: request.id, label: `${request.collection} / ${request.name}` }))]} ariaLabel="Saved request" className="capture-dialog-select" onChange={id => { if (id) void action(() => vm.ensureRequestExamples([id])); }} />
-        </div>
-        {#if ruleExamples.length}
-          <div class="capture-dialog-field capture-dialog-span"><span>Response example</span>
-            <Select value="" options={[{ value: '', label: 'Choose an example…' }, ...ruleExamples.map(example => ({ value: example.id, label: example.name }))]} ariaLabel="Response example" className="capture-dialog-select" onChange={chooseExample} />
-          </div>
-        {/if}
-      </div>
-    {/if}
-    <div class="capture-dialog-field">
-      <span class="capture-dialog-label-row">Body <button class="btn btn-ghost btn-xs" type="button" onclick={loadRuleFile}>Load file…</button></span>
-      <textarea class="field field-mono capture-dialog-text" aria-label="Local response body" bind:value={rule.body}></textarea>
-    </div>
-    <Disclosure title="Network conditions" summary={rule.delay || rule.rateKiB || rule.fault || rule.pause ? 'On' : 'Off'} storageKey="kurlo.proxy.ruleNetwork">
-      <div class="capture-dialog-grid">
-        <label class="capture-dialog-field"><span>Delay, ms</span><input type="number" class="field field-mono field-md" min="0" max="30000" required bind:value={rule.delay}></label>
-        <label class="capture-dialog-field"><span>Speed, KiB/s (0 = unlimited)</span><input type="number" class="field field-mono field-md" min="0" max="16384" required bind:value={rule.rateKiB}></label>
-        <label class="capture-dialog-field"><span>HTTP 503, %</span><input type="number" class="field field-mono field-md" min="0" max="100" required bind:value={rule.fault}></label>
-      </div>
-      <label class="capture-option"><input class="check" type="checkbox" bind:checked={rule.pause}><span><span class="capture-option-title">Pause before sending</span><span class="capture-option-note">Edit the response and release it within 60 seconds.</span></span></label>
-    </Disclosure>
-    <Disclosure title="JavaScript hooks" summary={rule.script.trim() ? 'On' : 'Off'} storageKey="kurlo.proxy.ruleHooks">
-      <textarea class="field field-mono capture-dialog-text" aria-label="Local response hooks" placeholder={'function onResponse(request, response) { response.status = 202; }'} bind:value={rule.script}></textarea>
-    </Disclosure>
-  </ProxyDialog>
+{#if editing}
+  <ProxyRuleEditor initial={editing.rule} isNew={editing.isNew} {busy} entries={rows} error={ruleError} onSave={commitRule} onDismiss={() => (editing = null)} onLoadFile={loadRuleFile} />
 {/if}
 
 {#if release}

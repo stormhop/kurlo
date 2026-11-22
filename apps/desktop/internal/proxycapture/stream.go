@@ -190,6 +190,7 @@ func (d *streamDuplex) Write(b []byte) (int, error) {
 }
 
 func (t *trace) responseBody(resp *http.Response) error {
+	applyResponseRewrites(resp.Header, t.rewrites)
 	t.response = copyHeaders(resp.Header)
 	ws := resp.StatusCode == 101 && strings.EqualFold(resp.Header.Get("Upgrade"), "websocket")
 	sse := strings.EqualFold(strings.TrimSpace(strings.SplitN(resp.Header.Get("Content-Type"), ";", 2)[0]), "text/event-stream")

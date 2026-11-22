@@ -29,6 +29,7 @@ const maxTextFileReadSize = 100 * 1024 * 1024
 
 type App struct {
 	capture            proxycapture.Recorder
+	captureRulesOnce   sync.Once
 	performance        performanceMonitor
 	historyStore       *historyResponseStore
 	credentialStore    *gitCredentialStore

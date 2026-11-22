@@ -5,7 +5,6 @@
   let {
     config = $bindable(),
     recording,
-    rules,
     support,
     certificate,
     busy,
@@ -19,11 +18,9 @@
     onExport,
     onChooseFile,
     onCopyPAC,
-    onClearRules,
   }: {
     config: ProxyConfig;
     recording: boolean;
-    rules: number;
     support: ProxyPlatformSupport;
     certificate: ProxyCertificateInfo | null;
     busy: boolean;
@@ -37,7 +34,6 @@
     onExport: () => void;
     onChooseFile: (kind: 'certificate' | 'key') => void;
     onCopyPAC: () => void;
-    onClearRules: () => void;
   } = $props();
 
   let newHost = $state('');
@@ -133,7 +129,6 @@
         <span class="capture-option-note">{support.identifyProcess ? 'Looks up the local process for every connection.' : 'Available on macOS.'}</span>
       </span>
     </label>
-    {#if rules}<button class="btn btn-secondary btn-sm capture-clear-rules" type="button" disabled={busy} onclick={onClearRules}>Clear local responses ({rules})</button>{/if}
   </section>
 
   <section class="capture-card capture-card-wide" aria-label="Development service">
