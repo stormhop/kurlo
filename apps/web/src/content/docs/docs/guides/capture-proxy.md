@@ -1,35 +1,89 @@
 ---
 title: Capture proxy
-description: Inspect traffic from a development client, save requests and examples, and export a session as HAR.
+description: Inspect HTTP and selected HTTPS traffic from your browser or app, save requests and examples, and export a session as HAR.
 ---
 
-Open **Capture proxy** and click **Record**. Kurlo listens for connections at the address in the header. Open the site yourself in your usual browser.
+Open **Capture proxy** and click **Record**, then open a site in any browser. Kurlo records the traffic of every browser and app that follows your system proxy settings.
 
-## Connect your browser
+## Use Kurlo as the system proxy
 
-1. In **Setup**, click **Copy PAC URL**. The default is `http://127.0.0.1:9090/proxy.pac`. Keep the recorder running while applying this setting.
-2. Select automatic proxy configuration in your operating system's network settings and paste the URL. Browsers with their own proxy preferences can use the same automatic configuration URL. Keep the listening port consistent across sessions.
-3. Open or reload the site. HTTP requests appear with their responses. For HTTPS, **CONNECT** shows the destination and connection metadata. To see individual HTTPS requests and responses for a development service, configure its certificate and key as described below.
+On macOS, Windows and Linux with GNOME, **Settings → Routing → Use as system proxy while recording** is on by default. While recording, the option shows **On** or **Off**.
+
+1. Click **Record**. Kurlo sets its automatic proxy configuration (PAC) URL in your system network settings. The header shows **System proxy** while it is active. On macOS, the system may ask for an administrator password.
+2. Open or reload a site in Safari, Chrome, Edge or another app that uses the system settings. Browsers pick up the change without a restart. Connections that were already open may need a reload.
+3. Click **Stop capture**. Kurlo restores your previous proxy settings. It also restores them when you quit Kurlo, and on the next launch if Kurlo did not close normally. Kurlo leaves a service alone if you changed its proxy settings while recording.
+
+The PAC file allows a direct connection when Kurlo is not running, so the internet keeps working even if Kurlo stops unexpectedly.
+
+![Capture settings with routing, HTTPS decryption and connection options while recording](../../../../assets/screenshots/capture-proxy-system.png)
+
+## Connect a single browser or device
+
+Turn off **Use as system proxy while recording** to route only one client through Kurlo.
+
+1. In **Settings → Routing**, click **Copy PAC URL**. While recording, the address in the header copies the same URL. The default is `http://127.0.0.1:9090/proxy.pac`.
+2. Paste it into the automatic proxy configuration setting of that browser or device. Keep the listening port consistent across sessions.
+3. Open or reload the site. HTTP requests appear with their responses. For HTTPS, **CONNECT** shows the destination and connection metadata. To see individual HTTPS requests and responses, [decrypt the host](#decrypt-https-for-selected-hosts).
 4. Click **Stop capture** to stop listening and keep the recorded entries. The PAC file offers a direct connection if the proxy is unavailable. Browser retry and PAC caching behavior can affect how quickly routing changes.
+
+To start a separate Chrome window that uses Kurlo without changing system settings:
+
+```sh
+open -na "Google Chrome" --args --user-data-dir=/tmp/kurlo-chrome --proxy-server=http://127.0.0.1:9090
+```
 
 For manual configuration, point both the HTTP and HTTPS proxy settings to the host and port shown in Kurlo. Disable a manual proxy when you stop Kurlo.
 
-![Capture timeline with a selected order request and its JSON response](../../../../assets/screenshots/capture-proxy.png)
+![Capture traffic list with a selected order request and its JSON response](../../../../assets/screenshots/capture-proxy.png)
 
-**Timeline** shows requests in capture order. **Structure** groups them by host. Filter by method, status, host or path, then select a row to inspect the request and response. On macOS, **Setup → Identify local processes** attempts to resolve the client process for local connections. For HTTP/1.1 WebSocket upgrades and SSE responses, open **Frames** while the stream is running. Frame previews sample the first 16 KiB per direction.
+## Inspect traffic
+
+**Timeline** shows requests in capture order. **By host** adds a list of hosts with their request counts. Filter by method or status. **Failed** shows requests that did not get a response, and **Tunnels** shows HTTPS connections that Kurlo did not decrypt.
+
+The search field matches the host, path and app name, and also headers, bodies and WebSocket or SSE messages. Kurlo searches the first 16 KiB of each body, after removing gzip, Brotli or zstd compression. A row found by its content shows where the text was found, such as **in response body**. Search ignores letter case.
+
+**Clear** removes the recorded entries and their temporary files. Recording continues.
+
+Select a row, or move through the list with the arrow keys. The details below the list show the **Response** and **Request**, each with its headers and a formatted body. Drag the line between the list and the details to resize them. For HTTP/1.1 WebSocket upgrades and SSE responses, open **Messages** or **Events** while the stream is running. Previews keep the first 16 KiB per direction.
+
+On macOS, **Settings → Connection → Show which app sent each request** adds the app name to each row.
+
+## Decrypt HTTPS for selected hosts
+
+Kurlo can decrypt HTTPS for the hosts you list, the way Charles or Proxyman do. Every other HTTPS destination stays an encrypted tunnel.
+
+1. Open **Settings** and find **HTTPS decryption**. Enter a host such as `api.example.com` and click **Add host**. You can also select a **TLS** row and click **Decrypt** with its host name. The list applies to new connections immediately, also while recording, and Kurlo remembers it for the next session.
+2. Click **Trust Kurlo certificate…** once. Kurlo creates a certificate authority for this computer and adds it to your login keychain on macOS or your user certificate store on Windows. The system asks you to confirm. On Linux, click **Export certificate…** and add the file to your system and browser trust stores.
+3. Reload the page in your browser. Requests to the listed hosts appear with their headers and bodies.
+
+![An HTTPS tunnel that the client rejected, with the Decrypt button for its host](../../../../assets/screenshots/capture-proxy-https.png)
+
+Host patterns:
+
+- `api.example.com` matches that host on port 443.
+- `*.example.com` matches its subdomains on port 443, but not `example.com` itself.
+- `local.test:8443` matches one port. `local.test:*` matches every port.
+
+Kurlo verifies the real server's certificate with your system's trusted authorities. If verification fails, the request is recorded with **Upstream connection failed** and nothing is sent. Decrypted connections use HTTP/1.1 between your browser and Kurlo.
+
+Some apps accept only their own certificate (certificate pinning) and refuse the connection. Kurlo records a **TLS** row marked **Failed** that says the client rejected the Kurlo certificate. Remove that host from the list to let the app work through the tunnel again. Firefox follows the system proxy by default, but it uses its own certificate store unless `security.enterprise_roots.enabled` is on. In that case, import the exported certificate in Firefox settings.
+
+The certificate and its private key are stored in Kurlo's configuration folder, in `capture-ca`. Anyone with the key could intercept HTTPS traffic on a computer that trusts the certificate. Do not share the key file. Use **Remove trust…** when you no longer need decryption.
 
 ## Inspect an HTTPS development service
 
-1. Open **Setup** while the proxy is stopped. Enter the service hostname and port, including `:443` when it uses the default HTTPS port.
+If you do not want to trust a Kurlo certificate, you can decrypt one development service with its own certificate instead.
+
+1. Stop recording and open **Settings → Inspect a service with its own certificate**. Enter the service hostname and port, including `:443` when it uses the default HTTPS port.
 2. Choose the PEM certificate and private key that your development server uses. The certificate must be current, cover that hostname and match the certificate the upstream server presents.
 3. Start capture and connect with a client that already trusts the development service. Kurlo uses HTTP/1.1 for this connection. Other HTTPS destinations appear as CONNECT tunnels with connection metadata.
 
-For a second device, choose your computer's private LAN interface address in Setup and enter the device's private IPv4 address. Set the device's proxy to the displayed address and port. The QR code contains the proxy address. Clients supporting automatic configuration can use `http://<address>:<port>/proxy.pac`.
+For a second device, choose your computer's private LAN interface address in **Settings → Connection → Listen address** and enter it in **Allowed device**. Then enter the device's private IPv4 address. Set the device's proxy to the displayed address and port. The QR code contains the proxy address. Clients supporting automatic configuration can use `http://<address>:<port>/proxy.pac`.
 
 ## Reuse a request
 
 - **Save as request** saves the request and its response example in the collection and folder you choose. The default folder is **Captured**. You can serve saved examples from the [mock server](/docs/guides/mock-server/).
-- **Open for replay** opens an editable draft. Check its URL, environment and authentication before pressing **Send**.
+- **Open in editor** opens an editable draft. Check its URL, environment and authentication before pressing **Send**.
 - **Create collection** makes a collection from the filtered HTTP entries and groups repeated method and URL pairs into one request.
 - **Export HAR** writes the filtered HTTP exchanges. **Ask agent** prepares a draft with observed endpoints and statuses for your review.
 
@@ -37,9 +91,9 @@ Kurlo retains the latest 1,000 entries. Stopping preserves the session for inspe
 
 ## Try a local response
 
-Select a recorded HTTP exchange and click **Map local**. Enter a status, content type and body, load a text file, or choose a saved response example. The next request with the same method and full URL receives this local response. A rule can limit bandwidth in KiB/s, add a delay, simulate HTTP 503 at a chosen rate, or pause before sending. Open a paused response, edit it, and click **Release response** within 60 seconds.
+While recording, select an HTTP exchange and click **Map local**. Enter a status, content type and body, load a text file, or choose a saved response example. The next request with the same method and full URL receives this local response. Under **Network conditions**, a rule can add a delay, limit the speed in KiB/s, return HTTP 503 at a chosen rate, or pause before sending. Paused responses appear above the traffic list. Open one, edit it, and click **Release response** within 60 seconds.
 
-Optional JavaScript functions `onRequest(request, response)` and `onResponse(request, response)` run in order for that local rule. Read `request.method` and `request.path`, and set `response.status` or `response.body`. Use **Setup → Clear local responses** to remove all rules for the session.
+Optional JavaScript functions `onRequest(request, response)` and `onResponse(request, response)` run in order for that local rule. Read `request.method` and `request.path`, and set `response.status` or `response.body`. Use **Settings → Connection → Clear local responses** to remove all rules for the session.
 
 ## Record from a terminal
 
@@ -47,8 +101,18 @@ Optional JavaScript functions `onRequest(request, response)` and `onResponse(req
 kurlo proxy --port 9090 --include api.dev.test --out session.har
 ```
 
-Point the client at the proxy while the command runs. Press Ctrl+C to stop and write the HAR. Use `--service api.dev.test:443 --cert service.pem --key service-key.pem` to inspect that HTTPS service. Run `kurlo proxy --help` for LAN and process options.
+Point the client at the proxy while the command runs, or add `--system-proxy` to set Kurlo as the system proxy until the command exits. Press Ctrl+C to stop and write the HAR. Add `--ssl-host api.dev.test` to decrypt HTTPS for a host with the Kurlo certificate. Repeat the flag or separate hosts with commas. `kurlo proxy ca` shows the certificate path, fingerprint and whether this system trusts it, and `kurlo proxy ca --pem` prints the certificate. Use `--service api.dev.test:443 --cert service.pem --key service-key.pem` to inspect a service with its own certificate instead. Run `kurlo proxy --help` for LAN and process options.
 
 To share endpoint metadata with an MCP client, start `kurlo mcp /path/to/workspace --capture-har /path/to/session.har`. The capture tools expose method, host, path, status and duration. Use `check_captured_openapi` with a synced collection and host to compare observed methods and paths with its saved specification.
 
 With write access, `create_captured_collection` accepts a collection name and host. It saves one request template per observed method and path, with a status assertion from the first matching response. Set the `baseUrl` environment variable to your development service before using those templates.
+
+## Platform support
+
+Recording, HTTPS decryption, local responses and HAR export work on macOS, Windows and Linux. A few options depend on the system. When an option is not available, Kurlo disables it in **Settings** and explains why, so recording still works.
+
+| Option | macOS | Windows | Linux |
+|---|---|---|---|
+| Use as system proxy while recording | Yes | Yes | GNOME only. Elsewhere, paste the PAC URL into your network or browser settings. |
+| Trust Kurlo certificate | Yes, in the login keychain | Yes, in your user certificate store | No. Use **Export certificate…** and add it to your system and browser trust stores. |
+| Show which app sent each request | Yes | No | No |

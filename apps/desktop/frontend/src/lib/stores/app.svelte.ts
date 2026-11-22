@@ -289,6 +289,7 @@ class AppVM {
   mockServerLog = $state<MockRequestLog[]>([]);
   mockServerError = $state('');
   proxyTabOpen = $state(false);
+  proxyRecording = $state(false);
   openProxyTab = () => {
     this.closeFloatingMenus();
     this.proxyTabOpen = true;

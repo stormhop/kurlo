@@ -1,6 +1,7 @@
 <script lang="ts">
   import AddCloseIcon from './AddCloseIcon.svelte';
   import MenuIcon from './MenuIcon.svelte';
+  import ProxyIcon from './ProxyIcon.svelte';
   import { tabListKeyboard } from '../a11y';
   import { middleClick } from '../middleClick';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
@@ -52,6 +53,7 @@
     openLoadTestTab = () => {},
     closeLoadTestTab = () => {},
     mockRunning = false,
+    proxyRecording = false,
     gitChangeCount = 0,
     workspaceBlocked = false,
     toggleWorkspaceMenu,
@@ -116,6 +118,7 @@
     openLoadTestTab?: () => void;
     closeLoadTestTab?: () => void;
     mockRunning?: boolean;
+    proxyRecording?: boolean;
     gitChangeCount?: number;
     workspaceBlocked?: boolean;
     toggleWorkspaceMenu: (event: MouseEvent) => void;
@@ -383,8 +386,8 @@
       {/if}
       {#if proxyTabOpen}
         <div class="saved-request-tab runner-tab" class:active={topView === 'proxy'} use:middleClick={closeProxyTab}>
-          <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={topView === 'proxy'} tabindex={topView === 'proxy' ? 0 : -1} onclick={openProxyTab}><span aria-hidden="true">⇄</span><span class="tab-title">Proxy</span></button>
-          <button class="tab-close" type="button" onclick={closeProxyTab} aria-label="Close Proxy tab"><AddCloseIcon /></button>
+          <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={topView === 'proxy'} tabindex={topView === 'proxy' ? 0 : -1} onclick={openProxyTab}><ProxyIcon size="0.875rem" strokeWidth={2} /><span class="tab-title">Capture</span>{#if proxyRecording}<span class="mock-tab-dot" aria-label="Capture proxy is recording"></span>{/if}</button>
+          <button class="tab-close" type="button" onclick={closeProxyTab} aria-label="Close Capture tab"><AddCloseIcon /></button>
         </div>
       {/if}
       {#if loadTestTabTitle}
@@ -468,7 +471,7 @@
               </button>
             {/if}
             {#if proxyTabOpen}
-              <button class="menu-item" role="option" aria-selected={topView === 'proxy'} type="button" onclick={() => pickTab(openProxyTab)}>Proxy</button>
+              <button class="menu-item" role="option" aria-selected={topView === 'proxy'} type="button" onclick={() => pickTab(openProxyTab)}>Capture</button>
             {/if}
             {#if mockTabOpen}
               <button class="menu-item" role="option" class:active={topView === 'mock'} aria-selected={topView === 'mock'} type="button" onclick={() => pickTab(openMockTab)}>

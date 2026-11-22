@@ -13,7 +13,8 @@ const usage = `Kurlo command-line tools
 Usage:
   kurlo run [workspace] [flags]   Run a workspace's requests and test scripts
   kurlo load list|export|run     Manage and run collection load tests with k6
-  kurlo proxy [flags]             Capture HTTP traffic and HTTPS tunnel metadata
+  kurlo proxy [flags]             Capture HTTP traffic and HTTPS for selected hosts
+  kurlo proxy ca [--pem]          Show the capture certificate authority
   kurlo docs build [collection]   Build a static documentation site from a collection
   kurlo openapi check [collection] Check a synced collection's OpenAPI spec for drift
   kurlo mcp [workspace] [flags]   Serve a workspace to AI agents over MCP

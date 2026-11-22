@@ -130,6 +130,10 @@ export function ClearHistoryResponses() {
   return window['go']['api']['App']['ClearHistoryResponses']();
 }
 
+export function ClearProxyCapture() {
+  return window['go']['api']['App']['ClearProxyCapture']();
+}
+
 export function ClearProxyLocalResponses() {
   return window['go']['api']['App']['ClearProxyLocalResponses']();
 }
@@ -610,8 +614,20 @@ export function ProxyCaptureStatus() {
   return window['go']['api']['App']['ProxyCaptureStatus']();
 }
 
+export function ProxyCertificate() {
+  return window['go']['api']['App']['ProxyCertificate']();
+}
+
+export function ProxyCertificatePEM() {
+  return window['go']['api']['App']['ProxyCertificatePEM']();
+}
+
 export function ProxyPausedResponses() {
   return window['go']['api']['App']['ProxyPausedResponses']();
+}
+
+export function ProxyPlatformSupport() {
+  return window['go']['api']['App']['ProxyPlatformSupport']();
 }
 
 export function PruneHistoryResponses(arg1) {
@@ -774,6 +790,10 @@ export function SaveWorkspaceSecrets(arg1) {
   return window['go']['api']['App']['SaveWorkspaceSecrets'](arg1);
 }
 
+export function SearchProxyCapture(arg1) {
+  return window['go']['api']['App']['SearchProxyCapture'](arg1);
+}
+
 export function SendAgentMessage(arg1) {
   return window['go']['api']['App']['SendAgentMessage'](arg1);
 }
@@ -836,6 +856,10 @@ export function SetEnvironmentVar(arg1, arg2) {
 
 export function SetProxyLocalResponse(arg1) {
   return window['go']['api']['App']['SetProxyLocalResponse'](arg1);
+}
+
+export function SetProxySSLHosts(arg1) {
+  return window['go']['api']['App']['SetProxySSLHosts'](arg1);
 }
 
 export function SetSecretProviderCredential(arg1, arg2, arg3, arg4) {
@@ -954,8 +978,16 @@ export function TestSecretRef(arg1, arg2) {
   return window['go']['api']['App']['TestSecretRef'](arg1, arg2);
 }
 
+export function TrustProxyCertificate() {
+  return window['go']['api']['App']['TrustProxyCertificate']();
+}
+
 export function TrustSecretProvider(arg1, arg2) {
   return window['go']['api']['App']['TrustSecretProvider'](arg1, arg2);
+}
+
+export function UntrustProxyCertificate() {
+  return window['go']['api']['App']['UntrustProxyCertificate']();
 }
 
 export function UpsertCookie(arg1, arg2) {

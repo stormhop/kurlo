@@ -815,6 +815,7 @@
     bind:sidebarHidden={vm.sidebarHidden}
     topView={vm.topView}
     mockRunning={vm.mockServer.running}
+    proxyRecording={vm.proxyRecording}
     cookieCount={vm.cookies.length}
     workspaceBlocked={vm.workspaceBlocked}
     openCollectionRunner={vm.openCollectionRunner}
@@ -966,6 +967,7 @@
       openLoadTestTab={() => (vm.topView = 'loadtest')}
       closeLoadTestTab={() => void vm.closeLoadTestTab()}
       mockRunning={vm.mockServer.running}
+      proxyRecording={vm.proxyRecording}
       gitChangeCount={kurloChangedFiles(vm.gitStatus).length}
       workspaceBlocked={vm.workspaceBlocked}
       toggleWorkspaceMenu={vm.toggleWorkspaceMenu}

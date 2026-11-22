@@ -15,14 +15,17 @@ import (
 )
 
 type Config struct {
-	Port            int    `json:"port"`
-	Include         string `json:"include"`
-	Service         string `json:"service"`
-	Certificate     string `json:"certificate"`
-	Key             string `json:"key"`
-	ListenIP        string `json:"listenIP"`
-	ClientIP        string `json:"clientIP"`
-	IdentifyProcess bool   `json:"identifyProcess"`
+	Port            int      `json:"port"`
+	Include         string   `json:"include"`
+	Service         string   `json:"service"`
+	Certificate     string   `json:"certificate"`
+	Key             string   `json:"key"`
+	ListenIP        string   `json:"listenIP"`
+	ClientIP        string   `json:"clientIP"`
+	IdentifyProcess bool     `json:"identifyProcess"`
+	SSLHosts        []string `json:"sslHosts"`
+	SystemProxy     bool     `json:"systemProxy"`
+	AuthorityDir    string   `json:"-"`
 }
 type serviceTLS struct {
 	authority string
@@ -99,6 +102,44 @@ func (l *serviceListener) Close() error   { return l.conn.Close() }
 func (l *serviceListener) Addr() net.Addr { return l.conn.LocalAddr() }
 
 func (s *session) serveService(w http.ResponseWriter, outer *http.Request) {
+	s.intercept(w, outer, s.service.server, s.service.authority, nil)
+}
+
+func (s *session) serveDecrypted(w http.ResponseWriter, outer *http.Request, authority *Authority, x Exchange) {
+	target := strings.ToLower(outer.Host)
+	host, port, err := net.SplitHostPort(target)
+	if err != nil || host == "" {
+		http.Error(w, "Expected host:port", 400)
+		return
+	}
+	origin := target
+	if port == "443" {
+		origin = host
+		if strings.Contains(host, ":") {
+			origin = "[" + host + "]"
+		}
+	}
+	server := &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}, GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+		name := hello.ServerName
+		if name == "" {
+			name = host
+		}
+		return authority.leaf(name)
+	}}
+	s.intercept(w, outer, server, origin, func() {
+		if s.include != "" && !strings.EqualFold(host, s.include) {
+			return
+		}
+		x.Entry.Status = 200
+		x.Entry.Error = "The client rejected the Kurlo certificate. Trust the Kurlo CA or remove " + host + " from SSL proxying."
+		if s.identifyProcess {
+			x.Entry.Process = s.processes.source(s.ctx, s.addr, outer.RemoteAddr)
+		}
+		s.record(x)
+	})
+}
+
+func (s *session) intercept(w http.ResponseWriter, outer *http.Request, config *tls.Config, origin string, rejected func()) {
 	raw, buffer, err := http.NewResponseController(w).Hijack()
 	if err != nil {
 		http.Error(w, "HTTPS inspection unavailable", 500)
@@ -114,7 +155,16 @@ func (s *session) serveService(w http.ResponseWriter, outer *http.Request) {
 	if err := buffer.Flush(); err != nil {
 		return
 	}
-	tlsConn := tls.Server(client, s.service.server)
+	tlsConn := tls.Server(client, config)
+	if rejected != nil {
+		ctx, cancel := context.WithTimeout(outer.Context(), 15*time.Second)
+		err := tlsConn.HandshakeContext(ctx)
+		cancel()
+		if err != nil {
+			rejected()
+			return
+		}
+	}
 	server := http.Server{
 		BaseContext:       func(net.Listener) context.Context { return outer.Context() },
 		ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 64 << 10,
@@ -124,10 +174,77 @@ func (s *session) serveService(w http.ResponseWriter, outer *http.Request) {
 				return
 			}
 			r.URL.Scheme = "https"
-			r.URL.Host = s.service.authority
-			r.Host = s.service.authority
+			r.URL.Host = origin
+			r.Host = origin
 			s.ServeHTTP(w, r)
 		}),
 	}
 	server.Serve(&serviceListener{conn: tlsConn, done: client.done})
+}
+
+var upstreamRoots *x509.CertPool
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func (s *session) newTransport(config *tls.Config) *http.Transport {
+	if config == nil && upstreamRoots != nil {
+		config = &tls.Config{RootCAs: upstreamRoots}
+	}
+	return &http.Transport{DialContext: s.dial, TLSClientConfig: config, DisableCompression: true, MaxIdleConns: 64, IdleConnTimeout: 60 * time.Second, ResponseHeaderTimeout: 60 * time.Second, TLSHandshakeTimeout: 15 * time.Second}
+}
+
+func (s *session) roundTrip(r *http.Request) (*http.Response, error) {
+	if s.serviceHTTP != nil && strings.EqualFold(r.URL.Host, s.service.authority) {
+		return s.serviceHTTP.RoundTrip(r)
+	}
+	return s.transport.RoundTrip(r)
+}
+
+func (s *session) decryptingAuthority(target string) *Authority {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.authority == nil || !matchSSLHost(s.sslHosts, target) {
+		return nil
+	}
+	return s.authority
+}
+
+func (r *Recorder) SetSSLHosts(hosts []string) (Status, error) {
+	normalized, err := NormalizeSSLHosts(hosts)
+	if err != nil {
+		return r.Status(), err
+	}
+	r.mu.Lock()
+	s := r.run
+	dir := r.config.AuthorityDir
+	r.mu.Unlock()
+	var authority *Authority
+	if s != nil && len(normalized) > 0 {
+		s.mu.Lock()
+		authority = s.authority
+		s.mu.Unlock()
+		if authority == nil {
+			if authority, err = LoadAuthority(dir, true); err != nil {
+				return r.Status(), err
+			}
+		}
+	}
+	r.mu.Lock()
+	r.config.SSLHosts = normalized
+	if r.run == s && s != nil {
+		s.mu.Lock()
+		s.sslHosts = normalized
+		if authority != nil {
+			s.authority = authority
+		}
+		s.mu.Unlock()
+	}
+	status := r.status()
+	r.mu.Unlock()
+	if s != nil {
+		s.changed()
+	}
+	return status, nil
 }

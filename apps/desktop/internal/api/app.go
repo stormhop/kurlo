@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"mime"
 	"os"
 	"path/filepath"
@@ -94,6 +95,11 @@ func (a *App) Startup(ctx context.Context) {
 	go a.watchWorkspaceDisk(ctx)
 	repairStaleBundleInBackground(ctx)
 	go refreshInstalledBrowserExtensions()
+	go func() {
+		if err := restoreSystemProxy(); err != nil {
+			log.Printf("kurlo: restore system proxy: %v", err)
+		}
+	}()
 }
 
 func (a *App) DiagnosticsReport() string {
@@ -116,6 +122,9 @@ func (a *App) OpenLogFolder() string {
 }
 
 func (a *App) Shutdown(_ context.Context) {
+	if err := restoreSystemProxy(); err != nil {
+		log.Printf("kurlo: restore system proxy: %v", err)
+	}
 	a.capture.Close()
 	a.StopPerformanceStream()
 	a.CancelCodexLogin()

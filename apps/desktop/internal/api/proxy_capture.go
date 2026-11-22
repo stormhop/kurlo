@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/skip2/go-qrcode"
 	"github.com/stormhop/kurlo/apps/desktop/internal/proxycapture"
+	"github.com/stormhop/kurlo/apps/desktop/internal/systemproxy"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -30,12 +32,41 @@ func (a *App) StartProxyCapture(config proxycapture.Config) (proxycapture.Status
 			runtime.EventsEmit(a.ctx, "proxy:changed")
 		}
 	}
+	config.AuthorityDir = captureAuthorityDir()
 	batch := newEventBatcher(256, 100*time.Millisecond, func(struct{}) { emit() }, func([]struct{}) { emit() })
-	return a.capture.Start(config, func() { batch.add(struct{}{}) })
+	status, err := a.capture.Start(config, func() { batch.add(struct{}{}) })
+	if err != nil || !config.SystemProxy {
+		return a.withSystemProxy(status), err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	err = newSystemProxy().Enable(ctx, "http://"+status.Address+"/proxy.pac")
+	return a.withSystemProxy(status), err
 }
 
-func (a *App) StopProxyCapture() proxycapture.Status     { return a.capture.Stop() }
-func (a *App) ProxyCaptureStatus() proxycapture.Status   { return a.capture.Status() }
+func (a *App) StopProxyCapture() (proxycapture.Status, error) {
+	status := a.capture.Stop()
+	err := restoreSystemProxy()
+	return a.withSystemProxy(status), err
+}
+
+func (a *App) ProxyCaptureStatus() proxycapture.Status { return a.withSystemProxy(a.capture.Status()) }
+
+func (a *App) withSystemProxy(status proxycapture.Status) proxycapture.Status {
+	status.SystemProxy = status.Running && newSystemProxy().Active()
+	return status
+}
+
+var newSystemProxy = func() *systemproxy.Manager {
+	return systemproxy.New(filepath.Join(requestStoreDir(), "capture-system-proxy.json"))
+}
+
+func restoreSystemProxy() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	return newSystemProxy().Recover(ctx)
+}
+
 func (a *App) ProxyCaptureEntries() []proxycapture.Entry { return a.capture.Entries() }
 func (a *App) ProxyCaptureEntry(id int64) (proxycapture.Exchange, error) {
 	x, err := a.capture.Get(id)
@@ -89,6 +120,9 @@ func RunProxyCLI(args []string, stdout, stderr io.Writer) int {
 }
 
 func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	if len(args) > 0 && args[0] == "ca" {
+		return runProxyCACLI(args[1:], stdout, stderr)
+	}
 	fs := flag.NewFlagSet("kurlo proxy", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	port := fs.Int("port", 9090, "loopback listening port")
@@ -98,6 +132,12 @@ func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) i
 	key := fs.String("key", "", "service private key PEM")
 	listen := fs.String("listen", "127.0.0.1", "loopback or private LAN interface IPv4")
 	peer := fs.String("client-ip", "", "client IPv4 allowed on the LAN interface")
+	var sslHosts []string
+	fs.Func("ssl-host", "decrypt HTTPS for this host with the Kurlo CA; repeat or separate with commas", func(value string) error {
+		sslHosts = append(sslHosts, strings.Split(value, ",")...)
+		return nil
+	})
+	systemProxy := fs.Bool("system-proxy", false, "set this proxy as the system automatic proxy while recording")
 	processes := fs.Bool("process", false, "identify local macOS client processes when available")
 	out := fs.String("out", "", "write the HTTP session as HAR on exit")
 	if err := fs.Parse(args); err != nil {
@@ -112,12 +152,24 @@ func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) i
 	}
 	var recorder proxycapture.Recorder
 	defer recorder.Close()
-	status, err := recorder.Start(proxycapture.Config{Port: *port, Include: *include, Service: *service, Certificate: *cert, Key: *key, ListenIP: *listen, ClientIP: *peer, IdentifyProcess: *processes}, nil)
+	status, err := recorder.Start(proxycapture.Config{Port: *port, Include: *include, Service: *service, Certificate: *cert, Key: *key, ListenIP: *listen, ClientIP: *peer, IdentifyProcess: *processes, SSLHosts: sslHosts, AuthorityDir: captureAuthorityDir()}, nil)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "Listening on http://%s\n", status.Address)
+	if *systemProxy {
+		if err := newSystemProxy().Enable(ctx, "http://"+status.Address+"/proxy.pac"); err != nil {
+			fmt.Fprintln(stderr, err)
+			return 1
+		}
+		defer func() {
+			if err := restoreSystemProxy(); err != nil {
+				fmt.Fprintln(stderr, err)
+			}
+		}()
+		fmt.Fprintln(stdout, "System proxy set to this recorder")
+	}
 	<-ctx.Done()
 	recorder.Stop()
 	if *out != "" {
@@ -165,4 +217,53 @@ func (a *App) ReadProxyResponseFile(path string) (string, error) {
 		return "", errors.New("choose a UTF-8 text file up to 1 MiB")
 	}
 	return string(data), nil
+}
+
+func runProxyCACLI(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("kurlo proxy ca", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	printPEM := fs.Bool("pem", false, "print the certificate PEM instead of its details")
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
+		return 2
+	}
+	if fs.NArg() != 0 {
+		fmt.Fprintln(stderr, "Expected no positional arguments")
+		return 2
+	}
+	info, authority, err := captureAuthorityInfo(true)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 1
+	}
+	if *printPEM {
+		stdout.Write(authority.PEM())
+		return 0
+	}
+	trusted := "no"
+	if info.Trusted {
+		trusted = "yes"
+	}
+	fmt.Fprintf(stdout, "Certificate: %s\nSubject: %s\nSHA-256: %s\nTrusted by this system: %s\n", info.Path, info.Subject, info.Fingerprint, trusted)
+	return 0
+}
+
+func (a *App) ClearProxyCapture() proxycapture.Status {
+	return a.withSystemProxy(a.capture.Clear())
+}
+
+func (a *App) SearchProxyCapture(query string) []proxycapture.SearchHit {
+	return a.capture.Search(query, decodeCapturePreview)
+}
+
+func decodeCapturePreview(headers http.Header, raw string, limit int) (string, bool) {
+	reader, closeReader := newDecodingReader(strings.NewReader(raw), &http.Response{Header: headers})
+	defer closeReader()
+	body, err := io.ReadAll(io.LimitReader(reader, int64(limit)))
+	if len(body) == 0 || (err != nil && !errors.Is(err, io.ErrUnexpectedEOF)) {
+		return "", false
+	}
+	return strings.ToValidUTF8(string(body), ""), true
 }

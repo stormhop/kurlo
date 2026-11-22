@@ -683,6 +683,22 @@ export namespace api {
 	        this.error = source["error"];
 	    }
 	}
+	export class ProxyPlatformSupport {
+	    systemProxy: boolean;
+	    trustCertificate: boolean;
+	    identifyProcess: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProxyPlatformSupport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.systemProxy = source["systemProxy"];
+	        this.trustCertificate = source["trustCertificate"];
+	        this.identifyProcess = source["identifyProcess"];
+	    }
+	}
 	export class RequestFileInfo {
 	    path: string;
 	    absolutePath: string;
@@ -5379,6 +5395,28 @@ export namespace model {
 
 export namespace proxycapture {
 	
+	export class AuthorityInfo {
+	    exists: boolean;
+	    trusted: boolean;
+	    path: string;
+	    subject: string;
+	    fingerprint: string;
+	    notAfter: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AuthorityInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.exists = source["exists"];
+	        this.trusted = source["trusted"];
+	        this.path = source["path"];
+	        this.subject = source["subject"];
+	        this.fingerprint = source["fingerprint"];
+	        this.notAfter = source["notAfter"];
+	    }
+	}
 	export class Config {
 	    port: number;
 	    include: string;
@@ -5388,6 +5426,8 @@ export namespace proxycapture {
 	    listenIP: string;
 	    clientIP: string;
 	    identifyProcess: boolean;
+	    sslHosts: string[];
+	    systemProxy: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
@@ -5403,6 +5443,8 @@ export namespace proxycapture {
 	        this.listenIP = source["listenIP"];
 	        this.clientIP = source["clientIP"];
 	        this.identifyProcess = source["identifyProcess"];
+	        this.sslHosts = source["sslHosts"];
+	        this.systemProxy = source["systemProxy"];
 	    }
 	}
 	export class Entry {
@@ -5569,12 +5611,27 @@ export namespace proxycapture {
 	        this.body = source["body"];
 	    }
 	}
+	export class SearchHit {
+	    id: number;
+	    where: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SearchHit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.where = source["where"];
+	    }
+	}
 	export class Status {
 	    config: Config;
 	    rules: number;
 	    address: string;
 	    running: boolean;
 	    count: number;
+	    systemProxy: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Status(source);
@@ -5587,6 +5644,7 @@ export namespace proxycapture {
 	        this.address = source["address"];
 	        this.running = source["running"];
 	        this.count = source["count"];
+	        this.systemProxy = source["systemProxy"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

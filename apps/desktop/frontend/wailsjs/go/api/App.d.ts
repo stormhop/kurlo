@@ -68,6 +68,8 @@ export function ClearCookies(arg1:string):Promise<Array<model.Cookie>>;
 
 export function ClearHistoryResponses():Promise<string>;
 
+export function ClearProxyCapture():Promise<proxycapture.Status>;
+
 export function ClearProxyLocalResponses():Promise<void>;
 
 export function ClearSecretCache():Promise<number>;
@@ -308,7 +310,13 @@ export function ProxyCaptureQR():Promise<string>;
 
 export function ProxyCaptureStatus():Promise<proxycapture.Status>;
 
+export function ProxyCertificate():Promise<proxycapture.AuthorityInfo>;
+
+export function ProxyCertificatePEM():Promise<string>;
+
 export function ProxyPausedResponses():Promise<Array<proxycapture.Paused>>;
+
+export function ProxyPlatformSupport():Promise<api.ProxyPlatformSupport>;
 
 export function PruneHistoryResponses(arg1:Array<string>):Promise<string>;
 
@@ -390,6 +398,8 @@ export function SaveSecretProvider(arg1:string,arg2:Record<string, any>):Promise
 
 export function SaveWorkspaceSecrets(arg1:Record<string, string>):Promise<api.WorkspaceOpenResult>;
 
+export function SearchProxyCapture(arg1:string):Promise<Array<proxycapture.SearchHit>>;
+
 export function SendAgentMessage(arg1:model.AgentSendInput):Promise<model.AgentTurn>;
 
 export function SendAiRequest(arg1:model.AiRequest):Promise<model.AiResponse>;
@@ -421,6 +431,8 @@ export function SetEnvironment(arg1:Record<string, string>):Promise<void>;
 export function SetEnvironmentVar(arg1:string,arg2:string):Promise<void>;
 
 export function SetProxyLocalResponse(arg1:proxycapture.LocalResponse):Promise<void>;
+
+export function SetProxySSLHosts(arg1:Array<string>):Promise<proxycapture.Status>;
 
 export function SetSecretProviderCredential(arg1:string,arg2:string,arg3:string,arg4:string):Promise<api.SecretActionResult>;
 
@@ -480,7 +492,11 @@ export function TestSecretProvider(arg1:string,arg2:string):Promise<api.SecretPr
 
 export function TestSecretRef(arg1:string,arg2:api.SecretRefInput):Promise<api.SecretRefTestResult>;
 
+export function TrustProxyCertificate():Promise<proxycapture.AuthorityInfo>;
+
 export function TrustSecretProvider(arg1:string,arg2:string):Promise<api.SecretActionResult>;
+
+export function UntrustProxyCertificate():Promise<proxycapture.AuthorityInfo>;
 
 export function UpsertCookie(arg1:string,arg2:model.Cookie):Promise<model.CookieJarResult>;
 

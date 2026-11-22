@@ -79,11 +79,12 @@ type Exchange struct {
 }
 
 type Status struct {
-	Config  Config `json:"config"`
-	Rules   int    `json:"rules"`
-	Address string `json:"address"`
-	Running bool   `json:"running"`
-	Count   int    `json:"count"`
+	Config      Config `json:"config"`
+	Rules       int    `json:"rules"`
+	Address     string `json:"address"`
+	Running     bool   `json:"running"`
+	Count       int    `json:"count"`
+	SystemProxy bool   `json:"systemProxy"`
 }
 
 type Recorder struct {
@@ -110,6 +111,10 @@ type session struct {
 	rules           map[localRoute]LocalResponse
 	server          *http.Server
 	transport       *http.Transport
+	serviceHTTP     *http.Transport
+	authority       *Authority
+	authorityDir    string
+	sslHosts        []string
 	proxy           *httputil.ReverseProxy
 	addr            *net.TCPAddr
 	include         string
@@ -134,6 +139,17 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 	if err != nil {
 		return r.status(), err
 	}
+	sslHosts, err := NormalizeSSLHosts(config.SSLHosts)
+	if err != nil {
+		return r.status(), err
+	}
+	config.SSLHosts = sslHosts
+	var authority *Authority
+	if len(sslHosts) > 0 {
+		if authority, err = LoadAuthority(config.AuthorityDir, true); err != nil {
+			return r.status(), err
+		}
+	}
 	listen := config.ListenIP
 	if listen == "" {
 		listen = "127.0.0.1"
@@ -150,12 +166,12 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 	if notify == nil {
 		notify = func() {}
 	}
-	s := &session{files: &bodyFiles{}, changed: notify, pauses: make(map[int64]pauseSlot), service: service, clientIP: peer, identifyProcess: config.IdentifyProcess, rules: make(map[localRoute]LocalResponse), addr: ln.Addr().(*net.TCPAddr), ctx: ctx, cancel: cancel, include: strings.ToLower(strings.TrimSpace(config.Include))}
-	s.transport = &http.Transport{DialContext: s.dial, DisableCompression: true, MaxIdleConns: 64, IdleConnTimeout: 60 * time.Second, ResponseHeaderTimeout: 60 * time.Second}
+	s := &session{files: &bodyFiles{}, changed: notify, pauses: make(map[int64]pauseSlot), service: service, clientIP: peer, identifyProcess: config.IdentifyProcess, rules: make(map[localRoute]LocalResponse), authority: authority, authorityDir: config.AuthorityDir, sslHosts: sslHosts, addr: ln.Addr().(*net.TCPAddr), ctx: ctx, cancel: cancel, include: strings.ToLower(strings.TrimSpace(config.Include))}
+	s.transport = s.newTransport(nil)
 	if service != nil {
-		s.transport.TLSClientConfig = service.upstream
+		s.serviceHTTP = s.newTransport(service.upstream)
 	}
-	s.proxy = &httputil.ReverseProxy{Transport: s.transport, Rewrite: func(p *httputil.ProxyRequest) { p.Out.Host = p.Out.URL.Host }, ModifyResponse: func(resp *http.Response) error {
+	s.proxy = &httputil.ReverseProxy{Transport: roundTripFunc(s.roundTrip), Rewrite: func(p *httputil.ProxyRequest) { p.Out.Host = p.Out.URL.Host }, ModifyResponse: func(resp *http.Response) error {
 		tr := resp.Request.Context().Value(traceKey{}).(*trace)
 		return tr.responseBody(resp)
 	}, ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
@@ -239,6 +255,9 @@ func (r *Recorder) stopSession(s *session) {
 	s.cancel()
 	s.server.Close()
 	s.transport.CloseIdleConnections()
+	if s.serviceHTTP != nil {
+		s.serviceHTTP.CloseIdleConnections()
+	}
 	s.wg.Wait()
 	r.mu.Lock()
 	if r.run == s {
@@ -487,10 +506,15 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			s.serveService(w, r)
 			return
 		}
+		if authority := s.decryptingAuthority(r.Host); authority != nil {
+			x.Entry.Host = r.Host
+			s.serveDecrypted(w, r, authority, x)
+			return
+		}
 		x.Entry.Host = r.Host
 		s.tunnel(w, r, &x.Entry)
 	} else {
-		if (r.URL.Scheme != "http" && !(r.TLS != nil && r.URL.Scheme == "https" && s.service != nil && r.URL.Host == s.service.authority)) || r.URL.Host == "" {
+		if (r.URL.Scheme != "http" && !(r.TLS != nil && r.URL.Scheme == "https")) || r.URL.Host == "" {
 			http.Error(w, "Expected an HTTP destination", 400)
 			return
 		}

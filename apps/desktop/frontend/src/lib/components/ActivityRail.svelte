@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ProxyIcon from './ProxyIcon.svelte';
   import type { SidebarView } from '../types/models';
   import type { SettingsTab, TopView } from '../stores/ui';
 
@@ -7,6 +8,7 @@
     sidebarHidden = $bindable(false),
     topView,
     mockRunning = false,
+    proxyRecording = false,
     cookieCount = 0,
     workspaceBlocked = false,
     openCollectionRunner,
@@ -21,6 +23,7 @@
     sidebarHidden: boolean;
     topView: TopView;
     mockRunning?: boolean;
+    proxyRecording?: boolean;
     cookieCount?: number;
     workspaceBlocked?: boolean;
     openCollectionRunner: () => void;
@@ -83,7 +86,8 @@
       {#if mockRunning}<span class="activity-rail-dot" aria-hidden="true"></span>{/if}
     </button>
     <button class="activity-rail-btn" class:active={topView === 'proxy'} type="button" aria-label="Capture proxy" onclick={openProxyTab} disabled={workspaceBlocked}>
-      <svg width="1.125rem" height="1.125rem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h15m-4-4 4 4-4 4M20 16H5m4-4-4 4 4 4"/></svg>
+      <ProxyIcon />
+      {#if proxyRecording}<span class="activity-rail-dot" aria-hidden="true"></span>{/if}
     </button>
   </div>
 
