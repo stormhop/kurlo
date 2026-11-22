@@ -4,6 +4,7 @@
   import Disclosure from './Disclosure.svelte';
   import Select from './Select.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
+  import CodeEditor from '../CodeEditor.svelte';
   import { vm } from '../stores/app.svelte';
   import type { ProxyEntry, ProxyHeaderValue, ProxyRule } from '../wire';
   import { compileRulePattern, headerNames, ruleMatches } from '../captureRules';
@@ -41,6 +42,14 @@
   const collections = $derived(vm.activeWorkspaceCollections());
   const exampleRequests = $derived(rule.kind === 'local' ? vm.requests.filter(request => collections.some(collection => collection.id === request.collectionId) && (request.examples?.length || request.exampleCount)) : []);
   const examples = $derived(exampleRequests.find(request => request.id === exampleRequest)?.examples ?? []);
+  const bodyLanguage = $derived.by(() => {
+    const media = rule.local.contentType.toLowerCase();
+    if (media.includes('json')) return 'json' as const;
+    if (media.includes('xml')) return 'xml' as const;
+    if (media.includes('html')) return 'html' as const;
+    if (media.includes('javascript')) return 'javascript' as const;
+    return 'text' as const;
+  });
   const title = $derived(`${isNew ? 'New' : 'Edit'} ${rule.kind === 'local' ? 'Map local' : 'Rewrite'} rule`);
 
   function chooseExample(id: string) {
@@ -137,7 +146,7 @@
     {/if}
     <div class="capture-dialog-field">
       <span class="capture-dialog-label-row">Body <button class="btn btn-ghost btn-xs" type="button" onclick={loadFile}>Load file…</button></span>
-      <textarea class="field field-mono capture-dialog-text" aria-label="Local response body" bind:value={rule.local.body}></textarea>
+      <div class="capture-code"><CodeEditor bind:value={rule.local.body} language={bodyLanguage} minHeight="9rem" maxHeight="18rem" ariaLabel="Local response body" placeholder="The response body Kurlo sends." /></div>
     </div>
     <Disclosure title="Network conditions" summary={rule.local.delayMs || rule.local.rateKiB || rule.local.errorPercent || rule.local.pause ? 'On' : 'Off'} storageKey="kurlo.proxy.ruleNetwork">
       <div class="capture-dialog-grid">
@@ -148,7 +157,7 @@
       <label class="capture-option"><input class="check" type="checkbox" bind:checked={rule.local.pause}><span><span class="capture-option-title">Pause before sending</span><span class="capture-option-note">Edit the response and release it within 60 seconds.</span></span></label>
     </Disclosure>
     <Disclosure title="JavaScript hooks" summary={rule.local.script.trim() ? 'On' : 'Off'} storageKey="kurlo.proxy.ruleHooks">
-      <textarea class="field field-mono capture-dialog-text" aria-label="Local response hooks" placeholder={'function onResponse(request, response) { response.status = 202; }'} bind:value={rule.local.script}></textarea>
+      <div class="capture-code"><CodeEditor bind:value={rule.local.script} language="javascript" minHeight="7.5rem" maxHeight="18rem" ariaLabel="Local response hooks" placeholder={'function onResponse(request, response) { response.status = 202; }'} /></div>
     </Disclosure>
   {:else}
     <label class="capture-dialog-field"><span>Send to</span><input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} class="field field-mono field-md" placeholder="Keep the original server, or http://localhost:3000" bind:value={rule.rewrite.target}></label>

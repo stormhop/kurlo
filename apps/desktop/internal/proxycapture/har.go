@@ -104,7 +104,11 @@ func (r *Recorder) HARDecoded(ids []int64, decode func(http.Header, string, int)
 		if err != nil {
 			return "", err
 		}
-		req := map[string]any{"method": e.Method, "url": e.URL, "httpVersion": "HTTP/1.1", "headers": pairs(x.Request.Headers), "cookies": []any{}, "queryString": pairs(u.Query()), "headersSize": -1, "bodySize": e.Sent}
+		version := e.Protocol
+		if version == "" {
+			version = "HTTP/1.1"
+		}
+		req := map[string]any{"method": e.Method, "url": e.URL, "httpVersion": version, "headers": pairs(x.Request.Headers), "cookies": []any{}, "queryString": pairs(u.Query()), "headersSize": -1, "bodySize": e.Sent}
 		reqBody, err := x.Request.archived()
 		if err != nil {
 			return "", err
@@ -131,8 +135,13 @@ func (r *Recorder) HARDecoded(ids []int64, decode func(http.Header, string, int)
 			content["encoding"] = "base64"
 			content["text"] = base64.StdEncoding.EncodeToString([]byte(resBody))
 		}
-		resp := map[string]any{"status": e.Status, "statusText": http.StatusText(e.Status), "httpVersion": "HTTP/1.1", "headers": pairs(x.Response.Headers), "cookies": []any{}, "content": content, "redirectURL": http.Header(x.Response.Headers).Get("Location"), "headersSize": -1, "bodySize": e.Received}
-		entries = append(entries, map[string]any{"startedDateTime": e.Started, "time": e.Duration, "request": req, "response": resp, "cache": map[string]any{}, "timings": map[string]int64{"send": 0, "wait": e.Duration, "receive": 0}})
+		resp := map[string]any{"status": e.Status, "statusText": http.StatusText(e.Status), "headers": pairs(x.Response.Headers), "cookies": []any{}, "content": content, "redirectURL": http.Header(x.Response.Headers).Get("Location"), "headersSize": -1, "bodySize": e.Received}
+		resp["httpVersion"] = version
+		item := map[string]any{"startedDateTime": e.Started, "time": e.Duration, "request": req, "response": resp, "cache": map[string]any{}, "timings": harTimings(x.Timings, e.Duration)}
+		if ext := (harExtension{Stream: e.Stream, Process: e.Process, Error: e.Error, Rule: e.Rule, Rewritten: e.Rewritten, Local: e.Local, Frames: x.Frames, Timings: x.Timings}); ext.Stream != "" || ext.Process != "" || ext.Error != "" || ext.Rule != "" || ext.Rewritten != "" || ext.Local || len(ext.Frames) > 0 || ext.Timings != nil {
+			item["_kurlo"] = ext
+		}
+		entries = append(entries, item)
 	}
 	if len(selected) > 0 {
 		return "", errors.New("some selected entries have expired; refresh the capture")

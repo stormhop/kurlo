@@ -5454,6 +5454,7 @@ export namespace proxycapture {
 	    local?: boolean;
 	    rule?: string;
 	    rewritten?: string;
+	    protocol?: string;
 	    id: number;
 	    started: string;
 	    method: string;
@@ -5478,6 +5479,7 @@ export namespace proxycapture {
 	        this.local = source["local"];
 	        this.rule = source["rule"];
 	        this.rewritten = source["rewritten"];
+	        this.protocol = source["protocol"];
 	        this.id = source["id"];
 	        this.started = source["started"];
 	        this.method = source["method"];
@@ -5530,6 +5532,7 @@ export namespace proxycapture {
 	    }
 	}
 	export class Exchange {
+	    timings?: model.ResponseTime;
 	    frames?: Frame[];
 	    entry: Entry;
 	    request: Message;
@@ -5541,6 +5544,7 @@ export namespace proxycapture {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.timings = this.convertValues(source["timings"], model.ResponseTime);
 	        this.frames = this.convertValues(source["frames"], Frame);
 	        this.entry = this.convertValues(source["entry"], Entry);
 	        this.request = this.convertValues(source["request"], Message);
@@ -5736,6 +5740,7 @@ export namespace proxycapture {
 	    running: boolean;
 	    count: number;
 	    systemProxy: boolean;
+	    source?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Status(source);
@@ -5749,6 +5754,7 @@ export namespace proxycapture {
 	        this.running = source["running"];
 	        this.count = source["count"];
 	        this.systemProxy = source["systemProxy"];
+	        this.source = source["source"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

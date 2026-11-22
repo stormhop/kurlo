@@ -218,6 +218,11 @@ export function agentToolLabel(name: string | undefined): string {
     case 'list_history': return 'Read the history';
     case 'get_history_entry': return 'Read a history entry';
     case 'diagnose_last_failure': return 'Diagnosed a failure';
+    case 'proxy_status': return 'Checked the capture';
+    case 'list_captured': return 'Listed captured traffic';
+    case 'get_captured': return 'Read a captured exchange';
+    case 'check_captured_openapi': return 'Compared capture with OpenAPI';
+    case 'create_captured_collection': return 'Created a collection from capture';
     case 'create_collection': return 'Created a collection';
     case 'save_request': return 'Saved a request';
     case 'delete_request': return 'Deleted a request';

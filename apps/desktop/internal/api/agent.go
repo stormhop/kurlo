@@ -87,6 +87,7 @@ func (rt *agentRuntime) bridge(chat model.AgentChat, root string) *agentToolBrid
 	if bridge == nil || !sameWorkspaceRoot(bridge.server.opts.workspace, root) {
 		bridge = newAgentToolBridge(mcpServerOptions{workspace: root, loadAppSecrets: true}, chat.ID, chat.AllowedTools)
 		if rt.app != nil {
+			bridge.server.capture = &rt.app.capture
 			if rt.app.mock != nil {
 				bridge.server.executionApp = rt.app
 			}

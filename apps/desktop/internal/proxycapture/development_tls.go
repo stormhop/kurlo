@@ -62,7 +62,7 @@ func loadService(config Config) (*serviceTLS, error) {
 	}
 	roots := x509.NewCertPool()
 	roots.AddCert(leaf)
-	return &serviceTLS{authority: strings.ToLower(config.Service), server: &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}}, upstream: &tls.Config{RootCAs: roots, ServerName: host, MinVersion: tls.VersionTLS12, VerifyConnection: func(s tls.ConnectionState) error {
+	return &serviceTLS{authority: strings.ToLower(config.Service), server: &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12, NextProtos: []string{"h2", "http/1.1"}}, upstream: &tls.Config{RootCAs: roots, ServerName: host, MinVersion: tls.VersionTLS12, VerifyConnection: func(s tls.ConnectionState) error {
 		if len(s.PeerCertificates) == 0 || !s.PeerCertificates[0].Equal(leaf) {
 			return errors.New("upstream certificate differs from the configured service")
 		}
@@ -119,7 +119,7 @@ func (s *session) serveDecrypted(w http.ResponseWriter, outer *http.Request, aut
 			origin = "[" + host + "]"
 		}
 	}
-	server := &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"http/1.1"}, GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+	server := &tls.Config{MinVersion: tls.VersionTLS12, NextProtos: []string{"h2", "http/1.1"}, GetCertificate: func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 		name := hello.ServerName
 		if name == "" {
 			name = host

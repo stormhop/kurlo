@@ -286,6 +286,8 @@ export function OpenLoadRunReport(arg1:string,arg2:string):Promise<string>;
 
 export function OpenLogFolder():Promise<string>;
 
+export function OpenProxyCaptureSession(arg1:string):Promise<proxycapture.Status>;
+
 export function OpenRouterConnectStatus():Promise<model.OpenRouterConnectState>;
 
 export function OpenWorkspaceRoot(arg1:string):Promise<api.WorkspaceOpenResult>;

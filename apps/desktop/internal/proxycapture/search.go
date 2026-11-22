@@ -24,6 +24,7 @@ func (r *Recorder) Clear() Status {
 	r.ring = [capacity]*Exchange{}
 	r.count = 0
 	r.cursor = 0
+	r.source = ""
 	s := r.run
 	status := r.status()
 	r.mu.Unlock()

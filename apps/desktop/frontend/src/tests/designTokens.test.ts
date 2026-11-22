@@ -62,7 +62,7 @@ function violations(check: (decl: { selector: string; property: string; value: s
 
 const KIT_BUTTON_CLASSES = new Set(['btn', 'btn-link', 'menu-item', 'segmented-item', 'field', 'option-card', 'tab']);
 const SPECIAL_BUTTON_CLASSES = new Set([
-  'about-item', 'activity-rail-btn', 'capture-host-link', 'capture-pill-button', 'capture-row', 'capture-rule-main', 'agent-change-head', 'agent-picker-trigger', 'agent-tool-toggle', 'ai-combo-option', 'btn-send', 'btn-send-caret', 'code-panel-resizer', 'collection-collapse',
+  'about-item', 'activity-rail-btn', 'capture-host-link', 'capture-recent-open', 'capture-pill-button', 'capture-row', 'capture-rule-main', 'agent-change-head', 'agent-picker-trigger', 'agent-tool-toggle', 'ai-combo-option', 'btn-send', 'btn-send-caret', 'code-panel-resizer', 'collection-collapse',
   'collection-empty-row', 'collection-name', 'collection-request', 'cookie-domain-item', 'cookie-row-main', 'date-picker-day',
   'dialog-choice-card', 'disclosure-toggle', 'env-color-swatch', 'env-matrix-inherited', 'env-matrix-not-set',
   'env-matrix-unset', 'env-type-toggle', 'environment-globals-item', 'environment-item-main',

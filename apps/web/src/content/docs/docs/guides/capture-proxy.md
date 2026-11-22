@@ -46,6 +46,8 @@ The search field matches the host, path and app name, and also headers, bodies a
 
 Select a row, or move through the list with the arrow keys. The details below the list show the **Response** and **Request**, each with its headers and a formatted body. Drag the line between the list and the details to resize them. For HTTP/1.1 WebSocket upgrades and SSE responses, open **Messages** or **Events** while the stream is running. Previews keep the first 16 KiB per direction.
 
+The line under the path shows the duration and the protocol the client used, such as **HTTP/2**. Hover over the duration to see where the time went: preparing the request, waiting for a connection, DNS lookup, TCP and TLS handshakes with the server, waiting for the first byte and downloading the response. A request that reused an open connection has no handshake time. Responses from a **Map local** rule never reach the network, so they show only the total.
+
 On macOS, **Settings → Connection → Show which app sent each request** adds the app name to each row.
 
 ## Decrypt HTTPS for selected hosts
@@ -55,6 +57,8 @@ Kurlo can decrypt HTTPS for the hosts you list, the way Charles or Proxyman do. 
 1. Open **Settings** and find **HTTPS decryption**. Enter a host such as `api.example.com` and click **Add host**. You can also select a **TLS** row and click **Decrypt** with its host name. The list applies to new connections immediately, also while recording, and Kurlo remembers it for the next session.
 2. Click **Trust Kurlo certificate…** once. Kurlo creates a certificate authority for this computer and adds it to your login keychain on macOS or your user certificate store on Windows. The system asks you to confirm. On Linux, click **Export certificate…** and add the file to your system and browser trust stores.
 3. Reload the page in your browser. Requests to the listed hosts appear with their headers and bodies.
+
+Kurlo offers HTTP/2 and HTTP/1.1 to the client on decrypted connections and on a service inspected with its own certificate, so browsers keep the protocol they would use without the proxy. Kurlo talks to the server over HTTP/1.1.
 
 ![An HTTPS tunnel that the client rejected, with the Decrypt button for its host](../../../../assets/screenshots/capture-proxy-https.png)
 
@@ -85,9 +89,17 @@ For a second device, choose your computer's private LAN interface address in **S
 - **Save as request** saves the request and its response example in the collection and folder you choose. The default folder is **Captured**. You can serve saved examples from the [mock server](/docs/guides/mock-server/).
 - **Open in editor** opens an editable draft. Check its URL, environment and authentication before pressing **Send**.
 - **Create collection** makes a collection from the filtered HTTP entries and groups repeated method and URL pairs into one request.
-- **Export HAR** writes the filtered HTTP exchanges. **Ask agent** prepares a draft with observed endpoints and statuses for your review.
+- **Export HAR** writes the filtered HTTP exchanges with their HTTP version and timings. Kurlo adds failed requests, the process, the rule that answered and stream messages as `_kurlo` fields, so **Open HAR** restores them. **Ask agent** opens a chat draft that lists the exchanges by id. The agent reads their headers, bodies and messages with `get_captured`, so it can suggest request bodies, variables and assertions on response fields. You review and send the draft.
 
 Kurlo retains the latest 1,000 entries. Stopping preserves the session for inspection. Starting another session clears it. Body previews show up to 16 KiB. Larger HTTP bodies can be exported in full up to 8 MiB per body and 64 MiB of temporary file storage per session. When a limit is reached, the HAR marks the preview incomplete. Check bodies and paths before sharing a HAR. They can contain application data.
+
+## Open a saved session
+
+**Open HAR** loads a HAR file into the traffic list, so you can go back to a session you exported or inspect one recorded elsewhere. Kurlo reads HAR files from its own export and from browser developer tools, Charles and Proxyman. The header shows the file name. Search, filters, rules, **Save as request**, **Create collection** and **Export HAR** work as they do for a live recording. WebSocket messages open in **Messages** and server-sent events in **Events**. Timings and the HTTP version are restored too.
+
+Kurlo opens the latest 1,000 HTTP entries of a file up to 256 MiB. Encrypted tunnels have no requests to restore, so they are skipped. Stop recording before you open a file. **Record** starts a new session and replaces the opened one.
+
+When the list is empty, **Recent sessions** shows the HAR files you opened or exported recently. Click a file to open it again. The list is stored on this device, not in the workspace.
 
 ## Change traffic with rules
 
@@ -129,7 +141,7 @@ kurlo proxy --port 9090 --include api.dev.test --out session.har
 
 Point the client at the proxy while the command runs, or add `--system-proxy` to set Kurlo as the system proxy until the command exits. Press Ctrl+C to stop and write the HAR. Add `--rules rules.json` to apply rules from a file with the same format Kurlo saves in its configuration folder as `capture-rules.json`. Add `--ssl-host api.dev.test` to decrypt HTTPS for a host with the Kurlo certificate. Repeat the flag or separate hosts with commas. `kurlo proxy ca` shows the certificate path, fingerprint and whether this system trusts it, and `kurlo proxy ca --pem` prints the certificate. Use `--service api.dev.test:443 --cert service.pem --key service-key.pem` to inspect a service with its own certificate instead. Run `kurlo proxy --help` for LAN and process options.
 
-To share endpoint metadata with an MCP client, start `kurlo mcp /path/to/workspace --capture-har /path/to/session.har`. The capture tools expose method, host, path, status and duration. Use `check_captured_openapi` with a synced collection and host to compare observed methods and paths with its saved specification.
+To share a recorded session with an MCP client, start `kurlo mcp /path/to/workspace --capture-har /path/to/session.har`. `list_captured` exposes method, host, path, status and duration, and `get_captured` adds headers and bodies of one exchange. Credential headers are left out, and secrets saved in Kurlo appear as `[secret]`. Share only a HAR you are ready to show the client. Use `check_captured_openapi` with a synced collection and host to compare observed methods and paths with its saved specification.
 
 With write access, `create_captured_collection` accepts a collection name and host. It saves one request template per observed method and path, with a status assertion from the first matching response. Set the `baseUrl` environment variable to your development service before using those templates.
 

@@ -20,6 +20,7 @@ import (
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
+	"github.com/stormhop/kurlo/apps/desktop/internal/proxycapture"
 	secretmgr "github.com/stormhop/kurlo/apps/desktop/internal/secrets"
 )
 
@@ -77,6 +78,11 @@ type mcpServer struct {
 	onOAuthDevicePrompt func(model.OAuth2DevicePrompt)
 	onWrite             func(root string, changes []model.AgentFileChange)
 	afterWrite          func(tool string, record *mcpCallRecord) string
+
+	capture      *proxycapture.Recorder
+	captureMu    sync.Mutex
+	captureFile  *proxycapture.Recorder
+	captureStamp string
 
 	pendingMu sync.Mutex
 	pending   map[string]context.CancelFunc
@@ -605,7 +611,7 @@ func (s *mcpServer) callTool(ctx context.Context, params json.RawMessage) (map[s
 	case "create_captured_collection":
 		run = s.createCapturedCollection
 	case "proxy_status", "list_captured", "get_captured", "check_captured_openapi":
-		if s.opts.captureHAR == "" {
+		if !s.hasCapture() {
 			return nil, &mcpServerError{code: mcpRPCInvalidParams, message: "no capture session was supplied"}
 		}
 		run = s.captureHandler(call.Name)

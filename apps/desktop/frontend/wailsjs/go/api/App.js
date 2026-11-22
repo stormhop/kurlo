@@ -566,6 +566,10 @@ export function OpenLogFolder() {
   return window['go']['api']['App']['OpenLogFolder']();
 }
 
+export function OpenProxyCaptureSession(arg1) {
+  return window['go']['api']['App']['OpenProxyCaptureSession'](arg1);
+}
+
 export function OpenRouterConnectStatus() {
   return window['go']['api']['App']['OpenRouterConnectStatus']();
 }

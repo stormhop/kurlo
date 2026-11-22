@@ -29,7 +29,7 @@ const clientAbilities = [
 ];
 
 const agentTools = [
-  { title: 'Capture', text: 'With --capture-har, list_captured and get_captured show observed endpoint metadata. check_captured_openapi compares the capture to a saved specification. create_captured_collection builds request templates for one host.' },
+  { title: 'Capture', text: 'With --capture-har, list_captured finds observed endpoints and get_captured reads an exchange with headers, bodies and timings. check_captured_openapi compares the capture to a saved specification. create_captured_collection builds request templates for one host.' },
   { title: 'Read', text: 'list_requests, get_request, list_environments, and list_history with get_history_entry for the requests you just sent from the app. diagnose_last_failure says why one failed.' },
   { title: 'Run', text: 'run_request sends saved HTTP, GraphQL, unary gRPC, MCP and AI requests. Use run_collection for data-driven runs, start_load_test and compare_load_runs for k6, or start_mock_server and mock_server_log to serve examples.' },
   { title: 'Write', text: 'create_collection, save_request, delete_request, save_example and set_variable change the same YAML files the app writes. generate_tests turns a response into status and JSON schema tests.' },

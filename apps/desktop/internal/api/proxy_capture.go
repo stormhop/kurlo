@@ -262,6 +262,22 @@ func runProxyCACLI(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+func (a *App) OpenProxyCaptureSession(path string) (proxycapture.Status, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return a.withSystemProxy(a.capture.Status()), err
+	}
+	if !info.Mode().IsRegular() || info.Size() > proxycapture.MaxSessionFile {
+		return a.withSystemProxy(a.capture.Status()), errors.New("choose a HAR file up to 256 MiB")
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return a.withSystemProxy(a.capture.Status()), err
+	}
+	status, err := a.capture.Load(data, filepath.Base(path), decodeCapturePreview)
+	return a.withSystemProxy(status), err
+}
+
 func (a *App) ClearProxyCapture() proxycapture.Status {
 	return a.withSystemProxy(a.capture.Clear())
 }

@@ -78,3 +78,33 @@ func TestProxyCLIRulesFile(t *testing.T) {
 		t.Fatal(code)
 	}
 }
+
+func TestOpenProxyCaptureSession(t *testing.T) {
+	dir := t.TempDir()
+	useTempConfigDir(t, t.TempDir())
+	app := &App{}
+	defer app.capture.Close()
+	path := filepath.Join(dir, "shop.har")
+	os.WriteFile(path, []byte(`{"log":{"entries":[{"startedDateTime":"2026-11-22T10:00:00Z","time":5,"request":{"method":"GET","url":"https://shop.test/a"},"response":{"status":204}}]}}`), 0o600)
+	status, err := app.OpenProxyCaptureSession(path)
+	if err != nil || status.Source != "shop.har" || status.Count != 1 {
+		t.Fatal(status, err)
+	}
+	if entries := app.ProxyCaptureEntries(); len(entries) != 1 || entries[0].Status != 204 {
+		t.Fatal(entries)
+	}
+	if _, err := app.OpenProxyCaptureSession(filepath.Join(dir, "missing.har")); err == nil {
+		t.Fatal("opened a missing file")
+	}
+	if _, err := app.OpenProxyCaptureSession(dir); err == nil || !strings.Contains(err.Error(), "HAR file") {
+		t.Fatal(err)
+	}
+	bad := filepath.Join(dir, "bad.har")
+	os.WriteFile(bad, []byte("{}"), 0o600)
+	if _, err := app.OpenProxyCaptureSession(bad); err == nil {
+		t.Fatal("opened an invalid file")
+	}
+	if status := app.ProxyCaptureStatus(); status.Source != "shop.har" || status.Count != 1 {
+		t.Fatal(status)
+	}
+}

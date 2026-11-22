@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { installKurloBridge } from './support/bridge';
+import { connection, installAgentBridge } from './support/agent';
 import type { ProxyConfig, ProxyEntry, ProxyRule } from '../src/lib/wire';
 
 test('capture, inspect a tunnel and save an HTTP request with its example', async ({ page }) => {
@@ -8,7 +9,7 @@ test('capture, inspect a tunnel and save an HTTP request with its example', asyn
   await page.goto('/');
   await page.evaluate(() => {
     let running = false;
-    let config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false };
+    let config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
     const rows: ProxyEntry[] = [];
     const status = () => ({ running, address: rows.length ? '127.0.0.1:9090' : '', count: rows.length, config, rules: 0 });
     const base = { started: '2026-11-18T14:32:00Z', duration: 12, sent: 0, received: 12 };
@@ -69,7 +70,7 @@ test('decrypt a tunnelled host with the trusted Kurlo certificate', async ({ pag
   await page.evaluate(() => {
     document.documentElement.dataset.platform = 'darwin';
     let running = false;
-    let config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [] };
+    let config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
     const certificate = { exists: false, trusted: false, path: '/tmp/kurlo-capture-ca.pem', subject: '', fingerprint: '', notAfter: '' };
     const calls: string[][] = [];
     (window as unknown as { proxyCalls: string[][] }).proxyCalls = calls;
@@ -252,6 +253,7 @@ test('search captured bodies and clear the list while recording', async ({ page 
   });
   await page.getByRole('button', { name: 'Capture proxy' }).click();
   await expect(page.locator('.capture-row')).toHaveCount(3);
+  await expect(page.getByRole('button', { name: 'Open HAR', exact: true })).toBeDisabled();
   await page.getByLabel('Filter traffic').fill('inv-42');
   await expect(page.locator('.capture-row')).toHaveCount(1);
   await expect(page.locator('.capture-row')).toContainText('/orders');
@@ -311,7 +313,7 @@ test('create, edit, order and remove capture rules', async ({ page }) => {
   const pattern = editor.getByPlaceholder('https://api.example.com/orders/*');
   await expect(pattern).toHaveValue('https://shop.test/orders/1');
   await expect(editor.getByText('Matches 1 recorded request')).toBeVisible();
-  await expect(editor.getByLabel('Local response body')).toHaveValue('{\n  "id": 1\n}');
+  await expect(editor.getByLabel('Local response body').locator('.cm-line')).toHaveText(['{', '  "id": 1', '}']);
   await pattern.fill('https://shop.test/orders/*');
   await expect(editor.getByText('Matches 2 recorded requests')).toBeVisible();
   await pattern.fill('shop.test/orders');
@@ -393,4 +395,162 @@ test('select several captured rows and act on them', async ({ page }) => {
   const calls = await page.evaluate(() => (window as unknown as { captureCalls: { deleted: number[][]; har: number[][] } }).captureCalls);
   expect(calls.har[0]).toEqual([1, 3]);
   expect(calls.deleted).toEqual([[2, 3, 4]]);
+});
+
+test('open a HAR session and reopen it from recent sessions', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    localStorage.setItem('kurlo.proxy.recentSessions', JSON.stringify(['/Users/me/sessions/gone.har']));
+    let rows: ProxyEntry[] = [];
+    let source = '';
+    const opened: string[] = [];
+    (window as unknown as { opened: string[] }).opened = opened;
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const status = () => ({ running: false, address: '', count: rows.length, config, rules: 0, systemProxy: false, source });
+    const msg = { headers: { 'Content-Type': ['application/json'] }, body: '{"ok":true}', binary: false, truncated: false };
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [...rows],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async (id: number) => ({ entry: rows.find(row => row.id === id), request: { ...msg, body: '' }, response: msg }),
+      OpenFileDialog: async (title: string) => title === 'Open a HAR session' ? '/Users/me/sessions/shop.har' : '',
+      OpenProxyCaptureSession: async (path: string) => {
+        opened.push(path);
+        if (path.endsWith('gone.har')) throw new Error('stat ' + path + ': no such file or directory');
+        source = path.split('/').pop()!;
+        rows = ['/login', '/orders'].map((item, index) => ({ id: index + 11, started: '2026-11-22T10:00:00Z', duration: 12, sent: 0, received: 11, host: 'shop.test', url: 'https://shop.test' + item, method: index ? 'GET' : 'POST', path: item, status: 200 }));
+        return status();
+      },
+      ClearProxyCapture: async () => { rows = []; source = ''; return status(); },
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const recentSessions = page.getByRole('group', { name: 'Recent sessions' });
+  await recentSessions.getByRole('button', { name: /^gone\.har/ }).click();
+  await expect(page.getByRole('alert')).toContainText('no such file');
+  await expect(recentSessions.getByRole('button', { name: /^gone\.har/ })).toHaveCount(0);
+  await expect(recentSessions).toHaveCount(0);
+  await page.getByRole('button', { name: 'Open HAR', exact: true }).click();
+  await expect(page.locator('.capture-row')).toHaveCount(2);
+  await expect(page.locator('.mock-head')).toContainText('2 exchanges from shop.har');
+  await expect(page.locator('.mock-status')).toContainText('Opened');
+  const middles = await page.locator('.mock-status').evaluate(node => [...node.querySelectorAll('.mock-status-state, .capture-pill, .capture-status-text')].map(el => { const r = el.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }));
+  expect(new Set(middles).size).toBe(1);
+  await expect(page.locator('.capture-detail-wrap')).toContainText('"ok"');
+  const shot = process.env.KURLO_PROXY_SESSION_SCREENSHOT;
+  if (shot) await page.screenshot({ path: shot, animations: 'disabled' });
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await expect(page.locator('.mock-status')).toContainText('Stopped');
+  await expect(recentSessions.getByRole('button', { name: /^shop\.har/ })).toBeVisible();
+  await recentSessions.getByRole('button', { name: /^shop\.har/ }).click();
+  await expect(page.locator('.capture-row')).toHaveCount(2);
+  expect(await page.evaluate(() => (window as unknown as { opened: string[] }).opened)).toEqual(['/Users/me/sessions/gone.har', '/Users/me/sessions/shop.har', '/Users/me/sessions/shop.har']);
+  expect(await page.evaluate(() => localStorage.getItem('kurlo.proxy.recentSessions'))).toBe(JSON.stringify(['/Users/me/sessions/shop.har']));
+});
+
+test('show timing phases and the client protocol of a captured exchange', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const rows: ProxyEntry[] = [
+      { id: 1, started: '2026-11-22T10:00:00Z', duration: 75, sent: 0, received: 12, host: 'api.shop.test', url: 'https://api.shop.test/orders', method: 'GET', path: '/orders', status: 200, protocol: 'HTTP/2.0' },
+      { id: 2, started: '2026-11-22T10:00:01Z', duration: 400, sent: 10, received: 40, host: 'api.shop.test', url: 'https://api.shop.test/live', method: 'GET', path: '/live', status: 101, protocol: 'HTTP/1.1', stream: 'WebSocket' },
+    ];
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: ['api.shop.test'], systemProxy: false };
+    const status = () => ({ running: false, address: '', count: rows.length, config, rules: 0, systemProxy: false });
+    const msg = { headers: { 'Content-Type': ['application/json'] }, body: '{"orders":[]}', binary: false, truncated: false };
+    const timings = { total: 74.62, prepare: 0.01, socketInitialization: 0.01, dnsLookup: 3.2, tcpHandshake: 0.4, tlsHandshake: 6.8, waitingTTFB: 41.38, download: 22.8, process: 0.02 };
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [...rows],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async (id: number) => ({ entry: rows.find(row => row.id === id), request: { ...msg, body: '' }, response: msg, timings: id === 1 ? timings : undefined, frames: id === 2 ? [{ direction: 'Sent', kind: 'Text', text: 'hello', size: 5 }] : undefined }),
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const detail = page.getByRole('region', { name: 'Captured exchange' });
+  await expect(detail.locator('.capture-protocol')).toHaveText('HTTP/2');
+  const trigger = detail.getByRole('button', { name: 'Response time details' });
+  await expect(trigger).toHaveText('75 ms');
+  await trigger.hover();
+  const popover = detail.getByRole('tooltip');
+  await expect(popover).toBeVisible();
+  await expect(popover).toContainText('TLS Handshake');
+  await expect(popover).toContainText('41 ms');
+  const shot = process.env.KURLO_PROXY_TIMING_SCREENSHOT;
+  if (shot) await page.screenshot({ path: shot, animations: 'disabled' });
+  await page.locator('.capture-row').nth(1).click();
+  await expect(detail.locator('.capture-protocol')).toHaveText('HTTP/1.1');
+  await expect(detail.getByRole('button', { name: 'Response time details' })).toHaveCount(0);
+  await expect(detail.getByRole('tab', { name: 'Messages' })).toBeVisible();
+});
+
+test('format a long event stream response', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const flags: Record<string, unknown> = {};
+    for (let i = 0; i < 400; i += 1) flags[`flag-${i}`] = { version: 7716 + i, flagVersion: 3, value: true, variation: 0, trackEvents: false };
+    const stream = ('event:put\ndata:' + JSON.stringify(flags)).slice(0, 16 * 1024);
+    const script = 'x'.repeat(6000);
+    const rows: ProxyEntry[] = [
+      { id: 1, started: '2026-11-22T23:42:44Z', duration: 6689, sent: 0, received: 186_000, host: 'clientstream.example.test', url: 'https://clientstream.example.test/meval/abc', method: 'GET', path: '/meval/abc', status: 200, protocol: 'HTTP/2.0', stream: 'SSE' },
+      { id: 2, started: '2026-11-22T23:42:45Z', duration: 20, sent: 0, received: 6000, host: 'cdn.example.test', url: 'https://cdn.example.test/app.js', method: 'GET', path: '/app.js', status: 200, protocol: 'HTTP/2.0' },
+    ];
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const status = () => ({ running: false, address: '', count: rows.length, config, rules: 0, systemProxy: false });
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [...rows],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async (id: number) => ({
+        entry: rows.find(row => row.id === id),
+        request: { headers: {}, body: '', binary: false, truncated: false },
+        response: id === 1
+          ? { headers: { 'Content-Type': ['text/event-stream'] }, body: stream, binary: false, truncated: true }
+          : { headers: { 'Content-Type': ['application/javascript'] }, body: script, binary: false, truncated: false },
+        frames: id === 1 ? [{ direction: 'Received', kind: 'put', text: stream.slice(15, 400), size: 186_000 }] : undefined,
+      }),
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const detail = page.getByRole('region', { name: 'Captured exchange' });
+  const viewer = detail.locator('.capture-viewer');
+  await expect(viewer).toContainText('event: put');
+  await expect(viewer).toContainText('"flag-0": {');
+  await expect(detail.locator('.capture-headers summary')).toBeVisible();
+  const shot = process.env.KURLO_PROXY_SSE_SCREENSHOT;
+  if (shot) await page.screenshot({ path: shot, animations: 'disabled' });
+  const scroll = await viewer.locator('.response-body-viewer, .response-body').first().evaluate(node => ({ scroll: node.scrollWidth, client: node.clientWidth }));
+  expect(scroll.scroll).toBeLessThan(scroll.client * 1.5);
+  await detail.getByRole('tab', { name: 'Events' }).click();
+  await expect(detail.locator('.capture-frame pre')).toContainText('"flag-0": {\n    "version": 7716,');
+  await page.locator('.capture-row').nth(1).click();
+  await expect(viewer).toContainText('xxxx');
+});
+
+test('ask the agent about selected captured exchanges by id', async ({ page }) => {
+  await installKurloBridge(page);
+  await installAgentBridge(page, [connection]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await installRulesCapture(page);
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await page.getByRole('button', { name: /\/orders\/1/ }).first().click();
+  await page.getByRole('button', { name: /\/cart/ }).first().click({ modifiers: [process.platform === 'darwin' ? 'Meta' : 'Control'] });
+  await page.getByRole('group', { name: 'Selected entries' }).getByRole('button', { name: 'Ask agent' }).click();
+  const draft = page.getByLabel('Message the agent');
+  await expect(draft).toBeVisible();
+  const text = await draft.inputValue();
+  expect(text).toContain('get_captured');
+  expect(text).toContain('{"id":1,"method":"GET","host":"shop.test","path":"/orders/1","status":200}');
+  expect(text).toContain('{"id":3,"method":"POST","host":"shop.test","path":"/cart","status":200}');
+  expect(text).not.toContain('"path":"/profile"');
 });

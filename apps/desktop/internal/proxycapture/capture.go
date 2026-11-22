@@ -16,6 +16,8 @@ import (
 	"sync"
 	"time"
 	"unicode/utf8"
+
+	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 )
 
 var activeAddresses sync.Map
@@ -42,6 +44,7 @@ type Entry struct {
 	Local      bool   `json:"local,omitempty"`
 	Rule       string `json:"rule,omitempty"`
 	Rewritten  string `json:"rewritten,omitempty"`
+	Protocol   string `json:"protocol,omitempty"`
 	ID         int64  `json:"id"`
 	Started    string `json:"started"`
 	Method     string `json:"method"`
@@ -73,10 +76,11 @@ func (m Message) EncodedPreview() io.Reader {
 }
 
 type Exchange struct {
-	Frames   []Frame `json:"frames,omitempty"`
-	Entry    Entry   `json:"entry"`
-	Request  Message `json:"request"`
-	Response Message `json:"response"`
+	Timings  *model.ResponseTime `json:"timings,omitempty"`
+	Frames   []Frame             `json:"frames,omitempty"`
+	Entry    Entry               `json:"entry"`
+	Request  Message             `json:"request"`
+	Response Message             `json:"response"`
 }
 
 type Status struct {
@@ -86,6 +90,7 @@ type Status struct {
 	Running     bool   `json:"running"`
 	Count       int    `json:"count"`
 	SystemProxy bool   `json:"systemProxy"`
+	Source      string `json:"source,omitempty"`
 }
 
 type Recorder struct {
@@ -95,6 +100,7 @@ type Recorder struct {
 	mu      sync.Mutex
 	run     *session
 	address string
+	source  string
 	next    int64
 	ring    [capacity]*Exchange
 	count   int
@@ -234,6 +240,7 @@ func (r *Recorder) beginSession(s *session, config Config, address string) {
 	r.config = config
 	r.address = address
 	r.run = s
+	r.source = ""
 	r.ring = [capacity]*Exchange{}
 	r.count = 0
 	r.cursor = 0
@@ -289,7 +296,7 @@ func (r *Recorder) Close() {
 	}
 }
 func (r *Recorder) status() Status {
-	return Status{Config: r.config, Rules: r.rules.enabled(), Running: r.run != nil, Address: r.address, Count: r.liveCount()}
+	return Status{Config: r.config, Rules: r.rules.enabled(), Running: r.run != nil, Address: r.address, Count: r.liveCount(), Source: r.source}
 }
 func (r *Recorder) liveCount() int {
 	count := 0
@@ -536,6 +543,7 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		x.Entry.URL = displayURL(r.URL)
+		x.Entry.Protocol = r.Proto
 		x.Entry.Path = r.URL.EscapedPath()
 		if x.Entry.Path == "" {
 			x.Entry.Path = "/"
@@ -563,7 +571,8 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			tr.received.files = s.files
 		}
 		defer tr.discardUnfinished()
-		req := r.WithContext(context.WithValue(r.Context(), traceKey{}, tr))
+		ctx, timing := withTiming(context.WithValue(r.Context(), traceKey{}, tr), start)
+		req := r.WithContext(ctx)
 		if rewrites := s.rules.matching(RuleRewrite, r); len(rewrites) > 0 {
 			applyRequestRewrites(req, rewrites)
 			tr.rewrites = rewrites
@@ -577,7 +586,9 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		func() {
 			defer func() {
 				if tr.stream != nil {
-					s.record(tr.stream.finish())
+					done := tr.stream.finish()
+					done.Timings = timing.result(time.Now())
+					s.record(done)
 				}
 			}()
 			s.proxy.ServeHTTP(writer, req)
@@ -591,6 +602,7 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		x.Request, x.Entry.Sent = tr.sent.message(copyHeaders(r.Header))
 		x.Response, x.Entry.Received = tr.received.message(tr.response)
+		x.Timings = timing.result(time.Now())
 	}
 	x.Entry.Duration = time.Since(start).Milliseconds()
 	if s.identifyProcess {
@@ -649,3 +661,5 @@ func (s *session) tunnel(w http.ResponseWriter, r *http.Request, e *Entry) {
 	}
 	e.Sent = <-sent
 }
+
+func SensitiveName(key string) bool { return sensitive(key) }

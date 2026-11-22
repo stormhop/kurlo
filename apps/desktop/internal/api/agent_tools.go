@@ -17,17 +17,21 @@ import (
 const agentToolServer = "Kurlo"
 
 var agentReadTools = map[string]bool{
-	"list_requests":         true,
-	"get_request":           true,
-	"list_environments":     true,
-	"check_openapi_sync":    true,
-	"list_globals":          true,
-	"list_history":          true,
-	"get_history_entry":     true,
-	"diagnose_last_failure": true,
-	"git_status":            true,
-	"git_diff":              true,
-	"pull_request_url":      true,
+	"list_requests":          true,
+	"get_request":            true,
+	"list_environments":      true,
+	"check_openapi_sync":     true,
+	"list_globals":           true,
+	"list_history":           true,
+	"get_history_entry":      true,
+	"diagnose_last_failure":  true,
+	"git_status":             true,
+	"git_diff":               true,
+	"pull_request_url":       true,
+	"proxy_status":           true,
+	"list_captured":          true,
+	"get_captured":           true,
+	"check_captured_openapi": true,
 }
 
 var agentRunTools = map[string]bool{
@@ -456,6 +460,9 @@ func agentRequestCount(s *mcpServer, tool string, arguments json.RawMessage) int
 
 func (b *agentToolBridge) toolDefinitions() []map[string]any {
 	definitions := append(mcpServerTools(b.server.opts.readOnly), executionToolDefinitions(b.server.opts.readOnly, true)...)
+	if b.server.capture != nil {
+		definitions = append(definitions, captureToolDefinitions(b.server.opts.readOnly)...)
+	}
 	definitions = append(definitions, agentPlanDefinition())
 	if !b.server.opts.readOnly {
 		definitions = append(definitions, agentNotesDefinition())

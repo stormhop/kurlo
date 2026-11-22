@@ -1,8 +1,10 @@
 <script lang="ts">
   import ResponseBodyViewer from './ResponseBodyViewer.svelte';
+  import ResponseTimeTooltip from './ResponseTimeTooltip.svelte';
   import type { ProxyEntry, ProxyExchange } from '../wire';
   import { formatSize, methodColor, statusClass } from '../utils';
   import { shouldVirtualizeResponseBody, type ResponseRenderMode } from '../response-render';
+  import { formatCapturedBody, formatJsonBody } from '../captureBody';
 
   let {
     entry,
@@ -35,27 +37,22 @@
   const panes = $derived<Array<{ id: Pane; label: string }>>([
     { id: 'response', label: 'Response' },
     { id: 'request', label: 'Request' },
-    ...(entry.stream ? [{ id: 'frames' as Pane, label: entry.stream === 'websocket' ? 'Messages' : 'Events' }] : []),
+    ...(entry.stream ? [{ id: 'frames' as Pane, label: entry.stream === 'WebSocket' ? 'Messages' : 'Events' }] : []),
   ]);
   const activePane = $derived(panes.some(item => item.id === pane) ? pane : 'response');
   const message = $derived(exchange ? (activePane === 'request' ? exchange.request : exchange.response) : null);
   const headers = $derived(Object.entries(message?.headers || {}).flatMap(([key, values]) => values.map(value => ({ key, value }))));
   const contentType = $derived(headers.find(header => header.key.toLowerCase() === 'content-type')?.value.split(';')[0] ?? '');
-  const body = $derived(!message || message.binary ? '' : formatBody(message.body));
-  const mode = $derived<ResponseRenderMode>(message && isJSON(message.body) ? 'json' : /html/i.test(contentType) ? 'html' : 'text');
+  const eventStream = $derived(activePane === 'response' && (entry.stream === 'SSE' || /event-stream/i.test(contentType)));
+  const formatted = $derived(!message || message.binary ? { text: '', json: false } : formatCapturedBody(message.body, eventStream));
+  const body = $derived(formatted.text);
+  const mode = $derived<ResponseRenderMode>(formatted.json ? 'json' : /html/i.test(contentType) ? 'html' : 'text');
   const virtualized = $derived(body ? shouldVirtualizeResponseBody(body, mode) : false);
   const blocked = $derived(!exchange || exchange.request.binary || (exchange.request.truncated && !exchange.request.archived));
+  const protocol = $derived(entry.protocol ? entry.protocol.replace(/^HTTP\/([23])\.0$/, 'HTTP/$1') : '');
+  const timings = $derived(!entry.inProgress && exchange?.entry.id === entry.id ? exchange.timings ?? null : null);
   const started = $derived(new Date(entry.started).toLocaleTimeString('en-GB', { hour12: false }));
 
-  function isJSON(value: string) {
-    const text = value.trim();
-    if (!text || !'[{'.includes(text[0])) return false;
-    try { JSON.parse(text); return true; } catch { return false; }
-  }
-
-  function formatBody(value: string) {
-    return isJSON(value) ? JSON.stringify(JSON.parse(value), null, 2) : value;
-  }
 </script>
 
 <section class="capture-detail" aria-label="Captured exchange">
@@ -70,16 +67,19 @@
         {/if}
       </h3>
       <p>
-        {entry.host} · {started} · {entry.inProgress ? 'open' : entry.duration + ' ms'} · {formatSize(entry.received)}
+        {entry.host} · {started} ·
+        {#if timings}<ResponseTimeTooltip {timings} total={entry.duration} streaming={Boolean(entry.stream)} />{:else}{entry.inProgress ? 'open' : entry.duration + ' ms'}{/if}
+        · {formatSize(entry.received)}
+        {#if protocol} · <span class="capture-protocol">{protocol}</span>{/if}
         {#if entry.process} · {entry.process}{/if}
         {#if entry.local} · <span class="capture-local">Answered by {entry.rule || 'a Map local rule'}</span>{/if}
       </p>
     </div>
     {#if !tunnel}
       <div class="capture-detail-actions">
-        <button class="btn btn-ghost btn-sm" type="button" disabled={busy || !exchange || exchange.request.binary || exchange.request.truncated} onclick={onCopyCurl}>Copy cURL</button>
-        <button class="btn btn-ghost btn-sm" type="button" disabled={busy || !exchange} onclick={onMapLocal}>Map local</button>
-        <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={onRewrite}>Rewrite</button>
+        <button class="btn btn-secondary btn-sm" type="button" disabled={busy || !exchange || exchange.request.binary || exchange.request.truncated} onclick={onCopyCurl}>Copy cURL</button>
+        <button class="btn btn-secondary btn-sm" type="button" disabled={busy || !exchange} onclick={onMapLocal}>Map local</button>
+        <button class="btn btn-secondary btn-sm" type="button" disabled={busy} onclick={onRewrite}>Rewrite</button>
         <button class="btn btn-secondary btn-sm" type="button" disabled={busy || blocked} onclick={onReplay}>Open in editor</button>
         <button class="btn btn-primary btn-sm" type="button" disabled={busy || blocked} onclick={onSave}>Save as request</button>
       </div>
@@ -121,7 +121,7 @@
         {#each exchange.frames || [] as frame, index (index)}
           <div class="capture-frame" class:inbound={frame.direction === 'Received'}>
             <span class="capture-frame-meta">{frame.direction} · {frame.kind} · {formatSize(frame.size)}</span>
-            <pre class="history-detail-code">{frame.text}</pre>
+            <pre class="history-detail-code">{formatJsonBody(frame.text) ?? frame.text}</pre>
           </div>
         {:else}
           <p class="history-detail-note">No messages yet.</p>
