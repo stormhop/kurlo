@@ -2,8 +2,9 @@
 
 # Kurlo
 
-**The open-source API client with an agent inside.**<br>
-Bring any model, Claude Code or Codex. No account, no paid plan, no telemetry. Collections live as YAML in your Git repo.
+**The open-source API client with an agent inside and your secret managers built in.**<br>
+Bring any model, Claude Code or Codex, and link variables to Vault, 1Password or your cloud. No account, no paid plan,
+no telemetry. Collections live as YAML in your Git repo.
 
 [![Latest release](https://img.shields.io/github/v/release/stormhop/kurlo)](https://github.com/stormhop/kurlo/releases/latest)
 [![GitHub stars](https://img.shields.io/github/stars/stormhop/kurlo?style=flat)](https://github.com/stormhop/kurlo/stargazers)
@@ -11,13 +12,44 @@ Bring any model, Claude Code or Codex. No account, no paid plan, no telemetry. C
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey)](https://github.com/stormhop/kurlo/releases/latest)
 
-**[Download](https://github.com/stormhop/kurlo/releases/latest)** · [Website](https://kurlo.dev/) · [Docs](https://kurlo.dev/docs/getting-started/installation/) · [Agent mode](https://kurlo.dev/agent/) · [MCP server](https://kurlo.dev/mcp/) · [Compare](https://kurlo.dev/vs/postman/)
+**[Download](https://github.com/stormhop/kurlo/releases/latest)** · [Website](https://kurlo.dev/) · [Docs](https://kurlo.dev/docs/getting-started/installation/) · [Secret managers](https://kurlo.dev/docs/guides/environments/secret-managers/) · [Agent mode](https://kurlo.dev/agent/) · [MCP server](https://kurlo.dev/mcp/) · [Compare](https://kurlo.dev/vs/postman/)
 
 </div>
 
-## New in 3.0: Agent mode
+## New in 3.2: Secret managers
 
-Ask in plain words and the agent runs your requests and collections, explains why a call failed, writes requests and tests and imports your specs, right inside Kurlo. Pick the Kurlo agent on your own model (OpenRouter, an API key, Ollama or LM Studio), or connect the Claude Code or Codex you already use. Every change and every call other than `GET`, `HEAD` or `OPTIONS` waits for your approval, and the model never sees your secrets.
+Link an environment variable to HashiCorp Vault or OpenBao, 1Password, AWS Secrets Manager or Parameter Store, Google
+Secret Manager, Azure Key Vault, Bitwarden Secrets Manager, Doppler, Infisical, a command of your own or the environment
+of the Kurlo process. The environment file in Git keeps only the reference, and each teammate signs in with their own
+token, AWS profile or CLI. Kurlo fetches the value when a request is sent and shows `[secret]` in responses, history,
+script logs, `kurlo run` reports and everything an agent sees. Paste an ARN, an `op://` link, an Azure secret URL or a
+Vault path to fill in the link, or browse the provider's paths. A workspace you clone uses a provider only after you
+trust it on your machine. All eleven providers are free; Bruno sells cloud vaults in its Ultimate plan and Postman in
+Enterprise with a security add-on.
+
+```yaml
+- key: dbPassword
+  secretRef:
+    provider: vault-prod
+    path: secret/data/orders
+    field: password
+```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="apps/web/src/assets/screenshots/secret-managers-environment-dark.png">
+  <img alt="An environment with variables linked to Vault, 1Password, AWS and Google Cloud, and every key of a Vault secret imported with a prefix" src="apps/web/src/assets/screenshots/secret-managers-environment.png">
+</picture>
+
+In CI, `kurlo run` fetches the same links with the runner's credentials before the first request and stops with exit
+code 2 naming any variable it could not
+get. [Secret managers guide](https://kurlo.dev/docs/guides/environments/secret-managers/)
+
+## Agent mode
+
+Ask in plain words and the agent runs your requests and collections, explains why a call failed, writes requests and
+tests and imports your specs, right inside Kurlo. Pick the Kurlo agent on your own model (OpenRouter, an API key, Ollama
+or LM Studio), or connect the Claude Code or Codex you already use. Every change and every call other than `GET`, `HEAD`
+or `OPTIONS` waits for your approval, and the model never sees your secrets.
 
 ![The Kurlo agent reads a collection, runs the requests, and asks before adding tests to four of them](.github/assets/agent-mode.gif)
 
@@ -25,23 +57,35 @@ Ask in plain words and the agent runs your requests and collections, explains wh
 
 ## Why Kurlo
 
-- **An agent that asks first.** The Kurlo agent, Claude Code or Codex works on your collections inside the app. It shows every change before it is written, can follow a plan you approve and work on its own Git branch, and keeps chats on your machine.
-- **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request as the API change.
-- **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`, `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
-- **Share an API reference.** Turn a collection into a searchable HTML file with saved requests and responses. Open it offline or publish it to a static host.
-- **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets are sent to the API but never shown to the model.
-- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.9 MB and the Linux one is 13.6 MB.
+- **Secrets from where they already live.** Link variables to Vault, 1Password, AWS, Google Cloud, Azure, Bitwarden,
+  Doppler or Infisical. Git gets the reference, your API gets the value, and the screen, logs and agents get `[secret]`.
+- **An agent that asks first.** The Kurlo agent, Claude Code or Codex works on your collections inside the app. It shows
+  every change before it is written, can follow a plan you approve and work on its own Git branch, and keeps chats on
+  your machine.
+- **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a
+  workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request
+  as the API change.
+- **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`,
+  `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
+- **Share an API reference.** Turn a collection into a searchable HTML file with saved requests and responses. Open it
+  offline or publish it to a static host.
+- **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your
+  saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets
+  are sent to the API but never shown to the model.
+- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.9 MB and
+  the Linux one is 13.6 MB.
 
-| | Kurlo | Postman | Insomnia | Bruno |
-|---|---|---|---|---|
-| Free plan | ✅ Every feature, any team size | 1 user | Up to 3 Git Sync users | Private Git hosts need Pro |
-| Account needed | ✅ No | For collections | Beyond Scratch Pad | No |
-| Collections in your Git repo | ✅ | Native Git in the desktop app | ✅ | ✅ |
-| Postman `pm.*` scripts | ✅ Run as written | Native | Compatibility layer | Converted to `bru.*` |
-| Mock server | ✅ Local, no cap | Cloud, needs an account | 1,000 requests/mo free | ✅ Local |
-| MCP | ✅ Client and server | Client | Client | Community servers |
+|                              | Kurlo                          | Postman                       | Insomnia               | Bruno                      |
+|------------------------------|--------------------------------|-------------------------------|------------------------|----------------------------|
+| Free plan                    | ✅ Every feature, any team size | 1 user                        | Up to 3 Git Sync users | Private Git hosts need Pro |
+| Account needed               | ✅ No                           | For collections               | Beyond Scratch Pad     | No                         |
+| Collections in your Git repo | ✅                              | Native Git in the desktop app | ✅                      | ✅                          |
+| Postman `pm.*` scripts       | ✅ Run as written               | Native                        | Compatibility layer    | Converted to `bru.*`       |
+| Mock server                  | ✅ Local, no cap                | Cloud, needs an account       | 1,000 requests/mo free | ✅ Local                    |
+| MCP                          | ✅ Client and server            | Client                        | Client                 | Community servers          |
 
-Checked against vendor pricing pages on 15 October 2026. Details and sources: [vs Postman](https://kurlo.dev/vs/postman/), [vs Insomnia](https://kurlo.dev/vs/insomnia/), [vs Bruno](https://kurlo.dev/vs/bruno/).
+Checked against vendor pricing pages on 15 October 2026. Details and
+sources: [vs Postman](https://kurlo.dev/vs/postman/), [vs Insomnia](https://kurlo.dev/vs/insomnia/), [vs Bruno](https://kurlo.dev/vs/bruno/).
 
 If Kurlo saves you time, a ⭐ helps other people find it.
 
@@ -51,15 +95,18 @@ If Kurlo saves you time, a ⭐ helps other people find it.
 
 Grab the latest build from the [releases page](https://github.com/stormhop/kurlo/releases/latest).
 
-| Platform | Installer |
-|----------|-----------|
-| macOS 15 Sequoia or later (Apple Silicon + Intel) | `.dmg` |
-| Windows 10/11 (x64, arm64) | `.exe` (NSIS installer), `.msix` |
-| Linux (x64) | `.AppImage` |
+| Platform                                          | Installer                        |
+|---------------------------------------------------|----------------------------------|
+| macOS 15 Sequoia or later (Apple Silicon + Intel) | `.dmg`                           |
+| Windows 10/11 (x64, arm64)                        | `.exe` (NSIS installer), `.msix` |
+| Linux (x64)                                       | `.AppImage`                      |
 
-Every release ships SHA256 checksums and minisign signatures, and the in-app updater refuses any binary that fails either check.
+Every release ships SHA256 checksums and minisign signatures, and the in-app updater refuses any binary that fails
+either check.
 
-The command line (`kurlo run` for CI, `kurlo mcp` for AI agents) is also on npm as [`@kurlo/cli`](https://www.npmjs.com/package/@kurlo/cli), with prebuilt binaries for macOS, Linux and Windows on x64 and arm64. It does not need the desktop app:
+The command line (`kurlo run` for CI, `kurlo mcp` for AI agents) is also on npm as [
+`@kurlo/cli`](https://www.npmjs.com/package/@kurlo/cli), with prebuilt binaries for macOS, Linux and Windows on x64 and
+arm64. It does not need the desktop app:
 
 ```bash
 npx -y @kurlo/cli --version
@@ -72,71 +119,116 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 ## Features
 
 **Requests**
+
 - All HTTP methods: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
 - Query params, headers, body (JSON, form-data, x-www-form-urlencoded, raw text/XML/HTML, binary file)
 - cURL import — paste a curl command into the URL field, it parses automatically
 - Bulk edit for params, headers and form fields — switch the table to a `key: value` text area and back
-- Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved examples
+- Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved
+  examples
 - Build GraphQL operations from a schema, select nested fields and bind typed variables in the query editor
-- GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
-- Import Postman v2 JSON or v3 Native Git folders, Insomnia v4, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and all-data backups
-- OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the collection
-- OpenAPI sync — keep a collection linked to its spec URL or file, review new, changed and removed endpoints with a three-way merge that keeps your edits, with no monthly limit; `kurlo openapi check` flags drift in CI
-- Export Postman v2.1 JSON, Postman v3 folders with native gRPC, Insomnia v4, OpenAPI/Swagger, OpenCollection YAML, and all-data backups
+- GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's
+  tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
+- Import Postman v2 JSON or v3 Native Git folders, Insomnia v4, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and
+  all-data backups
+- OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the
+  collection
+- OpenAPI sync — keep a collection linked to its spec URL or file, review new, changed and removed endpoints with a
+  three-way merge that keeps your edits, with no monthly limit; `kurlo openapi check` flags drift in CI
+- Export Postman v2.1 JSON, Postman v3 folders with native gRPC, Insomnia v4, OpenAPI/Swagger, OpenCollection YAML, and
+  all-data backups
 
 **Authentication**
+
 - Bearer Token
 - Basic Auth
 - NTLM (NTLMv2)
 - Digest Auth — MD5, SHA-256 and SHA-512-256 plus their `-sess` variants, with `qop=auth` and `auth-int`
 - API Key — in header or query string
-- JWT Bearer — signed on every send from a secret or a private key (HS, RS, PS and ES algorithms), with claims, an optional lifetime and a token preview
-- OAuth 2.0 — Client Credentials, Authorization Code (with PKCE), Password, and Device Code grants; loopback browser sign-in, refresh tokens, and automatic token refresh before each send
+- JWT Bearer — signed on every send from a secret or a private key (HS, RS, PS and ES algorithms), with claims, an
+  optional lifetime and a token preview
+- OAuth 2.0 — Client Credentials, Authorization Code (with PKCE), Password, and Device Code grants; loopback browser
+  sign-in, refresh tokens, and automatic token refresh before each send
 - AWS Signature v4
 - Client certificates (mutual TLS), per request or inherited from a collection
 - Per-request and collection defaults with inheritance
 
-**Scripting** — write sandboxed JavaScript in requests, folders and collections. The editor completes `pm.*` methods, variable keys and saved request names, with signatures and examples.
+**Scripting** — write sandboxed JavaScript in requests, folders and collections. The editor completes `pm.*` methods,
+variable keys and saved request names, with signatures and examples.
+
 ```js
 // pre-request: inject a header
 pm.request.headers.set("X-Client", "kurlo")
 
 // pre-request: rewrite and sign the body
-pm.request.body.update(JSON.stringify({ ...pm.request.body.json(), nonce: pm.crypto.randomHex(8) }))
+pm.request.body.update(JSON.stringify({...pm.request.body.json(), nonce: pm.crypto.randomHex(8)}))
 
 // test: assert status and shape
 pm.test("status is 200", () => pm.response.to.have.status(200))
-pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", required: ["id"] }))
+pm.test("has an id", () => pm.response.to.have.jsonSchema({type: "object", required: ["id"]}))
 ```
 
-**Assertions** — check the status, response time, size, a header or a JSON field without code (`status equals 201`, `body.items has length 3`); they run in the app, the collection runner, `kurlo run` and `kurlo mcp`.
+**Assertions** — check the status, response time, size, a header or a JSON field without code (`status equals 201`,
+`body.items has length 3`); they run in the app, the collection runner, `kurlo run` and `kurlo mcp`.
 
-`require` resolves bundled stand-ins for `lodash`, `ajv`, `tv4`, `uuid`, `crypto-js`, and `chai`, so imported Postman scripts keep working. `pm.sendRequest` makes an HTTP call from a script, and `pm.execution.skipRequest()` skips the send.
+`require` resolves bundled stand-ins for `lodash`, `ajv`, `tv4`, `uuid`, `crypto-js`, and `chai`, so imported Postman
+scripts keep working. `pm.sendRequest` makes an HTTP call from a script, and `pm.execution.skipRequest()` skips the
+send.
 
 **Environments & Variables**
+
 - Multiple environments per workspace, switch with one click
 - Environments inherit the variables they do not set from another environment, such as Staging from Base
 - Matrix view — every variable as a row, every environment as a column, edited in place
 - `{{variable}}` template syntax in URLs, headers, params, body, auth fields
 - Set variables from test scripts (`pm.variables.set`, `pm.environment.set`)
+- Secret managers — link a variable to Vault/OpenBao, 1Password, AWS Secrets Manager and Parameter Store, Google Secret
+  Manager, Azure Key Vault, Bitwarden, Doppler, Infisical, a command or process env vars, or import every key of one
+  secret; `{{vault:name}}` and `await pm.vault.get()` work as in Postman
 - Manual-save and autosave modes both cover request and environment edits
 
 **Workspaces & Collections**
+
 - Multiple workspaces for separate projects or clients
 - Collections with nested folder hierarchy and empty-folder preservation
 - Folder defaults — headers, auth, scripts and tests on a folder apply to every request inside it
 - Drag-and-drop organisation
-- Request history — every send on its own page, request and stored response side by side, reopenable in the editor (14-day retention, 1000 entries)
-- [Static API documentation](https://kurlo.dev/docs/guides/cli-runner/docs/) — build a standalone HTML reference with `kurlo docs build` or **Build documentation** in the collection menu
-- Collection runner — sequential or parallel, data files, iterations, an HTML report, and the last run of every collection kept
-- [Load testing with k6](https://kurlo.dev/docs/guides/load-testing/) — collection flows with extraction and checks, virtual users or iteration rates, thresholds, CSV/JSON data, script export, local runs and last-run reports
-- Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets; branch, commit, pull, push and open a pull request from the app
-- Edit a request's YAML file in the File tab with completion, schema checks, Beautify and protected identity fields; the address bar edits the same draft
-- **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure. `kurlo load list|export|run` lists collection load tests, exports k6 scripts or runs local k6 with threshold results and reports
+- Request history — every send on its own page, request and stored response side by side, reopenable in the editor (
+  14-day retention, 1000 entries)
+- [Static API documentation](https://kurlo.dev/docs/guides/cli-runner/docs/) — build a standalone HTML reference with
+  `kurlo docs build` or **Build documentation** in the collection menu
+- Collection runner — sequential or parallel, data files, iterations, an HTML report, and the last run of every
+  collection kept
+- [Load testing with k6](https://kurlo.dev/docs/guides/load-testing/) — collection flows with extraction and checks,
+  virtual users or iteration rates, thresholds, CSV/JSON data, script export, local runs and last-run reports
+- Git-backed YAML workspaces with diagnostics, conflict helpers, and local-only secrets; branch, commit, pull, push and
+  open a pull request from the app
+- Edit a request's YAML file in the File tab with completion, schema checks, Beautify and protected identity fields; the
+  address bar edits the same draft
+- **CLI runner** — `npx -y @kurlo/cli run ./workspace --env CI` executes requests and their test scripts for CI, with
+  data-driven iterations (`--data`), pretty/JSON/JUnit reporters, variable export, and a non-zero exit code on failure.
+  `kurlo load list|export|run` lists collection load tests, exports k6 scripts or runs local k6 with threshold results
+  and reports
 
-**Agent mode** — new in 3.0. Pick the Kurlo agent on your own model (OpenRouter, an API key, or Ollama and LM Studio), or connect the Claude Code and Codex CLIs you already use with their own accounts, and ask in plain words. The agent runs requests and collections, explains failures, writes requests and tests, imports OpenAPI, Postman and HAR files, and reads a connected project folder. It asks before every change and every call other than `GET`, `HEAD` or `OPTIONS`, can follow a plan you approve, work on its own Git branch and call your own MCP servers. Trusted hosts and sandbox environments run without asking, protected environments are off limits, and secrets reach the API while the model sees `[secret]`. Chats stay encrypted on your machine, and **Activity** lists every tool call with the files it changed and a way to restore them. See the [agent guide](https://kurlo.dev/docs/guides/agent/).
+**Agent mode** — since 3.0. Pick the Kurlo agent on your own model (OpenRouter, an API key, or Ollama and LM Studio), or
+connect the Claude Code and Codex CLIs you already use with their own accounts, and ask in plain words. The agent runs
+requests and collections, explains failures, writes requests and tests, imports OpenAPI, Postman and HAR files, and
+reads a connected project folder. It asks before every change and every call other than `GET`, `HEAD` or `OPTIONS`, can
+follow a plan you approve, work on its own Git branch and call your own MCP servers. Trusted hosts and sandbox
+environments run without asking, protected environments are off limits, and secrets reach the API while the model sees
+`[secret]`. Chats stay encrypted on your machine, and **Activity** lists every tool call with the files it changed and a
+way to restore them. See the [agent guide](https://kurlo.dev/docs/guides/agent/).
 
-**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor, Claude Desktop or any other MCP client can list your collections and environments, run saved HTTP, GraphQL, unary gRPC, MCP and AI requests, run collections with CSV or JSON data, and send one-off calls with your `{{variables}}`. It can start and compare k6 runs and serve saved examples from a local mock. In the desktop app, Agent Mode can also exchange messages on live connections. It can also keep the workspace up to date: add and change requests with their `pm.*` tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a secret. It can preview and apply imports, read a connected project folder, edit Markdown docs and generate snippets. It reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One command sets up every client on the machine:
+**AI agents (MCP server)** — the Kurlo binary is also a Model Context Protocol server, so Claude Code, Codex, Cursor,
+Claude Desktop or any other MCP client can list your collections and environments, run saved HTTP, GraphQL, unary gRPC,
+MCP and AI requests, run collections with CSV or JSON data, and send one-off calls with your `{{variables}}`. It can
+start and compare k6 runs and serve saved examples from a local mock. In the desktop app, Agent Mode can also exchange
+messages on live connections. It can also keep the workspace up to date: add and change requests with their `pm.*`
+tests, save responses as examples and set environment variables, in the same YAML the app writes, never storing a
+secret. It can preview and apply imports, read a connected project folder, edit Markdown docs and generate snippets. It
+reads the last request you sent from the app, so "why did that fail?" needs no copying. Secret values are sent to the
+API but masked as `[secret]` in everything the model sees, and environments you mark protected are off limits. One
+command sets up every client on the machine:
 
 ![Claude Code adds tests to a Kurlo collection over MCP, finds a pricing bug and fixes it, while the tests appear in Kurlo](.github/assets/demo.gif)
 
@@ -144,18 +236,32 @@ pm.test("has an id", () => pm.response.to.have.jsonSchema({ type: "object", requ
 npx -y @kurlo/cli mcp install --env Staging
 ```
 
-Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json` instead, so the whole team gets the server by cloning. Manual setup, the tools and the flags are covered in the [MCP server guide](https://kurlo.dev/docs/guides/mcp-server/).
+Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json` instead, so the whole team gets the
+server by cloning. Manual setup, the tools and the flags are covered in
+the [MCP server guide](https://kurlo.dev/docs/guides/mcp-server/).
 
-**Response examples** — save any response as a named example on its request: the status, headers and body it came back with, alongside the request that produced it. Secrets are redacted on capture, a clean body is stored byte for byte, and examples are read from Postman, OpenCollection, HAR and OpenAPI and included in Postman v2.1 and OpenCollection exports. A response can be diffed against an example instead of against the previous send.
+**Response examples** — save any response as a named example on its request: the status, headers and body it came back
+with, alongside the request that produced it. Secrets are redacted on capture, a clean body is stored byte for byte, and
+examples are read from Postman, OpenCollection, HAR and OpenAPI and included in Postman v2.1 and OpenCollection exports.
+A response can be diffed against an example instead of against the previous send.
 
 **Cookies** — a per-workspace cookie jar with a per-domain editor, disableable per request.
-- **Cookie sync**: pair Kurlo with the in-repo browser extension (`apps/desktop/extension`, Chromium + Firefox) and the session you already have in the browser is the session Kurlo sends with. A loopback-only bridge that stays off until you turn it on, an approval you give in Kurlo by matching a six-digit code, and a per-domain allowlist enforced on both sides. Cookies travel one way: browser into Kurlo.
 
-**Mock server** — serve a collection's saved examples over HTTP on a local port, so a client can be built against an endpoint that does not exist yet. Routing is by method and the example's path template (`/orders/:id`), a recorded query narrows which example answers, and a live log shows what the client asked for and which example replied. Loopback only; CORS preflight is answered for any origin.
+- **Cookie sync**: pair Kurlo with the in-repo browser extension (`apps/desktop/extension`, Chromium + Firefox) and the
+  session you already have in the browser is the session Kurlo sends with. A loopback-only bridge that stays off until
+  you turn it on, an approval you give in Kurlo by matching a six-digit code, and a per-domain allowlist enforced on
+  both sides. Cookies travel one way: browser into Kurlo.
+
+**Mock server** — serve a collection's saved examples over HTTP on a local port, so a client can be built against an
+endpoint that does not exist yet. Routing is by method and the example's path template (`/orders/:id`), a recorded query
+narrows which example answers, and a live log shows what the client asked for and which example replied. Loopback only;
+CORS preflight is answered for any origin.
 
 **Response viewer**
+
 - Syntax-highlighted body with line numbers, foldable JSON, XML and HTML blocks, and optional line wrapping
-- JSON, XML and HTML sent as plain text or without a `Content-Type` are detected and formatted; a format menu forces JSON, XML, HTML or plain text
+- JSON, XML and HTML sent as plain text or without a `Content-Type` are detected and formatted; a format menu forces
+  JSON, XML, HTML or plain text
 - Paginated rendering for large responses (512 KB pages, once a response exceeds 10 MB)
 - Full-text search with match navigation
 - Save response to file, copy to clipboard
@@ -164,20 +270,30 @@ Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json
 - Preview tab for HTML, images and PDFs; binary bodies are detected rather than rendered as mojibake
 - Diff against the previous response or a saved example
 - Timeline with connection details and the request as it went on the wire, secrets masked, one block per redirect hop
-- Realtime panels for SSE, WebSocket, Socket.IO, and gRPC responses, with saved WebSocket and Socket.IO messages kept in the request
+- Realtime panels for SSE, WebSocket, Socket.IO, and gRPC responses, with saved WebSocket and Socket.IO messages kept in
+  the request
 - Filter JSON responses with JSONPath or jq-style paths such as `.items[].id`
 
-**Code generation** — copy the current request as a runnable snippet in one of 14 targets: cURL, HTTPie, JavaScript `fetch`, Node.js `fetch`, Axios, Python `requests`, Go `net/http`, Java OkHttp, C# `HttpClient`, PHP cURL, Ruby `Net::HTTP`, Swift `URLSession`, Kotlin OkHttp, and Rust `reqwest`. Secret variables stay as `{{name}}` placeholders.
+**Code generation** — copy the current request as a runnable snippet in one of 14 targets: cURL, HTTPie, JavaScript
+`fetch`, Node.js `fetch`, Axios, Python `requests`, Go `net/http`, Java OkHttp, C# `HttpClient`, PHP cURL, Ruby
+`Net::HTTP`, Swift `URLSession`, Kotlin OkHttp, and Rust `reqwest`. Secret variables stay as `{{name}}` placeholders.
 
-**Browser request emulation** — send with a browser's rules instead of a client's: an `Origin` header, CORS preflight and response checks, and Content Security Policy enforcement, so a request can reproduce what the browser will do before the frontend is written.
+**Browser request emulation** — send with a browser's rules instead of a client's: an `Origin` header, CORS preflight
+and response checks, and Content Security Policy enforcement, so a request can reproduce what the browser will do before
+the frontend is written.
 
-**Settings per request**: HTTP version (auto / 1.1 / 2), SSL verification, redirect policy (follow, preserve method, preserve auth), cookie jar, timeout, proxy, URL encoding.
+**Settings per request**: HTTP version (auto / 1.1 / 2), SSL verification, redirect policy (follow, preserve method,
+preserve auth), cookie jar, timeout, proxy, URL encoding.
 
-**Keyboard-first**: all actions have configurable shortcuts. A command palette (`Cmd/Ctrl K`) finds requests and runs commands, quick send (`Cmd/Ctrl Enter`), focus the URL (`Cmd/Ctrl L`), tab switching (`Cmd/Ctrl 1`–`8`, with `9` for the last tab). Kurlo shows `Cmd` on macOS and `Ctrl` on Windows and Linux.
+**Keyboard-first**: all actions have configurable shortcuts. A command palette (`Cmd/Ctrl K`) finds requests and runs
+commands, quick send (`Cmd/Ctrl Enter`), focus the URL (`Cmd/Ctrl L`), tab switching (`Cmd/Ctrl 1`–`8`, with `9` for the
+last tab). Kurlo shows `Cmd` on macOS and `Ctrl` on Windows and Linux.
 
 **Dark and light themes**, with multiple built-in variations.
 
-**Local-first storage** — the local Kurlo profile and its secrets are encrypted at rest with AES-256-GCM. The key is stored in the OS credential store when available and also kept as a `0600` recovery file in Kurlo's app-data directory. Git-backed workspace YAML is intentionally human-readable; secret values are replaced with local placeholders.
+**Local-first storage** — the local Kurlo profile and its secrets are encrypted at rest with AES-256-GCM. The key is
+stored in the OS credential store when available and also kept as a `0600` recovery file in Kurlo's app-data directory.
+Git-backed workspace YAML is intentionally human-readable; secret values are replaced with local placeholders.
 
 ---
 
@@ -187,12 +303,14 @@ Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json
 
 - Go 1.25+
 - Node.js 22.12+
-- [Wails v2](https://wails.io/docs/gettingstarted/installation) — `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
+- [Wails v2](https://wails.io/docs/gettingstarted/installation) —
+  `go install github.com/wailsapp/wails/v2/cmd/wails@latest`
 - macOS: Xcode Command Line Tools
 - Windows: NSIS (for installer builds) and Windows SDK (for MSIX packaging/signing tools)
 - Linux: `libgtk-3-dev`, `libwebkit2gtk-4.1-dev`
 
 **Dev mode** (hot-reload frontend + Go backend):
+
 ```bash
 git clone https://github.com/stormhop/kurlo
 cd kurlo
@@ -201,38 +319,49 @@ make dev
 ```
 
 **Production build** for the current platform:
+
 ```bash
 make build
 ```
 
 **All platforms** (requires each platform's toolchain):
+
 ```bash
 make build-all
 ```
 
 **Run everyday checks** — lint, frontend types, unit tests and Go tests run concurrently, with Go's test cache enabled:
+
 ```bash
 make check
 ```
 
 **Run the full test suite**, including the Go race detector and Chromium/WebKit:
+
 ```bash
 make check-full
 ```
 
-| During development | Command |
-| --- | --- |
-| One unit-test file | `npm run test:unit -- src/tests/agent.test.ts` |
-| Watch unit tests | `npm run test:watch -- agent` |
-| Unit tests related to uncommitted changes | `npm run test:changed` |
-| Matching Go tests | `make test GO_TEST_FLAGS='-run TestCodex'` |
-| Go tests without the heavy scale cases | `make test GO_TEST_FLAGS=-short` |
-| Matching browser tests | `npm run test:e2e -- --grep 'Codex'` |
-| Both browsers | `npm run test:e2e:all` |
-| Interactive browser test runner | `npm run test:e2e:ui` |
-| Retry only failed browser tests | `npm run test:e2e:failed` |
+| During development                        | Command                                        |
+|-------------------------------------------|------------------------------------------------|
+| One unit-test file                        | `npm run test:unit -- src/tests/agent.test.ts` |
+| Watch unit tests                          | `npm run test:watch -- agent`                  |
+| Unit tests related to uncommitted changes | `npm run test:changed`                         |
+| Matching Go tests                         | `make test GO_TEST_FLAGS='-run TestCodex'`     |
+| Go tests without the heavy scale cases    | `make test GO_TEST_FLAGS=-short`               |
+| Matching browser tests                    | `npm run test:e2e -- --grep 'Codex'`           |
+| Both browsers                             | `npm run test:e2e:all`                         |
+| Interactive browser test runner           | `npm run test:e2e:ui`                          |
+| Retry only failed browser tests           | `npm run test:e2e:failed`                      |
 
-Browser tests run against a production build of the frontend that Playwright builds and serves on each run, so they do not keep a dev server compiling modules for every page. Locally they record no video or trace; set `KURLO_E2E_TRACE=1` to keep them for failures (`npm run test:e2e:failed` does), and `KURLO_E2E_SERVER=dev` to test against the Vite dev server, which the `--ui` and `--debug` modes use. Browser tests use up to four workers locally and two in CI. Override this with `--workers=2`; use `--workers=1` for isolated performance comparisons. Screenshot-generation and profiling modes default to one worker. On a memory-constrained machine, `make check CHECK_JOBS=1` runs the independent checks sequentially. Go tests already run packages in parallel; tests sharing process-wide environment variables stay sequential within a package. Go caches successful runs; add `GO_TEST_FLAGS='-count=1'` only when a fresh run is needed.
+Browser tests run against a production build of the frontend that Playwright builds and serves on each run, so they do
+not keep a dev server compiling modules for every page. Locally they record no video or trace; set `KURLO_E2E_TRACE=1`
+to keep them for failures (`npm run test:e2e:failed` does), and `KURLO_E2E_SERVER=dev` to test against the Vite dev
+server, which the `--ui` and `--debug` modes use. Browser tests use up to four workers locally and two in CI. Override
+this with `--workers=2`; use `--workers=1` for isolated performance comparisons. Screenshot-generation and profiling
+modes default to one worker. On a memory-constrained machine, `make check CHECK_JOBS=1` runs the independent checks
+sequentially. Go tests already run packages in parallel; tests sharing process-wide environment variables stay
+sequential within a package. Go caches successful runs; add `GO_TEST_FLAGS='-count=1'` only when a fresh run is needed.
 
 See `make help` for every available target.
 
@@ -266,42 +395,51 @@ perf/                       Generated performance fixtures (ignored by Git)
 
 ## Scripting API reference
 
-Scripts run in a sandboxed JavaScript environment with a two-second default timeout, configurable per request up to 60 seconds. The sandbox blocks module imports, filesystem access, processes, and direct network access. Requests can opt in to HTTP calls through `pm.sendRequest`.
+Scripts run in a sandboxed JavaScript environment with a two-second default timeout, configurable per request up to 60
+seconds. The sandbox blocks module imports, filesystem access, processes, and direct network access. Requests can opt in
+to HTTP calls through `pm.sendRequest`.
 
-The full surface — every method, the variable-scope precedence rules, and the Chai-style assertion aliases — is in the [scripting API reference](https://kurlo.dev/docs/reference/scripting-api/). The short version:
+The full surface — every method, the variable-scope precedence rules, and the Chai-style assertion aliases — is in
+the [scripting API reference](https://kurlo.dev/docs/reference/scripting-api/). The short version:
 
-| Surface | What it covers |
-|---------|----------------|
-| `pm.request` | `url`, `method`, `set_url()`, `headers.get/set/unset`, `params.get/set` |
-| `pm.request.body` | `raw`, `mode`, `json()`, `update()`, plus `urlencoded` / `formdata` field lists |
-| `pm.response` | `code`, `status`, `responseTime`, `size`, `body()`, `json()`, `headers.get()` — test scripts only |
-| `pm.variables` · `pm.globals` · `pm.environment` · `pm.collectionVariables` | `get` / `set` / `unset` / `clear`, differing only in which scope they read and write |
-| `pm.iterationData.get(key)` | The current data-row value in a data-driven run (read-only) |
-| `pm.info` | `requestName`, `eventName`, `iteration`, `iterationCount` |
-| `pm.cookies` | `get` / `has` / `names` for the cookies this request's jar would send |
-| `pm.crypto` · `CryptoJS` | MD5/SHA digests, HMAC, base64, `randomHex()`, `uuid()` |
-| `pm.sendRequest(req, cb)` | A synchronous HTTP call through the regular request engine |
-| `pm.execution.skipRequest()` | From a pre-request script, skips the send — reported as skipped, not failed |
-| `pm.test(name, fnOrResult)` | Register a named assertion |
-| `pm.expect(value)` | `.equal` · `.contains` · `.exists` · `.has_key` · … plus `.to.equal(v)`, `.to.include(v)`, `.to.have.property(k)` |
-| `pm.response.to.have.*` | `status(code)`, `header(name)`, `jsonBody(path?, value?)`, `jsonSchema(schema)` (draft-07) |
-| `pm.log(...values)` | Output to the Scripts panel |
+| Surface                                                                     | What it covers                                                                                                    |
+|-----------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `pm.request`                                                                | `url`, `method`, `set_url()`, `headers.get/set/unset`, `params.get/set`                                           |
+| `pm.request.body`                                                           | `raw`, `mode`, `json()`, `update()`, plus `urlencoded` / `formdata` field lists                                   |
+| `pm.response`                                                               | `code`, `status`, `responseTime`, `size`, `body()`, `json()`, `headers.get()` — test scripts only                 |
+| `pm.variables` · `pm.globals` · `pm.environment` · `pm.collectionVariables` | `get` / `set` / `unset` / `clear`, differing only in which scope they read and write                              |
+| `pm.iterationData.get(key)`                                                 | The current data-row value in a data-driven run (read-only)                                                       |
+| `pm.info`                                                                   | `requestName`, `eventName`, `iteration`, `iterationCount`                                                         |
+| `pm.cookies`                                                                | `get` / `has` / `names` for the cookies this request's jar would send                                             |
+| `pm.crypto` · `CryptoJS`                                                    | MD5/SHA digests, HMAC, base64, `randomHex()`, `uuid()`                                                            |
+| `pm.sendRequest(req, cb)`                                                   | A synchronous HTTP call through the regular request engine                                                        |
+| `pm.execution.skipRequest()`                                                | From a pre-request script, skips the send — reported as skipped, not failed                                       |
+| `pm.test(name, fnOrResult)`                                                 | Register a named assertion                                                                                        |
+| `pm.expect(value)`                                                          | `.equal` · `.contains` · `.exists` · `.has_key` · … plus `.to.equal(v)`, `.to.include(v)`, `.to.have.property(k)` |
+| `pm.response.to.have.*`                                                     | `status(code)`, `header(name)`, `jsonBody(path?, value?)`, `jsonSchema(schema)` (draft-07)                        |
+| `pm.log(...values)`                                                         | Output to the Scripts panel                                                                                       |
 
-`require` resolves bundled stand-ins for `lodash`, `ajv`, `tv4`, `uuid`, `crypto-js`, and `chai`. There is no event loop: `setTimeout`, `async` and `await` are not available, and `pm.sendRequest`'s callback runs immediately.
+`require` resolves bundled stand-ins for `lodash`, `ajv`, `tv4`, `uuid`, `crypto-js`, and `chai`. There is no event
+loop: `setTimeout`, `async` and `await` are not available, and `pm.sendRequest`'s callback runs immediately.
 
 ---
 
 ## Support Kurlo
 
-Kurlo is free for teams of any size and will stay that way. If it saves you time, you can support development on [Boosty](https://boosty.to/kurlo): it pays for the server, macOS code signing and the hours that go into new features. Supporters get dev updates and early release candidates.
+Kurlo is free for teams of any size and will stay that way. If it saves you time, you can support development
+on [Boosty](https://boosty.to/kurlo): it pays for the server, macOS code signing and the hours that go into new
+features. Supporters get dev updates and early release candidates.
 
 ---
 
 ## Contributing
 
-Bug reports, feature requests, and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) — it covers the dev setup, what CI enforces, and how to scope a change. Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+Bug reports, feature requests, and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) — it covers
+the dev setup, what CI enforces, and how to scope a change. Everyone taking part is expected to follow
+the [Code of Conduct](CODE_OF_CONDUCT.md).
 
-Found a security problem? Please **don't** open a public issue — see [SECURITY.md](SECURITY.md) for private reporting instead.
+Found a security problem? Please **don't** open a public issue — see [SECURITY.md](SECURITY.md) for private reporting
+instead.
 
 ---
 
