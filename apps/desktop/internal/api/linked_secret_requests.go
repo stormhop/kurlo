@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/url"
 	"reflect"
@@ -316,9 +317,21 @@ func (a *App) linkSecretsIntoHTTP(ctx context.Context, req *model.HttpRequest) (
 		return linkedHTTPSecrets{}, &model.HttpResponse{Error: linkedSecretErrorMessage(err), LinkedSecretFailures: linkedSecretFailures(err), Headers: []model.KeyValue{}, Timings: model.ResponseTime{Secrets: elapsed}}
 	}
 	if len(values) > 0 {
+		values = append(values, linkedAuthEncodings(resolveAuthTemplates(req.Auth, req.TemplateValues), values)...)
 		req.SecretEnvironmentValues = append(req.SecretEnvironmentValues, values...)
 	}
 	return linkedHTTPSecrets{values: values, duration: elapsed}, nil
+}
+
+func linkedAuthEncodings(cfg model.AuthConfig, linked []string) []string {
+	var out []string
+	for _, pair := range [][2]string{{cfg.Username, cfg.Password}, {cfg.OAuth2ClientID, cfg.OAuth2Secret}} {
+		if pair[1] == "" || redactSecrets(pair[0]+":"+pair[1], linked) == pair[0]+":"+pair[1] {
+			continue
+		}
+		out = append(out, base64.StdEncoding.EncodeToString([]byte(pair[0]+":"+pair[1])))
+	}
+	return out
 }
 
 func (a *App) linkSecretsIntoRealtime(sessionID string, msg any) error {

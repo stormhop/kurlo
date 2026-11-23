@@ -41,22 +41,31 @@ func systemRun(ctx context.Context, path string, args []string, env []string) ([
 }
 
 func toolCandidates(name string) []string {
-	if runtime.GOOS == "windows" {
-		var out []string
-		for _, base := range []string{os.Getenv("ProgramFiles"), os.Getenv("LOCALAPPDATA")} {
-			if base == "" {
-				continue
-			}
-			switch name {
-			case "op":
-				out = append(out, filepath.Join(base, "1Password CLI", "op.exe"), filepath.Join(base, "Microsoft", "WinGet", "Links", "op.exe"))
-			case "aws":
-				out = append(out, filepath.Join(base, "Amazon", "AWSCLIV2", "aws.exe"))
-			}
-		}
-		return out
+	return toolCandidatesFor(runtime.GOOS, os.Getenv, name)
+}
+
+func toolCandidatesFor(goos string, getenv func(string) string, name string) []string {
+	if goos != "windows" {
+		return []string{"/opt/homebrew/bin/" + name, "/usr/local/bin/" + name, "/usr/bin/" + name, "/snap/bin/" + name}
 	}
-	return []string{"/opt/homebrew/bin/" + name, "/usr/local/bin/" + name, "/usr/bin/" + name, "/snap/bin/" + name}
+	var out []string
+	for _, base := range []string{getenv("ProgramFiles"), getenv("ProgramFiles(x86)"), getenv("LOCALAPPDATA")} {
+		if base == "" {
+			continue
+		}
+		out = append(out, filepath.Join(base, "Microsoft", "WinGet", "Links", name+".exe"))
+		switch name {
+		case "op":
+			out = append(out, filepath.Join(base, "1Password CLI", "op.exe"))
+		case "aws":
+			out = append(out, filepath.Join(base, "Amazon", "AWSCLIV2", "aws.exe"))
+		case "az":
+			out = append(out, filepath.Join(base, "Microsoft SDKs", "Azure", "CLI2", "wbin", "az.cmd"))
+		case "gcloud":
+			out = append(out, filepath.Join(base, "Google", "Cloud SDK", "google-cloud-sdk", "bin", "gcloud.cmd"))
+		}
+	}
+	return out
 }
 
 func systemLookPath(name string) (string, error) {

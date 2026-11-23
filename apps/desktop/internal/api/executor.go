@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -338,7 +339,7 @@ func (d environmentDelta) removedKeys() []string {
 }
 
 func requestAuthSecrets(auth model.AuthConfig) []string {
-	return []string{
+	secrets := []string{
 		auth.Token, auth.Password, auth.KeyValue,
 		auth.OAuth2Secret, auth.OAuth2Password, auth.OAuth2RefreshToken,
 		auth.OAuth2AssertionPrivateKey, auth.OAuth1ConsumerSecret,
@@ -346,6 +347,13 @@ func requestAuthSecrets(auth model.AuthConfig) []string {
 		auth.AWSSecretKey, auth.AWSSessionToken,
 		auth.JWTSecret, auth.JWTPrivateKey,
 	}
+	if auth.Password != "" {
+		secrets = append(secrets, base64.StdEncoding.EncodeToString([]byte(auth.Username+":"+auth.Password)))
+	}
+	if auth.OAuth2Secret != "" {
+		secrets = append(secrets, base64.StdEncoding.EncodeToString([]byte(auth.OAuth2ClientID+":"+auth.OAuth2Secret)))
+	}
+	return secrets
 }
 
 func redactRequestScriptResult(result model.ScriptResult, auth model.AuthConfig, secrets []string) model.ScriptResult {
@@ -374,6 +382,9 @@ func redactSecrets(text string, secrets []string) string {
 			continue
 		}
 		unique[secret] = struct{}{}
+		for _, escaped := range jsonEscapedForms(secret) {
+			unique[escaped] = struct{}{}
+		}
 	}
 	ordered := make([]string, 0, len(unique))
 	for secret := range unique {
@@ -384,6 +395,24 @@ func redactSecrets(text string, secrets []string) string {
 		text = strings.ReplaceAll(text, secret, "[secret]")
 	}
 	return text
+}
+
+func jsonEscapedForms(secret string) []string {
+	if !strings.ContainsAny(secret, "\"\\<>&\u2028\u2029") && strings.IndexFunc(secret, func(r rune) bool { return r < 0x20 }) < 0 {
+		return nil
+	}
+	forms := make([]string, 0, 2)
+	for _, escapeHTML := range []bool{true, false} {
+		var buf bytes.Buffer
+		encoder := json.NewEncoder(&buf)
+		encoder.SetEscapeHTML(escapeHTML)
+		if err := encoder.Encode(secret); err != nil {
+			continue
+		}
+		encoded := strings.TrimSuffix(buf.String(), "\n")
+		forms = append(forms, encoded[1:len(encoded)-1])
+	}
+	return forms
 }
 
 func redactRequestError(text string, secrets []string) string {

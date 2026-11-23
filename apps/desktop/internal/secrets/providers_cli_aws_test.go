@@ -352,6 +352,10 @@ func TestAWSCredentialChain(t *testing.T) {
 	if _, err := nothing.Value(ctx, "ws", ref); KindOf(err) != KindNotAuthenticated {
 		t.Fatalf("no credentials = %v", err)
 	}
+	halfKeys := NewManager(&fakeSource{configs: []ProviderConfig{sso}}, (&fakeTool{}).env(map[string]string{"AWS_ACCESS_KEY_ID": "AKIDEXAMPLE"}, nil, c))
+	if _, err := halfKeys.Value(ctx, "ws", ref); KindOf(err) != KindNotAuthenticated || !strings.Contains(err.Error(), "AWS_SECRET_ACCESS_KEY is empty") {
+		t.Fatalf("an access key without a secret key = %v", err)
+	}
 	wrongKeys := NewManager(&fakeSource{configs: []ProviderConfig{mustProvider(t, map[string]any{"id": "aws", "type": "aws-secrets-manager", "region": "eu-central-1", "endpoint": server.URL})}}, (&fakeTool{}).env(map[string]string{"AWS_ACCESS_KEY_ID": "WRONG", "AWS_SECRET_ACCESS_KEY": "x"}, nil, c))
 	if _, err := wrongKeys.Value(ctx, "ws", ref); KindOf(err) != KindNotAuthenticated {
 		t.Fatalf("rejected keys = %v", err)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -342,6 +343,14 @@ func TestVaultErrorsAreTyped(t *testing.T) {
 		}
 	}
 
+	_, err := withToken.Value(ctx, "ws", Ref{Provider: "v", Path: "secret/team", Field: "password"})
+	if KindOf(err) != KindNotFound || !strings.Contains(err.Error(), "secret/data/team") {
+		t.Errorf("a KV v2 path without data/ should name the right path: %v", err)
+	}
+	if _, err := withToken.Value(ctx, "ws", Ref{Provider: "v", Path: "kv1/missing", Field: "password"}); err == nil || strings.Contains(err.Error(), "data/") {
+		t.Errorf("a KV v1 path must not suggest data/: %v", err)
+	}
+
 	noToken := NewManager(&fakeSource{configs: []ProviderConfig{config}}, testEnv(nil, c))
 	if _, err := noToken.Value(ctx, "ws", Ref{Provider: "v", Path: "secret/data/app", Field: "password"}); KindOf(err) != KindNotAuthenticated {
 		t.Errorf("no token: %v", err)
@@ -466,5 +475,70 @@ func TestMarkerMatchesTheFrontendEncoding(t *testing.T) {
 		if decoded, err := DecodeMarker(marker); err != nil || decoded != ref {
 			t.Errorf("DecodeMarker(%s) = %+v, %v", marker, decoded, err)
 		}
+	}
+}
+
+func TestGCPADCPathHonorsCloudSDKConfigOnEveryOS(t *testing.T) {
+	c := &clock{now: time.Now()}
+	for _, goos := range []string{"windows", "linux", "darwin"} {
+		env := testEnv(map[string]string{"CLOUDSDK_CONFIG": filepath.Join("cfg", "gcloud"), "APPDATA": filepath.Join("roaming")}, c)
+		if got, want := gcpADCPath(goos, env), filepath.Join("cfg", "gcloud", "application_default_credentials.json"); got != want {
+			t.Fatalf("%s: got %q, want %q", goos, got, want)
+		}
+	}
+	env := testEnv(map[string]string{"APPDATA": "roaming"}, c)
+	if got, want := gcpADCPath("windows", env), filepath.Join("roaming", "gcloud", "application_default_credentials.json"); got != want {
+		t.Fatalf("windows without CLOUDSDK_CONFIG: got %q, want %q", got, want)
+	}
+	if got := gcpADCPath("windows", testEnv(nil, c)); got != "" {
+		t.Fatalf("windows without APPDATA: got %q", got)
+	}
+	if got, want := gcpADCPath("linux", testEnv(nil, c)), filepath.Join("/nonexistent-home", ".config", "gcloud", "application_default_credentials.json"); got != want {
+		t.Fatalf("linux: got %q, want %q", got, want)
+	}
+}
+
+func TestExpandHomeAcceptsBothSeparators(t *testing.T) {
+	env := testEnv(nil, &clock{now: time.Now()})
+	for _, input := range []string{"~/certs/ca.pem", `~\certs\ca.pem`} {
+		got, err := expandHome(input, env)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(got, "/nonexistent-home") || strings.HasPrefix(got, "~") {
+			t.Fatalf("%q expanded to %q", input, got)
+		}
+	}
+	for _, input := range []string{"~user/ca.pem", "/etc/ca.pem", `C:\certs\ca.pem`} {
+		if got, _ := expandHome(input, env); got != input {
+			t.Fatalf("%q changed to %q", input, got)
+		}
+	}
+}
+
+func TestWindowsToolCandidatesCoverDefaultInstallFolders(t *testing.T) {
+	env := map[string]string{"ProgramFiles": `C:\Program Files`, "ProgramFiles(x86)": `C:\Program Files (x86)`, "LOCALAPPDATA": `C:\Users\me\AppData\Local`}
+	getenv := func(key string) string { return env[key] }
+	want := map[string]string{
+		"op":     filepath.Join(`C:\Program Files`, "1Password CLI", "op.exe"),
+		"aws":    filepath.Join(`C:\Program Files`, "Amazon", "AWSCLIV2", "aws.exe"),
+		"az":     filepath.Join(`C:\Program Files (x86)`, "Microsoft SDKs", "Azure", "CLI2", "wbin", "az.cmd"),
+		"gcloud": filepath.Join(`C:\Users\me\AppData\Local`, "Google", "Cloud SDK", "google-cloud-sdk", "bin", "gcloud.cmd"),
+		"bws":    filepath.Join(`C:\Users\me\AppData\Local`, "Microsoft", "WinGet", "Links", "bws.exe"),
+	}
+	for name, path := range want {
+		found := false
+		for _, candidate := range toolCandidatesFor("windows", getenv, name) {
+			found = found || candidate == path
+		}
+		if !found {
+			t.Fatalf("%s: %q is not among %q", name, path, toolCandidatesFor("windows", getenv, name))
+		}
+	}
+	if got := toolCandidatesFor("windows", func(string) string { return "" }, "op"); len(got) != 0 {
+		t.Fatalf("no install folders should give no candidates, got %q", got)
+	}
+	if got := toolCandidatesFor("linux", getenv, "op"); got[0] != "/opt/homebrew/bin/op" {
+		t.Fatalf("linux candidates changed: %q", got)
 	}
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -315,6 +316,26 @@ func TestLinkedSecretIsSentAndMaskedEverywhere(t *testing.T) {
 	}
 	if cleared := f.app.ClearSecretCache(); cleared == 0 {
 		t.Fatal("ClearSecretCache reported nothing")
+	}
+}
+
+func TestLinkedBasicAuthIsMaskedInTheEchoedHeader(t *testing.T) {
+	f := newLinkedFixture(t)
+	resp := f.app.SendRequest(f.request(t, func(req *model.HttpRequest) {
+		req.Auth = model.AuthConfig{Type: "basic", Username: "svc", Password: "{{dbPassword}}"}
+	}))
+	if resp.Error != "" {
+		t.Fatalf("send: %s", resp.Error)
+	}
+	encoded := base64.StdEncoding.EncodeToString([]byte("svc:" + linkedCanary))
+	if got, _ := f.echoAuth.Load().(string); got != "Basic "+encoded {
+		t.Fatalf("server saw Authorization %q", got)
+	}
+	if text := responseText(t, resp); strings.Contains(text, encoded) {
+		t.Fatalf("the encoded credentials leaked into the response: %s", text)
+	}
+	if !strings.Contains(resp.Body, "Basic [secret]") {
+		t.Fatalf("body = %s", resp.Body)
 	}
 }
 

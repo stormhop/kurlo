@@ -205,16 +205,33 @@ func (l *cliLinkedSecrets) withoutFetched(values map[string]string) map[string]s
 		return values
 	}
 	l.mu.Lock()
-	defer l.mu.Unlock()
-	if len(l.fetched) == 0 {
-		return values
-	}
-	out := make(map[string]string, len(values))
+	kept := make(map[string]string, len(values))
 	for key, value := range values {
 		if fetched, ok := l.fetched[key]; ok && fetched == value {
 			continue
 		}
-		out[key] = value
+		kept[key] = value
+	}
+	l.mu.Unlock()
+	return l.masked(kept)
+}
+
+func (l *cliLinkedSecrets) masked(values map[string]string) map[string]string {
+	if l == nil {
+		return values
+	}
+	l.mu.Lock()
+	secrets := make([]string, 0, len(l.fetched))
+	for _, value := range l.fetched {
+		secrets = append(secrets, value)
+	}
+	l.mu.Unlock()
+	if len(secrets) == 0 {
+		return values
+	}
+	out := make(map[string]string, len(values))
+	for key, value := range values {
+		out[key] = redactSecrets(value, secrets)
 	}
 	return out
 }

@@ -131,6 +131,58 @@ func TestRunCLIGetsLinkedSecretsFromProviders(t *testing.T) {
 	}
 }
 
+func TestRunCLIExportsMaskLinkedValuesCopiedByScripts(t *testing.T) {
+	t.Setenv("KURLO_TEST_API_TOKEN", cliLinkedCanary)
+	server, _ := linkedCLIServer(t)
+	root := writeLinkedCLIWorkspace(t, server.URL)
+	requestPath := filepath.Join(root, "workspaces", "Demo", "collections", "Smoke", "requests", "GET-1-ok.yml")
+	data, err := os.ReadFile(requestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := "    pm.environment.set(\"copied\", pm.response.json().echo)\n" +
+		"    pm.environment.set(\"header\", \"Bearer \" + pm.response.json().echo)\n" +
+		"    pm.globals.set(\"global\", \"token=\" + pm.response.json().echo)\n" +
+		"    pm.environment.set(\"chained\", \"yes\")\n"
+	updated := strings.Replace(string(data), "    pm.environment.set(\"chained\", \"yes\")\n", script, 1)
+	if updated == string(data) {
+		t.Fatal("the request script was not replaced")
+	}
+	if err := os.WriteFile(requestPath, []byte(updated), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	envFile, globalsFile := filepath.Join(dir, "env.json"), filepath.Join(dir, "globals.json")
+	opts, err := parseCLIArgs([]string{root, "--env", "Local", "--export-environment", envFile, "--export-globals", globalsFile}, io.Discard, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out, errOut bytes.Buffer
+	opts.stdout, opts.stderr = &out, &errOut
+	if code := runCLI(opts); code != 0 {
+		t.Fatalf("exit %d\n%s\n%s", code, out.String(), errOut.String())
+	}
+	for _, file := range []string{envFile, globalsFile} {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), cliLinkedCanary) {
+			t.Fatalf("%s holds the linked value:\n%s", filepath.Base(file), data)
+		}
+	}
+	env, _ := os.ReadFile(envFile)
+	for _, want := range []string{`"value": "[secret]"`, `"value": "Bearer [secret]"`, `"key": "chained"`} {
+		if !strings.Contains(string(env), want) {
+			t.Fatalf("the environment export misses %s:\n%s", want, env)
+		}
+	}
+	globals, _ := os.ReadFile(globalsFile)
+	if !strings.Contains(string(globals), `"value": "token=[secret]"`) {
+		t.Fatalf("the globals export is not masked:\n%s", globals)
+	}
+}
+
 func TestRunCLIStopsBeforeTheFirstRequestWhenALinkFails(t *testing.T) {
 	t.Setenv("KURLO_TEST_API_TOKEN", "")
 	os.Unsetenv("KURLO_TEST_API_TOKEN")
