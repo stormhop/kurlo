@@ -16,8 +16,14 @@
   import ResponsePreviewPanel from './ResponsePreviewPanel.svelte';
   import { responseMediaType, responsePreviewFor } from '../responsePreview';
   import type { ResponseDiff } from '../responseDiff';
+  import Select from './Select.svelte';
+  import { RESPONSE_FORMAT_CHOICES, RESPONSE_FORMAT_LABELS, isResponseFormatChoice } from '../responseFormat';
+  import { foldAllRegions, responseFoldRegions } from '../responseFolding';
+  import { httpStatusInfo } from '../httpStatus';
+  import { fixedPopover } from '../fixedPopover';
+  import { cookieExpiry, responseCookies } from '../setCookie';
 
-  type ResponseTab = 'body' | 'headers' | 'test-results' | 'timeline' | 'diff' | 'preview';
+  type ResponseTab = 'body' | 'headers' | 'cookies' | 'test-results' | 'timeline' | 'diff' | 'preview';
 
   let {
     loading,
@@ -110,6 +116,60 @@
     return count === 1 ? '1 match' : `${count} matches`;
   });
   let responsePreview = $derived(responsePreviewFor(response));
+  let showFormatSelect = $derived(Boolean(responseTab === 'body' && response?.body && !response.bodyIsBinary && !response.error && !responseBodyIsPaged));
+  let resolvedFormat = $derived(vm.responseFormat);
+  let statusInfo = $derived(response ? httpStatusInfo(response.statusCode) : null);
+  let statusClassLabel = $derived(response ? `${Math.floor(response.statusCode / 100)}xx` : '');
+  let contentEncoding = $derived(response?.headers?.find(header => header.key.toLowerCase() === 'content-encoding')?.value ?? '');
+  let sizeRows = $derived.by(() => {
+    if (!response) return [];
+    const rows: Array<{ label: string; value: string }> = [];
+    if (response.headersSize) rows.push({ label: 'Headers', value: formatSize(response.headersSize) });
+    if (response.encodedBodySize) {
+      rows.push({ label: `Body${contentEncoding ? ` (${contentEncoding})` : ' (compressed)'}`, value: formatSize(response.encodedBodySize) });
+      rows.push({ label: 'Body (uncompressed)', value: formatSize(response.size) });
+    } else {
+      rows.push({ label: 'Body', value: formatSize(response.size) });
+    }
+    return rows;
+  });
+  let sizeTotal = $derived(response ? (response.headersSize ?? 0) + (response.encodedBodySize || response.size) : 0);
+  let cookies = $derived(responseCookies(response?.headers));
+
+  $effect(() => {
+    if (responseTab === 'cookies' && response && !cookies.length) setResponseTab('headers');
+  });
+
+  const WRAP_STORAGE_KEY = 'kurlo.responseWrap.v1';
+  let wrapLines = $state(readWrapPreference());
+
+  function readWrapPreference() {
+    try {
+      return localStorage.getItem(WRAP_STORAGE_KEY) !== 'false';
+    } catch {
+      return true;
+    }
+  }
+
+  function toggleWrapLines() {
+    wrapLines = !wrapLines;
+    try {
+      localStorage.setItem(WRAP_STORAGE_KEY, wrapLines ? 'true' : 'false');
+    } catch {}
+  }
+
+  let foldedLines = $state(new Set<number>());
+  let foldRegions = $derived(showFormatSelect ? responseFoldRegions(responseDisplayBody, responseRenderMode) : new Map());
+  let canFold = $derived(foldRegions.size > 0);
+  let anyFolded = $derived(foldedLines.size > 0);
+
+  function toggleFoldAll() {
+    foldedLines = anyFolded ? new Set() : foldAllRegions(foldRegions);
+  }
+  let formatOptions = $derived(RESPONSE_FORMAT_CHOICES.map(choice => ({
+    value: choice,
+    label: choice === 'auto' ? `Auto · ${RESPONSE_FORMAT_LABELS[resolvedFormat.detected]}` : RESPONSE_FORMAT_LABELS[choice],
+  })));
 
   function testSummaryFor(tests: Array<{ passed: boolean }>) {
     if (!tests.length) return null;
@@ -231,11 +291,30 @@
   {:else if response}
     <div class="response-status-bar">
       <div class="status-left">
-        <span class="status-badge {statusClass(response.statusCode)}" class:status-arrived={responseArrived}>
-          {response.statusCode} {response.status.replace(String(response.statusCode), '').trim()}
+        <span class="resp-info" use:fixedPopover>
+          <span class="status-badge {statusClass(response.statusCode)}" class:status-arrived={responseArrived} tabindex="0" role="button" aria-describedby={statusInfo ? 'response-status-info' : undefined}>
+            {response.statusCode} {response.status.replace(String(response.statusCode), '').trim()}
+          </span>
+          {#if statusInfo}
+            <span class="resp-info-popover" id="response-status-info" role="tooltip">
+              <span class="resp-info-title"><span class="resp-info-chip {statusClass(response.statusCode)}">{statusClassLabel}</span>{statusInfo.title}</span>
+              <span class="resp-info-text">{statusInfo.description}</span>
+            </span>
+          {/if}
         </span>
         <ResponseTimeTooltip timings={response.timings} total={response.duration} />
-        <span class="status-meta">{formatSize(response.size)}</span>
+        <span class="resp-info" use:fixedPopover>
+          <span class="status-meta" tabindex="0" role="button" aria-describedby="response-size-info">{formatSize(response.size)}</span>
+          <span class="resp-info-popover resp-size-popover" id="response-size-info" role="tooltip">
+            <span class="resp-info-title resp-size-head"><span>Response size</span><span class="resp-size-value">{formatSize(sizeTotal)}</span></span>
+            {#each sizeRows as row (row.label)}
+              <span class="resp-size-row"><span>{row.label}</span><span class="resp-size-value">{row.value}</span></span>
+            {/each}
+            {#if response.encodedBodySize}
+              <span class="resp-info-text">Kurlo shows and saves the uncompressed body.</span>
+            {/if}
+          </span>
+        </span>
         {#if allTestSummary}
           <span class="test-summary-pill" class:all-passed={allTestSummary.allPassed}>{allTestSummary.passed}/{allTestSummary.total} tests</span>
         {/if}
@@ -265,6 +344,30 @@
           </div>
         {/if}
         <div class="resp-actions">
+          {#if showFormatSelect}
+            <Select
+              value={vm.responseFormatChoice}
+              options={formatOptions}
+              className="response-format-select"
+              ariaLabel="Response format"
+              floating
+              onChange={value => { if (isResponseFormatChoice(value)) { responseSearchIndex = 0; vm.setResponseFormat(value); } }}
+            />
+          {/if}
+          {#if showFormatSelect && !responseBodyVirtualized}
+            <button class="btn btn-icon" aria-label="Wrap lines" aria-pressed={wrapLines} onclick={toggleWrapLines} type="button">
+              <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M1.5 3h10M1.5 6.5h8a2 2 0 010 4H7M1.5 10h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 9l-1.2 1.5L8 12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          {/if}
+          {#if showFormatSelect && canFold}
+            <button class="btn btn-icon" aria-label={anyFolded ? 'Unfold all' : 'Fold all'} onclick={toggleFoldAll} type="button">
+              {#if anyFolded}
+                <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M4 4.5l2.5-2.5L9 4.5M4 8.5l2.5 2.5L9 8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {:else}
+                <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M4 2l2.5 2.5L9 2M4 11l2.5-2.5L9 11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {/if}
+            </button>
+          {/if}
           <button class="btn btn-icon" aria-label="Search response" aria-pressed={responseSearchOpen} onclick={toggleResponseSearch} type="button">
             <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none">
               <circle cx="5.8" cy="5.8" r="3.8" stroke="currentColor" stroke-width="1.3"/>
@@ -314,6 +417,11 @@
         <button class="tab" role="tab" class:active={responseTab === 'headers'} aria-selected={responseTab === 'headers'} aria-controls="response-panel-headers" tabindex={responseTab === 'headers' ? 0 : -1} onclick={() => setResponseTab('headers')} type="button">
           Headers{#if response.headers?.length}<span class="badge">{response.headers.length}</span>{/if}
         </button>
+        {#if cookies.length}
+          <button class="tab" role="tab" class:active={responseTab === 'cookies'} aria-selected={responseTab === 'cookies'} aria-controls="response-panel-cookies" tabindex={responseTab === 'cookies' ? 0 : -1} onclick={() => setResponseTab('cookies')} type="button">
+            Cookies<span class="badge">{cookies.length}</span>
+          </button>
+        {/if}
         {#if diffBaselineOptions.length}
           <button class="tab" role="tab" class:active={responseTab === 'diff'} aria-selected={responseTab === 'diff'} aria-controls="response-panel-diff" tabindex={responseTab === 'diff' ? 0 : -1} onclick={() => setResponseTab('diff')} type="button">
             Diff
@@ -349,6 +457,11 @@
           <div class="response-warning script-error-banner" role="alert">
             <span>{scriptErrorMessage}</span>
             <button class="btn btn-ghost btn-xs" type="button" onclick={() => setResponseTab('test-results')}>Open Scripts</button>
+          </div>
+        {/if}
+        {#if resolvedFormat.fallback && !response.error}
+          <div class="response-warning response-format-fallback" role="status">
+            This response is not valid {RESPONSE_FORMAT_LABELS[vm.responseFormatChoice]}, so it is shown as text.
           </div>
         {/if}
         {#if response.error}
@@ -424,6 +537,8 @@
           searchIndex={responseSearchIndex}
           virtualized={responseBodyVirtualized}
           page={responseBodyPage}
+          bind:folded={foldedLines}
+          wrap={wrapLines}
         />
         {/if}
         {/if}
@@ -441,6 +556,35 @@
             <span class="resp-header-val">{h.value}</span>
           </div>
         {/each}
+      </div>
+
+    {:else if responseTab === 'cookies'}
+      <div class="response-cookies" id="response-panel-cookies" role="tabpanel">
+        <table class="response-cookies-table">
+          <thead>
+            <tr><th>Name</th><th>Value</th><th>Domain</th><th>Path</th><th>Expires</th><th>Attributes</th></tr>
+          </thead>
+          <tbody>
+            {#each cookies as cookie, eachIndex (eachIndex)}
+              {@const expiry = cookieExpiry(cookie)}
+              <tr>
+                <td class="cookie-name">{cookie.name}</td>
+                <td class="cookie-value">{cookie.value}</td>
+                <td class:cookie-muted={!cookie.domain}>{cookie.domain || 'Host only'}</td>
+                <td class:cookie-muted={!cookie.path}>{cookie.path || 'Default'}</td>
+                <td class:cookie-muted={expiry === 'Session'} class:cookie-expired={expiry === 'Expired'}>{expiry}</td>
+                <td>
+                  <span class="cookie-flags">
+                    {#if cookie.httpOnly}<span class="tag">HttpOnly</span>{/if}
+                    {#if cookie.secure}<span class="tag">Secure</span>{/if}
+                    {#if cookie.sameSite}<span class="tag">SameSite={cookie.sameSite}</span>{/if}
+                    {#if cookie.partitioned}<span class="tag">Partitioned</span>{/if}
+                  </span>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
       </div>
 
     {:else if responseTab === 'preview'}

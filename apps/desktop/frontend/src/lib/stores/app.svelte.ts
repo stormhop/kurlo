@@ -78,6 +78,7 @@ import { requestSerializationFeature } from './features/requestSerialization';
 import { requestStateFeature } from './features/requestState';
 import { realtimeFeature } from './features/realtime';
 import { responseFeature } from './features/response';
+import type { ResponseFormatChoice } from '../responseFormat';
 import { snippetsFeature } from './features/snippets';
 import { sseFeature } from './features/sse';
 import { websocketFeature } from './features/websocket';
@@ -712,6 +713,12 @@ class AppVM {
   declare responseBodyPageCount: typeof responseFeature.responseBodyPageCount;
   declare responseBodyPageLabel: typeof responseFeature.responseBodyPageLabel;
   declare responseRenderMode: typeof responseFeature.responseRenderMode;
+  declare responseFormatChoice: typeof responseFeature.responseFormatChoice;
+  declare responseFormat: typeof responseFeature.responseFormat;
+  declare resolvedResponseFormat: typeof responseFeature.resolvedResponseFormat;
+  declare responseFormatChoiceFor: typeof responseFeature.responseFormatChoiceFor;
+  declare setResponseFormat: typeof responseFeature.setResponseFormat;
+  declare responseRenderModeFor: typeof responseFeature.responseRenderModeFor;
   declare safeResponseSearchIndex: typeof responseFeature.safeResponseSearchIndex;
   declare isJsonResponse: typeof responseFeature.isJsonResponse;
   declare isHtmlResponse: typeof responseFeature.isHtmlResponse;
@@ -1217,6 +1224,7 @@ class AppVM {
   previousResponses = $state<Map<string, HttpResponse>>(new Map());
   diffBaselineExampleIds = $state<Map<string, string>>(new Map());
   responseTabs = $state<Map<string, ResponseTab>>(new Map());
+  responseFormats = $state<Map<string, ResponseFormatChoice>>(new Map());
   grpcResponse = $state<GrpcResponse | null>(null);
   grpcResponseTab = $state<GrpcResponseTab>('messages');
   grpcResponses = $state<Map<string, GrpcResponse>>(new Map());

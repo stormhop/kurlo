@@ -2523,6 +2523,8 @@ export namespace model {
 	    duration: number;
 	    timings: ResponseTime;
 	    size: number;
+	    headersSize?: number;
+	    encodedBodySize?: number;
 	    error?: string;
 	    preRequestResult: ScriptResult;
 	    testResult: ScriptResult;
@@ -2560,6 +2562,8 @@ export namespace model {
 	        this.duration = source["duration"];
 	        this.timings = this.convertValues(source["timings"], ResponseTime);
 	        this.size = source["size"];
+	        this.headersSize = source["headersSize"];
+	        this.encodedBodySize = source["encodedBodySize"];
 	        this.error = source["error"];
 	        this.preRequestResult = this.convertValues(source["preRequestResult"], ScriptResult);
 	        this.testResult = this.convertValues(source["testResult"], ScriptResult);

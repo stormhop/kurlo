@@ -1,5 +1,6 @@
 import { vi, expect } from 'vitest';
 import { type RequestStore, type GrpcResponse, type KVRow, type Workspace, type Collection, type Environment, type SavedRequest, type RequestHistoryEntry, type ResponseTab, type GrpcResponseTab, type SidebarView, type RequestSettings, type RequestSettingsOverrides, type RequestType, type Method, type RequestTab, type OAuth2GrantType, type BodyType, type RawBodyType, type RequestExample, type SIOArg, type CollectionRunnerResult } from '../../lib/types/models';
+import type { ResponseFormatChoice } from '../../lib/responseFormat';
 import { type HttpRequest, type HttpResponse, type SaveRequestStoreResult, type OAuth2TokenResponse, type CookieJarEntry } from '../../lib/backend';
 import { mkRow, DEFAULT_REQUEST_SETTINGS } from '../../lib/constants';
 import { type TrashEntry, trashFeature } from '../../lib/stores/features/trash';
@@ -201,6 +202,7 @@ class TestApp {
   responses = new Map<string, HttpResponse>();
   previousResponses = new Map<string, HttpResponse>();
   responseTabs = new Map<string, ResponseTab>();
+  responseFormats = new Map<string, ResponseFormatChoice>();
   grpcResponses = new Map<string, GrpcResponse>();
   mcpResponse = null;
   mcpResponses = new Map();

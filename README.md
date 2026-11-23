@@ -154,11 +154,13 @@ Add `--project` to write a repository's shared `.mcp.json` and `.cursor/mcp.json
 **Mock server** — serve a collection's saved examples over HTTP on a local port, so a client can be built against an endpoint that does not exist yet. Routing is by method and the example's path template (`/orders/:id`), a recorded query narrows which example answers, and a live log shows what the client asked for and which example replied. Loopback only; CORS preflight is answered for any origin.
 
 **Response viewer**
-- Syntax-highlighted body with line numbers
+- Syntax-highlighted body with line numbers, foldable JSON, XML and HTML blocks, and optional line wrapping
+- JSON, XML and HTML sent as plain text or without a `Content-Type` are detected and formatted; a format menu forces JSON, XML, HTML or plain text
 - Paginated rendering for large responses (512 KB pages, once a response exceeds 10 MB)
 - Full-text search with match navigation
 - Save response to file, copy to clipboard
-- Headers table, test results, script logs — all in one panel
+- Headers table, parsed `Set-Cookie` cookies, test results, script logs — all in one panel
+- Hover the status for what the code means, and the size for headers, body and compressed size
 - Preview tab for HTML, images and PDFs; binary bodies are detected rather than rendered as mojibake
 - Diff against the previous response or a saved example
 - Timeline with connection details and the request as it went on the wire, secrets masked, one block per redirect hop

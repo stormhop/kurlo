@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ResponseTimings } from '../backend';
+  import { fixedPopover } from '../fixedPopover';
 
   type TimingRow = {
     label: string;
@@ -65,7 +66,7 @@
   }
 </script>
 
-<span class="response-time">
+<span class="response-time" use:fixedPopover>
   <button class="response-time-trigger" type="button" aria-label="Response time details">{triggerLabel}</button>
   <span class="response-time-popover" role="tooltip">
     <span class="rt-header">
@@ -125,10 +126,8 @@
   }
 
   .response-time-popover {
-    position: absolute;
-    top: calc(100% + 0.625rem);
-    left: 0;
-    z-index: 50;
+    position: fixed;
+    z-index: 300;
     display: none;
     width: min(26.875rem, calc(100vw - 1.5rem));
     padding: var(--space-4) var(--space-4) var(--space-3);

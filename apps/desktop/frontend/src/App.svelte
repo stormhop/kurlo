@@ -320,7 +320,7 @@
     return record ? { ...tallyCollectionRun(record), finishedAt: record.finishedAt } : null;
   });
   let historyDetailBody = $derived(vm.historyDetailResponse ? vm.formatResponseBody(vm.historyDetailResponse) : '');
-  let historyDetailMode = $derived<ResponseRenderMode>(!vm.historyDetailResponse ? 'text' : vm.isJsonResponse(vm.historyDetailResponse) ? 'json' : vm.isHtmlResponse(vm.historyDetailResponse) ? 'html' : 'text');
+  let historyDetailMode = $derived<ResponseRenderMode>(vm.responseRenderModeFor(vm.historyDetailResponse));
   let historyDetailVirtualized = $derived(historyDetailBody ? shouldVirtualizeResponseBody(historyDetailBody, historyDetailMode) : false);
   let responseOnRight = $derived(vm.responseLayout === 'right' && requestSplitWidth / $uiScale >= responseRightMinWidth(vm.responseLayoutChosen));
   let responseRightTooNarrow = $derived(!responseOnRight && requestSplitWidth > 0 && requestSplitWidth / $uiScale < responseRightMinWidth(true));

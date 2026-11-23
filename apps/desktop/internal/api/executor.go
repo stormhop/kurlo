@@ -648,11 +648,12 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 	}
 
 	var (
-		bodyBytes      []byte
-		bodySize       int64
-		truncated      bool
-		readErr        error
-		streamedToSink bool
+		bodyBytes       []byte
+		bodySize        int64
+		truncated       bool
+		readErr         error
+		streamedToSink  bool
+		encodedBodySize int64
 	)
 	if sinkFactory != nil {
 		if sink := sinkFactory(respHeaders); sink != nil && sink.writer != nil {
@@ -681,6 +682,7 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 		bodySize = int64(len(bodyBytes))
 		if readErr == nil && !truncated {
 			if decoded, ok := decodeResponseBody(bodyBytes, httpResp); ok {
+				encodedBodySize = bodySize
 				bodyBytes = decoded
 				bodySize = int64(len(bodyBytes))
 			}
@@ -697,6 +699,9 @@ func doRequestWithBodySink(ctx context.Context, req model.HttpRequest, jar http.
 		Duration:   duration,
 		Timings:    timings.snapshot(finish),
 		Size:       bodySize,
+
+		HeadersSize:     responseHeadersSize(httpResp),
+		EncodedBodySize: encodedBodySize,
 	}
 	resp.PreviewImageBase64, resp.PreviewMediaType = buildPreviewImage(bodyBytes, respHeaders, truncated)
 	resp.BodyIsBinary, resp.BodySniffedType = classifyResponseBody(bodyBytes, respHeaders)
