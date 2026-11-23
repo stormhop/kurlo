@@ -90,35 +90,64 @@
   let revealed = $state('');
   let revealError = $state('');
   let revealTimer: ReturnType<typeof setTimeout> | undefined;
+  let testSequence = 0;
+  let revealSequence = 0;
 
   $effect(() => {
+    workspaceId;
     ref.provider; ref.path; ref.field; ref.version;
     result = null;
+    testing = false;
     hideValue();
+    return () => {
+      testSequence++;
+      testing = false;
+      hideValue();
+    };
   });
 
   function hideValue() {
+    revealSequence++;
     revealed = '';
     revealError = '';
     if (revealTimer) clearTimeout(revealTimer);
+    revealTimer = undefined;
   }
 
   async function test() {
     if (!canLink) return;
+    const sequence = ++testSequence;
+    const targetWorkspace = workspaceId;
+    const targetRef = { ...ref };
     testing = true;
-    result = await testSecretRef(workspaceId, ref);
-    testing = false;
+    result = null;
+    try {
+      const outcome = await testSecretRef(targetWorkspace, targetRef);
+      if (sequence === testSequence) result = outcome;
+    } catch (error) {
+      if (sequence === testSequence) result = { ok: false, message: error instanceof Error ? error.message : String(error), length: 0, fields: [], durationMs: 0 };
+    } finally {
+      if (sequence === testSequence) testing = false;
+    }
   }
 
   async function reveal() {
     hideValue();
-    const outcome = await revealSecretRef(workspaceId, ref);
-    if (outcome.message) {
-      revealError = outcome.message;
-      return;
+    const sequence = revealSequence;
+    const targetWorkspace = workspaceId;
+    const targetRef = { ...ref };
+    try {
+      const outcome = await revealSecretRef(targetWorkspace, targetRef);
+      if (sequence !== revealSequence) return;
+      if (outcome.message) {
+        revealError = outcome.message;
+        return;
+      }
+      revealed = outcome.value;
+      revealTimer = setTimeout(hideValue, 30_000);
+    } catch (error) {
+      if (sequence === revealSequence) revealError = error instanceof Error ? error.message : String(error);
     }
-    revealed = outcome.value;
-    revealTimer = setTimeout(hideValue, 30_000);
   }
 
   const yaml = $derived([
@@ -251,7 +280,7 @@
         <button class="btn btn-ghost btn-sm secret-danger" type="button" onclick={onUnlink}><MenuIcon name="unlink" />Unlink</button>
       {/if}
       <span class="spacer"></span>
-      <button class="btn btn-secondary btn-sm" type="button" onclick={test} disabled={!canLink || testing || !provider?.trusted}><MenuIcon name="refresh" />{testing ? 'Testing…' : 'Test'}</button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick={test} disabled={!canLink || testing || !provider?.trusted} aria-busy={testing}><MenuIcon name="refresh" />{testing ? 'Testing…' : 'Test'}</button>
       <button class="btn btn-secondary btn-sm" type="button" onclick={onClose}>Cancel</button>
       <button class="btn btn-primary btn-sm" type="button" onclick={() => onLink(ref)} disabled={!canLink}><MenuIcon name="link" />{current ? 'Update' : 'Link'}</button>
     </div>

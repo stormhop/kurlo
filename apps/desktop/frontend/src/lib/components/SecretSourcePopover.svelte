@@ -44,6 +44,7 @@
 
   let loading = $state(false);
   let result = $state<SecretImportKeysResult | null>(null);
+  let loadSequence = 0;
   const canBrowse = $derived(Boolean(info?.browse && provider?.trusted));
   let browsing = $state(false);
   $effect(() => {
@@ -77,15 +78,28 @@
   }
 
   $effect(() => {
+    workspaceId;
     source.provider; source.path; source.version;
     result = null;
+    loading = false;
+    return () => { loadSequence++; };
   });
 
   async function loadKeys() {
     if (!canLoad) return;
+    const sequence = ++loadSequence;
+    const targetWorkspace = workspaceId;
+    const targetSource = { provider: source.provider, path: source.path, ...(source.version ? { version: source.version } : {}) };
     loading = true;
-    result = await loadKeysForSource(workspaceId, source);
-    loading = false;
+    result = null;
+    try {
+      const outcome = await loadKeysForSource(targetWorkspace, targetSource);
+      if (sequence === loadSequence) result = outcome;
+    } catch (error) {
+      if (sequence === loadSequence) result = { ok: false, kind: 'unavailable', message: error instanceof Error ? error.message : String(error), keys: [], loadedAt: 0, durationMs: 0 };
+    } finally {
+      if (sequence === loadSequence) loading = false;
+    }
   }
 
   let popover = $state<HTMLDivElement>();
@@ -200,7 +214,7 @@
     </div>
     <div class="secret-popover-foot">
       <span class="spacer"></span>
-      <button class="btn btn-secondary btn-sm" type="button" onclick={loadKeys} disabled={!canLoad || loading}>{#if loading}<BirdLoader label="Loading keys" size="1rem" />{:else}<MenuIcon name="refresh" />{/if}Load keys</button>
+      <button class="btn btn-secondary btn-sm" type="button" onclick={loadKeys} disabled={!canLoad || loading} aria-busy={loading}>{#if loading}<BirdLoader label="Loading keys" size="1rem" />{:else}<MenuIcon name="refresh" />{/if}Load keys</button>
       <button class="btn btn-secondary btn-sm" type="button" onclick={onClose}>Cancel</button>
       <button class="btn btn-primary btn-sm" type="button" onclick={() => onImport(source)} disabled={!providerId || !path.trim() || duplicate || (result !== null && !result.ok)}><MenuIcon name="import" />Import</button>
     </div>

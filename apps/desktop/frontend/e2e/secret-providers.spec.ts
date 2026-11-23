@@ -7,6 +7,41 @@ import { join } from 'node:path';
 
 const shot = (page: Page, name: string) => page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `${name}.png`), animations: 'disabled' });
 
+async function openProdEnvironment(page: Page, values: Array<{ id: number; key: string; value: string; enabled: boolean }> = [{ id: 1, key: 'apiToken', value: '', enabled: true }]) {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    environments: [{ id: 'env-prod', workspaceId: 'workspace-e2e', name: 'Prod', values }],
+    activeEnvironmentId: 'env-prod',
+  });
+  await installSecretProviderBridge(page, { providers: [vaultProvider], secrets: { 'vault-prod:secret/data/exists': { token: 'demo-value' } } });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Environments', exact: true }).click();
+  await page.locator('.environment-item-main').filter({ hasText: 'Prod' }).click();
+}
+
+async function installDeferredSecretCalls(page: Page) {
+  await page.evaluate(() => {
+    const tests: Array<{ workspaceId: string; ref: { provider: string; path: string; field?: string; version?: string }; resolve: (value: unknown) => void; reject: (error: Error) => void }> = [];
+    const reveals: Array<{ workspaceId: string; ref: { provider: string; path: string; field?: string; version?: string }; resolve: (value: unknown) => void; reject: (error: Error) => void }> = [];
+    const loads: Array<{ workspaceId: string; source: { provider: string; path: string; version?: string }; resolve: (value: unknown) => void; reject: (error: Error) => void }> = [];
+    const app = window.go!.api!.App!;
+    Object.assign(app, {
+      TestSecretRef: (workspaceId: string, ref: { provider: string; path: string; field?: string; version?: string }) => new Promise((resolve, reject) => tests.push({ workspaceId, ref, resolve, reject })),
+      RevealSecretRef: (workspaceId: string, ref: { provider: string; path: string; field?: string; version?: string }) => new Promise((resolve, reject) => reveals.push({ workspaceId, ref, resolve, reject })),
+      LoadSecretImportKeys: (workspaceId: string, source: { provider: string; path: string; version?: string }) => new Promise((resolve, reject) => loads.push({ workspaceId, source, resolve, reject })),
+    });
+    (window as unknown as { __secretAsyncAudit: Record<string, unknown> }).__secretAsyncAudit = {
+      tests: () => tests.map(({ workspaceId, ref }) => ({ workspaceId, ref })),
+      reveals: () => reveals.map(({ workspaceId, ref }) => ({ workspaceId, ref })),
+      loads: () => loads.map(({ workspaceId, source }) => ({ workspaceId, source })),
+      resolveTest: (index: number, value: unknown) => tests[index]?.resolve(value),
+      rejectTest: (index: number, message: string) => tests[index]?.reject(new Error(message)),
+      resolveReveal: (index: number, value: unknown) => reveals[index]?.resolve(value),
+      resolveLoad: (index: number, value: unknown) => loads[index]?.resolve(value),
+      rejectLoad: (index: number, message: string) => loads[index]?.reject(new Error(message)),
+    };
+  });
+}
+
 async function openSecretProviders(page: Page) {
   await page.getByRole('button', { name: 'Environments', exact: true }).click();
   await page.getByRole('button', { name: 'Secret providers', exact: true }).click();
@@ -248,6 +283,159 @@ test.describe('secret providers', () => {
       return store.environments.find(environment => environment.id === 'env-prod')!.secretSources;
     })).toEqual([expect.objectContaining({ provider: 'vault-prod', path: 'secret/data/db' })]);
     await expect(page.getByRole('region', { name: 'Imported from secret managers' })).toContainText('secret/data/db');
+  });
+
+  test('binds overlapping secret checks to the latest reference and retries failures', async ({ page }) => {
+    await openProdEnvironment(page);
+    await installDeferredSecretCalls(page);
+    await page.getByRole('button', { name: 'Link apiToken to a secret manager' }).click();
+    const popover = page.getByRole('dialog', { name: 'Link apiToken' });
+    const path = popover.locator('#secret-link-path');
+    const testButton = popover.getByRole('button', { name: 'Test', exact: true });
+    await path.fill('secret/data/first');
+    await testButton.click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => unknown[] } }).__secretAsyncAudit.tests().length)).toBe(1);
+    await path.fill('secret/data/second');
+    await popover.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => unknown[] } }).__secretAsyncAudit.tests().length)).toBe(2);
+    await path.fill('secret/data/first');
+    await popover.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => unknown[] } }).__secretAsyncAudit.tests().length)).toBe(3);
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveTest: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveTest(2, { ok: true, length: 5, fields: ['token'], durationMs: 1 }));
+    await expect(popover).toContainText('5 characters');
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveTest: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveTest(1, { ok: true, length: 99, fields: ['wrong'], durationMs: 1 }));
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { rejectTest: (index: number, message: string) => void } }).__secretAsyncAudit.rejectTest(0, 'obsolete failure'));
+    await expect(popover).toContainText('5 characters');
+    await expect(popover).not.toContainText('99 characters');
+    await expect(popover).not.toContainText('obsolete failure');
+    await shot(page, 'secret-link-race-retest');
+
+    await path.fill('secret/data/retry');
+    await popover.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => unknown[] } }).__secretAsyncAudit.tests().length)).toBe(4);
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { rejectTest: (index: number, message: string) => void } }).__secretAsyncAudit.rejectTest(3, 'temporary provider failure'));
+    await expect(popover).toContainText('temporary provider failure');
+    await expect(popover.getByRole('button', { name: 'Test', exact: true })).toBeEnabled();
+    await popover.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => unknown[] } }).__secretAsyncAudit.tests().length)).toBe(5);
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveTest: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveTest(4, { ok: true, length: 9, fields: ['token'], durationMs: 1 }));
+    await expect(popover).toContainText('9 characters');
+
+    await popover.getByRole('button', { name: 'Reveal', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { reveals: () => unknown[] } }).__secretAsyncAudit.reveals().length)).toBe(1);
+    await popover.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => unknown[] } }).__secretAsyncAudit.tests().length)).toBe(6);
+    await popover.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveReveal: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveReveal(0, { value: 'stale revealed secret' }));
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveTest: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveTest(5, { ok: true, length: 77, fields: ['stale'], durationMs: 1 }));
+    await page.getByRole('button', { name: 'Link apiToken to a secret manager' }).click();
+    const reopened = page.getByRole('dialog', { name: 'Link apiToken' });
+    await expect(reopened).not.toContainText('Fetched just now');
+    await expect(reopened).not.toContainText('stale revealed secret');
+    await reopened.locator('#secret-link-path').fill('secret/data/retry');
+    await expect(reopened.getByRole('button', { name: 'Test', exact: true })).toBeEnabled();
+  });
+
+  test('binds overlapping imported-key loads to the latest source and retries failures', async ({ page }) => {
+    await openProdEnvironment(page, [{ id: 1, key: 'baseUrl', value: 'https://api.example.com', enabled: true }]);
+    await installDeferredSecretCalls(page);
+    await page.getByRole('region', { name: 'Imported from secret managers' }).getByRole('button', { name: 'Add source' }).click();
+    const popover = page.getByRole('dialog', { name: 'Import from a secret' });
+    const path = popover.locator('#secret-source-path');
+    await path.fill('secret/data/first');
+    await popover.getByRole('button', { name: 'Load keys', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { loads: () => unknown[] } }).__secretAsyncAudit.loads().length)).toBe(1);
+    await path.fill('secret/data/second');
+    await popover.getByRole('button', { name: 'Load keys', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { loads: () => unknown[] } }).__secretAsyncAudit.loads().length)).toBe(2);
+    await path.fill('secret/data/first');
+    await popover.getByRole('button', { name: 'Load keys', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { loads: () => unknown[] } }).__secretAsyncAudit.loads().length)).toBe(3);
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveLoad: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveLoad(2, { ok: true, keys: ['latest_key'], loadedAt: 3, durationMs: 1 }));
+    await expect(popover).toContainText('latest_key');
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveLoad: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveLoad(1, { ok: true, keys: ['stale_key'], loadedAt: 2, durationMs: 1 }));
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { rejectLoad: (index: number, message: string) => void } }).__secretAsyncAudit.rejectLoad(0, 'obsolete source failure'));
+    await expect(popover).toContainText('latest_key');
+    await expect(popover).not.toContainText('stale_key');
+    await expect(popover).not.toContainText('obsolete source failure');
+    await expect(popover.getByRole('button', { name: 'Import', exact: true })).toBeEnabled();
+    await shot(page, 'secret-source-race-retest');
+
+    await path.fill('secret/data/retry');
+    await popover.getByRole('button', { name: 'Load keys', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { loads: () => unknown[] } }).__secretAsyncAudit.loads().length)).toBe(4);
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { rejectLoad: (index: number, message: string) => void } }).__secretAsyncAudit.rejectLoad(3, 'temporary provider failure'));
+    await expect(popover).toContainText('temporary provider failure');
+    await expect(popover.getByRole('button', { name: 'Load keys', exact: true })).toBeEnabled();
+    await popover.getByRole('button', { name: 'Load keys', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { loads: () => unknown[] } }).__secretAsyncAudit.loads().length)).toBe(5);
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveLoad: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveLoad(4, { ok: true, keys: ['retry_key'], loadedAt: 4, durationMs: 1 }));
+    await expect(popover).toContainText('retry_key');
+
+    await path.fill('secret/data/closed');
+    await popover.getByRole('button', { name: 'Load keys', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { loads: () => unknown[] } }).__secretAsyncAudit.loads().length)).toBe(6);
+    await popover.getByRole('button', { name: 'Close', exact: true }).click();
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveLoad: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveLoad(5, { ok: true, keys: ['stale_after_close'], loadedAt: 5, durationMs: 1 }));
+    await page.getByRole('region', { name: 'Imported from secret managers' }).getByRole('button', { name: 'Add source' }).click();
+    const reopened = page.getByRole('dialog', { name: 'Import from a secret' });
+    await expect(reopened).not.toContainText('stale_after_close');
+    await reopened.locator('#secret-source-path').fill('secret/data/retry');
+    await expect(reopened.getByRole('button', { name: 'Load keys', exact: true })).toBeEnabled();
+  });
+
+  test('does not carry a pending secret test across workspace switches or back', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      workspaces: [
+        { id: 'workspace-e2e', name: 'E2E Workspace', filesystemName: 'E2E-Workspace' },
+        { id: 'workspace-other', name: 'Other Workspace', filesystemName: 'Other-Workspace' },
+      ],
+      environments: [
+        { id: 'env-prod', workspaceId: 'workspace-e2e', name: 'Prod', values: [{ id: 1, key: 'apiToken', value: '', enabled: true }] },
+        { id: 'env-other', workspaceId: 'workspace-other', name: 'Other', values: [{ id: 2, key: 'apiToken', value: '', enabled: true }] },
+      ],
+      activeWorkspaceId: 'workspace-e2e',
+      activeEnvironmentId: 'env-prod',
+    });
+    await installSecretProviderBridge(page, { providers: [vaultProvider] });
+    await page.goto('/');
+    await installDeferredSecretCalls(page);
+
+    async function openLink(environment: string) {
+      await page.getByRole('button', { name: 'Environments', exact: true }).click();
+      await page.locator('.environment-item-main').filter({ hasText: environment }).click();
+      await page.getByRole('button', { name: 'Link apiToken to a secret manager' }).click();
+      return page.getByRole('dialog', { name: 'Link apiToken' });
+    }
+
+    const first = await openLink('Prod');
+    await first.locator('#secret-link-path').fill('secret/data/first');
+    await first.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => Array<{ workspaceId: string }> } }).__secretAsyncAudit.tests().length)).toBe(1);
+    await page.getByRole('button', { name: 'Workspace switcher' }).click();
+    await page.locator('.workspace-menu-select').filter({ hasText: 'Other Workspace' }).click();
+
+    const second = await openLink('Other');
+    await second.locator('#secret-link-path').fill('secret/data/second');
+    await second.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => Array<{ workspaceId: string }> } }).__secretAsyncAudit.tests().length)).toBe(2);
+    await page.getByRole('button', { name: 'Workspace switcher' }).click();
+    await page.locator('.workspace-menu-select').filter({ hasText: 'E2E Workspace' }).click();
+
+    const third = await openLink('Prod');
+    await third.locator('#secret-link-path').fill('secret/data/first');
+    await third.getByRole('button', { name: 'Test', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => Array<{ workspaceId: string }> } }).__secretAsyncAudit.tests().length)).toBe(3);
+    const workspaces = await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { tests: () => Array<{ workspaceId: string }> } }).__secretAsyncAudit.tests().map(call => call.workspaceId));
+    expect(workspaces).toEqual(['workspace-e2e', 'workspace-other', 'workspace-e2e']);
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveTest: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveTest(0, { ok: true, length: 99, fields: ['old workspace'], durationMs: 1 }));
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveTest: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveTest(1, { ok: true, length: 88, fields: ['other workspace'], durationMs: 1 }));
+    await expect(third).not.toContainText('Fetched just now');
+    await page.evaluate(() => (window as unknown as { __secretAsyncAudit: { resolveTest: (index: number, value: unknown) => void } }).__secretAsyncAudit.resolveTest(2, { ok: true, length: 5, fields: ['current workspace'], durationMs: 1 }));
+    await expect(third).toContainText('5 characters');
+    await expect(third).not.toContainText('99 characters');
+    await expect(third).not.toContainText('88 characters');
+    await shot(page, 'secret-link-workspace-switch-retest');
   });
 
   test('exports saved credentials as a .env file for CI', async ({ page }) => {

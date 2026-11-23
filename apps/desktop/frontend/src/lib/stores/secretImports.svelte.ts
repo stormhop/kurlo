@@ -10,6 +10,7 @@ export const secretImports = $state({
 });
 
 let requested: Record<string, true> = {};
+let loadSequences: Record<string, number> = {};
 
 export function ensureSecretImportKeys(workspaceId: string) {
   if (!workspaceId || requested[workspaceId]) return;
@@ -32,17 +33,21 @@ export function secretImportKeyset(workspaceId: string, source: Pick<SecretSourc
 
 export async function loadKeysForSource(workspaceId: string, source: Pick<SecretSource, 'provider' | 'path' | 'version'>) {
   const id = `${workspaceId}\u0000${secretSourceId(source)}`;
+  const sequence = (loadSequences[id] ?? 0) + 1;
+  loadSequences = { ...loadSequences, [id]: sequence };
   secretImports.loading = { ...secretImports.loading, [id]: true };
   try {
     const result = await loadSecretImportKeys(workspaceId, { provider: source.provider, path: source.path, ...(source.version ? { version: source.version } : {}) });
-    if (result.ok) {
+    if (sequence === loadSequences[id] && result.ok) {
       const current = secretImports.keys[workspaceId] ?? {};
       secretImports.keys = { ...secretImports.keys, [workspaceId]: { ...current, [secretSourceId(source)]: { keys: result.keys ?? [], loadedAt: result.loadedAt } } };
     }
     return result;
   } finally {
-    const { [id]: _done, ...rest } = secretImports.loading;
-    secretImports.loading = rest;
+    if (sequence === loadSequences[id]) {
+      const { [id]: _done, ...rest } = secretImports.loading;
+      secretImports.loading = rest;
+    }
   }
 }
 
@@ -67,6 +72,7 @@ export function importedEnvironmentRows(environment: Environment): Array<[string
 
 export function resetSecretImportsForTests() {
   requested = {};
+  loadSequences = {};
   secretImports.keys = {};
   secretImports.loading = {};
 }
