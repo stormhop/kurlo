@@ -311,6 +311,52 @@ test.describe("Agent", () => {
     expect(await page.evaluate(() => ((window.__kurloE2E as unknown as { parallelSent: unknown[] }).parallelSent).length)).toBe(2);
   });
 
+  test('never paints rows of a chat on top of each other while switching chats quickly', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 });
+    await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
+    await installAgentBridge(page, [connection]);
+    await page.addInitScript(() => {
+      const app = (window as E2EWindow).go!.api!.App as Record<string, unknown>;
+      const usage = { input: 10, output: 2, cacheRead: 0, cacheWrite: 0, reasoning: 0 };
+      const base = { workspaceId: 'workspace-e2e', createdAt: Date.now(), updatedAt: Date.now(), collection: '', environment: '', connectionId: 'c1', model: '', usage, allowedTools: [] };
+      const paragraph = (label: string, n: number) => Array.from({ length: n }, (_, i) => `${label} line ${i + 1}: the quick brown fox jumps over the lazy dog and keeps running across the field.`).join('\n\n');
+      const chat = (id: string, title: string, size: number) => ({ ...base, id, title, messages: Array.from({ length: 6 }, (_, i) => [
+        { role: 'user', blocks: [{ type: 'text', text: `${title} question ${i + 1}` }] },
+        { role: 'assistant', blocks: [{ type: 'text', text: paragraph(`${title} answer ${i + 1}`, size + (i % 3) * 4) }] },
+      ]).flat() });
+      const chats = [chat('chat-a', 'Alpha', 3), chat('chat-b', 'Bravo', 9), chat('chat-c', 'Charlie', 1)];
+      const slow = (id: string) => new Promise(resolve => setTimeout(() => resolve(structuredClone(chats.find(item => item.id === id))), 40));
+      app.AgentChats = async () => chats.map(item => ({ id: item.id, title: item.title, workspaceId: item.workspaceId, createdAt: item.createdAt, updatedAt: item.updatedAt }));
+      app.AgentChat = slow;
+      app.AgentChatPage = slow;
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    const sidebar = page.locator('.agent-sidebar');
+    await sidebar.getByRole('button', { name: /Alpha/ }).click();
+    await expect(page.getByText('Alpha question 6')).toBeVisible();
+    for (const title of ['Bravo', 'Charlie', 'Alpha', 'Bravo', 'Alpha', 'Charlie']) {
+      const overlaps = await page.evaluate(async name => {
+        const button = [...document.querySelectorAll<HTMLButtonElement>('.agent-sidebar button')].find(item => item.textContent?.includes(name))!;
+        const found: string[] = [];
+        const check = (frame: number) => {
+          const rows = [...document.querySelectorAll<HTMLElement>('.virtual-agent-row')].map(row => row.getBoundingClientRect()).filter(rect => rect.height > 0).sort((a, b) => a.top - b.top);
+          for (let index = 1; index < rows.length; index++) {
+            if (rows[index - 1].bottom > rows[index].top + 1) found.push(`frame ${frame}: row ${index - 1} ends at ${Math.round(rows[index - 1].bottom)}, row ${index} starts at ${Math.round(rows[index].top)}`);
+          }
+          if (document.querySelectorAll('.virtual-agent-history').length > 1) found.push(`frame ${frame}: two transcripts`);
+        };
+        button.click();
+        for (let frame = 0; frame < 30; frame++) {
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          check(frame);
+        }
+        return found;
+      }, title);
+      expect(overlaps, title).toEqual([]);
+    }
+  });
+
   test('edits an earlier message and branches a chat from it', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, agentStore);
     await installAgentBridge(page, [connection]);
