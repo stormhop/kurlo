@@ -505,7 +505,7 @@ func TestExpandHomeAcceptsBothSeparators(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !strings.HasPrefix(got, "/nonexistent-home") || strings.HasPrefix(got, "~") {
+		if !strings.HasPrefix(got, filepath.Clean("/nonexistent-home")) || strings.HasPrefix(got, "~") {
 			t.Fatalf("%q expanded to %q", input, got)
 		}
 	}
