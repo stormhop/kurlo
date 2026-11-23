@@ -34,15 +34,14 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **Response time.** The timing breakdown shows on hover again.
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+- **Secret masking.** Secrets echoed back in Basic authorization or escaped JSON show as `[secret]`.
 - **Undefined variables** are underlined in red even before any environment exists.
 - **Request tabs** keep titles readable, number untitled drafts, mark a draft as unsaved only after you change it, and no longer flash empty the first time you open them.
-- **Collection Runner** and **History** layouts fit narrower windows and show more of each request path.
-- **Workspace README** keeps your line breaks in the overview.
-- **Command palette** lists secret commands under **Secrets**.
-- **Activity bar** highlights one button at a time.
-- **Small windows** keep the empty response actions reachable and show when the provider list scrolls.
-- **Environments**, **Mock server** and **Settings** have clearer unsaved, empty and default-location states.
-- **Sidebar** shows the arrow pointer over collection names instead of a text cursor.
+- **Narrow windows** keep the Collection Runner, History and empty response actions readable and reachable.
+- **Themes** keep text readable on badges, selected rows, accent buttons on hover and in code, with clearer Catppuccin Latte syntax colours.
+- **Field errors** no longer move the field they belong to.
+- **Agent chats** no longer flash overlapping lines when you switch chats quickly.
+- **Smaller fixes** in the workspace README, command palette, activity bar, Settings, Environments and sidebar.
 
 ## 3.1.5
 
