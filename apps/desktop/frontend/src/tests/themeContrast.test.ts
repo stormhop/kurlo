@@ -66,6 +66,25 @@ function hueGap(a: string, b: string): number {
   return Math.min(gap, 360 - gap);
 }
 
+
+function parseAlpha(value: string): [Rgb, number] {
+  const rgba = value.match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/);
+  if (rgba) return [[Number(rgba[1]), Number(rgba[2]), Number(rgba[3])], Number(rgba[4])];
+  return [parseColor(value), 1];
+}
+
+function tint(color: string, amount: number, base: string): string {
+  const top = parseColor(color);
+  const bottom = parseColor(base);
+  return `rgb(${top.map((channel, index) => Math.round(channel * amount + bottom[index] * (1 - amount))).join(', ')})`;
+}
+
+function overlay(value: string, base: string): string {
+  const [color, alpha] = parseAlpha(value);
+  const bottom = parseColor(base);
+  return `rgb(${color.map((channel, index) => Math.round(channel * alpha + bottom[index] * (1 - alpha))).join(', ')})`;
+}
+
 const blocks = previewBlocks();
 
 function resolved(id: ThemeVariantId, mode: 'light' | 'dark'): Record<string, string> {
@@ -100,11 +119,63 @@ describe('theme contrast', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('keeps text on the accent button readable', () => {
+  it('keeps badge text readable on its own tinted background', () => {
+    const shared = tokens.match(/:root,\s*\[data-theme-preview\]\s*\{([^{}]*)\}/)?.[1] ?? '';
+    const badgeText = (role: string) => {
+      const match = shared.match(new RegExp(`${role}-(?:badge-)?text:\\s*color-mix\\(in srgb, var\\(${role}(?:-text)?\\) (\\d+)%, var\\(--text\\)\\)`));
+      if (!match) throw new Error(`no badge text token for ${role}`);
+      return Number(match[1]) / 100;
+    };
+    const offenders = checked.flatMap(variant => {
+      const theme = resolved(variant.id, variant.mode);
+      const limit = HIGH_CONTRAST.includes(variant.id) ? 7 : 4.5;
+      return ['--bg', '--surface'].flatMap(background => [
+        ...STATUS_ROLES.map(role => [role, tint(theme[role], badgeText(role), theme['--text']), tint(theme[role], 0.12, theme[background])] as const),
+        ['--accent', tint(theme['--accent-text'], badgeText('--accent'), theme['--text']), overlay(theme['--accent-dim'], theme[background])] as const,
+      ].map(([role, text, badge]) => [role, background, contrast(text, badge)] as const)
+        .filter(([, , ratio]) => ratio < limit)
+        .map(([role, base, ratio]) => `${variant.id} ${role} badge on ${base}: ${ratio.toFixed(2)}`));
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps text and methods readable on hovered and selected rows', () => {
+    const offenders = checked.flatMap(variant => {
+      const theme = resolved(variant.id, variant.mode);
+      const selected = BACKGROUNDS.flatMap(background => [
+        [`--selected over ${background}`, tint(theme['--accent'], 0.16, theme[background])] as const,
+        [`--accent-dim over ${background}`, overlay(theme['--accent-dim'], theme[background])] as const,
+      ]);
+      return [['--hover', theme['--hover']] as const, ...selected].flatMap(([name, background]) => ['--text', '--text-2', ...(name === '--hover' ? METHOD_ROLES : [])]
+        .filter(role => contrast(theme[role], background) < 4.5)
+        .map(role => `${variant.id} ${role} on ${name}: ${contrast(theme[role], background).toFixed(2)}`));
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps syntax colours readable wherever code is shown', () => {
+    const syntax = [...new Set(tokens.match(/--syn-[a-z-]+(?=\s*:)/g) ?? [])];
+    expect(syntax.length).toBeGreaterThan(5);
+    const offenders = checked.flatMap(variant => {
+      const theme = resolved(variant.id, variant.mode);
+      return syntax.filter(role => theme[role]).flatMap(role => BACKGROUNDS
+        .filter(background => contrast(theme[role], theme[background]) < 4.5)
+        .map(background => `${variant.id} ${role} on ${background}: ${contrast(theme[role], theme[background]).toFixed(2)}`));
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps text on the accent button readable, also on hover', () => {
     const offenders = checked
       .map(variant => ({ id: variant.id, theme: resolved(variant.id, variant.mode) }))
-      .filter(({ theme }) => contrast(theme['--on-accent'], theme['--accent']) < 4.5)
-      .map(({ id, theme }) => `${id}: ${contrast(theme['--on-accent'], theme['--accent']).toFixed(2)}`);
+      .flatMap(({ id, theme }) => {
+        const own = blocks.get(id) ?? {};
+        const mode = checked.find(variant => variant.id === id)!.mode;
+        const fill = (mode === 'light' ? own['--accent-fill-hover'] : theme['--accent-fill-hover']) ?? theme['--accent-hover'];
+        return ([['--accent', theme['--accent']], ['button hover', fill]] as const)
+          .filter(([, color]) => contrast(theme['--on-accent'], color) < 4.5)
+          .map(([role, color]) => `${id} ${role}: ${contrast(theme['--on-accent'], color).toFixed(2)}`);
+      });
     expect(offenders).toEqual([]);
   });
 

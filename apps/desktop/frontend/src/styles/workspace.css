@@ -1691,19 +1691,19 @@
 
 .git-banner.success {
   border-color: var(--success-border);
-  color: var(--s2xx);
+  color: var(--success-text);
   background: var(--success-bg-subtle);
 }
 
 .git-banner.error {
   border-color: var(--danger-border);
-  color: var(--danger);
+  color: var(--danger-text);
   background: var(--danger-bg-subtle);
 }
 
 .git-banner.warning {
   border-color: var(--warning-border);
-  color: var(--warning);
+  color: var(--warning-text);
   background: var(--warning-bg-subtle);
 }
 
@@ -2450,7 +2450,7 @@
 
 .git-diff-line.added {
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
 }
 
 .git-diff-line.added .git-diff-line-no {
@@ -2459,7 +2459,7 @@
 
 .git-diff-line.removed {
   background: var(--danger-bg-subtle);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .git-diff-line.removed .git-diff-line-no {
@@ -3160,7 +3160,7 @@
   padding: var(--space-2) var(--space-2-5);
   border: 1px solid var(--danger-border);
   border-radius: var(--radius-md);
-  color: var(--danger);
+  color: var(--danger-text);
   background: var(--danger-bg-subtle);
   font-size: var(--text-label);
 }
@@ -5467,7 +5467,7 @@
 }
 
 .find-replace-toggle.active {
-  color: var(--accent-text);
+  color: var(--accent-badge-text);
   background: var(--accent-dim);
 }
 
@@ -5907,7 +5907,7 @@
   padding: 0 var(--space-1-5);
   border-radius: var(--radius-sm);
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--warning-text);
   font-size: var(--text-micro);
 }
 

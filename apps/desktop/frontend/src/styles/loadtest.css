@@ -974,18 +974,18 @@
 
 .loadtest-result-badge.passed {
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
 }
 
 .loadtest-result-badge.failed,
 .loadtest-result-badge.error {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .loadtest-result-badge.stopped {
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--warning-text);
 }
 
 .loadtest-phase {
@@ -1456,12 +1456,12 @@
   height: 2.25rem;
   border-radius: var(--radius-full);
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
 }
 
 .loadrun-banner.failed .loadrun-banner-icon {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .loadrun-banner.stopped {
@@ -1471,7 +1471,7 @@
 
 .loadrun-banner.stopped .loadrun-banner-icon {
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--warning-text);
 }
 
 .loadrun-totals {

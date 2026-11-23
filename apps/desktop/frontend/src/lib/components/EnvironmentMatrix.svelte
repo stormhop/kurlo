@@ -489,6 +489,7 @@
   }
 
   .env-matrix-filter {
+    flex: none;
     width: 15rem;
     color: var(--text-3);
   }
@@ -585,6 +586,8 @@
   }
 
   .env-matrix-error {
+    flex: 1 1 0;
+    min-width: 0;
     color: var(--s5xx);
     font-size: var(--text-body);
   }

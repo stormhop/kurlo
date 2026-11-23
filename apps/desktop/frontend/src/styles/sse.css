@@ -488,7 +488,7 @@
   padding: 1px var(--space-1-5);
   border-radius: var(--radius-sm);
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
   font-weight: var(--weight-semibold);
   flex-shrink: 0;
 }
@@ -574,7 +574,7 @@
 }
 
 .ws-panel .sse-event-row.sse-event-connected .sse-event-arrow.system {
-  color: var(--s2xx);
+  color: var(--success-text);
   background: var(--success-bg);
 }
 
@@ -715,7 +715,7 @@
 
 .btn-sse-connect:hover,
 .btn-ws-connect:hover {
-  background: var(--accent-hover);
+  background: var(--accent-fill-hover, var(--accent-hover));
 }
 
 .btn-sse-disconnect,
@@ -782,11 +782,11 @@
 .btn-send.btn-sse-disconnect,
 .btn-send.btn-ws-disconnect {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .btn-send.btn-sse-disconnect:hover:not(:disabled),
 .btn-send.btn-ws-disconnect:hover:not(:disabled) {
   background: var(--danger-bg-strong);
-  color: var(--danger);
+  color: var(--danger-text);
 }

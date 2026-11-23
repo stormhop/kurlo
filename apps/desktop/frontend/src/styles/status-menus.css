@@ -221,7 +221,7 @@
 .storage-flag.warn {
   border: 1px solid var(--warning-border);
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--warning-text);
 }
 
 .storage-status-mode {
@@ -231,7 +231,7 @@
 
 .storage-status-btn.missing .storage-status-mode {
   border-color: var(--danger-border);
-  color: var(--danger);
+  color: var(--danger-text);
   background: var(--danger-bg-subtle);
 }
 

@@ -79,7 +79,7 @@
 
 .btn-primary:hover:not(:disabled),
 .btn-primary[aria-expanded="true"] {
-  background: var(--accent-hover);
+  background: var(--accent-fill-hover, var(--accent-hover));
   color: var(--on-accent);
 }
 
@@ -112,19 +112,19 @@
 .btn-primary.btn-danger {
   border-color: var(--danger-border);
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .btn-primary.btn-danger:hover:not(:disabled) {
   background: var(--danger-bg-strong);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .btn.feedback-ok,
 .btn.feedback-ok:hover:not(:disabled) {
   border-color: var(--success-border);
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
 }
 
 .btn-icon {
@@ -456,17 +456,17 @@
 
 .tag-success {
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
 }
 
 .tag-warning {
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--warning-text);
 }
 
 .tag-danger {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 :where(.modal) {

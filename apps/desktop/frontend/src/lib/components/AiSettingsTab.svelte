@@ -151,6 +151,7 @@
 <style>
   .ai-settings-list :global(.postman-setting) {
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
   }
   .ai-setting-control {
     display: flex;

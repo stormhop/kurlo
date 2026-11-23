@@ -113,7 +113,7 @@
   .gitauth-head h2 { margin-right: auto; }
   .gitauth-host { color: var(--text-2); font-size: var(--text-label); line-height: var(--leading-normal); margin: var(--space-0-5) 0 var(--space-2-5); }
   .gitauth-warn {
-    font-size: var(--text-caption); color: var(--danger);
+    font-size: var(--text-caption); color: var(--danger-text);
     background: var(--danger-bg);
     border: 1px solid var(--danger-border);
     border-radius: var(--radius-md); padding: var(--space-2) var(--space-2-5); margin-bottom: var(--space-2-5);

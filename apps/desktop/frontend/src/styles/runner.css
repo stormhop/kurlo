@@ -127,17 +127,17 @@
 
 .runner-verdict.pass .runner-verdict-icon {
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--success-text);
 }
 
 .runner-verdict.fail .runner-verdict-icon {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .runner-verdict.stopped .runner-verdict-icon {
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--warning-text);
 }
 
 .runner-progress-wrap {

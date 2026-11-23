@@ -125,7 +125,7 @@
   .sio-listen-btn.active {
     background: var(--success-bg);
     border-color: var(--success-border);
-    color: var(--success);
+    color: var(--success-text);
   }
 
   .sio-listen-dot {

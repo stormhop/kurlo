@@ -219,7 +219,7 @@
     border-radius: var(--radius-lg);
     border: 1px solid var(--danger-border);
     background: var(--danger-bg);
-    color: var(--danger);
+    color: var(--danger-text);
     font-size: var(--text-label);
     line-height: var(--leading-tight);
   }

@@ -14,7 +14,6 @@
 
 .saved-request-tab.draft > button:first-child .tab-title {
   font-style: italic;
-  opacity: 0.75;
 }
 
 .saved-request-tab.preview .tab-title {

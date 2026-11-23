@@ -539,7 +539,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-caption);
     background: var(--accent-dim);
-    color: var(--accent-text);
+    color: var(--accent-badge-text);
     border-radius: var(--radius-xs);
     padding: 1px var(--space-1-5);
   }
