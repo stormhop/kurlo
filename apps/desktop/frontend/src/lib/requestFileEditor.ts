@@ -12,6 +12,7 @@ const envelopeFields = new Map([
 
 const requestFields = new Map([
   ['id', 'id links this request to its saved examples, history and secrets.'],
+  ['collection', 'Move the request in the sidebar to change its collection.'],
   ['collectionId', 'Move the request in the sidebar to change its collection.'],
   ['filesystemName', 'filesystemName identifies the request file on disk.'],
 ]);

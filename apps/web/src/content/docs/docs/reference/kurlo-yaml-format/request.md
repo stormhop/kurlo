@@ -14,7 +14,7 @@ Use ⌘F or Ctrl+F inside the editor to find a field. Edit the YAML and choose *
 
 You can switch to another request and come back to your edits. When you close the request or return to its form, Kurlo asks how to handle unsaved YAML. If the file changed on disk, review the two versions before saving your edits or loading the disk version.
 
-Kurlo marks managed fields with a lock. Hover over a marked field to see what it controls. The file version, request ID, collection ID, filename and legacy order are protected when present. Keep these fields intact when pasting YAML from elsewhere. To move a request, use the collection sidebar. Use **Auth** or **Vars** to enter secret values. The YAML uses vault references for those values.
+Kurlo marks managed fields with a lock. Hover over a marked field to see what it controls. The file version, request ID, collection ID, filename, legacy collection name and legacy order are protected when present. Keep these fields intact when pasting YAML from elsewhere. To move a request, use the collection sidebar. Use **Auth** or **Vars** to enter secret values. The YAML uses vault references for those values.
 
 Start typing a key or press Ctrl+Space to list available fields at the cursor. Inside `auth`, choose a `type` first. For example, `type: basic` offers `basicUser` and `basicPass`. With `type: bearer`, it offers `bearerToken`. The editor also suggests allowed values for fields such as `method` and `enabled`. Use the arrow keys and Enter to choose a suggestion, or Escape to dismiss the list.
 

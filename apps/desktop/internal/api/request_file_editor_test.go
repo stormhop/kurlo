@@ -731,3 +731,30 @@ func TestRequestFileYAMLLargeCompactContentRoundTrip(t *testing.T) {
 		t.Fatal("Beautify changed the saved large request")
 	}
 }
+
+func TestRequestFileYAMLKeepsLegacyCollection(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	root := writeYAMLWorkspace(t, "https://orders.test")
+	const hint = "workspaces/Demo/collections/Smoke/requests/GET-1-ok.yml"
+	app := NewApp()
+	if opened := app.openWorkspaceRoot(root); !opened.Ok {
+		t.Fatal(opened.Error)
+	}
+	file := app.GetRequestFileYAML(root, "req-ok", hint)
+	if !file.Ok {
+		t.Fatal(file.Error)
+	}
+	content := strings.Replace(file.Content, "/ok?", "/updated?", 1)
+	saved := app.SaveRequestFileYAML(root, "req-ok", content, file.Revision, hint)
+	if !saved.Ok {
+		t.Fatal(saved.Error)
+	}
+	reopened := app.GetRequestFileYAML(root, "req-ok", hint)
+	if !reopened.Ok || !strings.Contains(reopened.Content, "/updated?") || !strings.Contains(reopened.Content, "collection: Smoke") {
+		t.Fatalf("reopen after save: %+v", reopened)
+	}
+	changed := strings.Replace(reopened.Content, "collection: Smoke", "collection: Other", 1)
+	if edited := app.SaveRequestFileYAML(root, "req-ok", changed, reopened.Revision, hint); edited.Ok || !strings.Contains(edited.Error, `field "collection" is managed`) {
+		t.Fatalf("accepted a change of collection: %+v", edited)
+	}
+}

@@ -622,7 +622,7 @@ func parseRequestFileYAMLDetailed(content string) (map[string]any, requestFileYA
 
 func protectedRequestFields(request map[string]any) map[string]any {
 	protected := make(map[string]any, 4)
-	for _, field := range []string{"id", "collectionId", filesystemNameField} {
+	for _, field := range []string{"id", "collectionId", "collection", filesystemNameField} {
 		if value, exists := request[field]; exists {
 			protected[field] = value
 		}
@@ -682,7 +682,7 @@ func validateRequestFileEdit(current, edited map[string]any, currentStructure, e
 		}
 		return line, fmt.Errorf("request order is managed by the collection")
 	}
-	for _, field := range []string{"id", "collectionId", filesystemNameField} {
+	for _, field := range []string{"id", "collectionId", "collection", filesystemNameField} {
 		before, beforeExists := currentStructure.request[field]
 		after, afterExists := editedStructure.request[field]
 		if beforeExists != afterExists || !reflect.DeepEqual(before, after) {
@@ -700,10 +700,8 @@ func validateRequestFileEdit(current, edited map[string]any, currentStructure, e
 		}
 		return line, fmt.Errorf("request field %q is managed by the file editor", "id")
 	}
-	for _, field := range []string{"examples", "collection"} {
-		if _, exists := edited[field]; exists {
-			return editedStructure.requestFieldLines[field], fmt.Errorf("request %s are stored separately and cannot be edited here", field)
-		}
+	if _, exists := edited["examples"]; exists {
+		return editedStructure.requestFieldLines["examples"], fmt.Errorf("request examples are stored separately and cannot be edited here")
 	}
 	if boolValue(edited["isDraft"]) {
 		return editedStructure.requestFieldLines["isDraft"], fmt.Errorf("draft requests cannot be saved from the file editor")

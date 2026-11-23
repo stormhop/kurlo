@@ -25,6 +25,14 @@ describe('request file editor', () => {
     expect(edit(state, { from: 0, to: state.doc.length, insert: updated }, 'input.paste').doc.toString()).toBe(updated);
   });
 
+  it('keeps an existing collection name while editing another field', () => {
+    const legacy = source.replace('  requestType:', '  collection: Smoke\n  requestType:');
+    const updated = legacy.replace('example.test', 'orders.test');
+    const pasted = (text: string) => edit(editor(legacy), { from: 0, to: legacy.length, insert: text }, 'input.paste').doc.toString();
+    expect(pasted(updated)).toBe(updated);
+    expect(pasted(updated.replace('Smoke', 'Other'))).toBe(legacy);
+  });
+
   it('recognizes fields in flow YAML and allows editing comments and block scalar content', () => {
     const flow = '{version: 1, request: {id: demo, requestType: http, url: example}}';
     const state = editor(flow);
