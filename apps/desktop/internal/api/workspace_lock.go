@@ -1,17 +1,18 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/stormhop/kurlo/apps/desktop/internal/filelock"
 )
 
 const workspaceLockWait = 15 * time.Second
-
-var errWorkspaceLockBusy = errors.New("workspace lock is busy")
 
 func workspaceLockKey(root string) string {
 	abs, err := filepath.Abs(root)
@@ -38,7 +39,7 @@ func openWorkspaceLockFile(root string) (*os.File, error) {
 
 func releaseWorkspaceLock(file *os.File) func() {
 	return func() {
-		_ = unlockFile(file)
+		_ = filelock.Unlock(file)
 		_ = file.Close()
 	}
 }
@@ -48,11 +49,8 @@ func tryLockWorkspaceWrites(root string) (func(), bool) {
 	if err != nil {
 		return nil, false
 	}
-	if err := tryLockFile(file); err != nil {
+	if err := filelock.Try(file); err != nil {
 		_ = file.Close()
-		if errors.Is(err, errWorkspaceLockBusy) {
-			return nil, false
-		}
 		return nil, false
 	}
 	return releaseWorkspaceLock(file), true
@@ -63,22 +61,16 @@ func lockWorkspaceWrites(root string) (func(), error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not open the workspace lock file: %w", err)
 	}
-	deadline := time.Now().Add(workspaceLockWait)
-	for {
-		err := tryLockFile(file)
-		if err == nil {
-			return releaseWorkspaceLock(file), nil
-		}
-		if !errors.Is(err, errWorkspaceLockBusy) {
-			_ = file.Close()
-			return nil, fmt.Errorf("could not lock the workspace: %w", err)
-		}
-		if time.Now().After(deadline) {
-			_ = file.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), workspaceLockWait)
+	defer cancel()
+	if err := filelock.Acquire(ctx, file); err != nil {
+		file.Close()
+		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, fmt.Errorf("another Kurlo process has been saving this workspace for over %s; try again", workspaceLockWait)
 		}
-		time.Sleep(25 * time.Millisecond)
+		return nil, fmt.Errorf("could not lock the workspace: %w", err)
 	}
+	return releaseWorkspaceLock(file), nil
 }
 
 func loadKurloStorePayloadLocked(localStorePath, root string) (string, []WorkspaceDiagnostic, error) {

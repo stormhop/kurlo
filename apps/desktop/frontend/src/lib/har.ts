@@ -86,6 +86,12 @@ function hasWebSocketUpgrade(headers: KVRow[]): boolean {
   return headers.some((header) => header.key.toLowerCase() === 'upgrade' && header.value.toLowerCase() === 'websocket');
 }
 
+function responseContentProblem(content: Record<string, unknown>): 'binary' | 'incomplete' | '' {
+  if (asText(content.encoding).toLowerCase() === 'base64') return 'binary';
+  if (content._incomplete === true) return 'incomplete';
+  return '';
+}
+
 export function harCollectionName(payload: unknown, fileName: string): string {
   const log = isRecord(payload) && isRecord((payload as Record<string, unknown>).log) ? (payload as Record<string, unknown>).log as Record<string, unknown> : {};
   return asText(log.comment) || fileName.replace(/\.har$/i, '') || 'HAR Import';
@@ -93,13 +99,15 @@ export function harCollectionName(payload: unknown, fileName: string): string {
 
 function harExampleFromEntry(entry: Record<string, unknown>, requestId: string, request: {
   method: Method; url: string; params: KVRow[]; headers: KVRow[]; bodyType: BodyType; bodyContent: string;
-}): RequestExample | null {
+}, omitUnsupportedResponse = false): RequestExample | null {
   const response = isRecord(entry.response) ? entry.response : null;
   if (!response) return null;
   const status = Number(response.status) || 0;
   if (status <= 0) return null;
   const statusText = asText(response.statusText);
   const content = isRecord(response.content) ? response.content : {};
+  const contentProblem = responseContentProblem(content);
+  if (omitUnsupportedResponse && contentProblem) return null;
   const headers = asArray(response.headers).map(item => {
     if (!isRecord(item)) return null;
     const key = asText(item.name);
@@ -107,7 +115,6 @@ function harExampleFromEntry(entry: Record<string, unknown>, requestId: string, 
     return row(key, asText(item.value));
   }).filter((item): item is KVRow => Boolean(item));
 
-  const base64 = asText(content.encoding).toLowerCase() === 'base64';
   return normalizeRequestExample({
     name: `${status} ${statusText}`.trim() || String(status),
     source: 'captured',
@@ -123,13 +130,30 @@ function harExampleFromEntry(entry: Record<string, unknown>, requestId: string, 
       statusCode: status,
       status: `${status} ${statusText}`.trim(),
       headers,
-      body: base64 ? '' : asText(content.text),
+      body: contentProblem === 'binary' ? '' : asText(content.text),
       bodyMediaType: mediaTypeOf(asText(content.mimeType)),
     },
   }, requestId);
 }
 
-export function harRequestsFromLog(payload: unknown, collectionId: string, collectionName: string): SavedRequest[] {
+export function capturedHarSaveProblem(payload: unknown): string {
+  if (!isRecord(payload) || !isRecord(payload.log)) return '';
+  const entries = asArray(payload.log.entries).filter(isRecord);
+  if (entries.some(entry => isRecord(entry.request) && isRecord(entry.request.postData) && entry.request.postData._incomplete === true)) {
+    return 'This capture contains a binary or incomplete request. Export HAR to preserve the recorded content.';
+  }
+  for (const entry of entries) {
+    const response = isRecord(entry.response) ? entry.response : null;
+    const content = response && isRecord(response.content) ? response.content : null;
+    if (!content) continue;
+    const responseProblem = responseContentProblem(content);
+    if (responseProblem === 'binary') return 'This capture contains a binary response that cannot be saved as a request example. Export HAR to preserve the recorded content.';
+    if (responseProblem === 'incomplete') return 'This capture contains an incomplete response that cannot be saved as a request example. Export HAR to preserve the recorded content.';
+  }
+  return '';
+}
+
+export function harRequestsFromLog(payload: unknown, collectionId: string, collectionName: string, options: { omitUnsupportedResponseExamples?: boolean } = {}): SavedRequest[] {
   if (!isRecord(payload) || !isRecord((payload as Record<string, unknown>).log)) {
     throw new Error('Expected a HAR file with a log object');
   }
@@ -191,7 +215,7 @@ export function harRequestsFromLog(payload: unknown, collectionId: string, colle
     const name = nameFromEntry(method, url);
     const example = harExampleFromEntry(entry as Record<string, unknown>, id, {
       method, url: socketIO?.url ?? baseUrl, params, headers, bodyType: body.bodyType, bodyContent: body.bodyContent,
-    });
+    }, options.omitUnsupportedResponseExamples);
     results.push({
       id,
       name,

@@ -205,7 +205,7 @@ func TestLoadReadsBrowserTimingsAndProtocol(t *testing.T) {
 	}
 	x, _ := r.Get(entries[0].ID)
 	got := x.Timings
-	if got == nil || got.Prepare != 2 || got.DNSLookup != 10 || got.TCPHandshake != 10 || got.TLSHandshake != 20 || got.WaitingTTFB != 60.5 || got.Download != 18 || got.Total != 120.5 || got.Process != 0 {
+	if got == nil || got.Prepare != 2 || got.DNSLookup != 10 || got.TCPHandshake != 10 || got.TLSHandshake != 20 || got.Send != 0.5 || got.WaitingTTFB != 60 || got.Download != 18 || got.Total != 120.5 || got.Process != 0 {
 		t.Fatalf("%+v", got)
 	}
 	for _, e := range entries[1:] {

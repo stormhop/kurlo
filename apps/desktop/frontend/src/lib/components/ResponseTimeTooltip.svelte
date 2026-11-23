@@ -44,6 +44,7 @@
       { label: 'DNS Lookup', value: numeric(source?.dnsLookup), color: 'var(--s4xx)' },
       { label: 'TCP Handshake', value: numeric(source?.tcpHandshake), color: 'var(--s3xx)' },
       { label: 'TLS Handshake', value: numeric(source?.tlsHandshake), color: 'var(--s3xx)' },
+      ...(numeric(source?.send) ? [{ label: 'Send', value: numeric(source?.send), color: 'var(--s3xx)' }] : []),
       { label: 'Waiting (TTFB)', value: numeric(source?.waitingTTFB), color: 'var(--s5xx)' },
       {
         label: 'Download',

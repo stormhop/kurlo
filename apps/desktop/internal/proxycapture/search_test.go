@@ -39,12 +39,13 @@ func TestSearchHeadersBodiesAndEncodedResponses(t *testing.T) {
 	}))
 	defer target.Close()
 	r, client := startRecorder(t, Config{})
-	resp, err := client.Post(target.URL+"/orders", "application/json", strings.NewReader(`{"customer":"Ada Lovelace"}`))
+	resp, err := client.Post(target.URL+"/orders?color=aquamarine", "application/json", strings.NewReader(`{"customer":"Ada Lovelace"}`))
 	responseText(t, resp, err)
 	resp, err = client.Get(target.URL + "/zipped")
 	responseText(t, resp, err)
 	cases := map[string][]string{
 		"ada lovelace":     {"request body", "response body"},
+		"AQUAMARINE":       {"url"},
 		"TRACE-alpha":      {"response headers"},
 		"inv-42-paid":      {"response body"},
 		"application/json": {"request headers"},

@@ -7,11 +7,11 @@ Open **Capture proxy** and click **Record**, then open a site in any browser. Ku
 
 ## Use Kurlo as the system proxy
 
-On macOS, Windows and Linux with GNOME, **Settings → Routing → Use as system proxy while recording** is on by default. While recording, the option shows **On** or **Off**.
+On macOS and Windows, **Settings → Routing → Use as system proxy while recording** is on by default. On Linux with GNOME, enable it in Routing to capture from applications using the system proxy. While recording, the option shows **On** or **Off**.
 
 1. Click **Record**. Kurlo sets its automatic proxy configuration (PAC) URL in your system network settings. The header shows **System proxy** while it is active. On macOS, the system may ask for an administrator password.
 2. Open or reload a site in Safari, Chrome, Edge or another app that uses the system settings. Browsers pick up the change without a restart. Connections that were already open may need a reload.
-3. Click **Stop capture**. Kurlo restores your previous proxy settings. It also restores them when you quit Kurlo, and on the next launch if Kurlo did not close normally. Kurlo leaves a service alone if you changed its proxy settings while recording.
+3. Click **Stop capture**. Kurlo restores your previous proxy settings. It also restores them when you quit Kurlo, and on the next launch if Kurlo did not close normally. Kurlo preserves manual changes made during recording. If two recorders set the system proxy, the most recent one controls it until it stops.
 
 The PAC file allows a direct connection when Kurlo is not running, so the internet keeps working even if Kurlo stops unexpectedly.
 
@@ -40,11 +40,11 @@ For manual configuration, point both the HTTP and HTTPS proxy settings to the ho
 
 **Timeline** shows requests in capture order. **By host** adds a list of hosts with their request counts. Filter by method or status. **Failed** shows requests that did not get a response, and **Tunnels** shows HTTPS connections that Kurlo did not decrypt.
 
-The search field matches the host, path and app name, and also headers, bodies and WebSocket or SSE messages. Kurlo searches the first 16 KiB of each body, after removing gzip, Brotli or zstd compression. A row found by its content shows where the text was found, such as **in response body**. Search ignores letter case.
+The search field matches the URL including its query string, the app name, headers, bodies and WebSocket or SSE messages. Kurlo searches the first 16 KiB of each body, after removing gzip, Brotli or zstd compression. A row found by its content shows where the text was found, such as **in response body**. Search ignores letter case.
 
 **Clear** removes the recorded entries and their temporary files. Recording continues.
 
-Select a row, or move through the list with the arrow keys. The details below the list show the **Response** and **Request**, each with its headers and a formatted body. Drag the line between the list and the details to resize them. For HTTP/1.1 WebSocket upgrades and SSE responses, open **Messages** or **Events** while the stream is running. Previews keep the first 16 KiB per direction.
+Select a row, or move through the list with the arrow keys. The details below the list show the **Response** and **Request**, each with its headers and a formatted body. Drag the line between the list and the details to resize them. For HTTP/1.1 WebSocket upgrades and SSE responses, open **Messages** or **Events** while the stream is running. **Events** also shows events from gzip, Brotli and zstd streams. Previews keep the first 16 KiB per direction.
 
 The line under the path shows the duration and the protocol the client used, such as **HTTP/2**. Hover over the duration to see where the time went: preparing the request, waiting for a connection, DNS lookup, TCP and TLS handshakes with the server, waiting for the first byte and downloading the response. A request that reused an open connection has no handshake time. Responses from a **Map local** rule never reach the network, so they show only the total.
 
@@ -68,7 +68,7 @@ Host patterns:
 - `*.example.com` matches its subdomains on port 443, but not `example.com` itself.
 - `local.test:8443` matches one port. `local.test:*` matches every port.
 
-Kurlo verifies the real server's certificate with your system's trusted authorities. If verification fails, the request is recorded with **Upstream connection failed** and nothing is sent. Decrypted connections use HTTP/1.1 between your browser and Kurlo.
+Kurlo verifies the real server's certificate with your system's trusted authorities. If verification fails, the request is recorded with **Upstream connection failed** and nothing is sent.
 
 Some apps accept only their own certificate (certificate pinning) and refuse the connection. Kurlo records a **TLS** row marked **Failed** that says the client rejected the Kurlo certificate. Remove that host from the list to let the app work through the tunnel again. Firefox follows the system proxy by default, but it uses its own certificate store unless `security.enterprise_roots.enabled` is on. In that case, import the exported certificate in Firefox settings.
 
@@ -80,13 +80,13 @@ If you do not want to trust a Kurlo certificate, you can decrypt one development
 
 1. Stop recording and open **Settings → Inspect a service with its own certificate**. Enter the service hostname and port, including `:443` when it uses the default HTTPS port.
 2. Choose the PEM certificate and private key that your development server uses. The certificate must be current, cover that hostname and match the certificate the upstream server presents.
-3. Start capture and connect with a client that already trusts the development service. Kurlo uses HTTP/1.1 for this connection. Other HTTPS destinations appear as CONNECT tunnels with connection metadata.
+3. Start capture and connect with a client that already trusts the development service. The client can negotiate HTTP/2 or HTTP/1.1. Other HTTPS destinations appear as CONNECT tunnels with connection metadata.
 
 For a second device, choose your computer's private LAN interface address in **Settings → Connection → Listen address** and enter it in **Allowed device**. Then enter the device's private IPv4 address. Set the device's proxy to the displayed address and port. The QR code contains the proxy address. Clients supporting automatic configuration can use `http://<address>:<port>/proxy.pac`.
 
 ## Reuse a request
 
-- **Save as request** saves the request and its response example in the collection and folder you choose. The default folder is **Captured**. You can serve saved examples from the [mock server](/docs/guides/mock-server/).
+- **Save as request** saves the request and its response example in the collection and folder you choose. The default folder is **Captured**. Examples require a complete text response. For a binary or incomplete response, choose **Export HAR** to keep the captured bytes. **Open in editor** opens the request on its own. You can serve saved examples from the [mock server](/docs/guides/mock-server/).
 - **Open in editor** opens an editable draft. Check its URL, environment and authentication before pressing **Send**.
 - **Create collection** makes a collection from the filtered HTTP entries and groups repeated method and URL pairs into one request.
 - **Export HAR** writes the filtered HTTP exchanges with their HTTP version and timings. Kurlo adds failed requests, the process, the rule that answered and stream messages as `_kurlo` fields, so **Open HAR** restores them. **Ask agent** opens a chat draft that lists the exchanges by id. The agent reads their headers, bodies and messages with `get_captured`, so it can suggest request bodies, variables and assertions on response fields. You review and send the draft.
@@ -95,7 +95,7 @@ Kurlo retains the latest 1,000 entries. Stopping preserves the session for inspe
 
 ## Open a saved session
 
-**Open HAR** loads a HAR file into the traffic list, so you can go back to a session you exported or inspect one recorded elsewhere. Kurlo reads HAR files from its own export and from browser developer tools, Charles and Proxyman. The header shows the file name. Search, filters, rules, **Save as request**, **Create collection** and **Export HAR** work as they do for a live recording. WebSocket messages open in **Messages** and server-sent events in **Events**. Timings and the HTTP version are restored too.
+**Open HAR** loads a HAR file into the traffic list, so you can go back to a session you exported or inspect one recorded elsewhere. Kurlo reads HAR files from its own export and from browser developer tools, Charles and Proxyman. The header shows the file name. Search, filters, rules, **Save as request**, **Create collection** and **Export HAR** work as they do for a live recording. WebSocket messages open in **Messages** and server-sent events in **Events**. Multipart form fields, the HTTP version and the original status text are restored too. HAR keeps the transfer size and decoded response size separately, along with time spent sending the request and waiting for the response. Bodies marked incomplete in the archive stay marked when you export again.
 
 Kurlo opens the latest 1,000 HTTP entries of a file up to 256 MiB. Encrypted tunnels have no requests to restore, so they are skipped. Stop recording before you open a file. **Record** starts a new session and replaces the opened one.
 
@@ -108,7 +108,7 @@ Click **Rules** in the header to open the rule list. Rules are saved on this com
 - **Map local** answers matching requests with your own status, content type and body. Nothing is sent to the server. Load the body from a text file or a saved response example. Under **Network conditions**, add a delay, limit the speed in KiB/s, return HTTP 503 at a chosen rate, or pause before sending. Paused responses appear above the traffic list. Open one, edit it, and click **Release response** within 60 seconds. Optional JavaScript functions `onRequest(request, response)` and `onResponse(request, response)` can read `request.method` and `request.path` and set `response.status` or `response.body`.
 - **Rewrite** changes matching requests before Kurlo sends them. **Send to** moves them to another server, such as `http://localhost:3000`. **Replace in path** swaps the first occurrence of a path part, such as `/v1/` for `/v2/`. Add, replace or remove request headers and response headers.
 
-To start from a recorded request, select it and click **Map local** or **Rewrite**. The rule takes its method and URL, and Map local also takes its status and body.
+To start from a recorded request, select it and click **Map local** or **Rewrite**. The rule takes its method and URL. Map local also copies the response status and the full text body up to 1 MiB. If the full response is unavailable, binary or too large, the editor explains why the body field is empty.
 
 ![Rules panel with a Map local rule and a Rewrite rule](../../../../assets/screenshots/capture-proxy-rules.png)
 

@@ -71,6 +71,9 @@ func (r *Recorder) Search(query string, decode func(http.Header, string, int) (s
 	hits := []SearchHit{}
 	for _, x := range items {
 		where := []string{}
+		if strings.Contains(strings.ToLower(x.Entry.URL), needle) {
+			where = append(where, "url")
+		}
 		if headersContain(x.Request.Headers, needle) {
 			where = append(where, "request headers")
 		}
@@ -116,7 +119,7 @@ func messageContains(m Message, needle string, decode func(http.Header, string, 
 		return strings.Contains(strings.ToLower(m.Body), needle)
 	}
 	headers := http.Header(m.Headers)
-	if decode == nil || headers.Get("Content-Encoding") == "" || len(m.raw) == 0 {
+	if decode == nil || !m.HasContentEncoding() || len(m.raw) == 0 {
 		return false
 	}
 	text, ok := decode(headers, string(m.raw), searchDecodeLimit)

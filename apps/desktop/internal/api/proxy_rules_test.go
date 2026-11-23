@@ -37,6 +37,24 @@ func TestProxyRulesPersist(t *testing.T) {
 	if after, _ := os.ReadFile(captureRulesPath()); !bytes.Equal(after, data) {
 		t.Fatal("an invalid rule changed the saved file")
 	}
+	dir := filepath.Dir(captureRulesPath())
+	if err := os.Rename(dir, dir+".saved"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dir, []byte("blocked"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	rule.Local.Body = "unsaved"
+	after, err := app.SetProxyRules([]proxycapture.Rule{rule})
+	if err == nil || len(after) != 1 || after[0].Local.Body != saved[0].Local.Body || app.ProxyRules()[0].Local.Body != saved[0].Local.Body {
+		t.Fatal(after, err)
+	}
+	if err := os.Remove(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(dir+".saved", dir); err != nil {
+		t.Fatal(err)
+	}
 	fresh := &App{}
 	loaded := fresh.ProxyRules()
 	if len(loaded) != 1 || loaded[0].Name != "Orders" || loaded[0].Local.Body != `{"ok":true}` {

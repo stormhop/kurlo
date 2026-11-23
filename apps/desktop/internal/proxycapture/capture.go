@@ -59,6 +59,7 @@ type Entry struct {
 }
 
 type Message struct {
+	decoded   bool
 	raw       []byte
 	file      string
 	Archived  bool                `json:"archived,omitempty"`
@@ -66,6 +67,18 @@ type Message struct {
 	Body      string              `json:"body"`
 	Truncated bool                `json:"truncated"`
 	Binary    bool                `json:"binary"`
+}
+
+func (m Message) HasContentEncoding() bool {
+	if m.decoded {
+		return false
+	}
+	for coding := range strings.SplitSeq(http.Header(m.Headers).Get("Content-Encoding"), ",") {
+		if name := strings.TrimSpace(coding); name != "" && !strings.EqualFold(name, "identity") {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Message) EncodedPreview() io.Reader {
@@ -76,11 +89,15 @@ func (m Message) EncodedPreview() io.Reader {
 }
 
 type Exchange struct {
-	Timings  *model.ResponseTime `json:"timings,omitempty"`
-	Frames   []Frame             `json:"frames,omitempty"`
-	Entry    Entry               `json:"entry"`
-	Request  Message             `json:"request"`
-	Response Message             `json:"response"`
+	harTimings     map[string]float64
+	harStatusText  *string
+	harBodySize    *int64
+	harContentSize *int64
+	Timings        *model.ResponseTime `json:"timings,omitempty"`
+	Frames         []Frame             `json:"frames,omitempty"`
+	Entry          Entry               `json:"entry"`
+	Request        Message             `json:"request"`
+	Response       Message             `json:"response"`
 }
 
 type Status struct {
@@ -126,6 +143,7 @@ type session struct {
 	proxy           *httputil.ReverseProxy
 	addr            *net.TCPAddr
 	include         string
+	systemProxy     bool
 	ctx             context.Context
 	cancel          context.CancelFunc
 	mu              sync.Mutex
@@ -174,12 +192,17 @@ func (r *Recorder) Start(config Config, notify func()) (Status, error) {
 	if notify == nil {
 		notify = func() {}
 	}
-	s := &session{files: &bodyFiles{}, changed: notify, pauses: make(map[int64]pauseSlot), service: service, clientIP: peer, identifyProcess: config.IdentifyProcess, rules: &r.rules, authority: authority, authorityDir: config.AuthorityDir, sslHosts: sslHosts, addr: ln.Addr().(*net.TCPAddr), ctx: ctx, cancel: cancel, include: strings.ToLower(strings.TrimSpace(config.Include))}
+	s := &session{files: &bodyFiles{}, changed: notify, pauses: make(map[int64]pauseSlot), service: service, clientIP: peer, identifyProcess: config.IdentifyProcess, rules: &r.rules, authority: authority, authorityDir: config.AuthorityDir, sslHosts: sslHosts, addr: ln.Addr().(*net.TCPAddr), ctx: ctx, cancel: cancel, include: strings.ToLower(strings.TrimSpace(config.Include)), systemProxy: config.SystemProxy}
 	s.transport = s.newTransport(nil)
 	if service != nil {
 		s.serviceHTTP = s.newTransport(service.upstream)
 	}
-	s.proxy = &httputil.ReverseProxy{Transport: roundTripFunc(s.roundTrip), Rewrite: func(p *httputil.ProxyRequest) { p.Out.Host = p.Out.URL.Host }, ModifyResponse: func(resp *http.Response) error {
+	s.proxy = &httputil.ReverseProxy{Transport: roundTripFunc(s.roundTrip), Rewrite: func(p *httputil.ProxyRequest) {
+		p.Out.Host = p.Out.URL.Host
+		if p.Out.Body != nil && len(p.Out.Trailer) > 0 {
+			p.Out.Body = &requestTrailerReader{ReadCloser: p.Out.Body, source: p.In.Trailer, target: p.Out.Trailer}
+		}
+	}, ModifyResponse: func(resp *http.Response) error {
 		tr := resp.Request.Context().Value(traceKey{}).(*trace)
 		return tr.responseBody(resp)
 	}, ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
@@ -386,13 +409,9 @@ func (p *preview) Write(b []byte) (int, error) {
 	}
 	return len(b), nil
 }
-func (p *preview) message(h http.Header) (Message, int64) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.done = true
-	b := p.data.Bytes()
+func TextPreview(b []byte, truncated bool) ([]byte, bool) {
 	visible := b
-	if p.total > int64(len(b)) {
+	if truncated {
 		for i := len(b) - 1; i >= max(0, len(b)-utf8.UTFMax); i-- {
 			if utf8.RuneStart(b[i]) {
 				if !utf8.FullRune(b[i:]) {
@@ -402,7 +421,17 @@ func (p *preview) message(h http.Header) (Message, int64) {
 			}
 		}
 	}
-	m := Message{Headers: h, Truncated: p.total > int64(len(b)), Binary: !utf8.Valid(visible) || bytes.IndexByte(visible, 0) >= 0}
+	return visible, utf8.Valid(visible) && bytes.IndexByte(visible, 0) < 0
+}
+
+func (p *preview) message(h http.Header) (Message, int64) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.done = true
+	b := p.data.Bytes()
+	truncated := p.total > int64(len(b))
+	visible, text := TextPreview(b, truncated)
+	m := Message{Headers: h, Truncated: truncated, Binary: !text}
 	if p.file != nil {
 		if err := p.file.Close(); err == nil {
 			m.file = p.file.Name()
@@ -447,6 +476,23 @@ type readerWithClose struct {
 	io.Reader
 	io.Closer
 }
+
+type requestTrailerReader struct {
+	io.ReadCloser
+	source http.Header
+	target http.Header
+}
+
+func (r *requestTrailerReader) Read(b []byte) (int, error) {
+	n, err := r.ReadCloser.Read(b)
+	if err == io.EOF {
+		for key, values := range r.source {
+			r.target[key] = append([]string(nil), values...)
+		}
+	}
+	return n, err
+}
+
 type statusWriter struct {
 	http.ResponseWriter
 	status int
@@ -505,7 +551,8 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer s.wg.Done()
 	if !s.addr.IP.IsLoopback() {
 		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-		if !net.ParseIP(ip).Equal(s.clientIP) {
+		remote := net.ParseIP(ip)
+		if !remote.Equal(s.clientIP) && !(s.systemProxy && remote.Equal(s.addr.IP)) {
 			http.Error(w, "Client is not enabled for this session", 403)
 			return
 		}
@@ -550,17 +597,22 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		if s.serveLocal(w, r, &x) {
 			x.Entry.Duration = time.Since(start).Milliseconds()
-			s.record(x)
+			if s.identifyProcess {
+				x.Entry.Process = s.processes.source(s.ctx, s.addr, r.RemoteAddr)
+			}
+			if s.includes(r.URL.Hostname()) {
+				s.record(x)
+			}
 			return
 		}
 		tr := &trace{}
-		if s.include == "" || strings.EqualFold(r.URL.Hostname(), s.include) {
+		if s.includes(r.URL.Hostname()) {
 			tr.newStream = func(kind string, code int, headers http.Header) *streamTap {
 				live := x
 				live.Entry.Stream = kind
 				live.Entry.Status = code
 				live.Entry.InProgress = true
-				live.Request.Headers = copyHeaders(r.Header)
+				live.Request, live.Entry.Sent = tr.sent.message(copyHeaders(r.Header))
 				live.Entry.Rule = x.Entry.Rule
 				live.Entry.Rewritten = x.Entry.Rewritten
 				live.Response.Headers = headers
@@ -608,9 +660,13 @@ func (s *session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.identifyProcess {
 		x.Entry.Process = s.processes.source(s.ctx, s.addr, r.RemoteAddr)
 	}
-	if s.include == "" || strings.EqualFold(r.URL.Hostname(), s.include) {
+	if s.includes(r.URL.Hostname()) {
 		s.record(x)
 	}
+}
+
+func (s *session) includes(host string) bool {
+	return s.include == "" || strings.EqualFold(host, s.include)
 }
 
 func (s *session) tunnel(w http.ResponseWriter, r *http.Request, e *Entry) {
@@ -642,7 +698,7 @@ func (s *session) tunnel(w http.ResponseWriter, r *http.Request, e *Entry) {
 		return
 	}
 	e.Status = 200
-	if s.include == "" || strings.EqualFold(r.URL.Hostname(), s.include) {
+	if s.includes(r.URL.Hostname()) {
 		e.InProgress = true
 		e.ID = s.record(Exchange{Entry: *e})
 		defer func() { e.InProgress = false }()

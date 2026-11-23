@@ -135,7 +135,7 @@ func parseMCPServerArgs(args []string, stderr io.Writer) (mcpServerOptions, erro
 	fs := flag.NewFlagSet("kurlo mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	var opts mcpServerOptions
-	fs.StringVar(&opts.captureHAR, "capture-har", "", "share endpoint metadata from this local HAR file")
+	fs.StringVar(&opts.captureHAR, "capture-har", "", "share captured URLs, headers, bodies and stream messages from this local HAR file")
 	fs.StringVar(&opts.projectRoot, "project-root", "", "read-only source directory for project and import tools")
 	fs.StringVar(&opts.env, "env", "", "environment to use when a tool call does not name one")
 	fs.IntVar(&opts.timeoutMs, "timeout", 0, "per-request timeout in milliseconds (overrides request settings)")
@@ -382,7 +382,7 @@ func (s *mcpServer) instructions() string {
 		"- Secrets are sent but shown as [secret]. Protected environments cannot be used here: ask the user to run those requests in Kurlo.",
 	}
 	if s.opts.captureHAR != "" {
-		lines = append(lines, "- list_captured reads endpoint metadata from the supplied HAR. check_captured_openapi compares observed operations to the collection spec.")
+		lines = append(lines, "- list_captured searches recorded exchanges in the supplied HAR. get_captured reads their headers, bodies and stream messages. check_captured_openapi compares observed operations to the collection spec.")
 	}
 	if !s.opts.readOnly {
 		lines = append(lines, "- create_collection, save_request, patch_request, apply_changes, delete_request, save_example and set_variable edit the workspace's YAML files, usually kept in Git; the open app picks the changes up. Write tests in JavaScript with pm.*, or let generate_tests write them from a response. Never write a secret: use a {{variable}} and ask the user to add the value in Kurlo.")

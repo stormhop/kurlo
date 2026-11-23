@@ -21,13 +21,18 @@ import (
 
 func TestSuppliedCaptureMetadata(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "session.har")
-	if err := os.WriteFile(file, []byte(`{"log":{"entries":[{"request":{"method":"GET","url":"https://dev.test/v1/orders/42?token=omit","headers":[{"name":"Authorization","value":"omit"}]},"response":{"status":200,"content":{"text":"omit"}},"time":16}]}}`), 0600); err != nil {
+	if err := os.WriteFile(file, []byte(`{"log":{"entries":[{"request":{"method":"GET","url":"https://dev.test/v1/orders/42?token=omit&color=aquamarine","headers":[{"name":"Authorization","value":"omit"}]},"response":{"status":200,"content":{"text":"omit"}},"time":16}]}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
 	server := newMCPServer(mcpServerOptions{captureHAR: file, readOnly: true}, os.Stdout)
 	result, err := server.callTool(context.Background(), json.RawMessage(`{"name":"list_captured","arguments":{"host":"dev.test"}}`))
 	b, _ := json.Marshal(result)
 	if err != nil || strings.Contains(string(b), "omit") || !strings.Contains(string(b), "/v1/orders/42") {
+		t.Fatal(string(b), err)
+	}
+	result, err = server.callTool(context.Background(), json.RawMessage(`{"name":"list_captured","arguments":{"query":"AQUAMARINE"}}`))
+	b, _ = json.Marshal(result)
+	if err != nil || !strings.Contains(string(b), "/v1/orders/42") || strings.Contains(string(b), "aquamarine") {
 		t.Fatal(string(b), err)
 	}
 	items, err := loadCaptureObservations(file)
@@ -64,7 +69,8 @@ func TestCreateCollectionFromCapturedMetadata(t *testing.T) {
 func TestCompressedCaptureExport(t *testing.T) {
 	var encoded bytes.Buffer
 	zip := gzip.NewWriter(&encoded)
-	io.WriteString(zip, `{"orders":42}`)
+	want := strings.Repeat("я", 10000)
+	io.WriteString(zip, want)
 	zip.Close()
 	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Encoding", "gzip")
@@ -93,7 +99,7 @@ func TestCompressedCaptureExport(t *testing.T) {
 	app.capture.Stop()
 	rows := app.ProxyCaptureEntries()
 	entry, err := app.ProxyCaptureEntry(rows[0].ID)
-	if err != nil || entry.Response.Body != `{"orders":42}` {
+	if err != nil || entry.Response.Binary || !entry.Response.Truncated || !entry.Response.Archived || entry.Response.Body != want[:16<<10] {
 		t.Fatal(entry, err)
 	}
 	har, err := app.ProxyCaptureHAR(nil)
@@ -104,7 +110,7 @@ func TestCompressedCaptureExport(t *testing.T) {
 			}
 		}
 	}
-	if err != nil || json.Unmarshal([]byte(har), &payload) != nil || len(payload.Log.Entries) != 1 || payload.Log.Entries[0].Response.Content.Text != entry.Response.Body {
+	if err != nil || json.Unmarshal([]byte(har), &payload) != nil || len(payload.Log.Entries) != 1 || payload.Log.Entries[0].Response.Content.Text != want {
 		t.Fatal(har, err)
 	}
 }
@@ -227,5 +233,18 @@ func TestSuppliedCaptureBodiesAndReload(t *testing.T) {
 	}
 	if !names["get_captured"] || names["create_captured_collection"] {
 		t.Fatal(names)
+	}
+}
+
+func TestCaptureOpenAPIEmbeddedParams(t *testing.T) {
+	const spec = `{"openapi":"3.0.0","paths":{"/files/{id}.json":{"get":{}},"/reports/report-{id}":{"get":{}},"/version/{name}-{id}":{"get":{}}}}`
+	entries := []captureObservation{}
+	for i, p := range []string{"/files/42.json", "/reports/report-42", "/version/stable-8", "/files/.json", "/files/a/b.json", "/files/42xjson", "/reports/report-"} {
+		entries = append(entries, captureObservation{Method: "GET", Host: "dev.test", Path: p, ID: int64(i + 1)})
+	}
+	result, err := compareCaptureOperations(spec, "dev.test", "", entries)
+	b, _ := json.Marshal(result)
+	if err != nil || string(b) != `{"matched":3,"unmatchedIds":[4,5,6,7]}` {
+		t.Fatal(string(b), err)
 	}
 }

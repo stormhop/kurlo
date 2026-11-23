@@ -26,6 +26,8 @@ import (
 )
 
 func (a *App) StartProxyCapture(config proxycapture.Config) (proxycapture.Status, error) {
+	a.captureLifecycle.Lock()
+	defer a.captureLifecycle.Unlock()
 	if config.Port < 1 {
 		return a.capture.Status(), errors.New("enter a port between 1 and 65535")
 	}
@@ -43,14 +45,17 @@ func (a *App) StartProxyCapture(config proxycapture.Config) (proxycapture.Status
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	err = newSystemProxy().Enable(ctx, "http://"+status.Address+"/proxy.pac")
+	err = a.systemProxyManager().Enable(ctx, "http://"+status.Address+"/proxy.pac")
 	return a.withSystemProxy(status), err
 }
 
 func (a *App) StopProxyCapture() (proxycapture.Status, error) {
-	status := a.capture.Stop()
-	err := restoreSystemProxy()
-	return a.withSystemProxy(status), err
+	a.captureLifecycle.Lock()
+	defer a.captureLifecycle.Unlock()
+	if err := restoreSystemProxy(a.systemProxyManager()); err != nil {
+		return a.withSystemProxy(a.capture.Status()), err
+	}
+	return a.withSystemProxy(a.capture.Stop()), nil
 }
 
 func (a *App) ProxyCaptureStatus() proxycapture.Status {
@@ -59,7 +64,7 @@ func (a *App) ProxyCaptureStatus() proxycapture.Status {
 }
 
 func (a *App) withSystemProxy(status proxycapture.Status) proxycapture.Status {
-	status.SystemProxy = status.Running && newSystemProxy().Active()
+	status.SystemProxy = status.Running && a.systemProxyManager().Active()
 	return status
 }
 
@@ -67,29 +72,42 @@ var newSystemProxy = func() *systemproxy.Manager {
 	return systemproxy.New(filepath.Join(requestStoreDir(), "capture-system-proxy.json"))
 }
 
-func restoreSystemProxy() error {
+func (a *App) systemProxyManager() *systemproxy.Manager {
+	a.captureProxyOnce.Do(func() { a.captureProxy = newSystemProxy() })
+	return a.captureProxy
+}
+
+func restoreSystemProxy(manager *systemproxy.Manager) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	return newSystemProxy().Recover(ctx)
+	return manager.Recover(ctx)
 }
 
 func (a *App) ProxyCaptureEntries() []proxycapture.Entry { return a.capture.Entries() }
 func (a *App) ProxyCaptureEntry(id int64) (proxycapture.Exchange, error) {
 	x, err := a.capture.Get(id)
-	if err != nil || http.Header(x.Response.Headers).Get("Content-Encoding") == "" {
+	if err != nil || !x.Response.HasContentEncoding() {
 		return x, err
 	}
-	reader, closeReader := newDecodingReader(x.Response.EncodedPreview(), &http.Response{Header: x.Response.Headers})
+	reader, closeReader, decoded := responseDecodingReader(x.Response.EncodedPreview(), &http.Response{Header: x.Response.Headers})
 	defer closeReader()
+	if !decoded {
+		return x, nil
+	}
 	const limit = 16 << 10
 	data, readErr := io.ReadAll(io.LimitReader(reader, limit+1))
 	if readErr != nil && !(readErr == io.ErrUnexpectedEOF && x.Response.Truncated) {
 		return x, nil
 	}
-	if len(data) > 0 && utf8.Valid(data) && !bytes.ContainsRune(data, 0) {
-		x.Response.Body = strings.ToValidUTF8(string(data[:min(len(data), limit)]), "�")
+	truncated := len(data) > limit || x.Response.Truncated
+	visible, text := proxycapture.TextPreview(data[:min(len(data), limit)], truncated)
+	if len(visible) > 0 && text {
+		x.Response.Body = string(visible)
 		x.Response.Binary = false
-		x.Response.Truncated = x.Response.Truncated || len(data) > limit
+		if truncated && !x.Response.Truncated {
+			x.Response.Archived = true
+		}
+		x.Response.Truncated = truncated
 	}
 	return x, nil
 }
@@ -98,8 +116,11 @@ func (a *App) ProxyCaptureHAR(ids []int64) (string, error) {
 }
 
 func decodeCaptureBody(headers http.Header, raw string, limit int) (string, bool) {
-	reader, closeReader := newDecodingReader(strings.NewReader(raw), &http.Response{Header: headers})
+	reader, closeReader, decoded := responseDecodingReader(strings.NewReader(raw), &http.Response{Header: headers})
 	defer closeReader()
+	if !decoded {
+		return "", false
+	}
 	body, err := io.ReadAll(io.LimitReader(reader, int64(limit)+1))
 	if err != nil || len(body) > limit {
 		return "", false
@@ -125,7 +146,7 @@ func RunProxyCLI(args []string, stdout, stderr io.Writer) int {
 	return runProxyCLI(ctx, args, stdout, stderr)
 }
 
-func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) (exitCode int) {
 	if len(args) > 0 && args[0] == "ca" {
 		return runProxyCACLI(args[1:], stdout, stderr)
 	}
@@ -169,19 +190,21 @@ func runProxyCLI(ctx context.Context, args []string, stdout, stderr io.Writer) i
 			return 1
 		}
 	}
-	status, err := recorder.Start(proxycapture.Config{Port: *port, Include: *include, Service: *service, Certificate: *cert, Key: *key, ListenIP: *listen, ClientIP: *peer, IdentifyProcess: *processes, SSLHosts: sslHosts, AuthorityDir: captureAuthorityDir()}, nil)
+	status, err := recorder.Start(proxycapture.Config{Port: *port, Include: *include, Service: *service, Certificate: *cert, Key: *key, ListenIP: *listen, ClientIP: *peer, IdentifyProcess: *processes, SystemProxy: *systemProxy, SSLHosts: sslHosts, AuthorityDir: captureAuthorityDir()}, nil)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 1
 	}
 	fmt.Fprintf(stdout, "Listening on http://%s\n", status.Address)
 	if *systemProxy {
-		if err := newSystemProxy().Enable(ctx, "http://"+status.Address+"/proxy.pac"); err != nil {
+		manager := newSystemProxy()
+		if err := manager.Enable(ctx, "http://"+status.Address+"/proxy.pac"); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 1
 		}
 		defer func() {
-			if err := restoreSystemProxy(); err != nil {
+			if err := restoreSystemProxy(manager); err != nil {
+				exitCode = 1
 				fmt.Fprintln(stderr, err)
 			}
 		}()
@@ -287,8 +310,11 @@ func (a *App) SearchProxyCapture(query string) []proxycapture.SearchHit {
 }
 
 func decodeCapturePreview(headers http.Header, raw string, limit int) (string, bool) {
-	reader, closeReader := newDecodingReader(strings.NewReader(raw), &http.Response{Header: headers})
+	reader, closeReader, decoded := responseDecodingReader(strings.NewReader(raw), &http.Response{Header: headers})
 	defer closeReader()
+	if !decoded {
+		return "", false
+	}
 	body, err := io.ReadAll(io.LimitReader(reader, int64(limit)))
 	if len(body) == 0 || (err != nil && !errors.Is(err, io.ErrUnexpectedEOF)) {
 		return "", false
@@ -329,27 +355,20 @@ func (a *App) ProxyRules() []proxycapture.Rule {
 
 func (a *App) SetProxyRules(rules []proxycapture.Rule) ([]proxycapture.Rule, error) {
 	a.loadCaptureRules()
-	if rules == nil {
-		rules = []proxycapture.Rule{}
-	}
-	if err := a.capture.SetRules(rules); err != nil {
-		return a.capture.Rules(), err
-	}
-	saved := a.capture.Rules()
-	for i := range saved {
-		saved[i].Hits = 0
-	}
-	data, err := json.MarshalIndent(saved, "", "  ")
-	if err == nil {
-		err = os.MkdirAll(filepath.Dir(captureRulesPath()), 0o700)
-	}
-	if err == nil {
-		err = replaceFileAtomicMode(captureRulesPath(), append(data, '\n'), 0o600)
-	}
-	if err != nil {
-		return a.capture.Rules(), fmt.Errorf("could not save capture rules: %w", err)
-	}
-	return a.capture.Rules(), nil
+	err := a.capture.SaveRules(rules, func(saved []proxycapture.Rule) error {
+		data, err := json.MarshalIndent(saved, "", "  ")
+		if err == nil {
+			err = os.MkdirAll(filepath.Dir(captureRulesPath()), 0700)
+		}
+		if err == nil {
+			err = replaceFileAtomicMode(captureRulesPath(), append(data, '\n'), 0600)
+		}
+		if err != nil {
+			return fmt.Errorf("could not save capture rules: %w", err)
+		}
+		return nil
+	})
+	return a.capture.Rules(), err
 }
 
 func (a *App) DeleteProxyEntries(ids []int64) proxycapture.Status {

@@ -18,6 +18,16 @@ describe('capture rules', () => {
       ['https://api.shop.test/search?q=*', '', 'GET', 'https://api.shop.test/search?q=boots', true],
       ['https://api.shop.test/search?q=*', '', 'GET', 'https://api.shop.test/search', false],
       ['https://api.shop.test/a.b', '', 'GET', 'https://api.shop.test/aXb', false],
+      ['http://fixture.test/orders', '', 'GET', 'http://fixture.test:80/orders', true],
+      ['http://fixture.test:80/orders', '', 'GET', 'http://fixture.test/orders', true],
+      ['https://fixture.test/orders', '', 'GET', 'https://fixture.test:443/orders', true],
+      ['https://fixture.test:443/orders', '', 'GET', 'https://fixture.test/orders', true],
+      ['http://fixture.test:8080/orders', '', 'GET', 'http://fixture.test/orders', false],
+      ['http://fixture.test/orders', '', 'GET', 'https://fixture.test:80/orders', false],
+      ['*://fixture.test:80/orders', '', 'GET', 'http://fixture.test:80/orders', true],
+      ['*://fixture.test/orders', '', 'GET', 'http://fixture.test:80/orders', false],
+      ['*://fixture.test:*/orders', '', 'GET', 'https://fixture.test:443/orders', true],
+      ['*://fixture.test:*/orders', '', 'GET', 'https://fixture.test/orders', false],
     ];
     for (const [url, method, requestMethod, target, want] of cases) {
       expect(ruleMatches({ url, method }, requestMethod, target), `${method} ${url} ${target}`).toBe(want);
@@ -40,5 +50,15 @@ describe('capture rules', () => {
     rewrite.rewrite.setRequestHeaders = [{ name: 'X-Env', value: 'dev' }];
     expect(ruleSummary(rewrite)).toBe('to http://localhost:3000 · 1 request header change');
     expect(headerNames(' X-Debug, Cookie  Server ')).toEqual(['X-Debug', 'Cookie', 'Server']);
+  });
+
+  it('suggests patterns with browser-normalized default ports', () => {
+    expect(patternForURL('http://fixture.test:80/orders')).toBe('http://fixture.test/orders');
+    expect(patternForURL('https://fixture.test:443/orders')).toBe('https://fixture.test/orders');
+  });
+
+  it('summarizes legacy rewrite rules with null header arrays', () => {
+    const legacy = { ...blankRule('rewrite'), rewrite: { target: '', pathFrom: '/v1', pathTo: '/v2', setRequestHeaders: null, removeRequestHeaders: null, setResponseHeaders: null, removeResponseHeaders: null } } as unknown as ProxyRule;
+    expect(ruleSummary(legacy)).toBe('/v1 → /v2');
   });
 });

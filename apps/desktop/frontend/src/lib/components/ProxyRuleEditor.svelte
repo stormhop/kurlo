@@ -15,6 +15,7 @@
     busy,
     entries,
     error = '',
+    warning = '',
     onSave,
     onDismiss,
     onLoadFile,
@@ -24,13 +25,19 @@
     busy: boolean;
     entries: ProxyEntry[];
     error?: string;
+    warning?: string;
     onSave: (rule: ProxyRule) => void;
     onDismiss: () => void;
-    onLoadFile: () => Promise<string>;
+    onLoadFile: () => Promise<string | null>;
   } = $props();
 
   const METHODS = ['', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
   const start = untrack(() => structuredClone($state.snapshot(initial)) as ProxyRule);
+  start.rewrite ??= { target: '', pathFrom: '', pathTo: '', setRequestHeaders: [], removeRequestHeaders: [], setResponseHeaders: [], removeResponseHeaders: [] };
+  start.rewrite.setRequestHeaders ??= [];
+  start.rewrite.removeRequestHeaders ??= [];
+  start.rewrite.setResponseHeaders ??= [];
+  start.rewrite.removeResponseHeaders ??= [];
   let rule = $state<ProxyRule>(start);
   let removeRequest = $state(start.rewrite.removeRequestHeaders.join(', '));
   let removeResponse = $state(start.rewrite.removeResponseHeaders.join(', '));
@@ -63,7 +70,7 @@
   async function loadFile() {
     try {
       const text = await onLoadFile();
-      if (text) rule.local.body = text;
+      if (text !== null) rule.local.body = text;
     } catch (cause) {
       problem = String(cause).replace(/^Error: /, '');
     }
@@ -176,5 +183,5 @@
       <label class="capture-dialog-field"><span>Remove</span><input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} class="field field-mono field-md" placeholder="Content-Security-Policy" bind:value={removeResponse}></label>
     </section>
   {/if}
-  {#if problem || error}<p class="mock-error" role="alert">{problem || error}</p>{/if}
+  {#if problem || error}<p class="mock-error" role="alert">{problem || error}</p>{:else if warning}<p class="capture-warn" role="status">{warning}</p>{/if}
 </ProxyDialog>

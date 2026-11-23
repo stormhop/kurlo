@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { harRequestsFromLog } from '../lib/har';
+import { capturedHarSaveProblem, harRequestsFromLog } from '../lib/har';
 
 describe('harRequestsFromLog', () => {
   const makeHar = (entries: unknown[]) => ({ log: { version: '1.2', entries } });
@@ -46,6 +46,49 @@ describe('harRequestsFromLog', () => {
     expect(requests[0].bodyType).toBe('json');
     expect(requests[0].bodyContent).toBe('{"item":"coffee"}');
     expect(requests[0].requestTab).toBe('body');
+  });
+
+  it('keeps complete textual response bodies as examples', () => {
+    const requests = harRequestsFromLog(makeHar([{
+      request: { method: 'GET', url: 'https://api.example.com/users', queryString: [] },
+      response: { status: 200, content: { mimeType: 'text/plain', text: 'complete response' } },
+    }]), 'col-1', 'My HAR');
+
+    expect(requests[0].examples?.[0].response.body).toBe('complete response');
+  });
+
+  it('preserves ordinary HAR response metadata while omitting unsupported examples when opening captured requests', () => {
+    const payload = makeHar([
+      {
+        request: { method: 'GET', url: 'https://api.example.com/binary', queryString: [] },
+        response: { status: 200, content: { mimeType: 'application/octet-stream', text: 'AAE=', encoding: 'base64' } },
+      },
+      {
+        request: { method: 'GET', url: 'https://api.example.com/incomplete', queryString: [] },
+        response: { status: 200, content: { mimeType: 'text/plain', text: 'partial preview', _incomplete: true } },
+      },
+    ]);
+    const ordinaryRequests = harRequestsFromLog(payload, 'col-1', 'My HAR');
+    const capturedRequests = harRequestsFromLog(payload, 'col-1', 'My HAR', { omitUnsupportedResponseExamples: true });
+
+    expect(ordinaryRequests).toHaveLength(2);
+    expect(ordinaryRequests.map(request => request.examples?.[0].response.body)).toEqual(['', 'partial preview']);
+    expect(capturedRequests).toHaveLength(2);
+    expect(capturedRequests.map(request => request.examples)).toEqual([undefined, undefined]);
+  });
+
+  it('reports unsupported response bodies before saving captured requests', () => {
+    const makeCapture = (content: Record<string, unknown>) => makeHar([{
+      request: { method: 'GET', url: 'https://api.example.com/users', queryString: [] },
+      response: { status: 200, content },
+    }]);
+
+    expect(capturedHarSaveProblem(makeCapture({ mimeType: 'text/plain', text: 'complete response' }))).toBe('');
+    expect(capturedHarSaveProblem(makeCapture({ mimeType: 'application/octet-stream', text: 'AAE=', encoding: 'base64' }))).toContain('binary response');
+    expect(capturedHarSaveProblem(makeCapture({ mimeType: 'text/plain', text: 'partial preview', _incomplete: true }))).toContain('incomplete response');
+    expect(capturedHarSaveProblem(makeHar([{
+      request: { method: 'POST', url: 'https://api.example.com/upload', postData: { text: 'partial', _incomplete: true } },
+    }]))).toContain('incomplete request');
   });
 
   it('imports GraphQL JSON bodies as GraphQL requests', () => {

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +43,7 @@ func timed(t *testing.T, label string, budget time.Duration, fn func()) {
 	fn()
 	elapsed := time.Since(start)
 	t.Logf("%-28s %v", label, elapsed.Round(time.Millisecond))
-	if os.Getenv("CI") == "" && elapsed > budget {
+	if !raceEnabled && os.Getenv("CI") == "" && elapsed > budget {
 		t.Errorf("%s took %v, budget %v", label, elapsed, budget)
 	}
 }
@@ -111,19 +112,31 @@ func TestTenThousandRequestsWithDeepFoldersAndUnicode(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
-	if len(workspaceTreeForTest(t, root)) != len(before) {
-		t.Fatal("unchanged save added or removed files")
+	if !maps.Equal(workspaceTreeForTest(t, root), before) {
+		t.Fatal("unchanged save changed workspace files")
 	}
 
 	var store map[string]any
 	if err := json.Unmarshal([]byte(loadedPayload), &store); err != nil {
 		t.Fatal(err)
 	}
-	storeItem(store, "requests", "big-00500")["url"] = "https://api.example.test/edited"
-	edited, _ := json.Marshal(store)
+	const editedID = "big-00500"
+	const editedURL = "https://api.example.test/edited"
+	storeItem(store, "requests", editedID)["url"] = editedURL
+	edited, err := json.Marshal(store)
+	if err != nil {
+		t.Fatal(err)
+	}
 	timed(t, "autosave after one edit", 10*time.Second, func() {
 		if err := saveKurloStorePayload(local, root, string(edited)); err != nil {
 			t.Fatal(err)
 		}
 	})
+	reloaded, diagnostics, err := loadKurloStoreWithDiagnostics(local, root)
+	if err != nil || len(diagnostics) > 0 {
+		t.Fatalf("reload after edit: %v, diagnostics: %v", err, diagnostics)
+	}
+	if got := itemByID(mapSlice(reloaded["requests"]), editedID)["url"]; got != editedURL {
+		t.Fatalf("reloaded URL for %s = %v, want %s", editedID, got, editedURL)
+	}
 }

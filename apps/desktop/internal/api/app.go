@@ -20,6 +20,7 @@ import (
 	"github.com/stormhop/kurlo/apps/desktop/internal/api/state"
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 	"github.com/stormhop/kurlo/apps/desktop/internal/proxycapture"
+	"github.com/stormhop/kurlo/apps/desktop/internal/systemproxy"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -30,6 +31,9 @@ const maxTextFileReadSize = 100 * 1024 * 1024
 type App struct {
 	capture            proxycapture.Recorder
 	captureRulesOnce   sync.Once
+	captureLifecycle   sync.Mutex
+	captureProxyOnce   sync.Once
+	captureProxy       *systemproxy.Manager
 	performance        performanceMonitor
 	historyStore       *historyResponseStore
 	credentialStore    *gitCredentialStore
@@ -97,7 +101,7 @@ func (a *App) Startup(ctx context.Context) {
 	repairStaleBundleInBackground(ctx)
 	go refreshInstalledBrowserExtensions()
 	go func() {
-		if err := restoreSystemProxy(); err != nil {
+		if err := restoreSystemProxy(newSystemProxy()); err != nil {
 			log.Printf("kurlo: restore system proxy: %v", err)
 		}
 	}()
@@ -123,10 +127,12 @@ func (a *App) OpenLogFolder() string {
 }
 
 func (a *App) Shutdown(_ context.Context) {
-	if err := restoreSystemProxy(); err != nil {
+	a.captureLifecycle.Lock()
+	if err := restoreSystemProxy(a.systemProxyManager()); err != nil {
 		log.Printf("kurlo: restore system proxy: %v", err)
 	}
 	a.capture.Close()
+	a.captureLifecycle.Unlock()
 	a.StopPerformanceStream()
 	a.CancelCodexLogin()
 	a.agentRuntime().closeMcpClients()

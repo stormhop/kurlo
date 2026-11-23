@@ -169,3 +169,99 @@ func TestSupported(t *testing.T) {
 		}
 	}
 }
+
+func TestMacRecoveryRespectsOwnerAndManualEdits(t *testing.T) {
+	const original = "http://original/route.pac"
+	mac := &fakeMac{urls: map[string]string{"Wi-Fi": original}, enabled: map[string]bool{"Wi-Fi": true}}
+	base := Manager{Path: filepath.Join(t.TempDir(), "backup.json"), GOOS: "darwin", Run: mac.run, Elevate: mac.elevate}
+	first, second, startup := base, base, base
+	ctx := context.Background()
+	if err := first.Enable(ctx, "http://first/proxy.pac"); err != nil {
+		t.Fatal(err)
+	}
+	if err := second.Enable(ctx, "http://second/proxy.pac"); err != nil {
+		t.Fatal(err)
+	}
+	for _, other := range []*Manager{&first, &startup} {
+		if err := other.Recover(ctx); err != nil || other.Active() || !second.Active() || mac.urls["Wi-Fi"] != "http://second/proxy.pac" {
+			t.Fatal(mac.urls, err)
+		}
+	}
+	mac.urls["Wi-Fi"] += "?profile=work"
+	mac.enabled["USB LAN"] = false
+	if err := second.Recover(ctx); err != nil || mac.urls["Wi-Fi"] != "http://second/proxy.pac?profile=work" || mac.enabled["USB LAN"] {
+		t.Fatal(mac.urls, mac.enabled, err)
+	}
+}
+
+func TestMacRecoveryRetriesReadAndPartialRestore(t *testing.T) {
+	mac := &fakeMac{urls: map[string]string{"Wi-Fi": "http://old/pac"}, enabled: map[string]bool{"Wi-Fi": false}}
+	m := Manager{Path: filepath.Join(t.TempDir(), "backup.json"), GOOS: "darwin", Run: mac.run, Elevate: mac.elevate}
+	ctx := context.Background()
+	if err := m.Enable(ctx, "http://recorder/pac"); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"-getautoproxyurl", "-setautoproxystate"} {
+		m.Run = func(ctx context.Context, name string, args ...string) (string, error) {
+			if args[0] == command && args[1] == "Wi-Fi" {
+				return "", errors.New("temporary failure")
+			}
+			return mac.run(ctx, name, args...)
+		}
+		if err := m.Recover(ctx); err == nil || !m.Active() {
+			t.Fatal(command, err)
+		}
+	}
+	m.Run = mac.run
+	if err := m.Recover(ctx); err != nil || mac.urls["Wi-Fi"] != "http://old/pac" || mac.enabled["Wi-Fi"] || m.Active() {
+		t.Fatal(mac.urls, mac.enabled, err)
+	}
+}
+
+func TestGnomeRecoveryRetriesAndRespectsManualMode(t *testing.T) {
+	for _, action := range []string{"read error", "write error", "manual edit", "abandoned lease"} {
+		t.Run(action, func(t *testing.T) {
+			settings := map[string]string{"mode": "manual", "autoconfig-url": "http://original/pac"}
+			fail := ""
+			runner := func(_ context.Context, _ string, args ...string) (string, error) {
+				if args[0]+" "+args[2] == fail {
+					return "", errors.New("temporary settings failure")
+				}
+				if args[0] == "get" {
+					return "'" + settings[args[2]] + "'", nil
+				}
+				settings[args[2]] = args[3]
+				return "", nil
+			}
+			ctx := context.Background()
+			m := &Manager{Path: filepath.Join(t.TempDir(), "backup.json"), GOOS: "linux", Run: runner}
+			if err := m.Enable(ctx, "http://recorder/pac"); err != nil {
+				t.Fatal(err)
+			}
+			wantMode, wantURL := "manual", "http://original/pac"
+			switch action {
+			case "read error":
+				fail = "get autoconfig-url"
+			case "write error":
+				fail = "set mode"
+			case "manual edit":
+				wantMode, wantURL = "none", "http://recorder/pac"
+				settings["mode"] = "none"
+			case "abandoned lease":
+				if err := m.currentLease().file.Close(); err != nil {
+					t.Fatal(err)
+				}
+				m = &Manager{Path: m.Path, GOOS: "linux", Run: runner}
+			}
+			if fail != "" {
+				if err := m.Recover(ctx); err == nil || !m.Active() {
+					t.Fatal(err)
+				}
+				fail = ""
+			}
+			if err := m.Recover(ctx); err != nil || settings["mode"] != wantMode || settings["autoconfig-url"] != wantURL {
+				t.Fatal(settings, err)
+			}
+		})
+	}
+}

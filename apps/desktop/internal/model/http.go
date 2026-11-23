@@ -289,6 +289,7 @@ type ResponseTime struct {
 	DNSLookup            float64 `json:"dnsLookup"`
 	TCPHandshake         float64 `json:"tcpHandshake"`
 	TLSHandshake         float64 `json:"tlsHandshake"`
+	Send                 float64 `json:"send,omitempty"`
 	WaitingTTFB          float64 `json:"waitingTTFB"`
 	Download             float64 `json:"download"`
 	Process              float64 `json:"process"`

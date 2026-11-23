@@ -154,7 +154,7 @@ func harTimings(t *model.ResponseTime, duration int64) map[string]float64 {
 	if t.TLSHandshake > 0 {
 		ssl = t.TLSHandshake
 	}
-	return map[string]float64{"blocked": t.Prepare + t.SocketInitialization + t.Process, "dns": dns, "connect": connect, "ssl": ssl, "send": 0, "wait": t.WaitingTTFB, "receive": t.Download}
+	return map[string]float64{"blocked": t.Prepare + t.SocketInitialization + t.Process, "dns": dns, "connect": connect, "ssl": ssl, "send": t.Send, "wait": t.WaitingTTFB, "receive": t.Download}
 }
 
 func sessionTimings(h map[string]float64, total float64) *model.ResponseTime {
@@ -169,8 +169,8 @@ func sessionTimings(h map[string]float64, total float64) *model.ResponseTime {
 	}
 	ssl := part("ssl")
 	tcp := max(0, part("connect")-ssl)
-	t := &model.ResponseTime{Prepare: part("blocked"), DNSLookup: part("dns"), TCPHandshake: tcp, TLSHandshake: ssl, WaitingTTFB: part("send") + part("wait"), Download: part("receive")}
-	sum := t.Prepare + t.DNSLookup + t.TCPHandshake + t.TLSHandshake + t.WaitingTTFB + t.Download
+	t := &model.ResponseTime{Prepare: part("blocked"), DNSLookup: part("dns"), TCPHandshake: tcp, TLSHandshake: ssl, Send: part("send"), WaitingTTFB: part("wait"), Download: part("receive")}
+	sum := t.Prepare + t.DNSLookup + t.TCPHandshake + t.TLSHandshake + t.Send + t.WaitingTTFB + t.Download
 	if sum == 0 {
 		return nil
 	}

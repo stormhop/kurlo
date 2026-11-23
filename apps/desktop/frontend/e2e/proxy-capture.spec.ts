@@ -3,6 +3,33 @@ import { installKurloBridge } from './support/bridge';
 import { connection, installAgentBridge } from './support/agent';
 import type { ProxyConfig, ProxyEntry, ProxyRule } from '../src/lib/wire';
 
+async function installSaveCapture(page: import('@playwright/test').Page, content: Record<string, unknown>) {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(responseContent => {
+    let running = false;
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const entry: ProxyEntry = { id: 1, started: '2026-11-23T10:00:00Z', duration: 15, sent: 0, received: 12, host: 'shop.test', url: 'https://shop.test/orders', method: 'GET', path: '/orders', status: 200 };
+    const status = () => ({ running, address: running ? '127.0.0.1:9090' : '', count: running ? 1 : 0, config, rules: 0, systemProxy: false });
+    const app = window.go!.api!.App!;
+    Object.assign(app, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => running ? [entry] : [],
+      StartProxyCapture: async () => { running = true; return status(); },
+      StopProxyCapture: async () => { running = false; return status(); },
+      ProxyCaptureEntry: async () => ({ entry, request: { headers: {}, body: '', binary: false, truncated: false }, response: { headers: { 'Content-Type': ['application/octet-stream'] }, body: '', binary: false, truncated: false } }),
+      ProxyCaptureHAR: async () => JSON.stringify({ log: { entries: [{ request: { method: 'GET', url: entry.url, queryString: [] }, response: { status: 200, statusText: 'OK', content: responseContent } }] } }),
+    });
+  }, content);
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await page.getByRole('button', { name: 'Record', exact: true }).click();
+  const row = page.locator('.capture-row').filter({ hasText: '/orders' });
+  await expect(row).toBeVisible();
+  await row.click();
+}
+
 test('capture, inspect a tunnel and save an HTTP request with its example', async ({ page }) => {
   await installKurloBridge(page);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -61,6 +88,38 @@ test('capture, inspect a tunnel and save an HTTP request with its example', asyn
   expect(saved?.folderPath).toEqual(['Captured']);
   expect(saved?.url).toBe('http://shop.test/orders');
   expect(saved?.examples?.[0]?.response.body).toBe('{"total":42}');
+});
+
+test('refuses Save as request for binary responses and keeps HAR export available', async ({ page }) => {
+  await installSaveCapture(page, { mimeType: 'application/octet-stream', text: 'AAE=', encoding: 'base64' });
+  await page.getByRole('button', { name: 'Save as request' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Save as request' });
+  await dialog.getByLabel('Request name').fill('Binary response');
+  await dialog.getByRole('button', { name: 'Save request', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('alert')).toContainText('binary response');
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.length)).toBe(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Export HAR', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedFiles.length)).toBe(1);
+  const exported = await page.evaluate(() => window.__kurloE2E.savedFiles[0]?.content ?? '');
+  expect(exported).toContain('"encoding":"base64"');
+  expect(exported).toContain('AAE=');
+});
+
+test('refuses Create collection for incomplete responses without importing a partial example', async ({ page }) => {
+  await installSaveCapture(page, { mimeType: 'text/plain', text: 'partial preview', _incomplete: true });
+  await page.getByRole('button', { name: 'Create collection', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('incomplete response');
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.length)).toBe(0);
+});
+
+test('opens a captured request with a binary response without creating an empty example', async ({ page }) => {
+  await installSaveCapture(page, { mimeType: 'application/octet-stream', text: 'AAE=', encoding: 'base64' });
+  await page.getByRole('button', { name: 'Open in editor', exact: true }).click();
+  await expect(page.getByLabel('Request URL')).toHaveValue('https://shop.test/orders');
+  const examples = await page.evaluate(() => window.__kurloE2E.store.requests.at(-1)?.examples ?? []);
+  expect(examples).toEqual([]);
 });
 
 test('decrypt a tunnelled host with the trusted Kurlo certificate', async ({ page }) => {
@@ -232,7 +291,7 @@ test('search captured bodies and clear the list while recording', async ({ page 
   await page.goto('/');
   await page.evaluate(() => {
     const bodies: Record<number, string> = { 1: '{"invoice":"INV-42"}', 2: '{"items":[]}', 3: '{"user":"ada"}' };
-    let rows: ProxyEntry[] = ['/orders', '/cart', '/profile'].map((path, index) => ({ id: index + 1, started: '2026-11-18T14:32:00Z', duration: 10, sent: 0, received: 20, host: 'shop.test', url: 'http://shop.test' + path, method: 'GET', path, status: 200 }));
+    let rows: ProxyEntry[] = ['/orders?color=aquamarine', '/cart', '/profile'].map((path, index) => ({ id: index + 1, started: '2026-11-18T14:32:00Z', duration: 10, sent: 0, received: 20, host: 'shop.test', url: 'http://shop.test' + path, method: 'GET', path: path.split('?')[0], status: 200 }));
     const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
     const status = () => ({ running: true, address: '127.0.0.1:9090', count: rows.length, config, rules: 0, systemProxy: false });
     const searches: string[] = [];
@@ -263,6 +322,11 @@ test('search captured bodies and clear the list while recording', async ({ page 
   await page.getByLabel('Filter traffic').fill('/cart');
   await expect(page.locator('.capture-row')).toHaveCount(1);
   await expect(page.locator('.capture-row .capture-match')).toHaveCount(0);
+  await page.getByLabel('Filter traffic').fill('aquamarine');
+  await expect(page.locator('.capture-row')).toHaveCount(1);
+  await expect(page.locator('.capture-row')).toContainText('/orders');
+  await page.getByLabel('Filter traffic').fill('orders');
+  await expect(page.locator('.capture-row')).toHaveCount(1);
   await page.getByLabel('Filter traffic').fill('');
   await expect(page.locator('.capture-row')).toHaveCount(3);
   expect(await page.evaluate(() => (window as unknown as { searches: string[] }).searches)).toContain('inv-42');
@@ -270,6 +334,270 @@ test('search captured bodies and clear the list while recording', async ({ page 
   await expect(page.locator('.capture-row')).toHaveCount(0);
   await expect(page.locator('.capture .empty-state')).toContainText('Waiting for traffic');
   await expect(page.getByRole('button', { name: 'Clear', exact: true })).toBeDisabled();
+});
+
+test('search starts while capture events continue arriving', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const row: ProxyEntry = { id: 1, started: '2026-11-18T14:32:00Z', duration: 10, sent: 0, received: 20, host: 'shop.test', url: 'http://shop.test/orders', method: 'GET', path: '/orders', status: 200 };
+    const calls: string[] = [];
+    (window as unknown as { proxySearchCalls: string[] }).proxySearchCalls = calls;
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false }),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [row],
+      StartProxyCapture: async () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false }),
+      SearchProxyCapture: async (query: string) => {
+        calls.push(query);
+        await new Promise(resolve => setTimeout(resolve, 620));
+        return query === 'fixed-query' ? [{ id: 1, where: ['response body'] }] : [];
+      },
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await expect(page.locator('.capture-row')).toHaveCount(1);
+  await page.getByLabel('Filter traffic').fill('fixed-query');
+  await page.evaluate(() => {
+    const state = window.__kurloE2E;
+    const timer = window.setInterval(() => state.emit('proxy:changed', {}), 80);
+    window.setTimeout(() => window.clearInterval(timer), 1300);
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { proxySearchCalls: string[] }).proxySearchCalls.includes('fixed-query')), { timeout: 1050 }).toBe(true);
+  await expect(page.locator('.capture-row .capture-match')).toHaveText('in response body', { timeout: 1250 });
+});
+
+test('a newer search wins while capture traffic continues', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const row: ProxyEntry = { id: 1, started: '2026-11-18T14:32:00Z', duration: 10, sent: 0, received: 20, host: 'shop.test', url: 'http://shop.test/orders', method: 'GET', path: '/orders', status: 200 };
+    const calls: string[] = [];
+    (window as unknown as { proxySearchCalls: string[] }).proxySearchCalls = calls;
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false }),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [row],
+      StartProxyCapture: async () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false }),
+      SearchProxyCapture: async (query: string) => {
+        calls.push(query);
+        if (query === 'first-query') await new Promise(resolve => setTimeout(resolve, 600));
+        return query === 'first-query' ? [{ id: 1, where: ['response body'] }] : [];
+      },
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await expect(page.locator('.capture-row')).toHaveCount(1);
+  const filter = page.getByLabel('Filter traffic');
+  await filter.fill('first-query');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { proxySearchCalls: string[] }).proxySearchCalls.includes('first-query'))).toBe(true);
+  await page.evaluate(() => {
+    const state = window.__kurloE2E;
+    const timer = window.setInterval(() => state.emit('proxy:changed', {}), 80);
+    window.setTimeout(() => window.clearInterval(timer), 1400);
+  });
+  await filter.fill('second-query');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { proxySearchCalls: string[] }).proxySearchCalls.includes('second-query'))).toBe(true);
+  await expect(page.locator('.capture-row')).toHaveCount(0);
+  await page.waitForTimeout(700);
+  await expect(page.locator('.capture-row')).toHaveCount(0);
+});
+
+test('Map local copies the complete text body of an archived response', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  const body = 'x'.repeat(20 * 1024) + 'ARCHIVE_TAIL_MARKER';
+  await page.evaluate(body => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const row: ProxyEntry = { id: 1, started: '2026-11-22T10:00:00Z', duration: 15, sent: 0, received: body.length, host: 'shop.test', url: 'https://shop.test/orders/42', method: 'GET', path: '/orders/42', status: 201 };
+    const rules: ProxyRule[][] = [];
+    (window as unknown as { archiveRuleWrites: ProxyRule[][] }).archiveRuleWrites = rules;
+    const status = () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false });
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [row],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async () => ({ entry: row, request: { headers: {}, body: '', binary: false, truncated: false }, response: { headers: { 'Content-Type': ['text/plain'] }, body: body.slice(0, 16 * 1024), binary: false, truncated: true, archived: true } }),
+      ProxyCaptureHAR: async () => JSON.stringify({ log: { entries: [{ response: { content: { mimeType: 'text/plain', text: body } } }] } }),
+      SetProxyRules: async (next: ProxyRule[]) => { rules.push(JSON.parse(JSON.stringify(next))); return next; },
+    });
+  }, body);
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const detail = page.getByRole('region', { name: 'Captured exchange' });
+  await expect(detail).toContainText('First 16 KiB shown. Export HAR for the full body.');
+  await detail.getByRole('button', { name: 'Map local' }).click();
+  const editor = page.getByRole('dialog', { name: 'New Map local rule' });
+  await expect(editor.getByRole('status')).toHaveCount(0);
+  const screenshot = process.env.KURLO_PROXY_ARCHIVED_RULE_SCREENSHOT;
+  if (screenshot) await page.screenshot({ path: screenshot, animations: 'disabled' });
+  await editor.getByRole('button', { name: 'Add rule' }).click();
+  const saved = await page.evaluate(() => (window as unknown as { archiveRuleWrites: ProxyRule[][] }).archiveRuleWrites.at(-1)?.[0].local.body ?? '');
+  expect(saved).toBe(body);
+});
+
+test('warns and omits binary, incomplete, and oversized archived bodies', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const row: ProxyEntry = { id: 1, started: '2026-11-22T10:00:00Z', duration: 15, sent: 0, received: 20 * 1024, host: 'shop.test', url: 'https://shop.test/orders/42', method: 'GET', path: '/orders/42', status: 201 };
+    let content: Record<string, unknown> = { mimeType: 'text/plain', text: 'x'.repeat(20 * 1024), _incomplete: true };
+    const status = () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false });
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [row],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async () => ({ entry: row, request: { headers: {}, body: '', binary: false, truncated: false }, response: { headers: { 'Content-Type': ['text/plain'] }, body: 'x'.repeat(16 * 1024), binary: false, truncated: true, archived: true } }),
+      ProxyCaptureHAR: async () => JSON.stringify({ log: { entries: [{ response: { content } }] } }),
+      SetProxyRules: async (next: ProxyRule[]) => next,
+    });
+    (window as unknown as { setArchivedContent: (value: Record<string, unknown>) => void }).setArchivedContent = value => { content = value; };
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const detail = page.getByRole('region', { name: 'Captured exchange' });
+  await detail.getByRole('button', { name: 'Map local' }).click();
+  const editor = page.getByRole('dialog', { name: 'New Map local rule' });
+  await expect(editor.getByRole('status')).toContainText('incomplete');
+  await expect(editor.getByLabel('Local response body').locator('.cm-placeholder')).toBeVisible();
+  await editor.getByRole('button', { name: 'Close dialog' }).click();
+  await page.evaluate(() => (window as unknown as { setArchivedContent: (value: Record<string, unknown>) => void }).setArchivedContent({ mimeType: 'application/octet-stream', text: 'AA==', encoding: 'base64' }));
+  await detail.getByRole('button', { name: 'Map local' }).click();
+  const binaryEditor = page.getByRole('dialog', { name: 'New Map local rule' });
+  await expect(binaryEditor.getByRole('status')).toContainText('binary');
+  await expect(binaryEditor.getByLabel('Local response body').locator('.cm-placeholder')).toBeVisible();
+  await binaryEditor.getByRole('button', { name: 'Close dialog' }).click();
+  await page.evaluate(() => (window as unknown as { setArchivedContent: (value: Record<string, unknown>) => void }).setArchivedContent({ mimeType: 'text/plain', text: 'x'.repeat((1 << 20) + 1) }));
+  await detail.getByRole('button', { name: 'Map local' }).click();
+  const largeEditor = page.getByRole('dialog', { name: 'New Map local rule' });
+  await expect(largeEditor.getByRole('status')).toContainText('exceeds the 1 MiB');
+  await expect(largeEditor.getByLabel('Local response body').locator('.cm-placeholder')).toBeVisible();
+});
+
+test('does not use the preview of an incomplete unarchived response', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const row: ProxyEntry = { id: 1, started: '2026-11-22T10:00:00Z', duration: 15, sent: 0, received: 20 * 1024, host: 'shop.test', url: 'https://shop.test/orders/42', method: 'GET', path: '/orders/42', status: 201 };
+    const status = () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false });
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [row],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async () => ({ entry: row, request: { headers: {}, body: '', binary: false, truncated: false }, response: { headers: { 'Content-Type': ['text/plain'] }, body: 'x'.repeat(16 * 1024), binary: false, truncated: true, archived: false } }),
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const detail = page.getByRole('region', { name: 'Captured exchange' });
+  await expect(detail).toContainText('Only the first 16 KiB were kept.');
+  await detail.getByRole('button', { name: 'Map local' }).click();
+  const editor = page.getByRole('dialog', { name: 'New Map local rule' });
+  await expect(editor.getByRole('status')).toContainText('incomplete');
+  await expect(editor.getByLabel('Local response body').locator('.cm-placeholder')).toBeVisible();
+});
+
+test('does not open an archived rule after the selected exchange changes', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const rows: ProxyEntry[] = [1, 2].map(id => ({ id, started: '2026-11-22T10:00:00Z', duration: 15, sent: 0, received: 20 * 1024, host: 'shop.test', url: `https://shop.test/orders/${id}`, method: 'GET', path: `/orders/${id}`, status: 201 }));
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => ({ running: true, address: '127.0.0.1:9090', count: 2, config, rules: 0, systemProxy: false }),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => rows,
+      StartProxyCapture: async () => ({ running: true, address: '127.0.0.1:9090', count: 2, config, rules: 0, systemProxy: false }),
+      ProxyCaptureEntry: async (id: number) => ({ entry: rows.find(row => row.id === id), request: { headers: {}, body: '', binary: false, truncated: false }, response: id === 1 ? { headers: {}, body: 'preview', binary: false, truncated: true, archived: true } : { headers: {}, body: 'second body', binary: false, truncated: false } }),
+      ProxyCaptureHAR: async () => new Promise(resolve => { (window as unknown as { resolveArchiveHAR: (value: string) => void }).resolveArchiveHAR = resolve; }),
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  const detail = page.getByRole('region', { name: 'Captured exchange' });
+  await expect(detail).toContainText('/orders/1');
+  await detail.getByRole('button', { name: 'Map local' }).click();
+  await page.locator('.capture-row').filter({ hasText: '/orders/2' }).click();
+  await expect(detail).toContainText('/orders/2');
+  await page.evaluate(() => {
+    const har = JSON.stringify({ log: { entries: [{ response: { content: { mimeType: 'text/plain', text: 'stale archived body' } } }] } });
+    (window as unknown as { resolveArchiveHAR: (value: string) => void }).resolveArchiveHAR(har);
+  });
+  await expect(page.getByRole('dialog', { name: 'New Map local rule' })).toHaveCount(0);
+  await detail.getByRole('button', { name: 'Map local' }).click();
+  const editor = page.getByRole('dialog', { name: 'New Map local rule' });
+  await expect(editor.getByLabel('URL pattern')).toHaveValue('https://shop.test/orders/2');
+});
+
+test('Load file replaces the body with the selected empty file', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await installRulesCapture(page);
+  await page.evaluate(() => {
+    const files = ['/tmp/response.txt', '/tmp/empty-response.txt'];
+    Object.assign(window.go!.api!.App!, {
+      OpenFileDialog: async () => files.shift() ?? '',
+      ReadProxyResponseFile: async (path: string) => path.endsWith('empty-response.txt') ? '' : 'loaded file response',
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await page.getByRole('button', { name: 'Capture rules' }).click();
+  await page.getByRole('button', { name: 'Add Map local' }).click();
+  const editor = page.getByRole('dialog', { name: 'New Map local rule' });
+  const body = editor.getByLabel('Local response body').locator('.cm-content');
+  await body.fill('old response body');
+  await editor.getByRole('button', { name: 'Load file…' }).click();
+  await expect(body).toContainText('loaded file response');
+  await body.fill('old response body');
+  await editor.getByRole('button', { name: 'Load file…' }).click();
+  await expect(body.locator('.cm-placeholder')).toBeVisible();
+  const screenshot = process.env.KURLO_PROXY_EMPTY_FILE_SCREENSHOT;
+  if (screenshot) await page.screenshot({ path: screenshot, animations: 'disabled' });
+});
+
+test('Use a saved example fills the local response status, type and body', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1120, height: 680 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const row: ProxyEntry = { id: 1, started: '2026-11-22T10:00:00Z', duration: 15, sent: 0, received: 20, host: 'shop.test', url: 'https://shop.test/orders', method: 'GET', path: '/orders', status: 201 };
+    const status = () => ({ running: true, address: '127.0.0.1:9090', count: 1, config, rules: 0, systemProxy: false });
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => status(),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [row],
+      StartProxyCapture: async () => status(),
+      ProxyCaptureEntry: async () => ({ entry: row, request: { headers: {}, body: '', binary: false, truncated: false }, response: { headers: { 'Content-Type': ['text/plain'] }, body: 'saved example body', binary: false, truncated: false } }),
+      ProxyCaptureHAR: async () => JSON.stringify({ log: { entries: [{ request: { method: 'GET', url: row.url, queryString: [] }, response: { status: 201, statusText: 'Created', headers: [{ name: 'Content-Type', value: 'text/plain' }], content: { mimeType: 'text/plain', text: 'saved example body' } } }] } }),
+      ProxyRules: async () => [],
+      SetProxyRules: async (next: ProxyRule[]) => next,
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await page.getByRole('button', { name: 'Create collection', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.length)).toBe(1);
+  await page.getByRole('tab', { name: /Capture/ }).click();
+  await page.getByRole('button', { name: 'Capture rules' }).click();
+  await page.getByRole('button', { name: 'Add Map local' }).click();
+  const editor = page.getByRole('dialog', { name: 'New Map local rule' });
+  await editor.getByLabel('URL pattern').fill('https://shop.test/orders');
+  await editor.getByLabel('Saved request').click();
+  await page.getByRole('option', { name: /GET \/orders/ }).click();
+  await editor.getByLabel('Response example').click();
+  await page.getByRole('option', { name: '201 Created' }).click();
+  await expect(editor.getByLabel('Status')).toHaveValue('201');
+  await expect(editor.getByLabel('Content-Type')).toHaveValue('text/plain');
+  await expect(editor.getByLabel('Local response body').locator('.cm-content')).toContainText('saved example body');
+  const screenshot = process.env.KURLO_PROXY_SAVED_EXAMPLE_SCREENSHOT;
+  if (screenshot) await page.screenshot({ path: screenshot, animations: 'disabled' });
 });
 
 async function installRulesCapture(page: import('@playwright/test').Page) {
@@ -359,6 +687,54 @@ test('create, edit, order and remove capture rules', async ({ page }) => {
   expect(saved[1][1].rewrite.setRequestHeaders).toEqual([{ name: 'X-Env', value: 'dev' }]);
   await drawer.getByRole('button', { name: 'Close rules' }).click();
   await expect(drawer).toHaveCount(0);
+});
+
+test('edit a Map local rule returned with null rewrite header arrays', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1120, height: 680 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const rule = { id: 'audit-local', name: 'Audit local', enabled: true, kind: 'local', method: '', url: 'https://shop.test/orders/*', local: { status: 200, contentType: 'text/plain', body: 'saved response', delayMs: 0, rateKiB: 0, errorPercent: 0, pause: false, script: '' }, rewrite: { target: '', pathFrom: '', pathTo: '', setRequestHeaders: null, removeRequestHeaders: null, setResponseHeaders: null, removeResponseHeaders: null }, hits: 0 } as unknown as ProxyRule;
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => ({ running: true, address: '127.0.0.1:9090', count: 0, config, rules: 1, systemProxy: false }),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => [],
+      StartProxyCapture: async () => ({ running: true, address: '127.0.0.1:9090', count: 0, config, rules: 1, systemProxy: false }),
+      ProxyRules: async () => [rule],
+      SetProxyRules: async (next: ProxyRule[]) => next,
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await page.getByRole('button', { name: 'Capture rules' }).click();
+  const drawer = page.getByRole('complementary', { name: 'Capture rules' });
+  await drawer.locator('.capture-rule-main').filter({ hasText: 'Audit local' }).click();
+  const editor = page.getByRole('dialog', { name: 'Edit Map local rule' });
+  await expect(editor.getByLabel('Local response body').locator('.cm-line')).toHaveText(['saved response']);
+  const screenshot = process.env.KURLO_PROXY_NULL_REWRITE_SCREENSHOT;
+  if (screenshot) await page.screenshot({ path: screenshot, animations: 'disabled' });
+});
+
+test('create a collection without dropping requests that differ by query parameters', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: [], systemProxy: false };
+    const rows: ProxyEntry[] = [1, 2].map(page => ({ id: page, started: '2026-11-18T14:32:00Z', duration: 10, sent: 0, received: 20, host: 'shop.test', url: `https://shop.test/orders?page=${page}`, method: 'GET', path: '/orders', status: 200 }));
+    Object.assign(window.go!.api!.App!, {
+      ProxyCaptureStatus: async () => ({ running: true, address: '127.0.0.1:9090', count: rows.length, config, rules: 0, systemProxy: false }),
+      ProxyPausedResponses: async () => [],
+      ProxyCaptureEntries: async () => rows,
+      StartProxyCapture: async () => ({ running: true, address: '127.0.0.1:9090', count: rows.length, config, rules: 0, systemProxy: false }),
+      ProxyCaptureEntry: async (id: number) => ({ entry: rows.find(row => row.id === id), request: { headers: {}, body: '', binary: false, truncated: false }, response: { headers: {}, body: '', binary: false, truncated: false } }),
+      ProxyCaptureHAR: async () => JSON.stringify({ log: { entries: [1, 2].map(page => ({ request: { method: 'GET', url: `https://shop.test/orders?page=${page}`, queryString: [{ name: 'page', value: String(page) }] }, response: { status: 200, content: { mimeType: 'text/plain', text: '' } } })) } }),
+    });
+  });
+  await page.getByRole('button', { name: 'Capture proxy' }).click();
+  await expect(page.locator('.capture-row')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Create collection', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.filter(request => request.url.startsWith('https://shop.test/orders')).map(request => request.params.map(param => [param.key, param.value])))).toEqual([[['page', '1']], [['page', '2']]]);
 });
 
 test('select several captured rows and act on them', async ({ page }) => {
@@ -463,7 +839,7 @@ test('show timing phases and the client protocol of a captured exchange', async 
     const config: ProxyConfig = { port: 9090, listenIP: '127.0.0.1', clientIP: '', include: '', service: '', certificate: '', key: '', identifyProcess: false, sslHosts: ['api.shop.test'], systemProxy: false };
     const status = () => ({ running: false, address: '', count: rows.length, config, rules: 0, systemProxy: false });
     const msg = { headers: { 'Content-Type': ['application/json'] }, body: '{"orders":[]}', binary: false, truncated: false };
-    const timings = { total: 74.62, prepare: 0.01, socketInitialization: 0.01, dnsLookup: 3.2, tcpHandshake: 0.4, tlsHandshake: 6.8, waitingTTFB: 41.38, download: 22.8, process: 0.02 };
+    const timings = { total: 74.62, prepare: 0.01, socketInitialization: 0.01, dnsLookup: 3.2, tcpHandshake: 0.4, tlsHandshake: 6.8, send: 5, waitingTTFB: 36.38, download: 22.8, process: 0.02 };
     Object.assign(window.go!.api!.App!, {
       ProxyCaptureStatus: async () => status(),
       ProxyPausedResponses: async () => [],
@@ -481,7 +857,9 @@ test('show timing phases and the client protocol of a captured exchange', async 
   const popover = detail.getByRole('tooltip');
   await expect(popover).toBeVisible();
   await expect(popover).toContainText('TLS Handshake');
-  await expect(popover).toContainText('41 ms');
+  await expect(popover).toContainText('Send');
+  await expect(popover).toContainText('5 ms');
+  await expect(popover).toContainText('36 ms');
   const shot = process.env.KURLO_PROXY_TIMING_SCREENSHOT;
   if (shot) await page.screenshot({ path: shot, animations: 'disabled' });
   await page.locator('.capture-row').nth(1).click();

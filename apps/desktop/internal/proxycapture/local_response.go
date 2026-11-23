@@ -19,7 +19,9 @@ func (s *session) serveLocal(w http.ResponseWriter, r *http.Request, x *Exchange
 	x.Entry.Local = true
 	x.Entry.Rule = ruleNames(matches[:1])
 	var request preview
-	request.files = s.files
+	if s.includes(r.URL.Hostname()) {
+		request.files = s.files
+	}
 	if r.Body != nil {
 		_, err := io.Copy(&request, r.Body)
 		if err != nil {
@@ -71,7 +73,10 @@ func (s *session) serveLocal(w http.ResponseWriter, r *http.Request, x *Exchange
 	}
 	x.Entry.Status = status
 	x.Entry.Received = int64(n)
-	response := preview{files: s.files}
+	response := preview{}
+	if s.includes(r.URL.Hostname()) {
+		response.files = s.files
+	}
 	io.WriteString(&response, body[:n])
 	x.Response, _ = response.message(copyHeaders(w.Header()))
 	return true

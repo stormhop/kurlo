@@ -122,22 +122,40 @@ func (r *Recorder) HARDecoded(ids []int64, decode func(http.Header, string, int)
 		}
 		binary := x.Response.Binary
 		size := e.Received
-		if decode != nil && remaining > 0 && (!x.Response.Truncated || x.Response.Archived) && http.Header(x.Response.Headers).Get("Content-Encoding") != "" {
+		if x.harContentSize != nil {
+			size = *x.harContentSize
+		}
+		wireEncoded := x.Response.HasContentEncoding()
+		if decode != nil && remaining > 0 && (!x.Response.Truncated || x.Response.Archived) && wireEncoded {
 			if decoded, ok := decode(x.Response.Headers, resBody, min(maxBodyFile, remaining)); ok {
 				resBody = decoded
+				wireEncoded = false
 				size = int64(len(decoded))
 				binary = !utf8.ValidString(decoded) || strings.IndexByte(decoded, 0) >= 0
 				remaining -= len(decoded)
 			}
 		}
 		content := map[string]any{"size": size, "mimeType": http.Header(x.Response.Headers).Get("Content-Type"), "text": resBody, "_incomplete": x.Response.Truncated && !x.Response.Archived}
-		if binary || !utf8.ValidString(resBody) {
+		if wireEncoded || binary && http.Header(x.Response.Headers).Get("Content-Encoding") != "" {
+			content["_wireEncoded"] = wireEncoded
+		}
+		if wireEncoded || binary || !utf8.ValidString(resBody) {
 			content["encoding"] = "base64"
 			content["text"] = base64.StdEncoding.EncodeToString([]byte(resBody))
 		}
 		resp := map[string]any{"status": e.Status, "statusText": http.StatusText(e.Status), "headers": pairs(x.Response.Headers), "cookies": []any{}, "content": content, "redirectURL": http.Header(x.Response.Headers).Get("Location"), "headersSize": -1, "bodySize": e.Received}
+		if x.harStatusText != nil {
+			resp["statusText"] = *x.harStatusText
+		}
+		if x.harBodySize != nil {
+			resp["bodySize"] = *x.harBodySize
+		}
 		resp["httpVersion"] = version
-		item := map[string]any{"startedDateTime": e.Started, "time": e.Duration, "request": req, "response": resp, "cache": map[string]any{}, "timings": harTimings(x.Timings, e.Duration)}
+		timings := x.harTimings
+		if timings == nil {
+			timings = harTimings(x.Timings, e.Duration)
+		}
+		item := map[string]any{"startedDateTime": e.Started, "time": e.Duration, "request": req, "response": resp, "cache": map[string]any{}, "timings": timings}
 		if ext := (harExtension{Stream: e.Stream, Process: e.Process, Error: e.Error, Rule: e.Rule, Rewritten: e.Rewritten, Local: e.Local, Frames: x.Frames, Timings: x.Timings}); ext.Stream != "" || ext.Process != "" || ext.Error != "" || ext.Rule != "" || ext.Rewritten != "" || ext.Local || len(ext.Frames) > 0 || ext.Timings != nil {
 			item["_kurlo"] = ext
 		}

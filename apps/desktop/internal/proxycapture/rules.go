@@ -58,10 +58,11 @@ type Rule struct {
 
 type compiledRule struct {
 	Rule
-	pattern   *regexp.Regexp
-	withQuery bool
-	target    *url.URL
-	hits      *atomic.Int64
+	pattern        *regexp.Regexp
+	withQuery      bool
+	wildcardScheme bool
+	target         *url.URL
+	hits           *atomic.Int64
 }
 
 type ruleSet struct {
@@ -72,16 +73,10 @@ type ruleSet struct {
 var methodPattern = regexp.MustCompile(`^[A-Z]{1,16}$`)
 var headerNamePattern = regexp.MustCompile("^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$")
 
-func (s *ruleSet) set(rules []Rule) error {
+func (s *ruleSet) set(rules []Rule, persist func([]Rule) error) error {
 	if len(rules) > maxRules {
 		return fmt.Errorf("keep at most %d rules", maxRules)
 	}
-	s.mu.RLock()
-	previous := map[string]*atomic.Int64{}
-	for _, rule := range s.list {
-		previous[rule.ID] = rule.hits
-	}
-	s.mu.RUnlock()
 	seen := map[string]bool{}
 	compiled := make([]*compiledRule, 0, len(rules))
 	for i, rule := range rules {
@@ -97,15 +92,30 @@ func (s *ruleSet) set(rules []Rule) error {
 			return fmt.Errorf("rule %q appears twice", item.ID)
 		}
 		seen[item.ID] = true
+		compiled = append(compiled, item)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if persist != nil {
+		saved := make([]Rule, len(compiled))
+		for i, item := range compiled {
+			saved[i] = item.Rule
+		}
+		if err := persist(saved); err != nil {
+			return err
+		}
+	}
+	previous := make(map[string]*atomic.Int64, len(s.list))
+	for _, item := range s.list {
+		previous[item.ID] = item.hits
+	}
+	for _, item := range compiled {
 		item.hits = previous[item.ID]
 		if item.hits == nil {
 			item.hits = new(atomic.Int64)
 		}
-		compiled = append(compiled, item)
 	}
-	s.mu.Lock()
 	s.list = compiled
-	s.mu.Unlock()
 	return nil
 }
 
@@ -148,19 +158,35 @@ func (c *compiledRule) matches(r *http.Request) bool {
 	if c.Method != "" && c.Method != r.Method {
 		return false
 	}
-	return c.pattern.MatchString(matchTarget(r.URL, c.withQuery))
+	host := strings.ToLower(r.URL.Host)
+	if c.pattern.MatchString(matchTarget(r.URL, host, c.withQuery)) {
+		return true
+	}
+	hostWithoutPort := withoutDefaultPort(r.URL.Scheme, host)
+	return !c.wildcardScheme && hostWithoutPort != host && c.pattern.MatchString(matchTarget(r.URL, hostWithoutPort, c.withQuery))
 }
 
-func matchTarget(u *url.URL, withQuery bool) string {
+func matchTarget(u *url.URL, host string, withQuery bool) string {
 	path := u.EscapedPath()
 	if path == "" {
 		path = "/"
 	}
-	value := strings.ToLower(u.Scheme) + "://" + strings.ToLower(u.Host) + path
+	scheme := strings.ToLower(u.Scheme)
+	value := scheme + "://" + host + path
 	if withQuery && u.RawQuery != "" {
 		value += "?" + u.RawQuery
 	}
 	return value
+}
+
+func withoutDefaultPort(scheme, host string) string {
+	switch strings.ToLower(scheme) {
+	case "http":
+		return strings.TrimSuffix(host, ":80")
+	case "https":
+		return strings.TrimSuffix(host, ":443")
+	}
+	return host
 }
 
 func compilePattern(raw string) (*regexp.Regexp, bool, error) {
@@ -180,7 +206,7 @@ func compilePattern(raw string) (*regexp.Regexp, bool, error) {
 	if host == "" {
 		return nil, false, errors.New("add a host to the URL pattern")
 	}
-	normalized := scheme + "://" + strings.ToLower(host) + "/"
+	normalized := scheme + "://" + withoutDefaultPort(scheme, strings.ToLower(host)) + "/"
 	if hasPath {
 		normalized += path
 	} else {
@@ -217,7 +243,7 @@ func compileRule(rule Rule) (*compiledRule, error) {
 	if err != nil {
 		return nil, err
 	}
-	item := &compiledRule{Rule: rule, pattern: pattern, withQuery: withQuery}
+	item := &compiledRule{Rule: rule, pattern: pattern, withQuery: withQuery, wildcardScheme: strings.HasPrefix(rule.URL, "*://")}
 	switch rule.Kind {
 	case RuleLocal:
 		item.Rewrite = RewriteAction{}
@@ -295,9 +321,13 @@ func applyRequestRewrites(r *http.Request, rules []*compiledRule) {
 			next.Scheme = rule.target.Scheme
 			next.Host = rule.target.Host
 		}
-		if action.PathFrom != "" && strings.Contains(next.Path, action.PathFrom) {
-			next.Path = strings.Replace(next.Path, action.PathFrom, action.PathTo, 1)
-			next.RawPath = ""
+		if start := strings.Index(next.Path, action.PathFrom); action.PathFrom != "" && start >= 0 {
+			end := start + len(action.PathFrom)
+			escaped := next.EscapedPath()
+			prefix := escapedPathOffset(escaped, start)
+			suffix := prefix + escapedPathOffset(escaped[prefix:], len(action.PathFrom))
+			next.RawPath = escaped[:prefix] + (&url.URL{Path: action.PathTo}).EscapedPath() + escaped[suffix:]
+			next.Path = next.Path[:start] + action.PathTo + next.Path[end:]
 		}
 		for _, name := range action.RemoveRequestHeaders {
 			r.Header.Del(name)
@@ -337,7 +367,11 @@ func ruleNames(rules []*compiledRule) string {
 func (r *Recorder) Rules() []Rule { return r.rules.rules() }
 
 func (r *Recorder) SetRules(rules []Rule) error {
-	if err := r.rules.set(rules); err != nil {
+	return r.SaveRules(rules, nil)
+}
+
+func (r *Recorder) SaveRules(rules []Rule, persist func([]Rule) error) error {
+	if err := r.rules.set(rules, persist); err != nil {
 		return err
 	}
 	r.mu.Lock()
@@ -347,4 +381,16 @@ func (r *Recorder) SetRules(rules []Rule) error {
 		s.changed()
 	}
 	return nil
+}
+
+func escapedPathOffset(escaped string, decodedBytes int) int {
+	offset := 0
+	for range decodedBytes {
+		if escaped[offset] == '%' {
+			offset += 3
+		} else {
+			offset++
+		}
+	}
+	return offset
 }

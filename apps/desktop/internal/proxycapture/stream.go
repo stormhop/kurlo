@@ -2,6 +2,7 @@ package proxycapture
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -9,6 +10,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
 )
 
 type Frame struct {
@@ -19,56 +23,63 @@ type Frame struct {
 }
 
 func websocketFrames(data []byte, dir string) []Frame {
+	frames, _ := websocketFramesFrom(data, dir)
+	return frames
+}
+
+func websocketFramesFrom(data []byte, dir string) ([]Frame, int) {
 	frames := []Frame{}
-	for len(data) >= 2 && len(frames) < 48 {
-		first, second := data[0], data[1]
+	consumed := 0
+	for len(data)-consumed >= 2 && len(frames) < 48 {
+		wireFrame := data[consumed:]
+		first, second := wireFrame[0], wireFrame[1]
 		off := 2
 		n := uint64(second & 127)
 		switch n {
 		case 126:
-			if len(data) < 4 {
-				return frames
+			if len(wireFrame) < 4 {
+				return frames, consumed
 			}
-			n = uint64(binary.BigEndian.Uint16(data[2:4]))
+			n = uint64(binary.BigEndian.Uint16(wireFrame[2:4]))
 			off = 4
 		case 127:
-			if len(data) < 10 {
-				return frames
+			if len(wireFrame) < 10 {
+				return frames, consumed
 			}
-			n = binary.BigEndian.Uint64(data[2:10])
+			n = binary.BigEndian.Uint64(wireFrame[2:10])
 			off = 10
 		}
 		var mask []byte
 		if second&128 != 0 {
-			if len(data) < off+4 {
-				return frames
+			if len(wireFrame) < off+4 {
+				return frames, consumed
 			}
-			mask = data[off : off+4]
+			mask = wireFrame[off : off+4]
 			off += 4
 		}
-		if n > uint64(len(data)-off) {
-			return frames
+		if n > uint64(len(wireFrame)-off) {
+			return frames, consumed
 		}
 		kind := map[byte]string{0: "Continuation", 1: "Text", 2: "Binary", 8: "Close", 9: "Ping", 10: "Pong"}[first&15]
 		if kind == "" {
 			kind = "Reserved"
 		}
-		frame := Frame{Direction: dir, Kind: kind, Size: int64(n)}
+		captured := Frame{Direction: dir, Kind: kind, Size: int64(n)}
 		if first&64 != 0 {
-			frame.Kind += " (compressed)"
+			captured.Kind += " (compressed)"
 		} else if kind == "Text" || kind == "Continuation" {
-			b := bytes.Clone(data[off : off+min(int(n), 1024)])
+			b := bytes.Clone(data[consumed+off : consumed+off+min(int(n), 1024)])
 			if mask != nil {
 				for i := range b {
 					b[i] ^= mask[i%4]
 				}
 			}
-			frame.Text = strings.ToValidUTF8(string(b), "�")
+			captured.Text = strings.ToValidUTF8(string(b), "�")
 		}
-		frames = append(frames, frame)
-		data = data[off+int(n):]
+		frames = append(frames, captured)
+		consumed += off + int(n)
 	}
-	return frames
+	return frames, consumed
 }
 func eventFrames(b []byte) []Frame {
 	text := strings.ReplaceAll(strings.ReplaceAll(strings.TrimPrefix(string(b), "\uFEFF"), "\r\n", "\n"), "\r", "\n")
@@ -82,8 +93,9 @@ func eventFrames(b []byte) []Frame {
 			value = strings.TrimPrefix(value, " ")
 			switch key {
 			case "event":
-				if value != "" {
-					kind = value
+				kind = value
+				if kind == "" {
+					kind = "message"
 				}
 			case "data":
 				data = append(data, value)
@@ -105,6 +117,11 @@ type streamTap struct {
 	mu             sync.Mutex
 	base           Exchange
 	sent, received bytes.Buffer
+	decoded        bytes.Buffer
+	frames         []Frame
+	sentParsed     int
+	receivedParsed int
+	encodedSSE     bool
 	start          time.Time
 	timer          *time.Timer
 	finished       bool
@@ -127,6 +144,37 @@ func (t *streamTap) write(b []byte, sent bool) {
 	if room := previewLimit - buf.Len(); room > 0 {
 		buf.Write(b[:min(room, len(b))])
 	}
+	if t.base.Entry.Stream == "WebSocket" && len(t.frames) < 48 {
+		parsed := &t.receivedParsed
+		direction := "Received"
+		if sent {
+			parsed = &t.sentParsed
+			direction = "Sent"
+		}
+		frames, consumed := websocketFramesFrom(buf.Bytes()[*parsed:], direction)
+		*parsed += consumed
+		room := 48 - len(t.frames)
+		t.frames = append(t.frames, frames[:min(len(frames), room)]...)
+	}
+	t.schedulePublish()
+}
+
+func (t *streamTap) writeDecoded(b []byte) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.finished {
+		return false
+	}
+	room := previewLimit - t.decoded.Len()
+	if room <= 0 {
+		return false
+	}
+	t.decoded.Write(b[:min(room, len(b))])
+	t.schedulePublish()
+	return len(b) < room
+}
+
+func (t *streamTap) schedulePublish() {
 	if t.timer == nil {
 		t.timer = time.AfterFunc(120*time.Millisecond, func() {
 			t.mu.Lock()
@@ -142,13 +190,23 @@ func (t *streamTap) snapshot() Exchange {
 	x := t.base
 	x.Entry.Duration = time.Since(t.start).Milliseconds()
 	if x.Entry.Stream == "WebSocket" {
-		x.Frames = append(websocketFrames(t.sent.Bytes(), "Sent"), websocketFrames(t.received.Bytes(), "Received")...)
+		x.Frames = append([]Frame(nil), t.frames...)
+		x.Request.Truncated = t.base.Request.Truncated
 	} else {
-		x.Frames = eventFrames(t.received.Bytes())
-		x.Response.Body = strings.ToValidUTF8(t.received.String(), "�")
+		events := t.received.Bytes()
+		if t.encodedSSE {
+			events = t.decoded.Bytes()
+		}
+		x.Frames = eventFrames(events)
+		if t.encodedSSE {
+			x.Response.Binary = true
+			x.Response.raw = bytes.Clone(t.received.Bytes())
+		} else {
+			x.Response.Body = strings.ToValidUTF8(t.received.String(), "�")
+		}
+		x.Request.Truncated = t.base.Request.Truncated
 	}
 	x.Response.Truncated = x.Entry.Received > int64(t.received.Len())
-	x.Request.Truncated = x.Entry.Sent > int64(t.sent.Len())
 	return x
 }
 func (t *streamTap) finish() Exchange {
@@ -214,7 +272,128 @@ func (t *trace) responseBody(resp *http.Response) error {
 		}
 		resp.Body = &streamDuplex{streamReadCloser: reader, writer: writer}
 	} else {
-		resp.Body = reader
+		encoding := strings.TrimSpace(strings.ToLower(resp.Header.Get("Content-Encoding")))
+		if encoding != "" && encoding != "identity" {
+			t.stream.encodedSSE = true
+			resp.Body = newEncodedSSEReadCloser(reader, t.stream, encoding)
+		} else {
+			resp.Body = reader
+		}
 	}
 	return nil
+}
+
+type encodedSSEReadCloser struct {
+	io.ReadCloser
+	decoded *io.PipeWriter
+	done    chan struct{}
+	once    sync.Once
+}
+
+func newEncodedSSEReadCloser(source io.ReadCloser, tap *streamTap, encoding string) *encodedSSEReadCloser {
+	reader, writer := io.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer reader.Close()
+		decoded, closeDecoder, err := newSSEDecoder(reader, encoding)
+		if err != nil {
+			reader.CloseWithError(err)
+			return
+		}
+		defer closeDecoder()
+		buffer := make([]byte, 32*1024)
+		for {
+			n, readErr := decoded.Read(buffer)
+			if n > 0 {
+				if !tap.writeDecoded(buffer[:n]) {
+					return
+				}
+			}
+			if readErr != nil {
+				return
+			}
+		}
+	}()
+	return &encodedSSEReadCloser{ReadCloser: source, decoded: writer, done: done}
+}
+
+func newSSEDecoder(source io.Reader, encoding string) (io.Reader, func(), error) {
+	codings := strings.Split(encoding, ",")
+	var closers []func()
+	reader := source
+	for i := len(codings) - 1; i >= 0; i-- {
+		coding := strings.TrimSpace(codings[i])
+		if coding == "" || coding == "identity" {
+			continue
+		}
+		var closeDecoder func()
+		switch coding {
+		case "gzip", "x-gzip":
+			decoded, err := gzip.NewReader(reader)
+			if err != nil {
+				closeSSEDecoders(closers)
+				return nil, func() {}, err
+			}
+			reader = decoded
+			closeDecoder = func() { _ = decoded.Close() }
+		case "br":
+			reader = brotli.NewReader(reader)
+		case "zstd":
+			decoded, err := zstd.NewReader(reader, zstd.WithDecoderConcurrency(1))
+			if err != nil {
+				closeSSEDecoders(closers)
+				return nil, func() {}, err
+			}
+			reader = decoded
+			closeDecoder = decoded.Close
+		default:
+			closeSSEDecoders(closers)
+			return nil, func() {}, fmt.Errorf("unsupported content encoding %q", coding)
+		}
+		if closeDecoder != nil {
+			closers = append(closers, closeDecoder)
+		}
+	}
+	return reader, func() { closeSSEDecoders(closers) }, nil
+}
+
+func closeSSEDecoders(closers []func()) {
+	for i := len(closers) - 1; i >= 0; i-- {
+		closers[i]()
+	}
+}
+
+func (r *encodedSSEReadCloser) Read(b []byte) (int, error) {
+	n, err := r.ReadCloser.Read(b)
+	if n > 0 {
+		if _, writeErr := r.decoded.Write(b[:n]); writeErr != nil {
+			r.decoded.CloseWithError(writeErr)
+		}
+	}
+	if err != nil {
+		r.stopDecoder(err)
+	}
+	return n, err
+}
+
+func (r *encodedSSEReadCloser) Close() error {
+	r.stopDecoder(io.ErrClosedPipe)
+	return r.ReadCloser.Close()
+}
+
+func (r *encodedSSEReadCloser) stopDecoder(err error) {
+	r.once.Do(func() {
+		if err == nil || err == io.EOF {
+			r.decoded.Close()
+		} else {
+			r.decoded.CloseWithError(err)
+		}
+	})
+	timer := time.NewTimer(time.Second)
+	defer timer.Stop()
+	select {
+	case <-r.done:
+	case <-timer.C:
+	}
 }

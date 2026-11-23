@@ -2486,6 +2486,7 @@ export namespace model {
 	    dnsLookup: number;
 	    tcpHandshake: number;
 	    tlsHandshake: number;
+	    send?: number;
 	    waitingTTFB: number;
 	    download: number;
 	    process: number;
@@ -2503,6 +2504,7 @@ export namespace model {
 	        this.dnsLookup = source["dnsLookup"];
 	        this.tcpHandshake = source["tcpHandshake"];
 	        this.tlsHandshake = source["tlsHandshake"];
+	        this.send = source["send"];
 	        this.waitingTTFB = source["waitingTTFB"];
 	        this.download = source["download"];
 	        this.process = source["process"];

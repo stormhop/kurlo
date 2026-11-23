@@ -34,7 +34,7 @@
   import { openFileDialog, saveFileDialog } from '../backend';
   import { clipboardCopy, formatSize, methodColor, statusClass } from '../utils';
   import { filesystemNameFromName } from '../normalizers';
-  import { harRequestsFromLog } from '../har';
+  import { capturedHarSaveProblem, harRequestsFromLog } from '../har';
   import Select from './Select.svelte';
   import VirtualList from './VirtualList.svelte';
   import ProxyIcon from './ProxyIcon.svelte';
@@ -86,6 +86,7 @@
   let rulesOpen = $state(false);
   let editing = $state<{ rule: ProxyRule; isNew: boolean } | null>(null);
   let ruleError = $state('');
+  let ruleWarning = $state('');
   let selection = $state.raw<Set<number>>(new Set());
   let anchor = $state(0);
   let release = $state<{ id: number; label: string; status: number; body: string } | null>(null);
@@ -93,6 +94,12 @@
   let synced = false;
   let reading = false;
   let refreshAgain = false;
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchMaxTimer: ReturnType<typeof setTimeout> | undefined;
+  let searchVersion = 0;
+  let searchRequestVersion = 0;
+  let appliedSearchRequestVersion = 0;
+  let scheduledSearchText = '';
 
   const collections = $derived(vm.activeWorkspaceCollections());
   const hosts = $derived(Object.entries(rows.reduce<Record<string, number>>((counts, row) => { counts[row.host] = (counts[row.host] ?? 0) + 1; return counts; }, {})).sort(([a], [b]) => a.localeCompare(b)));
@@ -124,7 +131,7 @@
   const failedCount = $derived(rows.filter(row => row.error).length);
 
   function matchesText(row: ProxyEntry) {
-    return (row.host + row.path + ' ' + (row.process || '')).toLowerCase().includes(query);
+    return (row.url + ' ' + row.host + row.path + ' ' + (row.process || '')).toLowerCase().includes(query);
   }
 
   function matchesStatus(row: ProxyEntry) {
@@ -242,7 +249,7 @@
     if (!snapshot.support) void loadSupport();
     void loadCertificate();
     void loadRules();
-    return () => { active = false; off?.(); };
+    return () => { active = false; off?.(); clearTimeout(searchDebounceTimer); clearTimeout(searchMaxTimer); };
   });
 
   $effect(() => {
@@ -265,18 +272,49 @@
     return () => { valid = false; };
   });
 
+  function scheduleSearch(text: string) {
+    if (text.length < 2) {
+      clearTimeout(searchDebounceTimer);
+      clearTimeout(searchMaxTimer);
+      searchDebounceTimer = undefined;
+      searchMaxTimer = undefined;
+      scheduledSearchText = '';
+      searchVersion++;
+      searchRequestVersion++;
+      return;
+    }
+    if (text !== scheduledSearchText) {
+      clearTimeout(searchDebounceTimer);
+      clearTimeout(searchMaxTimer);
+      searchDebounceTimer = undefined;
+      searchMaxTimer = undefined;
+      scheduledSearchText = text;
+      searchVersion++;
+    }
+    const version = searchVersion;
+    const run = () => {
+      clearTimeout(searchDebounceTimer);
+      clearTimeout(searchMaxTimer);
+      searchDebounceTimer = undefined;
+      searchMaxTimer = undefined;
+      const requestVersion = ++searchRequestVersion;
+      const app = window.go?.api?.App;
+      app?.SearchProxyCapture?.(text).then(hits => {
+        if (version === searchVersion && requestVersion > appliedSearchRequestVersion && text === query) {
+          appliedSearchRequestVersion = requestVersion;
+          searchResult = { query: text, hits: new Map((hits ?? []).map(hit => [hit.id, hit.where])) };
+        }
+      }).catch(() => {});
+    };
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(run, 200);
+    if (!searchMaxTimer) searchMaxTimer = setTimeout(run, 500);
+  }
+
   $effect(() => {
     const text = query;
     void rows;
-    if (text.length < 2) return;
-    let valid = true;
-    const timer = setTimeout(() => {
-      const app = window.go?.api?.App;
-      app?.SearchProxyCapture?.(text).then(hits => {
-        if (valid) searchResult = { query: text, hits: new Map((hits ?? []).map(hit => [hit.id, hit.where])) };
-      }).catch(() => {});
-    }, 200);
-    return () => { valid = false; clearTimeout(timer); };
+    scheduleSearch(text);
   });
 
   function clearTraffic() {
@@ -425,6 +463,7 @@
 
   function beginSave(ids = current ? [current.id] : []) {
     if (!ids.length) return;
+    error = '';
     const first = rows.find(row => row.id === ids[0]);
     saving = { ids, name: first ? `${first.method} ${first.path}` : '', collection: collections[0]?.id || '', folder: 'Captured' };
   }
@@ -434,7 +473,8 @@
     return action(async () => {
       const destination = { workspaceId: vm.activeWorkspaceId, persistEpoch: vm.requestStorePersistEpoch };
       const har = JSON.parse(await api().ProxyCaptureHAR!(ids));
-      if (har.log.entries.some((entry: { request: { postData?: { _incomplete?: boolean } } }) => entry.request.postData?._incomplete)) throw new Error('This capture contains a binary or incomplete request. Export HAR to preserve the recorded content.');
+      const problem = capturedHarSaveProblem(har);
+      if (problem) throw new Error(problem);
       await vm.importRequestsPayload('Captured', (collectionId, name) => {
         const requests = harRequestsFromLog(har, collectionId, name);
         if (target) {
@@ -450,7 +490,7 @@
         }
         const seen = new Set<string>();
         return requests.filter(request => {
-          const key = request.method + ' ' + request.url;
+          const key = JSON.stringify([request.method, request.url, (request.params ?? []).map(param => [param.key, param.value])]);
           if (seen.has(key)) return false;
           seen.add(key); return true;
         });
@@ -466,7 +506,7 @@
       const workspaceID = vm.activeWorkspaceId, epoch = vm.requestStorePersistEpoch;
       const har = JSON.parse(await api().ProxyCaptureHAR!([entryID]));
       if (har.log.entries[0]?.request.postData?._incomplete) throw new Error('Open in editor requires a complete text request.');
-      const [request] = harRequestsFromLog(har, '', '');
+      const [request] = harRequestsFromLog(har, '', '', { omitUnsupportedResponseExamples: true });
       if (!request) throw new Error('The entry is no longer available.');
       await vm.persistActiveRequestNow();
       if (!active || workspaceID !== vm.activeWorkspaceId || epoch !== vm.requestStorePersistEpoch) return;
@@ -521,7 +561,7 @@
 
   async function saveRules(next: ProxyRule[]) {
     if (busy) return false;
-    busy = true; ruleError = '';
+    busy = true; ruleError = ''; ruleWarning = '';
     try {
       rules = snapshot.rules = (await api().SetProxyRules!(next)) ?? [];
       await refresh();
@@ -533,12 +573,41 @@
     } finally { busy = false; }
   }
 
-  function startRule(kind: RuleKind, from?: ProxyEntry) {
+  async function startRule(kind: RuleKind, from?: ProxyEntry) {
+    ruleWarning = '';
+    const sourceID = from?.id;
+    const workspaceID = vm.activeWorkspaceId;
     const rule = blankRule(kind, from?.method ?? '', from ? patternForURL(from.url) : '');
     if (from && kind === 'local' && shown?.entry.id === from.id) {
       rule.local.status = from.status || 200;
       rule.local.contentType = shown.response.headers?.['Content-Type']?.[0] || 'text/plain';
-      rule.local.body = prettyJSON(shown.response.body);
+      rule.local.body = shown.response.binary ? '' : prettyJSON(shown.response.body);
+      if (shown.response.binary) {
+        ruleWarning = 'The captured response is binary and cannot be used as a text Map local body.';
+      } else if (shown.response.truncated || shown.response.archived) {
+        rule.local.body = '';
+        if (!shown.response.archived) {
+          ruleWarning = 'The captured response is incomplete. Its preview was not copied into the rule.';
+        } else {
+          let warning = '';
+          try {
+            const har = JSON.parse(await api().ProxyCaptureHAR!([from.id]));
+            const content = har.log?.entries?.[0]?.response?.content;
+            if (!content || content._incomplete) warning = 'The archived response is incomplete. Its preview was not copied into the rule.';
+            else if (content.encoding === 'base64') warning = 'The archived response is binary and cannot be used as a text Map local body.';
+            else if (typeof content.text !== 'string') warning = 'The archived response has no text body.';
+            else if (new TextEncoder().encode(content.text).byteLength > (1 << 20)) warning = 'The archived response exceeds the 1 MiB Map local body limit. Its preview was not copied into the rule.';
+            else {
+              rule.local.body = content.text;
+              rule.local.contentType = content.mimeType || rule.local.contentType;
+            }
+          } catch {
+            warning = 'The full archived response could not be loaded. Its preview was not copied into the rule.';
+          }
+          if (!active || currentID !== sourceID || vm.activeWorkspaceId !== workspaceID) return;
+          ruleWarning = warning;
+        }
+      }
     }
     ruleError = '';
     editing = { rule, isNew: true };
@@ -548,6 +617,7 @@
     const exists = rules.some(item => item.id === rule.id);
     if (await saveRules(exists ? rules.map(item => (item.id === rule.id ? rule : item)) : [...rules, rule])) {
       editing = null;
+      ruleWarning = '';
       rulesOpen = true;
     }
   }
@@ -562,7 +632,7 @@
 
   async function loadRuleFile() {
     const file = await openFileDialog('Choose a local response text file');
-    return file ? api().ReadProxyResponseFile!(file) : '';
+    return file ? api().ReadProxyResponseFile!(file) : null;
   }
 
   function selectRow(entry: ProxyEntry, event: MouseEvent | KeyboardEvent) {
@@ -678,7 +748,7 @@
         onChooseFile={chooseFile}
         onCopyPAC={copyPAC} />
     {/if}
-    {#if error}<p class="mock-error" role="alert">{error}</p>{/if}
+    {#if error && !saving}<p class="mock-error" role="alert">{error}</p>{/if}
     {#if paused.length}
       <div class="mock-hint capture-paused" role="region" aria-label="Paused responses">
         <strong>{paused.length} {paused.length === 1 ? 'response is' : 'responses are'} waiting</strong>
@@ -806,8 +876,8 @@
     {/if}
     {#if rulesOpen}
       <ProxyRules {rules} {busy}
-        onAdd={kind => startRule(kind)}
-        onEdit={rule => { ruleError = ''; editing = { rule, isNew: false }; }}
+        onAdd={kind => void startRule(kind)}
+        onEdit={rule => { ruleError = ''; ruleWarning = ''; editing = { rule, isNew: false }; }}
         onToggle={(rule, enabled) => saveRules(rules.map(item => (item.id === rule.id ? { ...item, enabled } : item)))}
         onMove={moveRule}
         onDelete={rule => saveRules(rules.filter(item => item.id !== rule.id))}
@@ -824,11 +894,12 @@
       <Select bind:value={saving.collection} options={[...collections.map(item => ({ value: item.id, label: item.name })), { value: '', label: 'New Captured collection' }]} ariaLabel="Collection" className="capture-dialog-select" />
     </div>
     <label class="capture-dialog-field"><span>Folder</span><input autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} class="field field-md" bind:value={saving.folder}></label>
+    {#if error}<p class="mock-error" role="alert">{error}</p>{/if}
   </ProxyDialog>
 {/if}
 
 {#if editing}
-  <ProxyRuleEditor initial={editing.rule} isNew={editing.isNew} {busy} entries={rows} error={ruleError} onSave={commitRule} onDismiss={() => (editing = null)} onLoadFile={loadRuleFile} />
+  <ProxyRuleEditor initial={editing.rule} isNew={editing.isNew} {busy} entries={rows} error={ruleError} warning={ruleWarning} onSave={commitRule} onDismiss={() => { editing = null; ruleWarning = ''; }} onLoadFile={loadRuleFile} />
 {/if}
 
 {#if release}

@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/pem"
+	"errors"
 	"net/http"
 	"path/filepath"
 	goruntime "runtime"
@@ -73,11 +74,15 @@ func TestProxyCLIRejectsInvalidSSLHost(t *testing.T) {
 func TestProxySystemProxyFollowsRecording(t *testing.T) {
 	dir := t.TempDir()
 	useTempConfigDir(t, dir)
+	failRead := false
 	settings := map[string]string{"mode": "'none'", "autoconfig-url": "''"}
 	original := newSystemProxy
 	newSystemProxy = func() *systemproxy.Manager {
 		return &systemproxy.Manager{Path: filepath.Join(dir, "capture-system-proxy.json"), GOOS: "linux", Run: func(_ context.Context, name string, args ...string) (string, error) {
 			if args[0] == "get" {
+				if failRead {
+					return "", errors.New("settings unavailable")
+				}
 				return settings[args[2]], nil
 			}
 			settings[args[2]] = "'" + args[3] + "'"
@@ -94,6 +99,12 @@ func TestProxySystemProxyFollowsRecording(t *testing.T) {
 	if !app.ProxyCaptureStatus().SystemProxy {
 		t.Fatal("status lost the system proxy")
 	}
+	failRead = true
+	status, err = app.StopProxyCapture()
+	if err == nil || !status.Running || !status.SystemProxy {
+		t.Fatal(status, err)
+	}
+	failRead = false
 	status, err = app.StopProxyCapture()
 	if err != nil || status.SystemProxy || settings["mode"] != "'none'" || settings["autoconfig-url"] != "''" {
 		t.Fatal(status, settings, err)
@@ -109,5 +120,16 @@ func TestDecodeCapturePreviewAcceptsTruncatedGzip(t *testing.T) {
 	text, ok := decodeCapturePreview(http.Header{"Content-Encoding": {"gzip"}}, string(raw), 256<<10)
 	if !ok || !strings.Contains(text, "INV-42") {
 		t.Fatal(ok, len(text))
+	}
+}
+
+func TestCaptureDecoderDistinguishesPassthroughFromDecodedContent(t *testing.T) {
+	for _, coding := range []string{"gzip", "zstd", "custom"} {
+		headers := http.Header{"Content-Encoding": {coding}}
+		for _, decode := range []func(http.Header, string, int) (string, bool){decodeCapturePreview, decodeCaptureBody} {
+			if _, ok := decode(headers, "already decoded", 1024); ok {
+				t.Fatalf("passthrough reported as decoded for %s", coding)
+			}
+		}
 	}
 }

@@ -5,6 +5,7 @@ export type RuleKind = 'local' | 'rewrite';
 export interface CompiledPattern {
   regex: RegExp;
   withQuery: boolean;
+  wildcardScheme: boolean;
 }
 
 export function compileRulePattern(raw: string): CompiledPattern | null {
@@ -18,16 +19,16 @@ export function compileRulePattern(raw: string): CompiledPattern | null {
   const slash = rest.indexOf('/');
   const host = slash < 0 ? rest : rest.slice(0, slash);
   if (!host) return null;
-  const normalized = `${scheme}://${host.toLowerCase()}/${slash < 0 ? '*' : rest.slice(slash + 1)}`;
+  const normalized = `${scheme}://${normalizePatternHost(scheme, host)}/${slash < 0 ? '*' : rest.slice(slash + 1)}`;
   const source = normalized.split('*').map(part => part.replace(/[.+?^${}()|[\]\\/]/g, '\\$&')).join('.*');
-  return { regex: new RegExp(`^${source}$`), withQuery: normalized.includes('?') };
+  return { regex: new RegExp(`^${source}$`), withQuery: normalized.includes('?'), wildcardScheme: scheme === '*' };
 }
 
 export function matchTarget(raw: string, withQuery: boolean) {
   let url: URL;
   try { url = new URL(raw); } catch { return ''; }
   const path = url.pathname || '/';
-  const value = `${url.protocol.replace(/:$/, '').toLowerCase()}://${url.host.toLowerCase()}${path}`;
+  const value = `${url.protocol.replace(/:$/, '').toLowerCase()}://${hostForWire(raw, url)}${path}`;
   return withQuery && url.search ? value + url.search : value;
 }
 
@@ -35,16 +36,41 @@ export function ruleMatches(rule: Pick<ProxyRule, 'method' | 'url'>, method: str
   if (rule.method && rule.method.toUpperCase() !== method.toUpperCase()) return false;
   const compiled = compileRulePattern(rule.url);
   if (!compiled) return false;
-  return compiled.regex.test(matchTarget(url, compiled.withQuery));
+  const target = matchTarget(url, compiled.withQuery);
+  if (compiled.regex.test(target)) return true;
+  return !compiled.wildcardScheme && compiled.regex.test(matchTargetWithDefaultPort(url, compiled.withQuery));
 }
 
 export function patternForURL(raw: string) {
   try {
     const url = new URL(raw);
-    return `${url.protocol}//${url.host}${url.pathname || '/'}`;
+    return `${url.protocol}//${url.host.toLowerCase()}${url.pathname || '/'}`;
   } catch {
     return raw;
   }
+}
+
+function hostForWire(raw: string, url: URL) {
+  const authority = raw.match(/^[a-z][a-z\d+.-]*:\/\/([^/?#]*)/i)?.[1]?.split('@').at(-1) ?? '';
+  const explicitPort = authority.match(/:(\d+)$/)?.[1];
+  return `${url.hostname.toLowerCase()}${explicitPort ? `:${explicitPort}` : ''}`;
+}
+
+function normalizePatternHost(scheme: string, host: string) {
+  const lower = host.toLowerCase();
+  if ((scheme === 'http' && lower.endsWith(':80')) || (scheme === 'https' && lower.endsWith(':443'))) return lower.slice(0, lower.lastIndexOf(':'));
+  return lower;
+}
+
+function matchTargetWithDefaultPort(raw: string, withQuery: boolean) {
+  let url: URL;
+  try { url = new URL(raw); } catch { return ''; }
+  const authority = raw.match(/^[a-z][a-z\d+.-]*:\/\/([^/?#]*)/i)?.[1]?.split('@').at(-1) ?? '';
+  const explicitPort = authority.match(/:(\d+)$/)?.[1];
+  const defaultPort = (url.protocol === 'http:' && explicitPort === '80') || (url.protocol === 'https:' && explicitPort === '443');
+  const host = `${url.hostname.toLowerCase()}${explicitPort && !defaultPort ? `:${explicitPort}` : ''}`;
+  const value = `${url.protocol.replace(/:$/, '').toLowerCase()}://${host}${url.pathname || '/'}`;
+  return withQuery && url.search ? value + url.search : value;
 }
 
 export function newRuleID() {
@@ -74,8 +100,8 @@ export function ruleSummary(rule: ProxyRule) {
   const parts = [
     action.target ? `to ${action.target}` : '',
     action.pathFrom ? `${action.pathFrom} → ${action.pathTo || '(removed)'}` : '',
-    headerChanges('request', action.setRequestHeaders.length + action.removeRequestHeaders.length),
-    headerChanges('response', action.setResponseHeaders.length + action.removeResponseHeaders.length),
+    headerChanges('request', (action.setRequestHeaders ?? []).length + (action.removeRequestHeaders ?? []).length),
+    headerChanges('response', (action.setResponseHeaders ?? []).length + (action.removeResponseHeaders ?? []).length),
   ].filter(Boolean);
   return parts.join(' · ') || 'No changes';
 }

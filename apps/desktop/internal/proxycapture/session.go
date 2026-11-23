@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,6 +20,19 @@ const MaxSessionFile = 256 << 20
 type harValue struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
+}
+
+type harParam struct {
+	harValue
+	FileName *string `json:"fileName"`
+}
+
+type harPostData struct {
+	MimeType   string     `json:"mimeType"`
+	Text       *string    `json:"text"`
+	Encoding   string     `json:"_encoding"`
+	Incomplete bool       `json:"_incomplete"`
+	Params     []harParam `json:"params"`
 }
 
 type harExtension struct {
@@ -46,27 +61,26 @@ type harEntry struct {
 	Messages []harSocketMessage `json:"_webSocketMessages"`
 	Timings  map[string]float64 `json:"timings"`
 	Request  struct {
-		Version  string     `json:"httpVersion"`
-		Method   string     `json:"method"`
-		URL      string     `json:"url"`
-		Headers  []harValue `json:"headers"`
-		BodySize int64      `json:"bodySize"`
-		PostData *struct {
-			MimeType string     `json:"mimeType"`
-			Text     string     `json:"text"`
-			Encoding string     `json:"_encoding"`
-			Params   []harValue `json:"params"`
-		} `json:"postData"`
+		Version  string       `json:"httpVersion"`
+		Method   string       `json:"method"`
+		URL      string       `json:"url"`
+		Headers  []harValue   `json:"headers"`
+		BodySize int64        `json:"bodySize"`
+		PostData *harPostData `json:"postData"`
 	} `json:"request"`
 	Response struct {
-		Version  string     `json:"httpVersion"`
-		Status   int        `json:"status"`
-		Headers  []harValue `json:"headers"`
-		BodySize int64      `json:"bodySize"`
-		Content  struct {
-			Size     int64  `json:"size"`
-			Text     string `json:"text"`
-			Encoding string `json:"encoding"`
+		Version    string     `json:"httpVersion"`
+		Status     int        `json:"status"`
+		StatusText *string    `json:"statusText"`
+		Headers    []harValue `json:"headers"`
+		BodySize   *int64     `json:"bodySize"`
+		Content    struct {
+			Size        *int64  `json:"size"`
+			WireEncoded *bool   `json:"_wireEncoded"`
+			Text        *string `json:"text"`
+			MimeType    string  `json:"mimeType"`
+			Incomplete  bool    `json:"_incomplete"`
+			Encoding    string  `json:"encoding"`
 		} `json:"content"`
 	} `json:"response"`
 }
@@ -84,6 +98,9 @@ func (r *Recorder) LoadPreviews(data []byte, source string, decode func(http.Hea
 func (r *Recorder) load(data []byte, source string, decode func(http.Header, string, int) (string, bool), archive bool) (Status, error) {
 	var file struct {
 		Log *struct {
+			Creator struct {
+				Name string `json:"name"`
+			} `json:"creator"`
 			Entries []harEntry `json:"entries"`
 		} `json:"log"`
 	}
@@ -91,19 +108,25 @@ func (r *Recorder) load(data []byte, source string, decode func(http.Header, str
 		return r.Status(), errors.New("this file is not a HAR archive")
 	}
 	items := file.Log.Entries
-	if len(items) > capacity {
-		items = items[len(items)-capacity:]
+	type selectedEntry struct {
+		item   *harEntry
+		url    *url.URL
+		method string
+	}
+	eligible := make([]selectedEntry, 0, min(len(items), capacity))
+	for i := len(items) - 1; i >= 0 && len(eligible) < capacity; i-- {
+		if u, method, ok := sessionTarget(&items[i]); ok {
+			eligible = append(eligible, selectedEntry{&items[i], u, method})
+		}
 	}
 	var files *bodyFiles
 	if archive {
 		files = &bodyFiles{}
 	}
-	exchanges := make([]*Exchange, 0, len(items))
-	for _, item := range items {
-		x, ok := sessionExchange(item, files, decode)
-		if ok {
-			exchanges = append(exchanges, x)
-		}
+	exchanges := make([]*Exchange, 0, len(eligible))
+	for i := len(eligible) - 1; i >= 0; i-- {
+		entry := eligible[i]
+		exchanges = append(exchanges, sessionExchange(entry.item, entry.url, entry.method, files, decode, file.Log.Creator.Name == "Kurlo"))
 	}
 	if len(exchanges) == 0 {
 		if files != nil {
@@ -139,15 +162,19 @@ func (r *Recorder) load(data []byte, source string, decode func(http.Header, str
 	return status, nil
 }
 
-func sessionExchange(item harEntry, files *bodyFiles, decode func(http.Header, string, int) (string, bool)) (*Exchange, bool) {
-	u, err := url.Parse(item.Request.URL)
-	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "ws" && u.Scheme != "wss") {
-		return nil, false
-	}
+func sessionTarget(item *harEntry) (*url.URL, string, bool) {
 	method := strings.ToUpper(strings.TrimSpace(item.Request.Method))
 	if method == "" || method == http.MethodConnect {
-		return nil, false
+		return nil, "", false
 	}
+	u, err := url.Parse(item.Request.URL)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https" && u.Scheme != "ws" && u.Scheme != "wss") {
+		return nil, "", false
+	}
+	return u, method, true
+}
+
+func sessionExchange(item *harEntry, u *url.URL, method string, files *bodyFiles, decode func(http.Header, string, int) (string, bool), fromKurlo bool) *Exchange {
 	x := &Exchange{Entry: Entry{Method: method, Host: u.Host, URL: displayURL(u), Path: u.EscapedPath(), Status: item.Response.Status, Started: sessionStarted(item.Started)}}
 	if x.Entry.Path == "" {
 		x.Entry.Path = "/"
@@ -159,41 +186,58 @@ func sessionExchange(item harEntry, files *bodyFiles, decode func(http.Header, s
 	reqHeaders := sessionHeaders(item.Request.Headers)
 	resHeaders := sessionHeaders(item.Response.Headers)
 	reqBody := ""
+	reqIncomplete := item.Request.BodySize > 0
 	if post := item.Request.PostData; post != nil {
-		reqBody = post.Text
-		if post.Encoding == "base64" {
-			if b, err := base64.StdEncoding.DecodeString(post.Text); err == nil {
-				reqBody = string(b)
-			}
-		} else if post.Text == "" && len(post.Params) > 0 && strings.HasPrefix(strings.ToLower(post.MimeType), "application/x-www-form-urlencoded") {
-			values := url.Values{}
-			for _, p := range post.Params {
-				values.Add(p.Name, p.Value)
-			}
-			reqBody = values.Encode()
-		}
 		if http.Header(reqHeaders).Get("Content-Type") == "" && post.MimeType != "" {
 			reqHeaders["Content-Type"] = []string{post.MimeType}
 		}
+		var present bool
+		reqBody, present = post.body(reqHeaders)
+		reqIncomplete = post.Incomplete || (!present && (post.Params != nil || post.Text != nil)) || (reqBody == "" && item.Request.BodySize > 0)
 	}
-	resBody := item.Response.Content.Text
-	if item.Response.Content.Encoding == "base64" {
-		if b, err := base64.StdEncoding.DecodeString(resBody); err == nil {
-			resBody = string(b)
-		}
+	content := item.Response.Content
+	if http.Header(resHeaders).Get("Content-Type") == "" && content.MimeType != "" {
+		resHeaders["Content-Type"] = []string{content.MimeType}
 	}
-	if resBody != "" && http.Header(resHeaders).Get("Content-Encoding") != "" {
-		if decode == nil {
-			delete(resHeaders, "Content-Encoding")
-		} else if _, ok := decode(resHeaders, resBody, maxBodyFile); !ok {
-			delete(resHeaders, "Content-Encoding")
+	resBody, present := sessionBody(content.Text, content.Encoding)
+	expectsBody := method != http.MethodHead && item.Response.Status != http.StatusNotModified && item.Response.Status != http.StatusNoContent && (item.Response.Status == 0 || item.Response.Status >= 200)
+	wireSize := int64(-1)
+	if item.Response.BodySize != nil {
+		wireSize = *item.Response.BodySize
+	}
+	contentSize := int64(len(resBody))
+	if content.Size != nil {
+		contentSize = *content.Size
+	}
+	missingBody := !present && firstSize(wireSize, contentSize) > 0 || resBody == "" && contentSize > 0
+	resIncomplete := content.Incomplete || expectsBody && missingBody
+	eventBody := resBody
+	wireEncoded := content.WireEncoded != nil && *content.WireEncoded
+	if decode != nil && resBody != "" && http.Header(resHeaders).Get("Content-Encoding") != "" {
+		legacyRaw := content.WireEncoded == nil && content.Encoding == "base64" && (fromKurlo || content.Size == nil || contentSize != int64(len(resBody)))
+		if wireEncoded || legacyRaw {
+			if decoded, ok := decode(resHeaders, resBody, previewLimit); ok {
+				eventBody = decoded
+				wireEncoded = true
+			}
 		}
 	}
 	var sent, received int64
-	x.Request, sent = sessionMessage(files, reqHeaders, reqBody)
-	x.Response, received = sessionMessage(files, resHeaders, resBody)
+	x.Request, sent = sessionMessage(files, reqHeaders, reqBody, reqIncomplete)
+	x.Response, received = sessionMessage(files, resHeaders, resBody, resIncomplete)
+	x.Response.decoded = !wireEncoded
+	x.harTimings = item.Timings
+	x.harStatusText = item.Response.StatusText
+	x.harBodySize = item.Response.BodySize
+	x.harContentSize = content.Size
+	if x.harContentSize == nil && present && !resIncomplete && !wireEncoded {
+		x.harContentSize = &received
+	}
 	x.Entry.Sent = firstSize(item.Request.BodySize, sent)
-	x.Entry.Received = firstSize(item.Response.BodySize, item.Response.Content.Size, received)
+	x.Entry.Received = wireSize
+	if wireSize < 0 {
+		x.Entry.Received = firstSize(contentSize, received)
+	}
 	x.Entry.Error = item.Error
 	if k := item.Kurlo; k != nil {
 		x.Entry.Stream = k.Stream
@@ -221,20 +265,72 @@ func sessionExchange(item harEntry, files *bodyFiles, decode func(http.Header, s
 				kind = "Reserved"
 			}
 			frame := Frame{Direction: direction, Kind: kind, Size: int64(len(m.Data))}
+			if kind == "Binary" {
+				if data, err := base64.StdEncoding.DecodeString(m.Data); err == nil {
+					frame.Size = int64(len(data))
+				}
+			}
 			if kind == "Text" || kind == "Continuation" {
 				frame.Text = strings.ToValidUTF8(m.Data[:min(len(m.Data), 1024)], "�")
 			}
 			x.Frames = append(x.Frames, frame)
 		}
 	}
-	if item.Kurlo == nil {
+	if x.Timings == nil && !x.Entry.Local {
 		x.Timings = sessionTimings(item.Timings, item.Time)
 	}
 	if x.Entry.Stream == "" && strings.HasPrefix(strings.ToLower(http.Header(resHeaders).Get("Content-Type")), "text/event-stream") {
 		x.Entry.Stream = "SSE"
-		x.Frames = eventFrames([]byte(resBody))
+		x.Frames = eventFrames([]byte(eventBody[:min(len(eventBody), previewLimit)]))
 	}
-	return x, true
+	return x
+}
+
+func sessionBody(text *string, encoding string) (string, bool) {
+	if text == nil {
+		return "", false
+	}
+	if encoding == "base64" {
+		b, err := base64.StdEncoding.DecodeString(*text)
+		return string(b), err == nil
+	}
+	return *text, true
+}
+
+func (p *harPostData) body(headers http.Header) (string, bool) {
+	if p.Params == nil || (p.Text != nil && *p.Text != "") {
+		return sessionBody(p.Text, p.Encoding)
+	}
+	media, params, _ := mime.ParseMediaType(headers.Get("Content-Type"))
+	switch media {
+	case "application/x-www-form-urlencoded":
+		var values []string
+		for _, param := range p.Params {
+			values = append(values, url.QueryEscape(param.Name)+"="+url.QueryEscape(param.Value))
+		}
+		return strings.Join(values, "&"), true
+	case "multipart/form-data":
+		var body strings.Builder
+		writer := multipart.NewWriter(&body)
+		if boundary := params["boundary"]; boundary == "" || writer.SetBoundary(boundary) != nil {
+			headers.Set("Content-Type", writer.FormDataContentType())
+		}
+		complete := true
+		for _, param := range p.Params {
+			if param.FileName != nil {
+				complete = false
+				continue
+			}
+			if err := writer.WriteField(param.Name, param.Value); err != nil {
+				return "", false
+			}
+		}
+		if err := writer.Close(); err != nil {
+			return "", false
+		}
+		return body.String(), complete
+	}
+	return "", false
 }
 
 func sessionProtocol(values ...string) string {
@@ -275,10 +371,15 @@ func sessionHeaders(values []harValue) map[string][]string {
 	return out
 }
 
-func sessionMessage(files *bodyFiles, headers map[string][]string, body string) (Message, int64) {
+func sessionMessage(files *bodyFiles, headers map[string][]string, body string, incomplete bool) (Message, int64) {
 	p := &preview{files: files}
 	p.Write([]byte(body))
-	return p.message(headers)
+	m, size := p.message(headers)
+	if incomplete {
+		m.Truncated = true
+		m.Archived = false
+	}
+	return m, size
 }
 
 func firstSize(values ...int64) int64 {

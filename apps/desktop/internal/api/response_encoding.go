@@ -94,6 +94,11 @@ const maxStreamedDecodedBodySize int64 = 1 << 30
 var errDecodedBodyTooLarge = errors.New("decompressed response exceeds 1 GB")
 
 func newDecodingReader(body io.Reader, resp *http.Response) (io.Reader, func()) {
+	reader, closeDecoders, _ := responseDecodingReader(body, resp)
+	return reader, closeDecoders
+}
+
+func responseDecodingReader(body io.Reader, resp *http.Response) (io.Reader, func(), bool) {
 	var closers []io.Closer
 	closeDecoders := func() {
 		for i := len(closers) - 1; i >= 0; i-- {
@@ -101,13 +106,14 @@ func newDecodingReader(body io.Reader, resp *http.Response) (io.Reader, func()) 
 		}
 	}
 	if resp.Uncompressed {
-		return body, closeDecoders
+		return body, closeDecoders, false
 	}
 	encoding := resp.Header.Get("Content-Encoding")
 	if encoding == "" {
-		return body, closeDecoders
+		return body, closeDecoders, false
 	}
 	encodings := strings.Split(encoding, ",")
+	decoded := false
 	current := body
 	for i := len(encodings) - 1; i >= 0; i-- {
 		name := strings.ToLower(strings.TrimSpace(encodings[i]))
@@ -119,11 +125,12 @@ func newDecodingReader(body io.Reader, resp *http.Response) (io.Reader, func()) 
 			closers = append(closers, closer)
 		}
 		if !ok {
-			return next, closeDecoders
+			return next, closeDecoders, false
 		}
+		decoded = true
 		current = next
 	}
-	return current, closeDecoders
+	return current, closeDecoders, decoded
 }
 
 type sniffReader struct {

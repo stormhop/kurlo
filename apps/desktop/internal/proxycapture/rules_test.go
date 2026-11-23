@@ -42,6 +42,38 @@ func TestRulePatterns(t *testing.T) {
 	}
 }
 
+func TestRulePatternsNormalizeDefaultPorts(t *testing.T) {
+	cases := []struct {
+		pattern string
+		target  string
+		want    bool
+	}{
+		{"http://fixture.test/orders", "http://fixture.test:80/orders", true},
+		{"http://fixture.test:80/orders", "http://fixture.test/orders", true},
+		{"https://fixture.test/orders", "https://fixture.test:443/orders", true},
+		{"https://fixture.test:443/orders", "https://fixture.test/orders", true},
+		{"http://fixture.test:8080/orders", "http://fixture.test/orders", false},
+		{"http://fixture.test/orders", "https://fixture.test:80/orders", false},
+		{"*://fixture.test:80/orders", "http://fixture.test:80/orders", true},
+		{"*://fixture.test/orders", "http://fixture.test:80/orders", false},
+		{"*://fixture.test:*/orders", "https://fixture.test:443/orders", true},
+		{"*://fixture.test:*/orders", "https://fixture.test/orders", false},
+	}
+	for _, tc := range cases {
+		u, err := url.Parse(tc.target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		compiled, err := compileRule(Rule{ID: "rule", Enabled: true, Kind: RuleLocal, URL: tc.pattern, Local: LocalAnswer{Status: http.StatusOK}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := compiled.matches(&http.Request{Method: http.MethodGet, URL: u}); got != tc.want {
+			t.Fatalf("%s against %s = %t, want %t", tc.pattern, tc.target, got, tc.want)
+		}
+	}
+}
+
 func TestRuleValidation(t *testing.T) {
 	ok := LocalAnswer{Status: 200}
 	bad := []Rule{
