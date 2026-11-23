@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { handleMenuKeydown } from '../menuKeyboard';
-  import { focusTextTarget, runTextAction, textTargetState, type TextAction, type TextMenuState } from '../textEditing';
+  import { focusTextTarget, runTextAction, runTextTransform, textTargetState, transformText, type TextAction, type TextMenuState, type TextTransform } from '../textEditing';
 
   let { menu, onclose }: { menu: TextMenuState; onclose: () => void } = $props();
 
@@ -17,6 +17,27 @@
     { action: 'paste', label: 'Paste', key: 'V', enabled: !status.readOnly },
     { action: 'selectAll', label: 'Select all', key: 'A', enabled: !status.empty },
   ]);
+
+  const transforms = $derived.by(() => {
+    if (!status.selection || status.readOnly || status.secret) return [];
+    const all: { transform: TextTransform; label: string }[] = [
+      { transform: 'encodeUri', label: 'Encode URI component' },
+      { transform: 'decodeUri', label: 'Decode URI component' },
+      { transform: 'encodeBase64', label: 'Encode Base64' },
+      { transform: 'decodeBase64', label: 'Decode Base64' },
+    ];
+    return all.map(item => {
+      const result = transformText(status.selection, item.transform);
+      return { ...item, enabled: result !== null && result !== status.selection };
+    });
+  });
+
+  function transform(kind: TextTransform) {
+    const { target } = menu;
+    const snapshot = status;
+    onclose();
+    runTextTransform(target, kind, snapshot);
+  }
 
   function place() {
     if (!node) return;
@@ -74,6 +95,14 @@
       <kbd>{modifier}{item.key}</kbd>
     </button>
   {/each}
+  {#if transforms.length}
+    <div class="menu-separator" role="separator"></div>
+    {#each transforms as item (item.transform)}
+      <button class="menu-item" role="menuitem" type="button" disabled={!item.enabled} onmousedown={(event) => event.preventDefault()} onclick={() => transform(item.transform)}>
+        <span>{item.label}</span>
+      </button>
+    {/each}
+  {/if}
 </div>
 
 <style>

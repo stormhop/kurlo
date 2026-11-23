@@ -16,6 +16,14 @@ With manual saving, a request added from a collection or folder starts as a draf
 
 Closing a draft asks whether to save it only when you have changed it since it opened. An untouched draft, like an empty tab from **+**, closes without asking.
 
+### Tab menu
+
+Right-click a request tab to close it, close the other tabs, close the tabs to its right or close all tabs. Tabs with unsaved changes still ask before closing. The same menu duplicates the request, copies its URL or a cURL command, and shows its file in Finder or File Explorer.
+
+### Encoding selected text
+
+Select text in the URL, a param, a header or another field and right-click it to **Encode URI component**, **Decode URI component**, **Encode Base64** or **Decode Base64**. Kurlo replaces the selection and keeps the result selected, so you can undo it with `⌘Z` or `Ctrl+Z`. Base64 decoding also reads the URL-safe alphabet used in JWTs. Actions that would not change the text, or cannot decode it, are dimmed.
+
 ### Docs
 
 The **Docs** tab of a request is written in Markdown: headings, **bold**, `code`, lists, task lists, tables, quotes, links and images. **Edit** shows the text on the left and a live preview on the right; **Preview** shows the rendered page, followed by a reference Kurlo builds from the request itself: the method and URL, the auth type, and the enabled path variables, query params, headers and body, with the description you gave each row. Links open in your browser, and secret values are masked. A request without docs opens in **Edit**; `Esc` goes back to the preview.
