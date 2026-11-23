@@ -72,8 +72,7 @@ or `OPTIONS` waits for your approval, and the model never sees your secrets.
 - **Or drive it from your terminal.** `kurlo mcp` lets Claude Code, Cursor, Codex and any other MCP client run your
   saved requests with their auth and tests, write new requests and tests, and explain why the last call failed. Secrets
   are sent to the API but never shown to the model.
-- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 25.9 MB and
-  the Linux one is 13.6 MB.
+- **Small and native.** Built with Go and the system WebView instead of Electron, so the macOS download is 26.8 MB and the Linux one is 14.1 MB.
 
 |                              | Kurlo                          | Postman                       | Insomnia               | Bruno                      |
 |------------------------------|--------------------------------|-------------------------------|------------------------|----------------------------|
