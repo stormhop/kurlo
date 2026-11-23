@@ -15,6 +15,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 - **File bodies.** **Body → Binary** is now a drop zone: drop a file onto it or choose one. The chosen file shows its name, size and type, and the path stays editable and accepts `{{variables}}`. **Show in Finder** opens the file's folder, a missing file is marked **File not found** before you send, and **Use image/png** (or the detected type) adds a matching `Content-Type` header; without one Kurlo still sends `application/octet-stream`. A file inside the workspace folder is saved with a path relative to that folder, for **Binary** bodies and files in **Form data**, so the request works after a Git clone and in `kurlo run` and `kurlo mcp`. Files outside the workspace keep their absolute path, and Kurlo notes that the path only works on this computer. Client certificate and key fields in request and collection settings use the same path field, with **Choose file…** and a clear button.
 
+- **Response viewer.** JSON, XML and HTML returned as `text/plain` or without a `Content-Type` are detected, formatted and highlighted, and so are `application/xml` responses. The format menu next to the response actions shows what Kurlo detected and lets you choose **JSON**, **XML**, **HTML** or **Text** for a request; a body that is not valid in the chosen format stays as text with a note. JSON detected this way can be filtered with JSONPath, and **Save to file** uses the matching extension. Fold JSON objects and arrays and XML or HTML elements from the line numbers, or everything below the top level with **Fold all**; search unfolds the block that holds a match, also in large responses. **Wrap lines** keeps long lines on one row with sideways scrolling and is remembered. Hover the status code to read what it means, and the size to see headers, body and the compressed size received. A **Cookies** tab lists the cookies the response sets, with domain, path, expiry and attributes.
+
+- **Tab and text menus.** Right-click a request tab to close it, the other tabs, the tabs to its right or all tabs, or to duplicate the request, copy its URL or cURL, or show its file. Right-click selected text in a field to encode or decode it as a URI component or Base64, including URL-safe Base64.
+
 ### Changed
 
 - **Collection documentation.** The exported HTML reference has a cleaner layout. The request address stays pinned while you scroll, and a **Code** panel beside the request details shows cURL, JavaScript (`fetch`) and Python (`requests`) snippets. Snippets include bearer token, OAuth 2.0 and API key authorization as variable placeholders. Requests list their authorization type and show parameter descriptions under each name. Saved examples open as a list with colored status codes, and each shows its request and response side by side. Long request documentation collapses behind **Show more**. The **Generate documentation** dialog now matches other Kurlo dialogs: the collection name and counts sit under the title, and each request shows its folder on the same line.
@@ -22,9 +26,10 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Response time.** Hovering the response time shows the timing breakdown again; the status bar clipped it.
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
 - **Undefined variables.** A `{{variable}}` that nothing defines is underlined in red even when the workspace has no environment, collection or global variables yet.
-- **Request tabs.** Tab titles stay readable when many tabs are open, untitled drafts are numbered (**New Request 2**), and a draft shows the unsaved dot only after you change it.
+- **Request tabs.** Tab titles stay readable when many tabs are open, untitled drafts are numbered (**New Request 2**), and a draft shows the unsaved dot only after you change it. Params, Auth, Headers, Body, Vars, Scripts, Docs, Examples and Settings load in the background after startup, so the first switch to a tab no longer shows an empty panel.
 - **Collection Runner.** The data file button fits its column, the result tiles stay on one line with the progress bar below them in narrower windows, and **Reset settings** looks like a button.
 - **History.** Rows give the request path more room; the **•••** menu appears in place of the time on hover.
 - **Workspace README.** Lines you type on separate lines stay on separate lines in the overview.
@@ -33,7 +38,6 @@ All notable changes to Kurlo are documented here. This project follows
 - **Activity bar.** Only one button is highlighted: when the Runner or Mock server is open, the button of the sidebar panel stays bright without the highlight.
 - **Mock server.** The empty state no longer repeats "Nothing to serve yet".
 - **Small windows.** The empty response area scrolls instead of cutting off **Load response from file**, and the provider list in **Add a secret provider** fades at the edge where more types are hidden.
-- **Request tabs.** Params, Auth, Headers, Body, Vars, Scripts, Docs, Examples and Settings load in the background after startup, so the first switch to a tab no longer shows an empty panel.
 - **Settings.** **Default location** saves when you leave the field, press `Enter` or pick a folder, without a separate **Save** button.
 - **Sidebar.** Hovering a collection name shows the normal arrow pointer instead of a text cursor.
 

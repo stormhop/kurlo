@@ -21,6 +21,10 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **File bodies.** Drop a file onto **Body → Binary** or choose one, and see its size and type, a **File not found** warning and a one-click `Content-Type` header. Files inside the workspace folder are saved with relative paths, so binary and form-data requests work after a Git clone and in `kurlo run`. [HTTP guide](/docs/guides/request-types/http/#send-a-file-as-the-body).
 
+- **Response viewer.** JSON, XML and HTML sent as plain text or without a `Content-Type` are formatted, with a format menu to choose **JSON**, **XML**, **HTML** or **Text**. Fold blocks from the line numbers or with **Fold all**, turn off line wrapping, hover the status and size for details, and see the cookies a response sets in a **Cookies** tab. [Response body guide](/docs/guides/response-viewer/body/).
+
+- **Tab and text menus.** Right-click a request tab to close tabs to the right, other tabs or all tabs, duplicate the request or copy its URL or cURL. Right-click selected text to encode or decode it as a URI component or Base64. [Requests guide](/docs/guides/workspaces/requests/#tab-menu).
+
 ### Changed
 
 - **Collection documentation.** The HTML reference keeps the request address pinned, shows cURL, JavaScript and Python snippets with authorization placeholders, and lists saved examples with colored status codes and side-by-side responses. The **Generate documentation** dialog is more compact. [Collection documentation guide](/docs/guides/cli-runner/docs/).
@@ -28,15 +32,15 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Fixed
 
+- **Response time.** The timing breakdown shows on hover again.
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
 - **Undefined variables** are underlined in red even before any environment exists.
-- **Request tabs** keep titles readable, number untitled drafts and mark a draft as unsaved only after you change it.
+- **Request tabs** keep titles readable, number untitled drafts, mark a draft as unsaved only after you change it, and no longer flash empty the first time you open them.
 - **Collection Runner** and **History** layouts fit narrower windows and show more of each request path.
 - **Workspace README** keeps your line breaks in the overview.
 - **Command palette** lists secret commands under **Secrets**.
 - **Activity bar** highlights one button at a time.
 - **Small windows** keep the empty response actions reachable and show when the provider list scrolls.
-- **Request tabs** no longer flash empty the first time you open them.
 - **Environments**, **Mock server** and **Settings** have clearer unsaved, empty and default-location states.
 - **Sidebar** shows the arrow pointer over collection names instead of a text cursor.
 
