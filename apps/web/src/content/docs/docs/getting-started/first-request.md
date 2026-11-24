@@ -14,9 +14,9 @@ On a new profile, the **Welcome to Kurlo** screen offers **New request**, **Impo
 
 ![Welcome screen with options to create a request, import a collection, or open a workspace](../../../../assets/screenshots/welcome.png)
 
-## 1. Create a workspace
+## 1. Open your workspace
 
-Workspaces are top-level containers — think one per project or per client. On first launch Kurlo creates a **Default** workspace; you can rename it or add more from the workspace switcher in the top-left.
+On first launch, Kurlo creates **My Workspace** with a collection called **Requests**. Use it for this walkthrough. You can rename the workspace or create another one from the workspace switcher in the top-left.
 
 ## 2. Send an ad-hoc request
 
@@ -50,9 +50,8 @@ It is the quickest way to paste a block of headers from somewhere else, or to ad
 
 ## 3. Save it to a collection
 
-- In the Collections sidebar, click **New collection** (`+`) and name it `Examples`.
-- Return to the request tab and name the request `Get with query`.
-- Click **Save** (or press `Cmd/Ctrl S`). In **Save request**, open the collection list, select `Examples`, and click **Save**.
+- Name the request `Get with query`.
+- Click **Save** (or press `Cmd/Ctrl S`). In **Save request**, choose **Requests** and click **Save**.
 
 The request now lives in the sidebar tree. Drag it to reorder it or [move it to another folder in the same collection](/docs/guides/workspaces/requests/#reordering-requests).
 
