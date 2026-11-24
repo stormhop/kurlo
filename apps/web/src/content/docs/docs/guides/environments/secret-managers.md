@@ -4,6 +4,8 @@ title: "Secret managers"
 
 An environment variable can take its value from a secret manager instead of storing it. The environment file keeps only a reference. Kurlo fetches the value when you send a request, keeps it in memory and shows it as `[secret]` in responses, history, script logs and test names.
 
+![The Prod environment with variables linked to Vault, 1Password, AWS and Google Cloud, and every key of a Vault secret imported with a prefix](../../../../../assets/screenshots/secret-managers-environment.png)
+
 Supported providers:
 
 | Provider | How Kurlo reads it | Where credentials come from |
@@ -19,7 +21,7 @@ Supported providers:
 | Command | Any program you choose, such as `pass` | Whatever the program uses |
 | Environment variables | The environment of the Kurlo process | Nothing to sign in to |
 
-Kurlo calls the services over their HTTP APIs or their official CLIs. It finds the CLIs in `PATH` and in the usual install folders, such as `/opt/homebrew/bin` on macOS.
+Kurlo calls the services over their HTTP APIs or their official CLIs. It finds the CLIs in `PATH` and in the usual install folders, such as `/opt/homebrew/bin` on macOS and `Program Files`, `AppData\Local` and the WinGet links folder on Windows, so `op`, `aws`, `az` and `gcloud` work even when Kurlo was started before they were added to `PATH`. Google application default credentials are read from `CLOUDSDK_CONFIG` when it is set, otherwise from `%APPDATA%\gcloud` on Windows and `~/.config/gcloud` elsewhere. Paths in provider settings may start with `~/`, or `~\` on Windows.
 
 ## Add a provider
 
@@ -30,6 +32,8 @@ Kurlo calls the services over their HTTP APIs or their official CLIs. It finds t
 The form checks each field before saving and shows what to fix under it: a missing address or region, a URL without `https://` or with a user name and password in it, an AWS region or Google Cloud project in the wrong form, an Azure client ID that is not a GUID, an ID another provider already uses, or a timeout outside 1 second to 10 minutes. Credentials are checked too: tokens cannot contain spaces, and a Google Cloud key must be the whole JSON key file.
 
 Provider settings are saved in `workspace.yml`, so a Git workspace shares them with your team. Tokens and keys you enter under **On this device** are stored only on this computer, encrypted like other local secrets. Each person signs in on their own device.
+
+![Secret providers: Vault, 1Password and AWS connected, and a Google Cloud provider from workspace.yml waiting to be trusted](../../../../../assets/screenshots/secret-managers-providers.png)
 
 ## Link a variable
 
@@ -64,6 +68,8 @@ Add `#key` to the end of any of them to fill **Field**. If no provider matches, 
 **Browse** lists what the provider can show you: Vault mounts, folders and secrets, 1Password vaults, items and fields, AWS secrets and parameters, Google and Azure secrets, Bitwarden projects and secrets, Doppler projects, configs and secret names, and Infisical environments, folders and secret names. Click an entry to use it, or **Open** to go inside. Browsing shows names only, and needs the provider to be trusted. Vault lists the paths its policy permits. Google Cloud and Azure check the permission to list secrets when you click **Test connection**. If listing is forbidden, enter a known path and click **Test** on the link to check read access.
 
 Click **Test** to fetch the secret without showing it. Kurlo reports its length and the fields it has. **Reveal** shows the value for 30 seconds. **Link** replaces the value with the reference and saves the environment right away.
+
+![Linking apiToken to a Vault secret picked with Browse and checked with Test](../../../../../assets/screenshots/secret-managers-link.png)
 
 A linked row shows **Linked** and the reference instead of a value. Click the reference to change or unlink it. Inherited environments and `{{name}}` suggestions show where the value comes from.
 

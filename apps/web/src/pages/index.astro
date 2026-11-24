@@ -17,8 +17,23 @@ const site = Astro.site ? new URL(base, Astro.site).toString() : base;
 const href = (path: string) => `${base}${path.replace(/^\//, '')}`;
 
 const title = 'Kurlo — free, open-source API client and Postman alternative';
-const description = 'A free, open-source desktop API client with Agent mode: the Kurlo agent with any model, Claude Code or Codex runs your requests, explains failures and writes tests, asking before every change. HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE, MCP and AI requests, saved as YAML in your repo. No account, no cloud, no telemetry.';
-const terms = /(pm\.sendRequest|pm\.response\.llm\(\)|kurlo run|kurlo mcp|pm\.\*|\[secret\]|\.proto|\bGET\b|\bHEAD\b|\bOPTIONS\b)/g;
+const description = 'A free, open-source desktop API client. Link variables to Vault, 1Password, AWS, Google Cloud or Azure secret managers, and let the Kurlo agent with any model, Claude Code or Codex run your requests, explain failures and write tests, asking before every change. HTTP, GraphQL, gRPC, WebSocket, Socket.IO, SSE, MCP and AI requests, saved as YAML in your repo. No account, no cloud, no telemetry.';
+const terms = /(op:\/\/|pm\.sendRequest|pm\.response\.llm\(\)|kurlo run|kurlo mcp|pm\.\*|\[secret\]|\.proto|\bGET\b|\bHEAD\b|\bOPTIONS\b)/g;
+
+const vaults = [
+  { id: 'vault-prod', name: 'HashiCorp Vault', path: 'secret/data/orders', field: 'password', who: 'AppRole · team-a', ms: '18 ms' },
+  { id: '1password', name: '1Password', path: 'op://Shop/Orders DB', field: 'password', who: 'op CLI · signed in', ms: '210 ms' },
+  { id: 'aws-prod', name: 'AWS Secrets Manager', path: 'prod/orders-db', field: 'password', who: 'role ci-reader · MFA', ms: '64 ms' },
+  { id: 'gcp', name: 'Google Secret Manager', path: 'projects/shop/secrets/orders-db', field: '', who: 'gcloud ADC', ms: '71 ms' },
+  { id: 'azure', name: 'Azure Key Vault', path: 'orders-db-password', field: '', who: 'az CLI · shop-kv', ms: '93 ms' },
+];
+
+const secretPromises = [
+  { title: 'Free, all eleven.', text: 'Bruno keeps cloud vaults for Ultimate. Postman wants Enterprise plus a security add-on. Kurlo has no paid plan to grow into.' },
+  { title: 'Only a reference in Git.', text: 'The environment file says where the secret lives. Each teammate signs in with their own token, profile or CLI.' },
+  { title: 'Paste what you have.', text: 'An ARN, an op:// link, an Azure URL or a Vault path fills in the link. Browse lists the paths you can read.' },
+  { title: 'Same in CI.', text: 'kurlo run fetches the values with the runner’s credentials, masks them in reports and stops with a clear error when one is missing.' },
+];
 
 const promises = [
   { title: 'Asks before it writes.', text: 'Every change shows the exact YAML lines to Apply, Reject or Allow for this chat. Anything but GET, HEAD or OPTIONS asks before it is sent.' },
@@ -103,6 +118,7 @@ const also = [
 
 const parts = [
   { part: 'Agent mode', details: 'The Kurlo agent with any model, Claude Code and Codex. Approvals, plans, MCP servers and a Git branch per chat.', status: 'Yes', tone: 'yes' },
+  { part: 'Secret managers', details: 'Vault and OpenBao, 1Password, AWS Secrets Manager and Parameter Store, Google, Azure, Bitwarden, Doppler, Infisical, a command or env vars.', status: 'Yes', tone: 'yes' },
   { part: 'HTTP', details: '1.1 and 2, with proxies and client certificates.', status: 'Yes', tone: 'yes' },
   { part: 'GraphQL', details: 'Queries, variables and a schema explorer.', status: 'Yes', tone: 'yes' },
   { part: 'gRPC', details: 'Server reflection or your own .proto files.', status: 'Yes', tone: 'yes' },
@@ -123,6 +139,7 @@ const parts = [
 const faq = [
   { q: 'What does it cost?', a: 'Nothing. It’s open source under MIT. No paid tier, no seats, no catch.' },
   { q: 'Does Agent mode cost extra?', a: 'Not from us. The Kurlo agent runs free on a local model or on your own key, and Claude Code and Codex use the plan you already have.', link: 'docs/guides/agent/' },
+  { q: 'Do I need a paid plan for Vault or AWS?', a: 'No. All eleven secret managers work in the free app and in kurlo run. Bruno and Postman sell theirs in their top plans.', link: 'docs/guides/environments/secret-managers/' },
   { q: 'Do I need an account?', a: 'No. There is no Kurlo server, so there is nothing to sign in to.' },
   { q: 'What does it collect?', a: 'Nothing. On launch it asks GitHub whether a newer release exists, with no usage data in the request. Everything else goes only where you send it.', link: 'privacy/' },
   { q: 'Does my agent see my tokens?', a: 'No. Secrets reach your API, but the agent sees [secret]. Environments you protect are off limits to it entirely.', link: 'docs/guides/mcp-server/' },
@@ -141,14 +158,14 @@ const ldJson = structuredData({
 });
 ---
 
-<SiteLayout title={title} description={description} canonical={site} ldJson={ldJson} links={[{ label: 'Agent mode', href: href('agent/') }, { label: 'Features', href: '#features' }, { label: 'MCP', href: href('mcp/') }, { label: 'Receipts', href: '#receipts' }, { label: 'Compare', href: '#compare' }]}>
+<SiteLayout title={title} description={description} canonical={site} ldJson={ldJson} links={[{ label: 'Secrets', href: '#secrets' }, { label: 'Agent mode', href: href('agent/') }, { label: 'Features', href: '#features' }, { label: 'MCP', href: href('mcp/') }]}>
   <section class="k-hero" data-hero aria-labelledby="hero-title">
     <Scene variant="dusk" bird winter />
     <p class="k-hint" data-hint aria-hidden="true">Click the sky <svg width="38" height="22" viewBox="0 0 38 22" fill="none"><path d="M2 4c10 0 22 2 32 14m0 0-1-8m1 8-8-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></p>
     <div class="k-hero-copy">
-      <a class="k-pill" href="#agent"><b>New</b><span>Kurlo 3.0: Agent mode, with Claude Code and Codex</span><i aria-hidden="true">→</i></a>
+      <a class="k-pill" href="#secrets"><b>New</b><span>Kurlo 3.2: secret managers, free for everyone</span><i aria-hidden="true">→</i></a>
       <h1 id="hero-title"><span>Send</span><span>it.</span></h1>
-      <p class="k-lead">The open-source API client with an agent inside. Bring any model, Claude Code or Codex. YAML in your repo, no account.</p>
+      <p class="k-lead">The open-source API client with an agent inside and your secret managers built in. Bring any model, Claude Code or Codex. YAML in your repo, no account.</p>
       <div class="k-cta">
         <DownloadButton />
         <InstallButton />
@@ -158,10 +175,68 @@ const ldJson = structuredData({
     <p class="k-counter" data-counter hidden>Delivered <b data-count>0</b></p>
   </section>
 
+  <section class="k-s32" id="secrets" aria-labelledby="s32-title">
+    <div class="k-s32-in">
+      <div class="k-s32-head">
+        <p class="k-s32-badge"><span>New</span>in Kurlo 3.2</p>
+        <h2 class="k-s32-title" id="s32-title"><span>Kurlo <em>3.2</em></span><span>Secret managers.</span></h2>
+        <p class="k-s32-lead">Link a variable to Vault, 1Password, AWS, Google Cloud, Azure and six more. Git keeps the reference, Kurlo fetches the value when you send, and every response, log and report shows <code>[secret]</code>. Free, like the rest of Kurlo.</p>
+      </div>
+
+      <div class="k-s32-flow" data-s32>
+        <div class="k-s32-pick" role="radiogroup" aria-label="Secret provider">
+          {vaults.map((item, i) => (
+            <button type="button" role="radio" aria-checked={i === 0 ? 'true' : 'false'} data-s32-pick={i}>{item.name}</button>
+          ))}
+          <span class="k-s32-more">+ Bitwarden, Doppler, Infisical, Parameter Store, a command or env vars</span>
+        </div>
+        <ol class="k-s32-steps">
+          <li class="k-s32-card">
+            <p class="k-s32-cap"><b>1</b>In Git: <code>environments/Prod.yml</code></p>
+            <pre><code><span class="k">key</span>: dbPassword
+<span class="k">secretRef</span>:
+  <span class="k">provider</span>: <span class="s" data-s32-provider>{vaults[0].id}</span>
+  <span class="k">path</span>: <span class="s" data-s32-path>{vaults[0].path}</span>
+<span data-s32-fieldline>  <span class="k">field</span>: <span class="s" data-s32-field>{vaults[0].field}</span></span></code></pre>
+            <p class="k-s32-note">No value in the file. Your teammates link the same secret with their own sign-in.</p>
+          </li>
+          <li class="k-s32-card">
+            <p class="k-s32-cap"><b>2</b>On send, from <span data-s32-name>{vaults[0].name}</span></p>
+            <pre><code><span class="d">Secrets</span>      <span class="n" data-s32-ms>{vaults[0].ms}</span>
+<span class="d">Provider</span>     <span data-s32-who>{vaults[0].who}</span>
+<span class="d">Trusted</span>      <span class="ok">on this device</span>
+<span class="d">Cached</span>       <span>5 min, in memory</span></code></pre>
+            <p class="k-s32-note">Tokens stay encrypted on your machine. A cloned workspace waits until you trust its providers.</p>
+          </li>
+          <li class="k-s32-card">
+            <p class="k-s32-cap"><b>3</b>What you, logs and agents see</p>
+            <pre><code><span class="ok">200 OK</span>
+{`{`}
+  <span class="k">"user"</span>: <span class="s">"svc-orders"</span>,
+  <span class="k">"authorization"</span>: <span class="s">"Bearer <mark>[secret]</mark>"</span>
+{`}`}</code></pre>
+            <p class="k-s32-note">The API gets the real value. History, script logs, <code>kurlo run</code> reports and MCP get <code>[secret]</code>.</p>
+          </li>
+        </ol>
+      </div>
+
+      <ul class="k-s32-promises">
+        {secretPromises.map(item => (
+          <li><h3>{item.title}</h3><p><Rich text={item.text} terms={terms} /></p></li>
+        ))}
+      </ul>
+
+      <div class="k-s32-cta">
+        <a class="k-s32-btn" href={href('docs/guides/environments/secret-managers/')}><b>Read the guide</b><i aria-hidden="true">→</i></a>
+        <a class="k-source" href={href('changelog/')}>Everything new in 3.2</a>
+      </div>
+    </div>
+  </section>
+
   <section class="k-a3" id="agent" aria-labelledby="a3-title">
     <div class="k-a3-in">
       <div class="k-a3-head">
-        <p class="k-a3-badge"><span>New</span>in Kurlo 3.0</p>
+        <p class="k-a3-badge"><span>Since</span>Kurlo 3.0</p>
         <h2 class="k-a3-title" id="a3-title"><span>Kurlo <em>3.0</em></span><span>Agent mode.</span></h2>
         <p class="k-a3-lead">Ask in plain words. It runs your requests, finds out why one failed and writes the missing test, right in your workspace. Use the Kurlo agent with any model, or the Claude Code and Codex you already pay for.</p>
       </div>
@@ -538,6 +613,39 @@ Cursor        <span class="ok">added</span>
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); fire(); }
         });
         select(current);
+      })();
+    </script>
+    <script define:vars={{ vaults }}>
+      (() => {
+        const root = document.querySelector('[data-s32]');
+        if (!root) return;
+        const buttons = [...root.querySelectorAll('[data-s32-pick]')];
+        const set = (name, value) => { root.querySelector(`[data-s32-${name}]`).textContent = value; };
+        const pick = index => {
+          const item = vaults[index];
+          buttons.forEach((button, i) => button.setAttribute('aria-checked', String(i === index)));
+          set('provider', item.id);
+          set('path', item.path);
+          set('field', item.field);
+          set('name', item.name);
+          set('who', item.who);
+          set('ms', item.ms);
+          root.querySelector('[data-s32-fieldline]').hidden = !item.field;
+          root.classList.remove('k-s32-flash');
+          void root.offsetWidth;
+          root.classList.add('k-s32-flash');
+        };
+        buttons.forEach((button, i) => {
+          button.addEventListener('click', () => pick(i));
+          button.addEventListener('keydown', event => {
+            const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+            if (!step) return;
+            event.preventDefault();
+            const next = (i + step + buttons.length) % buttons.length;
+            buttons[next].focus();
+            pick(next);
+          });
+        });
       })();
     </script>
   </Fragment>

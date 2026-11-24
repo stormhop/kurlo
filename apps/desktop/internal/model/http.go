@@ -223,6 +223,8 @@ type HttpResponse struct {
 	Duration         int64           `json:"duration"`
 	Timings          ResponseTime    `json:"timings"`
 	Size             int64           `json:"size"`
+	HeadersSize      int64           `json:"headersSize,omitempty"`
+	EncodedBodySize  int64           `json:"encodedBodySize,omitempty"`
 	Error            string          `json:"error,omitempty"`
 	PreRequestResult ScriptResult    `json:"preRequestResult"`
 	TestResult       ScriptResult    `json:"testResult"`

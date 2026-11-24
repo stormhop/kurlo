@@ -18,6 +18,27 @@ func TestRedactSecretsLongestFirst(t *testing.T) {
 	}
 }
 
+func TestRedactSecretsFindsJSONEscapedValues(t *testing.T) {
+	secret := `Tr1"ck\y&<pw>`
+	for _, text := range []string{
+		`{"body": "{\"pw\": \"Tr1\"ck\\y&<pw>\"}"}`,
+		`{"pw":"Tr1\"ck\\y&<pw>"}`,
+	} {
+		got := redactSecrets(text, []string{secret})
+		if strings.Contains(got, "Tr1") {
+			t.Fatalf("redactSecrets(%q) = %q", text, got)
+		}
+	}
+}
+
+func TestRequestAuthSecretsCoverBasicCredentials(t *testing.T) {
+	text := "Authorization: Basic c3ZjOmJhc2ljUFctOXo5eg== and client Y2xpZW50OmNsaWVudC1zZWNyZXQ="
+	got := redactSecrets(text, requestAuthSecrets(model.AuthConfig{Type: "basic", Username: "svc", Password: "basicPW-9z9z", OAuth2ClientID: "client", OAuth2Secret: "client-secret"}))
+	if got != "Authorization: Basic [secret] and client [secret]" {
+		t.Fatalf("redactSecrets = %q", got)
+	}
+}
+
 func TestRedactSecretsNoSecrets(t *testing.T) {
 	if got := redactSecrets("nothing to hide", nil); got != "nothing to hide" {
 		t.Fatalf("expected passthrough, got %q", got)

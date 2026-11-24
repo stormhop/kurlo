@@ -846,7 +846,7 @@ func exportScopes(opts cliOptions, sm *state.Manager) error {
 		}
 	}
 	if opts.exportGlobals != "" {
-		if err := writeVariableExport(opts.exportGlobals, "Globals", sm.GetVariables()); err != nil {
+		if err := writeVariableExport(opts.exportGlobals, "Globals", opts.linked.masked(sm.GetVariables())); err != nil {
 			return fmt.Errorf("export globals: %w", err)
 		}
 	}

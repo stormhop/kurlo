@@ -17,11 +17,24 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **Capture proxy** (new radar icon in the activity bar) records traffic from any browser through the system proxy, decrypts HTTPS for the hosts you choose, searches URLs, headers and bodies, keeps saved Map local and Rewrite rules with URL patterns, breaks each exchange's time into DNS, connection, TLS, waiting and download, speaks HTTP/2 to clients on decrypted hosts, lets the agent read captured headers and bodies, works on several selected rows, turns calls into requests and examples, exports HAR from the desktop or CLI, and opens HAR files from Kurlo, browsers, Charles or Proxyman with multipart fields, response sizes, status text and upload timings. The Events view reads gzip, Brotli and zstd streams. Saving a response as an example requires complete text. See [Capture proxy](/docs/guides/capture-proxy/).
 
-- **Secret managers.** Link environment variables to Vault, 1Password, AWS Secrets Manager or Parameter Store, Google Secret Manager, Azure Key Vault, Bitwarden, Doppler, Infisical or a command such as `pass`, and browse a provider to pick a secret. Link tests and key previews follow the selected source when you edit its path. Only the reference goes into Git; values are fetched on send and stay in memory. An environment can import every key of a secret as variables. `kurlo run`, load tests and AI agents use linked values too, masked in reports and results. The Collection Runner checks the selected requests before sending any of them and stops on missing or empty secrets. The provider form checks each field and credential before saving. Vault signs in with LDAP or userpass too, AWS providers can assume a role with MFA, and pasting an ARN, `op://` URI, Azure or Vault URL fills in the link. **Export for CI…** saves the provider's credentials as a `.env` file for `kurlo run`. Cache time can be any duration up to 24 hours, and scripts can use `await pm.vault.get()`. Postman-style `{{vault:name}}` works in every field, with suggestions after `{{vault:`. [Secret managers guide](/docs/guides/environments/secret-managers/).
+### Fixed
 
-- **File tab.** Edit a request’s YAML with wrapped lines, collapsible sections and protected metadata. Change the name, URL, method or protocol from the address bar and see it update in the YAML. Changing the URL back restores its original YAML. Choose suggested fields and values as you type, preview the save format with Beautify, hover over underlined fields to read validation errors, and review changes made on disk. Older request files keep their collection name when edited. Editor sections are remembered locally. Generated YAML keeps disabled rows and omits default row fields. [Request file guide](/docs/reference/kurlo-yaml-format/request/).
+- **Request tabs** no longer flash a close button after a draft is saved or closed.
+- **Record** starts the local proxy for browsers using the configured proxy address. [Connect your browser](/docs/guides/capture-proxy/#connect-your-browser).
+
+## 3.2.0
+
+### Added
+
+- **Secret managers.** Link environment variables to Vault, 1Password, AWS Secrets Manager or Parameter Store, Google Secret Manager, Azure Key Vault, Bitwarden, Doppler, Infisical or a command such as `pass`, and browse a provider to pick a secret. Only the reference goes into Git; values are fetched on send and stay in memory. An environment can import every key of a secret as variables. `kurlo run`, load tests and AI agents use linked values too, masked in reports and results. The Collection Runner checks the selected requests before sending any of them and stops on missing or empty secrets. The provider form checks each field and credential before saving. Vault signs in with LDAP or userpass too, AWS providers can assume a role with MFA, and pasting an ARN, `op://` URI, Azure or Vault URL fills in the link. **Export for CI…** saves the provider's credentials as a `.env` file for `kurlo run`. Cache time can be any duration up to 24 hours, and scripts can use `await pm.vault.get()`. Postman-style `{{vault:name}}` works in every field, with suggestions after `{{vault:`. [Secret managers guide](/docs/guides/environments/secret-managers/).
+
+- **File tab.** Edit a request’s YAML with wrapped lines, collapsible sections and protected metadata. Change the name, URL, method or protocol from the address bar and see it update in the YAML. Changing the URL back restores its original YAML. Choose suggested fields and values as you type, preview the save format with Beautify, hover over underlined fields to read validation errors, and review changes made on disk. Editor sections are remembered locally. Generated YAML keeps disabled rows and omits default row fields. [Request file guide](/docs/reference/kurlo-yaml-format/request/).
 
 - **File bodies.** Drop a file onto **Body → Binary** or choose one, and see its size and type, a **File not found** warning and a one-click `Content-Type` header. Files inside the workspace folder are saved with relative paths, so binary and form-data requests work after a Git clone and in `kurlo run`. [HTTP guide](/docs/guides/request-types/http/#send-a-file-as-the-body).
+
+- **Response viewer.** JSON, XML and HTML sent as plain text or without a `Content-Type` are formatted, with a format menu to choose **JSON**, **XML**, **HTML** or **Text**. Fold blocks from the line numbers or with **Fold all**, turn off line wrapping, hover the status and size for details, and see the cookies a response sets in a **Cookies** tab. [Response body guide](/docs/guides/response-viewer/body/).
+
+- **Tab and text menus.** Right-click a request tab to close tabs to the right, other tabs or all tabs, duplicate the request or copy its URL or cURL. Right-click selected text to encode or decode it as a URI component or Base64. [Requests guide](/docs/guides/workspaces/requests/#tab-menu).
 
 ### Changed
 
@@ -30,19 +43,16 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Fixed
 
-- **Request tabs** no longer flash a close button after a draft is saved or closed.
-- **Record** starts the local proxy for browsers using the configured proxy address. [Connect your browser](/docs/guides/capture-proxy/#connect-your-browser).
+- **Response time.** The timing breakdown shows on hover again.
 - **Authentication.** Credential fields show when a secret is unavailable on this device. You can replace it or clear its reference.
+- **Secret masking.** Secrets echoed back in Basic authorization or escaped JSON show as `[secret]`.
 - **Undefined variables** are underlined in red even before any environment exists.
-- **Request tabs** keep titles readable, number untitled drafts and mark a draft as unsaved only after you change it.
-- **Collection Runner** and **History** layouts fit narrower windows and show more of each request path.
-- **Workspace README** keeps your line breaks in the overview.
-- **Command palette** lists secret commands under **Secrets**.
-- **Activity bar** highlights one button at a time.
-- **Small windows** keep the empty response actions reachable and show when the provider list scrolls.
-- **Request tabs** no longer flash empty the first time you open them.
-- **Environments**, **Mock server** and **Settings** have clearer unsaved, empty and default-location states.
-- **Sidebar** shows the arrow pointer over collection names instead of a text cursor.
+- **Request tabs** keep titles readable, number untitled drafts, mark a draft as unsaved only after you change it, and no longer flash empty the first time you open them.
+- **Narrow windows** keep the Collection Runner, History and empty response actions readable and reachable.
+- **Themes** keep text readable on badges, selected rows, accent buttons on hover and in code, with clearer Catppuccin Latte syntax colours.
+- **Field errors** no longer move the field they belong to.
+- **Agent chats** no longer flash overlapping lines when you switch chats quickly.
+- **Smaller fixes** in the workspace README, command palette, activity bar, Settings, Environments and sidebar.
 
 ## 3.1.5
 

@@ -14,6 +14,13 @@
   let observedScrollTop = 0;
   let programmedScroll: number | null = null;
   let lastFollow: boolean | null = null;
+  let settled = false;
+
+  $effect(() => {
+    if (settled || !items.length) return;
+    const frame = requestAnimationFrame(() => { settled = true; });
+    return () => cancelAnimationFrame(frame);
+  });
 
   $effect(() => {
     const ids = new Set(items.map(item => item.id));
@@ -44,15 +51,17 @@
   function measure(node: HTMLDivElement, id: string) {
     let alive = true;
     let frame = 0;
+    const record = () => {
+      if (!alive) return;
+      const size = node.getBoundingClientRect().height;
+      if (size > 0 && Math.abs(size - (heights.get(id) ?? 0)) > 0.5) heights.set(id, size);
+    };
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        if (!alive) return;
-        const size = node.getBoundingClientRect().height;
-        if (size > 0 && Math.abs(size - (heights.get(id) ?? 0)) > 0.5) heights.set(id, size);
-      });
+      frame = requestAnimationFrame(record);
     });
     observer.observe(node);
+    if (!settled) record();
     return { destroy() { alive = false; cancelAnimationFrame(frame); observer.disconnect(); } };
   }
 

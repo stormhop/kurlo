@@ -5,6 +5,7 @@
   import { tabListKeyboard } from '../a11y';
   import { middleClick } from '../middleClick';
   import RequestTypeBadge from './RequestTypeBadge.svelte';
+  import RequestTabMenu from './RequestTabMenu.svelte';
   import WindowControls from './WindowControls.svelte';
   import { MAX_WORKSPACES } from '../constants';
   import type { Collection, Environment, SavedRequest, SidebarView, Workspace } from '../types/models';
@@ -264,6 +265,15 @@
       destroy: () => place(false),
     };
   }
+
+  let requestTabMenu = $state<{ id: string; x: number; y: number } | null>(null);
+
+  function openRequestTabMenu(event: MouseEvent, id: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (workspaceBlocked) return;
+    requestTabMenu = { id, x: event.clientX, y: event.clientY };
+  }
 </script>
 
 {#snippet environmentItem(environment: Environment, isDefault: boolean)}
@@ -436,7 +446,7 @@
       {/if}
       {#each openRequests as req, eachIndex (eachIndex)}
         {@const unsaved = req.isDraft ? (editedDraftIdSet.has(req.id) ? 'Unsaved draft' : '') : dirtyRequestIdSet.has(req.id) ? 'Unsaved changes' : ''}
-        <div class="saved-request-tab" class:active={req.id === activeRequestId && topView === 'request'} class:preview={req.id === previewRequestId} class:draft={req.isDraft} class:dirty={!req.isDraft && dirtyRequestIdSet.has(req.id)} class:unsaved={Boolean(unsaved)} use:middleClick={workspaceBlocked ? undefined : () => closeRequestTab(req.id)}>
+        <div class="saved-request-tab" class:active={req.id === activeRequestId && topView === 'request'} class:preview={req.id === previewRequestId} class:draft={req.isDraft} class:dirty={!req.isDraft && dirtyRequestIdSet.has(req.id)} class:unsaved={Boolean(unsaved)} use:middleClick={workspaceBlocked ? undefined : () => closeRequestTab(req.id)} oncontextmenu={(event) => openRequestTabMenu(event, req.id)} role="presentation">
           <button class="saved-request-tab-btn" role="tab" type="button" aria-selected={req.id === activeRequestId && topView === 'request'} tabindex={req.id === activeRequestId && topView === 'request' ? 0 : -1} onclick={() => switchRequest(req.id)} ondblclick={() => keepRequestTab(req.id)} disabled={workspaceBlocked}>
             <RequestTypeBadge request={req} variant="tab" />
             <span class="tab-title">{requestTabLabel(req)}</span>
@@ -573,3 +583,7 @@
     <WindowControls />
   </div>
 </div>
+
+{#if requestTabMenu}
+  <RequestTabMenu requestId={requestTabMenu.id} x={requestTabMenu.x} y={requestTabMenu.y} onclose={() => (requestTabMenu = null)} />
+{/if}

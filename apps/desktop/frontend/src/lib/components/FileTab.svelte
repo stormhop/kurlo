@@ -383,7 +383,7 @@
 
   .file-tab-error {
     background: var(--danger-bg);
-    color: var(--danger);
+    color: var(--danger-text);
   }
 
   @container (max-width: 34rem) {

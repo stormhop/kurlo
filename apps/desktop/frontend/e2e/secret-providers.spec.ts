@@ -1,5 +1,6 @@
 import { chooseRequestType } from './support/actions';
 import { installKurloBridge } from './support/bridge';
+import { captureDocsScreenshot } from './support/screenshots';
 import { installSecretProviderBridge } from './support/secretProviders';
 import { expect, test, type Page } from '@playwright/test';
 import { tmpdir } from 'node:os';
@@ -582,5 +583,64 @@ test.describe('secret providers', () => {
 
     await url.fill('{{vault:nothing}}');
     await expect(page.locator('.var-token-err').filter({ hasText: '{{vault:nothing}}' })).toHaveCount(1);
+  });
+
+  test('shows linked variables, the link popover and the provider list for the docs', async ({ page }) => {
+    await page.setViewportSize({ width: 1200, height: 780 });
+    const ref = (provider: string, path: string, field?: string) => ({ provider, path, ...(field ? { field } : {}) });
+    await installKurloBridge(page, '', 'browser/e2e', undefined, {
+      environments: [{
+        id: 'env-prod',
+        workspaceId: 'workspace-e2e',
+        name: 'Prod',
+        values: [
+          { id: 1, key: 'baseUrl', value: 'https://api.shop.example.com', enabled: true },
+          { id: 2, key: 'dbPassword', value: '', enabled: true, secret: true, secretRef: ref('vault-prod', 'secret/data/orders', 'password') },
+          { id: 3, key: 'stripeKey', value: '', enabled: true, secret: true, secretRef: ref('1password', 'op://Shop/Stripe', 'credential') },
+          { id: 4, key: 'awsWebhookSecret', value: '', enabled: true, secret: true, secretRef: ref('aws-prod', 'prod/webhooks', 'signing') },
+          { id: 5, key: 'mapsApiKey', value: '', enabled: true, secret: true, secretRef: ref('gcp', 'projects/shop/secrets/maps-key') },
+          { id: 6, key: 'apiToken', value: '', enabled: true },
+        ],
+        secretSources: [{ provider: 'vault-prod', path: 'secret/data/payments', prefix: 'pay_' }],
+      }],
+      activeEnvironmentId: 'env-prod',
+    });
+    await installSecretProviderBridge(page, {
+      providers: [
+        { id: 'vault-prod', type: 'vault', name: 'Vault prod', config: { address: 'https://vault.shop.example.com', auth: { method: 'approle', roleId: 'orders-api' } }, trusted: true, savedCredentials: ['secretId'] },
+        { id: '1password', type: '1password', name: '1Password', config: {}, trusted: true },
+        { id: 'aws-prod', type: 'aws-secrets-manager', name: 'AWS prod', config: { region: 'eu-central-1', profile: 'prod' }, trusted: true },
+        { id: 'gcp', type: 'gcp-secret-manager', name: 'Google Cloud', config: { project: 'shop' }, trusted: false },
+      ],
+      secrets: {
+        'vault-prod:secret/data/orders': { password: 'orders-db-pass', user: 'orders' },
+        'vault-prod:secret/data/payments': { merchantId: 'm-1', webhookKey: 'k' },
+        'vault-prod:secret/data/payments/api': { token: 's3cr3t-token-1', user: 'svc' },
+        'vault-prod:secret/data/billing': { key: 'x' },
+      },
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Environments', exact: true }).click();
+    await page.locator('.environment-item-main').filter({ hasText: 'Prod' }).click();
+    const imported = page.getByRole('region', { name: 'Imported from secret managers' });
+    await imported.getByRole('button', { name: 'Load keys' }).click();
+    await expect(imported).toContainText('pay_merchantId');
+    await captureDocsScreenshot(page, 'secret-managers-environment');
+
+    await page.getByRole('button', { name: 'Link apiToken to a secret manager' }).click();
+    const popover = page.getByRole('dialog', { name: 'Link apiToken' });
+    await popover.getByRole('button', { name: 'Browse the secrets of this provider' }).click();
+    const browser = popover.getByRole('group', { name: 'Browse secrets' });
+    for (const name of ['secret/', 'data/', 'payments/']) await browser.getByRole('button', { name, exact: true }).click();
+    await browser.getByRole('button', { name: 'api', exact: true }).click();
+    await popover.getByRole('combobox', { name: 'Field' }).fill('token');
+    await popover.getByRole('button', { name: 'Test' }).click();
+    await expect(popover).toContainText('14 characters');
+    await captureDocsScreenshot(page, 'secret-managers-link', popover);
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Secret providers', exact: true }).click();
+    await expect(page.locator('.secret-provider-row').filter({ hasText: 'Google Cloud' })).toBeVisible();
+    await captureDocsScreenshot(page, 'secret-managers-providers');
   });
 });

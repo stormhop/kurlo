@@ -75,7 +75,8 @@ export async function installSecretProviderBridge(page: Page, initial: { provide
           state.calls.push(`test:${id}`);
           const provider = find(id);
           if (!provider?.trusted) return { providerId: id, ok: false, kind: 'untrusted', message: 'Not trusted on this device', durationMs: 3 };
-          return { providerId: id, ok: true, detail: 'token valid', policies: ['default', 'payments-read'], expiresInSeconds: 7200, durationMs: 12 };
+          const detail = provider.type === 'vault' ? 'token valid' : provider.type.startsWith('aws') ? `Credentials from profile ${String(provider.config?.profile ?? 'default')}` : provider.type === '1password' ? 'Signed in with the op CLI' : 'Credentials found';
+          return { providerId: id, ok: true, detail, ...(provider.type === 'vault' ? { policies: ['default', 'payments-read'], expiresInSeconds: 7200 } : {}), durationMs: 12 };
         },
         TestSecretRef: async (_workspaceId: string, ref: { provider: string; path: string; field?: string }) => {
           state.calls.push(`testRef:${ref.provider}:${ref.path}#${ref.field ?? ''}`);

@@ -7,6 +7,7 @@
     responseMatchLine,
     type ResponseRenderMode,
   } from '../response-render';
+  import { responseFoldRegions, unfoldAround, visibleResponseLines } from '../responseFolding';
 
   const BASE_LINE_HEIGHT = 20;
   const VIRTUAL_OVERSCAN = 600;
@@ -19,6 +20,8 @@
     searchIndex,
     virtualized,
     page,
+    folded = $bindable(new Set<number>()),
+    wrap = true,
   }: {
     source: string;
     mode: ResponseRenderMode;
@@ -26,6 +29,8 @@
     searchIndex: number;
     virtualized: boolean;
     page: number;
+    folded?: Set<number>;
+    wrap?: boolean;
   } = $props();
 
   let lineHeight = $derived(BASE_LINE_HEIGHT * $uiScale);
@@ -41,35 +46,65 @@
   let dragging = $state(false);
 
   let rawLines = $derived(source.split(/\r\n|\r|\n/));
+  let foldRegions = $derived(responseFoldRegions(source, mode));
+  let displayLines = $derived(visibleResponseLines(rawLines.length, foldRegions, folded));
   let matchOffsets = $derived(buildResponseMatchOffsets(rawLines, search));
   let currentMatchLine = $derived(responseMatchLine(matchOffsets, searchIndex));
   let virtualWindow = $derived.by(() => {
-    if (!virtualized) return { start: 0, end: rawLines.length, before: 0, after: 0 };
+    if (!virtualized) return { start: 0, end: displayLines.length, before: 0, after: 0 };
     const start = Math.max(0, Math.floor((scrollTop - VIRTUAL_OVERSCAN) / lineHeight));
     const end = Math.min(
-      rawLines.length,
+      displayLines.length,
       Math.ceil((scrollTop + viewportHeight + VIRTUAL_OVERSCAN) / lineHeight),
     );
     return {
       start,
       end,
       before: start * lineHeight,
-      after: Math.max(0, (rawLines.length - end) * lineHeight),
+      after: Math.max(0, (displayLines.length - end) * lineHeight),
     };
   });
-  let visibleLines = $derived.by(() => {
-    const counter = { value: matchOffsets[virtualWindow.start] ?? 0 };
-    return rawLines
-      .slice(virtualWindow.start, virtualWindow.end)
-      .map((line, index) => renderResponseBodyLine(
-        line,
-        virtualWindow.start + index + 1,
+  let visibleLines = $derived.by(() => displayLines
+    .slice(virtualWindow.start, virtualWindow.end)
+    .map(index => {
+      const rendered = renderResponseBodyLine(
+        rawLines[index],
+        index + 1,
         mode,
         search,
-        counter,
+        { value: matchOffsets[index] ?? 0 },
         searchIndex,
-      ));
-  });
+      );
+      const region = foldRegions.get(index);
+      if (!region) return { ...rendered, region: null, isFolded: false };
+      const isFolded = folded.has(index);
+      if (!isFolded) return { ...rendered, region, isFolded };
+      const tail = renderResponseBodyLine(
+        rawLines[region.end].trim(),
+        region.end + 1,
+        mode,
+        '',
+        { value: 0 },
+        -1,
+      );
+      return {
+        ...rendered,
+        region,
+        isFolded,
+        html: `${rendered.html}<span class="rsp-fold-placeholder" data-fold-line="${index}">⋯</span>${tail.html}`,
+      };
+    }));
+
+  function setFolded(line: number, fold: boolean) {
+    folded = new Set(fold ? [...folded, line] : [...folded].filter(start => start !== line));
+  }
+
+  function onViewerClick(event: MouseEvent) {
+    const placeholder = (event.target as HTMLElement | null)?.closest<HTMLElement>('.rsp-fold-placeholder');
+    if (!placeholder) return;
+    const line = Number(placeholder.dataset.foldLine);
+    if (Number.isFinite(line)) setFolded(line, false);
+  }
 
   let scrollThumb = $derived.by(() => {
     const { top, scrollHeight, clientHeight } = metrics;
@@ -238,19 +273,29 @@
     if (page === lastPage && source === lastSource) return;
     lastPage = page;
     lastSource = source;
+    if (folded.size) folded = new Set();
     scrollTop = 0;
     if (viewer) viewer.scrollTop = 0;
   });
 
   $effect(() => {
-    if (rawLines.length >= 0 && virtualized && viewer) measure(viewer);
+    if (displayLines.length >= 0 && virtualized && viewer) measure(viewer);
+  });
+
+  $effect(() => {
+    const line = currentMatchLine;
+    if (line < 0 || !folded.size) return;
+    const next = unfoldAround(line, foldRegions, folded);
+    if (next !== folded) folded = next;
   });
 
   $effect(() => {
     const line = currentMatchLine;
     if (line < 0 || !viewer) return;
     if (virtualized) {
-      const targetTop = line * lineHeight;
+      const position = displayLines.indexOf(line);
+      if (position < 0) return;
+      const targetTop = position * lineHeight;
       const targetBottom = targetTop + lineHeight;
       if (targetTop < viewer.scrollTop || targetBottom > viewer.scrollTop + viewer.clientHeight) {
         const nextTop = Math.max(0, targetTop - Math.floor(viewer.clientHeight / 2));
@@ -265,11 +310,29 @@
   });
 </script>
 
+{#snippet foldToggle(line: { number: number; region: { start: number; end: number } | null; isFolded: boolean })}
+  {#if line.region}
+    <button
+      class="response-fold-toggle"
+      class:folded={line.isFolded}
+      type="button"
+      tabindex="-1"
+      aria-expanded={!line.isFolded}
+      aria-label={`${line.isFolded ? 'Unfold' : 'Fold'} lines ${line.region.start + 1}–${line.region.end + 1}`}
+      onmousedown={event => event.preventDefault()}
+      onclick={event => { event.stopPropagation(); setFolded(line.region!.start, !line.isFolded); }}
+    >
+      <svg width="0.5rem" height="0.5rem" viewBox="0 0 8 8" fill="none" aria-hidden="true"><path d="M1.5 2.75L4 5.25l2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  {/if}
+{/snippet}
+
 <div class="response-body-frame">
   <div
     bind:this={viewer}
     class="response-body-viewer"
     class:virtualized
+    class:nowrap={!wrap && !virtualized}
     data-virtualized={virtualized ? 'true' : undefined}
     role="textbox"
     aria-label="Response body"
@@ -279,13 +342,14 @@
     use:trackViewport
     onscroll={onScroll}
     onkeydown={onKeydown}
+    onclick={onViewerClick}
   >
     {#if virtualized}
-      <div class="response-virtual" style={`height: ${rawLines.length * lineHeight}px`}>
-        <div class="response-gutter" aria-hidden="true">
+      <div class="response-virtual" style={`height: ${displayLines.length * lineHeight}px`}>
+        <div class="response-gutter">
           <div class="response-lines-spacer" style={`height: ${virtualWindow.before}px`}></div>
           {#each visibleLines as line (line.number)}
-            <div class="response-line-no" data-line-number={line.number}>{line.number}</div>
+            <div class="response-line-no" data-line-number={line.number}><span aria-hidden="true">{line.number}</span>{@render foldToggle(line)}</div>
           {/each}
         </div>
         <div class="response-virtual-code">
@@ -301,7 +365,7 @@
     {:else}
       {#each visibleLines as line (line.number)}
         <div class="response-line" data-line-number={line.number}>
-          <span class="response-line-no">{line.number}</span>
+          <span class="response-line-no"><span>{line.number}</span>{@render foldToggle(line)}</span>
           <!-- eslint-disable-next-line svelte/no-at-html-tags -->
           <code class="response-line-code">{@html line.html}</code>
         </div>

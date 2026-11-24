@@ -368,6 +368,12 @@ test.describe("Kurlo desktop browser E2E", () => {
     }));
     expect(fits).toBe(true);
 
+    const rowOffset = () => page.locator('#ai-temperature').evaluate(input => {
+      const rect = input.getBoundingClientRect();
+      const row = input.closest('.postman-setting')!.getBoundingClientRect();
+      return { top: Math.round(rect.top - row.top), right: Math.round(row.right - rect.right) };
+    });
+    const offsetBefore = await rowOffset();
     await page.locator('#ai-temperature').fill('2132312231');
     const error = page.locator('#ai-temperature-error');
     await expect(error).toHaveText('Use a number from 0 to 2.');
@@ -376,6 +382,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(message!.y).toBeGreaterThanOrEqual(field!.y + field!.height - 1);
     expect(message!.y - (field!.y + field!.height)).toBeLessThan(16);
     expect(field!.width).toBeLessThanOrEqual(8 * 16 + 1);
+    expect(await rowOffset()).toEqual(offsetBefore);
     await page.locator('#ai-temperature').fill('');
     await expect(error).toHaveCount(0);
 

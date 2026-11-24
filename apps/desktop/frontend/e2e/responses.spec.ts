@@ -692,3 +692,181 @@ test('collapses long script log lines and reports dropped ones', async ({ page }
   await bigRow.getByRole('button', { name: 'Show less' }).click();
   expect((await bigRow.locator('.log-msg').textContent())!.length).toBeLessThan(700);
 });
+
+test('formats structured plain-text responses and lets the user choose the format', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    const bodies: Record<string, { type: string; body: string }> = {
+      json: { type: 'text/plain; charset=utf-8', body: '{"id":42,"roles":["admin","dev"]}' },
+      xml: { type: '', body: '<order id="7"><item sku="A1"/></order>' },
+      text: { type: 'text/plain', body: 'OK: 3 jobs queued' },
+    };
+    (window as E2EWindow).go.api.App.SendRequest = async (req: { url: string }) => {
+      const picked = bodies[req.url.split('/').pop() ?? 'text'];
+      return {
+        statusCode: 200, status: '200 OK', headers: picked.type ? [{ key: 'Content-Type', value: picked.type }] : [], body: picked.body, duration: 4, size: picked.body.length,
+        preRequestResult: { tests: [], logs: [] }, testResult: { tests: [], logs: [] },
+      };
+    };
+  });
+  await page.getByLabel('New unsaved request').click();
+  await chooseRequestType(page, 'HTTP Request');
+  const url = page.getByLabel('Request URL');
+  const send = page.getByRole('button', { name: 'Send', exact: true });
+  const viewer = page.getByRole('textbox', { name: 'Response body', exact: true });
+  const format = page.getByRole('button', { name: /^Response format:/ });
+
+  await url.fill('https://api.kurlo.test/json');
+  await send.click();
+  await expect(format).toHaveAccessibleName('Response format: Auto · JSON');
+  await expect(viewer.locator('.response-line')).toHaveCount(7);
+  await expect(viewer.locator('.jk').first()).toHaveText('"id":');
+  await expect(page.getByRole('button', { name: 'Filter response' })).toBeVisible();
+
+  await format.click();
+  await page.getByRole('option', { name: 'Text', exact: true }).click();
+  await expect(format).toHaveAccessibleName('Response format: Text');
+  await expect(viewer.locator('.response-line')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Filter response' })).toHaveCount(0);
+
+  await format.click();
+  await page.getByRole('option', { name: 'Auto · JSON' }).click();
+  await expect(viewer.locator('.response-line')).toHaveCount(7);
+
+  await url.fill('https://api.kurlo.test/xml');
+  await send.click();
+  await expect(format).toHaveAccessibleName('Response format: Auto · XML');
+  await expect(viewer.locator('.response-line')).toHaveCount(3);
+
+  await url.fill('https://api.kurlo.test/text');
+  await send.click();
+  await expect(format).toHaveAccessibleName('Response format: Auto · Text');
+  await format.click();
+  await page.getByRole('option', { name: 'JSON', exact: true }).click();
+  await expect(page.locator('.response-format-fallback')).toHaveText('This response is not valid JSON, so it is shown as text.');
+  await expect(viewer).toContainText('OK: 3 jobs queued');
+});
+
+test('folds JSON and XML response blocks', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  const order = JSON.stringify({ id: 7, customer: { name: 'Ada', address: { city: 'London' } }, items: [{ sku: 'A1' }, { sku: 'B2' }] });
+  const big = JSON.stringify({ resources: Array.from({ length: 400 }, (_, index) => ({ id: index, title: `needle-${index}` })) });
+  await page.evaluate(({ order, big }) => {
+    const bodies: Record<string, { type: string; body: string }> = {
+      order: { type: 'application/json', body: order },
+      xml: { type: 'text/plain', body: '<order><customer><name>Ada</name></customer><total>19.90</total></order>' },
+      big: { type: 'application/json', body: big },
+    };
+    (window as E2EWindow).go.api.App.SendRequest = async (req: { url: string }) => {
+      const picked = bodies[req.url.split('/').pop() ?? 'order'];
+      return {
+        statusCode: 200, status: '200 OK', headers: [{ key: 'Content-Type', value: picked.type }], body: picked.body, duration: 4, size: picked.body.length,
+        preRequestResult: { tests: [], logs: [] }, testResult: { tests: [], logs: [] },
+      };
+    };
+  }, { order, big });
+  await page.getByLabel('New unsaved request').click();
+  await chooseRequestType(page, 'HTTP Request');
+  const url = page.getByLabel('Request URL');
+  const send = page.getByRole('button', { name: 'Send', exact: true });
+  const viewer = page.getByRole('textbox', { name: 'Response body', exact: true });
+  const lineNumbers = () => viewer.locator('.response-line').evaluateAll(rows => rows.map(row => Number((row as HTMLElement).dataset.lineNumber)));
+
+  await url.fill('https://api.kurlo.test/order');
+  await send.click();
+  await expect(viewer.locator('.response-line')).toHaveCount(17);
+
+  await viewer.getByRole('button', { name: 'Fold lines 3–8' }).click();
+  expect(await lineNumbers()).toEqual([1, 2, 3, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
+  await expect(viewer.locator('.response-line[data-line-number="3"]')).toContainText('"customer": {⋯},');
+  await expect(viewer.getByRole('button', { name: 'Unfold lines 3–8' })).toHaveAttribute('aria-expanded', 'false');
+
+  await viewer.locator('.rsp-fold-placeholder').click();
+  await expect(viewer.locator('.response-line')).toHaveCount(17);
+
+  await page.getByRole('button', { name: 'Fold all' }).click();
+  expect(await lineNumbers()).toEqual([1, 2, 3, 9, 17]);
+  await page.getByRole('button', { name: 'Unfold all' }).click();
+  await expect(viewer.locator('.response-line')).toHaveCount(17);
+
+  await url.fill('https://api.kurlo.test/xml');
+  await send.click();
+  await expect(viewer.locator('.response-line')).toHaveCount(6);
+  await viewer.getByRole('button', { name: 'Fold lines 2–4' }).click();
+  await expect(viewer.locator('.response-line[data-line-number="2"]')).toContainText('<customer>⋯</customer>');
+
+  await url.fill('https://api.kurlo.test/big');
+  await send.click();
+  await expect(viewer).toHaveAttribute('data-virtualized', 'true');
+  await page.getByRole('button', { name: 'Fold all' }).click();
+  expect(await lineNumbers()).toEqual([1, 2, 1604]);
+  await page.getByRole('button', { name: 'Search response' }).click();
+  await page.getByLabel('Search response body').fill('needle-250');
+  await expect(viewer.locator('.rsp-search-current')).toHaveText('needle-250');
+  await expect(viewer.locator('.response-line[data-line-number="1005"]')).toBeVisible();
+});
+
+test('explains the status and size, lists cookies and wraps lines on request', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  const body = JSON.stringify({ token: 'x'.repeat(400), note: 'short' }, null, 2);
+  await page.evaluate((body) => {
+    (window as E2EWindow).go.api.App.SendRequest = async () => ({
+      statusCode: 404, status: '404 Not Found',
+      headers: [
+        { key: 'Content-Encoding', value: 'gzip' },
+        { key: 'Content-Type', value: 'application/json' },
+        { key: 'Set-Cookie', value: 'session=abc123; Path=/; HttpOnly; Secure; SameSite=Lax' },
+        { key: 'Set-Cookie', value: 'theme=dark; Domain=.kurlo.test; Expires=Wed, 01 Jan 2020 00:00:00 GMT' },
+      ],
+      body, duration: 9, size: body.length, headersSize: 210, encodedBodySize: 120,
+      preRequestResult: { tests: [], logs: [] }, testResult: { tests: [], logs: [] },
+    });
+  }, body);
+  await page.getByLabel('New unsaved request').click();
+  await chooseRequestType(page, 'HTTP Request');
+  await page.getByLabel('Request URL').fill('https://api.kurlo.test/missing');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+
+  const status = page.locator('#response-status-info');
+  await page.locator('.response-status-bar .status-badge').hover();
+  await expect(status).toBeVisible();
+  await expect(status).toContainText('Not Found');
+  await expect(status).toContainText('hide a private resource');
+  const statusBox = (await status.boundingBox())!;
+  const panelBox = (await page.locator('.response-status-bar').boundingBox())!;
+  expect(statusBox.y + statusBox.height).toBeGreaterThan(panelBox.y + panelBox.height);
+
+  await page.locator('.response-status-bar .status-meta').hover();
+  const size = page.locator('#response-size-info');
+  await expect(size).toBeVisible();
+  await expect(size.locator('.resp-size-row')).toHaveText(['Headers210 B', 'Body (gzip)120 B', `Body (uncompressed)${body.length} B`]);
+  await expect(size.locator('.resp-size-head')).toHaveText('Response size330 B');
+
+  await page.locator('.response-time-trigger').hover();
+  await expect(page.locator('.response-time-popover')).toBeVisible();
+
+  await page.mouse.move(5, 5);
+  await page.getByRole('tab', { name: 'Cookies 2' }).click();
+  const rows = page.locator('.response-cookies-table tbody tr');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('session');
+  await expect(rows.nth(0)).toContainText('Host only');
+  await expect(rows.nth(0)).toContainText('HttpOnly');
+  await expect(rows.nth(0)).toContainText('SameSite=Lax');
+  await expect(rows.nth(1)).toContainText('kurlo.test');
+  await expect(rows.nth(1).locator('.cookie-expired')).toHaveText('Expired');
+
+  await page.locator('.response-mini-tabs').getByRole('tab', { name: 'Body', exact: true }).click();
+  const tokenLine = page.locator('.response-line[data-line-number="2"]');
+  const wrapped = (await tokenLine.boundingBox())!.height;
+  expect(wrapped).toBeGreaterThan(40);
+  const wrap = page.getByRole('button', { name: 'Wrap lines' });
+  await expect(wrap).toHaveAttribute('aria-pressed', 'true');
+  await wrap.click();
+  await expect(wrap).toHaveAttribute('aria-pressed', 'false');
+  expect((await tokenLine.boundingBox())!.height).toBeLessThan(30);
+  expect(await page.evaluate(() => localStorage.getItem('kurlo.responseWrap.v1'))).toBe('false');
+});

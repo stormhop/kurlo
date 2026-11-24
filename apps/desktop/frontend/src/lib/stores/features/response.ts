@@ -6,7 +6,8 @@ import { diffResponseBodies, type ResponseDiff } from '../../responseDiff';
 import { applyJsonFilter, type JsonFilterResult } from '../../jsonFilter';
 import type { GrpcResponse, RequestExample, RequestType, ResponseTab } from '../../types/models';
 import { responseFromExample } from '../../examples';
-import { clamp, clipboardCopy, formatSize, prettyJson, prettyMarkup } from '../../utils';
+import { clamp, clipboardCopy, formatSize } from '../../utils';
+import { fileExtensionForFormat, formatResponseText, renderModeForFormat, resolveResponseFormat, type ResolvedResponseFormat, type ResponseFormatChoice } from '../../responseFormat';
 
 const RESPONSE_PAGE_CHARS = 512 * 1024;
 const LARGE_RESPONSE_BYTES = 10 * 1024 * 1024;
@@ -14,8 +15,20 @@ const responseDisplayCache = new WeakMap<HttpResponse, {
   body: string;
   page: number;
   paged: boolean;
+  choice: ResponseFormatChoice;
   value: string;
 }>();
+const responseFormatCache = new WeakMap<HttpResponse, {
+  body: string;
+  contentType: string;
+  choice: ResponseFormatChoice;
+  paged: boolean;
+  value: ResolvedResponseFormat;
+}>();
+
+function responseContentType(resp: HttpResponse | null | undefined) {
+  return resp?.headers?.find(h => h.key.toLowerCase() === 'content-type')?.value ?? '';
+}
 
 let lastFilter: { body: string; query: string; result: JsonFilterResult } | null = null;
 let responseFilterTimer: ReturnType<typeof setTimeout> | undefined;
@@ -51,6 +64,10 @@ type ResponseHost = {
   responseFilterResult: JsonFilterResult | null;
   applyResponseFilterNow: () => void;
   responseRenderMode: 'json' | 'html' | 'text';
+  responseFormats: Map<string, ResponseFormatChoice>;
+  responseFormatChoice: ResponseFormatChoice;
+  resolvedResponseFormat: (resp?: HttpResponse | null) => ResolvedResponseFormat;
+  responseFormatChoiceFor: (resp: HttpResponse | null) => ResponseFormatChoice;
   responseSearch: string;
   responseSearchCounting: boolean;
   responseSearchIndex: number;
@@ -149,9 +166,17 @@ export const responseFeature = {
     const host = this as unknown as ResponseHost;
     if (host.responseFilterResult?.ok) return 'json';
     if (host.responseBodyIsPaged) return 'text';
-    if (host.isJsonResponse()) return 'json';
-    if (host.isHtmlResponse()) return 'html';
-    return 'text';
+    return renderModeForFormat(host.resolvedResponseFormat().format);
+  },
+
+  get responseFormatChoice(): ResponseFormatChoice {
+    const host = this as unknown as ResponseHost;
+    return (host.activeRequestId && host.responseFormats.get(host.activeRequestId)) || 'auto';
+  },
+
+  get responseFormat(): ResolvedResponseFormat {
+    const host = this as unknown as ResponseHost;
+    return host.resolvedResponseFormat();
   },
 
   get safeResponseSearchIndex(): number {
@@ -163,14 +188,44 @@ export const responseFeature = {
     return host.responseSearchIndex;
   },
 
+  responseFormatChoiceFor(this: ResponseHost, resp: HttpResponse | null) {
+    return resp && resp === this.response ? this.responseFormatChoice : 'auto';
+  },
+
+  resolvedResponseFormat(this: ResponseHost, resp: HttpResponse | null = this.response): ResolvedResponseFormat {
+    if (!resp?.body || resp.bodyIsBinary) return { format: 'text', detected: 'text', fallback: false };
+    const contentType = responseContentType(resp);
+    const choice = this.responseFormatChoiceFor(resp);
+    const paged = resp.size > LARGE_RESPONSE_BYTES;
+    const cached = responseFormatCache.get(resp);
+    if (cached && cached.body === resp.body && cached.contentType === contentType && cached.choice === choice && cached.paged === paged) {
+      return cached.value;
+    }
+    const value = paged
+      ? { format: 'text' as const, detected: 'text' as const, fallback: false }
+      : resolveResponseFormat(contentType, resp.body, choice);
+    responseFormatCache.set(resp, { body: resp.body, contentType, choice, paged, value });
+    return value;
+  },
+
+  setResponseFormat(this: ResponseHost, choice: ResponseFormatChoice, requestId = this.activeRequestId) {
+    if (!requestId) return;
+    const next = new Map(this.responseFormats);
+    if (choice === 'auto') next.delete(requestId);
+    else next.set(requestId, choice);
+    this.responseFormats = next;
+  },
+
+  responseRenderModeFor(this: ResponseHost, resp: HttpResponse | null) {
+    return renderModeForFormat(this.resolvedResponseFormat(resp).format);
+  },
+
   isJsonResponse(this: ResponseHost, resp: HttpResponse | null = this.response) {
-    const ct = resp?.headers?.find(h => h.key.toLowerCase() === 'content-type')?.value.toLowerCase() ?? '';
-    return ct.includes('json');
+    return this.resolvedResponseFormat(resp).format === 'json';
   },
 
   isHtmlResponse(this: ResponseHost, resp: HttpResponse | null = this.response) {
-    const ct = resp?.headers?.find(h => h.key.toLowerCase() === 'content-type')?.value.toLowerCase() ?? '';
-    return ct.includes('html');
+    return this.resolvedResponseFormat(resp).format === 'html';
   },
 
   isEventStreamResponse(this: ResponseHost, resp: HttpResponse | null = this.response) {
@@ -199,18 +254,15 @@ export const responseFeature = {
       ? this.responseBodyIsPaged
       : resp.size > LARGE_RESPONSE_BYTES;
     const page = paged ? this.responseBodyPage : 0;
+    const choice = this.responseFormatChoiceFor(resp);
     const cached = responseDisplayCache.get(resp);
-    if (cached && cached.body === resp.body && cached.page === page && cached.paged === paged) {
+    if (cached && cached.body === resp.body && cached.page === page && cached.paged === paged && cached.choice === choice) {
       return cached.value;
     }
     const value = paged
       ? resp.body.slice(page * RESPONSE_PAGE_CHARS, (page + 1) * RESPONSE_PAGE_CHARS)
-      : this.isJsonResponse(resp)
-        ? prettyJson(resp.body)
-        : this.isHtmlResponse(resp)
-          ? prettyMarkup(resp.body)
-          : resp.body;
-    responseDisplayCache.set(resp, { body: resp.body, page, paged, value });
+      : formatResponseText(resp.body, this.resolvedResponseFormat(resp).format);
+    responseDisplayCache.set(resp, { body: resp.body, page, paged, choice, value });
     return value;
   },
 
@@ -470,7 +522,7 @@ export const responseFeature = {
       }
       return;
     }
-    const ext = this.isJsonResponse() ? 'json' : this.isHtmlResponse() ? 'html' : 'txt';
+    const ext = fileExtensionForFormat(this.resolvedResponseFormat().format);
     const path = await saveFileDialog(`response.${ext}`, this.response.body);
     if (path) {
       this.savedResponse = true;

@@ -1,12 +1,18 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import ProviderLogo from './ProviderLogo.svelte';
   import { vm } from '../stores/app.svelte';
   import { loadSecretProviders, secretProviders } from '../stores/secretProviders.svelte';
   import { SECRET_PROVIDER_STATE_LABELS, secretProviderState, secretProviderSummary } from '../secretProviderTypes';
   import { openAddSecretProvider, openSecretProviders } from '../secretProvidersNav';
+  import { appLazyComponents } from '../stores/lazyComponents.svelte';
 
   let { workspaceBlocked = false, active = false }: { workspaceBlocked?: boolean; active?: boolean } = $props();
+
+  onMount(() => {
+    void appLazyComponents.loadSecretProvidersWorkspace();
+  });
 
   $effect(() => {
     const workspaceId = vm.activeWorkspaceId;

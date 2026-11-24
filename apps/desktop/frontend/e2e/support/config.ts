@@ -12,4 +12,4 @@ export const DOCS_VIEWPORT = { width: 1200, height: 780 };
 
 export const DOCS_CROP_PADDING = 26;
 
-export const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai', 'agent-approval', 'collection-docs-generate', 'collection-docs-folders']);
+export const DOCS_DARK_VARIANTS = new Set(['request-editor', 'request-mcp', 'request-ai', 'agent-approval', 'collection-docs-generate', 'collection-docs-folders', 'secret-managers-environment']);

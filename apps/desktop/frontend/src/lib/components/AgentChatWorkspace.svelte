@@ -1301,7 +1301,7 @@
     height: 2.25rem;
     border-radius: var(--radius-lg);
     background: var(--accent-dim);
-    color: var(--accent-text);
+    color: var(--accent-badge-text);
   }
 
   .agent-empty-title {
@@ -1654,15 +1654,15 @@
   }
   .agent-tool-status.ok {
     background: var(--success-bg);
-    color: var(--s2xx);
+    color: var(--success-text);
   }
   .agent-tool-status.warn {
     background: var(--warning-bg);
-    color: var(--s4xx);
+    color: var(--warning-text);
   }
   .agent-tool-status.bad {
     background: var(--danger-bg);
-    color: var(--s5xx);
+    color: var(--danger-text);
   }
   .agent-tool-time {
     flex: 0 0 auto;
@@ -2158,7 +2158,7 @@
   }
   .agent-branch-toggle.on {
     background: var(--accent-dim);
-    color: var(--accent-text);
+    color: var(--accent-badge-text);
   }
   .agent-kv-mono {
     font-family: var(--font-mono);

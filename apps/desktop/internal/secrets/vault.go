@@ -72,7 +72,7 @@ func newVaultProvider(config ProviderConfig, credentials Credentials, env Enviro
 }
 
 func expandHome(path string, env Environment) (string, error) {
-	if path == "~" || strings.HasPrefix(path, "~/") {
+	if path == "~" || strings.HasPrefix(path, "~/") || strings.HasPrefix(path, `~\`) {
 		home, err := env.HomeDir()
 		if err != nil {
 			return "", err
@@ -101,6 +101,12 @@ func (p *vaultProvider) Fetch(ctx context.Context, path, version string) (Secret
 	}
 	if status == http.StatusForbidden && p.config.Auth.Method != "token" {
 		p.forgetLogin()
+	}
+	if status == http.StatusNotFound && !vaultKV2Path(path) {
+		if mount, err := p.mountFor(ctx, token, path); err == nil && mount.Type == "kv" && mount.Version == "2" && strings.HasPrefix(path+"/", mount.Path) {
+			suggested := mount.Path + "data/" + strings.TrimPrefix(path, mount.Path)
+			return Secret{}, newError(KindNotFound, p.config.ID, "no secret at %s; %s is a KV v2 engine, so use %s", path, strings.TrimSuffix(mount.Path, "/"), suggested)
+		}
 	}
 	if err := p.statusError(status, body, path); err != nil {
 		return Secret{}, err

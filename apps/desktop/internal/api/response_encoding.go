@@ -219,3 +219,13 @@ func (c *cappedReader) Read(p []byte) (int, error) {
 	c.remaining -= int64(n)
 	return n, err
 }
+
+func responseHeadersSize(resp *http.Response) int64 {
+	size := int64(len(resp.Proto) + 1 + len(resp.Status) + 2)
+	for key, values := range resp.Header {
+		for _, value := range values {
+			size += int64(len(key) + 2 + len(value) + 2)
+		}
+	}
+	return size + 2
+}

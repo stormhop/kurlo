@@ -227,6 +227,9 @@ func parseINISection(data []byte, name string) map[string]string {
 func (p *awsProvider) cliCredentials(ctx context.Context) (awsCredentials, error) {
 	path, err := p.env.LookPath("aws")
 	if err != nil {
+		if id, _ := p.env.Getenv("AWS_ACCESS_KEY_ID"); strings.TrimSpace(id) != "" {
+			return awsCredentials{}, newError(KindNotAuthenticated, p.config.ID, "no AWS credentials: AWS_ACCESS_KEY_ID is set but AWS_SECRET_ACCESS_KEY is empty")
+		}
 		return awsCredentials{}, newError(KindNotAuthenticated, p.config.ID, "no AWS credentials: set AWS_ACCESS_KEY_ID, add profile %q to ~/.aws/credentials, or install the AWS CLI for SSO profiles", p.profileName())
 	}
 	args := []string{"configure", "export-credentials", "--format", "process"}

@@ -213,7 +213,7 @@
     padding: var(--space-2) var(--space-3);
     border-bottom: 1px solid var(--border);
     background: var(--warning-bg-subtle);
-    color: var(--s4xx);
+    color: var(--warning-text);
   }
 
   .mcp-warnings svg {

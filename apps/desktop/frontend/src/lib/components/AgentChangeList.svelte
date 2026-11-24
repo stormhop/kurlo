@@ -186,15 +186,15 @@
   }
   .agent-change-status-new {
     background: var(--success-bg);
-    color: var(--s2xx);
+    color: var(--success-text);
   }
   .agent-change-status-changed {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
-    color: var(--accent-text);
+    color: var(--accent-badge-text);
   }
   .agent-change-status-deleted {
     background: var(--danger-bg);
-    color: var(--danger);
+    color: var(--danger-text);
   }
   .agent-change-body {
     display: flex;

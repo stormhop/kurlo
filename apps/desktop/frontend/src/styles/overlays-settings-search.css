@@ -1245,17 +1245,17 @@ button.settings-row:focus-visible {
 
 .settings-pill.ok {
   background: var(--success-bg);
-  color: var(--s2xx);
+  color: var(--success-text);
 }
 
 .settings-pill.warn {
   background: var(--warning-bg);
-  color: var(--s4xx);
+  color: var(--warning-text);
 }
 
 .settings-pill.accent {
   background: var(--accent-dim);
-  color: var(--accent-text);
+  color: var(--accent-badge-text);
 }
 
 .global-search-backdrop {
@@ -1565,7 +1565,7 @@ button.settings-row:focus-visible {
   padding: var(--space-0-5) var(--space-2);
   border-radius: var(--radius-full);
   background: var(--accent-dim);
-  color: var(--accent-text);
+  color: var(--accent-badge-text);
   font-size: var(--text-caption);
   font-weight: var(--weight-semibold);
 }
@@ -1614,7 +1614,7 @@ button.settings-row:focus-visible {
 
 .agent-spotlight-glyph-kurlo {
   background: var(--accent-dim);
-  color: var(--accent-text);
+  color: var(--accent-badge-text);
 }
 
 .agent-spotlight-glyph-claude-code {

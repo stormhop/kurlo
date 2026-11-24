@@ -12,6 +12,44 @@ export type TextTarget =
 
 export type TextAction = 'cut' | 'copy' | 'paste' | 'selectAll';
 
+export type TextTransform = 'encodeUri' | 'decodeUri' | 'encodeBase64' | 'decodeBase64';
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+export function transformText(text: string, transform: TextTransform): string | null {
+  try {
+    if (transform === 'encodeUri') return encodeURIComponent(text);
+    if (transform === 'decodeUri') return decodeURIComponent(text);
+    if (transform === 'encodeBase64') return bytesToBase64(new TextEncoder().encode(text));
+    const normalized = text.trim().replace(/-/g, '+').replace(/_/g, '/');
+    if (!normalized || !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)) return null;
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    const binary = atob(padded);
+    const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+export function runTextTransform(target: TextTarget, transform: TextTransform, state = textTargetState(target)) {
+  if (!state.selection || state.readOnly || state.secret) return false;
+  const next = transformText(state.selection, transform);
+  if (next === null || next === state.selection) {
+    focusTextTarget(target);
+    return false;
+  }
+  const start = target.kind === 'field' ? (target.el.selectionStart ?? 0) : target.kind === 'code' ? target.view.state.selection.main.from : -1;
+  replaceSelection(target, next);
+  if (target.kind === 'field') target.el.setSelectionRange(start, start + next.length);
+  else if (target.kind === 'code') target.view.dispatch({ selection: { anchor: start, head: start + next.length } });
+  return true;
+}
+
 export type TextTargetState = {
   selection: string;
   readOnly: boolean;
@@ -92,7 +130,7 @@ function replaceSelection(target: TextTarget, text: string) {
   }
 }
 
-async function writeClipboard(text: string) {
+export async function writeClipboard(text: string) {
   if (window.go?.api?.App?.ClipboardSet) await clipboardSet(text);
   else await clipboardCopy(text);
 }

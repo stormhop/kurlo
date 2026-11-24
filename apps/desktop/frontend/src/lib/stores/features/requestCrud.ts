@@ -1,6 +1,7 @@
 import { cancelQuit, confirmQuit, loadRequestExamples } from '../../backend';
 import { normalizeRequestExamples, requestExamplesPending } from '../../examples';
 import type { HttpResponse, McpResponse } from '../../backend';
+import type { ResponseFormatChoice } from '../../responseFormat';
 import { DEFAULT_COLLECTION, clampName } from '../../constants';
 import { addCollectionFolderPath } from '../../collections';
 import {
@@ -85,6 +86,7 @@ type RequestCrudHost = {
   requests: SavedRequest[];
   requestsById: Map<string, SavedRequest>;
   responseTabs: Map<string, ResponseTab>;
+  responseFormats: Map<string, ResponseFormatChoice>;
   savedRequestSnapshots: Map<string, SavedRequest>;
   sidebarSearch: string;
   responses: Map<string, HttpResponse>;
@@ -877,6 +879,7 @@ export const requestCrudFeature = {
     this.responses = keep(this.responses);
     this.previousResponses = keep(this.previousResponses);
     this.responseTabs = keep(this.responseTabs);
+    this.responseFormats = keep(this.responseFormats);
     this.grpcResponses = keep(this.grpcResponses);
     this.mcpResponses = keep(this.mcpResponses);
     this.grpcResponseTabs = keep(this.grpcResponseTabs);

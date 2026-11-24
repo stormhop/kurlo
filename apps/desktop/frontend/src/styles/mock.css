@@ -235,7 +235,7 @@
 .mock-error {
   border: 1px solid var(--danger-border);
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .mock-hint {

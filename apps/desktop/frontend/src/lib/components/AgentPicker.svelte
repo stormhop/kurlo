@@ -403,7 +403,7 @@
   }
   .agent-glyph-kurlo {
     background: var(--accent-dim);
-    color: var(--accent-text);
+    color: var(--accent-badge-text);
   }
   .agent-glyph-kind {
     background: var(--elevated);

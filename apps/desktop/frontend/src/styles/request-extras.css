@@ -1337,7 +1337,7 @@
 .modal-error {
   padding: var(--space-2) var(--space-4);
   font-size: var(--text-label);
-  color: var(--s5xx);
+  color: var(--danger-text);
   background: var(--danger-bg-subtle);
   border-top: 1px solid var(--danger-border);
 }

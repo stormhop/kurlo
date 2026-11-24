@@ -117,7 +117,7 @@
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 .request-code-btn.active {
-  color: var(--accent-text);
+  color: var(--accent-badge-text);
   background: var(--accent-dim);
 }
 .request-bar.request-bar-ws .btn-send {
@@ -589,7 +589,7 @@
   justify-content: center;
   gap: var(--space-1-5);
 }
-.btn-send:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-send:hover:not(:disabled) { background: var(--accent-fill-hover, var(--accent-hover)); }
 .btn-send-kbd {
   margin-left: var(--space-0-5);
   padding: 0;
@@ -611,7 +611,7 @@
 .btn-send:disabled { opacity: var(--opacity-disabled); cursor: not-allowed; }
 .btn-send-cancel {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--danger-text);
   box-shadow: inset 0 0 0 1px var(--danger-border);
 }
 .btn-send-cancel:hover:not(:disabled) {
@@ -642,7 +642,7 @@
 }
 .btn-send-caret:hover,
 .btn-send-caret.open {
-  background: var(--accent-hover);
+  background: var(--accent-fill-hover, var(--accent-hover));
 }
 .send-menu {
   position: absolute;
@@ -890,7 +890,7 @@
 }
 
 .bulk-edit-toggle[aria-pressed='true'] {
-  color: var(--accent-text);
+  color: var(--accent-badge-text);
   border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
@@ -2030,7 +2030,7 @@
   height: 1.125rem;
   border-radius: var(--radius-full);
   background: var(--success-bg-strong);
-  color: var(--success);
+  color: var(--success-text);
   flex-shrink: 0;
 }
 
@@ -2203,8 +2203,8 @@
   background: transparent !important;
 }
 
-.badge-pass { background: var(--success-bg) !important; color: var(--s2xx) !important; }
-.badge-fail { background: var(--danger-bg) !important; color: var(--s5xx) !important; }
+.badge-pass { background: var(--success-bg) !important; color: var(--success-text) !important; }
+.badge-fail { background: var(--danger-bg) !important; color: var(--danger-text) !important; }
 
 .sr-only {
   position: absolute;

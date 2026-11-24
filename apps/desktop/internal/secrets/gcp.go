@@ -106,16 +106,20 @@ func (p *gcpProvider) lookupToken(ctx context.Context) (string, string, int64, e
 }
 
 func (p *gcpProvider) adcPath() string {
-	if runtime.GOOS == "windows" {
-		if appData, ok := p.env.Getenv("APPDATA"); ok && appData != "" {
+	return gcpADCPath(runtime.GOOS, p.env)
+}
+
+func gcpADCPath(goos string, env Environment) string {
+	if dir, ok := env.Getenv("CLOUDSDK_CONFIG"); ok && dir != "" {
+		return filepath.Join(dir, "application_default_credentials.json")
+	}
+	if goos == "windows" {
+		if appData, ok := env.Getenv("APPDATA"); ok && appData != "" {
 			return filepath.Join(appData, "gcloud", "application_default_credentials.json")
 		}
 		return ""
 	}
-	if dir, ok := p.env.Getenv("CLOUDSDK_CONFIG"); ok && dir != "" {
-		return filepath.Join(dir, "application_default_credentials.json")
-	}
-	home, err := p.env.HomeDir()
+	home, err := env.HomeDir()
 	if err != nil {
 		return ""
 	}
