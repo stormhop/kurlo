@@ -99,6 +99,9 @@ The full pipeline in [`ci.yml`](.github/workflows/ci.yml) runs:
 | Dead code | `golang.org/x/tools/cmd/deadcode` must report nothing |
 | End-to-end | `npm run test:e2e:all` (Playwright, Chromium and WebKit) |
 
+CI builds the npm CLI for macOS, Linux and Windows on x64 and arm64 in parallel
+with the desktop and web checks. The required `Build & Test` check passes when both jobs succeed.
+
 CI runs Chromium in one job and splits WebKit across two parallel jobs, with two
 workers per job. A fourth job runs the `@scale` tests in both browsers with one worker.
 Each job uploads its own `playwright-report-<suite>` artifact. All four jobs run to

@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   test:
-    name: Build & Test
+    name: Desktop and web checks
     runs-on: ubuntu-22.04
 
     steps:
@@ -97,9 +97,6 @@ jobs:
       - name: Test Go (race detector)
         run: go test -race ./apps/desktop/...
 
-      - name: Build the npm CLI without cgo
-        run: node scripts/build-npm-packages.mjs --version 0.0.0-ci --out "$RUNNER_TEMP/npm"
-
       - name: Dead code check
         run: |
           output=$(go run golang.org/x/tools/cmd/deadcode@v0.45.0 -test ./apps/desktop/...)
@@ -109,6 +106,47 @@ jobs:
             exit 1
           fi
           echo "No dead code."
+
+  npm-cli:
+    name: Build npm CLI
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/desktop/go.mod
+          cache-dependency-path: |
+            apps/desktop/go.sum
+            scripts/build-npm-packages.mjs
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Build the npm CLI without cgo
+        run: node scripts/build-npm-packages.mjs --version 0.0.0-ci --out "$RUNNER_TEMP/npm"
+
+  build-and-test:
+    name: Build & Test
+    needs: [test, npm-cli]
+    if: ${{ always() }}
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Require desktop and web checks and the CLI build to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          CLI_RESULT: ${{ needs.npm-cli.result }}
+        run: |
+          if [ "$TEST_RESULT" != "success" ] || [ "$CLI_RESULT" != "success" ]; then
+            echo "::error::Desktop and web checks finished with '$TEST_RESULT', CLI build with '$CLI_RESULT'"
+            exit 1
+          fi
 
   go-cross-platform:
     name: Go tests (${{ matrix.os }})
