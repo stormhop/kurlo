@@ -99,10 +99,10 @@ The full pipeline in [`ci.yml`](.github/workflows/ci.yml) runs:
 | Dead code | `golang.org/x/tools/cmd/deadcode` must report nothing |
 | End-to-end | `npm run test:e2e:all` (Playwright, Chromium and WebKit) |
 
-CI runs Chromium and WebKit in separate jobs with two workers each. A third job
-runs only `@scale` tests in both browsers with one worker. Each job uploads its own
-`playwright-report-<suite>` artifact. The required `E2E (Playwright)` check succeeds
-only when all three jobs pass; a failure in one suite does not cancel the others.
+CI runs Chromium in one job and splits WebKit across two parallel jobs, with two
+workers per job. A fourth job runs the `@scale` tests in both browsers with one worker.
+Each job uploads its own `playwright-report-<suite>` artifact. All four jobs run to
+completion even if one fails. The required `E2E (Playwright)` check passes when all four succeed.
 
 `make test-extension` is not in that list: it drives the real Cookie Sync extension in a
 headless Chromium against a Go-hosted bridge, and it is run locally when `apps/desktop/extension`

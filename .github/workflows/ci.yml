@@ -161,9 +161,12 @@ jobs:
           - suite: chromium
             browsers: chromium
             args: --project=chromium --grep-invert @scale --workers=2
-          - suite: webkit
+          - suite: webkit-1
             browsers: webkit
-            args: --project=webkit --grep-invert @scale --workers=2
+            args: --project=webkit --grep-invert @scale --workers=2 --shard=1/2
+          - suite: webkit-2
+            browsers: webkit
+            args: --project=webkit --grep-invert @scale --workers=2 --shard=2/2
           - suite: scale
             browsers: chromium webkit
             args: --grep @scale --workers=1
