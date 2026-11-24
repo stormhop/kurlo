@@ -1,7 +1,8 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import { vm } from '../stores/app.svelte';
-  import { openFileDialog } from '../backend';
+  import FilePathField from './FilePathField.svelte';
   import { useClock } from '../clock.svelte';
   import { relativeTime } from '../collectionRuns';
   import { DEFAULT_OPENAPI_SYNC_INTERVAL, OPENAPI_SYNC_INTERVALS, openApiIntervalLabel, openApiSourceIsUrl } from '../openapiSource';
@@ -69,10 +70,6 @@
     }
   }
 
-  async function chooseFile() {
-    const path = await openFileDialog('Choose an OpenAPI spec file');
-    if (path) source = path;
-  }
 
   function connect() {
     if (!draft.source) return;
@@ -107,10 +104,14 @@
   <div class="settings-list">
     <div class="postman-setting openapi-source-setting">
       <span class="setting-copy"><strong>Spec source</strong><span>A URL, or a file path relative to the workspace folder. <code>&#123;&#123;variables&#125;&#125;</code> work.</span></span>
-      <span class="openapi-source-input">
-        <input class="field field-mono kv-input" type="text" placeholder="https://api.example.com/openapi.json" bind:value={source} spellcheck="false" autocomplete="off" aria-label="Spec source" autocorrect="off" autocapitalize="none" />
-        <button class="btn btn-secondary" type="button" onclick={chooseFile}>Choose file…</button>
-      </span>
+      <FilePathField
+        bind:value={source}
+        allowUrl
+        ariaLabel="Spec source"
+        dialogTitle="Choose an OpenAPI spec file"
+        placeholder="https://api.example.com/openapi.json"
+        suggestions={vm.variableSuggestions}
+      />
     </div>
     <div class="postman-setting">
       <span class="setting-copy"><strong>Check for updates</strong><span>While Kurlo is open. A minimized window checks when you come back.</span></span>
@@ -129,7 +130,7 @@
               <input type="checkbox" class="check" bind:checked={row.enabled} aria-label="Send header" disabled={!row.key && !row.value} />
               <input class="field field-bare kv-input" bind:value={row.key} placeholder="Header" spellcheck="false" oninput={() => guardTrailing(headers, i)} autocomplete="off" autocorrect="off" autocapitalize="none" />
               <input class="field field-bare kv-input" bind:value={row.value} placeholder="Value" spellcheck="false" autocomplete="off" oninput={() => guardTrailing(headers, i)} autocorrect="off" autocapitalize="none" />
-              <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(headers, i)} aria-label="Remove header">✕</button>
+              <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(headers, i)} aria-label="Remove header"><AddCloseIcon /></button>
             </div>
           {/each}
         </div>

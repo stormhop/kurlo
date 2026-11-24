@@ -7,7 +7,7 @@ title: "Connect an OpenAPI spec"
 There are two ways in:
 
 - **When you import.** **Import collection → OpenAPI / Swagger from URL** has **Keep in sync with this URL** ticked by default. The new collection is linked to that URL straight away.
-- **For an existing collection.** Open the collection's **•••** menu and choose **OpenAPI sync…**, or open its settings and the **OpenAPI** tab. Enter the spec's URL, or a file path relative to the workspace folder, such as `../api/openapi.yaml` in a monorepo, and click **Connect**. **Choose file…** picks a file.
+- **For an existing collection.** Open the collection's **•••** menu and choose **OpenAPI sync…**, or open its settings and the **OpenAPI** tab. Enter the spec's URL, or a file path relative to the workspace folder, such as `../api/openapi.yaml` in a monorepo, and click **Connect**. **Choose file…** picks a file, or drop one onto the field.
 
 The source and its request headers can use `{{variables}}` from the collection and the active environment, for example `https://{{host}}/v3/api-docs` with `Authorization: Bearer {{specToken}}`. Keep tokens in a secret variable rather than in the header itself, because the source settings are saved in `collection.yml`. **Skip TLS certificate check** is there for specs served with a self-signed or internal certificate.
 

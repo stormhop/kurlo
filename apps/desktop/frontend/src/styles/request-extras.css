@@ -663,51 +663,6 @@
   font-size: var(--text-code);
 }
 
-.kv-file-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1-5);
-  padding: 0 var(--space-2-5);
-  min-width: 0;
-  overflow: hidden;
-}
-
-.kv-file-name {
-  flex: 1;
-  font-size: var(--text-caption);
-  color: var(--accent-text);
-  font-family: var(--font-mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.kv-file-clear {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  color: var(--text-3);
-  font-size: var(--text-caption);
-  padding: 0 var(--space-0-5);
-  line-height: var(--leading-none);
-  cursor: pointer;
-}
-.kv-file-clear:hover { color: var(--danger); }
-
-.kv-file-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: var(--control-lg);
-  border: none;
-  border-left: 1px solid var(--border-subtle);
-  background: transparent;
-  color: var(--text-3);
-  transition: color var(--dur-fast);
-}
-.kv-file-btn:hover { color: var(--accent-text); }
-
 .form-kv-head,
 .form-kv-row {
   grid-template-columns: 2.75rem var(--kw, 1fr) var(--tw, 6.875rem) var(--vw, 1fr) minmax(5rem, 1fr) 1.75rem;
@@ -773,28 +728,32 @@
   font-size: var(--text-label);
 }
 
-.kv-file-value {
+.file-cell {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1-5);
   min-width: 0;
-  height: 2.125rem;
-  padding: 0 var(--space-2-5);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
+}
+
+.file-cell > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.file-cell-missing .file-path-input {
+  color: var(--danger);
+}
+
+.file-cell-error {
+  flex-shrink: 0;
+  padding-right: var(--space-2);
+  color: var(--danger);
+  font-size: var(--text-caption);
+}
+
+.file-cell-attach {
+  justify-content: flex-start;
   color: var(--text-2);
-  font-size: var(--text-label);
-  font-family: var(--font-mono);
-  text-align: left;
-  transition: background var(--dur-fast), color var(--dur-fast);
-}
-.kv-file-value:hover {
-  background: var(--elevated);
-  color: var(--accent-hover);
-}
-.kv-file-value .kv-file-name {
-  color: var(--accent-hover);
 }
 
 .kv-row--overridden .kv-cell {

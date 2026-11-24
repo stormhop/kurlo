@@ -5,6 +5,7 @@
   import { fileManagerLabel } from '../utils';
   import type { VariableSuggestion } from '../variables';
   import VariableInput from './VariableInput.svelte';
+  import AddCloseIcon from './AddCloseIcon.svelte';
 
   let {
     value = $bindable(''),
@@ -23,7 +24,7 @@
     testId = undefined,
   }: {
     value?: string;
-    variant?: 'field' | 'panel';
+    variant?: 'field' | 'panel' | 'cell';
     dialogTitle?: string;
     placeholder?: string;
     ariaLabel?: string;
@@ -176,6 +177,26 @@
       </div>
     {/if}
   </div>
+{:else if variant === 'cell'}
+  <div class="file-cell" class:file-cell-missing={missing} bind:this={root} style="--wails-drop-target: drop" data-testid={testId}>
+    {#if trimmed}
+      <VariableInput
+        className="field field-bare kv-input field-mono file-path-input"
+        bind:value
+        {suggestions}
+        {placeholder}
+        {ariaLabel}
+        {disabled}
+        oninput={() => onchange?.(value)}
+      />
+      {#if missing}<span class="file-cell-error" role="alert">Not found</span>{/if}
+    {:else}
+      <button class="btn btn-ghost btn-sm file-cell-attach" type="button" onclick={choose} {disabled}>
+        <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 2v6.5M4 4.5L6.5 2 9 4.5M2.5 10.5h8" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Choose file…
+      </button>
+    {/if}
+  </div>
 {:else}
   <div class="file-field" bind:this={root} style="--wails-drop-target: drop" data-testid={testId}>
     <div class="file-field-row">
@@ -190,9 +211,7 @@
       />
       <button class="btn btn-secondary" type="button" onclick={choose} {disabled}>Choose file…</button>
       {#if trimmed}
-        <button class="btn btn-ghost btn-icon" type="button" onclick={clear} {disabled} aria-label={`Clear ${ariaLabel.toLowerCase()}`}>
-          <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        </button>
+        <button class="btn btn-ghost btn-icon" type="button" onclick={clear} {disabled} aria-label={`Clear ${ariaLabel.toLowerCase()}`}><AddCloseIcon /></button>
       {:else}
         <span class="btn btn-ghost btn-icon file-field-clear-slot" aria-hidden="true"></span>
       {/if}

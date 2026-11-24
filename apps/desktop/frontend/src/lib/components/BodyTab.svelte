@@ -129,14 +129,14 @@
             </div>
           </div>
           {#if row.isFile}
-            <button class="kv-file-value" type="button" onclick={() => vm.pickFileForRow(row, i)}>
-              {#if row.value}
-                <span class="kv-file-name">{row.fileName ?? row.value}</span>
-              {:else}
-                <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 2v6.5M4 4.5L6.5 2 9 4.5M2.5 10.5h8" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Attach file
-              {/if}
-            </button>
+            <FilePathField
+              variant="cell"
+              value={row.value}
+              ariaLabel="File for {row.key || 'form field'}"
+              dialogTitle="Select file"
+              suggestions={vm.variableSuggestions}
+              onchange={(path) => vm.setFormRowFile(row, path, i)}
+            />
           {:else}
             <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => guardTrailing(vm.formRows, i)} />
           {/if}

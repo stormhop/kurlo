@@ -554,7 +554,7 @@ class AppVM {
   declare requestBodyForSend: typeof requestBodyFeature.requestBodyForSend;
   declare bodyContentType: typeof requestBodyFeature.bodyContentType;
   declare bodyLengthLabel: typeof requestBodyFeature.bodyLengthLabel;
-  declare pickFileForRow: typeof requestBodyFeature.pickFileForRow;
+  declare setFormRowFile: typeof requestBodyFeature.setFormRowFile;
   declare setBinaryFilePath: typeof requestBodyFeature.setBinaryFilePath;
   declare binaryContentTypeHeader: typeof requestBodyFeature.binaryContentTypeHeader;
   declare useBinaryContentType: typeof requestBodyFeature.useBinaryContentType;

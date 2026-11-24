@@ -1,4 +1,3 @@
-import { inspectRequestFile, openFileDialog } from '../../backend';
 import { fileBaseName } from '../../filePathField';
 import { bodyPlaceholder, type BodyEditorLang } from '../../bodyTemplates';
 import { mkRow } from '../../constants';
@@ -266,15 +265,11 @@ export const requestBodyFeature = {
     }
   },
 
-  async pickFileForRow(this: RequestBodyHost, row: KVRow, idx?: number) {
-    const picked = await openFileDialog('Select file');
-    if (picked) {
-      const path = (await inspectRequestFile(picked))?.path || picked;
-      row.isFile = true;
-      row.value = path;
-      row.fileName = fileBaseName(path);
-      if (idx !== undefined) guardTrailing(this.formRows, idx);
-    }
+  setFormRowFile(this: RequestBodyHost, row: KVRow, path: string, idx: number) {
+    row.isFile = true;
+    row.value = path;
+    row.fileName = path ? fileBaseName(path) : undefined;
+    guardTrailing(this.formRows, idx);
   },
 
   setBinaryFilePath(this: RequestBodyHost, path: string) {

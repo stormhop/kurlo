@@ -11,6 +11,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 - **Consistent controls.** Auth type, raw body type, WebSocket and Socket.IO message types, binary encoding, the message filter and the snippet language use the same dropdown as the rest of the app, with the same size, keyboard navigation and closing behaviour. Close buttons, checkmarks and chevrons are drawn with one set of icons, the YAML and `kurlo-agent.md` editors open over the same backdrop as other dialogs, and the Browser sync switch matches the other switches.
 - **Editor errors.** The line with a JSON, GraphQL or YAML error has its number marked in red and a wavy underline in the theme's colour. Hovering shows the message with its line in the app font. When the line is scrolled out of view, a note in the corner names it and takes you there. MCP arguments that are not a JSON object are marked in the editor instead of a second message below it, and the File tab and YAML editor show a syntax error once, in the editor.
+- **File fields.** A **File** row in **Form data** and the OpenAPI spec source take a dropped file, keep the path relative to the workspace, accept `{{variables}}` and mark a file that is not found, like the binary body and certificate fields.
 
 ### Fixed
 
