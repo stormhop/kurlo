@@ -115,7 +115,7 @@ describe('full application e2e smoke', () => {
     expect(app.requestHistory).toHaveLength(1);
     expect(backend.state.sentHttpRequests[0]).toMatchObject({
       method: 'POST',
-      url: '{{baseUrl}}/login',
+      url: '{{baseUrl}}/login?api_key={{token}}&tag=a&tag=b',
       resolveTemplates: true,
       templateValues: expect.objectContaining({ baseUrl: 'https://api.example.test' }),
       bodyType: 'json',

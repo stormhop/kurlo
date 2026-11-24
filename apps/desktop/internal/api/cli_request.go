@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
@@ -318,8 +319,9 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		}
 	}
 
-	params := make([]model.KeyValue, 0, len(req.Params))
-	for _, p := range req.Params {
+	savedParams := withoutMirroredURLParams(req.URL, req.Params)
+	params := make([]model.KeyValue, 0, len(savedParams))
+	for _, p := range savedParams {
 		if p.Enabled && strings.TrimSpace(p.Key) != "" {
 			params = append(params, model.KeyValue{Key: p.Key, Value: p.Value, Enabled: true})
 		}
@@ -462,6 +464,59 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		RequestVariables:        cliRequestVariablesForSend(req.Vars, values),
 		PostResponseVars:        cliPostResponseVars(req.PostResponseVars),
 	}
+}
+
+func withoutMirroredURLParams(rawURL string, rows []cliKV) []cliKV {
+	if len(rows) == 0 {
+		return rows
+	}
+	query := rawQueryFromURL(rawURL)
+	pairs := parseRawQuery(query)
+	if len(pairs) == 0 {
+		return rows
+	}
+	matched := make([]bool, len(rows))
+	usedPairs := make([]bool, len(pairs))
+	for _, exact := range []bool{true, false} {
+		for pairIndex, pair := range pairs {
+			if usedPairs[pairIndex] {
+				continue
+			}
+			for i, row := range rows {
+				if matched[i] || !row.Enabled || strings.TrimSpace(row.Key) == "" {
+					continue
+				}
+				key, value := pair.key, pair.value
+				if !pair.hasValue {
+					value = ""
+				}
+				if !exact {
+					key = unescapeQueryComponent(key)
+					value = unescapeQueryComponent(value)
+				}
+				if key == row.Key && value == row.Value {
+					matched[i] = true
+					usedPairs[pairIndex] = true
+					break
+				}
+			}
+		}
+	}
+	filtered := make([]cliKV, 0, len(rows))
+	for i, row := range rows {
+		if !matched[i] {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
+}
+
+func unescapeQueryComponent(raw string) string {
+	decoded, err := url.QueryUnescape(raw)
+	if err != nil {
+		return raw
+	}
+	return decoded
 }
 
 func defaultString(value, fallback string) string {

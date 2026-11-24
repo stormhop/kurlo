@@ -389,9 +389,16 @@ test.describe('secret providers', () => {
     await url.fill('{{baseUrl}}/t/{{vault:tenant}}?token={{vault:apiToken}}');
     await page.keyboard.press('Escape');
     await url.press('Enter');
-    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.sentRequests.at(-1) as { url?: string } | undefined)?.url ?? '')).toBe('https://api.kurlo.test/t/acme');
-    const token = await page.evaluate(() => (window.__kurloE2E.sentRequests.at(-1) as { params?: Array<{ key: string; value: string }> }).params?.find(param => param.key === 'token')?.value);
-    expect(token).toMatch(/^\{\{kurloRef:[A-Za-z0-9_-]+\}\}$/);
+    await expect.poll(() => page.evaluate(() => {
+      const sent = window.__kurloE2E.sentRequests.at(-1) as { url: string; params: Array<{ key: string }> } | undefined;
+      if (!sent) return null;
+      const target = new URL(sent.url);
+      return { endpoint: target.origin + target.pathname, tokens: target.searchParams.getAll('token'), extra: sent.params.filter(row => row.key === 'token').length };
+    })).toEqual({
+      endpoint: 'https://api.kurlo.test/t/acme',
+      tokens: [expect.stringMatching(/^\{\{kurloRef:[A-Za-z0-9_-]+\}\}$/)],
+      extra: 0,
+    });
 
     await url.fill('{{vault:nothing}}');
     await expect(page.locator('.var-token-err').filter({ hasText: '{{vault:nothing}}' })).toHaveCount(1);

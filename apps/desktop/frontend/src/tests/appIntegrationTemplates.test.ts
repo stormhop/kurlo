@@ -1,3 +1,5 @@
+import { toCurl } from '../lib/curl';
+import { buildSnippet } from '../lib/snippets';
 import { backend, TestApp, row, httpResponse } from './support/appIntegration';
 import { describe, it, vi, expect } from 'vitest';
 import { type OAuth2TokenResponse, type HttpRequest } from '../lib/backend';
@@ -155,6 +157,26 @@ describe('request templates reach the backend unresolved', () => {
     const req = app.savedRequestToRunnableHttpRequest(app.snapshotActiveRequest(), { host: 'https://env.test' }, [], []);
     expect(req.url).toBe('https://env.test/collection/from-globals');
     expect(req.resolveTemplates).toBeUndefined();
+  });
+
+  it('sends literal URL query bytes once and encodes only substituted query values', async () => {
+    const url = '{{host}}/p?q=hello%20world&plus=a%2Bb&tag=red&tag=red&flag&filter={{term}}#end';
+    const app = await appWithRequest(url);
+    const saved = { ...app.snapshotActiveRequest(), url, params: [
+      row('q', 'hello%20world'), row('plus', 'a+b'), row('tag', 'red'), row('tag', 'red'),
+      row('flag', ''), row('filter', '{{term}}'), row('extra', 'x+y'),
+    ] };
+    const values = { host: 'https://echo.test', term: "a&b + c#x!*'()" };
+    const req = app.savedRequestToRunnableHttpRequest(saved, values, [], []);
+    expect(req.url).toBe('https://echo.test/p?q=hello%20world&plus=a%2Bb&tag=red&tag=red&flag&filter=a%26b+%2B+c%23x%21%2A%27%28%29#end');
+    expect(req.params.map(p => [p.key, p.value])).toEqual([['extra', 'x+y']]);
+    const exportedURL = req.url.replace('#end', '&extra=x%2By#end');
+    expect(toCurl(req)).toContain(exportedURL);
+    expect(buildSnippet('javascript', req, () => '')).toContain(exportedURL);
+    const deferred = app.savedRequestToRunnableHttpRequest(saved, values, [], [], 'r', { deferTemplates: true });
+    expect(deferred.url).toBe(url);
+    expect(deferred.params).toEqual(req.params);
+    expect(app.savedRequestToHttpRequest(saved)).toMatchObject({ url, params: req.params });
   });
 
   it('keeps path variables in step with the URL, saves them and resolves them for sending', async () => {

@@ -52,6 +52,150 @@ func TestResolveTemplateValueStopsOnSelfReference(t *testing.T) {
 	}
 }
 
+func TestResolveTemplateURLEscapesQuerySubstitutionsAndPreservesRawParts(t *testing.T) {
+	got := resolveTemplateURL("https://{{host}}/items?x={{value}}&raw=a%2Fb&flag#{{fragment}}", map[string]string{
+		"host":     "api.example.test",
+		"value":    "a&b=c +d",
+		"fragment": "done",
+	})
+	want := "https://api.example.test/items?x=a%26b%3Dc+%2Bd&raw=a%2Fb&flag#done"
+	if got != want {
+		t.Fatalf("resolved URL = %q, want %q", got, want)
+	}
+}
+
+func TestResolveTemplateURLKeepsHashInsideSecretTemplate(t *testing.T) {
+	got := resolveTemplateURL("https://api.example.test/search?token={{secret:vault:app#token}}&keep=a%2fb#section", map[string]string{
+		"secret:vault:app#token": "a&b+",
+	})
+	want := "https://api.example.test/search?token=a%26b%2B&keep=a%2fb#section"
+	if got != want {
+		t.Fatalf("resolved URL = %q, want %q", got, want)
+	}
+}
+
+func TestCLIRequestMirroredParamsAreFilteredByOccurrence(t *testing.T) {
+	saved := cliSavedRequest{
+		Method: "GET",
+		URL:    "https://example.test/search?tag=a&tag=a&space=a%20b&encoded=%2F&debug",
+		Params: []cliKV{
+			{Key: "tag", Value: "a", Enabled: true},
+			{Key: "tag", Value: "a", Enabled: true},
+			{Key: "space", Value: "a b", Enabled: true},
+			{Key: "encoded", Value: "/", Enabled: true},
+			{Key: "debug", Value: "", Enabled: true},
+			{Key: "tag", Value: "extra", Enabled: true},
+		},
+	}
+	built := buildHTTPRequest(saved, nil, nil, 0)
+	if len(built.Params) != 1 || built.Params[0].Key != "tag" || built.Params[0].Value != "extra" {
+		t.Fatalf("expected only the true additional parameter, got %#v", built.Params)
+	}
+}
+
+func TestCLIKeepsDelimitersInsideQueryTemplateNames(t *testing.T) {
+	saved := cliSavedRequest{
+		URL:    "https://example.test/items?{{a=b}}={{a&b}}",
+		Params: []cliKV{{Key: "{{a=b}}", Value: "{{a&b}}", Enabled: true}},
+	}
+	built := buildHTTPRequest(saved, nil, nil, 0)
+	if len(built.Params) != 0 {
+		t.Fatalf("unexpected extra params: %#v", built.Params)
+	}
+	got := resolveTemplateURL(built.URL, map[string]string{"a=b": "filter", "a&b": "a+b"})
+	if got != "https://example.test/items?filter=a%2Bb" {
+		t.Fatalf("unexpected resolved URL: %s", got)
+	}
+}
+
+func TestCLIRequestMirrorFilteringKeepsExcessDuplicateRows(t *testing.T) {
+	saved := cliSavedRequest{
+		URL:    "https://example.test/search?tag=red",
+		Params: []cliKV{{Key: "tag", Value: "red", Enabled: true}, {Key: "tag", Value: "red", Enabled: true}},
+	}
+	built := buildHTTPRequest(saved, nil, nil, 0)
+	if len(built.Params) != 1 || built.Params[0].Key != "tag" || built.Params[0].Value != "red" {
+		t.Fatalf("one raw occurrence must suppress only one row, got %#v", built.Params)
+	}
+}
+
+func TestPreRequestParamMutationUpdatesRawQuery(t *testing.T) {
+	captured := &capturedRequest{}
+	server := captured.server(t)
+	req := traceTestRequest(server.URL + "/search?x=old&keep=a%20b&x=duplicate&flag")
+	req.Params = []model.KeyValue{{Key: "x", Value: "first", Enabled: true}, {Key: "x", Value: "old", Enabled: true}}
+	req.PreRequestScript = `if (pm.request.params.get("x") !== "old") throw new Error("last duplicate parameter value was not available"); pm.request.params.set("x", "a&b");`
+	resp := sendRequest(t.Context(), req, state.New(), newCookieJarRegistry(), newPreflightCache())
+	if resp.Error != "" {
+		t.Fatalf("unexpected request error: %s", resp.Error)
+	}
+	captured.mu.Lock()
+	got := captured.query
+	captured.mu.Unlock()
+	want := "x=a%26b&keep=a%20b&flag"
+	if got != want {
+		t.Fatalf("query = %q, want %q", got, want)
+	}
+}
+
+func TestPreRequestParamRemovalUpdatesRawQuery(t *testing.T) {
+	captured := &capturedRequest{}
+	server := captured.server(t)
+	req := traceTestRequest(server.URL + "/search?remove=first&keep=a%20b&remove=second")
+	req.PreRequestScript = `pm.request.params.unset("remove");`
+	resp := sendRequest(t.Context(), req, state.New(), newCookieJarRegistry(), newPreflightCache())
+	if resp.Error != "" {
+		t.Fatalf("unexpected request error: %s", resp.Error)
+	}
+	captured.mu.Lock()
+	got := captured.query
+	captured.mu.Unlock()
+	if got != "keep=a%20b" {
+		t.Fatalf("query = %q, want %q", got, "keep=a%20b")
+	}
+}
+
+func TestDeferredTemplateQueryValueIsEscapedOnLoopbackRequest(t *testing.T) {
+	captured := &capturedRequest{}
+	server := captured.server(t)
+	req := templatedRequest(map[string]string{"base": server.URL, "value": "a&b=c +d"})
+	req.URL = "{{base}}/search?x={{value}}&raw=a%2Fb&flag"
+	resp := sendRequest(t.Context(), req, state.New(), newCookieJarRegistry(), newPreflightCache())
+	if resp.Error != "" {
+		t.Fatalf("unexpected request error: %s", resp.Error)
+	}
+	captured.mu.Lock()
+	got := captured.query
+	captured.mu.Unlock()
+	want := "x=a%26b%3Dc+%2Bd&raw=a%2Fb&flag"
+	if got != want {
+		t.Fatalf("query = %q, want %q", got, want)
+	}
+}
+
+func TestCLIResultURLMatchesSentRequest(t *testing.T) {
+	captured := &capturedRequest{}
+	server := captured.server(t)
+	result, resp := executeCLIRequest(t.Context(), state.New(), newCookieJarRegistry(), newPreflightCache(), newOAuth2TokenCache(), cliSavedRequest{
+		Name:   "search",
+		Method: "GET",
+		URL:    server.URL + "/search?raw=a%20b",
+		Params: []cliKV{{Key: "extra", Value: "a&b", Enabled: true}},
+	}, 1, nil, cliOptions{}, nil)
+	if resp.Error != "" {
+		t.Fatalf("unexpected request error: %s", resp.Error)
+	}
+	if len(resp.SentRequests) == 0 {
+		t.Fatal("expected the outbound request to be recorded")
+	}
+	if result.URL != resp.SentRequests[0].URL {
+		t.Fatalf("reported URL = %q, sent URL = %q", result.URL, resp.SentRequests[0].URL)
+	}
+	if !strings.Contains(result.URL, "raw=a%20b&extra=a%26b") {
+		t.Fatalf("reported URL does not show the actual outgoing query: %q", result.URL)
+	}
+}
+
 type capturedRequest struct {
 	mu     sync.Mutex
 	header http.Header

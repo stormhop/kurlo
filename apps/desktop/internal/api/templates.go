@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -114,7 +115,7 @@ func resolveAuthTemplates(cfg model.AuthConfig, values map[string]string) model.
 func resolveHTTPRequestTemplates(req model.HttpRequest, values map[string]string) (model.HttpRequest, error) {
 	resolve := func(value string) string { return resolveTemplateValue(value, values) }
 	out := req
-	out.URL = resolve(req.URL)
+	out.URL = resolveTemplateURL(req.URL, values)
 	out.Params = resolveTemplateRows(req.Params, values)
 	out.PathParams = resolveTemplateRows(req.PathParams, values)
 	out.Headers = resolveTemplateRows(req.Headers, values)
@@ -155,6 +156,22 @@ func resolveHTTPRequestTemplates(req model.HttpRequest, values map[string]string
 	out.ResolveTemplates = false
 	out.TemplateValues = nil
 	return out, nil
+}
+
+func resolveTemplateURL(rawURL string, values map[string]string) string {
+	queryStart, queryEnd := rawURLQueryBounds(rawURL)
+	if queryStart < 0 {
+		return resolveTemplateValue(rawURL, values)
+	}
+	prefix := resolveTemplateValue(rawURL[:queryStart], values)
+	query := templatePattern.ReplaceAllStringFunc(rawURL[queryStart+1:queryEnd], func(match string) string {
+		resolved := resolveTemplateValue(match, values)
+		if resolved == match {
+			return match
+		}
+		return url.QueryEscape(resolved)
+	})
+	return prefix + "?" + query + resolveTemplateValue(rawURL[queryEnd:], values)
 }
 
 func buildGraphQLRequestBody(payload model.GraphQLPayload) (string, error) {

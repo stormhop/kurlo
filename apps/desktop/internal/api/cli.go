@@ -451,6 +451,12 @@ func executeCLIRequest(ctx context.Context, sm *state.Manager, jars *cookieJarRe
 	httpReq.SecretEnvironmentValues = append(httpReq.SecretEnvironmentValues, authSecrets...)
 
 	resp := sendRequest(ctx, httpReq, sm, jars, cache)
+	for _, sent := range resp.SentRequests {
+		if strings.EqualFold(sent.Method, httpReq.Method) && headerLookup(sent.Headers, "Access-Control-Request-Method") == "" {
+			base.URL = sent.URL
+			break
+		}
+	}
 	applyCLICollectionUpdates(sm, req.CollectionID, resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved)
 	for _, logs := range [][]string{resp.PreRequestResult.Logs, resp.TestResult.Logs} {
 		base.Logs = append(base.Logs, logs...)

@@ -5,6 +5,12 @@ All notable changes to Kurlo are documented here. This project follows
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+- **Query parameters.** Desktop, Collection Runner, CLI and MCP send saved query parameters once per occurrence. Sending a pasted URL keeps encoded values and flags such as `?preview`. After importing a Postman collection or an HTTP file, editing the path or one parameter keeps the other parameters.
+
 ## [3.2.0] - 2026-11-23
 
 ### Added

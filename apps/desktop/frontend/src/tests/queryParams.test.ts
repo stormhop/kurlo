@@ -3,7 +3,8 @@ import { mkRow } from '../lib/constants';
 import type { KVRow } from '../lib/types/models';
 import {
   buildQuery,
-  flattenUrlParams,
+  additionalQueryRows,
+  queryForEditor,
   paramsFromUrl,
   parseQuery,
   splitUrl,
@@ -37,8 +38,15 @@ describe('parseQuery', () => {
   it('splits pairs and tolerates empty / value-less segments', () => {
     expect(parseQuery('a=1&b=2')).toEqual([{ key: 'a', value: '1' }, { key: 'b', value: '2' }]);
     expect(parseQuery('a=1&&b=')).toEqual([{ key: 'a', value: '1' }, { key: 'b', value: '' }]);
-    expect(parseQuery('flag')).toEqual([{ key: 'flag', value: '' }]);
+    expect(parseQuery('flag')).toEqual([{ key: 'flag', value: '', bare: true }]);
     expect(parseQuery('')).toEqual([]);
+  });
+
+  it('recognizes delimiters only outside variable references', () => {
+    const url = '/p?q={{secret:vault:app#token}}&{{a=b}}={{a&b}}#fragment';
+    const { query, hash } = splitUrl(url);
+    expect(hash).toBe('#fragment');
+    expect(parseQuery(query)).toEqual([{ key: 'q', value: '{{secret:vault:app#token}}' }, { key: '{{a=b}}', value: '{{a&b}}' }]);
   });
 
   it('keeps template values literal', () => {
@@ -98,71 +106,62 @@ describe('paramsFromUrl', () => {
   });
 });
 
-describe('flattenUrlParams', () => {
-  it('strips a synced URL query and dedupes against params (no doubling)', () => {
-    const { url, params } = flattenUrlParams('https://x.com/p?a=1&b=2', [row('a', '1'), row('b', '2'), mkRow()]);
-    expect(url).toBe('https://x.com/p');
-    expect(kv(params)).toEqual([
-      { key: 'a', value: '1', enabled: true },
-      { key: 'b', value: '2', enabled: true },
-    ]);
-  });
-
-  it('leaves a query-less URL and its params untouched (legacy: query only in the table)', () => {
+describe('additionalQueryRows', () => {
+  it('leaves query-less URLs with their table rows', () => {
     const params = [row('a', '1'), mkRow()];
-    const out = flattenUrlParams('https://x.com/p', params);
-    expect(out.url).toBe('https://x.com/p');
-    expect(out.params).toBe(params);
+    expect(additionalQueryRows('https://x.com/p', params)).toBe(params);
   });
 
-  it('moves a URL-only query into params (legacy: query only in the URL)', () => {
-    const { url, params } = flattenUrlParams('https://x.com/p?a=1', [mkRow()]);
-    expect(url).toBe('https://x.com/p');
-    expect(kv(params)).toEqual([{ key: 'a', value: '1', enabled: true }]);
+  it('sends raw URL pairs only once and retains the extra occurrences in table order', () => {
+    const disabled = row('tag', 'a', false);
+    const extra = row('tag', 'a');
+    const different = row('tag', 'b');
+    expect(additionalQueryRows('https://x.com/p?tag=a&tag=a#frag', [
+      disabled, row('tag', 'a'), different, row('tag', 'a'), extra, mkRow(),
+    ])).toEqual([disabled, different, extra]);
+    expect(additionalQueryRows('https://x.com/p?flag&a=1', [mkRow()])).toEqual([]);
   });
 
-  it('keeps param-only keys and preserves the fragment', () => {
-    const { url, params } = flattenUrlParams('https://x.com/p?a=1#frag', [row('a', '1'), row('b', '2'), mkRow()]);
-    expect(url).toBe('https://x.com/p#frag');
-    expect(kv(params)).toEqual([
-      { key: 'a', value: '1', enabled: true },
-      { key: 'b', value: '2', enabled: true },
-    ]);
+  it('matches both raw URL rows and decoded imported rows without re-encoding either', () => {
+    const extra = row('search', 'A+B & C');
+    expect(additionalQueryRows('/p?a%26b=%23&search=A%2BB+%26+C&raw=%2f', [
+      row('a&b', '#'), row('search', 'A+B & C'), row('raw', '%2f'), extra,
+    ])).toEqual([extra]);
+  });
+});
+
+describe('editor query representation', () => {
+  it('preserves flag spelling and repeated pairs when another row is edited', () => {
+    const url = '/p?tag=red&preview&empty=&tag=red&word=caf%c3%a9#part';
+    const editor = queryForEditor(url, []);
+    expect(editor.url).toBe(url);
+    editor.params.push(row('a&b', 'x+y#z & {{name}}'));
+    expect(urlWithParams(url, editor.params)).toBe('/p?tag=red&preview&empty=&tag=red&word=caf%c3%a9&a%26b=x%2By%23z%20%26%20{{name}}#part');
   });
 
-  it('preserves duplicate keys present in the URL', () => {
-    const { params } = flattenUrlParams('https://x.com/p?a=1&a=2', [mkRow()]);
-    expect(kv(params)).toEqual([
-      { key: 'a', value: '1', enabled: true },
-      { key: 'a', value: '2', enabled: true },
-    ]);
+  it('keeps private table parameters out of the stored URL on open and after editing', () => {
+    const secret = { ...row('custom', 'private value'), secret: true };
+    const editor = queryForEditor('/p', [row('a', '1'), secret]);
+    expect(editor.url).toBe('/p?a=1');
+    expect(paramsFromUrl('/next?a=2', editor.params)).toContainEqual(secret);
+    expect(urlWithParams('/next?a=2', [row('a', '3'), secret])).toBe('/next?a=3');
+    expect(additionalQueryRows(editor.url, editor.params)).toEqual([secret]);
   });
 
-  it('keeps a second value for a key the URL already carries', () => {
-    const { params } = flattenUrlParams('https://x.com/p?tag=a', [row('tag', 'b'), mkRow()]);
-    expect(kv(params)).toEqual([
-      { key: 'tag', value: 'a', enabled: true },
-      { key: 'tag', value: 'b', enabled: true },
-    ]);
+  it('keeps disabled rows between their original neighbors on reload', () => {
+    const rows = [row('a', '1'), row('draft', '2', false), row('b', '3')];
+    expect(queryForEditor('/p?a=1&b=3', rows).params.slice(0, -1)).toEqual(rows);
   });
 
-  it('folds away only the row the two-way sync mirrored', () => {
-    const { params } = flattenUrlParams('https://x.com/p?tag=a', [row('tag', 'a'), row('tag', 'b'), mkRow()]);
-    expect(kv(params)).toEqual([
-      { key: 'tag', value: 'a', enabled: true },
-      { key: 'tag', value: 'b', enabled: true },
-    ]);
-  });
-
-  it('keeps a disabled row whose key the URL also carries', () => {
-    const { params } = flattenUrlParams('https://x.com/p?tag=a', [
-      { ...mkRow(), key: 'tag', value: 'draft', enabled: false },
-      mkRow(),
-    ]);
-    expect(kv(params)).toEqual([
-      { key: 'tag', value: 'a', enabled: true },
-      { key: 'tag', value: 'draft', enabled: false },
-    ]);
+  it('keeps duplicate row metadata on a URL edit or reload', () => {
+    const red = row('tag', 'red', true, 'first');
+    const blue = row('tag', 'blue', true, 'second');
+    const disabled = row('tag', 'red', false, 'draft');
+    const legacy = queryForEditor('/old?tag=blue#section', [red, blue, disabled]);
+    expect(legacy.url).toBe('/old?tag=blue&tag=red#section');
+    expect(legacy.params.slice(0, -1)).toEqual([blue, red, disabled]);
+    expect(paramsFromUrl('/new?tag=changed&tag=blue', legacy.params).slice(0, -1))
+      .toEqual([{ ...red, value: 'changed' }, blue, disabled]);
   });
 });
 

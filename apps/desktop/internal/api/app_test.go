@@ -1221,6 +1221,18 @@ func TestApplyQueryParamsReencodesExistingQueryWhenAutomatic(t *testing.T) {
 	}
 }
 
+func TestApplyQueryParamsAutomaticPreservesValidEscapes(t *testing.T) {
+	u, err := url.Parse("https://example.com/s?q=a%20b&slash=%2f&space=a b&bad=%zz")
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	applyQueryParams(u, model.HttpRequest{EncodeURLAutomatically: true})
+	want := "q=a%20b&slash=%2f&space=a+b&bad=%25zz"
+	if u.RawQuery != want {
+		t.Fatalf("expected %q, got %q", want, u.RawQuery)
+	}
+}
+
 func TestApplyQueryParamsLeavesExistingQueryAloneWhenManual(t *testing.T) {
 	u, err := url.Parse("https://example.com/s?q=a%20b&raw=%zz")
 	if err != nil {
@@ -1231,6 +1243,24 @@ func TestApplyQueryParamsLeavesExistingQueryAloneWhenManual(t *testing.T) {
 	want := "q=a%20b&raw=%zz"
 	if u.RawQuery != want {
 		t.Fatalf("expected %q, got %q", want, u.RawQuery)
+	}
+}
+
+func TestApplyQueryParamsManualPreservesEmptyQuerySegments(t *testing.T) {
+	u, err := url.Parse("https://example.com/s?a=1&&flag&")
+	if err != nil {
+		t.Fatalf("parse url: %v", err)
+	}
+	applyQueryParams(u, model.HttpRequest{EncodeURLAutomatically: false})
+	if u.RawQuery != "a=1&&flag&" {
+		t.Fatalf("raw query = %q, want %q", u.RawQuery, "a=1&&flag&")
+	}
+	applyQueryParams(u, model.HttpRequest{
+		EncodeURLAutomatically: false,
+		Params:                 []model.KeyValue{{Enabled: true, Key: "extra", Value: "x y"}},
+	})
+	if u.RawQuery != "a=1&&flag&&extra=x+y" {
+		t.Fatalf("raw query with extra = %q", u.RawQuery)
 	}
 }
 

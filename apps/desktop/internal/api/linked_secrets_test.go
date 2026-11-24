@@ -21,16 +21,17 @@ import (
 const linkedCanary = "kurlo-canary-s3cr3t-9f2b"
 
 type linkedFixture struct {
-	app        *App
-	root       string
-	localPath  string
-	workspace  string
-	vault      *httptest.Server
-	vaultHits  *atomic.Int32
-	echo       *httptest.Server
-	echoAuth   *atomic.Value
-	dbPassword string
-	ref        secretmgr.Ref
+	app         *App
+	root        string
+	localPath   string
+	workspace   string
+	vault       *httptest.Server
+	vaultHits   *atomic.Int32
+	echo        *httptest.Server
+	echoAuth    *atomic.Value
+	dbPassword  string
+	secretValue string
+	ref         secretmgr.Ref
 }
 
 func linkedPayload(vaultURL string) string {
@@ -53,13 +54,14 @@ func newLinkedFixture(t *testing.T) *linkedFixture {
 	t.Helper()
 	dir := t.TempDir()
 	f := &linkedFixture{
-		app:       NewApp(),
-		root:      filepath.Join(dir, "workspaces"),
-		localPath: filepath.Join(dir, "requests.json"),
-		workspace: "workspace-main",
-		vaultHits: &atomic.Int32{},
-		echoAuth:  &atomic.Value{},
-		ref:       secretmgr.Ref{Provider: "vault-prod", Path: "secret/data/app", Field: "password"},
+		app:         NewApp(),
+		root:        filepath.Join(dir, "workspaces"),
+		localPath:   filepath.Join(dir, "requests.json"),
+		workspace:   "workspace-main",
+		vaultHits:   &atomic.Int32{},
+		echoAuth:    &atomic.Value{},
+		secretValue: linkedCanary,
+		ref:         secretmgr.Ref{Provider: "vault-prod", Path: "secret/data/app", Field: "password"},
 	}
 	f.vault = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.vaultHits.Add(1)
@@ -74,7 +76,7 @@ func newLinkedFixture(t *testing.T) *linkedFixture {
 			_, _ = w.Write([]byte(`{"errors":[]}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"data":{"data":{"password":"` + linkedCanary + `"},"metadata":{"version":1}}}`))
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"data": map[string]string{"password": f.secretValue}, "metadata": map[string]int{"version": 1}}})
 	}))
 	t.Cleanup(f.vault.Close)
 	f.echo = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -131,6 +133,30 @@ func (f *linkedFixture) request(t *testing.T, mutate func(*model.HttpRequest)) m
 		mutate(&req)
 	}
 	return req
+}
+
+func TestLinkedSecretInRawQueryIsEscapedOnWire(t *testing.T) {
+	f := newLinkedFixture(t)
+	f.secretValue = "a&b+c"
+	var got string
+	wire := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.RawQuery
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(wire.Close)
+	req := model.HttpRequest{
+		WorkspaceID: f.workspace,
+		Method:      http.MethodGet,
+		URL:         wire.URL + "/search?token=" + secretmgr.Marker(f.ref),
+		TimeoutMs:   5000,
+	}
+	resp := f.app.SendRequest(req)
+	if resp.Error != "" {
+		t.Fatalf("unexpected request error: %s", resp.Error)
+	}
+	if got != "token=a%26b%2Bc" {
+		t.Fatalf("wire query = %q, want %q", got, "token=a%26b%2Bc")
+	}
 }
 
 func responseText(t *testing.T, resp any) string {

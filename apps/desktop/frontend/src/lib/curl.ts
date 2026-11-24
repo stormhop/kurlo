@@ -1,5 +1,6 @@
 import { methodConventionallyHasNoBody, RAW_BODY_CONTENT_TYPES } from './constants';
 import { applyPathParams } from './pathParams';
+import { appendQueryString } from './queryParams';
 
 function splitCurlFormValue(raw: string): { value: string; contentType: string } {
   const match = /;type=([^;]+)$/i.exec(raw);
@@ -62,11 +63,11 @@ export function toCurl(req: CurlRequest): string {
     activeParams.push({ key: req.auth.keyName, value: req.auth.keyValue ?? '', enabled: true });
   }
   if (activeParams.length) {
-    const sep = urlStr.includes('?') ? '&' : '?';
-    urlStr += sep + activeParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+    const query = activeParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&');
+    urlStr = appendQueryString(urlStr, query);
   }
   if (req.auth.type === 'jwt' && req.auth.jwtAddTo === 'query') {
-    urlStr += `${urlStr.includes('?') ? '&' : '?'}${encodeURIComponent((req.auth.jwtQueryParam ?? '').trim() || 'token')}=${JWT_TOKEN_PLACEHOLDER}`;
+    urlStr = appendQueryString(urlStr, `${encodeURIComponent((req.auth.jwtQueryParam ?? '').trim() || 'token')}=${JWT_TOKEN_PLACEHOLDER}`);
   }
   parts.push(shellQuote(urlStr));
 

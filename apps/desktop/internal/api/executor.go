@@ -445,6 +445,19 @@ func populateScriptRequestContext(ctx *script.Context, req model.HttpRequest) {
 			ctx.RequestHeaders[h.Key] = h.Value
 		}
 	}
+	for _, pair := range parseRawQuery(rawQueryFromURL(req.URL)) {
+		key := unescapeQueryComponent(pair.key)
+		if key == "" {
+			continue
+		}
+		if _, exists := ctx.RequestParams[key]; !exists {
+			value := pair.value
+			if pair.hasValue {
+				value = unescapeQueryComponent(value)
+			}
+			ctx.RequestParams[key] = value
+		}
+	}
 	for _, p := range req.Params {
 		if p.Enabled && p.Key != "" {
 			ctx.RequestParams[p.Key] = p.Value
@@ -1242,23 +1255,33 @@ func redirectKeepsAuthorization(prev, next *url.URL, followAcrossHosts bool) boo
 }
 
 func applyQueryParams(u *url.URL, req model.HttpRequest) {
-	pairs := parseRawQuery(u.RawQuery)
-	if req.EncodeURLAutomatically {
-		for i := range pairs {
-			pairs[i].key = reencodeQueryComponent(pairs[i].key)
-			if pairs[i].hasValue {
-				pairs[i].value = reencodeQueryComponent(pairs[i].value)
-			}
-		}
-	}
+	var additions []queryPair
 	for _, p := range req.Params {
 		if p.Enabled && p.Key != "" {
-			pairs = append(pairs, escapedQueryPair(p.Key, p.Value))
+			additions = append(additions, escapedQueryPair(p.Key, p.Value))
 		}
 	}
 	if req.Auth.Type == "apikey" && req.Auth.KeyIn == "query" && req.Auth.KeyName != "" {
-		pairs = append(pairs, escapedQueryPair(req.Auth.KeyName, req.Auth.KeyValue))
+		additions = append(additions, escapedQueryPair(req.Auth.KeyName, req.Auth.KeyValue))
 	}
+	if !req.EncodeURLAutomatically {
+		if len(additions) == 0 {
+			return
+		}
+		if u.RawQuery != "" {
+			u.RawQuery += "&"
+		}
+		u.RawQuery += encodeQueryPairs(additions)
+		return
+	}
+	pairs := parseRawQuery(u.RawQuery)
+	for i := range pairs {
+		pairs[i].key = reencodeQueryComponent(pairs[i].key)
+		if pairs[i].hasValue {
+			pairs[i].value = reencodeQueryComponent(pairs[i].value)
+		}
+	}
+	pairs = append(pairs, additions...)
 	u.RawQuery = encodeQueryPairs(pairs)
 }
 
@@ -1490,14 +1513,25 @@ func parseRawQuery(raw string) []queryPair {
 	if raw == "" {
 		return nil
 	}
-	segments := strings.Split(raw, "&")
-	pairs := make([]queryPair, 0, len(segments))
-	for _, segment := range segments {
-		if segment == "" {
+	masked := raw
+	if strings.Contains(raw, "{{") {
+		masked = templatePattern.ReplaceAllStringFunc(raw, func(token string) string {
+			return strings.Repeat("_", len(token))
+		})
+	}
+	var pairs []queryPair
+	offset := 0
+	for segment := range strings.SplitSeq(masked, "&") {
+		text := raw[offset : offset+len(segment)]
+		offset += len(segment) + 1
+		if text == "" {
 			continue
 		}
-		key, value, hasValue := strings.Cut(segment, "=")
-		pairs = append(pairs, queryPair{key: key, value: value, hasValue: hasValue})
+		if eq := strings.IndexByte(segment, '='); eq >= 0 {
+			pairs = append(pairs, queryPair{key: text[:eq], value: text[eq+1:], hasValue: true})
+		} else {
+			pairs = append(pairs, queryPair{key: text})
+		}
 	}
 	return pairs
 }
@@ -1507,11 +1541,35 @@ func escapedQueryPair(key, value string) queryPair {
 }
 
 func reencodeQueryComponent(raw string) string {
-	decoded, err := url.QueryUnescape(raw)
-	if err != nil {
-		return url.QueryEscape(raw)
+	var out strings.Builder
+	for index := 0; index < len(raw); {
+		if raw[index] == '%' {
+			if index+2 < len(raw) && isHexByte(raw[index+1]) && isHexByte(raw[index+2]) {
+				out.WriteString(raw[index : index+3])
+				index += 3
+				continue
+			}
+			out.WriteString("%25")
+			index++
+			continue
+		}
+		if raw[index] == '+' {
+			out.WriteByte('+')
+			index++
+			continue
+		}
+		end := index + 1
+		for end < len(raw) && raw[end] != '%' && raw[end] != '+' {
+			end++
+		}
+		out.WriteString(url.QueryEscape(raw[index:end]))
+		index = end
 	}
-	return url.QueryEscape(decoded)
+	return out.String()
+}
+
+func isHexByte(value byte) bool {
+	return value >= '0' && value <= '9' || value >= 'a' && value <= 'f' || value >= 'A' && value <= 'F'
 }
 
 func encodeQueryPairs(pairs []queryPair) string {
@@ -1566,20 +1624,113 @@ func mergeScriptHeaders(ctx *script.Context, req *model.HttpRequest) {
 }
 
 func mergeScriptParams(ctx *script.Context, req *model.HttpRequest) {
-	if len(ctx.RemovedParams) > 0 {
-		next := make([]model.KeyValue, 0, len(req.Params))
-		for _, p := range req.Params {
-			if _, removed := ctx.RemovedParams[p.Key]; removed {
-				continue
-			}
-			next = append(next, p)
-		}
-		req.Params = next
-	}
 	sameKey := func(a, b string) bool { return a == b }
-	for _, key := range writtenKeys(ctx.RequestParams, ctx.TouchedParams, func(s string) string { return s }) {
-		req.Params = upsertRow(req.Params, key, ctx.RequestParams[key], sameKey)
+	keys := make([]string, 0, len(ctx.TouchedParams))
+	for key := range ctx.TouchedParams {
+		keys = append(keys, key)
 	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		value, exists := ctx.RequestParams[key]
+		updatedURL, changed := updateRawURLQuery(req.URL, key, value, exists)
+		if changed {
+			req.URL = updatedURL
+			req.Params = withoutParamKey(req.Params, key)
+			continue
+		}
+		if exists {
+			req.Params = upsertRow(req.Params, key, value, sameKey)
+		} else {
+			req.Params = withoutParamKey(req.Params, key)
+		}
+	}
+}
+
+func withoutParamKey(rows []model.KeyValue, key string) []model.KeyValue {
+	filtered := make([]model.KeyValue, 0, len(rows))
+	for _, row := range rows {
+		if row.Key != key {
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
+}
+
+func rawQueryFromURL(rawURL string) string {
+	start, end := rawURLQueryBounds(rawURL)
+	if start < 0 {
+		return ""
+	}
+	return rawURL[start+1 : end]
+}
+
+func updateRawURLQuery(rawURL, key, value string, exists bool) (string, bool) {
+	query := rawQueryFromURL(rawURL)
+	segments := strings.Split(query, "&")
+	first := -1
+	for i, segment := range segments {
+		if segment == "" {
+			continue
+		}
+		pairKey, _, _ := strings.Cut(segment, "=")
+		if unescapeQueryComponent(pairKey) == key {
+			first = i
+			break
+		}
+	}
+	if first < 0 {
+		return rawURL, false
+	}
+	if exists {
+		segments[first] = url.QueryEscape(key) + "=" + url.QueryEscape(value)
+	}
+	filtered := make([]string, 0, len(segments))
+	for i, segment := range segments {
+		if segment == "" {
+			filtered = append(filtered, segment)
+			continue
+		}
+		pairKey, _, _ := strings.Cut(segment, "=")
+		if unescapeQueryComponent(pairKey) != key || (exists && i == first) {
+			filtered = append(filtered, segment)
+		}
+	}
+	updatedQuery := strings.Join(filtered, "&")
+	start, end := rawURLQueryBounds(rawURL)
+	prefix := rawURL[:start]
+	suffix := rawURL[end:]
+	if updatedQuery == "" {
+		return prefix + suffix, true
+	}
+	return prefix + "?" + updatedQuery + suffix, true
+}
+
+func rawURLQueryBounds(rawURL string) (int, int) {
+	start, end := -1, len(rawURL)
+	template := false
+	for index := 0; index < len(rawURL); index++ {
+		if !template && index+1 < len(rawURL) && rawURL[index:index+2] == "{{" {
+			template = true
+			index++
+			continue
+		}
+		if template && index+1 < len(rawURL) && rawURL[index:index+2] == "}}" {
+			template = false
+			index++
+			continue
+		}
+		if template {
+			continue
+		}
+		if rawURL[index] == '#' {
+			end = index
+			break
+		}
+		if rawURL[index] == '?' && start < 0 {
+			start = index
+		}
+	}
+	return start, end
 }
 
 func mergeScriptPathParams(ctx *script.Context, req *model.HttpRequest) {

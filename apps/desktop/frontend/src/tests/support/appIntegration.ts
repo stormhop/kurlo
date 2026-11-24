@@ -75,12 +75,13 @@ const backend = vi.hoisted(() => {
     sendHttpRequest: vi.fn(async (sent: HttpRequest): Promise<HttpResponse> => {
       state.sentHttpRequests.push(sent);
       const req = materializeTemplates(sent);
-      if (req.url.endsWith('/login')) {
+      const url = new URL(req.url, 'https://example.test');
+      if (url.pathname === '/login') {
         expect(req.method).toBe('POST');
-        expect(req.params).toEqual(expect.arrayContaining([
-          expect.objectContaining({ key: 'api_key', value: 'raw-token' }),
-          expect.objectContaining({ key: 'dryRun', value: 'true' }),
-        ]));
+        for (const param of req.params) {
+          if (param.enabled) url.searchParams.append(param.key, param.value);
+        }
+        expect([...url.searchParams]).toEqual([['api_key', 'raw-token'], ['tag', 'a'], ['tag', 'b'], ['dryRun', 'true']]);
         expect(req.headers).toEqual(expect.arrayContaining([
           expect.objectContaining({ key: 'Authorization', value: 'Bearer raw-token' }),
         ]));
@@ -88,7 +89,7 @@ const backend = vi.hoisted(() => {
         state.environment.sessionId = 'session-from-login';
         return { ...response(200, { ok: true, token: 'server-token' }, [{ name: 'status', passed: true }]), environmentUpdates: { sessionId: 'session-from-login' } };
       }
-      if (req.url.endsWith('/graphql')) {
+      if (url.pathname === '/graphql') {
         expect(req.method).toBe('POST');
         expect(req.bodyType).toBe('graphql');
         const payload = JSON.parse(req.body);

@@ -45,7 +45,7 @@ describe('postmanRequestsFromItems', () => {
       collection: 'Postman API',
       folderPath: ['Products'],
       method: 'POST',
-      url: '{{baseUrl}}/products',
+      url: '{{baseUrl}}/products?dryRun=true',
       bodyType: 'json',
       rawBodyType: 'json',
       bodyContent: '{"name":"Coffee"}',
@@ -152,6 +152,48 @@ describe('postmanRequestsFromItems', () => {
       query: 'query Viewer { viewer { name } }',
       variables: {},
     });
+  });
+
+  it('keeps Postman raw query spelling while honoring declared disabled rows', () => {
+    const requests = postmanRequestsFromItems([
+      {
+        name: 'Search',
+        request: {
+          method: 'GET',
+          url: {
+            raw: 'https://api.example.test/search?name=John%20Doe&flag&tag=x%2By&off=1#results',
+            query: [
+              { key: 'name', value: 'John Doe', description: 'Search label' },
+              { key: 'flag', value: '' },
+              { key: 'tag', value: 'x+y' },
+              { key: 'off', value: '1', disabled: true },
+            ],
+          },
+        },
+      },
+    ], 'collection-1', 'Postman API', undefined);
+
+    expect(requests[0].url).toBe('https://api.example.test/search?name=John%20Doe&flag&tag=x%2By#results');
+    expect(requests[0].params).toMatchObject([
+      { key: 'name', value: 'John Doe', enabled: true, description: 'Search label' },
+      { key: 'flag', value: '', enabled: true },
+      { key: 'tag', value: 'x+y', enabled: true },
+      { key: 'off', value: '1', enabled: false },
+    ]);
+    const exported = buildPostmanCollection('Postman API', '', requests, value => value) as { item: Array<{ request: { url: { raw: string } } }> };
+    expect(exported.item[0].request.url.raw).toBe('https://api.example.test/search?name=John%20Doe&flag&tag=x%2By#results');
+  });
+
+  it('keeps Postman raw query spelling when the URL is a string', () => {
+    const requests = postmanRequestsFromItems([
+      { name: 'Search', request: { method: 'GET', url: 'https://api.example.test/search?q=x%2By&flag#results' } },
+    ], 'collection-1', 'Postman API', undefined);
+
+    expect(requests[0].url).toBe('https://api.example.test/search?q=x%2By&flag#results');
+    expect(requests[0].params).toMatchObject([
+      { key: 'q', value: 'x+y', enabled: true },
+      { key: 'flag', value: '', enabled: true },
+    ]);
   });
 
   it('imports Postman raw JSON GraphQL bodies as GraphQL requests', () => {
@@ -500,6 +542,23 @@ describe('buildPostmanCollection', () => {
 
     const withSecrets = postmanExport(buildPostmanCollection('API', '', [request], strip, true));
     expect(withSecrets.item[0].request.url?.raw).toContain('api_key=raw-key');
+  });
+
+  it('redacts an explicitly secret raw URL parameter with a custom key', () => {
+    const request = testRequest({
+      id: 'req-explicit-query-secret',
+      method: 'GET',
+      url: 'https://api.example.test/search?credential=raw%2Bvalue&credential=raw%2Bvalue',
+      params: [testRow('credential', 'raw+value'), { ...testRow('credential', 'raw+value'), secret: true }],
+    });
+
+    const safe = postmanExport(buildPostmanCollection('API', '', [request], strip));
+    expect(safe.item[0].request.url?.raw).toBe('https://api.example.test/search?credential=&credential=');
+    expect(JSON.stringify(safe)).not.toContain('raw+value');
+    expect(JSON.stringify(safe)).not.toContain('raw%2Bvalue');
+
+    const withSecrets = postmanExport(buildPostmanCollection('API', '', [request], strip, true));
+    expect(withSecrets.item[0].request.url?.raw).toBe('https://api.example.test/search?credential=raw%2Bvalue&credential=raw%2Bvalue');
   });
 
   it('redacts raw URL userinfo and keeps templated URL userinfo', () => {

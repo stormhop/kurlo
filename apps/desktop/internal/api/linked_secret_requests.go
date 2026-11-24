@@ -27,9 +27,12 @@ var linkedSecretVariableMaps = map[string]bool{
 	"IterationData":       true,
 }
 
+var linkedURLMarkerPattern = regexp.MustCompile(`\{\{kurloRef:[A-Za-z0-9_-]+\}\}`)
+
 type linkedStringSlot struct {
 	value   string
 	set     func(string)
+	field   string
 	mapName string
 	key     string
 }
@@ -68,6 +71,7 @@ func collectLinkedStringSlots(v reflect.Value, fieldName string, out *[]linkedSt
 			mapKey := key
 			*out = append(*out, linkedStringSlot{
 				value:   elem.String(),
+				field:   fieldName,
 				mapName: fieldName,
 				key:     key.String(),
 				set: func(next string) {
@@ -78,7 +82,7 @@ func collectLinkedStringSlots(v reflect.Value, fieldName string, out *[]linkedSt
 	case reflect.String:
 		if v.CanSet() {
 			field := v
-			*out = append(*out, linkedStringSlot{value: v.String(), set: func(next string) { field.SetString(next) }})
+			*out = append(*out, linkedStringSlot{value: v.String(), field: fieldName, set: func(next string) { field.SetString(next) }})
 		}
 	}
 }
@@ -211,7 +215,11 @@ func planLinkedSecrets(target any) linkedSecretPlan {
 func (p linkedSecretPlan) apply(values map[secretmgr.Ref]string) []string {
 	for _, index := range p.use {
 		slot := p.slots[index]
-		slot.set(secretmgr.ReplaceMarkers(slot.value, values))
+		if slot.field == "URL" {
+			slot.set(replaceLinkedURLMarkers(slot.value, values))
+		} else {
+			slot.set(secretmgr.ReplaceMarkers(slot.value, values))
+		}
 	}
 	out := make([]string, 0, len(values))
 	for _, value := range values {
@@ -221,6 +229,23 @@ func (p linkedSecretPlan) apply(values map[secretmgr.Ref]string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func replaceLinkedURLMarkers(rawURL string, values map[secretmgr.Ref]string) string {
+	start, end := rawURLQueryBounds(rawURL)
+	if start < 0 {
+		return secretmgr.ReplaceMarkers(rawURL, values)
+	}
+	prefix := secretmgr.ReplaceMarkers(rawURL[:start], values)
+	query := linkedURLMarkerPattern.ReplaceAllStringFunc(rawURL[start+1:end], func(marker string) string {
+		replaced := secretmgr.ReplaceMarkers(marker, values)
+		if replaced == marker {
+			return marker
+		}
+		return url.QueryEscape(replaced)
+	})
+	suffix := secretmgr.ReplaceMarkers(rawURL[end:], values)
+	return prefix + "?" + query + suffix
 }
 
 func resolveLinkedSecretsIn(ctx context.Context, service *linkedSecretService, workspaceID string, target any) ([]string, error) {

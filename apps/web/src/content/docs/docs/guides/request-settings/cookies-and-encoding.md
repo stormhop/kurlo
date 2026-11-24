@@ -17,7 +17,7 @@ See [Cookies](/docs/guides/cookies/) for manual cookie editing, matching rules, 
 
 **Encode URL automatically** (on by default) percent-encodes characters in path segments and query values when Kurlo sends the request. Examples:
 
-- A space in a query value (`q=hello world`) becomes `q=hello%20world`.
+- A space typed in a query value (`q=hello world`) becomes `q=hello+world`. An existing escape such as `%20` or `%2B` keeps its spelling.
 - Cyrillic / emoji / other non-ASCII characters are encoded per RFC 3986.
 
 Turn this off if your server uses non-standard encoding rules — Kurlo will then transmit your URL byte-for-byte as you typed it.

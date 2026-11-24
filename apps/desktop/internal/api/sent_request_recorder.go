@@ -70,7 +70,7 @@ func (s *sentRequestRecorder) record(req *http.Request) {
 	defer s.mu.Unlock()
 	s.requests = append(s.requests, model.SentRequest{
 		Method:  req.Method,
-		URL:     redactSecrets(url, s.secrets),
+		URL:     redactRequestError(url, s.secrets),
 		Proto:   proto,
 		Headers: redactedHeaderRows(req.Header, s.secrets),
 	})

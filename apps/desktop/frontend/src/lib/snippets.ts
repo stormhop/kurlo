@@ -1,3 +1,4 @@
+import { appendQueryString } from './queryParams';
 import { RAW_BODY_CONTENT_TYPES } from './constants';
 import type { SnippetLanguage } from './stores/ui';
 import type { RenderedSnippetLine } from './types/models';
@@ -28,10 +29,9 @@ function snippetRequestUrl(req: SnippetRequest) {
     ? `${encodeURIComponent((req.auth.jwtQueryParam ?? '').trim() || 'token')}=${JWT_TOKEN_PLACEHOLDER}`
     : '';
   if (!paramsToAdd.length && !jwtQuery) return nextUrl;
-  const joiner = nextUrl.includes('?') ? '&' : '?';
   const pairs = paramsToAdd.map(row => `${encodeURIComponent(row.key)}=${encodeURIComponent(row.value)}`);
   if (jwtQuery) pairs.push(jwtQuery);
-  return `${nextUrl}${joiner}${pairs.join('&')}`;
+  return appendQueryString(nextUrl, pairs.join('&'));
 }
 
 function base64(value: string) {

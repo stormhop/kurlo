@@ -11,6 +11,12 @@ head:
 This page summarizes the notable-change log maintained in the source repository. For the exact notes and artifacts
 attached to every published tag, use the [Kurlo releases page](https://github.com/stormhop/kurlo/releases).
 
+## Unreleased
+
+### Fixed
+
+- **Query parameters** keep their values, flags and repeated keys when you send a saved request from Desktop, Runner, CLI or MCP. Editing an imported Postman or HTTP request keeps its other parameters.
+
 ## 3.2.0
 
 ### Added

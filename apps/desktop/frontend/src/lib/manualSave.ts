@@ -1,5 +1,7 @@
 import type { SavedRequest } from './types/models';
 import { assertionsWithoutUiIds } from './assertions';
+import { queryForEditor } from './queryParams';
+import { cloneRowsForStore } from './utils';
 
 export type ManualRequestSnapshotState = {
   dirtyRequestIds: Set<string>;
@@ -42,11 +44,15 @@ export function requestDirtyFingerprint(req: SavedRequest) {
     exampleCount,
     ...stable
   } = req;
+  const editorQuery = req.requestType === 'grpc'
+    ? { url: req.url ?? '', params: req.params ?? [] }
+    : queryForEditor(req.url ?? '', req.params ?? []);
   return stableStringify({
     ...stable,
+    url: editorQuery.url,
     examples: examples?.length ? examples : undefined,
     isDraft: Boolean(isDraft),
-    params: rowsWithoutUiIds(params),
+    params: rowsWithoutUiIds(cloneRowsForStore(editorQuery.params)),
     pathParams: pathParams?.length ? rowsWithoutUiIds(pathParams) : undefined,
     vars: vars?.length ? rowsWithoutUiIds(vars) : undefined,
     postResponseVars: postResponseVars?.length ? rowsWithoutUiIds(postResponseVars) : undefined,
@@ -67,12 +73,10 @@ export function requestDiffersFromSavedSnapshot(req: SavedRequest, saved: SavedR
   if (!saved) return true;
   if (req === saved) return false;
   if (req.method !== saved.method) return true;
-  if (req.url !== saved.url) return true;
   if (req.bodyType !== saved.bodyType) return true;
   if (req.bodyContent !== saved.bodyContent) return true;
   if (req.bodyFilePath !== saved.bodyFilePath) return true;
   if (req.name !== saved.name) return true;
-  if ((req.params?.length ?? 0) !== (saved.params?.length ?? 0)) return true;
   if ((req.headers?.length ?? 0) !== (saved.headers?.length ?? 0)) return true;
   if ((req.formRows?.length ?? 0) !== (saved.formRows?.length ?? 0)) return true;
   return requestDirtyFingerprint(req) !== requestDirtyFingerprint(saved);

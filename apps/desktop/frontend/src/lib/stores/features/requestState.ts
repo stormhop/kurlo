@@ -3,6 +3,7 @@ import { sseDisconnect, socketIODisconnect, webSocketDisconnect } from '../../ba
 import type { HttpResponse, McpResponse } from '../../backend';
 import { mcpFailureMessage } from './mcp';
 import { normalizeRequestSettingsOverrides } from '../../collectionDefaults';
+import { queryForEditor } from '../../queryParams';
 import {
   DEFAULT_GRAPHQL_QUERY,
   DEFAULT_GRAPHQL_VARIABLES,
@@ -430,7 +431,10 @@ export const requestStateFeature = {
     this.requestNameAuto = req.nameAuto ?? (!req.name || req.name === 'New Request');
     this.requestName = this.requestNameAuto ? '' : req.name;
     this.method = this.requestType === 'graphql' || this.requestType === 'grpc' ? 'POST' : req.method;
-    this.url = req.url;
+    const editorQuery = this.requestType === 'grpc'
+      ? { url: req.url, params: req.params ?? [] }
+      : queryForEditor(req.url, req.params ?? []);
+    this.url = editorQuery.url;
     const workspaceId = this.collections.find(collection => collection.id === req.collectionId)?.workspaceId ?? this.activeWorkspaceId;
     const section = requestSectionPreference(this.requestFiles?.root ?? '', workspaceId, req.id);
     this.requestTab = resolveFormRequestTab(this.requestType, this.method, section, req.requestTab);
@@ -465,7 +469,7 @@ export const requestStateFeature = {
     this.grpcProtoFilePath = req.grpcProtoFilePath ?? '';
     this.grpcProtoFileName = req.grpcProtoFileName ?? '';
     this.grpcProtoImportPaths = [...(req.grpcProtoImportPaths ?? [])];
-    this.params = restoreRows(req.params); this.pathParams = pathParamsFromUrl(req.url, restoreRows(req.pathParams)); this.reqHeaders = restoreRows(req.headers); this.formRows = restoreRows(req.formRows);
+    this.params = restoreRows(editorQuery.params); this.pathParams = pathParamsFromUrl(req.url, restoreRows(req.pathParams)); this.reqHeaders = restoreRows(req.headers); this.formRows = restoreRows(req.formRows);
     this.requestVars = restoreRows(req.vars ?? []); this.postResponseVars = restoreRows(req.postResponseVars ?? []);
     this.authType = req.auth.type; this.bearerToken = req.auth.bearerToken; this.basicUser = req.auth.basicUser; this.basicPass = req.auth.basicPass;
     this.apiKeyName = req.auth.apiKeyName; this.apiKeyValue = req.auth.apiKeyValue; this.apiKeyIn = req.auth.apiKeyIn;

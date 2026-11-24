@@ -299,7 +299,7 @@ describe('postmanV3FromFiles', () => {
     const { bundle } = bundleOf(shop);
     const list = byName(bundle.requests, 'List users');
     expect(list.method).toBe('GET');
-    expect(list.url).toBe('{{baseUrl}}/users');
+    expect(list.url).toBe('{{baseUrl}}/users?page=1&limit=10');
     expect(list.params.map(row => [row.key, row.value, row.enabled])).toEqual([['page', '1', true], ['limit', '10', true]]);
     expect(list.headers.map(row => [row.key, row.value, row.enabled])).toEqual([['Accept', 'application/json', true], ['X-Off', '1', false]]);
     expect(list.auth.type).toBe('none');
@@ -372,7 +372,7 @@ describe('postmanV3FromFiles', () => {
     const ok = list.examples?.[1];
     expect(ok?.response.body).toBe('[{"id":1}]');
     expect(ok?.response.bodyMediaType).toBe('application/json');
-    expect(ok?.snapshot.url).toBe('{{baseUrl}}/users');
+    expect(ok?.snapshot.url).toBe('{{baseUrl}}/users?page=1');
     expect(ok?.snapshot.params.map(row => [row.key, row.value])).toEqual([['page', '1']]);
 
     const get = byName(bundle.requests, 'Get user / by id');
@@ -558,7 +558,7 @@ describe('postmanV3FromFiles protocols', () => {
   it('imports WebSocket requests with saved messages and settings', () => {
     const { bundle } = bundleOf(protocols);
     const ws = byName(bundle.requests, 'Ticker');
-    expect(ws).toMatchObject({ requestType: 'ws', url: 'wss://stream.example.com/ticker', bodyContent: '{"op":"sub"}', bodyType: 'json' });
+    expect(ws).toMatchObject({ requestType: 'ws', url: 'wss://stream.example.com/ticker?symbols=ACME%2CFOO', bodyContent: '{"op":"sub"}', bodyType: 'json' });
     expect(ws.params.map(row => [row.key, row.value])).toEqual([['symbols', 'ACME,FOO']]);
     expect(ws.savedMessages?.map(message => [message.name, message.content, message.bodyType])).toEqual([
       ['subscribe', '{"op":"sub"}', 'json'],

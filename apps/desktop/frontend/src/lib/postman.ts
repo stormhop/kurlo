@@ -12,6 +12,7 @@ import { emptyCollectionDefaults, emptyFolderDefaults, folderDefaultsHaveContent
 import { mediaTypeOf, normalizeRequestExample } from './examples';
 import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
 import { applyPathParams, pathParamsFromUrl } from './pathParams';
+import { additionalQueryRows, appendQueryString, matchQueryRows, parseQuery, splitUrl, urlWithParams } from './queryParams';
 
 const KURLO_EXTENSION_KEY = 'x-kurlo';
 const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp']);
@@ -268,14 +269,17 @@ function postmanAuthConfig(authValue: unknown, inheritedAuth?: unknown): SavedRe
 }
 
 function postmanUrlToKurlo(urlValue: unknown) {
-  if (typeof urlValue === 'string') return { url: stripUrlQueryAndFragment(urlValue), params: queryParamsFromUrl(urlValue), pathParams: [] as KVRow[] };
+  if (typeof urlValue === 'string') {
+    const params = queryParamsFromUrl(urlValue);
+    return { url: urlWithParams(urlValue, params), params, pathParams: [] as KVRow[] };
+  }
   if (!isRecord(urlValue)) return { url: '', params: [] as KVRow[], pathParams: [] as KVRow[] };
   const declaredParams = postmanKvRows(urlValue.query);
   const pathParams = postmanKvRows(urlValue.variable);
   const raw = asText(urlValue.raw);
   if (raw) {
     const params = declaredParams.length ? declaredParams : queryParamsFromUrl(raw);
-    return { url: stripUrlQueryAndFragment(raw), params, pathParams };
+    return { url: urlWithParams(raw, params), params, pathParams };
   }
   const protocol = asText(urlValue.protocol);
   const host = Array.isArray(urlValue.host) ? urlValue.host.map(asText).join('.') : asText(urlValue.host);
@@ -288,10 +292,6 @@ function postmanUrlToKurlo(urlValue: unknown) {
     params: declaredParams,
     pathParams,
   };
-}
-
-function stripUrlQueryAndFragment(raw: string): string {
-  return raw.split('#')[0]?.split('?')[0] ?? '';
 }
 
 function queryParamsFromUrl(raw: string): KVRow[] {
@@ -605,16 +605,15 @@ function postmanKv(row: KVRow, includeSecrets = false) {
   return { key: safeRow.key, value: safeRow.value, ...(safeRow.description ? { description: safeRow.description } : {}), ...(!safeRow.enabled ? { disabled: true } : {}) };
 }
 
-function appendQueryString(url: string, queryString: string) {
-  const hashIndex = url.indexOf('#');
-  const beforeHash = hashIndex >= 0 ? url.slice(0, hashIndex) : url;
-  const hash = hashIndex >= 0 ? url.slice(hashIndex) : '';
-  return `${beforeHash}${beforeHash.includes('?') ? '&' : '?'}${queryString}${hash}`;
+function secretAdjustedRows(rows: KVRow[]) {
+  const secrets = new Set(rows.filter(row => row.secret).map(row => JSON.stringify([row.key, row.value])));
+  return rows.map(row => secrets.has(JSON.stringify([row.key, row.value])) && !row.secret ? { ...row, secret: true } : row);
 }
 
-function requestUrlWithParams(req: SavedRequest, includeSecrets = false) {
-  const activeParams = req.params.filter(r => r.enabled && r.key);
-  const cleanUrl = safeExportUrl(req.url.trim() || 'https://example.com', includeSecrets);
+function requestUrlWithParams(req: SavedRequest, includeSecrets = false, rows = secretAdjustedRows(req.params)) {
+  const activeParams = additionalQueryRows(req.url, rows).filter(r => r.enabled && r.key);
+  const rawUrl = req.url.trim() || 'https://example.com';
+  const cleanUrl = safeExportUrl(maskExplicitSecretQuery(rawUrl, rows, includeSecrets), includeSecrets);
   if (!activeParams.length) return cleanUrl;
   const qs = activeParams
     .map(r => `${encodeURIComponent(r.key)}=${encodeURIComponent(safeExportValue(r.key, r.value, includeSecrets, r.secret === true))}`)
@@ -622,9 +621,32 @@ function requestUrlWithParams(req: SavedRequest, includeSecrets = false) {
   return appendQueryString(cleanUrl, qs);
 }
 
+function decodedQueryPart(value: string) {
+  try { return decodeURIComponent(value.replace(/\+/g, ' ')); }
+  catch { return value; }
+}
+
+function maskExplicitSecretQuery(url: string, rows: KVRow[], includeSecrets: boolean) {
+  if (includeSecrets) return url;
+  const { head, query, hash } = splitUrl(url);
+  if (!query) return url;
+  const pairs = parseQuery(query);
+  const { matches } = matchQueryRows(pairs, rows);
+  const secretPairs = new Set(rows.filter(row => row.enabled && row.secret).map(row => JSON.stringify([row.key, row.value])));
+  const redacted = pairs.map(pair => pair.bare ? pair.key : `${pair.key}=${pair.value}`);
+  pairs.forEach((pair, index) => {
+    const row = rows[matches[index]];
+    const signature = JSON.stringify([decodedQueryPart(pair.key), decodedQueryPart(pair.value)]);
+    const secret = row?.secret === true || secretPairs.has(signature);
+    if (secret && !pair.bare && pair.value) redacted[index] = `${pair.key}=`;
+  });
+  return `${head}?${redacted.join('&')}${hash}`;
+}
+
 function postmanUrlFromKurlo(req: SavedRequest, includeSecrets = false) {
-  const raw = requestUrlWithParams(req, includeSecrets);
-  const query = req.params.filter(r => r.key).map(row => postmanKv(row, includeSecrets));
+  const params = secretAdjustedRows(req.params);
+  const raw = requestUrlWithParams(req, includeSecrets, params);
+  const query = params.filter(r => r.key).map(row => postmanKv(row, includeSecrets));
   const variable = (req.pathParams ?? []).filter(r => r.key).map(row => postmanKv(row, includeSecrets));
   try {
     const parsed = new URL(raw);

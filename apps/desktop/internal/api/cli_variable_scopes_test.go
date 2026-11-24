@@ -78,8 +78,8 @@ func TestMCPRunsKeepCollectionVariablesAndSessionChangesInTheirScope(t *testing.
 		}
 		return out
 	}
-	if out := run("A/Request", nil); out.URL != first.URL+"/A" {
-		t.Fatalf("first outcome=%+v", out)
+	if out := run("A/Request", nil); out.URL != first.URL+"/changed-A" {
+		t.Fatalf("first outcome should report the actual outbound URL: %+v", out)
 	}
 	if out := run("A/Request", nil); out.URL != first.URL+"/changed-A" {
 		t.Fatalf("collection session not retained: %+v", out)

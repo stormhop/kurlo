@@ -185,4 +185,46 @@ describe('requestDiffersFromSavedSnapshot', () => {
     expect(requestDiffersFromSavedSnapshot(request({ isDraft: true }), saved)).toBe(true);
     expect(requestDiffersFromSavedSnapshot(request({ url: 'https://example.test ' }), saved)).toBe(true);
   });
+
+  it('keeps URL-only and params-only saved requests clean after editor hydration', () => {
+    const urlOnly = request({ url: 'https://example.test/items?tag=red&tag=blue&limit=2', params: [] });
+    const hydratedUrlOnly = request({
+      url: 'https://example.test/items?tag=red&tag=blue&limit=2',
+      params: [
+        { id: 1, enabled: true, key: 'tag', value: 'red', description: '' },
+        { id: 2, enabled: true, key: 'tag', value: 'blue', description: '' },
+        { id: 3, enabled: true, key: 'limit', value: '2', description: '' },
+        { id: 4, enabled: true, key: '', value: '', description: '' },
+      ],
+    });
+    const paramsOnly = request({
+      url: 'https://example.test/items',
+      params: [{ id: 1, enabled: true, key: 'tag', value: 'red', description: '' }],
+    });
+    const hydratedParamsOnly = request({
+      url: 'https://example.test/items?tag=red',
+      params: [
+        { id: 2, enabled: true, key: 'tag', value: 'red', description: '' },
+        { id: 3, enabled: true, key: '', value: '', description: '' },
+      ],
+    });
+
+    expect(requestDiffersFromSavedSnapshot(hydratedUrlOnly, urlOnly)).toBe(false);
+    expect(requestDiffersFromSavedSnapshot(hydratedParamsOnly, paramsOnly)).toBe(false);
+  });
+
+  it('detects edits to one of several duplicate URL query values', () => {
+    const saved = request({ url: 'https://example.test/items?tag=red&tag=blue&limit=2', params: [] });
+    const edited = request({
+      url: 'https://example.test/items?tag=red&tag=green&limit=2',
+      params: [
+        { id: 1, enabled: true, key: 'tag', value: 'red', description: '' },
+        { id: 2, enabled: true, key: 'tag', value: 'green', description: '' },
+        { id: 3, enabled: true, key: 'limit', value: '2', description: '' },
+        { id: 4, enabled: true, key: '', value: '', description: '' },
+      ],
+    });
+
+    expect(requestDiffersFromSavedSnapshot(edited, saved)).toBe(true);
+  });
 });

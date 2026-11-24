@@ -66,7 +66,7 @@ describe('path variables in imports and exports', () => {
       { key: 'postId', value: '7' },
     ]);
     const [imported] = postmanRequestsFromItems(collection.item, 'col-2', 'API');
-    expect(imported.url).toBe('https://api.example.test/users/:userId/posts/:postId');
+    expect(imported.url).toBe('https://api.example.test/users/:userId/posts/:postId?expand=author');
     expect(pairs(imported.pathParams)).toEqual([{ key: 'userId', value: '42' }, { key: 'postId', value: '7' }]);
     expect(imported.pathParams?.[0].description).toBe('Owner');
   });

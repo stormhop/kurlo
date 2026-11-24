@@ -144,10 +144,13 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.length)).toBe(2);
     await expect(runner.locator('.runner-results-summary')).toContainText('Requests 2/2');
     const sent = await page.evaluate(() => window.__kurloE2E.sentRequests);
-    expect(sent.map(request => request.url)).toEqual(['https://dev.kurlo.test/slow', 'https://dev.kurlo.test/slow']);
+    expect(sent.map(request => request.url)).toEqual([
+      'https://dev.kurlo.test/slow?ms=1500&setenv=token:dev-token',
+      'https://dev.kurlo.test/slow?ms=1&seen=dev-token',
+    ]);
     expect(sent[1]).toMatchObject({
       scriptEnvironment: { host: 'https://dev.kurlo.test', token: 'dev-token' },
-      params: expect.arrayContaining([expect.objectContaining({ key: 'seen', value: 'dev-token' })]),
+      params: [],
     });
     await expect.poll(() => page.evaluate(() => {
       const environments = window.__kurloE2E.store.environments as Array<{ id: string; values: Array<{ key: string; value: string }> }>;
