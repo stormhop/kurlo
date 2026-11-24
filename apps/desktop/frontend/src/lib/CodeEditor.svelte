@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy, untrack } from 'svelte';
-  import { Decoration, EditorView, ViewPlugin, WidgetType, drawSelection, tooltips, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
-  import { EditorState, Compartment, Prec, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
+  import { Decoration, EditorView, GutterMarker, ViewPlugin, WidgetType, drawSelection, gutterLineClass, tooltips, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
+  import { EditorSelection, EditorState, Compartment, Prec, RangeSet, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
   import { defaultKeymap, history, isolateHistory, historyKeymap, indentWithTab } from '@codemirror/commands';
-  import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
+  import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching, foldEffect, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
   import { autocompletion, completionKeymap, completionStatus, closeBrackets, closeBracketsKeymap, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
-  import { forEachDiagnostic, linter, type Diagnostic } from '@codemirror/lint';
+  import { forEachDiagnostic, linter, setDiagnosticsEffect, type Diagnostic } from '@codemirror/lint';
   import { tags } from '@lezer/highlight';
   import { textChange } from './textChange';
   import { selectedLineNumbersForComment } from './editorSelection';
@@ -59,7 +59,7 @@
     includeVariableCompletions?: boolean;
     maxLength?: number;
     onformat?: () => void;
-    validate?: (text: string) => Promise<{ line: number; message: string } | null>;
+    validate?: (text: string) => Promise<{ line: number; message: string; source?: string } | null>;
     ghost?: (doc: string, pos: number) => EditorGhost | null;
   } = $props();
 
@@ -168,23 +168,71 @@
       padding: 'var(--space-2) var(--space-2-5)',
       borderLeft: '3px solid transparent',
       whiteSpace: 'pre-wrap',
-      fontFamily: 'var(--font-mono, ui-monospace, monospace)',
-      fontSize: 'var(--text-caption)',
+      fontFamily: 'var(--font-ui)',
+      fontSize: 'var(--text-label)',
       lineHeight: 'var(--leading-normal)',
       color: 'var(--text)',
     },
     '.cm-diagnostic-error': { borderLeftColor: 'var(--danger)' },
-    '.cm-diagnostic-warning': { borderLeftColor: 'var(--put, orange)' },
+    '.cm-diagnostic-warning': { borderLeftColor: 'var(--warning)' },
     '.cm-diagnosticText': { color: 'var(--text)' },
     '.cm-diagnosticSource': {
       display: 'block',
-      marginTop: 'var(--space-1)',
+      marginTop: 'var(--space-0-5)',
       color: 'var(--text-3)',
-      fontSize: 'var(--text-micro)',
-      fontWeight: 'var(--weight-semibold)',
-      letterSpacing: '0.04em',
-      textTransform: 'uppercase',
+      fontSize: 'var(--text-caption)',
       opacity: '1',
+    },
+    '.cm-kurlo-issue-badge': {
+      position: 'absolute',
+      right: 'var(--space-3)',
+      bottom: 'var(--space-2)',
+      zIndex: '5',
+      display: 'flex',
+      justifyContent: 'flex-end',
+      maxWidth: 'calc(100% - var(--space-6))',
+      pointerEvents: 'none',
+    },
+    '.cm-kurlo-issue': {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 'var(--space-2)',
+      minWidth: '0',
+      maxWidth: '100%',
+      padding: 'var(--space-1) var(--space-2-5)',
+      border: '1px solid color-mix(in srgb, var(--danger) 40%, var(--border))',
+      borderRadius: 'var(--radius-md)',
+      background: 'color-mix(in srgb, var(--danger) 8%, var(--surface))',
+      boxShadow: 'var(--shadow-popover)',
+      color: 'var(--danger-text)',
+      font: 'inherit',
+      fontFamily: 'var(--font-ui)',
+      fontSize: 'var(--text-caption)',
+      lineHeight: 'var(--leading-normal)',
+      textAlign: 'left',
+      cursor: 'pointer',
+      pointerEvents: 'auto',
+      WebkitUserSelect: 'none',
+      userSelect: 'none',
+    },
+    '.cm-kurlo-issue[hidden]': { display: 'none' },
+    '.cm-kurlo-issue-announcer': {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden',
+      clipPath: 'inset(50%)',
+      whiteSpace: 'nowrap',
+    },
+    '.cm-kurlo-issue:hover': { background: 'color-mix(in srgb, var(--danger) 14%, var(--surface))' },
+    '.cm-kurlo-issue:focus-visible': { outline: 'var(--focus-outline)', outlineOffset: '-2px' },
+    '.cm-kurlo-issue.warning': { borderColor: 'color-mix(in srgb, var(--warning) 45%, var(--border))', background: 'color-mix(in srgb, var(--warning) 10%, var(--surface))', color: 'var(--text)' },
+    '.cm-kurlo-issue-line-label': { flexShrink: '0', fontWeight: 'var(--weight-medium)' },
+    '.cm-kurlo-issue-message': { minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+    '.cm-lineNumbers .cm-gutterElement.cm-kurlo-issue-line': {
+      color: 'var(--danger)',
+      fontWeight: 'var(--weight-semibold)',
+      boxShadow: 'inset 2px 0 0 var(--danger)',
     },
     '.cm-panel.cm-panel-lint ul [aria-selected]': {
       backgroundColor: 'var(--accent-dim)',
@@ -289,10 +337,7 @@
         extension = (await import('@codemirror/lang-json')).json();
         break;
       case 'javascript':
-        extension = [
-          (await import('@codemirror/lang-javascript')).javascript({ jsx: false, typescript: false }),
-          readonly ? [] : drawSelection(),
-        ];
+        extension = (await import('@codemirror/lang-javascript')).javascript({ jsx: false, typescript: false });
         break;
       case 'html':
         extension = (await import('@codemirror/lang-html')).html();
@@ -553,7 +598,7 @@
     return null;
   }
 
-  function computeIssue(text: string): { position: number; message: string; source: string } | null {
+  function computeIssue(text: string): { position: number; message: string; source?: string } | null {
     if (!text.trim()) return null;
     if (language === 'json') {
       const error = validateJsonDocument(text);
@@ -574,7 +619,7 @@
       const found = await validate(text);
       if (found) {
         const lineNumber = Math.min(Math.max(found.line, 1), view.state.doc.lines);
-        issue = { position: view.state.doc.line(lineNumber).from, message: found.message, source: 'YAML' };
+        issue = { position: view.state.doc.line(lineNumber).from, message: found.message, source: found.source ?? (language === 'yaml' ? 'YAML' : undefined) };
       }
     }
     if (!issue) return [];
@@ -596,6 +641,148 @@
   const kurloLinter = linter(kurloDiagnostics, {
     delay: 300,
     tooltipFilter: () => null as unknown as Diagnostic[],
+  });
+
+  type EditorIssue = { from: number; message: string; source?: string; severity: Diagnostic['severity'] };
+
+  const issueField = StateField.define<EditorIssue | null>({
+    create: () => null,
+    update(current, tr) {
+      let next = current && tr.docChanged ? { ...current, from: tr.changes.mapPos(current.from) } : current;
+      for (const effect of tr.effects) {
+        if (!effect.is(setDiagnosticsEffect)) continue;
+        const first = [...effect.value].sort((a, b) => a.from - b.from)[0];
+        next = first ? { from: first.from, message: first.message, source: first.source, severity: first.severity } : null;
+      }
+      return next;
+    },
+  });
+
+  class IssueLineMarker extends GutterMarker {
+    elementClass = 'cm-kurlo-issue-line';
+  }
+  const issueLineMarker = new IssueLineMarker();
+
+  const issueGutter = gutterLineClass.compute([issueField], state => {
+    const issue = state.field(issueField);
+    if (!issue) return RangeSet.empty;
+    return RangeSet.of([issueLineMarker.range(state.doc.lineAt(Math.min(issue.from, state.doc.length)).from)]);
+  });
+
+  function jumpToIssue(target: EditorView) {
+    const issue = target.state.field(issueField);
+    if (!issue) return;
+    const pos = Math.min(issue.from, target.state.doc.length);
+    target.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) });
+    target.focus();
+  }
+
+  function issueLabel(state: EditorState, issue: EditorIssue) {
+    return `Line ${state.doc.lineAt(Math.min(issue.from, state.doc.length)).number}`;
+  }
+
+  const issueBadge = ViewPlugin.fromClass(class {
+    dom: HTMLDivElement;
+    announcer: HTMLSpanElement;
+    button: HTMLButtonElement;
+    line: HTMLSpanElement;
+    message: HTMLSpanElement;
+    badgeView: EditorView;
+    onScroll: () => void;
+
+    constructor(badgeView: EditorView) {
+      this.badgeView = badgeView;
+      this.dom = document.createElement('div');
+      this.dom.className = 'cm-kurlo-issue-badge';
+      this.announcer = document.createElement('span');
+      this.announcer.className = 'cm-kurlo-issue-announcer';
+      this.announcer.setAttribute('aria-live', 'polite');
+      this.button = document.createElement('button');
+      this.button.type = 'button';
+      this.button.className = 'cm-kurlo-issue';
+      this.button.hidden = true;
+      this.line = document.createElement('span');
+      this.line.className = 'cm-kurlo-issue-line-label';
+      this.message = document.createElement('span');
+      this.message.className = 'cm-kurlo-issue-message';
+      this.button.append(this.line, this.message);
+      this.button.addEventListener('mousedown', event => event.preventDefault());
+      this.button.addEventListener('click', () => jumpToIssue(this.badgeView));
+      this.dom.append(this.announcer, this.button);
+      badgeView.dom.append(this.dom);
+      this.onScroll = () => this.measure();
+      badgeView.scrollDOM.addEventListener('scroll', this.onScroll, { passive: true });
+      this.render(badgeView.state);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.state.field(issueField) !== update.startState.field(issueField)) this.render(update.state);
+      else if (update.viewportChanged || update.geometryChanged) this.measure();
+    }
+
+    render(state: EditorState) {
+      const issue = state.field(issueField);
+      const label = issue ? issueLabel(state, issue) : '';
+      this.announcer.textContent = issue ? `${label}: ${issue.message}` : '';
+      if (issue) {
+        this.button.classList.toggle('warning', issue.severity === 'warning');
+        this.line.textContent = label;
+        this.message.textContent = issue.message;
+        this.button.setAttribute('aria-label', `${label}: ${issue.message}. Go to the line`);
+      }
+      this.measure();
+    }
+
+    measure() {
+      this.badgeView.requestMeasure({
+        key: this,
+        read: target => {
+          const issue = target.state.field(issueField);
+          if (!issue) return false;
+          const block = target.lineBlockAt(Math.min(issue.from, target.state.doc.length));
+          const scroller = target.scrollDOM.getBoundingClientRect();
+          const top = target.documentTop + block.top;
+          const bottom = target.documentTop + block.bottom;
+          return bottom <= scroller.top + 2 || top >= scroller.bottom - 2;
+        },
+        write: offscreen => {
+          this.button.hidden = !offscreen;
+        },
+      });
+    }
+
+    destroy() {
+      this.badgeView.scrollDOM.removeEventListener('scroll', this.onScroll);
+      this.dom.remove();
+    }
+  });
+
+  const keepCursorOutOfFolds = EditorState.transactionFilter.of(tr => {
+    const folds = tr.effects.filter(effect => effect.is(foldEffect)).map(effect => effect.value as { from: number; to: number });
+    if (!folds.length) return tr;
+    const selection = tr.newSelection;
+    let moved = false;
+    const ranges = selection.ranges.map(range => {
+      const fold = folds.find(item => range.head > item.from && range.head <= item.to);
+      if (!fold) return range;
+      moved = true;
+      return EditorSelection.cursor(tr.state.doc.lineAt(fold.to).to);
+    });
+    return moved ? [tr, { selection: EditorSelection.create(ranges, selection.mainIndex), sequential: true }] : tr;
+  });
+
+  const keepFocusOnFoldClick = ViewPlugin.fromClass(class {
+    target: EditorView;
+    onMouseDown = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest('.cm-foldGutter')) event.preventDefault();
+    };
+    constructor(target: EditorView) {
+      this.target = target;
+      target.dom.addEventListener('mousedown', this.onMouseDown);
+    }
+    destroy() {
+      this.target.dom.removeEventListener('mousedown', this.onMouseDown);
+    }
   });
 
   const kurloLintTooltip = hoverTooltip((hoverView, pos, side) => {
@@ -623,12 +810,11 @@
           text.className = 'cm-diagnosticText';
           text.textContent = diagnostic.message;
           item.append(text);
-          if (diagnostic.source) {
-            const source = document.createElement('div');
-            source.className = 'cm-diagnosticSource';
-            source.textContent = diagnostic.source;
-            item.append(source);
-          }
+          const source = document.createElement('div');
+          source.className = 'cm-diagnosticSource';
+          const lineNumber = hoverView.state.doc.lineAt(Math.min(start, hoverView.state.doc.length)).number;
+          source.textContent = diagnostic.source ? `Line ${lineNumber} · ${diagnostic.source}` : `Line ${lineNumber}`;
+          item.append(source);
           dom.append(item);
         }
         return { dom };
@@ -690,6 +876,7 @@
         ? [EditorView.lineWrapping]
         : [lineNumbers(), foldGutter({ markerDOM: foldMarker }), highlightActiveLineGutter(), highlightActiveLine(), bracketMatching(), closeBrackets()]),
       editorExtensions,
+      readonly ? [] : drawSelection(),
       history(),
       indentOnInput(),
       ...(completionSource ? [tooltips({ parent: document.body })] : []),
@@ -701,6 +888,11 @@
       ghostExtension,
       kurloLinter,
       kurloLintTooltip,
+      keepCursorOutOfFolds,
+      keepFocusOnFoldClick,
+      issueField,
+      issueGutter,
+      issueBadge,
       keymap.of([
         { key: 'Mod-/', run: toggleSelectedLineComments },
         { key: 'Mod-Shift-f', run: () => { format(); return true; } },
@@ -866,15 +1058,17 @@
     color: var(--text-3) !important;
   }
   :global(.cm-wrap .cm-lintRange) {
+    --lint-color: var(--danger);
     padding-bottom: var(--space-0-5);
-    background-position: left bottom;
-    background-repeat: repeat-x;
+    background-image:
+      linear-gradient(135deg, transparent 37.5%, var(--lint-color) 37.5% 62.5%, transparent 62.5%),
+      linear-gradient(45deg, transparent 37.5%, var(--lint-color) 37.5% 62.5%, transparent 62.5%) !important;
+    background-size: 0.25rem 0.1875rem !important;
+    background-position: 0 100%, 0.125rem 100% !important;
+    background-repeat: repeat-x !important;
     text-decoration: none !important;
   }
-  :global(.cm-wrap .cm-lintRange-error) {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='m0 2.5 l2 -1.5 l1 0 l2 1.5 l1 0' stroke='%23e5484d' fill='none' stroke-width='1.1'/%3E%3C/svg%3E") !important;
-  }
   :global(.cm-wrap .cm-lintRange-warning) {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='m0 2.5 l2 -1.5 l1 0 l2 1.5 l1 0' stroke='%23e0922f' fill='none' stroke-width='1.1'/%3E%3C/svg%3E") !important;
+    --lint-color: var(--warning);
   }
 </style>

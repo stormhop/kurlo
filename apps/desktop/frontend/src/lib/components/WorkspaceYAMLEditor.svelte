@@ -11,7 +11,7 @@
 
   const fileName = $derived(vm.yamlEditorPath.slice(vm.yamlEditorPath.lastIndexOf('/') + 1));
   const folder = $derived(vm.yamlEditorPath.includes('/') ? vm.yamlEditorPath.slice(0, vm.yamlEditorPath.lastIndexOf('/')) : '');
-  const statusError = $derived(issue ? `Line ${issue.line}: ${issue.message}` : vm.yamlEditorError);
+  const statusError = $derived(vm.yamlEditorError);
 
   async function validate(text: string) {
     const sequence = ++validationSequence;
@@ -63,7 +63,7 @@
         {#if statusError}
           <span class="yaml-editor-dot" aria-hidden="true"></span>
           <span>{statusError}</span>
-        {:else if checked}
+        {:else if checked && !issue}
           <span class="yaml-editor-dot ok" aria-hidden="true"></span>
           <span>No problems found</span>
         {/if}

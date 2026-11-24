@@ -491,7 +491,7 @@ test('retains invalid YAML across requests and reviews it before leaving or clos
   await openSeededFileTab(page);
   await fillCodeEditor(page, 'request-file-editor', 'version: 1\nrequest:\n  id: file-one\n  name: "One"\n  method: GET\n  url: [broken\n');
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.includes('request-file-check'))).toBe(true);
-  await expect(page.locator('.file-tab').getByRole('status')).toContainText('Invalid URL value');
+  await expect(page.locator('.file-tab .cm-kurlo-issue-announcer')).toContainText('Invalid URL value');
   await expect(page.locator('.cm-lintRange-error').first()).toBeVisible();
   await expect(page.locator('.file-tab').getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
   await page.locator('.file-tab').getByRole('button', { name: 'Revert', exact: true }).click();

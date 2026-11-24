@@ -7,9 +7,15 @@ All notable changes to Kurlo are documented here. This project follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Editor errors.** The line with a JSON, GraphQL or YAML error has its number marked in red and a wavy underline in the theme's colour. Hovering shows the message with its line in the app font. When the line is scrolled out of view, a note in the corner names it and takes you there. MCP arguments that are not a JSON object are marked in the editor instead of a second message below it, and the File tab and YAML editor show a syntax error once, in the editor.
+
 ### Fixed
 
 - **Query parameters.** Desktop, Collection Runner, CLI and MCP send saved query parameters once per occurrence. Sending a pasted URL keeps encoded values and flags such as `?preview`. After importing a Postman collection or an HTTP file, editing the path or one parameter keeps the other parameters.
+- **Editor caret.** In request bodies, messages, arguments and other code editors the caret moves back with a deleted character at once instead of a moment later, as it already did in scripts and the File tab.
+- **Folding.** Folding a block keeps the editor focused and puts the caret after the folded block on its line instead of drawing it above the line.
 
 ## [3.2.0] - 2026-11-23
 

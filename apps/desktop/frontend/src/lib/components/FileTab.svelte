@@ -1,10 +1,10 @@
 <script module lang="ts">
   import { autocompletion } from '@codemirror/autocomplete';
   import { search, searchKeymap } from '@codemirror/search';
-  import { drawSelection, EditorView, keymap } from '@codemirror/view';
+  import { EditorView, keymap } from '@codemirror/view';
 
   const fileExtensions = [
-    search({ top: true }), keymap.of(searchKeymap), EditorView.lineWrapping, drawSelection(),
+    search({ top: true }), keymap.of(searchKeymap), EditorView.lineWrapping,
     autocompletion({ activateOnCompletion: option => option.type === 'property' }),
   ];
 </script>
@@ -38,7 +38,8 @@
   let validationIssue = $state<FileIssue | null>(null);
   let formatIssue = $state<FileIssue | null>(null);
   let invalid = $derived(validationIssue?.draft === draft && validationIssue.content === draft.content ? validationIssue : null);
-  let formatError = $derived(formatIssue?.draft === draft && formatIssue.content === draft.content ? formatIssue : null);
+  let formatError = $derived(!invalid && formatIssue?.draft === draft && formatIssue.content === draft.content ? formatIssue : null);
+  let fileError = $derived(invalid && draft.errorLine && !draft.readFailed ? '' : draft.error);
 
   async function formatFile() {
     if (formatting || draft.loading || draft.saving || !draft.ready) return;
@@ -138,8 +139,6 @@
     </div>
   </div>
 
-  <span class="sr-only" role="status">{#if invalid}{#if invalid.line}Line {invalid.line}: {/if}{invalid.message}{/if}</span>
-
   {#if draft.conflicted}
     <div class="file-tab-notice file-tab-conflict" role="alert">
       <div>
@@ -159,14 +158,14 @@
 
   {#if draft.loading && !draft.ready}
     <div class="file-tab-editor-state"><BirdLoader label="Loading request file" /></div>
-  {:else if managedHint || formatError || draft.error || draft.barIssue}
+  {:else if managedHint || formatError || fileError || draft.barIssue}
     <div class="file-tab-feedback" class:over-editor={draft.ready}>
       {#if draft.barIssue}<div class="file-tab-managed-hint" role="alert">{draft.barIssue}</div>{/if}
       {#if managedHint}<div class="file-tab-managed-hint" role="status">{managedHint}</div>{/if}
-      {#if formatError || draft.error}
+      {#if formatError || fileError}
         <div class="file-tab-notice file-tab-error" role="alert">
           <div>
-            <strong>{formatError?.message ?? draft.error}</strong>
+            <strong>{formatError?.message ?? fileError}</strong>
             {#if formatError?.line ?? draft.errorLine}<span>Line {formatError?.line ?? draft.errorLine}</span>{/if}
           </div>
           {#if draft.readFailed}

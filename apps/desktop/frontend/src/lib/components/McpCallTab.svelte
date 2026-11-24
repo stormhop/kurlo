@@ -17,7 +17,15 @@
   const needsName = $derived(mcpMethodNeedsName(vm.mcpMethod));
   const takesArguments = $derived(mcpMethodTakesArguments(vm.mcpMethod));
   const nameLabel = $derived(mcpNameLabelFor(vm.mcpMethod));
-  const argumentsError = $derived(vm.mcpArgumentsError());
+  async function validateArguments(text: string) {
+    if (!text.trim()) return null;
+    try {
+      const parsed: unknown = JSON.parse(text);
+      return parsed === null || typeof parsed !== 'object' || Array.isArray(parsed) ? { line: 1, message: 'Arguments must be a JSON object.', source: 'JSON' } : null;
+    } catch {
+      return null;
+    }
+  }
   const selectedTool = $derived(vm.mcpSelectedTool());
   const rejection = $derived(vm.mcpSelectedToolRejection());
 
@@ -139,19 +147,17 @@
           <span class="mcp-arguments-hint">checked against the tool's input schema</span>
         {/if}
       </div>
-      <div class="mcp-editor" class:invalid={Boolean(argumentsError)}>
+      <div class="mcp-editor">
         <CodeEditor
           bind:value={vm.mcpArguments}
           language="json"
           fillHeight
+          validate={validateArguments}
           ariaLabel="Tool arguments"
           variableSuggestions={vm.variableSuggestions}
           placeholder={'{\n  "key": "value"\n}'}
         />
       </div>
-      {#if argumentsError}
-        <p class="mcp-notice mcp-notice-bad" role="alert">{argumentsError}</p>
-      {/if}
     </div>
   {:else}
     <p class="mcp-notice">{vm.mcpMethod} takes no arguments — press Send to call it.</p>
@@ -290,10 +296,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     overflow: hidden;
-  }
-
-  .mcp-editor.invalid {
-    border-color: var(--warning-border);
   }
 
 </style>

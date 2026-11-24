@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { agentStore, connection, installAgentBridge } from './support/agent';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
-import { chooseRequestSection, collectionRow } from './support/actions';
+import { chooseRequestSection, collectionRow, fillCodeEditor } from './support/actions';
 
 for (const kind of ['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'ai', 'collection']) {
   test(`audits editor scrolling and height for ${kind}`, async ({ page }) => {
@@ -143,4 +143,96 @@ test('uses the same code font for the HTTP request and response bodies', async (
     await expect(responseLine).toHaveCSS(property, expected);
   }
   await page.screenshot({ path: join(tmpdir(), `kurlo-http-body-fonts-${testInfo.project.name}.png`), animations: 'disabled' });
+});
+
+for (const kind of ['http', 'mcp'] as const) {
+  test(`shows the first ${kind} editor error with its line and jumps to it`, async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'errors-col', workspaceId: 'workspace-e2e', name: 'Errors' }],
+      activeId: 'errors', openIds: ['errors'],
+      requests: [{ id: 'errors', name: 'Errors', collectionId: 'errors-col', collection: 'Errors', requestType: kind, method: 'POST', url: 'https://example.test',
+        bodyType: 'json', bodyContent: '{\n  "name": "x",\n  "age": 3,,\n  "ok": true\n}',
+        mcpMethod: 'tools/call', mcpName: 'audit', mcpArguments: '[1, 2]', auth: { type: 'none' } }],
+    });
+    await page.goto('/');
+    await chooseRequestSection(page, kind === 'mcp' ? 'Arguments' : 'Body');
+    const issue = page.locator('.cm-kurlo-issue');
+    if (kind === 'http') {
+      await expect(page.locator('.cm-lineNumbers .cm-kurlo-issue-line')).toHaveText('3');
+      await expect(page.locator('.cm-kurlo-issue-announcer')).toHaveText('Line 3: Expected property name');
+      await expect(issue).toBeHidden();
+      await fillCodeEditor(page, 'request-body-editor', `{\n  "name": "x",\n  "age": 3,,\n${Array.from({ length: 80 }, (_, i) => `  "k${i}": ${i},`).join('\n')}\n  "ok": true\n}`);
+      await page.getByTestId('request-body-editor').locator('.cm-scroller').evaluate(element => { element.scrollTop = element.scrollHeight; });
+      await expect(issue).toHaveText(/^Line 3\s*Expected property name/);
+      await page.screenshot({ path: join(tmpdir(), `kurlo-editor-issue-offscreen-${test.info().project.name}.png`), animations: 'disabled' });
+      await issue.click();
+      await expect(page.locator('.cm-lineNumbers .cm-activeLineGutter')).toHaveText('3');
+      await expect(issue).toBeHidden();
+      expect(await page.locator('.cm-lintRange-error').first().evaluate(element => {
+        const style = getComputedStyle(element);
+        return { gradient: style.backgroundImage.includes('linear-gradient'), decoration: style.textDecorationLine };
+      })).toEqual({ gradient: true, decoration: 'none' });
+      await page.locator('.cm-lintRange-error').first().hover();
+      await expect(page.locator('.cm-tooltip-lint .cm-diagnosticSource')).toHaveText('Line 3 · JSON');
+      await page.screenshot({ path: join(tmpdir(), `kurlo-editor-issue-tooltip-${test.info().project.name}.png`), animations: 'disabled' });
+      await fillCodeEditor(page, 'request-body-editor', '{ "ok": true }');
+      await expect(issue).toBeHidden();
+      await expect(page.locator('.cm-kurlo-issue-line')).toHaveCount(0);
+    } else {
+      await expect(page.locator('.cm-kurlo-issue-announcer')).toHaveText('Line 1: Arguments must be a JSON object.');
+      await expect(issue).toBeHidden();
+      await expect(page.locator('.mcp-notice')).toHaveCount(0);
+    }
+    await page.screenshot({ path: join(tmpdir(), `kurlo-editor-issue-${kind}-${test.info().project.name}.png`), animations: 'disabled' });
+  });
+}
+
+test('draws the body caret with the deleted character and keeps it in place after folding', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'caret-col', workspaceId: 'workspace-e2e', name: 'Caret' }],
+    activeId: 'caret', openIds: ['caret'],
+    requests: [{ id: 'caret', name: 'Caret', collectionId: 'caret-col', collection: 'Caret', requestType: 'http', method: 'POST', url: 'https://example.test',
+      bodyType: 'json', bodyContent: '{\n  "name": "kurlo",\n  "age": 1\n}', auth: { type: 'none' } }],
+  });
+  await page.goto('/');
+  await chooseRequestSection(page, 'Body');
+  const body = page.getByTestId('request-body-editor');
+  await body.locator('.cm-line').nth(1).click();
+  await page.keyboard.press('End');
+  await page.keyboard.type('xy');
+  const measurement = await body.evaluateHandle(root => {
+    const frame = new Promise(resolve => {
+      root.addEventListener('keyup', () => requestAnimationFrame(() => {
+        const line = root.querySelectorAll('.cm-line')[1];
+        const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+        let last: Text | null = null;
+        while (walker.nextNode()) if (walker.currentNode.textContent) last = walker.currentNode as Text;
+        const range = document.createRange();
+        if (last) range.setStart(last, last.length);
+        range.collapse(true);
+        const caret = root.querySelector('.cm-cursor-primary')?.getBoundingClientRect();
+        resolve({
+          text: line.textContent,
+          aligned: !!last && !!caret && Math.abs(caret.left - range.getBoundingClientRect().left) <= 1,
+          nativeCaret: getComputedStyle(line).caretColor,
+        });
+      }), { once: true });
+    });
+    return { frame };
+  });
+  await page.keyboard.press('Backspace');
+  expect(await measurement.evaluate(result => result.frame)).toEqual({ text: '  "name": "kurlo",x', aligned: true, nativeCaret: 'rgba(0, 0, 0, 0)' });
+  await measurement.dispose();
+
+  await body.locator('.cm-foldGutter .cm-gutterElement').nth(1).click();
+  await expect(body.locator('.cm-foldPlaceholder')).toBeVisible();
+  expect(await page.evaluate(() => {
+    const selection = getSelection();
+    return { focused: document.activeElement?.classList.contains('cm-content'), text: selection?.focusNode?.textContent, offset: selection?.focusOffset };
+  })).toEqual({ focused: true, text: '}', offset: 1 });
+  await expect.poll(async () => {
+    const caret = await body.locator('.cm-cursor-primary').boundingBox();
+    const line = await body.locator('.cm-line').first().boundingBox();
+    return Boolean(caret && line && caret.y >= line.y - 2 && caret.y + caret.height <= line.y + line.height + 2);
+  }).toBe(true);
 });
