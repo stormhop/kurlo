@@ -143,7 +143,6 @@
     return { value: environment.id, label: environment.name, hint: `${count} ${count === 1 ? 'variable' : 'variables'}`, color: environmentColorVar(environment) };
   }));
 
-  let authMenuOpen = $state(false);
   let savingInFlight = $state(false);
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
   let pendingAutosave: AutosaveDraft | null = null;
@@ -205,7 +204,6 @@
     loadedCollectionId = settingsKey(next);
     loadedFingerprint = incomingFingerprint(next);
     externalUpdate = false;
-    authMenuOpen = false;
     if (isFolder) {
       const folder = folderDefaultsFor(next, folderPath) ?? emptyFolderDefaults(folderPath);
       folderId = folder.id;
@@ -230,7 +228,6 @@
     const pins = normalizeCollectionEnvironmentPins(next);
     pinnedEnvironmentIds = [...(pins.environmentIds ?? [])];
     defaultEnvironmentId = pins.defaultEnvironmentId ?? '';
-    authMenuOpen = false;
   }
 
   function togglePinnedEnvironment(environmentId: string, pinned: boolean) {
@@ -725,7 +722,7 @@
                 <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={variableSuggestions} placeholder="Header" pickerOptions={HEADER_PICKER_NAMES} pickerLabel="Header names" oninput={() => guardTrailing(headers, i)} />
                 <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={variableSuggestions} placeholder="Value" pickerOptions={getHeaderValues(row.key)} pickerLabel="Header values" oninput={() => guardTrailing(headers, i)} />
                 <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-                <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(headers, i)} aria-label="Remove header">✕</button>
+                <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(headers, i)} aria-label="Remove header"><AddCloseIcon /></button>
               </div>
             {/each}
           </div>
@@ -750,7 +747,7 @@
                 <button class="env-type-toggle" class:secret={row.secret} type="button" onclick={() => (row.secret = !row.secret)} disabled={!row.key && !row.value}>{row.secret ? 'Secret' : 'Default'}</button>
                 <input class="field field-bare kv-input" type={row.secret ? 'password' : 'text'} bind:value={row.value} placeholder="https://api.example.com" oninput={() => guardTrailing(variables, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
                 <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-                <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(variables, i)} aria-label="Remove variable">✕</button>
+                <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(variables, i)} aria-label="Remove variable"><AddCloseIcon /></button>
               </div>
             {/each}
           </div>
@@ -758,22 +755,13 @@
           <div class="auth-section collection-auth-section">
             <div class="auth-type-column">
               <span class="field-label">Auth type</span>
-              <div class="auth-select">
-                <button class="field select-trigger auth-select-trigger" type="button" onclick={() => (authMenuOpen = !authMenuOpen)} aria-label="Auth type" aria-expanded={authMenuOpen}>
-                  <span>{authOptions.find(option => option.value === auth.type)?.label ?? 'No auth'}</span>
-                  <svg width="0.625rem" height="0.4375rem" viewBox="0 0 10 7" fill="none" aria-hidden="true"><path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                </button>
-                {#if authMenuOpen}
-                  <div class="menu auth-select-menu">
-                    {#each authOptions as option, eachIndex (eachIndex)}
-                      <button class="menu-item" class:active={auth.type === option.value} type="button" onclick={() => { auth.type = option.value; authMenuOpen = false; }}>
-                        {#if auth.type === option.value}<span class="auth-check">✓</span>{:else}<span class="auth-check"></span>{/if}
-                        <span>{option.label}</span>
-                      </button>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
+              <Select
+                className="auth-select"
+  floating
+                ariaLabel="Auth type"
+                bind:value={auth.type}
+                options={authOptions.map(option => ({ value: option.value, label: option.label }))}
+              />
             </div>
             <div class="auth-fields">
               {#if auth.type === 'bearer'}

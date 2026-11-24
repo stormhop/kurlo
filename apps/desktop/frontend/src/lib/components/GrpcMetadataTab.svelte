@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { rem } from '../uiScale';
   import { vm } from '../stores/app.svelte';
   import { activeCount, guardTrailing, removeRow } from '../utils';
@@ -26,7 +27,7 @@
       <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={vm.variableSuggestions} placeholder="Metadata key" oninput={() => guardTrailing(vm.grpcMetadata, i)} />
       <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => guardTrailing(vm.grpcMetadata, i)} />
       <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-      <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.grpcMetadata, i)} aria-label="Remove">✕</button>
+      <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.grpcMetadata, i)} aria-label="Remove"><AddCloseIcon /></button>
     </div>
   {/each}
 </div>

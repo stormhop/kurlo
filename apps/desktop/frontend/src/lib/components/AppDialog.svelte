@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { trapFocus } from '../a11y';
   import type { AppDialogState } from '../types/dialog';
@@ -41,7 +43,7 @@
   };
 </script>
 
-<div class="dialog-backdrop" role="presentation" onmousedown={(event) => event.target === event.currentTarget && onDismiss()}>
+<div class="dialog-backdrop dialog-backdrop-top" role="presentation" onmousedown={(event) => event.target === event.currentTarget && onDismiss()}>
   <div class="modal app-dialog" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title" tabindex="-1" use:trapFocus>
     <div class="modal-head dialog-head">
       <h2 class="modal-title" id="app-dialog-title">{dialog.title}</h2>
@@ -178,7 +180,7 @@
                 <strong>{opt.label}</strong>
                 {#if opt.description}<small>{opt.description}</small>{/if}
               </span>
-              <span class="dialog-choice-check">{inputValue === opt.value ? '✓' : ''}</span>
+              <span class="dialog-choice-check">{#if inputValue === opt.value}<CheckIcon />{/if}</span>
             </button>
           {/each}
         </div>
@@ -193,9 +195,7 @@
             onkeydown={onSelectKeydown}
           >
             <span>{selectLabel()}</span>
-            <svg width="0.625rem" height="0.4375rem" viewBox="0 0 10 7" fill="none" aria-hidden="true">
-              <path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
+            <Chevron />
           </button>
           {#if selectOpen}
             <div class="menu dialog-select-menu" role="listbox">
@@ -210,7 +210,7 @@
                   type="button"
                   onclick={() => onChooseOption(opt.value)}
                 >
-                  <span class="dialog-select-check">{inputValue === opt.value ? '✓' : ''}</span>
+                  <span class="dialog-select-check">{#if inputValue === opt.value}<CheckIcon />{/if}</span>
                   <span>{opt.label}</span>
                 </button>
               {/each}

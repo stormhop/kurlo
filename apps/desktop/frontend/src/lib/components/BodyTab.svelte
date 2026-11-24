@@ -1,4 +1,7 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { rem } from '../uiScale';
   import { vm } from '../stores/app.svelte';
   import { guardTrailing, removeRow } from '../utils';
@@ -90,18 +93,16 @@
                 aria-expanded={vm.openFormTypeMenuId === row.id}
               >
                 <span>{row.isFile ? 'File' : 'Text'}</span>
-                <svg width="0.5625rem" height="0.375rem" viewBox="0 0 9 6" fill="none" aria-hidden="true">
-                  <path d="M1 1.4l3.5 3.2L8 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <Chevron />
               </button>
               {#if vm.openFormTypeMenuId === row.id}
                 <div class="menu form-type-options" use:portal style="top: {formTypeMenuPos.top}px; left: {formTypeMenuPos.left}px;">
                   <button class="menu-item" class:active={!row.isFile} type="button" onclick={() => vm.setFormRowKind(row, 'text', i)}>
-                    <span class="form-type-check">{!row.isFile ? '✓' : ''}</span>
+                    <span class="form-type-check">{#if !row.isFile}<CheckIcon />{/if}</span>
                     Text
                   </button>
                   <button class="menu-item" class:active={row.isFile} type="button" onclick={() => vm.setFormRowKind(row, 'file', i)}>
-                    <span class="form-type-check">{row.isFile ? '✓' : ''}</span>
+                    <span class="form-type-check">{#if row.isFile}<CheckIcon />{/if}</span>
                     File
                   </button>
                   <div
@@ -140,7 +141,7 @@
             <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => guardTrailing(vm.formRows, i)} />
           {/if}
           <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-          <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.formRows, i)} aria-label="Remove">✕</button>
+          <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.formRows, i)} aria-label="Remove"><AddCloseIcon /></button>
         </div>
       {/each}
     </div>
@@ -172,7 +173,7 @@
           <VariableInput className="field field-bare kv-input" bind:value={row.key} suggestions={vm.variableSuggestions} placeholder="Key" oninput={() => guardTrailing(vm.formRows, i)} />
           <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => { row.isFile = false; row.fileName = undefined; guardTrailing(vm.formRows, i); }} />
           <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-          <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.formRows, i)} aria-label="Remove">✕</button>
+          <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.formRows, i)} aria-label="Remove"><AddCloseIcon /></button>
         </div>
       {/each}
     </div>

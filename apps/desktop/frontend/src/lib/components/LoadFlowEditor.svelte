@@ -337,7 +337,7 @@
                     </button>
                     <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step up" disabled={disabled || index === 0} onclick={() => moveStep(index, -1)}>↑</button>
                     <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step down" disabled={disabled || index === steps.length - 1} onclick={() => moveStep(index, 1)}>↓</button>
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove step" {disabled} onclick={() => removeStep(index)}>✕</button>
+                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove step" {disabled} onclick={() => removeStep(index)}><AddCloseIcon /></button>
                   </div>
                 </div>
                 <LoadValidationMessages problems={loadStepStructuralErrors(loadStepErrors(problems, index))} />
@@ -439,7 +439,7 @@
               <input class="field field-mono loadtest-var" value={extract.var} placeholder="token" aria-label="Variable name" aria-invalid={errors.name.length > 0} spellcheck="false" {disabled} oninput={(event) => (extract.var = inputValue(event))} autocomplete="off" autocorrect="off" autocapitalize="none" />
               <Select className="loadtest-source" ariaLabel="Source" value={extract.from} options={EXTRACT_SOURCES} {disabled} onChange={(value) => (extract.from = value)} />
               <input class="field field-mono loadtest-grow" value={extract.path} placeholder={extract.from === 'header' ? 'X-Request-Id' : extract.from === 'regex' ? 'id=(\\w+)' : '$.access_token'} aria-label="Path" aria-invalid={errors.path.length > 0} spellcheck="false" {disabled} oninput={(event) => (extract.path = inputValue(event))} autocomplete="off" autocorrect="off" autocapitalize="none" />
-              <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove saved value" {disabled} onclick={() => removeExtract(step, index)}>✕</button>
+              <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove saved value" {disabled} onclick={() => removeExtract(step, index)}><AddCloseIcon /></button>
             </div>
             <LoadValidationMessages problems={[...errors.name, ...errors.path, ...errors.source]} />
           </div>
@@ -457,7 +457,7 @@
             <div class="loadtest-rule-line loadtest-check-line">
               <Select className="loadtest-check-type" ariaLabel="Check" value={check.type} options={CHECK_TYPES} {disabled} onChange={(value) => setCheckType(check, value)} />
               <input class="field field-mono loadtest-grow" value={check.type === 'jsonExists' ? check.path ?? '' : check.value ?? ''} aria-label="Expected value" aria-invalid={errors.length > 0} spellcheck="false" {disabled} oninput={(event) => setCheckInput(check, inputValue(event))} autocomplete="off" autocorrect="off" autocapitalize="none" />
-              <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove check" {disabled} onclick={() => removeCheck(step, index)}>✕</button>
+              <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove check" {disabled} onclick={() => removeCheck(step, index)}><AddCloseIcon /></button>
             </div>
             <LoadValidationMessages problems={errors} />
           </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Select from './Select.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
   import RequestShortcutHint from './RequestShortcutHint.svelte';
@@ -26,35 +27,14 @@
 <div class="body-section">
   <div class="body-editor-wrap ws-body-editor-wrap" class:connected-message-editor={vm.webSocketConnected} role="presentation" onkeydowncapture={onKeydown}>
     <div class="body-editor-toolbar ws-message-toolbar">
-      <div class="raw-type-menu ws-type-menu">
-        <button
-          class="field field-sm select-trigger raw-type-button"
-          class:open={vm.wsMessageTypeMenuOpen}
-          type="button"
-          onclick={() => (vm.wsMessageTypeMenuOpen = !vm.wsMessageTypeMenuOpen)}
-        >
-          {vm.webSocketMessageTypeLabel()}
-          <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-            <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-        {#if vm.wsMessageTypeMenuOpen}
-          <div class="menu raw-type-list ws-type-options" role="listbox">
-            {#each WS_MESSAGE_TYPES as type, eachIndex (eachIndex)}
-              <button class="menu-item"
-                class:active={vm.webSocketMessageBodyType() === type}
-                role="option"
-                aria-selected={vm.webSocketMessageBodyType() === type}
-                type="button"
-                onclick={() => { vm.setWebSocketMessageBodyType(type); vm.wsMessageTypeMenuOpen = false; }}
-              >
-                <span class="method-check">{vm.webSocketMessageBodyType() === type ? '✓' : ''}</span>
-                {vm.webSocketMessageTypeLabel(type)}
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
+      <Select
+        className="raw-type-menu ws-type-menu"
+        size="sm"
+        ariaLabel="Message type"
+        value={vm.webSocketMessageBodyType()}
+        options={WS_MESSAGE_TYPES.map(type => ({ value: type, label: vm.webSocketMessageTypeLabel(type) }))}
+        onChange={type => vm.setWebSocketMessageBodyType(type as WebSocketMessageBodyType)}
+      />
 
       <BeautifyButton onbeautify={() => editorRef?.format()} beautified={vm.beautifiedBody} disabled={vm.bodyLang !== 'json'} title="Beautify message" />
 

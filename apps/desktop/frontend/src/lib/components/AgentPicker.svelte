@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import AgentGlyph from './AgentGlyph.svelte';
@@ -222,7 +223,7 @@
       <span class="agent-glyph agent-glyph-kurlo" aria-hidden="true"><KurloGlyph size="0.8125rem" /></span>
     {/if}
     <span class="agent-picker-summary">{summary}</span>
-    <svg class="agent-picker-chevron" width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2.5 3.75 5 6.25l2.5-2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <Chevron class="agent-picker-chevron" />
   </button>
 
   {#if open}
@@ -366,7 +367,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .agent-picker-chevron {
+  :global(.agent-picker-chevron) {
     flex: 0 0 auto;
     color: var(--text-3);
   }
@@ -392,7 +393,7 @@
     width: 1.5rem;
     height: 1.5rem;
     border-radius: var(--radius-md);
-    font-size: 0.625rem;
+    font-size: var(--text-micro);
   }
   .agent-glyph-codex {
     background: var(--text);

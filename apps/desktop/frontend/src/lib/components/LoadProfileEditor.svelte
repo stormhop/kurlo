@@ -258,7 +258,7 @@
               <span role="cell" class="loadtest-stage-name">{index + 1}<small>{previous} → {stage.target}</small></span>
               <span role="cell"><input class="field field-mono loadtest-duration" value={formatDuration(stage.durationMs)} aria-label={`Stage ${index + 1} duration`} aria-invalid={problems.includes(`Stage ${index + 1} needs a duration.`)} spellcheck="false" {disabled} onchange={(event) => durationInput(event, stage.durationMs, ms => (stage.durationMs = ms))} autocomplete="off" autocorrect="off" autocapitalize="none" /></span>
               <span role="cell"><input class="field field-mono loadtest-number" type="number" min="0" value={stage.target} aria-label={`Stage ${index + 1} target`} {disabled} oninput={(event) => (stage.target = Math.max(0, Math.round(Number(inputValue(event)) || 0)))} /></span>
-              <span role="cell"><button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Remove stage ${index + 1}`} {disabled} onclick={() => removeStage(index)}>✕</button></span>
+              <span role="cell"><button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Remove stage ${index + 1}`} {disabled} onclick={() => removeStage(index)}><AddCloseIcon /></button></span>
             </div>
             <LoadValidationMessages problems={problems.filter(problem => problem.startsWith(`Stage ${index + 1} `) || problem.startsWith(`Stage ${index + 1}:`))} />
           {/each}
@@ -318,7 +318,7 @@
               <input class="check" type="checkbox" checked={Boolean(threshold.abortOnFail)} {disabled} onchange={(event) => setAbort(threshold, event.currentTarget.checked)} />
               Stop the test early
             </label>
-            <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove threshold" {disabled} onclick={() => removeThreshold(index)}>✕</button>
+            <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove threshold" {disabled} onclick={() => removeThreshold(index)}><AddCloseIcon /></button>
           </span>
         </div>
         <LoadValidationMessages problems={problems.filter(problem => problem.startsWith(`Threshold ${index + 1}:`) || problem.startsWith(`Threshold ${index + 1} `))} />

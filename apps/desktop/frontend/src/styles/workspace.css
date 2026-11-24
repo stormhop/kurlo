@@ -4320,7 +4320,7 @@
 
 .runner-drag-dots {
   color: var(--text-3);
-  font-size: 0.9375rem;
+  font-size: var(--text-title);
   letter-spacing: -0.1875rem;
 }
 

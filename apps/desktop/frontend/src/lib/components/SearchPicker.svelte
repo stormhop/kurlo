@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import { tick } from 'svelte';
 
   type PickerOption = { value: string; label: string; hint?: string; color?: string };
@@ -163,9 +164,7 @@
 <div class="search-picker {className}" bind:this={wrap} onfocusout={closeOnFocusOut}>
   <button bind:this={trigger} class="field search-picker-trigger" type="button" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} {disabled} onclick={toggle} onkeydown={onTriggerKeydown}>
     <span class="search-picker-placeholder">{placeholder}</span>
-    <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
+    <Chevron />
   </button>
   {#if open}
     <div class="search-picker-menu" class:search-picker-up={upward} bind:this={menu} role="dialog" aria-label={ariaLabel} tabindex="-1" onkeydown={onKeydown}>
@@ -220,12 +219,12 @@
     text-align: left;
     cursor: pointer;
   }
-  .search-picker-trigger svg {
+  .search-picker-trigger :global(svg) {
     flex: 0 0 auto;
     color: var(--text-3);
     transition: transform var(--dur-fast);
   }
-  .search-picker-trigger[aria-expanded='true'] svg { transform: rotate(180deg); }
+  .search-picker-trigger[aria-expanded='true'] :global(svg) { transform: rotate(180deg); }
   .search-picker-placeholder {
     flex: 1 1 auto;
     min-width: 0;

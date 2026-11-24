@@ -30,8 +30,10 @@ test.describe("Kurlo desktop browser E2E", () => {
     });
     await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
     const runner = page.getByRole('region', { name: 'Collection runner' });
-    await runner.locator('.runner-select .app-select-trigger').click();
-    await runner.getByRole('option', { name: 'Secret preflight' }).click();
+    const collection = runner.getByRole('button', { name: /^Collection:/ });
+    await collection.click();
+    await runner.getByRole('listbox', { name: 'Collection', exact: true }).getByRole('option', { name: 'Secret preflight', exact: true }).click();
+    await expect(collection).toHaveAccessibleName('Collection: Secret preflight');
     await runner.getByRole('button', { name: 'Run 3 requests' }).click();
     await expect(runner.getByRole('alert', { name: 'Linked secret preflight errors' })).toContainText('Run stopped before sending requests');
     await expect(runner.getByRole('alert', { name: 'Linked secret preflight errors' })).toContainText('vault:missing#token');

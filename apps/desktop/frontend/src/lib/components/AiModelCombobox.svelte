@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import { tick } from 'svelte';
   import type { AiConnectionModel } from '../backend';
@@ -121,9 +122,7 @@
 <div class="ai-combo" bind:this={wrap} onfocusout={closeOnFocusOut}>
   <button class="field ai-combo-trigger" type="button" aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={open} onclick={toggle}>
     <span class="ai-combo-value" class:ai-combo-placeholder={!label}>{label || placeholder}</span>
-    <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
+    <Chevron />
   </button>
   {#if open}
     <div class="ai-combo-menu" class:ai-combo-up={upward} style={menuStyle} role="dialog" aria-label={ariaLabel} tabindex="-1" onkeydown={onKeydown}>
@@ -190,7 +189,7 @@
     cursor: pointer;
     color: var(--text);
   }
-  .ai-combo-trigger svg { flex: 0 0 auto; color: var(--text-3); }
+  .ai-combo-trigger :global(svg) { flex: 0 0 auto; color: var(--text-3); }
   .ai-combo-value {
     flex: 1 1 auto;
     min-width: 0;

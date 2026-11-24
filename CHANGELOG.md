@@ -9,11 +9,13 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
+- **Consistent controls.** Auth type, raw body type, WebSocket and Socket.IO message types, binary encoding, the message filter and the snippet language use the same dropdown as the rest of the app, with the same size, keyboard navigation and closing behaviour. Close buttons, checkmarks and chevrons are drawn with one set of icons, the YAML and `kurlo-agent.md` editors open over the same backdrop as other dialogs, and the Browser sync switch matches the other switches.
 - **Editor errors.** The line with a JSON, GraphQL or YAML error has its number marked in red and a wavy underline in the theme's colour. Hovering shows the message with its line in the app font. When the line is scrolled out of view, a note in the corner names it and takes you there. MCP arguments that are not a JSON object are marked in the editor instead of a second message below it, and the File tab and YAML editor show a syntax error once, in the editor.
 
 ### Fixed
 
 - **Query parameters.** Desktop, Collection Runner, CLI and MCP send saved query parameters once per occurrence. Sending a pasted URL keeps encoded values and flags such as `?preview`. After importing a Postman collection or an HTTP file, editing the path or one parameter keeps the other parameters.
+- **Collection Runner accessibility.** The collection picker exposes the selected collection and each option by name on macOS.
 - **Editor caret.** In request bodies, messages, arguments and other code editors the caret moves back with a deleted character at once instead of a moment later, as it already did in scripts and the File tab.
 - **Folding.** Folding a block keeps the editor focused and puts the caret after the folded block on its line instead of drawing it above the line.
 

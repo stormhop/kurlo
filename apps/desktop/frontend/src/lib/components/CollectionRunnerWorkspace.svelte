@@ -152,16 +152,17 @@
   <aside class="collection-runner-config">
     <div class="runner-group">
       <div class="runner-section-title">What to run</div>
-      <label class="runner-field">
+      <div class="runner-field">
         <span>Collection</span>
         <Select
           value={selectedCollectionId}
           options={collectionOptions}
+          ariaLabel="Collection"
           className="runner-select"
           disabled={running || !collections.length}
           onChange={onSelectCollection}
         />
-      </label>
+      </div>
       <label class="runner-field">
         <span>Only requests tagged</span>
         <input class="field" value={includeTags} placeholder="e.g. smoke, regression" aria-label="Include tags" oninput={(event) => onSetIncludeTags(inputValue(event))} disabled={running} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
@@ -264,7 +265,7 @@
       <section class="runner-preflight-alert" role="alert" aria-label="Linked secret preflight errors">
         <div class="runner-preflight-heading">
           <strong>Run stopped before sending requests</strong>
-          <button class="btn btn-ghost btn-icon" type="button" aria-label="Dismiss linked secret errors" onclick={onDismissPreflightFailures}>×</button>
+          <button class="btn btn-ghost btn-icon" type="button" aria-label="Dismiss linked secret errors" onclick={onDismissPreflightFailures}><AddCloseIcon /></button>
         </div>
         <p>Resolve the linked secrets below, then run the collection again.</p>
         <ul>

@@ -867,7 +867,6 @@ class AppVM {
   declare toggleHistoryEntryMenu: typeof menuFeature.toggleHistoryEntryMenu;
   declare toggleWorkspaceMenu: typeof menuFeature.toggleWorkspaceMenu;
   declare toggleEnvironmentMenu: typeof menuFeature.toggleEnvironmentMenu;
-  declare toggleAuthMenu: typeof menuFeature.toggleAuthMenu;
   declare toggleFormTypeMenu: typeof menuFeature.toggleFormTypeMenu;
   declare onWindowMouseDown: typeof menuFeature.onWindowMouseDown;
 
@@ -1200,8 +1199,6 @@ class AppVM {
   graphqlSchemaError = $state('');
   bodyFilePath = $state('');
   bodyFileName = $state('');
-  rawTypeMenuOpen = $state(false);
-  authMenuOpen = $state(false);
 
   preRequestScriptJs = $state('');
   testScriptJs = $state('');
@@ -1264,7 +1261,6 @@ class AppVM {
   _wsHistoryRecorded = new Set<string>();
   _wsTouchedAt = new Map<string, number>();
   wsResponseTab = $state<'messages' | 'headers'>('messages');
-  wsMessageTypeMenuOpen = $state(false);
   socketIOSessions = $state<Map<string, SocketIOSession>>(new Map());
   _sioEntryCounter = 0;
   _sioPendingMessages = new Map<string, SocketIOMessageEntry[]>();
@@ -1346,7 +1342,6 @@ class AppVM {
   codePanelOpen = $state(false);
   codePanelWidth = $state(330);
   snippetLanguage = $state<SnippetLanguage>('curl');
-  snippetMenuOpen = $state(false);
   snippetTextCache = $state('');
   snippetRenderedLinesCache = $state<RenderedSnippetLine[]>([]);
   snippetRenderKey = '';

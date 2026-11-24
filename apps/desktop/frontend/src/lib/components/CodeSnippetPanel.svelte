@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Select from './Select.svelte';
   import {
     SNIPPET_LABELS,
     SNIPPET_LANGUAGES,
@@ -14,7 +15,6 @@
     lines,
     codePanelOpen,
     snippetLanguage,
-    snippetMenuOpen = $bindable(false),
     copiedSnippet,
     onSnippetLanguageChange,
     onCopy,
@@ -24,7 +24,6 @@
     lines: RenderedSnippetLine[];
     codePanelOpen: boolean;
     snippetLanguage: SnippetLanguage;
-    snippetMenuOpen: boolean;
     copiedSnippet: boolean;
     onSnippetLanguageChange: (language: SnippetLanguage) => void;
     onCopy: () => void;
@@ -32,10 +31,6 @@
     onDividerKeydown: (event: KeyboardEvent) => void;
   } = $props();
 
-  function selectLanguage(language: SnippetLanguage) {
-    onSnippetLanguageChange(language);
-    snippetMenuOpen = false;
-  }
 </script>
 
 <div class="code-snippet-content">
@@ -49,33 +44,14 @@
     ></button>
   {/if}
   <div class="code-panel-toolbar">
-    <div class="snippet-select">
-      <button
-        class="btn btn-ghost select-trigger snippet-select-trigger"
-        type="button"
-        onclick={() => (snippetMenuOpen = !snippetMenuOpen)}
-        aria-label="Snippet language"
-        aria-expanded={snippetMenuOpen}
-      >
-        <span>{SNIPPET_LABELS[snippetLanguage]}</span>
-        <svg width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-          <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </button>
-      {#if snippetMenuOpen}
-        <div class="menu snippet-select-menu">
-          {#each SNIPPET_LANGUAGES as language, eachIndex (eachIndex)}
-            <button class="menu-item"
-              class:active={snippetLanguage === language}
-              type="button"
-              onclick={() => selectLanguage(language)}
-            >
-              {SNIPPET_LABELS[language]}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <Select
+      className="snippet-select"
+      size="md"
+      ariaLabel="Snippet language"
+      value={snippetLanguage}
+      options={SNIPPET_LANGUAGES.map(language => ({ value: language, label: SNIPPET_LABELS[language] }))}
+      onChange={language => onSnippetLanguageChange(language as SnippetLanguage)}
+    />
     <button class="btn btn-ghost code-copy-btn" class:feedback-ok={copiedSnippet} onclick={onCopy} type="button">
       {#if copiedSnippet}
         <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none"><path d="M2 6.5l3 3 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>

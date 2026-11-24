@@ -8,6 +8,10 @@
   background: var(--scrim);
 }
 
+.dialog-backdrop-top {
+  z-index: 310;
+}
+
 .app-dialog {
   width: min(26.25rem, 100%);
   color: var(--text);

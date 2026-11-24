@@ -408,7 +408,7 @@ test.describe('Request toolbar and sidebar menu placement', () => {
     await panel.getByLabel('Snippet language').click();
     await toggle.click();
     await toggle.click();
-    await expect(panel.locator('.snippet-select-menu')).toHaveCount(0);
+    await expect(panel.locator('.snippet-select .app-select-menu')).toHaveCount(0);
     await expect(panel).toBeVisible();
     await expect.poll(() => panel.evaluate(node => node.getAnimations().length)).toBe(0);
     const resizer = panel.getByLabel('Resize code snippet panel');

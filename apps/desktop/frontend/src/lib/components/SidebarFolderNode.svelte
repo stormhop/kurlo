@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS } from '../constants';
   import SidebarFolderNode from './SidebarFolderNode.svelte';
@@ -74,9 +75,7 @@
 <div class="collection-tree-node" style={`--tree-depth: ${depth}`}>
   <div class="collection-subfolder" role="presentation" oncontextmenu={(event) => { event.preventDefault(); toggleFolderMenu(folder.key, event); }}>
     <button class="subfolder-collapse" type="button" onclick={() => toggleFolderCollapsed(collectionId, folder.path)} aria-label={folder.collapsed ? 'Expand folder' : 'Collapse folder'}>
-      <svg class:collapsed={folder.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-        <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <Chevron collapsed={folder.collapsed} />
     </button>
     <svg class="folder-icon" width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M1.5 3.2h3l1.1 1.1h5.9v5.5a1.2 1.2 0 01-1.2 1.2H2.7a1.2 1.2 0 01-1.2-1.2V3.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
     <span class="folder-title">{folder.name}</span>

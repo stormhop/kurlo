@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { rem } from '../uiScale';
   import { vm } from '../stores/app.svelte';
   import { activeCount, guardTrailing, removeRow } from '../utils';
@@ -29,7 +30,7 @@
       <input class="field field-bare kv-input" bind:value={row.key} placeholder="userId" oninput={() => guardTrailing(vm.requestVars, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
       <VariableInput className="field field-bare kv-input" bind:value={row.value} suggestions={vm.variableSuggestions} placeholder="Value" oninput={() => guardTrailing(vm.requestVars, i)} />
       <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-      <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.requestVars, i)} aria-label="Remove variable">✕</button>
+      <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.requestVars, i)} aria-label="Remove variable"><AddCloseIcon /></button>
     </div>
   {/each}
 </div>
@@ -56,7 +57,7 @@
         <input class="field field-bare kv-input" bind:value={row.key} placeholder="token" oninput={() => guardTrailing(vm.postResponseVars, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
         <input class="field field-bare kv-input field-mono" bind:value={row.value} placeholder="res.body.token" oninput={() => guardTrailing(vm.postResponseVars, i)} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
         <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-        <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.postResponseVars, i)} aria-label="Remove variable">✕</button>
+        <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.postResponseVars, i)} aria-label="Remove variable"><AddCloseIcon /></button>
       </div>
     {/each}
   </div>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Select from './Select.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
@@ -29,15 +30,6 @@
     return map[type] ?? type;
   }
 
-  let typeMenuOpenId = $state<string | null>(null);
-  let encodingMenuOpen = $state(false);
-
-  function closeMenus() { typeMenuOpenId = null; encodingMenuOpen = false; }
-
-  $effect(() => {
-    window.addEventListener('click', closeMenus);
-    return () => window.removeEventListener('click', closeMenus);
-  });
 
   const currentArg = $derived(vm.sioCurrentArg());
   const currentArgIdx = $derived.by(() => {
@@ -67,8 +59,9 @@
             <button
               class="btn btn-ghost btn-icon btn-xs sio-arg-del"
               type="button"
+              aria-label="Remove argument"
               onclick={(e) => { e.stopPropagation(); vm.sioRemoveArg(arg.id); }}
-            >✕</button>
+            ><AddCloseIcon /></button>
           </div>
         {/each}
         <button class="btn btn-dashed btn-sm sio-add-arg-btn" type="button" onclick={vm.sioAddArg}>
@@ -83,67 +76,25 @@
 
         <div class="sio-editor-toolbar">
 
-          <div class="sio-type-menu">
-            <button
-              class="field field-sm select-trigger raw-type-button"
-              class:open={typeMenuOpenId === currentArg.id}
-              type="button"
-              onclick={(e) => { e.stopPropagation(); typeMenuOpenId = typeMenuOpenId === currentArg.id ? null : currentArg.id; encodingMenuOpen = false; }}
-            >
-              {bodyTypeLabel(currentArg.bodyType)}
-              <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-            </button>
-            {#if typeMenuOpenId === currentArg.id}
-              <div class="menu raw-type-list sio-type-options" role="listbox">
-                {#each RAW_BODY_TYPES as type, eachIndex (eachIndex)}
-                  <button class="menu-item"
-                    class:active={currentArg.bodyType === type}
-                    role="option"
-                    aria-selected={currentArg.bodyType === type}
-                    type="button"
-                    onclick={(e) => { e.stopPropagation(); vm.sioUpdateCurrentArg({ bodyType: type }); typeMenuOpenId = null; }}
-                  >
-                    <span class="method-check">{currentArg.bodyType === type ? '✓' : ''}</span>
-                    {bodyTypeLabel(type)}
-                  </button>
-                {/each}
-              </div>
-            {/if}
-          </div>
+          <Select
+            className="raw-type-menu sio-type-menu"
+            size="sm"
+            ariaLabel="Argument type"
+            value={currentArg.bodyType}
+            options={RAW_BODY_TYPES.map(type => ({ value: type, label: bodyTypeLabel(type) }))}
+            onChange={type => vm.sioUpdateCurrentArg({ bodyType: type as RawBodyType })}
+          />
 
 
           {#if currentArg.bodyType === 'binary'}
-            <div class="sio-type-menu">
-              <button
-                class="field field-sm select-trigger raw-type-button"
-                class:open={encodingMenuOpen}
-                type="button"
-                onclick={(e) => { e.stopPropagation(); encodingMenuOpen = !encodingMenuOpen; typeMenuOpenId = null; }}
-              >
-                {currentArg.encoding === 'hex' ? 'Hex' : 'Base64'}
-                <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-                  <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-              </button>
-              {#if encodingMenuOpen}
-                <div class="menu raw-type-list sio-type-options" role="listbox">
-                  {#each ENCODINGS as enc, eachIndex (eachIndex)}
-                    <button class="menu-item"
-                      class:active={currentArg.encoding === enc}
-                      role="option"
-                      aria-selected={currentArg.encoding === enc}
-                      type="button"
-                      onclick={(e) => { e.stopPropagation(); vm.sioUpdateCurrentArg({ encoding: enc }); encodingMenuOpen = false; }}
-                    >
-                      <span class="method-check">{currentArg.encoding === enc ? '✓' : ''}</span>
-                      {enc === 'hex' ? 'Hex' : 'Base64'}
-                    </button>
-                  {/each}
-                </div>
-              {/if}
-            </div>
+            <Select
+              className="raw-type-menu sio-type-menu"
+              size="sm"
+              ariaLabel="Encoding"
+              value={currentArg.encoding}
+              options={ENCODINGS.map(enc => ({ value: enc, label: enc === 'hex' ? 'Hex' : 'Base64' }))}
+              onChange={enc => vm.sioUpdateCurrentArg({ encoding: enc as typeof currentArg.encoding })}
+            />
           {/if}
 
 
@@ -286,15 +237,6 @@
 
   .sio-toolbar-spacer { flex: 1; }
 
-  .sio-type-menu { position: relative; }
-
-  .sio-type-options {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    z-index: 100;
-    min-width: 5.625rem;
-  }
 
   .sio-event-controls {
     display: flex;

@@ -457,12 +457,12 @@ for (const protocol of [
     await expect(shell).toHaveClass(/compact/);
     await page.getByRole('button', { name: 'Request section', exact: true }).click();
     const sections = page.getByRole('listbox', { name: 'Request sections' });
-    await expect(sections.getByRole('option', { name: '✓ Vars', exact: true })).toHaveCount(1);
+    await expect(sections.getByRole('option', { name: 'Vars', exact: true, selected: true })).toHaveCount(1);
     const compactLabels = await sections.getByRole('option').allTextContents();
     expect(compactLabels.length).toBe(labels.length);
     expect(new Set(compactLabels).size).toBe(compactLabels.length);
     await page.screenshot({ path: join(tmpdir(), `kurlo-sections-${protocol.requestType}-${protocol.method}-${testInfo.project.name}.png`), animations: 'disabled' });
-    await sections.getByRole('option', { name: '✓ Vars', exact: true }).click();
+    await sections.getByRole('option', { name: 'Vars', exact: true, selected: true }).click();
     await expect(page.getByRole('button', { name: 'Request section', exact: true })).toContainText('Vars');
   });
 }

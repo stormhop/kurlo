@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import type { Snippet } from 'svelte';
 
   let {
@@ -49,7 +50,7 @@
   <h3 class="disclosure-heading">
     <button class="disclosure-toggle" type="button" aria-expanded={open} onclick={toggle}>
       <span class="disclosure-title">{title}</span>
-      <svg class="disclosure-chevron" width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <Chevron direction="right" class="disclosure-chevron" />
       {#if summary}<span class="disclosure-summary">{summary}</span>{/if}
     </button>
   </h3>
@@ -88,11 +89,11 @@
   .disclosure-title {
     flex: 0 0 auto;
   }
-  .disclosure-chevron {
+  :global(.disclosure-chevron) {
     flex: 0 0 auto;
     transition: transform 0.12s ease;
   }
-  .open .disclosure-chevron {
+  .open :global(.disclosure-chevron) {
     transform: rotate(90deg);
   }
   .disclosure-summary {
@@ -138,7 +139,7 @@
     padding-top: var(--space-1);
   }
   @media (prefers-reduced-motion: reduce) {
-    .disclosure-chevron {
+    :global(.disclosure-chevron) {
       transition: none;
     }
   }

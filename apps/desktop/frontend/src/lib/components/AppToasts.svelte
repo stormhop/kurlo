@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { vm } from '../stores/app.svelte';
   import { trashEntryLabel } from '../stores/features/trash';
   import { secretProviders } from '../stores/secretProviders.svelte';
@@ -25,7 +26,7 @@
   <div class="undo-toast" role="status" aria-live="polite">
     <span class="undo-toast-text">Deleted {trashEntryLabel(undoEntry).replace(/^\w/, letter => letter.toLowerCase())}</span>
     <button class="btn btn-ghost btn-sm undo-toast-action" type="button" onclick={() => vm.restoreDeleted(undoEntry.id)}>Undo</button>
-    <button class="btn btn-ghost btn-icon btn-xs" type="button" aria-label="Dismiss" onclick={() => vm.dismissUndo()}>✕</button>
+    <button class="btn btn-ghost btn-icon btn-xs" type="button" aria-label="Dismiss" onclick={() => vm.dismissUndo()}><AddCloseIcon /></button>
   </div>
 {/if}
 {#if vm.curlPasteToast}<div class="curl-toast" role="status" aria-live="polite">{vm.curlPasteToast}</div>{/if}

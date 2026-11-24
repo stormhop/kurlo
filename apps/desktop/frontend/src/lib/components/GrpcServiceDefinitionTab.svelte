@@ -80,7 +80,7 @@
           <div class="grpc-proto-row">
             <span class="grpc-proto-icon" aria-hidden="true">&lt;/&gt;</span>
             <span class="grpc-proto-name">{vm.grpcProtoFileName}</span>
-            <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={vm.clearGrpcProtoFile} aria-label="Clear proto file">✕</button>
+            <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={vm.clearGrpcProtoFile} aria-label="Clear proto file"><AddCloseIcon /></button>
           </div>
         {/if}
 

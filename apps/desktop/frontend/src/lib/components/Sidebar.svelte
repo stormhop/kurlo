@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import { loadRunKey } from '../loadTests';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import KurloBird from './KurloBird.svelte';
@@ -837,9 +838,7 @@
             onclick={toggleStarredCollapsed}
             aria-expanded={starredExpanded}
           >
-            <svg class:collapsed={!starredExpanded} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-              <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <Chevron collapsed={!starredExpanded} />
             <span>Starred</span>
             <span class="collection-count">{pinnedRequests.length}</span>
           </button>
@@ -961,9 +960,7 @@
                   </svg>
                 </span>
                 <button class="collection-collapse" type="button" onclick={() => toggleCollectionCollapsed(row.group.collection.id)} aria-label={row.group.collection.collapsed ? 'Expand collection' : 'Collapse collection'} disabled={workspaceBlocked}>
-                  <svg class:collapsed={row.group.collection.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
+                  <Chevron collapsed={row.group.collection.collapsed} />
                 </button>
                 <svg class="collection-root-icon" width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
                   <path d="M2 2.5h9v2H2v-2zM2 5.5h9v2H2v-2zM2 8.5h9v2H2v-2z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
@@ -1037,9 +1034,7 @@
             <div class="collection-tree-node" style={`--tree-depth: ${row.depth}`}>
               <div class="collection-subfolder sidebar-loadtest-group hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation">
                 <button class="subfolder-collapse" type="button" onclick={() => toggleLoadTestGroup(row.collectionId)} aria-label={row.collapsed ? 'Expand load tests' : 'Collapse load tests'} aria-expanded={!row.collapsed}>
-                  <svg class:collapsed={row.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
+                  <Chevron collapsed={row.collapsed} />
                 </button>
                 <span class="folder-title sidebar-loadtest-group-title"><span class="sidebar-loadtest-icon" aria-hidden="true"><MenuIcon name="load" /></span>Load tests</span>
                 <span class="collection-count">{row.count}</span>
@@ -1113,9 +1108,7 @@
             <div class="collection-tree-node" style={`--tree-depth: ${row.depth}`}>
               <div ondragover={(event) => onFolderDragOver(row.collectionId, row.folder.path, event)} ondragleave={onFolderDragLeave} ondrop={(event) => onFolderDrop(row.collectionId, row.folder.path, event)} class:request-drop-target={dragOverFolderKey === folderDropKey(row.collectionId, row.folder.path)} class="collection-subfolder hover-managed" class:hovered={hoveredRowKey === row.key} data-sidebar-hover-key={row.key} role="presentation" oncontextmenu={(event) => { if (workspaceBlocked) return; event.preventDefault(); toggleFolderMenu(row.folder.key, event); }}>
                 <button class="subfolder-collapse" type="button" onclick={() => toggleFolderCollapsed(row.collectionId, row.folder.path)} aria-label={row.folder.collapsed ? 'Expand folder' : 'Collapse folder'} disabled={workspaceBlocked}>
-                  <svg class:collapsed={row.folder.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
+                  <Chevron collapsed={row.folder.collapsed} />
                 </button>
                 <svg class="folder-icon" width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M1.5 3.2h3l1.1 1.1h5.9v5.5a1.2 1.2 0 01-1.2 1.2H2.7a1.2 1.2 0 01-1.2-1.2V3.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
                 <span class="folder-title">{row.folder.name}</span>
@@ -1198,9 +1191,7 @@
           {#each visibleHistoryRows.rows as row (row.key)}
             {#if row.type === 'day'}
               <button class="history-day-toggle" type="button" onclick={() => toggleHistoryDay(row.group.key)} aria-label={row.group.collapsed ? 'Expand history day' : 'Collapse history day'} disabled={workspaceBlocked}>
-                <svg class:collapsed={row.group.collapsed} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                  <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <Chevron collapsed={row.group.collapsed} />
                 <span>{row.group.label}</span>
               </button>
             {:else if row.type === 'entry'}

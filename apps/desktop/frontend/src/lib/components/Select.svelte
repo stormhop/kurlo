@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
   import { tick } from 'svelte';
   let {
     value = $bindable(''),
@@ -7,16 +9,18 @@
     disabled = false,
     searchable = false,
     floating = false,
+    size = 'lg',
     searchPlaceholder = 'Search models',
     ariaLabel = undefined,
     onChange = () => {},
   }: {
     value: string;
-    options: Array<{ value: string; label: string; color?: string }>;
+    options: Array<{ value: string; label: string; color?: string; icon?: string; separated?: boolean }>;
     className?: string;
     disabled?: boolean;
     searchable?: boolean;
     floating?: boolean;
+    size?: 'sm' | 'md' | 'lg';
     searchPlaceholder?: string;
     ariaLabel?: string;
     onChange?: (value: string) => void;
@@ -31,6 +35,7 @@
   let searchInput = $state<HTMLInputElement>();
 
   const selected = $derived(options.find(o => o.value === value));
+  const hasIcons = $derived(options.some(o => o.icon));
   const filteredOptions = $derived(options.filter(option => option.label.toLowerCase().includes(search.trim().toLowerCase())));
 
   async function toggle() {
@@ -182,6 +187,8 @@
 <div class="app-select {className}" class:open bind:this={wrap} onfocusout={onFocusOut}>
   <button
     class="field select-trigger app-select-trigger"
+    class:field-sm={size === 'sm'}
+    class:field-md={size === 'md'}
     class:open
     class:env-colored={Boolean(selected?.color)}
     style:--env-color={selected?.color}
@@ -197,9 +204,7 @@
   >
     {#if selected?.color}<span class="env-color-dot" aria-hidden="true"></span>{/if}
     <span>{selected?.label ?? value}</span>
-    <svg class="app-select-chevron" width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
+    <Chevron class="app-select-chevron" />
   </button>
   {#if open}
     <div class="menu app-select-menu" class:app-select-menu-floating={floating} role="listbox" tabindex="-1" bind:this={menu} style={floating && !menuStyle ? 'visibility:hidden' : menuStyle} onkeydown={navigate} aria-label={ariaLabel}>
@@ -207,6 +212,7 @@
         <input class="field field-sm" type="search" bind:value={search} bind:this={searchInput} aria-label={`Search ${ariaLabel || 'options'}`} placeholder={searchPlaceholder} spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="none" />
       {/if}
       {#each filteredOptions as opt (opt.value)}
+        {#if opt.separated}<hr class="menu-separator" />{/if}
         <button
           class="menu-item app-select-option"
           class:active={opt.value === value}
@@ -216,8 +222,9 @@
           onmousedown={(e) => e.preventDefault()}
           onclick={(event) => { event.preventDefault(); choose(opt.value); }}
         >
-          <span class="app-select-check">{opt.value === value ? '✓' : ''}</span>
+          <span class="app-select-check">{#if opt.value === value}<CheckIcon />{/if}</span>
           {#if opt.color}<span class="env-color-dot" style:--env-color={opt.color} aria-hidden="true"></span>{/if}
+          {#if hasIcons}<span class="app-select-icon" aria-hidden="true">{opt.icon ?? ''}</span>{/if}
           <span>{opt.label}</span>
         </button>
       {/each}

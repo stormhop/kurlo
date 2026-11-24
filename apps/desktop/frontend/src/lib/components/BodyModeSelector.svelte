@@ -1,9 +1,11 @@
 <script lang="ts">
+  import Select from './Select.svelte';
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
   import type { BodyMode, RawBodyType } from '../types/models';
   import BeautifyButton from './BeautifyButton.svelte';
 
   let {
-    rawTypeMenuOpen = $bindable(false),
     rawBodyType,
     rawBodyTypes,
     bodyModeIs,
@@ -15,7 +17,6 @@
     beautifyDisabled = false,
     onBeautify,
   }: {
-    rawTypeMenuOpen: boolean;
     rawBodyType: RawBodyType;
     rawBodyTypes: RawBodyType[];
     bodyModeIs: (mode: BodyMode) => boolean;
@@ -45,13 +46,6 @@
     bodyModeMenuOpen = false;
   }
 
-  function closeRawTypeMenuOnFocusOut(event: FocusEvent) {
-    const current = event.currentTarget;
-    const next = event.relatedTarget;
-
-    if (!(current instanceof HTMLElement)) return;
-    if (!(next instanceof Node) || !current.contains(next)) rawTypeMenuOpen = false;
-  }
 
   function closeBodyModeMenuOnFocusOut(event: FocusEvent) {
     const current = event.currentTarget;
@@ -74,9 +68,7 @@
       onclick={() => (bodyModeMenuOpen = !bodyModeMenuOpen)}
     >
       <span>{activeBodyMode.label}</span>
-      <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-        <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
+      <Chevron />
     </button>
     {#if bodyModeMenuOpen}
       <div class="menu body-mode-compact-list" role="listbox" aria-label="Body types">
@@ -88,7 +80,7 @@
             type="button"
             onclick={() => chooseBodyMode(item.mode)}
           >
-            <span class="body-mode-check">{bodyModeIs(item.mode) ? '✓' : ''}</span>
+            <span class="body-mode-check">{#if bodyModeIs(item.mode)}<CheckIcon />{/if}</span>
             <span>{item.label}</span>
           </button>
         {/each}
@@ -118,39 +110,14 @@
     </label>
   </div>
   {#if bodyModeIs('raw')}
-    <div
-      class="raw-type-menu"
-      onfocusout={closeRawTypeMenuOnFocusOut}
-    >
-      <button
-        class="field field-sm select-trigger raw-type-button"
-        class:open={rawTypeMenuOpen}
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={rawTypeMenuOpen}
-        onclick={() => (rawTypeMenuOpen = !rawTypeMenuOpen)}
-      >
-        {rawTypeLabel()}
-        <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-          <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      {#if rawTypeMenuOpen}
-        <div class="menu raw-type-list" role="listbox">
-          {#each rawBodyTypes as type, eachIndex (eachIndex)}
-            <button class="menu-item"
-              class:active={rawBodyType === type}
-              role="option"
-              aria-selected={rawBodyType === type}
-              type="button"
-              onclick={() => setRawBodyType(type)}
-            >
-              {rawTypeLabel(type)}
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <Select
+      className="raw-type-menu"
+      size="sm"
+      ariaLabel="Raw body type"
+      value={rawBodyType}
+      options={rawBodyTypes.map(type => ({ value: type, label: rawTypeLabel(type) }))}
+      onChange={type => setRawBodyType(type as RawBodyType)}
+    />
   {/if}
   {#if showBeautify}
     <div class="body-mode-beautify">

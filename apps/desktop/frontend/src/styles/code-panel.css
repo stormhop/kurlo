@@ -73,34 +73,6 @@
   min-width: 0;
 }
 
-.snippet-select-trigger {
-  display: inline-flex;
-  max-width: calc(var(--code-panel-w, 20.625rem) - 6rem);
-}
-
-.snippet-select-trigger span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 1em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.snippet-select-menu {
-  position: absolute;
-  z-index: 70;
-  top: 2.125rem;
-  left: 0;
-  width: 13.125rem;
-}
-
-.snippet-select-menu button {
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
 .code-copy-btn {
   display: inline-flex;
   white-space: nowrap;

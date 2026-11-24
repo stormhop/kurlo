@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { tick } from 'svelte';
@@ -241,9 +243,7 @@
                   {@const key = thinkingKey(turn, step, blockIndex)}
                   <div class="ai-thinking">
                     <button class="btn btn-ghost btn-sm ai-thinking-toggle" type="button" aria-expanded={openThinking.has(key)} onclick={() => toggleThinking(key)}>
-                      <svg class:open={openThinking.has(key)} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                        <path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                      </svg>
+                      <Chevron direction="right" open={openThinking.has(key)} />
                       Thinking
                     </button>
                     {#if openThinking.has(key)}<div class="ai-thinking-text">{block.text}</div>{/if}
@@ -346,9 +346,7 @@
             {@const open = rawStepOpen(stepIndex)}
             <div class="ai-raw-step">
               <button class="btn btn-ghost btn-sm ai-raw-head" type="button" aria-expanded={open} onclick={() => toggleRawStep(stepIndex)}>
-                <svg class:open width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                  <path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
+                <Chevron direction="right" {open} />
                 Step {step.index + 1}{#if step.http.statusCode} · {step.http.status}{/if}
                 <span class="ai-raw-size">{formatSize((step.requestBody?.length ?? 0) + (step.http.body?.length ?? 0))}</span>
               </button>
@@ -378,7 +376,7 @@
             {#if tests.error}<div class="script-error-msg">{tests.error}</div>{/if}
             {#each (tests.tests ?? []) as t, eachIndex (eachIndex)}
               <div class="test-row" class:pass={t.passed} class:fail={!t.passed}>
-                <span class="test-icon">{t.passed ? '✓' : '✕'}</span>
+                <span class="test-icon">{#if t.passed}<CheckIcon />{:else}<AddCloseIcon />{/if}</span>
                 <span class="test-name">{t.name}</span>
                 {#if t.error}<span class="test-err">{t.error}</span>{/if}
               </div>
@@ -538,11 +536,11 @@
     font-size: var(--text-label);
     font-weight: var(--weight-medium);
   }
-  .ai-thinking-toggle svg {
+  .ai-thinking-toggle :global(svg) {
     color: var(--text-3);
     transition: transform var(--dur-fast);
   }
-  .ai-thinking-toggle svg.open {
+  .ai-thinking-toggle :global(svg.open) {
     transform: rotate(90deg);
   }
   .ai-thinking-text {
@@ -791,11 +789,11 @@
     font-size: var(--text-label);
     font-weight: var(--weight-medium);
   }
-  .ai-raw-head svg {
+  .ai-raw-head :global(svg) {
     color: var(--text-3);
     transition: transform var(--dur-fast);
   }
-  .ai-raw-head svg.open {
+  .ai-raw-head :global(svg.open) {
     transform: rotate(90deg);
   }
   .ai-raw-size {
@@ -859,8 +857,8 @@
     .ai-live-dot {
       animation: none;
     }
-    .ai-thinking-toggle svg,
-    .ai-raw-head svg {
+    .ai-thinking-toggle :global(svg),
+    .ai-raw-head :global(svg) {
       transition: none;
     }
   }

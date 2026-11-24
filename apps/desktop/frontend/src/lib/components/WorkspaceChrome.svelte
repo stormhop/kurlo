@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import { tabListKeyboard } from '../a11y';
@@ -283,9 +284,7 @@
           <path d="M4.5 6V4.2a3 3 0 016 0V6M3.2 6h8.6v6.2H3.2V6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
         </svg>
         <span>{activeWorkspace?.name ?? defaultWorkspace}</span>
-        <svg width="0.625rem" height="0.4375rem" viewBox="0 0 10 7" fill="none" aria-hidden="true">
-          <path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
+        <Chevron />
       </button>
       {#if workspaceMenuOpen}
         <div class="workspace-menu">
@@ -446,9 +445,7 @@
     {#if tabsOverflowing}
       <div class="tab-overflow" onfocusout={closeTabMenuOnFocusOut} onkeydown={onTabMenuKeydown} role="presentation">
         <button class="btn btn-ghost btn-icon tabbar-icon tab-overflow-btn" class:active={tabMenuOpen} type="button" onclick={() => (tabMenuOpen = !tabMenuOpen)} aria-label="All open tabs" aria-haspopup="listbox" aria-expanded={tabMenuOpen}>
-          <svg width="0.75rem" height="0.5rem" viewBox="0 0 12 8" fill="none" aria-hidden="true">
-            <path d="M1.5 2l4.5 4.5L10.5 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <Chevron />
         </button>
         {#if tabMenuOpen}
           <div class="menu tab-overflow-menu" role="listbox" aria-label="Open tabs">
@@ -509,9 +506,7 @@
           <path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>
         </svg>
         <span>{environmentLabel()}</span>
-        <svg width="0.625rem" height="0.4375rem" viewBox="0 0 10 7" fill="none" aria-hidden="true">
-          <path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
+        <Chevron />
       </button>
       {#if environmentMenuOpen}
         <div class="menu environment-menu">
@@ -537,7 +532,7 @@
                 {/each}
                 {#if environmentMenu.others.length}
                   <button class="menu-item environment-menu-others" type="button" aria-expanded={showOtherEnvironments} onclick={() => (otherEnvironmentsOpen = !otherEnvironmentsOpen)} disabled={workspaceBlocked || othersHoldActive}>
-                    <svg class="environment-menu-chevron" class:open={showOtherEnvironments} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2L6.5 5L3.5 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <Chevron direction="right" class="environment-menu-chevron" open={showOtherEnvironments} />
                     <span class="environment-menu-name">Other environments</span>
                     <small>{environmentMenu.others.length}</small>
                   </button>

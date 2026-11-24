@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import ScriptResults from './ScriptResults.svelte';
   import { scriptProblemCount } from '../scriptLogs';
   import KurloBird from './KurloBird.svelte';
@@ -349,9 +350,7 @@
                   </span>
                   <span class="sse-event-time">{formatGrpcTime(row.timestamp)}</span>
                   <span class="sse-expand-chevron" style="transform: rotate({expanded ? 180 : 0}deg)" aria-hidden="true">
-                    <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none">
-                      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
+                    <Chevron />
                   </span>
                 </button>
                 {#if expanded}

@@ -105,20 +105,20 @@ test.describe("Kurlo desktop browser E2E", () => {
 
     await chooseRequestSection(page, 'Authorization');
     await page.getByLabel('Auth Type').click();
-    await page.getByRole('button', { name: 'Bearer token' }).click();
+    await page.getByRole('option', { name: 'Bearer token' }).click();
     await page.locator('#bearer-token').fill('{{token}}');
     await captureDocsScreenshot(page, 'auth-bearer');
     if (docsScreenshotDir) {
       try {
         await page.getByLabel('Auth Type').click();
-        await page.getByRole('button', { name: 'OAuth 2.0' }).click();
+        await page.getByRole('option', { name: 'OAuth 2.0' }).click();
         await page.locator('#oauth2-url').fill('https://auth.kurlo.test/oauth/token');
         await page.locator('#oauth2-id').fill('kurlo-docs-client');
         await page.locator('#oauth2-secret').fill('<redacted>');
         await page.locator('#oauth2-scope').fill('openid profile');
         await captureDocsScreenshot(page, 'auth-oauth2-token-fetch');
         await page.getByLabel('Auth Type').click();
-        await page.getByRole('button', { name: 'Bearer token' }).click();
+        await page.getByRole('option', { name: 'Bearer token' }).click();
         await page.locator('#bearer-token').fill('{{token}}');
       } catch (err) { console.log('docs screenshot auth-oauth2-token-fetch skipped:', err); }
     }

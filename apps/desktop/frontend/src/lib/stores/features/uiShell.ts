@@ -121,7 +121,6 @@ type UiShellHost = {
   splitResizeStartX: number;
   splitResizeStartRatio: number;
   splitResizeWidth: number;
-  rawTypeMenuOpen: boolean;
   requestError: string;
   requestPanelHeight: number;
   requestType: RequestType;
@@ -581,7 +580,6 @@ export const uiShellFeature = {
       return;
     }
     if (shortcutId === 'cancel-request' && (e.defaultPrevented || !this.inFlightRequestIds.has(this.activeRequestId))) {
-      if (e.key === 'Escape' && this.rawTypeMenuOpen) this.rawTypeMenuOpen = false;
       if (e.key === 'Escape') this.closeFloatingMenus();
       return;
     }
@@ -603,7 +601,6 @@ export const uiShellFeature = {
       await this.runShortcut(shortcutId);
       return;
     }
-    if (e.key === 'Escape' && this.rawTypeMenuOpen) this.rawTypeMenuOpen = false;
     if (e.key === 'Escape') this.closeFloatingMenus();
   },
 };

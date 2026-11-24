@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import BirdLoader from './BirdLoader.svelte';
   import { vm } from '../stores/app.svelte';
   import { statusClass } from '../utils';
@@ -61,7 +62,7 @@
                 type="button"
                 aria-label="Delete {example.name}"
                 onclick={() => vm.deleteExample(example.id)}
-              >✕</button>
+              ><AddCloseIcon /></button>
             </div>
           </div>
         {/each}

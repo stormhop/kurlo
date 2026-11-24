@@ -5,10 +5,7 @@ type MenuHost = {
   openLoadTestMenuId: string;
   historyHeaderMenuOpen: boolean;
   openHistoryMenuId: string;
-  snippetMenuOpen: boolean;
   openFormTypeMenuId: number | null;
-  rawTypeMenuOpen: boolean;
-  authMenuOpen: boolean;
   workspaceMenuOpen: boolean;
   environmentMenuOpen: boolean;
   closeFloatingMenus: () => void;
@@ -21,10 +18,7 @@ function closeMenus(host: MenuHost) {
   host.openLoadTestMenuId = '';
   host.historyHeaderMenuOpen = false;
   host.openHistoryMenuId = '';
-  host.snippetMenuOpen = false;
   host.openFormTypeMenuId = null;
-  host.rawTypeMenuOpen = false;
-  host.authMenuOpen = false;
   host.workspaceMenuOpen = false;
   host.environmentMenuOpen = false;
 }
@@ -71,10 +65,6 @@ export const menuFeature = {
     const open = !this.environmentMenuOpen;
     toggleMenu(this, event, () => (this.environmentMenuOpen = open));
   },
-  toggleAuthMenu(this: MenuHost, event: MouseEvent) {
-    const open = !this.authMenuOpen;
-    toggleMenu(this, event, () => (this.authMenuOpen = open));
-  },
   toggleFormTypeMenu(this: MenuHost, id: number, event: MouseEvent) {
     const open = this.openFormTypeMenuId === id ? null : id;
     toggleMenu(this, event, () => (this.openFormTypeMenuId = open));
@@ -82,7 +72,7 @@ export const menuFeature = {
   onWindowMouseDown(this: MenuHost, event: MouseEvent) {
     const target = event.target as HTMLElement | null;
     if (!target) return;
-    if (target.closest('.request-menu, .request-menu-btn, .collection-menu-btn, .folder-menu-btn, .history-menu-btn, .history-entry-menu-btn, .snippet-select, .raw-type-menu, .form-type-menu, .form-type-options, .auth-select, .workspace-switcher, .environment-switcher, .app-dialog, .variable-input-wrap')) return;
+    if (target.closest('.request-menu, .request-menu-btn, .collection-menu-btn, .folder-menu-btn, .history-menu-btn, .history-entry-menu-btn, .form-type-menu, .form-type-options, .workspace-switcher, .environment-switcher, .app-dialog, .variable-input-wrap')) return;
     this.closeFloatingMenus();
   },
 };

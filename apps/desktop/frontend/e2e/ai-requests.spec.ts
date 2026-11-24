@@ -530,7 +530,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.getByLabel('New unsaved request').click();
     await page.getByRole('tab', { name: /Auth/ }).click();
     await page.getByLabel('Auth type').click();
-    await page.locator('.auth-select-menu').getByRole('button', { name: 'Bearer Token' }).click();
+    await page.getByRole('option', { name: 'Bearer Token' }).click();
     const input = page.locator('#bearer-token');
     await input.fill('x'.repeat(200));
     const [field, button] = await Promise.all([input.evaluate(el => {

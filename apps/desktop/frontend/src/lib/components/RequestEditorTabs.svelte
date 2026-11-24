@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
   import { tick } from 'svelte';
   import { tabListKeyboard } from '../a11y';
   import { appLazyComponents } from '../stores/lazyComponents.svelte';
@@ -275,9 +277,7 @@
       {#if activeTabItem.badge}
         <span class="badge" class:badge-on={activeTabItem.badgeKind === 'on'}>{activeTabItem.badge}</span>
       {/if}
-      <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-        <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
+      <Chevron />
     </button>
 
     {#if compactMenuOpen}
@@ -290,7 +290,7 @@
             type="button"
             onclick={() => selectTab(item.id)}
           >
-            <span class="request-tab-compact-check">{requestTab === item.id ? '✓' : ''}</span>
+            <span class="request-tab-compact-check">{#if requestTab === item.id}<CheckIcon />{/if}</span>
             <span>{item.label}</span>
             {#if item.badge}
               <span class="badge" class:badge-on={item.badgeKind === 'on'}>{item.badge}</span>

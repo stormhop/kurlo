@@ -254,9 +254,6 @@
   let destroyed = false;
   let focusedBeforeWindowBlur: HTMLElement | null = null;
   let codePanelAvailable = $derived(vm.codePanelAvailable);
-  $effect(() => {
-    if (!vm.codePanelOpen || !codePanelAvailable) vm.snippetMenuOpen = false;
-  });
   let untitledTabNumbers = new Map<string, number>();
   let requestTabNumbers = $derived.by(() => {
     untitledTabNumbers = numberDuplicateTabLabels(untitledTabNumbers, vm.openRequestsForTabs.map(req => ({ id: req.id, label: requestTabLabel(req) })));
@@ -1374,7 +1371,6 @@
 
         {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
           <BodyModeSelector
-            bind:rawTypeMenuOpen={vm.rawTypeMenuOpen}
             rawBodyType={vm.rawBodyType}
             rawBodyTypes={RAW_BODY_TYPES}
             bodyModeIs={vm.bodyModeIs}
@@ -1603,7 +1599,6 @@
         lines={vm.codePanelOpen && codePanelAvailable ? vm.snippetRenderedLines : vm.snippetRenderedLinesCache}
         codePanelOpen={vm.codePanelOpen && codePanelAvailable}
         snippetLanguage={vm.snippetLanguage}
-        bind:snippetMenuOpen={vm.snippetMenuOpen}
         copiedSnippet={vm.copiedSnippet}
         onSnippetLanguageChange={(lang: SnippetLanguage) => (vm.snippetLanguage = lang)}
         onCopy={vm.copySnippet}

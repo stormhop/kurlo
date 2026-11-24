@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import { autoSizeTextarea } from '../textareaSizing';
@@ -825,7 +826,7 @@
                   {@const key = `${turn.id}:${segment.step.index}:${segment.blockIndex}`}
                   <div>
                     <button class="btn btn-ghost btn-sm agent-step-toggle" type="button" aria-expanded={openThinking.has(key)} onclick={() => toggle(openThinking, key)}>
-                      <svg class:open={openThinking.has(key)} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      <Chevron direction="right" open={openThinking.has(key)} />
                       Thinking
                     </button>
                     {#if openThinking.has(key)}<div class="agent-thinking">{segment.block.text}</div>{/if}
@@ -859,7 +860,7 @@
                             <span class="agent-tool-name">{summary.detail || item.block.name}</span>
                             {#if summary.status}<span class="agent-tool-status" class:ok={summary.status < 300} class:warn={summary.status >= 300 && summary.status < 500} class:bad={summary.status >= 500}>{summary.status}</span>{/if}
                             {#if summary.durationMs}<span class="agent-tool-time">{summary.durationMs} ms</span>{/if}
-                            <svg class="agent-tool-chevron" class:open={openTools.has(key)} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <Chevron direction="right" class="agent-tool-chevron" open={openTools.has(key)} />
                           </button>
                           {#if target && canOpen(target)}
                             <button class="btn-link agent-tool-open" type="button" onclick={() => openTarget(target)}>{targetLabel(target)}</button>
@@ -940,12 +941,12 @@
                 <div class="agent-context-files" aria-label="Project and attachments">
                   {#if agentStore.projectRoot}
                     <button class="btn btn-secondary btn-sm agent-context-file" type="button" aria-label={`Disconnect project ${contextName(agentStore.projectRoot)}`} disabled={agentStore.running || workspaceBlocked} onclick={() => (agentStore.projectRoot = '')}>
-                      <span>Project · {contextName(agentStore.projectRoot)}</span><span aria-hidden="true">×</span>
+                      <span>Project · {contextName(agentStore.projectRoot)}</span><AddCloseIcon />
                     </button>
                   {/if}
                   {#each draftAttachments as file (file)}
                     <button class="btn btn-secondary btn-sm agent-context-file" type="button" aria-label={`Remove attachment ${contextName(file)}`} disabled={agentStore.running || workspaceBlocked} onclick={() => removeAttachment(file)}>
-                      <span>{contextName(file)}</span><span aria-hidden="true">×</span>
+                      <span>{contextName(file)}</span><AddCloseIcon />
                     </button>
                   {/each}
                 </div>
@@ -1499,7 +1500,7 @@
     padding: var(--space-3);
     object-fit: contain;
   }
-  .agent-file-button svg, .agent-file-label svg {
+  .agent-file-button :global(svg), .agent-file-label :global(svg) {
     flex: 0 0 auto;
   }
   .agent-file-button span, .agent-file-label span {
@@ -1533,12 +1534,12 @@
     gap: var(--space-1-5);
     color: var(--text-2);
   }
-  .agent-step-toggle svg {
+  .agent-step-toggle :global(svg) {
     flex: 0 0 auto;
     color: var(--text-3);
     transition: transform var(--dur-fast);
   }
-  .agent-step-toggle svg.open {
+  .agent-step-toggle :global(svg.open) {
     transform: rotate(90deg);
   }
   .agent-thinking {
@@ -1670,12 +1671,12 @@
     font-family: var(--font-mono);
     font-size: var(--text-caption);
   }
-  .agent-tool-chevron {
+  :global(.agent-tool-chevron) {
     flex: 0 0 auto;
     color: var(--text-3);
     transition: transform var(--dur-fast);
   }
-  .agent-tool-chevron.open {
+  :global(.agent-tool-chevron.open) {
     transform: rotate(90deg);
   }
   .agent-tool-open {
@@ -2359,8 +2360,8 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .agent-step-toggle svg,
-    .agent-tool-chevron {
+    .agent-step-toggle :global(svg),
+    :global(.agent-tool-chevron) {
       transition: none;
     }
   }

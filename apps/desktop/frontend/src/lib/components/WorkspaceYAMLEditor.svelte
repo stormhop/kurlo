@@ -34,7 +34,7 @@
   }
 </script>
 
-<div class="modal-overlay" role="presentation">
+<div class="dialog-backdrop" role="presentation">
   <div class="modal yaml-editor-modal" role="dialog" aria-modal="true" aria-labelledby="yaml-editor-title" tabindex="-1" {onkeydown}>
     <div class="modal-head modal-header">
       <div class="yaml-editor-title">

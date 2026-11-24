@@ -335,6 +335,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.app-select-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  color: var(--accent-text);
+  line-height: var(--leading-none);
+}
+
 .app-select-chevron {
   flex-shrink: 0;
   color: var(--text-3);
@@ -1287,16 +1297,6 @@
     border-left: none;
     border-top: 1px solid var(--border-subtle);
   }
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--scrim);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
 }
 
 .modal {

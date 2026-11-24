@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import { SvelteSet } from 'svelte/reactivity';
   import type { AgentFileChange } from '../backend';
   import { agentChangeCounts, agentChangeHint, agentChangeKindLabel, agentChangeStatus } from '../agent';
@@ -45,9 +46,7 @@
     {@const status = agentChangeStatus(change)}
     <li class="agent-change">
       <button class="agent-change-head" type="button" aria-expanded={open} onclick={() => toggle(change.path)}>
-        <svg class="agent-change-chevron" class:open width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-          <path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+        <Chevron direction="right" class="agent-change-chevron" {open} />
         {#if summary}
           {#if agentChangeKindLabel(summary.kind) !== summary.name}<span class="agent-change-kind">{agentChangeKindLabel(summary.kind)}</span>{/if}
           <span class="agent-change-name">{summary.name}</span>
@@ -136,12 +135,12 @@
     outline: 2px solid var(--accent);
     outline-offset: -2px;
   }
-  .agent-change-chevron {
+  :global(.agent-change-chevron) {
     flex: 0 0 auto;
     color: var(--text-3);
     transition: transform var(--dur-fast);
   }
-  .agent-change-chevron.open {
+  :global(.agent-change-chevron.open) {
     transform: rotate(90deg);
   }
   .agent-change-kind {

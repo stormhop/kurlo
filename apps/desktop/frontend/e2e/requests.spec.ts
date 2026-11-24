@@ -25,7 +25,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.getByLabel('Request URL').fill('https://api.example.test/orders');
     await chooseRequestSection(page, 'Authorization');
     await page.getByLabel('Auth Type').click();
-    await page.getByRole('button', { name: 'NTLM', exact: true }).click();
+    await page.getByRole('option', { name: 'NTLM', exact: true }).click();
     await page.getByLabel('Username').fill('EXAMPLE\\api-user');
     await page.getByLabel('Password').fill('{{ntlmPassword}}');
     await captureDocsScreenshot(page, 'auth-ntlm');
@@ -292,7 +292,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(page.getByRole('button', { name: 'Auth type' })).toHaveText('Inherit from parent');
     await expect(page.getByText('take it from the collection, which sets no auth')).toBeVisible();
     await page.getByRole('button', { name: 'Auth type' }).click();
-    await page.locator('.auth-select-menu').getByRole('button', { name: 'Bearer token' }).click();
+    await page.getByRole('option', { name: 'Bearer token' }).click();
     await page.locator('#collection-bearer-token').fill('folder-token');
     const save = page.getByRole('button', { name: 'Save', exact: true });
     if (await save.isVisible()) await save.click();
@@ -693,7 +693,7 @@ test('signs a request with JWT Bearer auth and previews the token', async ({ pag
   await page.getByLabel('Request URL').fill('https://api.example.test/me');
   await chooseRequestSection(page, 'Authorization');
   await page.getByLabel('Auth Type').click();
-  await page.getByRole('button', { name: 'JWT Bearer', exact: true }).click();
+  await page.getByRole('option', { name: 'JWT Bearer', exact: true }).click();
   await page.getByLabel('Secret', { exact: true }).fill('{{jwtSigningKey}}');
   const payload = page.getByLabel('JWT payload');
   await page.getByRole('button', { name: 'Preview token', exact: true }).click();
@@ -825,7 +825,7 @@ test('takes a {{variable}} in the bearer token and shows it instead of dots', as
   await page.getByLabel('Request URL').fill('https://api.kurlo.test/me');
   await page.getByRole('tab', { name: /^Auth/ }).click();
   await page.getByRole('button', { name: 'Auth type' }).click();
-  await page.locator('.auth-select-menu').getByRole('button', { name: 'Bearer token' }).click();
+  await page.getByRole('option', { name: 'Bearer token' }).click();
 
   const token = page.locator('#bearer-token');
   await token.pressSequentially('{{tok');

@@ -367,10 +367,10 @@
       </div>
       <div class="overview-actions">
         <label class="cookie-sync-toggle">
-          <span>{sync.running ? 'On' : 'Off'}</span>
           <span class="switch-control">
             <input type="checkbox" role="switch" aria-label="Cookie sync" checked={sync.running} disabled={syncBusy} onchange={(event) => { (event.currentTarget as HTMLInputElement).checked = sync.running; void vm.toggleCookieSync(); }} />
             <span class="switch-track"></span>
+            <span class="switch-state">{sync.running ? 'ON' : 'OFF'}</span>
           </span>
         </label>
       </div>

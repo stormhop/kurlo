@@ -1,9 +1,11 @@
 <script lang="ts" module>
+  import Chevron from './Chevron.svelte';
   import { rem } from '../uiScale';
   let autoHeadersOpen = $state(false);
 </script>
 
 <script lang="ts">
+  import AddCloseIcon from './AddCloseIcon.svelte';
   import { onMount } from 'svelte';
   import { vm } from '../stores/app.svelte';
   import { guardTrailing, removeRow, activeCount } from '../utils';
@@ -161,7 +163,7 @@
   <button class="kv-col-resizer kv-col-resizer--value" type="button" onmousedown={(e) => vm.startColResize('val', e)} aria-label="Resize value column"></button>
   {#if vm.autoRequestHeaders.length}
     <button class="kv-auto-toggle" type="button" aria-expanded={autoHeadersOpen} onclick={() => (autoHeadersOpen = !autoHeadersOpen)}>
-      <svg class:open={autoHeadersOpen} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M3.5 2L6.5 5L3.5 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <Chevron direction="right" open={autoHeadersOpen} />
       {vm.autoRequestHeaders.length} {vm.autoRequestHeaders.length === 1 ? 'header' : 'headers'} added by Kurlo
       <span class="kv-auto-toggle-keys">{vm.autoRequestHeaders.filter(h => !h.overridden).map(h => h.key).join(', ')}</span>
     </button>
@@ -207,7 +209,7 @@
         ondblclick={(event) => maybeOpenCustomHeaderDetailFromEvent(row, i, event)}
       />
       <input class="field field-bare kv-input kv-desc" bind:value={row.description} placeholder="Description" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-      <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.reqHeaders, i)} aria-label="Remove">✕</button>
+      <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeRow(vm.reqHeaders, i)} aria-label="Remove"><AddCloseIcon /></button>
     </div>
   {/each}
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CheckIcon from './CheckIcon.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import { vm } from '../stores/app.svelte';
   import { AUTH_OPTIONS, JWT_ALGORITHM_OPTIONS, OAUTH1_SIGNATURE_OPTIONS } from '../constants';
@@ -156,24 +157,14 @@
 <div class="auth-section">
   <div class="auth-type-column">
     <span class="field-label">Auth type</span>
-    <div class="auth-select">
-      <button class="field select-trigger auth-select-trigger" type="button" onclick={vm.toggleAuthMenu} aria-label="Auth type" aria-expanded={vm.authMenuOpen}>
-        <span>{vm.authLabel()}</span>
-        <svg width="0.625rem" height="0.4375rem" viewBox="0 0 10 7" fill="none" aria-hidden="true">
-          <path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      {#if vm.authMenuOpen}
-        <div class="menu auth-select-menu" class:grpc-auth-menu={vm.requestType === 'grpc'}>
-          {#each authOptions as option, eachIndex (eachIndex)}
-            <button class="menu-item" class:active={vm.authType === option.value} class:auth-option-separated={vm.requestType === 'grpc' && option.value === 'none'} type="button" onclick={() => vm.selectAuthType(option.value)}>
-              {#if vm.authType === option.value}<span class="auth-check">✓</span>{:else}<span class="auth-check"></span>{/if}
-              <span>{option.label}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <Select
+      className="auth-select"
+  floating
+      ariaLabel="Auth type"
+      value={vm.authType}
+      options={authOptions.map(option => ({ value: option.value, label: option.label, separated: vm.requestType === 'grpc' && option.value === 'none' }))}
+      onChange={type => vm.selectAuthType(type as typeof vm.authType)}
+    />
   </div>
   <div class="auth-fields">
     {#if vm.authType === 'bearer'}
@@ -306,7 +297,7 @@
         {#if vm.oauth2RefreshToken && !isWorkspaceSecretReference(vm.oauth2RefreshToken)}
           <button class="btn btn-secondary" type="button" disabled={vm.oauth2Loading} onclick={vm.refreshOAuth2Token}>Refresh token</button>
         {/if}
-        {#if vm.oauth2Token && !isWorkspaceSecretReference(vm.oauth2Token)}<span class="oauth2-token-badge">Token acquired ✓</span>{/if}
+        {#if vm.oauth2Token && !isWorkspaceSecretReference(vm.oauth2Token)}<span class="oauth2-token-badge">Token acquired <CheckIcon /></span>{/if}
       </div>
       {#if isWorkspaceSecretReference(vm.oauth2Token)}
         <span class="field-label-hint">The access token is unavailable on this device.</span>

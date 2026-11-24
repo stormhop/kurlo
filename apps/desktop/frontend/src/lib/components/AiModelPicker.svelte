@@ -5,6 +5,8 @@
 </script>
 
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import { tick } from 'svelte';
   import { vm } from '../stores/app.svelte';
@@ -117,9 +119,7 @@
   >
     <span class="ai-model-provider">{preset.label}</span>
     <span class="grpc-method-label" class:ai-model-empty={!shownModel}>{shownModel || (usesConnection ? 'Choose a model in Settings → AI' : 'Choose a model')}</span>
-    <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-      <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>
+    <Chevron />
   </button>
 
   {#if open}
@@ -192,7 +192,7 @@
               type="button"
               onclick={() => choose(model)}
             >
-              <span class="method-check">{modelName === model ? '✓' : ''}</span>
+              <span class="method-check">{#if modelName === model}<CheckIcon />{/if}</span>
               <span class="grpc-option-main"><strong>{model}</strong></span>
             </button>
           {/each}

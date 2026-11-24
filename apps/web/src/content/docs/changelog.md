@@ -15,11 +15,13 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Changed
 
+- **Consistent controls.** Dropdowns for auth type, body and message types, encoding, the message filter and the snippet language behave the same as every other dropdown, and close, check and chevron icons match across the app.
 - **Editor errors** mark the line number in red, show the message with its line on hover, and point to an error scrolled out of view.
 
 ### Fixed
 
 - **Query parameters** keep their values, flags and repeated keys when you send a saved request from Desktop, Runner, CLI or MCP. Editing an imported Postman or HTTP request keeps its other parameters.
+- **Collection Runner** exposes collection names to macOS accessibility tools.
 - **Editor caret** follows a deleted character at once in every code editor.
 - **Folding** a block keeps the caret on its line and the editor focused.
 

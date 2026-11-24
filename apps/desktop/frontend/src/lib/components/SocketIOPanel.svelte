@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Select from './Select.svelte';
+  import Chevron from './Chevron.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import { tick, untrack } from 'svelte';
   import { byteLength, formatSize } from '../utils';
@@ -42,7 +44,6 @@
   let searchOpen = $state(false);
   let searchInput = $state<HTMLInputElement | undefined>();
   let messageFilter = $state<SIOFilter>('all');
-  let filterMenuOpen = $state(false);
   let listEl = $state<HTMLElement | undefined>();
   let atTop = $state(true);
   let newMessagesBadge = $state(0);
@@ -154,15 +155,7 @@
       : new Set([...expandedIds, id]);
   }
 
-  function closeFilterMenuOnFocusOut(event: FocusEvent) {
-    const current = event.currentTarget;
-    const next = event.relatedTarget;
-    if (!(current instanceof HTMLElement)) return;
-    if (!(next instanceof Node) || !current.contains(next)) filterMenuOpen = false;
-  }
 
-  function selectMessageFilter(f: SIOFilter) { messageFilter = f; filterMenuOpen = false; }
-  function filterLabel() { return filterOptions.find((o) => o.value === messageFilter)?.label ?? 'All messages'; }
 
   function filterEmptyLabel(): string {
     if (searchQuery.trim()) return `No events match "${searchQuery}"`;
@@ -300,37 +293,12 @@
       </div>
     {/if}
 
-    <div class="ws-filter-menu" onfocusout={closeFilterMenuOnFocusOut}>
-      <button
-        class="field select-trigger ws-filter-button"
-        class:open={filterMenuOpen}
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={filterMenuOpen}
-        onclick={() => (filterMenuOpen = !filterMenuOpen)}
-      >
-        {filterLabel()}
-        <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-          <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </button>
-      {#if filterMenuOpen}
-        <div class="menu ws-filter-list" role="listbox" aria-label="Message filter">
-          {#each filterOptions as opt, eachIndex (eachIndex)}
-            <button class="menu-item"
-              class:active={messageFilter === opt.value}
-              role="option"
-              aria-selected={messageFilter === opt.value}
-              type="button"
-              onclick={() => selectMessageFilter(opt.value)}
-            >
-              <span class="ws-filter-icon">{opt.icon}</span>
-              <span>{opt.label}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <Select
+      className="ws-filter-menu"
+      ariaLabel="Message filter"
+      bind:value={messageFilter}
+      options={filterOptions}
+    />
 
     <div class="resp-actions">
       <button class="btn btn-icon" aria-label="Search response" aria-pressed={searchOpen} onclick={() => (searchOpen = !searchOpen)} type="button">
@@ -429,9 +397,7 @@
             <span class="sse-event-time">{formatTime(message.timestamp)}</span>
             {#if expandable}
               <span class="sse-expand-chevron" style="transform: rotate({expanded ? 180 : 0}deg)" aria-hidden="true">
-                <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none">
-                  <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
+                <Chevron />
               </span>
             {/if}
           </button>

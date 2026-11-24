@@ -12,7 +12,6 @@ type AuthHost = {
   apiKeyIn: 'header' | 'query';
   apiKeyName: string;
   apiKeyValue: string;
-  authMenuOpen: boolean;
   authType: AuthType;
   awsAccessKey: string;
   awsRegion: string;
@@ -131,7 +130,6 @@ export const authFeature = {
 
   selectAuthType(this: AuthHost, type: AuthType) {
     this.authType = type;
-    this.authMenuOpen = false;
   },
 
   authHasConfig(this: AuthHost) {

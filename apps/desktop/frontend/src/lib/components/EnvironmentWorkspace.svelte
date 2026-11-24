@@ -420,7 +420,7 @@
             </span>
           {/if}
           <input class="field field-bare kv-input kv-desc" value={row.description} placeholder="Description" aria-label="Environment variable description" oninput={(event) => updateEnvironmentRow(activeEnvironment.id, i, { description: inputValue(event) })} autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck={false} />
-          <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeEnvironmentRow(activeEnvironment.id, i)} aria-label="Remove variable">✕</button>
+          <button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => removeEnvironmentRow(activeEnvironment.id, i)} aria-label="Remove variable"><AddCloseIcon /></button>
         </div>
       {/each}
       {#if pagedEnvironmentRows.data.length > ENVIRONMENT_ROW_PAGE_SIZE}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import type { AgentApproval } from '../backend';
   import { agentAllowsChatApproval, agentApprovalAction, agentApprovalArguments, agentApprovalTitle } from '../agent';
   import AgentChangeList from './AgentChangeList.svelte';
@@ -62,9 +63,7 @@
     <AgentChangeList changes={approval.changes} />
   {:else}
     <button class="btn btn-ghost btn-sm agent-approval-args-toggle" type="button" aria-expanded={showArgs} onclick={() => (showArgs = !showArgs)}>
-      <svg class:open={showArgs} width="0.625rem" height="0.625rem" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-        <path d="M3.5 2l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <Chevron direction="right" open={showArgs} />
       Arguments
     </button>
     {#if showArgs}<pre class="agent-approval-args">{agentApprovalArguments(approval)}</pre>{/if}
@@ -158,7 +157,7 @@
     color: var(--text);
     font-size: var(--text-body);
   }
-  .agent-approval-head svg {
+  .agent-approval-head :global(svg) {
     flex: 0 0 auto;
     color: var(--accent-text);
   }
@@ -189,11 +188,11 @@
     gap: var(--space-1-5);
     color: var(--text-2);
   }
-  .agent-approval-args-toggle svg {
+  .agent-approval-args-toggle :global(svg) {
     color: var(--text-3);
     transition: transform var(--dur-fast);
   }
-  .agent-approval-args-toggle svg.open {
+  .agent-approval-args-toggle :global(svg.open) {
     transform: rotate(90deg);
   }
   .agent-approval-args {

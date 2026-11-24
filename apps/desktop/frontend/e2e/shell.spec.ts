@@ -135,7 +135,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(page.getByRole('listbox', { name: 'Body types' })).toBeVisible();
     await page.getByRole('option', { name: 'Raw', exact: true }).click();
 
-    const rawTypeButton = page.locator('.raw-type-button');
+    const rawTypeButton = page.locator('.raw-type-menu .app-select-trigger');
     const beautifyButton = bodyModeRow.getByRole('button', { name: 'Beautify', exact: true });
     await expect(rawTypeButton).toBeVisible();
     await expect(beautifyButton).toBeVisible();

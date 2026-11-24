@@ -60,7 +60,6 @@ type RequestBodyHost = {
   proxyUrl: string;
   openFormTypeMenuId: number | null;
   rawBodyType: RawBodyType;
-  rawTypeMenuOpen: boolean;
   reqHeaders: KVRow[];
   requestTab: RequestTab;
   requestType: RequestType;
@@ -110,7 +109,6 @@ export const requestBodyFeature = {
   setRawBodyType(this: RequestBodyHost, type: RawBodyType) {
     this.rawBodyType = type;
     this.bodyType = type;
-    this.rawTypeMenuOpen = false;
   },
 
   bodyModeIs(this: RequestBodyHost, mode: BodyMode) {

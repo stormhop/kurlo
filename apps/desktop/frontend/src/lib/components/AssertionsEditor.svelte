@@ -82,7 +82,7 @@
               <span class="assertions-no-value">—</span>
             {/if}
           </span>
-          <span role="cell"><button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => remove(row.id)} aria-label="Remove assertion">✕</button></span>
+          <span role="cell"><button class="btn btn-ghost btn-icon btn-sm kv-del" type="button" onclick={() => remove(row.id)} aria-label="Remove assertion"><AddCloseIcon /></button></span>
         </div>
       {/each}
     </div>

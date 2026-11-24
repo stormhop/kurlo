@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
+  import CheckIcon from './CheckIcon.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
   import { NAME_MAX_LENGTH } from '../constants';
   import { onMount } from 'svelte';
@@ -265,9 +267,7 @@
           onclick={() => { methodMenuOpen = !methodMenuOpen; }}
         >
           <span>{pickerLabel}</span>
-          <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-            <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <Chevron />
         </button>
         {#if methodMenuOpen}
           <div class="menu method-menu" role="listbox" aria-label="Method and protocol">
@@ -283,7 +283,7 @@
                   type="button"
                   onclick={() => selectMethod(option)}
                 >
-                  <span class="method-check">{isHTTP && method === option ? '✓' : ''}</span>
+                  <span class="method-check">{#if isHTTP && method === option}<CheckIcon />{/if}</span>
                   <span>{option}</span>
                 </button>
               {/each}
@@ -300,7 +300,7 @@
                     type="button"
                     onclick={() => selectRequestType(option)}
                   >
-                    <span class="method-check">{requestType === option ? '✓' : ''}</span>
+                    <span class="method-check">{#if requestType === option}<CheckIcon />{/if}</span>
                     <span>{PROTOCOL_NAMES[option] ?? requestTypeLabel(option)}</span>
                   </button>
                 {/each}
@@ -361,9 +361,7 @@
         >
           <span class="grpc-method-icon" aria-hidden="true">↕</span>
           <span class="grpc-method-label">{grpcSelectedLabel}</span>
-          <svg width="0.625rem" height="0.375rem" viewBox="0 0 10 6" fill="none" aria-hidden="true">
-            <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+          <Chevron />
         </button>
 
         {#if grpcMethodMenuOpen}
@@ -391,7 +389,7 @@
                     type="button"
                     onclick={() => selectGrpcMethod(option.fullName)}
                   >
-                    <span class="method-check">{grpcMethod === option.fullName ? '✓' : ''}</span>
+                    <span class="method-check">{#if grpcMethod === option.fullName}<CheckIcon />{/if}</span>
                     <span class="grpc-option-main">
                       <strong>{grpcMethodLabel(option.fullName)}</strong>
                       <small>{option.requestType} -> {option.responseType}</small>
@@ -469,9 +467,7 @@
             aria-expanded={sendMenuOpen}
             onclick={() => (sendMenuOpen = !sendMenuOpen)}
           >
-            <svg width="0.5rem" height="0.3125rem" viewBox="0 0 10 7" fill="none" aria-hidden="true">
-              <path d="M1.5 2L5 5.5L8.5 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <Chevron />
           </button>
           {#if sendMenuOpen}
             <div class="menu send-menu" role="menu" aria-label="Send options">
