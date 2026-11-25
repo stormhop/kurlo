@@ -290,10 +290,10 @@
 
   {:else if response}
     <div class="response-status-bar">
-      <div class="status-left">
+      <div class="status-left http-status-left">
         <span class="resp-info" use:fixedPopover>
           <span class="status-badge {statusClass(response.statusCode)}" class:status-arrived={responseArrived} tabindex="0" role="button" aria-describedby={statusInfo ? 'response-status-info' : undefined}>
-            {response.statusCode} {response.status.replace(String(response.statusCode), '').trim()}
+            <span class="status-code">{response.statusCode}</span> <span class="status-text">{response.status.replace(String(response.statusCode), '').trim()}</span>
           </span>
           {#if statusInfo}
             <span class="resp-info-popover" id="response-status-info" role="tooltip">

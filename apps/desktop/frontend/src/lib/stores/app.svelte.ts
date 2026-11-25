@@ -40,7 +40,7 @@ import type {
   Method, BodyType, RawBodyType, HttpVersion, RequestTab, ScriptTab, ResponseTab, GrpcResponseTab,
   AuthType, OAuth2GrantType, OAuth2ClientAuth, SidebarView, ShortcutId, KVRow,
   Workspace, Collection, Environment,
-   RequestSettingsOverrides, ProxyConfig, SavedRequest, RequestHistoryEntry, RequestStore,
+   RequestSettingsOverrides, ProxyConfig, SavedRequest, BodyVariant, RequestHistoryEntry, RequestStore,
   CollectionGroup, HistoryDayGroup,
   CollectionRunnerResult, RenderedSnippetLine, RequestType, SIOArg, SavedRealtimeMessage, GrpcResponse, GrpcServiceDefinition,
   RequestExample,
@@ -52,7 +52,8 @@ import { authFeature } from './features/auth';
 import { cookieFeature } from './features/cookies';
 import { cookieSyncFeature, DEFAULT_COOKIE_SYNC_PORT } from './features/cookieSync';
 import { collectionDefaultsFeature } from './features/collectionDefaults';
-import { collectionFeature, SidebarRequestMemo } from './features/collections';
+import { collectionFeature, readRequestSortMode, SidebarRequestMemo } from './features/collections';
+import { EMPTY_SELECTION, type RequestSelection } from '../sidebarSelection';
 import { collectionRunnerFeature } from './features/collectionRunner';
 import { collectionRunnerDerivedFeature } from './features/collectionRunnerDerived';
 import { dataBackupFeature } from './features/dataBackup';
@@ -261,6 +262,7 @@ class AppVM {
   declare deleteSavedMessage: typeof savedMessagesFeature.deleteSavedMessage;
   declare rememberDeleted: typeof trashFeature.rememberDeleted;
   declare trashRequest: typeof trashFeature.trashRequest;
+  declare trashRequests: typeof trashFeature.trashRequests;
   declare trashFolder: typeof trashFeature.trashFolder;
   declare trashCollection: typeof trashFeature.trashCollection;
   declare trashEnvironment: typeof trashFeature.trashEnvironment;
@@ -429,8 +431,10 @@ class AppVM {
   declare resetCollectionSettings: typeof collectionFeature.resetCollectionSettings;
   declare deleteCollection: typeof collectionFeature.deleteCollection;
   declare moveCollection: typeof collectionFeature.moveCollection;
+  declare setRequestSortMode: typeof collectionFeature.setRequestSortMode;
   declare moveRequest: typeof collectionFeature.moveRequest;
   declare moveRequestToFolder: typeof collectionFeature.moveRequestToFolder;
+  declare moveRequests: typeof collectionFeature.moveRequests;
   declare invalidCollectionFromDiagnostic: typeof collectionFeature.invalidCollectionFromDiagnostic;
   declare invalidRequestFromDiagnostic: typeof collectionFeature.invalidRequestFromDiagnostic;
   declare buildCollectionGroups: typeof collectionFeature.buildCollectionGroups;
@@ -619,6 +623,10 @@ class AppVM {
   declare renameRequest: typeof requestCrudFeature.renameRequest;
   declare duplicateRequest: typeof requestCrudFeature.duplicateRequest;
   declare deleteRequest: typeof requestCrudFeature.deleteRequest;
+  declare deleteRequests: typeof requestCrudFeature.deleteRequests;
+  declare removeRequests: typeof requestCrudFeature.removeRequests;
+  declare duplicateRequests: typeof requestCrudFeature.duplicateRequests;
+  declare setRequestsStarred: typeof requestCrudFeature.setRequestsStarred;
   declare forgetRequestResponses: typeof requestCrudFeature.forgetRequestResponses;
   declare toggleRequestPinned: typeof requestCrudFeature.toggleRequestPinned;
   declare copyActiveRequestItem: typeof requestCrudFeature.copyActiveRequestItem;
@@ -1197,6 +1205,8 @@ class AppVM {
   graphqlSchemaOperationToken = 0;
   graphqlSchemaStatus = $state('');
   graphqlSchemaError = $state('');
+  activeBodyVariant = $state('');
+  bodyVariants = $state.raw<BodyVariant[]>([]);
   bodyFilePath = $state('');
   bodyFileName = $state('');
 
@@ -1336,6 +1346,7 @@ class AppVM {
   folderCollapseState = $state<Record<string, boolean>>({});
   starredRequestIds = $state<Set<string>>(new Set());
   sidebarSearch = $state('');
+  requestSortMode = $state(readRequestSortMode());
   workspaceMenuOpen = $state(false);
   workspaceSearch = $state('');
   environmentMenuOpen = $state(false);
@@ -1350,6 +1361,7 @@ class AppVM {
   openFormTypeMenuId = $state<number | null>(null);
   copiedSnippet = $state(false);
   openRequestMenuId = $state('');
+  requestSelection = $state<RequestSelection>(EMPTY_SELECTION);
   openCollectionMenuId = $state('');
   activeCollectionSettingsId = $state('');
   activeFolderSettingsPath = $state<string[]>([]);

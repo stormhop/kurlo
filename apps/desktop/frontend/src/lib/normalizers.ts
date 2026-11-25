@@ -1,3 +1,4 @@
+import { normalizeBodyVariants } from './bodyVariants';
 import { resolveFormRequestTab } from './requestTabPreferences';
 import type {
     Collection,
@@ -75,13 +76,13 @@ const ENTITY_STRINGS = ['id', 'name', 'filesystemName', 'description', 'workspac
 const REQUEST_FIELDS: FieldTypes = {
     strings: [
         ...ENTITY_STRINGS, 'collectionId', 'collection', 'method', 'url', 'requestTab', 'requestType', 'bodyType', 'rawBodyType',
-        'bodyContent', 'bodyFilePath', 'bodyFileName', 'graphqlSchema',
+        'bodyContent', 'bodyFilePath', 'bodyFileName', 'activeBodyVariant', 'graphqlSchema',
         'preRequestScriptJs', 'testScriptJs', 'requestNotes', 'sioEventName', 'grpcMethod', 'grpcProtoFilePath',
         'grpcProtoFileName', 'mcpMethod', 'mcpName', 'mcpArguments', 'mcpProtocolVersion',
         'aiProvider', 'aiModel', 'aiSystem', 'aiPrompt', 'aiTemperature', 'aiTopP', 'aiMaxTokens', 'aiMaxSteps', 'aiIdleTimeoutSec', 'aiThinking', 'aiConnectionId', 'openapi',
     ],
     booleans: ['nameAuto', 'isDraft', 'sioAck', 'grpcUseReflection', 'aiStream', 'aiKurloTools'],
-    arrays: ['folderPath', 'params', 'pathParams', 'vars', 'postResponseVars', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'savedMessages', 'assertions', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
+    arrays: ['folderPath', 'params', 'pathParams', 'vars', 'postResponseVars', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'bodyVariants', 'savedMessages', 'assertions', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
     objects: ['auth', 'settings', 'settingsOverrides'],
 };
 
@@ -285,6 +286,7 @@ export function normalizeSavedRequest(
         bodyFilePath: input.bodyFilePath || bodyDefaults.bodyFilePath,
         bodyFileName: input.bodyFileName || bodyDefaults.bodyFileName,
         formRows: cloneRowsForStore(input.formRows ?? bodyDefaults.formRows),
+        ...(normalizedRequestType === 'http' ? normalizeBodyVariants(input) : {}),
         graphqlSchema: input.graphqlSchema || '',
         preRequestScriptJs: input.preRequestScriptJs || '',
         testScriptJs: input.testScriptJs || '',

@@ -8,6 +8,7 @@
   let { kinds, disabled = false }: { kinds: TrashKind[]; disabled?: boolean } = $props();
 
   let open = $state(false);
+  let openAtPointerDown = false;
   let root = $state<HTMLDivElement>();
   let menuEl = $state<HTMLDivElement>();
   let trigger = $state<HTMLButtonElement>();
@@ -74,7 +75,7 @@
 {#if entries.length}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="recently-deleted" bind:this={root} onfocusout={closeOnFocusOut} onkeydown={onKeydown}>
-    <button bind:this={trigger} class="btn btn-ghost btn-icon btn-sm collection-add recently-deleted-trigger" type="button" aria-label="Recently deleted" aria-haspopup="menu" aria-expanded={open} onclick={() => (open = !open)} {disabled}>
+    <button bind:this={trigger} class="btn btn-ghost btn-icon btn-sm collection-add recently-deleted-trigger" type="button" aria-label="Recently deleted" aria-haspopup="menu" aria-expanded={open} onpointerdown={() => (openAtPointerDown = open)} onclick={() => { open = !(open || openAtPointerDown); openAtPointerDown = false; }} {disabled}>
       <MenuIcon name="trash" />
     </button>
     {#if open}

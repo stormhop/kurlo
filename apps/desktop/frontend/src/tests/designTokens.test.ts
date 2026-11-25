@@ -66,7 +66,7 @@ const SPECIAL_BUTTON_CLASSES = new Set([
   'collection-empty-row', 'collection-name', 'collection-request', 'cookie-domain-item', 'cookie-row-main', 'date-picker-day',
   'dialog-choice-card', 'disclosure-toggle', 'env-color-swatch', 'env-matrix-inherited', 'env-matrix-not-set',
   'env-matrix-unset', 'env-type-toggle', 'environment-globals-item', 'environment-item-main',
-  'environment-none-item', 'examples-row-main', 'git-branch-chip', 'git-branch-row-main', 'git-branch-section',
+  'environment-none-item', 'examples-row-main', 'folder-name', 'git-branch-chip', 'git-branch-row-main', 'git-branch-section',
   'git-commit-row', 'git-conflict-choice-btn', 'git-conflict-file-pill', 'git-file-open', 'git-history-toggle', 'git-popover-scrim',
   'gitauth-pick', 'global-search-item', 'graphql-column-resizer', 'graphql-explorer-field',
   'graphql-explorer-footer-action', 'graphql-explorer-introspection-link', 'graphql-introspection-status',

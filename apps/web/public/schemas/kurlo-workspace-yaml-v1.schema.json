@@ -335,8 +335,33 @@
         "settings": { "$ref": "#/definitions/requestSettings" }
       }
     },
+    "bodyVariant": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "[^\\s]" },
+        "bodyType": { "type": "string", "enum": ["none", "json", "text", "xml", "html", "form", "urlencoded", "binary"] },
+        "rawBodyType": { "type": "string", "enum": ["text", "json", "html", "xml"] },
+        "bodyContent": { "type": "string" },
+        "bodyFilePath": { "type": "string" },
+        "bodyFileName": { "type": "string" },
+        "formRows": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } }
+      }
+    },
     "request": {
       "type": "object",
+      "dependencies": {
+        "bodyVariants": ["activeBodyVariant"],
+        "activeBodyVariant": {
+          "properties": {
+            "requestType": { "const": "http" },
+            "bodyType": { "$ref": "#/definitions/bodyVariant/properties/bodyType" }
+          },
+          "if": { "not": { "required": ["requestType"] } },
+          "then": { "properties": { "url": { "not": { "pattern": "^[wW][sS][sS]?://" } } } }
+        }
+      },
       "additionalProperties": true,
       "required": ["id"],
       "properties": {
@@ -385,6 +410,8 @@
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
         },
+        "activeBodyVariant": { "description": "Name of the HTTP body stored in the request’s ordinary body fields.", "type": "string", "pattern": "[^\\s]" },
+        "bodyVariants": { "description": "Up to four other HTTP bodies. Each name must be unique within the request, including the active body.", "type": "array", "maxItems": 4, "items": { "$ref": "#/definitions/bodyVariant" } },
         "graphqlSchema": { "type": "string" },
         "preRequestScriptJs": { "type": "string" },
         "testScriptJs": { "type": "string" },

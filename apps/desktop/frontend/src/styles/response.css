@@ -1152,3 +1152,50 @@
   overscroll-behavior: none;
   padding-block: var(--space-6);
 }
+
+.http-status-left {
+  container: http-status / inline-size;
+}
+
+.http-status-left > .resp-info:first-child {
+  flex-shrink: 1;
+  max-width: 100%;
+}
+
+.http-status-left .status-badge {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.http-status-left .status-badge::before {
+  flex-shrink: 0;
+}
+
+.http-status-left .status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@container http-status (max-width: 6rem) {
+  .http-status-left .status-text {
+    display: none;
+  }
+}
+
+@container http-status (max-width: 3rem) {
+  .http-status-left .status-badge {
+    gap: 0;
+  }
+  .http-status-left .status-code {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+
+.response-status-bar:has(> .http-status-left) {
+  grid-template-columns: minmax(0.75rem, 1fr) minmax(0, auto);
+}

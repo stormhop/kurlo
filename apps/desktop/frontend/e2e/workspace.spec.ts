@@ -712,9 +712,6 @@ test('reorders requests by dragging above and below siblings and restores the sa
   await expect.poll(titles).toEqual(['Nested one', 'Nested two', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
   await row('Nested two').dragTo(row('Nested one'), { targetPosition: { x: 80, y: 3 } });
   await expect.poll(titles).toEqual(['Nested two', 'Nested one', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
-  await row('Alpha').dragTo(row('Outside'), { targetPosition: { x: 80, y: 3 } });
-  await row('Alpha').dragTo(row('Nested two'), { targetPosition: { x: 80, y: 3 } });
-  await expect.poll(titles).toEqual(['Nested two', 'Nested one', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
   await page.getByRole('textbox', { name: 'Filter requests' }).fill('Alpha');
   await expect(row('Alpha')).toHaveAttribute('draggable', 'false');
   await page.getByRole('textbox', { name: 'Filter requests' }).fill('');
@@ -817,5 +814,187 @@ test('moves requests into empty and nested folders and back to the collection ro
   await expect(request).toBeVisible();
   await expect.poll(savedPath).toEqual(['Empty']);
   await expect(request).toHaveAttribute('style', /--tree-depth: 1/);
+  for (const text of [folder('Empty').locator('.folder-title'), folder('Empty').locator('.collection-count'), page.locator('.collection-folder').filter({ hasText: 'Move API' }).locator('.collection-count')]) {
+    await text.hover();
+    await expect(text).toHaveCSS('cursor', 'default');
+  }
+  await page.locator('.collection-name', { hasText: 'Move API' }).dblclick();
+  await expect(page.getByLabel('Collection name')).toHaveCSS('cursor', 'text');
+  await page.keyboard.press('Escape');
+
+  const folderInput = page.getByLabel('Folder name');
+  await folder('Empty').locator('.folder-title').dblclick();
+  await expect(folderInput).toBeFocused();
+  await expect(folderInput).toHaveCSS('cursor', 'text');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-folder-inline-rename.png'), animations: 'disabled' });
+  await folderInput.fill('Archive');
+  await folderInput.press('Enter');
+  await expect(folder('Archive')).toBeVisible();
+  await expect(request).toHaveAttribute('style', /--tree-depth: 1/);
+  await expect.poll(savedPath).toEqual(['Archive']);
+  await folder('Archive').locator('.folder-title').dblclick();
+  await folderInput.fill('Ignored');
+  await folderInput.press('Escape');
+  await expect(folderInput).toHaveCount(0);
+  await expect(folder('Archive')).toBeVisible();
+  await folder('Archive').locator('.folder-title').dblclick();
+  await folderInput.fill('   ');
+  await folderInput.press('Enter');
+  await expect(folder('Archive')).toBeVisible();
+  await folder('Child').locator('.folder-title').dblclick();
+  await folderInput.fill('Kids');
+  await folderInput.blur();
+  await expect(folder('Kids')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.collections as Array<{ id: string; folderPaths?: string[][] }>).find(collection => collection.id === 'move-api')?.folderPaths)).toContainEqual(['Parent', 'Kids']);
+  await folder('Archive').locator('.folder-title').dblclick();
+  await folderInput.fill('Parent');
+  await folderInput.press('Enter');
+  await expect(page.getByRole('dialog')).toContainText('This level already has a folder named "Parent".');
+  await page.getByRole('dialog').getByRole('button').first().click();
+  await expect(folder('Archive')).toBeVisible();
+  await expect.poll(savedPath).toEqual(['Archive']);
   await page.screenshot({ path: join(tmpdir(), 'kurlo-request-folder-moved.png'), animations: 'disabled' });
+});
+
+test('selects several requests, drags them together and deletes and restores them as one', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [
+      { id: 'bulk-api', workspaceId: 'workspace-e2e', name: 'Bulk API', folderPaths: [['Archive']] },
+      { id: 'other-api', workspaceId: 'workspace-e2e', name: 'Other API', folderPaths: [['Inbox']] },
+    ],
+    folderCollapsed: {},
+    requests: [
+      ...['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map(name => ({ id: name, name, collectionId: 'bulk-api', folderPath: [], method: 'GET', url: `https://example.test/${name}` })),
+      { id: 'Zulu', name: 'Zulu', collectionId: 'other-api', folderPath: [], method: 'GET', url: 'https://example.test/Zulu' },
+    ],
+  });
+  await page.goto('/');
+  const list = page.locator('.collection-list');
+  const row = (name: string) => list.locator('.collection-request-wrap').filter({ has: page.locator('.collection-title', { hasText: new RegExp(`^${name}$`) }) });
+  const titles = () => list.locator('.collection-title').allTextContents();
+  const selected = () => list.locator('.collection-request-wrap.selected .collection-title').allTextContents();
+  const folder = (name: string) => list.locator('.collection-subfolder').filter({ has: page.locator('.folder-title', { hasText: new RegExp(`^${name}$`) }) });
+  const bar = page.getByRole('status', { name: 'Request selection' });
+  const savedPaths = () => page.evaluate(() => Object.fromEntries((window.__kurloE2E.store.requests as Array<{ id: string; folderPath: string[] }>).map(request => [request.id, request.folderPath.join('/')])));
+
+  await row('Alpha').locator('.collection-request').click();
+  await row('Charlie').locator('.collection-request').click({ modifiers: ['ControlOrMeta'] });
+  await expect.poll(selected).toEqual(['Alpha', 'Charlie']);
+  await expect(bar).toContainText('2 selected');
+  await row('Echo').locator('.collection-request').click({ modifiers: ['Shift'] });
+  await expect.poll(selected).toEqual(['Charlie', 'Delta', 'Echo']);
+  await expect(list.locator('.collection-request-wrap.active .collection-title')).toHaveText('Alpha');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-multi-select.png'), animations: 'disabled' });
+
+  await row('Delta').dragTo(row('Alpha'), { targetPosition: { x: 80, y: 3 } });
+  await expect.poll(titles).toEqual(['Charlie', 'Delta', 'Echo', 'Alpha', 'Bravo', 'Zulu']);
+  await expect.poll(selected).toEqual([]);
+  const selectCharlieToEcho = async () => {
+    await row('Charlie').locator('.collection-request').click();
+    await row('Echo').locator('.collection-request').click({ modifiers: ['Shift'] });
+    await expect.poll(selected).toEqual(['Charlie', 'Delta', 'Echo']);
+  };
+  await selectCharlieToEcho();
+  await row('Charlie').dragTo(folder('Archive'));
+  await expect.poll(savedPaths).toEqual({ Alpha: '', Bravo: '', Charlie: 'Archive', Delta: 'Archive', Echo: 'Archive', Zulu: '' });
+  await expect(row('Echo')).toHaveAttribute('style', /--tree-depth: 1/);
+  await expect.poll(selected).toEqual([]);
+  await expect(bar).toHaveCount(0);
+  await selectCharlieToEcho();
+
+  await row('Delta').locator('.collection-request').click({ button: 'right' });
+  const menu = page.locator('.request-batch-menu');
+  await expect(menu).toContainText('3 requests');
+  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-batch-menu.png'), animations: 'disabled' });
+  await menu.getByRole('button', { name: 'Delete 3' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /Delete/ }).click();
+  await expect.poll(titles).toEqual(['Alpha', 'Bravo', 'Zulu']);
+  await expect(page.locator('.undo-toast')).toContainText('Deleted 3 requests');
+  await expect(bar).toHaveCount(0);
+  await page.locator('.undo-toast').getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByRole('button', { name: 'Recently deleted', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Restore request 3 requests' }).click();
+  await expect.poll(titles).toEqual(['Charlie', 'Delta', 'Echo', 'Alpha', 'Bravo', 'Zulu']);
+
+  const savedCollections = () => page.evaluate(() => Object.fromEntries((window.__kurloE2E.store.requests as Array<{ id: string; collectionId: string }>).map(request => [request.id, request.collectionId])));
+  const collectionHeader = (name: string) => list.locator('.collection-folder').filter({ has: page.locator('.collection-name', { hasText: new RegExp(`^${name}$`) }) });
+  await row('Alpha').locator('.collection-request').click();
+  await row('Bravo').locator('.collection-request').click({ modifiers: ['Shift'] });
+  await row('Bravo').dragTo(collectionHeader('Other API'));
+  await expect.poll(savedCollections).toMatchObject({ Alpha: 'other-api', Bravo: 'other-api', Charlie: 'bulk-api', Zulu: 'other-api' });
+  await expect.poll(selected).toEqual([]);
+  await expect(bar).toHaveCount(0);
+  await expect.poll(titles).toEqual(['Charlie', 'Delta', 'Echo', 'Alpha', 'Bravo', 'Zulu']);
+  await row('Zulu').dragTo(row('Echo'), { targetPosition: { x: 80, y: 24 } });
+  await expect.poll(savedCollections).toMatchObject({ Zulu: 'bulk-api' });
+  await expect.poll(savedPaths).toMatchObject({ Zulu: 'Archive' });
+  await expect.poll(titles).toEqual(['Charlie', 'Delta', 'Echo', 'Zulu', 'Alpha', 'Bravo']);
+
+  const transfer = await page.evaluateHandle(() => new DataTransfer());
+  await row('Delta').dispatchEvent('dragstart', { dataTransfer: transfer });
+  await folder('Archive').dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(folder('Archive')).not.toHaveClass(/request-drop-target/);
+  await row('Charlie').dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(list.locator('.request-drop-line')).toHaveCount(1);
+  await row('Delta').dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(list.locator('.request-drop-line')).toHaveCount(0);
+  await folder('Inbox').dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(folder('Inbox')).toHaveClass(/request-drop-target/);
+  await row('Delta').dispatchEvent('dragend');
+
+  await row('Bravo').locator('.collection-request').click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await expect(bar).toContainText('6 selected');
+  await page.keyboard.press('Escape');
+  await expect(bar).toHaveCount(0);
+  await row('Alpha').locator('.collection-request').click({ modifiers: ['ControlOrMeta'] });
+  await row('Bravo').locator('.collection-request').click();
+  await expect.poll(selected).toEqual([]);
+
+  await page.getByRole('button', { name: 'Collection tree menu' }).click();
+  await page.getByRole('menuitemradio', { name: 'By name' }).click();
+  await row('Bravo').dispatchEvent('dragstart', { dataTransfer: transfer });
+  await row('Charlie').dispatchEvent('dragover', { dataTransfer: transfer });
+  await expect(list.locator('.request-drop-line')).toHaveCount(0);
+  await expect(folder('Archive')).toHaveClass(/request-drop-target/);
+  await row('Charlie').dispatchEvent('drop', { dataTransfer: transfer });
+  await expect.poll(savedCollections).toMatchObject({ Bravo: 'bulk-api' });
+  await expect.poll(savedPaths).toMatchObject({ Bravo: 'Archive' });
+  await expect.poll(titles).toEqual(['Bravo', 'Charlie', 'Delta', 'Echo', 'Zulu', 'Alpha']);
+});
+
+test('closes the collection tree menu and Recently deleted with a second click on their button', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'menu-api', workspaceId: 'workspace-e2e', name: 'Menu API' }],
+    folderCollapsed: {},
+    requests: ['One', 'Two'].map(name => ({ id: name, name, collectionId: 'menu-api', folderPath: [], method: 'GET', url: `https://example.test/${name}` })),
+  });
+  await page.goto('/');
+  const treeMenu = page.getByRole('button', { name: 'Collection tree menu' });
+  const treeList = page.getByRole('menu', { name: 'Collection tree menu' });
+  for (let round = 0; round < 2; round += 1) {
+    await treeMenu.click();
+    await expect(treeList).toBeVisible();
+    await expect(treeMenu).toHaveAttribute('aria-expanded', 'true');
+    await treeMenu.click();
+    await expect(treeList).toHaveCount(0);
+    await expect(treeMenu).toHaveAttribute('aria-expanded', 'false');
+  }
+  await treeMenu.press('ArrowDown');
+  await expect(treeList).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(treeList).toHaveCount(0);
+
+  const row = page.locator('.collection-request-wrap').filter({ has: page.locator('.collection-title', { hasText: /^One$/ }) });
+  await row.locator('.collection-request').click({ button: 'right' });
+  await row.locator('.request-menu').getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /Delete/ }).click();
+  const deleted = page.getByRole('button', { name: 'Recently deleted', exact: true });
+  const deletedList = page.getByRole('menu', { name: 'Recently deleted' });
+  for (let round = 0; round < 2; round += 1) {
+    await deleted.click();
+    await expect(deletedList).toBeVisible();
+    await deleted.click();
+    await expect(deletedList).toHaveCount(0);
+  }
 });

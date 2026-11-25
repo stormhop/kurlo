@@ -10,7 +10,7 @@ Kurlo reads both Postman formats and tells them apart on its own:
 - **v3** — the folder of YAML files Postman v12 uses for local collections (Native Git). Use it to import native gRPC, WebSocket, Socket.IO, and MCP requests. See [Postman v3 folders](#postman-v3-folders).
 
 1. In Postman: right-click the collection → **Export** → choose v2.1.
-2. In Kurlo, click **Import collection** in the sidebar. Select **Postman collection**, click **Import**, then pick the JSON file. You can also drop the file into the window.
+2. In the Collections sidebar, choose **⋯ → Import collection…**. Select **Postman collection**, click **Import**, then pick the JSON file. You can also drop the file into the window.
 3. Kurlo creates a new collection in the current workspace, preserving the folder tree.
 
 What carries over:

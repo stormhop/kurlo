@@ -8,13 +8,14 @@ export function setFloatingMenuDismiss(dismiss: () => void) {
   dismissMenus = dismiss;
 }
 
-export function placeFloatingMenu(node: HTMLElement, row: Box, trigger: Box, viewport: { width: number; height: number }) {
+export function placeFloatingMenu(node: HTMLElement, row: Box, trigger: Box, viewport: { width: number; height: number }, align: 'start' | 'end' = 'start') {
   node.style.position = 'fixed';
   node.style.maxHeight = `${Math.max(0, viewport.height - MENU_GAP_PX * 2)}px`;
   node.style.maxWidth = `${Math.max(0, viewport.width - MENU_GAP_PX * 2)}px`;
   node.style.overflowY = 'auto';
   const { width, height } = node.getBoundingClientRect();
-  const left = Math.max(MENU_GAP_PX, Math.min(trigger.left, viewport.width - width - MENU_GAP_PX));
+  const anchorLeft = align === 'end' ? trigger.right - width : trigger.left;
+  const left = Math.max(MENU_GAP_PX, Math.min(anchorLeft, viewport.width - width - MENU_GAP_PX));
   const below = row.bottom + MENU_GAP_PX;
   const above = row.top - height - MENU_GAP_PX;
   const top = below + height <= viewport.height - MENU_GAP_PX || above < MENU_GAP_PX
@@ -44,14 +45,14 @@ function scrollParent(node: HTMLElement): HTMLElement | null {
   return null;
 }
 
-export function floatingMenu(node: HTMLElement) {
+export function floatingMenu(node: HTMLElement, align: 'start' | 'end' = 'start') {
   const anchor = node.parentElement;
   if (!anchor) return {};
   const trigger = triggerFor(node, anchor);
   const scroller = scrollParent(anchor);
   const place = () => {
     const row = anchor.getBoundingClientRect();
-    placeFloatingMenu(node, row, trigger.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight });
+    placeFloatingMenu(node, row, trigger.getBoundingClientRect(), { width: window.innerWidth, height: window.innerHeight }, align);
   };
   const onScroll = (event: Event) => {
     if (event.target instanceof Node && node.contains(event.target)) return;

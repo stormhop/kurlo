@@ -494,6 +494,40 @@ test.describe('Send races', () => {
     await expect(badge).not.toHaveClass(/status-arrived/);
   });
 
+  test('a narrow response pane shrinks the status to its code and then to the dot instead of cutting it', async ({ page }) => {
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await installKurloBridge(page);
+    await page.addInitScript(() => localStorage.setItem('kurlo.responseLayout.v1', 'right'));
+    await page.goto('/');
+    await openRequest(page, 'https://api.kurlo.test/orders/8123');
+    await page.locator('.send-split .btn-send').click();
+
+    const badge = page.locator('.response-status-bar .status-badge');
+    await expect(badge).toHaveText(/200 OK/);
+    await expect(badge).not.toHaveClass(/status-arrived/);
+    const state = () => badge.evaluate(el => {
+      const visible = (selector: string) => el.querySelector(selector)!.getBoundingClientRect().width > 0;
+      const left = el.closest('.status-left')!.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      const dot = getComputedStyle(el, '::before');
+      const dotTop = box.top + (box.height - parseFloat(dot.height)) / 2;
+      const toolbar = el.closest('.response-status-bar')!.querySelector('.status-right')!.getBoundingClientRect();
+      const centred = Math.abs(dotTop + parseFloat(dot.height) / 2 - (toolbar.top + toolbar.height / 2)) <= 2;
+      return { code: visible('.status-code'), text: visible('.status-text'), fits: box.right <= left.right + 0.5 && el.scrollWidth <= el.clientWidth + 0.5, centred };
+    });
+
+    await page.locator('.response-mini-tabs').getByRole('tab', { name: /^Body/ }).click();
+    const divider = page.getByRole('button', { name: 'Resize panels' });
+    await divider.focus();
+    for (let i = 0; i < 30; i++) await page.keyboard.press('ArrowRight');
+    const narrow = await state();
+    expect(narrow).toEqual({ code: false, text: false, fits: true, centred: true });
+    await page.locator('.response-status-bar').screenshot({ path: test.info().outputPath('narrow-status.png') });
+
+    await page.setViewportSize({ width: 1800, height: 800 });
+    await expect.poll(state).toEqual({ code: true, text: true, fits: true, centred: true });
+  });
+
   test('Send, Cancel, Send keeps the spinner until the second answer', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');

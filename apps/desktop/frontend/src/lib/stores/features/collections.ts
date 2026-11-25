@@ -8,15 +8,28 @@ import {
   normalizeCollectionFolderPaths,
   reorderWorkspaceCollections,
   reorderCollectionRequests,
+  movableRequest,
+  placeRequests,
   type DropPlacement,
+  type RequestDropTarget,
 } from '../../collections';
 import { normalizeCollectionEnvironmentPins } from '../../collectionEnvironments';
 import { makeCollection } from '../../normalizers';
-import type { Collection, CollectionGroup, FolderDefaults, FolderGroup, PersistRequestStore, RequestType, SavedRequest, SidebarView } from '../../types/models';
+import type { Collection, CollectionGroup, FolderDefaults, FolderGroup, PersistRequestStore, RequestSortMode, RequestType, SavedRequest, SidebarView } from '../../types/models';
 import { requestKindFor, requestTabLabel } from '../../utils';
 import type { TopView } from '../ui';
 
 const FOLDER_MAP_SEPARATOR = '\u001f';
+const REQUEST_SORT_MODE_KEY = 'kurlo.sidebar.requestSortMode.v1';
+const requestNameCollator = new Intl.Collator('en', { sensitivity: 'base', numeric: true });
+
+export function readRequestSortMode(): RequestSortMode {
+  try {
+    return localStorage.getItem(REQUEST_SORT_MODE_KEY) === 'name' ? 'name' : 'manual';
+  } catch {
+    return 'manual';
+  }
+}
 
 type CollectionSettingsTab = 'overview' | 'headers' | 'vars' | 'auth' | 'script' | 'tests' | 'proxy' | 'openapi';
 
@@ -35,6 +48,7 @@ type CollectionHost = {
   folderCollapseState: Record<string, boolean>;
   openCollectionMenuId: string;
   openRequestIds: string[];
+  requestSortMode: RequestSortMode;
   requests: SavedRequest[];
   unsavedRequestSnapshots: Map<string, SavedRequest>;
   savedRequestSnapshots: Map<string, SavedRequest>;
@@ -65,6 +79,7 @@ type CollectionHost = {
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: PersistRequestStore;
+  normalizeSavedRequestCtx: (input: Partial<SavedRequest>) => SavedRequest;
   requestsForDisplay: () => SavedRequest[];
   scheduleRequestStorePersist: (delay?: number) => void;
   workspaceDiagnosticKey: (diagnostic: WorkspaceDiagnostic) => string;
@@ -74,6 +89,10 @@ type CollectionHost = {
 function sortFolders(folders: FolderGroup[]) {
   folders.sort((a, b) => a.name.localeCompare(b.name));
   for (const folder of folders) sortFolders(folder.children);
+}
+
+function compareRequestNames(left: SavedRequest, right: SavedRequest): number {
+  return requestNameCollator.compare(requestTabLabel(left), requestTabLabel(right));
 }
 
 function updateRequestCount(folder: FolderGroup): number {
@@ -142,6 +161,12 @@ export function requestMatchesSidebarQuery(request: SavedRequest, query: string)
 }
 
 export const collectionFeature = {
+  setRequestSortMode(this: CollectionHost, mode: RequestSortMode) {
+    this.requestSortMode = mode;
+    try {
+      localStorage.setItem(REQUEST_SORT_MODE_KEY, mode);
+    } catch {}
+  },
   async toggleCollectionCollapsed(this: CollectionHost, collectionId: string) {
     this.collections = this.collections.map(collection => collection.id === collectionId ? { ...collection, collapsed: !collection.collapsed } : collection);
     this.scheduleRequestStorePersist();
@@ -333,7 +358,7 @@ export const collectionFeature = {
     await this.persistRequestStore();
   },
   async moveRequest(this: CollectionHost, sourceId: string, targetId: string, placement: DropPlacement) {
-    if (this.sidebarSearch.trim() || !this.guardWorkspaceWritable('Reordering requests')) return;
+    if (this.requestSortMode === 'name' || this.sidebarSearch.trim() || !this.guardWorkspaceWritable('Reordering requests')) return;
     const source = this.requests.find(request => request.id === sourceId);
     const collection = this.collections.find(collection => collection.id === source?.collectionId);
     if (!collection || collection.isInvalid || collection.workspaceId !== this.activeWorkspaceId) return;
@@ -366,6 +391,68 @@ export const collectionFeature = {
     this.folderCollapseState = { ...this.folderCollapseState, [this.folderCollapseKey(collectionId, folderPath)]: false };
     this.closeFloatingMenus();
     await this.persistRequestStore();
+  },
+  async moveRequests(this: CollectionHost, ids: string[], collectionId: string, folderPath: string[], target?: RequestDropTarget): Promise<boolean> {
+    if (this.sidebarSearch.trim() || (target && this.requestSortMode === 'name') || !this.guardWorkspaceWritable('Moving requests')) return false;
+    const usable = (id: string) => {
+      const candidate = this.collections.find(collection => collection.id === id);
+      return candidate && !candidate.isInvalid && candidate.workspaceId === this.activeWorkspaceId ? candidate : undefined;
+    };
+    const destination = usable(collectionId);
+    if (!destination) return false;
+    const wanted = new Set(ids);
+    const moving = this.requests.filter(request => wanted.has(request.id) && movableRequest(request));
+    if (!moving.length || moving.some(request => !usable(request.collectionId))) return false;
+    const targetKey = folderPathKey(folderPath);
+    const group = this.collectionGroups.find(candidate => candidate.collection.id === collectionId);
+    if (folderPath.length && (!group || !this.allFolderGroups([group]).some(folder => folderPathKey(folder.path) === targetKey))) return false;
+    const arrives = (request: SavedRequest) => request.collectionId !== collectionId || folderPathKey(request.folderPath) !== targetKey;
+    const incoming = moving.filter(arrives);
+    if (folderPath.length && incoming.length) {
+      const present = this.requests.filter(request => !request.isDraft && request.collectionId === collectionId && folderPathKey(request.folderPath) === targetKey).length;
+      if (present + incoming.length > MAX_FOLDER_REQUESTS) {
+        await this.openAlertDialog('Folder limit', `A folder can contain up to ${MAX_FOLDER_REQUESTS} requests.`);
+        return false;
+      }
+    }
+    const relocate = (request: SavedRequest) => {
+      if (request.collectionId === collectionId) return { ...request, folderPath: [...folderPath] };
+      const { openapi: _openapi, ...rest } = request;
+      return this.normalizeSavedRequestCtx({ ...rest, collectionId, collection: destination.name, folderPath: [...folderPath] });
+    };
+    const next = placeRequests(this.requests, moving.map(request => request.id), collectionId, folderPath, target, relocate);
+    if (next === this.requests) return false;
+    if (incoming.length) {
+      this.collections = this.collections.map(candidate => {
+        let updated = candidate.id === collectionId ? addCollectionFolderPath(candidate, folderPath) : candidate;
+        for (const request of incoming) if (request.collectionId === candidate.id) updated = addCollectionFolderPath(updated, request.folderPath ?? []);
+        return updated;
+      });
+    }
+    this.requests = next;
+    if (incoming.length) {
+      const moved = new Map(next.filter(request => incoming.some(source => source.id === request.id)).map(request => [request.id, request]));
+      const relocateSnapshots = (snapshots: Map<string, SavedRequest>) => {
+        if (!incoming.some(request => snapshots.has(request.id))) return snapshots;
+        const updated = new Map(snapshots);
+        for (const request of incoming) {
+          const snapshot = updated.get(request.id);
+          const placed = moved.get(request.id);
+          if (snapshot && placed) {
+            const { openapi: _openapi, ...rest } = snapshot;
+            updated.set(request.id, { ...(placed.collectionId === snapshot.collectionId ? snapshot : rest), collectionId: placed.collectionId, collection: placed.collection, folderPath: [...folderPath] });
+          }
+        }
+        return updated;
+      };
+      this.savedRequestSnapshots = relocateSnapshots(this.savedRequestSnapshots);
+      this.unsavedRequestSnapshots = relocateSnapshots(this.unsavedRequestSnapshots);
+      this.folderCollapseState = { ...this.folderCollapseState, [this.folderCollapseKey(collectionId, folderPath)]: false };
+      if (destination.collapsed) this.collections = this.collections.map(candidate => candidate.id === collectionId ? { ...candidate, collapsed: false } : candidate);
+    }
+    this.closeFloatingMenus();
+    await this.persistRequestStore();
+    return true;
   },
   invalidCollectionFromDiagnostic(this: CollectionHost, diagnostic: WorkspaceDiagnostic): Collection {
     const id = diagnostic.collectionId || `invalid-collection-${this.workspaceDiagnosticKey(diagnostic)}`;
@@ -485,6 +572,10 @@ export const collectionFeature = {
       }
       const folders = Array.from(folderMap.values()).filter(folder => folder.path.length === 1);
       sortFolders(folders);
+      if (this.requestSortMode === 'name') {
+        rootRequests.sort(compareRequestNames);
+        for (const folder of folderMap.values()) folder.requests.sort(compareRequestNames);
+      }
       for (const folder of folders) updateRequestCount(folder);
       return { collection, requests: groupRequests, rootRequests, folders };
     }).filter(group => group.requests.length || group.folders.length || !query);

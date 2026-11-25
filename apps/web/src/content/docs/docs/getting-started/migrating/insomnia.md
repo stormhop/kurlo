@@ -11,7 +11,7 @@ Export the collection from Insomnia as **Insomnia v4 (JSON)**.
 
 ## Import into Kurlo
 
-Click **Import collection** in Kurlo's sidebar. Select **Insomnia export**, click **Import**, then select the JSON file. You can also drop the file into the Kurlo window.
+In the Collections sidebar, choose **⋯ → Import collection…**. Select **Insomnia export**, click **Import**, then select the JSON file. You can also drop the file into the Kurlo window.
 
 ## What carries over
 

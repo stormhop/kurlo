@@ -1,5 +1,6 @@
 <script lang="ts">
   import { loadRunKey } from './lib/loadTests';
+  import type { RequestSelection } from './lib/sidebarSelection';
   import { kurloChangedFiles } from './lib/gitFiles';
   import { onMount, untrack } from 'svelte';
   import { docsRelativeLinkScopes, getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
@@ -826,6 +827,8 @@
     bind:sidebarView={vm.sidebarView}
     bind:sidebarSearch={vm.sidebarSearch}
     bind:sidebarSearchInput={vm._sidebarSearchInput}
+    requestSortMode={vm.requestSortMode}
+    setRequestSortMode={vm.setRequestSortMode}
     topView={vm.topView}
     activeRequestId={vm.activeRequestId}
     activeEnvironmentId={vm.activeEnvironmentId}
@@ -852,8 +855,12 @@
     exportCollection={vm.exportCollection}
     deleteCollection={vm.deleteCollection}
     moveCollection={vm.moveCollection}
-    moveRequest={vm.moveRequest}
-    moveRequestToFolder={vm.moveRequestToFolder}
+    moveRequests={vm.moveRequests}
+    requestSelection={vm.requestSelection}
+    setRequestSelection={(selection: RequestSelection) => (vm.requestSelection = selection)}
+    deleteRequests={(ids: string[]) => void vm.deleteRequests(ids)}
+    duplicateRequests={(ids: string[]) => void vm.duplicateRequests(ids)}
+    setRequestsStarred={(ids: string[], starred: boolean) => void vm.setRequestsStarred(ids, starred)}
     switchRequest={vm.switchRequest}
     {requestTabLabel}
     toggleRequestMenu={vm.toggleRequestMenu}
@@ -1371,6 +1378,7 @@
 
         {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
           <BodyModeSelector
+            showVariants={vm.method !== 'SSE'}
             rawBodyType={vm.rawBodyType}
             rawBodyTypes={RAW_BODY_TYPES}
             bodyModeIs={vm.bodyModeIs}
@@ -1420,7 +1428,7 @@
             {:else if vm.requestType === 'ai'}
               {#if lazy.AiPromptTabComponent}<lazy.AiPromptTabComponent />{/if}
             {:else if lazy.BodyTabComponent}
-              <lazy.BodyTabComponent />
+              {#key vm.activeBodyVariant}<lazy.BodyTabComponent />{/key}
             {/if}
           {:else if vm.requestTab === 'tools'}
             {#if lazy.AiToolsTabComponent}<lazy.AiToolsTabComponent />{/if}

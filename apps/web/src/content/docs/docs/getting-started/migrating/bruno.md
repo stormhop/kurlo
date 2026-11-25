@@ -8,7 +8,7 @@ Use your existing Bruno collection folder. Kurlo reads OpenCollection folders wi
 ## Import into Kurlo
 
 1. Open the destination workspace in Kurlo.
-2. In the sidebar, click **Import collection** next to **+**. Select **Bruno / OpenCollection**, then click **Import**.
+2. In the Collections sidebar, choose **⋯ → Import collection…**. Select **Bruno / OpenCollection**, then click **Import**.
 3. Select the collection's root folder. You can also drop that folder into the Kurlo window.
 
 ## What carries over

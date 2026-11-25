@@ -1,5 +1,6 @@
 <script lang="ts">
   import Chevron from './Chevron.svelte';
+  import CollectionTreeMenu from './CollectionTreeMenu.svelte';
   import { loadRunKey } from '../loadTests';
   import AddCloseIcon from './AddCloseIcon.svelte';
   import KurloBird from './KurloBird.svelte';
@@ -22,6 +23,7 @@
     FolderGroup,
     HistoryDayGroup,
     RequestHistoryEntry,
+    RequestSortMode,
     SavedRequest,
     SidebarView,
     WorkspaceDiagnostic,
@@ -33,7 +35,8 @@
   import SecretProvidersSidebar from './SecretProvidersSidebar.svelte';
   import type { LoadRunResult, LoadTest } from '../wire';
 
-  import { canReorderRequests, type DropPlacement } from '../collections';
+  import { canReorderRequests, movableRequest, type DropPlacement, type RequestDropTarget } from '../collections';
+  import { EMPTY_SELECTION, applySelectionClick, pruneSelection, selectAllRequests, selectionModifiers, type RequestBatchActions, type RequestSelection } from '../sidebarSelection';
   type CollectionSidebarRow =
     | { type: 'onboarding'; key: string; height: number }
     | { type: 'request'; key: string; height: number; req: SavedRequest; depth: number; menuKey: string }
@@ -70,6 +73,8 @@
     sidebarView = $bindable<SidebarView>('collections'),
     sidebarSearch = $bindable(''),
     sidebarSearchInput = $bindable<HTMLInputElement | undefined>(),
+    requestSortMode,
+    setRequestSortMode,
     topView,
     activeRequestId,
     activeEnvironmentId,
@@ -96,8 +101,12 @@
     exportCollection,
     deleteCollection,
     moveCollection,
-    moveRequest,
-    moveRequestToFolder,
+    moveRequests,
+    requestSelection = EMPTY_SELECTION,
+    setRequestSelection = () => {},
+    deleteRequests = () => {},
+    duplicateRequests = () => {},
+    setRequestsStarred = () => {},
     switchRequest,
     requestTabLabel,
     toggleRequestMenu,
@@ -159,6 +168,8 @@
     sidebarView: SidebarView;
     sidebarSearch: string;
     sidebarSearchInput?: HTMLInputElement;
+    requestSortMode: RequestSortMode;
+    setRequestSortMode: (mode: RequestSortMode) => void;
     topView: TopView;
     activeRequestId: string;
     activeEnvironmentId: string;
@@ -185,8 +196,12 @@
     exportCollection: (id: string) => void;
     deleteCollection: (id: string) => void;
     moveCollection: (sourceId: string, targetId: string, placement: DropPlacement) => void;
-    moveRequestToFolder: (sourceId: string, collectionId: string, folderPath: string[]) => void;
-    moveRequest: (sourceId: string, targetId: string, placement: DropPlacement) => void;
+    moveRequests: (ids: string[], collectionId: string, folderPath: string[], target?: RequestDropTarget) => unknown;
+    requestSelection?: RequestSelection;
+    setRequestSelection?: (selection: RequestSelection) => void;
+    deleteRequests?: (ids: string[]) => void;
+    duplicateRequests?: (ids: string[]) => void;
+    setRequestsStarred?: (ids: string[], starred: boolean) => void;
     switchRequest: (id: string) => void;
     requestTabLabel: (request: SavedRequest) => string;
     toggleRequestMenu: (id: string, event: MouseEvent) => void;
@@ -201,7 +216,7 @@
     toggleFolderMenu: (key: string, event: MouseEvent) => void;
     createRequestInFolder: (collectionId: string, folderPath: string[]) => void;
     createSubfolder: (collectionId: string, parentPath: string[]) => void;
-    renameFolder: (collectionId: string, folderPath: string[]) => void;
+    renameFolder: (collectionId: string, folderPath: string[], name?: string) => void | Promise<void>;
     openFindReplace: (collectionId: string, folderPath?: string[]) => void;
     deleteFolder: (collectionId: string, folderPath: string[]) => void;
     createFolderInCollection: (collectionId: string) => void;
@@ -247,7 +262,8 @@
   } = $props();
 
   let hoveredRowKey = $state('');
-  let draggingRequest = $state<SavedRequest | undefined>();
+  let draggingRequests = $state<SavedRequest[]>([]);
+  let draggingRequestIds = $derived(new Set(draggingRequests.map(request => request.id)));
   let dragOverRequestId = $state('');
   let dragOverFolderKey = $state('');
   let requestDropPlacement = $state<DropPlacement>('before');
@@ -348,6 +364,17 @@
   const collectionGrowth = new WindowGrowth((): boolean => canGrowWindow(visibleCollectionRows));
   let visibleCollectionRows = $derived(virtualizeRows(collectionRows, collectionScrollTop, collectionViewportHeight, collectionOverscan, ROW_HEIGHT * $uiScale, collectionRowHeights, $uiScale, collectionGrowth.extra));
   let historyRows = $derived(buildHistoryRows());
+  let treeRequests = $derived(collectionRows.flatMap(row => row.type === 'request' && !row.req.isInvalid ? [row.req] : []));
+  let treeRequestOrder = $derived(treeRequests.map(request => request.id));
+  let treeRequestsById = $derived(new Map(treeRequests.map(request => [request.id, request])));
+  let selectedRequestIds = $derived(new Set(requestSelection.ids));
+  let selectedRequests = $derived(requestSelection.ids.flatMap(id => treeRequestsById.get(id) ?? []));
+  let selectionBatch = $derived(selectedRequests.length > 1 ? batchFor(selectedRequests) : undefined);
+
+  $effect(() => {
+    const pruned = pruneSelection(requestSelection, treeRequestOrder);
+    if (pruned !== requestSelection) untrack(() => setRequestSelection(pruned));
+  });
 
   const LOAD_RUN_STATUS: Record<string, string> = { passed: 'passed', failed: 'failed', stopped: 'stopped', error: 'did not finish' };
 
@@ -643,40 +670,134 @@
 
   function updateRequestHover(event: PointerEvent) {
     const row = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-sidebar-hover-key]') : null;
-    hoveredRowKey = draggingRequest || draggingCollectionId ? '' : row?.dataset.sidebarHoverKey ?? '';
+    hoveredRowKey = draggingRequests.length || draggingCollectionId ? '' : row?.dataset.sidebarHoverKey ?? '';
   }
 
   function clearRequestHover() {
     hoveredRowKey = '';
   }
 
+  function batchFor(requests: SavedRequest[]): RequestBatchActions {
+    const ids = requests.map(request => request.id);
+    const starrable = requests.filter(request => !request.isDraft);
+    const allStarred = starrable.length > 0 && starrable.every(request => starredRequestIds.has(request.id));
+    const loadTestIds = requests.filter(request => !request.isDraft && ['', 'http', 'graphql'].includes(request.requestType ?? '')).map(request => request.id);
+    const collectionIds = new Set(requests.map(request => request.collectionId));
+    const loadTestCollectionId = collectionIds.size === 1 && loadTestIds.length ? requests[0].collectionId : '';
+    return {
+      count: requests.length,
+      allStarred,
+      canStar: starrable.length > 0,
+      canLoadTest: Boolean(loadTestCollectionId),
+      duplicate: () => duplicateRequests(ids),
+      star: () => setRequestsStarred(ids, !allStarred),
+      loadTest: () => { if (loadTestCollectionId) createLoadTest(loadTestCollectionId, loadTestIds); },
+      remove: () => deleteRequests(ids),
+    };
+  }
+
+  function onRequestRowClick(request: SavedRequest, event: MouseEvent): boolean {
+    if (collectionListEl && !collectionListEl.contains(document.activeElement)) collectionListEl.focus({ preventScroll: true });
+    const modifiers = selectionModifiers(event);
+    const next = applySelectionClick(requestSelection, request.id, treeRequestOrder, activeRequestId, modifiers);
+    if (next !== requestSelection) setRequestSelection(next);
+    if (!modifiers.toggle && !modifiers.range) return false;
+    event.preventDefault();
+    return true;
+  }
+
+  function onRequestRowMenu(request: SavedRequest, menuKey: string, event: MouseEvent) {
+    if (requestSelection.ids.length && !selectedRequestIds.has(request.id)) setRequestSelection({ ids: [], anchor: request.id });
+    toggleRequestMenu(menuKey, event);
+  }
+
+  function clearRequestSelection() {
+    setRequestSelection({ ids: [], anchor: requestSelection.anchor });
+  }
+
+  function onCollectionListKeydown(event: KeyboardEvent) {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'a') return;
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+    if (!treeRequestOrder.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setRequestSelection(selectAllRequests(treeRequestOrder));
+  }
+
   function clearRequestDragState() {
     clearRequestHover();
-    draggingRequest = undefined;
+    draggingRequests = [];
     dragOverFolderKey = '';
     dragOverRequestId = '';
     requestDropPlacement = 'before';
   }
 
+  function finishGroupDrop(moved: unknown) {
+    if (draggingRequests.length > 1) {
+      void Promise.resolve(moved).then(done => { if (done) clearRequestSelection(); });
+    }
+    clearRequestDragState();
+  }
+
+  function dragGhost(label: string) {
+    const ghost = document.createElement('div');
+    ghost.className = 'sidebar-drag-ghost';
+    ghost.textContent = label;
+    document.body.appendChild(ghost);
+    setTimeout(() => ghost.remove(), 0);
+    return ghost;
+  }
+
   function onRequestDragStart(request: SavedRequest, event: DragEvent) {
     event.stopPropagation();
-    if (collectionDragDisabled() || request.isDraft || request.isInvalid) {
+    if (collectionDragDisabled() || !movableRequest(request)) {
       event.preventDefault();
       return;
     }
     clearCollectionDragState();
     clearRequestHover();
-    draggingRequest = request;
+    let group = [request];
+    if (selectedRequestIds.has(request.id) && selectedRequests.length > 1) group = selectedRequests.filter(movableRequest);
+    draggingRequests = group;
     event.dataTransfer?.setData('application/x-kurlo-request-id', request.id);
-    event.dataTransfer?.setData('text/plain', request.id);
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer?.setData('text/plain', group.map(candidate => candidate.id).join('\n'));
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      if (group.length > 1) event.dataTransfer.setDragImage(dragGhost(`${group.length} requests`), 12, 12);
+    }
+  }
+
+  function sameFolder(left: SavedRequest, collectionId: string, path: string[]) {
+    return left.collectionId === collectionId && JSON.stringify(left.folderPath ?? []) === JSON.stringify(path);
+  }
+
+  function canDropOnRequest(request: SavedRequest) {
+    if (collectionDragDisabled() || !draggingRequests.length || !movableRequest(request) || draggingRequestIds.has(request.id)) return false;
+    if (collectionById(request.collectionId)?.isInvalid) return false;
+    if (requestSortMode !== 'name') return true;
+    return draggingRequests.some(source => !sameFolder(source, request.collectionId, request.folderPath ?? []));
+  }
+
+  function refuseRequestDrop(event: DragEvent) {
+    if (!draggingRequests.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragOverRequestId = '';
+    dragOverFolderKey = '';
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
   }
 
   function onRequestDragOver(request: SavedRequest, event: DragEvent) {
-    if (collectionDragDisabled() || !canReorderRequests(draggingRequest, request)) return;
-    dragOverFolderKey = '';
+    if (!canDropOnRequest(request)) { refuseRequestDrop(event); return; }
     event.preventDefault();
     event.stopPropagation();
+    if (requestSortMode === 'name') {
+      dragOverRequestId = '';
+      dragOverFolderKey = folderDropKey(request.collectionId, request.folderPath ?? []);
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+      return;
+    }
+    dragOverFolderKey = '';
     const target = currentElement(event);
     if (!target) return;
     const rect = target.getBoundingClientRect();
@@ -692,11 +813,13 @@
   }
 
   function onRequestDrop(request: SavedRequest, event: DragEvent) {
-    if (collectionDragDisabled() || !draggingRequest || !canReorderRequests(draggingRequest, request)) return;
+    if (!canDropOnRequest(request)) return;
     event.preventDefault();
     event.stopPropagation();
-    moveRequest(draggingRequest.id, request.id, requestDropPlacement);
-    clearRequestDragState();
+    const ids = draggingRequests.map(source => source.id);
+    finishGroupDrop(requestSortMode === 'name'
+      ? moveRequests(ids, request.collectionId, request.folderPath ?? [])
+      : moveRequests(ids, request.collectionId, request.folderPath ?? [], { id: request.id, placement: requestDropPlacement }));
   }
 
   function folderDropKey(collectionId: string, path: string[]) {
@@ -704,13 +827,12 @@
   }
 
   function canDropRequestInFolder(collectionId: string, path: string[]) {
-    return !collectionDragDisabled() && draggingRequest && !draggingRequest.isDraft && !draggingRequest.isInvalid
-      && draggingRequest.collectionId === collectionId && !collectionById(collectionId)?.isInvalid
-      && JSON.stringify(draggingRequest.folderPath ?? []) !== JSON.stringify(path);
+    if (collectionDragDisabled() || !draggingRequests.length || collectionById(collectionId)?.isInvalid) return false;
+    return draggingRequests.some(source => !sameFolder(source, collectionId, path));
   }
 
   function onFolderDragOver(collectionId: string, path: string[], event: DragEvent) {
-    if (!canDropRequestInFolder(collectionId, path)) return;
+    if (!canDropRequestInFolder(collectionId, path)) { refuseRequestDrop(event); return; }
     event.preventDefault();
     event.stopPropagation();
     dragOverRequestId = '';
@@ -725,11 +847,10 @@
   }
 
   function onFolderDrop(collectionId: string, path: string[], event: DragEvent) {
-    if (!canDropRequestInFolder(collectionId, path) || !draggingRequest) return;
+    if (!canDropRequestInFolder(collectionId, path)) return;
     event.preventDefault();
     event.stopPropagation();
-    moveRequestToFolder(draggingRequest.id, collectionId, path);
-    clearRequestDragState();
+    finishGroupDrop(moveRequests(draggingRequests.map(source => source.id), collectionId, path));
   }
 
   function collectionById(collectionId: string) {
@@ -768,6 +889,56 @@
     }
   }
 
+  let editingFolderKey = $state('');
+  let editingFolderCollectionId = $state('');
+  let editingFolderPath = $state<string[]>([]);
+  let editingFolderName = $state('');
+  let editingFolderInput = $state<HTMLInputElement | undefined>();
+
+  $effect(() => {
+    if (!editingFolderKey || !editingFolderInput) return;
+    editingFolderInput.focus();
+    editingFolderInput.select();
+  });
+
+  function startFolderInlineRename(collectionId: string, folder: FolderGroup, event: MouseEvent) {
+    if (workspaceBlocked) return;
+    event.preventDefault();
+    event.stopPropagation();
+    editingFolderKey = folder.key;
+    editingFolderCollectionId = collectionId;
+    editingFolderPath = [...folder.path];
+    editingFolderName = folder.name;
+  }
+
+  function cancelFolderInlineRename() {
+    editingFolderKey = '';
+    editingFolderCollectionId = '';
+    editingFolderPath = [];
+    editingFolderName = '';
+    editingFolderInput = undefined;
+  }
+
+  async function commitFolderInlineRename() {
+    const collectionId = editingFolderCollectionId;
+    const path = editingFolderPath;
+    const name = editingFolderName.trim();
+    const editing = Boolean(editingFolderKey);
+    cancelFolderInlineRename();
+    if (!editing || !name || name === path.at(-1)) return;
+    await renameFolder(collectionId, path, name);
+  }
+
+  function onFolderNameKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void commitFolderInlineRename();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelFolderInlineRename();
+    }
+  }
+
   function currentElement(event: Event) {
     return event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   }
@@ -785,7 +956,7 @@
   }
 
   function onCollectionDragOver(collectionId: string, event: DragEvent) {
-    if (draggingRequest) { onFolderDragOver(collectionId, [], event); return; }
+    if (draggingRequests.length) { onFolderDragOver(collectionId, [], event); return; }
     if (collectionDragDisabled() || !draggingCollectionId || draggingCollectionId === collectionId) return;
     event.preventDefault();
     const target = currentElement(event);
@@ -805,7 +976,7 @@
   }
 
   function onCollectionDrop(collectionId: string, event: DragEvent) {
-    if (draggingRequest) { onFolderDrop(collectionId, [], event); return; }
+    if (draggingRequests.length) { onFolderDrop(collectionId, [], event); return; }
     if (collectionDragDisabled()) return;
     event.preventDefault();
     const sourceId = event.dataTransfer?.getData('application/x-kurlo-collection-id') || draggingCollectionId;
@@ -876,17 +1047,26 @@
           {/if}
         </section>
       {/if}
-      <div class="collections-head">
-        <span>Collections</span>
-        <div class="collections-head-actions">
-          <RecentlyDeleted kinds={['request', 'folder', 'collection']} disabled={workspaceBlocked} />
-          <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={openPostmanImport} aria-label="Import collection" disabled={workspaceBlocked}>
-            <svg width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M6.5 1.5v6M4 5l2.5 2.5L9 5M2 9.5v1.2c0 .4.3.8.8.8h7.4c.5 0 .8-.4.8-.8V9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createCollection} aria-label="New collection" disabled={workspaceBlocked}><AddCloseIcon add /></button>
+      {#if selectionBatch}
+        <div class="collections-head sidebar-selection-bar" role="status" aria-label="Request selection">
+          <span class="sidebar-selection-count">{selectionBatch.count} selected</span>
+          <div class="collections-head-actions">
+            <button class="btn btn-ghost btn-icon btn-sm" type="button" onclick={selectionBatch.remove} aria-label={`Delete ${selectionBatch.count} requests`} disabled={workspaceBlocked}><MenuIcon name="trash" /></button>
+            <button class="btn btn-ghost btn-icon btn-sm" type="button" onclick={clearRequestSelection} aria-label="Clear selection"><AddCloseIcon /></button>
+          </div>
         </div>
-      </div>
-      <div class="collection-list" role="list" bind:this={collectionListEl} use:trackViewport={syncCollectionViewport} onscroll={onCollectionScroll}>
+      {:else}
+        <div class="collections-head">
+          <span>Collections</span>
+          <div class="collections-head-actions">
+            <RecentlyDeleted kinds={['request', 'folder', 'collection']} disabled={workspaceBlocked} />
+            <CollectionTreeMenu {requestSortMode} {setRequestSortMode} {openPostmanImport} {workspaceBlocked} />
+            <button class="btn btn-ghost btn-icon btn-sm collection-add" type="button" onclick={createCollection} aria-label="New collection" disabled={workspaceBlocked}><AddCloseIcon add /></button>
+          </div>
+        </div>
+      {/if}
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div class="collection-list" role="list" tabindex="-1" bind:this={collectionListEl} use:trackViewport={syncCollectionViewport} onscroll={onCollectionScroll} onkeydown={onCollectionListKeydown}>
         <div class="sidebar-virtual-spacer" style={`height: ${visibleCollectionRows.before}px`}></div>
         {#each visibleCollectionRows.rows as row (row.key)}
           <div class="sidebar-vrow" use:measureRow={row.key}>
@@ -909,7 +1089,11 @@
               menuKey={row.menuKey}
               hovered={hoveredRowKey === row.menuKey}
               dragEnabled={!collectionDragDisabled() && !collectionById(row.req.collectionId)?.isInvalid}
-              dragging={draggingRequest?.id === row.req.id}
+              dragging={draggingRequestIds.has(row.req.id)}
+              selected={selectedRequestIds.has(row.req.id)}
+              batch={selectedRequestIds.has(row.req.id) ? selectionBatch : undefined}
+              onrowclick={(event) => onRequestRowClick(row.req, event)}
+              onrowmenu={(event) => onRequestRowMenu(row.req, row.menuKey, event)}
               dropPlacement={dragOverRequestId === row.req.id ? requestDropPlacement : undefined}
               ondragstart={(event) => onRequestDragStart(row.req, event)}
               ondragover={(event) => onRequestDragOver(row.req, event)}
@@ -1111,7 +1295,25 @@
                   <Chevron collapsed={row.folder.collapsed} />
                 </button>
                 <svg class="folder-icon" width="0.8125rem" height="0.8125rem" viewBox="0 0 13 13" fill="none" aria-hidden="true"><path d="M1.5 3.2h3l1.1 1.1h5.9v5.5a1.2 1.2 0 01-1.2 1.2H2.7a1.2 1.2 0 01-1.2-1.2V3.2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
-                <span class="folder-title">{row.folder.name}</span>
+                {#if editingFolderKey === row.folder.key}
+                  <input
+                    class="collection-name-input folder-name-input"
+                    maxlength={NAME_MAX_LENGTH}
+                    bind:this={editingFolderInput}
+                    bind:value={editingFolderName}
+                    aria-label="Folder name"
+                    spellcheck="false"
+                    onblur={commitFolderInlineRename}
+                    onkeydown={onFolderNameKeydown}
+                    onclick={(event) => event.stopPropagation()}
+                    ondblclick={(event) => event.stopPropagation()}
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="none"
+                  />
+                {:else}
+                  <button class="folder-title folder-name" type="button" ondblclick={(event) => startFolderInlineRename(row.collectionId, row.folder, event)} disabled={workspaceBlocked}>{row.folder.name}</button>
+                {/if}
                 <span class="collection-count">{row.folder.requestCount}</span>
                 <button class="btn btn-ghost btn-icon btn-sm folder-menu-btn" type="button" onclick={(event) => toggleFolderMenu(row.folder.key, event)} aria-label="Folder menu" disabled={workspaceBlocked}>•••</button>
                 {#if openFolderMenuKey === row.folder.key}

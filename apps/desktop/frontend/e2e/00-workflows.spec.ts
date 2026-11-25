@@ -1,4 +1,4 @@
-import { addRequestFromFolder, chooseRequestSection, chooseRequestType, clickTabClose, collectionRow, fillCodeEditor, fillPrompt, folderRow } from './support/actions';
+import { addRequestFromFolder, chooseRequestSection, chooseRequestType, clickTabClose, collectionRow, fillCodeEditor, fillPrompt, folderRow, openCollectionImport } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -60,7 +60,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await captureDocsScreenshot(page, 'environments-panel');
 
     await page.getByRole('button', { name: 'Collections' }).click();
-    await page.locator('.collections-head-actions').getByLabel('Import collection').click();
+    await openCollectionImport(page);
     const importDialog = page.getByRole('dialog', { name: 'Import collection' });
     await expect(importDialog).toBeVisible();
     for (const source of ['Bruno / OpenCollection', 'Postman collection', 'Insomnia export', 'OpenAPI / Swagger', 'HAR from DevTools']) {

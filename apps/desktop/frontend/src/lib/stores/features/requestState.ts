@@ -23,6 +23,7 @@ import type {
   AuthState,
   AuthType,
   BodyType,
+  BodyVariant,
   Collection,
   GrpcResponse,
   GrpcResponseTab,
@@ -88,6 +89,8 @@ type RequestStateHost = {
   basicUser: string;
   bearerToken: string;
   bodyContent: string;
+  activeBodyVariant: string;
+  bodyVariants: BodyVariant[];
   bodyFileName: string;
   bodyFilePath: string;
   bodyType: BodyType;
@@ -219,6 +222,7 @@ function rowsIfAny<K extends 'vars' | 'postResponseVars'>(key: K, rows: KVRow[])
 
 export const requestStateFeature = {
   requestEditSignal(this: RequestStateHost): string {
+    void this.activeBodyVariant; void this.bodyVariants;
     void this.bodyContent; void this.graphqlSchema; void this.graphqlQuery;
     void this.graphqlVariables; void this.preRequestScriptJs; void this.testScriptJs;
     void this.requestNotes; void this.url; void this.requestName;
@@ -316,6 +320,7 @@ export const requestStateFeature = {
       ...rowsIfAny('vars', this.requestVars), ...rowsIfAny('postResponseVars', requestTypeSupportsAssertions(normalizedType) ? this.postResponseVars : []),
       auth: options.forPersistence ? this.authForPersistence(auth) : auth,
       bodyType: isGraphQL ? 'graphql' : this.bodyType, rawBodyType: isGraphQL ? 'json' : this.rawBodyType, bodyContent: isGraphQL ? this.graphQLBodyContentForStore() : this.bodyContent,
+      ...(normalizedType === 'http' && this.activeBodyVariant ? { activeBodyVariant: this.activeBodyVariant, bodyVariants: this.bodyVariants } : {}),
       bodyFilePath: this.bodyFilePath, bodyFileName: this.bodyFileName,
       formRows: cloneRowsForStore(this.formRows), graphqlSchema: isGraphQL ? this.graphqlSchema : '',
       preRequestScriptJs: this.preRequestScriptJs, testScriptJs: this.testScriptJs,
@@ -372,7 +377,7 @@ export const requestStateFeature = {
     const hasName = req.name && req.name !== 'New Request';
     const hasUrl = req.url.trim();
     const requestType = this.normalizeRequestTypeValue(req.requestType, req.url);
-    const hasBodyContent = req.bodyContent.trim() || req.bodyFilePath || req.bodyFileName || req.formRows.some(rowHasContent);
+    const hasBodyContent = req.activeBodyVariant || req.bodyContent.trim() || req.bodyFilePath || req.bodyFileName || req.formRows.some(rowHasContent);
     const hasSharedContent =
       req.params.some(rowHasContent) || (req.pathParams ?? []).some(r => r.value.trim()) || req.headers.some(rowHasContent) ||
       (req.vars ?? []).some(rowHasContent) || (req.postResponseVars ?? []).some(rowHasContent) ||
@@ -504,6 +509,8 @@ export const requestStateFeature = {
       this.graphqlOperationName = ''; this.graphqlSchema = '';
       this.graphqlSchemaStatus = ''; this.graphqlSchemaError = '';
     }
+    this.activeBodyVariant = req.activeBodyVariant ?? '';
+    this.bodyVariants = req.bodyVariants ?? [];
     this.bodyFilePath = req.bodyFilePath; this.bodyFileName = req.bodyFileName;
     this.preRequestScriptJs = req.preRequestScriptJs ?? ''; this.testScriptJs = req.testScriptJs ?? '';
     this.requestNotes = req.requestNotes ?? '';

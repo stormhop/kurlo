@@ -1,4 +1,4 @@
-import { chooseRequestSection, clickTabClose, collectionRow, folderRow } from './support/actions';
+import { chooseRequestSection, clickTabClose, collectionRow, folderRow, openCollectionImport } from './support/actions';
 
 import { installKurloBridge, type E2EWindow } from './support/bridge';
 
@@ -21,7 +21,7 @@ test.describe('Import destination and save errors', () => {
   async function prepareImport(page: Page, source: string) {
     await page.goto('/');
     await page.getByRole('button', { name: 'Collections', exact: true }).click();
-    await page.getByLabel('Import collection').first().click();
+    await openCollectionImport(page);
     const dialog = page.getByRole('dialog', { name: 'Import collection' });
     await dialog.getByText(source, { exact: true }).click();
     await dialog.getByRole('button', { name: 'Import', exact: true }).click();
@@ -130,7 +130,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(page.getByRole('button', { name: 'Collections' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Collections' }).click();
-    await page.getByLabel('Import collection').first().click();
+    await openCollectionImport(page);
 
     const sourceDialog = page.getByRole('dialog', { name: 'Import collection' });
     await expect(sourceDialog).toBeVisible();
@@ -210,7 +210,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await installKurloBridge(page);
     await page.goto('/');
     await page.getByRole('button', { name: 'Collections' }).click();
-    await page.getByLabel('Import collection').first().click();
+    await openCollectionImport(page);
     const sourceDialog = page.getByRole('dialog', { name: 'Import collection' });
     await sourceDialog.getByText('Postman collection').click();
     await sourceDialog.getByRole('button', { name: 'Import', exact: true }).click();
@@ -271,7 +271,7 @@ for (const source of ['file', 'URL']) {
     }, { spec });
     await page.goto('/');
     await page.getByRole('button', { name: 'Collections', exact: true }).click();
-    await page.getByLabel('Import collection').first().click();
+    await openCollectionImport(page);
     const dialog = page.getByRole('dialog', { name: 'Import collection' });
     await dialog.getByText(source === 'file' ? 'OpenAPI / Swagger' : 'OpenAPI / Swagger from URL', { exact: true }).click();
     await dialog.getByRole('button', { name: 'Import', exact: true }).click();
@@ -364,7 +364,7 @@ test('keeps an imported OpenAPI collection in sync with its URL and applies revi
   }, { first, second });
   await page.goto('/');
   await page.getByRole('button', { name: 'Collections', exact: true }).click();
-  await page.getByLabel('Import collection').first().click();
+  await openCollectionImport(page);
   const dialog = page.getByRole('dialog', { name: 'Import collection' });
   await dialog.getByText('OpenAPI / Swagger from URL', { exact: true }).click();
   await dialog.getByRole('button', { name: 'Import', exact: true }).click();

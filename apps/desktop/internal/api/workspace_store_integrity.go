@@ -110,6 +110,9 @@ func validateWorkspaceStorePayload(store map[string]any) error {
 				v.report(path, fmt.Sprintf("%s references missing %s %q. Restore the reference before saving.", kind, field, stringValue(item, field)))
 			}
 			if kind == "request" {
+				if err := validateStoredBodyVariants(item); err != nil {
+					v.report(path, err.Error())
+				}
 				for _, example := range mapSlice(item["examples"]) {
 					v.item("example", filepath.Join(path, "examples", stringValue(example, "id")), example)
 				}

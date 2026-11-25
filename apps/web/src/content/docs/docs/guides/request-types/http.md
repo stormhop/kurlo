@@ -17,6 +17,16 @@ The method menu lists the HTTP methods on the left and the other protocols on th
 
 To copy the request as cURL or client code, open [Code snippets](/docs/guides/code-generation/).
 
+## Switch between body variants
+
+Open **Body → Saved** on a request such as `POST /orders`. Enter **Minimal** and choose **Save current**. To start a second variant with the same payload, enter **Full**, choose **Save current** again, then edit the body. Each request can have up to five named bodies.
+
+The badge on **Saved** shows how many variants the request has. A checkmark marks the body in the editor. Click a name to load it, or use the send icon in its row to load and send it immediately. The pencil renames a variant and the cross removes it. All variants share the request’s URL, authorization, headers and tests.
+
+![The Saved menu in the HTTP Body tab with three named payloads](../../../../../assets/screenshots/request-body-variants.png)
+
+Save the request to write all variants and the selection to its YAML file. With autosave enabled, Kurlo saves them automatically. The Collection Runner and `kurlo run` use the saved selection. To keep a response for comparison or mocking, capture a [request example](/docs/guides/examples/).
+
 ## Send a file as the body
 
 Choose **Body → Binary** to send a file byte for byte. Drop a file onto the panel, or choose **Choose file…**.

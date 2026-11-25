@@ -157,3 +157,55 @@ func TestBrokenExampleFoundLaterBlocksSavesUntilAFullReload(t *testing.T) {
 		t.Fatal("a healthy reload should go back to deferred examples")
 	}
 }
+
+func TestMovingARequestToAnotherCollectionMovesItsFileAndUnloadedExamples(t *testing.T) {
+	app, root := setUpDeferredExamplesWorkspace(t)
+	collections := filepath.Join(root, "workspaces", "Main", "collections")
+	if before, _ := filepath.Glob(filepath.Join(collections, "API", "requests", "Get-order*.yml")); len(before) != 1 {
+		t.Fatalf("request file before move: %v", before)
+	}
+	store, err := decodeJSONMap(app.LoadWorkspace().Payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, request := range mapSlice(store["requests"]) {
+		if stringValue(request, "id") == "req-b" {
+			request["collectionId"] = "col-2"
+			request["collection"] = "Second"
+			request["folderPath"] = []any{}
+		}
+	}
+	encoded, err := json.Marshal(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result := app.SaveRequestStoreWithError(string(encoded)); !result.Ok {
+		t.Fatalf("save after move: %s", result.Error)
+	}
+	moved, _ := filepath.Glob(filepath.Join(collections, "Second", "requests", "Get-order*.yml"))
+	left, _ := filepath.Glob(filepath.Join(collections, "API", "requests", "Get-order*.yml"))
+	if len(moved) != 1 || len(left) != 0 {
+		t.Fatalf("request file moved=%v left=%v", moved, left)
+	}
+	files := exampleFilePaths(exampleFiles(t, root))
+	movedExamples, oldExamples := 0, 0
+	for _, path := range files {
+		if filepath.Base(filepath.Dir(path)) != "Get-order" {
+			continue
+		}
+		switch filepath.Base(filepath.Dir(filepath.Dir(filepath.Dir(path)))) {
+		case "Second":
+			movedExamples++
+		case "API":
+			oldExamples++
+		}
+	}
+	if len(files) != 4 || movedExamples != 1 || oldExamples != 0 {
+		t.Fatalf("example files after move: %v", files)
+	}
+	loadedRequestExamples.forget(root)
+	reloaded := app.LoadRequestExamples([]string{"req-b"})
+	if len(reloaded["req-b"]) != 1 {
+		t.Fatalf("examples after reload = %v", reloaded)
+	}
+}

@@ -16,7 +16,7 @@ If you have environments too: Postman left sidebar → **Environments** → `⋯
 
 ## Import into Kurlo
 
-In Kurlo's sidebar header, click **Import collection** next to **+**. Select **Postman collection**, click **Import**, then pick the exported `.json`. Kurlo creates a collection with the same name and restores its folder tree.
+In the Collections sidebar, choose **⋯ → Import collection…**. Select **Postman collection**, click **Import**, then pick the exported `.json`. Kurlo creates a collection with the same name and restores its folder tree.
 
 ![Kurlo import source selector for collection formats](../../../../../assets/screenshots/import-postman.png)
 

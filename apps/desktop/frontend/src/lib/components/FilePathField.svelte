@@ -83,6 +83,7 @@
   });
 
   function commit(next: string) {
+    if (!root?.isConnected || disabled) return;
     value = next;
     onchange?.(next);
   }

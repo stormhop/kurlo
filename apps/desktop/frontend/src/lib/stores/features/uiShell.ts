@@ -12,6 +12,7 @@ import {
 import type { SettingsTab, TopView } from '../ui';
 import { shortcutComboLabel } from './preferences';
 import { toLogicalPx } from '../../uiScale';
+import { EMPTY_SELECTION, type RequestSelection } from '../../sidebarSelection';
 
 const SIDEBAR_MIN_WIDTH = 260;
 const SIDEBAR_MAX_WIDTH = 460;
@@ -71,6 +72,11 @@ const REQUEST_SCOPED_SHORTCUTS = new Set<ShortcutId>([
   'duplicate-item', 'rename-item', 'copy-item', 'paste-item', 'delete-item',
   'next-item', 'previous-item', 'expand-item', 'collapse-item', 'expand-all', 'collapse-all',
 ]);
+
+function dismissOnEscape(host: UiShellHost) {
+  host.closeFloatingMenus();
+  if (host.requestSelection.ids.length) host.requestSelection = EMPTY_SELECTION;
+}
 
 export function codePanelMaxWidth(viewportWidth: number, sidebarWidth: number): number {
   const availableWidth = Math.max(0, viewportWidth - ACTIVITY_RAIL_WIDTH - sidebarWidth);
@@ -162,6 +168,9 @@ type UiShellHost = {
   copyVisibleResponseOrError: () => Promise<unknown>;
   createNewRequest: () => Promise<unknown>;
   deleteRequest: (id: string) => Promise<unknown>;
+  deleteRequests: (ids: string[]) => Promise<unknown>;
+  duplicateRequests: (ids: string[]) => Promise<unknown>;
+  requestSelection: RequestSelection;
   dismissDialog: () => void;
   duplicateRequest: (id: string) => Promise<unknown>;
   eventToCombo: (event: KeyboardEvent) => string;
@@ -478,10 +487,12 @@ export const uiShellFeature = {
     else if (id === 'send-request') await this.runActiveRequest();
     else if (id === 'search-sidebar') this.focusSidebarSearch();
     else if (id === 'search') this.openGlobalSearch();
+    else if (id === 'duplicate-item' && this.requestSelection.ids.length > 1) await this.duplicateRequests(this.requestSelection.ids);
     else if (id === 'duplicate-item' && this.activeRequestId) await this.duplicateRequest(this.activeRequestId);
     else if (id === 'rename-item' && this.activeRequestId) await this.renameRequest(this.activeRequestId);
     else if (id === 'copy-item') this.copyActiveRequestItem();
     else if (id === 'paste-item') await this.pasteCopiedRequestItem();
+    else if (id === 'delete-item' && this.requestSelection.ids.length > 1) await this.deleteRequests(this.requestSelection.ids);
     else if (id === 'delete-item' && this.activeRequestId) await this.deleteRequest(this.activeRequestId);
     else if (id === 'next-item') await this.switchSidebarItem(1);
     else if (id === 'previous-item') await this.switchSidebarItem(-1);
@@ -576,11 +587,11 @@ export const uiShellFeature = {
     const shortcutId = this.shortcutForEvent(e);
     if (shortcutId === 'send-request' && document.querySelector('[aria-modal="true"]')) return;
     if (shortcutId && this.topView === 'agent' && REQUEST_SCOPED_SHORTCUTS.has(shortcutId)) {
-      if (e.key === 'Escape') this.closeFloatingMenus();
+      if (e.key === 'Escape') dismissOnEscape(this);
       return;
     }
     if (shortcutId === 'cancel-request' && (e.defaultPrevented || !this.inFlightRequestIds.has(this.activeRequestId))) {
-      if (e.key === 'Escape') this.closeFloatingMenus();
+      if (e.key === 'Escape') dismissOnEscape(this);
       return;
     }
     if (shortcutId) {
@@ -601,6 +612,6 @@ export const uiShellFeature = {
       await this.runShortcut(shortcutId);
       return;
     }
-    if (e.key === 'Escape') this.closeFloatingMenus();
+    if (e.key === 'Escape') dismissOnEscape(this);
   },
 };

@@ -13,6 +13,13 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ## Unreleased
 
+### Added
+
+- **Named body variants.** Keep up to five payloads for one HTTP request, load or send one from **Body → Saved**, and share them in Git. [Switch between body variants](/docs/guides/request-types/http/#switch-between-body-variants).
+- **Rename folders in place** by double-clicking their name in the sidebar. [Collections](/docs/guides/workspaces/collections/).
+- **Sort requests by name.** Choose **Manual** or **By name** in the **Collections → ⋯** menu. Kurlo remembers the choice on this device. The Collection Runner uses the saved order in either view. The same menu includes **Import collection…**. [Reordering requests](/docs/guides/workspaces/requests/#reordering-requests).
+- **Select several requests.** Cmd/Ctrl-click, Shift-click or Cmd/Ctrl+A in the sidebar, then drag the selection into another folder or collection, or duplicate, star or delete it together. [Working with several requests](/docs/guides/workspaces/requests/#working-with-several-requests).
+
 ### Changed
 
 - **Consistent controls.** Dropdowns for auth type, body and message types, encoding, the message filter and the snippet language behave the same as every other dropdown, and close, check and chevron icons match across the app.
@@ -21,6 +28,10 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Fixed
 
+- **Response status in a narrow pane** shrinks to the code and then to the coloured dot instead of being cut off.
+- **Renaming with manual save.** A request renamed in the sidebar is saved at once instead of waiting for you to open and save it.
+- **Sidebar menus.** A second click on the **Collections** `⋯` or **Recently deleted** button closes the menu on macOS.
+- **Sidebar cursor.** Folder names show the regular pointer instead of a text cursor.
 - **Query parameters** keep their values, flags and repeated keys when you send a saved request from Desktop, Runner, CLI or MCP. Editing an imported Postman or HTTP request keeps its other parameters.
 - **Collection Runner** exposes collection names to macOS accessibility tools.
 - **Editor caret** follows a deleted character at once in every code editor.

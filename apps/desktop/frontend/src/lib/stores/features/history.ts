@@ -171,6 +171,7 @@ export const historyFeature = {
     const baseRequest = requestSnapshot ?? this.snapshotActiveRequest();
     const snapshot = this.normalizeSavedRequestCtx({
       ...baseRequest,
+      bodyVariants: undefined,
       id: newRequestId(),
       filesystemName: undefined,
       isDraft: false,

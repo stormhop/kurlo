@@ -219,6 +219,7 @@ func TestSchemaEnumsMatchTheAppTypes(t *testing.T) {
 		{"RequestTab", "request", "requestTab"},
 		{"BodyType", "request", "bodyType"},
 		{"RawBodyType", "request", "rawBodyType"},
+		{"RawBodyType", "bodyVariant", "rawBodyType"},
 		{"AuthType", "auth", "type"},
 		{"OAuth2GrantType", "auth", "oauth2GrantType"},
 		{"HttpVersion", "requestSettings", "httpVersion"},
@@ -227,5 +228,44 @@ func TestSchemaEnumsMatchTheAppTypes(t *testing.T) {
 		if got, want := enum(pair.definition, pair.property), union(pair.typeName); strings.Join(got, ",") != strings.Join(want, ",") {
 			t.Errorf("schema %s.%s = %v, but %s in models.ts = %v", pair.definition, pair.property, got, pair.typeName, want)
 		}
+	}
+}
+
+func TestBodyVariantContract(t *testing.T) {
+	others := []map[string]any{{"name": "Two"}, {"name": "Three"}, {"name": "Four"}, {"name": "Five"}}
+	for _, tc := range []struct {
+		name   string
+		fields map[string]any
+		valid  bool
+	}{
+		{"unnamed legacy body", map[string]any{"bodyType": "text"}, true},
+		{"active only", map[string]any{"activeBodyVariant": "One"}, true},
+		{"five bodies", map[string]any{"activeBodyVariant": "One", "bodyVariants": others}, true},
+		{"six bodies", map[string]any{"activeBodyVariant": "One", "bodyVariants": append(others, map[string]any{"name": "Six"})}, false},
+		{"missing active name", map[string]any{"bodyVariants": others}, false},
+		{"blank name", map[string]any{"activeBodyVariant": "  "}, false},
+		{"duplicate active name", map[string]any{"activeBodyVariant": " Two ", "bodyVariants": others}, false},
+		{"duplicate saved name", map[string]any{"activeBodyVariant": "One", "bodyVariants": append(others[:1:1], map[string]any{"name": " Two "})}, false},
+		{"wrong list type", map[string]any{"activeBodyVariant": "One", "bodyVariants": "Two"}, false},
+		{"shared field inside body", map[string]any{"activeBodyVariant": "One", "bodyVariants": []map[string]any{{"name": "Two", "headers": []any{}}}}, false},
+		{"GraphQL body", map[string]any{"activeBodyVariant": "One", "bodyType": "graphql"}, false},
+		{"WebSocket protocol", map[string]any{"activeBodyVariant": "One", "requestType": "ws"}, false},
+		{"inferred WebSocket", map[string]any{"activeBodyVariant": "One", "url": "WSS://example.test"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request := tc.fields
+			request["id"], request["collectionId"] = "r", "c"
+			store := map[string]any{
+				"workspaces":  []map[string]any{{"id": "w"}},
+				"collections": []map[string]any{{"id": "c", "workspaceId": "w"}},
+				"requests":    []map[string]any{request},
+			}
+			if err := validateWorkspaceFileContract("request", request); (err == nil) != tc.valid {
+				t.Errorf("workspace file validation: %v", err)
+			}
+			if err := validateWorkspaceStorePayload(store); (err == nil) != tc.valid {
+				t.Errorf("store validation: %v", err)
+			}
+		})
 	}
 }

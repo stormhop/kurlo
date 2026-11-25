@@ -30,7 +30,7 @@ const authPrefixes: Record<string, string[]> = {
 const protocolFieldGroups: { fields: string[]; protocols: string[] }[] = [
   { fields: ['postResponseVars', 'assertions', 'openapi'], protocols: ['http', 'graphql'] },
   { fields: ['savedMessages'], protocols: ['ws', 'socketio'] },
-  { fields: ['formRows'], protocols: ['http'] },
+  { fields: ['formRows', 'activeBodyVariant', 'bodyVariants'], protocols: ['http'] },
   { fields: ['bodyFilePath', 'bodyFileName'], protocols: ['http'] },
 ];
 const protocolPrefixes: { prefix: string; protocols: string[] }[] = [

@@ -34,7 +34,7 @@ The **Docs** tab of a request is written in Markdown: headings, **bold**, `code`
 
 Right-click (or click the `⋯` button on hover) on any request to reveal:
 
-- **Rename** — inline rename; double-click the title also works
+- **Rename** — inline rename; double-click the title also works. The new name is saved at once, also with manual save; other unsaved edits of the request still wait for **Save**
 - **Duplicate** — clones the request, including auth/headers/body/scripts
 - **Star** / **Unstar** — adds the request to the *Starred* group at the top of the sidebar, or removes it.
 - **Copy as cURL** — copies a `curl` command for a supported request. Review the command before sharing it.
@@ -43,8 +43,23 @@ Right-click (or click the `⋯` button on hover) on any request to reveal:
 
 ### Reordering requests
 
-Hover a request to reveal its `⋮⋮` handle on the left. Drag it onto another request in the same collection or folder: the top half places it above, and the bottom half places it below. A line shows the insertion point. The order is saved in `collection.yml` and persists between sessions.
+Open **⋯** next to **Collections**. Under **Sort requests**, choose how requests appear at the collection root and inside each folder. **Manual** is the default and shows the saved order. **By name** lists requests alphabetically within each group. Kurlo remembers your choice across workspaces and restarts on this device. The Collection Runner uses the saved order in either view.
 
-To move a saved request, drop it onto a folder header or an empty folder in the same collection. Nested and collapsed folders accept drops too. Drop onto the collection header to move it back to the root. Empty source folders are kept.
+To change the saved order, choose **Manual** and clear the sidebar search. Hover a request to reveal its `⋮⋮` handle, then drag it onto the top or bottom half of another request in the same folder or at the collection root. A line shows where it will land. Kurlo saves this order in `collection.yml`.
 
-Clear the sidebar search before dragging. Dragging onto another request changes the order among siblings; dragging onto a folder changes the parent.
+In either view, you can move a request by clearing the search and dropping it onto a folder header, an empty folder or a collection header, in this collection or another one of the workspace. Nested and collapsed folders accept drops too. With **By name**, dropping onto another request moves it into that request's folder. Empty source folders are kept. A place that cannot take the request shows the not-allowed cursor.
+
+A request moved to another collection inherits that collection's and folder's auth, headers, variables and scripts from then on, and its examples move with it. A request linked to an OpenAPI source loses the link, because the source belongs to the old collection.
+
+### Working with several requests
+
+Select requests in the collection tree without opening them:
+
+- **Cmd-click** on macOS or **Ctrl-click** on Windows and Linux adds a request to the selection or removes it. The first one also keeps the request you have open.
+- **Shift-click** selects every visible request between the last one you clicked and this one.
+- **Cmd/Ctrl+A** with the focus in the tree selects every visible request. Requests inside collapsed folders are left out.
+- **Escape**, a plain click or the `×` in the *N selected* bar clears the selection. The bar takes the place of the **Collections** header while requests are selected.
+
+Drag any selected request to move the whole selection. Dropping onto a folder header, an empty folder or a collection header moves every selected request there, from any folders and collections of the workspace. With **Manual** order, dropping onto another request places them above or below it, in their current order, in that request's folder. With **By name**, the drop moves them into that folder. A folder holds at most 50 requests, so a move that would overflow it is refused. Dragging a request that is not selected moves only that request and keeps the selection. After a selection moves, it is cleared.
+
+Right-click a selected request to **Duplicate**, **Star** or **Unstar**, **Load test selected** (requests of one collection) or **Delete** the whole selection. **Backspace** and the duplicate shortcut work on the selection too. Kurlo asks once before deleting, and **Recently deleted** keeps the requests as one entry that restores them in place.

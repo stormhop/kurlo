@@ -1,4 +1,4 @@
-import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS } from '../../constants';
+import { MAX_FOLDER_DEPTH, MAX_FOLDER_REQUESTS, clampName } from '../../constants';
 import {
   addCollectionFolderPath,
   folderCollapsedByDefault,
@@ -130,13 +130,22 @@ export const folderFeature = {
     this.folderCollapseState = { ...this.folderCollapseState, [key]: false };
     await this.persistRequestStore();
   },
-  async renameFolder(this: FolderHost, collectionId: string, folderPath: string[]) {
+  async renameFolder(this: FolderHost, collectionId: string, folderPath: string[], nextName?: string) {
     if (!this.guardWorkspaceWritable('Renaming folders')) return;
     this.closeFloatingMenus();
     const oldName = folderPath.at(-1) ?? '';
-    const name = await this.openNameDialog('Rename folder', oldName);
+    const name = typeof nextName === 'string' ? clampName(nextName) : await this.openNameDialog('Rename folder', oldName);
     if (!name || name === oldName) return;
     const newPath = [...folderPath.slice(0, -1), name];
+    const collection = this.collections.find(candidate => candidate.id === collectionId);
+    const taken = [
+      ...(collection?.folderPaths ?? []),
+      ...this.requests.filter(request => request.collectionId === collectionId).map(request => request.folderPath ?? []),
+    ].some(path => this.folderPathMatches(path, newPath));
+    if (taken) {
+      await this.openAlertDialog('Folder already exists', `This level already has a folder named "${name}".`);
+      return;
+    }
     this.collections = this.collections.map(collection =>
       collection.id === collectionId ? renameFolderDefaults(renameCollectionFolderPath(collection, folderPath, newPath), folderPath, newPath) : collection
     );

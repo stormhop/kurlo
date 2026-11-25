@@ -62,6 +62,39 @@ func TestMCPWorkspaceRequestDocumentsAndPatch(t *testing.T) {
 	}
 }
 
+func TestMCPWorkspaceBodyVariantYAML(t *testing.T) {
+	useTempConfigDir(t, t.TempDir())
+	root := writeYAMLWorkspace(t, "https://example.test")
+	h := startMCPHarness(t, mcpServerOptions{workspace: root})
+	var saved struct{ ID, File string }
+	h.tool("save_request", map[string]any{"collection": "Smoke", "yaml": `version: 1
+request:
+  name: Orders
+  requestType: http
+  method: POST
+  activeBodyVariant: Minimal
+  bodyType: json
+  bodyContent: '{}'
+  bodyVariants:
+    - name: Full
+      bodyType: text
+      bodyContent: extra
+`}, &saved)
+	h.tool("patch_request", map[string]any{"request": saved.ID, "patch": map[string]any{"url": "https://example.test/orders"}}, nil)
+	var read struct{ YAML string }
+	h.tool("get_request", map[string]any{"request": saved.ID, "format": "yaml"}, &read)
+	request, err := decodeMCPRequestYAML(read.YAML)
+	variants := mapSlice(request["bodyVariants"])
+	if err != nil || request["activeBodyVariant"] != "Minimal" || request["bodyContent"] != "{}" || len(variants) != 1 || variants[0]["name"] != "Full" || variants[0]["bodyContent"] != "extra" {
+		t.Fatalf("unexpected body variants in MCP YAML: %s (%v)", read.YAML, err)
+	}
+	before := readWorkspaceFile(t, root, saved.File)
+	res := h.tool("patch_request", map[string]any{"request": saved.ID, "patch": map[string]any{"activeBodyVariant": "Full"}}, nil)
+	if !res.IsError || before != readWorkspaceFile(t, root, saved.File) {
+		t.Fatal("patch with a duplicate body name must fail without changing the file")
+	}
+}
+
 func TestMCPWorkspaceBatchStagesOneReview(t *testing.T) {
 	useTempConfigDir(t, t.TempDir())
 	root := writeYAMLWorkspace(t, "https://example.test")

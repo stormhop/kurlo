@@ -1477,7 +1477,7 @@ func readYAMLRequestEntriesWithDiagnostics(root string, order []string, secrets 
 			diagnostics = append(diagnostics, workspaceDiagnostic{scope: "request", path: path, root: workspaceRoot, err: err, workspaceID: workspaceID, collectionID: collectionID, requestID: requestID}.toDiagnostic())
 			return nil
 		}
-		normalizeWorkspaceRows(request, requestRowFieldsForStrip...)
+		updateRequestRows(request, restoreWorkspaceRowDefaults)
 		normalizeLoadedBodyType(request)
 		id, validID := request["id"].(string)
 		if doc.Version == fileStoreVersion && validID && strings.TrimSpace(id) != "" {
@@ -1696,7 +1696,10 @@ func sanitizeRequestsForFilesystem(requests []map[string]any, existingSecrets, s
 			}
 		}
 		if id != "" {
-			sanitizeRequestSecretRows(next, id, existingSecrets, secrets)
+			sanitizeRequestSecretRows(next, id, stringValue(next, "activeBodyVariant"), existingSecrets, secrets)
+			for _, variant := range mapSlice(next["bodyVariants"]) {
+				sanitizeRequestSecretRows(variant, id, stringValue(variant, "name"), existingSecrets, secrets)
+			}
 		}
 		stripRequestForFilesystem(next)
 		sanitized = append(sanitized, next)
@@ -1861,7 +1864,7 @@ func hydrateRequestCollectionNames(requests, collections []map[string]any) {
 	}
 }
 
-func sanitizeRequestSecretRows(request map[string]any, requestID string, existingSecrets, secrets map[string]string) {
+func sanitizeRequestSecretRows(request map[string]any, requestID, bodyName string, existingSecrets, secrets map[string]string) {
 	for _, field := range requestSecretRowFields {
 		rows, ok := request[field].([]any)
 		if !ok {
@@ -1874,7 +1877,11 @@ func sanitizeRequestSecretRows(request map[string]any, requestID string, existin
 			}
 			rowID := secretRowID(row, index)
 			value := stringFromAny(row["value"])
-			key := requestRowSecretKey(requestID, field, rowID)
+			scope := field
+			if field == "formRows" && bodyName != "" {
+				scope = fmt.Sprintf("bodyVariant.%x.formRows", bodyName)
+			}
+			key := requestRowSecretKey(requestID, scope, rowID)
 			if placeholderKey, ok := kurloSecretKeyFromPlaceholder(value); ok {
 				if existingValue, exists := existingSecrets[placeholderKey]; exists {
 					secrets[placeholderKey] = existingValue
@@ -1978,6 +1985,9 @@ func mergeRequestSecrets(request map[string]any, secrets map[string]string) {
 		}
 	}
 	mergeRequestSecretRows(request, secrets)
+	for _, variant := range mapSlice(request["bodyVariants"]) {
+		mergeRequestSecretRows(variant, secrets)
+	}
 }
 
 func mergeCollectionSecrets(collection map[string]any, secrets map[string]string) {

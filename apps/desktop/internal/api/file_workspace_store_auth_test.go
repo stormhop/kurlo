@@ -1,6 +1,10 @@
 package api
 
 import (
+	"bytes"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -298,5 +302,79 @@ func TestWorkspaceRowsRoundTripWithCompactDefaults(t *testing.T) {
 	values := loadedEnvs[0]["values"].([]any)
 	if values[0].(map[string]any)["enabled"] != true || values[1].(map[string]any)["enabled"] != false {
 		t.Fatal("environment row state changed")
+	}
+}
+
+func TestBodyVariantsRoundTripThroughWorkspace(t *testing.T) {
+	root := t.TempDir()
+	secrets := map[string]string{}
+	form := func(value string) []any {
+		return []any{map[string]any{"id": 7, "key": "token", "value": value, "secret": true, "enabled": true}}
+	}
+	requests := sanitizeRequestsForFilesystem([]map[string]any{{
+		"id": "r1", "collectionId": "c1", "name": "Orders", "requestType": "http", "method": "POST",
+		"activeBodyVariant": "Minimal", "bodyType": "form", "formRows": form("active-secret"),
+		"bodyVariants": []any{
+			map[string]any{"name": "Full", "bodyType": "form", "formRows": form("full-secret")},
+			map[string]any{"name": "Missing", "bodyType": "json", "bodyContent": "{}"},
+		},
+	}}, nil, secrets)
+	workspaces := []map[string]any{{"id": "w1", "name": "WS"}}
+	collections := []map[string]any{{"id": "c1", "workspaceId": "w1", "name": "Shop"}}
+	if err := writeYAMLWorkspaceStore(root, workspaces, collections, requests, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.ReadFile(filepath.Join(root, "workspaces", "WS", "collections", "Shop", "requests", "Orders.yml"))
+	if err != nil || strings.Contains(string(file), "active-secret") || strings.Contains(string(file), "full-secret") {
+		t.Fatalf("unexpected request YAML: %v %s", err, file)
+	}
+	_, _, loaded, _, _, diagnostics, err := loadYAMLWorkspaceStoreWithDiagnostics(root, secrets)
+	if err != nil || len(diagnostics) != 0 || len(loaded) != 1 {
+		t.Fatalf("load: %v, diagnostics: %v", err, diagnostics)
+	}
+	request := loaded[0]
+	variants := mapSlice(request["bodyVariants"])
+	if request["activeBodyVariant"] != "Minimal" || len(variants) != 2 || variants[0]["name"] != "Full" || variants[1]["bodyContent"] != "{}" {
+		t.Fatalf("unexpected body variants: %#v", request)
+	}
+	active := mapSlice(request["formRows"])[0]
+	other := mapSlice(variants[0]["formRows"])[0]
+	if active["value"] != "active-secret" || other["value"] != "full-secret" || other["enabled"] != true {
+		t.Fatalf("form rows: %#v, %#v", active, other)
+	}
+}
+
+func TestCLISendsActiveBodyVariant(t *testing.T) {
+	received := make(chan string, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, err := io.ReadAll(r.Body)
+		if err != nil || r.Method != http.MethodPost || r.URL.Path != "/orders" {
+			t.Errorf("unexpected request: %s %s, %v", r.Method, r.URL.Path, err)
+		}
+		received <- string(data)
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+	root := t.TempDir()
+	request := map[string]any{
+		"id": "order", "collectionId": "shop", "name": "Create order", "requestType": "http",
+		"method": "POST", "url": server.URL + "/orders", "activeBodyVariant": "Minimal", "bodyType": "json", "bodyContent": `{"sku":"tea"}`,
+		"bodyVariants": []any{map[string]any{"name": "Missing", "bodyType": "json", "bodyContent": "{}"}},
+	}
+	if err := writeYAMLWorkspaceStore(root, []map[string]any{{"id": "w1", "name": "WS"}},
+		[]map[string]any{{"id": "shop", "workspaceId": "w1", "name": "Shop"}}, []map[string]any{request}, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	var log bytes.Buffer
+	if code := runCLI(cliOptions{workspace: root, reporters: []string{"cli"}, iterations: 1, stdout: &log, stderr: &log}); code != 0 {
+		t.Fatalf("exit %d: %s", code, log.String())
+	}
+	select {
+	case body := <-received:
+		if body != request["bodyContent"] {
+			t.Fatalf("sent %q, want %q", body, request["bodyContent"])
+		}
+	default:
+		t.Fatal("no request received")
 	}
 }

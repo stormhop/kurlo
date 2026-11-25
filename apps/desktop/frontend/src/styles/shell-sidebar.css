@@ -168,6 +168,7 @@
 
 .collections-head-actions {
   display: flex;
+  align-items: center;
 }
 
 .collection-add {
@@ -694,6 +695,36 @@
   white-space: nowrap;
 }
 
+.collection-folder,
+.collection-subfolder {
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.folder-name {
+  appearance: none;
+  display: block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: default;
+  font: inherit;
+  text-align: left;
+}
+
+.folder-name-input {
+  width: 100%;
+}
+
+.collection-folder input,
+.collection-subfolder input {
+  cursor: text;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .collection-request-wrap.in-folder {
   padding-left: 0;
 }
@@ -1164,6 +1195,64 @@
 .collection-request-wrap.active .collection-request {
   background: var(--elevated);
   color: var(--text);
+}
+
+.collection-request-wrap.selected .collection-request,
+.collection-request-wrap.selected:is(.hovered, :not(.hover-managed):hover) .collection-request {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+.collection-request-wrap.selected.active .collection-request {
+  box-shadow: inset 0 0 0 0.0625rem var(--accent);
+}
+
+.collection-request-wrap {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.collection-request-wrap input {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.collection-list:focus {
+  outline: none;
+}
+
+.sidebar-selection-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-0-5);
+  height: 1.75rem;
+  padding: 0 var(--space-0-5) 0 var(--space-1-5);
+  border-radius: var(--radius-md);
+  background: var(--accent-dim);
+  color: var(--text);
+  font-size: var(--text-label);
+}
+
+.sidebar-selection-count {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-drag-ghost {
+  position: fixed;
+  top: -6rem;
+  left: -20rem;
+  padding: var(--space-1) var(--space-2);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--elevated);
+  color: var(--text);
+  font-size: var(--text-label);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .collection-method {

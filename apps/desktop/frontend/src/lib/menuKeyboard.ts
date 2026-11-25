@@ -1,5 +1,5 @@
 function menuItems(menu: HTMLElement) {
-  return Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)'));
+  return Array.from(menu.querySelectorAll<HTMLElement>(':is([role="menuitem"], [role="menuitemradio"]):not(:disabled)'));
 }
 
 export function focusFirstMenuItem(menu: HTMLElement | undefined) {

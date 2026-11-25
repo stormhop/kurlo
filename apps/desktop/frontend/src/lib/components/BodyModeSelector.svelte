@@ -1,4 +1,5 @@
 <script lang="ts">
+  import SavedBodiesMenu from './SavedBodiesMenu.svelte';
   import Select from './Select.svelte';
   import Chevron from './Chevron.svelte';
   import CheckIcon from './CheckIcon.svelte';
@@ -12,6 +13,7 @@
     setBodyMode,
     rawTypeLabel,
     setRawBodyType,
+    showVariants,
     showBeautify = false,
     beautified = false,
     beautifyDisabled = false,
@@ -23,6 +25,7 @@
     setBodyMode: (mode: BodyMode) => void;
     rawTypeLabel: (type?: RawBodyType) => string;
     setRawBodyType: (type: RawBodyType) => void;
+    showVariants: boolean;
     showBeautify?: boolean;
     beautified?: boolean;
     beautifyDisabled?: boolean;
@@ -119,16 +122,20 @@
       onChange={type => setRawBodyType(type as RawBodyType)}
     />
   {/if}
-  {#if showBeautify}
-    <div class="body-mode-beautify">
-      <BeautifyButton onbeautify={() => onBeautify?.()} beautified={beautified} disabled={beautifyDisabled} title="Beautify body" />
+  {#if showVariants || showBeautify}
+    <div class="body-mode-actions">
+      {#if showBeautify}
+        <BeautifyButton onbeautify={() => onBeautify?.()} beautified={beautified} disabled={beautifyDisabled} title="Beautify body" />
+      {/if}
+      {#if showVariants}<SavedBodiesMenu />{/if}
     </div>
   {/if}
 </div>
 
 <style>
 
-  .body-mode-beautify {
+  .body-mode-actions {
+    gap: var(--space-2);
     display: flex;
     align-items: center;
     margin-left: auto;

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { installKurloBridge } from './support/bridge';
-import { chooseRequestSection, collectionRow } from './support/actions';
+import { chooseRequestSection, collectionRow, openCollectionImport } from './support/actions';
 
 const screenshotPath = (name: string) => join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), name);
 
@@ -86,7 +86,7 @@ test('imports a Postman URL query once, retains disabled rows and raw spelling a
   await page.addInitScript(() => localStorage.setItem('kurlo.autosave.v1', 'false'));
   await page.goto('/');
   await page.getByRole('button', { name: 'Collections' }).click();
-  await page.getByLabel('Import collection').first().click();
+  await openCollectionImport(page);
   const sourceDialog = page.getByRole('dialog', { name: 'Import collection' });
   await sourceDialog.getByText('Postman collection').click();
   await sourceDialog.getByRole('button', { name: 'Import', exact: true }).click();
@@ -129,7 +129,7 @@ test('imports an HTTP file query into the editor and preserves every occurrence 
   await page.addInitScript(() => localStorage.setItem('kurlo.autosave.v1', 'false'));
   await page.goto('/');
   await page.getByRole('button', { name: 'Collections' }).click();
-  await page.getByLabel('Import collection').first().click();
+  await openCollectionImport(page);
   const sourceDialog = page.getByRole('dialog', { name: 'Import collection' });
   await sourceDialog.getByText('.http / .rest file').click();
   await sourceDialog.getByRole('button', { name: 'Import', exact: true }).click();

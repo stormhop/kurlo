@@ -7,6 +7,13 @@ All notable changes to Kurlo are documented here. This project follows
 
 ## [Unreleased]
 
+### Added
+
+- **Named body variants.** Use **Body → Saved** to create, rename, load and send up to five payloads of an HTTP request. Variants share the request’s URL, auth, headers and tests. The request YAML stores each payload and the selected name.
+- **Rename folders in place.** Double-click a folder name in the sidebar to rename it, as with collections. Enter saves, Escape cancels.
+- **Sort requests by name.** Choose **Collections → ⋯ → By name** to list requests alphabetically at each level. **Manual** restores the saved order. Kurlo remembers your choice on this device, and the Collection Runner uses the collection’s saved order in either view. The same menu includes **Import collection…**.
+- **Work on several requests at once.** In the sidebar, Cmd-click (Ctrl-click on Windows and Linux) adds or removes a request, Shift-click selects a range and Cmd/Ctrl+A selects every visible request. Drag the selection onto a folder or a collection header to move it there in one step, including into another collection of the workspace, or onto a request to place it next to that request in its order. With **By name** sorting, dropping onto a request moves the selection into that request's folder. A place that cannot take the selection shows the not-allowed cursor, and a successful move clears the selection. Right-click a selected request to duplicate, star, load test or delete them together. Backspace and the duplicate shortcut act on the selection, a deletion asks once and lands in **Recently deleted** as one entry, and Escape clears the selection.
+
 ### Changed
 
 - **Consistent controls.** Auth type, raw body type, WebSocket and Socket.IO message types, binary encoding, the message filter and the snippet language use the same dropdown as the rest of the app, with the same size, keyboard navigation and closing behaviour. Close buttons, checkmarks and chevrons are drawn with one set of icons, the YAML and `kurlo-agent.md` editors open over the same backdrop as other dialogs, and the Browser sync switch matches the other switches.
@@ -15,6 +22,11 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Response status in a narrow pane.** When the response pane is too narrow for the whole status, Kurlo drops the reason phrase, then the code, and keeps the coloured dot. Before, the status was cut in the middle.
+- **Renaming with manual save.** Renaming a request in the sidebar, by double-clicking its name or with **Rename**, saves the new name at once. Before, the request stayed unsaved until you opened it and saved it. Other unsaved edits of that request still wait for **Save**.
+- **Folder names that already exist.** Renaming a folder to the name of another folder at the same level is refused with a message instead of merging the two folders.
+- **Sidebar menus on macOS.** A second click on the `⋯` button next to **Collections** or on **Recently deleted** closes the menu instead of opening it again.
+- **Sidebar cursor.** Folder names and the request counts of folders and collections show the regular pointer instead of a text cursor, like collection names.
 - **Query parameters.** Desktop, Collection Runner, CLI and MCP send saved query parameters once per occurrence. Sending a pasted URL keeps encoded values and flags such as `?preview`. After importing a Postman collection or an HTTP file, editing the path or one parameter keeps the other parameters.
 - **Collection Runner accessibility.** The collection picker exposes the selected collection and each option by name on macOS.
 - **Editor caret.** In request bodies, messages, arguments and other code editors the caret moves back with a deleted character at once instead of a moment later, as it already did in scripts and the File tab.

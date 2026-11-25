@@ -425,3 +425,39 @@ describe('folder move safeguards', () => {
     expect(app.requestsById.get(id)?.folderPath).toEqual([]);
   });
 });
+
+describe('renaming in manual save mode', () => {
+  it('saves a new name from the sidebar at once and keeps other edits unsaved', async () => {
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Manual rename');
+    await app.createCollection();
+    const collection = app.collections[0];
+    await app.createNewRequest(collection.id);
+    app.url = 'https://example.test/saved';
+    await app.saveActiveRequest();
+    const id = app.activeRequestId;
+    await app.createNewRequest(collection.id);
+    app.url = 'https://example.test/other';
+    await app.saveActiveRequest();
+    const otherId = app.activeRequestId;
+    app.autosave = false;
+    const storedRequest = (requestId: string) => backend.state.savedStores.at(-1)?.requests.find((request: SavedRequest) => request.id === requestId);
+
+    await app.renameRequest(otherId, 'Renamed in sidebar');
+    expect(storedRequest(otherId)).toMatchObject({ name: 'Renamed in sidebar', url: 'https://example.test/other' });
+    expect(app.isRequestDirty(otherId)).toBe(false);
+    expect(app.requestName).toBe('Renamed in sidebar');
+
+    app.switchRequest(id);
+    await settleMicrotasks();
+    app.url = 'https://example.test/unsaved';
+    app.updateRequestDirtyState(id, app.snapshotActiveRequest());
+    await app.renameRequest(id, 'Renamed with edits');
+    expect(storedRequest(id)).toMatchObject({ name: 'Renamed with edits', url: 'https://example.test/saved' });
+    expect(app.isRequestDirty(id)).toBe(true);
+    expect(app.requestForEditing(id)).toMatchObject({ name: 'Renamed with edits', url: 'https://example.test/unsaved' });
+    await app.saveActiveRequest();
+    expect(storedRequest(id)).toMatchObject({ name: 'Renamed with edits', url: 'https://example.test/unsaved' });
+    expect(app.isRequestDirty(id)).toBe(false);
+  });
+});

@@ -44,7 +44,7 @@ Each guide page benefits from at least one screenshot. To take the doc site from
 | `environments-panel.png`       | Environments guide                           | Environment editor with 4–5 variables, one secret            |
 | `workspace-overview.png`       | Workspaces guide                             | The full workspace overview with notes + quick actions       |
 | `git-workspace.png`            | Git workspaces guide                         | Git tab with branch, changed YAML files, and diff preview    |
-| `sidebar-collections.png`      | Workspaces guide                             | Sidebar with collections, folders, and a starred request     |
+| `sidebar-collections.png`      | Workspaces guide                             | Tree menu button, empty collection and populated folder     |
 | `response-viewer-json.png`     | Response viewer guide                        | JSON response with syntax highlight + line numbers           |
 | `response-viewer-search.png`   | Response viewer guide                        | Active search highlighting matches in a body                 |
 | `response-viewer-large-body.png` | Response viewer guide                      | Large response paging / virtualization controls              |
@@ -55,6 +55,7 @@ Each guide page benefits from at least one screenshot. To take the doc site from
 | `request-websocket.png`        | Request types guide                          | WebSocket connection with sent and echoed messages           |
 | `request-socketio.png`         | Request types guide                          | Socket.IO event emit with acknowledgement                    |
 | `request-grpc.png`             | Request types guide                          | gRPC method selection and response messages                  |
+| `request-body-variants.png`    | Request types guide (HTTP)                   | Saved body variants and their row actions                              |
 | `request-binary-body.png`      | Request types guide (HTTP)                   | Binary body with a chosen file, its size, type and path       |
 | `history.png`                  | Request history guide                        | History panel with grouped days                              |
 | `scripting-pre-request.png`    | Scripting guide / Scripting API reference    | Pre-request script with `pm.request.headers.set(...)`        |

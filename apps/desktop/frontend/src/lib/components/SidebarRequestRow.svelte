@@ -7,6 +7,7 @@
   import { floatingMenu } from '../floatingMenu';
   import type { SavedRequest, WorkspaceDiagnostic } from '../types/models';
   import type { TopView } from '../stores/ui';
+  import type { RequestBatchActions } from '../sidebarSelection';
 
   let {
     req,
@@ -30,6 +31,10 @@
     disabled = false,
     dragEnabled = false,
     dragging = false,
+    selected = false,
+    batch,
+    onrowclick,
+    onrowmenu,
     hovered,
     dropPlacement,
     ondragstart,
@@ -59,6 +64,10 @@
     disabled?: boolean;
     dragEnabled?: boolean;
     dragging?: boolean;
+    selected?: boolean;
+    batch?: RequestBatchActions;
+    onrowclick?: (event: MouseEvent) => boolean;
+    onrowmenu?: (event: MouseEvent) => void;
     hovered?: boolean;
     dropPlacement?: DropPlacement;
     ondragstart?: (event: DragEvent) => void;
@@ -113,6 +122,16 @@
     }
   }
 
+  function onRowClick(event: MouseEvent) {
+    if (onrowclick?.(event)) return;
+    switchRequest(req.id);
+  }
+
+  function openRowMenu(event: MouseEvent) {
+    if (onrowmenu) onrowmenu(event);
+    else toggleRequestMenu(menuKey, event);
+  }
+
   function openDiagnostics(event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -123,6 +142,8 @@
 <div
   class="collection-request-wrap"
   class:dragging
+  class:selected
+  data-selected={selected ? 'true' : undefined}
   class:hovered={hovered === true}
   class:hover-managed={hovered !== undefined}
   data-sidebar-hover-key={menuKey}
@@ -169,7 +190,7 @@
       />
     </div>
   {:else}
-    <button class="collection-request" type="button" onclick={() => switchRequest(req.id)} ondblclick={startRequestInlineRename} oncontextmenu={(event) => { if (disabled || req.isInvalid) return; event.preventDefault(); toggleRequestMenu(menuKey, event); }} disabled={disabled}>
+    <button class="collection-request" type="button" onclick={onRowClick} ondblclick={startRequestInlineRename} oncontextmenu={(event) => { if (disabled || req.isInvalid) return; event.preventDefault(); openRowMenu(event); }} disabled={disabled}>
       <RequestTypeBadge request={req} invalid={req.isInvalid} />
       <span class="collection-title">{requestTabLabel(req)}</span>
     </button>
@@ -193,9 +214,18 @@
     >★</button>
   {/if}
   {#if !req.isInvalid}
-    <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={(event) => toggleRequestMenu(menuKey, event)} aria-label="Request menu" disabled={disabled}>•••</button>
+    <button class="btn btn-ghost btn-icon btn-sm request-menu-btn" type="button" onclick={openRowMenu} aria-label="Request menu" disabled={disabled}>•••</button>
   {/if}
-  {#if !req.isInvalid && openRequestMenuId === menuKey}
+  {#if !req.isInvalid && openRequestMenuId === menuKey && batch}
+    <div class="menu request-menu request-batch-menu" use:floatingMenu>
+      <div class="menu-label">{batch.count} requests</div>
+      <button class="menu-item" type="button" onclick={batch.duplicate} disabled={disabled}><MenuIcon name="duplicate" />Duplicate {batch.count}</button>
+      {#if batch.canStar}<button class="menu-item" type="button" onclick={batch.star} disabled={disabled}><MenuIcon name="star" />{batch.allStarred ? 'Unstar' : 'Star'} {batch.count}</button>{/if}
+      {#if createLoadTestFromRequest && batch.canLoadTest}<button class="menu-item" type="button" onclick={batch.loadTest} disabled={disabled}><MenuIcon name="load" />Load test selected</button>{/if}
+      <div class="menu-separator" role="separator"></div>
+      <button class="menu-item danger" type="button" onclick={batch.remove} disabled={disabled}><MenuIcon name="trash" />Delete {batch.count}</button>
+    </div>
+  {:else if !req.isInvalid && openRequestMenuId === menuKey}
     <div class="menu request-menu" use:floatingMenu>
       <button class="menu-item" type="button" onclick={() => renameRequest(req.id)} disabled={disabled}><MenuIcon name="rename" />Rename</button>
       <button class="menu-item" type="button" onclick={() => duplicateRequest(req.id)} disabled={disabled}><MenuIcon name="duplicate" />Duplicate</button>

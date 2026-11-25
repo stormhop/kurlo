@@ -9,6 +9,7 @@ import {
   reorderWorkspaceCollections,
   reorderCollectionRequests,
   canReorderRequests,
+  placeRequests,
 } from '../lib/collections';
 import { normalizeSavedRequest } from '../lib/normalizers';
 import { collectionFeature } from '../lib/stores/features/collections';
@@ -170,5 +171,54 @@ describe('reorderCollectionRequests', () => {
     const requests = [request('a'), request('b')];
     expect(reorderCollectionRequests(requests, 'a', 'b', 'before')).toBe(requests);
     expect(reorderCollectionRequests(requests, 'b', 'a', 'after')).toBe(requests);
+  });
+});
+
+describe('placeRequests', () => {
+  const request = (id: string, collectionId = 'api', folderPath: string[] = []) => normalizeSavedRequest({
+    id, collectionId, folderPath, name: id, method: 'GET', url: `https://example.test/${id}`,
+  }, [collection('api'), collection('other')]);
+  const ids = (requests: { id: string }[]) => requests.map(req => req.id);
+
+  it('moves a group next to a sibling and keeps the group order', () => {
+    const requests = [request('a'), request('b'), request('x', 'other'), request('c'), request('d')];
+    expect(ids(placeRequests(requests, ['d', 'b'], 'api', [], { id: 'a', placement: 'before' }))).toEqual(['b', 'd', 'a', 'x', 'c']);
+    expect(ids(placeRequests(requests, ['a', 'b'], 'api', [], { id: 'd', placement: 'after' }))).toEqual(['x', 'c', 'd', 'a', 'b']);
+    expect(ids(requests)).toEqual(['a', 'b', 'x', 'c', 'd']);
+  });
+
+  it('moves a group into a folder without changing global positions', () => {
+    const requests = [request('a'), request('n', 'api', ['Users']), request('b', 'api', ['Other'])];
+    const moved = placeRequests(requests, ['a', 'b', 'n'], 'api', ['Users']);
+    expect(moved.map(req => req.folderPath)).toEqual([['Users'], ['Users'], ['Users']]);
+    expect(moved[1]).toBe(requests[1]);
+    expect(placeRequests(moved, ['a', 'b'], 'api', ['Users'])).toBe(moved);
+  });
+
+  it('skips drafts and invalid rows and rejects bad targets', () => {
+    const requests = [request('a'), { ...request('draft'), isDraft: true }, { ...request('invalid'), isInvalid: true }, request('x', 'other'), request('f', 'api', ['F'])];
+    expect(placeRequests(requests, ['draft', 'invalid'], 'api', ['F'])).toBe(requests);
+    expect(placeRequests(requests, ['a'], '', [])).toBe(requests);
+    for (const id of ['a', 'draft', 'invalid', 'x', 'f', 'missing']) {
+      expect(placeRequests(requests, ['a'], 'api', [], { id, placement: 'before' })).toBe(requests);
+    }
+    expect(placeRequests(requests, ['a', 'b'], 'api', [], { id: 'a', placement: 'after' })).toBe(requests);
+  });
+
+  it('moves requests from other collections and folders next to a target through the relocation', () => {
+    const requests = [request('a'), request('x', 'other'), request('f', 'api', ['F']), request('b')];
+    const relocate = (req: ReturnType<typeof request>, collectionId: string, folderPath: string[]) => ({ ...req, collectionId, folderPath, collection: `moved to ${collectionId}` });
+    const moved = placeRequests(requests, ['x', 'f'], 'api', [], { id: 'b', placement: 'before' }, relocate);
+    expect(ids(moved)).toEqual(['a', 'x', 'f', 'b']);
+    expect(moved.slice(1, 3)).toMatchObject([
+      { collectionId: 'api', folderPath: [], collection: 'moved to api' },
+      { collectionId: 'api', folderPath: [], collection: 'moved to api' },
+    ]);
+    expect(placeRequests(requests, ['a', 'x'], 'other', [])[0]).toMatchObject({ collectionId: 'other', folderPath: [] });
+  });
+
+  it('returns the same list when a group drop changes nothing', () => {
+    const requests = [request('a'), request('b'), request('c')];
+    expect(placeRequests(requests, ['a', 'b'], 'api', [], { id: 'c', placement: 'before' })).toBe(requests);
   });
 });

@@ -13,7 +13,7 @@ A collection groups related requests inside a workspace. There's no maximum — 
 - Right-click anywhere in the empty sidebar area → *New collection*
 - Empty-state CTA when a workspace has no collections yet
 
-Each collection has a **name**, a **filesystem name** (auto-derived for Git sync), and child folders/requests. Inline rename: double-click the collection title in the sidebar.
+Each collection has a **name**, a **filesystem name** (auto-derived for Git sync), and child folders/requests. Inline rename: double-click the collection title in the sidebar. Folders work the same way: double-click a folder name, type the new name and press Enter, or Escape to keep the old one. **Rename** in the folder menu opens a dialog instead. A folder cannot take the name of another folder at the same level.
 
 ### Collection menu
 
@@ -31,4 +31,4 @@ The `⋯` button next to a collection reveals:
 
 Hover the `⋮⋮` handle on the left of a collection row to grab it. Drag onto another collection — drop above (top half) or below (bottom half) to set the new position. Order persists between sessions.
 
-Drag-and-drop is disabled while a search is active in the sidebar (the order you see is sorted by relevance, not user order).
+Clear the sidebar search to enable drag-and-drop. For the **Collections → ⋯** menu and dragging requests within a collection, see [Reordering requests](/docs/guides/workspaces/requests/#reordering-requests).

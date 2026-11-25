@@ -11,6 +11,7 @@ describe('sidebar derived data', () => {
     vm.activeWorkspaceId = 'sidebar-workspace';
     vm.collections = [{ ...makeCollection(vm.activeWorkspaceId, 'API'), id: 'sidebar-collection' }];
     vm.requests = [normalizeSavedRequest({ id: 'sidebar-request', name: 'First request', collectionId: 'sidebar-collection', folderPath: ['Accounts'], method: 'GET', url: 'https://example.test/accounts' }, vm.collections, vm.activeWorkspaceId)];
+    vm.requestSortMode = 'manual';
     vm.environments = [{ id: 'sidebar-environment', workspaceId: vm.activeWorkspaceId, name: 'Development', values: [] }];
     vm.sidebarSearch = '';
     vm.workspaceDiagnostics = [];
@@ -125,6 +126,59 @@ describe('sidebar derived data', () => {
     expect(vm.collectionGroups[0].requests.find(request => request.id === first.id)?.workspaceDiagnostics).toBeUndefined();
     vm.requests = vm.requests.filter(request => request.id !== first.id);
     expect(vm.collectionGroups[0].folders[0].requests.map(request => request.id)).toEqual(['second-request']);
+  });
+
+  it('sorts each displayed request group by name and restores canonical order in manual mode', () => {
+    const accountsPath = ['Accounts'];
+    const nestedPath = ['Accounts', 'Active'];
+    const request = (id: string, name: string, folderPath: string[] = [], url = '') =>
+      ({ ...vm.requests[0], id, name, folderPath, url });
+    const requests = [
+      request('root-10', 'Request 10'),
+      request('folder-same-first', 'Same label', accountsPath),
+      request('nested-z', 'Zulu', nestedPath),
+      request('nested-a', 'Alpha', nestedPath),
+      request('root-2', 'request 2'),
+      request('folder-2', 'Folder 2', accountsPath),
+      request('folder-url', '', accountsPath, 'https://example.test/accounts/Aardvark'),
+      request('folder-same-second', 'Same label', accountsPath),
+    ];
+    vm.requests = requests;
+    const nestedKey = vm.folderCollapseKey(vm.collections[0].id, nestedPath);
+    vm.folderCollapseState[nestedKey] = false;
+
+    vm.requestSortMode = 'name';
+    const sorted = vm.collectionGroups[0];
+    const accounts = sorted.folders[0];
+    expect(sorted.requests.map(request => request.id)).toEqual(requests.map(request => request.id));
+    expect(accounts.requests.map(request => request.id)).toEqual(['folder-2', 'folder-url', 'folder-same-first', 'folder-same-second']);
+    expect(accounts.children[0].requests.map(request => request.id)).toEqual(['nested-a', 'nested-z']);
+    expect(sorted.rootRequests.map(request => request.id)).toEqual(['root-2', 'root-10']);
+    expect(vm.visibleSidebarRequests().map(request => request.id)).toEqual([
+      'nested-a', 'nested-z', 'folder-2', 'folder-url', 'folder-same-first', 'folder-same-second', 'root-2', 'root-10',
+    ]);
+
+    vm.requestSortMode = 'manual';
+    const manual = vm.collectionGroups[0];
+    expect(manual.requests.map(request => request.id)).toEqual(requests.map(request => request.id));
+    expect(manual.rootRequests.map(request => request.id)).toEqual(['root-10', 'root-2']);
+    expect(manual.folders[0].requests.map(request => request.id)).toEqual(['folder-same-first', 'folder-2', 'folder-url', 'folder-same-second']);
+    expect(vm.visibleSidebarRequests().map(request => request.id)).toEqual([
+      'nested-z', 'nested-a', 'folder-same-first', 'folder-2', 'folder-url', 'folder-same-second', 'root-10', 'root-2',
+    ]);
+    expect(vm.requests.map(request => request.id)).toEqual(requests.map(request => request.id));
+  });
+
+  it('does not persist request reordering while name sorting is active', async () => {
+    vm.requestSortMode = 'name';
+    vm.requests = [...vm.requests, { ...vm.requests[0], id: 'sidebar-request-2', name: 'Second request' }];
+    const requestsBeforeMove = vm.requests;
+    const persist = vi.spyOn(vm, 'persistRequestStore');
+
+    await vm.moveRequest('sidebar-request-2', 'sidebar-request', 'before');
+
+    expect(vm.requests).toBe(requestsBeforeMove);
+    expect(persist).not.toHaveBeenCalled();
   });
 
   it('reuses environment lists and updates them when workspace membership changes', () => {

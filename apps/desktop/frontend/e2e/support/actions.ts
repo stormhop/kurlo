@@ -1,5 +1,10 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 
+export async function openCollectionImport(page: Page) {
+  await page.getByRole('button', { name: 'Collection tree menu' }).click();
+  await page.getByRole('menuitem', { name: 'Import collection…' }).click();
+}
+
 export async function clickTabClose(button: Locator) {
   await button.locator('xpath=..').hover();
   await button.click();

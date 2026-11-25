@@ -129,3 +129,43 @@ export function reorderCollectionRequests(
   const siblingIds = new Set(siblings.map(request => request.id));
   return requests.map(request => siblingIds.has(request.id) ? reordered[nextIndex++] : request);
 }
+
+export type RequestDropTarget = { id: string; placement: DropPlacement };
+
+export function movableRequest(request: SavedRequest | undefined): request is SavedRequest {
+  return Boolean(request && request.collectionId && !request.isDraft && !request.isInvalid);
+}
+
+export type RequestRelocation = (request: SavedRequest, collectionId: string, folderPath: string[]) => SavedRequest;
+
+function relocateRequest(request: SavedRequest, collectionId: string, folderPath: string[]): SavedRequest {
+  return { ...request, collectionId, folderPath: [...folderPath] };
+}
+
+export function placeRequests(
+  requests: SavedRequest[],
+  ids: Iterable<string>,
+  collectionId: string,
+  folderPath: string[],
+  target?: RequestDropTarget,
+  relocate: RequestRelocation = relocateRequest,
+): SavedRequest[] {
+  const wanted = new Set(ids);
+  const moving = requests.filter(request => wanted.has(request.id) && movableRequest(request));
+  if (!moving.length || !collectionId) return requests;
+  const key = folderPathKey(folderPath);
+  const relocated = new Map(moving.map(request => [
+    request.id,
+    request.collectionId === collectionId && folderPathKey(request.folderPath) === key ? request : relocate(request, collectionId, folderPath),
+  ]));
+  if (!target) {
+    if (moving.every(request => relocated.get(request.id) === request)) return requests;
+    return requests.map(request => relocated.get(request.id) ?? request);
+  }
+  const anchor = requests.find(request => request.id === target.id);
+  if (!movableRequest(anchor) || relocated.has(anchor.id) || anchor.collectionId !== collectionId || folderPathKey(anchor.folderPath) !== key) return requests;
+  const rest = requests.filter(request => !relocated.has(request.id));
+  const insertAt = rest.indexOf(anchor) + (target.placement === 'after' ? 1 : 0);
+  const next = [...rest.slice(0, insertAt), ...moving.map(request => relocated.get(request.id) ?? request), ...rest.slice(insertAt)];
+  return next.every((request, index) => request === requests[index]) ? requests : next;
+}

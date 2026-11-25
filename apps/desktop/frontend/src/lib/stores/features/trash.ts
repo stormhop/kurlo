@@ -68,8 +68,13 @@ function plural(count: number, word: string) {
   return `${count} ${word}${count === 1 ? '' : 's'}`;
 }
 
-export function trashEntryLabel(entry: Pick<TrashEntry, 'kind' | 'name'>) {
+export function trashEntryLabel(entry: Pick<TrashEntry, 'kind' | 'name'> & { requests?: unknown[] }) {
+  if (entry.kind === 'request' && (entry.requests?.length ?? 0) > 1) return entry.name;
   return `${entry.kind[0].toUpperCase()}${entry.kind.slice(1)} “${entry.name}”`;
+}
+
+function entryCollectionIds(entry: TrashEntry): string[] {
+  return [...new Set([entry.collectionId, ...entry.requests.map(({ request }) => request.collectionId)].filter((id): id is string => Boolean(id)))];
 }
 
 export const trashFeature = {
@@ -92,6 +97,20 @@ export const trashFeature = {
     this.rememberDeleted({
       kind: 'request', name: request.name || request.url || 'Untitled request', detail: request.collection,
       workspaceId, requests: placed(this.requests, new Set([request.id])), collectionId: request.collectionId,
+    });
+  },
+
+  trashRequests(this: RememberHost, requests: SavedRequest[], workspaceId: string) {
+    if (requests.length === 1) {
+      trashFeature.trashRequest.call(this, requests[0], workspaceId);
+      return;
+    }
+    const collections = [...new Set(requests.map(request => request.collection).filter(Boolean))];
+    const collectionIds = [...new Set(requests.map(request => request.collectionId))];
+    this.rememberDeleted({
+      kind: 'request', name: plural(requests.length, 'request'), detail: collections.join(', '),
+      workspaceId, requests: placed(this.requests, new Set(requests.map(request => request.id))),
+      ...(collectionIds.length === 1 ? { collectionId: collectionIds[0] } : {}),
     });
   },
 
@@ -148,8 +167,13 @@ export const trashFeature = {
   trashRestoreProblem(this: TrashHost, entry: TrashEntry): string {
     if (!this.workspaces.some(workspace => workspace.id === entry.workspaceId)) return 'Its workspace no longer exists.';
     if (entry.kind === 'request' || entry.kind === 'folder') {
-      const collection = this.collections.find(candidate => candidate.id === entry.collectionId);
-      if (!collection) return `Its collection “${entry.detail.split(' · ')[0]}” was deleted. Restore the collection first.`;
+      const owners = entryCollectionIds(entry);
+      const missing = owners.filter(id => !this.collections.some(candidate => candidate.id === id));
+      if (missing.length && owners.length === 1) return `Its collection “${entry.detail.split(' · ')[0]}” was deleted. Restore the collection first.`;
+      if (missing.length) {
+        const names = [...new Set(entry.requests.filter(({ request }) => missing.includes(request.collectionId)).map(({ request }) => request.collection))];
+        return `${names.length === 1 ? 'Collection' : 'Collections'} “${names.join('”, “')}” ${names.length === 1 ? 'was' : 'were'} deleted. Restore ${names.length === 1 ? 'it' : 'them'} first.`;
+      }
     }
     if (entry.kind === 'collection' && this.collections.some(candidate => candidate.id === entry.collectionId)) return 'This collection is already back.';
     if (entry.kind === 'environment' && this.environments.some(candidate => candidate.id === entry.environment?.environment.id)) return 'This environment is already back.';
@@ -171,12 +195,13 @@ export const trashFeature = {
       this.collections = insertAt(this.collections, [{ item: clone(entry.collection.collection), index: entry.collection.index }]);
     }
     if (entry.kind === 'request' || entry.kind === 'folder') {
+      const owners = new Set(entryCollectionIds(entry));
       this.collections = this.collections.map(collection => {
-        if (collection.id !== entry.collectionId) return collection;
+        if (!owners.has(collection.id)) return collection;
         let next = collection;
-        for (const path of entry.folderPaths ?? []) next = addCollectionFolderPath(next, path);
-        for (const { item } of requests) next = addCollectionFolderPath(next, item.folderPath);
-        if (entry.folderDefaults?.length) {
+        if (collection.id === entry.collectionId) for (const path of entry.folderPaths ?? []) next = addCollectionFolderPath(next, path);
+        for (const { item } of requests) if (item.collectionId === collection.id) next = addCollectionFolderPath(next, item.folderPath);
+        if (collection.id === entry.collectionId && entry.folderDefaults?.length) {
           const have = new Set((next.folderDefaults ?? []).map(folder => folder.path.join('\u0000')));
           const missing = entry.folderDefaults.filter(folder => !have.has(folder.path.join('\u0000')));
           if (missing.length) next = { ...next, folderDefaults: [...(next.folderDefaults ?? []), ...clone(missing)] };

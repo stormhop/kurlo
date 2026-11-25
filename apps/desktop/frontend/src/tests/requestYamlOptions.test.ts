@@ -21,6 +21,17 @@ describe('request YAML completions', () => {
     expect(labels(['request', 'headers', '*', 'enabled'], 'value')).toEqual(['true', 'false']);
   });
 
+  it('offers the HTTP body variant fields and their nested schema', () => {
+    const fields = ['activeBodyVariant', 'bodyVariants'];
+    expect(labels(['request'], 'key', new Map(), 'http')).toEqual(expect.arrayContaining(fields));
+    for (const field of fields) expect(labels(['request'], 'key', new Map(), 'ws')).not.toContain(field);
+
+    const variant = ['request', 'bodyVariants', '*'];
+    expect(labels(variant, 'key').sort()).toEqual(['bodyContent', 'bodyFileName', 'bodyFilePath', 'bodyType', 'formRows', 'name', 'rawBodyType']);
+    expect(labels([...variant, 'bodyType'], 'value')).toEqual(labels(['request', 'bodyType'], 'value').filter(type => type !== 'graphql'));
+    expect(labels([...variant, 'formRows', '*', 'enabled'], 'value')).toEqual(['true', 'false']);
+  });
+
   it('suggests auth fields for the selected scheme and marks only secret fields', () => {
     const fields = requestYamlOptions(['request', 'auth'], 'key', new Map([['type', 'basic']]));
     expect(fields.map(field => field.label)).toEqual(['basicUser', 'basicPass']);

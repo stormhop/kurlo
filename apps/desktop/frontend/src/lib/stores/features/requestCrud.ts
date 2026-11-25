@@ -43,6 +43,7 @@ type RequestCrudHost = {
   draftTargets: Map<string, DraftTarget>;
   draftBaselines: Map<string, SavedRequest>;
   trashRequest: (request: import('../../types/models').SavedRequest, workspaceId: string) => void;
+  trashRequests: (requests: import('../../types/models').SavedRequest[], workspaceId: string) => void;
   starredRequestIds: Set<string>;
   reviewWorkspaceEditsBeforeQuit: () => Promise<boolean>;
   unsavedRequestSnapshots: Map<string, SavedRequest>;
@@ -798,11 +799,11 @@ export const requestCrudFeature = {
     };
     for (const g of this.collectionGroups) {
       if (g.collection.collapsed && !forceExpanded) continue;
-      visible.push(...g.rootRequests);
       for (const f of g.folders) {
         if (f.collapsed && !forceExpanded) continue;
         addFolderRequests(f);
       }
+      visible.push(...g.rootRequests);
     }
     return visible;
   },
@@ -839,6 +840,13 @@ export const requestCrudFeature = {
       if (!current) return;
       const updated = { ...current, name, nameAuto: false };
       if (!this.autosave && !current.isDraft && !this.draftRequestIds.has(id)) {
+        const renamed = (req: SavedRequest) => ({ ...req, name, nameAuto: false });
+        const saved = this.savedRequestSnapshots.get(id);
+        if (saved) this.savedRequestSnapshots = new Map(this.savedRequestSnapshots).set(id, renamed(saved));
+        const unsaved = this.unsavedRequestSnapshots.get(id);
+        if (unsaved) this.unsavedRequestSnapshots = new Map(this.unsavedRequestSnapshots).set(id, renamed(unsaved));
+        this.requests = this.requests.map(r => r.id === id ? renamed(r) : r);
+        await this.persistRequestStore();
         this.updateRequestDirtyState(id, updated);
         return;
       }
@@ -890,19 +898,48 @@ export const requestCrudFeature = {
     this.openRequestMenuId = '';
     const confirmed = await this.openConfirmDialog('Delete request', `Delete "${requestTabLabel(req)}"? You can restore it from Recently deleted until you quit Kurlo.`);
     if (!confirmed) return;
-    if (this.requestFiles && !await this.requestFiles.review([id])) return;
-    this.trashRequest(this.requestsById.get(id) ?? req, this.workspaceIdForCollection(req.collectionId));
-    this.removeDirtyRequest(id);
-    if ((req.folderPath ?? []).length) {
-      this.collections = this.collections.map(collection =>
-        collection.id === req.collectionId ? addCollectionFolderPath(collection, req.folderPath) : collection
-      );
+    await requestCrudFeature.removeRequests.call(this, [req]);
+  },
+
+  async deleteRequests(this: RequestCrudHost, ids: string[]) {
+    const reqs = [...new Set(ids)].flatMap(id => this.requestsById.get(id) ?? []).filter(req => !req.isInvalid);
+    if (reqs.length <= 1) {
+      if (reqs.length) await requestCrudFeature.deleteRequest.call(this, reqs[0].id);
+      return;
     }
-    this.requests = this.requests.filter(r => r.id !== id);
-    this.openRequestIds = this.openRequestIds.filter(oid => oid !== id);
-    this.disposeRealtimeSession(id);
-    this.forgetRequestResponses([id]);
-    if (id === this.activeRequestId) {
+    if (!this.guardWorkspaceWritable('Deleting requests')) return;
+    this.openRequestMenuId = '';
+    const confirmed = await this.openConfirmDialog('Delete requests', `Delete ${reqs.length} requests? You can restore them from Recently deleted until you quit Kurlo.`, `Delete ${reqs.length}`);
+    if (!confirmed) return;
+    await requestCrudFeature.removeRequests.call(this, reqs);
+  },
+
+  async removeRequests(this: RequestCrudHost, reqs: SavedRequest[]) {
+    const ids = reqs.map(req => req.id);
+    if (this.requestFiles && !await this.requestFiles.review(ids)) return;
+    const current = reqs.flatMap(req => this.requestsById.get(req.id) ?? []);
+    if (!current.length) return;
+    const byWorkspace = new Map<string, SavedRequest[]>();
+    for (const req of current) {
+      const workspaceId = this.workspaceIdForCollection(req.collectionId);
+      byWorkspace.set(workspaceId, [...(byWorkspace.get(workspaceId) ?? []), req]);
+    }
+    for (const [workspaceId, group] of byWorkspace) this.trashRequests(group, workspaceId);
+    const gone = new Set(current.map(req => req.id));
+    for (const id of gone) this.removeDirtyRequest(id);
+    const folders = current.filter(req => (req.folderPath ?? []).length);
+    if (folders.length) {
+      this.collections = this.collections.map(collection => folders.reduce(
+        (next, req) => req.collectionId === collection.id ? addCollectionFolderPath(next, req.folderPath) : next,
+        collection,
+      ));
+    }
+    this.requests = this.requests.filter(r => !gone.has(r.id));
+    this.openRequestIds = this.openRequestIds.filter(oid => !gone.has(oid));
+    for (const id of gone) this.disposeRealtimeSession(id);
+    this.forgetRequestResponses([...gone]);
+    if (gone.has(this.activeRequestId)) {
+      const removedActive = this.activeRequestId;
       const next = this.requests.find(r => this.openRequestIds.includes(r.id)) ?? this.requests[0];
       if (next) {
         this.openRequestIds = [...new Set([...this.openRequestIds, next.id])];
@@ -911,11 +948,51 @@ export const requestCrudFeature = {
         this.topView = 'request';
       } else {
         this.activeRequestId = '';
-        this.setActiveResponse(null, id);
+        this.setActiveResponse(null, removedActive);
         this.requestError = '';
         this.topView = 'overview';
       }
     }
+    await this.persistRequestStore();
+  },
+
+  async duplicateRequests(this: RequestCrudHost, ids: string[]) {
+    const unique = [...new Set(ids)].filter(id => this.requestsById.has(id));
+    if (unique.length <= 1) {
+      if (unique.length) await requestCrudFeature.duplicateRequest.call(this, unique[0]);
+      return;
+    }
+    if (!this.guardWorkspaceWritable('Duplicating requests')) return;
+    await this.persistActiveRequestNow();
+    await this.ensureRequestExamples(unique);
+    const copies = unique.flatMap(id => {
+      const req = id === this.activeRequestId
+        ? this.snapshotActiveRequest({ forPersistence: true })
+        : this.requestForEditing(id) ?? this.requestsById.get(id);
+      if (!req || req.isInvalid) return [];
+      return [this.normalizeSavedRequestCtx({ ...req, id: newRequestId(), filesystemName: undefined, openapi: undefined, name: `${requestTabLabel(req)} Copy`, nameAuto: false })];
+    });
+    if (!copies.length) return;
+    this.openRequestMenuId = '';
+    this.requests = [...this.requests, ...copies];
+    await this.persistRequestStore();
+    return copies.map(copy => copy.id);
+  },
+
+  async setRequestsStarred(this: RequestCrudHost, ids: string[], starred: boolean) {
+    if (!this.guardWorkspaceWritable('Updating requests')) return;
+    const eligible = ids.filter(id => {
+      const req = this.requestsById.get(id);
+      return req && !req.isDraft && !req.isInvalid;
+    });
+    const next = new Set(this.starredRequestIds);
+    for (const id of eligible) {
+      if (starred) next.add(id);
+      else next.delete(id);
+    }
+    if (next.size === this.starredRequestIds.size && eligible.every(id => this.starredRequestIds.has(id) === starred)) return;
+    this.starredRequestIds = next;
+    this.openRequestMenuId = '';
     await this.persistRequestStore();
   },
 

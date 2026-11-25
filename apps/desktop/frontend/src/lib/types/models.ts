@@ -135,6 +135,7 @@ export type ResponseTab = 'body' | 'preview' | 'headers' | 'cookies' | 'test-res
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
 export type AuthType = 'inherit' | 'none' | 'bearer' | 'basic' | 'apikey' | 'jwt' | 'oauth2' | 'oauth1' | 'aws' | 'digest' | 'ntlm';
 export type SidebarView = 'collections' | 'environments' | 'history' | 'agent' | 'cookies';
+export type RequestSortMode = 'manual' | 'name';
 export type ShortcutId =
   | 'close-tab' | 'force-close-tab' | 'next-tab' | 'previous-tab'
   | 'tab-1' | 'tab-2' | 'tab-3' | 'tab-4' | 'tab-5' | 'tab-6' | 'tab-7' | 'tab-8' | 'last-tab'
@@ -284,6 +285,9 @@ export type RequestExample = {
   response: RequestExampleResponse;
   match: RequestExampleMatch;
 };
+export type BodyVariant = Pick<SavedRequest, 'name' | 'rawBodyType' | 'bodyContent' | 'bodyFilePath' | 'bodyFileName' | 'formRows'> & {
+  bodyType: Exclude<BodyType, 'graphql'>;
+};
 export type SavedRequest = {
   id: string; name: string; filesystemName: string; nameAuto?: boolean; requestType?: RequestType; isDraft?: boolean; collectionId: string; collection: string;
   openapi?: string;
@@ -295,6 +299,7 @@ export type SavedRequest = {
   auth: AuthState;
   bodyType: BodyType; rawBodyType: RawBodyType; bodyContent: string;
   bodyFilePath: string; bodyFileName: string; formRows: KVRow[];
+  activeBodyVariant?: string; bodyVariants?: BodyVariant[];
   graphqlSchema?: string;
   preRequestScriptJs?: string; testScriptJs?: string; requestNotes: string; settings: RequestSettings; settingsOverrides?: RequestSettingsOverrides;
   sioEvents?: KVRow[];

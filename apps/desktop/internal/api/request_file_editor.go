@@ -236,7 +236,7 @@ func (a *App) SaveRequestFileYAML(workspaceRoot, requestID, content, baseRevisio
 	}
 	resultRequest := cloneMap(updated)
 	resultRequest["collection"] = stringValue(collection, "name")
-	normalizeWorkspaceRows(resultRequest, requestRowFieldsForStrip...)
+	updateRequestRows(resultRequest, restoreWorkspaceRowDefaults)
 	mergeRequestSecrets(resultRequest, existingSecrets)
 	requestJSON, err := json.Marshal(resultRequest)
 	if err != nil {
@@ -500,7 +500,7 @@ func loadRequestYAMLContext(root, requestID, pathHint string, knownContent *stri
 	if err != nil && !os.IsNotExist(err) {
 		return requestYAMLContext{}, err
 	}
-	normalizeWorkspaceRows(request, requestRowFieldsForStrip...)
+	updateRequestRows(request, restoreWorkspaceRowDefaults)
 	mergeRequestSecrets(request, stringMap(localStore["secrets"]))
 	validator := newWorkspaceIntegrityValidator(root)
 	scanned := scanRequestExampleDirs([]string{requestExampleDir(collectionDir, request[filesystemNameField].(string))})

@@ -190,7 +190,7 @@ var grpcRequestSettingFieldSet = stringSet(grpcRequestSettingFields)
 
 func omitRequestEditorDefaults(request map[string]any) {
 	delete(request, "requestTab")
-	updateWorkspaceRows(request, omitWorkspaceRowDefaults, requestRowFieldsForStrip...)
+	updateRequestRows(request, omitWorkspaceRowDefaults)
 }
 
 func stripRequestForFilesystem(request map[string]any) {
@@ -198,6 +198,11 @@ func stripRequestForFilesystem(request map[string]any) {
 	delete(request, "isPinned")
 	requestType := stringValue(request, "requestType")
 	stripBodyFieldsForType(request, requestType)
+	for _, variant := range mapSlice(request["bodyVariants"]) {
+		stripBodyFieldsForType(variant, "http")
+		stripAndCompactKVRows(variant["formRows"])
+		stripEmptyAndDefaults(variant, nil)
+	}
 	stripRealtimeFieldsForType(request, requestType)
 	stripMethodForType(request, requestType)
 	delete(request, "requestTab")
@@ -599,6 +604,13 @@ func stripEmptyAndDefaults(item map[string]any, defaults map[string]any) {
 		if isEmptyValue(value) {
 			delete(item, key)
 		}
+	}
+}
+
+func updateRequestRows(request map[string]any, update func(map[string]any)) {
+	updateWorkspaceRows(request, update, requestRowFieldsForStrip...)
+	for _, variant := range mapSlice(request["bodyVariants"]) {
+		updateWorkspaceRows(variant, update, "formRows")
 	}
 }
 
