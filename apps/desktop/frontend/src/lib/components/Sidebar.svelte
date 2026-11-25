@@ -35,7 +35,7 @@
   import SecretProvidersSidebar from './SecretProvidersSidebar.svelte';
   import type { LoadRunResult, LoadTest } from '../wire';
 
-  import { canReorderRequests, movableRequest, type DropPlacement, type RequestDropTarget } from '../collections';
+  import { movableRequest, type DropPlacement, type RequestDropTarget } from '../collections';
   import { EMPTY_SELECTION, applySelectionClick, pruneSelection, selectAllRequests, selectionModifiers, type RequestBatchActions, type RequestSelection } from '../sidebarSelection';
   type CollectionSidebarRow =
     | { type: 'onboarding'; key: string; height: number }

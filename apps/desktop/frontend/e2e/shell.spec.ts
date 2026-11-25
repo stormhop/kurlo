@@ -289,7 +289,7 @@ test.describe("Kurlo desktop browser E2E", () => {
       const binaryLabel = Array.from(row.querySelectorAll<HTMLElement>('.body-mode-label'))
         .find((label) => label.textContent?.trim() === 'Binary');
       const rawType = row.querySelector<HTMLElement>('.raw-type-menu');
-      const beautify = row.querySelector<HTMLElement>('.body-mode-beautify');
+      const beautify = row.querySelector<HTMLElement>('.body-mode-actions');
       if (!binaryLabel || !rawType || !beautify) return false;
 
       const rowBox = row.getBoundingClientRect();

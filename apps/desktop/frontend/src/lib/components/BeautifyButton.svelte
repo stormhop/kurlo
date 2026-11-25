@@ -27,13 +27,13 @@
     <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <path d="M2 6l2.3 2.3L10 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    Beautified
+    <span class="btn-label">Beautified</span>
   {:else}
     <svg width="0.75rem" height="0.75rem" viewBox="0 0 12 12" fill="none" aria-hidden="true">
       <path d="M1 3h4M1 6h7M1 9h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
       <path d="M9 4l2 2-2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    Beautify
+    <span class="btn-label">Beautify</span>
   {/if}
 </button>
 

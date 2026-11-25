@@ -158,7 +158,7 @@
     <svg width="0.75rem" height="0.75rem" viewBox="0 0 13 13" fill="none" aria-hidden="true">
       <path d="M3.5 1.5h6a1 1 0 011 1v9l-4-2.2-4 2.2v-9a1 1 0 011-1z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
     </svg>
-    Saved
+    <span class="btn-label">Saved</span>
     {#if items.length}<span class="badge">{items.length}</span>{/if}
   </button>
 
