@@ -11,7 +11,7 @@ Folders are optional. They're useful when a single collection has too many reque
 - Collection `⋯` menu → **Add folder**
 - Inside a folder, the folder's `⋯` menu → **Add subfolder**
 
-Folders can nest up to **4 levels deep** (a cap to keep the tree usable). Empty folders are preserved, so creating a folder does not force you to create a request immediately. Once a folder contains **50 requests**, **Add request** is disabled in its menu.
+Folders can nest up to **4 levels deep** (a cap to keep the tree usable). Empty folders are preserved, so creating a folder does not force you to create a request immediately. Once a folder contains **50 requests**, **Add request** is disabled in its menu, and moving, duplicating or pasting more requests into it is refused. Each folder has its own limit: requests in subfolders and at the collection root do not count toward it.
 
 ## Collection defaults
 

@@ -30,6 +30,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 - **Response status in a narrow pane** shrinks to the code and then to the coloured dot instead of being cut off.
 - **Renaming with manual save.** A request renamed in the sidebar is saved at once instead of waiting for you to open and save it.
+- **Folder limit** also applies when you duplicate or paste requests into a folder.
 - **Sidebar menus.** A second click on the **Collections** `⋯` or **Recently deleted** button closes the menu on macOS.
 - **Sidebar cursor.** Folder names show the regular pointer instead of a text cursor.
 - **Query parameters** keep their values, flags and repeated keys when you send a saved request from Desktop, Runner, CLI or MCP. Editing an imported Postman or HTTP request keeps its other parameters.

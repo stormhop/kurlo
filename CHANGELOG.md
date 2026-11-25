@@ -24,6 +24,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 - **Response status in a narrow pane.** When the response pane is too narrow for the whole status, Kurlo drops the reason phrase, then the code, and keeps the coloured dot. Before, the status was cut in the middle.
 - **Renaming with manual save.** Renaming a request in the sidebar, by double-clicking its name or with **Rename**, saves the new name at once. Before, the request stayed unsaved until you opened it and saved it. Other unsaved edits of that request still wait for **Save**.
+- **Folder limit when copying.** Duplicating requests or pasting a copied request into a folder that already holds 50 requests is refused with a message, as moving and creating requests already were. Before, copies could push a folder past the limit.
 - **Folder names that already exist.** Renaming a folder to the name of another folder at the same level is refused with a message instead of merging the two folders.
 - **Sidebar menus on macOS.** A second click on the `⋯` button next to **Collections** or on **Recently deleted** closes the menu instead of opening it again.
 - **Sidebar cursor.** Folder names and the request counts of folders and collections show the regular pointer instead of a text cursor, like collection names.

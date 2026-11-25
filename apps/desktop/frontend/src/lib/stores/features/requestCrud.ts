@@ -2,7 +2,7 @@ import { cancelQuit, confirmQuit, loadRequestExamples } from '../../backend';
 import { normalizeRequestExamples, requestExamplesPending } from '../../examples';
 import type { HttpResponse, McpResponse } from '../../backend';
 import type { ResponseFormatChoice } from '../../responseFormat';
-import { DEFAULT_COLLECTION, clampName } from '../../constants';
+import { DEFAULT_COLLECTION, MAX_FOLDER_REQUESTS, clampName } from '../../constants';
 import { addCollectionFolderPath } from '../../collections';
 import {
   DEFAULT_GRAPHQL_QUERY,
@@ -130,6 +130,7 @@ type RequestCrudHost = {
   normalizeRequestTypeValue: (value: unknown, url?: string) => RequestType;
   normalizeSavedRequestCtx: (input: Partial<SavedRequest>) => SavedRequest;
   openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openAlertDialog: (title: string, message: string) => Promise<void>;
   openDraftRequests: () => SavedRequest[];
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
@@ -167,6 +168,27 @@ type RequestCrudHost = {
   socketIODisconnect: () => Promise<void>;
   workspaceIdForCollection: (collectionId: string) => string;
 };
+
+async function refuseFolderOverflow(host: RequestCrudHost, additions: SavedRequest[]): Promise<boolean> {
+  const incoming = new Map<string, { collectionId: string; folderPath: string[]; count: number }>();
+  for (const req of additions) {
+    const folderPath = req.folderPath ?? [];
+    if (req.isDraft || !folderPath.length) continue;
+    const key = JSON.stringify([req.collectionId, folderPath]);
+    const entry = incoming.get(key) ?? { collectionId: req.collectionId, folderPath, count: 0 };
+    entry.count++;
+    incoming.set(key, entry);
+  }
+  for (const { collectionId, folderPath, count } of incoming.values()) {
+    const key = JSON.stringify([collectionId, folderPath]);
+    const present = host.requests.filter(req => !req.isDraft && JSON.stringify([req.collectionId, req.folderPath ?? []]) === key).length;
+    if (present + count > MAX_FOLDER_REQUESTS) {
+      await host.openAlertDialog('Folder limit', `A folder can contain up to ${MAX_FOLDER_REQUESTS} requests.`);
+      return true;
+    }
+  }
+  return false;
+}
 
 export const requestCrudFeature = {
   get openRequests(): SavedRequest[] {
@@ -867,6 +889,7 @@ export const requestCrudFeature = {
       : this.requestForEditing(id) ?? this.requestsById.get(id);
     if (!req) return;
     const copy = this.normalizeSavedRequestCtx({ ...req, id: newRequestId(), filesystemName: undefined, openapi: undefined, name: `${requestTabLabel(req)} Copy`, nameAuto: false });
+    if (await refuseFolderOverflow(this, [copy])) return;
     this.requests = [...this.requests, copy];
     this.openRequestIds = [...new Set([...this.openRequestIds, copy.id])];
     this.openRequestMenuId = '';
@@ -972,7 +995,7 @@ export const requestCrudFeature = {
       if (!req || req.isInvalid) return [];
       return [this.normalizeSavedRequestCtx({ ...req, id: newRequestId(), filesystemName: undefined, openapi: undefined, name: `${requestTabLabel(req)} Copy`, nameAuto: false })];
     });
-    if (!copies.length) return;
+    if (!copies.length || await refuseFolderOverflow(this, copies)) return;
     this.openRequestMenuId = '';
     this.requests = [...this.requests, ...copies];
     await this.persistRequestStore();
@@ -1029,6 +1052,7 @@ export const requestCrudFeature = {
     }
     const colId = this.activeCollectionId() || source.collectionId;
     const copy = this.normalizeSavedRequestCtx({ ...source, id: newRequestId(), filesystemName: undefined, collectionId: colId, collection: this.collectionNameById(colId), name: `${requestTabLabel(source)} Copy`, nameAuto: false });
+    if (await refuseFolderOverflow(this, [copy])) return;
     this.requests = [...this.requests, copy];
     this.openRequestIds = [...new Set([...this.openRequestIds, copy.id])];
     this.applySavedRequest(copy);

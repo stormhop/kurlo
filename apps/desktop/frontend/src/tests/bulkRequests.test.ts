@@ -120,6 +120,26 @@ describe('bulk delete, duplicate and star', () => {
     ]);
   });
 
+  it('refuses duplicates and pastes that would overflow a folder', async () => {
+    const { app } = await bulkApp();
+    const template = app.requestsById.get('u');
+    app.requests = [...app.requests, ...Array.from({ length: 49 }, (_, index) => ({ ...template, id: `full-${index}` }))];
+    const alert = vi.spyOn(app, 'openAlertDialog').mockResolvedValue(undefined);
+    const persist = vi.spyOn(app, 'persistRequestStore');
+    await app.duplicateRequest('u');
+    expect(alert).toHaveBeenCalledTimes(1);
+    expect(await app.duplicateRequests(['a', 'u', 'full-0'])).toBeUndefined();
+    expect(alert).toHaveBeenCalledTimes(2);
+    app.copiedRequestItem = app.requestsById.get('u');
+    await app.pasteCopiedRequestItem();
+    expect(alert).toHaveBeenCalledTimes(3);
+    expect(persist).not.toHaveBeenCalled();
+    expect(app.requests).toHaveLength(54);
+
+    expect(await app.duplicateRequests(['a', 'b'])).toHaveLength(2);
+    expect(app.requests.filter((req: SavedRequest) => req.folderPath?.[0] === 'Users')).toHaveLength(50);
+  });
+
   it('stars and unstars a selection and skips drafts', async () => {
     const { app } = await bulkApp();
     app.requests = app.requests.map((req: SavedRequest) => req.id === 'c' ? { ...req, isDraft: true } : req);
