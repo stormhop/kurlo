@@ -24,6 +24,7 @@ const (
 	TypeDoppler           = "doppler"
 	TypeInfisical         = "infisical"
 	TypeCommand           = "command"
+	TypeKeePassXC         = "keepassxc"
 
 	DefaultCacheTTL = 5 * time.Minute
 	DefaultTimeout  = 10 * time.Second
@@ -310,6 +311,7 @@ func ParseProvider(item map[string]any) (ProviderConfig, error) {
 		default:
 			return config, fmt.Errorf("provider %q: unsupported auth method %q", config.ID, config.Auth.Method)
 		}
+	case TypeKeePassXC:
 	case TypeCommand:
 		if len(config.Command) == 0 || strings.TrimSpace(config.Command[0]) == "" {
 			return config, fmt.Errorf("provider %q: command is required, like [pass, show, \"{path}\"]", config.ID)
@@ -445,7 +447,7 @@ func CredentialProblem(name, value string) string {
 		}
 		return ""
 	}
-	if name == "password" {
+	if name == "password" || name == "associationId" {
 		if strings.ContainsAny(value, "\r\n") {
 			return "must be one line"
 		}

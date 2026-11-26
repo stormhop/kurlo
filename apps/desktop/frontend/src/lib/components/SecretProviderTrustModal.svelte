@@ -45,6 +45,7 @@
       case 'bitwarden': return { what: 'your Bitwarden access token through the bws CLI', where: String(config.address || 'bitwarden.com') };
       case 'doppler': return { what: 'your Doppler token', where: String(config.address || 'api.doppler.com') };
       case 'infisical': return { what: 'your Infisical credentials', where: String(config.address || 'app.infisical.com') };
+      case 'keepassxc': return { what: 'the KeePassXC app on this computer through keepassxc-proxy', where: 'entries that match the URLs you link' };
       case 'command': return { what: 'this computer to run', where: joinCommand(commandList(config.command)) };
       case 'env': return { what: 'environment variables of this computer', where: 'requests in this workspace' };
       default: return { what: 'credentials', where: provider.id };

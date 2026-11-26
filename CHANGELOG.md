@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **KeePassXC secret provider.** Link a variable to a KeePassXC entry by its URL. Kurlo reads it from the running KeePassXC app through `keepassxc-proxy`, like the browser extension: click **Connect to KeePassXC** once and approve the connection in KeePassXC. **Field** picks the user name, password, TOTP or a `KPH:` attribute, and **Entry** picks one entry when several match. `kurlo run` reads `KEEPASSXC_ASSOCIATION_ID` and `KEEPASSXC_ASSOCIATION_KEY`.
 - **Named body variants.** Use **Body → Saved** to create, rename, load and send up to five payloads of an HTTP request. Variants share the request’s URL, auth, headers and tests. The request YAML stores each payload and the selected name.
 - **Rename folders in place.** Double-click a folder name in the sidebar to rename it, as with collections. Enter saves, Escape cancels.
 - **Sort requests by name.** Choose **Collections → ⋯ → By name** to list requests alphabetically at each level. **Manual** restores the saved order. Kurlo remembers your choice on this device, and the Collection Runner uses the collection’s saved order in either view. The same menu includes **Import collection…**.

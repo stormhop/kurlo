@@ -85,6 +85,8 @@ export function ConnectClaudeCode(arg1:model.ClaudeConnection):Promise<model.Cla
 
 export function ConnectCodex(arg1:model.CodexConnection):Promise<model.CodexStatus>;
 
+export function ConnectSecretProvider(arg1:string,arg2:string):Promise<api.SecretProviderStatus>;
+
 export function CookieSyncStatus():Promise<model.CookieSyncStatus>;
 
 export function CreateLocalWorkspaceRoot(arg1:string,arg2:string,arg3:string):Promise<api.WorkspaceOpenResult>;

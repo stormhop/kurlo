@@ -8,7 +8,7 @@ import { browseSecretProvider } from '../lib/secretProvidersBackend';
 import { variableDisplayValue } from '../lib/variables';
 import type { SecretProviderView } from '../lib/wire';
 import {
-  checkAllSecretProviders, loadSecretProviders, saveSecretProviderConfig, secretProviderAttention, secretProviders,
+  checkAllSecretProviders, connectProvider, loadSecretProviders, saveSecretProviderConfig, secretProviderAttention, secretProviders,
 } from '../lib/stores/secretProviders.svelte';
 
 function provider(overrides: Partial<SecretProviderView> = {}): SecretProviderView {
@@ -67,7 +67,7 @@ describe('secret provider states', () => {
   });
 
   it('has a logo or a monogram for every provider type', () => {
-    expect(SECRET_PROVIDER_TYPES.map(item => item.type)).toEqual(['vault', '1password', 'aws-secrets-manager', 'aws-ssm', 'gcp-secret-manager', 'azure-key-vault', 'bitwarden', 'doppler', 'infisical', 'command', 'env']);
+    expect(SECRET_PROVIDER_TYPES.map(item => item.type)).toEqual(['vault', '1password', 'aws-secrets-manager', 'aws-ssm', 'gcp-secret-manager', 'azure-key-vault', 'bitwarden', 'doppler', 'infisical', 'keepassxc', 'command', 'env']);
     for (const item of SECRET_PROVIDER_TYPES) {
       expect(Boolean(secretProviderLogo(item.type)) || item.monogram.length > 0).toBe(true);
     }
@@ -119,6 +119,32 @@ describe('secret provider store', () => {
     expect(TestSecretProvider).toHaveBeenCalledTimes(2);
     expect(secretProviderAttention()).toEqual({ signin: 1, untrusted: 1 });
     expect(await saveSecretProviderConfig({ id: 'x', type: 'aws-ssm' })).toBe('provider "x": region is required');
+  });
+});
+
+describe('KeePassXC provider', () => {
+  it('is offered with an entry selector instead of a version', () => {
+    const info = SECRET_PROVIDER_TYPES.find(item => item.type === 'keepassxc');
+    expect(info).toMatchObject({ name: 'KeePassXC', versionLabel: 'Entry', browse: false });
+    expect(info?.versionHint).not.toBe('');
+    expect(secretProviderSummary(provider({ id: 'kp', type: 'keepassxc', config: { id: 'kp', type: 'keepassxc' } }))).toBe('KeePassXC · keepassxc-proxy');
+  });
+
+  it('connects through the app and checks the provider again', async () => {
+    const ConnectSecretProvider = vi.fn(async (_workspace: string, id: string) => ({ providerId: id, ok: true, detail: 'Connected to KeePassXC as kurlo laptop', durationMs: 5 }));
+    const TestSecretProvider = vi.fn(async (_workspace: string, id: string) => ({ providerId: id, ok: true, durationMs: 1 }));
+    host.window!.go = { api: { App: {
+      ListSecretProviders: vi.fn(async () => ({ cachedValues: 0, providers: [provider({ id: 'kp', type: 'keepassxc', config: { id: 'kp', type: 'keepassxc' }, savedCredentials: ['associationId', 'associationKey'] })] })),
+      ConnectSecretProvider,
+      TestSecretProvider,
+    } } };
+    await loadSecretProviders('ws-kp');
+    expect(await connectProvider('kp')).toBe('');
+    expect(ConnectSecretProvider).toHaveBeenCalledWith('ws-kp', 'kp');
+    expect(TestSecretProvider).toHaveBeenCalledWith('ws-kp', 'kp');
+
+    ConnectSecretProvider.mockResolvedValueOnce({ providerId: 'kp', ok: false, kind: 'forbidden', message: 'kp: the connection was not approved in KeePassXC', durationMs: 5 } as never);
+    expect(await connectProvider('kp')).toBe('kp: the connection was not approved in KeePassXC');
   });
 });
 

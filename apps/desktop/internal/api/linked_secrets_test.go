@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -552,5 +553,35 @@ func TestResponseTimingsReportSecretLookup(t *testing.T) {
 	}))
 	if plain.Timings.Secrets != 0 {
 		t.Fatalf("a request without links reported %v ms of secret lookup", plain.Timings.Secrets)
+	}
+}
+
+func TestConnectKeePassXCProviderBinding(t *testing.T) {
+	f := newLinkedFixture(t)
+	linkedSecrets.manager = secretmgr.NewManager(linkedSecrets, secretmgr.Environment{
+		Getenv:   func(string) (string, bool) { return "", false },
+		LookPath: func(string) (string, error) { return "", errors.New("not found") },
+	})
+	if result := f.app.SaveSecretProvider(f.workspace, map[string]any{"id": "kp", "type": "keepassxc", "name": "KeePassXC"}); !result.Ok {
+		t.Fatal(result.Error)
+	}
+	if status := f.app.ConnectSecretProvider(f.workspace, "vault-prod"); status.Ok || status.Kind != "invalid_ref" {
+		t.Fatalf("connect on Vault = %+v", status)
+	}
+	if status := f.app.ConnectSecretProvider(f.workspace, "kp"); status.Ok || status.Kind != "tool_missing" || !strings.Contains(status.Message, "keepassxc-proxy") {
+		t.Fatalf("connect without KeePassXC = %+v", status)
+	}
+	if status := f.app.TestSecretProvider(f.workspace, "kp"); status.Ok || status.Kind != "not_authenticated" {
+		t.Fatalf("test before connecting = %+v", status)
+	}
+	if result := f.app.SetSecretProviderCredential(f.workspace, "kp", "associationId", "kurlo laptop"); !result.Ok {
+		t.Fatalf("connection name with a space: %s", result.Error)
+	}
+	if result := f.app.SetSecretProviderCredential(f.workspace, "kp", "associationKey", "a b"); result.Ok {
+		t.Fatal("a connection key with a space was saved")
+	}
+	export := f.app.PreviewSecretProviderEnv(f.workspace, "kp")
+	if !strings.Contains(fmt.Sprint(export), "KEEPASSXC_ASSOCIATION_ID") || !strings.Contains(fmt.Sprint(export), "KEEPASSXC_ASSOCIATION_KEY") {
+		t.Fatalf("export for CI = %+v", export)
 	}
 }

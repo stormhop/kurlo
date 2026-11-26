@@ -199,6 +199,29 @@ test.describe('secret providers', () => {
     await expect(page.getByText('Secret cache cleared · 3 values')).toBeVisible();
   });
 
+  test('connects a KeePassXC provider with the Connect button', async ({ page }) => {
+    await installKurloBridge(page);
+    await installSecretProviderBridge(page, { secrets: { 'keepassxc:https://api.example.com': { password: 's3cret', username: 'ci-bot' } } });
+    await page.goto('/');
+    await openSecretProviders(page);
+    await page.getByRole('button', { name: 'Add provider' }).first().click();
+    const dialog = page.getByRole('dialog', { name: 'Add a secret provider' });
+    await dialog.getByRole('radio', { name: /KeePassXC/ }).click();
+    await dialog.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByRole('heading', { name: /New .*KeePassXC/ })).toBeVisible();
+    await expect(page.locator('#secret-provider-address')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Not connected.')).toBeVisible();
+
+    const connect = page.getByRole('button', { name: 'Connect to KeePassXC' });
+    await expect(page.getByText('Open KeePassXC, unlock the database and turn on Browser Integration.', { exact: false })).toBeVisible();
+    await connect.click();
+    await expect(page.getByRole('button', { name: 'Connect again' })).toBeVisible();
+    await expect(page.getByText('Connected to KeePassXC 2.7.10 as kurlo laptop')).toBeVisible();
+    expect(await page.evaluate(() => window.__kurloSecrets.calls)).toEqual(expect.arrayContaining(['connect:keepassxc', 'test:keepassxc']));
+    await shot(page, 'secret-providers-keepassxc');
+  });
+
   test('links an environment variable to a secret through Browse', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       environments: [{ id: 'env-prod', workspaceId: 'workspace-e2e', name: 'Prod', values: [{ id: 1, key: 'apiToken', value: '', enabled: true }] }],

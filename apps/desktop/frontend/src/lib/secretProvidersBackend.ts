@@ -33,6 +33,12 @@ export async function testSecretProvider(workspaceId: string, providerId: string
   return bridge.TestSecretProvider(workspaceId, providerId);
 }
 
+export async function connectSecretProvider(workspaceId: string, providerId: string): Promise<SecretProviderStatus> {
+  const bridge = app();
+  if (!bridge?.ConnectSecretProvider) return { providerId, ok: false, kind: 'unavailable', message: unavailable, durationMs: 0 };
+  return bridge.ConnectSecretProvider(workspaceId, providerId);
+}
+
 export async function testSecretRef(workspaceId: string, ref: SecretRefInput): Promise<SecretRefTestResult> {
   const bridge = app();
   if (!bridge?.TestSecretRef) return { ok: false, kind: 'unavailable', message: unavailable, length: 0, fields: [], durationMs: 0 };

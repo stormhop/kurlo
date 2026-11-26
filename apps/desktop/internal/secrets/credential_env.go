@@ -34,6 +34,8 @@ func CredentialEnvNames(config ProviderConfig) []CredentialEnv {
 		}
 	case TypeBitwarden:
 		return []CredentialEnv{{"token", "BWS_ACCESS_TOKEN"}}
+	case TypeKeePassXC:
+		return []CredentialEnv{{"associationId", KeePassXCAssociationIDEnv}, {"associationKey", KeePassXCAssociationKeyEnv}}
 	case TypeDoppler:
 		return []CredentialEnv{{"token", "DOPPLER_TOKEN"}}
 	case TypeInfisical:

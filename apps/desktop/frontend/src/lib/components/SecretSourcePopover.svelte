@@ -177,8 +177,8 @@
           <input class="field field-mono" value={prefix} placeholder="None" oninput={(event) => (prefix = inputValue(event))} autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" />
         </label>
         <label class="secret-popover-field">
-          <span>Version</span>
-          <input class="field field-mono" value={version} placeholder="Latest" disabled={!info?.versionHint} oninput={(event) => (version = inputValue(event))} autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" />
+          <span>{info?.versionLabel ?? 'Version'}</span>
+          <input class="field field-mono" value={version} placeholder={info?.versionPlaceholder ?? 'Latest'} disabled={!info?.versionHint} oninput={(event) => (version = inputValue(event))} autocomplete="off" spellcheck="false" autocorrect="off" autocapitalize="none" />
         </label>
       </div>
       {#if duplicate}

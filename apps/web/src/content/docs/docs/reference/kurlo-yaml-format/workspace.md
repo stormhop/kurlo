@@ -60,7 +60,7 @@ secretProviders:
 | Field | Meaning |
 |---|---|
 | `id` | Lowercase letters, digits, `-` and `_`. Environment files refer to the provider by it. |
-| `type` | `vault`, `1password`, `aws-secrets-manager`, `aws-ssm`, `gcp-secret-manager`, `azure-key-vault`, `bitwarden`, `doppler`, `infisical`, `command` or `env`. |
+| `type` | `vault`, `1password`, `aws-secrets-manager`, `aws-ssm`, `gcp-secret-manager`, `azure-key-vault`, `bitwarden`, `doppler`, `infisical`, `keepassxc`, `command` or `env`. |
 | `name` | Name shown in Kurlo, up to 80 characters. |
 | `address` | Vault server or Azure Key Vault URL; for Bitwarden, Doppler and Infisical, a self-hosted or regional server. |
 | `namespace`, `caCert`, `skipTlsVerify` | Vault Enterprise namespace, PEM file of a private CA, and whether to skip TLS checks. |

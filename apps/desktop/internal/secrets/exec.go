@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 )
 
 const maxToolOutputBytes = 1 << 20
@@ -40,13 +43,68 @@ func systemRun(ctx context.Context, path string, args []string, env []string) ([
 	return stdout.Bytes(), stderr.Bytes(), err
 }
 
+type spawnedProcess struct {
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
+	once   sync.Once
+}
+
+func (p *spawnedProcess) Read(buf []byte) (int, error)  { return p.stdout.Read(buf) }
+func (p *spawnedProcess) Write(buf []byte) (int, error) { return p.stdin.Write(buf) }
+
+func (p *spawnedProcess) Close() error {
+	p.once.Do(func() {
+		_ = p.stdin.Close()
+		done := make(chan struct{})
+		go func() {
+			_ = p.cmd.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			_ = p.cmd.Process.Kill()
+			<-done
+		}
+	})
+	return nil
+}
+
+func systemSpawn(ctx context.Context, path string, args []string) (io.ReadWriteCloser, error) {
+	cmd := exec.Command(path, args...)
+	cmd.Stderr = io.Discard
+	hideWindow(cmd)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	process := &spawnedProcess{cmd: cmd, stdin: stdin, stdout: stdout}
+	if ctx.Err() != nil {
+		_ = process.Close()
+		return nil, ctx.Err()
+	}
+	return process, nil
+}
+
 func toolCandidates(name string) []string {
 	return toolCandidatesFor(runtime.GOOS, os.Getenv, name)
 }
 
 func toolCandidatesFor(goos string, getenv func(string) string, name string) []string {
 	if goos != "windows" {
-		return []string{"/opt/homebrew/bin/" + name, "/usr/local/bin/" + name, "/usr/bin/" + name, "/snap/bin/" + name}
+		out := []string{"/opt/homebrew/bin/" + name, "/usr/local/bin/" + name, "/usr/bin/" + name, "/snap/bin/" + name}
+		if name == keepassxcProxy {
+			out = append(out, "/Applications/KeePassXC.app/Contents/MacOS/keepassxc-proxy", "/snap/bin/keepassxc.proxy")
+		}
+		return out
 	}
 	var out []string
 	for _, base := range []string{getenv("ProgramFiles"), getenv("ProgramFiles(x86)"), getenv("LOCALAPPDATA")} {
@@ -61,6 +119,8 @@ func toolCandidatesFor(goos string, getenv func(string) string, name string) []s
 			out = append(out, filepath.Join(base, "Amazon", "AWSCLIV2", "aws.exe"))
 		case "az":
 			out = append(out, filepath.Join(base, "Microsoft SDKs", "Azure", "CLI2", "wbin", "az.cmd"))
+		case keepassxcProxy:
+			out = append(out, filepath.Join(base, "KeePassXC", "keepassxc-proxy.exe"))
 		case "gcloud":
 			out = append(out, filepath.Join(base, "Google", "Cloud SDK", "google-cloud-sdk", "bin", "gcloud.cmd"))
 		}

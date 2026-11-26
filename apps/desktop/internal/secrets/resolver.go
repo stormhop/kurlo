@@ -160,6 +160,31 @@ func (m *Manager) Check(ctx context.Context, workspaceID, providerID string) (St
 	return instance.Check(ctx)
 }
 
+type Associator interface {
+	Associate(ctx context.Context) (map[string]string, error)
+}
+
+func (m *Manager) Associate(ctx context.Context, workspaceID, providerID string) (map[string]string, error) {
+	config, err := m.Config(workspaceID, providerID)
+	if err != nil {
+		return nil, err
+	}
+	if !m.source.Trusted(workspaceID, config) {
+		return nil, untrusted(config)
+	}
+	instance, _, err := m.provider(workspaceID, config)
+	if err != nil {
+		return nil, err
+	}
+	associator, ok := instance.(Associator)
+	if !ok {
+		return nil, newError(KindInvalidRef, config.ID, "%s does not connect this way", config.DisplayName())
+	}
+	ctx, cancel := context.WithTimeout(ctx, config.Timeout+keepassxcAssociateTimeout)
+	defer cancel()
+	return associator.Associate(ctx)
+}
+
 func (m *Manager) List(ctx context.Context, workspaceID, providerID, prefix string) ([]Entry, error) {
 	config, err := m.Config(workspaceID, providerID)
 	if err != nil {

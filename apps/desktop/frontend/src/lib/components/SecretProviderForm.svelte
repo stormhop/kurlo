@@ -9,7 +9,7 @@
     SECRET_TOOL_INSTALL_URLS, commandList, joinCommand, secretProviderState, secretProviderTypeInfo, splitCommand, type SecretProviderType,
   } from '../secretProviderTypes';
   import {
-    cancelSecretProviderDraft, checkSecretProvider, forgetProviderCredentials, removeSecretProvider, revokeProviderTrust,
+    cancelSecretProviderDraft, checkSecretProvider, connectProvider, forgetProviderCredentials, removeSecretProvider, revokeProviderTrust,
     saveProviderCredential, saveSecretProviderConfig, secretProviders,
   } from '../stores/secretProviders.svelte';
   import { secretCredentialProblem, validateSecretProviderDraft, type SecretProviderDraft, type SecretProviderDraftErrors } from '../secretProviderValidation';
@@ -97,6 +97,8 @@
   let deleting = $state(false);
   let moreMenuOpen = $state(false);
   let exportingEnv = $state(false);
+  let connecting = $state(false);
+  let connectError = $state('');
   let credentialDraft = $state<Record<string, string>>({});
   let draft = $state<Draft>(draftFrom(undefined, 'env'));
   let baseline = $state('');
@@ -248,6 +250,13 @@
     saving = false;
   }
 
+  async function connect() {
+    if (!provider) return;
+    connecting = true;
+    connectError = await connectProvider(provider.id);
+    connecting = false;
+  }
+
   async function remove() {
     if (!provider) return;
     deleting = true;
@@ -336,7 +345,7 @@
           <strong>Connected.</strong>
           {connectedDetail(statusResult)}
         {:else}
-          <strong>{statusResult.kind === 'not_authenticated' ? 'Sign in required.' : statusResult.kind === 'tool_missing' ? 'CLI not installed.' : 'Not connected.'}</strong> {statusResult.message}
+          <strong>{statusResult.kind === 'not_authenticated' ? (type === 'keepassxc' ? 'Not connected.' : 'Sign in required.') : statusResult.kind === 'tool_missing' ? 'CLI not installed.' : 'Not connected.'}</strong> {statusResult.message}
         {/if}
       </span>
       {#if statusResult.kind === 'tool_missing' && SECRET_TOOL_INSTALL_URLS[type]}
@@ -583,6 +592,19 @@
             </div>
           </div>
         {/each}
+        {#if type === 'keepassxc'}
+          {@const connected = provider.savedCredentials.includes('associationId') && provider.savedCredentials.includes('associationKey')}
+          <div class="settings-row">
+            <div class="settings-row-text">
+              <span class="settings-row-title">KeePassXC connection</span>
+              <span class="settings-row-desc">{connecting ? 'Name the connection in KeePassXC and click Save and allow access.' : connected ? 'Connected on this device. Connect again after you open another database.' : 'Open KeePassXC, unlock the database and turn on Browser Integration. KeePassXC asks you to name the connection.'}</span>
+            </div>
+            <div class="settings-row-control">
+              <button class="btn btn-sm" class:btn-primary={!connected} class:btn-secondary={connected} type="button" onclick={() => void connect()} disabled={connecting || !provider.trusted || !provider.valid}>{connecting ? 'Waiting for KeePassXC…' : connected ? 'Connect again' : 'Connect to KeePassXC'}</button>
+              {#if connectError}<span class="secret-field-error" role="alert">{connectError}</span>{/if}
+            </div>
+          </div>
+        {/if}
         {#if provider.savedCredentials.length}
           <div class="settings-row">
             <div class="settings-row-text"><span class="settings-row-title">Saved credentials</span><span class="settings-row-desc">{provider.savedCredentials.join(', ')}</span></div>

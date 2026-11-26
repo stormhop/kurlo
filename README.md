@@ -19,12 +19,12 @@ no telemetry. Collections live as YAML in your Git repo.
 ## New in 3.2: Secret managers
 
 Link an environment variable to HashiCorp Vault or OpenBao, 1Password, AWS Secrets Manager or Parameter Store, Google
-Secret Manager, Azure Key Vault, Bitwarden Secrets Manager, Doppler, Infisical, a command of your own or the environment
-of the Kurlo process. The environment file in Git keeps only the reference, and each teammate signs in with their own
+Secret Manager, Azure Key Vault, Bitwarden Secrets Manager, Doppler, Infisical, KeePassXC, a command of your own or the
+environment of the Kurlo process. The environment file in Git keeps only the reference, and each teammate signs in with their own
 token, AWS profile or CLI. Kurlo fetches the value when a request is sent and shows `[secret]` in responses, history,
 script logs, `kurlo run` reports and everything an agent sees. Paste an ARN, an `op://` link, an Azure secret URL or a
 Vault path to fill in the link, or browse the provider's paths. A workspace you clone uses a provider only after you
-trust it on your machine. All eleven providers are free; Bruno sells cloud vaults in its Ultimate plan and Postman in
+trust it on your machine. All twelve providers are free; Bruno sells cloud vaults in its Ultimate plan and Postman in
 Enterprise with a security add-on.
 
 ```yaml
@@ -58,7 +58,7 @@ or `OPTIONS` waits for your approval, and the model never sees your secrets.
 ## Why Kurlo
 
 - **Secrets from where they already live.** Link variables to Vault, 1Password, AWS, Google Cloud, Azure, Bitwarden,
-  Doppler or Infisical. Git gets the reference, your API gets the value, and the screen, logs and agents get `[secret]`.
+  Doppler, Infisical or KeePassXC. Git gets the reference, your API gets the value, and the screen, logs and agents get `[secret]`.
 - **An agent that asks first.** The Kurlo agent, Claude Code or Codex works on your collections inside the app. It shows
   every change before it is written, can follow a plan you approve and work on its own Git branch, and keeps chats on
   your machine.
@@ -182,7 +182,7 @@ send.
 - `{{variable}}` template syntax in URLs, headers, params, body, auth fields
 - Set variables from test scripts (`pm.variables.set`, `pm.environment.set`)
 - Secret managers — link a variable to Vault/OpenBao, 1Password, AWS Secrets Manager and Parameter Store, Google Secret
-  Manager, Azure Key Vault, Bitwarden, Doppler, Infisical, a command or process env vars, or import every key of one
+  Manager, Azure Key Vault, Bitwarden, Doppler, Infisical, KeePassXC, a command or process env vars, or import every key of one
   secret; `{{vault:name}}` and `await pm.vault.get()` work as in Postman
 - Manual-save and autosave modes both cover request and environment edits
 

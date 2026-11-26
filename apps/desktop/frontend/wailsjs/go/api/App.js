@@ -166,6 +166,10 @@ export function ConnectCodex(arg1) {
   return window['go']['api']['App']['ConnectCodex'](arg1);
 }
 
+export function ConnectSecretProvider(arg1, arg2) {
+  return window['go']['api']['App']['ConnectSecretProvider'](arg1, arg2);
+}
+
 export function CookieSyncStatus() {
   return window['go']['api']['App']['CookieSyncStatus']();
 }

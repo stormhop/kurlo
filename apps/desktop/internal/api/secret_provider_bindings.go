@@ -401,6 +401,27 @@ func (a *App) SetSecretProviderCredential(workspaceID, providerID, name, value s
 	return secretActionResult(linkedSecrets.setCredential(workspaceID, providerID, name, value))
 }
 
+func (a *App) ConnectSecretProvider(workspaceID, providerID string) SecretProviderStatus {
+	started := time.Now()
+	out := SecretProviderStatus{ProviderID: providerID}
+	credentials, err := linkedSecrets.manager.Associate(a.secretContext(), workspaceID, providerID)
+	if err == nil {
+		for _, name := range []string{"associationId", "associationKey"} {
+			if err = linkedSecrets.setCredential(workspaceID, providerID, name, credentials[name]); err != nil {
+				break
+			}
+		}
+	}
+	out.DurationMs = time.Since(started).Milliseconds()
+	if err != nil {
+		out.Kind, out.Message = secretErrorFields(err)
+		return out
+	}
+	out.Ok = true
+	out.Detail = "Connected to KeePassXC as " + credentials["associationId"]
+	return out
+}
+
 func (a *App) ForgetSecretProviderCredentials(workspaceID, providerID string) SecretActionResult {
 	return secretActionResult(linkedSecrets.forgetCredentials(workspaceID, providerID))
 }

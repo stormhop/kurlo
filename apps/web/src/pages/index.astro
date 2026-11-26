@@ -118,7 +118,7 @@ const also = [
 
 const parts = [
   { part: 'Agent mode', details: 'The Kurlo agent with any model, Claude Code and Codex. Approvals, plans, MCP servers and a Git branch per chat.', status: 'Yes', tone: 'yes' },
-  { part: 'Secret managers', details: 'Vault and OpenBao, 1Password, AWS Secrets Manager and Parameter Store, Google, Azure, Bitwarden, Doppler, Infisical, a command or env vars.', status: 'Yes', tone: 'yes' },
+  { part: 'Secret managers', details: 'Vault and OpenBao, 1Password, AWS Secrets Manager and Parameter Store, Google, Azure, Bitwarden, Doppler, Infisical, KeePassXC, a command or env vars.', status: 'Yes', tone: 'yes' },
   { part: 'HTTP', details: '1.1 and 2, with proxies and client certificates.', status: 'Yes', tone: 'yes' },
   { part: 'GraphQL', details: 'Queries, variables and a schema explorer.', status: 'Yes', tone: 'yes' },
   { part: 'gRPC', details: 'Server reflection or your own .proto files.', status: 'Yes', tone: 'yes' },
@@ -139,7 +139,7 @@ const parts = [
 const faq = [
   { q: 'What does it cost?', a: 'Nothing. It’s open source under MIT. No paid tier, no seats, no catch.' },
   { q: 'Does Agent mode cost extra?', a: 'Not from us. The Kurlo agent runs free on a local model or on your own key, and Claude Code and Codex use the plan you already have.', link: 'docs/guides/agent/' },
-  { q: 'Do I need a paid plan for Vault or AWS?', a: 'No. All eleven secret managers work in the free app and in kurlo run. Bruno and Postman sell theirs in their top plans.', link: 'docs/guides/environments/secret-managers/' },
+  { q: 'Do I need a paid plan for Vault or AWS?', a: 'No. All twelve secret managers work in the free app and in kurlo run. Bruno and Postman sell theirs in their top plans.', link: 'docs/guides/environments/secret-managers/' },
   { q: 'Do I need an account?', a: 'No. There is no Kurlo server, so there is nothing to sign in to.' },
   { q: 'What does it collect?', a: 'Nothing. On launch it asks GitHub whether a newer release exists, with no usage data in the request. Everything else goes only where you send it.', link: 'privacy/' },
   { q: 'Does my agent see my tokens?', a: 'No. Secrets reach your API, but the agent sees [secret]. Environments you protect are off limits to it entirely.', link: 'docs/guides/mcp-server/' },
@@ -188,7 +188,7 @@ const ldJson = structuredData({
           {vaults.map((item, i) => (
             <button type="button" role="radio" aria-checked={i === 0 ? 'true' : 'false'} data-s32-pick={i}>{item.name}</button>
           ))}
-          <span class="k-s32-more">+ Bitwarden, Doppler, Infisical, Parameter Store, a command or env vars</span>
+          <span class="k-s32-more">+ Bitwarden, Doppler, Infisical, KeePassXC, Parameter Store, a command or env vars</span>
         </div>
         <ol class="k-s32-steps">
           <li class="k-s32-card">

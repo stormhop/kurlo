@@ -21,6 +21,9 @@ func (c ProviderConfig) CallTimeout() time.Duration {
 	if c.Type == TypeVault && c.Auth.Method == "oidc" {
 		return c.Timeout + oidcLoginTimeout
 	}
+	if c.Type == TypeKeePassXC {
+		return c.Timeout + keepassxcConfirmTimeout
+	}
 	return c.Timeout
 }
 

@@ -20,6 +20,7 @@ const secretProviderStateFile = "secret-providers.json"
 var secretProviderCredentialNames = map[string]bool{
 	"token": true, "secretId": true, "accessKeyId": true, "secretAccessKey": true, "sessionToken": true,
 	"clientSecret": true, "serviceAccountKey": true, "username": true, "password": true, "mfaCode": true,
+	"associationId": true, "associationKey": true,
 }
 
 type secretProviderDeviceState struct {
@@ -522,6 +523,10 @@ func credentialLabel(name string) string {
 		return "The password"
 	case "mfaCode":
 		return "The MFA code"
+	case "associationId":
+		return "The KeePassXC connection name"
+	case "associationKey":
+		return "The KeePassXC connection key"
 	default:
 		return "The token"
 	}

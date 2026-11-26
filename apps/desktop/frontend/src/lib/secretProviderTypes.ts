@@ -2,7 +2,7 @@ import type { SecretProviderStatus, SecretProviderView } from './wire';
 
 export type SecretProviderType =
   | 'vault' | '1password' | 'aws-secrets-manager' | 'aws-ssm' | 'gcp-secret-manager' | 'azure-key-vault'
-  | 'bitwarden' | 'doppler' | 'infisical' | 'command' | 'env';
+  | 'bitwarden' | 'doppler' | 'infisical' | 'keepassxc' | 'command' | 'env';
 
 export type SecretProviderTypeInfo = {
   type: SecretProviderType;
@@ -14,6 +14,8 @@ export type SecretProviderTypeInfo = {
   pathHint: string;
   fieldHint: string;
   versionHint: string;
+  versionLabel?: string;
+  versionPlaceholder?: string;
   idSuggestion: string;
   sourceHint: string;
   sourcePlaceholder?: string;
@@ -74,6 +76,12 @@ export const SECRET_PROVIDER_TYPES: SecretProviderTypeInfo[] = [
     description: 'Machine identity (universal auth) or a token. Cloud or self-hosted.',
     pathPlaceholder: 'prod/backend', pathHint: 'Environment slug and an optional folder.', fieldHint: 'Secret name', versionHint: '', idSuggestion: 'infisical',
     sourceHint: 'An environment and folder. Each secret in it becomes a variable.', browse: true,
+  },
+  {
+    type: 'keepassxc', name: 'KeePassXC', short: 'KeePassXC', monogram: 'KP',
+    description: 'Reads entries from the KeePassXC app on this computer through keepassxc-proxy.',
+    pathPlaceholder: 'https://api.example.com', pathHint: 'The URL saved in the KeePassXC entry. When several entries match, put the title in Entry.', fieldHint: 'password, username, totp or a KPH: field', versionHint: 'Entry title or UUID, when several entries match the URL', versionLabel: 'Entry', versionPlaceholder: 'Only match', idSuggestion: 'keepassxc',
+    sourceHint: 'The URL of an entry. Its user name, password and KPH: fields become variables.', sourcePlaceholder: 'https://api.example.com', browse: false,
   },
   {
     type: 'command', name: 'Command', short: 'Command', monogram: '>_',
@@ -170,6 +178,8 @@ export function secretProviderSummary(provider: SecretProviderView) {
       const method = (config.auth as Record<string, unknown> | undefined)?.method === 'universal' ? 'machine identity' : 'token';
       return [info?.name, text('address').replace(/^https?:\/\//, '') || 'app.infisical.com', `project ${text('project')}`, method].filter(Boolean).join(' · ');
     }
+    case 'keepassxc':
+      return [info?.name, 'keepassxc-proxy'].filter(Boolean).join(' · ');
     case 'command':
       return `Runs ${joinCommand(commandList(config.command))}`;
     case 'env':
@@ -220,6 +230,7 @@ export const SECRET_TOOL_INSTALL_URLS: Record<string, string> = {
   '1password': 'https://developer.1password.com/docs/cli/get-started/',
   'azure-key-vault': 'https://learn.microsoft.com/cli/azure/install-azure-cli',
   bitwarden: 'https://bitwarden.com/help/secrets-manager-cli/',
+  keepassxc: 'https://keepassxc.org/download/',
   'gcp-secret-manager': 'https://cloud.google.com/sdk/docs/install',
   'aws-secrets-manager': 'https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html',
   'aws-ssm': 'https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html',

@@ -15,6 +15,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **KeePassXC secret provider.** Read variables from the running KeePassXC app through `keepassxc-proxy`, matched by the entry URL. [KeePassXC](/docs/guides/environments/secret-managers/#keepassxc).
 - **Named body variants.** Keep up to five payloads for one HTTP request, load or send one from **Body → Saved**, and share them in Git. [Switch between body variants](/docs/guides/request-types/http/#switch-between-body-variants).
 - **Rename folders in place** by double-clicking their name in the sidebar. [Collections](/docs/guides/workspaces/collections/).
 - **Sort requests by name.** Choose **Manual** or **By name** in the **Collections → ⋯** menu. Kurlo remembers the choice on this device. The Collection Runner uses the saved order in either view. The same menu includes **Import collection…**. [Reordering requests](/docs/guides/workspaces/requests/#reordering-requests).

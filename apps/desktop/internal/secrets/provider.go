@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -36,12 +37,13 @@ type Environment struct {
 	Now      func() time.Time
 	LookPath func(string) (string, error)
 	Run      func(ctx context.Context, path string, args []string, env []string) ([]byte, []byte, error)
+	Spawn    func(ctx context.Context, path string, args []string) (io.ReadWriteCloser, error)
 
 	OpenBrowser func(string) error
 }
 
 func SystemEnvironment() Environment {
-	return Environment{Getenv: os.LookupEnv, HomeDir: os.UserHomeDir, ReadFile: os.ReadFile, Now: time.Now, LookPath: systemLookPath, Run: systemRun}
+	return Environment{Getenv: os.LookupEnv, HomeDir: os.UserHomeDir, ReadFile: os.ReadFile, Now: time.Now, LookPath: systemLookPath, Run: systemRun, Spawn: systemSpawn}
 }
 
 func (e Environment) withDefaults() Environment {
@@ -63,6 +65,9 @@ func (e Environment) withDefaults() Environment {
 	}
 	if e.Run == nil {
 		e.Run = system.Run
+	}
+	if e.Spawn == nil {
+		e.Spawn = system.Spawn
 	}
 	return e
 }
@@ -93,6 +98,8 @@ func NewProvider(config ProviderConfig, credentials Credentials, env Environment
 		return newInfisicalProvider(config, credentials, env), nil
 	case TypeCommand:
 		return &commandProvider{config: config, env: env}, nil
+	case TypeKeePassXC:
+		return &keepassxcProvider{config: config, credentials: credentials, env: env}, nil
 	default:
 		return nil, newError(KindInvalidRef, config.ID, "unsupported provider type %q", config.Type)
 	}
@@ -100,7 +107,7 @@ func NewProvider(config ProviderConfig, credentials Credentials, env Environment
 
 func (s Secret) Value(provider string, ref Ref) (string, error) {
 	if ref.Field == "" {
-		if s.Fields == nil {
+		if s.Fields == nil || s.Raw != "" {
 			return checkedSecretValue(provider, ref, s.Raw)
 		}
 		if len(s.Fields) == 1 {

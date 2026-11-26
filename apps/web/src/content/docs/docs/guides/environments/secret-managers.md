@@ -18,10 +18,11 @@ Supported providers:
 | Bitwarden Secrets Manager | The `bws` CLI | A machine account access token saved on this device or in `BWS_ACCESS_TOKEN` |
 | Doppler | Doppler API | A token saved on this device, `DOPPLER_TOKEN`, or the signed-in `doppler` CLI |
 | Infisical | Infisical API | A token saved on this device or in `INFISICAL_TOKEN`, or a machine identity (universal auth) with its client secret saved on this device or in `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET` |
+| KeePassXC | The KeePassXC app on this computer, through `keepassxc-proxy` | A connection you approve in KeePassXC, saved on this device, or `KEEPASSXC_ASSOCIATION_ID` and `KEEPASSXC_ASSOCIATION_KEY` |
 | Command | Any program you choose, such as `pass` | Whatever the program uses |
 | Environment variables | The environment of the Kurlo process | Nothing to sign in to |
 
-Kurlo calls the services over their HTTP APIs or their official CLIs. It finds the CLIs in `PATH` and in the usual install folders, such as `/opt/homebrew/bin` on macOS and `Program Files`, `AppData\Local` and the WinGet links folder on Windows, so `op`, `aws`, `az` and `gcloud` work even when Kurlo was started before they were added to `PATH`. Google application default credentials are read from `CLOUDSDK_CONFIG` when it is set, otherwise from `%APPDATA%\gcloud` on Windows and `~/.config/gcloud` elsewhere. Paths in provider settings may start with `~/`, or `~\` on Windows.
+Kurlo calls the services over their HTTP APIs or their official CLIs. It finds the CLIs in `PATH` and in the usual install folders, such as `/opt/homebrew/bin` on macOS and `Program Files`, `AppData\Local` and the WinGet links folder on Windows, so `op`, `aws`, `az` and `gcloud` work even when Kurlo was started before they were added to `PATH`. `keepassxc-proxy` is also found inside `KeePassXC.app` on macOS and in `Program Files\KeePassXC` on Windows. Google application default credentials are read from `CLOUDSDK_CONFIG` when it is set, otherwise from `%APPDATA%\gcloud` on Windows and `~/.config/gcloud` elsewhere. Paths in provider settings may start with `~/`, or `~\` on Windows.
 
 ## Add a provider
 
@@ -47,6 +48,7 @@ Hover a variable row in an environment and click the link icon next to its value
 - Bitwarden: the secret id or its name. For `projects/<project id>`, put the secret name in **Field**.
 - Doppler: `project/config` with the secret name in **Field**, or `project/config/NAME`.
 - Infisical: the environment slug and an optional folder, such as `prod/backend`, with the secret name in **Field**.
+- KeePassXC: the URL saved in the entry, such as `https://api.example.com`. Without a field, Kurlo uses the password; **Field** can be `username`, `password`, `totp`, `title` or the name of a `KPH:` attribute. If several entries match the URL, put the entry title or UUID in **Entry**.
 - Command: the path the command receives as `{path}`.
 - Environment variables: the variable name.
 
@@ -65,7 +67,7 @@ You can also paste a reference copied from the provider into **Path**. Kurlo rec
 
 Add `#key` to the end of any of them to fill **Field**. If no provider matches, Kurlo says which one to add.
 
-**Browse** lists what the provider can show you: Vault mounts, folders and secrets, 1Password vaults, items and fields, AWS secrets and parameters, Google and Azure secrets, Bitwarden projects and secrets, Doppler projects, configs and secret names, and Infisical environments, folders and secret names. Click an entry to use it, or **Open** to go inside. Browsing shows names only, and needs the provider to be trusted. Vault lists the paths its policy permits. Google Cloud and Azure check the permission to list secrets when you click **Test connection**. If listing is forbidden, enter a known path and click **Test** on the link to check read access.
+**Browse** lists what the provider can show you: Vault mounts, folders and secrets, 1Password vaults, items and fields, AWS secrets and parameters, Google and Azure secrets, Bitwarden projects and secrets, Doppler projects, configs and secret names, and Infisical environments, folders and secret names. KeePassXC cannot list entries, so type the URL. Click an entry to use it, or **Open** to go inside. Browsing shows names only, and needs the provider to be trusted. Vault lists the paths its policy permits. Google Cloud and Azure check the permission to list secrets when you click **Test connection**. If listing is forbidden, enter a known path and click **Test** on the link to check read access.
 
 Click **Test** to fetch the secret without showing it. Kurlo reports its length and the fields it has. **Reveal** shows the value for 30 seconds. **Link** replaces the value with the reference and saves the environment right away.
 
@@ -75,7 +77,7 @@ A linked row shows **Linked** and the reference instead of a value. Click the re
 
 ## Import a whole secret
 
-To turn every key of a secret into variables, open the environment and click **Add source** under **Imported from secret managers**. Choose the provider and the secret: a Vault KV secret, a 1Password item (`op://Vault/Item`), a JSON secret in AWS, Google Cloud or Azure, a Bitwarden project (`projects/<project id>`), a Doppler config (`project/config`) or an Infisical folder (`prod/backend`). **Browse** helps you find it. **Prefix** is added before each key, so `db_` turns `password` into `db_password`. **Load keys** reads the current field names from the provider each time you click it.
+To turn every key of a secret into variables, open the environment and click **Add source** under **Imported from secret managers**. Choose the provider and the secret: a Vault KV secret, a 1Password item (`op://Vault/Item`), a JSON secret in AWS, Google Cloud or Azure, a Bitwarden project (`projects/<project id>`), a Doppler config (`project/config`), an Infisical folder (`prod/backend`) or a KeePassXC entry by its URL. **Browse** helps you find it. **Prefix** is added before each key, so `db_` turns `password` into `db_password`. **Load keys** reads the current field names from the provider each time you click it.
 
 The source lists each key and the variable it becomes. Clear a key's checkbox to skip it. A key is marked when something else wins:
 
@@ -116,6 +118,27 @@ secretProviders:
     mfaSerial: arn:aws:iam::123456789012:mfa/ada
 ```
 
+## KeePassXC
+
+Kurlo reads entries from the running KeePassXC app the way the KeePassXC browser extension does. Entries are found by their URL, and the database stays in KeePassXC.
+
+1. In KeePassXC, open **Settings → Browser Integration** and turn on **Enable browser integration**. You do not need to pick a browser.
+2. Unlock the database.
+3. In Kurlo, add a **KeePassXC** provider, save it and click **Connect to KeePassXC**.
+4. KeePassXC asks you to name the connection, for example `kurlo-laptop`. Click **Save and allow access**.
+
+The connection is saved encrypted on this device and in the KeePassXC database. Each person connects on their own device. After you switch to another database, click **Connect again**.
+
+The first time Kurlo reads an entry, KeePassXC may ask you to allow access to it. Tick **Remember** and click **Allow Selected**; the request waits up to two minutes for your answer. Entries with **Never** allowed for the URL, or hidden from browser integration, are not returned. `KPH:` attributes are returned when **Return advanced string fields which start with "KPH: "** is on in the KeePassXC browser integration settings.
+
+If the database is locked, KeePassXC asks you to unlock it and Kurlo reports the variable as not resolved; send the request again after unlocking.
+
+```yaml
+secretProviders:
+  - id: keepassxc
+    type: keepassxc
+```
+
 ## Permissions each provider needs
 
 Give Kurlo read access only. **Test connection** and **Browse** need the listing rights; reading linked values needs only the read rights.
@@ -132,6 +155,7 @@ Give Kurlo read access only. **Test connection** and **Browse** need the listing
 | Bitwarden | Read access to the project for the machine account | The same |
 | Doppler | A read-only service token for the config, or a personal token | A personal or workplace token |
 | Infisical | Viewer role on the project for the machine identity | The same |
+| KeePassXC | Access to the entry allowed in KeePassXC | — |
 
 ## Command provider
 
@@ -170,7 +194,7 @@ The Runner checks linked secrets for the selected requests before sending the fi
 
 `kurlo run` fetches the linked variables that the selected requests use before it sends the first request. Values are masked as `[secret]` in the terminal output and in JSON and JUnit reports, and `--export-environment` leaves them out.
 
-The CLI uses the credentials of the machine it runs on: `VAULT_TOKEN` or `~/.vault-token`, `VAULT_SECRET_ID` for AppRole, `VAULT_USERNAME` and `VAULT_PASSWORD` for LDAP and userpass, the pod's service account for Vault Kubernetes auth, `OP_SERVICE_ACCOUNT_TOKEN` or the signed-in `op` CLI, the standard AWS variables, profiles and SSO, with `AWS_MFA_CODE` for a role that needs MFA, `KURLO_GCP_SERVICE_ACCOUNT_KEY` with the key file contents, `GOOGLE_APPLICATION_CREDENTIALS` or `gcloud`, `az login` or `AZURE_CLIENT_SECRET`, `BWS_ACCESS_TOKEN`, `DOPPLER_TOKEN`, and `INFISICAL_TOKEN` or `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`. Tokens saved in the app are not read. The CLI does not ask you to trust providers: running it is the decision. The one exception is a `command` provider, which runs only with `--allow-secret-commands`.
+The CLI uses the credentials of the machine it runs on: `VAULT_TOKEN` or `~/.vault-token`, `VAULT_SECRET_ID` for AppRole, `VAULT_USERNAME` and `VAULT_PASSWORD` for LDAP and userpass, the pod's service account for Vault Kubernetes auth, `OP_SERVICE_ACCOUNT_TOKEN` or the signed-in `op` CLI, the standard AWS variables, profiles and SSO, with `AWS_MFA_CODE` for a role that needs MFA, `KURLO_GCP_SERVICE_ACCOUNT_KEY` with the key file contents, `GOOGLE_APPLICATION_CREDENTIALS` or `gcloud`, `az login` or `AZURE_CLIENT_SECRET`, `BWS_ACCESS_TOKEN`, `DOPPLER_TOKEN`, `INFISICAL_TOKEN` or `INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET`, and `KEEPASSXC_ASSOCIATION_ID` with `KEEPASSXC_ASSOCIATION_KEY` while KeePassXC runs on the same computer. Tokens saved in the app are not read. The CLI does not ask you to trust providers: running it is the decision. The one exception is a `command` provider, which runs only with `--allow-secret-commands`.
 
 To move credentials you already saved in the app to CI, open the provider, click **•••** and choose **Export for CI…**. Kurlo lists the variables the CLI reads for this provider and saves them to a `.env` file that only you can read. Credentials you did not save in the app are left empty for you to fill in. The file holds secrets in plain text: add each line as a CI secret, or load the file in the job with `set -a; . ./vault.ci.env; set +a`, and delete it afterwards. Keep it out of Git.
 

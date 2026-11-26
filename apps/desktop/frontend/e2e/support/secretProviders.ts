@@ -75,7 +75,8 @@ export async function installSecretProviderBridge(page: Page, initial: { provide
           state.calls.push(`test:${id}`);
           const provider = find(id);
           if (!provider?.trusted) return { providerId: id, ok: false, kind: 'untrusted', message: 'Not trusted on this device', durationMs: 3 };
-          const detail = provider.type === 'vault' ? 'token valid' : provider.type.startsWith('aws') ? `Credentials from profile ${String(provider.config?.profile ?? 'default')}` : provider.type === '1password' ? 'Signed in with the op CLI' : 'Credentials found';
+          if (provider.type === 'keepassxc' && !(provider.savedCredentials ?? []).includes('associationKey')) return { providerId: id, ok: false, kind: 'not_authenticated', message: `${id}: Kurlo is not connected to KeePassXC: click Connect to KeePassXC`, durationMs: 3 };
+          const detail = provider.type === 'keepassxc' ? 'Connected to KeePassXC 2.7.10 as kurlo laptop' : provider.type === 'vault' ? 'token valid' : provider.type.startsWith('aws') ? `Credentials from profile ${String(provider.config?.profile ?? 'default')}` : provider.type === '1password' ? 'Signed in with the op CLI' : 'Credentials found';
           return { providerId: id, ok: true, detail, ...(provider.type === 'vault' ? { policies: ['default', 'payments-read'], expiresInSeconds: 7200 } : {}), durationMs: 12 };
         },
         TestSecretRef: async (_workspaceId: string, ref: { provider: string; path: string; field?: string }) => {
@@ -105,6 +106,13 @@ export async function installSecretProviderBridge(page: Page, initial: { provide
           const provider = find(id);
           if (provider && value && name !== 'mfaCode') provider.savedCredentials = [...new Set([...(provider.savedCredentials ?? []), name])];
           return { ok: true };
+        },
+        ConnectSecretProvider: async (_workspaceId: string, id: string) => {
+          state.calls.push(`connect:${id}`);
+          const provider = find(id);
+          if (!provider || provider.type !== 'keepassxc') return { providerId: id, ok: false, kind: 'invalid_ref', message: `${id} does not connect this way`, durationMs: 2 };
+          provider.savedCredentials = ['associationId', 'associationKey'];
+          return { providerId: id, ok: true, detail: 'Connected to KeePassXC as kurlo laptop', durationMs: 900 };
         },
         ForgetSecretProviderCredentials: async (_workspaceId: string, id: string) => {
           state.calls.push(`forget:${id}`);
