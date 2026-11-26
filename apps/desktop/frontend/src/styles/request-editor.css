@@ -199,7 +199,7 @@
   min-width: 0;
   padding-inline: var(--space-2);
   gap: var(--space-1-5);
-  color: var(--accent-text);
+  color: var(--text);
   font-family: var(--font-ui);
 }
 .method-trigger:hover,
@@ -265,6 +265,12 @@
 }
 .method-menu button.method-menu-protocol {
   font-family: var(--font-ui);
+}
+.method-menu-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .grpc-method-wrap {
@@ -385,12 +391,13 @@
 .method-delete  { color: var(--delete); }
 .method-head    { color: var(--head); }
 .method-options { color: var(--options); }
-.method-ws,
-.method-sio,
-.method-graphql,
-.method-grpc,
-.method-mcp { color: var(--accent-text); }
-.method-ai { color: var(--syn-flag); }
+.method-ws { color: var(--proto-ws); }
+.method-sio { color: var(--proto-sio); }
+.method-graphql { color: var(--proto-graphql); }
+.method-grpc { color: var(--proto-grpc); }
+.method-kafka { color: var(--proto-kafka); }
+.method-mcp { color: var(--proto-mcp); }
+.method-ai { color: var(--proto-ai); }
 
 .url-input {
   height: var(--control-xl);

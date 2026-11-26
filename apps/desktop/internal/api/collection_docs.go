@@ -709,6 +709,8 @@ func collectionDocsEndpoint(req cliSavedRequest, credentials map[string]bool) do
 		method = "gRPC"
 	case kind == "socketio":
 		method = "Socket.IO"
+	case kind == "kafka":
+		method = "Kafka"
 	case kind != "http":
 		method = strings.ToUpper(kind)
 	}
@@ -725,6 +727,27 @@ func collectionDocsEndpoint(req cliSavedRequest, credentials map[string]bool) do
 			message.Address = strings.TrimRight(message.Address, "/") + "/" + strings.TrimLeft(req.GrpcMethod, "/")
 		}
 		message.addRows("Metadata", req.GrpcMetadata)
+	case "kafka":
+		if k := req.Kafka; k != nil {
+			if k.Mode == "consume" {
+				rows := []cliKV{}
+				for _, topic := range k.Topics {
+					rows = append(rows, cliKV{Key: topic.Name, Value: defaultString(topic.Partitions, "all partitions"), Enabled: true})
+				}
+				message.addRows("Topics", rows)
+				message.addRows("Consumer", []cliKV{
+					{Key: "Start from", Value: strings.TrimSpace(defaultString(k.StartFrom, "latest") + " " + k.StartValue), Enabled: true},
+					{Key: "Stop after", Value: strings.TrimSpace(defaultString(k.StopAfter, "records") + " " + k.StopValue), Enabled: true},
+				})
+			} else {
+				message.addRows("Record", []cliKV{
+					{Key: "Topic", Value: k.Topic, Enabled: k.Topic != ""},
+					{Key: "Key", Value: k.Key, Enabled: k.Key != ""},
+					{Key: "Partition", Value: k.Partition, Enabled: k.Partition != ""},
+					{Key: "Value format", Value: defaultString(k.Format, "json"), Enabled: true},
+				})
+			}
+		}
 	case "mcp":
 		message.addRows("MCP operation", []cliKV{
 			{Key: "Method", Value: req.McpMethod, Enabled: req.McpMethod != ""},

@@ -108,6 +108,16 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		if urlChanged {
 			req.URL = scriptedURL
 		}
+		if req.Kafka != nil && len(ctx.KafkaEdits) > 0 {
+			k := *req.Kafka
+			fields := map[string]*string{"topic": &k.Topic, "key": &k.Key, "partition": &k.Partition, "timestamp": &k.Timestamp, "compression": &k.Compression, "acknowledgements": &k.Acks, "startFrom": &k.StartFrom, "stopAfter": &k.StopAfter}
+			for key, value := range ctx.KafkaEdits {
+				if field := fields[key]; field != nil {
+					*field = value
+				}
+			}
+			req.Kafka = &k
+		}
 		mergeScriptHeaders(ctx, &req)
 		mergeScriptParams(ctx, &req)
 		mergeScriptPathParams(ctx, &req)
@@ -134,12 +144,20 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		}
 	}
 
-	resp := doRequestWithBodySink(requestCtx, req, jar, cache, sinkFactory)
+	var resp model.HttpResponse
+	var messageResult model.ScriptResult
+	if req.Kafka != nil {
+		resp, messageResult = runKafkaRequest(requestCtx, req, sm, preResult, &envDelta)
+	} else {
+		resp = doRequestWithBodySink(requestCtx, req, jar, cache, sinkFactory)
+	}
 	resp.PreRequestResult = preResult
 
+	responseCollection := collectionVariablesAfter(req.CollectionVariables, preResult)
+	responseCollection = collectionVariablesAfter(responseCollection, messageResult)
 	var varsResult model.ScriptResult
 	if len(req.PostResponseVars) > 0 && resp.Error == "" {
-		varsScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult), req.RequestVariables)
+		varsScope := beginScriptScope(sm, responseCollection, req.RequestVariables)
 		varsCtx := varsScope.ctx
 		varsCtx.Response = &resp
 		populateScriptRequestContext(varsCtx, req)
@@ -148,7 +166,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 	}
 
 	if req.TestScript != "" {
-		testScope := beginScriptScope(sm, collectionVariablesAfter(req.CollectionVariables, preResult), req.RequestVariables)
+		testScope := beginScriptScope(sm, responseCollection, req.RequestVariables)
 		testCtx := testScope.ctx
 		testCtx.Response = &resp
 		populateScriptRequestContext(testCtx, req)
@@ -158,6 +176,11 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		resp.TestResult = redactRequestScriptResult(resp.TestResult, req.Auth, req.SecretEnvironmentValues)
 		envDelta.merge(testScope.commit(sm))
 	}
+	resp.TestResult.Tests = append(messageResult.Tests, resp.TestResult.Tests...)
+	resp.TestResult.Logs = append(messageResult.Logs, resp.TestResult.Logs...)
+	if messageResult.Error != "" {
+		resp.TestResult.Error = "on message: " + messageResult.Error
+	}
 	mergePostResponseVarsResult(&resp.TestResult, varsResult)
 	if checks := runAssertions(req.Assertions, resp); len(checks) > 0 {
 		for i := range checks {
@@ -166,7 +189,7 @@ func runRequestWithBodySink(requestCtx context.Context, req model.HttpRequest, s
 		resp.TestResult.Tests = append(resp.TestResult.Tests, redactScriptResult(model.ScriptResult{Tests: checks}, req.SecretEnvironmentValues).Tests...)
 	}
 
-	resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult, resp.TestResult)
+	resp.CollectionVariableUpdates, resp.CollectionVariablesRemoved = mergeCollectionVariableResults(preResult, messageResult, resp.TestResult)
 	envDelta.apply(&resp)
 
 	return resp
@@ -424,6 +447,7 @@ func redactRequestError(text string, secrets []string) string {
 }
 
 func populateScriptRequestContext(ctx *script.Context, req model.HttpRequest) {
+	ctx.Kafka = req.Kafka
 	ctx.RequestAuth = req.Auth
 	ctx.RequestURL = req.URL
 	ctx.RequestMethod = req.Method

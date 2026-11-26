@@ -186,6 +186,8 @@ var grpcRequestSettingFields = []string{
 var httpRequestSettingFieldSet = stringSet(httpRequestSettingFields)
 var webSocketRequestSettingFieldSet = stringSet(webSocketRequestSettingFields)
 var socketIORequestSettingFieldSet = stringSet(socketIORequestSettingFields)
+var kafkaRequestSettingFieldSet = stringSet([]string{"timeoutMs", "enableSSLVerification", "clientCertPath", "clientKeyPath", "clientKeyPassword", "scriptTimeoutMs", "allowSendRequest"})
+
 var grpcRequestSettingFieldSet = stringSet(grpcRequestSettingFields)
 
 func omitRequestEditorDefaults(request map[string]any) {
@@ -278,6 +280,9 @@ func stripBodyFieldsForType(request map[string]any, requestType string) {
 }
 
 func stripRealtimeFieldsForType(request map[string]any, requestType string) {
+	if requestType != "kafka" {
+		delete(request, "kafka")
+	}
 	if requestType != "socketio" {
 		delete(request, "sioEvents")
 		delete(request, "sioEventName")
@@ -317,7 +322,7 @@ var aiRequestFields = []string{
 func stripMethodForType(request map[string]any, requestType string) {
 	method := stringValue(request, "method")
 	switch requestType {
-	case "ws", "socketio", "grpc", "mcp", "ai":
+	case "ws", "socketio", "grpc", "mcp", "ai", "kafka":
 		delete(request, "method")
 	case "graphql":
 		if method == "POST" {
@@ -411,6 +416,8 @@ func stripRequestSettingsForType(request map[string]any, requestType string) {
 
 func requestSettingFieldsForType(requestType string) map[string]bool {
 	switch requestType {
+	case "kafka":
+		return kafkaRequestSettingFieldSet
 	case "", "http", "graphql", "mcp", "ai":
 		return httpRequestSettingFieldSet
 	case "ws":

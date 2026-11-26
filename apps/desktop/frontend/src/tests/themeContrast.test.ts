@@ -11,6 +11,7 @@ const TEXT_ROLES = ['--text', '--text-2', '--text-3', '--accent-text'];
 const METHOD_ROLES = ['--get', '--post', '--put', '--patch', '--delete', '--head', '--options'];
 const STATUS_ROLES = ['--success', '--warning', '--danger', '--info'];
 const BACKGROUNDS = ['--bg', '--surface', '--elevated'];
+const PROTOCOL_ROLES = ['--proto-graphql', '--proto-ws', '--proto-sio', '--proto-grpc', '--proto-kafka', '--proto-mcp', '--proto-ai'];
 
 type Rgb = [number, number, number];
 
@@ -161,6 +162,23 @@ describe('theme contrast', () => {
       return syntax.filter(role => theme[role]).flatMap(role => BACKGROUNDS
         .filter(background => contrast(theme[role], theme[background]) < 4.5)
         .map(background => `${variant.id} ${role} on ${background}: ${contrast(theme[role], theme[background]).toFixed(2)}`));
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('gives every protocol icon a readable colour of its own in every theme', () => {
+    const offenders = checked.flatMap(variant => {
+      const theme = resolved(variant.id, variant.mode);
+      const limit = HIGH_CONTRAST.includes(variant.id) ? 7 : 4.5;
+      const missing = PROTOCOL_ROLES.filter(role => !theme[role]).map(role => `${variant.id} ${role} missing`);
+      if (missing.length) return missing;
+      const unreadable = PROTOCOL_ROLES.flatMap(role => [...BACKGROUNDS, '--hover']
+        .filter(background => contrast(theme[role], theme[background]) < limit)
+        .map(background => `${variant.id} ${role} on ${background}: ${contrast(theme[role], theme[background]).toFixed(2)}`));
+      const alike = PROTOCOL_ROLES.flatMap((role, index) => PROTOCOL_ROLES.slice(index + 1)
+        .filter(other => hueGap(theme[role], theme[other]) < 25)
+        .map(other => `${variant.id} ${role} looks like ${other}: ${hueGap(theme[role], theme[other]).toFixed(0)}°`));
+      return [...unreadable, ...alike];
     });
     expect(offenders).toEqual([]);
   });

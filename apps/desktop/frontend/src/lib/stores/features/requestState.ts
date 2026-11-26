@@ -1,3 +1,4 @@
+import { kafkaConfig, type KafkaConfig } from '../../kafka';
 import { requestSectionPreference, resolveFormRequestTab } from '../../requestTabPreferences';
 import { sseDisconnect, socketIODisconnect, webSocketDisconnect } from '../../backend';
 import type { HttpResponse, McpResponse } from '../../backend';
@@ -104,6 +105,7 @@ type RequestStateHost = {
   graphqlSchemaOperationToken: number;
   graphqlSchemaStatus: string;
   graphqlVariables: string;
+  kafka: KafkaConfig;
   grpcMetadata: KVRow[];
   grpcMethod: string;
   mcpMethod: string;
@@ -240,6 +242,7 @@ export const requestStateFeature = {
       sioArgs: this.sioArgs, sioAck: this.sioAck,
       savedMessages: this.savedMessages,
       assertions: this.assertions,
+      kafka: this.requestType === 'kafka' ? this.kafka : undefined,
       grpcMethod: this.grpcMethod, grpcMetadata: this.grpcMetadata,
       grpcUseReflection: this.grpcUseReflection, grpcProtoFilePath: this.grpcProtoFilePath,
       grpcProtoFileName: this.grpcProtoFileName, grpcProtoImportPaths: this.grpcProtoImportPaths,
@@ -280,7 +283,7 @@ export const requestStateFeature = {
     const settings = this.currentRequestSettings();
     const id = newRequestId();
     const aiAuth = aiDefaultAuthFor();
-    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, savedMessages: [], grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], aiKurloTools: false, aiConnectionId: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
+    return { id, name: 'New Request', filesystemName: filesystemNameFromName('New Request', id), nameAuto: true, requestType: normalizedType, collectionId: resolved, collection: this.collectionNameById(resolved), folderPath: [], method: isGraphQL || isGrpc || isMcp || isAi ? 'POST' : 'GET', url: isAi ? AI_DEFAULT_PRESET.url : '', requestTab: normalizedType === 'kafka' || isMcp || isGrpc || isAi ? 'body' : isRealtime ? 'body' : isGraphQL ? 'query' : 'params', params: [], pathParams: [], headers: [], auth: isAi ? { ...emptyAuthState(), ...aiAuth } : resolved ? inheritAuthState() : emptyAuthState(), bodyType: bodyDefaults.bodyType, rawBodyType: bodyDefaults.rawBodyType, bodyContent: bodyDefaults.bodyContent, bodyFilePath: bodyDefaults.bodyFilePath, bodyFileName: bodyDefaults.bodyFileName, formRows: bodyDefaults.formRows, graphqlSchema: '', preRequestScriptJs: '', testScriptJs: '', requestNotes: '', settings, settingsOverrides: {}, sioEvents: [], sioEventName: '', sioArgs: defaultSocketIOArgs(), sioAck: false, savedMessages: [], grpcMethod: '', mcpMethod: isMcp ? 'tools/list' : '', mcpName: '', mcpArguments: '', mcpProtocolVersion: '', aiProvider: isAi ? AI_DEFAULT_PRESET.provider : '', aiModel: '', aiSystem: '', aiPrompt: '', aiTemperature: '', aiTopP: '', aiMaxTokens: '', aiMaxSteps: '', aiIdleTimeoutSec: '', aiThinking: '', aiStream: true, aiToolRequestIds: [], aiKurloTools: false, aiConnectionId: '', grpcMetadata: [], grpcUseReflection: settings.grpcUseReflection, grpcProtoFilePath: '', grpcProtoFileName: '', grpcProtoImportPaths: [] };
   },
 
   activeRequestDraftTarget(this: RequestStateHost, forPersistence = false) {
@@ -336,6 +339,7 @@ export const requestStateFeature = {
       sioAck: this.sioAck,
       ...(requestTypeSupportsSavedMessages(normalizedType) && this.savedMessages.length ? { savedMessages: cloneSavedMessages(this.savedMessages) } : {}),
       ...(requestTypeSupportsAssertions(normalizedType) && assertionsForStore(this.assertions).length ? { assertions: assertionsForStore(this.assertions) } : {}),
+      ...(normalizedType === 'kafka' ? { kafka: kafkaConfig(this.kafka) } : {}),
       grpcMethod: this.grpcMethod,
       mcpMethod: this.mcpMethod,
       mcpName: this.mcpName,
@@ -384,6 +388,7 @@ export const requestStateFeature = {
       this.authStateHasData(req.auth, req.auth.type) || req.preRequestScriptJs?.trim() || req.testScriptJs?.trim() ||
       req.requestNotes.trim() || Boolean(req.assertions?.some(row => row.target.trim()));
     const hasSavedMessages = Boolean(req.savedMessages?.length);
+    if (requestType === 'kafka') return Boolean(hasName || hasUrl || hasBodyContent || hasSharedContent || JSON.stringify(kafkaConfig(req.kafka)) !== JSON.stringify(kafkaConfig()));
     if (requestType === 'ws') {
       return Boolean(hasName || hasUrl || hasBodyContent || hasSharedContent || hasSavedMessages);
     }
@@ -436,7 +441,7 @@ export const requestStateFeature = {
     this.requestNameAuto = req.nameAuto ?? (!req.name || req.name === 'New Request');
     this.requestName = this.requestNameAuto ? '' : req.name;
     this.method = this.requestType === 'graphql' || this.requestType === 'grpc' ? 'POST' : req.method;
-    const editorQuery = this.requestType === 'grpc'
+    const editorQuery = this.requestType === 'grpc' || this.requestType === 'kafka'
       ? { url: req.url, params: req.params ?? [] }
       : queryForEditor(req.url, req.params ?? []);
     this.url = editorQuery.url;
@@ -450,6 +455,7 @@ export const requestStateFeature = {
     this.sioAck = req.sioAck ?? false;
     this.savedMessages = normalizeSavedMessages(req.savedMessages, this.requestType);
     this.assertions = requestTypeSupportsAssertions(this.requestType) ? normalizeAssertions(req.assertions) : [];
+    this.kafka = kafkaConfig(req.kafka);
     this.grpcMethod = req.grpcMethod ?? '';
     this.mcpMethod = req.mcpMethod || (this.requestType === 'mcp' ? 'tools/list' : '');
     this.mcpName = req.mcpName ?? '';

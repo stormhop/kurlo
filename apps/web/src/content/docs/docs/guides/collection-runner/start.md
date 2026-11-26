@@ -11,7 +11,7 @@ Open it from:
 - The play icon in the activity rail on the left.
 - From the workspace overview, choose **Start → Run collection**.
 
-Kurlo opens the runner workspace and selects runnable requests from the current collection. Realtime sessions (`SSE`, WebSocket, Socket.IO) are skipped because they do not naturally finish. HTTP, GraphQL, and gRPC requests can run.
+Kurlo opens the runner workspace and selects runnable requests from the current collection. Realtime sessions (`SSE`, WebSocket, Socket.IO) are skipped because they do not naturally finish. HTTP, GraphQL, gRPC and Kafka requests can run. A Kafka consumer finishes at the stop condition saved with the request.
 
 ## Selecting requests
 

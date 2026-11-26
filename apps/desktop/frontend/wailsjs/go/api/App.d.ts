@@ -239,6 +239,8 @@ export function LastLoadRun(arg1:string,arg2:string):Promise<model.LoadRunResult
 
 export function ListCookies(arg1:string):Promise<Array<model.Cookie>>;
 
+export function ListKafkaTopics(arg1:model.HttpRequest):Promise<Array<string>>;
+
 export function ListSecretImportKeys(arg1:string):Promise<Array<api.SecretImportKeys>>;
 
 export function ListSecretProviders(arg1:string):Promise<api.SecretProvidersResult>;

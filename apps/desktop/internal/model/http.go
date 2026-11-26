@@ -122,6 +122,9 @@ type CookieJarResult struct {
 }
 
 type HttpRequest struct {
+	KafkaStreamID string        `json:"kafkaStreamId,omitempty"`
+	Kafka         *KafkaRequest `json:"kafka,omitempty"`
+
 	RequestID        string      `json:"requestId"`
 	WorkspaceID      string      `json:"workspaceId"`
 	Method           string      `json:"method"`
@@ -216,6 +219,7 @@ type LinkedSecretFailure struct {
 }
 
 type HttpResponse struct {
+	KafkaStopReason  string          `json:"kafkaStopReason,omitempty"`
 	StatusCode       int             `json:"statusCode"`
 	Status           string          `json:"status"`
 	Headers          []KeyValue      `json:"headers"`

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { RequestType, SavedRequest } from '../types/models';
   import { methodColor, requestBadgeLabel, requestKindFor } from '../utils';
+  import RequestTypeIcon from './RequestTypeIcon.svelte';
 
   type BadgeVariant = 'sidebar' | 'tab' | 'search';
 
@@ -20,16 +21,6 @@
     invalid?: boolean;
   } = $props();
 
-  const SHORT_LABELS: Record<string, string> = {
-    sse: 'SSE',
-    ws: 'WS',
-    graphql: 'GQL',
-    socketio: 'SIO',
-    grpc: 'gRPC',
-    mcp: 'MCP',
-    ai: 'AI',
-  };
-
   function input() {
     return {
       method: request?.method ?? method,
@@ -45,7 +36,8 @@
     OPTIONS: 'OPT',
   };
 
-  let shortLabel = $derived(SHORT_LABELS[currentKind] ?? (variant === 'sidebar' ? SIDEBAR_METHOD_LABELS[currentLabel] : undefined) ?? currentLabel);
+  let isProtocol = $derived(currentKind !== 'http' && currentKind !== 'sse');
+  let shortLabel = $derived((variant === 'sidebar' ? SIDEBAR_METHOD_LABELS[currentLabel] : undefined) ?? currentLabel);
   let currentMethodClass = $derived(currentKind === 'http' || currentKind === 'sse' ? methodColor(currentLabel) : '');
 </script>
 
@@ -54,7 +46,7 @@
   class:request-kind-badge--sidebar={variant === 'sidebar'}
   class:request-kind-badge--tab={variant === 'tab'}
   class:request-kind-badge--search={variant === 'search'}
-  class:request-kind-badge--protocol={!invalid && currentKind !== 'http' && currentKind !== 'sse'}
+  class:request-kind-badge--protocol={!invalid && isProtocol}
   class:request-kind-badge--invalid={invalid}
   aria-label={invalid ? 'Invalid request' : currentLabel}
 >
@@ -64,6 +56,8 @@
       <path d="M9 7v3.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       <circle cx="9" cy="12.4" r="0.95" fill="currentColor"/>
     </svg>
+  {:else if isProtocol}
+    <RequestTypeIcon kind={currentKind} />
   {:else}
     <span class="request-kind-text">{shortLabel}</span>
   {/if}
@@ -90,8 +84,8 @@
     white-space: nowrap;
   }
 
-  .request-kind-badge--protocol {
-    color: var(--accent-text);
+  .request-kind-badge--protocol.request-kind-badge--tab {
+    width: 1rem;
   }
 
   .request-kind-badge--invalid {

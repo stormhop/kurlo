@@ -116,6 +116,17 @@ func resolveHTTPRequestTemplates(req model.HttpRequest, values map[string]string
 	resolve := func(value string) string { return resolveTemplateValue(value, values) }
 	out := req
 	out.URL = resolveTemplateURL(req.URL, values)
+	if req.Kafka != nil {
+		k := *req.Kafka
+		k.Topic, k.Key, k.Partition = resolve(k.Topic), resolve(k.Key), resolve(k.Partition)
+		k.SchemaPath, k.Timestamp = resolve(k.SchemaPath), resolve(k.Timestamp)
+		k.StartValue, k.StopValue = resolve(k.StartValue), resolve(k.StopValue)
+		k.Topics = append([]model.KafkaTopic(nil), k.Topics...)
+		for i, t := range k.Topics {
+			k.Topics[i] = model.KafkaTopic{SchemaPath: resolve(t.SchemaPath), Name: resolve(t.Name), Partitions: resolve(t.Partitions), StartOffset: resolve(t.StartOffset), EndOffset: resolve(t.EndOffset)}
+		}
+		out.Kafka = &k
+	}
 	out.Params = resolveTemplateRows(req.Params, values)
 	out.PathParams = resolveTemplateRows(req.PathParams, values)
 	out.Headers = resolveTemplateRows(req.Headers, values)
@@ -147,7 +158,7 @@ func resolveHTTPRequestTemplates(req model.HttpRequest, values map[string]string
 		out.BodyType = "graphql"
 	} else {
 		out.Body = resolve(req.Body)
-		if _, raw := rawBodyContentTypes[out.BodyType]; raw && strings.TrimSpace(out.Body) == "" {
+		if _, raw := rawBodyContentTypes[out.BodyType]; req.Kafka == nil && raw && strings.TrimSpace(out.Body) == "" {
 			out.BodyType = "none"
 			out.Body = ""
 		}

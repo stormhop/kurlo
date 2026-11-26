@@ -1,3 +1,4 @@
+import { kafkaConfig } from '../kafka';
 import {
   loadRequestStore, loadWorkspace, loadWorkspaceDiagnostics, storedHistoryResponseIds,
   openDirectoryDialog, saveFileDialog, defaultWorkspaceLocation, setDefaultWorkspaceLocation,
@@ -1289,6 +1290,7 @@ class AppVM {
   assertions = $state<AssertionRow[]>([]);
   sioSelectedArgId = $state('1');
   sioAck = $state(false);
+  kafka = $state(kafkaConfig());
   grpcMethod = $state('');
   mcpMethod = $state('tools/list');
   mcpName = $state('');

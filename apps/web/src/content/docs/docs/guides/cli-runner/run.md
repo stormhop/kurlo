@@ -19,7 +19,7 @@ The first argument is the workspace directory (the folder that contains `kurlo.y
 
 ## What it runs
 
-- **HTTP and GraphQL requests**, in the order they load from the workspace.
+- **HTTP, GraphQL and [Kafka requests](/docs/guides/request-types/kafka/)**, in the order they load from the workspace.
 - **Pre-request and test scripts** — the same sandboxed JavaScript `pm.*` API as the app. Assertions become the pass/fail signal.
 - **Collection defaults** — a collection's auth, headers, scripts, and settings are applied exactly as they are in the app, so a request set to **Inherit auth** authenticates in CI too.
 - **Variable chaining**: a value a test writes with `pm.environment.set(...)` is visible to later requests in the same run, so a login step can hand a token to the requests after it.

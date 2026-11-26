@@ -126,6 +126,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved
   examples
 - Build GraphQL operations from a schema, select nested fields and bind typed variables in the query editor
+- Kafka producer and consumer requests with topic discovery, live records, partition offsets, TLS and SASL.
 - GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's
   tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
 - Import Postman v2 JSON or v3 Native Git folders, Insomnia v4, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and

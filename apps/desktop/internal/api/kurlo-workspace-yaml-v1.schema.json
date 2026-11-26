@@ -369,7 +369,7 @@
         "name": { "type": "string" },
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "nameAuto": { "type": "boolean" },
-        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "mcp", "ai"] },
+        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "kafka", "mcp", "ai"] },
         "isDraft": { "type": "boolean" },
         "isPinned": { "type": "boolean" },
         "collectionId": { "$ref": "#/definitions/id" },
@@ -460,6 +460,32 @@
         "grpcProtoImportPaths": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "kafka": {
+          "type": "object",
+          "properties": {
+            "mode": { "type": "string", "enum": ["produce", "consume"] },
+            "keyFormat": { "type": "string", "enum": ["text", "json", "hex", "base64"] },
+            "format": { "type": "string", "enum": ["json", "text", "hex", "base64", "tombstone"] },
+            "schemaPath": { "type": "string" },
+            "onMessage": { "type": "string" },
+            "timestamp": { "type": "string" },
+            "acks": { "type": "string", "enum": ["none", "leader", "all"] },
+            "compression": { "type": "string", "enum": ["none", "gzip", "snappy", "lz4", "zstd"] },
+            "mechanism": { "type": "string", "enum": ["PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"] },
+            "startFrom": { "type": "string", "enum": ["earliest", "latest", "offset", "timestamp"] },
+            "stopAfter": { "type": "string", "enum": ["records", "duration", "idle", "timestamp"] },
+            "topic": { "type": "string" },
+            "key": { "type": "string" },
+            "partition": { "type": "string" },
+            "startValue": { "type": "string" },
+            "stopValue": { "type": "string" },
+            "tls": { "type": "boolean" },
+            "topics": { "type": "array", "items": { "type": "object", "required": ["name"], "properties": {
+              "name": { "type": "string" }, "partitions": { "type": "string" }, "schemaPath": { "type": "string" },
+              "startOffset": { "type": "string" }, "endOffset": { "type": "string" }
+            } } }
+          }
         },
         "mcpMethod": { "type": "string" },
         "mcpName": { "type": "string" },

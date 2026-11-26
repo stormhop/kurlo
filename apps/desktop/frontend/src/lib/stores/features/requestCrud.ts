@@ -242,10 +242,11 @@ export const requestCrudFeature = {
   },
 
   isRequestType(this: RequestCrudHost, value: unknown): value is RequestType {
-    return value === 'http' || value === 'graphql' || value === 'ws' || value === 'socketio' || value === 'grpc' || value === 'mcp' || value === 'ai';
+    return value === 'kafka' || value === 'http' || value === 'graphql' || value === 'ws' || value === 'socketio' || value === 'grpc' || value === 'mcp' || value === 'ai';
   },
 
   normalizeRequestTypeValue(this: RequestCrudHost, value: unknown, url = ''): RequestType {
+    if (value === 'kafka') return 'kafka';
     if (value === 'mcp') return 'mcp';
     if (value === 'ai') return 'ai';
     if (value === 'grpc') return 'grpc';
@@ -275,6 +276,7 @@ export const requestCrudFeature = {
   },
 
   requestTypeLabel(this: RequestCrudHost, type: RequestType = this.requestType) {
+    if (type === 'kafka') return 'Kafka';
     if (this.normalizeRequestTypeValue(type) === 'grpc') return 'gRPC';
     if (this.normalizeRequestTypeValue(type) === 'socketio') return 'Socket.IO';
     if (this.normalizeRequestTypeValue(type) === 'graphql') return 'GraphQL';
@@ -360,6 +362,16 @@ export const requestCrudFeature = {
         this.rawBodyType = bodyDefaults.rawBodyType;
         this.bodyContent = bodyDefaults.bodyContent;
       } else if (this.bodyType === 'graphql') this.bodyType = this.rawBodyType;
+    } else if (this.requestType === 'kafka') {
+      if (this.method === 'SSE') void this.sseDisconnect();
+      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'socketio') void this.socketIODisconnect();
+      this.method = 'POST';
+      this.requestTab = 'body';
+      this.bodyType = 'text';
+      this.rawBodyType = 'text';
+      if (wasGraphQL) this.bodyContent = '';
+      if (!['none', 'inherit', 'basic', 'bearer', 'oauth2', 'aws'].includes(this.authType)) this.authType = 'none';
     } else if (this.requestType === 'grpc') {
       if (this.method === 'SSE') void this.sseDisconnect();
       if (previousType === 'ws') void this.webSocketDisconnect();

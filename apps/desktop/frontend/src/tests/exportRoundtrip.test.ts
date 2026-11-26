@@ -6,6 +6,7 @@ import { emptyCollectionDefaults } from '../lib/collectionDefaults';
 import { DEFAULT_REQUEST_SETTINGS, mkRow } from '../lib/constants';
 import type { AuthType, BodyType, SavedRequest } from '../lib/types/models';
 import { emptyAuthState } from '../lib/utils';
+import { kafkaConfig } from '../lib/kafka';
 
 function row(key: string, value: string, enabled = true) {
   return { ...mkRow(), key, value, enabled };
@@ -132,5 +133,27 @@ describe('export then import keeps every request field', () => {
     const exported = JSON.parse(JSON.stringify(buildInsomniaExport('API', '', original, strip, true)));
     const imported = insomniaRequestsFromResources(exported, 'collection-2', 'API');
     expect(byName(imported)).toEqual(byName(original));
+  });
+});
+
+describe('Kafka requests survive export and import', () => {
+  const kafka = { ...kafkaConfig(), mode: 'consume', topics: [{ name: 'orders', partitions: '0,1', schemaPath: 'schemas/orders.json' }], startFrom: 'earliest', stopAfter: 'idle', stopValue: '2000', keyFormat: 'hex', compression: 'zstd', tls: true, mechanism: 'SCRAM-SHA-512', onMessage: 'pm.test("v", () => pm.expect(pm.message.value).to.exist)' };
+  const original = [richRequest('k', { requestType: 'kafka', url: 'broker-1:9092,broker-2:9092', bodyType: 'text', bodyContent: '{"id":1}', params: [], kafka })];
+  const check = (imported: SavedRequest[]) => {
+    expect(imported).toHaveLength(1);
+    expect(imported[0].requestType).toBe('kafka');
+    expect(imported[0].url).toBe('broker-1:9092,broker-2:9092');
+    expect(imported[0].bodyContent).toBe('{"id":1}');
+    expect(imported[0].kafka).toEqual(kafka);
+  };
+
+  it('through Postman', () => {
+    const exported = JSON.parse(JSON.stringify(buildPostmanCollection('API', '', original, strip, true)));
+    check(postmanCollectionBundle(exported, 'collection-2', 'API').requests);
+  });
+
+  it('through Insomnia', () => {
+    const exported = JSON.parse(JSON.stringify(buildInsomniaExport('API', '', original, strip, true)));
+    check(insomniaRequestsFromResources(exported, 'collection-2', 'API'));
   });
 });

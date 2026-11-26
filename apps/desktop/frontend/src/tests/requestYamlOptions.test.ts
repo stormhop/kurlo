@@ -60,7 +60,7 @@ describe('request YAML completions', () => {
   });
 
   it('does not offer values for fields managed by Kurlo or paths outside request files', () => {
-    expect(labels(['request', 'requestType'], 'value')).toEqual(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'ai']);
+    expect(labels(['request', 'requestType'], 'value')).toEqual(['http', 'graphql', 'ws', 'socketio', 'grpc', 'kafka', 'mcp', 'ai']);
     expect(labels(['request', 'requestTab'], 'value')).toEqual([]);
     expect(labels(['environment'], 'key')).toEqual([]);
     expect(labels(['request', 'bodyType'], 'value')).toContain('json');

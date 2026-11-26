@@ -3,7 +3,9 @@ title: Choose a request type
 description: Find the protocol picker and compare what each request type supports.
 ---
 
-A new request always starts as HTTP — the `+` in the tab bar, `Cmd/Ctrl N`, and **Add request** in the sidebar open it straight away, with no dialog. To use another protocol, pick it from the menu at the start of the address bar, or run **New GraphQL request**, **New WebSocket request**, **New Socket.IO request**, **New gRPC request**, **New MCP request**, or **New AI request** from the command palette.
+A new request always starts as HTTP — the `+` in the tab bar, `Cmd/Ctrl N`, and **Add request** in the sidebar open it straight away, with no dialog. To use another protocol, pick it from the menu at the start of the address bar, or run **New GraphQL request**, **New WebSocket request**, **New Socket.IO request**, **New gRPC request**, **New Kafka request**, **New MCP request**, or **New AI request** from the command palette.
+
+In the sidebar, the tab bar, search and the Collection Runner, HTTP requests show their method. Every other protocol shows its own icon, so a Kafka or Socket.IO request is easy to tell apart. The protocol picker shows the same icons.
 
 ![Method and protocol picker in the address bar](../../../../../assets/screenshots/request-protocol-picker.png)
 
@@ -19,7 +21,8 @@ The address bar lists HTTP methods on the left and other protocols on the right.
 | [WebSocket](/docs/guides/request-types/websocket/) | Raw `ws://` / `wss://` sessions | Params, Auth, Headers, Message, Settings | Frames, handshake, logs | No |
 | [Socket.IO](/docs/guides/request-types/socket-io/) | Socket.IO servers with namespaces/events | Params, Auth, Headers, Events, Message, Settings | Events, handshake, logs | No |
 | [gRPC](/docs/guides/request-types/grpc/) | Protobuf RPCs with metadata/reflection/proto files | Message, Auth, Metadata, Vars, Service definition, Scripts, Settings | Messages, metadata, trailers, scripts | Yes |
+| [Kafka](/docs/guides/request-types/kafka/) | Produce records and consume from broker topics | Message or Topics, Auth, Scripts, Settings | Stream, record value and metadata, test results | Yes |
 | [MCP](/docs/guides/request-types/mcp/) | Model Context Protocol servers — list their tools and call one by hand | Arguments, Auth, Headers, Scripts, Settings | Result, raw exchange, notifications | No |
 | [AI](/docs/guides/request-types/ai/) | Prompts to OpenAI, Anthropic and OpenAI-compatible models, with MCP tools | Prompt, Auth, Headers, Tools, Scripts, Settings (model) | Conversation, raw stream, tests | No |
 
-The [CLI runner](/docs/guides/cli-runner/run/#what-it-runs) handles HTTP and GraphQL. Use the desktop Collection Runner to include gRPC.
+The [CLI runner](/docs/guides/cli-runner/run/#what-it-runs) handles HTTP, GraphQL and Kafka. Use the desktop Collection Runner to include gRPC.

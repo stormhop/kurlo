@@ -664,6 +664,20 @@ func (a *App) SendRequest(req model.HttpRequest) model.HttpResponse {
 	if failed != nil {
 		return *failed
 	}
+	if req.KafkaStreamID != "" && req.Kafka != nil && a.ctx != nil {
+		ctx = context.WithValue(ctx, kafkaStreamKey{}, func(records []kafkaRecord) {
+			if len(linked.values) > 0 {
+				body, _ := json.Marshal(records)
+				records = nil
+				masked := model.HttpResponse{Body: string(body)}
+				linked.finish(&masked)
+				if json.Unmarshal([]byte(masked.Body), &records) != nil {
+					return
+				}
+			}
+			runtime.EventsEmit(a.ctx, "kafka:records:"+req.KafkaStreamID, records)
+		})
+	}
 	resp := a.keepBinaryBodyOutOfTheWindow(req.RequestID, sendRequest(ctx, req, a.state, a.cookieJars, a.preflightCache))
 	linked.finish(&resp)
 	return resp

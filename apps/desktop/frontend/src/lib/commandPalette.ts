@@ -71,6 +71,7 @@ export function buildPaletteCommands(ctx: PaletteContext): PaletteCommand[] {
     { id: 'create-request-graphql', group: 'Create', label: 'New GraphQL request', keywords: 'gql query', run: () => ctx.createRequest('graphql') },
     { id: 'create-request-ws', group: 'Create', label: 'New WebSocket request', keywords: 'ws realtime socket', run: () => ctx.createRequest('ws') },
     { id: 'create-request-socketio', group: 'Create', label: 'New Socket.IO request', keywords: 'sio realtime socket', run: () => ctx.createRequest('socketio') },
+    { id: 'create-request-kafka', group: 'Create', label: 'New Kafka request', keywords: 'broker producer consumer topic', run: () => ctx.createRequest('kafka') },
     { id: 'create-request-grpc', group: 'Create', label: 'New gRPC request', keywords: 'protobuf rpc', run: () => ctx.createRequest('grpc') },
     { id: 'create-request-mcp', group: 'Create', label: 'New MCP request', keywords: 'model context protocol tools', run: () => ctx.createRequest('mcp') },
     { id: 'create-request-ai', group: 'Create', label: 'New AI request', keywords: 'llm openai anthropic claude gpt chat model prompt', run: () => ctx.createRequest('ai') },

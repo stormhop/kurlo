@@ -7,7 +7,8 @@
   import type { Collection, CollectionRunnerResult, SavedRequest } from '../types/models';
   import { MAX_RUNNER_CONCURRENCY, MIN_RUNNER_CONCURRENCY } from '../concurrency';
   import Select from './Select.svelte';
-  import { requestKindShortLabel } from '../utils';
+  import { requestKindFromTransportLabel, requestKindShortLabel } from '../utils';
+  import RequestTypeIcon from './RequestTypeIcon.svelte';
   import { relativeTime } from '../collectionRuns';
   import BirdSpinner from './BirdSpinner.svelte';
 
@@ -340,7 +341,7 @@
           <VirtualList rows={resultRows} rowHeight={RUNNER_ROW_HEIGHT} scroller={pageBody}>
             {#snippet row({ result })}
             <div class="runner-result-row" data-testid="runner-result-row" class:running={result.status === 'running'} class:pass={result.status === 'passed'} class:fail={result.status === 'failed' || result.status === 'error'}>
-              <span class="collection-method {methodColor(result.method)}">{requestKindShortLabel(result.method)}</span>
+              <span class="collection-method {methodColor(result.method)}">{#if ['http', 'sse'].includes(requestKindFromTransportLabel(result.method))}{requestKindShortLabel(result.method)}{:else}<RequestTypeIcon kind={requestKindFromTransportLabel(result.method)} label={result.method} />{/if}</span>
               <div class="runner-request-main">
                 <span>{result.name}</span>
                 {#if iterations > 1}<small>iteration {result.iteration}</small>{/if}
@@ -398,7 +399,7 @@
                 aria-label={`Select ${requestTabLabel(request)}`}
                 onchange={() => onToggleRequest(request.id)}
               />
-              <span class="collection-method {methodColor(transportLabel)}">{requestKindShortLabel(transportLabel)}</span>
+              <span class="collection-method {methodColor(transportLabel)}">{#if ['http', 'sse'].includes(requestKindFromTransportLabel(transportLabel))}{requestKindShortLabel(transportLabel)}{:else}<RequestTypeIcon kind={requestKindFromTransportLabel(transportLabel)} label={transportLabel} />{/if}</span>
               <span class="runner-request-copy">
                 <strong>{requestTabLabel(request)}</strong>
                 <small>{request.url}</small>

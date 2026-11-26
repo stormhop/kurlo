@@ -362,12 +362,12 @@ export const requestBodyFeature = {
   },
 
   syncUrlFromParams(this: RequestBodyHost) {
-    if (this.requestType === 'grpc') return;
+    if (this.requestType === 'grpc' || this.requestType === 'kafka') return;
     this.url = urlWithParams(this.url, this.params);
   },
 
   syncParamsFromUrl(this: RequestBodyHost) {
-    if (this.requestType === 'grpc') return;
+    if (this.requestType === 'grpc' || this.requestType === 'kafka') return;
     this.params = paramsFromUrl(this.url, this.params);
     this.pathParams = pathParamsFromUrl(this.url, this.pathParams);
   },

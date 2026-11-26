@@ -26,7 +26,12 @@
     { value: 'oauth2', label: 'OAuth 2.0' },
     { value: 'none', label: 'No auth' },
   ] as const;
-  let authOptions = $derived(vm.requestType === 'grpc' ? GRPC_AUTH_OPTIONS : AUTH_OPTIONS.filter(option => option.value !== 'ntlm' || vm.requestType === 'http' || vm.requestType === 'graphql'));
+  const KAFKA_AUTH_OPTIONS = [
+    { value: 'inherit', label: 'Inherit auth' }, { value: 'none', label: 'No auth' },
+    { value: 'basic', label: 'SASL' }, { value: 'bearer', label: 'Bearer token' },
+    { value: 'oauth2', label: 'OAuth 2.0' }, { value: 'aws', label: 'AWS MSK IAM' },
+  ];
+  let authOptions = $derived(vm.requestType === 'kafka' ? KAFKA_AUTH_OPTIONS : vm.requestType === 'grpc' ? GRPC_AUTH_OPTIONS : AUTH_OPTIONS.filter(option => option.value !== 'ntlm' || vm.requestType === 'http' || vm.requestType === 'graphql'));
   const OAUTH2_GRANT_OPTIONS = [
     { value: 'client_credentials', label: 'Client credentials' },
     { value: 'authorization_code', label: 'Authorization code' },
@@ -204,6 +209,10 @@
       {/if}
 
     {:else if vm.authType === 'basic' || vm.authType === 'digest' || vm.authType === 'ntlm'}
+      {#if vm.requestType === 'kafka'}
+        <span class="field-label">Mechanism</span>
+        <Select bind:value={vm.kafka.mechanism} ariaLabel="SASL mechanism" options={['PLAIN', 'SCRAM-SHA-256', 'SCRAM-SHA-512'].map(value => ({ value, label: value }))} />
+      {/if}
       <label class="field-label" for="auth-user">Username</label>
       <VariableInput id="auth-user" className="field field-input" bind:value={vm.basicUser} suggestions={vm.variableSuggestions} placeholder="Enter username" />
       <label class="field-label" for="auth-pass">Password</label>
@@ -481,6 +490,7 @@
           <label class="field-label" for="aws-session-token">Session token <span class="field-label-hint">(temporary credentials from STS / SSO)</span></label>
           <SecretInput id="aws-session-token" className="field field-input field-mono" bind:value={vm.awsSessionToken} suggestions={vm.variableSuggestions} />
         </div>
+        {#if vm.requestType !== 'kafka'}
         <div>
           <label class="field-label" for="aws-region">Region</label>
           <VariableInput id="aws-region" className="field field-input" bind:value={vm.awsRegion} suggestions={vm.variableSuggestions} placeholder="us-east-1" />
@@ -489,6 +499,7 @@
           <label class="field-label" for="aws-service">Service</label>
           <VariableInput id="aws-service" className="field field-input" bind:value={vm.awsService} suggestions={vm.variableSuggestions} placeholder="execute-api" />
         </div>
+        {/if}
       </div>
 
     {:else if vm.authType === 'inherit'}

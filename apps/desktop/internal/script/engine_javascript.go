@@ -501,6 +501,22 @@ func buildJSHost(vm *goja.Runtime, ctx *Context, hasResponse bool, deadline time
 		"canSend":     ctx.Send != nil,
 	}
 
+	if ctx.Kafka != nil {
+		k := ctx.Kafka
+		host["kafkaMode"] = k.Mode
+		host["kafkaRequest"] = map[string]string{"topic": k.Topic, "key": k.Key, "partition": k.Partition, "timestamp": k.Timestamp, "compression": k.Compression, "acknowledgements": k.Acks, "startFrom": k.StartFrom, "stopAfter": k.StopAfter}
+		host["kafkaMessage"] = ctx.KafkaMessage
+		host["kafkaEdit"] = func(key, value string) {
+			if ctx.KafkaEdits == nil {
+				ctx.KafkaEdits = map[string]string{}
+			}
+			ctx.KafkaEdits[key] = limitJSHostString(value)
+		}
+		if ctx.Response != nil {
+			host["kafkaError"] = ctx.Response.Error
+			host["kafkaStopReason"] = ctx.Response.KafkaStopReason
+		}
+	}
 	if ctx.Send != nil {
 		host["sendRequest"] = func(method, url string, headers map[string]string, body string) goja.Value {
 			resp := ctx.Send(SendRequest{
@@ -963,6 +979,28 @@ var __kurloAPI = (function (host) {
   Object.defineProperty(requestBody, 'mode', { get: function () { return host.reqGetBodyMode(); }, configurable: true });
   Object.defineProperty(requestBody, 'urlencoded', { get: function () { return host.reqGetBodyMode() === 'urlencoded' ? formList : undefined; }, configurable: true });
   Object.defineProperty(requestBody, 'formdata', { get: function () { return host.reqGetBodyMode() === 'formdata' ? formList : undefined; }, configurable: true });
+  function kafkaMessage(record) {
+    if (record.key === null) delete record.key;
+    if (typeof record.value === 'string' && !record.encoding) {
+      try { record.value = JSON.parse(record.value); } catch (_) {}
+    }
+    return record;
+  }
+  if (host.kafkaRequest) {
+    Object.keys(host.kafkaRequest).forEach(function (key) {
+      var value = host.kafkaRequest[key];
+      Object.defineProperty(pm.request, key, { enumerable: true,
+        get: function () { return value; },
+        set: function (next) { value = next; host.kafkaEdit(key, String(next)); }
+      });
+    });
+    Object.defineProperty(pm.request, 'value', {
+      get: function () { var v = host.reqGetBody(); try { return JSON.parse(v); } catch (_) { return v; } },
+      set: function (v) { host.reqSetBody(typeof v === 'string' ? v : JSON.stringify(v)); }
+    });
+    Object.defineProperty(pm.request, 'url', { get: function () { return host.reqGetUrl(); }, set: function (v) { host.reqSetUrl(String(v)); } });
+    if (host.kafkaMessage) pm.message = kafkaMessage(JSON.parse(host.kafkaMessage));
+  }
   pm.request.body = requestBody;
   pm.request.setBody = function (v) { host.reqSetBody(valStr(v)); };
 
@@ -1150,6 +1188,16 @@ var __kurloAPI = (function (host) {
     Object.defineProperty(resp, 'time', { get: function () { return host.resTime(); }, configurable: true });
     Object.defineProperty(resp, 'size', { get: function () { return host.resSize(); }, configurable: true });
     Object.defineProperty(resp, 'to', { get: function () { return new Assertion(resp); }, configurable: true });
+    if (host.kafkaRequest) {
+      if (host.kafkaError) resp.error = host.kafkaError;
+      if (host.kafkaMode === 'consume') {
+        Object.defineProperty(resp, 'messages', { get: function () { return resp.json().map(kafkaMessage); } });
+        resp.reason = host.kafkaError || host.kafkaStopReason;
+      } else {
+        var receipt = resp.body ? resp.json()[0] : null;
+        if (receipt) ['topic','partition','offset','timestamp'].forEach(function (key) { resp[key] = receipt[key]; });
+      }
+    }
     pm.response = resp;
   }
 

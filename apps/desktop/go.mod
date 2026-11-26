@@ -20,6 +20,9 @@ require (
 	github.com/minio/selfupdate v0.6.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
+	github.com/twmb/franz-go v1.22.3
+	github.com/twmb/franz-go/pkg/kadm v1.20.0
+	github.com/twmb/franz-go/pkg/kfake v0.0.0-20261109062130-78bf4a9044b7
 	github.com/wailsapp/wails/v2 v2.13.0
 	github.com/yuin/goldmark v1.7.17
 	golang.org/x/image v0.40.0
@@ -30,6 +33,11 @@ require (
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 	software.sslmate.com/src/go-pkcs12 v0.7.4
+)
+
+require (
+	github.com/pierrec/lz4/v4 v4.1.33 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.15.2 // indirect
 )
 
 require (

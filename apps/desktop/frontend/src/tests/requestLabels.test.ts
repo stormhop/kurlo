@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { methodColor, requestTransportLabel } from '../lib/utils';
+import { methodColor, requestKindFor, requestKindFromTransportLabel, requestTransportLabel } from '../lib/utils';
 import { normalizeSavedRequest } from '../lib/normalizers';
 
 describe('request labels', () => {
@@ -15,6 +15,16 @@ describe('request labels', () => {
 
   it('shows gRPC transport instead of the saved HTTP method', () => {
     expect(requestTransportLabel({ requestType: 'grpc', method: 'POST', url: 'localhost:50051' })).toBe('gRPC');
+  });
+
+  it('maps every transport label back to the kind whose icon it shows', () => {
+    const types = ['graphql', 'ws', 'socketio', 'grpc', 'kafka', 'mcp', 'ai'] as const;
+    for (const requestType of types) {
+      const label = requestTransportLabel({ requestType, method: 'POST', url: 'localhost:1' });
+      expect(requestKindFromTransportLabel(label)).toBe(requestKindFor({ requestType }));
+    }
+    expect(requestKindFromTransportLabel('DELETE')).toBe('http');
+    expect(requestKindFromTransportLabel('SSE')).toBe('sse');
   });
 });
 

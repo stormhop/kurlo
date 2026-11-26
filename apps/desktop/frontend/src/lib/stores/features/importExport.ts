@@ -723,7 +723,7 @@ export const importExportFeature = {
     const reqs = this.requests.filter(r => r.collectionId === collectionId && !r.isDraft);
     this.closeFloatingMenus();
     const label = format === 'swagger2' ? 'Swagger 2.0' : 'OpenAPI 3.0';
-    const exportableReqs = reqs.filter(req => !this.savedRequestIsRealtime(req) && !this.savedRequestIsGraphQL(req) && !['grpc', 'mcp', 'ai'].includes(req.requestType ?? 'http'));
+    const exportableReqs = reqs.filter(req => !this.savedRequestIsRealtime(req) && !this.savedRequestIsGraphQL(req) && !['grpc', 'mcp', 'ai', 'kafka'].includes(req.requestType ?? 'http'));
     const skippedUnsupported = reqs.length - exportableReqs.length;
     if (!exportableReqs.length) {
       await this.openAlertDialog(`${label} export skipped`, `${label} export only supports HTTP and SSE requests. GraphQL, gRPC, MCP, AI and realtime requests are not written to the spec.`);

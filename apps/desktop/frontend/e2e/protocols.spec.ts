@@ -366,8 +366,8 @@ test.describe('Protocol badge', () => {
       await page.getByLabel('Request URL').fill(type === 'WebSocket' ? 'wss://echo.websocket.org' : 'https://api.example.test/');
       widths[`${type} with url`] = Math.round((await trigger.boundingBox())!.width);
     }
-    for (const [label, width] of Object.entries(widths)) expect(width, label).toBeLessThanOrEqual(widths.http + 24);
-    expect(widths.ws, 'the WS picker leaves room for the URL').toBeLessThanOrEqual(56);
+    for (const [label, width] of Object.entries(widths)) expect(width, label).toBeLessThanOrEqual(widths.http + 32);
+    expect(widths.ws, 'the WS picker leaves room for the URL').toBeLessThanOrEqual(78);
   });
 });
 

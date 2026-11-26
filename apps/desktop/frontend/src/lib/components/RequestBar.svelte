@@ -1,4 +1,7 @@
 <script lang="ts">
+  import KafkaConnection from './KafkaConnection.svelte';
+  import KafkaMode from './KafkaMode.svelte';
+  import RequestTypeIcon from './RequestTypeIcon.svelte';
   import Chevron from './Chevron.svelte';
   import CheckIcon from './CheckIcon.svelte';
   import BirdSpinner from './BirdSpinner.svelte';
@@ -13,6 +16,7 @@
   import { aiConnectionsStore } from '../stores/aiConnections.svelte';
   import { vm } from '../stores/app.svelte';
   import { aiEndpointParts } from '../stores/features/ai';
+  import { requestKindFor } from '../utils';
   import type { VariableSuggestion } from '../variables';
   import type { GrpcMethodInfo, RequestType, SSEStatus, WebSocketStatus, SocketIOStatus } from '../types/models';
 
@@ -176,6 +180,7 @@
     graphql: 'GraphQL',
     ws: 'WebSocket',
     socketio: 'Socket.IO',
+    kafka: 'Kafka',
     grpc: 'gRPC',
     mcp: 'MCP',
     ai: 'AI',
@@ -254,7 +259,7 @@
     {/if}
   </div>
 
-  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp'} class:request-bar-code={codePanelAvailable} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
+  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp' || requestType === 'kafka'} class:request-bar-code={codePanelAvailable} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
     <div class="url-field" inert={!!fileDraft && !fileDraft.ready}>
       <div class="method-wrap" onfocusout={closeMethodMenuOnFocusOut}>
         <button
@@ -266,6 +271,7 @@
           aria-expanded={methodMenuOpen}
           onclick={() => { methodMenuOpen = !methodMenuOpen; }}
         >
+          {#if !isHTTP}<RequestTypeIcon kind={requestKindFor({ requestType })} />{/if}
           <span>{pickerLabel}</span>
           <Chevron />
         </button>
@@ -301,7 +307,7 @@
                     onclick={() => selectRequestType(option)}
                   >
                     <span class="method-check">{#if requestType === option}<CheckIcon />{/if}</span>
-                    <span>{PROTOCOL_NAMES[option] ?? requestTypeLabel(option)}</span>
+                    <span class="method-menu-name"><RequestTypeIcon kind={requestKindFor({ requestType: option })} />{PROTOCOL_NAMES[option] ?? requestTypeLabel(option)}</span>
                   </button>
                 {/each}
               {:else}
@@ -312,6 +318,9 @@
         {/if}
       </div>
 
+      {#if requestType === 'kafka' && !fileDraft}
+        <KafkaMode disabled={loading} />
+      {/if}
       {#if isAI && aiProvider === 'kurlo'}
       <button class="field url-input ai-connection-url" type="button" aria-label={connectionId ? 'AI connection' : 'Default AI connection'} onclick={() => { aiConnectionsStore.reveal = 'models'; vm.openSettings('ai'); }}>
         <span class="ai-connection-url-label" class:missing={connectionId && !chosenAiConnection}>{connectionId ? chosenAiConnection?.label ?? 'Removed connection' : aiConnectionsStore.defaultConnection?.label ?? 'No AI connection yet'}</span>
@@ -325,13 +334,14 @@
         wheelScroll
         suggestions={variableSuggestions}
         ghost={urlGhostFor}
-        placeholder={requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Base URL' : 'Enter request URL or paste cURL…'}
-        ariaLabel={requestType === 'grpc' ? 'gRPC target' : requestType === 'ai' ? 'Provider base URL' : 'Request URL'}
+        placeholder={requestType === 'kafka' ? 'Bootstrap brokers, e.g. localhost:9092' : requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Base URL' : 'Enter request URL or paste cURL…'}
+        ariaLabel={requestType === 'kafka' ? 'Bootstrap brokers' : requestType === 'grpc' ? 'gRPC target' : requestType === 'ai' ? 'Provider base URL' : 'Request URL'}
         oninput={onUrlInput}
         onpaste={(event) => { onUrlPaste(event); keepHostVisible(); }}
         onenter={sendFromUrl}
       />
       {/if}
+      {#if requestType === 'kafka' && !fileDraft}<KafkaConnection disabled={loading} />{/if}
     </div>
 
     {#if isAI}
@@ -413,7 +423,7 @@
       </button>
     {/if}
 
-    {#if sendType === 'graphql' || sendType === 'grpc' || sendType === 'ai'}
+    {#if sendType === 'kafka' || sendType === 'graphql' || sendType === 'grpc' || sendType === 'ai'}
       <button
         class="btn-send"
         class:btn-graphql-query={sendType === 'graphql' || sendType === 'grpc'}
@@ -422,9 +432,9 @@
         type="button"
       >
         {#if loading}
-          <BirdSpinner tone="current" />{sendType === 'ai' ? 'Stop' : 'Cancel'}
+          <BirdSpinner tone="current" />{sendType === 'ai' || sendType === 'kafka' ? 'Stop' : 'Cancel'}
         {:else}
-          {sendType === 'graphql' ? 'Query' : sendType === 'grpc' ? 'Invoke' : 'Send'}
+          {sendType === 'kafka' ? (vm.kafka.mode === 'consume' ? 'Consume' : 'Produce') : sendType === 'graphql' ? 'Query' : sendType === 'grpc' ? 'Invoke' : 'Send'}
         {/if}
         <RequestShortcutHint cancel={loading} />
       </button>

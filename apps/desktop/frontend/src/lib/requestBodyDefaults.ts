@@ -28,6 +28,7 @@ export const REQUEST_BODY_DEFAULTS: Record<RequestType, BodyDefaults> = {
   graphql: GRAPHQL_BODY_DEFAULT,
   ws: { bodyType: 'text', rawBodyType: 'text', bodyContent: '' },
   socketio: { bodyType: 'text', rawBodyType: 'text', bodyContent: '' },
+  kafka: { bodyType: 'text', rawBodyType: 'text', bodyContent: '' },
   grpc: { bodyType: 'json', rawBodyType: 'json', bodyContent: DEFAULT_GRPC_MESSAGE },
   mcp: { bodyType: 'none', rawBodyType: 'json', bodyContent: '' },
   ai: { bodyType: 'none', rawBodyType: 'json', bodyContent: '' },

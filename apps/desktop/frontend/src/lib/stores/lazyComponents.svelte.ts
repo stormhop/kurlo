@@ -42,6 +42,8 @@ class AppLazyComponents {
   GrpcMessageTabComponent = $state<LazyComponent | null>(null);
   GrpcMetadataTabComponent = $state<LazyComponent | null>(null);
   VarsTabComponent = $state<LazyComponent | null>(null);
+  KafkaEditorComponent = $state<typeof import('../components/KafkaEditor.svelte').default | null>(null);
+  KafkaResponsePanelComponent = $state<typeof import('../components/KafkaResponsePanel.svelte').default | null>(null);
   GrpcResponsePanelComponent = $state<LazyComponent | null>(null);
   McpCallTabComponent = $state<LazyComponent | null>(null);
   McpResponsePanelComponent = $state<LazyComponent | null>(null);
@@ -267,12 +269,15 @@ class AppLazyComponents {
     if (state.requestTab === 'body') void this.loadBodyTab();
     if (state.requestTab === 'file' && !this.FileTabComponent) void import('../components/FileTab.svelte').then(module => this.FileTabComponent = module.default);
     if (state.requestTab === 'docs') void this.loadDocsTab();
-    if (state.requestTab === 'headers') void this.loadHeadersTab();
+    if (state.requestTab === 'headers') {
+      if (state.requestType === 'kafka') void this.loadGrpcMetadataTab();
+      else void this.loadHeadersTab();
+    }
     if (state.requestTab === 'vars') void this.loadVarsTab();
     if (state.requestTab === 'params') void this.loadParamsTab();
     if (state.requestTab === 'scripts') void this.loadScriptsTab();
     if (state.requestTab === 'examples') void this.loadExamplesTab();
-    if (state.requestTab === 'settings' && state.requestType !== 'ws' && state.requestType !== 'socketio' && state.requestType !== 'grpc') void this.loadRequestSettingsTab();
+    if (state.requestTab === 'settings' && state.requestType !== 'ws' && state.requestType !== 'socketio' && state.requestType !== 'grpc' && state.requestType !== 'kafka') void this.loadRequestSettingsTab();
     if (state.codePanelOpen && state.codePanelAvailable) void this.loadCodeSnippetPanel();
     if (state.globalSearchOpen) void this.loadGlobalSearchModal();
     if (state.settingsOpen) void this.loadSettingsModal();
@@ -298,6 +303,10 @@ class AppLazyComponents {
       if (state.requestTab === 'events') void this.loadSocketIOEventsTab();
       if (state.requestTab === 'settings') void this.loadSocketIOSettingsTab();
     }
+    if (state.requestType === 'kafka') {
+      if (!this.KafkaResponsePanelComponent) void import('../components/KafkaResponsePanel.svelte').then(module => this.KafkaResponsePanelComponent = module.default);
+      if (['body', 'settings'].includes(state.requestTab) && !this.KafkaEditorComponent) void import('../components/KafkaEditor.svelte').then(module => this.KafkaEditorComponent = module.default);
+    }
     if (state.requestType === 'mcp') {
       void this.loadMcpResponsePanel();
       if (state.requestTab === 'body') void this.loadMcpCallTab();
@@ -315,7 +324,7 @@ class AppLazyComponents {
       if (state.requestTab === 'service') void this.loadGrpcServiceDefinitionTab();
       if (state.requestTab === 'settings') void this.loadGrpcSettingsTab();
     }
-    if (state.requestType !== 'ws' && state.requestType !== 'socketio' && state.requestType !== 'grpc' && state.requestType !== 'mcp' && state.requestType !== 'ai' && !(state.requestType === 'http' && (state.method === 'SSE' || state.sseSessionVisible))) {
+    if (state.requestType !== 'ws' && state.requestType !== 'socketio' && state.requestType !== 'grpc' && state.requestType !== 'mcp' && state.requestType !== 'ai' && state.requestType !== 'kafka' && !(state.requestType === 'http' && (state.method === 'SSE' || state.sseSessionVisible))) {
       void this.loadResponsePanel();
     }
   }

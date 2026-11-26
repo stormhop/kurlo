@@ -1376,7 +1376,7 @@
           exampleCount={vm.requestExamplesLoaded ? vm.requestExamples.length : (vm.requestsById.get(vm.activeRequestId)?.exampleCount ?? 0)}
         />
 
-        {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai'}
+        {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai' && vm.requestType !== 'kafka'}
           <BodyModeSelector
             showVariants={vm.method !== 'SSE'}
             rawBodyType={vm.rawBodyType}
@@ -1402,6 +1402,8 @@
             {:else if lazy.FileTabComponent}
               <lazy.FileTabComponent draft={vm.requestFiles.active} />
             {/if}
+          {:else if vm.requestType === 'kafka' && (vm.requestTab === 'body' || vm.requestTab === 'settings')}
+            {#if lazy.KafkaEditorComponent}<lazy.KafkaEditorComponent />{/if}
           {:else if vm.requestTab === 'docs'}
             {#if lazy.DocsTabComponent}<lazy.DocsTabComponent />{/if}
           {:else if vm.requestTab === 'query'}
@@ -1410,6 +1412,8 @@
             {#if lazy.ParamsTabComponent}<lazy.ParamsTabComponent />{/if}
           {:else if vm.requestTab === 'auth'}
             {#if lazy.AuthTabComponent}<lazy.AuthTabComponent />{/if}
+          {:else if vm.requestTab === 'headers' && vm.requestType === 'kafka'}
+            {#if lazy.GrpcMetadataTabComponent}<lazy.GrpcMetadataTabComponent kafka />{/if}
           {:else if vm.requestTab === 'headers'}
             {#if lazy.HeadersTabComponent}<lazy.HeadersTabComponent />{/if}
           {:else if vm.requestTab === 'vars'}
@@ -1476,7 +1480,9 @@
         ></button>
       {/if}
 
-      {#if vm.requestType === 'ws'}
+      {#if vm.requestType === 'kafka'}
+        {#if lazy.KafkaResponsePanelComponent}{#key vm.activeRequestId}<lazy.KafkaResponsePanelComponent />{/key}{/if}
+      {:else if vm.requestType === 'ws'}
         {#if lazy.WebSocketPanelComponent}
         <lazy.WebSocketPanelComponent
           status={vm.currentWebSocketSession?.status ?? 'idle'}

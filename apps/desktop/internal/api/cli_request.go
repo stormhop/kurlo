@@ -154,8 +154,9 @@ type cliExample struct {
 }
 
 type cliSavedRequest struct {
-	CollectionVariables    map[string]string `json:"-"`
-	CollectionSecretValues []string          `json:"-"`
+	Kafka                  *model.KafkaRequest `json:"kafka,omitempty"`
+	CollectionVariables    map[string]string   `json:"-"`
+	CollectionSecretValues []string            `json:"-"`
 
 	WorkspaceID          string   `json:"-"`
 	OpenAPI              string   `json:"openapi"`
@@ -294,7 +295,7 @@ func enabledRowValues(rows []cliKV) map[string]string {
 
 func cliRunnable(req cliSavedRequest) bool {
 	switch strings.ToLower(strings.TrimSpace(req.RequestType)) {
-	case "", "http", "graphql":
+	case "", "http", "graphql", "kafka":
 		return !req.IsDraft && !strings.EqualFold(strings.TrimSpace(req.Method), "SSE")
 	default:
 		return false
@@ -367,7 +368,16 @@ func buildHTTPRequest(req cliSavedRequest, values map[string]string, secretValue
 		timeoutMs = timeoutOverrideMs
 	}
 
+	var kafka *model.KafkaRequest
+	if req.RequestType == "kafka" {
+		kafka = req.Kafka
+		if kafka == nil {
+			kafka = &model.KafkaRequest{}
+		}
+		method = "KAFKA"
+	}
 	return model.HttpRequest{
+		Kafka:       kafka,
 		RequestID:   req.ID,
 		WorkspaceID: req.WorkspaceID,
 		Method:      method,

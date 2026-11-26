@@ -1,3 +1,4 @@
+import { kafkaStreams, openKafkaStream } from '../kafka.svelte';
 import { cancelHttpRequest, sendHttpRequest, sendHttpRequestToFile, setEnvironment, setGlobalVariables } from '../../backend';
 import type { HttpRequest, HttpResponse } from '../../backend';
 import { emptyHttpResponse } from '../../wire';
@@ -182,7 +183,10 @@ export const requestExecutionFeature = {
       await this.cancelActiveRequest();
       return;
     }
-    if (!this.url.trim()) return;
+    if (!this.url.trim()) {
+      if (this.requestType === 'kafka') this.requestError = 'Enter at least one bootstrap broker.';
+      return;
+    }
     if (this.authType === 'bearer' && !this.bearerToken.trim()) {
       this.requestError = 'Bearer token is empty — add a token in the Auth tab or change the auth type';
       return;
@@ -199,7 +203,9 @@ export const requestExecutionFeature = {
     const generation = nextSendGeneration(requestId);
     const isCurrent = () => sendGenerations.get(requestId) === generation;
     const workspaceId = this.activeWorkspaceId;
-    const useCookieJar = !this.disableCookieJar;
+    const useCookieJar = this.requestType !== 'kafka' && !this.disableCookieJar;
+    let closeStream: (() => void) | undefined;
+    if (this.requestType === 'kafka') this.setActiveResponse(null, requestId);
     this.markRequestLoading(requestId, true);
     this.requestError = '';
     let completedResponse: HttpResponse | undefined;
@@ -238,6 +244,10 @@ export const requestExecutionFeature = {
         resp = result.response;
         downloadedPath = result.savedPath;
       } else {
+        if (serialized.kafka?.mode === 'consume') {
+          serialized.kafkaStreamId = newRequestId();
+          closeStream = openKafkaStream(requestId, serialized.kafkaStreamId);
+        }
         resp = await sendHttpRequest(serialized);
       }
       completedResponse = resp;
@@ -288,6 +298,7 @@ export const requestExecutionFeature = {
       if (isCurrent() && this.requestIsActive(requestId)) this.requestError = String(e);
     }
     finally {
+      closeStream?.();
       if (isCurrent()) this.markRequestLoading(requestId, false);
       if (useCookieJar) void this.refreshCookieJar(true, true, workspaceId);
     }
@@ -296,6 +307,7 @@ export const requestExecutionFeature = {
   async cancelActiveRequest(this: RequestExecutionHost) {
     const requestId = this.activeRequestId;
     if (!requestId || !this.inFlightRequestIds.has(requestId)) return;
+    const partial = kafkaStreams.get(requestId);
     nextSendGeneration(requestId);
     try {
       await cancelHttpRequest(requestId);
@@ -314,8 +326,9 @@ export const requestExecutionFeature = {
         this.requestError = '';
         return;
       }
-      this.requestError = REQUEST_CANCELED_ERROR;
-      this.setActiveResponse(null, requestId);
+      const stream = kafkaStreams.get(requestId) ?? partial;
+      this.requestError = stream ? '' : REQUEST_CANCELED_ERROR;
+      this.setActiveResponse(stream ? { ...emptyHttpResponse(), body: JSON.stringify(stream), status: 'Stopped' } : null, requestId);
       this.setActiveGrpcResponse(null, requestId);
     }
   },

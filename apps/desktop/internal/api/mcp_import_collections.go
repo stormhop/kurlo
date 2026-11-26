@@ -358,8 +358,12 @@ func importInsomnia(doc map[string]any, fallback string) (workspaceImport, error
 
 func importProtocolExtension(req, extension map[string]any) {
 	switch kind := stringValue(extension, "requestType"); kind {
-	case "http", "graphql", "ws", "socketio", "grpc", "mcp", "ai":
+	case "http", "graphql", "ws", "socketio", "grpc", "kafka", "mcp", "ai":
 		req["requestType"] = kind
+	}
+	if kafka := nestedMap(extension, "kafka"); kafka != nil && req["requestType"] == "kafka" {
+		req["kafka"] = kafka
+		req["method"], req["requestTab"] = "POST", "body"
 	}
 	for _, key := range []string{"url", "requestTab", "grpcMethod", "grpcUseReflection", "sioEventName", "sioArgs", "sioAck", "mcpMethod", "mcpName", "mcpArguments", "aiProvider", "aiModel", "aiPrompt", "aiSystem"} {
 		if value, ok := extension[key]; ok {

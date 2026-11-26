@@ -51,6 +51,9 @@ func PostmanBodyMode(bodyType string) string {
 type SendFunc func(SendRequest) SendResponse
 
 type Context struct {
+	KafkaMessage        string
+	Kafka               *model.KafkaRequest
+	KafkaEdits          map[string]string
 	Variables           map[string]string
 	Environment         map[string]string
 	CollectionVariables map[string]string

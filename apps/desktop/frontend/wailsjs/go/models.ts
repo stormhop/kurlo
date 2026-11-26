@@ -2516,6 +2516,7 @@ export namespace model {
 	    }
 	}
 	export class HttpResponse {
+	    kafkaStopReason?: string;
 	    statusCode: number;
 	    status: string;
 	    headers: KeyValue[];
@@ -2555,6 +2556,7 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kafkaStopReason = source["kafkaStopReason"];
 	        this.statusCode = source["statusCode"];
 	        this.status = source["status"];
 	        this.headers = this.convertValues(source["headers"], KeyValue);
@@ -3129,7 +3131,93 @@ export namespace model {
 	        this.jwtQueryParam = source["jwtQueryParam"];
 	    }
 	}
+	export class KafkaTopic {
+	    schemaPath?: string;
+	    name: string;
+	    partitions?: string;
+	    startOffset?: string;
+	    endOffset?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new KafkaTopic(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.schemaPath = source["schemaPath"];
+	        this.name = source["name"];
+	        this.partitions = source["partitions"];
+	        this.startOffset = source["startOffset"];
+	        this.endOffset = source["endOffset"];
+	    }
+	}
+	export class KafkaRequest {
+	    onMessage?: string;
+	    schemaPath?: string;
+	    timestamp?: string;
+	    mode?: string;
+	    topic?: string;
+	    topics?: KafkaTopic[];
+	    keyFormat?: string;
+	    key?: string;
+	    partition?: string;
+	    format?: string;
+	    acks?: string;
+	    compression?: string;
+	    tls?: boolean;
+	    mechanism?: string;
+	    startFrom?: string;
+	    startValue?: string;
+	    stopAfter?: string;
+	    stopValue?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new KafkaRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.onMessage = source["onMessage"];
+	        this.schemaPath = source["schemaPath"];
+	        this.timestamp = source["timestamp"];
+	        this.mode = source["mode"];
+	        this.topic = source["topic"];
+	        this.topics = this.convertValues(source["topics"], KafkaTopic);
+	        this.keyFormat = source["keyFormat"];
+	        this.key = source["key"];
+	        this.partition = source["partition"];
+	        this.format = source["format"];
+	        this.acks = source["acks"];
+	        this.compression = source["compression"];
+	        this.tls = source["tls"];
+	        this.mechanism = source["mechanism"];
+	        this.startFrom = source["startFrom"];
+	        this.startValue = source["startValue"];
+	        this.stopAfter = source["stopAfter"];
+	        this.stopValue = source["stopValue"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class HttpRequest {
+	    kafkaStreamId?: string;
+	    kafka?: KafkaRequest;
 	    requestId: string;
 	    workspaceId: string;
 	    method: string;
@@ -3210,6 +3298,8 @@ export namespace model {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kafkaStreamId = source["kafkaStreamId"];
+	        this.kafka = this.convertValues(source["kafka"], KafkaRequest);
 	        this.requestId = source["requestId"];
 	        this.workspaceId = source["workspaceId"];
 	        this.method = source["method"];
@@ -4220,6 +4310,8 @@ export namespace model {
 	        this.error = source["error"];
 	    }
 	}
+	
+	
 	
 	
 	export class LoadCheck {

@@ -9,6 +9,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
+- **Kafka requests.** Produce a record or stream records from selected topics and partitions. Inspect values, headers and offsets, validate JSON against a local schema, and run saved Kafka requests in collections or with `kurlo run`.
 - **KeePassXC secret provider.** Link a variable to a KeePassXC entry by its URL. Kurlo reads it from the running KeePassXC app through `keepassxc-proxy`, like the browser extension: click **Connect to KeePassXC** once and approve the connection in KeePassXC. **Field** picks the user name, password, TOTP or a `KPH:` attribute, and **Entry** picks one entry when several match. `kurlo run` reads `KEEPASSXC_ASSOCIATION_ID` and `KEEPASSXC_ASSOCIATION_KEY`.
 - **Named body variants.** Use **Body → Saved** to create, rename, load and send up to five payloads of an HTTP request. Variants share the request’s URL, auth, headers and tests. The request YAML stores each payload and the selected name.
 - **Rename folders in place.** Double-click a folder name in the sidebar to rename it, as with collections. Enter saves, Escape cancels.
@@ -17,6 +18,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
+- **Protocol icons.** Requests other than HTTP show an icon for their protocol instead of a short label such as `SIO` or `GQL`, in the sidebar, request tabs, search, collection docs and the Collection Runner. The protocol picker shows the same icons. HTTP requests keep their coloured method.
 - **Variables that use a secret provider.** When more than eight variables are linked to a provider, its page groups them by environment with a count for each, and shows the first 20 of an environment until you click **Show all**. Saved credentials are listed by name, such as **Secret access key**, instead of their internal keys.
 - **Consistent controls.** Auth type, raw body type, WebSocket and Socket.IO message types, binary encoding, the message filter and the snippet language use the same dropdown as the rest of the app, with the same size, keyboard navigation and closing behaviour. Close buttons, checkmarks and chevrons are drawn with one set of icons, the YAML and `kurlo-agent.md` editors open over the same backdrop as other dialogs, and the Browser sync switch matches the other switches.
 - **Editor errors.** The line with a JSON, GraphQL or YAML error has its number marked in red and a wavy underline in the theme's colour. Hovering shows the message with its line in the app font. When the line is scrolled out of view, a note in the corner names it and takes you there. MCP arguments that are not a JSON object are marked in the editor instead of a second message below it, and the File tab and YAML editor show a syntax error once, in the editor.

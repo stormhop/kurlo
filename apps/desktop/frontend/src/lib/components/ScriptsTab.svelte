@@ -9,19 +9,25 @@
 
   const assertionsAvailable = $derived(requestTypeSupportsAssertions(vm.requestType));
   const assertionCount = $derived(assertionsForStore(vm.assertions).length);
-  const activeTab = $derived(vm.scriptTab === 'assertions' && !assertionsAvailable ? 'tests' : vm.scriptTab);
+  let messageTab = $state(false);
+  const kafka = $derived(vm.requestType === 'kafka');
+  const consuming = $derived(kafka && vm.kafka.mode === 'consume');
+  const activeTab = $derived(consuming && messageTab ? 'message' : vm.scriptTab === 'assertions' && !assertionsAvailable ? 'tests' : vm.scriptTab);
 
-  const hint = $derived(activeTab === 'pre-request' ? 'JavaScript · runs before the request is sent' : activeTab === 'tests' ? 'JavaScript · runs after the response is received' : 'checked after the tests, no code needed');
+  const hint = $derived(activeTab === 'message' ? 'JavaScript · runs for each received record' : activeTab === 'pre-request' ? 'JavaScript · runs before the request is sent' : activeTab === 'tests' ? 'JavaScript · runs after the response is received' : 'checked after the tests, no code needed');
 </script>
 
 <div class="script-section">
   <div class="script-head">
     <div class="segmented subtabs" role="tablist" use:tabListKeyboard>
-      <button class="segmented-item" role="tab" class:active={activeTab === 'pre-request'} aria-selected={activeTab === 'pre-request'} tabindex={activeTab === 'pre-request' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'pre-request')}>
-        Pre-request{#if scriptLineCount(vm.preRequestScriptJs) > 0}<span class="subtab-count">{scriptLineCount(vm.preRequestScriptJs)}</span>{/if}
+      <button class="segmented-item" role="tab" class:active={activeTab === 'pre-request'} aria-selected={activeTab === 'pre-request'} tabindex={activeTab === 'pre-request' ? 0 : -1} type="button" onclick={() => { messageTab = false; vm.scriptTab = 'pre-request'; }}>
+        {kafka ? (consuming ? 'Before consume' : 'Before produce') : 'Pre-request'}{#if scriptLineCount(vm.preRequestScriptJs) > 0}<span class="subtab-count">{scriptLineCount(vm.preRequestScriptJs)}</span>{/if}
       </button>
-      <button class="segmented-item" role="tab" class:active={activeTab === 'tests'} aria-selected={activeTab === 'tests'} tabindex={activeTab === 'tests' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'tests')}>
-        Tests{#if scriptLineCount(vm.testScriptJs) > 0}<span class="subtab-count">{scriptLineCount(vm.testScriptJs)}</span>{/if}
+      {#if consuming}
+        <button class="segmented-item" role="tab" class:active={activeTab === 'message'} aria-selected={activeTab === 'message'} tabindex={activeTab === 'message' ? 0 : -1} type="button" onclick={() => messageTab = true}>On message</button>
+      {/if}
+      <button class="segmented-item" role="tab" class:active={activeTab === 'tests'} aria-selected={activeTab === 'tests'} tabindex={activeTab === 'tests' ? 0 : -1} type="button" onclick={() => { messageTab = false; vm.scriptTab = 'tests'; }}>
+        {kafka ? (consuming ? 'After consume' : 'After produce') : 'Tests'}{#if scriptLineCount(vm.testScriptJs) > 0}<span class="subtab-count">{scriptLineCount(vm.testScriptJs)}</span>{/if}
       </button>
       {#if assertionsAvailable}
         <button class="segmented-item" role="tab" class:active={activeTab === 'assertions'} aria-selected={activeTab === 'assertions'} tabindex={activeTab === 'assertions' ? 0 : -1} type="button" onclick={() => (vm.scriptTab = 'assertions')}>
@@ -54,6 +60,8 @@
       testId="pre-request-script-editor"
       ariaLabel="Pre-request script editor"
     />
+  {:else if activeTab === 'message'}
+    <ScriptEditor bind:value={vm.kafka.onMessage} tests collection={vm.activeRequestCollection()} requestVariables={vm.requestVars} placeholder={'pm.test("Has a key", () => pm.expect(pm.message.key).to.exist)'} testId="kafka-message-script" ariaLabel="On message script" />
   {:else if activeTab === 'assertions'}
     <AssertionsEditor />
   {:else}

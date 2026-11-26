@@ -20,6 +20,7 @@ export const DOCS_TOPICS = {
     ['websocket', 'WebSocket'],
     ['socket-io', 'Socket.IO'],
     ['grpc', 'gRPC'],
+    ['kafka', 'Kafka requests'],
     ['mcp', 'MCP requests'],
     ['ai', 'AI requests'],
     ['portability', 'Import and export by protocol'],

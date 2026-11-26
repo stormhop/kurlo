@@ -15,6 +15,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Kafka requests.** Produce a record or stream records from selected topics and partitions. Inspect values, headers and offsets, validate JSON against a local schema, and run saved Kafka requests in collections or with `kurlo run`.
 - **KeePassXC secret provider.** Read variables from the running KeePassXC app through `keepassxc-proxy`, matched by the entry URL. [KeePassXC](/docs/guides/environments/secret-managers/#keepassxc).
 - **Named body variants.** Keep up to five payloads for one HTTP request, load or send one from **Body → Saved**, and share them in Git. [Switch between body variants](/docs/guides/request-types/http/#switch-between-body-variants).
 - **Rename folders in place** by double-clicking their name in the sidebar. [Collections](/docs/guides/workspaces/collections/).
@@ -23,6 +24,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Changed
 
+- **Protocol icons.** GraphQL, WebSocket, Socket.IO, gRPC, Kafka, MCP and AI requests show their own icon in the sidebar, tabs, search and the Collection Runner. HTTP requests keep their method. [Choose a request type](/docs/guides/request-types/choose/).
 - **Linked variables by environment.** A secret provider used by many variables lists them by environment, and saved credentials show readable names.
 - **Consistent controls.** Dropdowns for auth type, body and message types, encoding, the message filter and the snippet language behave the same as every other dropdown, and close, check and chevron icons match across the app.
 - **Editor errors** mark the line number in red, show the message with its line on hover, and point to an error scrolled out of view.

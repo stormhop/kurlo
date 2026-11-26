@@ -474,6 +474,10 @@ export function ListCookies(arg1) {
   return window['go']['api']['App']['ListCookies'](arg1);
 }
 
+export function ListKafkaTopics(arg1) {
+  return window['go']['api']['App']['ListKafkaTopics'](arg1);
+}
+
 export function ListSecretImportKeys(arg1) {
   return window['go']['api']['App']['ListSecretImportKeys'](arg1);
 }

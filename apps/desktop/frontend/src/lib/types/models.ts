@@ -3,7 +3,7 @@ import type { LoadTest } from '../wire';
 
 export type { CookieJarEntry, KeyValue, ResponseTimings, ScriptResult };
 
-export type RequestType = 'http' | 'graphql' | 'ws' | 'socketio' | 'grpc' | 'mcp' | 'ai';
+export type RequestType = 'kafka' | 'http' | 'graphql' | 'ws' | 'socketio' | 'grpc' | 'mcp' | 'ai';
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'SSE';
 
 export type SSEStatus = 'idle' | 'connecting' | 'reconnecting' | 'connected' | 'error';
@@ -308,6 +308,7 @@ export type SavedRequest = {
   sioAck?: boolean;
   savedMessages?: SavedRealtimeMessage[];
   assertions?: import('../assertions').AssertionRow[];
+  kafka?: NonNullable<import('../wire').HttpRequest['kafka']>;
   grpcMethod?: string;
   grpcMetadata?: KVRow[];
   grpcUseReflection?: boolean;

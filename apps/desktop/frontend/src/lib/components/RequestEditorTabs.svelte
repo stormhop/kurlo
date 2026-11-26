@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { vm } from '../stores/app.svelte';
   import Chevron from './Chevron.svelte';
   import CheckIcon from './CheckIcon.svelte';
   import { tick } from 'svelte';
@@ -90,6 +91,9 @@
       ];
     }
 
+    if (requestType === 'kafka') {
+      return [docs, { id: 'body', label: vm.kafka.mode === 'consume' ? 'Topics' : 'Message' }, auth, ...(vm.kafka.mode === 'consume' ? [] : [headers]), vars, scripts, settings];
+    }
     if (requestType === 'mcp') {
       return [
         docs,

@@ -7,6 +7,7 @@ import type { KVRow, PreviewHeader, RequestType, SavedRequest } from '../../type
 import { activeCount } from '../../utils';
 
 type RequestHeadersHost = {
+  requestType: RequestType;
   autoRequestHeaders: PreviewHeader[];
   cookies: CookieJarEntry[];
   headerValueSuggestions: string[];
@@ -42,6 +43,7 @@ export const requestHeadersFeature = {
   },
 
   headerValidationErrorForRequest(this: RequestHeadersHost, req: SavedRequest, envValues = this.activeEnvironmentValues()) {
+    if (req.requestType === 'kafka') return '';
     const request = this.requestWithCollectionDefaults(req);
     const values = this.environmentValuesForRequest(request, envValues);
     const rows = this.resolveRows(request.headers, values);
@@ -57,6 +59,7 @@ export const requestHeadersFeature = {
   },
 
   buildAutoRequestHeaders(this: RequestHeadersHost): PreviewHeader[] {
+    if (this.requestType === 'kafka') return [];
     const request = this.requestWithCollectionDefaults(this.snapshotActiveRequest());
     const requestType = this.normalizeRequestTypeValue(request.requestType, request.url);
     const auth = request.auth;

@@ -65,6 +65,12 @@ func (l *cliLinkedSecrets) onlyFor(req *cliSavedRequest) *cliLinkedSecrets {
 			add(v.String())
 		}
 	}
+	if req.Kafka != nil {
+		target.scripts += "\n" + req.Kafka.OnMessage
+		for _, slot := range linkedStringSlots(req.Kafka) {
+			add(slot.value)
+		}
+	}
 	for _, slot := range linkedStringSlots(&req.Settings) {
 		add(slot.value)
 	}

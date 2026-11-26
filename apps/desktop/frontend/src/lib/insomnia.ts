@@ -1,3 +1,4 @@
+import { kafkaConfig } from './kafka';
 import type { AuthType, BodyType, KVRow, Method, OAuth1SignatureMethod, RawBodyType, RequestSettings, RequestTab, RequestType, SavedRequest, SIOArg } from './types/models';
 import { DEFAULT_REQUEST_SETTINGS, mkRow } from './constants';
 import { asArray, asText, isRecord, newRequestId } from './utils';
@@ -9,7 +10,7 @@ import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
 import { safeExportRow, safeExportSettings, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
 import { pathParamsFromUrl } from './pathParams';
 
-const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp']);
+const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'kafka']);
 const KURLO_REQUEST_TABS = new Set<RequestTab>(['docs', 'params', 'query', 'auth', 'headers', 'metadata', 'body', 'schema', 'service', 'events', 'scripts', 'settings']);
 
 function resourceType(resource: Record<string, unknown>) {
@@ -308,6 +309,7 @@ export function insomniaRequestsFromResources(payload: unknown, collectionId: st
       ...(sioArgs ? { sioArgs } : {}),
       ...(Array.isArray(kurlo.sioEvents) ? { sioEvents: insomniaRows(kurlo.sioEvents) } : {}),
       ...(typeof kurlo.sioAck === 'boolean' ? { sioAck: kurlo.sioAck } : {}),
+      ...(requestType === 'kafka' ? { kafka: kafkaConfig(isRecord(kurlo.kafka) ? kurlo.kafka : undefined) } : {}),
       ...(requestType === 'grpc' ? {
         grpcMethod,
         grpcMetadata,
@@ -462,6 +464,10 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (source: string, 
       encoding: arg.encoding,
     }));
     extension.sioAck = req.sioAck ?? false;
+  }
+  if (requestType === 'kafka') {
+    extension.kafka = req.kafka;
+    extension.message = exportBodyLikeValue(req.bodyContent, req.kafka?.format || 'json', stripFn, includeSecrets);
   }
   if (requestType === 'grpc') {
     extension.grpcMethod = req.grpcMethod ?? '';

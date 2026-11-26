@@ -800,7 +800,7 @@ function isGraphQLExportRequest(req: SavedRequest): boolean {
 }
 
 function isNonHttpExportRequest(req: SavedRequest): boolean {
-  return req.requestType === 'grpc' || req.requestType === 'mcp' || req.requestType === 'ai';
+  return req.requestType === 'kafka' || req.requestType === 'grpc' || req.requestType === 'mcp' || req.requestType === 'ai';
 }
 
 function isOpenApiExportableRequest(req: SavedRequest): boolean {

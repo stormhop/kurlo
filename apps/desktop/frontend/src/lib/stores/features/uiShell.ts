@@ -219,7 +219,7 @@ export const uiShellFeature = {
   get codePanelAvailable(): boolean {
     const host = this as unknown as UiShellHost;
     if (host.topView !== 'request' || !host.activeRequestId) return false;
-    return host.requestType !== 'graphql' && host.requestType !== 'ws' && host.requestType !== 'socketio' && host.requestType !== 'grpc';
+    return host.requestType !== 'kafka' && host.requestType !== 'graphql' && host.requestType !== 'ws' && host.requestType !== 'socketio' && host.requestType !== 'grpc';
   },
 
   buildGlobalSearchResults(this: UiShellHost): SavedRequest[] {
@@ -235,6 +235,7 @@ export const uiShellFeature = {
         ws: 'ws websocket web socket realtime',
         socketio: 'sio socketio socket.io socket io realtime',
         graphql: 'graphql gql graph ql',
+        kafka: 'kafka topic broker produce consume',
         grpc: 'grpc protobuf proto reflection rpc service method',
       };
       const searchable = [
