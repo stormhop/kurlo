@@ -73,7 +73,7 @@ const SPECIAL_BUTTON_CLASSES = new Set([
   'graphql-panel-tab-btn', 'grpc-method-option', 'history-day-toggle', 'history-entry-main',
   'input-validation-anchor', 'kv-auto-toggle', 'kv-col-resizer', 'method-trigger', 'mock-row-name',
   'mock-url', 'openapi-update-dot', 'overview-name', 'overview-row', 'overview-tile', 'palette-command', 'panel-divider', 'pinned-head', 'response-fold-toggle', 'response-time-trigger',
-  'saved-messages-load', 'saved-request-tab-btn', 'search-picker-option', 'secret-browser-crumb', 'secret-browser-item', 'secret-chip', 'secret-provider-open', 'secret-sidebar-empty', 'secret-sidebar-item', 'secret-sidebar-title', 'secret-type-tile', 'secret-usage-row', 'settings-nav-item', 'shortcut-combo', 'sidebar-divider', 'sse-event-main',
+  'saved-messages-load', 'saved-request-tab-btn', 'search-picker-option', 'secret-browser-crumb', 'secret-browser-item', 'secret-chip', 'secret-provider-open', 'secret-sidebar-empty', 'secret-sidebar-item', 'secret-sidebar-title', 'secret-type-tile', 'secret-usage-group', 'secret-usage-row', 'settings-nav-item', 'shortcut-combo', 'sidebar-divider', 'sse-event-main',
   'subfolder-collapse', 'support-link-card', 'tab-close', 'theme-menu-item', 'theme-menu-mode', 'theme-menu-scrim',
   'version-pill', 'win-control', 'workspace-diagnostic-chip', 'workspace-menu-footer', 'workspace-menu-select',
 ]);

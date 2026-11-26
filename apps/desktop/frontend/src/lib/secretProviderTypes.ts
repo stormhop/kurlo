@@ -1,4 +1,4 @@
-import type { SecretProviderStatus, SecretProviderView } from './wire';
+import type { SecretProviderStatus, SecretProviderUsage, SecretProviderView } from './wire';
 
 export type SecretProviderType =
   | 'vault' | '1password' | 'aws-secrets-manager' | 'aws-ssm' | 'gcp-secret-manager' | 'azure-key-vault'
@@ -235,3 +235,43 @@ export const SECRET_TOOL_INSTALL_URLS: Record<string, string> = {
   'aws-secrets-manager': 'https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html',
   'aws-ssm': 'https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html',
 };
+
+export const SECRET_USAGE_FLAT_LIMIT = 8;
+export const SECRET_USAGE_GROUP_PREVIEW = 20;
+
+export type SecretUsageGroup = { environmentId: string; environmentName: string; usages: SecretProviderUsage[] };
+
+export function groupSecretUsages(usages: SecretProviderUsage[]): SecretUsageGroup[] {
+  const groups = new Map<string, SecretUsageGroup>();
+  for (const usage of usages) {
+    const group = groups.get(usage.environmentId);
+    if (group) group.usages.push(usage);
+    else groups.set(usage.environmentId, { environmentId: usage.environmentId, environmentName: usage.environmentName, usages: [usage] });
+  }
+  return [...groups.values()];
+}
+
+export function secretUsageTitle(usages: SecretProviderUsage[]) {
+  const count = usages.length;
+  const environments = new Set(usages.map(usage => usage.environmentId)).size;
+  const title = `Used by ${count} ${count === 1 ? 'variable' : 'variables'}`;
+  return environments > 1 ? `${title} in ${environments} environments` : title;
+}
+
+const CREDENTIAL_LABELS: Record<string, string> = {
+  token: 'Token',
+  secretId: 'AppRole secret_id',
+  accessKeyId: 'Access key ID',
+  secretAccessKey: 'Secret access key',
+  sessionToken: 'Session token',
+  clientSecret: 'Client secret',
+  serviceAccountKey: 'Service account key',
+  username: 'User name',
+  password: 'Password',
+  associationId: 'KeePassXC connection name',
+  associationKey: 'KeePassXC connection key',
+};
+
+export function secretCredentialLabels(names: string[]) {
+  return names.map(name => CREDENTIAL_LABELS[name] ?? name).join(', ');
+}

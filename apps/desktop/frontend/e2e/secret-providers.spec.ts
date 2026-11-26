@@ -222,6 +222,40 @@ test.describe('secret providers', () => {
     await shot(page, 'secret-providers-keepassxc');
   });
 
+  test('groups a long list of linked variables by environment', async ({ page }) => {
+    const linked = (count: number, prefix: string) => Array.from({ length: count }, (_, index) => ({ id: index + 1, key: `${prefix}Secret${index + 1}`, value: '', enabled: true, secret: true, secretRef: { provider: 'vault-prod', path: `secret/data/${prefix}/${index + 1}`, field: 'value' } }));
+    await installKurloBridge(page, '', 'browser/e2e', undefined, {
+      environments: [
+        { id: 'env-dev', workspaceId: 'workspace-e2e', name: 'Dev', values: linked(3, 'dev') },
+        { id: 'env-prod', workspaceId: 'workspace-e2e', name: 'Prod', values: linked(25, 'prod') },
+      ],
+    });
+    await installSecretProviderBridge(page, { providers: [{ ...vaultProvider, savedCredentials: ['token'] }] });
+    await page.goto('/');
+    await openSecretProviders(page);
+    await page.getByRole('button', { name: /Vault prod/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Used by 28 variables in 2 environments' })).toBeVisible();
+    await expect(page.getByText('Saved credentials')).toBeVisible();
+    await expect(page.locator('.settings-row-desc').filter({ hasText: /^Token$/ })).toBeVisible();
+    const rows = page.locator('.secret-usage-row');
+    await expect(rows).toHaveCount(0);
+    const groups = page.locator('.secret-usage-group');
+    const prod = groups.filter({ hasText: 'Prod' });
+    await expect(prod).toHaveAttribute('aria-expanded', 'false');
+    await prod.click();
+    await expect(prod).toHaveAttribute('aria-expanded', 'true');
+    await expect(rows).toHaveCount(20);
+    await page.getByRole('heading', { name: 'Used by 28 variables in 2 environments' }).evaluate(element => element.scrollIntoView({ block: 'start' }));
+    await shot(page, 'secret-providers-usage-groups');
+    await page.getByRole('button', { name: 'Show all 25' }).click();
+    await expect(rows).toHaveCount(25);
+    await expect(groups.filter({ hasText: 'Dev' })).toContainText('3 variables');
+    await groups.filter({ hasText: 'Dev' }).click();
+    await expect(rows).toHaveCount(28);
+    await prod.click();
+    await expect(rows).toHaveCount(3);
+  });
+
   test('links an environment variable to a secret through Browse', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       environments: [{ id: 'env-prod', workspaceId: 'workspace-e2e', name: 'Prod', values: [{ id: 1, key: 'apiToken', value: '', enabled: true }] }],

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Chevron from './Chevron.svelte';
   import MenuIcon from './MenuIcon.svelte';
   import ProviderLogo from './ProviderLogo.svelte';
   import SecretStatusPill from './SecretStatusPill.svelte';
@@ -6,14 +7,15 @@
   import SecretProviderEnvExportModal from './SecretProviderEnvExportModal.svelte';
   import { openExternalURL } from '../externalLinks';
   import {
-    SECRET_TOOL_INSTALL_URLS, commandList, joinCommand, secretProviderState, secretProviderTypeInfo, splitCommand, type SecretProviderType,
+    SECRET_TOOL_INSTALL_URLS, SECRET_USAGE_FLAT_LIMIT, SECRET_USAGE_GROUP_PREVIEW, commandList, groupSecretUsages, joinCommand, secretCredentialLabels,
+    secretProviderState, secretProviderTypeInfo, secretUsageTitle, splitCommand, type SecretProviderType,
   } from '../secretProviderTypes';
   import {
     cancelSecretProviderDraft, checkSecretProvider, connectProvider, forgetProviderCredentials, removeSecretProvider, revokeProviderTrust,
     saveProviderCredential, saveSecretProviderConfig, secretProviders,
   } from '../stores/secretProviders.svelte';
   import { secretCredentialProblem, validateSecretProviderDraft, type SecretProviderDraft, type SecretProviderDraftErrors } from '../secretProviderValidation';
-  import type { SecretProviderView } from '../wire';
+  import type { SecretProviderUsage, SecretProviderView } from '../wire';
 
   let {
     provider,
@@ -99,6 +101,8 @@
   let exportingEnv = $state(false);
   let connecting = $state(false);
   let connectError = $state('');
+  let openUsageGroups = $state(new Set<string>());
+  let fullUsageGroups = $state(new Set<string>());
   let credentialDraft = $state<Record<string, string>>({});
   let draft = $state<Draft>(draftFrom(undefined, 'env'));
   let baseline = $state('');
@@ -115,7 +119,21 @@
     confirmDelete = false;
     touched = new Set();
     submitted = false;
+    openUsageGroups = new Set();
+    fullUsageGroups = new Set();
   });
+
+  const usageGroups = $derived(groupSecretUsages(provider?.usedBy ?? []));
+
+  function usageGroupOpen(environmentId: string) {
+    return usageGroups.length === 1 || openUsageGroups.has(environmentId);
+  }
+
+  function toggleUsageGroup(environmentId: string) {
+    openUsageGroups = openUsageGroups.has(environmentId)
+      ? new Set([...openUsageGroups].filter(id => id !== environmentId))
+      : new Set([...openUsageGroups, environmentId]);
+  }
 
 
   const info = $derived(secretProviderTypeInfo(type));
@@ -521,6 +539,14 @@
     </section>
   {/if}
 
+  {#snippet usageRow(usage: SecretProviderUsage, withEnvironment: boolean)}
+    <button class="settings-row secret-usage-row" class:nested={!withEnvironment} type="button" onclick={() => onOpenEnvironment(usage.environmentId)}>
+      <span class="secret-usage-key">{usage.key}</span>
+      {#if withEnvironment}<span class="secret-usage-env">{usage.environmentName}</span>{/if}
+      <span class="secret-usage-path">{usage.path}{usage.field ? `#${usage.field}` : ''}</span>
+    </button>
+  {/snippet}
+
   {#snippet authMethodRow()}
     {@const methods = AUTH_METHODS[type] ?? []}
     <div class="settings-row">
@@ -607,7 +633,7 @@
         {/if}
         {#if provider.savedCredentials.length}
           <div class="settings-row">
-            <div class="settings-row-text"><span class="settings-row-title">Saved credentials</span><span class="settings-row-desc">{provider.savedCredentials.join(', ')}</span></div>
+            <div class="settings-row-text"><span class="settings-row-title">Saved credentials</span><span class="settings-row-desc">{secretCredentialLabels(provider.savedCredentials)}</span></div>
             <div class="settings-row-control"><button class="btn btn-secondary btn-sm" type="button" onclick={() => forgetProviderCredentials(provider.id)}>Forget credentials</button></div>
           </div>
         {/if}
@@ -615,15 +641,31 @@
     </section>
 
     <section class="settings-block">
-      <h4 class="settings-group-label">Used by {provider.usedBy.length} {provider.usedBy.length === 1 ? 'variable' : 'variables'}</h4>
-      {#if provider.usedBy.length}
+      <h4 class="settings-group-label">{secretUsageTitle(provider.usedBy)}</h4>
+      {#if provider.usedBy.length <= SECRET_USAGE_FLAT_LIMIT && provider.usedBy.length}
         <div class="settings-group">
           {#each provider.usedBy as usage (`${usage.environmentId}:${usage.key}`)}
-            <button class="settings-row secret-usage-row" type="button" onclick={() => onOpenEnvironment(usage.environmentId)}>
-              <span class="secret-usage-key">{usage.key}</span>
-              <span class="secret-usage-env">{usage.environmentName}</span>
-              <span class="secret-usage-path">{usage.path}{usage.field ? `#${usage.field}` : ''}</span>
+            {@render usageRow(usage, true)}
+          {/each}
+        </div>
+      {:else if provider.usedBy.length}
+        <div class="settings-group">
+          {#each usageGroups as group (group.environmentId)}
+            {@const open = usageGroupOpen(group.environmentId)}
+            {@const shownUsages = fullUsageGroups.has(group.environmentId) ? group.usages : group.usages.slice(0, SECRET_USAGE_GROUP_PREVIEW)}
+            <button class="settings-row secret-usage-group" type="button" aria-expanded={open} onclick={() => toggleUsageGroup(group.environmentId)} disabled={usageGroups.length === 1}>
+              {#if usageGroups.length > 1}<Chevron direction="right" {open} />{/if}
+              <span class="secret-usage-group-name">{group.environmentName}</span>
+              <span class="secret-usage-group-count">{group.usages.length} {group.usages.length === 1 ? 'variable' : 'variables'}</span>
             </button>
+            {#if open}
+              {#each shownUsages as usage (`${usage.environmentId}:${usage.key}`)}
+                {@render usageRow(usage, false)}
+              {/each}
+              {#if shownUsages.length < group.usages.length}
+                <div class="settings-row secret-usage-more"><button class="btn-link" type="button" onclick={() => (fullUsageGroups = new Set([...fullUsageGroups, group.environmentId]))}>Show all {group.usages.length}</button></div>
+              {/if}
+            {/if}
           {/each}
         </div>
       {:else}

@@ -23,6 +23,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Changed
 
+- **Linked variables by environment.** A secret provider used by many variables lists them by environment, and saved credentials show readable names.
 - **Consistent controls.** Dropdowns for auth type, body and message types, encoding, the message filter and the snippet language behave the same as every other dropdown, and close, check and chevron icons match across the app.
 - **Editor errors** mark the line number in red, show the message with its line on hover, and point to an error scrolled out of view.
 - **File fields.** **Form data** file rows and the OpenAPI spec source take a dropped file, keep a workspace-relative path with `{{variables}}` and flag a missing file. [Send a file as the body](/docs/guides/request-types/http/#send-a-file-as-the-body).

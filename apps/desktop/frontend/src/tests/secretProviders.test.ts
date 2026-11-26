@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildPaletteCommands, filterPaletteCommands, type PaletteContext } from '../lib/commandPalette';
 import {
-  SECRET_PROVIDER_TYPES, joinCommand, secretKindAction, secretProviderState, secretProviderSummary, splitCommand,
+  SECRET_PROVIDER_TYPES, groupSecretUsages, joinCommand, secretCredentialLabels, secretKindAction, secretUsageTitle, secretProviderState, secretProviderSummary, splitCommand,
 } from '../lib/secretProviderTypes';
 import { secretProviderLogo } from '../lib/secretProviderLogos';
 import { browseSecretProvider } from '../lib/secretProvidersBackend';
@@ -120,6 +120,22 @@ describe('secret provider store', () => {
     expect(TestSecretProvider).toHaveBeenCalledTimes(2);
     expect(secretProviderAttention()).toEqual({ signin: 1, untrusted: 1 });
     expect(await saveSecretProviderConfig({ id: 'x', type: 'aws-ssm' })).toBe('provider "x": region is required');
+  });
+});
+
+describe('provider usage list', () => {
+  it('groups variables by environment and counts them in the title', () => {
+    const usage = (environmentId: string, key: string) => ({ environmentId, environmentName: environmentId.toUpperCase(), key, path: `p/${key}` });
+    const usages = [usage('dev', 'a'), usage('prod', 'b'), usage('dev', 'c')];
+    expect(groupSecretUsages(usages).map(group => [group.environmentName, group.usages.map(item => item.key)])).toEqual([['DEV', ['a', 'c']], ['PROD', ['b']]]);
+    expect(secretUsageTitle(usages)).toBe('Used by 3 variables in 2 environments');
+    expect(secretUsageTitle([usage('dev', 'a')])).toBe('Used by 1 variable');
+    expect(secretUsageTitle([])).toBe('Used by 0 variables');
+  });
+
+  it('names saved credentials for people', () => {
+    expect(secretCredentialLabels(['associationId', 'associationKey'])).toBe('KeePassXC connection name, KeePassXC connection key');
+    expect(secretCredentialLabels(['secretAccessKey', 'custom'])).toBe('Secret access key, custom');
   });
 });
 
