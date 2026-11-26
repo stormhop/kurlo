@@ -752,7 +752,7 @@ test('keeps the secret provider picker within the minimum window at 125% scale',
   expect(bounds!.y).toBeGreaterThanOrEqual(0);
   expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(680);
   const choices = dialog.getByRole('radiogroup');
-  await expect(choices.getByRole('radio')).toHaveCount(11);
+  await expect(choices.getByRole('radio')).toHaveCount(12);
   await choices.hover();
   await page.mouse.wheel(0, 600);
   await expect.poll(() => choices.evaluate(el => el.scrollTop)).toBeGreaterThan(0);
