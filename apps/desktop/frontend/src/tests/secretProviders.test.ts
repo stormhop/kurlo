@@ -72,6 +72,7 @@ describe('secret provider states', () => {
       expect(Boolean(secretProviderLogo(item.type)) || item.monogram.length > 0).toBe(true);
     }
     expect(secretProviderLogo('bitwarden')?.mono).toBe(true);
+    expect(secretProviderLogo('keepassxc')?.mono).toBe(true);
     expect(secretProviderLogo('gcp-secret-manager')?.mono).toBe(false);
   });
 

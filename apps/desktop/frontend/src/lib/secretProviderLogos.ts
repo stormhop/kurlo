@@ -7,6 +7,7 @@ import azureKeyVault from './assets/secret-providers/azure-key-vault.svg';
 import bitwarden from './assets/secret-providers/bitwarden.svg';
 import doppler from './assets/secret-providers/doppler.svg';
 import infisical from './assets/secret-providers/infisical.svg';
+import keepassxc from './assets/secret-providers/keepassxc.svg';
 
 export type SecretProviderLogo = { src: string; mono: boolean };
 
@@ -20,6 +21,7 @@ const LOGOS: Record<string, SecretProviderLogo> = {
   bitwarden: { src: bitwarden, mono: true },
   doppler: { src: doppler, mono: false },
   infisical: { src: infisical, mono: true },
+  keepassxc: { src: keepassxc, mono: true },
 };
 
 export function secretProviderLogo(type: string): SecretProviderLogo | undefined {
