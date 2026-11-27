@@ -17,30 +17,43 @@
         const platform = navigator.platform || navigator.userAgent || '';
         const defaultTheme = { mode: 'system', light: 'light', dark: 'dark' };
         const bootVariants = {
-          light: { mode: 'light', bg: '#ffffff', text: '#17171a', muted: '#50505a', accent: '#4f5be8' },
-          'light-monochrome': { mode: 'light', bg: '#ffffff', text: '#343434', muted: '#74747a', accent: '#525252' },
-          'light-pastel': { mode: 'light', bg: '#fdfaf7', text: '#2b2f3a', muted: '#85796a', accent: '#d16c6c' },
-          'catppuccin-latte': { mode: 'light', bg: '#eff1f5', text: '#4c4f69', muted: '#6c6f85', accent: '#8839ef' },
-          'vscode-light': { mode: 'light', bg: '#ffffff', text: '#000000', muted: '#616161', accent: '#007acc' },
-          dark: { mode: 'dark', bg: '#111113', text: '#ececef', muted: '#a6a6ae', accent: '#5865f2' },
-          'dark-monochrome': { mode: 'dark', bg: '#1e1e1e', text: '#d4d4d4', muted: '#969696', accent: '#a3a3a3' },
-          'dark-pastel': { mode: 'dark', bg: '#1a1625', text: '#e8e0f0', muted: '#aaa0b7', accent: '#f0a6ca' },
-          'catppuccin-frappe': { mode: 'dark', bg: '#303446', text: '#c6d0f5', muted: '#a5adce', accent: '#ca9ee6' },
-          'catppuccin-macchiato': { mode: 'dark', bg: '#24273a', text: '#cad3f5', muted: '#a5adcb', accent: '#c6a0f6' },
-          'catppuccin-mocha': { mode: 'dark', bg: '#1e1e2e', text: '#cdd6f4', muted: '#a6adc8', accent: '#cba6f7' },
-          nord: { mode: 'dark', bg: '#2e3440', text: '#d8dee9', muted: '#aab4c3', accent: '#88c0d0' },
-          'vscode-dark': { mode: 'dark', bg: '#1e1e1e', text: '#d4d4d4', muted: '#969696', accent: '#007acc' },
+          "light": { "mode": "light", "bg": "#ffffff", "text": "#17171a", "muted": "#50505a", "accent": "#4f5be8" },
+          "github-light": { "mode": "light", "bg": "#ffffff", "text": "#1f2328", "muted": "#424a53", "accent": "#0969da" },
+          "jetbrains-light": { "mode": "light", "bg": "#ffffff", "text": "#000000", "muted": "#494b57", "accent": "#336fe6" },
+          "vscode-light": { "mode": "light", "bg": "#ffffff", "text": "#1f1f1f", "muted": "#4d4d4d", "accent": "#005fb8" },
+          "catppuccin-latte": { "mode": "light", "bg": "#eff1f5", "text": "#4c4f69", "muted": "#51546a", "accent": "#8839ef" },
+          "flexoki-paper": { "mode": "light", "bg": "#fffcf0", "text": "#100f0f", "muted": "#403e3c", "accent": "#205ea6" },
+          "high-contrast-light": { "mode": "light", "bg": "#ffffff", "text": "#000000", "muted": "#1f1f24", "accent": "#1d3fc4" },
+          "dark": { "mode": "dark", "bg": "#111113", "text": "#ececef", "muted": "#a6a6ae", "accent": "#5865f2" },
+          "github-dimmed": { "mode": "dark", "bg": "#22272e", "text": "#cdd9e5", "muted": "#adbac7", "accent": "#316dca" },
+          "jetbrains-dark": { "mode": "dark", "bg": "#1e1f22", "text": "#dfe1e5", "muted": "#b4b8bf", "accent": "#336fe6" },
+          "vscode-dark": { "mode": "dark", "bg": "#1f1f1f", "text": "#cccccc", "muted": "#ababab", "accent": "#0077d2" },
+          "one-dark": { "mode": "dark", "bg": "#282c34", "text": "#d7dae0", "muted": "#abb2bf", "accent": "#4b74c6" },
+          "tokyo-night": { "mode": "dark", "bg": "#1a1b26", "text": "#c0caf5", "muted": "#a9b1d6", "accent": "#7aa2f7" },
+          "catppuccin-mocha": { "mode": "dark", "bg": "#1e1e2e", "text": "#cdd6f4", "muted": "#bac2de", "accent": "#cba6f7" },
+          "nord": { "mode": "dark", "bg": "#2e3440", "text": "#eceff4", "muted": "#d8dee9", "accent": "#88c0d0" },
+          "everforest": { "mode": "dark", "bg": "#2d353b", "text": "#d3c6aa", "muted": "#ccc7b7", "accent": "#a7c080" },
+          "high-contrast-dark": { "mode": "dark", "bg": "#0b0b0c", "text": "#ffffff", "muted": "#e4e4e8", "accent": "#8c9bff" }
         };
-        const isLightVariant = value => bootVariants[value]?.mode === 'light';
-        const isDarkVariant = value => bootVariants[value]?.mode === 'dark';
+        const retiredVariants = {
+          "light-monochrome": "light",
+          "light-pastel": "flexoki-paper",
+          "dark-monochrome": "dark",
+          "dark-pastel": "everforest",
+          "catppuccin-frappe": "catppuccin-mocha",
+          "catppuccin-macchiato": "catppuccin-mocha"
+        };
+        const currentVariant = value => typeof value === 'string' && Object.hasOwn(retiredVariants, value) ? retiredVariants[value] : value;
+        const isLightVariant = value => bootVariants[currentVariant(value)]?.mode === 'light';
+        const isDarkVariant = value => bootVariants[currentVariant(value)]?.mode === 'dark';
         const normalize = value => value === 'dark' || value === 'light' || value === 'system' ? value : 'system';
         const normalizeTheme = value => {
           if (typeof value === 'string') return { ...defaultTheme, mode: normalize(value) };
           if (!value || typeof value !== 'object') return { ...defaultTheme };
           return {
             mode: normalize(value.mode),
-            light: isLightVariant(value.light) ? value.light : defaultTheme.light,
-            dark: isDarkVariant(value.dark) ? value.dark : defaultTheme.dark,
+            light: isLightVariant(value.light) ? currentVariant(value.light) : defaultTheme.light,
+            dark: isDarkVariant(value.dark) ? currentVariant(value.dark) : defaultTheme.dark,
           };
         };
         const themeFromStorage = () => {

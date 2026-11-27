@@ -422,7 +422,7 @@
 
 .cookie-table-head {
   position: sticky;
-  top: 0;
+  top: calc(var(--workspace-pad-top, 0px) * -1);
   z-index: 1;
   grid-template-columns: var(--cookie-cols) var(--control-lg);
   padding: 0 var(--space-2);

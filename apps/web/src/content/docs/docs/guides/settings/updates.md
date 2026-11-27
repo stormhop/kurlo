@@ -6,9 +6,13 @@ title: "Updates and support"
 
 Updates live in the **About** tab, under the version. The first row shows the current state and one action: **Check for updates**, **Check again**, **Install** or **Download**, **Restart now**, or **Try again** after an error. When a new release is found, its notes appear below the list.
 
-When the background check finds a release, a notice in the lower-right corner says so; **View** opens the **About** tab.
+Choose an **Update mode** for this device.
 
-**Install updates automatically** installs a discovered release in the background, then asks you to restart. Development builds created with `make dev` or `go run` do not use the release updater, so both controls are off there.
+- **Manual** skips the startup check. Press **Check for updates** when you want to check GitHub for a release.
+- **Notify me** (default) checks after launch. When a release is available, select **View** in the notification to open **About**.
+- **Install automatically** installs a discovered release in the background and asks you to restart. This option is available on builds that support in-place installation.
+
+Development builds created with `make dev` or `go run` have the release updater disabled.
 
 For a Windows MSIX installation, download and open the next `.msix` package to upgrade in place. The package directory is managed by Windows.
 

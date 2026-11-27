@@ -3730,11 +3730,12 @@
 }
 
 .environment-workspace {
+  --workspace-pad-top: var(--space-8);
   flex: 1;
   min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable;
-  padding: var(--space-8) var(--space-12) var(--space-12);
+  padding: var(--workspace-pad-top) var(--space-12) var(--space-12);
   background: var(--bg);
 }
 

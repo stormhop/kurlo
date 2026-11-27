@@ -93,7 +93,7 @@ test.describe("Agent", () => {
     await collectionRow(page, 'Shop API').getByRole('button', { name: 'New load test', exact: true }).click();
     const loadTest = page.locator('section[aria-label="Load test"]');
     const loadEnvironment = loadTest.getByRole('button', { name: /^Environment:/ });
-    await expect(loadEnvironment).toHaveAccessibleName('Environment: Active environment');
+    await expect(loadEnvironment).toHaveAccessibleName('Environment: Active · Local');
     await assertColor(loadEnvironment, 'danger');
     await loadEnvironment.click();
     await expect(page.getByRole('option', { name: 'Other workspace', exact: true })).toHaveCount(0);
@@ -101,7 +101,7 @@ test.describe("Agent", () => {
     await page.getByRole('option', { name: 'Local', exact: true }).click();
     const shortWidth = (await loadEnvironment.boundingBox())!.width;
     const rem = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
-    expect(shortWidth).toBeCloseTo(8.625 * rem, 1);
+    expect(shortWidth).toBeCloseTo(12 * rem, 1);
     await page.screenshot({ path: join(tmpdir(), `kurlo-k6-environment-short-${testInfo.project.name}.png`), animations: 'disabled' });
     await loadEnvironment.click();
     await expect(page.getByRole('option', { name: stagingName, exact: true })).toContainText(stagingName);
@@ -119,13 +119,15 @@ test.describe("Agent", () => {
     await page.getByRole('option', { name: 'Plain', exact: true }).click();
     await expect(loadEnvironment).not.toHaveClass(/env-colored/);
     await loadEnvironment.click();
-    await page.getByRole('option', { name: 'Active environment', exact: true }).click();
+    await page.getByRole('option', { name: 'Active · Local', exact: true }).click();
     await assertColor(loadEnvironment, 'danger');
     await page.locator('.environment-select').click();
     await page.locator('.environment-menu').getByRole('button', { name: stagingName, exact: true }).click();
+    await expect(loadEnvironment).toHaveAccessibleName(`Environment: Active · ${stagingName}`);
     await assertColor(loadEnvironment, 'info');
     await page.locator('.environment-select').click();
     await page.locator('.environment-menu').getByRole('button', { name: 'No environment', exact: true }).click();
+    await expect(loadEnvironment).toHaveAccessibleName('Environment: Active environment');
     await expect(loadEnvironment).not.toHaveClass(/env-colored/);
   });
 

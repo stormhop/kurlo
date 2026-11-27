@@ -1,10 +1,35 @@
+import { DYNAMIC_VARIABLES } from './dynamicVariables';
+
+const DYNAMIC_VARIABLE_DESCRIPTIONS = new Map(DYNAMIC_VARIABLES.map(variable => [variable.name, variable.description]));
+
+export type VariableSourceKind = 'request' | 'environment' | 'collection' | 'global';
+
+export type VariableSource = {
+  kind: VariableSourceKind;
+  id: string;
+  name: string;
+  readonly?: boolean;
+};
+
 export type VariableSuggestion = {
   key: string;
   value: string;
   description?: string;
   secret?: boolean;
   linked?: { provider: string; path: string; field?: string };
+  source?: VariableSource;
 };
+
+export function variableSourceLabel(source: VariableSource) {
+  if (source.kind === 'request') return 'Request vars';
+  if (source.kind === 'global') return 'Globals';
+  if (source.kind === 'collection') return `Collection · ${source.name}`;
+  return `Environment · ${source.name}`;
+}
+
+export function dynamicVariableDescription(key: string) {
+  return DYNAMIC_VARIABLE_DESCRIPTIONS.get(key.trim()) ?? '';
+}
 
 const SECRET_MASK = '••••••';
 

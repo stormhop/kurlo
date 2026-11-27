@@ -15,7 +15,9 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
-- **Kafka requests.** Produce a record or stream records from selected topics and partitions. Inspect values, headers and offsets, validate JSON against a local schema, and run saved Kafka requests in collections or with `kurlo run`.
+- **Variable hover card.** Hover over a `{{variable}}` to see its value and where it comes from, then edit, remove or add it in place. [Variable scopes](/docs/guides/environments/scopes/#check-a-variable-from-a-field).
+- **Manual update checks.** Choose **Manual** in **Settings → About → Update mode** to check only when you press **Check for updates**.
+- **Kafka requests.** Produce a record or stream records from selected topics and partitions. The request timeout covers connecting to the brokers and looking up partitions for a consumer, which can then wait for records until its stop condition. Inspect values, headers and offsets, validate JSON against a local schema, and run saved Kafka requests in collections or with `kurlo run`.
 - **KeePassXC secret provider.** Read variables from the running KeePassXC app through `keepassxc-proxy`, matched by the entry URL. [KeePassXC](/docs/guides/environments/secret-managers/#keepassxc).
 - **Named body variants.** Keep up to five payloads for one HTTP request, load or send one from **Body → Saved**, and share them in Git. [Switch between body variants](/docs/guides/request-types/http/#switch-between-body-variants).
 - **Rename folders in place** by double-clicking their name in the sidebar. [Collections](/docs/guides/workspaces/collections/).
@@ -24,6 +26,7 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Changed
 
+- **Load test layout.** **Export k6 script** is in the arrow beside **Run with k6**, steps are reordered by dragging, and waits are shown between steps. [Build the flow](/docs/guides/load-testing/flow/).
 - **Protocol icons.** GraphQL, WebSocket, Socket.IO, gRPC, Kafka, MCP and AI requests show their own icon in the sidebar, tabs, search and the Collection Runner. HTTP requests keep their method. [Choose a request type](/docs/guides/request-types/choose/).
 - **Linked variables by environment.** A secret provider used by many variables lists them by environment, and saved credentials show readable names.
 - **Consistent controls.** Dropdowns for auth type, body and message types, encoding, the message filter and the snippet language behave the same as every other dropdown, and close, check and chevron icons match across the app.
@@ -32,6 +35,9 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Fixed
 
+- **Startup colours** match your theme for every theme, instead of flashing the default light or dark screen first.
+- **Cookie table header** stays at the top edge when you scroll a long list instead of leaving a gap that rows showed through.
+- **Accent buttons in light themes** keep the theme's colour on hover instead of turning violet.
 - **Response status in a narrow pane** shrinks to the code and then to the coloured dot instead of being cut off.
 - **Renaming with manual save.** A request renamed in the sidebar is saved at once instead of waiting for you to open and save it.
 - **Folder limit** also applies when you duplicate or paste requests into a folder.

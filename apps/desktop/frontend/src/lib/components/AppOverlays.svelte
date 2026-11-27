@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { UpdateMode } from '../updateMode';
   import type { AgentChatSummary, UpdateInfo } from '../backend';
   import { agentStore, codexAgentStore, claudeAgentStore, agentModeFor, agentNavigation, agentStoreFor } from '../stores/agent.svelte';
   import type { SavedRequest, ShortcutId } from '../types/models';
@@ -34,9 +35,9 @@
   type Props = {
     startupUpdateInfo: UpdateInfo | null;
     startupUpdateReady: boolean;
-    autoUpdateInstall: boolean;
+    updateMode: UpdateMode;
     autoUpdateInstalling: boolean;
-    setAutoUpdateInstall: (value: boolean) => void;
+    setUpdateMode: (value: UpdateMode) => void;
     appRuntime: string;
     onUpdateInstalled: (info: UpdateInfo) => void;
     whatsNewAvailable: boolean;
@@ -47,9 +48,9 @@
   let {
     startupUpdateInfo,
     startupUpdateReady,
-    autoUpdateInstall,
+    updateMode,
     autoUpdateInstalling,
-    setAutoUpdateInstall,
+    setUpdateMode,
     appRuntime,
     onUpdateInstalled,
     whatsNewAvailable,
@@ -174,9 +175,9 @@
       onClose={vm.closeSettings}
       {startupUpdateInfo}
       {startupUpdateReady}
-      {autoUpdateInstall}
+      {updateMode}
       {autoUpdateInstalling}
-      {setAutoUpdateInstall}
+      {setUpdateMode}
       {onUpdateInstalled}
     />
   {/if}

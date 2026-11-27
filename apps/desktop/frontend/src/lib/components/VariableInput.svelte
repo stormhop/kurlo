@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { VariableSuggestion } from '../variables';
-  import { VAULT_TEMPLATE_PREFIX, matchVariableSuggestions, templateVariableKey, variableDisplayValue } from '../variables';
-  import { isDynamicVariableName } from '../dynamicVariables';
+  import { VAULT_TEMPLATE_PREFIX, dynamicVariableDescription, matchVariableSuggestions, templateVariableKey, variableDisplayValue, variableSourceLabel } from '../variables';
+  import { isDynamicVariableName, resolveDynamicVariable } from '../dynamicVariables';
+  import { variableEditor } from '../variableEditor';
+  import { tick } from 'svelte';
   import { escapeHtml } from '../utils';
   import type { InputGhost } from '../ghostText';
   import { horizontalWheel } from '../horizontalWheel';
@@ -69,6 +71,7 @@
   let ghostDismissedFor = $state<string | null>(null);
 
   const knownKeySet = $derived(new Set(suggestions.map(s => s.key)));
+  const suggestionByKey = $derived(new Map(suggestions.map(s => [s.key, s] as const)));
 
   const activeGhost = $derived.by(() => {
     if (!ghost || !focused || !caretAtEnd || open || pickerOpen || disabled || ghostDismissedFor === value) return null;
@@ -81,14 +84,13 @@
     let result = '';
     let last = 0;
     let m: RegExpExecArray | null;
+    let index = 0;
     while ((m = VAR_RE.exec(value)) !== null) {
       result += escapeHtml(value.slice(last, m.index));
       const key = templateVariableKey(m[1]);
-      if (knownKeySet.has(key) || isDynamicVariableName(key)) {
-        result += escapeHtml(m[0]);
-      } else {
-        result += `<mark class="var-token-err">${escapeHtml(m[0])}</mark>`;
-      }
+      const known = knownKeySet.has(key) || isDynamicVariableName(key);
+      result += `<mark class="${known ? 'var-token' : 'var-token var-token-err'}" data-var-key="${escapeHtml(key)}" data-var-index="${index}">${escapeHtml(m[0])}</mark>`;
+      index += 1;
       last = m.index + m[0].length;
     }
     result += escapeHtml(value.slice(last));
@@ -102,6 +104,141 @@
   });
 
   const hasUnresolved = $derived(highlightHtml.includes('var-token-err'));
+
+  type VariableHover = { key: string; index: number; top: number; bottom: number; left: number };
+  const NEW_VARIABLE_KEY = /^[\p{L}\p{N}_.-]+$/u;
+  let hover = $state<VariableHover | null>(null);
+  let hoverDraft = $state('');
+  let hoverSaved = $state<'' | 'Saved' | 'Removed'>('');
+  let popoverEl = $state<HTMLDivElement | undefined>();
+  let hoverShowTimer: ReturnType<typeof setTimeout> | undefined;
+  let hoverHideTimer: ReturnType<typeof setTimeout> | undefined;
+  let hoverSavedTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const hoverSuggestion = $derived(hover ? suggestionByKey.get(hover.key) : undefined);
+  const hoverDynamic = $derived(Boolean(hover && !hoverSuggestion && isDynamicVariableName(hover.key)));
+  const hoverEditor = $derived(hover ? variableEditor() : null);
+  const hoverEditable = $derived(Boolean(hoverEditor && hoverSuggestion?.source && !hoverSuggestion.source.readonly && !hoverSuggestion.linked));
+  const hoverAddTarget = $derived(hover && hoverEditor && !hoverSuggestion && !hoverDynamic && NEW_VARIABLE_KEY.test(hover.key) ? hoverEditor.addTarget() : null);
+  const hoverDirty = $derived(hoverEditable ? hoverDraft !== (hoverSuggestion?.value ?? '') : hoverDraft !== '');
+  const hoverRemoves = $derived(hoverEditable && hoverDraft === '');
+  const popoverLeft = $derived.by(() => {
+    if (!hover) return 0;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    return Math.max(8, Math.min(hover.left, viewportWidth - 328));
+  });
+  const popoverPlacement = $derived.by(() => {
+    if (!hover) return '';
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    if (hover.bottom + 200 > viewportHeight && hover.top > 220) return `bottom: ${viewportHeight - hover.top + 6}px`;
+    return `top: ${hover.bottom + 6}px`;
+  });
+
+  function clearHoverTimers() {
+    clearTimeout(hoverShowTimer);
+    clearTimeout(hoverHideTimer);
+  }
+
+  function tokenAt(x: number, y: number): VariableHover | null {
+    if (!backdropEl || !wrap) return null;
+    const bounds = wrap.getBoundingClientRect();
+    if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return null;
+    for (const mark of backdropEl.querySelectorAll<HTMLElement>('mark[data-var-index]')) {
+      for (const rect of mark.getClientRects()) {
+        if (x >= rect.left && x <= rect.right && y >= rect.top - 2 && y <= rect.bottom + 2) {
+          return { key: mark.dataset.varKey ?? '', index: Number(mark.dataset.varIndex), top: rect.top, bottom: rect.bottom, left: rect.left };
+        }
+      }
+    }
+    return null;
+  }
+
+  function showHover(next: VariableHover) {
+    if (hover && hover.index === next.index && hover.key === next.key) {
+      hover = next;
+      return;
+    }
+    hover = next;
+    hoverSaved = '';
+    const suggestion = suggestionByKey.get(next.key);
+    hoverDraft = suggestion?.source && !suggestion.source.readonly && !suggestion.linked ? suggestion.value : '';
+  }
+
+  function scheduleHide() {
+    clearTimeout(hoverShowTimer);
+    clearTimeout(hoverHideTimer);
+    if (!hover) return;
+    hoverHideTimer = setTimeout(() => {
+      if (popoverEl?.matches(':hover') || popoverEl?.contains(document.activeElement)) return;
+      hover = null;
+    }, 220);
+  }
+
+  function onWrapMouseMove(event: MouseEvent) {
+    if (open || pickerOpen || type === 'password') return;
+    const next = tokenAt(event.clientX, event.clientY);
+    if (!next) {
+      scheduleHide();
+      return;
+    }
+    clearHoverTimers();
+    if (hover) {
+      if (!hoverDirty || !popoverEl?.contains(document.activeElement)) showHover(next);
+      return;
+    }
+    hoverShowTimer = setTimeout(() => showHover(next), 350);
+  }
+
+  function closeHover(refocus = false) {
+    clearHoverTimers();
+    hover = null;
+    if (refocus) inputRef?.focus();
+  }
+
+  async function saveHover(event: SubmitEvent) {
+    event.preventDefault();
+    const editor = variableEditor();
+    if (!hover || !editor) return;
+    let outcome: 'Saved' | 'Removed';
+    if (hoverEditable && hoverSuggestion?.source && hoverRemoves) {
+      await editor.remove(hover.key, hoverSuggestion.source);
+      outcome = 'Removed';
+    } else if (!hoverDirty) {
+      return;
+    } else if (hoverEditable && hoverSuggestion?.source) {
+      await editor.save(hover.key, hoverDraft, hoverSuggestion.source);
+      outcome = 'Saved';
+    } else if (hoverAddTarget) {
+      await editor.save(hover.key, hoverDraft, hoverAddTarget);
+      outcome = 'Saved';
+    } else {
+      return;
+    }
+    await tick();
+    hoverSaved = outcome;
+    clearTimeout(hoverSavedTimer);
+    hoverSavedTimer = setTimeout(() => (hoverSaved = ''), 1600);
+    const saved = suggestionByKey.get(hover.key);
+    hoverDraft = saved?.source && !saved.source.readonly && !saved.linked ? saved.value : '';
+  }
+
+  function onPopoverKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeHover(true);
+  }
+
+  function onPopoverFocusOut(event: FocusEvent) {
+    const next = event.relatedTarget;
+    if (next instanceof Node && popoverEl?.contains(next)) return;
+    scheduleHide();
+  }
+
+  $effect(() => () => {
+    clearHoverTimers();
+    clearTimeout(hoverSavedTimer);
+  });
 
   function updateCaret() {
     if (!inputRef) return;
@@ -196,7 +333,10 @@
   function refreshMenu() {
     matches = filteredSuggestions();
     open = matches.length > 0;
-    if (open) pickerOpen = false;
+    if (open) {
+      pickerOpen = false;
+      if (hover) closeHover();
+    }
     activeIndex = Math.min(activeIndex, Math.max(0, matches.length - 1));
   }
 
@@ -219,6 +359,7 @@
     }
     positionPicker();
     pickerOpen = true;
+    if (hover) closeHover();
     pickerActiveIndex = Math.min(pickerActiveIndex, Math.max(0, pickerMatches.length - 1));
   }
 
@@ -262,6 +403,7 @@
   }
 
   function onInput(event: Event) {
+    if (hover) closeHover();
     updateCaret();
     oninput?.(event);
     refreshMenu();
@@ -357,6 +499,9 @@
   class:has-validation-error={Boolean(validationMessage)}
   bind:this={wrap}
   onfocusout={onFocusOut}
+  onmousemove={onWrapMouseMove}
+  onmouseleave={scheduleHide}
+  role="presentation"
 >
   {#if backdropHtml}
     <!-- eslint-disable-next-line svelte/no-at-html-tags -->
@@ -415,6 +560,78 @@
           <span class="input-picker-value">{option}</span>
         </button>
       {/each}
+    </div>
+  {/if}
+  {#if hover}
+    <div
+      use:portal
+      bind:this={popoverEl}
+      class="var-popover"
+      role="dialog"
+      aria-label={`Variable ${hover.key}`}
+      style="left: {popoverLeft}px; {popoverPlacement}"
+      tabindex="-1"
+      onmouseenter={() => clearTimeout(hoverHideTimer)}
+      onmouseleave={scheduleHide}
+      onkeydown={onPopoverKeydown}
+      onfocusout={onPopoverFocusOut}
+    >
+      <div class="var-popover-head">
+        <code class="var-popover-key">{`{{${hover.key}}}`}</code>
+        <span class="var-popover-source" class:missing={!hoverSuggestion && !hoverDynamic}>
+          {#if hoverSuggestion?.source}{variableSourceLabel(hoverSuggestion.source)}{:else if hoverSuggestion}{hoverSuggestion.description || 'Defined'}{:else if hoverDynamic}Dynamic{:else}Not defined{/if}
+        </span>
+      </div>
+      {#if hoverDynamic}
+        <p class="var-popover-note">{dynamicVariableDescription(hover.key)}</p>
+        <p class="var-popover-note">A new value is generated on every send, for example <code>{resolveDynamicVariable(hover.key)}</code>.</p>
+      {:else if hoverSuggestion && hoverEditable}
+        <form class="var-popover-form" onsubmit={saveHover}>
+          <input
+            class="field field-input field-mono"
+            type={hoverSuggestion.secret ? 'password' : 'text'}
+            bind:value={hoverDraft}
+            aria-label={`Value of ${hover.key}`}
+            spellcheck="false"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="none"
+          />
+          {#if hoverRemoves}
+            <button class="btn btn-danger btn-sm" type="submit">Remove</button>
+          {:else}
+            <button class="btn btn-primary btn-sm" type="submit" disabled={!hoverDirty}>Save</button>
+          {/if}
+        </form>
+        {#if hoverSaved}<p class="var-popover-note var-popover-saved" role="status">{hoverSaved}</p>{/if}
+        {#if hoverRemoves}
+          <p class="var-popover-note">Removes <code>{hover.key}</code> from {hoverSuggestion.source ? variableSourceLabel(hoverSuggestion.source) : 'this scope'}.</p>
+        {/if}
+      {:else if hoverSuggestion}
+        <p class="var-popover-value">{variableDisplayValue(hoverSuggestion) || 'Empty'}</p>
+        {#if hoverSuggestion.linked || hoverSuggestion.source?.readonly}
+          <p class="var-popover-note">Read from a secret provider. Change it in Environments.</p>
+        {/if}
+      {:else}
+        <p class="var-popover-note">No environment, collection, global or request variable has this name.</p>
+        {#if hoverSaved === 'Removed'}<p class="var-popover-note var-popover-saved" role="status">Removed</p>{/if}
+        {#if hoverAddTarget}
+          <form class="var-popover-form" onsubmit={saveHover}>
+            <input
+              class="field field-input field-mono"
+              type="text"
+              bind:value={hoverDraft}
+              placeholder="Value"
+              aria-label={`Value of ${hover.key}`}
+              spellcheck="false"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="none"
+            />
+            <button class="btn btn-primary btn-sm" type="submit" disabled={!hoverDirty}>Add to {hoverAddTarget.name}</button>
+          </form>
+        {/if}
+      {/if}
     </div>
   {/if}
   {#if open && matches.length}

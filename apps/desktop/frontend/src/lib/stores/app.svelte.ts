@@ -33,7 +33,7 @@ import {
   DEFAULT_PROXY_CONFIG,
 } from '../constants';
 import {
-  safeFileName, downloadTextFile, clipboardCopy, restoreRows, requestSupportsCurl,
+   safeFileName, downloadTextFile, clipboardCopy, restoreRows, requestSupportsCurl, removeRow,
   oauth1FieldsFromAuth, type OAuth1Fields,
   jwtFieldsFromAuth, type JwtFields,
 } from '../utils';
@@ -46,7 +46,8 @@ import type {
   CollectionRunnerResult, RenderedSnippetLine, RequestType, SIOArg, SavedRealtimeMessage, GrpcResponse, GrpcServiceDefinition,
   RequestExample,
 } from '../types/models';
-import type { VariableSuggestion } from '../variables';
+import type { VariableSource, VariableSuggestion } from '../variables';
+import { registerVariableEditor } from '../variableEditor';
 import type { SettingsTab, SnippetLanguage, TopView } from './ui';
 import type { AppDialogState } from '../types/dialog';
 import { authFeature } from './features/auth';
@@ -992,6 +993,7 @@ class AppVM {
   declare updateGlobalVariableRow: typeof globalsFeature.updateGlobalVariableRow;
   declare removeGlobalVariableRow: typeof globalsFeature.removeGlobalVariableRow;
   declare clearGlobalVariables: typeof globalsFeature.clearGlobalVariables;
+  declare setGlobalVariableValue: typeof globalsFeature.setGlobalVariableValue;
   declare scheduleGlobalsPersist: typeof globalsFeature.scheduleGlobalsPersist;
   declare saveGlobals: typeof globalsFeature.saveGlobals;
   declare editGlobals: typeof globalsFeature.editGlobals;
@@ -1693,21 +1695,68 @@ class AppVM {
         value: row.value,
         description: row.description || `Collection: ${collection?.name ?? ''}`.trim(),
         secret: row.secret ?? false,
+        source: { kind: 'collection' as const, id: collection?.id ?? '', name: collection?.name ?? '' },
       }));
     const globalSuggestions = this.globalVariableRows().map(row => ({
       key: row.key.trim(),
       value: row.value,
       description: row.description || 'Global',
       secret: row.secret ?? false,
+      source: { kind: 'global' as const, id: '', name: 'Globals' },
     }));
     const requestSuggestions = this.topView === 'request'
       ? this.requestVars
         .filter(row => row.enabled && row.key.trim())
-        .map(row => ({ key: row.key.trim(), value: row.value, description: row.description || 'Request', secret: row.secret ?? false }))
+        .map(row => ({ key: row.key.trim(), value: row.value, description: row.description || 'Request', secret: row.secret ?? false, source: { kind: 'request' as const, id: this.activeRequestId, name: 'Request vars' } }))
       : [];
     const rows = [...requestSuggestions, ...this.environmentVariableSuggestions(), ...collectionSuggestions, ...globalSuggestions];
     const firstIndex = new Map(rows.map((row, index) => [row.key, index] as const).reverse());
     return rows.filter((row, index) => firstIndex.get(row.key) === index);
+  }
+  variableAddTarget(): VariableSource {
+    const environment = this.activeEnvironment;
+    if (environment) return { kind: 'environment', id: environment.id, name: environment.name };
+    return { kind: 'global', id: '', name: 'Globals' };
+  }
+  async setVariableValue(key: string, value: string, source: VariableSource = this.variableAddTarget()): Promise<void> {
+    const name = key.trim();
+    if (!name || source.readonly) return;
+    if (source.kind === 'request') {
+      if (source.id !== this.activeRequestId) return;
+      const index = this.requestVars.findIndex(row => row.enabled && row.key.trim() === name);
+      if (index >= 0) this.requestVars[index] = { ...this.requestVars[index], value };
+      return;
+    }
+    if (source.kind === 'environment') {
+      this.setEnvironmentMatrixValue(source.id, name, value);
+      return;
+    }
+    if (source.kind === 'collection') {
+      await this.applyCollectionVariableUpdates({ collectionId: source.id }, { [name]: value }, undefined);
+      return;
+    }
+    this.setGlobalVariableValue(name, value);
+  }
+  async removeVariable(key: string, source: VariableSource): Promise<void> {
+    const name = key.trim();
+    if (!name || source.readonly) return;
+    if (source.kind === 'request') {
+      if (source.id !== this.activeRequestId) return;
+      const index = this.requestVars.findIndex(row => row.enabled && row.key.trim() === name);
+      if (index >= 0) removeRow(this.requestVars, index);
+      return;
+    }
+    if (source.kind === 'environment') {
+      if (!this.guardWorkspaceWritable('Environment changes')) return;
+      this.unsetEnvironmentMatrixValue(source.id, name);
+      return;
+    }
+    if (source.kind === 'collection') {
+      await this.applyCollectionVariableUpdates({ collectionId: source.id }, undefined, [name]);
+      return;
+    }
+    const index = this.globalVariables.findIndex(row => row.enabled && row.key.trim() === name);
+    if (index >= 0) this.removeGlobalVariableRow(index);
   }
   async copyHistoryEntryCurl(historyId: string) {
     const entry = this.requestHistory.find(candidate => candidate.id === historyId);
@@ -2227,3 +2276,9 @@ applyFeatures(
 );
 
 export const vm = new AppVM();
+
+registerVariableEditor({
+  save: (key, value, source) => vm.setVariableValue(key, value, source),
+  remove: (key, source) => vm.removeVariable(key, source),
+  addTarget: () => vm.variableAddTarget(),
+});

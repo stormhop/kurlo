@@ -75,7 +75,7 @@
   {:else if error && !records.length && !vm.loading}
     <div class="response-placeholder error" role="textbox" aria-readonly="true" tabindex="0">
       <div class="request-error-shell">
-        <div class="request-error-title">{kafkaDiscovery.error && !vm.response ? 'Could not reach the brokers' : 'The broker returned an error'}</div>
+        <div class="request-error-title">{kafkaDiscovery.error && !vm.response ? 'Could not reach the brokers' : vm.kafka.mode === 'consume' ? 'Could not consume' : 'Could not produce'}</div>
         <div class="request-error-card">
           <svg width="1.25rem" height="1.25rem" viewBox="0 0 20 20" fill="none" aria-hidden="true">
             <path d="M10 2l8 14H2L10 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>

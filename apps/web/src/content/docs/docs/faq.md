@@ -50,7 +50,7 @@ The NSIS installer is not currently Authenticode-signed, so SmartScreen may flag
 ## Auto-updates aren't working
 
 - Check manually from **Settings → About**.
-- If you want background installation, enable **Settings → About → Install updates automatically**.
+- If you want background installation, choose **Install automatically** in **Settings → About → Update mode**.
 - Make sure `https://github.com/stormhop/kurlo/releases/latest/download/latest.json` is reachable — corporate proxies sometimes block GitHub release downloads.
 - If you're on an unreleased dev build, auto-update is disabled by design.
 

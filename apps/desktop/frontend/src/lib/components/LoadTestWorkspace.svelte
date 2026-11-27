@@ -17,6 +17,9 @@
   import { environmentColorVar } from '../environmentColors';
   import SaveActions from './SaveActions.svelte';
   import LoadValidationMessages from './LoadValidationMessages.svelte';
+  import MenuIcon from './MenuIcon.svelte';
+  import { tick } from 'svelte';
+  import { focusFirstMenuItem, handleMenuKeydown } from '../menuKeyboard';
 
   const VALIDATE_DEBOUNCE_MS = 300;
 
@@ -118,6 +121,9 @@
   let savingInFlight = $state(false);
   let problems = $state<string[]>([]);
   let exportOpen = $state(false);
+  let runMenuOpen = $state(false);
+  let runMenu = $state<HTMLDivElement>();
+  let runMenuTrigger = $state<HTMLButtonElement>();
   let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   const runningHere = $derived(run.running && run.collectionId === collection?.id && run.loadTestId === loadTest?.id);
@@ -140,8 +146,9 @@
   const ramps = $derived(Boolean(executor?.stages?.length));
   const dataName = $derived(draft.data?.path.trim().split(/[\\/]/).at(-1) ?? '');
 
+  const activeEnvironment = $derived(environments.find(environment => environment.id === activeEnvironmentId));
   const environmentOptions = $derived([
-    { value: '', label: 'Active environment', color: environmentColorVar(environments.find(environment => environment.id === activeEnvironmentId)) },
+    { value: '', label: activeEnvironment ? `Active · ${activeEnvironment.name}` : 'Active environment', color: environmentColorVar(activeEnvironment) },
     ...environments.map(environment => ({ value: environment.name, label: environment.name, color: environmentColorVar(environment) })),
   ]);
 
@@ -251,10 +258,35 @@
     draft.settings = value ? { ...settings, environment: value } : settings;
   }
 
+  async function toggleRunMenu() {
+    runMenuOpen = !runMenuOpen;
+    if (!runMenuOpen) return;
+    await tick();
+    focusFirstMenuItem(runMenu);
+  }
+
+  function closeRunMenu() {
+    runMenuOpen = false;
+    runMenuTrigger?.focus();
+  }
+
+  function openExport() {
+    runMenuOpen = false;
+    exportOpen = true;
+  }
+
+  function onWindowPointerDown(event: PointerEvent) {
+    if (!runMenuOpen) return;
+    if (event.target instanceof Element && event.target.closest('.loadtest-run-split')) return;
+    runMenuOpen = false;
+  }
+
   function selectTab(tab: LoadTestTab) {
     loadTestTab = tab;
   }
 </script>
+
+<svelte:window onpointerdown={onWindowPointerDown} />
 
 <section class="loadtest-workspace" aria-label="Load test">
   {#if collection && loadTest && ready}
@@ -302,15 +334,24 @@
             disabled={editingLocked}
             onChange={setEnvironment}
           />
-          <button class="btn btn-secondary" type="button" onclick={() => (exportOpen = true)}>Export k6 script</button>
-          {#if runningHere}
-            <button class="btn btn-secondary btn-danger loadtest-run-action" type="button" disabled={run.stopping} onclick={onStop}>{run.stopping ? 'Stopping…' : 'Stop'}</button>
-          {:else}
-            <button class="btn btn-primary loadtest-run-action" type="button" disabled={workspaceBlocked || runningElsewhere} onclick={runDraft}>
-              <svg width="0.75rem" height="0.75rem" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l11-7z"/></svg>
-              Run with k6
+          <div class="loadtest-run-split" class:running={runningHere}>
+            {#if runningHere}
+              <button class="btn btn-secondary btn-danger loadtest-run-action" type="button" disabled={run.stopping} onclick={onStop}>{run.stopping ? 'Stopping…' : 'Stop'}</button>
+            {:else}
+              <button class="btn btn-primary loadtest-run-action" type="button" disabled={workspaceBlocked || runningElsewhere} onclick={runDraft}>
+                <svg width="0.75rem" height="0.75rem" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5v14l11-7z"/></svg>
+                Run with k6
+              </button>
+            {/if}
+            <button class="btn {runningHere ? 'btn-secondary' : 'btn-primary'} loadtest-run-caret" class:open={runMenuOpen} type="button" bind:this={runMenuTrigger} aria-label="More run options" aria-haspopup="menu" aria-expanded={runMenuOpen} onclick={() => void toggleRunMenu()}>
+              <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
             </button>
-          {/if}
+            {#if runMenuOpen}
+              <div class="menu loadtest-run-menu" role="menu" aria-label="Run options" tabindex="-1" bind:this={runMenu} onkeydown={event => handleMenuKeydown(event, closeRunMenu)}>
+                <button class="menu-item" type="button" role="menuitem" onclick={openExport}><MenuIcon name="export" />Export k6 script</button>
+              </div>
+            {/if}
+          </div>
         </div>
       </div>
       {#if externalUpdate}
@@ -319,28 +360,25 @@
           <button class="btn btn-secondary btn-sm" type="button" onclick={() => load(loadTest)} disabled={editingLocked}>Reload</button>
         </div>
       {/if}
+    </header>
+    <div class="loadtest-tabbar">
+      <div class="tab-bar tabs loadtest-tabs" role="tablist" use:tabListKeyboard>
+        <button class="tab" role="tab" aria-selected={loadTestTab === 'flow'} tabindex={loadTestTab === 'flow' ? 0 : -1} type="button" onclick={() => selectTab('flow')}>Flow{#if stepCount}<span class="badge">{stepCount}</span>{/if}{#if flowProblems.some(problem => problem !== 'Add at least one request to the flow.') || nameProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
+        <button class="tab" role="tab" aria-selected={loadTestTab === 'load'} tabindex={loadTestTab === 'load' ? 0 : -1} type="button" onclick={() => selectTab('load')}>Load &amp; thresholds{#if thresholdCount}<span class="badge">{thresholdCount}</span>{/if}{#if profileProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
+        <button class="tab" role="tab" aria-selected={loadTestTab === 'data'} tabindex={loadTestTab === 'data' ? 0 : -1} type="button" onclick={() => selectTab('data')}>Data &amp; options{#if dataProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
+        <button class="tab" role="tab" aria-selected={loadTestTab === 'results'} tabindex={loadTestTab === 'results' ? 0 : -1} type="button" onclick={() => selectTab('results')}>Results{#if runningHere}<span class="badge badge-on">running</span>{:else if result}<span class="loadtest-result-badge {result.status}">{RESULT_LABELS[result.status] ?? result.status}</span>{/if}</button>
+      </div>
       <div class="loadtest-plan" role="group" aria-label="Test plan">
-        <span class="loadtest-plan-label">Plan</span>
-        <button class="btn btn-ghost btn-xs loadtest-plan-chip" type="button" onclick={() => selectTab('flow')}><b>{stepCount}</b> {stepCount === 1 ? 'step' : 'steps'}</button>
         {#if peak}
           <button class="btn btn-ghost btn-xs loadtest-plan-chip" type="button" onclick={() => selectTab('load')}>{ramps ? 'up to ' : ''}<b>{peak}</b> {loadUnit}</button>
         {/if}
         {#if totalMs}
           <button class="btn btn-ghost btn-xs loadtest-plan-chip" type="button" onclick={() => selectTab('load')}><b>{formatDuration(totalMs)}</b> total</button>
         {/if}
-        {#if thresholdCount}
-          <button class="btn btn-ghost btn-xs loadtest-plan-chip" type="button" onclick={() => selectTab('load')}><b>{thresholdCount}</b> pass {thresholdCount === 1 ? 'criterion' : 'criteria'}</button>
-        {/if}
         {#if dataName}
           <button class="btn btn-ghost btn-xs loadtest-plan-chip" type="button" onclick={() => selectTab('data')}><code>{dataName}</code> · {DATA_MODES[draft.data?.mode ?? 'per-vu'] ?? 'one row per user'}</button>
         {/if}
       </div>
-    </header>
-    <div class="tab-bar tabs loadtest-tabs" role="tablist" use:tabListKeyboard>
-      <button class="tab" role="tab" aria-selected={loadTestTab === 'flow'} tabindex={loadTestTab === 'flow' ? 0 : -1} type="button" onclick={() => selectTab('flow')}>Flow{#if stepCount}<span class="badge">{stepCount}</span>{/if}{#if flowProblems.some(problem => problem !== 'Add at least one request to the flow.') || nameProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
-      <button class="tab" role="tab" aria-selected={loadTestTab === 'load'} tabindex={loadTestTab === 'load' ? 0 : -1} type="button" onclick={() => selectTab('load')}>Load &amp; thresholds{#if thresholdCount}<span class="badge">{thresholdCount}</span>{/if}{#if profileProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
-      <button class="tab" role="tab" aria-selected={loadTestTab === 'data'} tabindex={loadTestTab === 'data' ? 0 : -1} type="button" onclick={() => selectTab('data')}>Data &amp; options{#if dataProblems.length}<span class="loadtest-tab-issue"></span>{/if}</button>
-      <button class="tab" role="tab" aria-selected={loadTestTab === 'results'} tabindex={loadTestTab === 'results' ? 0 : -1} type="button" onclick={() => selectTab('results')}>Results{#if runningHere}<span class="badge badge-on">running</span>{:else if result}<span class="loadtest-result-badge {result.status}">{RESULT_LABELS[result.status] ?? result.status}</span>{/if}</button>
     </div>
     <div class="loadtest-content" role="tabpanel">
       {#if loadTestTab === 'flow'}

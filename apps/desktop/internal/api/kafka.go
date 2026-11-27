@@ -169,17 +169,15 @@ func (a *App) ListKafkaTopics(req model.HttpRequest) ([]string, error) {
 
 func executeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kafkaRecord)) model.HttpResponse {
 	start := time.Now()
-	if req.TimeoutMs > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(req.TimeoutMs)*time.Millisecond)
-		defer cancel()
-	}
+	parent := ctx
 	var records []kafkaRecord
 	var err error
 	var status, reason string
 	switch req.Kafka.Mode {
 	case "", "produce":
-		records, err = produceKafka(ctx, req)
+		produceCtx, cancel := kafkaTimeoutContext(ctx, req)
+		records, err = produceKafka(produceCtx, req)
+		cancel()
 		status = "Produced"
 	case "consume":
 		records, err = consumeKafka(ctx, req, onMessage, &reason)
@@ -194,11 +192,21 @@ func executeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 	body, _ := json.Marshal(records)
 	resp.Body, resp.Size = string(body), int64(len(body))
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) && parent.Err() == nil && req.TimeoutMs > 0 {
+			err = fmt.Errorf("the brokers did not answer within %d ms; raise Request timeout in Settings or check the broker address", req.TimeoutMs)
+		}
 		resp.Error = err.Error()
 		return resp
 	}
 	resp.StatusCode, resp.Status = 200, status
 	return resp
+}
+
+func kafkaTimeoutContext(ctx context.Context, req model.HttpRequest) (context.Context, context.CancelFunc) {
+	if req.TimeoutMs > 0 {
+		return context.WithTimeout(ctx, time.Duration(req.TimeoutMs)*time.Millisecond)
+	}
+	return ctx, func() {}
 }
 
 func kafkaFieldBytes(value, format, field string) ([]byte, error) {

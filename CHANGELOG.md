@@ -9,7 +9,9 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Added
 
-- **Kafka requests.** Produce a record or stream records from selected topics and partitions. Inspect values, headers and offsets, validate JSON against a local schema, and run saved Kafka requests in collections or with `kurlo run`.
+- **Variable hover card.** Hover over a `{{variable}}` in a request field to see where its value comes from: the environment, collection, globals or the request's **Vars**. Edit the value in the card and press **Save**, clear it and press **Remove** to delete the variable from that scope, or give an undefined variable a value with **Add to** the active environment, or to globals when no environment is selected. Secrets stay masked, and values read from a secret provider are read-only.
+- **Manual update checks.** Choose **Manual** in **Settings → About → Update mode** to check only when you press **Check for updates**.
+- **Kafka requests.** Produce a record or stream records from selected topics and partitions. The request timeout covers connecting to the brokers and looking up partitions for a consumer, which can then wait for records until its stop condition. Inspect values, headers and offsets, validate JSON against a local schema, and run saved Kafka requests in collections or with `kurlo run`.
 - **KeePassXC secret provider.** Link a variable to a KeePassXC entry by its URL. Kurlo reads it from the running KeePassXC app through `keepassxc-proxy`, like the browser extension: click **Connect to KeePassXC** once and approve the connection in KeePassXC. **Field** picks the user name, password, TOTP or a `KPH:` attribute, and **Entry** picks one entry when several match. `kurlo run` reads `KEEPASSXC_ASSOCIATION_ID` and `KEEPASSXC_ASSOCIATION_KEY`.
 - **Named body variants.** Use **Body → Saved** to create, rename, load and send up to five payloads of an HTTP request. Variants share the request’s URL, auth, headers and tests. The request YAML stores each payload and the selected name.
 - **Rename folders in place.** Double-click a folder name in the sidebar to rename it, as with collections. Enter saves, Escape cancels.
@@ -18,6 +20,7 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Changed
 
+- **Load test layout.** **Export k6 script** moved into the arrow beside **Run with k6**, and the environment picker names the active environment, such as **Active · Dev**. The peak load, duration and test data chips sit beside the tabs, which already count steps and pass criteria. In **Flow**, drag a step by its handle or focus the handle and press ↑ or ↓ to reorder it; the wait after a step is shown between it and the next step, and the buttons to open, replace or remove the selected step are at the top of its settings.
 - **Protocol icons.** Requests other than HTTP show an icon for their protocol instead of a short label such as `SIO` or `GQL`, in the sidebar, request tabs, search, collection docs and the Collection Runner. The protocol picker shows the same icons. HTTP requests keep their coloured method.
 - **Variables that use a secret provider.** When more than eight variables are linked to a provider, its page groups them by environment with a count for each, and shows the first 20 of an environment until you click **Show all**. Saved credentials are listed by name, such as **Secret access key**, instead of their internal keys.
 - **Consistent controls.** Auth type, raw body type, WebSocket and Socket.IO message types, binary encoding, the message filter and the snippet language use the same dropdown as the rest of the app, with the same size, keyboard navigation and closing behaviour. Close buttons, checkmarks and chevrons are drawn with one set of icons, the YAML and `kurlo-agent.md` editors open over the same backdrop as other dialogs, and the Browser sync switch matches the other switches.
@@ -26,6 +29,9 @@ All notable changes to Kurlo are documented here. This project follows
 
 ### Fixed
 
+- **Startup colours.** Kurlo starts in the colours of your theme with every current theme, including GitHub, JetBrains, Flexoki, One Dark, Tokyo Night, Everforest and High Contrast. Before, these themes showed the default light or dark startup screen and then changed colour when the app opened.
+- **Cookie table header.** When you scroll a long list of cookies, the column header stays at the top edge of the page. Before, it stopped a little below the edge and rows scrolled into the gap above it.
+- **Accent buttons in light themes.** Hovering a primary button, or opening its menu, uses the theme's own darker accent. Before, light themes showed a violet shade on hover.
 - **Response status in a narrow pane.** When the response pane is too narrow for the whole status, Kurlo drops the reason phrase, then the code, and keeps the coloured dot. Before, the status was cut in the middle.
 - **Renaming with manual save.** Renaming a request in the sidebar, by double-clicking its name or with **Rename**, saves the new name at once. Before, the request stayed unsaved until you opened it and saved it. Other unsaved edits of that request still wait for **Save**.
 - **Folder limit when copying.** Duplicating requests or pasting a copied request into a folder that already holds 50 requests is refused with a message, as moving and creating requests already were. Before, copies could push a folder past the limit.

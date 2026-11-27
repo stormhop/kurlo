@@ -8,6 +8,8 @@
   import type { LoadCheck, LoadExtract, LoadStep, LoadTest } from '../wire';
   import Select from './Select.svelte';
   import LoadValidationMessages from './LoadValidationMessages.svelte';
+  import MenuIcon from './MenuIcon.svelte';
+  import { tick } from 'svelte';
 
   let {
     draft = $bindable(),
@@ -39,6 +41,8 @@
   let addMenuOpen = $state(false);
   let picked = $state<string[]>([]);
   let requestMenuStepId = $state('');
+  let drag = $state<{ id: string; from: number; to: number } | null>(null);
+  let stepList = $state<HTMLDivElement>();
 
   const steps = $derived(draft.scenarios[0]?.steps ?? []);
   const selectedIndex = $derived(steps.findIndex(step => step.id === selectedStepId));
@@ -108,8 +112,9 @@
   }
 
   function closeRequestMenu(event: PointerEvent) {
-    if (!(event.target instanceof Element) || !event.target.closest('.loadtest-step')) requestMenuStepId = '';
-    if (!(event.target instanceof Element) || !event.target.closest('.loadtest-add')) addMenuOpen = false;
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest('[data-request-picker-trigger], .loadtest-request-menu')) requestMenuStepId = '';
+    if (!target?.closest('.loadtest-add')) addMenuOpen = false;
   }
 
   function selectStep(step: LoadStep) {
@@ -191,6 +196,47 @@
     list.splice(target, 0, step);
   }
 
+  async function moveStepByKey(event: KeyboardEvent, index: number) {
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const id = steps[index].id;
+    moveStep(index, event.key === 'ArrowUp' ? -1 : 1);
+    selectedStepId = id;
+    await tick();
+    stepList?.querySelector<HTMLButtonElement>(`[data-step-handle="${id}"]`)?.focus();
+  }
+
+  function startDrag(event: PointerEvent, index: number) {
+    if (disabled || event.button !== 0 || !(event.currentTarget instanceof HTMLElement)) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    selectStep(steps[index]);
+    drag = { id: steps[index].id, from: index, to: index };
+  }
+
+  function moveDrag(event: PointerEvent) {
+    if (!drag || !stepList) return;
+    const cards = [...stepList.querySelectorAll<HTMLElement>('.loadtest-step-card')];
+    const to = cards.findIndex(card => {
+      const bounds = card.getBoundingClientRect();
+      return event.clientY < bounds.top + bounds.height / 2;
+    });
+    drag.to = to < 0 ? cards.length : to;
+  }
+
+  function endDrag() {
+    if (!drag) return;
+    const { from, to } = drag;
+    drag = null;
+    const target = to > from ? to - 1 : to;
+    if (target !== from) moveStep(from, target - from);
+  }
+
+  function dropBefore(index: number): boolean {
+    return Boolean(drag) && drag!.to === index && index !== drag!.from && index !== drag!.from + 1;
+  }
+
   function removeStep(index: number) {
     const list = ensureScenario().steps;
     const [removed] = list.splice(index, 1);
@@ -200,7 +246,7 @@
 
   function waitLabel(step: LoadStep): string {
     if (!step.thinkTimeMs && !step.thinkJitterMs) return '';
-    return `wait ${formatDuration(step.thinkTimeMs ?? 0)}${step.thinkJitterMs ? ` ± ${formatDuration(step.thinkJitterMs)}` : ''}`;
+    return `wait ${formatDuration(step.thinkTimeMs ?? 0)}${step.thinkJitterMs ? ` + up to ${formatDuration(step.thinkJitterMs)}` : ''}`;
   }
 
   function savedNames(step: LoadStep): string[] {
@@ -291,7 +337,7 @@
   <div class="loadtest-steps">
     {#if steps.length}<p class="loadtest-hint">Every virtual user runs these steps top to bottom, again and again — with the collection's defaults, auth and the chosen environment.</p>{/if}
     {#if steps.length}
-      <div class="loadtest-step-list" role="group" aria-label="Steps">
+      <div class="loadtest-step-list" class:dragging={Boolean(drag)} role="group" aria-label="Steps" bind:this={stepList}>
         {#each steps as step, index (step.id)}
           {@const request = requestFor(step)}
           {@const saved = savedNames(step)}
@@ -301,9 +347,7 @@
           {#if phaseStarts(index)}
             <div class="loadtest-phase" class:loadtest-phase-setup={step.once}>{step.once ? 'Setup · once per user' : 'Every iteration'}</div>
           {/if}
-          <div class="loadtest-step" class:selected={step.id === selectedStepId} class:first={index === 0} class:last={index === steps.length - 1} onfocusout={(event) => {
-              if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) requestMenuStepId = '';
-          }}>
+          <div class="loadtest-step" class:selected={step.id === selectedStepId} class:first={index === 0} class:last={index === steps.length - 1} class:drag-source={drag?.id === step.id} class:drop-before={dropBefore(index)} class:drop-after={index === steps.length - 1 && drag !== null && drag.to === steps.length && drag.from !== index}>
             <span class="loadtest-step-rail" aria-hidden="true"><span class="loadtest-step-index" class:once={step.once}>{index + 1}</span></span>
             <div class="loadtest-step-body">
               <div class="loadtest-step-picker">
@@ -329,28 +373,31 @@
                         {#if hasScript(request)}<span class="loadtest-chip loadtest-chip-warning">scripts not run</span>{/if}
                       </span>
                     {/if}
-                    {#if wait}<span class="loadtest-step-wait">{wait}</span>{/if}
                   </button>
-                  <div class="loadtest-step-actions">
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Replace request for step ${index + 1}`} aria-haspopup="listbox" aria-expanded={requestMenuStepId === step.id} data-request-picker-trigger {disabled} onclick={() => toggleRequestMenu(step)}>
-                      <svg width="1rem" height="1rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 5h10m-3-3 3 3-3 3M13 11H3m3-3-3 3 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  {#if steps.length > 1}
+                    <button
+                      class="btn btn-ghost btn-icon btn-sm loadtest-step-handle"
+                      type="button"
+                      aria-label={`Move step ${index + 1}`}
+                      data-step-handle={step.id}
+                      {disabled}
+                      onpointerdown={(event) => startDrag(event, index)}
+                      onpointermove={moveDrag}
+                      onpointerup={endDrag}
+                      onpointercancel={() => (drag = null)}
+                      onkeydown={(event) => void moveStepByKey(event, index)}
+                    >
+                      <svg width="0.875rem" height="0.875rem" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="6" cy="3.5" r="1.1"/><circle cx="10" cy="3.5" r="1.1"/><circle cx="6" cy="8" r="1.1"/><circle cx="10" cy="8" r="1.1"/><circle cx="6" cy="12.5" r="1.1"/><circle cx="10" cy="12.5" r="1.1"/></svg>
                     </button>
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step up" disabled={disabled || index === 0} onclick={() => moveStep(index, -1)}>↑</button>
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Move step down" disabled={disabled || index === steps.length - 1} onclick={() => moveStep(index, 1)}>↓</button>
-                    <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove step" {disabled} onclick={() => removeStep(index)}><AddCloseIcon /></button>
-                  </div>
+                  {/if}
                 </div>
                 <LoadValidationMessages problems={loadStepStructuralErrors(loadStepErrors(problems, index))} />
               </div>
-              {#if requestMenuStepId === step.id}
-                <div class="menu loadtest-request-menu" use:fitRequestMenu role="listbox" aria-label="Replace request">
-                  {#each requests as candidate (candidate.id)}
-                    <button class="menu-item" class:active={candidate.id === step.requestId} type="button" role="option" aria-selected={candidate.id === step.requestId} onmousedown={(event) => event.preventDefault()} onclick={() => replaceRequest(step, candidate.id)}>
-                      <span class="loadtest-step-method {methodColor(methodOf(candidate))}">{methodOf(candidate)}</span>
-                      <span>{requestTabLabel(candidate)}</span>
-                    </button>
-                  {/each}
-                </div>
+              {#if wait}
+                <button class="loadtest-step-wait" type="button" {disabled} onclick={() => selectStep(step)}>
+                  <svg width="0.75rem" height="0.75rem" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 4.75V8l2.25 1.5"/></svg>
+                  {wait}
+                </button>
               {/if}
             </div>
           </div>
@@ -412,13 +459,33 @@
     {@const step = selected}
     {@const request = requestFor(step)}
     <aside class="loadtest-inspector" aria-label="Step settings">
-      <div class="loadtest-inspector-head">
+      <div class="loadtest-inspector-head" onfocusout={(event) => {
+          if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) requestMenuStepId = '';
+      }}>
         <span class="loadtest-step-index active" aria-hidden="true">{selectedIndex + 1}</span>
         <div class="loadtest-inspector-title">
-          <h2>Step {selectedIndex + 1}</h2>
-          <span>{request ? requestTabLabel(request) : 'Missing request'}</span>
+          <h2>{request ? requestTabLabel(request) : 'Missing request'}</h2>
+          <span>Step {selectedIndex + 1}</span>
         </div>
-        {#if request}<button class="btn-link" type="button" onclick={() => onOpenRequest(step.requestId)}>Open request</button>{/if}
+        <div class="loadtest-inspector-actions">
+          {#if request}
+            <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Open request" onclick={() => onOpenRequest(step.requestId)}><MenuIcon name="open" /></button>
+          {/if}
+          <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label={`Replace request for step ${selectedIndex + 1}`} aria-haspopup="listbox" aria-expanded={requestMenuStepId === step.id} data-request-picker-trigger {disabled} onclick={() => toggleRequestMenu(step)}>
+            <svg width="1rem" height="1rem" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 5h10m-3-3 3 3-3 3M13 11H3m3-3-3 3 3 3" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" /></svg>
+          </button>
+          <button class="btn btn-ghost btn-icon btn-sm" type="button" aria-label="Remove step" {disabled} onclick={() => removeStep(selectedIndex)}><MenuIcon name="trash" /></button>
+        </div>
+        {#if requestMenuStepId === step.id}
+          <div class="menu loadtest-request-menu" use:fitRequestMenu role="listbox" aria-label="Replace request">
+            {#each requests as candidate (candidate.id)}
+              <button class="menu-item" class:active={candidate.id === step.requestId} type="button" role="option" aria-selected={candidate.id === step.requestId} onmousedown={(event) => event.preventDefault()} onclick={() => replaceRequest(step, candidate.id)}>
+                <span class="loadtest-step-method {methodColor(methodOf(candidate))}">{methodOf(candidate)}</span>
+                <span>{requestTabLabel(candidate)}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
       </div>
       <div class="loadtest-field">
         <span class="loadtest-inspector-label">Run</span>

@@ -189,7 +189,8 @@ describe('theme contrast', () => {
       .flatMap(({ id, theme }) => {
         const own = blocks.get(id) ?? {};
         const mode = checked.find(variant => variant.id === id)!.mode;
-        const fill = (mode === 'light' ? own['--accent-fill-hover'] : theme['--accent-fill-hover']) ?? theme['--accent-hover'];
+        const declared = (mode === 'light' ? own['--accent-fill-hover'] : theme['--accent-fill-hover']) ?? theme['--accent-hover'];
+        const fill = declared === 'var(--accent-hover)' ? theme['--accent-hover'] : declared;
         return ([['--accent', theme['--accent']], ['button hover', fill]] as const)
           .filter(([, color]) => contrast(theme['--on-accent'], color) < 4.5)
           .map(([role, color]) => `${id} ${role}: ${contrast(theme['--on-accent'], color).toFixed(2)}`);

@@ -906,6 +906,133 @@ test('checks a header name built from collection and request variables', async (
   await expect(names.nth(1)).not.toHaveAttribute('aria-invalid', 'true');
 });
 
+test.describe('Variable hover card', () => {
+  async function hoverVariable(page: Page, key: string) {
+    const mark = page.locator(`.url-field mark[data-var-key="${key}"]`);
+    const box = await mark.boundingBox();
+    if (!box) throw new Error(`no token for ${key}`);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    const card = page.getByRole('dialog', { name: `Variable ${key}` });
+    await expect(card).toBeVisible();
+    return card;
+  }
+
+  test('shows where a variable comes from and edits or adds its value', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeEnvironmentId: 'env-staging',
+      environments: [{ id: 'env-staging', workspaceId: 'workspace-e2e', name: 'Staging', values: [
+        { key: 'host', value: 'https://staging.kurlo.test', enabled: true },
+        { key: 'token', value: 'hidden-token', enabled: true, secret: true },
+      ] }],
+      collections: [{ id: 'vars-col', workspaceId: 'workspace-e2e', name: 'Shop', defaults: { variables: [{ key: 'apiVersion', value: 'v1', enabled: true }] } }],
+      activeId: 'vars', openIds: ['vars'],
+      requests: [{ id: 'vars', name: 'Users', collectionId: 'vars-col', collection: 'Shop', requestType: 'http', method: 'GET',
+        url: '{{host}}/{{apiVersion}}/users/{{userId}}?trace={{$randomUUID}}&t={{token}}',
+        auth: { type: 'none' } }],
+    });
+    await page.setViewportSize(DOCS_VIEWPORT);
+    await page.goto('/');
+
+    const host = await hoverVariable(page, 'host');
+    await expect(host).toContainText('Environment · Staging');
+    const hostValue = host.getByLabel('Value of host');
+    await expect(hostValue).toHaveValue('https://staging.kurlo.test');
+    await expect(host.getByRole('button', { name: 'Save' })).toBeDisabled();
+    await captureDocsScreenshot(page, 'variable-hover');
+    await hostValue.fill('https://edited.kurlo.test');
+    await hostValue.press('Enter');
+    await expect(host.getByRole('status')).toHaveText('Saved');
+    await expect(host.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    const token = await hoverVariable(page, 'token');
+    await expect(token.getByLabel('Value of token')).toHaveAttribute('type', 'password');
+    await expect(token).not.toContainText('hidden-token');
+
+    const version = await hoverVariable(page, 'apiVersion');
+    await expect(version).toContainText('Collection · Shop');
+    await version.getByLabel('Value of apiVersion').fill('v2');
+    await version.getByRole('button', { name: 'Save' }).click();
+
+    const dynamic = await hoverVariable(page, '$randomUUID');
+    await expect(dynamic).toContainText('Dynamic');
+    await expect(dynamic.getByRole('textbox')).toHaveCount(0);
+
+    await expect(page.locator('.url-field .var-token-err')).toHaveText('{{userId}}');
+    const missing = await hoverVariable(page, 'userId');
+    await expect(missing).toContainText('Not defined');
+    await missing.getByLabel('Value of userId').fill('42');
+    await missing.getByRole('button', { name: 'Add to Staging' }).click();
+    await expect(page.locator('.url-field .var-token-err')).toHaveCount(0);
+    await expect(missing).toContainText('Environment · Staging');
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: /^Variable / })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.sentRequests.at(-1) as { url?: string } | undefined)?.url ?? ''))
+      .toMatch(/^https:\/\/edited\.kurlo\.test\/v2\/users\/42\?trace=/);
+  });
+
+  test('removes a variable when its value is cleared and falls back to the next scope', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeEnvironmentId: 'env-dev',
+      environments: [{ id: 'env-dev', workspaceId: 'workspace-e2e', name: 'Dev', values: [{ key: 'test', value: 'from-dev', enabled: true }] }],
+      collections: [{ id: 'vars-col', workspaceId: 'workspace-e2e', name: 'Shop', defaults: { variables: [{ key: 'test', value: 'from-shop', enabled: true }] } }],
+      activeId: 'vars', openIds: ['vars'],
+      requests: [{ id: 'vars', name: 'Users', collectionId: 'vars-col', collection: 'Shop', requestType: 'http', method: 'GET', url: 'https://api.kurlo.test/{{test}}', auth: { type: 'none' } }],
+    });
+    await page.goto('/');
+
+    const card = await hoverVariable(page, 'test');
+    await expect(card).toContainText('Environment · Dev');
+    await card.getByLabel('Value of test').fill('');
+    await expect(card.getByRole('button', { name: 'Save' })).toHaveCount(0);
+    await expect(card).toContainText('Removes test from Environment · Dev');
+    await card.getByRole('button', { name: 'Remove' }).click();
+    await expect(card.getByRole('status')).toHaveText('Removed');
+    await expect(card).toContainText('Collection · Shop');
+    await expect(card.getByLabel('Value of test')).toHaveValue('from-shop');
+
+    await card.getByLabel('Value of test').fill('');
+    await card.getByLabel('Value of test').press('Enter');
+    await expect(card).toContainText('Not defined');
+    await expect(page.locator('.url-field .var-token-err')).toHaveText('{{test}}');
+  });
+
+  test('gives way to the variable menu when the token is clicked', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeEnvironmentId: 'env-dev',
+      environments: [{ id: 'env-dev', workspaceId: 'workspace-e2e', name: 'Dev', values: [{ key: 'host', value: 'https://dev.kurlo.test', enabled: true }] }],
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'New unsaved request' }).click();
+    await page.getByLabel('Request URL').fill('{{host}}/users');
+    await page.getByLabel('Request URL').blur();
+    await hoverVariable(page, 'host');
+    const box = await page.locator('.url-field mark[data-var-key="host"]').boundingBox();
+    await page.mouse.click(box!.x + box!.width - 14, box!.y + box!.height / 2);
+    await expect(page.getByRole('listbox', { name: 'Environment variables' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Variable host' })).toHaveCount(0);
+    await page.mouse.move(box!.x + 10, box!.y + box!.height / 2);
+    await page.waitForTimeout(600);
+    await expect(page.getByRole('dialog', { name: 'Variable host' })).toHaveCount(0);
+  });
+
+  test('closes the card when the pointer leaves and while typing', async ({ page }) => {
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'New unsaved request' }).click();
+    const url = page.getByLabel('Request URL');
+    await url.fill('{{host}}/users');
+    await hoverVariable(page, 'host');
+    await page.mouse.move(5, 5);
+    await expect(page.getByRole('dialog', { name: 'Variable host' })).toHaveCount(0);
+    await hoverVariable(page, 'host');
+    await url.press('End');
+    await url.pressSequentially('/1');
+    await expect(page.getByRole('dialog', { name: 'Variable host' })).toHaveCount(0);
+  });
+});
+
 test.describe('Pasting cURL', () => {
   async function pasteIntoUrl(page: Page, text: string) {
     await page.getByLabel('Request URL').evaluate((input, value) => {

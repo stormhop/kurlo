@@ -146,8 +146,15 @@ export const environmentFeature = {
   environmentVariableSuggestions(this: EnvironmentHost, environmentId = this.activeEnvironmentId): VariableSuggestion[] {
     const environment = this.environments.find(candidate => candidate.id === environmentId && candidate.workspaceId === this.activeWorkspaceId);
     if (!environment) return [];
-    return [...effectiveEnvironmentRows(this.environments, environment.id)].map(([key, { row }]) => (
-      { key, value: row.value, description: row.description, secret: (row.secret ?? false) || Boolean(linkedSecretRef(row)), ...(linkedSecretRef(row) ? { linked: linkedSecretRef(row) } : {}) }
+    return [...effectiveEnvironmentRows(this.environments, environment.id)].map(([key, { row, sourceId, sourceName, imported }]) => (
+      {
+        key,
+        value: row.value,
+        description: row.description,
+        secret: (row.secret ?? false) || Boolean(linkedSecretRef(row)),
+        ...(linkedSecretRef(row) ? { linked: linkedSecretRef(row) } : {}),
+        source: { kind: 'environment' as const, id: sourceId, name: sourceName, ...(imported || linkedSecretRef(row) ? { readonly: true } : {}) },
+      }
     ));
   },
   activeSecretEnvironmentKeys(this: EnvironmentHost) {

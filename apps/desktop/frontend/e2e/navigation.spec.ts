@@ -597,7 +597,8 @@ test('slides the sidebar without restyling the rest of the window', async ({ pag
     for (const sheet of document.styleSheets) walk(sheet.cssRules);
     for (const name of document.querySelector<HTMLElement>('.shell')!.style) if (name.startsWith('--')) names.add(name);
     const style = getComputedStyle(document.querySelector('.workspace')!);
-    return Object.fromEntries([...names].sort().map(name => [name, style.getPropertyValue(name)]));
+    const inherited = [...names].sort().map(name => [name, style.getPropertyValue(name)]);
+    return Object.fromEntries(inherited.filter(([, value]) => value !== ''));
   });
   const before = await inherited();
   const toggle = page.getByLabel('Toggle sidebar', { exact: true });

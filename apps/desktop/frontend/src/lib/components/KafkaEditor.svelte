@@ -34,19 +34,63 @@
 
 {#if vm.requestTab === 'settings'}
   <div class="settings-section">
-    <div class="settings-header"><strong class="settings-title">Broker connection</strong></div>
+    <div class="settings-header">
+      <div>
+        <span class="settings-title">Broker connection</span>
+        <span class="settings-subtitle">TLS, compression and timeouts for this request.</span>
+      </div>
+      <div class="settings-actions">
+        <button class="btn btn-ghost" type="button" onclick={vm.resetRequestSettings}>Reset</button>
+        <button class="btn btn-secondary" class:feedback-ok={vm.settingsSaved} type="button" onclick={vm.saveRequestSettings}>
+          {vm.settingsSaved ? 'Saved as default' : 'Save as default'}
+        </button>
+      </div>
+    </div>
     <div class="settings-list">
-      <label class="postman-setting"><span class="setting-copy"><strong>Secure connection (TLS)</strong></span>
-        <span class="switch-control"><input type="checkbox" bind:checked={vm.kafka.tls} /><span class="switch-track"></span></span>
+      <label class="postman-setting">
+        <span class="setting-copy">
+          <strong>Secure connection (TLS)</strong>
+          <span>Connect to the brokers over TLS.</span>
+        </span>
+        <span class="switch-control">
+          <input type="checkbox" bind:checked={vm.kafka.tls} />
+          <span class="switch-track"></span>
+          <span class="switch-state">{vm.kafka.tls ? 'ON' : 'OFF'}</span>
+        </span>
       </label>
       {#if vm.kafka.tls}
-        <label class="postman-setting"><span class="setting-copy"><strong>Verify server certificate</strong></span>
-          <span class="switch-control"><input type="checkbox" bind:checked={vm.enableSSLVerification} onchange={() => vm.markRequestSettingOverride('enableSSLVerification')} /><span class="switch-track"></span></span>
+        <label class="postman-setting">
+          <span class="setting-copy">
+            <strong>Verify server certificate</strong>
+            <span>Check the broker certificate against trusted authorities.</span>
+            {#if vm.collectionSettingDefaultNote('enableSSLVerification')}<em class:setting-default-muted={!vm.collectionSettingIsInherited('enableSSLVerification')}>{vm.collectionSettingDefaultNote('enableSSLVerification')}</em>{/if}
+          </span>
+          <span class="switch-control">
+            <input type="checkbox" bind:checked={vm.enableSSLVerification} onchange={() => vm.markRequestSettingOverride('enableSSLVerification')} />
+            <span class="switch-track"></span>
+            <span class="switch-state">{vm.enableSSLVerification ? 'ON' : 'OFF'}</span>
+          </span>
         </label>
         <ClientCertSetting description="Present a client certificate when the broker requires mutual TLS." />
       {/if}
-      <div class="postman-setting"><strong>Compression</strong><Select ariaLabel="Compression" bind:value={vm.kafka.compression} options={choices(['none', 'gzip', 'snappy', 'lz4', 'zstd'])} /></div>
-      <label class="postman-setting"><strong>Request timeout (ms)</strong><input class="field field-input" type="number" min="0" bind:value={vm.timeoutMs} oninput={() => vm.markRequestSettingOverride('timeoutMs')} /></label>
+      <div class="postman-setting">
+        <span class="setting-copy">
+          <strong>Compression</strong>
+          <span>Codec for produced record batches.</span>
+        </span>
+        <Select ariaLabel="Compression" bind:value={vm.kafka.compression} options={choices(['none', 'gzip', 'snappy', 'lz4', 'zstd'])} className="setting-select" />
+      </div>
+      <label class="postman-setting">
+        <span class="setting-copy">
+          <strong>Request timeout</strong>
+          <span>How long to wait for the brokers to connect and acknowledge. Consume then streams until its stop condition. 0 waits indefinitely.</span>
+          {#if vm.collectionSettingDefaultNote('timeoutMs')}<em class:setting-default-muted={!vm.collectionSettingIsInherited('timeoutMs')}>{vm.collectionSettingDefaultNote('timeoutMs')}</em>{/if}
+        </span>
+        <span class="setting-inline-number">
+          <input class="field setting-number" type="number" min="0" step="1000" bind:value={vm.timeoutMs} oninput={() => vm.markRequestSettingOverride('timeoutMs')} />
+          <span>ms</span>
+        </span>
+      </label>
     </div>
   </div>
 {:else if vm.kafka.mode === 'consume'}

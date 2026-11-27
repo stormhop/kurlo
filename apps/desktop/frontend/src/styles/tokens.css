@@ -81,6 +81,7 @@
   --accent-dim:   rgba(79,91,232,0.10);
   --claude-tile:  #f1ebe0;
   --accent-hover: #3c48d4;
+  --accent-fill-hover: var(--accent-hover);
   --accent-text: #3c48d4;
 
   --get:     #137a4b;
@@ -131,6 +132,7 @@
     --accent-dim: rgba(79,91,232,0.10);
     --claude-tile: #f1ebe0;
     --accent-hover: #3c48d4;
+    --accent-fill-hover: var(--accent-hover);
     --accent-text: #3c48d4;
     --get: #137a4b; --post: #975d00; --put: #1c5fcf;
     --patch: #7443cc; --delete: #c3352b; --head: #0e7490; --options: #0d7563;

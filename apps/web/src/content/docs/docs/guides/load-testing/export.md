@@ -2,7 +2,7 @@
 title: "Export to k6"
 ---
 
-Click **Export k6 script** to inspect the generated JavaScript and see what carries over. Choose:
+Click the arrow beside **Run with k6** and choose **Export k6 script** to inspect the generated JavaScript and see what carries over. Choose:
 
 - **Single script** for one self-contained `.k6.js` file, including test data.
 - **Folder** for `script.k6.js` and a separate `data.json` when data is configured. **Save folder…** asks for a parent directory and creates a folder named after the test. It preserves any existing export folder.

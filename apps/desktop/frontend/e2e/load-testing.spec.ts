@@ -78,7 +78,8 @@ test.describe("Kurlo desktop browser E2E", () => {
     await editor.getByRole('tab', { name: 'Data & options' }).click();
     await expect(editor.getByRole('table', { name: 'Test data preview' })).toContainText('ada@shop.test');
     await captureWorkspace('load-testing-data');
-    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    await editor.getByRole('button', { name: 'More run options' }).click();
+    await editor.getByRole('menuitem', { name: 'Export k6 script' }).click();
     const exportDialog = page.getByRole('dialog', { name: 'Export to k6' });
     await expect(exportDialog.locator('.cm-content')).not.toBeEmpty();
     await captureDocsScreenshot(page, 'load-testing-export');
@@ -156,7 +157,8 @@ test.describe("Kurlo desktop browser E2E", () => {
         return { script: 'export default function () {}', fileName: 'stress.k6.js', warnings: [], steps: [], error: '' };
       };
     });
-    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    await editor.getByRole('button', { name: 'More run options' }).click();
+    await editor.getByRole('menuitem', { name: 'Export k6 script' }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('snapshot:')))).toEqual(['snapshot:стресс:http://127.0.0.1:18080/work']);
   });
 
@@ -202,6 +204,71 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(rules.nth(3)).toContainText('expected status');
     await expect(editor.locator('.loadtest-step-picker .loadtest-errors')).toHaveCount(0);
     await page.screenshot({ path: join(tmpdir(), 'kurlo-load-flow-field-errors.png'), animations: 'disabled' });
+  });
+
+  test('reorders load steps by dragging or with arrow keys and shows waits between them', async ({ page }) => {
+    await page.setViewportSize({ width: 1360, height: 900 });
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      collections: [{ id: 'col-order', workspaceId: 'workspace-e2e', name: 'Order API', loadTests: [{
+        id: 'lt-order', name: 'Order flow', scenarios: [{ id: 'main', name: 'Flow', executor: { type: 'constant-vus', vus: 2, durationMs: 60000 }, steps: [
+          { id: 'step-login', requestId: 'req-login', once: true },
+          { id: 'step-list', requestId: 'req-list', thinkTimeMs: 1000, thinkJitterMs: 500 },
+          { id: 'step-buy', requestId: 'req-buy' },
+        ] }],
+      }] }],
+      requests: [
+        { id: 'req-login', collectionId: 'col-order', collection: 'Order API', name: 'Login', requestType: 'http', method: 'POST', url: 'http://127.0.0.1:18080/login' },
+        { id: 'req-list', collectionId: 'col-order', collection: 'Order API', name: 'List items', requestType: 'http', method: 'GET', url: 'http://127.0.0.1:18080/items' },
+        { id: 'req-buy', collectionId: 'col-order', collection: 'Order API', name: 'Buy', requestType: 'http', method: 'POST', url: 'http://127.0.0.1:18080/buy' },
+      ],
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Order flow', exact: true }).click();
+    const editor = page.locator('section[aria-label="Load test"]');
+    const names = editor.locator('.loadtest-step-name');
+    await expect(names).toHaveText(['Login', 'List items', 'Buy']);
+    await expect(editor.locator('.loadtest-step-wait')).toHaveText('wait 1s + up to 500ms');
+    await expect(editor.locator('.loadtest-phase')).toHaveText(['Setup · once per user', 'Every iteration']);
+    await expect(editor.locator('.loadtest-step-main').first()).not.toContainText('wait');
+
+    const handle = editor.getByRole('button', { name: 'Move step 3', exact: true });
+    const target = (await editor.locator('.loadtest-step-card').nth(1).boundingBox())!;
+    await editor.locator('.loadtest-step').nth(2).hover();
+    const from = (await handle.boundingBox())!;
+    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + from.width / 2, target.y + 4, { steps: 6 });
+    await expect(editor.locator('.loadtest-step.drop-before')).toHaveCount(1);
+    await page.mouse.up();
+    await expect(names).toHaveText(['Login', 'Buy', 'List items']);
+    await expect(editor.locator('.loadtest-inspector h2')).toHaveText('Buy');
+
+    await editor.getByRole('button', { name: 'Move step 2', exact: true }).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(names).toHaveText(['Login', 'List items', 'Buy']);
+    await expect(editor.getByRole('button', { name: 'Move step 3', exact: true })).toBeFocused();
+    await expect(editor.locator('.loadtest-step-index.once')).toHaveCount(1);
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-flow-timeline.png'), animations: 'disabled' });
+
+    await editor.locator('.loadtest-step-wait').click();
+    await expect(editor.locator('.loadtest-inspector h2')).toHaveText('List items');
+    await expect(editor.getByLabel('Wait', { exact: true })).toHaveValue('1s');
+    await editor.getByRole('button', { name: 'Replace request for step 2', exact: true }).click();
+    await editor.getByRole('listbox', { name: 'Replace request' }).getByRole('option', { name: /Login/ }).click();
+    await expect(names).toHaveText(['Login', 'Login', 'Buy']);
+    await editor.getByRole('button', { name: 'Remove step', exact: true }).click();
+    await expect(names).toHaveText(['Login', 'Buy']);
+    await editor.getByRole('button', { name: 'More run options', exact: true }).click();
+    await expect(editor.getByRole('menuitem', { name: 'Export k6 script' })).toBeFocused();
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'light';
+      document.documentElement.dataset.themeVariant = 'flexoki-paper';
+    });
+    await expect(editor.getByRole('button', { name: 'More run options', exact: true })).toHaveCSS('background-color', 'rgb(28, 81, 143)');
+    await page.keyboard.press('Escape');
+    await expect(editor.getByRole('menu', { name: 'Run options' })).toHaveCount(0);
+    await expect(editor.getByRole('button', { name: 'More run options', exact: true })).toBeFocused();
+    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-flow-reorder.png'), animations: 'disabled' });
   });
 
   test('keeps load-test navigation responsive during a 60000-line log flood', async ({ page }) => {
@@ -341,9 +408,11 @@ test.describe("Kurlo desktop browser E2E", () => {
     const headerBounds = await editor.locator('.loadtest-head').boundingBox();
     const environmentBounds = await editor.getByRole('button', { name: /^Environment:/ }).boundingBox();
     const runBounds = await editor.getByRole('button', { name: 'Run with k6', exact: true }).boundingBox();
+    const caretBounds = await editor.getByRole('button', { name: 'More run options', exact: true }).boundingBox();
     expect(environmentBounds!.x).toBeGreaterThan((await name.boundingBox())!.x + 190);
     expect(environmentBounds!.x + environmentBounds!.width).toBeLessThanOrEqual(runBounds!.x);
-    expect(Math.round(runBounds!.x + runBounds!.width)).toBe(Math.round(headerBounds!.x + headerBounds!.width));
+    expect(Math.round(runBounds!.x + runBounds!.width)).toBe(Math.round(caretBounds!.x));
+    expect(Math.round(caretBounds!.x + caretBounds!.width)).toBe(Math.round(headerBounds!.x + headerBounds!.width));
     await name.fill('Discard this rename');
     await users.fill('7');
     await editor.getByRole('button', { name: 'Revert unsaved changes', exact: true }).click();
@@ -454,11 +523,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(editor.locator('.loadtest-errors')).toHaveCount(0);
     await expect(editor.locator('.loadtest-step-main')).toHaveCount(1);
     await expect(editor.locator('.loadtest-step-main')).toContainText('Request 2');
-    const card = (await editor.locator('.loadtest-step-main').boundingBox())!;
-    const actions = (await editor.locator('.loadtest-step-actions').boundingBox())!;
-    const gaps = [actions.y - card.y, card.x + card.width - actions.x - actions.width, card.y + card.height - actions.y - actions.height];
-    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThanOrEqual(1);
-    await editor.locator('.loadtest-step-card').screenshot({ path: join(tmpdir(), 'kurlo-load-step-actions.png'), animations: 'disabled' });
+    await expect(editor.locator('.loadtest-step-handle')).toHaveCount(0);
     const add = editor.getByRole('button', { name: 'Add request from collection' });
     await add.click();
     const menu = editor.getByRole('menu', { name: 'Requests', exact: true });
@@ -524,9 +589,11 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(steps.nth(1)).toContainText('status 200');
     await expect(editor.locator('.loadtest-phase')).toHaveText(['Setup · once per user', 'Every iteration']);
     const plan = editor.getByRole('group', { name: 'Test plan' });
-    await expect(plan).toContainText('2 steps');
+    await expect(plan).not.toContainText('steps');
     await expect(plan).toContainText('up to 40 users');
-    await expect(plan).toContainText('1 pass criterion');
+    await expect(plan).not.toContainText('pass criterion');
+    await expect(editor.getByRole('tab', { name: /Flow/ }).locator('.badge')).toHaveText('2');
+    await expect(editor.getByRole('tab', { name: /Load & thresholds/ }).locator('.badge')).toHaveText('1');
     await expect(plan).toContainText('users.csv · next row each iteration');
     await plan.getByRole('button', { name: '13m total' }).click();
     await expect(editor.getByRole('tab', { name: /Load & thresholds/ })).toHaveAttribute('aria-selected', 'true');
@@ -617,22 +684,22 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(editor.locator('.loadtest-step-main')).toHaveCount(2);
     await editor.getByLabel('Wait', { exact: true }).fill('500ms');
     await editor.getByLabel('Wait', { exact: true }).press('Enter');
-    await expect(editor.locator('.loadtest-step-main').nth(1)).toContainText('wait 500ms');
+    await expect(editor.locator('.loadtest-step').nth(1).locator('.loadtest-step-wait')).toHaveText('wait 500ms');
     await expect(editor.getByLabel('Wait', { exact: true })).toHaveValue('500ms');
     await editor.getByLabel('Random extra wait', { exact: true }).fill('250ms');
     await editor.getByLabel('Random extra wait', { exact: true }).press('Tab');
     await expect(editor.getByLabel('Random extra wait', { exact: true })).toHaveValue('250ms');
-    await expect(editor.locator('.loadtest-step-main').nth(1)).toContainText('wait 500ms ± 250ms');
+    await expect(editor.locator('.loadtest-step').nth(1).locator('.loadtest-step-wait')).toHaveText('wait 500ms + up to 250ms');
 
     const stepRows = editor.locator('.loadtest-step-main');
-    const replaceButtons = editor.getByRole('button', { name: /^Replace request for step/ });
+    const replaceButton = editor.getByRole('button', { name: /^Replace request for step/ });
     await stepRows.first().click();
     await expect(editor.getByLabel('Variable name')).toHaveValue('token');
     await expect(editor.getByRole('listbox', { name: 'Replace request' })).toBeHidden();
     await stepRows.nth(1).click();
     await expect(editor.getByLabel('Wait', { exact: true })).toHaveValue('500ms');
     await expect(editor.getByRole('listbox', { name: 'Replace request' })).toBeHidden();
-    await replaceButtons.nth(1).click();
+    await replaceButton.click();
     const replacementMenu = editor.getByRole('listbox', { name: 'Replace request' });
     await expect(replacementMenu).toBeVisible();
     await page.screenshot({ path: join(tmpdir(), 'kurlo-load-replace-request.png'), fullPage: true, animations: 'disabled' });
@@ -640,23 +707,25 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(replacementMenu).toBeHidden();
     await expect(stepRows).toHaveCount(2);
     await expect(stepRows.nth(1)).toContainText('Login');
-    await expect(stepRows.nth(1)).toContainText('wait 500ms');
+    await expect(editor.locator('.loadtest-step').nth(1).locator('.loadtest-step-wait')).toContainText('wait 500ms');
     await expect(editor.getByLabel('Wait', { exact: true })).toHaveValue('500ms');
-    await replaceButtons.nth(1).click();
+    await expect(replaceButton).toHaveAccessibleName('Replace request for step 2');
+    await replaceButton.click();
     await page.keyboard.press('Escape');
     await expect(replacementMenu).toBeHidden();
-    await replaceButtons.nth(1).click();
-    await editor.getByRole('heading', { name: 'Step 2', exact: true }).click();
+    await replaceButton.click();
+    await editor.locator('.loadtest-inspector').getByRole('heading', { name: 'Login', exact: true }).click();
     await expect(replacementMenu).toBeHidden();
-    await replaceButtons.nth(1).focus();
+    await replaceButton.focus();
     await page.keyboard.press('Enter');
     await replacementMenu.getByRole('option', { name: /List orders/ }).click();
-    await replaceButtons.first().click();
+    await stepRows.first().click();
+    await replaceButton.click();
     await replacementMenu.getByRole('option', { name: /List orders/ }).click();
     await expect(editor.getByRole('radio', { name: 'Once per user' })).toHaveAttribute('aria-checked', 'true');
     await expect(editor.getByLabel('Variable name')).toHaveValue('token');
     await expect(editor.getByRole('textbox', { name: 'Path' })).toHaveValue('$.access_token');
-    await replaceButtons.first().click();
+    await replaceButton.click();
     await replacementMenu.getByRole('option', { name: /Login/ }).click();
 
     await editor.getByRole('tab', { name: /Load & thresholds/ }).click();
@@ -696,7 +765,8 @@ test.describe("Kurlo desktop browser E2E", () => {
       }],
     });
 
-    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    await editor.getByRole('button', { name: 'More run options' }).click();
+    await editor.getByRole('menuitem', { name: 'Export k6 script' }).click();
     const exportDialog = page.getByRole('dialog', { name: 'Export to k6' });
     await expect(exportDialog).toBeVisible();
     await expect(exportDialog.locator('.k6-export-warnings li')).toHaveCount(1);
@@ -786,7 +856,8 @@ test.describe("Kurlo desktop browser E2E", () => {
     await editor.getByRole('button', { name: 'Save', exact: true }).click();
 
     await page.evaluate(() => { (window.__kurloE2E as unknown as { k6Found: boolean }).k6Found = false; });
-    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    await editor.getByRole('button', { name: 'More run options' }).click();
+    await editor.getByRole('menuitem', { name: 'Export k6 script' }).click();
     await page.getByRole('dialog', { name: 'Export to k6' }).getByRole('button', { name: 'Run with local k6' }).click();
     const missing = page.getByRole('dialog', { name: 'k6 is not installed' });
     await expect(missing).toBeVisible();
@@ -795,7 +866,8 @@ test.describe("Kurlo desktop browser E2E", () => {
     await missing.getByRole('button', { name: 'Check again' }).click();
     await expect(missing).toBeHidden();
 
-    await editor.getByRole('button', { name: 'Export k6 script' }).click();
+    await editor.getByRole('button', { name: 'More run options' }).click();
+    await editor.getByRole('menuitem', { name: 'Export k6 script' }).click();
     await page.getByRole('dialog', { name: 'Export to k6' }).getByRole('button', { name: 'Run with local k6' }).click();
     const confirm = page.getByRole('dialog', { name: 'Run load test' });
     await expect(confirm).toContainText('shop.kurlo.test');

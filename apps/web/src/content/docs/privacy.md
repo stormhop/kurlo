@@ -56,7 +56,7 @@ For folder/Git workspaces, Kurlo replaces sensitive YAML values with `{{kurloSec
 A few bounded categories of network calls happen on your behalf:
 
 1. **Requests you send.** This is the whole point — when you press Send, Kurlo opens a connection to the host you typed in the URL bar. The request is built on your machine and sent directly unless you configured a system, global, or per-request proxy.
-2. **Auto-update checks.** On launch (and when you press *Check for updates*), Kurlo fetches `latest.json` from the public release repository (`github.com/stormhop/kurlo`) over HTTPS. Release builds verify the downloaded binary by SHA-256 and minisign signature. No usage data is included in the request.
+2. **Auto-update checks.** By default, after launch and when you press *Check for updates*, Kurlo fetches `latest.json` from the public release repository (`github.com/stormhop/kurlo`) over HTTPS. Release builds verify the downloaded binary by SHA-256 and minisign signature. Choose **Manual** under **Settings → About → Update mode** to skip the request on launch. No usage data is included in the request.
 3. **OAuth 2.0 authorization and token calls.** Kurlo can open the provider's authorization page and call the authorization/token endpoints you configured.
 4. **GraphQL schema introspection.** When you load a GraphQL schema URL in the Schema tab, Kurlo sends a standard introspection query to that URL.
 5. **Git remotes.** Clone, fetch, pull, push, remote tests, and remote branch actions contact the Git server you configured.

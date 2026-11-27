@@ -105,3 +105,39 @@ test('keeps thousands of topics and records responsive and selectable', async ({
   await page.getByLabel('Search records').fill('key-42');
   await expect(page.locator('.kafka-record').first()).toContainText('key-42');
 });
+
+test('lays out Kafka broker settings like other request settings', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByLabel('New unsaved request').click();
+  await chooseRequestType(page, 'Kafka');
+  await page.getByLabel('Bootstrap brokers').fill('localhost:9092');
+  await page.getByLabel('Producer topic').fill('orders.created');
+  await page.getByRole('tab', { name: 'Settings', exact: true }).click();
+  const settings = page.locator('.settings-section');
+  await expect(settings.locator('.settings-title')).toHaveText('Broker connection');
+  await expect(settings.getByRole('button', { name: 'Save as default' })).toBeVisible();
+  for (const name of ['Secure connection (TLS)', 'Compression', 'Request timeout']) {
+    await expect(settings.locator('.postman-setting > .setting-copy > strong', { hasText: name })).toBeVisible();
+  }
+  const timeout = settings.locator('.setting-inline-number input.setting-number');
+  await timeout.fill('5000');
+  await page.locator('.btn-send').click();
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1)?.timeoutMs)).toBe(5000);
+  await page.screenshot({ path: process.env.KURLO_SHOT ?? 'test-results/kafka-settings.png' });
+});
+
+test('names the failed Kafka operation like other request errors', async ({ page }) => {
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.evaluate(() => {
+    (window as E2EWindow).go.api.App.SendRequest = async () => ({ statusCode: 0, status: '', body: '[]', headers: [], duration: 200, error: 'the brokers did not answer within 200 ms; raise Request timeout in Settings or check the broker address' });
+  });
+  await page.getByLabel('New unsaved request').click();
+  await chooseRequestType(page, 'Kafka');
+  await page.getByLabel('Bootstrap brokers').fill('localhost:9092');
+  await page.getByLabel('Producer topic').fill('orders.created');
+  await page.locator('.btn-send').click();
+  await expect(page.locator('.kafka-response .request-error-title')).toHaveText('Could not produce');
+  await expect(page.locator('.kafka-response .request-error-card')).toContainText('did not answer within 200 ms');
+});

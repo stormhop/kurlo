@@ -4,6 +4,7 @@
   import { kurloChangedFiles } from './lib/gitFiles';
   import { onMount, untrack } from 'svelte';
   import { docsRelativeLinkScopes, getAppInfo, checkForUpdate, applyUpdate, restartApp, clipboardSet, ackQuit } from './lib/backend';
+  import { loadUpdateMode, UPDATE_MODE_KEY, type UpdateMode } from './lib/updateMode';
   import type { MockRequestLog, OAuth2DevicePrompt, UpdateInfo } from './lib/backend';
   import { hasReleaseNotes } from 'virtual:kurlo-changelog-meta';
   import { isReleaseVersion, latestReleaseNotes, normalizeVersion, releaseNotesFor, shouldShowWhatsNew, shouldSpotlightAgentMode, type ChangelogSection } from './lib/whatsNew';
@@ -101,7 +102,6 @@
     }
   }
 
-  const AUTO_UPDATE_INSTALL_KEY = 'kurlo:auto-update-install';
   const UPDATE_READY_KEY = 'kurlo:update-ready';
   const LAST_SEEN_VERSION_KEY = 'kurlo:last-seen-version';
   const AGENT_SEEN_KEY = 'kurlo:agent-seen';
@@ -249,7 +249,8 @@
 
   let updateInfo = $state<UpdateInfo | null>(null);
   let updateReady = $state(false);
-  let autoUpdateInstall = $state(readStoredFlag(AUTO_UPDATE_INSTALL_KEY) === 'true');
+  let updateMode = $state(loadUpdateMode());
+  const checkOnLaunch = $derived(updateMode !== 'manual');
   let autoUpdateInstalling = $state(false);
   let updateCheckTimer: ReturnType<typeof setTimeout> | null = null;
   let destroyed = false;
@@ -338,9 +339,10 @@
     textMenu = target ? { x: event.clientX, y: event.clientY, target } : null;
   }
 
-  function setAutoUpdateInstall(value: boolean) {
-    autoUpdateInstall = value;
-    writeStoredValue(AUTO_UPDATE_INSTALL_KEY, value ? 'true' : 'false');
+  function setUpdateMode(value: UpdateMode) {
+    updateMode = value;
+    writeStoredValue(UPDATE_MODE_KEY, value);
+    if (value === 'manual' && !updateReady && !autoUpdateInstalling) updateInfo = null;
   }
 
   function markUpdateReady(info: UpdateInfo) {
@@ -384,7 +386,7 @@
   }
 
   async function installUpdateAutomatically(info: UpdateInfo): Promise<boolean> {
-    if (info.manualInstallUrl || !autoUpdateInstall || autoUpdateInstalling || readStoredFlag(UPDATE_READY_KEY)) return false;
+    if (info.manualInstallUrl || updateMode !== 'install' || autoUpdateInstalling || readStoredFlag(UPDATE_READY_KEY)) return false;
     autoUpdateInstalling = true;
     try {
       const err = await applyUpdate(info);
@@ -694,9 +696,9 @@
       if (info.version && info.version !== 'dev' && !updatePendingRestart) {
         updateCheckTimer = setTimeout(async () => {
           updateCheckTimer = null;
-          if (destroyed) return;
+          if (destroyed || !checkOnLaunch) return;
           const result = await checkForUpdate();
-          if (destroyed) return;
+          if (destroyed || !checkOnLaunch) return;
           if (result.info) {
             updateInfo = result.info;
             updateReady = await installUpdateAutomatically(result.info);
@@ -774,9 +776,9 @@
 <AppOverlays
   startupUpdateInfo={updateInfo}
   startupUpdateReady={updateReady}
-  {autoUpdateInstall}
+  {updateMode}
   {autoUpdateInstalling}
-  {setAutoUpdateInstall}
+  {setUpdateMode}
   appRuntime={vm.appRuntime}
   onUpdateInstalled={markUpdateReady}
   {whatsNewAvailable}

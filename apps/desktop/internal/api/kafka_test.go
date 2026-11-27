@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -274,5 +275,28 @@ func TestKafkaCollectionDocsDescribeTheSubscription(t *testing.T) {
 	}
 	if got := text(produce); !strings.HasPrefix(got, "Kafka|Record;Topic=orders;Key=order-1") || strings.Contains(got, "curl") {
 		t.Fatal(got)
+	}
+}
+
+func TestKafkaConsumeWaitsPastRequestTimeout(t *testing.T) {
+	broker, topic := kafkaTestBroker(t)
+	app := NewApp()
+	req := model.HttpRequest{URL: broker, TimeoutMs: 150, Kafka: &model.KafkaRequest{Mode: "consume", Topics: []model.KafkaTopic{{Name: topic}}, StartFrom: "latest", StopAfter: "duration", StopValue: "600"}}
+	started := time.Now()
+	resp := app.SendRequest(req)
+	if resp.Error != "" || resp.KafkaStopReason != "duration" || time.Since(started) < 600*time.Millisecond {
+		t.Fatalf("consume stopped early: %+v", resp)
+	}
+}
+
+func TestKafkaRequestTimeoutExplainsUnreachableBrokers(t *testing.T) {
+	broker, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer broker.Close()
+	resp := NewApp().SendRequest(model.HttpRequest{URL: broker.Addr().String(), TimeoutMs: 200, Kafka: &model.KafkaRequest{Mode: "consume", Topics: []model.KafkaTopic{{Name: "orders"}}, StopAfter: "records", StopValue: "1"}})
+	if !strings.Contains(resp.Error, "did not answer within 200 ms") {
+		t.Fatalf("unexpected error: %q", resp.Error)
 	}
 }

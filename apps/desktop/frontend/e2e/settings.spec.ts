@@ -390,6 +390,65 @@ test.describe('Update release notes', () => {
   });
 });
 
+test.describe('Update mode', () => {
+  test.beforeEach(async ({ page }) => {
+    await installKurloBridge(page, '', 'darwin/e2e', false, null, { preserveStorage: true });
+    await page.addInitScript(() => {
+      const app = (window as any).go.api.App;
+      app.AppInfo = async () => ({ name: 'Kurlo', version: '2.0.3', runtime: 'darwin/e2e', goVersion: 'e2e' });
+      app.CheckForUpdate = async () => {
+        window.__kurloE2E.calls.push('CheckForUpdate');
+        return { info: { version: '2.1.0' }, error: '' };
+      };
+      app.ApplyUpdate = async () => {
+        window.__kurloE2E.calls.push('ApplyUpdate');
+        return '';
+      };
+    });
+  });
+
+  async function openAbout(page: Page) {
+    await page.getByLabel('Settings', { exact: true }).click();
+    await page.getByRole('tab', { name: 'About', exact: true }).click();
+  }
+
+  test('checks only on demand in Manual mode after a relaunch', async ({ page }) => {
+    await page.goto('/');
+    await openAbout(page);
+    await page.getByRole('button', { name: 'Update mode: Notify me' }).click();
+    if (aboutScreenshotDir) {
+      await page.locator('#boot-screen').waitFor({ state: 'hidden' });
+      await page.locator('.settings-modal').screenshot({ path: join(aboutScreenshotDir, 'update-modes.png'), animations: 'disabled' });
+    }
+    await page.getByRole('option', { name: 'Manual', exact: true }).click();
+
+    await page.clock.install();
+    await page.reload();
+    await openAbout(page);
+    await expect(page.getByRole('button', { name: 'Update mode: Manual' })).toBeVisible();
+    await page.clock.fastForward(5000);
+    expect(await page.evaluate(() => window.__kurloE2E.calls)).not.toContain('CheckForUpdate');
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    const about = page.locator('#settings-panel-about');
+    await expect(about.getByRole('button', { name: 'Install', exact: true })).toBeVisible();
+    const calls = await page.evaluate(() => window.__kurloE2E.calls);
+    expect(calls.filter(call => call === 'CheckForUpdate')).toHaveLength(1);
+    expect(calls).not.toContain('ApplyUpdate');
+    await page.getByRole('button', { name: 'Update mode: Manual' }).click();
+    await page.getByRole('option', { name: 'Install automatically' }).click();
+    await expect(about.getByRole('button', { name: 'Restart now' })).toBeVisible();
+  });
+
+  test('honors the previous automatic install preference on launch', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('kurlo:auto-update-install', 'true'));
+    await page.goto('/');
+    await openAbout(page);
+    await expect(page.getByRole('button', { name: 'Update mode: Install automatically' })).toBeVisible();
+    await expect(page.locator('#settings-panel-about').getByRole('button', { name: 'Restart now' })).toBeVisible();
+    expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call === 'ApplyUpdate'))).toHaveLength(1);
+  });
+});
+
 test.describe('Windows app package updates', () => {
   test('offers the MSIX download instead of replacing a packaged install', async ({ page }) => {
     const msixUrl = 'https://github.com/stormhop/kurlo/releases/download/v2.1.0/kurlo-2.1.0-windows-amd64.msix';
@@ -434,10 +493,10 @@ test.describe('Windows app package updates', () => {
     await about.getByRole('button', { name: 'Download', exact: true }).click();
     await expect.poll(async () => (await page.evaluate(() => window.__kurloE2E.calls)).filter((call: string) => call === `open:${msixUrl}`).length).toBe(2);
 
-    const autoInstall = page.getByLabel('Install updates automatically').locator('input');
-    await expect(autoInstall).toBeDisabled();
-    await expect(autoInstall).not.toBeChecked();
-    await expect(about).toContainText('Not available for the Windows app package');
+    await about.getByRole('button', { name: 'Update mode: Notify me' }).click();
+    await expect(about.getByRole('option', { name: 'Install automatically' })).toHaveCount(0);
+    await about.getByRole('option', { name: 'Manual', exact: true }).click();
+    await expect(about.getByRole('button', { name: 'Update mode: Manual' })).toBeVisible();
 
     const calls = await page.evaluate(() => window.__kurloE2E.calls);
     expect(calls).not.toContain('ApplyUpdate');

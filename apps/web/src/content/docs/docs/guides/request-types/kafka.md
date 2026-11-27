@@ -17,7 +17,7 @@ Click **Produce** to send the record. The records list shows its time, topic, pa
 
 Choose **Consume**, test the connection and select topics. You can also enter a topic manually or use a regular expression beginning with `^`. Click a selected topic to specify partition numbers, a starting offset or an exclusive end offset. Kurlo reads those partitions directly without committing consumer-group offsets.
 
-Choose **Earliest** to see existing records or **Latest** to watch new arrivals. You can also start at an offset or timestamp. Stop after a record count, a duration, an idle period, or a timestamp. Durations use milliseconds. Timestamps accept RFC 3339 or Unix milliseconds. The request timeout in **Settings** also applies. A run holds up to 10,000 records and 16 MiB of record data.
+Choose **Earliest** to see existing records or **Latest** to watch new arrivals. You can also start at an offset or timestamp. Stop after a record count, a duration, an idle period, or a timestamp. Durations use milliseconds. Timestamps accept RFC 3339 or Unix milliseconds. The request timeout in **Settings** covers connecting to the brokers and looking up partitions. The consumer can then wait for new records until its stop condition. A run holds up to 10,000 records and 16 MiB of record data.
 
 Click **Consume**, then select a record to inspect its value or metadata. Search the stream or filter by topic. **Stop** keeps the records already received.
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { UpdateMode } from '../updateMode';
   import BirdSpinner from './BirdSpinner.svelte';
   import { DEFAULT_AUTOSAVE_DELAY_MS, MAX_AUTOSAVE_DELAY_MS, MIN_AUTOSAVE_DELAY_MS } from '../autosaveDelay';
   import AddCloseIcon from './AddCloseIcon.svelte';
@@ -97,7 +98,7 @@
     { id: 'ai', label: 'AI', keywords: 'ai agent model llm openrouter anthropic claude openai gpt key api byok ollama lm studio local connection' },
     { id: 'shortcuts', label: 'Shortcuts', keywords: 'shortcuts keybindings keyboard hotkeys' },
     { id: 'support', label: 'Support', keywords: 'support report issues bug github questions telegram help' },
-    { id: 'about', label: 'About', keywords: 'updates check upgrade release notes about version platform runtime auto update install' },
+    { id: 'about', label: 'About', keywords: 'updates check upgrade release notes about version platform runtime auto update install manual notify' },
   ];
 
   let {
@@ -134,9 +135,9 @@
     onClose,
     startupUpdateInfo = null,
     startupUpdateReady = false,
-    autoUpdateInstall = false,
+    updateMode = 'notify',
     autoUpdateInstalling = false,
-    setAutoUpdateInstall,
+    setUpdateMode,
     onUpdateInstalled = () => {},
     whatsNewAvailable = false,
     onShowWhatsNew = () => {},
@@ -174,9 +175,9 @@
     onClose: () => void;
     startupUpdateInfo?: UpdateInfo | null;
     startupUpdateReady?: boolean;
-    autoUpdateInstall?: boolean;
+    updateMode?: UpdateMode;
     autoUpdateInstalling?: boolean;
-    setAutoUpdateInstall: (value: boolean) => void;
+    setUpdateMode: (value: UpdateMode) => void;
     onUpdateInstalled?: (info: UpdateInfo) => void;
     whatsNewAvailable?: boolean;
     onShowWhatsNew?: () => void;
@@ -197,6 +198,13 @@
   let currentVersion = $state('');
   let packagedInstall = $state(false);
   let isDevBuild = $derived(currentVersion === 'dev');
+  const updateModes = [
+    { value: 'manual', label: 'Manual', detail: 'Check only when you ask.' },
+    { value: 'notify', label: 'Notify me', detail: 'Check on launch and let you know when an update is available.' },
+    { value: 'install', label: 'Install automatically', detail: 'Install updates in the background and ask you to restart.' },
+  ];
+  let availableUpdateModes = $derived(packagedInstall ? updateModes.filter(mode => mode.value !== 'install') : updateModes);
+  let selectedUpdateMode = $derived(packagedInstall && updateMode === 'install' ? 'notify' : updateMode);
   let manualUpdateURL = $derived(updateInfo?.manualInstallUrl ?? '');
 
 
@@ -356,10 +364,9 @@
     void restartApp();
   }
 
-  function handleAutoUpdateToggle(event: Event) {
-    const enabled = inputChecked(event);
-    setAutoUpdateInstall(enabled);
-    if (enabled && updateState === 'available' && updateInfo && !updateInfo.manualInstallUrl && !isDevBuild) {
+  function handleUpdateMode(value: UpdateMode) {
+    setUpdateMode(value);
+    if (value === 'install' && updateState === 'available' && updateInfo && !updateInfo.manualInstallUrl && !isDevBuild) {
       void handleInstall();
     }
   }
@@ -1058,7 +1065,7 @@
                   <span class="updates-error-text">{updateError}</span>
                 {:else}
                   <strong>Updates</strong>
-                  <span>Kurlo also checks in the background.</span>
+                  <span>Check for a new version of Kurlo.</span>
                 {/if}
               </span>
               {#if !isDevBuild}
@@ -1081,19 +1088,18 @@
             </div>
             <div class="settings-row about-item">
               <span class="about-item-copy">
-                <strong>Install updates automatically</strong>
-                <span>{packagedInstall ? 'Not available for the Windows app package.' : 'New builds install in the background, then Kurlo asks for a restart.'}</span>
+                <strong>Update mode</strong>
+                <span>{availableUpdateModes.find(mode => mode.value === selectedUpdateMode)?.detail}</span>
               </span>
-              <label class="switch-control" aria-label="Install updates automatically">
-                <input
-                  type="checkbox"
-                  checked={autoUpdateInstall && !packagedInstall}
-                  disabled={isDevBuild || packagedInstall || updateState === 'installing'}
-                  onchange={handleAutoUpdateToggle}
-                />
-                <span class="switch-track"></span>
-                <span class="switch-state">{autoUpdateInstall && !packagedInstall ? 'ON' : 'OFF'}</span>
-              </label>
+              <Select
+                value={selectedUpdateMode}
+                options={availableUpdateModes}
+                ariaLabel="Update mode"
+                size="md"
+                floating
+                disabled={!currentVersion || isDevBuild || updateState === 'installing'}
+                onChange={(value) => handleUpdateMode(value as UpdateMode)}
+              />
             </div>
             {#if whatsNewAvailable}
               <button class="settings-row about-item about-item-link" type="button" onclick={onShowWhatsNew}>
@@ -1426,7 +1432,6 @@
     color: var(--text-3);
   }
 
-  .about-item .switch-control,
   .about-item .btn {
     flex-shrink: 0;
   }

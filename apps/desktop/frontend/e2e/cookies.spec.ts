@@ -208,6 +208,28 @@ test.describe('Cookie jar', () => {
     await expect(main).toBeVisible();
   });
 
+  test('keeps the cookie table header at the top edge while the list scrolls', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await installKurloBridge(page);
+    await page.goto('/');
+    await page.evaluate(() => {
+      (window.__kurloE2E as any).cookies['workspace-e2e'] = Array.from({ length: 60 }, (_, index) => ({
+        name: `perf_${index}`, value: '', domain: 'api.kurlo.test', path: '/', hostOnly: true, secure: index % 2 === 0, httpOnly: false, sameSite: '', session: true,
+      }));
+    });
+    await page.getByRole('button', { name: 'Cookies', exact: true }).click();
+    const main = page.locator('.cookie-workspace');
+    await main.getByRole('button', { name: 'More cookie actions' }).click();
+    await page.getByRole('menuitem', { name: 'Reload from disk' }).click();
+    await expect(main.locator('.cookie-row')).toHaveCount(50);
+    await main.evaluate(node => { node.scrollTop = node.scrollHeight; });
+    const gap = await main.evaluate(node => {
+      const head = node.querySelector('.cookie-table-head') as HTMLElement;
+      return head.getBoundingClientRect().top - node.getBoundingClientRect().top;
+    });
+    expect(Math.abs(gap)).toBeLessThan(1);
+  });
+
   test('picks a cookie expiry with the app date picker instead of the system one', async ({ page }) => {
     await installKurloBridge(page);
     await page.goto('/');

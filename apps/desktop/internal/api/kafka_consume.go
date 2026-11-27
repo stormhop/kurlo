@@ -213,7 +213,9 @@ func consumeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 		return nil, err
 	}
 	defer cl.Close()
-	ranges, err := kafkaRanges(ctx, kadm.NewClient(cl), k)
+	rangesCtx, cancelRanges := kafkaTimeoutContext(ctx, req)
+	ranges, err := kafkaRanges(rangesCtx, kadm.NewClient(cl), k)
+	cancelRanges()
 	if err != nil {
 		return nil, err
 	}
