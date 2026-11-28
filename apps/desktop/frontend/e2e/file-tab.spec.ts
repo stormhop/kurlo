@@ -345,7 +345,10 @@ test('keeps the request bar and YAML in sync while editing URL, method, protocol
   await expect(methodLine()).toContainText('method: "DELETE"');
 
   await method.click();
-  await page.getByRole('option', { name: 'gRPC', exact: true }).click();
+  await expect(page.getByText('The protocol is fixed once a saved request has a URL.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'gRPC', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await fillCodeEditor(page, 'request-file-editor', editedFromFile.replace('"PATCH"', '"POST"').replace('requestType: "http"', 'requestType: "grpc"'));
   const target = page.getByLabel('gRPC target');
   const grpcMethod = page.getByLabel('gRPC method');
   await expect(target).toHaveValue('https://yaml.kurlo.test/next');
@@ -374,13 +377,13 @@ test('keeps the request bar and YAML in sync while editing URL, method, protocol
   await expect(urlLine()).toContainText('url: "localhost:50051" # keep URL note');
 });
 
-test('switches File to AI and back to HTTP while keeping edits reversible', async ({ page }) => {
+test('switches File to AI from YAML and reverts to HTTP', async ({ page }) => {
   await openSeededFileTab(page);
   const editor = page.getByTestId('request-file-editor');
   const file = page.locator('.file-tab');
   const protocol = page.getByRole('button', { name: 'Method and protocol' });
-  await protocol.click();
-  await page.getByRole('option', { name: 'AI', exact: true }).click();
+  const yaml = 'version: 1\nrequest:\n  id: file-one\n  name: "One"\n  requestType: "ai"\n  url: "https://one.kurlo.test"\n';
+  await fillCodeEditor(page, 'request-file-editor', yaml);
   await expect(page.getByLabel('Provider base URL')).toHaveValue('https://one.kurlo.test');
 
   await page.getByRole('button', { name: 'Provider and model' }).click();
@@ -394,11 +397,8 @@ test('switches File to AI and back to HTTP while keeping edits reversible', asyn
   await expect(editor.locator('.cm-line').filter({ hasText: /^\s*aiModel:/ })).toContainText('aiModel: "claude-3-5-haiku-latest"');
 
   await protocol.click();
-  await page.getByRole('option', { name: 'GET', exact: true }).click();
-  await expect(page.getByLabel('Request URL')).toHaveValue('https://api.anthropic.com/v1');
-  await expect(editor.locator('.cm-line').filter({ hasText: /^\s*requestType:/ })).toContainText('requestType: http');
-  await expect(editor.locator('.cm-line').filter({ hasText: /^\s*method:/ })).toContainText('method: "GET"');
-  await expect(editor.locator('.cm-line').filter({ hasText: /^\s*aiProvider:/ })).toContainText('aiProvider: "anthropic"');
+  await expect(page.getByRole('option', { name: 'GET', exact: true })).toBeDisabled();
+  await page.keyboard.press('Escape');
 
   await file.getByRole('button', { name: 'Revert', exact: true }).click();
   await expect(page.getByLabel('Method and protocol')).toContainText('GET');

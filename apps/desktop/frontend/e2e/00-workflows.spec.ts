@@ -96,7 +96,8 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Login user' })).toHaveCount(1);
     await page.getByLabel('Method and protocol').click();
-    await expect(page.getByRole('option', { name: 'GraphQL' })).toBeVisible();
+    await expect(page.getByText('The protocol is fixed once a saved request has a URL.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('option', { name: 'GraphQL' })).toHaveCount(0);
     await page.getByRole('option', { name: 'POST' }).click();
 
     await chooseRequestSection(page, 'Params');

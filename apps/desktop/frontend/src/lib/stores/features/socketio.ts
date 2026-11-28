@@ -50,6 +50,8 @@ type SocketIOHost = {
   _recordSocketIOHistoryOnce: (sessionId: string, statusCode: number, status: string, timestamp: number) => Promise<void>;
 };
 
+const connectAttempts = new Map<string, number>();
+
 export const socketioFeature = {
   forgetSocketIOSession(this: SocketIOHost, id: string) {
     if (!this.socketIOSessions.has(id)) return;
@@ -144,10 +146,14 @@ export const socketioFeature = {
     this._sioStartedAt.set(id, Date.now());
     this._sioHistoryRecorded.delete(id);
     this._sioSetSession(id, { status: 'connecting', messages: [], clearedMessages: [], namespace: this.sioNamespace || '/', error: '', connectedUrl: this.url.trim(), connectedAt: 0 });
+    const attempt = (connectAttempts.get(id) ?? 0) + 1;
+    connectAttempts.set(id, attempt);
     try {
+      const request = this.buildRequest();
       await this.persistActiveRequestNow();
       try { await this.syncBackendEnvironment(); } catch {  }
-      await socketIOConnect(id, this.buildRequest());
+      if (connectAttempts.get(id) !== attempt) return;
+      await socketIOConnect(id, request);
     } catch (e) {
       const timestamp = Date.now();
       const message = e instanceof Error ? e.message : String(e);
@@ -159,6 +165,7 @@ export const socketioFeature = {
   async socketIODisconnect(this: SocketIOHost) {
     const id = this.activeRequestId;
     if (!id) return;
+    connectAttempts.set(id, (connectAttempts.get(id) ?? 0) + 1);
     await socketIODisconnect(id);
     this._sioSetSession(id, { status: 'idle' });
   },

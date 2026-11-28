@@ -7,6 +7,7 @@ import { byteLength, requestTitleFrom } from '../../utils';
 const WS_MAX_MESSAGES = 3000;
 const WS_MAX_PENDING_MESSAGES = 1000;
 const WS_EVENT_FLUSH_MS = 50;
+const connectAttempts = new Map<string, number>();
 
 type WebSocketHost = {
   webSocketSessions: Map<string, WebSocketSession>;
@@ -195,10 +196,14 @@ export const websocketFeature = {
       error: '',
       connectedUrl: this.url.trim(),
     });
+    const attempt = (connectAttempts.get(id) ?? 0) + 1;
+    connectAttempts.set(id, attempt);
     try {
+      const request = this.buildRequest();
       await this.persistActiveRequestNow();
       try { await this.syncBackendEnvironment(); } catch {  }
-      await webSocketConnect(id, this.buildRequest());
+      if (connectAttempts.get(id) !== attempt) return;
+      await webSocketConnect(id, graphql ? { ...request, graphqlSubscription: true } : request);
     } catch (e) {
       const timestamp = Date.now();
       const message = e instanceof Error ? e.message : String(e);
@@ -214,6 +219,7 @@ export const websocketFeature = {
   async webSocketDisconnect(this: WebSocketHost) {
     const id = this.activeRequestId;
     if (!id) return;
+    connectAttempts.set(id, (connectAttempts.get(id) ?? 0) + 1);
     await webSocketDisconnect(id);
     this._wsSetSession(id, { status: 'idle' });
   },

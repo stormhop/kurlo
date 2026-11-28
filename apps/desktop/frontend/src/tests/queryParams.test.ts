@@ -139,6 +139,15 @@ describe('editor query representation', () => {
     expect(urlWithParams(url, editor.params)).toBe('/p?tag=red&preview&empty=&tag=red&word=caf%c3%a9&a%26b=x%2By%23z%20%26%20{{name}}#part');
   });
 
+  it('keeps an encoded key as it is when only the value is edited', () => {
+    const url = '/p?filter%5Bstatus%5D=open';
+    const editor = queryForEditor(url, []);
+    editor.params[0] = { ...editor.params[0], value: 'closed' };
+    expect(urlWithParams(url, editor.params)).toBe('/p?filter%5Bstatus%5D=closed');
+    editor.params[0] = { ...editor.params[0], value: '100% caf%C3%A9' };
+    expect(urlWithParams(url, editor.params)).toBe('/p?filter%5Bstatus%5D=100%25%20caf%C3%A9');
+  });
+
   it('keeps private table parameters out of the stored URL on open and after editing', () => {
     const secret = { ...row('custom', 'private value'), secret: true };
     const editor = queryForEditor('/p', [row('a', '1'), secret]);

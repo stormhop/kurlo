@@ -142,7 +142,7 @@ for (const protocol of ['ws', 'socketio', 'sse', 'mqtt']) {
   });
 }
 
-for (const protocol of ['http', 'grpc']) {
+for (const protocol of ['http', 'grpc', 'kafka']) {
   test(`keeps a preview when its ${protocol} request is running in the background`, async ({ page }) => {
     await start(page, true, false, protocol);
     await page.evaluate(protocol => {
@@ -150,7 +150,7 @@ for (const protocol of ['http', 'grpc']) {
       const wait = () => new Promise<void>(resolve => {
         window.__kurloE2E.responseGate = { ready: true, release: resolve };
       });
-      if (protocol === 'http') {
+      if (protocol !== 'grpc') {
         const send = app.SendRequest;
         app.SendRequest = async request => { await wait(); return await send(request); };
       } else {
@@ -160,14 +160,14 @@ for (const protocol of ['http', 'grpc']) {
     }, protocol);
     await openRequest(page, 'Two');
     await expect(page.locator('.saved-request-tab.preview .tab-title')).toHaveText('Two');
-    await page.getByRole('button', { name: protocol === 'http' ? 'Send' : 'Invoke', exact: true }).click();
+    await page.getByRole('button', { name: protocol === 'http' ? 'Send' : protocol === 'kafka' ? 'Produce' : 'Invoke', exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.responseGate?.ready)).toBe(true);
     await expect(page.locator('.saved-request-tab.preview')).toHaveCount(0);
     await openRequest(page, 'Three');
     await expect(requestTabs(page)).toHaveText(['One', 'Two', 'Three']);
     await page.evaluate(() => window.__kurloE2E.responseGate?.release());
     await openRequest(page, 'Two');
-    await expect(page.locator('.response-status-bar .status-badge')).toContainText(protocol === 'http' ? '200' : 'OK');
+    await expect(page.locator(protocol === 'kafka' ? '.kafka-status' : '.response-status-bar .status-badge')).toContainText(protocol === 'grpc' ? 'OK' : '200');
   });
 }
 

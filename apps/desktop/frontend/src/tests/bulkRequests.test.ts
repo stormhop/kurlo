@@ -161,6 +161,19 @@ describe('bulk delete, duplicate and star', () => {
     expect(order(app)).not.toContain('a');
     expect(order(app)).not.toContain('b');
   });
+
+  it('applies the delete and duplicate shortcuts to the one selected request, not the open one', async () => {
+    const { app } = await bulkApp();
+    app.applySavedRequest(app.requestsById.get('a'));
+    app.requestSelection = { ids: ['b'], anchor: 'b' };
+    await uiShellFeature.runShortcut.call(app as never, 'duplicate-item');
+    expect(app.requests.map((req: SavedRequest) => req.name)).toContain('b Copy');
+    expect(app.requests.map((req: SavedRequest) => req.name)).not.toContain('a Copy');
+    app.requestSelection = { ids: ['b'], anchor: 'b' };
+    await uiShellFeature.runShortcut.call(app as never, 'delete-item');
+    expect(order(app)).toContain('a');
+    expect(order(app)).not.toContain('b');
+  });
 });
 
 describe('moving requests to another collection', () => {

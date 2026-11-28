@@ -316,8 +316,10 @@
                     <span class="method-menu-name"><RequestTypeIcon kind={requestKindFor({ requestType: option })} />{PROTOCOL_NAMES[option] ?? requestTypeLabel(option)}</span>
                   </button>
                 {/each}
-              {:else}
+              {:else if running}
                 <p class="method-menu-note">Stop the running request to change its protocol.</p>
+              {:else}
+                <p class="method-menu-note">{isAI && aiProvider === 'kurlo' ? 'The protocol is fixed once a request using a Kurlo AI connection is saved.' : 'The protocol is fixed once a saved request has a URL.'} Create a new request to use another protocol.</p>
               {/if}
             </div>
           </div>

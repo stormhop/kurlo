@@ -77,8 +77,12 @@ export function matchQueryRows(pairs: QueryPair[], rows: QueryRow[], allowKeyMat
   return { matches, remaining };
 }
 
+function encodeKeepingEscapes(part: string) {
+  return part.replace(/%[0-9A-Fa-f]{2}|[^%]+|%/g, piece => (/^%[0-9A-Fa-f]{2}$/.test(piece) ? piece : encodeURIComponent(piece)));
+}
+
 function formatRow(row: QueryRow) {
-  return `${encodePart(row.key)}=${encodePart(row.value)}`;
+  return `${encodePart(row.key, encodeKeepingEscapes)}=${encodePart(row.value, encodeKeepingEscapes)}`;
 }
 
 export function buildQuery(rows: QueryRow[]): string {

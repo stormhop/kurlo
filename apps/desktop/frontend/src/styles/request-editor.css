@@ -128,7 +128,7 @@
   padding: 0 var(--space-4);
 }
 .request-bar.request-bar-grpc {
-  grid-template-columns: minmax(11.25rem, 0.44fr) minmax(13.75rem, 0.56fr) max-content;
+  grid-template-columns: minmax(11.25rem, 1fr) minmax(12.5rem, 22.5rem) max-content;
 }
 .request-bar.request-bar-ai {
   grid-template-columns: minmax(12.5rem, 0.55fr) minmax(12.5rem, 0.45fr) max-content;
@@ -278,7 +278,7 @@
   min-width: 0;
 }
 
-.grpc-method-trigger {
+.select-trigger.grpc-method-trigger {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   width: 100%;
@@ -309,7 +309,7 @@
   left: 0;
   right: 0;
   z-index: 130;
-  min-width: min(32.5rem, 82vw);
+  min-width: min(max(100%, 25rem), 82vw);
   max-height: min(27.5rem, 58vh);
   padding: var(--space-2);
   border: 1px solid var(--border);

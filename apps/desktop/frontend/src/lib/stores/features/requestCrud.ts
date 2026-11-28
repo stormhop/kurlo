@@ -222,7 +222,10 @@ export const requestCrudFeature = {
 
   get requestTypeEditable(): boolean {
     const host = this as unknown as RequestCrudHost;
-    return !!host.activeRequest && !host.requestIsRunning(host.activeRequestId);
+    const active = host.activeRequest;
+    if (!active || host.requestIsRunning(host.activeRequestId)) return false;
+    if (active.isDraft) return true;
+    return !host.url.trim() && !(host.requestType === 'ai' && host.aiProvider === 'kurlo');
   },
 
   get pinnedRequests(): SavedRequest[] {

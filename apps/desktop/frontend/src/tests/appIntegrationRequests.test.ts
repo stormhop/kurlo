@@ -98,7 +98,7 @@ describe('creating a request', () => {
     expect(selectDialog).not.toHaveBeenCalled();
   });
 
-  it('changes the protocol of a saved request with a URL and preserves its identity', async () => {
+  it('fixes the protocol once a saved request has a URL', async () => {
     backend.state.savedStores = [];
     const app = new TestApp() as TestApp & Record<string, any>;
 
@@ -113,7 +113,6 @@ describe('creating a request', () => {
     expect(app.requestTypeEditable).toBe(true);
     app.selectRequestType('grpc');
     expect(app.requestType).toBe('grpc');
-    expect(app.requestTypeEditable).toBe(true);
     app.selectRequestType('graphql');
     expect(app.requestType).toBe('graphql');
     expect(app.requestTab).toBe('query');
@@ -121,12 +120,38 @@ describe('creating a request', () => {
     app.url = 'https://api.example.test/graphql';
     await app.saveActiveRequest();
     const id = app.activeRequestId;
-    app.inFlightRequestIds.add(id);
     expect(app.requestTypeEditable).toBe(false);
     app.selectRequestType('http');
     app.selectRequestType('mqtt');
     expect(app.requestType).toBe('graphql');
+    expect(app.requestsById.get(id)).toMatchObject({ requestType: 'graphql', url: 'https://api.example.test/graphql', name: 'Schema' });
+
+    app.url = '';
+    expect(app.requestTypeEditable).toBe(true);
+    app.inFlightRequestIds.add(id);
+    expect(app.requestTypeEditable).toBe(false);
     app.inFlightRequestIds.delete(id);
+  });
+
+  it('fixes the protocol of a saved request that uses a Kurlo AI connection', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+
+    app.prompts.push('Assistants');
+    await app.createCollection();
+    await app.createNewRequest(app.collections[0].id);
+    app.selectRequestType('ai');
+    app.aiProvider = 'kurlo';
+    app.url = '';
+    await app.saveActiveRequest();
+    const id = app.activeRequestId;
+    expect(app.requestTypeEditable).toBe(false);
+    app.selectRequestType('http');
+    app.selectRequestType('grpc');
+    expect(app.requestType).toBe('ai');
+    expect(app.requestsById.get(id)).toMatchObject({ requestType: 'ai', aiProvider: 'kurlo' });
+
+    app.aiProvider = 'openai';
     expect(app.requestTypeEditable).toBe(true);
   });
 });
@@ -147,6 +172,17 @@ describe('switching a request to MQTT and back', () => {
     expect(app.bodyType).toBe('json');
     await app.saveActiveRequest();
     app.selectRequestType('http');
+    expect(app.method).toBe('POST');
+    expect(app.bodyType).toBe('json');
+    expect(app.bodyContent).toBe('{"id":7}');
+  });
+
+  it('keeps the message of a request that had no body', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Devices');
+    await app.createCollection();
+    await app.createNewRequest(app.collections[0].id);
     await app.saveActiveRequest();
     expect(app.bodyType).toBe('none');
     app.selectRequestType('mqtt');

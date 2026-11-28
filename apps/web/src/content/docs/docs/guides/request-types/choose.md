@@ -9,7 +9,7 @@ In the sidebar, the tab bar, search and the Collection Runner, HTTP requests sho
 
 ![Method and protocol picker in the address bar](../../../../../assets/screenshots/request-protocol-picker.png)
 
-The address bar lists HTTP methods on the left and other protocols on the right. You can change a draft or a saved request, including one with a URL. For example, choosing `POST` on a GraphQL request switches it to HTTP. Stop an active request or disconnect its session before changing protocols. In **File**, the picker updates the open YAML draft.
+The address bar lists HTTP methods on the left and other protocols on the right. A draft can switch protocol at any time: choosing `POST` on a GraphQL draft makes it an HTTP request. A saved request can switch until it has a URL. After that its protocol is fixed, and so is the protocol of a saved AI request that uses a Kurlo AI connection, so settings that belong to one protocol are never dropped by a misclick. The picker still changes an HTTP request's method. To use another protocol, create a new request. Stop an active request or disconnect its session before changing protocols. In **File**, you can still change `requestType` in the YAML yourself.
 
 ## At a glance
 

@@ -3,6 +3,7 @@
   import { tick } from 'svelte';
   import CheckIcon from './CheckIcon.svelte';
   import MenuIcon from './MenuIcon.svelte';
+  import { portal } from '../portal';
 
   let {
     noun, items, summary, suggestName, saveProblem, onSave, onLoad, onSend, onRemove, onRename,
@@ -90,42 +91,48 @@
     close(true);
   }
 
+  function inside(node: unknown) {
+    return node instanceof Node && Boolean(wrap?.contains(node) || menu?.contains(node));
+  }
+
   function closeOnFocusOut(event: FocusEvent) {
     const next = event.relatedTarget;
-    if (!(next instanceof Node) || wrap?.contains(next)) return;
+    if (!(next instanceof Node) || inside(next)) return;
     open = false;
   }
 
   function closeOnPointerOutside(event: PointerEvent) {
-    if (event.target instanceof Node && wrap?.contains(event.target)) return;
+    if (inside(event.target)) return;
     open = false;
   }
 
-  const MENU_MARGIN = 10;
+  const MENU_MARGIN = 8;
+  const MENU_GAP = 4;
   const MENU_MIN_HEIGHT = 160;
 
-  function clipBounds(from: HTMLElement) {
-    let node = from.parentElement;
-    while (node && node !== document.body) {
-      const style = getComputedStyle(node);
-      if (style.overflow !== 'visible' || style.overflowY !== 'visible') return node.getBoundingClientRect();
-      node = node.parentElement;
-    }
-    return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
-  }
-
   function fitMenu() {
-    if (!wrap || !menu) return;
-    const trigger = wrap.getBoundingClientRect();
-    const bounds = clipBounds(wrap);
-    const below = Math.min(bounds.bottom, window.innerHeight) - trigger.bottom - MENU_MARGIN;
-    const above = trigger.top - Math.max(bounds.top, 0) - MENU_MARGIN;
+    if (!trigger || !menu) return;
+    const anchor = trigger.getBoundingClientRect();
+    const customWidth = wrap ? getComputedStyle(wrap).getPropertyValue('--saved-menu-width').trim() : '';
+    const widthStyle = customWidth ? `--saved-menu-width:${customWidth};` : '';
+    if (customWidth) menu.style.setProperty('--saved-menu-width', customWidth);
+    const viewportWidth = document.documentElement.clientWidth;
+    const viewportHeight = document.documentElement.clientHeight;
+    const below = viewportHeight - anchor.bottom - MENU_GAP - MENU_MARGIN;
+    const above = anchor.top - MENU_GAP - MENU_MARGIN;
     const natural = menu.scrollHeight;
+    const width = menu.offsetWidth;
+    const left = Math.max(MENU_MARGIN, Math.min(anchor.right - width, viewportWidth - width - MENU_MARGIN));
     if (natural <= below || below >= above) {
-      menuStyle = `max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(below))}px`;
+      menuStyle = `${widthStyle}left:${left}px;top:${Math.round(anchor.bottom + MENU_GAP)}px;max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(below))}px`;
       return;
     }
-    menuStyle = `top:auto;bottom:calc(100% + 4px);max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(above))}px`;
+    menuStyle = `${widthStyle}left:${left}px;bottom:${Math.round(viewportHeight - anchor.top + MENU_GAP)}px;max-height:${Math.max(MENU_MIN_HEIGHT, Math.floor(above))}px`;
+  }
+
+  function refitOnScroll(event: Event) {
+    if (event.target instanceof Node && menu?.contains(event.target)) return;
+    fitMenu();
   }
 
   $effect(() => {
@@ -133,12 +140,21 @@
       menuStyle = '';
       return;
     }
-    if (menu) fitMenu();
+    if (!menu) return;
+    fitMenu();
+    const observer = new ResizeObserver(fitMenu);
+    observer.observe(menu);
+    if (trigger) observer.observe(trigger);
+    const pane = trigger?.closest('.tab-content, .request-editor-pane, main');
+    if (pane) observer.observe(pane);
     document.addEventListener('pointerdown', closeOnPointerOutside, true);
     window.addEventListener('resize', fitMenu);
+    window.addEventListener('scroll', refitOnScroll, true);
     return () => {
+      observer.disconnect();
       document.removeEventListener('pointerdown', closeOnPointerOutside, true);
       window.removeEventListener('resize', fitMenu);
+      window.removeEventListener('scroll', refitOnScroll, true);
     };
   });
 </script>
@@ -163,7 +179,7 @@
   </button>
 
   {#if open}
-    <div class="saved-messages-menu" bind:this={menu} style={menuStyle} role="dialog" aria-label={label} tabindex="-1" onkeydown={onKeydown}>
+    <div class="saved-messages-menu" bind:this={menu} use:portal style={menuStyle} role="dialog" aria-label={label} tabindex="-1" onkeydown={onKeydown} onfocusout={closeOnFocusOut}>
       <form class="saved-messages-form" onsubmit={save}>
         <input
           bind:this={nameInput}
@@ -233,11 +249,9 @@
   }
   .saved-messages-menu {
     box-sizing: border-box;
-    position: absolute;
-    z-index: 30;
-    top: calc(100% + var(--space-1));
-    right: 0;
-    width: min(var(--saved-menu-width, 22rem), calc(100vw - 2rem), calc(100cqw - 1.5rem));
+    position: fixed;
+    z-index: 60;
+    width: min(var(--saved-menu-width, 22rem), calc(100vw - 2rem));
     display: flex;
     flex-direction: column;
     gap: var(--space-1-5);
@@ -300,7 +314,7 @@
   .saved-messages-item-name,
   .saved-messages-item-hint {
     min-width: 0;
-    overflow: hidden;
+    overflow: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

@@ -219,7 +219,7 @@ export const uiShellFeature = {
   get codePanelAvailable(): boolean {
     const host = this as unknown as UiShellHost;
     if (host.topView !== 'request' || !host.activeRequestId) return false;
-    return host.requestType !== 'kafka' && host.requestType !== 'graphql' && host.requestType !== 'ws' && host.requestType !== 'socketio' && host.requestType !== 'grpc';
+    return host.requestType !== 'kafka' && host.requestType !== 'mqtt' && host.requestType !== 'graphql' && host.requestType !== 'ws' && host.requestType !== 'socketio' && host.requestType !== 'grpc';
   },
 
   buildGlobalSearchResults(this: UiShellHost): SavedRequest[] {
@@ -236,6 +236,7 @@ export const uiShellFeature = {
         socketio: 'sio socketio socket.io socket io realtime',
         graphql: 'graphql gql graph ql',
         kafka: 'kafka topic broker produce consume',
+        mqtt: 'mqtt iot broker topic publish subscribe',
         grpc: 'grpc protobuf proto reflection rpc service method',
       };
       const searchable = [
@@ -477,6 +478,7 @@ export const uiShellFeature = {
       else if (this.activeRequestId) await this.saveActiveRequest();
       return;
     }
+    const targetRequestId = this.requestSelection.ids.length === 1 ? this.requestSelection.ids[0] : this.activeRequestId;
     if (id === 'close-tab' || id === 'force-close-tab') await this.closeActiveTab(id === 'force-close-tab');
     else if (id === 'next-tab') await this.switchOpenTabByOffset(1);
     else if (id === 'previous-tab') await this.switchOpenTabByOffset(-1);
@@ -489,12 +491,12 @@ export const uiShellFeature = {
     else if (id === 'search-sidebar') this.focusSidebarSearch();
     else if (id === 'search') this.openGlobalSearch();
     else if (id === 'duplicate-item' && this.requestSelection.ids.length > 1) await this.duplicateRequests(this.requestSelection.ids);
-    else if (id === 'duplicate-item' && this.activeRequestId) await this.duplicateRequest(this.activeRequestId);
-    else if (id === 'rename-item' && this.activeRequestId) await this.renameRequest(this.activeRequestId);
+    else if (id === 'duplicate-item' && targetRequestId) await this.duplicateRequest(targetRequestId);
+    else if (id === 'rename-item' && targetRequestId) await this.renameRequest(targetRequestId);
     else if (id === 'copy-item') this.copyActiveRequestItem();
     else if (id === 'paste-item') await this.pasteCopiedRequestItem();
     else if (id === 'delete-item' && this.requestSelection.ids.length > 1) await this.deleteRequests(this.requestSelection.ids);
-    else if (id === 'delete-item' && this.activeRequestId) await this.deleteRequest(this.activeRequestId);
+    else if (id === 'delete-item' && targetRequestId) await this.deleteRequest(targetRequestId);
     else if (id === 'next-item') await this.switchSidebarItem(1);
     else if (id === 'previous-item') await this.switchSidebarItem(-1);
     else if (id === 'expand-item') await this.expandActiveCollection();
