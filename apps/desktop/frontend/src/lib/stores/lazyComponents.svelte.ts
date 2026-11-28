@@ -14,6 +14,7 @@ export type AppLazyComponentState = {
   globalSearchOpen: boolean;
   settingsOpen: boolean;
   sseSessionVisible: boolean;
+  graphqlSubscriptionView?: boolean;
 };
 
 class AppLazyComponents {
@@ -294,6 +295,7 @@ class AppLazyComponents {
     if (state.requestType === 'graphql' && state.requestTab === 'query') void this.loadGraphQLQueryTab();
     if (state.requestType === 'graphql' && state.requestTab === 'schema') void this.loadGraphQLSchemaTab();
     if (state.requestType === 'http' && (state.method === 'SSE' || state.sseSessionVisible)) void this.loadSSEPanel();
+    if (state.graphqlSubscriptionView) void this.loadWebSocketPanel();
     if (state.requestType === 'ws') {
       void this.loadWebSocketPanel();
       if (state.requestTab === 'body') void this.loadWebSocketMessageTab();

@@ -307,6 +307,7 @@
     if (agentDetailsDocked && vm.sidebarWidth > shownSidebarWidth) vm.sidebarWidth = shownSidebarWidth;
   });
   let sseSessionVisible = $derived(vm.sseSessionIsVisible());
+  let graphqlSubscriptionView = $derived(vm.requestType === 'graphql' && (vm.graphqlIsSubscription() || vm.webSocketConnected || vm.webSocketConnecting));
   let requestSplitWidth = $state(0);
   let activeRequestLocation = $derived.by(() => {
     const request = vm.activeRequest;
@@ -467,6 +468,7 @@
       globalSearchOpen: vm.globalSearchOpen,
       settingsOpen: vm.settingsOpen,
       sseSessionVisible,
+      graphqlSubscriptionView,
     });
   });
 
@@ -1344,7 +1346,8 @@
         onSend={vm.runActiveRequest}
         onSendAndDownload={() => vm.runActiveRequestAndDownload()}
         sseStatus={vm.requestType === 'http' && (vm.method === 'SSE' || sseSessionVisible) ? (vm.currentSSESession?.status ?? 'idle') : undefined}
-        wsStatus={vm.requestType === 'ws' ? (vm.currentWebSocketSession?.status ?? 'idle') : undefined}
+        wsStatus={vm.requestType === 'ws' || graphqlSubscriptionView ? (vm.currentWebSocketSession?.status ?? 'idle') : undefined}
+        graphqlSubscription={graphqlSubscriptionView}
         sioStatus={vm.requestType === 'socketio' ? (vm.currentSocketIOSession?.status ?? 'idle') : undefined}
         grpcMethod={vm.grpcMethod}
         grpcMethods={vm.grpcSelectableMethods()}
@@ -1488,7 +1491,7 @@
         {#if lazy.MqttPanelComponent}<lazy.MqttPanelComponent />{/if}
       {:else if vm.requestType === 'kafka'}
         {#if lazy.KafkaResponsePanelComponent}{#key vm.activeRequestId}<lazy.KafkaResponsePanelComponent />{/key}{/if}
-      {:else if vm.requestType === 'ws'}
+      {:else if vm.requestType === 'ws' || graphqlSubscriptionView}
         {#if lazy.WebSocketPanelComponent}
         <lazy.WebSocketPanelComponent
           status={vm.currentWebSocketSession?.status ?? 'idle'}

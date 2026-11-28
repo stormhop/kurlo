@@ -34,6 +34,7 @@ const defaultWebSocketHandshakeTimeout = 30 * time.Second
 type websocketSession struct {
 	cancel  context.CancelFunc
 	conn    *websocket.Conn
+	graphql *graphqlWSClient
 	id      uint64
 	writeMu sync.Mutex
 }
@@ -182,14 +183,25 @@ func (m *websocketManager) runtimeCallbacks(appCtx context.Context, sessionID st
 
 func (m *websocketManager) disconnect(sessionID string) {
 	m.mu.Lock()
-	if sess, ok := m.sessions[sessionID]; ok {
-		sess.cancel()
-		if sess.conn != nil {
-			_ = sess.conn.Close()
-		}
+	sess, ok := m.sessions[sessionID]
+	var conn *websocket.Conn
+	var gql *graphqlWSClient
+	if ok {
+		conn = sess.conn
+		gql = sess.graphql
 		delete(m.sessions, sessionID)
 	}
 	m.mu.Unlock()
+	if !ok {
+		return
+	}
+	if gql != nil && conn != nil {
+		gql.stop()
+	}
+	sess.cancel()
+	if conn != nil {
+		_ = conn.Close()
+	}
 }
 
 func (m *websocketManager) disconnectAll() {
@@ -305,6 +317,15 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 		emitError("URL contains an unresolved variable — make sure all {{variables}} are defined in the active environment")
 		return false
 	}
+	var gqlSubscribe, gqlInit []byte
+	if req.GraphQLSubscription {
+		subscribe, init, err := graphqlSubscriptionPayloads(req)
+		if err != nil {
+			emitError(err.Error())
+			return false
+		}
+		gqlSubscribe, gqlInit = subscribe, init
+	}
 	u, err := buildWebSocketURL(req)
 	if err != nil {
 		emitError(err.Error())
@@ -352,6 +373,9 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 		Proxy:            proxyForRequest(req),
 		HandshakeTimeout: websocketHandshakeTimeout(req),
 	}
+	if req.GraphQLSubscription {
+		dialer.Subprotocols = graphqlSubprotocols(headers)
+	}
 	var wsJar *trackedCookieJar
 	if !skipCookieJar {
 		wsJar = m.jars.jar(req.WorkspaceID)
@@ -392,6 +416,7 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 		m.mu.Lock()
 		if sess, ok := m.sessions[sessionID]; ok && sess.id == seq && sess.conn == conn {
 			sess.conn = nil
+			sess.graphql = nil
 		}
 		m.mu.Unlock()
 	}()
@@ -406,6 +431,12 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 		return false
 	}
 	sess.conn = conn
+	var gql *graphqlWSClient
+	if req.GraphQLSubscription {
+		gql = newGraphQLWSClient(conn, &sess.writeMu, conn.Subprotocol(), gqlSubscribe, gqlInit, callbacks.onEvent)
+		sess.graphql = gql
+		defer gql.close()
+	}
 	m.mu.Unlock()
 
 	readIdleTimeout := websocketReadIdleTimeout(req)
@@ -440,6 +471,17 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 		Timestamp:       time.Now().UnixMilli(),
 	})
 
+	if gql != nil {
+		if err := gql.start(websocketHandshakeTimeout(req)); err != nil {
+			if ctx.Err() != nil {
+				emitClose("Disconnected", websocket.CloseNormalClosure)
+				return false
+			}
+			emitError("Could not start the GraphQL connection: " + err.Error())
+			return false
+		}
+	}
+
 	if interval := websocketKeepAliveInterval(req); interval > 0 {
 		stopKeepAlive := make(chan struct{})
 		defer close(stopKeepAlive)
@@ -469,6 +511,10 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 				emitClose("Disconnected", websocket.CloseNormalClosure)
 				return false
 			}
+			if gql != nil && gql.ackTimedOut() {
+				emitError(fmt.Sprintf("The server did not acknowledge the GraphQL connection within %s. Check the URL and the connection payload.", websocketHandshakeTimeout(req)))
+				return false
+			}
 			if closeErr, ok := err.(*websocket.CloseError); ok {
 				emitClose(websocketCloseMessage(closeErr), closeErr.Code)
 				return websocketShouldReconnect(req, closeErr.Code)
@@ -478,6 +524,21 @@ func (m *websocketManager) runConnectionOnceWithCallbacks(ctx context.Context, s
 		}
 		switch messageType {
 		case websocket.TextMessage:
+			if gql != nil {
+				result := gql.receive(data)
+				if !result.done {
+					continue
+				}
+				sess.writeMu.Lock()
+				_ = conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), time.Now().Add(graphqlStopWriteTimeout))
+				sess.writeMu.Unlock()
+				if result.failed {
+					emitError(result.message)
+				} else {
+					emitClose(result.message, result.code)
+				}
+				return false
+			}
 			callbacks.onEvent(newWebSocketMessage("incoming", "text", data, "plain", 0, false, false, ""))
 		case websocket.BinaryMessage:
 			callbacks.onEvent(newWebSocketMessage("incoming", "binary", data, "base64", 0, false, false, ""))

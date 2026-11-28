@@ -30,6 +30,7 @@
     vm.graphqlQuery = payload.query;
     vm.graphqlVariables = payload.variables;
     vm.graphqlOperationName = payload.operationName;
+    if (payload.connectionPayload !== undefined) vm.graphqlConnectionPayload = payload.connectionPayload;
     vm.scheduleActiveRequestPersist();
     error = '';
   }

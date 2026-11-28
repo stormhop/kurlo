@@ -482,6 +482,8 @@ class AppVM {
   declare graphQLBodyForSend: typeof graphqlFeature.graphQLBodyForSend;
   declare graphQLPayloadFromRequest: typeof graphqlFeature.graphQLPayloadFromRequest;
   declare graphQLPayloadError: typeof graphqlFeature.graphQLPayloadError;
+  declare graphqlIsSubscription: typeof graphqlFeature.graphqlIsSubscription;
+  declare graphQLSubscriptionError: typeof graphqlFeature.graphQLSubscriptionError;
   declare beautifyGraphQLQuery: typeof graphqlFeature.beautifyGraphQLQuery;
   declare graphQLPayloadHasContent: typeof graphqlFeature.graphQLPayloadHasContent;
   declare fetchGraphQLSchemaUrl: typeof graphqlFeature.fetchGraphQLSchemaUrl;
@@ -1220,6 +1222,7 @@ class AppVM {
   graphqlQuery = $state(DEFAULT_GRAPHQL_QUERY);
   graphqlVariables = $state(DEFAULT_GRAPHQL_VARIABLES);
   graphqlOperationName = $state('');
+  graphqlConnectionPayload = $state('');
   graphqlSchema = $state('');
   graphqlSchemaLoading = $state(false);
   graphqlSchemaOperationToken = 0;

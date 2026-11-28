@@ -114,6 +114,7 @@ type RequestExecutionHost = {
   syncBackendGlobals: () => Promise<void>;
   syncGlobalsFromBackend: () => Promise<boolean>;
   webSocketConnect: () => Promise<void>;
+  graphqlIsSubscription: () => boolean;
   webSocketDisconnect: () => Promise<void>;
 };
 
@@ -158,6 +159,11 @@ export const requestExecutionFeature = {
     }
     if (this.requestType === 'ai') {
       await this.sendAiPrompt();
+      return;
+    }
+    if (this.requestType === 'graphql' && (this.webSocketConnected || this.webSocketConnecting || (!this.loading && this.graphqlIsSubscription()))) {
+      if (this.webSocketConnected || this.webSocketConnecting) await this.webSocketDisconnect();
+      else await this.webSocketConnect();
       return;
     }
     if (this.requestType === 'http' && (this.method === 'SSE' || this.sseSessionIsActive())) {

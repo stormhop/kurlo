@@ -1,7 +1,7 @@
 import { webSocketConnect, webSocketDisconnect, webSocketSend } from '../../backend';
 import { emptyHttpResponse } from '../../wire';
 import type { HttpRequest, HttpResponse } from '../../backend';
-import type { BodyType, RequestTab, SavedRequest, WebSocketMessageEntry, WebSocketSession } from '../../types/models';
+import type { BodyType, RequestTab, RequestType, SavedRequest, WebSocketMessageEntry, WebSocketSession } from '../../types/models';
 import { byteLength, requestTitleFrom } from '../../utils';
 
 const WS_MAX_MESSAGES = 3000;
@@ -20,6 +20,7 @@ type WebSocketHost = {
   url: string;
   bodyType: BodyType;
   bodyContent: string;
+  requestType: RequestType;
   requests: SavedRequest[];
   requestsById: Map<string, SavedRequest>;
   requestError: string;
@@ -32,6 +33,7 @@ type WebSocketHost = {
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   syncBackendEnvironment: () => Promise<void>;
   buildRequest: () => HttpRequest;
+  graphQLSubscriptionError: () => string;
   headerValidationErrorForRequest: (req: SavedRequest, envValues?: Record<string, string>) => string;
   setActiveResponse: (response: HttpResponse | null, requestId?: string) => void;
   resolveTemplate: (value: string, values?: Record<string, string>) => string;
@@ -128,6 +130,12 @@ export const websocketFeature = {
       ? this.snapshotActiveRequest()
       : this.requestsById.get(sessionId);
     if (!base) return null;
+    if (base.requestType === 'graphql') {
+      return this.normalizeSavedRequestCtx({
+        ...base,
+        name: !base.nameAuto && base.name && base.name !== 'New Request' ? base.name : requestTitleFrom('GQL', base.url),
+      });
+    }
     return this.normalizeSavedRequestCtx({
       ...base,
       requestType: 'ws',
@@ -164,6 +172,15 @@ export const websocketFeature = {
       this._wsSetSession(id, { status: 'error', error: headerError, connectedUrl: this.url.trim() });
       return;
     }
+    const graphql = this.requestType === 'graphql';
+    const graphqlError = graphql ? this.graphQLSubscriptionError() : '';
+    if (graphqlError) {
+      this.requestError = graphqlError;
+      this.setActiveResponse(null, id);
+      this._wsSetSession(id, { status: 'error', error: graphqlError, connectedUrl: this.url.trim() });
+      return;
+    }
+    this.requestError = '';
     this._wsPendingMessages.delete(id);
     this._wsStartedAt.set(id, Date.now());
     this._wsHistoryRecorded.delete(id);

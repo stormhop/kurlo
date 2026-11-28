@@ -18,6 +18,14 @@
 
   type ActivePanel = 'query' | 'variables';
   let activePanel = $state<ActivePanel>('query');
+  let bottomTab = $state<'variables' | 'connection'>('variables');
+  const showConnection = $derived(vm.graphqlIsSubscription() || vm.graphqlConnectionPayload.trim() !== '');
+  const shownBottomTab = $derived(showConnection ? bottomTab : 'variables');
+
+  function openBottom(tab: 'variables' | 'connection') {
+    bottomTab = tab;
+    activePanel = 'variables';
+  }
 
   const TOOLBAR_H = 38;
   const MIN_EXPLORER_WIDTH = 320;
@@ -102,7 +110,7 @@
   <aside class="graphql-explorer-panel">
     {#if schema && schema.types.get(schema.roots.query ?? '')?.fields.length}
       {#key vm.activeRequestId}
-        <GraphQLBuilder {schema} showVariables={() => { activePanel = 'variables'; }} />
+        <GraphQLBuilder {schema} showVariables={() => openBottom('variables')} />
       {/key}
     {:else}
       <div class="graphql-explorer-empty">
@@ -239,14 +247,22 @@
       <div class="graphql-panel-toolbar">
         <button
           class="graphql-panel-tab-btn"
-          class:active={activePanel === 'variables'}
+          class:active={activePanel === 'variables' && shownBottomTab === 'variables'}
           type="button"
-          onclick={() => { activePanel = 'variables'; }}
+          onclick={() => openBottom('variables')}
         >Variables</button>
+        {#if showConnection}
+          <button
+            class="graphql-panel-tab-btn"
+            class:active={activePanel === 'variables' && shownBottomTab === 'connection'}
+            type="button"
+            onclick={() => openBottom('connection')}
+          >Connection payload</button>
+        {/if}
         <button
           class="btn btn-ghost btn-icon btn-sm graphql-panel-toggle"
           type="button"
-          aria-label={activePanel === 'variables' ? 'Collapse variables' : 'Expand variables'}
+          aria-label={activePanel === 'variables' ? (shownBottomTab === 'connection' ? 'Collapse connection payload' : 'Collapse variables') : (shownBottomTab === 'connection' ? 'Expand connection payload' : 'Expand variables')}
           onclick={() => { activePanel = activePanel === 'variables' ? 'query' : 'variables'; }}
         >
           <svg
@@ -259,6 +275,18 @@
         </button>
       </div>
       <div class="graphql-editor-body">
+        {#if shownBottomTab === 'connection'}
+          <CodeEditor
+            bind:value={vm.graphqlConnectionPayload}
+            language="json"
+            placeholder={'{\n  "authorization": "Bearer {{token}}"\n}'}
+            fillHeight={true}
+            compact={true}
+            testId="graphql-connection-payload-editor"
+            ariaLabel="GraphQL connection payload editor"
+            variableSuggestions={vm.variableSuggestions}
+          />
+        {:else}
         <CodeEditor
           bind:value={vm.graphqlVariables}
           language="json"
@@ -269,6 +297,7 @@
           ariaLabel="GraphQL variables editor"
           variableSuggestions={vm.variableSuggestions}
         />
+        {/if}
       </div>
     </section>
   </section>

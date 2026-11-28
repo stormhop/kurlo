@@ -169,6 +169,8 @@ type HttpRequest struct {
 	ResolveTemplates             bool              `json:"resolveTemplates,omitempty"`
 	TemplateValues               map[string]string `json:"templateValues,omitempty"`
 	GraphQL                      *GraphQLPayload   `json:"graphql,omitempty"`
+	GraphQLSubscription          bool              `json:"graphqlSubscription,omitempty"`
+	GraphQLConnectionPayload     string            `json:"graphqlConnectionPayload,omitempty"`
 	ProxyURL                     string            `json:"proxyUrl"`
 	ProxyMode                    string            `json:"proxyMode"`
 	ProxyBypass                  string            `json:"proxyBypass"`

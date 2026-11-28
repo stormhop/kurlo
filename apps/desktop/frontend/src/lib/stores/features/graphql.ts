@@ -7,6 +7,8 @@ import {
   DEFAULT_GRAPHQL_VARIABLES,
   GRAPHQL_INTROSPECTION_QUERY,
   buildGraphQLRequestBody,
+  graphQLOperationType,
+  parseGraphQLConnectionPayload,
   formatGraphQLQuery,
   graphQLSchemaValidationError,
   normalizeGraphQLSchemaText,
@@ -22,6 +24,7 @@ import { newRequestId, prettyJson } from '../../utils';
 type GraphQLHost = {
   activeRequestId: string;
   graphqlOperationName: string;
+  graphqlConnectionPayload: string;
   graphqlQuery: string;
   graphqlSchema: string;
   graphqlSchemaError: string;
@@ -38,6 +41,7 @@ type GraphQLHost = {
   environmentValuesForRequest: (req: Pick<SavedRequest, 'collectionId'>, envValues?: Record<string, string>) => Record<string, string>;
   fetchGraphQLSchemaUrl: (schemaUrl: string) => Promise<{ body: string; status: string; statusCode: number }>;
   graphQLBodyForSend: (payload?: GraphQLPayload) => string;
+  graphQLPayloadError: (payload?: GraphQLPayload) => string;
   importGraphQLSchemaText: (source: string, label?: string) => void;
   normalizeRequestUrlForSend: (rawUrl: string) => string;
   requestWithCollectionDefaults: (req: SavedRequest) => SavedRequest;
@@ -55,6 +59,7 @@ export const graphqlFeature = {
       query: this.graphqlQuery,
       variables: this.graphqlVariables,
       operationName: this.graphqlOperationName,
+      connectionPayload: this.graphqlConnectionPayload,
     };
   },
 
@@ -68,6 +73,10 @@ export const graphqlFeature = {
 
   graphQLPayloadFromRequest(this: GraphQLHost, req: Pick<SavedRequest, 'bodyContent'>) {
     return parseGraphQLPayload(req.bodyContent);
+  },
+
+  graphqlIsSubscription(this: GraphQLHost): boolean {
+    return this.requestType === 'graphql' && graphQLOperationType(this.currentGraphQLPayload()) === 'subscription';
   },
 
   graphQLPayloadError(this: GraphQLHost, payload = this.currentGraphQLPayload()) {
@@ -84,6 +93,17 @@ export const graphqlFeature = {
     this.scheduleActiveRequestPersist();
   },
 
+  graphQLSubscriptionError(this: GraphQLHost, payload = this.currentGraphQLPayload()) {
+    const error = this.graphQLPayloadError(payload);
+    if (error) return error;
+    try {
+      parseGraphQLConnectionPayload(this.resolveTemplate(payload.connectionPayload ?? '', this.environmentValuesForRequest(this.snapshotActiveRequest())));
+      return '';
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  },
+
   graphQLPayloadHasContent(this: GraphQLHost, source: string) {
     const payload = parseGraphQLPayload(source);
     let variablesHaveContent: boolean;
@@ -97,6 +117,7 @@ export const graphqlFeature = {
       payload.query.trim() && payload.query.trim() !== DEFAULT_GRAPHQL_QUERY.trim()
       || variablesHaveContent
       || payload.operationName.trim()
+      || (payload.connectionPayload ?? '').trim()
     );
   },
 

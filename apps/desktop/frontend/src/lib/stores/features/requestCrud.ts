@@ -68,6 +68,7 @@ type RequestCrudHost = {
   graphqlSchemaError: string;
   graphqlSchemaStatus: string;
   graphqlVariables: string;
+  graphqlConnectionPayload: string;
   grpcResponseTabs: Map<string, GrpcResponseTab>;
   grpcResponses: Map<string, GrpcResponse>;
   mcpResponses: Map<string, McpResponse>;
@@ -329,6 +330,7 @@ export const requestCrudFeature = {
         this.graphqlQuery = parsed.query;
         this.graphqlVariables = parsed.variables;
         this.graphqlOperationName = parsed.operationName;
+        this.graphqlConnectionPayload = parsed.connectionPayload ?? '';
         this.graphqlSchema = '';
         this.graphqlSchemaStatus = '';
         this.graphqlSchemaError = '';
@@ -352,7 +354,7 @@ export const requestCrudFeature = {
     } else if (this.requestType === 'socketio') {
       const bodyDefaults = requestBodyDefaultsFor('socketio');
       if (this.method === 'SSE') void this.sseDisconnect();
-      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'ws' || previousType === 'graphql') void this.webSocketDisconnect();
       this.method = 'GET';
       if (this.requestTab === 'auth' || this.requestTab === 'scripts' || this.requestTab === 'query' || this.requestTab === 'schema') this.requestTab = 'body';
       if (wasGraphQL) {
@@ -364,9 +366,20 @@ export const requestCrudFeature = {
         this.rawBodyType = bodyDefaults.rawBodyType;
         this.bodyContent = bodyDefaults.bodyContent;
       } else if (this.bodyType === 'graphql') this.bodyType = this.rawBodyType;
+    } else if (this.requestType === 'mqtt') {
+      if (this.method === 'SSE') void this.sseDisconnect();
+      if (previousType === 'ws' || previousType === 'graphql') void this.webSocketDisconnect();
+      if (previousType === 'socketio') void this.socketIODisconnect();
+      this.requestTab = ['docs', 'body', 'events', 'auth', 'properties', 'will', 'vars', 'settings'].includes(this.requestTab) ? this.requestTab : 'body';
+      if (!RAW_BODY_TYPES.includes(this.bodyType as RawBodyType)) {
+        this.bodyType = 'text';
+        this.rawBodyType = 'text';
+      }
+      if (wasGraphQL) this.bodyContent = '';
+      if (!['none', 'inherit', 'basic'].includes(this.authType)) this.authType = 'none';
     } else if (this.requestType === 'kafka') {
       if (this.method === 'SSE') void this.sseDisconnect();
-      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'ws' || previousType === 'graphql') void this.webSocketDisconnect();
       if (previousType === 'socketio') void this.socketIODisconnect();
       this.method = 'POST';
       this.requestTab = 'body';
@@ -376,7 +389,7 @@ export const requestCrudFeature = {
       if (!['none', 'inherit', 'basic', 'bearer', 'oauth2', 'aws'].includes(this.authType)) this.authType = 'none';
     } else if (this.requestType === 'grpc') {
       if (this.method === 'SSE') void this.sseDisconnect();
-      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'ws' || previousType === 'graphql') void this.webSocketDisconnect();
       if (previousType === 'socketio') void this.socketIODisconnect();
       this.method = 'POST';
       this.requestTab = ['docs', 'body', 'auth', 'metadata', 'service', 'scripts', 'settings'].includes(this.requestTab) ? this.requestTab : 'body';
@@ -388,7 +401,7 @@ export const requestCrudFeature = {
       else if (!this.bodyContent.trim()) this.bodyContent = defaultBodyContentFor('grpc');
     } else if (this.requestType === 'mcp') {
       if (this.method === 'SSE') void this.sseDisconnect();
-      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'ws' || previousType === 'graphql') void this.webSocketDisconnect();
       if (previousType === 'socketio') void this.socketIODisconnect();
       if (/^wss?:\/\//i.test(this.url)) this.url = this.url.replace(/^ws/i, 'http');
       this.method = 'POST';
@@ -399,7 +412,7 @@ export const requestCrudFeature = {
       if (!this.mcpMethod) this.mcpMethod = 'tools/list';
     } else if (this.requestType === 'ai') {
       if (this.method === 'SSE') void this.sseDisconnect();
-      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'ws' || previousType === 'graphql') void this.webSocketDisconnect();
       if (previousType === 'socketio') void this.socketIODisconnect();
       this.method = 'POST';
       this.requestTab = ['docs', 'body', 'auth', 'headers', 'tools', 'scripts', 'settings'].includes(this.requestTab) ? this.requestTab : 'body';
@@ -414,7 +427,7 @@ export const requestCrudFeature = {
         this.bearerToken = auth.bearerToken;
       }
     } else {
-      if (previousType === 'ws') void this.webSocketDisconnect();
+      if (previousType === 'ws' || previousType === 'graphql') void this.webSocketDisconnect();
       if (previousType === 'socketio') void this.socketIODisconnect();
       if (/^wss?:\/\//i.test(this.url)) this.url = this.url.replace(/^ws/i, 'http');
       if (wasGraphQL) {
@@ -429,6 +442,7 @@ export const requestCrudFeature = {
       this.graphqlQuery = DEFAULT_GRAPHQL_QUERY;
       this.graphqlVariables = DEFAULT_GRAPHQL_VARIABLES;
       this.graphqlOperationName = '';
+      this.graphqlConnectionPayload = '';
       this.graphqlSchema = '';
       this.graphqlSchemaStatus = '';
       this.graphqlSchemaError = '';

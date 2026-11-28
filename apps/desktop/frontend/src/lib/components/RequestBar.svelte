@@ -54,6 +54,7 @@
     onSendAndDownload = () => {},
     sseStatus = undefined,
     wsStatus = undefined,
+    graphqlSubscription = false,
     sioStatus = undefined,
     grpcMethod = '',
     grpcMethods = [],
@@ -92,6 +93,7 @@
     onSendAndDownload?: () => void;
     sseStatus?: SSEStatus;
     wsStatus?: WebSocketStatus;
+    graphqlSubscription?: boolean;
     sioStatus?: SocketIOStatus;
     grpcMethod?: string;
     grpcMethods?: GrpcMethodInfo[];
@@ -430,7 +432,20 @@
       </button>
     {/if}
 
-    {#if sendType === 'kafka' || sendType === 'graphql' || sendType === 'grpc' || sendType === 'ai'}
+    {#if graphqlSubscribing}
+      <button
+        class="btn-send"
+        class:btn-graphql-query={!connectionActive}
+        class:btn-ws-disconnect={connectionActive}
+        onclick={onSend}
+        type="button"
+      >
+        {#if connecting}<BirdSpinner tone="current" />
+        {:else if connectionActive}<span class="sse-dot-live"></span>{/if}
+        {connectionActive ? 'Unsubscribe' : 'Subscribe'}
+        <RequestShortcutHint />
+      </button>
+    {:else if sendType === 'kafka' || sendType === 'graphql' || sendType === 'grpc' || sendType === 'ai'}
       <button
         class="btn-send"
         class:btn-graphql-query={sendType === 'graphql' || sendType === 'grpc'}

@@ -50,6 +50,7 @@ type RequestBodyHost = {
   graphqlSchemaError: string;
   graphqlSchemaStatus: string;
   graphqlVariables: string;
+  graphqlConnectionPayload: string;
   method: Method;
   params: KVRow[];
   pathParams: KVRow[];
@@ -174,6 +175,7 @@ export const requestBodyFeature = {
     this.graphqlQuery = DEFAULT_GRAPHQL_QUERY;
     this.graphqlVariables = DEFAULT_GRAPHQL_VARIABLES;
     this.graphqlOperationName = '';
+    this.graphqlConnectionPayload = '';
     this.graphqlSchema = '';
     this.graphqlSchemaStatus = '';
     this.graphqlSchemaError = '';

@@ -3466,6 +3466,8 @@ export namespace model {
 	    resolveTemplates?: boolean;
 	    templateValues?: Record<string, string>;
 	    graphql?: GraphQLPayload;
+	    graphqlSubscription?: boolean;
+	    graphqlConnectionPayload?: string;
 	    proxyUrl: string;
 	    proxyMode: string;
 	    proxyBypass: string;
@@ -3549,6 +3551,8 @@ export namespace model {
 	        this.resolveTemplates = source["resolveTemplates"];
 	        this.templateValues = source["templateValues"];
 	        this.graphql = this.convertValues(source["graphql"], GraphQLPayload);
+	        this.graphqlSubscription = source["graphqlSubscription"];
+	        this.graphqlConnectionPayload = source["graphqlConnectionPayload"];
 	        this.proxyUrl = source["proxyUrl"];
 	        this.proxyMode = source["proxyMode"];
 	        this.proxyBypass = source["proxyBypass"];

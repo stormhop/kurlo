@@ -99,6 +99,7 @@ type RequestStateHost = {
   collections: Collection[];
   formRows: KVRow[];
   graphqlOperationName: string;
+  graphqlConnectionPayload: string;
   graphqlQuery: string;
   graphqlSchema: string;
   graphqlSchemaError: string;
@@ -210,7 +211,7 @@ type RequestStateHost = {
   currentRequestSettingsOverrides: () => RequestSettingsOverrides;
   defaultCollectionForWorkspace: (workspaceId?: string) => Collection | undefined;
   graphQLBodyContentForStore: () => string;
-  graphQLPayloadFromRequest: (req: Pick<SavedRequest, 'bodyContent'>) => { query: string; variables: string; operationName: string };
+  graphQLPayloadFromRequest: (req: Pick<SavedRequest, 'bodyContent'>) => { query: string; variables: string; operationName: string; connectionPayload?: string };
   graphQLPayloadHasContent: (bodyContent: string) => boolean;
   normalizeRequestTypeValue: (value: unknown, url?: string) => RequestType;
   restoreSioEventRows: (rows: KVRow[] | undefined) => KVRow[];
@@ -228,7 +229,7 @@ export const requestStateFeature = {
   requestEditSignal(this: RequestStateHost): string {
     void this.activeBodyVariant; void this.bodyVariants;
     void this.bodyContent; void this.graphqlSchema; void this.graphqlQuery;
-    void this.graphqlVariables; void this.preRequestScriptJs; void this.testScriptJs;
+    void this.graphqlVariables; void this.graphqlConnectionPayload; void this.preRequestScriptJs; void this.testScriptJs;
     void this.requestNotes; void this.url; void this.requestName;
     return JSON.stringify({
       id: this.activeRequestId, requestType: this.requestType,
@@ -507,18 +508,18 @@ export const requestStateFeature = {
     if (this.requestType === 'graphql') {
       const graphql = this.graphQLPayloadFromRequest(req);
       this.bodyType = 'graphql'; this.rawBodyType = 'json'; this.bodyContent = req.bodyContent || defaultBodyContentFor('graphql');
-      this.graphqlQuery = graphql.query; this.graphqlVariables = graphql.variables; this.graphqlOperationName = graphql.operationName;
+      this.graphqlQuery = graphql.query; this.graphqlVariables = graphql.variables; this.graphqlOperationName = graphql.operationName; this.graphqlConnectionPayload = graphql.connectionPayload ?? '';
       this.graphqlSchema = req.graphqlSchema ?? '';
       this.graphqlSchemaStatus = ''; this.graphqlSchemaError = '';
     } else if (this.requestType === 'grpc') {
       this.bodyType = 'json'; this.rawBodyType = 'json'; this.bodyContent = req.bodyContent || defaultBodyContentFor('grpc');
       this.graphqlQuery = DEFAULT_GRAPHQL_QUERY; this.graphqlVariables = DEFAULT_GRAPHQL_VARIABLES;
-      this.graphqlOperationName = ''; this.graphqlSchema = '';
+      this.graphqlOperationName = ''; this.graphqlConnectionPayload = ''; this.graphqlSchema = '';
       this.graphqlSchemaStatus = ''; this.graphqlSchemaError = '';
     } else {
       this.bodyType = req.bodyType; this.rawBodyType = req.rawBodyType; this.bodyContent = req.bodyContent;
       this.graphqlQuery = DEFAULT_GRAPHQL_QUERY; this.graphqlVariables = DEFAULT_GRAPHQL_VARIABLES;
-      this.graphqlOperationName = ''; this.graphqlSchema = '';
+      this.graphqlOperationName = ''; this.graphqlConnectionPayload = ''; this.graphqlSchema = '';
       this.graphqlSchemaStatus = ''; this.graphqlSchemaError = '';
     }
     this.activeBodyVariant = req.activeBodyVariant ?? '';

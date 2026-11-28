@@ -275,6 +275,7 @@ export const requestSerializationFeature = {
       secretEnvironmentValues,
       ...(defer ? { resolveTemplates: true, templateValues: { ...envValues, ...(options.iterationData ?? {}) }, scriptEnvironment, scriptVariables } : {}),
       ...(deferredGraphQL ? { graphql: deferredGraphQL } : {}),
+      ...(graphQLPayload?.connectionPayload?.trim() ? { graphqlConnectionPayload: resolveValue(stripJsonComments(graphQLPayload.connectionPayload)) } : {}),
       ...(options.iterationData ? { iterationData: options.iterationData } : {}),
       ...(options.iteration ? { iteration: options.iteration, iterationCount: options.iterationCount ?? 0 } : {}),
     };

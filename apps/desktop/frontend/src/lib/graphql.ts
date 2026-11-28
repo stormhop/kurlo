@@ -1,5 +1,6 @@
 import { parse } from 'graphql/language/parser';
 import { print } from 'graphql/language/printer';
+import type { OperationDefinitionNode } from 'graphql/language/ast';
 import { stripJsonComments } from './jsonEditing';
 import { asText, isRecord } from './utils';
 
@@ -7,7 +8,10 @@ export type GraphQLPayload = {
   query: string;
   variables: string;
   operationName: string;
+  connectionPayload?: string;
 };
+
+export type GraphQLOperationType = 'query' | 'mutation' | 'subscription';
 
 export type GraphQLExplorerArg = {
   name: string;
@@ -132,6 +136,20 @@ fragment TypeRef on __Type {
   }
 }`;
 
+function prettyConnectionPayload(value: unknown) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') {
+    const clean = value.trim();
+    if (!clean) return '';
+    try {
+      return JSON.stringify(JSON.parse(stripJsonComments(clean)), null, 2);
+    } catch {
+      return value;
+    }
+  }
+  return JSON.stringify(value, null, 2);
+}
+
 function prettyJsonValue(value: unknown) {
   if (typeof value === 'string') {
     const clean = value.trim();
@@ -159,6 +177,7 @@ export function parseGraphQLPayload(source: string): GraphQLPayload {
         query: asText(parsed.query) || DEFAULT_GRAPHQL_QUERY,
         variables: prettyJsonValue(parsed.variables),
         operationName: asText(parsed.operationName),
+        connectionPayload: prettyConnectionPayload(parsed.connectionPayload),
       };
     }
   } catch {
@@ -185,11 +204,52 @@ export function serializeGraphQLPayload(payload: GraphQLPayload): string {
   } catch {
     variables = payload.variables;
   }
+  const connection = (payload.connectionPayload ?? '').trim();
+  let connectionPayload: unknown;
+  if (connection) {
+    try {
+      connectionPayload = JSON.parse(stripJsonComments(connection));
+    } catch {
+      connectionPayload = payload.connectionPayload;
+    }
+  }
   return JSON.stringify({
     query: payload.query,
     variables,
     ...(payload.operationName.trim() ? { operationName: payload.operationName.trim() } : {}),
+    ...(connection ? { connectionPayload } : {}),
   }, null, 2);
+}
+
+export function parseGraphQLConnectionPayload(source: string): string {
+  const clean = source.trim();
+  if (!clean) return '';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripJsonComments(clean));
+  } catch {
+    throw new Error('GraphQL connection payload must be a JSON object');
+  }
+  if (!isRecord(parsed)) throw new Error('GraphQL connection payload must be a JSON object');
+  return JSON.stringify(parsed);
+}
+
+export function graphQLOperationType(payload: Pick<GraphQLPayload, 'query' | 'operationName'>): GraphQLOperationType | '' {
+  let operations: OperationDefinitionNode[];
+  try {
+    operations = parse(payload.query).definitions.filter((d): d is OperationDefinitionNode => d.kind === 'OperationDefinition');
+  } catch {
+    const name = payload.operationName.trim();
+    const pattern = name
+      ? new RegExp(`(?:^|[^\\w])(query|mutation|subscription)\\s+${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+      : /^\s*(?:#[^\n]*\n\s*)*(query|mutation|subscription)\b/;
+    return (payload.query.match(pattern)?.[1] as GraphQLOperationType | undefined) ?? '';
+  }
+  const name = payload.operationName.trim();
+  const selected = name
+    ? operations.find(op => op.name?.value === name)
+    : operations.length === 1 ? operations[0] : undefined;
+  return selected?.operation ?? '';
 }
 
 export function buildGraphQLRequestBody(payload: GraphQLPayload): string {
