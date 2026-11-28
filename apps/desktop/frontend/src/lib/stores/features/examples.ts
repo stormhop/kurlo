@@ -23,7 +23,7 @@ type ExamplesHost = {
   activeSecretEnvironmentValues: () => string[];
   scheduleActiveRequestPersist: () => void;
   guardWorkspaceWritable: (action?: string) => boolean;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   addCapturedExample: (example: RequestExample) => Promise<void>;
@@ -200,6 +200,7 @@ export const examplesFeature = {
       'Delete example',
       `Delete “${example.name}”? Its saved response goes with it.`,
       'Delete',
+      true,
     );
     if (!confirmed) return;
     const remaining = this.requestExamples.filter(item => item.id !== id);

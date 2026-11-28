@@ -76,7 +76,7 @@ type EnvironmentHost = {
   activeWorkspaceEnvironments: Environment[];
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openAlertDialog: (title: string, message: string) => Promise<unknown>;
   guardWorkspaceWritable: (action?: string) => boolean;
   persistRequestStore: () => Promise<boolean>;
@@ -336,7 +336,7 @@ export const environmentFeature = {
     const childNote = children.length
       ? ` ${children.map(child => child.name).join(', ')} ${children.length === 1 ? 'inherits' : 'inherit'} from it and will ${grandparent ? `inherit from ${grandparent.name} instead` : 'keep only the values set there'}.`
       : '';
-    const confirmed = await this.openConfirmDialog('Delete environment', `Delete "${environment.name}" from this workspace?${childNote} You can restore it from Recently deleted until you quit Kurlo.`);
+    const confirmed = await this.openConfirmDialog('Delete environment', `Delete "${environment.name}" from this workspace?${childNote} You can restore it from Recently deleted until you quit Kurlo.`, 'Delete', true);
     if (!confirmed) return;
     this.trashEnvironment(environment);
     const baselines = new Map(this.environmentBaselines);
@@ -500,7 +500,7 @@ export const environmentFeature = {
   },
   async removeEnvironmentVariable(this: EnvironmentHost, key: string) {
     if (!this.guardWorkspaceWritable('Environment changes')) return;
-    const ok = await this.openConfirmDialog('Delete variable', `Remove ${key} from every environment in this workspace?`, 'Delete');
+    const ok = await this.openConfirmDialog('Delete variable', `Remove ${key} from every environment in this workspace?`, 'Delete', true);
     if (!ok) return;
     this.updateWorkspaceEnvironments(environment => removeMatrixKey(environment, key));
   },

@@ -567,6 +567,55 @@ test('persists a PFX container and passphrase for gRPC without a separate key', 
   })).toEqual({ cert: '/certs/client.pfx', key: '', password: '{{pfxPassword}}' });
 });
 
+test('streams gRPC messages one at a time on a bidirectional call', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    requests: [{
+      id: 'grpc-bidi', collectionId: '', name: 'Watch stock', folderPath: [],
+      requestType: 'grpc', method: 'POST', url: 'grpc.kurlo.test:443', grpcMethod: 'shop.Inventory/WatchStock',
+      bodyContent: JSON.stringify({ sku: 'sku-1' }, null, 2),
+    }],
+    activeId: 'grpc-bidi', openIds: ['grpc-bidi'],
+  });
+  await page.setViewportSize({ width: 1400, height: 860 });
+  await page.goto('/');
+  await page.getByLabel('gRPC method').click();
+  await page.getByRole('option', { name: /Inventory \/ WatchStock/ }).click();
+  const send = page.getByTestId('grpc-stream-send');
+  const end = page.getByTestId('grpc-stream-end');
+  await expect(send).toBeDisabled();
+  await expect(page.getByRole('note', { name: 'Message format' })).toHaveText('JSON');
+  await expect(page.getByRole('button', { name: 'Message format' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Invoke', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window.__kurloE2E.sentGrpcRequests.at(-1) as { interactive?: boolean } | undefined)?.interactive)).toBe(true);
+  await expect(send).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => window.__kurloE2E.grpcStreamMessages.length)).toBe(0);
+
+  await send.click();
+  await expect(page.locator('.grpc-message-list')).toContainText('"stock":6');
+  await fillCodeEditor(page, 'grpc-message-editor', JSON.stringify({ sku: 'sku-2' }, null, 2));
+  await page.keyboard.press('Control+Enter');
+  await expect(page.locator('.grpc-message-list')).toContainText('sku-2');
+  await fillCodeEditor(page, 'grpc-message-editor', '{"sku":');
+  await send.click();
+  await expect(page.getByTestId('grpc-message-editor').locator('.cm-lintRange')).toHaveCount(1);
+  await fillCodeEditor(page, 'grpc-message-editor', '{"warehouse":"north"}');
+  await expect(page.getByTestId('grpc-message-editor').locator('.cm-lintRange')).toHaveCount(0);
+  await send.click();
+  const rejected = page.locator('.grpc-message-list .sse-event-error');
+  await expect(rejected).toContainText('message has no field "warehouse"');
+  await expect(rejected.locator('.sse-badge')).toHaveText('error');
+  expect(await page.evaluate(() => window.__kurloE2E.grpcStreamMessages.map(item => JSON.parse(item.message).sku))).toEqual(['sku-1', 'sku-2']);
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-grpc-bidi-stream.png'), animations: 'disabled' });
+  await captureDocsScreenshot(page, 'request-grpc-stream');
+
+  await end.click();
+  await expect(page.locator('.response-status-bar')).toContainText('OK');
+  await expect(send).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Invoke', exact: true })).toBeVisible();
+  await expect(page.locator('.grpc-message-list')).toContainText('sku-2');
+});
+
 test('builds and sends a nested GraphQL operation from live introspection', async ({ page }) => {
   const { startCatalogServer } = await import('./support/graphqlCatalog');
   const { server, url } = await startCatalogServer();
@@ -646,4 +695,73 @@ test('builds and sends a nested GraphQL operation from live introspection', asyn
     server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
+});
+
+test('subscribes to a GraphQL subscription over graphql-ws and unsubscribes', async ({ page }) => {
+  await installKurloBridge(page, '', 'windows/e2e', false, {
+    collections: [{ id: 'live', name: 'Live', workspaceId: 'workspace-e2e' }],
+    requests: [{ id: 'ticks', name: 'Ticks', collectionId: 'live', collection: 'Live',
+      requestType: 'graphql', method: 'POST', url: 'https://api.kurlo.test/graphql', requestTab: 'query', bodyType: 'graphql',
+      bodyContent: JSON.stringify({ query: 'query Me {\n  me { id }\n}', variables: { n: 2 } }) }],
+    activeId: 'ticks', openIds: ['ticks'],
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Query', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Connection payload', exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Show the response below the request' }).click();
+  await fillCodeEditor(page, 'graphql-query-editor', 'subscription OnTick($n: Int) {\n  tick(n: $n)\n}');
+  const subscribe = page.getByRole('button', { name: 'Subscribe', exact: true });
+  await expect(subscribe).toBeVisible();
+  await page.getByRole('button', { name: 'Connection payload', exact: true }).click();
+  await fillCodeEditor(page, 'graphql-connection-payload-editor', '{\n  "authorization": "Bearer live-token"\n}');
+  await subscribe.click();
+
+  await expect(page.getByRole('button', { name: 'Unsubscribe', exact: true })).toBeVisible();
+  const connect = await page.evaluate(() => window.__kurloE2E.webSocketConnects.at(-1)!);
+  expect(connect.sessionId).toBe('ticks');
+  expect(connect.request.graphqlSubscription).toBe(true);
+  expect(connect.request.url).toBe('https://api.kurlo.test/graphql');
+  expect(JSON.parse(connect.request.graphqlConnectionPayload ?? '')).toEqual({ authorization: 'Bearer live-token' });
+  expect(JSON.parse(connect.request.body)).toEqual({ query: 'subscription OnTick($n: Int) {\n  tick(n: $n)\n}', variables: { n: 2 } });
+
+  await page.evaluate(() => {
+    const frame = (direction: string, data: string, isSystem = false) => ({
+      id: `gql-${Math.random()}`, direction, type: 'text', data, encoding: 'plain', size: data.length,
+      timestamp: Date.now(), isSystem, isError: false, message: '',
+    });
+    window.__kurloE2E.emit('ws:events', {
+      sessionId: 'ticks',
+      events: [
+        frame('outgoing', '{"type":"connection_init","payload":{"authorization":"Bearer live-token"}}'),
+        frame('incoming', '{"type":"connection_ack"}'),
+        frame('outgoing', '{"id":"1","type":"subscribe","payload":{"query":"subscription OnTick { tick }"}}'),
+        frame('incoming', '{"id":"1","type":"next","payload":{"data":{"tick":1}}}'),
+        frame('incoming', '{"id":"1","type":"next","payload":{"data":{"tick":2}}}'),
+      ],
+    });
+  });
+  await expect(page.locator('.ws-message-list')).toContainText('"tick":2');
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-graphql-subscription-${test.info().project.name}.png`), animations: 'disabled' });
+
+  await page.getByRole('button', { name: 'Unsubscribe', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Subscribe', exact: true })).toBeVisible();
+  await expect(page.locator('.ws-panel')).toContainText('Disconnected by E2E');
+
+  await page.keyboard.press('Control+s');
+  await expect.poll(async () => page.evaluate(() => {
+    const saved = window.__kurloE2E.store.requests.find(request => request.id === 'ticks');
+    return saved ? JSON.parse(saved.bodyContent).connectionPayload : null;
+  })).toEqual({ authorization: 'Bearer live-token' });
+});
+
+test('orders MCP request tabs like HTTP with Examples before Settings', async ({ page }) => {
+  await page.setViewportSize({ width: 1900, height: 900 });
+  await installKurloBridge(page);
+  await page.goto('/');
+  await page.getByLabel('New unsaved request').click();
+  await chooseRequestType(page, 'MCP Request');
+  const tabs = page.locator('.request-editor-tabs-shell').getByRole('tab');
+  await expect(tabs).toHaveText([/^Docs/, /^Arguments/, /^Auth/, /^Headers/, /^Vars/, /^Scripts/, /^Examples/, /^File/, /^Settings/]);
 });

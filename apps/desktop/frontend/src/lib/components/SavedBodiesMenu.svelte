@@ -47,7 +47,7 @@
 
   async function remove(name: string) {
     const id = vm.activeRequestId;
-    if (!await vm.openConfirmDialog('Delete body variant', `Delete “${name}” from the saved variants?`)) return;
+    if (!await vm.openConfirmDialog('Delete body variant', `Delete “${name}” from the saved variants?`, 'Delete', true)) return;
     if (vm.activeRequestId !== id) return;
     if (vm.activeBodyVariant !== name) vm.bodyVariants = vm.bodyVariants.filter(body => body.name !== name);
     else if (vm.bodyVariants.length) selectBodyVariant(vm, vm.bodyVariants[0].name, true);

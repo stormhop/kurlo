@@ -13,7 +13,7 @@
 
   async function close() {
     if (notes.saving) return;
-    if (notes.dirty && !(await vm.openConfirmDialog('Discard changes', `Your changes to ${AGENT_NOTES_FILE} are not saved.`, 'Discard'))) return;
+    if (notes.dirty && !(await vm.openConfirmDialog('Discard changes', `Your changes to ${AGENT_NOTES_FILE} are not saved.`, 'Discard', true))) return;
     notes.close();
   }
 
@@ -31,11 +31,11 @@
   }
 
   async function reload() {
-    if (await vm.openConfirmDialog('Load the newer version', `Your edits are replaced with ${AGENT_NOTES_FILE} as it is on disk now.`, 'Load')) notes.reloadFromDisk();
+    if (await vm.openConfirmDialog('Load the newer version', `Your edits are replaced with ${AGENT_NOTES_FILE} as it is on disk now.`, 'Load', true)) notes.reloadFromDisk();
   }
 
   async function overwrite() {
-    if (!(await vm.openConfirmDialog('Replace the newer version', `${AGENT_NOTES_FILE} on disk is replaced with your text. The changes made elsewhere are lost unless they are in Git.`, 'Replace'))) return;
+    if (!(await vm.openConfirmDialog('Replace the newer version', `${AGENT_NOTES_FILE} on disk is replaced with your text. The changes made elsewhere are lost unless they are in Git.`, 'Replace', true))) return;
     const created = !notes.conflictExists;
     if (await notes.overwrite()) finish(created);
   }

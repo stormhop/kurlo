@@ -348,3 +348,17 @@ for (const dockOpen of [false, true]) {
     });
   }
 }
+
+test('names the runner after its collection and tells an empty collection from an empty filter', async ({ page }) => {
+  await installKurloBridge(page, '', 'browser/e2e', false, {
+    collections: [{ id: 'col-empty', workspaceId: 'workspace-e2e', name: 'Empty suite' }],
+    requests: [],
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Collection runner', exact: true }).click();
+  const runner = page.getByRole('region', { name: 'Collection runner' });
+  await expect(runner.getByRole('heading', { level: 1 })).toHaveText('Empty suite');
+  await expect(runner.locator('.runner-empty')).toHaveText('No requests in this collection');
+  await runner.getByLabel('Include tags').fill('smoke');
+  await expect(runner.locator('.runner-empty')).toHaveText('No requests match the current filters');
+});

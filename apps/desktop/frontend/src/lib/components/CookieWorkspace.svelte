@@ -322,6 +322,8 @@
   }
 
   async function clearAll() {
+    const count = cookies.length;
+    if (!await vm.openConfirmDialog('Clear all cookies', `Delete all ${count} ${count === 1 ? 'cookie' : 'cookies'} in this workspace? This cannot be undone.`, 'Clear all', true)) return;
     await vm.clearCookieJar();
     cookieView.manualDomains = [];
     cookieView.domain = '';

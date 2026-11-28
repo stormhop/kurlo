@@ -30,7 +30,7 @@
     running,
     preflighting = false,
     preflightFailures = [],
-    title,
+    heading,
     results,
     summary,
     lastRunAt = 0,
@@ -74,7 +74,7 @@
     running: boolean;
     preflighting?: boolean;
     preflightFailures?: { requestId: string; name: string; failures: LinkedSecretFailure[] }[];
-    title: string;
+    heading: string;
     results: CollectionRunnerResult[];
     summary: { total: number; completed: number; passed: number; failed: number; skipped: number; testsPassed: number; testsTotal: number; duration: number; allPassed: boolean };
     lastRunAt?: number;
@@ -237,7 +237,7 @@
   <section class="collection-runner-main">
     <header class="runner-page-head">
       <div class="runner-page-title">
-        <h1>{title}</h1>
+        <h1>{heading}</h1>
         <p><b>{selectedCount}</b> of {runnableCount} {runnableCount === 1 ? 'request' : 'requests'} × <b>{Math.max(1, iterations)}</b> {iterations === 1 ? 'iteration' : 'iterations'} = <b>{runCount}</b> {runCount === 1 ? 'call' : 'calls'} · {parallel ? 'in parallel' : 'one by one'}{delayMs ? ` · ${delayMs} ms apart` : ''}</p>
       </div>
       <div class="runner-page-actions">
@@ -378,6 +378,8 @@
       <div class="runner-request-list">
         {#if !collections.length}
           <div class="empty-state runner-empty"><span class="empty-state-title">No collections in this workspace</span></div>
+        {:else if !filteredRequests.length && !includeTags.trim() && !excludeTags.trim()}
+          <div class="empty-state runner-empty"><span class="empty-state-title">No requests in this collection</span></div>
         {:else if !filteredRequests.length}
           <div class="empty-state runner-empty"><span class="empty-state-title">No requests match the current filters</span></div>
         {:else}

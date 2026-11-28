@@ -88,7 +88,7 @@
 
   async function clearLog() {
     menuOpen = false;
-    if (await vm.openConfirmDialog('Clear agent activity', 'Every recorded call and its saved file versions are deleted. Restore from Git afterwards if you need an older version.', 'Clear')) {
+    if (await vm.openConfirmDialog('Clear agent activity', 'Every recorded call and its saved file versions are deleted. Restore from Git afterwards if you need an older version.', 'Clear', true)) {
       await activity.clear();
     }
   }

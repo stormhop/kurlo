@@ -149,7 +149,7 @@ export const collectionRunnerFeature = {
     const collectionChanged = previousCollectionId !== nextCollectionId;
     this.collectionRunnerOpen = true;
     this.topView = 'runner';
-    this.collectionRunnerTitle = this.collections.find(collection => collection.id === nextCollectionId)?.name || 'Collection Runner';
+    this.collectionRunnerTitle = this.collections.find(collection => collection.id === nextCollectionId)?.name || 'Collection runner';
     if (!this.collectionRunnerRunning && (collectionChanged || !this.collectionRunnerResults.length)) this.showCollectionLastRun(nextCollectionId);
     if (selectedRequestIds) {
       const allowedIds = new Set(this.collectionRunnerSelectableRequests.map(request => request.id));
@@ -168,7 +168,7 @@ export const collectionRunnerFeature = {
   },
   setCollectionRunnerCollection(this: CollectionRunnerHost, collectionId: string) {
     this.collectionRunnerCollectionId = collectionId;
-    this.collectionRunnerTitle = this.collections.find(collection => collection.id === collectionId)?.name || 'Collection Runner';
+    this.collectionRunnerTitle = this.collections.find(collection => collection.id === collectionId)?.name || 'Collection runner';
     this.collectionRunnerSelectedRequestIds = new Set();
     this.showCollectionLastRun(collectionId);
     this.selectAllCollectionRunnerRequests();
@@ -250,7 +250,7 @@ export const collectionRunnerFeature = {
     this.openCollectionRunner(this.collectionRunnerEffectiveCollectionId);
     await this.persistActiveRequestNow();
     await this.startCollectionRunner(
-      this.collections.find(collection => collection.id === this.collectionRunnerEffectiveCollectionId)?.name || 'Collection Runner',
+      this.collections.find(collection => collection.id === this.collectionRunnerEffectiveCollectionId)?.name || 'Collection runner',
       this.collectionRunnerSelectedRequests,
       {
         delayMs: this.collectionRunnerDelayMs,
@@ -354,7 +354,7 @@ export const collectionRunnerFeature = {
     const generatedAt = new Date();
     const { buildCollectionRunnerReportHtml, collectionRunnerReportFileName } = await import('../../runnerReport');
     const html = buildCollectionRunnerReportHtml({
-      title: this.collectionRunnerTitle || 'Collection Runner',
+      title: this.collectionRunnerTitle || 'Collection runner',
       generatedAt,
       summary: this.buildCollectionRunnerSummary(),
       results: this.collectionRunnerResults,

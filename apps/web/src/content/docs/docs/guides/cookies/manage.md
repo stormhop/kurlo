@@ -12,7 +12,7 @@ Open cookies from the cookie icon at the bottom of the activity rail, on the far
 - **Cookies from another computer.** A cookie created on another machine keeps its value in that machine's Kurlo profile, and the workspace files only reference it. Kurlo shows such a cookie with an empty value marked *Not on this computer*, in the **Raw** editor too, and does not send it. Type the value and save to use it here; saving without a value keeps the reference.
 - **Set when a cookie expires** with the **Expires** field: pick a day in the calendar, type the time, or choose **In 1 hour**, **Tomorrow**, **In 7 days** or **In 30 days**. The arrow keys move between days and `Escape` closes the calendar. **Clear** turns the cookie back into a session cookie.
 - **Edit a cookie** by clicking its row. The editor opens under the table; `Cmd/Ctrl Enter` or **Save** stores the change and `Escape` closes the editor without saving.
-- **Delete** one cookie with the cross at the end of its row. The **•••** menu next to **Add cookie** deletes every cookie of the domain, clears the whole jar, or reloads the jar from disk.
+- **Delete** one cookie with the cross at the end of its row. The **•••** menu next to **Add cookie** deletes every cookie of the domain, clears the whole jar after you confirm, or reloads the jar from disk.
 
 ![Cookie editor with the Fields mode open](../../../../../assets/screenshots/cookie-jar-editor.png)
 

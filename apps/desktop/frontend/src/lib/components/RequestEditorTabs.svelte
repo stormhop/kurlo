@@ -106,8 +106,8 @@
         headers,
         vars,
         scripts,
-        settings,
         examples,
+        settings,
       ];
     }
 

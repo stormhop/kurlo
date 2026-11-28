@@ -79,7 +79,7 @@ type PreferencesHost = {
   workspaces: Workspace[];
   activeWorkspace: Workspace | undefined;
   closeFloatingMenus: () => void;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   persistRequestStore: () => Promise<boolean>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   saveDirtyRequestsToDisk: () => Promise<void>;
@@ -313,7 +313,8 @@ export const preferencesFeature = {
       const confirmed = await this.openConfirmDialog(
         'Disable SSL verification',
         'Disabling SSL verification exposes this request to man-in-the-middle attacks. Only use this against trusted hosts in a controlled environment.',
-        'Disable'
+        'Disable',
+        true,
       );
       if (confirmed) {
         this.enableSSLVerification = false;

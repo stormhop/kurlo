@@ -74,7 +74,7 @@ type CollectionHost = {
   invalidCollectionFromDiagnostic: (diagnostic: WorkspaceDiagnostic) => Collection;
   invalidRequestFromDiagnostic: (diagnostic: WorkspaceDiagnostic, collection: Collection) => SavedRequest;
   openAlertDialog: (title: string, message: string) => Promise<void>;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
@@ -253,7 +253,7 @@ export const collectionFeature = {
     if (!collection || collection.isInvalid) return false;
     const folder = folderDefaultsFor(collection, folderPath);
     const confirmed = folderDefaultsHaveContent(folder)
-      ? await this.openConfirmDialog('Reset folder defaults', `Clear headers, auth, scripts and tests for "${folderPath.at(-1) ?? 'this folder'}"? Its requests go back to what the parent folder or collection sets.`, 'Reset')
+      ? await this.openConfirmDialog('Reset folder defaults', `Clear headers, auth, scripts and tests for "${folderPath.at(-1) ?? 'this folder'}"? Its requests go back to what the parent folder or collection sets.`, 'Reset', true)
       : true;
     if (!confirmed) return false;
     this.collections = this.collections.map(candidate => candidate.id === collectionId && folder
@@ -310,7 +310,7 @@ export const collectionFeature = {
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection || collection.isInvalid) return false;
     const confirmed = collectionDefaultsHaveContent(collection.defaults)
-      ? await this.openConfirmDialog('Reset collection defaults', `Clear headers, variables, auth, scripts, tests, and proxy defaults for "${collection.name}"?`, 'Reset')
+      ? await this.openConfirmDialog('Reset collection defaults', `Clear headers, variables, auth, scripts, tests, and proxy defaults for "${collection.name}"?`, 'Reset', true)
       : true;
     if (!confirmed) return false;
     this.collections = this.collections.map(candidate => candidate.id === collectionId
@@ -323,7 +323,7 @@ export const collectionFeature = {
     if (!this.guardWorkspaceWritable('Deleting collections')) return;
     const collection = this.collections.find(candidate => candidate.id === collectionId);
     if (!collection) return;
-    const confirmed = await this.openConfirmDialog('Delete collection', `Delete "${collection.name}" and all requests inside it? You can restore it from Recently deleted until you quit Kurlo.`);
+    const confirmed = await this.openConfirmDialog('Delete collection', `Delete "${collection.name}" and all requests inside it? You can restore it from Recently deleted until you quit Kurlo.`, 'Delete', true);
     if (!confirmed) return;
     const requestIds = this.requests.filter(request => request.collectionId === collectionId).map(request => request.id);
     if (this.requestFiles && !await this.requestFiles.review(requestIds)) return;

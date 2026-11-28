@@ -29,7 +29,7 @@ type HistoryHost = {
   applySavedRequest: (request: SavedRequest) => void;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   guardWorkspaceWritable: (action?: string) => boolean;
   activeCollectionId: () => string;
   defaultCollectionForWorkspace: (workspaceId?: string) => Collection | undefined;
@@ -328,7 +328,7 @@ export const historyFeature = {
   },
   async clearRequestHistory(this: HistoryHost) {
     if (!this.guardWorkspaceWritable('Clearing history')) return;
-    const confirmed = await this.openConfirmDialog('Clear history', 'Clear all request history stored for the last 14 days?', 'Clear history');
+    const confirmed = await this.openConfirmDialog('Clear history', 'Clear all request history stored for the last 14 days?', 'Clear history', true);
     if (!confirmed) return;
     this.requestHistory = [];
     this.historyHeaderMenuOpen = false;

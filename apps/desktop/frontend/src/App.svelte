@@ -1271,6 +1271,7 @@
     {:else if vm.topView === 'runner'}
       {#if lazy.CollectionRunnerWorkspaceComponent}
       <lazy.CollectionRunnerWorkspaceComponent
+        heading={vm.collectionRunnerTitle || 'Collection runner'}
         collections={vm.collectionRunnerCollections}
         selectedCollectionId={vm.collectionRunnerEffectiveCollectionId}
         filteredRequests={vm.collectionRunnerFilteredRequests}

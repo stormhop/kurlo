@@ -130,7 +130,7 @@ type RequestCrudHost = {
   isRequestType: (value: unknown) => value is RequestType;
   normalizeRequestTypeValue: (value: unknown, url?: string) => RequestType;
   normalizeSavedRequestCtx: (input: Partial<SavedRequest>) => SavedRequest;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   openDraftRequests: () => SavedRequest[];
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
@@ -660,7 +660,8 @@ export const requestCrudFeature = {
         const quitAnyway = await this.openConfirmDialog(
           'Quit without saving?',
           'Kurlo could not save your latest changes. Quit anyway and lose them, or stay and fix the problem first.',
-          'Quit without saving'
+          'Quit without saving',
+          true,
         );
         if (quitAnyway) await confirmQuit();
         else await cancelQuit();
@@ -950,7 +951,7 @@ export const requestCrudFeature = {
     const req = this.requestsById.get(id);
     if (!req) return;
     this.openRequestMenuId = '';
-    const confirmed = await this.openConfirmDialog('Delete request', `Delete "${requestTabLabel(req)}"? You can restore it from Recently deleted until you quit Kurlo.`);
+    const confirmed = await this.openConfirmDialog('Delete request', `Delete "${requestTabLabel(req)}"? You can restore it from Recently deleted until you quit Kurlo.`, 'Delete', true);
     if (!confirmed) return;
     await requestCrudFeature.removeRequests.call(this, [req]);
   },
@@ -963,7 +964,7 @@ export const requestCrudFeature = {
     }
     if (!this.guardWorkspaceWritable('Deleting requests')) return;
     this.openRequestMenuId = '';
-    const confirmed = await this.openConfirmDialog('Delete requests', `Delete ${reqs.length} requests? You can restore them from Recently deleted until you quit Kurlo.`, `Delete ${reqs.length}`);
+    const confirmed = await this.openConfirmDialog('Delete requests', `Delete ${reqs.length} requests? You can restore them from Recently deleted until you quit Kurlo.`, `Delete ${reqs.length}`, true);
     if (!confirmed) return;
     await requestCrudFeature.removeRequests.call(this, reqs);
   },

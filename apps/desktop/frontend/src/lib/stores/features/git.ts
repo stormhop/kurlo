@@ -200,7 +200,7 @@ type GitHost = {
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openSelectDialog: (title: string, message: string, options: DialogOption[], confirmLabel?: string, cancelLabel?: string) => Promise<string | false | null>;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   defaultWorkspaceParentForDialogs: () => Promise<string>;
   applyWorkspaceOpenResult: (result: WorkspaceOpenResult, successMessage: string) => Promise<boolean>;
@@ -496,6 +496,7 @@ export const gitFeature = {
           'Folder already exists',
           `A folder named "${directoryName}" already exists in the chosen location.\n\nOverwrite it? This permanently deletes its current contents (only after the clone succeeds — a failed clone leaves it untouched).`,
           'Overwrite',
+          true,
         );
         if (!confirmed) {
           this.gitError = result.error || 'Destination folder already exists.';
@@ -763,7 +764,9 @@ export const gitFeature = {
     if (!operation) return;
     const confirmed = await this.openConfirmDialog(
       `Abort ${operation}`,
-      `Abort the current Git ${operation} and reload the workspace from the previous state?`
+      `Abort the current Git ${operation} and reload the workspace from the previous state?`,
+      'Abort',
+      true,
     );
     if (!confirmed) return;
     if (this.requestFiles && !await this.requestFiles.review()) return;
@@ -1064,7 +1067,8 @@ export const gitFeature = {
       remote
         ? `Delete ${branchName} from the remote? This removes it for everyone who uses that remote.`
         : `Delete local branch ${branchName}? The remote branch, if any, is not deleted.`,
-      'Delete'
+      'Delete',
+      true,
     );
     if (!confirmed) return;
     this.gitLoading = true;
@@ -1079,7 +1083,8 @@ export const gitFeature = {
         const forceConfirmed = await this.openConfirmDialog(
           'Branch has unmerged commits',
           `Git refused to safely delete ${branchName} because it has commits not merged into the current branch.\n\nForce delete this local branch?`,
-          'Force delete'
+          'Force delete',
+          true,
         );
         if (!forceConfirmed) {
           this.gitError = result.error || 'Branch deletion cancelled';
@@ -1113,7 +1118,8 @@ export const gitFeature = {
       const confirmed = await this.openConfirmDialog(
         'Rename remote branch',
         `Rename ${branchName} to ${newName} on the remote? The old remote branch is deleted and recreated under the new name for everyone who uses that remote.`,
-        'Rename'
+        'Rename',
+        true,
       );
       if (!confirmed) return;
     }
@@ -1170,7 +1176,9 @@ export const gitFeature = {
     if (!this.gitStatus.isRepo || !path || path === 'Outgoing changes') return;
     const confirmed = await this.openConfirmDialog(
       'Discard file changes',
-      `Discard local changes in "${path}" and reload the workspace? This cannot be undone.`
+      `Discard local changes in "${path}" and reload the workspace? This cannot be undone.`,
+      'Discard',
+      true,
     );
     if (!confirmed) return;
     if (this.requestFiles && !await this.requestFiles.review()) return;
@@ -1196,7 +1204,9 @@ export const gitFeature = {
     const count = selectedPaths.length;
     const confirmed = await this.openConfirmDialog(
       'Discard selected changes',
-      `Discard local changes in ${count} selected Kurlo file${count === 1 ? '' : 's'} and reload the workspace? This cannot be undone.`
+      `Discard local changes in ${count} selected Kurlo file${count === 1 ? '' : 's'} and reload the workspace? This cannot be undone.`,
+      'Discard',
+      true,
     );
     if (!confirmed) return;
     if (this.requestFiles && !await this.requestFiles.review()) return;
@@ -1222,7 +1232,9 @@ export const gitFeature = {
     const count = kurloChangedFiles(this.gitStatus).length;
     const confirmed = await this.openConfirmDialog(
       'Discard Kurlo changes',
-      `Discard local Kurlo workspace changes and reload from the current commit? This affects Kurlo-managed files only and cannot be undone.`
+      `Discard local Kurlo workspace changes and reload from the current commit? This affects Kurlo-managed files only and cannot be undone.`,
+      'Discard',
+      true,
     );
     if (!confirmed) return;
     if (this.requestFiles && !await this.requestFiles.review()) return;
@@ -1326,7 +1338,8 @@ export const gitFeature = {
           : 'Kurlo will rebase your local commits onto the remote.';
         const confirmed = await this.openConfirmDialog(
           'Remote has new commits',
-          `${result.error}\n\n${detail}\n\nPull and then push?`
+          `${result.error}\n\n${detail}\n\nPull and then push?`,
+          'Pull and push',
         );
         if (!confirmed) {
           this.gitError = result.error || 'Push failed';
@@ -1380,7 +1393,9 @@ export const gitFeature = {
     if (!await this.beginGitMutation('Force push')) return;
     const confirmed = await this.openConfirmDialog(
       'Force push with lease',
-      'Force push rewrites the remote branch. Kurlo refuses if the remote has commits this branch has not taken in yet — even ones a fetch already downloaded. Continue?'
+      'Force push rewrites the remote branch. Kurlo refuses if the remote has commits this branch has not taken in yet — even ones a fetch already downloaded. Continue?',
+      'Force push',
+      true,
     );
     if (!confirmed) return;
     if (!this.gitStatus.upstream) {

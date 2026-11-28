@@ -34,7 +34,7 @@ type WorkspaceHost = {
   defaultCollectionForWorkspace: (workspaceId?: string) => Collection | undefined;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   guardWorkspaceWritable: (action?: string) => boolean;
   guardWorkspaceListWritable: (action?: string) => boolean;
@@ -204,7 +204,8 @@ export const workspaceFeature = {
     const confirmed = await this.openConfirmDialog(
       'Delete workspace',
       `Delete "${workspace.name}" and all its ${collectionIds.length} collection${collectionIds.length === 1 ? '' : 's'} and ${requestCount} request${requestCount === 1 ? '' : 's'}? This cannot be undone.`,
-      'Delete workspace'
+      'Delete workspace',
+      true,
     );
     if (!confirmed) return;
     await this.captureActiveWorkspaceCookies();

@@ -31,7 +31,7 @@ type FolderHost = {
   forgetRequestResponses: (ids: string[]) => void;
   guardWorkspaceWritable: (action?: string) => boolean;
   openAlertDialog: (title: string, message: string) => Promise<void>;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openPromptDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   openNameDialog: (title: string, initialValue?: string, message?: string) => Promise<string | null>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
@@ -164,7 +164,7 @@ export const folderFeature = {
     this.closeFloatingMenus();
     const folderName = folderPath.at(-1) ?? 'this folder';
     const count = this.requests.filter(request => request.collectionId === collectionId && this.folderPathMatches(request.folderPath ?? [], folderPath)).length;
-    const confirmed = await this.openConfirmDialog('Delete folder', `Delete "${folderName}" and its ${count} request${count === 1 ? '' : 's'}? You can restore it from Recently deleted until you quit Kurlo.`);
+    const confirmed = await this.openConfirmDialog('Delete folder', `Delete "${folderName}" and its ${count} request${count === 1 ? '' : 's'}? You can restore it from Recently deleted until you quit Kurlo.`, 'Delete', true);
     if (!confirmed) return;
     const removed = this.requests
       .filter(request => request.collectionId === collectionId && this.folderPathMatches(request.folderPath ?? [], folderPath))

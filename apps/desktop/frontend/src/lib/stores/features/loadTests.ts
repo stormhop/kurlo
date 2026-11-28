@@ -36,7 +36,7 @@ type LoadTestHost = {
   closeFloatingMenus: () => void;
   guardWorkspaceWritable: (action?: string) => boolean;
   openAlertDialog: (title: string, message: string) => Promise<void>;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openLoadTest: (collectionId: string, loadTestId: string) => Promise<void>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   persistRequestStore: PersistRequestStore;
@@ -285,7 +285,7 @@ export const loadTestFeature = {
     this.closeFloatingMenus();
     const test = this.collections.find(candidate => candidate.id === collectionId)?.loadTests?.find(candidate => candidate.id === loadTestId);
     if (!test) return;
-    if (!await this.openConfirmDialog('Delete load test', `Delete "${test.name}"? Its file is removed from the workspace.`, 'Delete')) return;
+    if (!await this.openConfirmDialog('Delete load test', `Delete "${test.name}"? Its file is removed from the workspace.`, 'Delete', true)) return;
     if (!await this.updateCollectionLoadTests(collectionId, tests => tests.filter(candidate => candidate.id !== loadTestId))) return;
     if (this.activeLoadTestId === loadTestId && this.activeLoadTestCollectionId === collectionId) {
       this.loadTestEdits = null;

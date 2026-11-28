@@ -383,6 +383,14 @@ test.describe('Cookie jar', () => {
     await expect(panel.locator('.cookie-domain-item')).toHaveCount(1);
     await modal.getByRole('button', { name: 'More cookie actions' }).click();
     await modal.getByRole('menuitem', { name: 'Clear all cookies' }).click();
+    const confirm = page.getByRole('dialog', { name: 'Clear all cookies' });
+    await expect(confirm).toContainText('This cannot be undone.');
+    await confirm.getByRole('button', { name: 'Cancel' }).click();
+    await expect(panel.locator('.cookie-domain-item')).toHaveCount(1);
+    await modal.getByRole('button', { name: 'More cookie actions' }).click();
+    await modal.getByRole('menuitem', { name: 'Clear all cookies' }).click();
+    await expect(confirm.getByRole('button', { name: 'Clear all' })).toHaveClass(/btn-danger/);
+    await confirm.getByRole('button', { name: 'Clear all' }).click();
     await expect(modal.getByText('No cookies yet')).toBeVisible();
     expect(await stored()).toEqual([]);
   });

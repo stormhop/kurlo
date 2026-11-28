@@ -54,7 +54,7 @@ type DataBackupHost = {
   isRecord: (value: unknown) => value is Record<string, unknown>;
   closeFloatingMenus: () => void;
   hasUnsavedRequestChanges: () => boolean;
-  openConfirmDialog: (title: string, message: string, confirmLabel?: string) => Promise<boolean>;
+  openConfirmDialog: (title: string, message: string, confirmLabel?: string, danger?: boolean) => Promise<boolean>;
   openAlertDialog: (title: string, message: string) => Promise<void>;
   persistActiveRequestNow: (forceDisk?: boolean) => Promise<void>;
   requestsForStore: (nextRequests: SavedRequest[]) => SavedRequest[];
@@ -192,7 +192,7 @@ export const dataBackupFeature = {
     this.closeFloatingMenus();
     const path = await openFileDialog('Import Kurlo data backup');
     if (!path) return;
-    const confirmed = await this.openConfirmDialog('Import all data', 'This will replace workspaces, collections, requests, environments, history, and cookies in this app.', 'Import');
+    const confirmed = await this.openConfirmDialog('Import all data', 'This will replace workspaces, collections, requests, environments, history, and cookies in this app.', 'Import', true);
     if (!confirmed) return;
     try {
       const text = await readTextFile(path);

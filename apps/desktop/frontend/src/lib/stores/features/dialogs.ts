@@ -53,12 +53,12 @@ export const dialogFeature = {
     const name = await dialogFeature.openPromptDialog.call(this, title, clampName(initialValue), message, 'Name', 'Save', NAME_MAX_LENGTH);
     return name === null ? null : clampName(name);
   },
-  openConfirmDialog(this: DialogHost, title: string, message: string, confirmLabel = 'Delete') {
+  openConfirmDialog(this: DialogHost, title: string, message: string, confirmLabel = 'Continue', danger = false) {
     this.closeFloatingMenus();
     this.dialogSelectOpen = false;
     this.dialogInputValue = '';
     return new Promise<boolean>((resolve) => {
-      this.appDialog = { mode: 'confirm', title, message, confirmLabel, cancelLabel: 'Cancel', danger: confirmLabel.toLowerCase().includes('delete'), resolve: (value) => resolve(value === true) };
+      this.appDialog = { mode: 'confirm', title, message, confirmLabel, cancelLabel: 'Cancel', danger, resolve: (value) => resolve(value === true) };
     });
   },
   openAlertDialog(this: DialogHost, title: string, message: string) {
