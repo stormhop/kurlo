@@ -21,7 +21,7 @@
         body: string;
       }
     | {
-        kind: 'cancelled' | 'error';
+        kind: 'cancelled' | 'error' | 'rejected';
         key: string;
         timestamp: number;
         sortIndex: number;
@@ -59,15 +59,24 @@
   let grpcRows = $derived.by(() => {
     const current = response;
     if (!current) return [];
-    const rows: GrpcResponseRow[] = (current.messages ?? []).map((message) => ({
-      kind: 'message',
-      key: `message-${message.index}-${message.timestamp}`,
-      timestamp: message.timestamp || current.timestamp || 0,
-      sortIndex: message.index,
-      message,
-      preview: compactGrpcJson(message.body),
-      body: prettyGrpcJson(message.body),
-    }));
+    const rows: GrpcResponseRow[] = (current.messages ?? []).map((message): GrpcResponseRow => message.direction === 'error'
+      ? {
+          kind: 'rejected',
+          key: `rejected-${message.index}-${message.timestamp}`,
+          timestamp: message.timestamp || current.timestamp || 0,
+          sortIndex: message.index,
+          title: message.body,
+          detail: message.body,
+        }
+      : {
+          kind: 'message',
+          key: `message-${message.index}-${message.timestamp}`,
+          timestamp: message.timestamp || current.timestamp || 0,
+          sortIndex: message.index,
+          message,
+          preview: compactGrpcJson(message.body),
+          body: prettyGrpcJson(message.body),
+        });
     const terminalTimestamp = current.timestamp || Math.max(0, ...rows.map((row) => row.timestamp)) + 1 || Date.now();
     if (isGrpcCancelled(current.grpcCode, current.error)) {
       rows.push({
@@ -312,7 +321,7 @@
               <div
                 class="sse-event-row"
                 class:sse-event-system={row.kind !== 'message'}
-                class:sse-event-error={row.kind === 'cancelled' || row.kind === 'error'}
+                class:sse-event-error={row.kind !== 'message'}
               >
                 <button
                   class="sse-event-main"
@@ -358,6 +367,10 @@
                     {#if row.kind === 'message'}
                       <!-- eslint-disable-next-line svelte/no-at-html-tags -->
                       <pre class="sse-event-data-viewer sse-event-pre sse-event-data-json"><code>{@html renderGrpcBodyHtml(row.body)}</code></pre>
+                    {:else if row.kind === 'rejected'}
+                      <div class="rt-handshake grpc-system-detail">
+                        <p class="grpc-system-reason">{row.detail}</p>
+                      </div>
                     {:else if row.kind === 'cancelled'}
                       <div class="rt-handshake grpc-system-detail">
                         <p>You have cancelled the execution of the method.</p>

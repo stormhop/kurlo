@@ -21,6 +21,7 @@ export type KurloE2EState = {
   sentMcpRequests: HttpRequest[];
   sentAiRequests: AiRequest[];
   sentGrpcRequests: GrpcRequest[];
+  grpcStreamMessages: Array<{ requestId: string; message: string }>;
   webSocketConnects: Array<{ sessionId: string; request: HttpRequest }>;
   webSocketMessages: Array<{ sessionId: string; message: WebSocketSendMessage }>;
   socketIOConnects: Array<{ sessionId: string; request: HttpRequest }>;
@@ -132,6 +133,7 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
       sentMcpRequests: [],
       sentAiRequests: [],
       sentGrpcRequests: [],
+      grpcStreamMessages: [],
       webSocketConnects: [],
       webSocketMessages: [],
       socketIOConnects: [],
@@ -181,6 +183,17 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
       clientStreaming: false,
       serverStreaming: false,
     };
+    const grpcWatchMethod = {
+      fullName: 'shop.Inventory/WatchStock',
+      service: 'shop.Inventory',
+      name: 'WatchStock',
+      requestType: 'shop.WatchStockRequest',
+      responseType: 'shop.StockUpdate',
+      exampleMessage: JSON.stringify({ sku: 'sku-example' }, null, 2),
+      clientStreaming: true,
+      serverStreaming: true,
+    };
+    const grpcStreams = new Map<string, { index: number; finish: () => void }>();
 
     function parseStore(payload: string): E2EStore {
       try {
@@ -651,8 +664,64 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
           methods: [grpcInventoryMethod, grpcWatchMethod],
         };
       },
+      GrpcStreamSend: async (requestId, message) => {
+        const stream = grpcStreams.get(requestId);
+        if (!stream) return { ok: false, sent: 0, error: 'no gRPC stream is open for this request' };
+        const parsed = parseJsonMaybe(message, null);
+        if (!parsed) return { ok: false, sent: 0, error: 'invalid JSON message' };
+        if (parsed.warehouse) {
+          const error = 'message has no field "warehouse"';
+          stream.index += 1;
+          emit('grpc:message', { requestId, message: { index: stream.index, direction: 'error', body: error, size: error.length, timestamp: Date.now() }, size: 0, duration: 1, timestamp: Date.now() });
+          return { ok: false, sent: 0, error, recorded: true };
+        }
+        state.grpcStreamMessages.push({ requestId, message });
+        const timestamp = Date.now();
+        stream.index += 1;
+        emit('grpc:message', { requestId, message: { index: stream.index, direction: 'outgoing', body: message, size: byteLength(message), timestamp }, size: 0, duration: 1, timestamp });
+        const reply = JSON.stringify({ sku: parsed.sku ?? 'sku-example', stock: 7 - stream.index }, null, 2);
+        stream.index += 1;
+        emit('grpc:message', { requestId, message: { index: stream.index, direction: 'incoming', body: reply, size: byteLength(reply), timestamp }, size: byteLength(reply), duration: 2, timestamp });
+        return { ok: true, sent: 1 };
+      },
+      GrpcStreamEnd: async (requestId) => {
+        const stream = grpcStreams.get(requestId);
+        if (!stream) return { ok: false, sent: 0, error: 'no gRPC stream is open for this request' };
+        stream.finish();
+        return { ok: true, sent: 0 };
+      },
       SendGrpcRequest: async (req) => {
         state.sentGrpcRequests.push(clone(req));
+        if (req.interactive && req.fullMethod === grpcWatchMethod.fullName) {
+          emit('grpc:stream', { requestId: req.requestId, method: grpcWatchMethod, timestamp: Date.now() });
+          await new Promise<void>(resolve => grpcStreams.set(req.requestId, { index: 0, finish: resolve }));
+          grpcStreams.delete(req.requestId);
+          const messages = state.grpcStreamMessages.filter(item => item.requestId === req.requestId);
+          const timestamp = Date.now();
+          emit('grpc:trailers', { requestId: req.requestId, grpcCode: 'OK', grpcMessage: '', status: 'OK', trailers: [], duration: 30, timestamp });
+          return {
+            grpcCode: 'OK',
+            grpcMessage: '',
+            status: 'OK',
+            headers: [],
+            trailers: [],
+            messages: messages.flatMap((item, position) => {
+              const reply = JSON.stringify({ sku: parseJsonMaybe(item.message, {})?.sku ?? 'sku-example', stock: 7 - (position * 2 + 1) }, null, 2);
+              return [
+                { index: position * 2 + 1, direction: 'outgoing', body: item.message, size: byteLength(item.message), timestamp },
+                { index: position * 2 + 2, direction: 'incoming', body: reply, size: byteLength(reply), timestamp },
+              ];
+            }),
+            body: '',
+            duration: 30,
+            size: 0,
+            timestamp,
+            error: '',
+            method: grpcWatchMethod,
+            preRequestResult: { tests: [] },
+            testResult: { tests: [] },
+          };
+        }
         const message = parseJsonMaybe(req.message, {});
         const sku = message?.sku ?? 'sku-example';
         const responseBody = JSON.stringify({ sku, stock: 7, warehouse: 'e2e-main' }, null, 2);

@@ -409,6 +409,15 @@ export type GrpcTrailersEvent = {
   duration: number;
   timestamp: number;
 };
+export type GrpcStreamEvent = {
+  requestId: string;
+  method: GrpcMethodInfo;
+  timestamp: number;
+};
+export type GrpcStreamState = {
+  status: 'open' | 'ended';
+  sent: number;
+};
 export type GrpcDoneEvent = {
   requestId: string;
   response: GrpcResponse;

@@ -4208,6 +4208,7 @@ export namespace model {
 	    target: string;
 	    fullMethod: string;
 	    message: string;
+	    interactive?: boolean;
 	    metadata: KeyValue[];
 	    auth: AuthConfig;
 	    useReflection: boolean;
@@ -4245,6 +4246,7 @@ export namespace model {
 	        this.target = source["target"];
 	        this.fullMethod = source["fullMethod"];
 	        this.message = source["message"];
+	        this.interactive = source["interactive"];
 	        this.metadata = this.convertValues(source["metadata"], KeyValue);
 	        this.auth = this.convertValues(source["auth"], AuthConfig);
 	        this.useReflection = source["useReflection"];
@@ -4397,6 +4399,24 @@ export namespace model {
 		    }
 		    return a;
 		}
+	}
+	export class GrpcStreamSendResult {
+	    ok: boolean;
+	    sent: number;
+	    error?: string;
+	    recorded?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new GrpcStreamSendResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.sent = source["sent"];
+	        this.error = source["error"];
+	        this.recorded = source["recorded"];
+	    }
 	}
 	
 	

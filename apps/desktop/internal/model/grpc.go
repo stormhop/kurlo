@@ -4,11 +4,12 @@ type GrpcRequest struct {
 	RequestID   string `json:"requestId"`
 	WorkspaceID string `json:"workspaceId,omitempty"`
 
-	Target     string     `json:"target"`
-	FullMethod string     `json:"fullMethod"`
-	Message    string     `json:"message"`
-	Metadata   []KeyValue `json:"metadata"`
-	Auth       AuthConfig `json:"auth"`
+	Target      string     `json:"target"`
+	FullMethod  string     `json:"fullMethod"`
+	Message     string     `json:"message"`
+	Interactive bool       `json:"interactive,omitempty"`
+	Metadata    []KeyValue `json:"metadata"`
+	Auth        AuthConfig `json:"auth"`
 
 	UseReflection    bool     `json:"useReflection"`
 	ProtoFilePath    string   `json:"protoFilePath"`
@@ -114,6 +115,19 @@ type GrpcMethodInfo struct {
 	ExampleMessage  string `json:"exampleMessage"`
 	ClientStreaming bool   `json:"clientStreaming"`
 	ServerStreaming bool   `json:"serverStreaming"`
+}
+
+type GrpcStreamEvent struct {
+	RequestID string         `json:"requestId"`
+	Method    GrpcMethodInfo `json:"method"`
+	Timestamp int64          `json:"timestamp"`
+}
+
+type GrpcStreamSendResult struct {
+	OK       bool   `json:"ok"`
+	Sent     int    `json:"sent"`
+	Error    string `json:"error,omitempty"`
+	Recorded bool   `json:"recorded,omitempty"`
 }
 
 type GrpcServiceDefinition struct {

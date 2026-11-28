@@ -3,7 +3,7 @@ import type {
   CookieSyncConfig, CookieSyncStatus,
   DefaultWorkspaceLocationResult, DownloadResult, GitAuthConfigResult, GitBranchListResult,
   GitConflictFileResult, GitDiffResult, GitFileStatusResult, GitLogResult, GitOperationResult, GitTokenInfoResult,
-  GitWorkspaceStatus, GrpcRequest, GrpcResponse, GrpcServiceDefinition, HttpRequest, HttpResponse,
+  GitWorkspaceStatus, GrpcRequest, GrpcResponse, GrpcServiceDefinition, GrpcStreamSendResult, HttpRequest, HttpResponse,
   JWTBearerPreview, OAuth2TokenResponse, SaveRequestStoreResult, SocketIOEmitMessage, SocketIOEmitResult, UpdateCheckResult,
   UpdateInfo, WebSocketSendMessage, WebSocketSendResult, WorkspaceDiagnostic, WorkspaceOpenResult,
   RequestFileYAMLResult, WorkspaceYAMLFileResult, HistoryResponseResult, MockServerConfig, MockServerStatus, MockRequestLog, MockRequestRef, MockRoute,
@@ -95,6 +95,14 @@ export async function sendMcpRequest(req: HttpRequest): Promise<McpResponse> {
     throw new Error('Wails bridge not available');
   }
   return app.SendMcpRequest(req);
+}
+
+export async function grpcStreamSend(requestId: string, message: string): Promise<GrpcStreamSendResult> {
+  return (await window.go?.api?.App?.GrpcStreamSend?.(requestId, message)) ?? { ok: false, sent: 0, error: 'Wails bridge not available' };
+}
+
+export async function grpcStreamEnd(requestId: string): Promise<GrpcStreamSendResult> {
+  return (await window.go?.api?.App?.GrpcStreamEnd?.(requestId)) ?? { ok: false, sent: 0, error: 'Wails bridge not available' };
 }
 
 export async function grpcDiscover(req: GrpcRequest): Promise<GrpcServiceDefinition> {

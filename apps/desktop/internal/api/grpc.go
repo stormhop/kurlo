@@ -83,6 +83,7 @@ type grpcInvokeHandler struct {
 	startedAt time.Time
 	formatter grpcurl.Formatter
 	emit      grpcEventEmitter
+	onClose   func()
 
 	mu       sync.Mutex
 	response *model.GrpcResponse
@@ -167,6 +168,16 @@ func (h *grpcInvokeHandler) OnSendMessage(body string) {
 	}, false))
 }
 
+func (h *grpcInvokeHandler) recordSendFailure(err error) {
+	body := err.Error()
+	h.emitEvent("grpc:message", h.appendMessage(model.GrpcMessage{
+		Direction: "error",
+		Body:      body,
+		Size:      len([]byte(body)),
+		Timestamp: time.Now().UnixMilli(),
+	}, false))
+}
+
 func (h *grpcInvokeHandler) OnReceiveTrailers(stat *status.Status, md metadata.MD) {
 	h.mu.Lock()
 	h.response.GrpcCode = stat.Code().String()
@@ -194,6 +205,9 @@ func (h *grpcInvokeHandler) OnReceiveTrailers(stat *status.Status, md metadata.M
 		Timestamp:   time.Now().UnixMilli(),
 	}
 	h.mu.Unlock()
+	if h.onClose != nil {
+		h.onClose()
+	}
 	h.emitEvent("grpc:trailers", event)
 }
 
@@ -276,14 +290,21 @@ func sendGrpcRequestWith(requestCtx context.Context, req model.GrpcRequest, sm *
 }
 
 func doGrpcRequest(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter) model.GrpcResponse {
-	return doGrpcRequestWithMode(ctx, req, emit, false)
+	return doGrpcRequestWithMode(ctx, req, emit, false, nil)
 }
 
 func doUnaryGrpcRequest(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter) model.GrpcResponse {
-	return doGrpcRequestWithMode(ctx, req, emit, true)
+	return doGrpcRequestWithMode(ctx, req, emit, true, nil)
 }
 
-func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter, unaryOnly bool) model.GrpcResponse {
+func doInteractiveGrpcRequest(input *grpcStreamInput) func(context.Context, model.GrpcRequest, grpcEventEmitter) model.GrpcResponse {
+	return func(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter) model.GrpcResponse {
+		defer input.finish()
+		return doGrpcRequestWithMode(ctx, req, emit, false, input)
+	}
+}
+
+func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpcEventEmitter, unaryOnly bool, input *grpcStreamInput) model.GrpcResponse {
 	start := time.Now()
 	resp := model.GrpcResponse{
 		Headers:  []model.KeyValue{},
@@ -321,15 +342,22 @@ func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpc
 	if refClient != nil {
 		defer refClient.Reset()
 	}
-	if unaryOnly {
+	if unaryOnly || input != nil {
 		method, err := resolveGrpcMethod(source, req.FullMethod)
 		if err != nil {
 			resp.Error = err.Error()
 			return resp
 		}
-		if method.IsServerStreaming() || method.IsClientStreaming() {
+		if unaryOnly && (method.IsServerStreaming() || method.IsClientStreaming()) {
 			resp.Error = grpcStreamingRequired
 			return resp
+		}
+		if input != nil && !method.IsClientStreaming() {
+			input.finish()
+			input = nil
+		}
+		if input != nil && emit != nil && req.RequestID != "" {
+			emit("grpc:stream", model.GrpcStreamEvent{RequestID: req.RequestID, Method: grpcMethodInfo(method), Timestamp: time.Now().UnixMilli()})
 		}
 	}
 
@@ -338,10 +366,11 @@ func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpc
 	if message == "" {
 		message = "{}"
 	}
-	parser, formatter, err := grpcurl.RequestParserAndFormatter(grpcurl.FormatJSON, source, strings.NewReader(message), grpcurl.FormatOptions{
+	formatOptions := grpcurl.FormatOptions{
 		EmitJSONDefaultFields: req.IncludeDefaultValues,
 		AllowUnknownFields:    true,
-	})
+	}
+	parser, formatter, err := grpcurl.RequestParserAndFormatter(grpcurl.FormatJSON, source, strings.NewReader(message), formatOptions)
 	if err != nil {
 		resp.Duration = time.Since(start).Milliseconds()
 		resp.Error = err.Error()
@@ -355,9 +384,29 @@ func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpc
 		response:  &resp,
 		emit:      emit,
 	}
+	if input != nil {
+		handler.onClose = input.finish
+	}
 	outgoingBodies := grpcOutgoingMessageBodies(rawMessage)
 	outgoingIndex := 0
 	nextRequest := func(msg proto.Message) error {
+		if input != nil {
+			return input.next(ctx, func(body string) error {
+				msg.Reset()
+				body = defaultString(strings.TrimSpace(body), "{}")
+				itemParser, _, err := grpcurl.RequestParserAndFormatter(grpcurl.FormatJSON, source, strings.NewReader(body), formatOptions)
+				if err != nil {
+					return err
+				}
+				if err := itemParser.Next(msg); err != nil {
+					msg.Reset()
+					handler.recordSendFailure(err)
+					return grpcRejectedMessage{err}
+				}
+				handler.OnSendMessage(body)
+				return nil
+			})
+		}
 		if err := parser.Next(msg); err != nil {
 			return err
 		}
@@ -865,7 +914,7 @@ func grpcShouldRecordOutgoingMessage(message string) bool {
 func grpcResponseBody(messages []model.GrpcMessage) string {
 	incoming := make([]model.GrpcMessage, 0, len(messages))
 	for _, msg := range messages {
-		if msg.Direction == "outgoing" {
+		if msg.Direction == "outgoing" || msg.Direction == "error" {
 			continue
 		}
 		incoming = append(incoming, msg)

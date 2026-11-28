@@ -454,6 +454,14 @@ export function GrpcDiscover(arg1) {
   return window['go']['api']['App']['GrpcDiscover'](arg1);
 }
 
+export function GrpcStreamEnd(arg1) {
+  return window['go']['api']['App']['GrpcStreamEnd'](arg1);
+}
+
+export function GrpcStreamSend(arg1, arg2) {
+  return window['go']['api']['App']['GrpcStreamSend'](arg1, arg2);
+}
+
 export function InspectRequestFile(arg1) {
   return window['go']['api']['App']['InspectRequestFile'](arg1);
 }

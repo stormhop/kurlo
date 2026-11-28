@@ -1,41 +1,46 @@
 <script lang="ts">
   import CodeEditor from '../CodeEditor.svelte';
   import BeautifyButton from './BeautifyButton.svelte';
+  import RequestShortcutHint from './RequestShortcutHint.svelte';
   import { DEFAULT_GRPC_MESSAGE } from '../requestBodyDefaults';
   import { vm } from '../stores/app.svelte';
 
   let editorRef = $state<CodeEditor>();
   let selectedMethod = $derived(vm.grpcServiceDefinition.methods.find(method => method.fullName === vm.grpcMethod));
+  let stream = $derived(vm.grpcStreamState());
+  let streamOpen = $derived(stream?.status === 'open');
+  let clientStreaming = $derived(Boolean(selectedMethod?.clientStreaming || stream));
 
   function onKeydown(event: KeyboardEvent) {
     if (vm.shortcutForEvent(event) === 'send-request') {
       event.preventDefault();
       event.stopPropagation();
-      void vm.invokeGrpc();
+      if (streamOpen) void vm.grpcStreamSendCurrentMessage();
+      else void vm.invokeGrpc();
     }
   }
 </script>
 
 <div class="body-section">
-  <div class="body-editor-wrap grpc-message-editor-wrap" role="presentation" onkeydowncapture={onKeydown}>
+  <div class="body-editor-wrap grpc-message-editor-wrap" class:connected-message-editor={streamOpen} role="presentation" onkeydowncapture={onKeydown}>
     <div class="body-editor-toolbar grpc-message-toolbar">
-      <div class="grpc-method-summary">
-        {#if selectedMethod}
-          <strong>{selectedMethod.name}</strong>
-          <span>{selectedMethod.requestType} -> {selectedMethod.responseType}</span>
-        {:else if vm.grpcMethod}
-          <strong>{vm.grpcMethod}</strong>
-          <span>Selected method</span>
-        {:else}
-          <strong>Message</strong>
-        {/if}
-      </div>
+      <span class="grpc-message-format" role="note" aria-label="Message format">JSON</span>
+
+      <BeautifyButton onbeautify={() => editorRef?.format()} beautified={vm.beautifiedBody} title="Beautify message" />
 
       <div class="grpc-message-actions">
         <button class="btn btn-secondary btn-sm toolbar-btn" type="button" onclick={vm.useGrpcExampleMessage}>
           Use example message
         </button>
-        <BeautifyButton onbeautify={() => editorRef?.format()} beautified={vm.beautifiedBody} disabled={vm.bodyLang !== 'json'} title="Beautify message" />
+        {#if clientStreaming}
+          <button class="btn btn-secondary btn-sm toolbar-btn" type="button" disabled={!streamOpen} onclick={vm.grpcStreamEnd} data-testid="grpc-stream-end">
+            End stream
+          </button>
+          <button class="btn btn-primary btn-sm grpc-stream-send" type="button" disabled={!streamOpen} onclick={vm.grpcStreamSendCurrentMessage} data-testid="grpc-stream-send">
+            Send
+            {#if streamOpen}<RequestShortcutHint />{/if}
+          </button>
+        {/if}
       </div>
     </div>
 
@@ -55,9 +60,14 @@
 </div>
 
 <style>
-  .grpc-message-toolbar {
-    justify-content: space-between;
-    gap: var(--space-2-5);
+  .grpc-message-format {
+    display: inline-flex;
+    align-items: center;
+    height: var(--control-sm);
+    padding: 0 var(--space-2);
+    color: var(--text-2);
+    font-size: var(--text-label);
+    font-weight: var(--weight-medium);
   }
 
   .grpc-message-actions {
@@ -65,34 +75,7 @@
     align-items: center;
     gap: var(--space-1-5);
     flex-shrink: 0;
-  }
-
-  .grpc-method-summary {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-2);
-    min-width: 0;
-    margin-right: auto;
-  }
-
-  .grpc-method-summary strong {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text);
-    font-size: var(--text-label);
-    font-weight: var(--weight-semibold);
-  }
-
-  .grpc-method-summary span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: var(--text-3);
-    font-family: var(--font-mono);
-    font-size: var(--text-caption);
+    margin-left: auto;
   }
 
   .grpc-message-editor-wrap {

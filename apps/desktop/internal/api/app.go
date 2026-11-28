@@ -52,6 +52,7 @@ type App struct {
 	agentEmit          aiEmitter
 	globalsRevision    atomic.Pointer[string]
 	realtimeWorkspaces sync.Map
+	grpcStreams        sync.Map
 }
 
 type SaveRequestStoreResult struct {
@@ -920,9 +921,37 @@ func (a *App) SendGrpcRequest(req model.GrpcRequest) model.GrpcResponse {
 	if err != nil {
 		return model.GrpcResponse{Error: linkedSecretErrorMessage(err)}
 	}
-	resp := sendGrpcRequest(ctx, req, a.state, a.grpcEventEmitter())
+	invoke := doGrpcRequest
+	var session *grpcStreamSession
+	if req.Interactive && req.RequestID != "" {
+		session = &grpcStreamSession{input: newGrpcStreamInput(), workspaceID: req.WorkspaceID, ctx: ctx}
+		a.grpcStreams.Store(req.RequestID, session)
+		defer a.grpcStreams.CompareAndDelete(req.RequestID, session)
+		invoke = doInteractiveGrpcRequest(session.input)
+	}
+	resp := sendGrpcRequestWith(ctx, req, a.state, a.grpcEventEmitter(), invoke, grpcRunIteration{})
+	if session != nil {
+		linked = append(linked, session.linkedValues()...)
+	}
 	redactLinkedSecretValues(&resp, linked)
 	return resp
+}
+
+func (a *App) GrpcStreamSend(requestID string, message string) model.GrpcStreamSendResult {
+	value, ok := a.grpcStreams.Load(requestID)
+	if !ok {
+		return model.GrpcStreamSendResult{Error: errGrpcStreamAbsent.Error()}
+	}
+	return value.(*grpcStreamSession).send(message)
+}
+
+func (a *App) GrpcStreamEnd(requestID string) model.GrpcStreamSendResult {
+	value, ok := a.grpcStreams.Load(requestID)
+	if !ok {
+		return model.GrpcStreamSendResult{Error: errGrpcStreamAbsent.Error()}
+	}
+	value.(*grpcStreamSession).input.closeSend()
+	return model.GrpcStreamSendResult{OK: true}
 }
 
 func (a *App) grpcEventEmitter() grpcEventEmitter {

@@ -11,6 +11,7 @@ function host() {
     grpcResponses: new Map([['visible', visible]]),
     grpcResponseTab: 'trailers',
     grpcResponseTabs: new Map([['visible', 'trailers']]),
+    grpcStreams: new Map(),
     mcpResponse: visible,
     mcpResponses: new Map([['visible', visible]]),
     requestIsActive: (id: string) => id === 'visible',
@@ -51,6 +52,7 @@ describe('protocol response ownership', () => {
     Object.assign(state, {
       setActiveGrpcResponse: grpcFeature.setActiveGrpcResponse,
       setActiveGrpcResponseTab: grpcFeature.setActiveGrpcResponseTab,
+      setGrpcStreamState: grpcFeature.setGrpcStreamState,
       grpcSelectedMethodInfo: () => ({}),
       grpcEmptyMethodInfo: () => ({}),
       grpcBodyFromMessages: () => '',

@@ -39,7 +39,7 @@ import {
   jwtFieldsFromAuth, type JwtFields,
 } from '../utils';
 import type {
-  Method, BodyType, RawBodyType, HttpVersion, RequestTab, ScriptTab, ResponseTab, GrpcResponseTab,
+  Method, BodyType, RawBodyType, HttpVersion, RequestTab, ScriptTab, ResponseTab, GrpcResponseTab, GrpcStreamState,
   AuthType, OAuth2GrantType, OAuth2ClientAuth, SidebarView, ShortcutId, KVRow,
   Workspace, Collection, Environment,
    RequestSettingsOverrides, ProxyConfig, SavedRequest, BodyVariant, RequestHistoryEntry, RequestStore,
@@ -516,6 +516,12 @@ class AppVM {
   declare applyGrpcDoneEvent: typeof grpcFeature.applyGrpcDoneEvent;
   declare discoverGrpcServices: typeof grpcFeature.discoverGrpcServices;
   declare invokeGrpc: typeof grpcFeature.invokeGrpc;
+  declare grpcStreamState: typeof grpcFeature.grpcStreamState;
+  declare setGrpcStreamState: typeof grpcFeature.setGrpcStreamState;
+  declare applyGrpcStreamEvent: typeof grpcFeature.applyGrpcStreamEvent;
+  declare grpcStreamSendCurrentMessage: typeof grpcFeature.grpcStreamSendCurrentMessage;
+  declare grpcStreamEnd: typeof grpcFeature.grpcStreamEnd;
+  declare appendGrpcStreamError: typeof grpcFeature.appendGrpcStreamError;
   declare initGrpcListeners: typeof grpcFeature.initGrpcListeners;
   declare setActiveMcpResponse: typeof mcpFeature.setActiveMcpResponse;
   declare mcpSelectableTools: typeof mcpFeature.mcpSelectableTools;
@@ -1250,6 +1256,7 @@ class AppVM {
   grpcResponseTab = $state<GrpcResponseTab>('messages');
   grpcResponses = $state<Map<string, GrpcResponse>>(new Map());
   grpcResponseTabs = $state<Map<string, GrpcResponseTab>>(new Map());
+  grpcStreams = $state<Map<string, GrpcStreamState>>(new Map());
   grpcServiceDefinition = $state<GrpcServiceDefinition>({ source: '', services: [], methods: [] });
   grpcServiceLoading = $state(false);
   grpcServiceOperationToken = 0;

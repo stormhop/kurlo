@@ -1,5 +1,5 @@
 import { vi, expect } from 'vitest';
-import { type RequestStore, type GrpcResponse, type KVRow, type Workspace, type Collection, type Environment, type SavedRequest, type RequestHistoryEntry, type ResponseTab, type GrpcResponseTab, type SidebarView, type RequestSettings, type RequestSettingsOverrides, type RequestType, type Method, type RequestTab, type OAuth2GrantType, type BodyType, type RawBodyType, type RequestExample, type SIOArg, type CollectionRunnerResult } from '../../lib/types/models';
+import { type RequestStore, type GrpcResponse, type KVRow, type Workspace, type Collection, type Environment, type SavedRequest, type RequestHistoryEntry, type ResponseTab, type GrpcResponseTab, type GrpcStreamState, type SidebarView, type RequestSettings, type RequestSettingsOverrides, type RequestType, type Method, type RequestTab, type OAuth2GrantType, type BodyType, type RawBodyType, type RequestExample, type SIOArg, type CollectionRunnerResult } from '../../lib/types/models';
 import type { ResponseFormatChoice } from '../../lib/responseFormat';
 import { type HttpRequest, type HttpResponse, type SaveRequestStoreResult, type OAuth2TokenResponse, type CookieJarEntry } from '../../lib/backend';
 import { mkRow, DEFAULT_REQUEST_SETTINGS } from '../../lib/constants';
@@ -208,6 +208,7 @@ class TestApp {
   mcpResponse = null;
   mcpResponses = new Map();
   grpcResponseTabs = new Map<string, GrpcResponseTab>();
+  grpcStreams = new Map<string, GrpcStreamState>();
   aiConversations = new Map<string, unknown[]>();
   sseSessions = new Map();
   webSocketSessions = new Map();

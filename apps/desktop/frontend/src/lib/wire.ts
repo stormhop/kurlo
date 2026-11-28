@@ -29,6 +29,7 @@ export type GrpcMessage = Wire<model.GrpcMessage>;
 export type GrpcMethodInfo = Wire<model.GrpcMethodInfo>;
 export type GrpcRequest = Wire<model.GrpcRequest>;
 export type GrpcResponse = Wire<model.GrpcResponse>;
+export type GrpcStreamSendResult = Wire<model.GrpcStreamSendResult>;
 export type GrpcServiceDefinition = Wire<model.GrpcServiceDefinition>;
 export type HttpRequest = Wire<model.HttpRequest>;
 export type HttpResponse = Wire<model.HttpResponse>;

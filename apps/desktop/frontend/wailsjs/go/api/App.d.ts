@@ -229,6 +229,10 @@ export function GitTokenInfo(arg1:string):Promise<api.GitTokenInfoResult>;
 
 export function GrpcDiscover(arg1:model.GrpcRequest):Promise<model.GrpcServiceDefinition>;
 
+export function GrpcStreamEnd(arg1:string):Promise<model.GrpcStreamSendResult>;
+
+export function GrpcStreamSend(arg1:string,arg2:string):Promise<model.GrpcStreamSendResult>;
+
 export function InspectRequestFile(arg1:string):Promise<api.RequestFileInfo>;
 
 export function InstallBrowserExtension(arg1:string):Promise<api.BrowserExtensionResult>;

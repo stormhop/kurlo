@@ -1,4 +1,4 @@
-import { grpcDiscover, openDirectoryDialog, openFileDialog, sendGrpcRequest } from '../../backend';
+import { grpcDiscover, grpcStreamEnd, grpcStreamSend, openDirectoryDialog, openFileDialog, sendGrpcRequest } from '../../backend';
 import { emptyHttpResponse, emptyScriptResult } from '../../wire';
 import type { GrpcRequest, HttpResponse } from '../../backend';
 import { DEFAULT_GRPC_MESSAGE } from '../../requestBodyDefaults';
@@ -13,6 +13,8 @@ import type {
   GrpcResponse,
   GrpcResponseTab,
   GrpcServiceDefinition,
+  GrpcStreamEvent,
+  GrpcStreamState,
   GrpcTrailersEvent,
   RequestTab,
   RequestType,
@@ -23,6 +25,7 @@ import { newRequestId } from '../../utils';
 import type { EnvironmentChanges } from './environments';
 import type { GlobalVariableChanges } from './globals';
 import { listenRuntime } from '../../runtimeEvents';
+import { validateJsonDocument } from '../../jsonEditing';
 
 const REQUEST_CANCELED_ERROR = 'Request canceled';
 
@@ -43,6 +46,7 @@ type GrpcHost = {
   grpcResponseTabs: Map<string, GrpcResponseTab>;
   grpcResponses: Map<string, GrpcResponse>;
   grpcServiceDefinition: GrpcServiceDefinition;
+  grpcStreams: Map<string, GrpcStreamState>;
   grpcServiceError: string;
   grpcServiceLoading: boolean;
   grpcServiceOperationToken: number;
@@ -54,6 +58,9 @@ type GrpcHost = {
   requestTab: RequestTab;
   requestType: RequestType;
   responseSearch: string;
+  resolveTemplate: (value: string, envValues: Record<string, string>) => string;
+  grpcStreamState: (requestId?: string) => GrpcStreamState | undefined;
+  setGrpcStreamState: (requestId: string, state: GrpcStreamState | null) => void;
   responseSearchIndex: number;
   url: string;
   activeEnvironmentValues: () => Record<string, string>;
@@ -68,6 +75,8 @@ type GrpcHost = {
   applyGrpcHeadersEvent: (payload: GrpcHeadersEvent) => void;
   applyGrpcMessageEvent: (payload: GrpcMessageEvent) => void;
   applyGrpcTrailersEvent: (payload: GrpcTrailersEvent) => void;
+  applyGrpcStreamEvent: (payload: GrpcStreamEvent) => void;
+  appendGrpcStreamError: (requestId: string, error: string) => void;
   grpcBodyFromMessages: (messages: GrpcMessage[]) => string;
   grpcEmptyMethodInfo: (fullName?: string) => GrpcMethodInfo;
   grpcExampleMessageForMethod: (fullName?: string) => string;
@@ -261,7 +270,7 @@ export const grpcFeature = {
   },
 
   grpcBodyFromMessages(this: GrpcHost, messages: GrpcMessage[]) {
-    const incoming = messages.filter(message => message.direction !== 'outgoing');
+    const incoming = messages.filter(message => message.direction !== 'outgoing' && message.direction !== 'error');
     if (!incoming.length) return '';
     if (incoming.length === 1) return incoming[0].body;
     return `[\n${incoming.map(message => message.body).join(',\n')}\n]`;
@@ -323,7 +332,57 @@ export const grpcFeature = {
     }, payload.requestId);
   },
 
+  grpcStreamState(this: GrpcHost, requestId = this.activeRequestId): GrpcStreamState | undefined {
+    return requestId ? this.grpcStreams.get(requestId) : undefined;
+  },
+
+  setGrpcStreamState(this: GrpcHost, requestId: string, state: GrpcStreamState | null) {
+    if (!requestId) return;
+    if (!state && !this.grpcStreams.has(requestId)) return;
+    const next = new Map(this.grpcStreams);
+    if (state) next.set(requestId, state);
+    else next.delete(requestId);
+    this.grpcStreams = next;
+  },
+
+  applyGrpcStreamEvent(this: GrpcHost, payload: GrpcStreamEvent) {
+    if (!payload.requestId) return;
+    this.setGrpcStreamState(payload.requestId, { status: 'open', sent: 0 });
+    const existing = this.ensureActiveGrpcResponse(payload.requestId);
+    if (existing && payload.method?.fullName) this.setActiveGrpcResponse({ ...existing, method: payload.method }, payload.requestId);
+  },
+
+  async grpcStreamSendCurrentMessage(this: GrpcHost) {
+    const requestId = this.activeRequestId;
+    const stream = this.grpcStreamState(requestId);
+    if (!requestId || stream?.status !== 'open') return;
+    const message = this.resolveTemplate(this.bodyContent, this.environmentValuesForRequest(this.snapshotActiveRequest()));
+    if (message.trim() && validateJsonDocument(message)) return;
+    const result = await grpcStreamSend(requestId, message);
+    const current = this.grpcStreamState(requestId);
+    if (current && result.sent) this.setGrpcStreamState(requestId, { ...current, sent: current.sent + result.sent });
+    if (!result.ok && !result.recorded) this.appendGrpcStreamError(requestId, result.error || 'Failed to send the gRPC message');
+  },
+
+  appendGrpcStreamError(this: GrpcHost, requestId: string, error: string) {
+    const existing = this.ensureActiveGrpcResponse(requestId);
+    if (!existing) return;
+    const index = (existing.messages.at(-1)?.index ?? 0) + 1;
+    const message: GrpcMessage = { index, direction: 'error', body: error, size: 0, timestamp: Date.now() };
+    this.setActiveGrpcResponse({ ...existing, messages: [...existing.messages.slice(-(GRPC_KEPT_MESSAGES - 1)), message] }, requestId);
+  },
+
+  async grpcStreamEnd(this: GrpcHost) {
+    const requestId = this.activeRequestId;
+    const stream = this.grpcStreamState(requestId);
+    if (!requestId || stream?.status !== 'open') return;
+    this.setGrpcStreamState(requestId, { ...stream, status: 'ended' });
+    const result = await grpcStreamEnd(requestId);
+    if (!result.ok) this.appendGrpcStreamError(requestId, result.error || 'Failed to end the gRPC stream');
+  },
+
   applyGrpcDoneEvent(this: GrpcHost, payload: GrpcDoneEvent) {
+    this.setGrpcStreamState(payload.requestId, null);
     if (!this.requestForEditing(payload.requestId)) return;
     const response = payload.response;
     const messages = response.messages ?? [];
@@ -423,7 +482,7 @@ export const grpcFeature = {
     this.responseSearchIndex = 0;
     try {
       await this.persistActiveRequestNow();
-      const resp = await sendGrpcRequest(this.savedRequestToRunnableGrpcRequest(requestSnapshot, envValues, secretValues, secretKeys, requestId, globals));
+      const resp = await sendGrpcRequest({ ...this.savedRequestToRunnableGrpcRequest(requestSnapshot, envValues, secretValues, secretKeys, requestId, globals), interactive: true });
       try { await this.applyEnvironmentChangesFromResponse(resp, environmentId); } catch {}
       try { await this.applyGlobalVariableChangesFromResponse(resp); } catch {}
       try { await this.applyCollectionVariableUpdates(requestSnapshot, resp.collectionVariableUpdates, resp.collectionVariablesRemoved); } catch {}
@@ -475,6 +534,7 @@ export const grpcFeature = {
       if (this.requestForEditing(requestId)) this.setActiveGrpcResponse({ ...this.emptyGrpcResponse(), grpcCode: '', error: String(e) }, requestId);
       if (this.requestIsActive(requestId)) this.requestError = String(e);
     } finally {
+      this.setGrpcStreamState(requestId, null);
       this.markRequestLoading(requestId, false);
     }
   },
@@ -490,7 +550,12 @@ export const grpcFeature = {
       this.applyGrpcMessageEvent(payload);
     });
 
+    listenRuntime('grpc:stream', (payload: GrpcStreamEvent) => {
+      this.applyGrpcStreamEvent(payload);
+    });
+
     listenRuntime('grpc:trailers', (payload: GrpcTrailersEvent) => {
+      this.setGrpcStreamState(payload.requestId, null);
       this.applyGrpcTrailersEvent(payload);
     });
 
