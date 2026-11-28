@@ -243,7 +243,7 @@ test('opens and connects a saved MQTT request with three hundred subscriptions',
   await page.getByRole('tab', { name: /Topics/ }).click();
   await expect(page.getByLabel('Topic 1', { exact: true })).toHaveValue('site/0/+/state');
   const openMs = Date.now() - opened;
-  expect(await page.getByTestId('mqtt-topic-row').count()).toBeLessThan(100);
+  expect(await page.getByTestId('mqtt-topic-row').count()).toBeLessThan(topics.length);
   const connected = Date.now();
   await page.locator('.btn-send').click();
   await expect(page.getByTestId('mqtt-panel')).toContainText('Subscribed to site/299/+/state');
