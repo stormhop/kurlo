@@ -80,6 +80,9 @@ func (in *grpcStreamInput) send(ctx context.Context, body string) error {
 
 func (in *grpcStreamInput) next(ctx context.Context, accept func(string) error) error {
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		select {
 		case item := <-in.items:
 			err := accept(item.body)
@@ -88,8 +91,14 @@ func (in *grpcStreamInput) next(ctx context.Context, accept func(string) error) 
 				return nil
 			}
 		case <-in.end:
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			return io.EOF
 		case <-in.done:
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			return io.EOF
 		case <-ctx.Done():
 			return ctx.Err()

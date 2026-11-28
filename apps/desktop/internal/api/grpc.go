@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/url"
@@ -421,12 +422,15 @@ func doGrpcRequestWithMode(ctx context.Context, req model.GrpcRequest, emit grpc
 		return nil
 	}
 	err = grpcurl.InvokeRPC(ctx, source, cc, normalizeGrpcMethodName(req.FullMethod), grpcMetadataHeaders(req), handler, nextRequest)
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
 	resp.Duration = time.Since(start).Milliseconds()
 	resp.Timestamp = time.Now().UnixMilli()
-	handler.mu.Lock()
 	resp.Messages = keepLatestGrpcMessages(resp.Messages, grpcKeptMessages)
-	handler.mu.Unlock()
 	resp.Body = grpcResponseBody(resp.Messages)
+	if err == nil && errors.Is(ctx.Err(), context.Canceled) {
+		err = ctx.Err()
+	}
 	if err != nil {
 		resp.Error = err.Error()
 		if ctx.Err() == context.Canceled {
