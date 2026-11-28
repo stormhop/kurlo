@@ -208,13 +208,17 @@ func consumeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 		return nil, errors.New("unknown Kafka stop condition")
 	}
 	started := time.Now()
-	cl, err := kafkaClient(req)
+	cl, err := kafkaClient(req, kgo.KeepControlRecords())
 	if err != nil {
 		return nil, err
 	}
 	defer cl.Close()
 	rangesCtx, cancelRanges := kafkaTimeoutContext(ctx, req)
-	ranges, err := kafkaRanges(rangesCtx, kadm.NewClient(cl), k)
+	err = kafkaPing(rangesCtx, cl, req)
+	var ranges map[kafkaPartition]kafkaRange
+	if err == nil {
+		ranges, err = kafkaRanges(rangesCtx, kadm.NewClient(cl), k)
+	}
 	cancelRanges()
 	if err != nil {
 		return nil, err
@@ -233,8 +237,14 @@ func consumeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 	cl.AddConsumePartitions(assign)
 	var records []kafkaRecord
 	size := 0
-	deadline := time.Now().Add(duration)
 	emit, _ := ctx.Value(kafkaStreamKey{}).(func([]kafkaRecord))
+	idle := k.StopAfter == "idle"
+	unattended := emit == nil && duration == 0 && cutoff.IsZero() && req.TimeoutMs > 0
+	if unattended {
+		duration, idle = time.Duration(req.TimeoutMs)*time.Millisecond, true
+	}
+	deadline := time.Now().Add(duration)
+	timedOut := false
 	for len(ranges) > 0 && len(records) < limit {
 		pollCtx := ctx
 		cancel := func() {}
@@ -250,6 +260,7 @@ func consumeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 		}
 		if err := fetch.Err(); err != nil {
 			if (duration > 0 || !cutoff.IsZero()) && errors.Is(err, context.DeadlineExceeded) {
+				timedOut = unattended
 				break
 			}
 			return records, err
@@ -261,8 +272,9 @@ func consumeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 			if !ok {
 				continue
 			}
-			pastCutoff := !cutoff.IsZero() && !r.Timestamp.Before(cutoff)
-			if !pastCutoff && (bounds.end < 0 || r.Offset < bounds.end) {
+			control := r.Attrs.IsControl()
+			pastCutoff := !control && !cutoff.IsZero() && !r.Timestamp.Before(cutoff)
+			if !control && !pastCutoff && (bounds.end < 0 || r.Offset < bounds.end) {
 				size += len(r.Topic) + len(r.Key) + len(r.Value) + 64
 				for _, h := range r.Headers {
 					size += len(h.Key) + len(h.Value) + 16
@@ -289,7 +301,7 @@ func consumeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 			if emit != nil {
 				emit(records[start:])
 			}
-			if k.StopAfter == "idle" {
+			if idle {
 				deadline = time.Now().Add(duration)
 			}
 		}
@@ -299,6 +311,9 @@ func consumeKafka(ctx context.Context, req model.HttpRequest, onMessage func(kaf
 	}
 	if reason != nil {
 		*reason = defaultString(k.StopAfter, "records")
+		if timedOut {
+			*reason = "timeout"
+		}
 		if len(ranges) == 0 && len(records) < limit && cutoff.IsZero() {
 			*reason = "endOffset"
 		}

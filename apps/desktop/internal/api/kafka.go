@@ -16,6 +16,7 @@ import (
 
 	"github.com/stormhop/kurlo/apps/desktop/internal/model"
 	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl"
 	"github.com/twmb/franz-go/pkg/sasl/aws"
@@ -137,6 +138,24 @@ func kafkaClient(req model.HttpRequest, options ...kgo.Opt) (*kgo.Client, error)
 	return kgo.NewClient(options...)
 }
 
+func kafkaPing(ctx context.Context, cl *kgo.Client, req model.HttpRequest) error {
+	err := cl.Ping(ctx)
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, kerr.SaslAuthenticationFailed) || errors.Is(err, kerr.UnsupportedSaslMechanism) || errors.Is(err, kerr.IllegalSaslState) {
+		return fmt.Errorf("the brokers rejected the sign-in: %w", err)
+	}
+	switch req.Auth.Type {
+	case "", "none", "inherit":
+		return fmt.Errorf("could not connect to the brokers; check the address and the TLS setting: %w", err)
+	}
+	return fmt.Errorf("could not sign in to the brokers; check the username, password and SASL mechanism: %w", err)
+}
+
 func (a *App) ListKafkaTopics(req model.HttpRequest) ([]string, error) {
 	if req.Kafka == nil {
 		return nil, errors.New("expected a Kafka request")
@@ -160,6 +179,9 @@ func (a *App) ListKafkaTopics(req model.HttpRequest) ([]string, error) {
 		return nil, err
 	}
 	defer cl.Close()
+	if err := kafkaPing(ctx, cl, req); err != nil {
+		return nil, err
+	}
 	topics, err := kadm.NewClient(cl).ListTopics(ctx)
 	if err != nil {
 		return nil, err
@@ -266,6 +288,11 @@ func produceKafka(ctx context.Context, req model.HttpRequest) ([]kafkaRecord, er
 			r.Headers = append(r.Headers, kgo.RecordHeader{Key: h.Key, Value: []byte(h.Value)})
 		}
 	}
+	checked := kafkaRecordView(r)
+	loadKafkaSchema(req.FileRoot, k.SchemaPath, r.Topic).validate(&checked)
+	if checked.Validation == "Invalid" {
+		return nil, fmt.Errorf("the message does not match the schema %s, so it was not sent: %s", k.SchemaPath, checked.SchemaIssue)
+	}
 	opts := []kgo.Opt{kgo.AllowIdempotentProduceCancellation()}
 	if k.Partition != "" {
 		n, err := strconv.ParseInt(k.Partition, 10, 32)
@@ -295,12 +322,14 @@ func produceKafka(ctx context.Context, req model.HttpRequest) ([]kafkaRecord, er
 		return nil, err
 	}
 	defer cl.Close()
-	schema := loadKafkaSchema(req.FileRoot, k.SchemaPath, r.Topic)
+	if err := kafkaPing(ctx, cl, req); err != nil {
+		return nil, err
+	}
 	if err := cl.ProduceSync(ctx, r).FirstErr(); err != nil {
 		return nil, err
 	}
 	view := kafkaRecordView(r)
-	schema.validate(&view)
+	view.Validation, view.SchemaIssue = checked.Validation, checked.SchemaIssue
 	if k.Acks == "none" {
 		view.Offset = ""
 	}

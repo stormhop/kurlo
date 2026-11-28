@@ -40,6 +40,7 @@ func kafkaTestBroker(t *testing.T, opts ...kfake.Opt) (string, string) {
 }
 
 func TestKafkaProducerRejectsInvalidInputBeforeConnecting(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct{ format, value, partition, want string }{
 		{"json", "nope", "", "valid JSON"}, {"base64", "$", "", "base64"}, {"hex", "f", "", "hex"}, {"text", "ok", "-1", "partition"},
 	} {
@@ -51,6 +52,7 @@ func TestKafkaProducerRejectsInvalidInputBeforeConnecting(t *testing.T) {
 }
 
 func TestKafkaBrokerRoundTrip(t *testing.T) {
+	t.Parallel()
 	broker, topic := kafkaTestBroker(t)
 	app := NewApp()
 	req := model.HttpRequest{URL: "{{brokers}}", ResolveTemplates: true, TemplateValues: map[string]string{"brokers": broker, "topic": topic, "order": "42"}, Kafka: &model.KafkaRequest{Topic: "{{topic}}", Key: "order-{{order}}", Format: "json", Partition: "1"}, Body: `{"order":"{{order}}"}`, BodyType: "text", Headers: []model.KeyValue{{Key: "trace", Value: "t1", Enabled: true}}, TimeoutMs: 8000, EnableSSLVerification: true}
@@ -134,6 +136,7 @@ func TestKafkaBrokerRoundTrip(t *testing.T) {
 }
 
 func TestKafkaTemplateDoesNotMutateSavedTopicBounds(t *testing.T) {
+	t.Parallel()
 	req := model.HttpRequest{Kafka: &model.KafkaRequest{Topics: []model.KafkaTopic{{Name: "{{topic}}", EndOffset: "{{end}}"}}}}
 	got, err := resolveHTTPRequestTemplates(req, map[string]string{"topic": "payments", "end": "42"})
 	if err != nil || got.Kafka.Topics[0].Name != "payments" || got.Kafka.Topics[0].EndOffset != "42" || req.Kafka.Topics[0].EndOffset != "{{end}}" {
@@ -145,6 +148,7 @@ func TestKafkaTemplateDoesNotMutateSavedTopicBounds(t *testing.T) {
 }
 
 func TestKafkaBrokerAuthentication(t *testing.T) {
+	t.Parallel()
 	for _, mechanism := range []string{"PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"} {
 		t.Run(mechanism, func(t *testing.T) {
 			_, _, cert := issueCert(t, "localhost")
@@ -159,6 +163,7 @@ func TestKafkaBrokerAuthentication(t *testing.T) {
 }
 
 func TestKafkaSavedRequestRunsFromCLI(t *testing.T) {
+	t.Parallel()
 	broker, topic := kafkaTestBroker(t)
 	root := writeDefaultsWorkspace(t, broker, "    settings: {}", "")
 	path := filepath.Join(root, "workspaces/Demo/collections/Smoke/requests/GET-x.yml")
@@ -174,6 +179,7 @@ func TestKafkaSavedRequestRunsFromCLI(t *testing.T) {
 }
 
 func TestKafkaAsyncAPISchema(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	data := []byte("asyncapi: 3.0.0\nchannels:\n  orderEvents:\n    address: orders\n    messages:\n      order:\n        $ref: '#/components/messages/Order'\ncomponents:\n  messages:\n    Order:\n      payload:\n        $ref: '#/components/schemas/Order'\n  schemas:\n    Order:\n      type: object\n      required: [id]\n")
 	if err := os.WriteFile(filepath.Join(root, "schema.yaml"), data, 0600); err != nil {
@@ -191,13 +197,49 @@ func TestKafkaAsyncAPISchema(t *testing.T) {
 
 func TestKafkaRejectsWrongPassword(t *testing.T) {
 	broker, topic := kafkaTestBroker(t, kfake.EnableSASL(), kfake.Superuser("SCRAM-SHA-256", "kurlo", "fixture"))
-	resp := NewApp().SendRequest(model.HttpRequest{URL: broker, TimeoutMs: 3000, Auth: model.AuthConfig{Type: "basic", Username: "kurlo", Password: "wrong"}, Kafka: &model.KafkaRequest{Mechanism: "SCRAM-SHA-256", Topic: topic, Format: "text"}, Body: "x"})
-	if resp.Error == "" || resp.Status == "Produced" {
-		t.Fatalf("wrong password produced: %+v", resp)
+	auth := model.AuthConfig{Type: "basic", Username: "kurlo", Password: "wrong"}
+	for _, kafka := range []*model.KafkaRequest{
+		{Mechanism: "SCRAM-SHA-256", Topic: topic, Format: "text"},
+		{Mechanism: "SCRAM-SHA-256", Mode: "consume", Topics: []model.KafkaTopic{{Name: topic}}, StartFrom: "earliest"},
+	} {
+		started := time.Now()
+		resp := NewApp().SendRequest(model.HttpRequest{URL: broker, TimeoutMs: 3000, Auth: auth, Kafka: kafka, Body: "x"})
+		if resp.Status != "" || !strings.Contains(resp.Error, "sign in") || strings.Contains(resp.Error, "did not answer") {
+			t.Fatalf("%s with a wrong password: %+v", defaultString(kafka.Mode, "produce"), resp)
+		}
+		if elapsed := time.Since(started); elapsed > time.Second {
+			t.Fatalf("%s waited %s for a rejected sign-in", defaultString(kafka.Mode, "produce"), elapsed)
+		}
+	}
+	if _, err := NewApp().ListKafkaTopics(model.HttpRequest{URL: broker, Auth: auth, Kafka: &model.KafkaRequest{Mechanism: "SCRAM-SHA-256"}}); err == nil || !strings.Contains(err.Error(), "sign in") {
+		t.Fatalf("Test connection with a wrong password: %v", err)
+	}
+}
+
+func TestKafkaConsumeOutsideTheWindowStopsAfterTheRequestTimeout(t *testing.T) {
+	broker, topic := kafkaTestBroker(t)
+	req := model.HttpRequest{URL: broker, TimeoutMs: 300, Kafka: &model.KafkaRequest{Mode: "consume", Topics: []model.KafkaTopic{{Name: topic}}, StartFrom: "latest", StopAfter: "records", StopValue: "1000"}}
+	started := time.Now()
+	resp := NewApp().SendRequest(req)
+	if resp.Error != "" || resp.Status != "Consumed" || resp.KafkaStopReason != "timeout" || resp.Body != "[]" {
+		t.Fatalf("unattended consume: %+v", resp)
+	}
+	if elapsed := time.Since(started); elapsed < 300*time.Millisecond || elapsed > 3*time.Second {
+		t.Fatalf("unattended consume took %s", elapsed)
+	}
+
+	streamed := context.WithValue(t.Context(), kafkaStreamKey{}, func([]kafkaRecord) {})
+	ctx, cancel := context.WithTimeout(streamed, 900*time.Millisecond)
+	defer cancel()
+	var reason string
+	records, err := consumeKafka(ctx, req, nil, &reason)
+	if !errors.Is(err, context.DeadlineExceeded) || len(records) != 0 {
+		t.Fatalf("a consume shown in the window stopped on its own: records=%d err=%v reason=%q", len(records), err, reason)
 	}
 }
 
 func TestKafkaCompressedRecordsRoundTrip(t *testing.T) {
+	t.Parallel()
 	broker, topic := kafkaTestBroker(t)
 	app := NewApp()
 	codecs := []string{"none", "gzip", "snappy", "lz4", "zstd"}
@@ -220,6 +262,7 @@ func TestKafkaCompressedRecordsRoundTrip(t *testing.T) {
 }
 
 func TestKafkaStreamKeepsRecordsAtTheResultLimit(t *testing.T) {
+	t.Parallel()
 	broker, topic := kafkaTestBroker(t)
 	cl, err := kgo.NewClient(kgo.SeedBrokers(strings.Split(broker, ",")...), kgo.RecordPartitioner(kgo.ManualPartitioner()))
 	if err != nil {
@@ -241,6 +284,7 @@ func TestKafkaStreamKeepsRecordsAtTheResultLimit(t *testing.T) {
 }
 
 func TestKafkaPostmanExtensionImportsAsKafka(t *testing.T) {
+	t.Parallel()
 	doc := map[string]any{"info": map[string]any{"name": "Events"}, "item": []any{map[string]any{
 		"name":    "Order created",
 		"request": map[string]any{"method": "POST", "url": "localhost:9092"},
@@ -258,6 +302,7 @@ func TestKafkaPostmanExtensionImportsAsKafka(t *testing.T) {
 }
 
 func TestKafkaCollectionDocsDescribeTheSubscription(t *testing.T) {
+	t.Parallel()
 	consume := collectionDocsEndpoint(cliSavedRequest{ID: "c", Name: "Orders stream", RequestType: "kafka", URL: "localhost:9092", Kafka: &model.KafkaRequest{Mode: "consume", Topics: []model.KafkaTopic{{Name: "orders", Partitions: "0,1"}}, StartFrom: "earliest", StopAfter: "records", StopValue: "5"}}, nil)
 	produce := collectionDocsEndpoint(cliSavedRequest{ID: "p", Name: "Order created", RequestType: "kafka", URL: "localhost:9092", BodyContent: `{"id":1}`, Kafka: &model.KafkaRequest{Topic: "orders", Key: "order-1"}}, nil)
 	text := func(e docsEndpoint) string {
@@ -290,6 +335,7 @@ func TestKafkaConsumeWaitsPastRequestTimeout(t *testing.T) {
 }
 
 func TestKafkaRequestTimeoutExplainsUnreachableBrokers(t *testing.T) {
+	t.Parallel()
 	broker, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -298,5 +344,50 @@ func TestKafkaRequestTimeoutExplainsUnreachableBrokers(t *testing.T) {
 	resp := NewApp().SendRequest(model.HttpRequest{URL: broker.Addr().String(), TimeoutMs: 200, Kafka: &model.KafkaRequest{Mode: "consume", Topics: []model.KafkaTopic{{Name: "orders"}}, StopAfter: "records", StopValue: "1"}})
 	if !strings.Contains(resp.Error, "did not answer within 200 ms") {
 		t.Fatalf("unexpected error: %q", resp.Error)
+	}
+}
+
+func TestKafkaProducerRefusesAMessageThatBreaksItsSchema(t *testing.T) {
+	broker, topic := kafkaTestBroker(t)
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "order.json"), []byte(`{"type":"object","required":["id"]}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	req := model.HttpRequest{URL: broker, TimeoutMs: 5000, Body: `{}`, Kafka: &model.KafkaRequest{Topic: topic, Partition: "0", Format: "json", SchemaPath: filepath.Join(root, "order.json")}}
+	refused := NewApp().SendRequest(req)
+	if !strings.Contains(refused.Error, "does not match the schema") || refused.Body != "[]" {
+		t.Fatalf("invalid message: %+v", refused)
+	}
+	req.Body = `{"id":7}`
+	sent := NewApp().SendRequest(req)
+	var records []kafkaRecord
+	if sent.Error != "" || json.Unmarshal([]byte(sent.Body), &records) != nil || len(records) != 1 || records[0].Validation != "Valid" || records[0].Offset != "0" {
+		t.Fatalf("valid message: %+v", sent)
+	}
+}
+
+func TestKafkaConsumeStopsAtTheEndOfATransactionalTopic(t *testing.T) {
+	broker, topic := kafkaTestBroker(t)
+	producer, err := kgo.NewClient(kgo.SeedBrokers(strings.Split(broker, ",")...), kgo.TransactionalID("kurlo-test"), kgo.DefaultProduceTopic(topic), kgo.RecordPartitioner(kgo.ManualPartitioner()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer producer.Close()
+	if err := producer.BeginTransaction(); err != nil {
+		t.Fatal(err)
+	}
+	if err := producer.ProduceSync(t.Context(), &kgo.Record{Partition: 0, Value: []byte(`{"id":1}`)}).FirstErr(); err != nil {
+		t.Fatal(err)
+	}
+	if err := producer.EndTransaction(t.Context(), kgo.TryCommit); err != nil {
+		t.Fatal(err)
+	}
+	req := model.HttpRequest{URL: broker, Kafka: &model.KafkaRequest{Mode: "consume", Topics: []model.KafkaTopic{{Name: topic, Partitions: "0", EndOffset: "2"}}, StartFrom: "earliest"}}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	var reason string
+	records, err := consumeKafka(ctx, req, nil, &reason)
+	if err != nil || len(records) != 1 || reason != "endOffset" || *records[0].Value != `{"id":1}` {
+		t.Fatalf("records=%d reason=%q err=%v", len(records), reason, err)
 	}
 }

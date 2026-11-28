@@ -193,7 +193,7 @@
   .tombstone-note { margin: var(--space-3); color: var(--text-2); font-size: var(--text-label); }
   .message-tools { justify-content: flex-start; gap: var(--space-2); }
   .schema-label { margin-inline-start: auto; }
-  .message-value { flex: 1; min-height: 4rem; }
+  .message-value { display: flex; flex: 1; flex-direction: column; min-height: 4rem; }
   .kafka-consume { display: grid; grid-template-columns: minmax(12rem, 2fr) minmax(0, 3fr); container-type: size; }
   section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; min-height: 0; padding: var(--space-2-5) var(--space-3); overflow: auto; }
   section > :global(*) { flex-shrink: 0; }
