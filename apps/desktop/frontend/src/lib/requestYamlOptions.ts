@@ -36,6 +36,7 @@ const protocolFieldGroups: { fields: string[]; protocols: string[] }[] = [
 const protocolPrefixes: { prefix: string; protocols: string[] }[] = [
   { prefix: 'graphql', protocols: ['graphql'] },
   { prefix: 'kafka', protocols: ['kafka'] },
+  { prefix: 'mqtt', protocols: ['mqtt'] },
   { prefix: 'grpc', protocols: ['grpc'] },
   { prefix: 'mcp', protocols: ['mcp'] },
   { prefix: 'ai', protocols: ['ai'] },
@@ -85,6 +86,7 @@ function allowedProperty(path: string[], name: string, siblings: ReadonlyMap<str
       !protocolFieldGroups.some(group => group.fields.includes(name) && !group.protocols.includes(protocol));
   }
   if (path.length === 2 && path[0] === 'request' && path[1] === 'settings') {
+    if (protocol === 'mqtt') return ['enableSSLVerification', 'clientCertPath', 'clientKeyPath', 'clientKeyPassword', 'proxyMode', 'proxyUrl', 'proxyBypass'].includes(name);
     if (protocol === 'kafka') return ['timeoutMs', 'scriptTimeoutMs', 'allowSendRequest', 'enableSSLVerification', 'clientCertPath', 'clientKeyPath', 'clientKeyPassword'].includes(name);
     if (protocol === 'http') return !hasPrefix(name, ['ws', 'sio', 'grpc']) && (method?.toUpperCase() === 'SSE' || !name.startsWith('sse'));
     if (protocol === 'graphql' || protocol === 'mcp' || protocol === 'ai') return !hasPrefix(name, ['ws', 'sio', 'grpc']) && !name.startsWith('sse');

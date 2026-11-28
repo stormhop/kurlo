@@ -2,7 +2,7 @@ import { cancelQuit, confirmQuit, loadRequestExamples } from '../../backend';
 import { normalizeRequestExamples, requestExamplesPending } from '../../examples';
 import type { HttpResponse, McpResponse } from '../../backend';
 import type { ResponseFormatChoice } from '../../responseFormat';
-import { DEFAULT_COLLECTION, MAX_FOLDER_REQUESTS, clampName } from '../../constants';
+import { DEFAULT_COLLECTION, MAX_FOLDER_REQUESTS, RAW_BODY_TYPES, clampName } from '../../constants';
 import { addCollectionFolderPath } from '../../collections';
 import {
   DEFAULT_GRAPHQL_QUERY,
@@ -242,11 +242,12 @@ export const requestCrudFeature = {
   },
 
   isRequestType(this: RequestCrudHost, value: unknown): value is RequestType {
-    return value === 'kafka' || value === 'http' || value === 'graphql' || value === 'ws' || value === 'socketio' || value === 'grpc' || value === 'mcp' || value === 'ai';
+    return value === 'kafka' || value === 'mqtt' || value === 'http' || value === 'graphql' || value === 'ws' || value === 'socketio' || value === 'grpc' || value === 'mcp' || value === 'ai';
   },
 
   normalizeRequestTypeValue(this: RequestCrudHost, value: unknown, url = ''): RequestType {
     if (value === 'kafka') return 'kafka';
+    if (value === 'mqtt') return 'mqtt';
     if (value === 'mcp') return 'mcp';
     if (value === 'ai') return 'ai';
     if (value === 'grpc') return 'grpc';
@@ -277,6 +278,7 @@ export const requestCrudFeature = {
 
   requestTypeLabel(this: RequestCrudHost, type: RequestType = this.requestType) {
     if (type === 'kafka') return 'Kafka';
+    if (type === 'mqtt') return 'MQTT';
     if (this.normalizeRequestTypeValue(type) === 'grpc') return 'gRPC';
     if (this.normalizeRequestTypeValue(type) === 'socketio') return 'Socket.IO';
     if (this.normalizeRequestTypeValue(type) === 'graphql') return 'GraphQL';

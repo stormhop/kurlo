@@ -11,7 +11,7 @@ const TEXT_ROLES = ['--text', '--text-2', '--text-3', '--accent-text'];
 const METHOD_ROLES = ['--get', '--post', '--put', '--patch', '--delete', '--head', '--options'];
 const STATUS_ROLES = ['--success', '--warning', '--danger', '--info'];
 const BACKGROUNDS = ['--bg', '--surface', '--elevated'];
-const PROTOCOL_ROLES = ['--proto-graphql', '--proto-ws', '--proto-sio', '--proto-grpc', '--proto-kafka', '--proto-mcp', '--proto-ai'];
+const PROTOCOL_ROLES = ['--proto-graphql', '--proto-ws', '--proto-sio', '--proto-grpc', '--proto-kafka', '--proto-mqtt', '--proto-mcp', '--proto-ai'];
 
 type Rgb = [number, number, number];
 

@@ -41,6 +41,7 @@ type App struct {
 	sse                *sseManager
 	ws                 *websocketManager
 	sio                *socketIOManager
+	mqtt               *mqttManager
 	mock               *mockServer
 	cookieSync         *cookieSyncServer
 	binaryBodies       *binaryResponseCache
@@ -80,6 +81,7 @@ func NewApp() *App {
 		sse:            newSSEManager(jars),
 		ws:             newWebSocketManager(jars),
 		sio:            newSocketIOManager(jars),
+		mqtt:           newMqttManager(),
 		mock:           newMockServer(),
 		cookieSync:     newCookieSyncServer(jars),
 	}
@@ -128,6 +130,9 @@ func (a *App) Shutdown(_ context.Context) {
 	}
 	if a.sio != nil {
 		a.sio.disconnectAll()
+	}
+	if a.mqtt != nil {
+		a.mqtt.disconnectAll()
 	}
 	if a.sse != nil {
 		a.sse.disconnectAll()
@@ -1058,6 +1063,40 @@ func (a *App) SocketIOEmit(sessionID string, msg model.SocketIOEmitMessage) mode
 		return model.SocketIOEmitResult{Error: linkedSecretErrorMessage(err)}
 	}
 	return a.sio.emit(sessionID, msg)
+}
+
+func (a *App) MqttConnect(sessionID string, req model.HttpRequest) {
+	if a.ctx == nil {
+		return
+	}
+	linked, failed := a.linkSecretsIntoHTTP(a.ctx, &req)
+	if failed != nil {
+		runtime.EventsEmit(a.ctx, "mqtt:error", model.MqttErrorEvent{SessionID: sessionID, Message: failed.Error, Timestamp: time.Now().UnixMilli()})
+		return
+	}
+	a.realtimeWorkspaces.Store(sessionID, req.WorkspaceID)
+	rememberRealtimeSecrets(sessionID, linked.values)
+	a.mqtt.connect(a.ctx, sessionID, req, a.mqtt.runtimeCallbacks(a.ctx, sessionID))
+}
+
+func (a *App) MqttDisconnect(sessionID string) {
+	linkedRealtimeValues.Delete(sessionID)
+	a.mqtt.disconnect(sessionID)
+}
+
+func (a *App) MqttPublish(sessionID string, msg model.MqttPublishMessage) model.MqttResult {
+	if err := a.linkSecretsIntoRealtime(sessionID, &msg); err != nil {
+		return model.MqttResult{Error: linkedSecretErrorMessage(err)}
+	}
+	return a.mqtt.publish(sessionID, msg)
+}
+
+func (a *App) MqttSubscribe(sessionID string, topic model.MqttTopic) model.MqttResult {
+	return a.mqtt.subscribe(sessionID, topic)
+}
+
+func (a *App) MqttUnsubscribe(sessionID string, topic string) model.MqttResult {
+	return a.mqtt.unsubscribe(sessionID, topic)
 }
 
 func (a *App) StartMockServer(config model.MockServerConfig) model.MockServerStatus {

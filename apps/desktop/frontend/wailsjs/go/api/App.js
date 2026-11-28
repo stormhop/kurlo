@@ -546,6 +546,26 @@ export function MockServerStatus() {
   return window['go']['api']['App']['MockServerStatus']();
 }
 
+export function MqttConnect(arg1, arg2) {
+  return window['go']['api']['App']['MqttConnect'](arg1, arg2);
+}
+
+export function MqttDisconnect(arg1) {
+  return window['go']['api']['App']['MqttDisconnect'](arg1);
+}
+
+export function MqttPublish(arg1, arg2) {
+  return window['go']['api']['App']['MqttPublish'](arg1, arg2);
+}
+
+export function MqttSubscribe(arg1, arg2) {
+  return window['go']['api']['App']['MqttSubscribe'](arg1, arg2);
+}
+
+export function MqttUnsubscribe(arg1, arg2) {
+  return window['go']['api']['App']['MqttUnsubscribe'](arg1, arg2);
+}
+
 export function OpenDirectoryDialog(arg1) {
   return window['go']['api']['App']['OpenDirectoryDialog'](arg1);
 }

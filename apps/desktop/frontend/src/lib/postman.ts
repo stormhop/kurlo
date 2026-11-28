@@ -1,4 +1,5 @@
 import { kafkaConfig } from './kafka';
+import { mqttConfig } from './mqtt';
 import type { KVRow, SavedRequest, CollectionDefaults, Environment, FolderDefaults, AuthType, BodyType, JwtAlgorithm, OAuth1SignatureMethod, OAuth2ClientAuth, OAuth2GrantType, RawBodyType, Method, RequestExample, RequestSettings, RequestTab, RequestType, SavedRealtimeMessage, SIOArg } from './types/models';
 import { DEFAULT_REQUEST_SETTINGS, JWT_ALGORITHMS } from './constants';
 import { assertionsToPostmanScript, assertionsWithoutUiIds, normalizeAssertions, requestTypeSupportsAssertions, type AssertionRow } from './assertions';
@@ -16,7 +17,7 @@ import { applyPathParams, pathParamsFromUrl } from './pathParams';
 import { additionalQueryRows, appendQueryString, matchQueryRows, parseQuery, splitUrl, urlWithParams } from './queryParams';
 
 const KURLO_EXTENSION_KEY = 'x-kurlo';
-const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'kafka']);
+const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'kafka', 'mqtt']);
 const KURLO_REQUEST_TABS = new Set<RequestTab>(['docs', 'params', 'query', 'auth', 'headers', 'metadata', 'body', 'schema', 'service', 'events', 'scripts', 'settings']);
 
 function postmanDescription(value: unknown) {
@@ -491,6 +492,7 @@ export function postmanRequestsFromItems(
         mcpProtocolVersion: asText(kurlo.mcpProtocolVersion),
       } : {}),
       ...(requestType === 'kafka' ? { kafka: kafkaConfig(isRecord(kurlo.kafka) ? kurlo.kafka : undefined) } : {}),
+      ...(requestType === 'mqtt' ? { mqtt: mqttConfig(isRecord(kurlo.mqtt) ? kurlo.mqtt : undefined) } : {}),
       ...(requestType === 'grpc' ? {
         grpcMethod,
         grpcMetadata,
@@ -807,6 +809,10 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (s: string, t: st
       encoding: arg.encoding,
     }));
     extension.sioAck = req.sioAck ?? false;
+  }
+  if (requestType === 'mqtt') {
+    extension.mqtt = req.mqtt;
+    extension.message = exportBodyLikeValue(req.bodyContent, req.mqtt?.format === 'json' ? 'json' : 'text', stripFn, includeSecrets);
   }
   if (requestType === 'kafka') {
     extension.kafka = req.kafka;

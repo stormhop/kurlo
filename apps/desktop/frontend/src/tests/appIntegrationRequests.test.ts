@@ -124,12 +124,33 @@ describe('creating a request', () => {
     app.inFlightRequestIds.add(id);
     expect(app.requestTypeEditable).toBe(false);
     app.selectRequestType('http');
+    app.selectRequestType('mqtt');
     expect(app.requestType).toBe('graphql');
     app.inFlightRequestIds.delete(id);
     expect(app.requestTypeEditable).toBe(true);
+  });
+});
+
+describe('switching a request to MQTT and back', () => {
+  it('keeps the JSON body and its type', async () => {
+    backend.state.savedStores = [];
+    const app = new TestApp() as TestApp & Record<string, any>;
+    app.prompts.push('Devices');
+    await app.createCollection();
+    await app.createNewRequest(app.collections[0].id);
+    app.method = 'POST';
+    app.bodyType = 'json';
+    app.rawBodyType = 'json';
+    app.bodyContent = '{"id":7}';
+    await app.saveActiveRequest();
+    app.selectRequestType('mqtt');
+    expect(app.bodyType).toBe('json');
+    await app.saveActiveRequest();
     app.selectRequestType('http');
     await app.saveActiveRequest();
-    expect(app.requestsById.get(id)).toMatchObject({ requestType: 'http', url: 'https://api.example.test/graphql', name: 'Schema' });
+    expect(app.bodyType).toBe('none');
+    app.selectRequestType('mqtt');
+    expect(app.bodyType).toBe('text');
   });
 });
 

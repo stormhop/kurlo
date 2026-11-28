@@ -442,5 +442,105 @@ test('keeps an imported OpenAPI collection in sync with its URL and applies revi
   await chooseRequestSection(page, 'Params');
   await expect.poll(() => page.locator('.kv-row input').evaluateAll(inputs => inputs.map(input => (input as HTMLInputElement).value))).toContain('limit');
   await expect(page.locator('.saved-request-tab.active')).not.toHaveClass(/unsaved/);
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-openapi-sync-saved-params.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-openapi-sync-saved-params.png'), animations: 'disabled' });
+});
+
+test('imports an AsyncAPI document as a Kafka collection and produces its example', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installKurloBridge(page);
+  const spec = {
+    asyncapi: '3.0.0',
+    info: { title: 'Order events', version: '1.0.0' },
+    servers: { dev: { host: 'localhost:9092', protocol: 'kafka', description: 'Local cluster' } },
+    channels: {
+      orders: {
+        address: 'orders', description: 'Orders placed in the shop',
+        messages: {
+          created: {
+            name: 'OrderCreated', title: 'Order created', contentType: 'application/json',
+            headers: { type: 'object', properties: { 'trace-id': { type: 'string', example: 'trace-7f2c' } } },
+            bindings: { kafka: { key: { type: 'string', example: 'order-1042' } } },
+            payload: { type: 'object', properties: { id: { type: 'integer', example: 1042 }, total: { type: 'number', example: 59.9 }, currency: { type: 'string', enum: ['EUR', 'USD'] } } },
+          },
+        },
+      },
+      shipments: {
+        address: 'shipments',
+        messages: { shipped: { name: 'OrderShipped', payload: { type: 'object', properties: { orderId: { type: 'integer' }, carrier: { type: 'string', example: 'DHL' } } } } },
+      },
+    },
+    operations: {
+      placeOrder: { action: 'receive', title: 'Place an order', channel: { $ref: '#/channels/orders' } },
+      watchOrders: { action: 'send', title: 'Watch new orders', channel: { $ref: '#/channels/orders' } },
+      watchShipments: { action: 'send', title: 'Watch shipments', channel: { $ref: '#/channels/shipments' } },
+    },
+  };
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Collections', exact: true }).click();
+  await openCollectionImport(page);
+  const dialog = page.getByRole('dialog', { name: 'Import collection' });
+  await dialog.getByText('AsyncAPI', { exact: true }).click();
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await page.setInputFiles('input[type="file"]', { name: 'orders.asyncapi.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(spec)) });
+  const collection = collectionRow(page, 'Order events');
+  await expect(collection).toBeVisible();
+  if (await collection.getByLabel('Expand collection').count()) await collection.getByLabel('Expand collection').click();
+  for (const folder of ['orders', 'shipments']) {
+    const row = folderRow(page, folder);
+    await expect(row).toBeVisible();
+    if (await row.getByLabel('Expand folder').count()) await row.getByLabel('Expand folder').click();
+  }
+  await page.locator('.collection-list .collection-request').filter({ hasText: 'Place an order' }).click();
+  await expect(page.getByLabel('Bootstrap brokers')).toHaveValue('{{brokers}}');
+  await expect(page.getByLabel('Producer topic')).toHaveValue('orders');
+  await expect(page.getByTestId('kafka-message-editor').locator('.cm-content')).toContainText('"currency": "EUR"');
+  await captureDocsScreenshot(page, 'import-asyncapi');
+  await page.getByRole('button', { name: 'Produce', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => {
+    const sent = window.__kurloE2E.sentRequests.at(-1);
+    return sent ? { topic: sent.kafka?.topic, key: sent.kafka?.key, headers: sent.headers?.map(h => h.key) } : null;
+  })).toEqual({ topic: 'orders', key: 'order-1042', headers: ['trace-id'] });
+  await page.locator('.collection-list .collection-request').filter({ hasText: 'Watch shipments' }).click();
+  await expect(page.getByRole('button', { name: 'Consume', exact: true })).toBeVisible();
+});
+
+test('imports an MQTT AsyncAPI document as one session with subscriptions and saved messages', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await installKurloBridge(page);
+  const spec = {
+    asyncapi: '2.6.0',
+    info: { title: 'Streetlights', version: '1.0.0', description: 'Control and monitor the streetlights of a city.' },
+    servers: { production: { url: 'broker.example.com:1883', protocol: 'mqtt', protocolVersion: '3.1.1' } },
+    channels: {
+      'smartylighting/streetlights/{streetlightId}/lighting/measured': {
+        parameters: { streetlightId: { schema: { type: 'string', examples: ['42'] } } },
+        subscribe: { operationId: 'receiveLightMeasurement', summary: 'Lighting measured', bindings: { mqtt: { qos: 1 } }, message: { name: 'LightMeasured', payload: { type: 'object', properties: { lumens: { type: 'integer', example: 120 } } } } },
+      },
+      'smartylighting/streetlights/{streetlightId}/command/turn': {
+        parameters: { streetlightId: { schema: { type: 'string', examples: ['42'] } } },
+        publish: { operationId: 'turnOn', summary: 'Turn on', bindings: { mqtt: { qos: 1 } }, message: { name: 'TurnOn', payload: { type: 'object', properties: { command: { type: 'string', enum: ['on', 'off'] }, sentAt: { type: 'string', format: 'date-time' } } } } },
+      },
+    },
+  };
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Collections', exact: true }).click();
+  await openCollectionImport(page);
+  const dialog = page.getByRole('dialog', { name: 'Import collection' });
+  await dialog.getByText('AsyncAPI', { exact: true }).click();
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click();
+  await page.setInputFiles('input[type="file"]', { name: 'streetlights.yaml', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(spec)) });
+  const collection = collectionRow(page, 'Streetlights');
+  await expect(collection).toBeVisible();
+  if (await collection.getByLabel('Expand collection').count()) await collection.getByLabel('Expand collection').click();
+  await page.locator('.collection-list .collection-request').filter({ hasText: 'Streetlights' }).click();
+  await expect(page.getByLabel('Broker URL')).toHaveValue('{{mqttBroker}}');
+  await expect(page.getByLabel('Publish topic')).toHaveValue('smartylighting/streetlights/{{streetlightId}}/command/turn');
+  await expect(page.getByTestId('mqtt-message-editor').locator('.cm-content')).toContainText('"command": "on"');
+  await expect(page.getByRole('tab', { name: /Topics\s*1/ })).toBeVisible();
+  await captureDocsScreenshot(page, 'import-asyncapi-mqtt');
+  await page.locator('.btn-send').click();
+  await expect.poll(() => page.evaluate(() => {
+    const connect = window.__kurloE2E.mqttConnects.at(-1)?.request;
+    return connect ? { version: connect.mqtt?.version, topics: connect.mqtt?.topics?.map(topic => `${topic.name} ${topic.qos}`) } : null;
+  })).toEqual({ version: '3.1.1', topics: ['smartylighting/streetlights/+/lighting/measured 1'] });
 });

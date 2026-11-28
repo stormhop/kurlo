@@ -4,8 +4,9 @@ title: "Request fields"
 
 | Field | Contract |
 |-------|----------|
-| `requestType` | `http`, `graphql`, `ws`, `socketio`, `grpc`, `kafka`, `mcp`, or `ai` |
+| `requestType` | `http`, `graphql`, `ws`, `socketio`, `grpc`, `kafka`, `mqtt`, `mcp`, or `ai` |
 | `kafka` | Producer or consumer configuration. `url` lists the bootstrap brokers. `bodyContent` is the producer value. See [Kafka requests](/docs/guides/request-types/kafka/) for subscription bounds, schemas and security settings. |
+| `mqtt` | Connection, subscriptions, last will and saved messages. `url` is the broker URL. `bodyContent` is the message to publish. See [MQTT requests](/docs/guides/request-types/mqtt/). |
 | `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`, or `SSE` |
 | `folderPath` | Display names only. Request files are stored flat; `folderPath` is the UI source of truth. |
 | `params`, `pathParams`, `vars`, `postResponseVars`, `headers`, `formRows`, `sioEvents`, `grpcMetadata` | Arrays of row objects: `id`, `enabled`, `key`, `value`, `description`, optional `secret`, `isFile`, `fileName`. An omitted `enabled` means true. Disabled rows keep `enabled: false`. An omitted `description` means an empty string. A row with `secret: true` keeps its value in the encrypted local store, with a `{{kurloSecret:...}}` placeholder in the file. |

@@ -31,7 +31,8 @@
     { value: 'basic', label: 'SASL' }, { value: 'bearer', label: 'Bearer token' },
     { value: 'oauth2', label: 'OAuth 2.0' }, { value: 'aws', label: 'AWS MSK IAM' },
   ];
-  let authOptions = $derived(vm.requestType === 'kafka' ? KAFKA_AUTH_OPTIONS : vm.requestType === 'grpc' ? GRPC_AUTH_OPTIONS : AUTH_OPTIONS.filter(option => option.value !== 'ntlm' || vm.requestType === 'http' || vm.requestType === 'graphql'));
+  const MQTT_AUTH_OPTIONS = [{ value: 'inherit', label: 'Inherit auth' }, { value: 'none', label: 'No auth' }, { value: 'basic', label: 'Username and password' }];
+  let authOptions = $derived(vm.requestType === 'mqtt' ? MQTT_AUTH_OPTIONS : vm.requestType === 'kafka' ? KAFKA_AUTH_OPTIONS : vm.requestType === 'grpc' ? GRPC_AUTH_OPTIONS : AUTH_OPTIONS.filter(option => option.value !== 'ntlm' || vm.requestType === 'http' || vm.requestType === 'graphql'));
   const OAUTH2_GRANT_OPTIONS = [
     { value: 'client_credentials', label: 'Client credentials' },
     { value: 'authorization_code', label: 'Authorization code' },

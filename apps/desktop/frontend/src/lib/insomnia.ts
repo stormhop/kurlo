@@ -1,4 +1,5 @@
 import { kafkaConfig } from './kafka';
+import { mqttConfig } from './mqtt';
 import type { AuthType, BodyType, KVRow, Method, OAuth1SignatureMethod, RawBodyType, RequestSettings, RequestTab, RequestType, SavedRequest, SIOArg } from './types/models';
 import { DEFAULT_REQUEST_SETTINGS, mkRow } from './constants';
 import { asArray, asText, isRecord, newRequestId } from './utils';
@@ -10,7 +11,7 @@ import { DEFAULT_GRPC_MESSAGE } from './requestBodyDefaults';
 import { safeExportRow, safeExportSettings, safeExportUrl, safeExportValue, sanitizeExportExample } from './secretExport';
 import { pathParamsFromUrl } from './pathParams';
 
-const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'kafka']);
+const KURLO_REQUEST_TYPES = new Set<RequestType>(['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'kafka', 'mqtt']);
 const KURLO_REQUEST_TABS = new Set<RequestTab>(['docs', 'params', 'query', 'auth', 'headers', 'metadata', 'body', 'schema', 'service', 'events', 'scripts', 'settings']);
 
 function resourceType(resource: Record<string, unknown>) {
@@ -310,6 +311,7 @@ export function insomniaRequestsFromResources(payload: unknown, collectionId: st
       ...(Array.isArray(kurlo.sioEvents) ? { sioEvents: insomniaRows(kurlo.sioEvents) } : {}),
       ...(typeof kurlo.sioAck === 'boolean' ? { sioAck: kurlo.sioAck } : {}),
       ...(requestType === 'kafka' ? { kafka: kafkaConfig(isRecord(kurlo.kafka) ? kurlo.kafka : undefined) } : {}),
+      ...(requestType === 'mqtt' ? { mqtt: mqttConfig(isRecord(kurlo.mqtt) ? kurlo.mqtt : undefined) } : {}),
       ...(requestType === 'grpc' ? {
         grpcMethod,
         grpcMetadata,
@@ -464,6 +466,10 @@ function kurloExtensionFromRequest(req: SavedRequest, stripFn: (source: string, 
       encoding: arg.encoding,
     }));
     extension.sioAck = req.sioAck ?? false;
+  }
+  if (requestType === 'mqtt') {
+    extension.mqtt = req.mqtt;
+    extension.message = exportBodyLikeValue(req.bodyContent, req.mqtt?.format === 'json' ? 'json' : 'text', stripFn, includeSecrets);
   }
   if (requestType === 'kafka') {
     extension.kafka = req.kafka;

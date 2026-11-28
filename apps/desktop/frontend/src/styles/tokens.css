@@ -61,7 +61,7 @@
   background: var(--bg);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --proto-graphql: #d85aaa; --proto-ai: #a96edd; --proto-grpc: #6286da; --proto-ws: #2ca2ba; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #be7a2d;
+  --proto-graphql: #d85aaa; --proto-ai: #a96edd; --proto-grpc: #6286da; --proto-ws: #2ca2ba; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #be7a2d; --proto-mqtt: #d9665e;
 }
 
 :root[data-theme="light"],
@@ -114,7 +114,7 @@
   --syn-snip-num:#0d7563;
 
   color-scheme: light;
-  --proto-graphql: #c41c87; --proto-ai: #8620df; --proto-grpc: #2059df; --proto-ws: #137386; --proto-sio: #117845; --proto-mcp: #3f7411; --proto-kafka: #975b16;
+  --proto-graphql: #c41c87; --proto-ai: #8620df; --proto-grpc: #2059df; --proto-ws: #137386; --proto-sio: #117845; --proto-mcp: #3f7411; --proto-kafka: #975b16; --proto-mqtt: #c9291d;
 }
 
 @media (prefers-color-scheme: light) {
@@ -144,7 +144,7 @@
     --syn-hdr-key:#3c48d4; --syn-kw:#1c5fcf; --syn-flag:#7443cc;
     --syn-snip-str:#8f5410; --syn-url:#0e7490; --syn-snip-num:#0d7563;
     color-scheme: light;
-    --proto-graphql: #c41c87; --proto-ai: #8620df; --proto-grpc: #2059df; --proto-ws: #137386; --proto-sio: #117845; --proto-mcp: #3f7411; --proto-kafka: #975b16;
+    --proto-graphql: #c41c87; --proto-ai: #8620df; --proto-grpc: #2059df; --proto-ws: #137386; --proto-sio: #117845; --proto-mcp: #3f7411; --proto-kafka: #975b16; --proto-mqtt: #c9291d;
   }
 }
 
@@ -182,7 +182,7 @@
   --syn-key:#c40e35; --syn-str:#895712; --syn-num:#aa3f01; --syn-bool:#b31b8b;
   --syn-hdr-key:#0a54e8; --syn-kw:#0a54e8; --syn-flag:#7f2bee;
   --syn-snip-str:#895712; --syn-url:#036992; --syn-snip-num:#aa3f01;
-  --proto-graphql: #a01d70; --proto-ai: #7b24c7; --proto-grpc: #224fba; --proto-ws: #145d6c; --proto-sio: #12633b; --proto-mcp: #365f11; --proto-kafka: #7d4d17;
+  --proto-graphql: #a01d70; --proto-ai: #7b24c7; --proto-grpc: #224fba; --proto-ws: #145d6c; --proto-sio: #12633b; --proto-mcp: #365f11; --proto-kafka: #7d4d17; --proto-mqtt: #a7271f;
 }
 
 :root[data-theme-variant="vscode-light"],
@@ -219,7 +219,7 @@
   --syn-key:#af00db; --syn-str:#a31515; --syn-num:#087c52; --syn-bool:#0000ff;
   --syn-hdr-key:#0451a5; --syn-kw:#0000ff; --syn-flag:#795e26;
   --syn-snip-str:#a31515; --syn-url:#0451a5; --syn-snip-num:#087c52;
-  --proto-graphql: #c11582; --proto-ai: #8619e6; --proto-grpc: #1957e6; --proto-ws: #0f7185; --proto-sio: #0d7340; --proto-mcp: #3c730d; --proto-kafka: #935610;
+  --proto-graphql: #c11582; --proto-ai: #8619e6; --proto-grpc: #1957e6; --proto-ws: #0f7185; --proto-sio: #0d7340; --proto-mcp: #3c730d; --proto-kafka: #935610; --proto-mqtt: #c42115;
 }
 
 :root[data-theme-variant="github-light"],
@@ -256,7 +256,7 @@
   --syn-key:#0550ae; --syn-str:#0a3069; --syn-num:#953800; --syn-bool:#cf222e;
   --syn-hdr-key:#0550ae; --syn-kw:#0969da; --syn-flag:#814fdd;
   --syn-snip-str:#0a3069; --syn-url:#0969da; --syn-snip-num:#953800;
-  --proto-graphql: #c01682; --proto-ai: #861ae5; --proto-grpc: #1a57e5; --proto-ws: #0f7185; --proto-sio: #0e7742; --proto-mcp: #3c720d; --proto-kafka: #975911;
+  --proto-graphql: #c01682; --proto-ai: #861ae5; --proto-grpc: #1a57e5; --proto-ws: #0f7185; --proto-sio: #0e7742; --proto-mcp: #3c720d; --proto-kafka: #975911; --proto-mqtt: #c92317;
 }
 
 :root[data-theme-variant="jetbrains-light"],
@@ -293,7 +293,7 @@
   --syn-key:#871094; --syn-str:#067b17; --syn-num:#1750eb; --syn-bool:#0033b3;
   --syn-hdr-key:#871094; --syn-kw:#2e64d2; --syn-flag:#7b45c7;
   --syn-snip-str:#067b17; --syn-url:#2e64d2; --syn-snip-num:#1750eb;
-  --proto-graphql: #ad297d; --proto-ai: #8531ce; --proto-grpc: #2f5cc6; --proto-ws: #1c6878; --proto-sio: #1a6f45; --proto-mcp: #406b19; --proto-kafka: #885820;
+  --proto-graphql: #ad297d; --proto-ai: #8531ce; --proto-grpc: #2f5cc6; --proto-ws: #1c6878; --proto-sio: #1a6f45; --proto-mcp: #406b19; --proto-kafka: #885820; --proto-mqtt: #b4342a;
 }
 
 :root[data-theme-variant="flexoki-paper"],
@@ -330,7 +330,7 @@
   --syn-key:#205ea6; --syn-str:#1f6f68; --syn-num:#5e409d; --syn-bool:#af3029;
   --syn-hdr-key:#205ea6; --syn-kw:#205ea6; --syn-flag:#5e409d;
   --syn-snip-str:#1f6f68; --syn-url:#205ea6; --syn-snip-num:#5e409d;
-  --proto-graphql: #a72075; --proto-ai: #8028cd; --proto-grpc: #2554c0; --proto-ws: #166473; --proto-sio: #14673d; --proto-mcp: #3a6714; --proto-kafka: #805019;
+  --proto-graphql: #a72075; --proto-ai: #8028cd; --proto-grpc: #2554c0; --proto-ws: #166473; --proto-sio: #14673d; --proto-mcp: #3a6714; --proto-kafka: #805019; --proto-mqtt: #aa2b21;
 }
 
 :root[data-theme-variant="high-contrast-light"],
@@ -367,7 +367,7 @@
   --syn-key:#1d3fc4; --syn-str:#6b3d00; --syn-num:#035c2a; --syn-bool:#a3001a;
   --syn-hdr-key:#1d3fc4; --syn-kw:#1d3fc4; --syn-flag:#5a1fa8;
   --syn-snip-str:#6b3d00; --syn-url:#1d3fc4; --syn-snip-num:#035c2a;
-  --proto-graphql: #811359; --proto-ai: #6018a0; --proto-grpc: #163d97; --proto-ws: #0c4854; --proto-sio: #0b4c2b; --proto-mcp: #294c0b; --proto-kafka: #623b0e;
+  --proto-graphql: #811359; --proto-ai: #6018a0; --proto-grpc: #163d97; --proto-ws: #0c4854; --proto-sio: #0b4c2b; --proto-mcp: #294c0b; --proto-kafka: #623b0e; --proto-mqtt: #841b13;
 }
 
 :root[data-theme-variant="catppuccin-mocha"],
@@ -405,7 +405,7 @@
   --syn-hdr-key:#89b4fa; --syn-kw:#89b4fa; --syn-flag:#cba6f7;
   --syn-snip-str:#f9e2af; --syn-url:#89dceb; --syn-snip-num:#fab387;
   --on-accent: #11111b;
-  --proto-graphql: #e387c1; --proto-ai: #bf94e6; --proto-grpc: #87a3e3; --proto-ws: #30b4cf; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #d69851;
+  --proto-graphql: #e387c1; --proto-ai: #bf94e6; --proto-grpc: #87a3e3; --proto-ws: #30b4cf; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #d69851; --proto-mqtt: #e38e88;
 }
 
 :root[data-theme-variant="nord"],
@@ -443,7 +443,7 @@
   --syn-hdr-key:#97b2cc; --syn-kw:#97b2cc; --syn-flag:#c4a7bf;
   --syn-snip-str:#a3be8c; --syn-url:#88c0d0; --syn-snip-num:#c4a7bf;
   --on-accent: #2e3440;
-  --proto-graphql: #dfb4cf; --proto-ai: #cdb8e0; --proto-grpc: #b0bedd; --proto-ws: #94c7d1; --proto-sio: #89cdab; --proto-mcp: #a3c982; --proto-kafka: #d4ba9b;
+  --proto-graphql: #dfb4cf; --proto-ai: #cdb8e0; --proto-grpc: #b0bedd; --proto-ws: #94c7d1; --proto-sio: #89cdab; --proto-mcp: #a3c982; --proto-kafka: #d4ba9b; --proto-mqtt: #e2bdb9;
 }
 
 :root[data-theme-variant="vscode-dark"],
@@ -481,7 +481,7 @@
   --syn-key:#c586c0; --syn-str:#ce9178; --syn-num:#b5cea8; --syn-bool:#569cd6;
   --syn-hdr-key:#9cdcfe; --syn-kw:#569cd6; --syn-flag:#dcdcaa;
   --syn-snip-str:#ce9178; --syn-url:#4fc1ff; --syn-snip-num:#b5cea8;
-  --proto-graphql: #e07bbb; --proto-ai: #b887e3; --proto-grpc: #7f9ce1; --proto-ws: #2ea9c2; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #d28f41;
+  --proto-graphql: #e07bbb; --proto-ai: #b887e3; --proto-grpc: #7f9ce1; --proto-ws: #2ea9c2; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #d28f41; --proto-mqtt: #e0847d;
 }
 
 :root[data-theme-variant="github-dimmed"],
@@ -519,7 +519,7 @@
   --syn-key:#6cb6ff; --syn-str:#96d0ff; --syn-num:#f69d50; --syn-bool:#f4746c;
   --syn-hdr-key:#6cb6ff; --syn-kw:#6cb6ff; --syn-flag:#b285f0;
   --syn-snip-str:#96d0ff; --syn-url:#6cb6ff; --syn-snip-num:#f69d50;
-  --proto-graphql: #e58fc6; --proto-ai: #c298e7; --proto-grpc: #8fa9e5; --proto-ws: #3db9d1; --proto-sio: #2ec278; --proto-mcp: #70be2d; --proto-kafka: #d9a05e;
+  --proto-graphql: #e58fc6; --proto-ai: #c298e7; --proto-grpc: #8fa9e5; --proto-ws: #3db9d1; --proto-sio: #2ec278; --proto-mcp: #70be2d; --proto-kafka: #d9a05e; --proto-mqtt: #e59791;
 }
 
 :root[data-theme-variant="jetbrains-dark"],
@@ -557,7 +557,7 @@
   --syn-key:#c77dbb; --syn-str:#6aab73; --syn-num:#2aacb8; --syn-bool:#cf8e6d;
   --syn-hdr-key:#c77dbb; --syn-kw:#6c9cf8; --syn-flag:#b48aef;
   --syn-snip-str:#6aab73; --syn-url:#6c9cf8; --syn-snip-num:#2aacb8;
-  --proto-graphql: #e48bc3; --proto-ai: #c298e7; --proto-grpc: #8ba6e4; --proto-ws: #35b6d0; --proto-sio: #2dbe75; --proto-mcp: #6eba2c; --proto-kafka: #d79b56;
+  --proto-graphql: #e48bc3; --proto-ai: #c298e7; --proto-grpc: #8ba6e4; --proto-ws: #35b6d0; --proto-sio: #2dbe75; --proto-mcp: #6eba2c; --proto-kafka: #d79b56; --proto-mqtt: #e4918b;
 }
 
 :root[data-theme-variant="one-dark"],
@@ -595,7 +595,7 @@
   --syn-key:#e47f87; --syn-str:#98c379; --syn-num:#d19a66; --syn-bool:#56b6c2;
   --syn-hdr-key:#e47f87; --syn-kw:#56b6c2; --syn-flag:#ca81df;
   --syn-snip-str:#98c379; --syn-url:#61afef; --syn-snip-num:#d19a66;
-  --proto-graphql: #df95c4; --proto-ai: #c29de1; --proto-grpc: #95abdf; --proto-ws: #53b7cb; --proto-sio: #3ac07d; --proto-mcp: #76bc39; --proto-kafka: #d2a26a;
+  --proto-graphql: #df95c4; --proto-ai: #c29de1; --proto-grpc: #95abdf; --proto-ws: #53b7cb; --proto-sio: #3ac07d; --proto-mcp: #76bc39; --proto-kafka: #d2a26a; --proto-mqtt: #df9994;
 }
 
 :root[data-theme-variant="tokyo-night"],
@@ -633,7 +633,7 @@
   --syn-key:#7aa2f7; --syn-str:#9ece6a; --syn-num:#ff9e64; --syn-bool:#bb9af7;
   --syn-hdr-key:#7aa2f7; --syn-kw:#7dcfff; --syn-flag:#bb9af7;
   --syn-snip-str:#9ece6a; --syn-url:#7aa2f7; --syn-snip-num:#ff9e64;
-  --proto-graphql: #de73b7; --proto-ai: #b683e2; --proto-grpc: #7796df; --proto-ws: #2da6be; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #d08735;
+  --proto-graphql: #de73b7; --proto-ai: #b683e2; --proto-grpc: #7796df; --proto-ws: #2da6be; --proto-sio: #2cba73; --proto-mcp: #6eba2c; --proto-kafka: #d08735; --proto-mqtt: #df7b74;
 }
 
 :root[data-theme-variant="everforest"],
@@ -671,7 +671,7 @@
   --syn-key:#7fbbb3; --syn-str:#a7c080; --syn-num:#d699b6; --syn-bool:#e69875;
   --syn-hdr-key:#7fbbb3; --syn-kw:#7fbbb3; --syn-flag:#d699b6;
   --syn-snip-str:#a7c080; --syn-url:#a7c080; --syn-snip-num:#d699b6;
-  --proto-graphql: #daa9c8; --proto-ai: #c6addc; --proto-grpc: #a9b8da; --proto-ws: #86bfcb; --proto-sio: #7bc6a1; --proto-mcp: #99c374; --proto-kafka: #d0b290;
+  --proto-graphql: #daa9c8; --proto-ai: #c6addc; --proto-grpc: #a9b8da; --proto-ws: #86bfcb; --proto-sio: #7bc6a1; --proto-mcp: #99c374; --proto-kafka: #d0b290; --proto-mqtt: #daaca9;
 }
 
 :root[data-theme-variant="high-contrast-dark"],
@@ -709,7 +709,7 @@
   --syn-key:#a9b4ff; --syn-str:#ffd9a0; --syn-num:#7ff0d0; --syn-bool:#ffb0a8;
   --syn-hdr-key:#a9b4ff; --syn-kw:#9cc3ff; --syn-flag:#d9b8ff;
   --syn-snip-str:#ffd9a0; --syn-url:#a9b4ff; --syn-snip-num:#7ff0d0;
-  --proto-graphql: #e89ccc; --proto-ai: #c9a4ea; --proto-grpc: #9cb3e8; --proto-ws: #51c0d6; --proto-sio: #2fca7d; --proto-mcp: #75c62f; --proto-kafka: #dca76a;
+  --proto-graphql: #e89ccc; --proto-ai: #c9a4ea; --proto-grpc: #9cb3e8; --proto-ws: #51c0d6; --proto-sio: #2fca7d; --proto-mcp: #75c62f; --proto-kafka: #dca76a; --proto-mqtt: #eda9a4;
 }
 
 :root,

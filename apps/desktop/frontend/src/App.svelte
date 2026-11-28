@@ -1378,7 +1378,7 @@
           exampleCount={vm.requestExamplesLoaded ? vm.requestExamples.length : (vm.requestsById.get(vm.activeRequestId)?.exampleCount ?? 0)}
         />
 
-        {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai' && vm.requestType !== 'kafka'}
+        {#if requestSection === 'body' && vm.requestType !== 'ws' && vm.requestType !== 'socketio' && vm.requestType !== 'graphql' && vm.requestType !== 'grpc' && vm.requestType !== 'mcp' && vm.requestType !== 'ai' && vm.requestType !== 'kafka' && vm.requestType !== 'mqtt'}
           <BodyModeSelector
             showVariants={vm.method !== 'SSE'}
             rawBodyType={vm.rawBodyType}
@@ -1404,6 +1404,8 @@
             {:else if lazy.FileTabComponent}
               <lazy.FileTabComponent draft={vm.requestFiles.active} />
             {/if}
+          {:else if vm.requestType === 'mqtt' && ['body', 'events', 'properties', 'will', 'settings'].includes(vm.requestTab)}
+            {#if lazy.MqttEditorComponent}<lazy.MqttEditorComponent />{/if}
           {:else if vm.requestType === 'kafka' && (vm.requestTab === 'body' || vm.requestTab === 'settings')}
             {#if lazy.KafkaEditorComponent}<lazy.KafkaEditorComponent />{/if}
           {:else if vm.requestTab === 'docs'}
@@ -1482,7 +1484,9 @@
         ></button>
       {/if}
 
-      {#if vm.requestType === 'kafka'}
+      {#if vm.requestType === 'mqtt'}
+        {#if lazy.MqttPanelComponent}<lazy.MqttPanelComponent />{/if}
+      {:else if vm.requestType === 'kafka'}
         {#if lazy.KafkaResponsePanelComponent}{#key vm.activeRequestId}<lazy.KafkaResponsePanelComponent />{/key}{/if}
       {:else if vm.requestType === 'ws'}
         {#if lazy.WebSocketPanelComponent}

@@ -7,6 +7,7 @@ const protocolTabs: Record<RequestType, readonly RequestTab[]> = {
   ws: ['docs', 'body', 'params', 'auth', 'headers', 'vars', 'settings'],
   socketio: ['docs', 'body', 'events', 'params', 'auth', 'headers', 'vars', 'settings'],
   kafka: ['docs', 'body', 'auth', 'headers', 'vars', 'scripts', 'settings'],
+  mqtt: ['docs', 'body', 'events', 'auth', 'vars', 'properties', 'will', 'settings'],
   grpc: ['docs', 'body', 'auth', 'metadata', 'vars', 'service', 'scripts', 'settings'],
   mcp: ['docs', 'body', 'auth', 'headers', 'vars', 'scripts', 'settings', 'examples'],
   ai: ['docs', 'body', 'auth', 'headers', 'vars', 'tools', 'scripts', 'settings'],

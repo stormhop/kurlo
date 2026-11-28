@@ -43,7 +43,7 @@ What the v3 folder import keeps:
 - Saved examples of HTTP and GraphQL requests.
 - Scripts written for HTTP requests at collection and folder level. Collection and folder scripts that Postman runs only for gRPC or Kafka are left out, so they cannot run on your HTTP requests.
 
-The importer skips Postman MQTT, Kafka, LLM, data, and stdio MCP items and reports the count. Secrets that Postman keeps in a vault import as empty secret variables for you to fill in.
+The importer skips Postman's own MQTT, Kafka, LLM, data, and stdio MCP items and reports the count. Secrets that Postman keeps in a vault import as empty secret variables for you to fill in.
 
 What doesn't carry over:
 

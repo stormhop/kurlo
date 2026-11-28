@@ -1,4 +1,5 @@
 import { kafkaConfig } from '../../kafka';
+import { mqttWire } from '../../mqttWire';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
 import type { AiMessage, AiRequest, GrpcRequest, HttpRequest } from '../../backend';
 import { aiOptionalNumber } from './ai';
@@ -177,7 +178,7 @@ export const requestSerializationFeature = {
     const resolveValue = (value: string) => (defer ? value : this.resolveTemplate(value, envValues));
     const resolveRows = (rows: KVRow[]) => (defer ? rows : this.resolveRows(rows, envValues));
     const isGraphQL = this.normalizeRequestTypeValue(req.requestType, req.url) === 'graphql' || req.bodyType === 'graphql';
-    const rawBody = req.requestType === 'kafka' ? req.bodyContent : bodyContentForSend(this, req);
+    const rawBody = req.requestType === 'kafka' || req.requestType === 'mqtt' ? req.bodyContent : bodyContentForSend(this, req);
     const graphQLPayload = isGraphQL ? this.graphQLPayloadFromRequest(req) : null;
     const deferredGraphQL = defer && graphQLPayload
       ? { query: graphQLPayload.query, variables: stripJsonComments(graphQLPayload.variables), operationName: graphQLPayload.operationName }
@@ -199,7 +200,8 @@ export const requestSerializationFeature = {
       workspaceId: options.workspaceId ?? this.activeWorkspaceId,
       method: normalizedRequestType === 'kafka' ? 'KAFKA' : isGraphQL ? 'POST' : req.method,
       ...(normalizedRequestType === 'kafka' ? { kafka: kafkaConfig(req.kafka) } : {}),
-      url: normalizedRequestType === 'kafka' ? resolveValue(req.url.trim()) : normalizedRequestType === 'ws' || normalizedRequestType === 'socketio'
+      ...(normalizedRequestType === 'mqtt' ? { mqtt: mqttWire(req.mqtt, resolveValue) } : {}),
+      url: normalizedRequestType === 'kafka' || normalizedRequestType === 'mqtt' ? resolveValue(req.url.trim()) : normalizedRequestType === 'ws' || normalizedRequestType === 'socketio'
         ? this.normalizeWebSocketUrlForSend(resolvedUrl)
         : this.normalizeRequestUrlForSend(resolvedUrl),
       params: resolveRows(params).filter(r => r.enabled && r.key).map(({ key, value, enabled }) => ({ key, value, enabled, isFile: false, fileName: '', contentType: '' })),

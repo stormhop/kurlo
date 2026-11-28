@@ -14,6 +14,18 @@
     { "$ref": "#/definitions/loadTestFile" }
   ],
   "definitions": {
+    "mqttPublishProperties": {
+      "type": "object",
+      "properties": {
+        "contentType": { "type": "string" },
+        "responseTopic": { "type": "string" },
+        "correlationData": { "type": "string" },
+        "messageExpiryInterval": { "type": "string" },
+        "topicAlias": { "type": "string" },
+        "payloadFormatIndicator": { "type": "boolean" },
+        "userProperties": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } }
+      }
+    },
     "fileVersion": {
       "type": "integer",
       "const": 1
@@ -369,7 +381,7 @@
         "name": { "type": "string" },
         "filesystemName": { "$ref": "#/definitions/filesystemName" },
         "nameAuto": { "type": "boolean" },
-        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "kafka", "mcp", "ai"] },
+        "requestType": { "type": "string", "enum": ["http", "graphql", "ws", "socketio", "grpc", "kafka", "mqtt", "mcp", "ai"] },
         "isDraft": { "type": "boolean" },
         "isPinned": { "type": "boolean" },
         "collectionId": { "$ref": "#/definitions/id" },
@@ -379,7 +391,7 @@
         },
         "method": { "type": "string", "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "SSE"] },
         "url": { "type": "string" },
-        "requestTab": { "type": "string", "description": "Legacy editor section. Kurlo remembers the selection locally for each request.", "enum": ["docs", "params", "query", "auth", "headers", "vars", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools"] },
+        "requestTab": { "type": "string", "description": "Legacy editor section. Kurlo remembers the selection locally for each request.", "enum": ["docs", "params", "query", "auth", "headers", "vars", "metadata", "body", "schema", "service", "events", "scripts", "settings", "examples", "tools", "properties", "will"] },
         "params": {
           "type": "array",
           "items": { "$ref": "#/definitions/kvRow" }
@@ -485,6 +497,39 @@
               "name": { "type": "string" }, "partitions": { "type": "string" }, "schemaPath": { "type": "string" },
               "startOffset": { "type": "string" }, "endOffset": { "type": "string" }
             } } }
+          }
+        },
+        "mqtt": {
+          "type": "object",
+          "properties": {
+            "version": { "type": "string", "enum": ["3.1", "3.1.1", "5"] },
+            "clientId": { "type": "string" },
+            "cleanSession": { "type": "boolean" },
+            "keepAliveSec": { "type": "integer", "minimum": 0, "maximum": 65535 },
+            "connectTimeoutMs": { "type": "integer", "minimum": 0 },
+            "autoReconnect": { "type": "boolean" },
+            "topic": { "type": "string" },
+            "qos": { "type": "integer", "enum": [0, 1, 2] },
+            "retain": { "type": "boolean" },
+            "format": { "type": "string", "enum": ["text", "json", "base64", "hex"] },
+            "topics": { "type": "array", "items": { "type": "object", "required": ["name"], "properties": {
+              "name": { "type": "string" }, "qos": { "type": "integer", "enum": [0, 1, 2] }, "enabled": { "type": "boolean" },
+              "description": { "type": "string" }, "noLocal": { "type": "boolean" }, "retainAsPublished": { "type": "boolean" }
+            } } },
+            "properties": { "$ref": "#/definitions/mqttPublishProperties" },
+            "connectProperties": { "type": "object", "properties": {
+              "sessionExpiryInterval": { "type": "string" }, "receiveMaximum": { "type": "string" },
+              "maximumPacketSize": { "type": "string" }, "topicAliasMaximum": { "type": "string" },
+              "requestResponseInformation": { "type": "boolean" }, "requestProblemInformation": { "type": "boolean" },
+              "userProperties": { "type": "array", "items": { "$ref": "#/definitions/kvRow" } }
+            } },
+            "will": { "type": "object", "properties": {
+              "enabled": { "type": "boolean" }, "topic": { "type": "string" }, "payload": { "type": "string" },
+              "format": { "type": "string", "enum": ["text", "json", "base64", "hex"] },
+              "qos": { "type": "integer", "enum": [0, 1, 2] }, "retain": { "type": "boolean" },
+              "delayInterval": { "type": "string" },
+              "properties": { "$ref": "#/definitions/mqttPublishProperties" }
+            } }
           }
         },
         "mcpMethod": { "type": "string" },

@@ -275,6 +275,16 @@ export function MockServerLog():Promise<Array<model.MockRequestLog>>;
 
 export function MockServerStatus():Promise<model.MockServerStatus>;
 
+export function MqttConnect(arg1:string,arg2:model.HttpRequest):Promise<void>;
+
+export function MqttDisconnect(arg1:string):Promise<void>;
+
+export function MqttPublish(arg1:string,arg2:model.MqttPublishMessage):Promise<model.MqttResult>;
+
+export function MqttSubscribe(arg1:string,arg2:model.MqttTopic):Promise<model.MqttResult>;
+
+export function MqttUnsubscribe(arg1:string,arg2:string):Promise<model.MqttResult>;
+
 export function OpenDirectoryDialog(arg1:string):Promise<string>;
 
 export function OpenDirectoryDialogWithDefault(arg1:string,arg2:string):Promise<string>;

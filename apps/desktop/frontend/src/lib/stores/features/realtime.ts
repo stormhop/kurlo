@@ -11,6 +11,7 @@ import type {
   WebSocketSession,
 } from '../../types/models';
 import { listenRuntime } from '../../runtimeEvents';
+import { mqttForget } from '../mqtt.svelte';
 
 const REALTIME_MAX_STORED_SESSIONS = 24;
 const REALTIME_IDLE_SESSION_TTL_MS = 30 * 60 * 1000;
@@ -121,6 +122,7 @@ export const realtimeFeature = {
     this.forgetSSESession(id);
     this.forgetWebSocketSession(id);
     this.forgetSocketIOSession(id);
+    mqttForget(id);
   },
 
   cleanupRealtimeSessions(this: RealtimeHost) {

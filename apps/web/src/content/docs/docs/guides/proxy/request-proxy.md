@@ -15,6 +15,8 @@ http://username:password@proxy.example.com:8080
 
 A request URL is the strongest override. A collection URL applies to requests that still inherit that setting. When the effective URL is empty, Kurlo uses the global mode.
 
+MQTT requests to `mqtt://` and `mqtts://` brokers tunnel through an HTTP, HTTPS or SOCKS5 proxy set in Kurlo, but ignore the system proxy. See [MQTT settings](/docs/guides/request-types/mqtt/#settings).
+
 Credentials embedded in a request or collection proxy URL become part of that saved API data. Do not put them in a shareable workspace; use the device-local global proxy authentication fields instead. Kurlo does not expand `{{variables}}` inside proxy URLs.
 
 ## Troubleshooting

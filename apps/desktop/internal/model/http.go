@@ -124,6 +124,7 @@ type CookieJarResult struct {
 type HttpRequest struct {
 	KafkaStreamID string        `json:"kafkaStreamId,omitempty"`
 	Kafka         *KafkaRequest `json:"kafka,omitempty"`
+	Mqtt          *MqttRequest  `json:"mqtt,omitempty"`
 
 	RequestID        string      `json:"requestId"`
 	WorkspaceID      string      `json:"workspaceId"`

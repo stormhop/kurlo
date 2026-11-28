@@ -187,6 +187,7 @@ var httpRequestSettingFieldSet = stringSet(httpRequestSettingFields)
 var webSocketRequestSettingFieldSet = stringSet(webSocketRequestSettingFields)
 var socketIORequestSettingFieldSet = stringSet(socketIORequestSettingFields)
 var kafkaRequestSettingFieldSet = stringSet([]string{"timeoutMs", "enableSSLVerification", "clientCertPath", "clientKeyPath", "clientKeyPassword", "scriptTimeoutMs", "allowSendRequest"})
+var mqttRequestSettingFieldSet = stringSet([]string{"enableSSLVerification", "clientCertPath", "clientKeyPath", "clientKeyPassword", "proxyMode", "proxyUrl", "proxyBypass"})
 
 var grpcRequestSettingFieldSet = stringSet(grpcRequestSettingFields)
 
@@ -259,7 +260,7 @@ func stripBodyFieldsForType(request map[string]any, requestType string) {
 		delete(request, "formRows")
 		return
 	}
-	if requestType == "ws" {
+	if requestType == "ws" || requestType == "mqtt" {
 		delete(request, "bodyFilePath")
 		delete(request, "bodyFileName")
 		delete(request, "formRows")
@@ -282,6 +283,9 @@ func stripBodyFieldsForType(request map[string]any, requestType string) {
 func stripRealtimeFieldsForType(request map[string]any, requestType string) {
 	if requestType != "kafka" {
 		delete(request, "kafka")
+	}
+	if requestType != "mqtt" {
+		delete(request, "mqtt")
 	}
 	if requestType != "socketio" {
 		delete(request, "sioEvents")
@@ -322,7 +326,7 @@ var aiRequestFields = []string{
 func stripMethodForType(request map[string]any, requestType string) {
 	method := stringValue(request, "method")
 	switch requestType {
-	case "ws", "socketio", "grpc", "mcp", "ai", "kafka":
+	case "ws", "socketio", "grpc", "mcp", "ai", "kafka", "mqtt":
 		delete(request, "method")
 	case "graphql":
 		if method == "POST" {
@@ -418,6 +422,8 @@ func requestSettingFieldsForType(requestType string) map[string]bool {
 	switch requestType {
 	case "kafka":
 		return kafkaRequestSettingFieldSet
+	case "mqtt":
+		return mqttRequestSettingFieldSet
 	case "", "http", "graphql", "mcp", "ai":
 		return httpRequestSettingFieldSet
 	case "ws":

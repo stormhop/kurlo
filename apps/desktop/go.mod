@@ -18,6 +18,7 @@ require (
 	github.com/jhump/protoreflect v1.19.0
 	github.com/klauspost/compress v1.20.3
 	github.com/minio/selfupdate v0.6.0
+	github.com/mochi-mqtt/server/v2 v2.7.9
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/twmb/franz-go v1.22.3
@@ -37,6 +38,7 @@ require (
 
 require (
 	github.com/pierrec/lz4/v4 v4.1.33 // indirect
+	github.com/rs/xid v1.4.0 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.15.2 // indirect
 )
 

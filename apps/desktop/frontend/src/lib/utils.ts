@@ -205,12 +205,12 @@ export function methodColor(m: string) {
     PATCH: 'method-patch', DELETE: 'method-delete',
     HEAD: 'method-head', OPTIONS: 'method-options',
     SSE: 'method-sse', GRAPHQL: 'method-graphql', GQL: 'method-graphql',
-    WS: 'method-ws', WEBSOCKET: 'method-ws', SIO: 'method-sio', 'SOCKET.IO': 'method-sio', GRPC: 'method-grpc', MCP: 'method-mcp', AI: 'method-ai', KAFKA: 'method-kafka',
+    WS: 'method-ws', WEBSOCKET: 'method-ws', SIO: 'method-sio', 'SOCKET.IO': 'method-sio', GRPC: 'method-grpc', MCP: 'method-mcp', AI: 'method-ai', KAFKA: 'method-kafka', MQTT: 'method-mqtt',
   };
   return map[m.toUpperCase()] ?? '';
 }
 
-export type RequestKind = 'kafka' | 'http' | 'graphql' | 'sse' | 'ws' | 'socketio' | 'grpc' | 'mcp' | 'ai';
+export type RequestKind = 'kafka' | 'mqtt' | 'http' | 'graphql' | 'sse' | 'ws' | 'socketio' | 'grpc' | 'mcp' | 'ai';
 export type RequestKindInput = {
   requestType?: RequestType;
   method?: string;
@@ -219,6 +219,7 @@ export type RequestKindInput = {
 
 export function requestKindFor(input: RequestKindInput): RequestKind {
   if (input.requestType === 'kafka') return 'kafka';
+  if (input.requestType === 'mqtt') return 'mqtt';
   if (input.requestType === 'socketio') return 'socketio';
   if (input.requestType === 'mcp') return 'mcp';
   if (input.requestType === 'ai') return 'ai';
@@ -232,6 +233,7 @@ export function requestKindFor(input: RequestKindInput): RequestKind {
 export function requestBadgeLabel(input: RequestKindInput): string {
   const kind = requestKindFor(input);
   if (kind === 'kafka') return 'Kafka';
+  if (kind === 'mqtt') return 'MQTT';
   if (kind === 'socketio') return 'Socket.IO';
   if (kind === 'mcp') return 'MCP';
   if (kind === 'ai') return 'AI';
@@ -308,6 +310,7 @@ export function requestTitleFrom(methodValue: string, urlValue: string) {
 
 export function requestTransportLabel(req: { requestType?: string; method: string; url?: string }) {
   if (req.requestType === 'kafka') return 'Kafka';
+  if (req.requestType === 'mqtt') return 'MQTT';
   if (req.requestType === 'socketio') return 'Socket.IO';
   if (req.requestType === 'mcp') return 'MCP';
   if (req.requestType === 'ai') return 'AI';
@@ -317,7 +320,7 @@ export function requestTransportLabel(req: { requestType?: string; method: strin
 }
 
 export function requestKindFromTransportLabel(label: string): RequestKind {
-  const kinds: Record<string, RequestKind> = { Kafka: 'kafka', 'Socket.IO': 'socketio', SIO: 'socketio', MCP: 'mcp', AI: 'ai', gRPC: 'grpc', GraphQL: 'graphql', GQL: 'graphql', WS: 'ws', WebSocket: 'ws', SSE: 'sse' };
+  const kinds: Record<string, RequestKind> = { Kafka: 'kafka', MQTT: 'mqtt', 'Socket.IO': 'socketio', SIO: 'socketio', MCP: 'mcp', AI: 'ai', gRPC: 'grpc', GraphQL: 'graphql', GQL: 'graphql', WS: 'ws', WebSocket: 'ws', SSE: 'sse' };
   return kinds[label] ?? 'http';
 }
 

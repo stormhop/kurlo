@@ -6,7 +6,7 @@ import { agentStore, connection, installAgentBridge } from './support/agent';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
 import { chooseRequestSection, collectionRow, fillCodeEditor } from './support/actions';
 
-for (const kind of ['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'ai', 'collection']) {
+for (const kind of ['http', 'graphql', 'ws', 'socketio', 'grpc', 'kafka', 'mqtt', 'mcp', 'ai', 'collection']) {
   test(`audits editor scrolling and height for ${kind}`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1200 });
     await installKurloBridge(page, '', 'browser/e2e', false, {

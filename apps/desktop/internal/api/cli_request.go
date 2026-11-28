@@ -155,6 +155,7 @@ type cliExample struct {
 
 type cliSavedRequest struct {
 	Kafka                  *model.KafkaRequest `json:"kafka,omitempty"`
+	Mqtt                   *model.MqttRequest  `json:"mqtt,omitempty"`
 	CollectionVariables    map[string]string   `json:"-"`
 	CollectionSecretValues []string            `json:"-"`
 

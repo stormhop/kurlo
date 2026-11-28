@@ -396,6 +396,7 @@
 .method-graphql { color: var(--proto-graphql); }
 .method-grpc { color: var(--proto-grpc); }
 .method-kafka { color: var(--proto-kafka); }
+.method-mqtt { color: var(--proto-mqtt); }
 .method-mcp { color: var(--proto-mcp); }
 .method-ai { color: var(--proto-ai); }
 

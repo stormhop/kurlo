@@ -18,7 +18,7 @@ describe('request labels', () => {
   });
 
   it('maps every transport label back to the kind whose icon it shows', () => {
-    const types = ['graphql', 'ws', 'socketio', 'grpc', 'kafka', 'mcp', 'ai'] as const;
+    const types = ['graphql', 'ws', 'socketio', 'grpc', 'kafka', 'mqtt', 'mcp', 'ai'] as const;
     for (const requestType of types) {
       const label = requestTransportLabel({ requestType, method: 'POST', url: 'localhost:1' });
       expect(requestKindFromTransportLabel(label)).toBe(requestKindFor({ requestType }));

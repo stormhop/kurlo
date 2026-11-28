@@ -1,4 +1,5 @@
 import { kafkaConfig } from './kafka';
+import { mqttConfig } from './mqtt';
 import { normalizeBodyVariants } from './bodyVariants';
 import { resolveFormRequestTab } from './requestTabPreferences';
 import type {
@@ -84,7 +85,7 @@ const REQUEST_FIELDS: FieldTypes = {
     ],
     booleans: ['nameAuto', 'isDraft', 'sioAck', 'grpcUseReflection', 'aiStream', 'aiKurloTools'],
     arrays: ['folderPath', 'params', 'pathParams', 'vars', 'postResponseVars', 'headers', 'formRows', 'sioEvents', 'sioArgs', 'bodyVariants', 'savedMessages', 'assertions', 'grpcMetadata', 'grpcProtoImportPaths', 'aiToolRequestIds', 'examples'],
-    objects: ['auth', 'settings', 'settingsOverrides', 'kafka'],
+    objects: ['auth', 'settings', 'settingsOverrides', 'kafka', 'mqtt'],
 };
 
 const managedRequestFields = new Set([
@@ -100,6 +101,7 @@ export function extraRequestFileFields(request?: Partial<SavedRequest>): Record<
 
 export function normalizeRequestType(input: { requestType?: string; bodyType?: string; url?: string }): RequestType {
     if (input.requestType === 'kafka') return 'kafka';
+    if (input.requestType === 'mqtt') return 'mqtt';
     if (input.requestType === 'mcp') return 'mcp';
     if (input.requestType === 'ai') return 'ai';
     if (input.requestType === 'grpc') return 'grpc';
@@ -247,7 +249,7 @@ export function normalizeSavedRequest(
     const isMcp = normalizedRequestType === 'mcp';
     const isAi = normalizedRequestType === 'ai';
     const bodyDefaults = requestBodyDefaultsFor(normalizedRequestType);
-    const realtimeLabel = normalizedRequestType === 'kafka' ? 'Kafka' : normalizedRequestType === 'ai' ? 'AI' : normalizedRequestType === 'mcp' ? 'MCP' : normalizedRequestType === 'grpc' ? 'gRPC' : normalizedRequestType === 'socketio' ? 'Socket.IO' : normalizedRequestType === 'ws' ? 'WS' : normalizedRequestType === 'graphql' ? 'GraphQL' : '';
+    const realtimeLabel = normalizedRequestType === 'mqtt' ? 'MQTT' : normalizedRequestType === 'kafka' ? 'Kafka' : normalizedRequestType === 'ai' ? 'AI' : normalizedRequestType === 'mcp' ? 'MCP' : normalizedRequestType === 'grpc' ? 'gRPC' : normalizedRequestType === 'socketio' ? 'Socket.IO' : normalizedRequestType === 'ws' ? 'WS' : normalizedRequestType === 'graphql' ? 'GraphQL' : '';
     const normalizedName = input.name || requestTitleFrom(realtimeLabel || (input.method || 'GET'), input.url || '');
     const folderPath = Array.isArray(input.folderPath) ? input.folderPath.map(asText).filter(Boolean) : [];
     const id = input.id || newRequestId();
@@ -269,6 +271,7 @@ export function normalizeSavedRequest(
         nameAuto: input.nameAuto ?? false,
         requestType: normalizedRequestType,
         ...(normalizedRequestType === 'kafka' ? { kafka: kafkaConfig(input.kafka), } : {}),
+        ...(normalizedRequestType === 'mqtt' ? { mqtt: mqttConfig(input.mqtt) } : {}),
         isDraft,
         collectionId,
         collection: isDraft ? '' : input.collection || collectionName,

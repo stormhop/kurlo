@@ -1,4 +1,5 @@
 import { kafkaStreams, openKafkaStream } from '../kafka.svelte';
+import { mqttActive } from '../mqtt.svelte';
 import { cancelHttpRequest, sendHttpRequest, sendHttpRequestToFile, setEnvironment, setGlobalVariables } from '../../backend';
 import type { HttpRequest, HttpResponse } from '../../backend';
 import { emptyHttpResponse } from '../../wire';
@@ -38,6 +39,7 @@ type RequestExecutionHost = {
   switchRequest: (id: string) => Promise<void>;
   topView: string;
   runActiveRequest: () => Promise<void>;
+  mqttToggleConnection: () => Promise<void>;
   activeWorkspaceId: string;
   authType: AuthType;
   bearerToken: string;
@@ -128,13 +130,17 @@ export const requestExecutionFeature = {
 
   async runActiveRequest(this: RequestExecutionHost) {
     if (!this.guardWorkspaceWritable('Sending requests')) return;
-    if (this.requestFiles?.active?.dirty && !this.loading && !this.sseSessionIsActive() && !this.webSocketConnected && !this.webSocketConnecting && !this.socketIOConnected && !this.socketIOConnecting) {
+    if (this.requestFiles?.active?.dirty && !this.loading && !mqttActive(this.activeRequestId) && !this.sseSessionIsActive() && !this.webSocketConnected && !this.webSocketConnecting && !this.socketIOConnected && !this.socketIOConnecting) {
       this.collectionImportToast = 'Save or revert your YAML edits before running this request.';
       return;
     }
     if (this.requestType === 'ws') {
       if (this.webSocketConnected || this.webSocketConnecting) await this.webSocketDisconnect();
       else await this.webSocketConnect();
+      return;
+    }
+    if (this.requestType === 'mqtt') {
+      await this.mqttToggleConnection();
       return;
     }
     if (this.requestType === 'socketio') {

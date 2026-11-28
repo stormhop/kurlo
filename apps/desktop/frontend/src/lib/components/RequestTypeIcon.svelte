@@ -30,6 +30,10 @@
     <circle cx="6" cy="13.4" r="1.35" />
     <circle cx="11.5" cy="5" r="1.35" />
     <circle cx="11.5" cy="11" r="1.35" />
+  {:else if kind === 'mqtt'}
+    <circle cx="3.4" cy="12.6" r="1.25" fill="currentColor" stroke="none" />
+    <path d="M2.6 8.2a5.2 5.2 0 0 1 5.2 5.2M2.6 4.1a9.3 9.3 0 0 1 9.3 9.3" />
+    <path d="M10.4 2.6h3v3" />
   {:else if kind === 'mcp'}
     <path d="M6 1.9v3.3M10 1.9v3.3" />
     <path d="M3.9 5.2h8.2v2.3a4.1 4.1 0 0 1-8.2 0z" />
@@ -54,6 +58,7 @@
   .request-type-icon--socketio { color: var(--proto-sio); }
   .request-type-icon--grpc { color: var(--proto-grpc); }
   .request-type-icon--kafka { color: var(--proto-kafka); }
+  .request-type-icon--mqtt { color: var(--proto-mqtt); }
   .request-type-icon--mcp { color: var(--proto-mcp); }
   .request-type-icon--ai { color: var(--proto-ai); }
   .request-type-icon--sse { color: var(--head); }

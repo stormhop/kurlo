@@ -91,6 +91,10 @@
       ];
     }
 
+    if (requestType === 'mqtt') {
+      const subscribed = vm.mqtt.topics.filter(topic => topic.enabled && topic.name.trim()).length;
+      return [docs, { id: 'body', label: 'Message', badge: bodyHasContent ? 'On' : undefined, badgeKind: 'on' }, { id: 'events', label: 'Topics', badge: subscribed ? String(subscribed) : undefined }, { ...auth, badge: vm.authType === 'basic' ? 'On' : undefined }, vars, { id: 'properties', label: 'Properties' }, { id: 'will', label: 'Last Will', badge: vm.mqtt.will.enabled ? 'On' : undefined, badgeKind: 'on' }, settings];
+    }
     if (requestType === 'kafka') {
       return [docs, { id: 'body', label: vm.kafka.mode === 'consume' ? 'Topics' : 'Message' }, auth, ...(vm.kafka.mode === 'consume' ? [] : [headers]), vars, scripts, settings];
     }

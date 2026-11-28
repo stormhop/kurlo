@@ -1,4 +1,5 @@
 import { kafkaConfig } from '../kafka';
+import { mqttConfig } from '../mqtt';
 import {
   loadRequestStore, loadWorkspace, loadWorkspaceDiagnostics, storedHistoryResponseIds,
   openDirectoryDialog, saveFileDialog, defaultWorkspaceLocation, setDefaultWorkspaceLocation,
@@ -86,6 +87,7 @@ import { snippetsFeature } from './features/snippets';
 import { sseFeature } from './features/sse';
 import { websocketFeature } from './features/websocket';
 import { socketioFeature } from './features/socketio';
+import { mqttRequestFeature } from './features/mqttRequest';
 import { savedMessagesFeature } from './features/savedMessages';
 import { trashFeature, type TrashEntry } from './features/trash';
 import { mkSioEventRow, socketioFormFeature } from './features/socketioForm';
@@ -251,6 +253,15 @@ class AppVM {
   declare _sioTrimMessages: typeof socketioFeature._sioTrimMessages;
   declare _sioHistorySnapshot: typeof socketioFeature._sioHistorySnapshot;
   declare _recordSocketIOHistoryOnce: typeof socketioFeature._recordSocketIOHistoryOnce;
+  declare mqttConnected: typeof mqttRequestFeature.mqttConnected;
+  declare mqttToggleConnection: typeof mqttRequestFeature.mqttToggleConnection;
+  declare mqttResolve: typeof mqttRequestFeature.mqttResolve;
+  declare mqttPublishCurrent: typeof mqttRequestFeature.mqttPublishCurrent;
+  declare mqttSetSubscribed: typeof mqttRequestFeature.mqttSetSubscribed;
+  declare mqttRemoveTopic: typeof mqttRequestFeature.mqttRemoveTopic;
+  declare mqttSaveMessage: typeof mqttRequestFeature.mqttSaveMessage;
+  declare mqttLoadMessage: typeof mqttRequestFeature.mqttLoadMessage;
+  declare mqttDeleteMessage: typeof mqttRequestFeature.mqttDeleteMessage;
   declare socketIOConnect: typeof socketioFeature.socketIOConnect;
   declare socketIODisconnect: typeof socketioFeature.socketIODisconnect;
   declare socketIOEmitCurrentMessage: typeof socketioFeature.socketIOEmitCurrentMessage;
@@ -1293,6 +1304,7 @@ class AppVM {
   sioSelectedArgId = $state('1');
   sioAck = $state(false);
   kafka = $state(kafkaConfig());
+  mqtt = $state(mqttConfig());
   grpcMethod = $state('');
   mcpMethod = $state('tools/list');
   mcpName = $state('');
@@ -2232,6 +2244,7 @@ applyFeatures(
   sseFeature,
   websocketFeature,
   socketioFeature,
+  mqttRequestFeature,
   socketioFormFeature,
   savedMessagesFeature,
   trashFeature,

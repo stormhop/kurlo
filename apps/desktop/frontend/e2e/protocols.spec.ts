@@ -436,6 +436,8 @@ for (const protocol of [
   { requestType: 'grpc', method: 'POST' },
   { requestType: 'ws', method: 'GET' },
   { requestType: 'socketio', method: 'GET' },
+  { requestType: 'kafka', method: 'GET' },
+  { requestType: 'mqtt', method: 'GET' },
 ]) {
   test(`shows each request section once for ${protocol.requestType} ${protocol.method}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 2800, height: 900 });

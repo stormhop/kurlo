@@ -18,7 +18,7 @@ async function start(page: Page, preview = true, autosave = false, protocol = 'h
     ...request,
     requestType: protocol === 'sse' ? 'http' : protocol,
     method: protocol === 'sse' ? 'SSE' : protocol === 'grpc' ? 'POST' : 'GET',
-    url: protocol === 'ws' ? 'wss://example.test/two' : protocol === 'grpc' ? 'grpc.kurlo.test:443' : request.url,
+    url: protocol === 'ws' ? 'wss://example.test/two' : protocol === 'grpc' ? 'grpc.kurlo.test:443' : protocol === 'kafka' ? 'localhost:9092' : protocol === 'mqtt' ? 'mqtt://broker.example.test:1883' : request.url,
     ...(protocol === 'grpc' ? { grpcMethod: 'greeter.Greeter/Hello' } : {}),
   });
   await installKurloBridge(page, '', 'browser/e2e', false, {
@@ -122,7 +122,7 @@ test('keeps new drafts alongside a replaceable preview and clears closed preview
   await expect(requestTabs(page)).toHaveText(['One', 'New Request', 'Four']);
 });
 
-for (const protocol of ['ws', 'socketio', 'sse']) {
+for (const protocol of ['ws', 'socketio', 'sse', 'mqtt']) {
   test(`keeps a preview with an active ${protocol} connection`, async ({ page }) => {
     await start(page, true, false, protocol);
     await openRequest(page, 'Two');
@@ -136,7 +136,7 @@ for (const protocol of ['ws', 'socketio', 'sse']) {
     await expect(page.getByRole('button', { name: 'Disconnect', exact: true })).toBeVisible();
     const connectCount = await page.evaluate(protocol => {
       const state = window.__kurloE2E;
-      return (protocol === 'ws' ? state.webSocketConnects : protocol === 'sse' ? state.sseConnects : state.socketIOConnects).length;
+      return (protocol === 'ws' ? state.webSocketConnects : protocol === 'sse' ? state.sseConnects : protocol === 'mqtt' ? state.mqttConnects : state.socketIOConnects).length;
     }, protocol);
     expect(connectCount).toBe(1);
   });

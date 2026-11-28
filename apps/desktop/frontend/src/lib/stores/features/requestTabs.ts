@@ -1,3 +1,4 @@
+import { mqttActive } from '../mqtt.svelte';
 import type { SavedRequest } from '../../types/models';
 
 const PREVIEW_TABS_KEY = 'kurlo.previewTabs.v1';
@@ -59,6 +60,7 @@ export const requestTabsFeature = {
 
   requestIsRunning(this: RequestTabsHost, id: string) {
     return this.inFlightRequestIds.has(id)
+      || mqttActive(id)
       || [this.webSocketSessions, this.socketIOSessions, this.sseSessions]
         .some(sessions => {
           const session = sessions.get(id);

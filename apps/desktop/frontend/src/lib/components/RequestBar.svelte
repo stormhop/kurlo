@@ -1,6 +1,8 @@
 <script lang="ts">
   import KafkaConnection from './KafkaConnection.svelte';
   import KafkaMode from './KafkaMode.svelte';
+  import MqttVersion from './MqttVersion.svelte';
+  import { mqttSession } from '../stores/mqtt.svelte';
   import RequestTypeIcon from './RequestTypeIcon.svelte';
   import Chevron from './Chevron.svelte';
   import CheckIcon from './CheckIcon.svelte';
@@ -112,7 +114,8 @@
   const chosenAiConnection = $derived(aiConnectionsStore.list.find(connection => connection.id === connectionId));
   const running = $derived(vm.requestIsRunning(vm.activeRequestId));
   const sendType = $derived(running ? vm.requestType : requestType);
-  const connectionStatus = $derived(sendType === 'ws' ? wsStatus : sendType === 'socketio' ? sioStatus : sseStatus);
+  const graphqlSubscribing = $derived(sendType === 'graphql' && graphqlSubscription);
+  const connectionStatus = $derived(sendType === 'mqtt' ? mqttSession(vm.activeRequestId).status : sendType === 'ws' || graphqlSubscribing ? wsStatus : sendType === 'socketio' ? sioStatus : sseStatus);
   const connecting = $derived(connectionStatus === 'connecting' || connectionStatus === 'reconnecting');
   const connectionActive = $derived(connecting || connectionStatus === 'connected');
   const showSSEControls = $derived(sendType === 'http' && ((running ? vm.method : method) === 'SSE' || connectionActive));
@@ -181,6 +184,7 @@
     ws: 'WebSocket',
     socketio: 'Socket.IO',
     kafka: 'Kafka',
+    mqtt: 'MQTT',
     grpc: 'gRPC',
     mcp: 'MCP',
     ai: 'AI',
@@ -259,7 +263,7 @@
     {/if}
   </div>
 
-  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp' || requestType === 'kafka'} class:request-bar-code={codePanelAvailable} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
+  <div class="request-bar" class:request-bar-ws={requestType === 'ws' || requestType === 'socketio' || requestType === 'graphql' || requestType === 'mcp' || requestType === 'kafka' || requestType === 'mqtt'} class:request-bar-code={codePanelAvailable} class:request-bar-grpc={requestType === 'grpc'} class:request-bar-ai={requestType === 'ai'}>
     <div class="url-field" inert={!!fileDraft && !fileDraft.ready}>
       <div class="method-wrap" onfocusout={closeMethodMenuOnFocusOut}>
         <button
@@ -318,6 +322,9 @@
         {/if}
       </div>
 
+      {#if requestType === 'mqtt' && !fileDraft}
+        <MqttVersion disabled={connectionActive} />
+      {/if}
       {#if requestType === 'kafka' && !fileDraft}
         <KafkaMode disabled={loading} />
       {/if}
@@ -334,8 +341,8 @@
         wheelScroll
         suggestions={variableSuggestions}
         ghost={urlGhostFor}
-        placeholder={requestType === 'kafka' ? 'Bootstrap brokers, e.g. localhost:9092' : requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Base URL' : 'Enter request URL or paste cURL…'}
-        ariaLabel={requestType === 'kafka' ? 'Bootstrap brokers' : requestType === 'grpc' ? 'gRPC target' : requestType === 'ai' ? 'Provider base URL' : 'Request URL'}
+        placeholder={requestType === 'mqtt' ? 'Broker URL, e.g. mqtt://localhost:1883' : requestType === 'kafka' ? 'Bootstrap brokers, e.g. localhost:9092' : requestType === 'graphql' ? 'Enter GraphQL endpoint URL…' : requestType === 'ws' ? 'Enter WebSocket URL…' : requestType === 'socketio' ? 'Enter Socket.IO URL…' : requestType === 'grpc' ? 'Enter gRPC target, e.g. localhost:50051…' : requestType === 'mcp' ? 'Enter the MCP endpoint URL…' : requestType === 'ai' ? 'Base URL' : 'Enter request URL or paste cURL…'}
+        ariaLabel={requestType === 'mqtt' ? 'Broker URL' : requestType === 'kafka' ? 'Bootstrap brokers' : requestType === 'grpc' ? 'gRPC target' : requestType === 'ai' ? 'Provider base URL' : 'Request URL'}
         oninput={onUrlInput}
         onpaste={(event) => { onUrlPaste(event); keepHostVisible(); }}
         onenter={sendFromUrl}
@@ -438,7 +445,7 @@
         {/if}
         <RequestShortcutHint cancel={loading} />
       </button>
-    {:else if sendType === 'ws' || sendType === 'socketio' || showSSEControls}
+    {:else if sendType === 'ws' || sendType === 'socketio' || sendType === 'mqtt' || showSSEControls}
       <button
         class="btn-send"
         class:btn-sse-connect={showSSEControls && !connectionActive}

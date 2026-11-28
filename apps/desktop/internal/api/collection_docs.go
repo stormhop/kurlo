@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/pkg/browser"
@@ -711,6 +712,8 @@ func collectionDocsEndpoint(req cliSavedRequest, credentials map[string]bool) do
 		method = "Socket.IO"
 	case kind == "kafka":
 		method = "Kafka"
+	case kind == "mqtt":
+		method = "MQTT"
 	case kind != "http":
 		method = strings.ToUpper(kind)
 	}
@@ -727,6 +730,20 @@ func collectionDocsEndpoint(req cliSavedRequest, credentials map[string]bool) do
 			message.Address = strings.TrimRight(message.Address, "/") + "/" + strings.TrimLeft(req.GrpcMethod, "/")
 		}
 		message.addRows("Metadata", req.GrpcMetadata)
+	case "mqtt":
+		if q := req.Mqtt; q != nil {
+			rows := []cliKV{}
+			for _, topic := range q.Topics {
+				rows = append(rows, cliKV{Key: topic.Name, Value: fmt.Sprintf("QoS %d", topic.QoS), Description: topic.Description, Enabled: topic.Enabled})
+			}
+			message.addRows("Topics", rows)
+			message.addRows("Message", []cliKV{
+				{Key: "Topic", Value: q.Topic, Enabled: q.Topic != ""},
+				{Key: "QoS", Value: strconv.Itoa(q.QoS), Enabled: true},
+				{Key: "Retain", Value: strconv.FormatBool(q.Retain), Enabled: q.Retain},
+				{Key: "MQTT version", Value: defaultString(q.Version, "5"), Enabled: true},
+			})
+		}
 	case "kafka":
 		if k := req.Kafka; k != nil {
 			if k.Mode == "consume" {

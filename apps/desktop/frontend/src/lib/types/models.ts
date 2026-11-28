@@ -3,7 +3,7 @@ import type { LoadTest } from '../wire';
 
 export type { CookieJarEntry, KeyValue, ResponseTimings, ScriptResult };
 
-export type RequestType = 'kafka' | 'http' | 'graphql' | 'ws' | 'socketio' | 'grpc' | 'mcp' | 'ai';
+export type RequestType = 'kafka' | 'mqtt' | 'http' | 'graphql' | 'ws' | 'socketio' | 'grpc' | 'mcp' | 'ai';
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS' | 'SSE';
 
 export type SSEStatus = 'idle' | 'connecting' | 'reconnecting' | 'connected' | 'error';
@@ -129,7 +129,7 @@ export type BodyType = 'none' | 'json' | 'text' | 'xml' | 'html' | 'form' | 'url
 export type BodyMode = 'none' | 'form' | 'urlencoded' | 'raw' | 'binary' | 'graphql';
 export type RawBodyType = 'text' | 'json' | 'html' | 'xml';
 export type HttpVersion = 'auto' | '1.1' | '2';
-export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'vars' | 'metadata' | 'body' | 'schema' | 'service' | 'events' | 'scripts' | 'settings' | 'examples' | 'tools';
+export type RequestTab = 'docs' | 'params' | 'query' | 'auth' | 'headers' | 'vars' | 'metadata' | 'body' | 'schema' | 'service' | 'events' | 'scripts' | 'settings' | 'examples' | 'tools' | 'properties' | 'will';
 export type ScriptTab = 'pre-request' | 'tests' | 'assertions';
 export type ResponseTab = 'body' | 'preview' | 'headers' | 'cookies' | 'test-results' | 'timeline' | 'diff';
 export type GrpcResponseTab = 'messages' | 'metadata' | 'trailers' | 'scripts';
@@ -309,6 +309,7 @@ export type SavedRequest = {
   savedMessages?: SavedRealtimeMessage[];
   assertions?: import('../assertions').AssertionRow[];
   kafka?: NonNullable<import('../wire').HttpRequest['kafka']>;
+  mqtt?: import('../mqtt').MqttConfig;
   grpcMethod?: string;
   grpcMetadata?: KVRow[];
   grpcUseReflection?: boolean;

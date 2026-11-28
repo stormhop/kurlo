@@ -21,6 +21,7 @@ export const DOCS_TOPICS = {
     ['socket-io', 'Socket.IO'],
     ['grpc', 'gRPC'],
     ['kafka', 'Kafka requests'],
+    ['mqtt', 'MQTT requests'],
     ['mcp', 'MCP requests'],
     ['ai', 'AI requests'],
     ['portability', 'Import and export by protocol'],
@@ -116,6 +117,8 @@ export const DOCS_TOPICS = {
   '/docs/guides/import-export/': [
     ['postman', 'Postman collections'],
     ['openapi', 'Import OpenAPI or Swagger'],
+    ['asyncapi', 'Import AsyncAPI for Kafka and MQTT'],
+    ['wsdl', 'Import WSDL for SOAP'],
     ['http-files', 'Import .http or .rest files'],
     ['curl', 'Import a cURL command'],
     ['bruno', 'Import from Bruno'],

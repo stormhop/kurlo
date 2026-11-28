@@ -24,6 +24,7 @@ export type KurloE2EState = {
   webSocketConnects: Array<{ sessionId: string; request: HttpRequest }>;
   webSocketMessages: Array<{ sessionId: string; message: WebSocketSendMessage }>;
   socketIOConnects: Array<{ sessionId: string; request: HttpRequest }>;
+  mqttConnects: Array<{ sessionId: string; request: HttpRequest }>;
   socketIOEmits: Array<{ sessionId: string; message: SocketIOEmitMessage }>;
   savedFiles: Array<{ name: string; content: string; path: string }>;
   environment: Record<string, string>;
@@ -134,6 +135,7 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
       webSocketConnects: [],
       webSocketMessages: [],
       socketIOConnects: [],
+      mqttConnects: [],
       socketIOEmits: [],
       savedFiles: [],
       environment: {},
@@ -646,7 +648,7 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
         return {
           source: req.useReflection ? 'reflection' : 'proto',
           services: [grpcInventoryMethod.service],
-          methods: [grpcInventoryMethod],
+          methods: [grpcInventoryMethod, grpcWatchMethod],
         };
       },
       SendGrpcRequest: async (req) => {
@@ -718,6 +720,13 @@ export async function installKurloBridge(page: Page, largeResponseBody = '', run
           },
         });
         return { ok: true };
+      },
+      MqttConnect: async (sessionId, req) => {
+        state.mqttConnects.push({ sessionId, request: clone(req) });
+        emit('mqtt:open', { sessionId, url: req.url, clientId: 'kurlo-e2e', version: req.mqtt?.version || '5', sessionPresent: false, timestamp: Date.now() });
+      },
+      MqttDisconnect: async (sessionId) => {
+        emit('mqtt:close', { sessionId, message: 'Disconnected by E2E', timestamp: Date.now() });
       },
       SocketIOConnect: async (sessionId, req) => {
         const namespace = req.sioNamespace || '/';

@@ -126,6 +126,9 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
 - Suggestions while you type — the rest of a URL from history and saved requests, and the next JSON key from saved
   examples
 - Build GraphQL operations from a schema, select nested fields and bind typed variables in the query editor
+- Run GraphQL subscriptions over WebSocket with the `graphql-ws` protocol (and the older `subscriptions-transport-ws`), with a connection payload and a live event log
+- MQTT 3.1, 3.1.1 and 5 requests over TCP, TLS and WebSocket: subscriptions with wildcards and QoS, publishing with properties,
+  last will and a live message log
 - Kafka producer and consumer requests with topic discovery, live records, partition offsets, TLS and SASL.
 - GraphQL, Server-Sent Events, WebSocket, Socket.IO, gRPC, and MCP request types — an MCP call discovers the server's
   tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange

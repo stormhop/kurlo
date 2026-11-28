@@ -7,6 +7,7 @@ import { DEFAULT_REQUEST_SETTINGS, mkRow } from '../lib/constants';
 import type { AuthType, BodyType, SavedRequest } from '../lib/types/models';
 import { emptyAuthState } from '../lib/utils';
 import { kafkaConfig } from '../lib/kafka';
+import { mqttConfig } from '../lib/mqtt';
 
 function row(key: string, value: string, enabled = true) {
   return { ...mkRow(), key, value, enabled };
@@ -145,6 +146,35 @@ describe('Kafka requests survive export and import', () => {
     expect(imported[0].url).toBe('broker-1:9092,broker-2:9092');
     expect(imported[0].bodyContent).toBe('{"id":1}');
     expect(imported[0].kafka).toEqual(kafka);
+  };
+
+  it('through Postman', () => {
+    const exported = JSON.parse(JSON.stringify(buildPostmanCollection('API', '', original, strip, true)));
+    check(postmanCollectionBundle(exported, 'collection-2', 'API').requests);
+  });
+
+  it('through Insomnia', () => {
+    const exported = JSON.parse(JSON.stringify(buildInsomniaExport('API', '', original, strip, true)));
+    check(insomniaRequestsFromResources(exported, 'collection-2', 'API'));
+  });
+});
+
+describe('MQTT requests survive export and import', () => {
+  const mqtt = {
+    ...mqttConfig(), version: '3.1.1' as const, clientId: 'sensor-{{id}}', cleanSession: false, keepAliveSec: 15, autoReconnect: true,
+    topic: 'devices/1/cmd', qos: 1 as const, retain: true, format: 'json' as const,
+    topics: [{ name: 'devices/+/status', qos: 2 as const, enabled: true, description: 'Status of every device' }],
+    properties: { ...mqttConfig().properties, contentType: 'application/json', userProperties: [{ key: 'trace', value: '1', enabled: true }] },
+    will: { ...mqttConfig().will, enabled: true, topic: 'devices/1/status', payload: 'offline', qos: 1 as const, retain: true },
+    savedMessages: [{ id: 'm1', name: 'Reboot', topic: 'devices/1/cmd', payload: '{"op":"reboot"}', format: 'json' as const, qos: 1 as const, retain: false }],
+  };
+  const original = [richRequest('q', { requestType: 'mqtt', url: 'mqtts://broker.local:8883', bodyType: 'text', bodyContent: '{"op":"ping"}', params: [], mqtt })];
+  const check = (imported: SavedRequest[]) => {
+    expect(imported).toHaveLength(1);
+    expect(imported[0].requestType).toBe('mqtt');
+    expect(imported[0].url).toBe('mqtts://broker.local:8883');
+    expect(imported[0].bodyContent).toBe('{"op":"ping"}');
+    expect(imported[0].mqtt).toEqual(mqtt);
   };
 
   it('through Postman', () => {

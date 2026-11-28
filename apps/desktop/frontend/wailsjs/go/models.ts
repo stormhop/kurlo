@@ -3131,6 +3131,212 @@ export namespace model {
 	        this.jwtQueryParam = source["jwtQueryParam"];
 	    }
 	}
+	export class MqttWill {
+	    enabled?: boolean;
+	    topic?: string;
+	    payload?: string;
+	    format?: string;
+	    qos?: number;
+	    retain?: boolean;
+	    delayInterval?: string;
+	    properties?: MqttPublishProperties;
+	
+	    static createFrom(source: any = {}) {
+	        return new MqttWill(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.topic = source["topic"];
+	        this.payload = source["payload"];
+	        this.format = source["format"];
+	        this.qos = source["qos"];
+	        this.retain = source["retain"];
+	        this.delayInterval = source["delayInterval"];
+	        this.properties = this.convertValues(source["properties"], MqttPublishProperties);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MqttConnectProperties {
+	    sessionExpiryInterval?: string;
+	    receiveMaximum?: string;
+	    maximumPacketSize?: string;
+	    topicAliasMaximum?: string;
+	    requestResponseInformation?: boolean;
+	    requestProblemInformation?: boolean;
+	    userProperties?: KeyValue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MqttConnectProperties(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionExpiryInterval = source["sessionExpiryInterval"];
+	        this.receiveMaximum = source["receiveMaximum"];
+	        this.maximumPacketSize = source["maximumPacketSize"];
+	        this.topicAliasMaximum = source["topicAliasMaximum"];
+	        this.requestResponseInformation = source["requestResponseInformation"];
+	        this.requestProblemInformation = source["requestProblemInformation"];
+	        this.userProperties = this.convertValues(source["userProperties"], KeyValue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MqttPublishProperties {
+	    contentType?: string;
+	    responseTopic?: string;
+	    correlationData?: string;
+	    messageExpiryInterval?: string;
+	    topicAlias?: string;
+	    payloadFormatIndicator?: boolean;
+	    userProperties?: KeyValue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new MqttPublishProperties(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.contentType = source["contentType"];
+	        this.responseTopic = source["responseTopic"];
+	        this.correlationData = source["correlationData"];
+	        this.messageExpiryInterval = source["messageExpiryInterval"];
+	        this.topicAlias = source["topicAlias"];
+	        this.payloadFormatIndicator = source["payloadFormatIndicator"];
+	        this.userProperties = this.convertValues(source["userProperties"], KeyValue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MqttTopic {
+	    name: string;
+	    qos: number;
+	    enabled: boolean;
+	    description?: string;
+	    noLocal?: boolean;
+	    retainAsPublished?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new MqttTopic(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.qos = source["qos"];
+	        this.enabled = source["enabled"];
+	        this.description = source["description"];
+	        this.noLocal = source["noLocal"];
+	        this.retainAsPublished = source["retainAsPublished"];
+	    }
+	}
+	export class MqttRequest {
+	    version?: string;
+	    clientId?: string;
+	    cleanSession: boolean;
+	    keepAliveSec?: number;
+	    connectTimeoutMs?: number;
+	    autoReconnect?: boolean;
+	    topic?: string;
+	    qos?: number;
+	    retain?: boolean;
+	    format?: string;
+	    topics?: MqttTopic[];
+	    properties?: MqttPublishProperties;
+	    connectProperties?: MqttConnectProperties;
+	    will?: MqttWill;
+	
+	    static createFrom(source: any = {}) {
+	        return new MqttRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.clientId = source["clientId"];
+	        this.cleanSession = source["cleanSession"];
+	        this.keepAliveSec = source["keepAliveSec"];
+	        this.connectTimeoutMs = source["connectTimeoutMs"];
+	        this.autoReconnect = source["autoReconnect"];
+	        this.topic = source["topic"];
+	        this.qos = source["qos"];
+	        this.retain = source["retain"];
+	        this.format = source["format"];
+	        this.topics = this.convertValues(source["topics"], MqttTopic);
+	        this.properties = this.convertValues(source["properties"], MqttPublishProperties);
+	        this.connectProperties = this.convertValues(source["connectProperties"], MqttConnectProperties);
+	        this.will = this.convertValues(source["will"], MqttWill);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class KafkaTopic {
 	    schemaPath?: string;
 	    name: string;
@@ -3218,6 +3424,7 @@ export namespace model {
 	export class HttpRequest {
 	    kafkaStreamId?: string;
 	    kafka?: KafkaRequest;
+	    mqtt?: MqttRequest;
 	    requestId: string;
 	    workspaceId: string;
 	    method: string;
@@ -3300,6 +3507,7 @@ export namespace model {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.kafkaStreamId = source["kafkaStreamId"];
 	        this.kafka = this.convertValues(source["kafka"], KafkaRequest);
+	        this.mqtt = this.convertValues(source["mqtt"], MqttRequest);
 	        this.requestId = source["requestId"];
 	        this.workspaceId = source["workspaceId"];
 	        this.method = source["method"];
@@ -5208,6 +5416,65 @@ export namespace model {
 	        this.error = source["error"];
 	    }
 	}
+	
+	export class MqttPublishMessage {
+	    topic: string;
+	    payload: string;
+	    format?: string;
+	    qos: number;
+	    retain: boolean;
+	    properties?: MqttPublishProperties;
+	
+	    static createFrom(source: any = {}) {
+	        return new MqttPublishMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.topic = source["topic"];
+	        this.payload = source["payload"];
+	        this.format = source["format"];
+	        this.qos = source["qos"];
+	        this.retain = source["retain"];
+	        this.properties = this.convertValues(source["properties"], MqttPublishProperties);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	export class MqttResult {
+	    ok: boolean;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MqttResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.error = source["error"];
+	    }
+	}
+	
+	
 	export class OAuth2TokenResponse {
 	    access_token: string;
 	    token_type: string;
