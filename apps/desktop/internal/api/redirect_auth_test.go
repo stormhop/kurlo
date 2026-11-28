@@ -43,6 +43,7 @@ func redirectingServer(tls bool) func(target string) *httptest.Server {
 }
 
 func TestRedirectKeepsAuthorizationOnTheSameHost(t *testing.T) {
+	t.Parallel()
 	for _, follow := range []bool{false, true} {
 		var got string
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +65,7 @@ func TestRedirectKeepsAuthorizationOnTheSameHost(t *testing.T) {
 }
 
 func TestRedirectToAnotherHostDropsAuthorizationUnlessFollowed(t *testing.T) {
+	t.Parallel()
 	newTarget := func() *httptest.Server {
 		target := httptest.NewServer(nil)
 		target.URL = strings.Replace(target.URL, "127.0.0.1", "localhost", 1)
@@ -80,6 +82,7 @@ func TestRedirectToAnotherHostDropsAuthorizationUnlessFollowed(t *testing.T) {
 }
 
 func TestRedirectFromHTTPSToHTTPDropsAuthorizationEvenWhenFollowed(t *testing.T) {
+	t.Parallel()
 	target := httptest.NewServer(nil)
 	defer target.Close()
 	if got := authorizationAfterRedirect(t, redirectingServer(true), target, true); got != "" {
@@ -88,6 +91,7 @@ func TestRedirectFromHTTPSToHTTPDropsAuthorizationEvenWhenFollowed(t *testing.T)
 }
 
 func TestRedirectFromHTTPToHTTPSOnTheSameHostKeepsAuthorization(t *testing.T) {
+	t.Parallel()
 	target := httptest.NewTLSServer(nil)
 	defer target.Close()
 	if got := authorizationAfterRedirect(t, redirectingServer(false), target, false); got != "Bearer SECRET" {
@@ -96,6 +100,7 @@ func TestRedirectFromHTTPToHTTPSOnTheSameHostKeepsAuthorization(t *testing.T) {
 }
 
 func TestDigestRedirectRespectsAuthorizationPolicy(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name      string
 		crossHost bool
@@ -141,6 +146,7 @@ func TestDigestRedirectRespectsAuthorizationPolicy(t *testing.T) {
 }
 
 func TestZeroTimeoutWaitsIndefinitely(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(150 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)

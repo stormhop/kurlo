@@ -16,6 +16,9 @@ import (
 
 func k6ForTest(t *testing.T) string {
 	t.Helper()
+	if testing.Short() {
+		t.Skip("runs k6")
+	}
 	if path := os.Getenv("KURLO_K6"); path != "" {
 		return path
 	}

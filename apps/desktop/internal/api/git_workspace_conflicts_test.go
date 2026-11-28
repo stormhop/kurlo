@@ -3,7 +3,6 @@ package api
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,9 +11,7 @@ import (
 func TestGitPullWorkspaceDirtyOverlapLeavesResolvableConflict(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, peer := setupGitPullRemoteForTest(t)
 	if err := os.WriteFile(filepath.Join(dir, "kurlo.yml"), []byte("version: 1\nlocal: true\n"), 0644); err != nil {
 		t.Fatalf("write dirty local kurlo index: %v", err)
@@ -82,9 +79,7 @@ func TestGitPullWorkspaceDirtyOverlapLeavesResolvableConflict(t *testing.T) {
 func TestGitPullMergeConflictCanResolveAndContinue(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -188,9 +183,7 @@ func TestGitPullMergeConflictCanResolveAndContinue(t *testing.T) {
 func TestGitPullWorkspaceRebaseConflictMapsOursToLocalCommit(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, peer := setupGitPullRemoteForTest(t)
 	if err := os.WriteFile(filepath.Join(dir, "kurlo.yml"), []byte("version: 1\nlocal: true\n"), 0644); err != nil {
 		t.Fatalf("write local kurlo index: %v", err)
@@ -254,9 +247,7 @@ func TestGitPullWorkspaceRebaseConflictMapsOursToLocalCommit(t *testing.T) {
 func TestGitResolveMarkerlessModifyDeleteConflict(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	setup := func(t *testing.T) (string, string) {
 		t.Helper()
 		dir := t.TempDir()

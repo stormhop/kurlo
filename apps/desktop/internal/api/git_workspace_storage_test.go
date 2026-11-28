@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -35,9 +34,7 @@ func TestSaveKurloStorePayloadDoesNotRecreateMissingCustomRoot(t *testing.T) {
 }
 
 func TestUseLocalWorkspaceStoreSuppressesGitRepoInDefaultStorage(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 	root := defaultFileWorkspaceStorePath()
@@ -172,9 +169,7 @@ func TestCreateLocalWorkspaceRootCreatesFolderWorkspace(t *testing.T) {
 		t.Fatalf("expected local storage mode, got %#v", storage)
 	}
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	initResult := app.GitInitWorkspace()
 	if !initResult.Ok {
 		t.Fatalf("init folder workspace failed: %s\n%s", initResult.Error, initResult.Output)
@@ -230,9 +225,7 @@ func TestCreateLocalWorkspaceRootUsesConfiguredDefaultLocation(t *testing.T) {
 }
 
 func TestOpenWorkspaceRootEnsuresGitignore(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 
@@ -262,9 +255,7 @@ func TestOpenWorkspaceRootEnsuresGitignore(t *testing.T) {
 func TestWorkspaceGitignoreIgnoresGeneratedRunnerReports(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	runGitForTest(t, dir, "init")
@@ -286,9 +277,7 @@ func TestWorkspaceGitignoreIgnoresGeneratedRunnerReports(t *testing.T) {
 }
 
 func TestOpenWorkspaceRootFetchesRemoteStatus(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 

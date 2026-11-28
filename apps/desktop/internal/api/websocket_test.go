@@ -108,6 +108,7 @@ func wsURLFromHTTP(serverURL string) string {
 }
 
 func TestWebSocketConnectReceivesTextAndSendsText(t *testing.T) {
+	t.Parallel()
 	upgrader := websocket.Upgrader{}
 	handshakeSeen := make(chan struct{}, 1)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -311,6 +312,7 @@ func TestWebSocketBinaryPingPongAndClose(t *testing.T) {
 }
 
 func TestWebSocketDisconnectCancelsSession(t *testing.T) {
+	t.Parallel()
 	upgrader := websocket.Upgrader{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -343,6 +345,7 @@ func TestWebSocketDisconnectCancelsSession(t *testing.T) {
 }
 
 func TestWebSocketReconnectsAfterAbnormalClose(t *testing.T) {
+	t.Parallel()
 	upgrader := websocket.Upgrader{}
 	var connections atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -391,6 +394,7 @@ func TestWebSocketReconnectsAfterAbnormalClose(t *testing.T) {
 }
 
 func TestWebSocketReconnectsAfterInitialHandshakeFailure(t *testing.T) {
+	t.Parallel()
 	upgrader := websocket.Upgrader{}
 	var attempts atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -438,6 +442,7 @@ func TestWebSocketReconnectsAfterInitialHandshakeFailure(t *testing.T) {
 }
 
 func TestWebSocketConnectionErrors(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		url  string
@@ -463,6 +468,7 @@ func TestWebSocketConnectionErrors(t *testing.T) {
 }
 
 func TestWebSocketCloseMessageIsFriendly(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		err  *websocket.CloseError
@@ -495,6 +501,7 @@ func TestWebSocketCloseMessageIsFriendly(t *testing.T) {
 }
 
 func TestWebSocketInvalidSendPayload(t *testing.T) {
+	t.Parallel()
 	manager := newWebSocketManager(nil)
 	result := manager.send("missing", model.WebSocketSendMessage{Type: "text", Data: "hello"})
 	if result.OK || !strings.Contains(result.Error, "not connected") {
@@ -529,6 +536,7 @@ func TestWebSocketInvalidSendPayload(t *testing.T) {
 }
 
 func TestWebSocketMaxMessageSizeLimit(t *testing.T) {
+	t.Parallel()
 	upgrader := websocket.Upgrader{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -627,6 +635,7 @@ func TestWebSocketKeepAliveDisabledByNegativeInterval(t *testing.T) {
 }
 
 func TestWebSocketIdleDeadlineFollowsKeepAlive(t *testing.T) {
+	t.Parallel()
 	cases := map[int]time.Duration{
 		-1:     0,
 		0:      90 * time.Second,
@@ -642,6 +651,7 @@ func TestWebSocketIdleDeadlineFollowsKeepAlive(t *testing.T) {
 }
 
 func TestWebSocketIgnoresHandshakeHeadersCopiedFromABrowser(t *testing.T) {
+	t.Parallel()
 	server := idleWSServer(t, make(chan struct{}, 1))
 	defer server.Close()
 
@@ -675,6 +685,7 @@ func TestWebSocketIgnoresHandshakeHeadersCopiedFromABrowser(t *testing.T) {
 }
 
 func TestWebSocketHandshakeHasADefaultTimeout(t *testing.T) {
+	t.Parallel()
 	if got := websocketHandshakeTimeout(model.HttpRequest{}); got != defaultWebSocketHandshakeTimeout || got <= 0 {
 		t.Fatalf("a request without its own handshake timeout must still time out, got %s", got)
 	}

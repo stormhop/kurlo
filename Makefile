@@ -47,7 +47,7 @@ _NEXT_MAJOR := $(shell printf '%d' $$(( $(_V_MAJOR) + 1 )))
 
 GITHUB_REPO := $(shell git remote get-url origin 2>/dev/null | sed 's|.*github.com[:/]\(.*\)\.git|\1|;s|.*github.com[:/]\(.*\)$$|\1|')
 
-.PHONY: help version dev dev-go dev-run frontend install tidy check test check-full check-lint check-types test-unit test-scripts test-race test-e2e test-e2e-all test-watch \
+.PHONY: help version dev dev-go dev-run frontend install tidy check check-fast test test-fast check-full check-lint check-types test-unit test-scripts test-race test-e2e test-e2e-all test-watch \
         build build-desktop build-macos build-windows build-windows-msix build-linux build-all build-frontend \
         open clean wails-install bindings screenshots readme-screenshot test-extension mcp-schemas \
         release release-patch release-minor release-major _do-release _guard-clean \
@@ -60,8 +60,10 @@ help:
 	@printf '  %-24s %s\n' 'make frontend' 'Run only Svelte/Vite frontend'
 	@printf '  %-24s %s\n' 'make install' 'Install npm deps and tidy Go deps'
 	@printf '  %-24s %s\n' 'make check' 'Run lint, types, frontend, Python and Go tests in parallel'
+	@printf '  %-24s %s\n' 'make check-fast' 'Like make check, with Go in -short mode (no Git, k6, scale or crash runs)'
 	@printf '  %-24s %s\n' 'make check-full' 'Run lint, types, unit, Go with -race and both browsers'
 	@printf '  %-24s %s\n' 'make test' 'Run Go tests (GO_TEST_FLAGS=...)'
+	@printf '  %-24s %s\n' 'make test-fast' 'Run Go tests in -short mode'
 	@printf '  %-24s %s\n' 'make test-race' 'Run Go tests with the race detector'
 	@printf '  %-24s %s\n' 'make test-unit' 'Run frontend unit tests (UNIT_ARGS=...)'
 	@printf '  %-24s %s\n' 'make test-scripts' 'Run Python release script tests'
@@ -389,6 +391,9 @@ E2E_ARGS ?=
 check:
 	$(MAKE) -j$(CHECK_JOBS) check-lint check-types test-unit test-scripts test
 
+check-fast:
+	$(MAKE) -j$(CHECK_JOBS) check-lint check-types test-unit test-scripts test-fast
+
 check-lint:
 	cd $(ROOT_DIR) && npm run lint
 
@@ -406,6 +411,9 @@ test-watch:
 
 test:
 	cd $(ROOT_DIR) && $(GO_ENV) go test -parallel=$(GO_TEST_PARALLEL) $(GO_TEST_FLAGS) ./apps/desktop/...
+
+test-fast:
+	cd $(ROOT_DIR) && $(GO_ENV) go test -short -parallel=$(GO_TEST_PARALLEL) $(GO_TEST_FLAGS) ./apps/desktop/...
 
 test-race:
 	cd $(ROOT_DIR) && $(GO_ENV) go test -race -parallel=$(GO_TEST_PARALLEL) $(GO_TEST_FLAGS) ./apps/desktop/...

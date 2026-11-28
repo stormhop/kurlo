@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,9 +11,7 @@ import (
 func TestGitStatusDetectsRepositoryAndChangedFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	runGitForTest(t, dir, "init")
 	if err := os.WriteFile(filepath.Join(dir, "kurlo.yml"), []byte("version: 1\n"), 0644); err != nil {
@@ -43,9 +40,7 @@ func TestGitStatusDetectsRepositoryAndChangedFiles(t *testing.T) {
 func TestGitDiffShowsUntrackedWorkspaceFile(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	runGitForTest(t, dir, "init")
 	if err := os.WriteFile(filepath.Join(dir, "kurlo.yml"), []byte("version: 1\n"), 0644); err != nil {
@@ -64,9 +59,7 @@ func TestGitDiffShowsUntrackedWorkspaceFile(t *testing.T) {
 func TestGitDiffSeparatesStagedAndUnstagedChanges(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -102,9 +95,7 @@ func TestGitDiffSeparatesStagedAndUnstagedChanges(t *testing.T) {
 func TestGitStatusMarshalsEmptyFilesAsArray(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	runGitForTest(t, dir, "init")
 
@@ -182,9 +173,7 @@ func TestNormalizeGitDiffPathsKeepsSidePrefixes(t *testing.T) {
 func TestGitStatusMarksWhichChangesKurloCanHandle(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	repo := t.TempDir()
 	root := filepath.Join(repo, "api")
 	writeKurloWorkspaceFiles(t, root)

@@ -301,6 +301,9 @@ func TestLoadCLIRunExitCodesArtifactsSecretsAndStop(t *testing.T) {
 }
 
 func TestLoadCLIWithRealK6(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs k6")
+	}
 	k6, err := exec.LookPath("k6")
 	if err != nil {
 		t.Skip("k6 is not installed")

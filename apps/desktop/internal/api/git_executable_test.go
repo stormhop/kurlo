@@ -136,9 +136,7 @@ func TestGitRunFailsFastWhenGitIsMissing(t *testing.T) {
 
 func requireGitBinary(t *testing.T) {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git binary not available")
-	}
+	requireGitForTest(t)
 }
 
 func TestLookupGitExecutableResolvesAnAbsolutePath(t *testing.T) {

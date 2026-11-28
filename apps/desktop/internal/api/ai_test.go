@@ -133,6 +133,7 @@ func aiTestRequest(provider, url string) model.AiRequest {
 }
 
 func TestAiOpenAIStreamAssemblesTextAndUsage(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t, sseScript{events: []string{
 		openAIChunkEvent(`{"model":"gpt-test","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}`),
 		openAIChunkEvent(`{"model":"gpt-test","choices":[{"index":0,"delta":{"content":"Hel"},"finish_reason":null}]}`),
@@ -188,6 +189,7 @@ func TestAiOpenAIStreamAssemblesTextAndUsage(t *testing.T) {
 }
 
 func TestAiEndpointKeepsAFullPath(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"https://api.deepseek.com/v1":                                              "https://api.deepseek.com/v1/chat/completions",
 		"https://api.deepseek.com/v1/":                                             "https://api.deepseek.com/v1/chat/completions",
@@ -204,6 +206,7 @@ func TestAiEndpointKeepsAFullPath(t *testing.T) {
 }
 
 func TestAiOpenAIUsesCompletionTokensOnOpenAIHost(t *testing.T) {
+	t.Parallel()
 	req := aiTestRequest(model.AiProviderOpenAI, "https://api.openai.com/v1")
 	body, _, err := openAIProvider{}.build(req, req.Messages, nil)
 	if err != nil {
@@ -215,6 +218,7 @@ func TestAiOpenAIUsesCompletionTokensOnOpenAIHost(t *testing.T) {
 }
 
 func TestAiOpenAIToolLoopCallsMcpAndContinues(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t,
 		sseScript{events: []string{
 			openAIChunkEvent(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}}]}}]}`),
@@ -272,6 +276,7 @@ func TestAiOpenAIToolLoopCallsMcpAndContinues(t *testing.T) {
 }
 
 func TestAiStopsAtStepLimitWithWarning(t *testing.T) {
+	t.Parallel()
 	toolCall := sseScript{events: []string{
 		openAIChunkEvent(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"c","type":"function","function":{"name":"ping","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`),
 	}}
@@ -293,6 +298,7 @@ func TestAiStopsAtStepLimitWithWarning(t *testing.T) {
 }
 
 func TestAiToolErrorIsSentBackToTheModel(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t,
 		sseScript{events: []string{
 			openAIChunkEvent(`{"choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"c","type":"function","function":{"name":"boom","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}`),
@@ -319,6 +325,7 @@ func TestAiToolErrorIsSentBackToTheModel(t *testing.T) {
 }
 
 func TestAiAnthropicStreamWithThinkingAndToolUse(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t,
 		sseScript{events: []string{
 			anthropicSSE("message_start", `{"type":"message_start","message":{"model":"claude-test","usage":{"input_tokens":100,"cache_read_input_tokens":40,"cache_creation_input_tokens":5,"output_tokens":1}}}`),
@@ -402,6 +409,7 @@ func TestAiAnthropicStreamWithThinkingAndToolUse(t *testing.T) {
 }
 
 func TestAiAnthropicMaxTokensAndStreamError(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t, sseScript{events: []string{
 		anthropicSSE("message_start", `{"type":"message_start","message":{"model":"m","usage":{"input_tokens":3,"output_tokens":1}}}`),
 		anthropicSSE("content_block_start", `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`),
@@ -426,6 +434,7 @@ func TestAiAnthropicMaxTokensAndStreamError(t *testing.T) {
 }
 
 func TestAiProviderErrorStatusIsReadable(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t, sseScript{status: 401, json: `{"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}`})
 	runner, _ := newTestAiRunner(aiTestRequest(model.AiProviderAnthropic, server.URL), nil)
 	out := runner.run()
@@ -435,6 +444,7 @@ func TestAiProviderErrorStatusIsReadable(t *testing.T) {
 }
 
 func TestAiNonStreamingJSONResponse(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t, sseScript{json: `{"model":"gpt-x","choices":[{"message":{"content":"Plain answer","reasoning_content":"thought"},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":2}}`})
 	req := aiTestRequest(model.AiProviderOpenAI, server.URL)
 	req.Settings.Stream = false
@@ -475,6 +485,7 @@ func TestAiIdleTimeoutStopsAStalledStream(t *testing.T) {
 }
 
 func TestAiCancelStopsTheStream(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.(http.Flusher).Flush()
@@ -492,6 +503,7 @@ func TestAiCancelStopsTheStream(t *testing.T) {
 }
 
 func TestAiToolNamesAreSanitizedAndUnique(t *testing.T) {
+	t.Parallel()
 	tools := aiAssignToolNames([]aiTool{
 		{Original: "files.read", Server: "Disk"},
 		{Original: "search", Server: "Web"},
@@ -505,6 +517,7 @@ func TestAiToolNamesAreSanitizedAndUnique(t *testing.T) {
 }
 
 func TestAiRequiresModelAndURL(t *testing.T) {
+	t.Parallel()
 	req := aiTestRequest(model.AiProviderOpenAI, "")
 	runner, _ := newTestAiRunner(req, nil)
 	if out := runner.run(); !strings.Contains(out.Error, "base URL") {
@@ -519,6 +532,7 @@ func TestAiRequiresModelAndURL(t *testing.T) {
 }
 
 func TestAiResponseReachesTheFrontendWithArrays(t *testing.T) {
+	t.Parallel()
 	out := model.NormalizeAiResponse(model.AiResponse{Steps: []model.AiStep{{}}, Messages: []model.AiMessage{{Role: "assistant"}}})
 	encoded, _ := json.Marshal(out)
 	for _, needle := range []string{`"steps":[{`, `"blocks":[]`, `"toolResults":[]`, `"tools":[]`, `"warnings":[]`, `"headers":[]`} {
@@ -529,6 +543,7 @@ func TestAiResponseReachesTheFrontendWithArrays(t *testing.T) {
 }
 
 func TestAiTestScriptsReadTheNormalizedAnswer(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t, sseScript{events: []string{
 		openAIChunkEvent(`{"model":"gpt-test","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"lookup","arguments":"{\"q\":\"kurlo\"}"}}]},"finish_reason":"tool_calls"}]}`),
 		openAIChunkEvent(`{"choices":[],"usage":{"prompt_tokens":9,"completion_tokens":4}}`),
@@ -558,6 +573,7 @@ pm.test("model", () => pm.expect(llm.model).to.equal("gpt-test"));
 }
 
 func TestAiTestScriptsRunOnceAfterAllSteps(t *testing.T) {
+	t.Parallel()
 	server := newAiTestServer(t, sseScript{events: []string{
 		openAIChunkEvent(`{"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}`),
 	}})
@@ -576,6 +592,7 @@ func TestAiTestScriptsRunOnceAfterAllSteps(t *testing.T) {
 }
 
 func TestAiRefusesPromptsOverTheLengthLimit(t *testing.T) {
+	t.Parallel()
 	long := strings.Repeat("я", model.AiMaxPromptChars+1)
 	req := aiTestRequest(model.AiProviderOpenAI, "http://127.0.0.1:1/v1")
 	req.Messages[0].Blocks[0].Text = long

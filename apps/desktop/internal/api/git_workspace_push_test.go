@@ -2,7 +2,6 @@ package api
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,9 +10,7 @@ import (
 func TestGitPushWorkspaceFriendlyErrorAfterLocalRename(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, _ := setupGitPullRemoteForTest(t)
 
 	runGitForTest(t, dir, "config", "push.default", "simple")
@@ -59,9 +56,7 @@ func TestGitPushWorkspaceFriendlyErrorAfterLocalRename(t *testing.T) {
 func TestGitPushWorkspaceUsesLocalRemote(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -90,9 +85,7 @@ func TestGitPushWorkspaceUsesLocalRemote(t *testing.T) {
 func TestGitPushNewBranchAfterCommitSetsUpstream(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -159,9 +152,7 @@ func TestGitPushNewBranchAfterCommitSetsUpstream(t *testing.T) {
 func TestGitForcePushWorkspaceUsesForceWithLease(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -202,9 +193,7 @@ func TestGitForcePushWorkspaceUsesForceWithLease(t *testing.T) {
 func TestGitForcePushRefusesToDropFetchedTeammateCommits(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, peer := setupGitPullRemoteForTest(t)
 	if err := os.WriteFile(filepath.Join(peer, "teammate.txt"), []byte("work\n"), 0644); err != nil {
 		t.Fatal(err)
@@ -236,9 +225,7 @@ func TestGitForcePushRefusesToDropFetchedTeammateCommits(t *testing.T) {
 func TestGitOutgoingChangesShowsOnlyCommittedKurloFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -284,9 +271,7 @@ func TestGitOutgoingChangesShowsOnlyCommittedKurloFiles(t *testing.T) {
 func TestGitOutgoingChangesWithoutUpstreamShowsInitialPublishDiff(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -312,9 +297,7 @@ func TestGitOutgoingChangesWithoutUpstreamShowsInitialPublishDiff(t *testing.T) 
 func TestGitTestRemoteUsesConfiguredRemote(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {

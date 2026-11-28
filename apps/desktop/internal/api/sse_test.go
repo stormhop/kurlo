@@ -16,6 +16,7 @@ import (
 )
 
 func TestSSEStreamDecodesExplicitContentEncoding(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Content-Encoding", "gzip")
@@ -38,6 +39,7 @@ func TestSSEStreamDecodesExplicitContentEncoding(t *testing.T) {
 }
 
 func TestSSEStreamReportsInvalidCompressedBody(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Content-Encoding", "gzip")
@@ -125,6 +127,7 @@ func runStreamWithEmitter(sseCtx context.Context, req model.HttpRequest, em *tes
 }
 
 func TestSSEStream_BasicEvents(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-cache")
@@ -207,6 +210,7 @@ func TestSSEStream_BasicEvents(t *testing.T) {
 }
 
 func TestSSEStream_OpenIncludesRequestDuration(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(20 * time.Millisecond)
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -238,6 +242,7 @@ func TestSSEStream_OpenIncludesRequestDuration(t *testing.T) {
 }
 
 func TestSSEStream_DefaultEventType(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -265,6 +270,7 @@ func TestSSEStream_DefaultEventType(t *testing.T) {
 }
 
 func TestSSEStream_MultilineData(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -290,6 +296,7 @@ func TestSSEStream_MultilineData(t *testing.T) {
 }
 
 func TestSSEStream_LargeDataLine(t *testing.T) {
+	t.Parallel()
 	large := strings.Repeat("x", 70*1024)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -317,6 +324,7 @@ func TestSSEStream_LargeDataLine(t *testing.T) {
 }
 
 func TestSSEStream_QueryParams(t *testing.T) {
+	t.Parallel()
 	var gotQuery string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotQuery = r.URL.RawQuery
@@ -350,6 +358,7 @@ func TestSSEStream_QueryParams(t *testing.T) {
 }
 
 func TestSSEStream_CustomHeaders(t *testing.T) {
+	t.Parallel()
 	var gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
@@ -379,6 +388,7 @@ func TestSSEStream_CustomHeaders(t *testing.T) {
 }
 
 func TestSSEStream_AppliesAuthConfigAndCookies(t *testing.T) {
+	t.Parallel()
 	var gotAuth string
 	var gotCookie string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -435,6 +445,7 @@ func TestSSEStream_AppliesAuthConfigAndCookies(t *testing.T) {
 }
 
 func TestSSEStream_AppliesAPIKeyQueryAuth(t *testing.T) {
+	t.Parallel()
 	var gotQuery url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotQuery = r.URL.Query()
@@ -463,6 +474,7 @@ func TestSSEStream_AppliesAPIKeyQueryAuth(t *testing.T) {
 }
 
 func TestSSEStream_Disconnect(t *testing.T) {
+	t.Parallel()
 	connected := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -493,6 +505,7 @@ func TestSSEStream_Disconnect(t *testing.T) {
 }
 
 func TestSSEStream_ServerError(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -513,6 +526,7 @@ func TestSSEStream_ServerError(t *testing.T) {
 }
 
 func TestSSEStream_InvalidURL(t *testing.T) {
+	t.Parallel()
 	em := &testEmitter{}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -528,6 +542,7 @@ func noopOpen(model.SSEOpenEvent) {}
 func noopEvent(model.SSEEvent)    {}
 
 func TestSSEReconnect_LastEventIDResent(t *testing.T) {
+	t.Parallel()
 	var mu sync.Mutex
 	requests := 0
 	secondLastEventID := ""
@@ -573,6 +588,7 @@ func TestSSEReconnect_LastEventIDResent(t *testing.T) {
 }
 
 func TestSSEReconnect_RespectsRetryField(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.WriteHeader(http.StatusOK)
@@ -591,6 +607,7 @@ func TestSSEReconnect_RespectsRetryField(t *testing.T) {
 }
 
 func TestSSEReconnect_NoReconnectOnUserDisconnect(t *testing.T) {
+	t.Parallel()
 	connected := make(chan struct{})
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -620,6 +637,7 @@ func TestSSEReconnect_NoReconnectOnUserDisconnect(t *testing.T) {
 }
 
 func TestSSEReconnectDelay(t *testing.T) {
+	t.Parallel()
 	if d := sseReconnectDelay(model.HttpRequest{SSEReconnectIntervalMs: 1000}, 5*time.Second); d != time.Second {
 		t.Errorf("override delay = %v, want 1s", d)
 	}
@@ -647,6 +665,7 @@ func sseEventsFor(t *testing.T, payload string) []model.SSEEvent {
 }
 
 func TestSSEStream_FollowsTheEventStreamSpec(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		payload string
 		want    []model.SSEEvent
@@ -673,6 +692,7 @@ func TestSSEStream_FollowsTheEventStreamSpec(t *testing.T) {
 }
 
 func TestSSELineSplitterHandlesACarriageReturnAtTheChunkEdge(t *testing.T) {
+	t.Parallel()
 	split := newSSELineSplitter()
 	advance, token, _ := split([]byte("a\r"), false)
 	if advance != 2 || string(token) != "a" {

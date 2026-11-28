@@ -3,7 +3,6 @@ package api
 import (
 	"errors"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,9 +11,7 @@ import (
 func TestGitDiscardWorkspaceFileRestoresTrackedKurloFile(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -48,9 +45,7 @@ func TestGitDiscardWorkspaceFileRestoresTrackedKurloFile(t *testing.T) {
 }
 
 func TestGitDiscardWorkspaceFileClearsStaleManagedGitignore(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 
@@ -94,9 +89,7 @@ func TestGitDiscardWorkspaceFileClearsStaleManagedGitignore(t *testing.T) {
 func TestGitDiscardWorkspaceFileRemovesRunnerReportArtifact(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	runGitForTest(t, dir, "init", "-b", "main")
@@ -136,9 +129,7 @@ func TestGitDiscardWorkspaceFileRemovesRunnerReportArtifact(t *testing.T) {
 func TestGitDiscardWorkspaceFileRemovesUntrackedKurloFile(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -168,9 +159,7 @@ func TestGitDiscardWorkspaceFileRemovesUntrackedKurloFile(t *testing.T) {
 func TestGitDiscardWorkspaceFileRestoresCollectionOrderForNewRequest(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -225,9 +214,7 @@ requestOrder:
 func TestGitDiscardWorkspaceFilesRestoresCollectionOrderForSelectedNewRequest(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -277,9 +264,7 @@ requestOrder:
 func TestGitDiscardWorkspaceFileRemovesUntrackedKurloFileBeforeInitialCommit(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	runGitForTest(t, dir, "init")
@@ -303,9 +288,7 @@ func TestGitDiscardWorkspaceFileRemovesUntrackedKurloFileBeforeInitialCommit(t *
 func TestGitDiscardWorkspaceFilesBeforeInitialCommitRejectsKurloIndex(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	runGitForTest(t, dir, "init")
@@ -322,9 +305,7 @@ func TestGitDiscardWorkspaceFilesBeforeInitialCommitRejectsKurloIndex(t *testing
 func TestGitDiscardWorkspaceChangesOnlyTouchesKurloFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -357,9 +338,7 @@ func TestGitDiscardWorkspaceChangesOnlyTouchesKurloFiles(t *testing.T) {
 func TestGitDiscardWorkspaceFilesOnlyTouchesSelectedKurloFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -417,9 +396,7 @@ func TestGitDiscardWorkspaceFilesOnlyTouchesSelectedKurloFiles(t *testing.T) {
 func TestGitDiscardWorkspaceFileRejectsNonKurloPath(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {

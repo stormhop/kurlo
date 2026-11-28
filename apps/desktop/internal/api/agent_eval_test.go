@@ -379,6 +379,9 @@ func agentEvalTasks() []agentEvalTask {
 }
 
 func TestAgentReferenceTasksOnAFakeProvider(t *testing.T) {
+	if testing.Short() {
+		t.Skip("runs every reference task")
+	}
 	for _, task := range agentEvalTasks() {
 		t.Run(task.name, func(t *testing.T) {
 			h, app, shop := newAgentEvalHarness(t, task)

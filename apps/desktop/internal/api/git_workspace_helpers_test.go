@@ -160,9 +160,7 @@ func readFileForTest(t *testing.T, path string) string {
 
 func setupBranchRepoForTest(t *testing.T) string {
 	t.Helper()
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -184,4 +182,14 @@ func setupBranchRepoForTest(t *testing.T) string {
 		t.Fatalf("push failed: %s", result.Error)
 	}
 	return dir
+}
+
+func requireGitForTest(t *testing.T) {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("runs git")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
 }

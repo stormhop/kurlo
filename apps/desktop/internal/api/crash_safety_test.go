@@ -155,6 +155,9 @@ func assertCrashState(t testing.TB, label, local, root string, before, after cra
 }
 
 func TestInterruptedImportOverExistingWorkspaceKeepsEveryRequest(t *testing.T) {
+	if testing.Short() {
+		t.Skip("interrupts every write of an import")
+	}
 	before, after := crashBaseline(), crashAfterImport()
 	t.Cleanup(func() { beforeYAMLWrite = nil })
 	for cut := 0; ; cut++ {

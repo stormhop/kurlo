@@ -214,6 +214,7 @@ func sioHTTPToWS(serverURL string) string {
 }
 
 func TestSocketIOConnectAndReceiveEvent(t *testing.T) {
+	t.Parallel()
 	srv := newSIOServer(t)
 	server := httptest.NewServer(http.HandlerFunc(srv.handler))
 	defer server.Close()
@@ -252,6 +253,7 @@ func TestSocketIOConnectAndReceiveEvent(t *testing.T) {
 }
 
 func TestSocketIOEmitFromClient(t *testing.T) {
+	t.Parallel()
 	srv := newSIOServer(t)
 	server := httptest.NewServer(http.HandlerFunc(srv.handler))
 	defer server.Close()
@@ -341,6 +343,7 @@ func TestSocketIONoEventsListened(t *testing.T) {
 }
 
 func TestSocketIOV2PollingHandshakeAppliesParamsAuthAndCookies(t *testing.T) {
+	t.Parallel()
 	var gotQuery url.Values
 	var gotCookie string
 	var gotHeader string
@@ -407,6 +410,7 @@ func TestSocketIOV2PollingHandshakeAppliesParamsAuthAndCookies(t *testing.T) {
 }
 
 func TestSocketIOEmitWithAck(t *testing.T) {
+	t.Parallel()
 	srv := newSIOServer(t)
 	ackSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/socket.io") {
@@ -472,6 +476,7 @@ func TestSocketIOEmitWithAck(t *testing.T) {
 }
 
 func TestSocketIODisconnect(t *testing.T) {
+	t.Parallel()
 	srv := newSIOServer(t)
 	server := httptest.NewServer(http.HandlerFunc(srv.handler))
 	defer server.Close()
@@ -493,6 +498,7 @@ func TestSocketIODisconnect(t *testing.T) {
 }
 
 func TestSocketIOConnectionError(t *testing.T) {
+	t.Parallel()
 	manager := newSocketIOManager(nil)
 	em := newSIOTestEmitter()
 	manager.connectWithCallbacks(context.Background(), "sio-err", model.HttpRequest{
@@ -507,6 +513,7 @@ func TestSocketIOConnectionError(t *testing.T) {
 }
 
 func TestSocketIOConnectionErrorIsFriendly(t *testing.T) {
+	t.Parallel()
 	target, err := url.Parse("ws://localhost:3001/socket.io/?EIO=4&transport=websocket")
 	if err != nil {
 		t.Fatalf("parse URL: %v", err)
@@ -523,6 +530,7 @@ func TestSocketIOConnectionErrorIsFriendly(t *testing.T) {
 }
 
 func TestSocketIOMultipleEvents(t *testing.T) {
+	t.Parallel()
 	srv := newSIOServer(t)
 	server := httptest.NewServer(http.HandlerFunc(srv.handler))
 	defer server.Close()
@@ -552,6 +560,7 @@ func TestSocketIOMultipleEvents(t *testing.T) {
 }
 
 func TestSocketIOAllEventsWhenNilListenEvents(t *testing.T) {
+	t.Parallel()
 	srv := newSIOServer(t)
 	server := httptest.NewServer(http.HandlerFunc(srv.handler))
 	defer server.Close()
@@ -578,6 +587,7 @@ func TestSocketIOAllEventsWhenNilListenEvents(t *testing.T) {
 }
 
 func TestSocketIODisplayURLHumanizesSchemeAndQuery(t *testing.T) {
+	t.Parallel()
 	u, err := url.Parse("ws://localhost:3001/socket.io/?EIO=4&transport=websocket&%D0%B0=")
 	if err != nil {
 		t.Fatal(err)
@@ -591,6 +601,7 @@ func TestSocketIODisplayURLHumanizesSchemeAndQuery(t *testing.T) {
 }
 
 func TestSocketIOReceivesBinaryEvents(t *testing.T) {
+	t.Parallel()
 	srv := newSIOServer(t)
 	server := httptest.NewServer(http.HandlerFunc(srv.handler))
 	defer server.Close()
@@ -654,6 +665,7 @@ func TestSocketIOReceivesABinaryAck(t *testing.T) {
 }
 
 func TestSocketIOCallbacksFromAReplacedConnectionAreDropped(t *testing.T) {
+	t.Parallel()
 	manager := newSocketIOManager(nil)
 	em := newSIOTestEmitter()
 	stale := manager.currentSessionCallbacks("sio-gen", 1, em.callbacks())

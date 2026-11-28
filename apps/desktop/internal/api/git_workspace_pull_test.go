@@ -2,7 +2,6 @@ package api
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,9 +10,7 @@ import (
 func TestGitPullWorkspaceReportsChangeSummary(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, peer := setupGitPullRemoteForTest(t)
 	if err := os.WriteFile(filepath.Join(peer, "kurlo.yml"), []byte("version: 1\nremoteUpdate: true\n"), 0644); err != nil {
 		t.Fatalf("write peer kurlo index: %v", err)
@@ -36,9 +33,7 @@ func TestGitPullWorkspaceReportsChangeSummary(t *testing.T) {
 }
 
 func TestGitPullWorkspaceReturnsDiagnosticsForInvalidRemoteRequest(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 
@@ -76,9 +71,7 @@ func TestGitPullWorkspaceReturnsDiagnosticsForInvalidRemoteRequest(t *testing.T)
 }
 
 func TestGitPullWorkspaceKeepsRepoOpenForInvalidRemoteWorkspace(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	configDir := t.TempDir()
 	useTempConfigDir(t, configDir)
 
@@ -115,9 +108,7 @@ func TestGitPullWorkspaceKeepsRepoOpenForInvalidRemoteWorkspace(t *testing.T) {
 func TestGitPullWorkspaceAllowsDirtyNonOverlappingChanges(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, peer := setupGitPullRemoteForTest(t)
 	localWorkspace := filepath.Join(dir, "workspaces", "Main", "workspace.yml")
 	if err := os.WriteFile(localWorkspace, []byte(`version: 1
@@ -158,9 +149,7 @@ collectionOrder:
 func TestGitPullWorkspaceMergeAllowsDirtyNonOverlappingChanges(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, peer := setupGitPullRemoteForTest(t)
 	workspacePath := filepath.Join(dir, "workspaces", "Main", "workspace.yml")
 	if err := os.WriteFile(workspacePath, []byte(`version: 1

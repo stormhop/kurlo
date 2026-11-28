@@ -134,6 +134,9 @@ func drainWorkspaceWatch(watch workspaceNativeWatch) {
 }
 
 func TestNativeWorkspaceWatchReportsWorkspaceFiles(t *testing.T) {
+	if testing.Short() {
+		t.Skip("waits for native file events")
+	}
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, fileStoreRootIndex), []byte("version: 1\n"), 0o644); err != nil {
 		t.Fatal(err)

@@ -15,6 +15,7 @@ import (
 )
 
 func TestScriptSenderDisabledReturnsNil(t *testing.T) {
+	t.Parallel()
 	if newScriptSender(context.Background(), false, model.HttpRequest{EnableSSLVerification: true}) != nil {
 		t.Fatal("pm.sendRequest must stay unavailable unless the request opts in")
 	}
@@ -24,6 +25,7 @@ func TestScriptSenderDisabledReturnsNil(t *testing.T) {
 }
 
 func TestPerformScriptSend(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := readAllString(r)
 		w.Header().Set("Content-Type", "application/json")
@@ -62,6 +64,7 @@ func TestPerformScriptSend(t *testing.T) {
 }
 
 func TestPerformScriptSendRejectsBadURLs(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		name, url, wantIn string
 	}{
@@ -83,6 +86,7 @@ func TestPerformScriptSendRejectsBadURLs(t *testing.T) {
 }
 
 func TestPerformScriptSendNon2xxIsNotAnError(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 		fmt.Fprint(w, `{"nope":true}`)
@@ -99,6 +103,7 @@ func TestPerformScriptSendNon2xxIsNotAnError(t *testing.T) {
 }
 
 func TestPerformScriptSendStopsRedirectLoop(t *testing.T) {
+	t.Parallel()
 	var hops int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hops++
@@ -116,6 +121,7 @@ func TestPerformScriptSendStopsRedirectLoop(t *testing.T) {
 }
 
 func TestSendRequestPreScriptFetchesToken(t *testing.T) {
+	t.Parallel()
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{"access_token":"tok-from-script"}`)
 	}))
@@ -150,6 +156,7 @@ func TestSendRequestPreScriptFetchesToken(t *testing.T) {
 }
 
 func TestSendRequestPmSendRequestBlockedWithoutOptIn(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("the request should not have been sent — the pre-request script must fail first")
 	}))
@@ -172,6 +179,7 @@ func TestSendRequestPmSendRequestBlockedWithoutOptIn(t *testing.T) {
 }
 
 func TestSendRequestSkipRequest(t *testing.T) {
+	t.Parallel()
 	var hits int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits++
@@ -201,6 +209,7 @@ func TestSendRequestSkipRequest(t *testing.T) {
 }
 
 func TestSendRequestCollectionVariablesRoundTrip(t *testing.T) {
+	t.Parallel()
 	var gotURL string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotURL = r.URL.String()
@@ -240,6 +249,7 @@ func TestSendRequestCollectionVariablesRoundTrip(t *testing.T) {
 }
 
 func TestSendRequestScriptTimeoutOverride(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("X-Slow"); got != "done" {
 			t.Errorf("script did not finish before sending: X-Slow = %q", got)
@@ -275,6 +285,7 @@ func TestSendRequestScriptTimeoutOverride(t *testing.T) {
 }
 
 func TestSendRequestPmInfoRequestName(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "{}")
 	}))
@@ -306,6 +317,7 @@ func TestSendRequestPmInfoRequestName(t *testing.T) {
 }
 
 func TestSendRequestPmCookies(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{Name: "session", Value: "s-42", Path: "/"})
 		fmt.Fprint(w, "{}")
@@ -340,6 +352,7 @@ func TestSendRequestPmCookies(t *testing.T) {
 }
 
 func TestTestScriptSeesCollectionVariablesThePreRequestScriptSet(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, `{}`)
 	}))
@@ -378,6 +391,7 @@ func TestTestScriptSeesCollectionVariablesThePreRequestScriptSet(t *testing.T) {
 }
 
 func TestMergeCollectionVariableResults(t *testing.T) {
+	t.Parallel()
 	pre := model.ScriptResult{
 		CollectionVariables:        map[string]string{"a": "1", "shared": "from-pre"},
 		CollectionVariablesRemoved: []string{"gone"},
@@ -460,6 +474,7 @@ func TestSendRequestScriptTimeoutBoundsPmSendRequest(t *testing.T) {
 }
 
 func TestPerformScriptSendHonoursTheScriptDeadline(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("the request must not be sent after the script deadline")
 	}))
@@ -476,6 +491,7 @@ func TestPerformScriptSendHonoursTheScriptDeadline(t *testing.T) {
 }
 
 func TestSendRequestPostmanFormBodiesReachTheServer(t *testing.T) {
+	t.Parallel()
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mediaType := strings.Split(r.Header.Get("Content-Type"), ";")[0]
 		switch r.URL.Path {
@@ -544,6 +560,7 @@ func TestSendRequestPostmanFormBodiesReachTheServer(t *testing.T) {
 }
 
 func TestRequestAuthInPreRequestAndResponseScripts(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer session-value" || r.Header.Get("X-Script-Auth") != "bearer" {
 			t.Error("request did not use the configured bearer auth and script header")

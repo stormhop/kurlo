@@ -48,14 +48,23 @@ Run this before pushing — it covers most of what CI checks:
 make check
 ```
 
+While working on a change, `make check-fast` runs the same checks with Go in `-short`
+mode: it skips the tests that run git, k6 or the native file watcher, the scale and
+crash runs, the 100 MB body tests and other long waits, and takes about 70 seconds
+instead of two minutes. `make test-fast` runs only that Go part. Run `make check`
+before pushing; CI always runs the full suite.
+
 Local `make` targets run up to four parallel Go tests per package. Use
 `make test GO_TEST_PARALLEL=2` to reduce concurrency, or
 `make test GO_TEST_FLAGS="-run TestGit"` to select tests. Independent Git tests use
 their own temporary repositories. Crypto, history and Git credential tests use
 explicit store instances, paths and key sources. Filesystem tests share a read-only
 key created in the temporary test home; they do not replace process-wide providers.
-Tests that change process environment or global fault injection hooks, and the
-scale benchmark, remain sequential. Crash helpers receive their key through an
+Tests that change process environment or global fault injection hooks, measure
+process-wide allocations, assert timing budgets, and the scale benchmark, remain
+sequential. Network tests that start their own server or broker run in parallel;
+an MQTT test broker listens on a socket the test opened, so parallel tests never
+race for a port. Crash helpers receive their key through an
 explicit temporary fixture file.
 
 Browser tests live in `apps/desktop/frontend/e2e`, grouped by feature. Shared bridge,

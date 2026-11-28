@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,9 +11,7 @@ import (
 func TestGitCommitStagesAndCommitsOnlyKurloFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if err := os.MkdirAll(filepath.Join(dir, ".kurlo-local"), 0755); err != nil {
@@ -63,9 +60,7 @@ func TestGitCommitStagesAndCommitsOnlyKurloFiles(t *testing.T) {
 func TestGitHistoryIgnoresNonYAMLFilesUnderWorkspaces(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -106,9 +101,7 @@ func TestGitHistoryIgnoresNonYAMLFilesUnderWorkspaces(t *testing.T) {
 func TestGitManagedPathspecsRespectWorkspaceSubdirectory(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	repo := t.TempDir()
 	workspace := filepath.Join(repo, "apps", "kurlo-workspace")
 	if err := os.MkdirAll(workspace, 0755); err != nil {
@@ -147,9 +140,7 @@ func TestGitManagedPathspecsRespectWorkspaceSubdirectory(t *testing.T) {
 func TestGitCommitRejectsNonKurloStagedFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	runGitForTest(t, dir, "init")
@@ -184,9 +175,7 @@ func TestGitCommitRejectsNonKurloStagedFiles(t *testing.T) {
 func TestGitCommitWorkspaceFilesCommitsOnlySelectedKurloFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -236,9 +225,7 @@ func TestGitCommitWorkspaceFilesCommitsOnlySelectedKurloFiles(t *testing.T) {
 func TestGitCommitWorkspaceFilesRejectsNonKurloPath(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	runGitForTest(t, dir, "init")
@@ -258,9 +245,7 @@ func TestGitCommitWorkspaceFilesRejectsNonKurloPath(t *testing.T) {
 func TestGitStashWorkspaceStashesOnlyKurloManagedFiles(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -308,9 +293,7 @@ func TestGitStashWorkspaceStashesOnlyKurloManagedFiles(t *testing.T) {
 func TestGitCommitLogAndCommitDiffShowKurloHistory(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -346,9 +329,7 @@ func TestGitCommitLogAndCommitDiffShowKurloHistory(t *testing.T) {
 func TestGitCommitLogPagePaginatesKurloHistory(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {

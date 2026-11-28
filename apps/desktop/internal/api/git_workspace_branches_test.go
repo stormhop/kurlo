@@ -2,7 +2,6 @@ package api
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,9 +10,7 @@ import (
 func TestGitCreateBranchFromRemoteBaseDoesNotTrackDifferentBranchName(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -87,9 +84,7 @@ func TestParseGitBranchLineTracksGoneUpstreamSeparately(t *testing.T) {
 func TestGitBranchesListLocalAndRemoteBranches(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -129,9 +124,7 @@ func TestGitBranchesListLocalAndRemoteBranches(t *testing.T) {
 func TestGitBranchesKeepStableAlphabeticalLocalOrder(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -161,9 +154,7 @@ func TestGitBranchesKeepStableAlphabeticalLocalOrder(t *testing.T) {
 func TestGitCheckoutBranchRequiresCleanWorkspace(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -199,9 +190,7 @@ func TestGitCheckoutBranchRequiresCleanWorkspace(t *testing.T) {
 func TestGitCreateBranchFromRemoteTracksUpstream(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -242,9 +231,7 @@ func TestGitCreateBranchFromRemoteTracksUpstream(t *testing.T) {
 func TestGitCreateBranchFromLocalBranchDoesNotSetUpstream(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -271,9 +258,7 @@ func TestGitCreateBranchFromLocalBranchDoesNotSetUpstream(t *testing.T) {
 func TestGitCreateBranchRejectsExistingLocalBranch(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	writeKurloWorkspaceFiles(t, dir)
 	if initResult := gitInitWorkspaceForRoot(dir); !initResult.Ok {
@@ -296,9 +281,7 @@ func TestGitCreateBranchRejectsExistingLocalBranch(t *testing.T) {
 func TestGitDeleteBranchDeletesLocalAndRemoteBranches(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir := t.TempDir()
 	remote := filepath.Join(t.TempDir(), "origin.git")
 	if err := os.MkdirAll(remote, 0755); err != nil {
@@ -364,9 +347,7 @@ func TestGitDeleteBranchDeletesLocalAndRemoteBranches(t *testing.T) {
 func TestGitPullBranchFastForwardsNonCurrentTrackingBranch(t *testing.T) {
 	t.Parallel()
 
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git is not installed")
-	}
+	requireGitForTest(t)
 	dir, peer := setupGitPullRemoteForTest(t)
 	runGitForTest(t, peer, "checkout", "-b", "feature/api")
 	if err := os.WriteFile(filepath.Join(peer, "kurlo.yml"), []byte("version: 1\nformat: kurlo.workspace.yaml.v1\nbranch: api\n"), 0644); err != nil {
