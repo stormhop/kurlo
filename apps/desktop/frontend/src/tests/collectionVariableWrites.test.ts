@@ -52,6 +52,18 @@ describe('applyCollectionVariableUpdates', () => {
     expect(host.persistRequestStore).toHaveBeenCalledTimes(1);
   });
 
+  it('updates the last enabled row, the one a request uses', async () => {
+    const host = makeHost([row(1, 'region', 'eu'), row(2, 'region', 'us'), row(3, 'region', 'off', { enabled: false })]);
+    await host.applyCollectionVariableUpdates(req, { region: 'ap' }, undefined);
+    expect(host.collections[0].defaults.variables.map((item: KVRow) => item.value)).toEqual(['eu', 'ap', 'off']);
+  });
+
+  it('reports a change that could not be saved', async () => {
+    const host = makeHost([row(1, 'token', 'old')]);
+    host.persistRequestStore.mockResolvedValue(false);
+    expect(await host.applyCollectionVariableUpdates(req, { token: 'new' }, undefined)).toBe(false);
+  });
+
   it('updates an existing row in place, preserving its flags and description', async () => {
     const host = makeHost([row(7, 'token', 'old', { secret: true, description: 'API token' })]);
     await host.applyCollectionVariableUpdates(req, { token: 'new' }, undefined);

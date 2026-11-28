@@ -579,6 +579,13 @@
 .var-popover:focus {
   outline: none;
 }
+.cm-tooltip:has(> .cm-var-popover) {
+  border: none;
+  background: transparent;
+}
+.var-popover.cm-var-popover {
+  position: static;
+}
 .var-popover-head {
   display: flex;
   align-items: baseline;
@@ -624,6 +631,9 @@
 }
 .var-popover-saved {
   color: var(--success);
+}
+.var-popover-saved.var-popover-failed {
+  color: var(--danger);
 }
 .var-popover-form {
   display: flex;

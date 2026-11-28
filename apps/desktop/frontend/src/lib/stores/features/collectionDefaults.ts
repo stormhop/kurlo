@@ -34,6 +34,11 @@ type CollectionDefaultsHost = {
   guardWorkspaceWritable: (action?: string) => boolean;
 };
 
+function effectiveRowIndex(rows: KVRow[], key: string) {
+  const enabled = rows.findLastIndex(row => row.enabled && row.key.trim() === key);
+  return enabled >= 0 ? enabled : rows.findLastIndex(row => row.key.trim() === key);
+}
+
 export const collectionDefaultsFeature = {
   async applyCollectionVariableUpdates(
     this: CollectionDefaultsHost,
@@ -53,14 +58,14 @@ export const collectionDefaultsFeature = {
     let changed = false;
 
     for (const key of removed ?? []) {
-      const index = rows.findIndex(row => row.key.trim() === key);
+      const index = effectiveRowIndex(rows, key);
       if (index >= 0) {
         rows.splice(index, 1);
         changed = true;
       }
     }
     for (const [key, value] of Object.entries(updates ?? {})) {
-      const index = rows.findIndex(row => row.key.trim() === key);
+      const index = effectiveRowIndex(rows, key);
       if (index >= 0) {
         if (rows[index].value === value) continue;
         rows[index] = { ...rows[index], value };
@@ -77,8 +82,7 @@ export const collectionDefaultsFeature = {
         ? { ...candidate, defaults: { ...candidate.defaults, variables: rows } }
         : candidate,
     );
-    await this.persistRequestStore();
-    return true;
+    return (await this.persistRequestStore()) !== false;
   },
 
   currentRequestSettingsOverrides(this: CollectionDefaultsHost): RequestSettingsOverrides {

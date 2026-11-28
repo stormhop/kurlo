@@ -160,6 +160,12 @@ function normalizeTopViewState(value: unknown): TopViewState | null {
 
 export type { GitAuthChoice, GitAuthRequest } from './features/git';
 
+function lastRowPerKey<T extends { key: string; enabled: boolean }>(rows: T[]): T[] {
+  const last: Record<string, number> = Object.create(null);
+  rows.forEach((row, index) => { if (row.enabled && row.key.trim()) last[row.key.trim()] = index; });
+  return rows.filter((row, index) => row.enabled && last[row.key.trim()] === index);
+}
+
 class AppVM {
   constructor() {
     const proto = Object.getPrototypeOf(this);
@@ -1714,8 +1720,7 @@ class AppVM {
       ? this.activeCollectionSettingsId
       : this.activeCollectionId();
     const collection = this.collections.find(candidate => candidate.id === collectionId);
-    const collectionSuggestions = (collection?.defaults.variables ?? [])
-      .filter(row => row.enabled && row.key.trim())
+    const collectionSuggestions = lastRowPerKey(collection?.defaults.variables ?? [])
       .map(row => ({
         key: row.key.trim(),
         value: row.value,
@@ -1723,7 +1728,7 @@ class AppVM {
         secret: row.secret ?? false,
         source: { kind: 'collection' as const, id: collection?.id ?? '', name: collection?.name ?? '' },
       }));
-    const globalSuggestions = this.globalVariableRows().map(row => ({
+    const globalSuggestions = lastRowPerKey(this.globalVariableRows()).map(row => ({
       key: row.key.trim(),
       value: row.value,
       description: row.description || 'Global',
@@ -1731,8 +1736,7 @@ class AppVM {
       source: { kind: 'global' as const, id: '', name: 'Globals' },
     }));
     const requestSuggestions = this.topView === 'request'
-      ? this.requestVars
-        .filter(row => row.enabled && row.key.trim())
+      ? lastRowPerKey(this.requestVars)
         .map(row => ({ key: row.key.trim(), value: row.value, description: row.description || 'Request', secret: row.secret ?? false, source: { kind: 'request' as const, id: this.activeRequestId, name: 'Request vars' } }))
       : [];
     const rows = [...requestSuggestions, ...this.environmentVariableSuggestions(), ...collectionSuggestions, ...globalSuggestions];
@@ -1744,45 +1748,50 @@ class AppVM {
     if (environment) return { kind: 'environment', id: environment.id, name: environment.name };
     return { kind: 'global', id: '', name: 'Globals' };
   }
-  async setVariableValue(key: string, value: string, source: VariableSource = this.variableAddTarget()): Promise<void> {
+  async setVariableValue(key: string, value: string, source: VariableSource = this.variableAddTarget()): Promise<boolean> {
     const name = key.trim();
-    if (!name || source.readonly) return;
+    if (!name || source.readonly) return false;
     if (source.kind === 'request') {
-      if (source.id !== this.activeRequestId) return;
-      const index = this.requestVars.findIndex(row => row.enabled && row.key.trim() === name);
-      if (index >= 0) this.requestVars[index] = { ...this.requestVars[index], value };
-      return;
+      if (source.id !== this.activeRequestId) return false;
+      const index = this.requestVars.findLastIndex(row => row.enabled && row.key.trim() === name);
+      if (index < 0) return false;
+      this.requestVars[index] = { ...this.requestVars[index], value };
+      return true;
     }
     if (source.kind === 'environment') {
+      if (!this.guardWorkspaceWritable('Environment changes')) return false;
       this.setEnvironmentMatrixValue(source.id, name, value);
-      return;
+      return true;
     }
     if (source.kind === 'collection') {
-      await this.applyCollectionVariableUpdates({ collectionId: source.id }, { [name]: value }, undefined);
-      return;
+      return this.applyCollectionVariableUpdates({ collectionId: source.id }, { [name]: value }, undefined);
     }
+    if (!this.guardWorkspaceWritable('Global variables')) return false;
     this.setGlobalVariableValue(name, value);
+    return true;
   }
-  async removeVariable(key: string, source: VariableSource): Promise<void> {
+  async removeVariable(key: string, source: VariableSource): Promise<boolean> {
     const name = key.trim();
-    if (!name || source.readonly) return;
+    if (!name || source.readonly) return false;
     if (source.kind === 'request') {
-      if (source.id !== this.activeRequestId) return;
-      const index = this.requestVars.findIndex(row => row.enabled && row.key.trim() === name);
-      if (index >= 0) removeRow(this.requestVars, index);
-      return;
+      if (source.id !== this.activeRequestId) return false;
+      const index = this.requestVars.findLastIndex(row => row.enabled && row.key.trim() === name);
+      if (index < 0) return false;
+      removeRow(this.requestVars, index);
+      return true;
     }
     if (source.kind === 'environment') {
-      if (!this.guardWorkspaceWritable('Environment changes')) return;
+      if (!this.guardWorkspaceWritable('Environment changes')) return false;
       this.unsetEnvironmentMatrixValue(source.id, name);
-      return;
+      return true;
     }
     if (source.kind === 'collection') {
-      await this.applyCollectionVariableUpdates({ collectionId: source.id }, undefined, [name]);
-      return;
+      return this.applyCollectionVariableUpdates({ collectionId: source.id }, undefined, [name]);
     }
-    const index = this.globalVariables.findIndex(row => row.enabled && row.key.trim() === name);
-    if (index >= 0) this.removeGlobalVariableRow(index);
+    const index = this.globalVariables.findLastIndex(row => row.enabled && row.key.trim() === name);
+    if (index < 0 || !this.guardWorkspaceWritable('Global variables')) return false;
+    this.removeGlobalVariableRow(index);
+    return true;
   }
   async copyHistoryEntryCurl(historyId: string) {
     const entry = this.requestHistory.find(candidate => candidate.id === historyId);

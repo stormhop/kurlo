@@ -999,6 +999,58 @@ test.describe('Variable hover card', () => {
     await expect(page.locator('.url-field .var-token-err')).toHaveText('{{test}}');
   });
 
+  test('edits the request variable that Send uses from a JSON body', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeId: 'vars', openIds: ['vars'],
+      requests: [{ id: 'vars', name: 'Regions', requestType: 'http', method: 'POST', url: 'https://api.kurlo.test/regions',
+        vars: [{ key: 'region', value: 'eu', enabled: true }, { key: 'region', value: 'us', enabled: true }],
+        bodyType: 'json', rawBodyType: 'json', bodyContent: '{"region":"{{region}}"}', auth: { type: 'none' } }],
+    });
+    await page.goto('/');
+    await chooseRequestSection(page, 'Body');
+    const box = await page.locator('.cm-content').evaluate(content => {
+      const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const at = node.textContent?.indexOf('region}}') ?? -1;
+        if (at < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + 3);
+        const rect = range.getBoundingClientRect();
+        return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+      }
+      return null;
+    });
+    if (!box) throw new Error('no region token in the body');
+    await page.mouse.move(box.x, box.y);
+    const card = page.getByRole('dialog', { name: 'Variable region' });
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Request vars');
+    await expect(card.getByLabel('Value of region')).toHaveValue('us');
+    await card.getByLabel('Value of region').fill('ap');
+    await card.getByRole('button', { name: 'Save' }).click();
+    await expect(card.getByRole('status')).toHaveText('Saved');
+    await page.mouse.move(5, 5);
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => (window.__kurloE2E.sentRequests.at(-1) as { body?: string } | undefined)?.body ?? ''))
+      .toBe('{"region":"ap"}');
+  });
+
+  test('offers Add to for an undefined name with a colon', async ({ page }) => {
+    await installKurloBridge(page, '', 'browser/e2e', false, {
+      activeEnvironmentId: 'env-dev',
+      environments: [{ id: 'env-dev', workspaceId: 'workspace-e2e', name: 'Dev', values: [{ key: 'host', value: 'https://dev.kurlo.test', enabled: true }] }],
+    });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'New unsaved request' }).click();
+    await page.getByLabel('Request URL').fill('{{host}}/items/{{custom:id}}');
+    await page.getByLabel('Request URL').blur();
+    const card = await hoverVariable(page, 'custom:id');
+    await card.getByLabel('Value of custom:id').fill('7');
+    await card.getByRole('button', { name: 'Add to Dev' }).click();
+    await expect(page.locator('.url-field .var-token-err')).toHaveCount(0);
+  });
+
   test('gives way to the variable menu when the token is clicked', async ({ page }) => {
     await installKurloBridge(page, '', 'browser/e2e', false, {
       activeEnvironmentId: 'env-dev',

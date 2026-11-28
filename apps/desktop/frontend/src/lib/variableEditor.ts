@@ -1,8 +1,8 @@
 import type { VariableSource } from './variables';
 
 export type VariableEditor = {
-  save: (key: string, value: string, source?: VariableSource) => Promise<void> | void;
-  remove: (key: string, source: VariableSource) => Promise<void> | void;
+  save: (key: string, value: string, source?: VariableSource) => Promise<boolean | void> | boolean | void;
+  remove: (key: string, source: VariableSource) => Promise<boolean | void> | boolean | void;
   addTarget: () => VariableSource;
 };
 

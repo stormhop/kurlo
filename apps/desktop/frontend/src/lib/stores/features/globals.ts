@@ -112,7 +112,7 @@ export const globalsFeature = {
 
   setGlobalVariableValue(this: GlobalsHost, key: string, value: string) {
     if (!this.guardWorkspaceWritable('Global variables')) return;
-    const index = this.globalVariables.findIndex(row => row.enabled && row.key.trim() === key);
+    const index = this.globalVariables.findLastIndex(row => row.enabled && row.key.trim() === key);
     if (index >= 0) {
       this.editGlobals(withTrailingRow(this.globalVariables.map((row, i) => (i === index ? { ...row, value } : row))));
       return;

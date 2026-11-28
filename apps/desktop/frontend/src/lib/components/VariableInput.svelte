@@ -1,9 +1,8 @@
 <script lang="ts">
   import type { VariableSuggestion } from '../variables';
-  import { VAULT_TEMPLATE_PREFIX, dynamicVariableDescription, matchVariableSuggestions, templateVariableKey, variableDisplayValue, variableSourceLabel } from '../variables';
-  import { isDynamicVariableName, resolveDynamicVariable } from '../dynamicVariables';
-  import { variableEditor } from '../variableEditor';
-  import { tick } from 'svelte';
+  import { VAULT_TEMPLATE_PREFIX, matchVariableSuggestions, templateVariableKey, variableDisplayValue } from '../variables';
+  import { isDynamicVariableName } from '../dynamicVariables';
+  import VariableHoverCard from './VariableHoverCard.svelte';
   import { escapeHtml } from '../utils';
   import type { InputGhost } from '../ghostText';
   import { horizontalWheel } from '../horizontalWheel';
@@ -106,22 +105,13 @@
   const hasUnresolved = $derived(highlightHtml.includes('var-token-err'));
 
   type VariableHover = { key: string; index: number; top: number; bottom: number; left: number };
-  const NEW_VARIABLE_KEY = /^[\p{L}\p{N}_.-]+$/u;
   let hover = $state<VariableHover | null>(null);
-  let hoverDraft = $state('');
-  let hoverSaved = $state<'' | 'Saved' | 'Removed'>('');
+  let hoverDirty = $state(false);
   let popoverEl = $state<HTMLDivElement | undefined>();
   let hoverShowTimer: ReturnType<typeof setTimeout> | undefined;
   let hoverHideTimer: ReturnType<typeof setTimeout> | undefined;
-  let hoverSavedTimer: ReturnType<typeof setTimeout> | undefined;
 
   const hoverSuggestion = $derived(hover ? suggestionByKey.get(hover.key) : undefined);
-  const hoverDynamic = $derived(Boolean(hover && !hoverSuggestion && isDynamicVariableName(hover.key)));
-  const hoverEditor = $derived(hover ? variableEditor() : null);
-  const hoverEditable = $derived(Boolean(hoverEditor && hoverSuggestion?.source && !hoverSuggestion.source.readonly && !hoverSuggestion.linked));
-  const hoverAddTarget = $derived(hover && hoverEditor && !hoverSuggestion && !hoverDynamic && NEW_VARIABLE_KEY.test(hover.key) ? hoverEditor.addTarget() : null);
-  const hoverDirty = $derived(hoverEditable ? hoverDraft !== (hoverSuggestion?.value ?? '') : hoverDraft !== '');
-  const hoverRemoves = $derived(hoverEditable && hoverDraft === '');
   const popoverLeft = $derived.by(() => {
     if (!hover) return 0;
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
@@ -159,9 +149,6 @@
       return;
     }
     hover = next;
-    hoverSaved = '';
-    const suggestion = suggestionByKey.get(next.key);
-    hoverDraft = suggestion?.source && !suggestion.source.readonly && !suggestion.linked ? suggestion.value : '';
   }
 
   function scheduleHide() {
@@ -195,33 +182,6 @@
     if (refocus) inputRef?.focus();
   }
 
-  async function saveHover(event: SubmitEvent) {
-    event.preventDefault();
-    const editor = variableEditor();
-    if (!hover || !editor) return;
-    let outcome: 'Saved' | 'Removed';
-    if (hoverEditable && hoverSuggestion?.source && hoverRemoves) {
-      await editor.remove(hover.key, hoverSuggestion.source);
-      outcome = 'Removed';
-    } else if (!hoverDirty) {
-      return;
-    } else if (hoverEditable && hoverSuggestion?.source) {
-      await editor.save(hover.key, hoverDraft, hoverSuggestion.source);
-      outcome = 'Saved';
-    } else if (hoverAddTarget) {
-      await editor.save(hover.key, hoverDraft, hoverAddTarget);
-      outcome = 'Saved';
-    } else {
-      return;
-    }
-    await tick();
-    hoverSaved = outcome;
-    clearTimeout(hoverSavedTimer);
-    hoverSavedTimer = setTimeout(() => (hoverSaved = ''), 1600);
-    const saved = suggestionByKey.get(hover.key);
-    hoverDraft = saved?.source && !saved.source.readonly && !saved.linked ? saved.value : '';
-  }
-
   function onPopoverKeydown(event: KeyboardEvent) {
     if (event.key !== 'Escape') return;
     event.preventDefault();
@@ -235,10 +195,7 @@
     scheduleHide();
   }
 
-  $effect(() => () => {
-    clearHoverTimers();
-    clearTimeout(hoverSavedTimer);
-  });
+  $effect(() => () => clearHoverTimers());
 
   function updateCaret() {
     if (!inputRef) return;
@@ -576,62 +533,9 @@
       onkeydown={onPopoverKeydown}
       onfocusout={onPopoverFocusOut}
     >
-      <div class="var-popover-head">
-        <code class="var-popover-key">{`{{${hover.key}}}`}</code>
-        <span class="var-popover-source" class:missing={!hoverSuggestion && !hoverDynamic}>
-          {#if hoverSuggestion?.source}{variableSourceLabel(hoverSuggestion.source)}{:else if hoverSuggestion}{hoverSuggestion.description || 'Defined'}{:else if hoverDynamic}Dynamic{:else}Not defined{/if}
-        </span>
-      </div>
-      {#if hoverDynamic}
-        <p class="var-popover-note">{dynamicVariableDescription(hover.key)}</p>
-        <p class="var-popover-note">A new value is generated on every send, for example <code>{resolveDynamicVariable(hover.key)}</code>.</p>
-      {:else if hoverSuggestion && hoverEditable}
-        <form class="var-popover-form" onsubmit={saveHover}>
-          <input
-            class="field field-input field-mono"
-            type={hoverSuggestion.secret ? 'password' : 'text'}
-            bind:value={hoverDraft}
-            aria-label={`Value of ${hover.key}`}
-            spellcheck="false"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="none"
-          />
-          {#if hoverRemoves}
-            <button class="btn btn-danger btn-sm" type="submit">Remove</button>
-          {:else}
-            <button class="btn btn-primary btn-sm" type="submit" disabled={!hoverDirty}>Save</button>
-          {/if}
-        </form>
-        {#if hoverSaved}<p class="var-popover-note var-popover-saved" role="status">{hoverSaved}</p>{/if}
-        {#if hoverRemoves}
-          <p class="var-popover-note">Removes <code>{hover.key}</code> from {hoverSuggestion.source ? variableSourceLabel(hoverSuggestion.source) : 'this scope'}.</p>
-        {/if}
-      {:else if hoverSuggestion}
-        <p class="var-popover-value">{variableDisplayValue(hoverSuggestion) || 'Empty'}</p>
-        {#if hoverSuggestion.linked || hoverSuggestion.source?.readonly}
-          <p class="var-popover-note">Read from a secret provider. Change it in Environments.</p>
-        {/if}
-      {:else}
-        <p class="var-popover-note">No environment, collection, global or request variable has this name.</p>
-        {#if hoverSaved === 'Removed'}<p class="var-popover-note var-popover-saved" role="status">Removed</p>{/if}
-        {#if hoverAddTarget}
-          <form class="var-popover-form" onsubmit={saveHover}>
-            <input
-              class="field field-input field-mono"
-              type="text"
-              bind:value={hoverDraft}
-              placeholder="Value"
-              aria-label={`Value of ${hover.key}`}
-              spellcheck="false"
-              autocomplete="off"
-              autocorrect="off"
-              autocapitalize="none"
-            />
-            <button class="btn btn-primary btn-sm" type="submit" disabled={!hoverDirty}>Add to {hoverAddTarget.name}</button>
-          </form>
-        {/if}
-      {/if}
+      {#key hover.index}
+        <VariableHoverCard variableKey={hover.key} suggestion={hoverSuggestion} ondirty={(dirty) => (hoverDirty = dirty)} />
+      {/key}
     </div>
   {/if}
   {#if open && matches.length}

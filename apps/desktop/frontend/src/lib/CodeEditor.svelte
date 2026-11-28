@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy, untrack } from 'svelte';
+  import { mount, onMount, onDestroy, unmount, untrack } from 'svelte';
   import { Decoration, EditorView, GutterMarker, ViewPlugin, WidgetType, drawSelection, gutterLineClass, tooltips, hoverTooltip, keymap, placeholder as cmPlaceholder, lineNumbers, highlightActiveLine, highlightActiveLineGutter, type DecorationSet, type ViewUpdate } from '@codemirror/view';
   import { EditorSelection, EditorState, Compartment, Prec, RangeSet, RangeSetBuilder, StateEffect, StateField, type Extension } from '@codemirror/state';
   import { defaultKeymap, history, isolateHistory, historyKeymap, indentWithTab } from '@codemirror/commands';
@@ -13,7 +13,8 @@
   import { formatGraphQLQuery } from './graphql';
   import { prettyMarkup } from './utils';
   import type { VariableSuggestion } from './variables';
-  import { VAULT_TEMPLATE_PREFIX, matchVariableSuggestions, variableDisplayValue } from './variables';
+  import { VAULT_TEMPLATE_PREFIX, matchVariableSuggestions, templateVariableKey, variableDisplayValue } from './variables';
+  import VariableHoverCard from './components/VariableHoverCard.svelte';
   import { DYNAMIC_VARIABLES } from './dynamicVariables';
   import { maxLength as maxLengthFilter } from './editorLimit';
   import { registerEditorView, unregisterEditorView } from './editorViews';
@@ -822,6 +823,37 @@
     };
   }, { hideOnChange: true });
 
+  const variableHoverTooltip = hoverTooltip((hoverView, pos) => {
+    const line = hoverView.state.doc.lineAt(pos);
+    for (const match of line.text.matchAll(/\{\{([^{}]*)\}\}/g)) {
+      const from = line.from + (match.index ?? 0);
+      const to = from + match[0].length;
+      if (pos < from || pos > to) continue;
+      const variableKey = templateVariableKey(match[1]);
+      if (!variableKey) return null;
+      return {
+        pos: from,
+        end: to,
+        above: false,
+        create() {
+          const dom = document.createElement('div');
+          dom.className = 'var-popover cm-var-popover';
+          dom.setAttribute('role', 'dialog');
+          dom.setAttribute('aria-label', `Variable ${variableKey}`);
+          const card = mount(VariableHoverCard, {
+            target: dom,
+            props: {
+              variableKey,
+              get suggestion() { return variableSuggestions.find(candidate => candidate.key === variableKey); },
+            },
+          });
+          return { dom, destroy: () => { void unmount(card); } };
+        },
+      };
+    }
+    return null;
+  }, { hoverTime: 350 });
+
   function toggleSelectedLineComments() {
     if (!view || readonly) return false;
     const currentView = view;
@@ -888,6 +920,7 @@
       ghostExtension,
       kurloLinter,
       kurloLintTooltip,
+      !readonly && (!completionSource || includeVariableCompletions) ? variableHoverTooltip : [],
       keepCursorOutOfFolds,
       keepFocusOnFoldClick,
       issueField,
