@@ -1,7 +1,7 @@
 import type { CollectionTextFilesResult } from '../../wire';
 import { environmentChain } from '../../environmentInheritance';
 import { requestExamplesPending } from '../../examples';
-import { exportCollectionDocs, chooseImportFile, hasNativeImportDialog, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles, writeNewCollectionTextFiles } from '../../backend';
+import { exportCollectionDocs, chooseImportFile, hasNativeImportDialog, inspectRequestFile, openDirectoryDialog, readCollectionTextFiles, readImportFile, sendHttpRequest, writeCollectionTextFiles, writeNewCollectionTextFiles } from '../../backend';
 import { detectImportSource, isBrunoFolder, isPostmanV3Document, isPostmanV3Folder, type ImportSource } from '../../importSource';
 import { emptyAuthConfig, emptyHttpRequest } from '../../wire';
 import type { BodyType, Collection, CollectionDefaults, Environment, FolderDefaults, KVRow, RequestHistoryEntry, SavedRequest, Workspace } from '../../types/models';
@@ -37,7 +37,7 @@ export function looksLikeTlsCertificateError(message: string): boolean {
   return /x509|certificate|tls: failed to verify|unknown authority/i.test(message);
 }
 
-async function fetchImportDocument(url: string, options: UrlImportOptions = {}): Promise<{ body: string; contentType: string }> {
+async function fetchImportDocument(url: string, options: UrlImportOptions = {}, accept = 'application/json, application/yaml, text/yaml, text/plain;q=0.9, */*;q=0.8'): Promise<{ body: string; contentType: string; url: string }> {
   const response = await sendHttpRequest({
     ...emptyHttpRequest(),
     requestId: `import-url-${Date.now()}`,
@@ -45,7 +45,7 @@ async function fetchImportDocument(url: string, options: UrlImportOptions = {}):
     url,
     headers: [{
       key: 'Accept',
-      value: 'application/json, application/yaml, text/yaml, text/plain;q=0.9, */*;q=0.8',
+      value: accept,
       enabled: true,
       isFile: false,
       fileName: '',
@@ -69,7 +69,37 @@ async function fetchImportDocument(url: string, options: UrlImportOptions = {}):
   if (response.statusCode >= 400) {
     throw new Error(`That URL answered ${response.status || response.statusCode}.`);
   }
-  return { body: response.body ?? '', contentType: headerValue(response.headers, 'content-type') };
+  return { body: response.body ?? '', contentType: headerValue(response.headers, 'content-type'), url: response.sentRequests?.at(-1)?.url || url };
+}
+
+const WSDL_ACCEPT = 'text/xml, application/wsdl+xml, application/xml;q=0.9, */*;q=0.8';
+
+export function fileUrlFromPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/');
+  return encodeURI(`file://${normalized.startsWith('/') ? '' : '/'}${normalized}`).replace(/[?#]/g, encodeURIComponent);
+}
+
+export function pathFromFileUrl(url: string): string {
+  const path = decodeURIComponent(new URL(url).pathname);
+  return /^\/[A-Za-z]:\//.test(path) ? path.slice(1) : path;
+}
+
+type WsdlOrigin = { base: string; load: (url: string) => Promise<string | { text: string; url: string }> };
+
+function wsdlFileOrigin(filePath: string): WsdlOrigin | undefined {
+  if (!filePath) return undefined;
+  return {
+    base: fileUrlFromPath(filePath),
+    load: async url => {
+      if (!url.startsWith('file:')) {
+        const fetched = await fetchImportDocument(url, {}, WSDL_ACCEPT);
+        return { text: fetched.body, url: fetched.url };
+      }
+      const file = await readImportFile(pathFromFileUrl(url));
+      if (file.error) throw new Error(file.error);
+      return file.content;
+    },
+  };
 }
 
 export type ImportedCollectionBundle = {
@@ -131,10 +161,14 @@ type ImportExportHost = {
   importCollectionFolder: (root: string, preloaded?: CollectionTextFilesResult) => Promise<void>;
   runPostmanV3Import: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<void>;
   importPostmanV3Files: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<number>;
-  importCollectionPayload: (text: string, fileName: string, source: ImportSource, destination?: ImportDestination) => Promise<number>;
-  runCollectionFileImport: (text: string, fileName: string, source: ImportSource, destination?: ImportDestination) => Promise<void>;
+  importCollectionPayload: (text: string, fileName: string, source: ImportSource, destination?: ImportDestination, filePath?: string) => Promise<number>;
+  runCollectionFileImport: (text: string, fileName: string, source: ImportSource, destination?: ImportDestination, filePath?: string) => Promise<void>;
+  importAsyncApiPayload: (text: string, fileName: string, filePath: string, destination: ImportDestination) => Promise<number>;
   importOpenCollectionFiles: (files: Array<{ path: string; content: string }>, fallbackName: string) => Promise<number>;
   importHarPayload: (payload: unknown, fileName: string) => Promise<number>;
+  importWsdlPayload: (text: string, fileName: string, destination?: ImportDestination, origin?: WsdlOrigin) => Promise<number>;
+  importWsdlFromUrl: (wsdlUrl: string, options?: UrlImportOptions) => Promise<number>;
+  openWsdlUrlImport: () => Promise<void>;
   importRequestsPayload: (collectionName: string, buildRequests: (collectionId: string, collectionName: string) => SavedRequest[], collectionDefaults?: ImportedCollectionDefaults | (() => ImportedCollectionDefaults | undefined), destination?: ImportDestination) => Promise<ImportedRequests>;
   importCollectionBundle: (bundle: ImportedCollectionBundle) => Promise<number>;
   importPostmanVariableBundle: (bundle: { scope: 'environment' | 'globals'; name: string; values: KVRow[] }) => Promise<number>;
@@ -197,18 +231,25 @@ export const importExportFeature = {
     if (!this.guardWorkspaceWritable('Importing')) return;
     this.closeFloatingMenus();
     const source = await this.openSelectDialog('Import collection', 'Choose the source format to import:', [
-      { value: 'bruno', label: 'Bruno / OpenCollection', icon: 'bruno', description: 'Import a Bruno collection folder with opencollection.yml or legacy .bru files.' },
       { value: 'postman', label: 'Postman collection', icon: 'postman', description: 'Import a Postman v2.0/v2.1 collection, environment, or globals JSON file.' },
       { value: 'postman-v3', label: 'Postman v3 collection folder', icon: 'postman', description: 'Import a Postman v12 collection folder with .request.yaml files, environments and globals.' },
-      { value: 'insomnia', label: 'Insomnia export', icon: 'insomnia', description: 'Import an Insomnia workspace or collection export JSON file.' },
       { value: 'openapi', label: 'OpenAPI / Swagger', icon: 'openapi', description: 'Import OpenAPI 3.x or Swagger 2.0 JSON/YAML specs.' },
       { value: 'openapi-url', label: 'OpenAPI / Swagger from URL', icon: 'openapi', description: 'Fetch a spec from a link — https://api.example.com/openapi.json' },
+      { value: 'insomnia', label: 'Insomnia export', icon: 'insomnia', description: 'Import an Insomnia workspace or collection export JSON file.' },
+      { value: 'bruno', label: 'Bruno / OpenCollection', icon: 'bruno', description: 'Import a Bruno collection folder with opencollection.yml or legacy .bru files.' },
+      { value: 'wsdl', label: 'WSDL / SOAP', icon: 'wsdl', description: 'Build SOAP 1.1 and 1.2 requests with sample envelopes from a WSDL 1.1 file.' },
+      { value: 'wsdl-url', label: 'WSDL from URL', icon: 'wsdl', description: 'Fetch a WSDL from a link — https://example.com/Service.svc?wsdl' },
+      { value: 'asyncapi', label: 'AsyncAPI', icon: 'asyncapi', description: 'Build Kafka and MQTT requests from an AsyncAPI 2.x or 3.x JSON/YAML document.' },
       { value: 'har', label: 'HAR from DevTools', icon: 'har', description: 'Turn captured browser traffic into requests.' },
       { value: 'httpfile', label: '.http / .rest file', icon: 'httpfile', description: 'Import a JetBrains HTTP Client or VS Code REST Client file.' },
     ], 'Import');
     if (!source) return;
     if (source === 'openapi-url') {
       await this.openOpenApiUrlImport();
+      return;
+    }
+    if (source === 'wsdl-url') {
+      await this.openWsdlUrlImport();
       return;
     }
     if (source === 'postman-v3') {
@@ -233,7 +274,7 @@ export const importExportFeature = {
       setTimeout(() => (this.collectionImportToast = ''), 3200);
       return;
     }
-    if (file.path) await this.runCollectionFileImport(file.content, file.name, importSource, destination);
+    if (file.path) await this.runCollectionFileImport(file.content, file.name, importSource, destination, file.path);
   },
   async importDroppedFiles(this: ImportExportHost, paths: string[]) {
     const destination = importDestination(this);
@@ -251,7 +292,7 @@ export const importExportFeature = {
         setTimeout(() => (this.collectionImportToast = ''), 3200);
         continue;
       }
-      await this.runCollectionFileImport(file.content, name, source, destination);
+      await this.runCollectionFileImport(file.content, name, source, destination, file.path || path);
     }
   },
   async openOpenApiUrlImport(this: ImportExportHost) {
@@ -306,10 +347,10 @@ export const importExportFeature = {
     const destination = importDestination(this);
     await this.runCollectionFileImport(await file.text(), file.name, source, destination);
   },
-  async runCollectionFileImport(this: ImportExportHost, text: string, fileName: string, source: ImportSource, destination = importDestination(this)) {
+  async runCollectionFileImport(this: ImportExportHost, text: string, fileName: string, source: ImportSource, destination = importDestination(this), filePath = '') {
     try {
       this.collectionImportSummary = '';
-      const count = await this.importCollectionPayload(text, fileName, source, destination);
+      const count = await this.importCollectionPayload(text, fileName, source, destination, filePath);
       this.collectionImportToast = this.collectionImportSummary
         || (count ? `Imported ${count} request${count === 1 ? '' : 's'}` : 'Imported empty collection');
       this.collectionImportSummary = '';
@@ -317,8 +358,10 @@ export const importExportFeature = {
       this.collectionImportToast = `Import failed: ${err instanceof Error ? err.message : String(err)}`;
     } finally { setTimeout(() => (this.collectionImportToast = ''), 3200); }
   },
-  async importCollectionPayload(this: ImportExportHost, text: string, fileName: string, source: ImportSource, destination = importDestination(this)) {
+  async importCollectionPayload(this: ImportExportHost, text: string, fileName: string, source: ImportSource, destination = importDestination(this), filePath = '') {
     requireImportDestination(this, destination);
+    if (source === 'asyncapi') return this.importAsyncApiPayload(text, fileName, filePath, destination);
+    if (source === 'wsdl') return this.importWsdlPayload(text, fileName, destination, wsdlFileOrigin(filePath));
     if (source === 'bruno') {
       return this.importOpenCollectionFiles([{ path: fileName, content: text }], fileName.replace(/\.(bru|ya?ml)$/i, '') || 'Bruno Collection');
     }
@@ -446,6 +489,69 @@ export const importExportFeature = {
     }
     await confirmImportedRequests(this, destination, importedReqs, this.persistRequestStore(nextReqs, first?.id, nextOpenIds, this.workspaces, nextCols, wsId, this.requestHistory, nextEnvs, this.activeEnvironmentId));
     return importedReqs.length;
+  },
+  async importAsyncApiPayload(this: ImportExportHost, text: string, fileName: string, filePath: string, destination: ImportDestination) {
+    const { asyncApiCollectionName, asyncApiImport, parseAsyncApiDocument } = await import('../../asyncapi');
+    const spec = parseAsyncApiDocument(text);
+    const schemaPath = filePath ? (await inspectRequestFile(filePath))?.path || filePath : '';
+    let variables: KVRow[] = [];
+    const { requestCount } = await this.importRequestsPayload(asyncApiCollectionName(spec, fileName), (collectionId, name) => {
+      const built = asyncApiImport(spec, collectionId, name, schemaPath);
+      variables = built.variables;
+      return built.requests;
+    }, () => ({ variables }), destination);
+    return requestCount;
+  },
+  async importWsdlPayload(this: ImportExportHost, text: string, fileName: string, destination = importDestination(this), origin?: WsdlOrigin) {
+    const { loadWsdlImports, parseWsdlDocument, wsdlCollectionName, wsdlRequests } = await import('../../wsdl');
+    const sources = origin ? await loadWsdlImports(text, origin.base, origin.load) : undefined;
+    requireImportDestination(this, destination);
+    const wsdl = parseWsdlDocument(text, sources);
+    const { requestCount } = await this.importRequestsPayload(wsdlCollectionName(wsdl, fileName), (collectionId, name) => wsdlRequests(wsdl, collectionId, name), undefined, destination);
+    if (wsdl.unresolvedImports) {
+      this.collectionImportSummary = `Imported ${requestCount} request${requestCount === 1 ? '' : 's'} · ${wsdl.unresolvedImports} imported file${wsdl.unresolvedImports === 1 ? '' : 's'} not found, so some values are ?`;
+    }
+    return requestCount;
+  },
+  async importWsdlFromUrl(this: ImportExportHost, wsdlUrl: string, options: UrlImportOptions = {}) {
+    const destination = importDestination(this);
+    requireImportDestination(this, destination);
+    const url = normalizeSpecUrl(wsdlUrl);
+    if (!url) throw new Error('Enter a URL to import from.');
+    const { wsdlNameFromUrl } = await import('../../wsdl');
+    const { body, url: finalUrl } = await fetchImportDocument(url, options, WSDL_ACCEPT);
+    requireImportDestination(this, destination);
+    return this.importWsdlPayload(body, wsdlNameFromUrl(url), destination, {
+      base: finalUrl,
+      load: async location => {
+        const fetched = await fetchImportDocument(location, options, WSDL_ACCEPT);
+        return { text: fetched.body, url: fetched.url };
+      },
+    });
+  },
+  async openWsdlUrlImport(this: ImportExportHost) {
+    if (!this.guardWorkspaceWritable('Importing')) return;
+    const entered = await this.openPromptWithToggleDialog(
+      'Import WSDL from URL',
+      'Paste a link to a WSDL 1.1 document. Kurlo fetches it and builds a SOAP request for every operation.',
+      'https://example.com/Service.svc?wsdl',
+      'Import',
+      { label: 'Skip TLS certificate check', hint: 'For self-signed or internal certificates. Only use it for a server you trust.' },
+    );
+    if (!entered?.value.trim()) return;
+    this.collectionImportToast = 'Fetching WSDL…';
+    try {
+      this.collectionImportSummary = '';
+      const count = await this.importWsdlFromUrl(entered.value, { skipTlsVerification: entered.checked });
+      this.collectionImportToast = this.collectionImportSummary || `Imported ${count} request${count === 1 ? '' : 's'}`;
+    } catch (err) {
+      this.collectionImportToast = '';
+      await this.openAlertDialog('Import from URL failed', err instanceof Error ? err.message : String(err));
+      return;
+    } finally {
+      this.collectionImportSummary = '';
+    }
+    setTimeout(() => (this.collectionImportToast = ''), 3200);
   },
   async importHarPayload(this: ImportExportHost, payload: unknown, fileName: string) {
     const { harCollectionName, harRequestsFromLog } = await import('../../har');
@@ -723,7 +829,7 @@ export const importExportFeature = {
     const reqs = this.requests.filter(r => r.collectionId === collectionId && !r.isDraft);
     this.closeFloatingMenus();
     const label = format === 'swagger2' ? 'Swagger 2.0' : 'OpenAPI 3.0';
-    const exportableReqs = reqs.filter(req => !this.savedRequestIsRealtime(req) && !this.savedRequestIsGraphQL(req) && !['grpc', 'mcp', 'ai', 'kafka'].includes(req.requestType ?? 'http'));
+    const exportableReqs = reqs.filter(req => !this.savedRequestIsRealtime(req) && !this.savedRequestIsGraphQL(req) && !['grpc', 'mcp', 'ai', 'kafka', 'mqtt'].includes(req.requestType ?? 'http'));
     const skippedUnsupported = reqs.length - exportableReqs.length;
     if (!exportableReqs.length) {
       await this.openAlertDialog(`${label} export skipped`, `${label} export only supports HTTP and SSE requests. GraphQL, gRPC, MCP, AI and realtime requests are not written to the spec.`);

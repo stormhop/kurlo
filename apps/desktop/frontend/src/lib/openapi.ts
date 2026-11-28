@@ -64,7 +64,7 @@ function resolveLocalRef(root: unknown, ref: string): unknown {
   }, root);
 }
 
-function deref(root: unknown, value: unknown, seen = new Set<string>()): unknown {
+export function deref(root: unknown, value: unknown, seen = new Set<string>()): unknown {
   if (!isRecord(value) || typeof value.$ref !== 'string') return value;
   if (seen.has(value.$ref)) return value;
   seen.add(value.$ref);
@@ -82,7 +82,7 @@ function firstExample(examples: unknown): unknown {
   return resolved;
 }
 
-function schemaExample(schemaValue: unknown, root: unknown, depth = 0): unknown {
+export function schemaExample(schemaValue: unknown, root: unknown, depth = 0): unknown {
   if (depth > 8) return {};
   const schema = deref(root, schemaValue);
   if (!isRecord(schema)) return {};
@@ -124,7 +124,7 @@ function schemaExample(schemaValue: unknown, root: unknown, depth = 0): unknown 
   return 'string';
 }
 
-function stringifyJson(value: unknown) {
+export function stringifyJson(value: unknown) {
   if (typeof value === 'string') {
     try {
       JSON.parse(value);
@@ -800,7 +800,7 @@ function isGraphQLExportRequest(req: SavedRequest): boolean {
 }
 
 function isNonHttpExportRequest(req: SavedRequest): boolean {
-  return req.requestType === 'kafka' || req.requestType === 'grpc' || req.requestType === 'mcp' || req.requestType === 'ai';
+  return req.requestType === 'kafka' || req.requestType === 'mqtt' || req.requestType === 'grpc' || req.requestType === 'mcp' || req.requestType === 'ai';
 }
 
 function isOpenApiExportableRequest(req: SavedRequest): boolean {

@@ -20,7 +20,9 @@ var importFileFilters = map[string]runtime.FileFilter{
 	"postman":  {DisplayName: "Postman collection or environment (*.json)", Pattern: "*.json"},
 	"insomnia": {DisplayName: "Insomnia export (*.json, *.yaml)", Pattern: "*.json;*.yaml;*.yml"},
 	"openapi":  {DisplayName: "OpenAPI / Swagger (*.json, *.yaml)", Pattern: "*.json;*.yaml;*.yml"},
+	"asyncapi": {DisplayName: "AsyncAPI (*.json, *.yaml)", Pattern: "*.json;*.yaml;*.yml"},
 	"har":      {DisplayName: "HAR (*.har, *.json)", Pattern: "*.har;*.json"},
+	"wsdl":     {DisplayName: "WSDL (*.wsdl, *.xml)", Pattern: "*.wsdl;*.xml"},
 	"httpfile": {DisplayName: "HTTP file (*.http, *.rest)", Pattern: "*.http;*.rest"},
 }
 

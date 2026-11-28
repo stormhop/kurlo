@@ -807,7 +807,7 @@
     class="hidden-file-input"
     bind:this={vm._postmanImportInput}
     type="file"
-    accept=".json,.yaml,.yml,.bru,.http,.rest,.har,application/json,application/yaml,text/yaml,text/x-yaml"
+    accept=".json,.yaml,.yml,.bru,.http,.rest,.har,.wsdl,.xml,application/json,application/yaml,text/yaml,text/x-yaml"
     onchange={vm.onPostmanImportFile}
   />
 

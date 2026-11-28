@@ -1,6 +1,13 @@
 import { parseYaml } from './yaml';
 
-export type ImportSource = 'bruno' | 'postman' | 'insomnia' | 'openapi' | 'har' | 'httpfile';
+export type ImportSource = 'bruno' | 'postman' | 'insomnia' | 'openapi' | 'asyncapi' | 'har' | 'httpfile' | 'wsdl';
+
+export function isWsdlDocument(text: string): boolean {
+  const head = text.replace(/^\uFEFF/, '').trimStart();
+  if (!head.startsWith('<')) return false;
+  return /<([\w.-]+:)?definitions[\s>]/.test(head) && head.includes('http://schemas.xmlsoap.org/wsdl/')
+    || /<([\w.-]+:)?description[\s>]/.test(head) && head.includes('http://www.w3.org/ns/wsdl');
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -21,6 +28,7 @@ function parseDocument(text: string): unknown {
 function sourceFromDocument(document: unknown): ImportSource | null {
   if (!isRecord(document)) return null;
   if (typeof document.openapi === 'string' || typeof document.swagger === 'string') return 'openapi';
+  if (typeof document.asyncapi === 'string') return 'asyncapi';
   if (isRecord(document.log) && Array.isArray(document.log.entries)) return 'har';
   if (document._type === 'export' || document.__export_format !== undefined) return 'insomnia';
   if (isRecord(document.info) && (document.info._postman_id !== undefined || /postman/i.test(String(document.info.schema ?? '')))) return 'postman';
@@ -32,6 +40,7 @@ export function detectImportSource(fileName: string, text: string): ImportSource
   const extension = fileName.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? '';
   if (extension === 'http' || extension === 'rest') return 'httpfile';
   if (extension === 'bru') return 'bruno';
+  if (extension === 'wsdl' || isWsdlDocument(text)) return 'wsdl';
   const fromDocument = sourceFromDocument(parseDocument(text));
   if (fromDocument === 'insomnia' && !text.trimStart().startsWith('{')) return null;
   if (fromDocument) return fromDocument;

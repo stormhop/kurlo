@@ -812,6 +812,10 @@ class AppVM {
   declare importPostmanV3Files: typeof importExportFeature.importPostmanV3Files;
   declare importOpenCollectionFiles: typeof importExportFeature.importOpenCollectionFiles;
   declare importHarPayload: typeof importExportFeature.importHarPayload;
+  declare importAsyncApiPayload: typeof importExportFeature.importAsyncApiPayload;
+  declare importWsdlPayload: typeof importExportFeature.importWsdlPayload;
+  declare importWsdlFromUrl: typeof importExportFeature.importWsdlFromUrl;
+  declare openWsdlUrlImport: typeof importExportFeature.openWsdlUrlImport;
   declare importRequestsPayload: typeof importExportFeature.importRequestsPayload;
   declare importCollectionBundle: typeof importExportFeature.importCollectionBundle;
   declare importPostmanVariableBundle: typeof importExportFeature.importPostmanVariableBundle;

@@ -63,7 +63,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await openCollectionImport(page);
     const importDialog = page.getByRole('dialog', { name: 'Import collection' });
     await expect(importDialog).toBeVisible();
-    for (const source of ['Bruno / OpenCollection', 'Postman collection', 'Insomnia export', 'OpenAPI / Swagger', 'HAR from DevTools']) {
+    for (const source of ['Bruno / OpenCollection', 'Postman collection', 'Insomnia export', 'OpenAPI / Swagger', 'WSDL / SOAP', 'HAR from DevTools']) {
       await expect(importDialog).toContainText(source);
     }
     await captureDocsScreenshot(page, 'import-postman');

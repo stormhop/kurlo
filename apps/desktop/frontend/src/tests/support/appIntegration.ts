@@ -127,6 +127,7 @@ const backend = vi.hoisted(() => {
     hasNativeImportDialog: vi.fn(() => false),
     chooseImportFile: vi.fn(async () => ({ path: '', name: '', content: '', error: '' })),
     readImportFile: vi.fn(async (path: string) => ({ path, name: '', content: '', error: 'missing' })),
+    inspectRequestFile: vi.fn(async (path: string) => ({ path: path.replace(/^\/work\//, ''), absolutePath: path, name: '', size: 0, contentType: '', exists: true, insideWorkspace: path.startsWith('/work/') })),
     openDirectoryDialog: vi.fn(async () => ''),
     readCollectionTextFiles: vi.fn(async (root: string) => ({ root, name: '', files: [] as Array<{ path: string; content: string }>, error: 'missing' })),
     saveFileDialog: vi.fn(async (name: string, content: string) => {

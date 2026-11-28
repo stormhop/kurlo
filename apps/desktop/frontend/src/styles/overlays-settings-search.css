@@ -18,6 +18,10 @@
   overflow: hidden;
 }
 
+.app-dialog.wide {
+  width: min(46rem, 100%);
+}
+
 .dialog-head {
   display: flex;
   align-items: center;
@@ -132,6 +136,11 @@
   display: grid;
   gap: var(--space-0-5);
   margin: var(--space-3) var(--space-2-5) 0;
+}
+
+.dialog-choice-grid.columns {
+  grid-template-columns: repeat(auto-fill, minmax(min(19rem, 100%), 1fr));
+  align-items: stretch;
 }
 
 .dialog-choice-card {

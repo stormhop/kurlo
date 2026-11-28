@@ -2,6 +2,7 @@ import { backend, TestApp } from './support/appIntegration';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { type SavedRequest } from '../lib/types/models';
 import { detectImportSource } from '../lib/importSource';
+import { fileUrlFromPath, pathFromFileUrl } from '../lib/stores/features/importExport';
 import { addFileDropZone, blockExternalDropNavigation, dispatchFileDrop, installFileDrop } from '../lib/fileDrop';
 
 const httpFile = `### Login
@@ -134,6 +135,25 @@ describe('blockExternalDropNavigation', () => {
   });
 });
 
+describe('importing an AsyncAPI document', () => {
+  it('builds a Kafka collection and links the spec as the message schema', async () => {
+    const app = newApp();
+    vi.mocked(backend.hasNativeImportDialog).mockReturnValue(true);
+    const spec = 'asyncapi: 3.0.0\ninfo:\n  title: Orders\nservers:\n  dev:\n    host: localhost:9092\n    protocol: kafka\nchannels:\n  orders:\n    address: orders\n    messages:\n      created:\n        payload:\n          type: object\n          properties:\n            id: { type: integer, example: 7 }\noperations:\n  placeOrder:\n    action: receive\n    channel:\n      $ref: \'#/channels/orders\'\n';
+    vi.mocked(backend.chooseImportFile).mockResolvedValueOnce({ path: '/work/specs/orders.yaml', name: 'orders.yaml', content: spec, error: '' });
+
+    app.selects.push('asyncapi');
+    await app.openPostmanImport();
+
+    expect(backend.chooseImportFile).toHaveBeenCalledWith('asyncapi');
+    expect(app.collections.map((collection: { name: string }) => collection.name)).toEqual(['Orders']);
+    const [request] = app.requests as SavedRequest[];
+    expect(request).toMatchObject({ name: 'placeOrder', requestType: 'kafka', url: '{{brokers}}', bodyContent: '{\n  "id": 7\n}' });
+    expect(request.kafka).toMatchObject({ mode: 'produce', topic: 'orders', schemaPath: 'specs/orders.yaml' });
+    expect(app.collections[0].defaults.variables.map((row: { key: string; value: string }) => [row.key, row.value])).toEqual([['brokers', 'localhost:9092']]);
+  });
+});
+
 describe('importing .http files from disk', () => {
   it('uses the native dialog filtered to .http files and keeps the scripts', async () => {
     const app = newApp();
@@ -191,5 +211,138 @@ describe('importing .http files from disk', () => {
     await app.importDroppedFiles(['/work/dropped.http']);
     expect(app.collections.map((collection: { name: string }) => collection.name)).toEqual(['dropped']);
     expect((app.requests as SavedRequest[]).map(request => request.url)).toEqual(['https://api.example.com/ping']);
+  });
+});
+
+const pingWsdl = `<?xml version="1.0"?>
+<definitions name="Ping" xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn:ping" targetNamespace="urn:ping">
+  <message name="PingIn"><part name="text" type="xsd:string"/></message>
+  <portType name="PingPort"><operation name="Ping"><input message="tns:PingIn"/></operation></portType>
+  <binding name="PingBinding" type="tns:PingPort">
+    <soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="Ping"><soap:operation soapAction="urn:ping#Ping"/><input><soap:body use="literal" namespace="urn:ping"/></input></operation>
+  </binding>
+  <service name="PingService"><port name="PingPort" binding="tns:PingBinding"><soap:address location="https://soap.example.com/ping"/></port></service>
+</definitions>`;
+
+describe('importing a WSDL', () => {
+  it('builds a SOAP collection from the import dialog', async () => {
+    const app = newApp();
+    vi.mocked(backend.hasNativeImportDialog).mockReturnValue(true);
+    vi.mocked(backend.chooseImportFile).mockResolvedValueOnce({ path: '/work/ping.wsdl', name: 'ping.wsdl', content: pingWsdl, error: '' });
+
+    app.selects.push('wsdl');
+    await app.openPostmanImport();
+
+    expect(backend.chooseImportFile).toHaveBeenCalledWith('wsdl');
+    expect(app.collectionImportToast).toBe('Imported 1 request');
+    expect(app.collections.map((collection: { name: string }) => collection.name)).toEqual(['Ping']);
+    const [request] = app.requests as SavedRequest[];
+    expect(request).toMatchObject({ name: 'Ping', requestType: 'http', method: 'POST', url: 'https://soap.example.com/ping', bodyType: 'xml', requestTab: 'body' });
+    expect(request.headers.map(row => `${row.key}: ${row.value}`)).toEqual(['Content-Type: text/xml; charset=utf-8', 'SOAPAction: "urn:ping#Ping"']);
+    expect(request.bodyContent).toContain('<tns:Ping>\n      <text>?</text>\n    </tns:Ping>');
+    expect(backend.state.savedStores.at(-1)).toBeTruthy();
+  });
+
+  it('imports a dropped WSDL file', async () => {
+    const app = newApp();
+    vi.mocked(backend.readImportFile).mockResolvedValueOnce({ path: '/work/Service.xml', name: 'Service.xml', content: pingWsdl, error: '' });
+
+    await app.importDroppedFiles(['/work/Service.xml']);
+
+    expect(app.collections.map((collection: { name: string }) => collection.name)).toEqual(['Ping']);
+    expect((app.requests as SavedRequest[]).map(request => request.name)).toEqual(['Ping']);
+  });
+
+  it('fetches a WSDL from a URL', async () => {
+    const app = newApp();
+    vi.mocked(backend.sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, status: '200 OK', body: pingWsdl, headers: [{ key: 'Content-Type', value: 'text/xml' }] } as never);
+
+    app.selects.push('wsdl-url');
+    app.prompts.push('soap.example.com/ping.asmx?wsdl');
+    app.toggles.push(true);
+    await app.openPostmanImport();
+
+    const sent = vi.mocked(backend.sendHttpRequest).mock.calls.at(-1)![0];
+    expect(sent).toMatchObject({ method: 'GET', url: 'https://soap.example.com/ping.asmx?wsdl', enableSSLVerification: false });
+    expect(sent.headers[0].value).toContain('application/wsdl+xml');
+    expect(app.collectionImportToast).toBe('Imported 1 request');
+    expect((app.requests as SavedRequest[]).map(request => request.url)).toEqual(['https://soap.example.com/ping']);
+  });
+
+  it('shows why a WSDL from a URL could not be imported', async () => {
+    const app = newApp();
+    vi.mocked(backend.sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, status: '200 OK', body: '<html><body>Service</body></html>', headers: [] } as never);
+
+    app.selects.push('wsdl-url');
+    app.prompts.push('https://soap.example.com/ping.asmx');
+    await app.openPostmanImport();
+
+    expect(app.alerts.at(-1)).toMatchObject({ title: 'Import from URL failed', message: expect.stringContaining('WSDL 1.1') });
+    expect(app.collections).toHaveLength(0);
+  });
+});
+
+const splitRoot = `<definitions name="Split" xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="urn:split" targetNamespace="urn:split">
+  <import namespace="urn:split" location="parts/messages.wsdl"/>
+  <service name="Split"><port name="P" binding="tns:B"><soap:address location="https://soap.example.com/split"/></port></service>
+</definitions>`;
+const splitMessages = `<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn:split" targetNamespace="urn:split">
+  <types><xsd:schema targetNamespace="urn:split" elementFormDefault="qualified"><xsd:element name="Hello"><xsd:complexType><xsd:sequence><xsd:element name="who" type="xsd:string"/></xsd:sequence></xsd:complexType></xsd:element></xsd:schema></types>
+  <message name="HelloIn"><part name="p" element="tns:Hello"/></message>
+  <portType name="T"><operation name="Hello"><input message="tns:HelloIn"/></operation></portType>
+  <binding name="B" type="tns:T"><soap:binding transport="http://schemas.xmlsoap.org/soap/http"/><operation name="Hello"><soap:operation soapAction="urn:split#Hello"/><input><soap:body use="literal"/></input></operation></binding>
+</definitions>`;
+
+describe('importing a WSDL that imports other files', () => {
+  it('reads imported files next to a WSDL on disk', async () => {
+    const app = newApp();
+    vi.mocked(backend.readImportFile).mockImplementation(async (path: string) => (
+      path === '/work/my wsdl/split.wsdl'
+        ? { path, name: 'split.wsdl', content: splitRoot, error: '' }
+        : path === '/work/my wsdl/parts/messages.wsdl'
+          ? { path, name: 'messages.wsdl', content: splitMessages, error: '' }
+          : { path, name: '', content: '', error: `${path} not found` }
+    ));
+
+    await app.importDroppedFiles(['/work/my wsdl/split.wsdl']);
+
+    const [request] = app.requests as SavedRequest[];
+    expect(request.name).toBe('Hello');
+    expect(request.bodyContent).toContain('<tns:Hello>\n      <tns:who>?</tns:who>\n    </tns:Hello>');
+  });
+
+  it('reports a missing imported file', async () => {
+    const app = newApp();
+    vi.mocked(backend.readImportFile).mockImplementation(async (path: string) => (
+      path.endsWith('split.wsdl') ? { path, name: 'split.wsdl', content: splitRoot, error: '' } : { path, name: '', content: '', error: 'no such file' }
+    ));
+
+    await app.importDroppedFiles(['/work/split.wsdl']);
+
+    expect(app.collectionImportToast).toBe('Import failed: Kurlo could not load parts/messages.wsdl, which the WSDL imports: no such file');
+    expect(app.collections).toHaveLength(0);
+  });
+
+  it('fetches the imports of a WSDL from a URL', async () => {
+    const app = newApp();
+    vi.mocked(backend.sendHttpRequest)
+      .mockResolvedValueOnce({ statusCode: 200, status: '200 OK', body: splitRoot, headers: [] } as never)
+      .mockResolvedValueOnce({ statusCode: 200, status: '200 OK', body: splitMessages, headers: [] } as never);
+
+    app.selects.push('wsdl-url');
+    app.prompts.push('https://soap.example.com/svc/split.wsdl');
+    await app.openPostmanImport();
+
+    const urls = vi.mocked(backend.sendHttpRequest).mock.calls.slice(-2).map(([sent]) => sent.url);
+    expect(urls).toEqual(['https://soap.example.com/svc/split.wsdl', 'https://soap.example.com/svc/parts/messages.wsdl']);
+    expect(app.collectionImportToast).toBe('Imported 1 request');
+  });
+
+  it('turns file paths into file URLs and back', () => {
+    expect(fileUrlFromPath('/work/my wsdl/a#b.wsdl')).toBe('file:///work/my%20wsdl/a%23b.wsdl');
+    expect(pathFromFileUrl(new URL('parts/x.xsd', fileUrlFromPath('/work/my wsdl/a#b.wsdl')).toString())).toBe('/work/my wsdl/parts/x.xsd');
+    expect(fileUrlFromPath('C:\\Services\\calc.wsdl')).toBe('file:///C:/Services/calc.wsdl');
+    expect(pathFromFileUrl(new URL('types.xsd', fileUrlFromPath('C:\\Services\\calc.wsdl')).toString())).toBe('C:/Services/types.xsd');
   });
 });

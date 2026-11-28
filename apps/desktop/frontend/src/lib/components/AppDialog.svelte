@@ -32,6 +32,7 @@
   } = $props();
 
   let richSelect = $derived(dialog.mode === 'select' && Boolean(dialog.options?.some(option => option.icon || option.description)));
+  let choiceColumns = $derived(richSelect && (dialog.options?.length ?? 0) > 5);
 
   const KIND_LABELS: Record<string, string> = {
     http: 'HTTP',
@@ -44,7 +45,7 @@
 </script>
 
 <div class="dialog-backdrop dialog-backdrop-top" role="presentation" onmousedown={(event) => event.target === event.currentTarget && onDismiss()}>
-  <div class="modal app-dialog" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title" tabindex="-1" use:trapFocus>
+  <div class="modal app-dialog" class:wide={choiceColumns} role="dialog" aria-modal="true" aria-labelledby="app-dialog-title" tabindex="-1" use:trapFocus>
     <div class="modal-head dialog-head">
       <h2 class="modal-title" id="app-dialog-title">{dialog.title}</h2>
       <button type="button" class="btn btn-ghost btn-icon dialog-close" onclick={onDismiss} aria-label="Close dialog"><AddCloseIcon /></button>
@@ -74,7 +75,7 @@
     {/if}
     {#if dialog.mode === 'select' && dialog.options}
       {#if richSelect}
-        <div class="dialog-choice-grid" role="radiogroup" aria-label={dialog.title}>
+        <div class="dialog-choice-grid" class:columns={choiceColumns} role="radiogroup" aria-label={dialog.title}>
           {#each dialog.options as opt, eachIndex (eachIndex)}
             <button
               class="dialog-choice-card"
@@ -123,6 +124,17 @@
                     <circle cx="13" cy="5" r="2" stroke="currentColor" stroke-width="1.35"/>
                     <circle cx="9" cy="13" r="2" stroke="currentColor" stroke-width="1.35"/>
                     <path d="M6.7 6.4l1.6 4M11.3 6.4l-1.6 4M7 5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                  </svg>
+                {:else if opt.icon === 'asyncapi'}
+                  <svg width="1.375rem" height="1.375rem" viewBox="0 0 18 18" fill="none">
+                    <circle cx="9" cy="9" r="1.6" stroke="currentColor" stroke-width="1.35"/>
+                    <path d="M6.1 6.1a4.1 4.1 0 000 5.8M11.9 6.1a4.1 4.1 0 010 5.8M3.9 3.9a7.2 7.2 0 000 10.2M14.1 3.9a7.2 7.2 0 010 10.2" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+                  </svg>
+                {:else if opt.icon === 'wsdl'}
+                  <svg width="1.375rem" height="1.375rem" viewBox="0 0 18 18" fill="none">
+                    <path d="M3.2 5.2h11.6v8.6H3.2V5.2z" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/>
+                    <path d="M3.5 5.6L9 9.8l5.5-4.2" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M7 3.2h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
                   </svg>
                 {:else if opt.icon === 'har'}
                   <svg width="1.375rem" height="1.375rem" viewBox="0 0 18 18" fill="none">

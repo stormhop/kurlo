@@ -234,3 +234,18 @@ describe('openPromptWithToggleDialog', () => {
     await expect(pending).resolves.toBeNull();
   });
 });
+
+describe('importWsdlFromUrl after a redirect', () => {
+  it('resolves imported schemas against the address the WSDL was served from', async () => {
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({
+      statusCode: 200, body: '<definitions/>', headers: [],
+      sentRequests: [{ url: 'https://svc.example.test/catalog' }, { url: 'https://svc.example.test/service/meta/endpoint.wsdl' }],
+    } as never);
+    const host = { ...urlImportHost(), importWsdlPayload: vi.fn(async () => 1) };
+    await importExportFeature.importWsdlFromUrl.call(host as never, 'https://svc.example.test/catalog');
+    const origin = (host.importWsdlPayload.mock.calls[0] as unknown[])[3] as { base: string; load: (url: string) => Promise<unknown> };
+    expect(origin.base).toBe('https://svc.example.test/service/meta/endpoint.wsdl');
+    vi.mocked(sendHttpRequest).mockResolvedValueOnce({ statusCode: 200, body: '<schema/>', headers: [] } as never);
+    expect(await origin.load('https://svc.example.test/service/meta/types.xsd')).toEqual({ text: '<schema/>', url: 'https://svc.example.test/service/meta/types.xsd' });
+  });
+});

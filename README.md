@@ -65,7 +65,7 @@ or `OPTIONS` waits for your approval, and the model never sees your secrets.
 - **Free for a team of any size.** There is no paid plan to grow into and no account to create. A team shares a
   workspace through any Git host, and every request is a readable YAML file that gets reviewed in the same pull request
   as the API change.
-- **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI or HAR file. `pm.test`,
+- **Your Postman collections keep working.** Import a Postman, Insomnia, Bruno, OpenAPI, WSDL or HAR file. `pm.test`,
   `pm.expect` with chai, `pm.sendRequest` and `require('lodash')` run as they were written.
 - **Share an API reference.** Turn a collection into a searchable HTML file with saved requests and responses. Open it
   offline or publish it to a static host.
@@ -134,6 +134,7 @@ Guides, the scripting reference, and the YAML workspace format live in the **[do
   tools, resources and prompts, seeds the arguments from the tool's schema, and shows the raw JSON-RPC exchange
 - Import Postman v2 JSON or v3 Native Git folders, Insomnia v4, Bruno/OpenCollection, OpenAPI/Swagger, HAR, cURL, and
   all-data backups
+- WSDL import — a SOAP 1.1 or 1.2 request with a sample envelope for every operation, from a file or a `?wsdl` link
 - OpenAPI/Swagger imports from a link as well as a file — paste the spec URL and Kurlo fetches it and builds the
   collection
 - OpenAPI sync — keep a collection linked to its spec URL or file, review new, changed and removed endpoints with a

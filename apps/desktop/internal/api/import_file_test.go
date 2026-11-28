@@ -14,7 +14,7 @@ func TestImportDialogOptionsFilterBySource(t *testing.T) {
 	if len(httpFile.Filters) != 1 || httpFile.Filters[0].Pattern != "*.http;*.rest" {
 		t.Fatalf("httpfile filters = %+v", httpFile.Filters)
 	}
-	for _, source := range []string{"postman", "insomnia", "openapi", "har"} {
+	for _, source := range []string{"postman", "insomnia", "openapi", "asyncapi", "har", "wsdl"} {
 		if len(importDialogOptions(source).Filters) != 1 {
 			t.Errorf("%s has no filter", source)
 		}
