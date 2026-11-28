@@ -15,9 +15,14 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Added
 
+- **Interactive gRPC streaming.** On client-streaming and bidirectional methods, **Invoke** opens the stream, **Send** sends the editor's message and **End stream** half-closes it, with replies shown as they arrive. [Interactive streaming](/docs/guides/request-types/grpc/#interactive-streaming).
+- **GraphQL subscriptions.** Run a `subscription` operation from a GraphQL request with **Subscribe**. Kurlo uses the `graphql-ws` protocol over WebSocket, or the older `subscriptions-transport-ws` one, sends an optional connection payload and shows each event live. [GraphQL subscriptions](/docs/guides/request-types/graphql/#subscriptions).
 - **Variable hover card.** Hover over a `{{variable}}` to see its value and where it comes from, then edit, remove or add it in place. [Variable scopes](/docs/guides/environments/scopes/#check-a-variable-from-a-field).
 - **Manual update checks.** Choose **Manual** in **Settings → About → Update mode** to check only when you press **Check for updates**.
-- **Kafka requests.** Produce a record or stream records from selected topics and partitions. The request timeout covers connecting to the brokers and looking up partitions for a consumer, which can then wait for records until its stop condition. Inspect values, headers and offsets, validate JSON against a local schema, and run saved Kafka requests in collections or with `kurlo run`.
+- **MQTT requests.** Connect to an MQTT 3.1, 3.1.1 or 5 broker, directly or through a proxy, subscribe to topics, publish messages and watch them live. [MQTT requests](/docs/guides/request-types/mqtt/).
+- **Kafka requests.** Produce a record or stream records from selected topics and partitions. The request timeout covers connecting to the brokers and looking up partitions for a consumer, which can then wait for records until its stop condition. In the Collection Runner, `kurlo run` and MCP tools, a consumer that stops after a record count also stops when no record arrives within the request timeout. A rejected SASL sign-in is reported at once. Inspect values, headers and offsets, validate JSON against a local schema, which stops a producer from sending a message that breaks it, and run saved Kafka requests in collections or with `kurlo run`.
+- **Kafka and MQTT collections from AsyncAPI.** Import an AsyncAPI 2.x or 3.x document to get Kafka producers and consumers with example messages, a `{{brokers}}` variable or one per cluster a channel names, SASL auth and schema validation, or an MQTT session with its subscriptions, saved messages and broker settings. [Import AsyncAPI](/docs/guides/import-export/asyncapi/).
+- **SOAP requests from WSDL.** Import a WSDL 1.1 file or URL to get a SOAP 1.1 or 1.2 request for each operation, with its `SOAPAction` header and a sample envelope. Imported WSDL and schema files are followed, and WS-Addressing headers are added where the binding needs them. [Import WSDL](/docs/guides/import-export/wsdl/).
 - **KeePassXC secret provider.** Read variables from the running KeePassXC app through `keepassxc-proxy`, matched by the entry URL. [KeePassXC](/docs/guides/environments/secret-managers/#keepassxc).
 - **Named body variants.** Keep up to five payloads for one HTTP request, load or send one from **Body → Saved**, and share them in Git. [Switch between body variants](/docs/guides/request-types/http/#switch-between-body-variants).
 - **Rename folders in place** by double-clicking their name in the sidebar. [Collections](/docs/guides/workspaces/collections/).
@@ -26,15 +31,24 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 
 ### Changed
 
+- **Narrower gRPC method picker.** The target field gets most of the row, and the method label starts at the left.
+- **Protocol of saved requests.** A saved request with a URL, or an AI request that uses a Kurlo AI connection, keeps its protocol again, so switching cannot drop its settings. Drafts can still switch. [Choose a request type](/docs/guides/request-types/choose/).
+
 - **Load test layout.** **Export k6 script** is in the arrow beside **Run with k6**, steps are reordered by dragging, and waits are shown between steps. [Build the flow](/docs/guides/load-testing/flow/).
+- **Import dialog in two columns**, with related sources side by side. [Import & export](/docs/guides/import-export/).
 - **Protocol icons.** GraphQL, WebSocket, Socket.IO, gRPC, Kafka, MCP and AI requests show their own icon in the sidebar, tabs, search and the Collection Runner. HTTP requests keep their method. [Choose a request type](/docs/guides/request-types/choose/).
 - **Linked variables by environment.** A secret provider used by many variables lists them by environment, and saved credentials show readable names.
 - **Consistent controls.** Dropdowns for auth type, body and message types, encoding, the message filter and the snippet language behave the same as every other dropdown, and close, check and chevron icons match across the app.
 - **Editor errors** mark the line number in red, show the message with its line on hover, and point to an error scrolled out of view.
 - **File fields.** **Form data** file rows and the OpenAPI spec source take a dropped file, keep a workspace-relative path with `{{variables}}` and flag a missing file. [Send a file as the body](/docs/guides/request-types/http/#send-a-file-as-the-body).
+- **MCP tab order.** **Examples** comes before **File** and **Settings**, as in HTTP requests.
 
 ### Fixed
 
+- **Connecting while switching tabs.** A WebSocket or Socket.IO request no longer takes the URL and settings of a tab you switch to right after pressing **Connect**.
+- **Disconnect while connecting.** **Disconnect** stops a Socket.IO connection that is still getting ready.
+- **Encoded parameter names.** Editing a parameter value in **Params** no longer encodes a name such as `filter%5Bstatus%5D` a second time.
+- **Saved menu next to a short editor.** The **Saved** menu of body variants and WebSocket, Socket.IO and MQTT messages stays on screen above the response panel instead of being cut off by the editor.
 - **Startup colours** match your theme for every theme, instead of flashing the default light or dark screen first.
 - **Cookie table header** stays at the top edge when you scroll a long list instead of leaving a gap that rows showed through.
 - **Accent buttons in light themes** keep the theme's colour on hover instead of turning violet.
@@ -47,6 +61,9 @@ attached to every published tag, use the [Kurlo releases page](https://github.co
 - **Collection Runner** exposes collection names to macOS accessibility tools.
 - **Editor caret** follows a deleted character at once in every code editor.
 - **Folding** a block keeps the caret on its line and the editor focused.
+- **Collection Runner** shows the collection's name as its title and says when a collection has no requests, instead of blaming the filters.
+- **Clear all cookies** asks before it deletes the jar. [Manage cookies](/docs/guides/cookies/manage/).
+- **Confirmation buttons** name their action, such as **Abort** or **Discard** in Git, and are red for every action that cannot be undone.
 
 ## 3.2.0
 
