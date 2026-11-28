@@ -1,4 +1,5 @@
 import { addRequestFromFolder, chooseRequestSection, chooseRequestType, collectionRow, fillCodeEditor, fillPrompt, folderRow } from './support/actions';
+import { reviewShot } from './support/reviewShot';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -263,7 +264,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(row).toHaveText('Renamed request');
     await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.requests as Array<{ name: string }>)[0].name)).toBe('Renamed request');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-manual-name-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-manual-name-${testInfo.project.name}.png`), animations: 'disabled' });
   });
 
   test('applies the headers and auth a folder sets to the requests inside it', async ({ page }) => {
@@ -665,7 +666,7 @@ test.describe('Starred requests', () => {
         return corners.every(([x, y]) => node.contains(document.elementFromPoint(x, y)));
       });
       expect(menuShown).toBe(true);
-      await page.screenshot({ path: join(tmpdir(), `kurlo-starred-40-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-starred-40-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
 
       await menu.getByRole('button', { name: 'Unstar' }).click();
       await expect(page.getByRole('button', { name: 'Starred 39' })).toBeVisible();
@@ -752,9 +753,9 @@ test('signs a request with JWT Bearer auth and previews the token', async ({ pag
   await captureDocsScreenshot(page, 'auth-jwt');
   if (!docsScreenshotDir) {
     await page.getByLabel('Auth Type').scrollIntoViewIfNeeded();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-auth-jwt-top-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-auth-jwt-top-${testInfo.project.name}.png`), animations: 'disabled' });
     await inspector.scrollIntoViewIfNeeded();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-auth-jwt-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-auth-jwt-${testInfo.project.name}.png`), animations: 'disabled' });
   }
 
   await page.getByRole('radio', { name: 'Query string' }).check();
@@ -784,7 +785,7 @@ test('checks a response with assertions and sends them with the request', async 
   await chooseRequestSection(page, 'Scripts');
   await page.getByRole('tab', { name: 'Assertions' }).click();
   await expect(page.locator('.assertions-empty')).toContainText('Check the response without code');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-assertions-empty-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-assertions-empty-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.getByRole('button', { name: 'Status is 200', exact: true }).click();
   await page.getByRole('button', { name: 'JSON response', exact: true }).click();
   await page.getByRole('button', { name: 'Assertion', exact: true }).click();
@@ -797,7 +798,7 @@ test('checks a response with assertions and sends them with the request', async 
   await rows.nth(1).getByLabel('Enable assertion').uncheck();
   await expect(page.getByRole('tab', { name: /Assertions\s*3/ })).toBeVisible();
   await captureDocsScreenshot(page, 'request-assertions');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-assertions-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-assertions-${testInfo.project.name}.png`), animations: 'disabled' });
 
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1)?.assertions)).toEqual([
@@ -838,7 +839,7 @@ for (const count of [200, 250]) {
     await page.getByRole('option', { name: 'equals', exact: true }).click();
     await last.getByLabel('Expected value').fill('42');
     expect(Date.now() - started).toBeLessThan(5000);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-assertions-${count}-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-assertions-${count}-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.keyboard.press('Control+s');
     await expect.poll(() => page.evaluate(() => (window as any).__kurloE2E.store.requests.find((request: { id: string }) => request.id === 'checked')?.assertions?.length)).toBe(count);
     await expect.poll(() => page.evaluate(() => (window as any).__kurloE2E.store.requests.find((request: { id: string }) => request.id === 'checked')?.assertions?.at(-1))).toMatchObject({ operator: 'eq', value: '42' });
@@ -868,7 +869,7 @@ test('takes a {{variable}} in the bearer token and shows it instead of dots', as
   await menu.getByRole('option', { name: /token/ }).first().click();
   await expect(token).toHaveValue('{{token}}');
   await expect(token).toHaveAttribute('type', 'text');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-bearer-variable.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-bearer-variable.png'), animations: 'disabled' });
 
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window.__kurloE2E.sentRequests.at(-1) as { auth?: { token?: string } } | undefined)?.auth?.token)).toBe('secret-123');

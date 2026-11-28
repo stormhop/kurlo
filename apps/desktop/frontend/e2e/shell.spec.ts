@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseRequestSection, chooseRequestType, clickTabClose, collectionRow, fillCodeEditor, fillPrompt } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -643,7 +644,7 @@ test.describe('Window title bar', () => {
         await expect(minimise).toBeVisible();
         await expect(page.getByRole('button', { name: 'Maximize' })).toBeVisible();
         expect(await page.locator('.titlebar-drag-region').first().evaluate(el => getComputedStyle(el).getPropertyValue('--wails-draggable').trim())).toBe('drag');
-        await page.screenshot({ path: join(tmpdir(), `kurlo-titlebar-${runtime.split('/')[0]}-${testInfo.project.name}.png`), animations: 'disabled' });
+        await reviewShot(page, { path: join(tmpdir(), `kurlo-titlebar-${runtime.split('/')[0]}-${testInfo.project.name}.png`), animations: 'disabled' });
       } else {
         await expect(minimise).toBeHidden();
       }
@@ -667,7 +668,7 @@ test.describe('Window title bar', () => {
     });
     expect(spot.width).toBeGreaterThanOrEqual(48);
     expect(spot).toMatchObject({ hit: true, drag: 'drag' });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-titlebar-grab-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 1100, height: 60 }, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-titlebar-grab-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 1100, height: 60 }, animations: 'disabled' });
   });
 
   test('keeps one title band with a line across the rail and sidebar on macOS', async ({ page }, testInfo) => {
@@ -715,14 +716,14 @@ test.describe('Window title bar', () => {
     const stripStart = await page.locator('.workspace-searchbar').evaluate(bar => (bar.querySelector('.request-tab-strip') as HTMLElement).getBoundingClientRect().left - bar.getBoundingClientRect().left);
     expect(stripStart).toBeLessThanOrEqual(12.5);
     expect(switcherBox.y + switcherBox.height / 2).toBeCloseTo((open.barLineTop + 1) / 2, 0);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-title-band-darwin-open-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 480, height: 140 }, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-title-band-darwin-open-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 480, height: 140 }, animations: 'disabled' });
     await switcher.click();
     const menu = page.locator('.workspace-menu');
     await expect(menu).toBeVisible();
     const menuBox = (await menu.boundingBox())!;
     expect(menuBox.y).toBeGreaterThan(open.barLineTop);
     expect(await page.evaluate(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('.workspace-menu')), [menuBox.x + menuBox.width - 8, menuBox.y + 20])).toBe(true);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-title-band-darwin-menu-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 560, height: 320 }, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-title-band-darwin-menu-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 560, height: 320 }, animations: 'disabled' });
     await switcher.click();
     await expect(menu).toHaveCount(0);
     await page.getByRole('button', { name: 'Toggle sidebar' }).click();
@@ -733,7 +734,7 @@ test.describe('Window title bar', () => {
     expect(hidden.railLineTop).toBeCloseTo(hidden.barLineTop, 1);
     expect(hidden.buttonTop).toBe(open.buttonTop);
     await page.getByRole('button', { name: 'Collections' }).hover();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-title-band-darwin-hidden-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 480, height: 140 }, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-title-band-darwin-hidden-${testInfo.project.name}.png`), clip: { x: 0, y: 0, width: 480, height: 140 }, animations: 'disabled' });
   });
 
   test('quits with Ctrl+Q on Linux only', async ({ page }) => {

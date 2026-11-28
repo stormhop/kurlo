@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { reviewShot } from './support/reviewShot';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
@@ -21,7 +22,7 @@ test('welcome appears once, survives reload as dismissed and reopens from comman
   await expect(bird).toBeVisible();
   const animations = await bird.evaluate(element => element.getAnimations({ subtree: true }).length);
   expect(animations).toBe(0);
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-welcome-dark.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-welcome-dark.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Skip for now' }).click();
   await expect(page.getByRole('heading', { name: 'Welcome to Kurlo' })).toBeHidden();
   await page.reload();
@@ -74,7 +75,7 @@ test('welcome debug override works for returning users and supports a compact li
   await page.goto('/?welcome=1');
   await expect(page.getByRole('heading', { name: 'Welcome to Kurlo' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Try an example' })).toBeVisible();
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-welcome-light.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-welcome-light.png'), animations: 'disabled' });
   const overflow = await page.locator('.welcome-workspace').evaluate(element => element.scrollWidth > element.clientWidth);
   expect(overflow).toBe(false);
   await page.getByRole('button', { name: 'Skip for now' }).click();

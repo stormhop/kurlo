@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { clickTabClose, collectionRow } from './support/actions';
 
 import { agentStore, connection, installAgentBridge } from './support/agent';
@@ -58,9 +59,9 @@ test.describe("Agent", () => {
     const environmentChip = agentEnvironment.locator('..').locator('..');
     await expect(environmentChip).toHaveClass(/compact/);
     await expect(environmentChip.locator('.agent-composer-chip-icon')).toHaveCSS('color', await agentEnvironment.locator('.env-color-dot').evaluate(node => getComputedStyle(node).backgroundColor));
-    await page.screenshot({ path: join(tmpdir(), `kurlo-environment-agent-compact-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-agent-compact-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 1280, height: 720 });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-environment-agent-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-agent-${testInfo.project.name}.png`), animations: 'disabled' });
     await agentEnvironment.click();
     await page.getByRole('option', { name: stagingName, exact: true }).click();
     await assertColor(agentEnvironment, 'info');
@@ -86,7 +87,7 @@ test.describe("Agent", () => {
     }));
     await page.getByRole('option', { name: /Local/ }).click();
     await expect(page.getByRole('list', { name: 'Pinned environments' }).locator('.env-color-dot')).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-environment-collection-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-collection-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.getByRole('button', { name: 'Revert unsaved changes', exact: true }).click();
 
     await collectionRow(page, 'Shop API').getByLabel('Collection menu').click();
@@ -102,7 +103,7 @@ test.describe("Agent", () => {
     const shortWidth = (await loadEnvironment.boundingBox())!.width;
     const rem = await page.evaluate(() => parseFloat(getComputedStyle(document.documentElement).fontSize));
     expect(shortWidth).toBeCloseTo(12 * rem, 1);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-k6-environment-short-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-k6-environment-short-${testInfo.project.name}.png`), animations: 'disabled' });
     await loadEnvironment.click();
     await expect(page.getByRole('option', { name: stagingName, exact: true })).toContainText(stagingName);
     await page.getByRole('option', { name: stagingName, exact: true }).click();
@@ -112,9 +113,9 @@ test.describe("Agent", () => {
     expect(await label.evaluate(node => node.scrollWidth > node.clientWidth)).toBe(true);
     await expect(loadEnvironment).toHaveAccessibleName(`Environment: ${stagingName}`);
     await assertColor(loadEnvironment, 'info');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-environment-k6-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-k6-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-environment-k6-dark-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-k6-dark-${testInfo.project.name}.png`), animations: 'disabled' });
     await loadEnvironment.click();
     await page.getByRole('option', { name: 'Plain', exact: true }).click();
     await expect(loadEnvironment).not.toHaveClass(/env-colored/);
@@ -178,7 +179,7 @@ test.describe("Agent", () => {
           await compactChip.hover();
           await expect(compactChip.locator('.agent-composer-chip-icon')).toBeVisible();
           expect(await compactChip.evaluate(chip => getComputedStyle(chip.querySelector('.agent-composer-chip-icon')!).zIndex)).toBe('1');
-          await compactChip.screenshot({ path: join(tmpdir(), `kurlo-chip-hover-${driver || 'kurlo'}-${size.width}.png`) });
+          await reviewShot(compactChip, { path: join(tmpdir(), `kurlo-chip-hover-${driver || 'kurlo'}-${size.width}.png`) });
         }
         const actionOverlap = await main.locator('.agent-composer-actions').evaluate(element => {
           const buttons = [...element.querySelectorAll<HTMLButtonElement>('.agent-picker-trigger, .agent-effort .app-select-trigger, .agent-send')].map(button => button.getBoundingClientRect());
@@ -210,7 +211,7 @@ test.describe("Agent", () => {
         await page.getByRole('menu', { name: 'Templates' }).getByRole('menuitem').first().click();
         await expect(composer).not.toHaveValue('');
         await composer.fill('');
-        await page.screenshot({ path: join(tmpdir(), `kurlo-narrow-${driver || 'kurlo'}-${size.width}-${testInfo.project.name}.png`), animations: 'disabled' });
+        await reviewShot(page, { path: join(tmpdir(), `kurlo-narrow-${driver || 'kurlo'}-${size.width}-${testInfo.project.name}.png`), animations: 'disabled' });
       }
       await page.setViewportSize({ width: 900, height: 540 });
       await page.locator('.agent-chat-main').click();
@@ -230,7 +231,7 @@ test.describe("Agent", () => {
       });
       expect(docked.sideBySide).toBe(true);
       expect(docked.mainWidth).toBeGreaterThan(400);
-      await page.screenshot({ path: join(tmpdir(), `kurlo-docked-details-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-docked-details-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
       await page.setViewportSize({ width: 900, height: 540 });
       await expect(main).toBeHidden();
       await expect(details).toBeVisible();
@@ -238,7 +239,7 @@ test.describe("Agent", () => {
       await page.getByRole('button', { name: 'Toggle chat details' }).click();
       await page.getByRole('button', { name: 'Toggle chat details' }).click();
       await expect(details.getByRole('button', { name: 'Close chat details' })).toBeFocused();
-      await page.screenshot({ path: join(tmpdir(), `kurlo-narrow-details-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-narrow-details-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
       await page.keyboard.press('Escape');
       await expect(details).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Toggle chat details' })).toBeFocused();
@@ -253,7 +254,7 @@ test.describe("Agent", () => {
       await composer.fill('A long prompt that wraps. '.repeat(100));
       await assertFits(main, '.agent-composer-box, .agent-composer-bar button');
       await expect(composer).toHaveCSS('overflow-y', 'auto');
-      await page.screenshot({ path: join(tmpdir(), `kurlo-narrow-zoom-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-narrow-zoom-${driver || 'kurlo'}-${testInfo.project.name}.png`), animations: 'disabled' });
     });
   }
 
@@ -465,7 +466,7 @@ test.describe("Agent", () => {
     await expect(history.getByRole('button', { name: 'Compact chat' })).toBeDisabled();
     await history.getByRole('button', { name: 'Show summary' }).click();
     await expect(history.getByRole('region', { name: 'Chat summary' })).toContainText('List orders request in Shop');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-compact-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-compact-${testInfo.project.name}.png`), animations: 'disabled' });
 
     const composer = page.getByRole('textbox', { name: 'Message the agent' });
     await composer.fill('Rename it to All orders');
@@ -508,7 +509,7 @@ test.describe("Agent", () => {
     expect(atEnd.chatBottom).toBeGreaterThanOrEqual(atEnd.boxTop - 1);
     expect(atEnd.lastBottom).toBeLessThanOrEqual(atEnd.boxTop - 8);
     await chat.evaluate(element => { element.scrollTop = element.scrollHeight - element.clientHeight - 105; });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-composer-edge-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-composer-edge-${testInfo.project.name}.png`), animations: 'disabled' });
   });
 
   test('keeps the approval mode clear of the composer buttons at every width', async ({ page }, testInfo) => {
@@ -533,14 +534,14 @@ test.describe("Agent", () => {
         const rows = new Set([...left, ...right].map(rect => Math.round(rect.top + rect.height / 2))).size;
         return { overlap, clipped, rows: window.innerWidth >= 760 ? rows : 1 };
       }), { message: `width ${width}`, timeout: 3000 }).toEqual({ overlap: false, clipped: false, rows: 1 });
-      if (width === 840 || width === 760) await page.locator('.agent-composer').screenshot({ path: join(tmpdir(), `kurlo-composer-${width}-${testInfo.project.name}.png`) });
+      if (width === 840 || width === 760) await reviewShot(page.locator('.agent-composer'), { path: join(tmpdir(), `kurlo-composer-${width}-${testInfo.project.name}.png`) });
     }
     await page.setViewportSize({ width: 1280, height: 700 });
     await expect(main.locator('.agent-composer-chip.compact')).toHaveCount(0);
     await expect(main.getByRole('button', { name: /^Collection:/ })).toContainText('Any collection');
     await expect(main.getByRole('button', { name: /^Approvals:/ })).toContainText('Ask for changes');
     await page.setViewportSize({ width: 900, height: 700 });
-    await page.locator('.agent-composer').screenshot({ path: join(tmpdir(), `kurlo-composer-mode-${testInfo.project.name}.png`) });
+    await reviewShot(page.locator('.agent-composer'), { path: join(tmpdir(), `kurlo-composer-mode-${testInfo.project.name}.png`) });
   });
 
   test('slides chat details without squeezing content in docked and narrow layouts', async ({ page }, testInfo) => {
@@ -555,7 +556,7 @@ test.describe("Agent", () => {
     const panel = page.locator('.agent-details-shell');
     const selectors = { toggle: '[aria-label="Toggle chat details"]', panel: '.agent-details-shell', content: '.agent-context-panel', main: '.agent-main-slot' };
     expectPanelSlide(await samplePanelSlide(page, selectors), true);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-details-slide-open-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-details-slide-open-${testInfo.project.name}.png`), animations: 'disabled' });
     expectPanelSlide(await samplePanelSlide(page, selectors), false);
     await expect(panel).toBeHidden();
     await expect(panel).toHaveAttribute('inert');
@@ -572,7 +573,7 @@ test.describe("Agent", () => {
     expectPanelSlide(await samplePanelSlide(page, selectors), true);
     await expect(page.locator('.agent-main-slot')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Close chat details' })).toBeFocused();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-details-slide-narrow-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-details-slide-narrow-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');
     await expect(panel).toBeHidden();
     await expect(toggle).toBeFocused();
@@ -613,7 +614,7 @@ test.describe("Agent", () => {
     expect(layout.sideBySide).toBe(true);
     expect(layout.mainWidth).toBeGreaterThan(400);
     expect(layout.panelRight).toBeLessThanOrEqual(1121);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-docked-sidebar-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-docked-sidebar-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.getByRole('button', { name: 'Close chat details' }).click();
     const moved = (await divider.boundingBox())!;
     await page.mouse.move(moved.x + moved.width / 2, moved.y + 200);
@@ -752,7 +753,7 @@ test.describe("Agent", () => {
     await page.getByRole('option', { name: 'Staging', exact: true }).click();
     await collection.click();
     await page.getByRole('option', { name: 'Other API', exact: true }).click();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-workspace-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-workspace-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.getByRole('button', { name: 'Workspace switcher' }).click();
     await page.locator('.workspace-menu-select').filter({ hasText: 'Shop workspace' }).click();
     await page.getByRole('button', { name: 'Agent', exact: true }).click();
@@ -946,7 +947,7 @@ for (const connected of [true, false]) {
       const e2e = window.__kurloE2E as unknown as Record<string, unknown>;
       return Boolean(e2e.finishConnectionCheck && e2e.finishCodexCheck);
     })).toBe(true);
-    if (connected) await page.screenshot({ path: join(tmpdir(), `kurlo-agent-instant-welcome-${testInfo.project.name}.png`), animations: 'disabled' });
+    if (connected) await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-instant-welcome-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.evaluate(() => { (window.__kurloE2E as unknown as { finishConnectionCheck: () => void }).finishConnectionCheck(); });
     await expect(page.getByRole('heading', { name: 'What should we check?' })).toBeVisible();
     await expect(input).toHaveValue('Draft while connections are checked');
@@ -1131,7 +1132,7 @@ test('shows a failed chat deletion in the agent sidebar', async ({ page }) => {
   await expect(menu.getByRole('menuitem', { name: 'Rename' })).toBeFocused();
   await page.keyboard.press('End');
   await expect(menu.getByRole('menuitem', { name: 'Delete' })).toBeFocused();
-  await sidebar.screenshot({ path: join(tmpdir(), 'kurlo-agent-sidebar-menu.png'), animations: 'disabled' });
+  await reviewShot(sidebar, { path: join(tmpdir(), 'kurlo-agent-sidebar-menu.png'), animations: 'disabled' });
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);
   await expect(trigger).toBeFocused();
@@ -1139,7 +1140,7 @@ test('shows a failed chat deletion in the agent sidebar', async ({ page }) => {
   await menu.getByRole('menuitem', { name: 'Delete' }).click();
   await expect(sidebar.getByRole('alert')).toHaveText('Chat storage is read-only.');
   await expect(row).toBeVisible();
-  await sidebar.screenshot({ path: join(tmpdir(), 'kurlo-agent-delete-error.png'), animations: 'disabled' });
+  await reviewShot(sidebar, { path: join(tmpdir(), 'kurlo-agent-delete-error.png'), animations: 'disabled' });
   await row.getByRole('button', { name: /Locked chat/ }).click();
   await expect(page.locator('.agent-header').getByRole('button', { name: 'Chat actions' })).toHaveCount(0);
 });

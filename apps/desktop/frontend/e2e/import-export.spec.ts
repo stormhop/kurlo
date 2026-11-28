@@ -1,4 +1,5 @@
 import { chooseRequestSection, clickTabClose, collectionRow, folderRow, openCollectionImport } from './support/actions';
+import { reviewShot } from './support/reviewShot';
 
 import { installKurloBridge, type E2EWindow } from './support/bridge';
 
@@ -168,7 +169,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(collectionRow(page, 'Billing API').getByLabel('Expand collection')).toBeVisible();
     await expect(page.getByRole('button', { name: 'GET List invoices' })).toBeHidden();
     await expect(folderRow(page, 'Invoices')).toBeHidden();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-import-collapsed.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-import-collapsed.png'), animations: 'disabled' });
     await page.evaluate(() => sessionStorage.setItem('import-collapse-store', JSON.stringify(window.__kurloE2E.store)));
     await page.reload();
     await expect(collectionRow(page, 'Billing API').getByLabel('Expand collection')).toBeVisible();
@@ -191,7 +192,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.reload();
     await expect(page.getByRole('button', { name: 'POST Create invoice' })).toBeVisible();
     await expect(folderRow(page, 'Empty folder').getByLabel('Expand folder')).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-import-expanded-restored.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-import-expanded-restored.png'), animations: 'disabled' });
 
     const store = await page.evaluate(() => window.__kurloE2E.store as {
       collections: Array<{ id: string; name: string }>;
@@ -301,7 +302,7 @@ for (const source of ['file', 'URL']) {
     await expect(servers.nth(1).getByRole('textbox', { name: 'Value' })).toHaveValue('https://sandbox.kurlo.test/secured');
     await expect(servers.nth(0).getByRole('checkbox')).toBeChecked();
     await expect(servers.nth(1).getByRole('checkbox')).not.toBeChecked();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-openapi-server-variables-${source}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-openapi-server-variables-${source}.png`), animations: 'disabled' });
     await servers.nth(0).getByRole('checkbox').uncheck();
     await servers.nth(1).getByRole('checkbox').check();
     const saveRequest = page.getByRole('button', { name: 'Save', exact: true });
@@ -399,7 +400,7 @@ test('keeps an imported OpenAPI collection in sync with its URL and applies revi
   await expect(removed.getByRole('checkbox')).not.toBeChecked();
   await review.getByRole('button', { name: /\/pets\/\{id\}/ }).click();
   await expect(review.locator('.openapi-review-field').filter({ hasText: 'Docs' })).toContainText('Returns one pet by id.');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-openapi-sync-review.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-openapi-sync-review.png'), animations: 'disabled' });
   await captureDocsScreenshot(page, 'openapi-sync-review');
   await removed.getByRole('checkbox').check();
   await review.getByRole('button', { name: 'Apply 3', exact: true }).click();
@@ -411,7 +412,7 @@ test('keeps an imported OpenAPI collection in sync with its URL and applies revi
   await expect(page.locator('.openapi-sync-status')).toContainText('In sync');
   const base = await page.evaluate(() => Object.values((window as unknown as { __openapi: { base: Record<string, string> } }).__openapi.base)[0]);
   expect(JSON.parse(base).paths['/owners']).toBeTruthy();
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-openapi-sync-panel.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-openapi-sync-panel.png'), animations: 'disabled' });
   await page.locator('.undo-toast').getByRole('button', { name: 'Dismiss' }).click();
   await expect(page.locator('.undo-toast')).toHaveCount(0);
   await captureDocsScreenshot(page, 'openapi-sync-panel');

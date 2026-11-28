@@ -1,4 +1,5 @@
 import { chooseRequestType, clickTabClose } from './support/actions';
+import { reviewShot } from './support/reviewShot';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -176,7 +177,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     }));
     const labelWidth = await first.locator('.tab-title').evaluate(node => node.clientWidth);
     expect(labelWidth).toBeGreaterThan(135);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-tabs-idle-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-tabs-idle-${testInfo.project.name}.png`), animations: 'disabled' });
 
     await first.hover();
     await expect(close).toHaveCSS('opacity', '1');
@@ -187,9 +188,9 @@ test.describe("Kurlo desktop browser E2E", () => {
       return { x, width };
     }))).toEqual(bounds);
     expect(await first.locator('.tab-title').evaluate(node => node.clientWidth)).toBe(labelWidth);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-tabs-hover-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-tabs-hover-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-tabs-hover-dark-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-tabs-hover-dark-${testInfo.project.name}.png`), animations: 'disabled' });
 
     await page.mouse.move(0, 100);
     await page.getByRole('tab', { name: 'Overview', exact: true }).focus();
@@ -246,7 +247,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(close).toHaveCSS('opacity', '1');
     await expect(close.locator('svg')).toHaveCSS('opacity', '0');
     expect(await close.evaluate(node => getComputedStyle(node, '::after').backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-tabs-unsaved-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-tabs-unsaved-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.getByRole('tab', { name: 'Overview', exact: true }).focus();
     await page.keyboard.press('End');
     await expect(close.locator('svg')).toHaveCSS('opacity', '1');
@@ -404,7 +405,7 @@ test.describe('Request toolbar and sidebar menu placement', () => {
     await expect(panel).toHaveAttribute('inert');
     expectPanelSlide(await samplePanelSlide(page, selectors), true);
     await expect(panel).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-snippet-slide-open-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-snippet-slide-open-${testInfo.project.name}.png`), animations: 'disabled' });
     await panel.getByLabel('Snippet language').click();
     await toggle.click();
     await toggle.click();
@@ -453,7 +454,7 @@ test.describe('Request toolbar and sidebar menu placement', () => {
           return { fits: send.right <= row.right + 1, sameLine: Math.abs(code.top - send.top) < 1, beforeSend: code.right <= send.left };
         });
         expect(layout).toEqual({ fits: true, sameLine: true, beforeSend: true });
-        await page.screenshot({ path: join(tmpdir(), `kurlo-snippet-${type}.png`), animations: 'disabled' });
+        await reviewShot(page, { path: join(tmpdir(), `kurlo-snippet-${type}.png`), animations: 'disabled' });
         await snippet.click();
       } else {
         await expect(snippet).toHaveCount(0);
@@ -491,7 +492,7 @@ test.describe('Request toolbar and sidebar menu placement', () => {
       await expect(page.locator('.code-snippet-panel')).toBeVisible();
       await expect(snippet).toHaveAttribute('aria-pressed', 'true');
       await assertToolbar();
-      await page.screenshot({ path: join(tmpdir(), `kurlo-snippet-url-${runtime.split('/')[0]}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-snippet-url-${runtime.split('/')[0]}.png`), animations: 'disabled' });
       await snippet.click();
       await expect(page.locator('.code-snippet-panel')).toBeHidden();
 
@@ -516,7 +517,7 @@ test.describe('Request toolbar and sidebar menu placement', () => {
             const box = node.getBoundingClientRect();
             return node.contains(document.elementFromPoint(box.left + 8, box.top + 8));
           })).toBe(true);
-          await page.screenshot({ path: join(tmpdir(), `kurlo-sidebar-menu-${runtime.split('/')[0]}-${await row.getAttribute('class')}-${rightClick}.png`), animations: 'disabled' });
+          await reviewShot(page, { path: join(tmpdir(), `kurlo-sidebar-menu-${runtime.split('/')[0]}-${await row.getAttribute('class')}-${rightClick}.png`), animations: 'disabled' });
           await page.locator('.sidebar-search input').click();
           await expect(menu).toHaveCount(0);
         }
@@ -568,7 +569,7 @@ test('closes a sidebar menu once its row scrolls out of the list, keeps it while
   await expect(menu).toBeVisible();
   await list.evaluate(node => { node.scrollTop += 4; });
   await expect(menu).toBeVisible();
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-sidebar-menu-scroll-open.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-sidebar-menu-scroll-open.png'), animations: 'disabled' });
   await list.evaluate(node => { node.scrollTop += 600; });
   await expect(page.locator('.collection-list .request-menu')).toHaveCount(0);
   await list.evaluate(node => { node.scrollTop = 0; });

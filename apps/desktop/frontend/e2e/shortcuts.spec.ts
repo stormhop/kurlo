@@ -1,4 +1,5 @@
 import { chooseRequestType, collectionRow, fillCodeEditor } from './support/actions';
+import { reviewShot } from './support/reviewShot';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -119,7 +120,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     const query = page.getByRole('button', { name: 'Query', exact: true });
     await expect(query.locator('kbd')).toHaveText('⌘↵');
     await expect(query.locator('kbd')).toBeVisible();
-    await query.screenshot({ path: join(tmpdir(), 'kurlo-graphql-query-shortcut.png') });
+    await reviewShot(query, { path: join(tmpdir(), 'kurlo-graphql-query-shortcut.png') });
     await page.getByTestId('graphql-query-editor').locator('.cm-content').press('Meta+Enter');
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.sentRequests.at(-1)?.url)).toBe('https://api.kurlo.test/graphql');
   });
@@ -149,7 +150,7 @@ test.describe("Kurlo desktop browser E2E", () => {
       await expect(primary.locator('kbd')).toHaveText('⌘↵');
       await expect(primary.locator('kbd')).toBeVisible();
       if (scenario.type === 'grpc') {
-        await primary.screenshot({ path: join(tmpdir(), 'kurlo-grpc-invoke-shortcut.png') });
+        await reviewShot(primary, { path: join(tmpdir(), 'kurlo-grpc-invoke-shortcut.png') });
         await page.getByTestId('grpc-message-editor').locator('.cm-content').press('Meta+Enter');
       } else {
         await primary.press('Meta+Enter');
@@ -200,14 +201,14 @@ test.describe("Kurlo desktop browser E2E", () => {
       await page.keyboard.press('Meta+Enter');
       if (isWebSocket) {
         await expect.poll(() => page.evaluate(() => window.__kurloE2E.webSocketMessages.map(m => m.message.data))).toEqual(['"hello"']);
-        await send.screenshot({ path: join(tmpdir(), 'kurlo-websocket-send-shortcut.png') });
+        await reviewShot(send, { path: join(tmpdir(), 'kurlo-websocket-send-shortcut.png') });
       } else {
         await expect.poll(() => page.evaluate(() => window.__kurloE2E.socketIOEmits.map(m => [m.message.eventName, m.message.args]))).toEqual([['greeting', ['"hello"']]]);
       }
       await url.focus();
       await expect(connect.locator('kbd')).toBeVisible();
       await expect(send.locator('kbd')).toBeHidden();
-      if (isWebSocket) await connect.screenshot({ path: join(tmpdir(), 'kurlo-websocket-disconnect-shortcut.png') });
+      if (isWebSocket) await reviewShot(connect, { path: join(tmpdir(), 'kurlo-websocket-disconnect-shortcut.png') });
       await page.keyboard.press('Meta+Enter');
       await expect(connect).toHaveAccessibleName('Connect');
       await expect(send).toBeDisabled();
@@ -283,7 +284,7 @@ test.describe("Kurlo desktop browser E2E", () => {
         expect(await body.evaluate(el => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(0);
       }
       await expect(settings.getByLabel('Autosave delay')).toHaveValue('1200');
-      await settings.screenshot({ path: join(tmpdir(), `kurlo-settings-general-${runtime.split('/')[0]}.png`), animations: 'disabled' });
+      await reviewShot(settings, { path: join(tmpdir(), `kurlo-settings-general-${runtime.split('/')[0]}.png`), animations: 'disabled' });
     });
   }
 });

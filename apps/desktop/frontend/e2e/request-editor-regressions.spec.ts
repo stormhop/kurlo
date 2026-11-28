@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { reviewShot } from './support/reviewShot';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { SavedRequest } from '../src/lib/types/models';
@@ -60,7 +61,7 @@ for (const scale of [1.25, 1.5]) {
     await page.getByRole('button', { name: 'Connect', exact: true }).click();
     for (let step = 0; step < (scale === 1.25 ? 2 : 3); step++) await page.keyboard.press('Meta+=');
     await expect(page.locator('html')).toHaveCSS('font-size', 16 * scale + 'px');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-socketio-send-${scale}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-socketio-send-${scale}.png`), animations: 'disabled' });
     const send = page.locator('.ws-message-send');
     await expect.poll(() => send.evaluate(button => {
       const rect = button.getBoundingClientRect();

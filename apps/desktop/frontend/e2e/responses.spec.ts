@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseRequestSection, chooseRequestType, collectionRow, fillCodeEditor, fillPrompt } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -474,7 +475,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.mouse.up();
     expect(await selected()).toContain('parseQuery');
     expect(await selected()).not.toContain('Replaced by the Auth tab');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-response-selection-warning.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-response-selection-warning.png'), animations: 'disabled' });
   });
 
   test('switches the response beside the request from the status bar', async ({ page }) => {
@@ -584,7 +585,7 @@ test.describe('Script results', () => {
     await expect(panel.locator('.test-row.fail')).toContainText('pre-request token');
     await expect(panel).toContainText('0/1 passed');
     await expect(panel).toContainText('expected "failing" to equal "passing"');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-pre-request-tests.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-pre-request-tests.png'), animations: 'disabled' });
   });
 });
 
@@ -610,7 +611,7 @@ test('surfaces script errors, console levels and pm.sendRequest calls', async ({
   await expect(banner).toContainText('Pre-request script failed: TypeError');
   const scriptsTab = page.locator('.tab-script');
   await expect(scriptsTab.locator('.badge')).toHaveText('2');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-error-banner.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-script-error-banner.png'), animations: 'disabled' });
 
   await banner.getByRole('button', { name: 'Open Scripts' }).click();
   await expect(scriptsTab).toHaveAttribute('aria-selected', 'true');
@@ -618,7 +619,7 @@ test('surfaces script errors, console levels and pm.sendRequest calls', async ({
   await expect(rows).toHaveCount(4);
   expect(await rows.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-level')))).toEqual(['log', 'request', 'warn', 'error']);
   await expect(rows.nth(3)).toContainText('login failed');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-console.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-script-console.png'), animations: 'disabled' });
 });
 
 test('keeps the script output visible when a failing pre-request script stops the send', async ({ page }) => {
@@ -646,7 +647,7 @@ test('keeps the script output visible when a failing pre-request script stops th
   const rows = output.locator('.script-log-row');
   expect(await rows.evaluateAll(nodes => nodes.map(node => node.getAttribute('data-level')))).toEqual(['log', 'warn', 'error', 'warn', 'error']);
   await expect(rows.nth(3)).toContainText('415 Unsupported Media Type');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-output-on-send-error.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-script-output-on-send-error.png'), animations: 'disabled' });
   await rows.nth(4).scrollIntoViewIfNeeded();
   await expect(rows.nth(4)).toBeInViewport();
   await expect(page.locator('.response-placeholder.error')).toHaveCSS('overflow-y', 'auto');
@@ -684,7 +685,7 @@ test('collapses long script log lines and reports dropped ones', async ({ page }
   await expect(rows.nth(3)).toHaveAttribute('data-level', 'warn');
   await expect(rows.nth(3)).toContainText('50 more log lines were not shown');
   await page.setViewportSize({ width: 1280, height: 1200 });
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-script-log-collapsed.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-script-log-collapsed.png'), animations: 'disabled' });
 
   await toggle.click();
   expect((await bigRow.locator('.log-msg').textContent())!.length).toBeGreaterThan(100000);

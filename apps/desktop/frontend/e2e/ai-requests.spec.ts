@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseRequestType, clickTabClose, fillCodeEditor } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -38,7 +39,7 @@ test.describe("Kurlo desktop browser E2E", () => {
       return { labelInside: text.right <= box.right + 0.5, labelCut: label.scrollWidth > label.clientWidth, hintInside: hint.right <= box.right + 0.5 && hint.left >= text.right - 0.5, sameLine: Math.abs(hint.top - text.top) < 4 };
     });
     expect(layout).toEqual({ labelInside: true, labelCut: true, hintInside: true, sameLine: true });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-ai-connection-long-${test.info().project.name}.png`), clip: { x: 330, y: 80, width: 670, height: 60 } });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-ai-connection-long-${test.info().project.name}.png`), clip: { x: 330, y: 80, width: 670, height: 60 } });
   });
 
   test('sends an AI request, streams the answer and shows the tool call', async ({ page }) => {
@@ -226,7 +227,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(kurloTools).not.toBeChecked();
     await kurloTools.check();
     await expect(page.getByRole('tab', { name: /^Tools/ })).toContainText('1');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-ai-kurlo-tools-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-ai-kurlo-tools-${testInfo.project.name}.png`), animations: 'disabled' });
 
     await page.getByRole('tab', { name: /^Prompt/ }).click();
     await fillCodeEditor(page, 'ai-prompt-editor', 'Which requests are saved?');

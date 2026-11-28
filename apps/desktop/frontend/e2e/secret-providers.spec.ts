@@ -1,4 +1,5 @@
 import { chooseRequestType } from './support/actions';
+import { reviewShot } from './support/reviewShot';
 import { installKurloBridge } from './support/bridge';
 import { captureDocsScreenshot } from './support/screenshots';
 import { installSecretProviderBridge } from './support/secretProviders';
@@ -6,7 +7,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const shot = (page: Page, name: string) => page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `${name}.png`), animations: 'disabled' });
+const shot = (page: Page, name: string) => reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `${name}.png`), animations: 'disabled' });
 
 async function openSecretProviders(page: Page) {
   await page.getByRole('button', { name: 'Environments', exact: true }).click();

@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseAppSelect, chooseRequestType, fillCodeEditor } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -165,7 +166,7 @@ test.describe("Kurlo desktop browser E2E", () => {
       await expect.poll(() => visibleAt(last)).toBe(true);
       expect(await trigger.evaluate(node => node.getBoundingClientRect().top)).toBe(triggerTop);
       expect(await visibleAt(menu.getByRole('searchbox', { name: 'Search saved messages' }))).toBe(true);
-      await page.screenshot({ path: join(tmpdir(), `kurlo-saved-messages-100-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-saved-messages-100-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
 
       await menu.getByRole('searchbox', { name: 'Search saved messages' }).fill('orders-42"');
       await expect(list.getByRole('listitem')).toHaveCount(1);
@@ -213,7 +214,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     });
     expect(layout).toEqual({ sideways: false, rows: true });
     await expect(menu.getByRole('button', { name: /^Load Echo order 1 for the warehouse/ })).toHaveAttribute('title', /northern distribution region/);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-saved-messages-long-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-saved-messages-long-${testInfo.project.name}.png`), animations: 'disabled' });
   });
 
   test('shows the first 100 of a longer saved message list and finds the rest by search', async ({ page }) => {
@@ -260,7 +261,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(page.locator('.status-badge')).toHaveText('SKIPPED');
     await expect(page.locator('.response-status-bar')).toContainText('Skipped by pre-request script');
     await expect(page.getByText('Request skipped before sending', { exact: true })).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-grpc-skipped.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-grpc-skipped.png'), animations: 'disabled' });
     await expect.poll(() => page.evaluate(() => (window.__kurloE2E.store.history as Array<{ status: string }>)[0]?.status)).toBe('SKIPPED');
   });
 
@@ -422,7 +423,7 @@ test.describe('GraphQL explorer', () => {
     expect(await list.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
     expect(await list.evaluate(element => element.scrollWidth > element.clientWidth), 'the field list does not scroll sideways').toBe(false);
     await list.evaluate(element => { element.scrollTop = element.scrollHeight; });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-graphql-explorer-long-${test.info().project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-graphql-explorer-long-${test.info().project.name}.png`), animations: 'disabled' });
   });
 });
 
@@ -461,7 +462,7 @@ for (const protocol of [
     const compactLabels = await sections.getByRole('option').allTextContents();
     expect(compactLabels.length).toBe(labels.length);
     expect(new Set(compactLabels).size).toBe(compactLabels.length);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-sections-${protocol.requestType}-${protocol.method}-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-sections-${protocol.requestType}-${protocol.method}-${testInfo.project.name}.png`), animations: 'disabled' });
     await sections.getByRole('option', { name: 'Vars', exact: true, selected: true }).click();
     await expect(page.getByRole('button', { name: 'Request section', exact: true })).toContainText('Vars');
   });
@@ -524,7 +525,7 @@ test('sends the client certificate with a gRPC call', async ({ page }) => {
   await certSetting.getByRole('button', { name: 'Choose file…' }).nth(1).click();
   await expect(certSetting.getByRole('textbox', { name: 'Private key path' })).toHaveValue('/certs/client.key');
   await certSetting.getByPlaceholder('Leave blank if the key is unencrypted').fill('{{keyPassword}}');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-grpc-client-cert.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-grpc-client-cert.png'), animations: 'disabled' });
 
   await page.getByRole('button', { name: 'Invoke', exact: true }).click();
   await expect.poll(() => page.evaluate(() => {
@@ -556,7 +557,7 @@ test('persists a PFX container and passphrase for gRPC without a separate key', 
   await expect(certSetting.getByPlaceholder('Leave blank if the key is unencrypted')).toHaveValue('{{pfxPassword}}');
   await certSetting.scrollIntoViewIfNeeded();
   if (docsScreenshotDir) await certSetting.screenshot({ path: join(docsScreenshotDir, 'client-certificate-pfx.png'), animations: 'disabled' });
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-pfx-client-cert.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-pfx-client-cert.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Invoke', exact: true }).click();
   await expect.poll(() => page.evaluate(() => {
     const sent = window.__kurloE2E.sentGrpcRequests.at(-1) as { clientCertPath?: string; clientKeyPath?: string; clientKeyPassword?: string } | undefined;

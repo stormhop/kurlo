@@ -1,4 +1,5 @@
 import type { E2EWindow, E2EAppBridge } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { collectionRow } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -40,7 +41,7 @@ test.describe('Audit regressions', () => {
         : area === 'collections' ? list.getByRole('button', { name: /Request 59/ })
         : list.locator('.history-entry-main').filter({ hasText: '/item/59' });
       await expect(target).toBeInViewport();
-      await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-${area}-last-row.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-${area}-last-row.png`), animations: 'disabled' });
       await target.click();
       if (area === 'environments' || area === 'switcher') await expect(page.locator('.environment-select')).toContainText('Environment 29');
       else if (area === 'collections') await expect(page.getByLabel('Request URL')).toHaveValue('https://audit.test/item/59');
@@ -159,7 +160,7 @@ test.describe('Audit regressions', () => {
       expect(sample.below).toBeGreaterThanOrEqual(Math.min(sample.contentBelow, buffer) - 1);
       expect(sample.rows).toBeLessThan(700);
     }
-    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `fling-collection-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `fling-collection-${testInfo.project.name}.png`), animations: 'disabled' });
 
     await list.evaluate((node) => {
       node.scrollTop = 0;
@@ -226,7 +227,7 @@ test.describe('Audit regressions', () => {
     await expect(page.locator('.response-status-bar .status-badge')).toContainText('200');
     await page.locator('.response-area').getByRole('tab', { name: 'Body', exact: true }).click();
     await expect(body).toContainText('alpha.test');
-    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'audit-background-response.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'audit-background-response.png'), animations: 'disabled' });
   });
 
   test('refits an open environment pin picker when its available space changes', async ({ page }) => {
@@ -244,7 +245,7 @@ test.describe('Audit regressions', () => {
     await expect(picker).toBeInViewport();
     const inside = () => menu.evaluate(node => { const rect = node.getBoundingClientRect(); const panel = node.closest('.collection-workspace')!.getBoundingClientRect(); return rect.top >= Math.max(0, panel.top) && rect.bottom <= Math.min(innerHeight, panel.bottom); });
     await expect.poll(inside).toBe(true);
-    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'audit-picker-resized.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'audit-picker-resized.png'), animations: 'disabled' });
     const list = menu.locator('.search-picker-list');
     const label = (await list.locator('.search-picker-option-label').nth(3).boundingBox())!;
     await page.mouse.move(label.x + label.width / 2, label.y + label.height / 2);
@@ -274,7 +275,7 @@ test.describe('Audit regressions', () => {
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.collections.find(item => item.id === 'audit-c')?.description)).toBe('Collection notes at 150%');
     await expect(page.locator('.overview-actions').getByRole('button', { name: 'Saved', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Revert unsaved changes', exact: true })).toBeDisabled();
-    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'audit-collection-scaled.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'audit-collection-scaled.png'), animations: 'disabled' });
   });
 });
 
@@ -293,7 +294,7 @@ test.describe('Audit followup regressions', () => {
       await page.getByRole('button', { name: 'Run 1 request', exact: true }).click();
       await expect.poll(() => page.evaluate(() => Boolean(window.__kurloE2E.store.collectionRuns?.['audit-c']))).toBe(true);
       expect(await page.evaluate(() => window.__kurloE2E.sentRequests.map(sent => sent.url))).toEqual(['https://audit.test/Alpha']);
-      await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-runner-subset-${scale}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-runner-subset-${scale}.png`), animations: 'disabled' });
     });
 
     test(`scrolls both matrix axes over a cell and saves the last value at ${scale}`, async ({ page }) => {
@@ -321,7 +322,7 @@ test.describe('Audit followup regressions', () => {
       await last.fill('matrix-edge-saved');
       await page.getByRole('button', { name: 'Save', exact: true }).click();
       await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.environments.find(env => env.id === 'e-15')!.values.find(row => row.key === 'key29')!.value)).toBe('matrix-edge-saved');
-      await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-matrix-edge-${scale}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-matrix-edge-${scale}.png`), animations: 'disabled' });
     });
   }
 
@@ -488,7 +489,7 @@ test.describe('Audit followup regressions', () => {
       else if (kind === 'sse') await expect(page.locator('.sse-panel')).toBeVisible();
       else if (kind === 'mcp') await expect(page.locator('.mcp-result-panel')).toContainText('It is 21C and clear.');
       else await expect(page.locator('.grpc-response-area')).toContainText('OK');
-      await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-background-${kind}-fixed.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `audit-background-${kind}-fixed.png`), animations: 'disabled' });
     });
   }
 });

@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseRequestSection, chooseRequestType, clickTabClose, collectionRow, fillCodeEditor, fillPrompt } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -53,7 +54,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(save).toBeDisabled();
     await dialog.getByLabel('Login user: Bearer token').fill('token-value');
     await expect(save).toHaveText('Save 1 secret');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-missing-secrets.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-missing-secrets.png'), animations: 'disabled' });
     await dialog.getByRole('button', { name: 'Later', exact: true }).click();
     await expect(dialog).toBeHidden();
   });
@@ -79,7 +80,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(notice).toContainText('workspaces/My-Workspace/workspace.yml');
     await expect(notice).toContainText("could not find expected ':'");
     await expect(page.getByRole('button', { name: 'New request', exact: true }).first()).toBeDisabled();
-    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `overview-blocked-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `overview-blocked-${testInfo.project.name}.png`), animations: 'disabled' });
     await notice.getByRole('button', { name: 'Show all issues' }).click();
     await expect(page.locator('.git-yaml-card')).toContainText('Editing is paused');
   });
@@ -419,7 +420,7 @@ test.describe('Text fields and workspace files', () => {
     await expect(menu).toBeHidden();
 
     await url.click({ button: 'right' });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-text-menu-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-text-menu-${testInfo.project.name}.png`), animations: 'disabled' });
     await menu.getByRole('menuitem', { name: /Copy/ }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.clipboard)).toBe('https://api.kurlo.test/orders');
 
@@ -484,7 +485,7 @@ test.describe('Text fields and workspace files', () => {
 
     await page.evaluate(() => { window.__kurloE2E.calls.length = 0; });
     await page.locator('.collection-request').filter({ hasText: 'List orders' }).click({ button: 'right' });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-reveal-menu-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-reveal-menu-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.locator('.request-menu').getByRole('button', { name: 'Show in Finder' }).click();
     await collectionRow(page, 'Orders API').getByLabel('Collection menu').click();
     await collectionRow(page, 'Orders API').locator('.collection-menu').getByRole('button', { name: 'Show in Finder' }).click();
@@ -611,7 +612,7 @@ test('undoes a deletion and restores items from Recently deleted', async ({ page
   await page.getByRole('dialog').getByRole('button', { name: /Delete|OK|Confirm/ }).click();
   const toast = page.locator('.undo-toast');
   await expect(toast).toContainText('Deleted collection “Billing API”');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-undo-toast-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-undo-toast-${testInfo.project.name}.png`), animations: 'disabled' });
   await toast.getByRole('button', { name: 'Undo' }).click();
   await expect(collectionRow(page, 'Billing API')).toBeVisible();
   await expect.poll(storedNames).toEqual(expect.arrayContaining(['https://api.example.test/invoices', 'https://api.example.test/refunds']));
@@ -625,7 +626,7 @@ test('undoes a deletion and restores items from Recently deleted', async ({ page
   await page.getByRole('button', { name: 'Recently deleted', exact: true }).click();
   const menu = page.getByRole('menu', { name: 'Recently deleted' });
   await expect(menu).toContainText('Billing API');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-recently-deleted-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-recently-deleted-${testInfo.project.name}.png`), animations: 'disabled' });
   if (testInfo.project.name === 'chromium') await captureDocsScreenshot(page, 'recently-deleted');
   await menu.getByRole('menuitem', { name: 'Restore collection Billing API' }).click();
   await expect(collectionRow(page, 'Billing API')).toBeVisible();
@@ -670,7 +671,7 @@ for (const scale of [1, 1.5]) {
     });
     expect(geometry).toEqual({ scrolls: true, sideways: false, fits: true });
     expect(await list.evaluate(node => getComputedStyle(node).overscrollBehaviorY)).toBe('none');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-recently-deleted-20-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-recently-deleted-20-${scale}-${testInfo.project.name}.png`), animations: 'disabled' });
 
     await list.hover();
     for (let step = 0; step < 4; step += 1) await page.mouse.wheel(0, 30000);
@@ -725,14 +726,14 @@ test('reorders requests by dragging above and below siblings and restores the sa
   await page.reload();
   await expect.poll(titles).toEqual(['Nested two', 'Nested one', 'Alpha', 'Bravo', 'Charlie', 'Outside']);
   await row('Alpha').hover();
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-reorder.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-request-reorder.png'), animations: 'disabled' });
   const transfer = await page.evaluateHandle(() => new DataTransfer());
   await row('Charlie').dispatchEvent('dragstart', { dataTransfer: transfer });
   const target = await row('Alpha').boundingBox();
   expect(target).not.toBeNull();
   await row('Alpha').dispatchEvent('dragover', { dataTransfer: transfer, clientY: target!.y + 3 });
   await expect(row('Alpha').locator('.request-drop-line.before')).toBeVisible();
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-reorder-drop.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-request-reorder-drop.png'), animations: 'disabled' });
   await row('Charlie').dispatchEvent('dragend');
   await expect(list.locator('.request-drop-line')).toHaveCount(0);
   await expect(list.locator('.collection-request-wrap.active')).toHaveCount(1);
@@ -777,7 +778,7 @@ test('reorders requests by dragging above and below siblings and restores the sa
     await expect(collectionHeader('Other').locator('.collection-menu-btn')).toHaveCSS('opacity', '0');
     await expect(folderHeader.locator('.folder-menu-btn')).toHaveCSS('opacity', '1');
     await expect(list.locator('.hovered')).toHaveCount(1);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-request-hover-after-drag.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-request-hover-after-drag.png'), animations: 'disabled' });
     await cdp.detach();
   }
 });
@@ -797,7 +798,7 @@ test('moves requests into empty and nested folders and back to the collection ro
   await request.dispatchEvent('dragstart', { dataTransfer: transfer });
   await folder('Empty').dispatchEvent('dragover', { dataTransfer: transfer });
   await expect(folder('Empty')).toHaveClass(/request-drop-target/);
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-folder-drop.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-request-folder-drop.png'), animations: 'disabled' });
   await folder('Empty').dispatchEvent('drop', { dataTransfer: transfer });
   await expect.poll(savedPath).toEqual(['Empty']);
   await request.dragTo(folder('Child'));
@@ -826,7 +827,7 @@ test('moves requests into empty and nested folders and back to the collection ro
   await folder('Empty').locator('.folder-title').dblclick();
   await expect(folderInput).toBeFocused();
   await expect(folderInput).toHaveCSS('cursor', 'text');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-folder-inline-rename.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-folder-inline-rename.png'), animations: 'disabled' });
   await folderInput.fill('Archive');
   await folderInput.press('Enter');
   await expect(folder('Archive')).toBeVisible();
@@ -853,7 +854,7 @@ test('moves requests into empty and nested folders and back to the collection ro
   await page.getByRole('dialog').getByRole('button').first().click();
   await expect(folder('Archive')).toBeVisible();
   await expect.poll(savedPath).toEqual(['Archive']);
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-folder-moved.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-request-folder-moved.png'), animations: 'disabled' });
 });
 
 test('selects several requests, drags them together and deletes and restores them as one', async ({ page }) => {
@@ -884,7 +885,7 @@ test('selects several requests, drags them together and deletes and restores the
   await row('Echo').locator('.collection-request').click({ modifiers: ['Shift'] });
   await expect.poll(selected).toEqual(['Charlie', 'Delta', 'Echo']);
   await expect(list.locator('.collection-request-wrap.active .collection-title')).toHaveText('Alpha');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-multi-select.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-request-multi-select.png'), animations: 'disabled' });
 
   await row('Delta').dragTo(row('Alpha'), { targetPosition: { x: 80, y: 3 } });
   await expect.poll(titles).toEqual(['Charlie', 'Delta', 'Echo', 'Alpha', 'Bravo', 'Zulu']);
@@ -905,7 +906,7 @@ test('selects several requests, drags them together and deletes and restores the
   await row('Delta').locator('.collection-request').click({ button: 'right' });
   const menu = page.locator('.request-batch-menu');
   await expect(menu).toContainText('3 requests');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-request-batch-menu.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-request-batch-menu.png'), animations: 'disabled' });
   await menu.getByRole('button', { name: 'Delete 3' }).click();
   await page.getByRole('dialog').getByRole('button', { name: /Delete/ }).click();
   await expect.poll(titles).toEqual(['Alpha', 'Bravo', 'Zulu']);

@@ -73,6 +73,10 @@ fixtures and UI helpers live in `e2e/support`. Run a feature on its own with
 The normal configuration already runs tests within each file in parallel.
 `00-workflows.spec.ts` runs first in serial screenshot mode: later feature tests
 refine some documentation captures from that initial walkthrough.
+Screenshots a test takes for review, saved as `kurlo-*.png` in the temporary
+directory, are written only with `KURLO_E2E_SHOTS=1`, for example
+`KURLO_E2E_SHOTS=1 npm run test:e2e -- e2e/mqtt.spec.ts --workers=2`. Use
+`reviewShot` from `e2e/support/reviewShot.ts` for new ones.
 
 Frontend unit tests live in `src/tests`. Import/export tests are grouped by format
 in `importers*.test.ts`; application integration tests use `appIntegration*.test.ts`.

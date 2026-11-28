@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { reviewShot } from './support/reviewShot';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { installKurloBridge, type E2EWindow } from './support/bridge';
@@ -50,7 +51,7 @@ test('switches preview tabs in General and filters the setting through search', 
   await expect(toggle).not.toBeChecked();
   await toggle.locator('..').click();
   await expect(toggle).toBeChecked();
-  await settings.screenshot({ path: join(tmpdir(), 'kurlo-preview-tabs-general.png'), animations: 'disabled' });
+  await reviewShot(settings, { path: join(tmpdir(), 'kurlo-preview-tabs-general.png'), animations: 'disabled' });
   await captureDocsScreenshot(page, 'settings-general');
   await settings.getByLabel('Search settings').fill('preview');
   await expect(toggle).toBeVisible();
@@ -82,7 +83,7 @@ test('replaces preview tabs, retains tab order and keeps a tab after double clic
   await expect(page.locator('.saved-request-tab.preview .tab-title')).toHaveText('Two');
   await openRequest(page, 'Four');
   await expect(requestTabs(page)).toHaveText(['One', 'Three', 'Four']);
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-preview-tabs-strip.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-preview-tabs-strip.png'), animations: 'disabled' });
 });
 
 for (const autosave of [false, true]) {
@@ -225,7 +226,7 @@ test('script editors fill resized panels and scroll throughout the available are
     await page.mouse.move(box.x + box.width / 2, box.y + box.height - 30);
     await page.mouse.wheel(0, 550);
     await expect.poll(() => scroller.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-${id}-resized.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-${id}-resized.png`), animations: 'disabled' });
     const expandedHeight = await scroller.evaluate(node => node.clientHeight);
     await dragDivider(550);
     await expect.poll(() => scroller.evaluate(node => node.clientHeight)).toBeLessThan(expandedHeight - 100);

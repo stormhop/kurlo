@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { fillPrompt } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -39,10 +40,10 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(git.locator('.storage-sync .sr-only')).toHaveText('2 commits to push · 1 to pull');
     await expect(git.locator('.storage-change-count')).toHaveText('2 changed');
     await expect(git.locator('.storage-flag')).toHaveText(['merge', 'gone']);
-    await git.screenshot({ path: join(tmpdir(), 'kurlo-status-git.png'), animations: 'disabled' });
+    await reviewShot(git, { path: join(tmpdir(), 'kurlo-status-git.png'), animations: 'disabled' });
     await page.getByRole('tab', { name: 'Overview' }).click();
     await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
-    await page.locator('.status-bar').screenshot({ path: join(tmpdir(), 'kurlo-status-git-dark.png'), animations: 'disabled' });
+    await reviewShot(page.locator('.status-bar'), { path: join(tmpdir(), 'kurlo-status-git-dark.png'), animations: 'disabled' });
   });
 
   test('Git panel commits Kurlo changes, and writes the pending edit first', async ({ page }) => {
@@ -406,7 +407,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(list.getByRole('status', { name: 'Loading older commits' }).locator('.kurlo-bird-flying')).toBeVisible();
     await expect(list.locator('.virtual-list-more')).toHaveText('');
     await list.evaluate(element => element.scrollTo(0, element.scrollHeight));
-    await list.screenshot({ path: join(tmpdir(), 'kurlo-git-history-loading.png'), animations: 'disabled' });
+    await reviewShot(list, { path: join(tmpdir(), 'kurlo-git-history-loading.png'), animations: 'disabled' });
     await expect(page.getByRole('button', { name: 'Fetch', exact: true })).toBeEnabled();
     await expect.poll(loadedOffsets).toEqual([100]);
     await expect(list.getByRole('status')).toHaveCount(0);
@@ -460,7 +461,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await list.evaluate(element => element.scrollTo(0, element.scrollHeight - 1));
     await page.waitForTimeout(300);
     expect((await calls()).length).toBe(afterFailure);
-    await list.screenshot({ path: join(tmpdir(), 'kurlo-git-history-failed.png'), animations: 'disabled' });
+    await reviewShot(list, { path: join(tmpdir(), 'kurlo-git-history-failed.png'), animations: 'disabled' });
     await failure.getByRole('button', { name: 'Retry' }).click();
     await expect(failure).toHaveCount(0);
     await expect.poll(async () => (await calls()).length).toBeGreaterThan(afterFailure);
@@ -554,7 +555,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(layout.textTop).toBeGreaterThanOrEqual(0);
     expect(layout.textBottom).toBeGreaterThanOrEqual(0);
     expect(Math.abs(layout.offset)).toBeLessThan(1);
-    await page.locator('.status-bar').screenshot({ path: join(tmpdir(), `kurlo-local-storage-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page.locator('.status-bar'), { path: join(tmpdir(), `kurlo-local-storage-${testInfo.project.name}.png`), animations: 'disabled' });
   });
 
   test('keeps the branch name and change counters of the status bar on one baseline', async ({ page }) => {
@@ -604,7 +605,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.getByRole('menuitem', { name: 'Refresh status' }).click();
     const create = page.getByRole('button', { name: 'Create PR' });
     await expect(create).toBeVisible();
-    await page.locator('.git-toolbar').screenshot({ path: join(tmpdir(), `kurlo-git-create-pr-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page.locator('.git-toolbar'), { path: join(tmpdir(), `kurlo-git-create-pr-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.evaluate(() => { window.__kurloE2E.calls.length = 0; });
     await create.click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls)).toContain('open:https://github.com/acme/api/compare/main...feature%2Forders?expand=1');

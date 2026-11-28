@@ -1,4 +1,5 @@
 import { chooseRequestType, collectionRow, fillPrompt } from './support/actions';
+import { reviewShot } from './support/reviewShot';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -31,7 +32,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
     await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
     await expect(envRow('Environment 30')).toBeInViewport();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-list-scrolled.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-environment-list-scrolled.png'), animations: 'disabled' });
 
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.getByRole('button', { name: 'History', exact: true }).click();
@@ -43,7 +44,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     for (const height of await rowHeights()) expect(Math.abs(height - noneHeight)).toBeLessThan(1);
     await page.setViewportSize({ width: 1280, height: 1000 });
     await expect(envRow('Environment 30')).toBeInViewport();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-list-resized.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-environment-list-resized.png'), animations: 'disabled' });
   });
 
   test('pins collection environments from a searchable picker instead of a full list', async ({ page }) => {
@@ -102,7 +103,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(geometry.inside).toBe(true);
     expect(geometry.scrollTop).toBe(scrollTopBefore);
     expect(geometry.overscroll).toBe('none');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-collection-environment-picker-open.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-collection-environment-picker-open.png'), animations: 'disabled' });
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(picker).toBeFocused();
@@ -120,7 +121,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(search).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(menu).toHaveCount(0);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-collection-environment-picker.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-collection-environment-picker.png'), animations: 'disabled' });
 
     const save = page.locator('.overview-actions').getByRole('button', { name: 'Save', exact: true });
     await save.click();
@@ -156,7 +157,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(await list.evaluate(node => node.scrollHeight > node.clientHeight)).toBe(true);
     await list.evaluate(node => { node.scrollTop = node.scrollHeight; });
     await expect(list.getByRole('button', { name: 'env-30' })).toBeInViewport();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-switcher-scroll.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-environment-switcher-scroll.png'), animations: 'disabled' });
 
     await search.fill('27');
     await expect(list.locator('.environment-menu-name')).toHaveText(['env-27']);
@@ -173,7 +174,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+Alt+E');
     await expect(menu.getByRole('searchbox', { name: 'Search environments' })).toBeFocused();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-switcher-active.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-environment-switcher-active.png'), animations: 'disabled' });
   });
 
   test('keeps environment selects and the matrix usable with many environments', async ({ page }) => {
@@ -201,7 +202,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(sizes.height).toBeLessThanOrEqual(20.5);
     expect(sizes.scrolls).toBe(true);
     expect(sizes.menuWidth - sizes.inputWidth).toBeLessThan(40);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-environment-parent-select.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-environment-parent-select.png'), animations: 'disabled' });
     await search.fill('05');
     await expect(menu.getByRole('option')).toHaveText(['env-05']);
     await menu.getByRole('option', { name: 'env-05' }).click();
@@ -469,7 +470,7 @@ test('marks an environment as a sandbox for the agent', async ({ page }, testInf
   await expect(workspace.locator('.env-sandbox')).toHaveText('Sandbox');
   await trigger.click();
   await expect(workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Stop treating as a sandbox' })).toHaveAttribute('aria-checked', 'true');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-sandbox-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-sandbox-${testInfo.project.name}.png`), animations: 'disabled' });
   await workspace.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Protect from AI agents' }).click();
   await expect(workspace.locator('.env-protected')).toHaveText('Protected');
   const nameField = workspace.getByLabel('Environment name');
@@ -527,7 +528,7 @@ test('dismisses environment actions outside the menu and keeps switching in the 
   await expect(menu).toHaveCount(0);
   await expect(workspace.locator('.env-protected')).toHaveText('Protected');
   await trigger.click();
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-actions-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-actions-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.locator('.environment-select').click();
   await expect(menu).toHaveCount(0);
   await page.locator('.environment-menu').getByRole('button', { name: 'Local menu test' }).click();
@@ -601,7 +602,7 @@ test('renames environments inline in the header and sidebar without a dialog', a
   })).toEqual({ id: original, active: original, value: 'https://example.test' });
   await row.focus();
   await row.press('F2');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-inline-name-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-inline-name-${testInfo.project.name}.png`), animations: 'disabled' });
   await sidebarName.press('Escape');
 });
 
@@ -615,7 +616,7 @@ test('colors an environment and shows it in the switcher, sidebar and matrix', a
   await page.getByRole('button', { name: 'More environment actions', exact: true }).click();
   const swatches = workspace.getByRole('group', { name: 'Environment color' });
   await expect(swatches.getByRole('menuitemradio', { name: 'No color' })).toHaveAttribute('aria-checked', 'true');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-color-menu-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-color-menu-${testInfo.project.name}.png`), animations: 'disabled' });
   await swatches.getByRole('menuitemradio', { name: 'Red' }).click();
   await expect(workspace.locator('.env-title-color')).toBeVisible();
   await expect(workspace.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
@@ -624,7 +625,7 @@ test('colors an environment and shows it in the switcher, sidebar and matrix', a
     return store.environments?.find(environment => environment.name === 'Production')?.color;
   });
   expect(await storedColor()).toBeUndefined();
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-color-unsaved-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-color-unsaved-${testInfo.project.name}.png`), animations: 'disabled' });
   await workspace.getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => page.evaluate(() => {
     const store = (window as any).__kurloE2E.store as { environments?: Array<{ name: string; color?: string }> };
@@ -643,10 +644,10 @@ test('colors an environment and shows it in the switcher, sidebar and matrix', a
   await page.locator('.environment-menu').getByRole('button', { name: /Production/ }).click();
   await expect(switcher).toHaveClass(/env-colored/);
   await expect(switcher).toContainText('Production');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-color-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-color-${testInfo.project.name}.png`), animations: 'disabled' });
   if (testInfo.project.name === 'chromium') await captureDocsScreenshot(page, 'environment-colors');
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-color-dark-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-color-dark-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.emulateMedia({ colorScheme: 'light' });
 
   await page.getByRole('button', { name: 'More environment actions', exact: true }).click();
@@ -675,7 +676,7 @@ test('colors an environment and shows it in the switcher, sidebar and matrix', a
   const columns = page.getByRole('dialog', { name: 'Environments in the matrix' });
   await expect(columns.locator('.env-matrix-columns-item').filter({ hasText: 'Production' }).locator('.env-color-dot')).toBeVisible();
   await expect(columns.locator('.env-matrix-columns-item').filter({ hasText: 'Staging' }).locator('.env-color-dot')).toHaveCount(0);
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-columns-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-columns-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.keyboard.press('Escape');
   await page.getByRole('radio', { name: 'Single', exact: true }).click();
   const parent = workspace.getByRole('button', { name: /^Inherits from:/ });
@@ -684,7 +685,7 @@ test('colors an environment and shows it in the switcher, sidebar and matrix', a
   await page.getByRole('option', { name: 'Production', exact: true }).click();
   await expect(parent).toHaveClass(/env-colored/);
   await expect(parent.locator('.env-color-dot')).toBeVisible();
-  await page.screenshot({ path: join(tmpdir(), `kurlo-environment-parent-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-environment-parent-${testInfo.project.name}.png`), animations: 'disabled' });
 });
 
 test('keeps a later environment page while editing a variable there', async ({ page }) => {
@@ -760,7 +761,7 @@ test('keeps the secret provider picker within the minimum window at 125% scale',
   await expect(dialog.getByRole('button', { name: 'Close dialog' })).toBeInViewport({ ratio: 1 });
   const next = dialog.getByRole('button', { name: 'Continue' });
   await expect(next).toBeInViewport({ ratio: 1 });
-  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'add-provider-125.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'add-provider-125.png'), animations: 'disabled' });
   await next.click();
   await expect(page.getByRole('heading', { name: 'New Environment variables' })).toBeVisible();
 });

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { reviewShot } from './support/reviewShot';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { agentStore, connection, installAgentBridge } from './support/agent';
@@ -55,7 +56,7 @@ for (const kind of ['http', 'graphql', 'ws', 'socketio', 'grpc', 'mcp', 'ai', 'c
       const panel = node.closest('.tab-content, .collection-workspace')!;
       return { editorBottom: node.getBoundingClientRect().bottom, panelBottom: panel.getBoundingClientRect().bottom };
     });
-    await page.screenshot({ path: join(tmpdir(), `kurlo-editor-audit-${kind}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-editor-audit-${kind}.png`), animations: 'disabled' });
     expect(geometry.panelBottom - geometry.editorBottom).toBeLessThan(50);
   });
 }
@@ -95,7 +96,7 @@ for (const kind of ['yaml', 'notes']) {
     await page.mouse.move(box.x + box.width / 2, box.y + box.height - 10);
     await page.mouse.wheel(0, 450);
     await expect.poll(() => scroller.evaluate(node => node.scrollTop)).toBeGreaterThan(100);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-editor-audit-${kind}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-editor-audit-${kind}.png`), animations: 'disabled' });
   });
 }
 
@@ -142,7 +143,7 @@ test('uses the same code font for the HTTP request and response bodies', async (
     const expected = await requestLine.evaluate((node, prop) => getComputedStyle(node).getPropertyValue(prop), property);
     await expect(responseLine).toHaveCSS(property, expected);
   }
-  await page.screenshot({ path: join(tmpdir(), `kurlo-http-body-fonts-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-http-body-fonts-${testInfo.project.name}.png`), animations: 'disabled' });
 });
 
 for (const kind of ['http', 'mcp'] as const) {
@@ -164,7 +165,7 @@ for (const kind of ['http', 'mcp'] as const) {
       await fillCodeEditor(page, 'request-body-editor', `{\n  "name": "x",\n  "age": 3,,\n${Array.from({ length: 80 }, (_, i) => `  "k${i}": ${i},`).join('\n')}\n  "ok": true\n}`);
       await page.getByTestId('request-body-editor').locator('.cm-scroller').evaluate(element => { element.scrollTop = element.scrollHeight; });
       await expect(issue).toHaveText(/^Line 3\s*Expected property name/);
-      await page.screenshot({ path: join(tmpdir(), `kurlo-editor-issue-offscreen-${test.info().project.name}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-editor-issue-offscreen-${test.info().project.name}.png`), animations: 'disabled' });
       await issue.click();
       await expect(page.locator('.cm-lineNumbers .cm-activeLineGutter')).toHaveText('3');
       await expect(issue).toBeHidden();
@@ -174,7 +175,7 @@ for (const kind of ['http', 'mcp'] as const) {
       })).toEqual({ gradient: true, decoration: 'none' });
       await page.locator('.cm-lintRange-error').first().hover();
       await expect(page.locator('.cm-tooltip-lint .cm-diagnosticSource')).toHaveText('Line 3 · JSON');
-      await page.screenshot({ path: join(tmpdir(), `kurlo-editor-issue-tooltip-${test.info().project.name}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-editor-issue-tooltip-${test.info().project.name}.png`), animations: 'disabled' });
       await fillCodeEditor(page, 'request-body-editor', '{ "ok": true }');
       await expect(issue).toBeHidden();
       await expect(page.locator('.cm-kurlo-issue-line')).toHaveCount(0);
@@ -183,7 +184,7 @@ for (const kind of ['http', 'mcp'] as const) {
       await expect(issue).toBeHidden();
       await expect(page.locator('.mcp-notice')).toHaveCount(0);
     }
-    await page.screenshot({ path: join(tmpdir(), `kurlo-editor-issue-${kind}-${test.info().project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-editor-issue-${kind}-${test.info().project.name}.png`), animations: 'disabled' });
   });
 }
 

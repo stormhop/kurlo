@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { fillCodeEditor } from './support/actions';
 
 import { agentStore, connection, installAgentBridge } from './support/agent';
@@ -77,7 +78,7 @@ test.describe("Agent", () => {
     await expect(card.locator('.agent-plan-steps li')).toHaveCount(3);
     await expect(card).toContainText('Shop API/Orders/Create order');
     await expect(card.getByRole('button', { name: 'Allow for this chat' })).toHaveCount(0);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-plan-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-plan-${testInfo.project.name}.png`), animations: 'disabled' });
     await card.getByRole('button', { name: 'Approve plan' }).click();
     await expect(page.getByText('Planned.')).toBeVisible();
     const input = await page.evaluate(() => ((window.__kurloE2E as unknown as { planSent: Array<Record<string, unknown>> }).planSent)[0]);
@@ -89,7 +90,7 @@ test.describe("Agent", () => {
     await expect(details).toContainText('2 requests');
     await expect(details).toContainText('$0.01');
     await expect(details.getByText('Context (last request)')).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-permissions-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-permissions-${testInfo.project.name}.png`), animations: 'disabled' });
   });
 
   test('adds an MCP server for the agent in Settings', async ({ page }, testInfo) => {
@@ -124,14 +125,14 @@ test.describe("Agent", () => {
     await expect(page.getByRole('region', { name: 'Codex connection' })).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Your agents' }).getByRole('button', { name: /Your agents/ })).toHaveAttribute('aria-expanded', 'false');
     await section.getByRole('button', { name: /MCP servers for the agent/ }).click();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-mcp-list-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-mcp-list-${testInfo.project.name}.png`), animations: 'disabled' });
     await section.getByRole('button', { name: 'Add MCP server' }).click();
     await section.getByRole('textbox', { name: 'Name' }).fill('GitHub');
     await section.getByRole('textbox', { name: 'URL' }).fill('https://api.githubcopilot.com/mcp/');
     await section.getByRole('textbox', { name: 'Headers' }).fill('Authorization: Bearer ghp_test');
     await section.getByRole('button', { name: 'Test' }).click();
     await expect(section).toContainText('Connected. 2 tools available.');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-mcp-settings-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-mcp-settings-${testInfo.project.name}.png`), animations: 'disabled' });
     await section.getByRole('button', { name: 'Save' }).click();
     await expect(section.getByRole('list', { name: 'Agent MCP servers' })).toContainText('GitHub');
     await expect(section.getByRole('button', { name: /MCP servers for the agent/ })).toContainText('GitHub');
@@ -176,7 +177,7 @@ test.describe("Agent", () => {
     await expect(section.getByRole('textbox', { name: 'Client ID' })).toBeVisible();
     await section.getByRole('button', { name: 'Test' }).click();
     await expect(section).toContainText('Connected. 1 tool, resources, prompts available.');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-mcp-oauth-form-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-mcp-oauth-form-${testInfo.project.name}.png`), animations: 'disabled' });
     await section.getByRole('button', { name: 'Save' }).click();
     const saved = await page.evaluate(() => (window.__kurloE2E as unknown as { mcpSaved: Record<string, unknown> }).mcpSaved);
     expect(saved).toMatchObject({ name: 'Linear', kind: 'http', auth: 'oauth', oauthClientId: '' });
@@ -186,7 +187,7 @@ test.describe("Agent", () => {
     await row.getByRole('button', { name: 'Sign in' }).click();
     await expect(row).toContainText('Signed in');
     expect(await page.evaluate(() => (window.__kurloE2E as unknown as { mcpSignIn: string }).mcpSignIn)).toBe('mcp-oauth');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-mcp-oauth-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-mcp-oauth-${testInfo.project.name}.png`), animations: 'disabled' });
     await row.getByRole('button', { name: 'Sign out' }).click();
     await expect(row).toContainText('Not signed in');
   });
@@ -557,7 +558,7 @@ test.describe("Agent", () => {
     await composer.fill(Array.from({ length: 40 }, (_, index) => `Line ${index + 1}`).join('\n'));
     await expect(composer).toHaveCSS('overflow-y', 'auto');
     expect((await composer.boundingBox())!.height).toBeLessThanOrEqual(192);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-long-prompt-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-long-prompt-${testInfo.project.name}.png`), animations: 'disabled' });
     await composer.fill('A long prompt that wraps to another line. '.repeat(12));
     await expect.poll(async () => (await composer.boundingBox())!.height).toBeGreaterThan(emptyHeight);
     await expect(composer).toHaveCSS('overflow-y', 'hidden');
@@ -664,7 +665,7 @@ test.describe("Agent", () => {
     await composer.click();
     await expect(chatMenu).toHaveAttribute('aria-expanded', 'false');
     await entry.hover();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-layout-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-layout-${testInfo.project.name}.png`), animations: 'disabled' });
     await captureDocsScreenshot(page, 'agent-chat');
 
     await expect(page.locator('.agent-user')).toHaveCSS('-webkit-user-select', 'text');
@@ -688,7 +689,7 @@ test.describe("Agent", () => {
     await headerTitle.fill('Что видишь в коллекции и как устроены запросы?');
     const expandedWidth = (await headerTitle.boundingBox())!.width;
     expect(expandedWidth).toBeGreaterThan(compactWidth);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-rename-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-rename-${testInfo.project.name}.png`), animations: 'disabled' });
     const longTitle = 'Что видишь в коллекции и как устроены запросы? '.repeat(2);
     await headerTitle.fill(longTitle);
     const cappedWidth = (await headerTitle.boundingBox())!.width;
@@ -747,7 +748,7 @@ test.describe("Agent", () => {
     const narrow = await headEdges();
     expect(narrow.newChat).toBeLessThanOrEqual(narrow.searchRight);
     expect(narrow.lists).toBeLessThan(narrow.newChatLeft);
-    await page.locator('.agent-sidebar-head').screenshot({ path: join(tmpdir(), `kurlo-agent-head-narrow-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page.locator('.agent-sidebar-head'), { path: join(tmpdir(), `kurlo-agent-head-narrow-${testInfo.project.name}.png`), animations: 'disabled' });
     await page.locator('.shell').evaluate((shell, [sidebarWidth, slideWidth]) => {
       (shell as HTMLElement).style.setProperty('--sidebar-w', sidebarWidth);
       (shell as HTMLElement).style.setProperty('--sidebar-slide-w', slideWidth);
@@ -770,7 +771,7 @@ test.describe("Agent", () => {
     await page.locator('.agent-approval').getByRole('button', { name: 'Reject' }).click();
     await expect(page.locator('.agent-user')).toHaveCount(2);
     await expect(page.locator('.agent-turn').nth(1)).toHaveCSS('border-top-width', '0px');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-agent-no-dividers-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-no-dividers-${testInfo.project.name}.png`), animations: 'disabled' });
 
     const sidebar = page.locator('.agent-sidebar');
     const rowMenu = sidebar.getByRole('button', { name: 'Chat menu' });
@@ -843,7 +844,7 @@ test('requires a fresh cookie jar approval and retries a failed response', async
   await expect(approval.getByRole('alert')).toHaveText('Decision could not be delivered. Try again.');
   await expect(approval.getByRole('button', { name: 'Clear cookies', exact: true })).toBeEnabled();
   await expect(approval).toContainText('30 minutes');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-cookie-approval-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-cookie-approval-${testInfo.project.name}.png`), animations: 'disabled' });
   await approval.getByRole('button', { name: 'Clear cookies', exact: true }).click();
   await expect(approval).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Stop the agent' })).toBeVisible();
@@ -929,7 +930,7 @@ test('connects project context and drops files onto an agent message', async ({ 
   await expect(page.getByRole('button', { name: 'Remove attachment openapi.yaml' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Remove attachment screenshot.png' })).toBeVisible();
   await composer.fill('Review the pet routes');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-context-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-context-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   const bubble = page.locator('.agent-user');
   const files = page.getByRole('list', { name: 'Attachments' });
@@ -955,7 +956,7 @@ test('connects project context and drops files onto an agent message', async ({ 
   await expect(bubble).toHaveText('Review the pet routes');
   await captureDocsScreenshot(page, 'agent-context');
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-attachments-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-attachments-${testInfo.project.name}.png`), animations: 'disabled' });
   const openImage = files.getByRole('button', { name: 'Open screenshot.png' });
   await openImage.click();
   const viewer = page.getByRole('dialog', { name: 'screenshot.png' });
@@ -964,7 +965,7 @@ test('connects project context and drops files onto an agent message', async ({ 
   const fitted = (await image.boundingBox())!.width;
   await viewer.getByRole('button', { name: 'Zoom in' }).click();
   await expect.poll(async () => (await image.boundingBox())!.width).toBeGreaterThan(fitted);
-  await page.screenshot({ path: join(tmpdir(), `kurlo-agent-attachment-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-agent-attachment-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.keyboard.press('Escape');
   await expect(viewer).toHaveCount(0);
   await expect(openImage).toBeFocused();

@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { installLongAgentHistory, visibleHistoryAnchor } from './support/agent';
 
 import { installKurloBridge } from './support/bridge';
@@ -56,7 +57,7 @@ test.describe('Codex agent connection', () => {
     await expect(connection).toContainText('user@example.test');
     await expect(connection.locator('.agent-brand-glyph')).toHaveCount(1);
     await expect(connection).not.toContainText('Cx');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-connect.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-codex-connect.png'), animations: 'disabled' });
     await captureDocsScreenshot(page, 'agent-codex-connect');
     await connection.getByRole('button', { name: 'Use this account', exact: true }).click();
     await page.getByRole('button', { name: 'Close settings' }).click();
@@ -75,7 +76,7 @@ test.describe('Codex agent connection', () => {
     await efforts.getByRole('option', { name: 'High', exact: true }).click();
     await expect(effortPicker).toHaveAccessibleName('Effort: High');
     await expect(page.getByRole('dialog', { name: 'Choose agent and model' })).toHaveCount(0);
-    await page.screenshot({ path: join(tmpdir(), `kurlo-model-effort-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-model-effort-${testInfo.project.name}.png`), animations: 'disabled' });
     await picker.click();
     const agentPanel = page.getByRole('dialog', { name: 'Choose agent and model' });
     await expect(agentPanel).toContainText('Add a model');
@@ -87,7 +88,7 @@ test.describe('Codex agent connection', () => {
     await modelSearch.fill('small');
     await expect(codexModels.getByRole('radio')).toHaveCount(1);
     expect(Math.abs(await codexModels.evaluate(element => element.getBoundingClientRect().top) - listTop)).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-agent-picker.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-agent-picker.png'), animations: 'disabled' });
     await codexModels.getByRole('radio', { name: /^Small test/ }).click();
     await expect(agentPanel).toHaveCount(0);
     await expect(picker).toHaveAccessibleName('Agent: Codex · Small test');
@@ -129,7 +130,7 @@ test.describe('Codex agent connection', () => {
     await expect(details.locator('.agent-limit-resets').first()).toContainText('resets');
     await details.getByRole('region', { name: 'Context' }).getByRole('button', { name: /^Context/ }).click();
     await expect(details).toContainText('Effort');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-chat.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-codex-chat.png'), animations: 'disabled' });
     await captureDocsScreenshot(page, 'agent-codex-chat');
     await toggle.click();
     await expect(details).toHaveCount(0);
@@ -233,7 +234,7 @@ test.describe('Codex agent connection', () => {
     await expect(connection.getByRole('textbox', { name: 'Codex executable' })).toHaveValue('/usr/local/bin/codex');
     await expect(connection.getByRole('alert')).toContainText('Could not load Codex models');
     await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeDisabled();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-model-error.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-codex-model-error.png'), animations: 'disabled' });
     await connection.getByRole('button', { name: 'Check again', exact: true }).click();
     await expect(connection.getByRole('alert')).toHaveCount(0);
     await expect(connection.getByRole('button', { name: 'Use this account', exact: true })).toBeEnabled();
@@ -273,7 +274,7 @@ test('reconnects a saved Codex connection after a routing failure and retries th
   await expect(connection.getByRole('alert')).toContainText('Could not reach the provider');
   await connection.getByText('Technical details', { exact: true }).click();
   await expect(connection.getByRole('alert')).toContainText('workspace routing discovery failed');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-codex-network-error.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-codex-network-error.png'), animations: 'disabled' });
   await connection.getByRole('button', { name: 'Reconnect', exact: true }).click();
   await expect(connection.getByRole('alert')).toHaveCount(0);
   await expect(connection.locator('.settings-pill')).toHaveText('Connected');
@@ -284,7 +285,7 @@ test('reconnects a saved Codex connection after a routing failure and retries th
   await input.press('Enter');
   await expect(page.locator('.agent-workspace').getByRole('alert')).toContainText('Could not reach the provider');
   await expect(input).toHaveValue('Check connection');
-  await page.screenshot({ path: join(tmpdir(), 'kurlo-agent-network-error.png'), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), 'kurlo-agent-network-error.png'), animations: 'disabled' });
   await page.getByRole('button', { name: 'Reconnect and retry', exact: true }).click();
   await expect(page.locator('.agent-workspace').getByRole('alert')).toContainText('Could not reach the provider');
   await expect(page.getByRole('button', { name: /^Agent:/ })).toHaveAccessibleName(/^Agent: Codex/);
@@ -332,7 +333,7 @@ test('pages and virtualizes a long Codex chat while preserving the reading posit
   const calls = await page.evaluate(() => (window.__kurloE2E as unknown as { historyRequests: Array<{ before: number; count: number }> }).historyRequests);
   expect(calls.map(call => call.before)).toEqual([-1, 19920, 19840, 19760, 19680]);
   expect(calls.every(call => call.count === 80)).toBe(true);
-  await page.screenshot({ path: join(tmpdir(), `kurlo-long-history-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-long-history-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.setViewportSize({ width: 800, height: 620 });
   await expect.poll(() => rows.count()).toBeGreaterThan(0);
   expect(await rows.count()).toBeLessThan(25);
@@ -393,7 +394,7 @@ test('shows Codex compaction, ignores unrelated events and does not jump during 
   await expect(page.getByText('Compacting context…', { exact: true })).toHaveCount(0);
   await emitCompaction(true);
   await expect(page.getByText('Compacting context…', { exact: true })).toBeVisible();
-  await page.screenshot({ path: join(tmpdir(), `kurlo-codex-compacting-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-codex-compacting-${testInfo.project.name}.png`), animations: 'disabled' });
   const chat = page.locator('.agent-main > .agent-chat');
   const movement = await chat.evaluate(async element => {
     const e2e = window.__kurloE2E as unknown as { emit: (name: string, payload: unknown) => void; longInput: { turnId: string } };

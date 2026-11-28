@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseRequestType, collectionRow, fillPrompt, folderRow } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -203,7 +204,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(rules.nth(2).locator('.loadtest-errors')).toHaveCount(0);
     await expect(rules.nth(3)).toContainText('expected status');
     await expect(editor.locator('.loadtest-step-picker .loadtest-errors')).toHaveCount(0);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-flow-field-errors.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-flow-field-errors.png'), animations: 'disabled' });
   });
 
   test('reorders load steps by dragging or with arrow keys and shows waits between them', async ({ page }) => {
@@ -248,7 +249,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(names).toHaveText(['Login', 'List items', 'Buy']);
     await expect(editor.getByRole('button', { name: 'Move step 3', exact: true })).toBeFocused();
     await expect(editor.locator('.loadtest-step-index.once')).toHaveCount(1);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-flow-timeline.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-flow-timeline.png'), animations: 'disabled' });
 
     await editor.locator('.loadtest-step-wait').click();
     await expect(editor.locator('.loadtest-inspector h2')).toHaveText('List items');
@@ -268,7 +269,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.keyboard.press('Escape');
     await expect(editor.getByRole('menu', { name: 'Run options' })).toHaveCount(0);
     await expect(editor.getByRole('button', { name: 'More run options', exact: true })).toBeFocused();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-flow-reorder.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-flow-reorder.png'), animations: 'disabled' });
   });
 
   test('keeps load-test navigation responsive during a 60000-line log flood', async ({ page }) => {
@@ -308,7 +309,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.evaluate(() => window.__kurloE2E.emit('load:progress', { running: false, stopping: false, loadTestId: 'lt-flood', collectionId: 'col-flood', startedAt: Date.now() - 10000, plannedMs: 60000, dashboardUrl: '', k6Version: 'v1.4.2', progress: { elapsedMs: 10000, vus: 0, maxVUs: 128, iterations: 10000, interrupted: 0 } }));
     await page.evaluate(() => window.__kurloE2E.emit('load:done', { loadTestId: 'lt-flood', collectionId: 'col-flood', loadTestName: 'Log flood', status: 'stopped', exitCode: 105, k6Version: 'v1.4.2', startedAt: Date.now() - 10000, finishedAt: Date.now(), hasReport: false, hasSummary: false, thresholds: [], steps: [] }));
     await expect(editor.locator('.loadrun-banner')).toContainText('Stopped before the end');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-log-flood.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-log-flood.png'), animations: 'disabled' });
   });
 
   test('keeps load parameter columns stable when a long pool error appears', async ({ page }) => {
@@ -346,7 +347,7 @@ test.describe("Kurlo desktop browser E2E", () => {
       expect(errorBounds.x).toBeGreaterThanOrEqual(before!.x - 1);
       expect(errorBounds.x + errorBounds.width).toBeLessThanOrEqual(before!.x + before!.width + 1);
       expect(errorBounds.y).toBeGreaterThanOrEqual(before!.y + before!.height);
-      await page.screenshot({ path: join(tmpdir(), `kurlo-load-pool-error-${width}.png`), animations: 'disabled' });
+      await reviewShot(page, { path: join(tmpdir(), `kurlo-load-pool-error-${width}.png`), animations: 'disabled' });
     }
   });
 
@@ -387,7 +388,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(custom).toContainText('your own settings, not a preset');
     expect((await tabs.boundingBox())!.y).toBe(top);
     await expect(editor.locator('.loadtest-problems')).toHaveCount(0);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-inline-validation.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-inline-validation.png'), animations: 'disabled' });
     await users.fill('2');
     await expect(users).toHaveAttribute('aria-invalid', 'false');
     await expect(smoke).toHaveAttribute('aria-pressed', 'true');
@@ -402,7 +403,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await editor.getByRole('tab', { name: /Flow/ }).click();
     await editor.getByRole('tab', { name: /Load & thresholds/ }).click();
     await expect(smoke).toHaveAttribute('aria-pressed', 'true');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-smoke-selected.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-smoke-selected.png'), animations: 'disabled' });
     const name = editor.getByRole('textbox', { name: 'Load test name', exact: true });
     expect((await name.boundingBox())!.width).toBeLessThanOrEqual(190);
     const headerBounds = await editor.locator('.loadtest-head').boundingBox();
@@ -429,7 +430,7 @@ test.describe("Kurlo desktop browser E2E", () => {
       const store = window.__kurloE2E.store as { collections: Array<{ id: string; loadTests: Array<{ name: string }> }> };
       return store.collections.find(collection => collection.id === 'col-profile')?.loadTests[0]?.name;
     })).toBe('Renamed load test');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-compact-header.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-compact-header.png'), animations: 'disabled' });
   });
 
   test('keeps a new load test in its own tab and asks before closing it once edited', async ({ page }) => {
@@ -453,7 +454,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.locator('.collection-request-wrap').filter({ hasText: 'List items' }).locator('.collection-request').click();
     await expect(editor).toHaveCount(0);
     await expect(tab).toContainText('Draft check');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-test-tab.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-test-tab.png'), animations: 'disabled' });
     await tab.getByRole('tab').click();
     await expect(editor.getByLabel('Load test name')).toHaveValue('Draft check');
     await tab.getByRole('button', { name: 'Close load test tab' }).click();
@@ -480,7 +481,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(tab).toHaveCount(0);
     await expect(page.locator('.collection-request-wrap').filter({ hasText: 'Smoke' })).toHaveCount(1);
     await expect(page.locator('.sidebar-loadtest-group')).toContainText('Load tests');
-    await page.locator('.sidebar-loadtest-group').screenshot({ path: join(tmpdir(), 'kurlo-load-sidebar-group.png'), animations: 'disabled' });
+    await reviewShot(page.locator('.sidebar-loadtest-group'), { path: join(tmpdir(), 'kurlo-load-sidebar-group.png'), animations: 'disabled' });
     await folderRow(page, 'Orders').getByLabel('Folder menu').click();
     await folderRow(page, 'Orders').locator('.folder-menu').getByRole('button', { name: 'New load test from folder' }).click();
     await expect(editor.locator('.loadtest-step-main')).toHaveCount(1);
@@ -518,7 +519,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(start.getByRole('button', { name: 'Add 40 requests to the flow' })).toBeEnabled();
     await start.getByRole('checkbox', { name: 'Select all 40' }).uncheck();
     await start.getByRole('checkbox', { name: 'Add Request 2', exact: true }).check();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-start-screen.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-start-screen.png'), animations: 'disabled' });
     await start.getByRole('button', { name: 'Add 1 request to the flow' }).click();
     await expect(editor.locator('.loadtest-errors')).toHaveCount(0);
     await expect(editor.locator('.loadtest-step-main')).toHaveCount(1);
@@ -541,7 +542,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     const addBounds = await add.boundingBox();
     const menuBounds = await menu.boundingBox();
     expect(menuBounds!.y + menuBounds!.height).toBeLessThanOrEqual(addBounds!.y);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-add-menu-bounds.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-add-menu-bounds.png'), animations: 'disabled' });
     await menu.getByRole('menuitem', { name: /Request 40$/ }).click();
     await expect(editor.locator('.loadtest-step-main').last()).toContainText('Request 40');
     await editor.locator('.loadtest-step-main').last().click();
@@ -552,7 +553,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await page.setViewportSize({ width: 1000, height: 540 });
     await assertContained('.loadtest-request-menu');
     expect((await editor.locator('.loadtest-step-main').last().boundingBox())!.width).toBeGreaterThan(250);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-replace-menu-bounds.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-replace-menu-bounds.png'), animations: 'disabled' });
     await replacements.getByRole('option', { name: /Request 39$/ }).click();
     await expect(editor.locator('.loadtest-step-main').last()).toContainText('Request 39');
   });
@@ -603,7 +604,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(plan.getByRole('button', { name: /issue/ })).toHaveCount(0);
     await editor.getByRole('spinbutton', { name: 'Stage 2 target', exact: true }).fill('40');
     await expect(editor.getByRole('tab', { name: /Load & thresholds/ }).locator('.loadtest-tab-issue')).toHaveCount(0);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-plan-strip.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-plan-strip.png'), animations: 'disabled' });
 
     await expect(sidebarRow.locator('.sidebar-loadtest-status')).toHaveCount(0);
     const group = page.locator('.sidebar-loadtest-group');
@@ -638,7 +639,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(sidebarRow.locator('.sidebar-loadtest-status')).toHaveClass(/running/);
     await expect(editor.getByRole('tab', { name: /Results/ })).toHaveAttribute('aria-selected', 'true');
     await expect(editor.locator('.loadrun-progress')).toContainText('Ramping up to 40 users');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-sidebar-running.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-sidebar-running.png'), animations: 'disabled' });
   });
 
   test('builds a load test from collection requests and saves it to the workspace', async ({ page }) => {
@@ -702,7 +703,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await replaceButton.click();
     const replacementMenu = editor.getByRole('listbox', { name: 'Replace request' });
     await expect(replacementMenu).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-replace-request.png'), fullPage: true, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-replace-request.png'), fullPage: true, animations: 'disabled' });
     await replacementMenu.getByRole('option', { name: /Login/ }).click();
     await expect(replacementMenu).toBeHidden();
     await expect(stepRows).toHaveCount(2);
@@ -742,7 +743,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(editor.getByRole('radio', { name: 'Next row each iteration' })).toHaveAttribute('aria-checked', 'true');
     await expect(editor.getByRole('status', { name: 'Reading test data' })).toBeHidden();
     await expect(editor.getByRole('table', { name: 'Test data preview' })).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-data-preview.png'), fullPage: true, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-data-preview.png'), fullPage: true, animations: 'disabled' });
     await editor.getByRole('textbox', { name: 'File', exact: true }).fill('data/missing.csv');
     await expect(editor.getByRole('alert')).toContainText('no such file');
     await expect(editor.getByRole('table', { name: 'Test data preview' })).toBeHidden();
@@ -785,7 +786,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(exportDialog.locator('.k6-export-command')).toHaveText('k6 run script.k6.js');
     await exportDialog.getByRole('tab', { name: 'data.json' }).click();
     await expect(exportDialog.locator('.cm-content')).toContainText('ada@shop.test');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-k6-folder-export.png'), fullPage: true, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-k6-folder-export.png'), fullPage: true, animations: 'disabled' });
     await exportDialog.getByRole('button', { name: 'Save folder…' }).click();
     await expect(exportDialog.getByRole('button', { name: 'Saved', exact: true })).toBeVisible();
     expect(await page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('SaveLoadTestK6Folder')))).toEqual([
@@ -802,7 +803,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(sidebarRow.getByRole('button', { name: 'Rename', exact: true })).toBeVisible();
     await expect(sidebarRow.getByRole('button', { name: 'Open', exact: true })).toHaveCount(0);
     await expect(sidebarRow.getByRole('button', { name: /Copy as cURL|Load test this request|^Star$/ })).toHaveCount(0);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-sidebar-menu.png'), fullPage: true, animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-sidebar-menu.png'), fullPage: true, animations: 'disabled' });
     await sidebarRow.getByRole('button', { name: 'Rename', exact: true }).click();
     await fillPrompt(page, 'Rename load test', 'Renamed load test');
     await expect(editor.getByLabel('Load test name')).toHaveValue('Renamed load test');
@@ -885,7 +886,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(editor.locator('.loadrun-bar')).toHaveAttribute('aria-valuenow', '25');
     await expect(editor.locator('.loadrun-log')).toContainText('42 complete');
     await expect(editor.getByRole('button', { name: 'Stop', exact: true })).toHaveCount(1);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-single-stop.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-single-stop.png'), animations: 'disabled' });
     await editor.getByRole('button', { name: 'Stop', exact: true }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.includes('StopLoadRun'))).toBe(true);
 
@@ -915,9 +916,9 @@ test.describe("Kurlo desktop browser E2E", () => {
     await expect(stepRows.nth(1).locator('td')).toHaveText(['Removed step', '0', '—', '—', '—', '—', '—']);
     await expect(stepRows.nth(2).locator('td').nth(2)).toHaveText('0.0 ms');
     await expect(editor.locator('.loadrun-totals')).toContainText('1,200');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-loadrun-regressions.png'), fullPage: true });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-loadrun-regressions.png'), fullPage: true });
     await stepRows.last().scrollIntoViewIfNeeded();
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-loadrun-steps.png'), fullPage: true });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-loadrun-steps.png'), fullPage: true });
     await editor.getByRole('button', { name: 'Open HTML report' }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.filter(call => call.startsWith('OpenLoadRunReport')))).toEqual([`OpenLoadRunReport:${loadTestId}`]);
     await editor.getByRole('button', { name: 'Save summary JSON' }).click();
@@ -933,7 +934,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     const badgeBounds = await banner.locator('.tag').boundingBox();
     const titleBounds = await banner.locator('strong').boundingBox();
     expect(Math.abs(badgeBounds!.y + badgeBounds!.height / 2 - titleBounds!.y - titleBounds!.height / 2)).toBeLessThan(1);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-load-stopped-alignment.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-load-stopped-alignment.png'), animations: 'disabled' });
 
   });
 });

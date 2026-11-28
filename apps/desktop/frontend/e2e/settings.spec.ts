@@ -1,4 +1,5 @@
 import { collectionRow } from './support/actions';
+import { reviewShot } from './support/reviewShot';
 
 import { installKurloBridge } from './support/bridge';
 
@@ -219,7 +220,7 @@ test.describe('Interface size', () => {
     await expect(zoom.locator('output')).toHaveText('110%');
     await expect.poll(() => rootFontSize(page)).toBe('17.6px');
     expect(await page.evaluate(() => localStorage.getItem('kurlo.uiScale.v1'))).toBe('1.1');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-settings-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-settings-zoom-${testInfo.project.name}.png`), animations: 'disabled' });
 
     await page.keyboard.press('Control+=');
     await expect(zoom.locator('output')).toHaveText('125%');

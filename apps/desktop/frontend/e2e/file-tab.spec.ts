@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { reviewShot } from './support/reviewShot';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { SavedRequest } from '../src/lib/types/models';
@@ -236,7 +237,7 @@ test('places File before Settings in wide and compact tabs and wraps long tokens
   await expect.poll(() => scroller.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(2);
   await page.locator('.file-tab').getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window.__kurloE2E as RequestFileE2EState).requestFileLastSaved?.content ?? '')).toBe(content.replace(/^ {2}/gm, '    ').replace(/\n/g, '\r\n'));
-  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-wrap-order-${test.info().project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-wrap-order-${test.info().project.name}.png`), animations: 'disabled' });
 });
 
 test('clears reverted URL edits and keeps a formatted file clean before and after saving', async ({ page }) => {
@@ -307,7 +308,7 @@ test('saves a newly created request file from the File tab and updates the reque
   await page.locator('.file-tab').getByRole('button', { name: 'Save', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.store.requests.find(request => request.name === 'Created in editor')?.url)).toBe('https://updated.kurlo.test');
   await expect.poll(() => page.evaluate(() => window.__kurloE2E.calls.some(call => call.startsWith('request-file-save:')))).toBe(true);
-  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-created-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-created-${testInfo.project.name}.png`), animations: 'disabled' });
 });
 
 test('saves the file with Cmd+S and synchronizes its request fields', async ({ page }) => {
@@ -360,7 +361,7 @@ test('keeps the request bar and YAML in sync while editing URL, method, protocol
     return [request?.name, request?.requestType, request?.method, request?.url].join('|');
   })).toBe('One|grpc|POST|localhost:50051');
   await expect.poll(() => page.evaluate(() => (window.__kurloE2E as RequestFileE2EState).requestFileLastSaved?.content ?? '')).toContain('grpcMethod: "/inventory.v1.Inventory/GetItem"');
-  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-request-bar-sync-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-request-bar-sync-${testInfo.project.name}.png`), animations: 'disabled' });
 
   await target.fill('localhost:50052');
   await expect(urlLine()).toContainText('localhost:50052');
@@ -484,7 +485,7 @@ test('keeps File controls inside a narrow side-by-side request panel', async ({ 
   const actionBounds = await page.locator('.file-tab-actions').boundingBox();
   if (!toolbarBounds || !actionBounds) throw new Error('File tab controls are not visible');
   expect(actionBounds.x + actionBounds.width).toBeLessThanOrEqual(toolbarBounds.x + toolbarBounds.width);
-  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-narrow-split-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-narrow-split-${testInfo.project.name}.png`), animations: 'disabled' });
 });
 
 test('retains invalid YAML across requests and reviews it before leaving or closing the file', async ({ page }) => {
@@ -546,7 +547,7 @@ test('checks edited fields before Save and formats the draft as one undoable edi
   await marked.hover();
   await expect(page.locator('.cm-tooltip-lint .cm-diagnosticText')).toContainText('true or false');
   await expect(file.getByRole('alert')).toHaveCount(0);
-  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `request-file-live-validation-${test.info().project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `request-file-live-validation-${test.info().project.name}.png`), animations: 'disabled' });
   const valid = invalid.replace('isPinned: nope', 'isPinned: false');
   await fillCodeEditor(page, 'request-file-editor', valid);
   await expect(marked).toHaveCount(0);
@@ -635,7 +636,7 @@ test('completes YAML fields for the selected auth type without saving the draft'
   await page.keyboard.press('Enter');
   await page.keyboard.press('Control+Space');
   await expect(options).toHaveText(['basicUser', 'basicPass']);
-  await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-auth-completion-${test.info().project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), `file-tab-auth-completion-${test.info().project.name}.png`), animations: 'disabled' });
   await page.getByRole('option', { name: 'basicUser', exact: true }).click({ timeout: 10_000 });
   await page.keyboard.type('user@example.test');
   await page.keyboard.press('Enter');

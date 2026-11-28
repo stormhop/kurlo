@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { installKurloBridge } from './support/bridge';
 
 import { expect, test } from '@playwright/test';
@@ -27,7 +28,7 @@ test('offers sign-in when a connected Claude Code CLI is signed out', async ({ p
   await expect(connection.getByLabel('Claude plan limits')).toHaveCount(0);
   await expect(panel).toContainText('Claude Code signed out');
   await expect(panel).not.toContainText('Claude Code connected');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-signed-out-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-claude-signed-out-${testInfo.project.name}.png`), animations: 'disabled' });
   await connection.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(connection.getByRole('status')).toHaveText('Connected');
   await expect(connection).toContainText('Signed in: dev@example.com · max');
@@ -85,7 +86,7 @@ test('connects Claude Code like Codex and sends a workspace chat', async ({ page
   await expect(connection.getByRole('status')).toHaveText('CLI detected');
   await expect(connection).toContainText('Claude Code CLI detected · 2.1.0 (Claude Code)');
   await expect(connection.getByRole('button', { name: 'Use this account' })).toHaveCount(0);
-  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-sign-in-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-claude-sign-in-${testInfo.project.name}.png`), animations: 'disabled' });
   await connection.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(connection.getByRole('status')).toHaveText('Signing in…');
   await page.evaluate(() => (window.__kurloE2E as unknown as { finishClaudeSignIn: () => void }).finishClaudeSignIn());
@@ -99,7 +100,7 @@ test('connects Claude Code like Codex and sends a workspace chat', async ({ page
   await expect(connection.getByRole('button', { name: 'Claude Code model: Opus 5.5' })).toBeVisible();
   await expect(connection.getByLabel('Claude plan limits')).toContainText('77% left');
   await expect(connection.locator('.claude-glyph .agent-brand-glyph')).toHaveCount(1);
-  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-settings-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-claude-settings-${testInfo.project.name}.png`), animations: 'disabled' });
   await page.getByRole('button', { name: 'Close settings' }).click();
   await picker.click();
   await page.getByRole('radio', { name: /Claude Code/ }).click();
@@ -132,7 +133,7 @@ test('connects Claude Code like Codex and sends a workspace chat', async ({ page
   await expect(details.locator('.agent-limits')).toContainText('77% left');
   await expect(details.locator('.agent-limits')).toContainText('39% left');
   await expect(details).toContainText('Shared with your other Claude Code sessions.');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-chat-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-claude-chat-${testInfo.project.name}.png`), animations: 'disabled' });
   await picker.click();
   await page.getByRole('button', { name: 'Manage connections', exact: true }).click();
   await connection.getByRole('button', { name: 'Remove connection', exact: true }).click();
@@ -181,7 +182,7 @@ test('uses discovered Claude Code models and their own effort levels', async ({ 
   await picker.click();
   await page.getByRole('radio', { name: /^Future 42/ }).click();
   await expect(effortPicker).toHaveAccessibleName('Effort: Max');
-  await page.screenshot({ path: join(tmpdir(), `kurlo-claude-discovered-models-${testInfo.project.name}.png`), animations: 'disabled' });
+  await reviewShot(page, { path: join(tmpdir(), `kurlo-claude-discovered-models-${testInfo.project.name}.png`), animations: 'disabled' });
   const composer = page.getByRole('textbox', { name: 'Message the agent' });
   await composer.fill('Check models');
   await composer.press('Enter');

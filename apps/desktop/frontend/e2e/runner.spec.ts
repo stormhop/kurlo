@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseRequestType } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -42,7 +43,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(alertBox).not.toBeNull();
     expect(alertBox!.y).toBeGreaterThanOrEqual(0);
     expect(alertBox!.y + alertBox!.height).toBeLessThanOrEqual(680);
-    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'runner-linked-secret-preflight.png'), fullPage: false, animations: 'disabled' });
+    await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'runner-linked-secret-preflight.png'), fullPage: false, animations: 'disabled' });
   });
 
   test('scrolls a runner with hundreds of requests and results without pages', async ({ page }) => {
@@ -116,7 +117,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(await body.evaluate(node => Math.round(node.scrollHeight - node.scrollTop - node.clientHeight))).toBe(0);
     await expect(runner.getByTestId('runner-request-row').last()).toContainText('Request 490');
     expect(await gaps()).toEqual([]);
-    await page.screenshot({ path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'runner-scrolled-to-end.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(process.env.KURLO_E2E_ARTIFACT_DIR ?? tmpdir(), 'runner-scrolled-to-end.png'), animations: 'disabled' });
   });
 
   test('keeps a running collection on its original environment after switching to production', async ({ page }) => {
@@ -194,7 +195,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     expect(new Set(tops).size).toBe(1);
     const [summaryBox, progressBox] = await Promise.all([summary.boundingBox(), summary.locator('.runner-progress-wrap').boundingBox()]);
     expect(progressBox!.width).toBeGreaterThan(summaryBox!.width * 0.8);
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-runner-compact.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-runner-compact.png'), animations: 'disabled' });
   });
 
   test('keeps the full saved runner verdict when result details are limited', async ({ page, browserName }) => {
@@ -227,7 +228,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await runner.getByRole('radio', { name: 'Failed 1', exact: true }).click();
     await expect(runner.getByTestId('runner-result-row')).toHaveCount(1);
     await expect(runner.getByTestId('runner-result-row')).toContainText('Failure on iteration 501');
-    await page.screenshot({ path: join(tmpdir(), `kurlo-runner-retained-failures-${browserName}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-runner-retained-failures-${browserName}.png`), animations: 'disabled' });
     await runner.getByRole('button', { name: 'Download report' }).click();
     await expect.poll(() => page.evaluate(() => window.__kurloE2E.savedFiles.length)).toBe(1);
     const report = await page.evaluate(() => window.__kurloE2E.savedFiles.at(-1)?.content ?? '');
@@ -237,7 +238,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     const reportPage = await page.context().newPage();
     await reportPage.setContent(report);
     await expect(reportPage.locator('.badge')).toHaveText('Failed');
-    await reportPage.screenshot({ path: join(tmpdir(), `kurlo-runner-retained-report-${browserName}.png`), animations: 'disabled' });
+    await reviewShot(reportPage, { path: join(tmpdir(), `kurlo-runner-retained-report-${browserName}.png`), animations: 'disabled' });
     await reportPage.close();
   });
 
@@ -274,7 +275,7 @@ test.describe("Kurlo desktop browser E2E", () => {
     await filter.getByRole('radio', { name: 'Failed 1' }).click();
     await expect(runner.getByTestId('runner-result-row')).toHaveCount(1);
     await expect(runner.getByTestId('runner-result-row')).toContainText('breaks');
-    await page.screenshot({ path: join(tmpdir(), 'kurlo-runner-failed-filter.png'), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), 'kurlo-runner-failed-filter.png'), animations: 'disabled' });
     await filter.getByRole('radio', { name: 'All 2' }).click();
     await expect(runner.getByTestId('runner-result-row')).toHaveCount(2);
   });

@@ -1,4 +1,5 @@
 import type { E2EWindow } from './support/bridge';
+import { reviewShot } from './support/reviewShot';
 import { chooseRequestType } from './support/actions';
 
 import { installKurloBridge } from './support/bridge';
@@ -250,7 +251,7 @@ test.describe('Cookie jar', () => {
     await trigger.click();
     const picker = page.getByRole('dialog', { name: 'Expires date' });
     await expect(picker).toBeVisible();
-    await page.screenshot({ path: join(tmpdir(), `kurlo-date-picker-${test.info().project.name}.png`), animations: 'disabled' });
+    await reviewShot(page, { path: join(tmpdir(), `kurlo-date-picker-${test.info().project.name}.png`), animations: 'disabled' });
     const today = await page.evaluate(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth(), d: d.getDate() }; });
     await expect(picker.locator(`[data-day="${today.y}-${today.m}-${today.d}"]`)).toBeFocused();
     await page.keyboard.press('ArrowRight');
